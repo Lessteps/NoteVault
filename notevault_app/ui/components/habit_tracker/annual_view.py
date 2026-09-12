@@ -8,7 +8,7 @@ import calendar
 from datetime import date
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
-    QGridLayout, QSizePolicy, QPushButton,
+    QGridLayout, QSizePolicy, QPushButton, QLayout,
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -211,6 +211,8 @@ class AnnualView(QWidget):
         page = QVBoxLayout(content)
         page.setContentsMargins(20, 18, 20, 20)
         page.setSpacing(0)
+        # Keep rows at their natural height; let the area scroll.
+        page.setSizeConstraint(QLayout.SetMinimumSize)
 
         card = card_frame()
         card_lay = QVBoxLayout(card)

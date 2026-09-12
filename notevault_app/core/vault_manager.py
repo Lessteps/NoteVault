@@ -6,9 +6,12 @@ Handles file tree, frontmatter, backlinks, and note CRUD.
 
 import re
 import json
+import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
+
+from . import vault_format
 
 
 class Note:
@@ -27,7 +30,12 @@ class Note:
     @property
     def raw(self) -> str:
         if self._raw is None:
-            self._raw = self.path.read_text(encoding="utf-8", errors="replace")
+            try:
+                self._raw = self.path.read_text(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                # Missing, locked or path-too-long: treat as empty rather
+                # than taking the whole explorer down.
+                self._raw = ""
         return self._raw
 
     @property
@@ -112,7 +120,23 @@ def _split_frontmatter(raw: str) -> tuple[dict, str]:
 
 # Folders owned by the app's own modules. They hold habit / exercise /
 # task / project data files and must never appear in the notes explorer.
-RESERVED_DIRS = {"habits", "ejercicio", "tareas", "proyectos"}
+RESERVED_DIRS = set(vault_format.RESERVED_DIRS)
+
+# Folders that are never notes. Without this, pointing the app at a code
+# folder tries to build a tree of tens of thousands of files.
+IGNORED_DIRS = {
+    "node_modules", "__pycache__", "site-packages", "venv", ".venv", "env",
+    "dist", "build", "target", "out", "bin", "obj", ".git", ".idea",
+    ".vscode", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".next",
+    ".gradle", ".cache", "vendor", "Lib", "Scripts",
+}
+
+# Hard ceiling so a wrong pick can never hang the app.
+MAX_SCAN_NOTES = 4000
+
+
+def is_ignored_dir(path: Path) -> bool:
+    return path.name in IGNORED_DIRS or path.name.startswith(".")
 
 
 def is_reserved(path: Path, root: Path) -> bool:
@@ -125,28 +149,107 @@ def is_reserved(path: Path, root: Path) -> bool:
     return bool(parts) and parts[0] in RESERVED_DIRS
 
 
+def migrate_vault(root: Path) -> list[str]:
+    """Move FORMAT_VERSION 1 module folders under DATA_DIR.
+
+    A file already present at the destination wins; its legacy copy is left
+    on disk rather than overwritten, so a half-synced vault cannot lose data.
+    """
+    moved: list[str] = []
+    data_root = root / vault_format.DATA_DIR
+
+    for name in vault_format.LEGACY_DIRS:
+        old = root / name
+        if not old.is_dir():
+            continue
+        new = data_root / name
+
+        if not new.exists():
+            new.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(old), str(new))
+            moved.append(name)
+            continue
+
+        for src in old.rglob("*"):
+            if not src.is_file():
+                continue
+            dest = new / src.relative_to(old)
+            if dest.exists():
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dest))
+            moved.append(src.relative_to(root).as_posix())
+
+        # Only ever removes a tree we just emptied ourselves.
+        if not any(p.is_file() for p in old.rglob("*")):
+            shutil.rmtree(old, ignore_errors=True)
+
+    return moved
+
+
 class VaultManager:
     def __init__(self, vault_root: Path):
         self.vault_root = vault_root
         self.vault_root.mkdir(parents=True, exist_ok=True)
+        migrate_vault(self.vault_root)
         self._backlink_index: dict[str, list[Path]] = {}
 
     # ── File tree ────────────────────────────────────────────────────────
 
-    def all_notes(self) -> list[Note]:
-        return [
-            Note(p, self.vault_root)
-            for p in sorted(self.vault_root.rglob("*.md"))
-            if not any(part.startswith(".") for part in p.parts)
-            and not is_reserved(p, self.vault_root)
-        ]
+    def _walk_note_paths(self, limit: int = MAX_SCAN_NOTES):
+        """Yield markdown paths, skipping module data and tooling folders."""
+        count = 0
+        stack = [self.vault_root]
+        while stack:
+            folder = stack.pop()
+            try:
+                entries = list(folder.iterdir())
+            except (OSError, ValueError):
+                continue
+            for entry in entries:
+                try:
+                    if entry.is_dir():
+                        if is_ignored_dir(entry):
+                            continue
+                        if entry.parent == self.vault_root and is_reserved(
+                                entry, self.vault_root):
+                            continue
+                        stack.append(entry)
+                    elif entry.suffix.lower() == ".md":
+                        if is_reserved(entry, self.vault_root):
+                            continue
+                        yield entry
+                        count += 1
+                        if count >= limit:
+                            return
+                except (OSError, ValueError):
+                    continue
 
-    def all_folders(self) -> list[Path]:
-        return [
-            p for p in sorted(self.vault_root.rglob("*"))
-            if p.is_dir() and not any(part.startswith(".") for part in p.parts)
-            and not is_reserved(p, self.vault_root)
-        ]
+    def all_notes(self, limit: int = MAX_SCAN_NOTES) -> list:
+        return [Note(p, self.vault_root)
+                for p in sorted(self._walk_note_paths(limit))]
+
+    def all_folders(self) -> list:
+        out = []
+        stack = [self.vault_root]
+        while stack:
+            folder = stack.pop()
+            try:
+                entries = list(folder.iterdir())
+            except (OSError, ValueError):
+                continue
+            for entry in entries:
+                try:
+                    if not entry.is_dir() or is_ignored_dir(entry):
+                        continue
+                except OSError:
+                    continue
+                if entry.parent == self.vault_root and is_reserved(
+                        entry, self.vault_root):
+                    continue
+                out.append(entry)
+                stack.append(entry)
+        return sorted(out)
 
     def tree(self) -> list[dict]:
         """Return a nested dict tree for the file explorer."""
@@ -232,14 +335,11 @@ class VaultManager:
     # ── Stats ────────────────────────────────────────────────────────────
 
     def stats(self) -> dict:
-        notes = self.all_notes()
-        folders = self.all_folders()
-        total_words = sum(n.word_count for n in notes)
-        return {
-            "notes": len(notes),
-            "folders": len(folders),
-            "words": total_words,
-        }
+        """Cheap counters: never opens a file, never raises."""
+        notes = 0
+        for _ in self._walk_note_paths():
+            notes += 1
+        return {"notes": notes, "folders": 0, "words": 0}
 
 
 def _build_tree(folder: Path, root: Path) -> list[dict]:
@@ -251,6 +351,8 @@ def _build_tree(folder: Path, root: Path) -> list[dict]:
 
     for entry in entries:
         if entry.name.startswith("."):
+            continue
+        if entry.is_dir() and entry.name in IGNORED_DIRS:
             continue
         if entry.parent == root and entry.name in RESERVED_DIRS:
             continue   # module data folders are not notes

@@ -6,7 +6,7 @@ Add, edit, delete exercises. Each exercise can have a video file path.
 from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QScrollArea, QFrame, QComboBox, QFileDialog,
+    QLineEdit, QScrollArea, QFrame, QComboBox, QFileDialog, QLayout,
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -77,6 +77,8 @@ class EjercicioManage(QWidget):
         self._page = QVBoxLayout(content)
         self._page.setContentsMargins(20, 18, 20, 20)
         self._page.setSpacing(14)
+        # Keep rows at their natural height; let the area scroll.
+        self._page.setSizeConstraint(QLayout.SetMinimumSize)
 
         scroll.setWidget(content)
         outer.addWidget(scroll)

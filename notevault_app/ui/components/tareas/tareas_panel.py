@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QStackedWidget
 from PySide6.QtCore import Signal, QTimer
 
 from ....core.task_manager import TaskManager
+from ....core import reminder_scheduler as scheduler
 from .tareas_table import TareasTable
 from .tareas_calendar import TareasCalendar
 from .tareas_reminders import TareasReminders
@@ -82,23 +83,29 @@ class TareasPanel(QWidget):
     # ── Reminder notifications ────────────────────────────────────────────
 
     def _check_reminders(self):
+        """Fire whatever the shared scheduler says is due right now.
+
+        The rules live in core.reminder_scheduler so the Android client can
+        reproduce them exactly; this method only does the Qt part.
+        """
         self.manager.tasks(force=True)
-        due = self.manager.due_reminders()
+        tasks = self.manager.tasks()
+
+        # Reminders from a period when the app was closed are marked as seen
+        # instead of arriving all at once days later.
+        for old_one in scheduler.stale(tasks):
+            self.manager.mark_reminder_shown(old_one.task_id)
+
+        due = scheduler.due_now(self.manager.tasks(force=True))
         self._emit_reminder_count()
         if not due:
             return
 
-        lines = []
-        for t in due:
-            when = t.reminder.strftime("%H:%M") if t.reminder else ""
-            subj = f" · {t.subject}" if t.subject else ""
-            limit = f" · vence {t.due.strftime('%d/%m')}" if t.due else ""
-            lines.append(f"• {t.name}{subj}{limit}  ({when})")
-            self.manager.mark_reminder_shown(t.id)
+        for reminder in due:
+            self.manager.mark_reminder_shown(reminder.task_id)
 
-        title = ("Recordatorio de tarea" if len(due) == 1
-                 else f"{len(due)} recordatorios de tareas")
-        self.notify_requested.emit(title, "\n".join(lines))
+        title, body = scheduler.summarize(due)
+        self.notify_requested.emit(title, body)
 
         self.manager.tasks(force=True)
         current = self._stack.currentIndex()

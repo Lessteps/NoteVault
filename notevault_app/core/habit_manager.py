@@ -18,6 +18,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
+from . import vault_format
+
 CONFIG_VERSION = 3
 ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
 MON_WED_FRI = [0, 2, 4]
@@ -138,8 +140,8 @@ class HabitDay:
 class HabitManager:
     def __init__(self, vault_root: Path):
         self.vault_root = vault_root
-        self.habits_dir = vault_root / "habits"
-        self._config_path = self.habits_dir / "habits_config.json"
+        self.habits_dir = vault_root / vault_format.LAYOUT["habits_dir"]
+        self._config_path = vault_root / vault_format.LAYOUT["habits_config"]
         self._habits: Optional[list] = None
         self._day_cache: dict[date, HabitDay] = {}
 

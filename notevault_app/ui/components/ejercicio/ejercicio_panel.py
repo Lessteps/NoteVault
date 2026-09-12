@@ -71,6 +71,12 @@ class EjercicioPanel(QWidget):
             self._stack.setCurrentIndex(idx)
             self._trackers[key].refresh()
 
+    def refresh_current(self):
+        idx = self._stack.currentIndex()
+        widget = self._stack.widget(idx)
+        if widget is not None and hasattr(widget, "refresh"):
+            widget.refresh()
+
     def _on_exercises_changed(self):
         self._overview.refresh()
         self._registro.refresh()

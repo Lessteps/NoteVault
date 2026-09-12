@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QGraphicsOpacityEffect
 from PySide6.QtGui import QFont, QColor
 
 from ...core.vault_manager import VaultManager, Note
+from .. import theme
 from ...config import AppConfig
 
 
@@ -210,7 +211,7 @@ class FileExplorer(QWidget):
         if data["type"] == "folder":
             item = QTreeWidgetItem(parent)
             item.setText(0, "  " + data["name"])
-            item.setForeground(0, QColor("#888895"))
+            item.setForeground(0, QColor(theme.tint("#888895")))
             font = item.font(0)
             font.setBold(True)
             font.setPointSizeF(8.5)
@@ -224,7 +225,7 @@ class FileExplorer(QWidget):
             is_active = active_path and note_path == active_path
             color = "#dcdde0" if is_active else "#888895"
             item.setText(0, "  " + data["name"])
-            item.setForeground(0, QColor(color))
+            item.setForeground(0, QColor(theme.tint(color)))
             item.setData(0, Qt.UserRole, {"type": "note", "path": note_path})
             if is_active:
                 self._tree.setCurrentItem(item)

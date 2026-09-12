@@ -8,7 +8,7 @@ import calendar
 from datetime import date
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFrame,
-    QPushButton, QScrollArea, QSizePolicy,
+    QPushButton, QScrollArea, QSizePolicy, QLayout,
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -52,6 +52,8 @@ class TareasCalendar(QWidget):
         page = QVBoxLayout(content)
         page.setContentsMargins(18, 16, 18, 18)
         page.setSpacing(10)
+        # Keep rows at their natural height; let the area scroll.
+        page.setSizeConstraint(QLayout.SetMinimumSize)
 
         # Header
         top = QHBoxLayout()

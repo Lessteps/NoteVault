@@ -129,7 +129,7 @@ QPushButton#primaryActionBtn {
     font-weight: 600;
 }
 QPushButton#primaryActionBtn:hover {
-    background-color: #ffffff;
+    background-color: #fbfbfd;
 }
 QPushButton#primaryActionBtn:disabled {
     background-color: #44444e;
@@ -610,7 +610,7 @@ QPushButton#sendBtn {
     padding: 0;
 }
 QPushButton#sendBtn:hover {
-    background-color: #ffffff;
+    background-color: #fbfbfd;
 }
 QPushButton#sendBtn:disabled {
     background-color: #44444e;
@@ -848,57 +848,9 @@ QMessageBox, QProgressDialog {
 """
 
 # ---------------------------------------------------------------------------
-# Light theme -- auto-generated from DARK_THEME_QSS by swapping every hex
-# for its warm-cream light-mode counterpart.
+# The light theme is no longer a second copy of this sheet: notevault_app.ui.
+# theme re-tints every stylesheet (this one and each panel's own) through a
+# single dark -> light colour map, so there is exactly one palette to edit.
 # ---------------------------------------------------------------------------
-import re as _re
 
-_DARK_TO_LIGHT = {
-    # Backgrounds -- darkest to lightest in the dark theme
-    "#14141a": "#f0e8d8",    # icon rail (darkest strip)
-    "#1a1a1e": "#f5efe4",    # main background
-    "#1e1e22": "#f0e8d8",    # variant
-    "#202024": "#efe7d8",    # panel bg
-    "#222228": "#eee5d5",    # slightly elevated
-    "#20202a": "#ece2d0",    # elevated dark
-    "#1a2232": "#e2ecf8",    # blue-tinted (theory card / activity bar)
-    "#1a2e1c": "#e3f0e0",    # green-tinted (pass)
-    "#2e1a1c": "#f8e2df",    # red-tinted (fail)
-    "#281e0e": "#f7ecd8",    # amber-tinted (example card)
-    "#26262e": "#e7dcc6",    # elevated
-    "#252534": "#e2d9f2",    # indigo-tinted btn base
-    "#2e2e36": "#dfd2b8",    # hover
-    "#2e2e38": "#dfd2b8",    # variant
-    "#303048": "#d6c9ef",    # indigo btn hover
-    "#303038": "#d9cdb5",    # variant
-    # Borders
-    "#33333e": "#d7c8ab",    # subtle border
-    "#44444e": "#c4b291",    # strong border
-    "#383844": "#c4b291",    # variant
-    "#505060": "#b3a081",    # focus border
-    "#4848a0": "#8f7fd8",    # indigo border
-    "#383855": "#c9bce8",    # indigo card border
-    "#585868": "#a99c81",    # disabled
-    # Text
-    "#dcdde0": "#2b2620",    # primary text
-    "#aaaaae": "#463f33",    # secondary text
-    "#888895": "#655c4c",    # dim text
-    "#666672": "#8a7f6a",    # faint text
-    # Accents and semantic colors
-    "#7c5af0": "#5548d6",    # purple accent → indigo (legible on cream)
-    "#a5b4fc": "#4c3fb0",    # light purple text
-    "#6366f1": "#5548d6",    # indigo
-    "#3fb950": "#2f8f3e",    # success green
-    "#e0a13a": "#a66f12",    # warning amber
-    "#f2555a": "#c1393e",    # danger red
-    "#ffffff": "#171310",    # extreme hover (darkest extreme on light)
-}
-
-_HEX_RE = _re.compile(r"#[0-9a-fA-F]{6}\b")
-
-
-def _retint(qss: str, mapping: dict) -> str:
-    return _HEX_RE.sub(lambda m: mapping.get(m.group(0).lower(), m.group(0)), qss)
-
-
-LIGHT_THEME_QSS = _retint(DARK_THEME_QSS, _DARK_TO_LIGHT)
+LIGHT_THEME_QSS = DARK_THEME_QSS

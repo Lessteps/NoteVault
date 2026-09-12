@@ -11,6 +11,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
+from . import vault_format
+
 # Default exercises loaded from exercise_data.py on first use
 _DEFAULT_EXERCISES_LOADED = False
 _DEFAULT_EXERCISES: list[dict] = []
@@ -62,8 +64,8 @@ class ExerciseLog:
 class ExerciseManager:
     def __init__(self, vault_root: Path):
         self.vault_root = vault_root
-        self.ejercicio_dir = vault_root / "ejercicio"
-        self._config_path = self.ejercicio_dir / "exercises.json"
+        self.ejercicio_dir = vault_root / vault_format.LAYOUT["exercise_dir"]
+        self._config_path = vault_root / vault_format.LAYOUT["exercises"]
         self._exercises: Optional[list] = None
         self._log_cache: dict[date, ExerciseLog] = {}
 

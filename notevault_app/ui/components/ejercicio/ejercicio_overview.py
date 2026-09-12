@@ -6,7 +6,7 @@ GitHub-style heatmap + per-exercise filter + summary stats.
 from datetime import date
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QFrame, QComboBox,
+    QScrollArea, QFrame, QComboBox, QLayout,
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -63,6 +63,8 @@ class EjercicioOverview(QWidget):
         self._page = QVBoxLayout(content)
         self._page.setContentsMargins(20, 18, 20, 20)
         self._page.setSpacing(14)
+        # Keep rows at their natural height; let the area scroll.
+        self._page.setSizeConstraint(QLayout.SetMinimumSize)
 
         scroll.setWidget(content)
         outer.addWidget(scroll)

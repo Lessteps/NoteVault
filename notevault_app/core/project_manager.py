@@ -30,6 +30,8 @@ from datetime import date
 from pathlib import Path
 from typing import Optional
 
+from . import vault_format
+
 P_PLANNED = "Planeado"
 P_ACTIVE  = "En curso"
 P_PAUSED  = "Pausado"
@@ -144,7 +146,7 @@ class Project:
 class ProjectManager:
     def __init__(self, vault_root: Path):
         self.vault_root = Path(vault_root)
-        self.projects_dir = self.vault_root / "proyectos"
+        self.projects_dir = self.vault_root / vault_format.LAYOUT["projects_dir"]
         self._cache: Optional[list] = None
 
     def _path(self, pid: str) -> Path:

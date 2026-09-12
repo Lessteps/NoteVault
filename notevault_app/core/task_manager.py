@@ -27,6 +27,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
+from . import vault_format
+
 STATUS_TODO   = "Sin empezar"
 STATUS_DOING  = "En progreso"
 STATUS_DONE   = "Completado"
@@ -120,7 +122,7 @@ class Task:
 class TaskManager:
     def __init__(self, vault_root: Path):
         self.vault_root = Path(vault_root)
-        self.tasks_dir = self.vault_root / "tareas"
+        self.tasks_dir = self.vault_root / vault_format.LAYOUT["tasks_dir"]
         self._cache: Optional[list] = None
 
     # ── Paths ─────────────────────────────────────────────────────────────

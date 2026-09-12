@@ -21,9 +21,13 @@ from ..core.exercise_manager import ExerciseManager
 from ..core.task_manager import TaskManager
 from ..core.project_manager import ProjectManager
 from ..core.notifier import Notifier, app_icon
-from .styles import DARK_THEME_QSS, LIGHT_THEME_QSS
+from ..core.notes_service import NotesService
+from . import theme
+from .styles import DARK_THEME_QSS
 from .components.icon_rail import IconRail
-from .components.file_explorer import FileExplorer
+from .components.notes.notes_sidebar import NotesSidebar
+from .components.notes.markdown_editor import MarkdownEditor
+from .components.notes.ai_chat_panel import AIChatPanel
 from .components.habit_tracker.habit_tracker_panel import HabitTrackerPanel
 from .components.habit_right_panel import HabitRightPanel
 from .components.habit_left_panel import HabitLeftPanel
@@ -69,11 +73,14 @@ class MainWindow(QMainWindow):
         self.exercise_mgr = ExerciseManager(vault_path)
         self.tasks       = TaskManager(vault_path)
         self.projects    = ProjectManager(vault_path)
+        self.notes       = NotesService(self.vault)
 
         self._mode = MODE_HOME
         self._navigator_width = 220
         self._inspector_width = 190
+        self._chat_width      = 340
         self._nav_anim        = None
+        self._insp_anim       = None
 
         self._init_ui()
         self._switch_mode(MODE_HOME)
@@ -81,8 +88,10 @@ class MainWindow(QMainWindow):
     # ── Build UI ──────────────────────────────────────────────────────────
 
     def _init_ui(self):
+        theme.install()
         self._theme = AppConfig.get_theme()
-        self.setStyleSheet(LIGHT_THEME_QSS if self._theme == "light" else DARK_THEME_QSS)
+        theme.set_theme(self._theme)
+        self.setStyleSheet(DARK_THEME_QSS)
 
         # ── Icon rail ─────────────────────────────────────────────────────
         self.icon_rail = IconRail()
@@ -107,7 +116,7 @@ class MainWindow(QMainWindow):
         self._left_stack.setMinimumWidth(0)
         self._left_stack.setMaximumWidth(420)
 
-        self._explorer       = FileExplorer(self.vault)
+        self._explorer       = NotesSidebar(self.vault, self.notes)
         self._explorer.vault_switch_requested.connect(self._on_vault_switch)
         self._habit_left     = HabitLeftPanel(self.habits)
         self._ejercicio_left = EjercicioLeftPanel()
@@ -128,7 +137,7 @@ class MainWindow(QMainWindow):
 
         self._habit_panel    = HabitTrackerPanel(self.habits)
         self._ejercicio_panel = EjercicioPanel(self.exercise_mgr)
-        self._notas_center   = _placeholder("Editor de notas — próximamente")
+        self._notas_center   = MarkdownEditor(self.vault, self.notes)
         self._tareas_panel   = TareasPanel(self.tasks)
         self._proj_panel     = ProyectosPanel(self.projects)
         self._dashboard      = DashboardPanel(
@@ -145,7 +154,7 @@ class MainWindow(QMainWindow):
         self._right_stack = QStackedWidget()
 
         self._habit_right  = HabitRightPanel(self.habits)
-        self._notas_right  = _placeholder("Propiedades — próximamente", "chatPanel")
+        self._notas_right  = AIChatPanel(self._notas_center)
         self._right_empty  = QWidget()
         self._right_empty.setObjectName("chatPanel")
         self._right_stack.addWidget(self._habit_right)  # 0
@@ -172,6 +181,26 @@ class MainWindow(QMainWindow):
         self._dashboard.go_proyectos.connect(lambda: self._switch_mode(MODE_PROYECTOS))
         self._dashboard.go_notas.connect(lambda: self._switch_mode(MODE_NOTAS))
 
+        # ── Notes module ──────────────────────────────────────────────
+        self._explorer.note_selected.connect(self._notas_center.open_note)
+        self._explorer.note_selected_at_line.connect(self._notas_center.open_note)
+        self._explorer.bookmarks_changed.connect(
+            self._notas_center.refresh_mentions)
+        self._notas_center.active_note_changed.connect(self._on_note_changed)
+        self._notas_center.open_note_requested.connect(
+            self._notas_center.open_note)
+        # note_saved is NOT connected to populate_tree: auto-save fires every
+        # 1.2 s and a full tree rebuild on each save would freeze the UI.
+        # New notes are added to the tree by new_note() in NotesSidebar itself.
+        self._notas_center.bookmarks_changed.connect(
+            self._explorer.refresh_bookmarks)
+        self._notas_center.assistant_toggled.connect(self.toggle_assistant)
+        self._notas_right.insert_requested.connect(
+            self._notas_center.insert_markdown)
+        self._notas_right.replace_requested.connect(
+            self._notas_center.replace_selection)
+        self._notas_right.new_note_requested.connect(self._ai_new_note)
+
         # ── Main splitter ─────────────────────────────────────────────────
         self.main_splitter = QSplitter(Qt.Horizontal)
         self.main_splitter.setChildrenCollapsible(True)
@@ -185,7 +214,7 @@ class MainWindow(QMainWindow):
         self.main_splitter.setCollapsible(2, True)
         self.main_splitter.setStretchFactor(CENTER_PANEL_INDEX, 1)
         self._right_stack.setMinimumWidth(140)
-        self._right_stack.setMaximumWidth(320)
+        self._right_stack.setMaximumWidth(520)
 
         # ── Central widget ────────────────────────────────────────────────
         central = QWidget()
@@ -268,6 +297,9 @@ class MainWindow(QMainWindow):
         total = max(self.main_splitter.width(), 900)
         left  = self._navigator_width if show_left else 0
         right = self._inspector_width if show_right else 0
+        if self._mode == MODE_NOTAS:
+            left = max(left, 250)
+            right = 340   # the assistant needs room to read
         self.main_splitter.setSizes([left, max(320, total - left - right), right])
 
     def showEvent(self, event):
@@ -305,6 +337,10 @@ class MainWindow(QMainWindow):
         if self._mode == MODE_NOTAS:
             self._animate_panel(0, "_nav_anim", "_navigator_width")
 
+    def toggle_assistant(self):
+        if self._mode == MODE_NOTAS:
+            self._animate_panel(2, "_insp_anim", "_chat_width")
+
     # ── Vault switching ───────────────────────────────────────────────────
 
     def _on_vault_switch(self, vault_path: Path):
@@ -314,7 +350,9 @@ class MainWindow(QMainWindow):
         self.exercise_mgr = ExerciseManager(vault_path)
         self.tasks        = TaskManager(vault_path)
         self.projects     = ProjectManager(vault_path)
-        self._explorer.set_vault(self.vault)
+        self.notes = NotesService(self.vault)
+        self._explorer.set_vault(self.vault, self.notes)
+        self._notas_center.set_vault(self.vault, self.notes)
         self._habit_panel.set_manager(self.habits)
         self._habit_right.set_manager(self.habits)
         self._habit_left.manager = self.habits
@@ -325,6 +363,26 @@ class MainWindow(QMainWindow):
         self._dashboard.set_managers(
             self.habits, self.exercise_mgr, self.tasks, self.projects)
         self.status_bar.showMessage(f"Vault: {vault_path.name}")
+
+    # ── Notes helpers ─────────────────────────────────────────────────────
+
+    def _on_note_changed(self, path):
+        """Keep the explorer in sync with the active editor tab."""
+        self._explorer.set_active_note(path)
+        if path is not None:
+            AppConfig.set_last_note(self.vault.vault_root, path)
+
+    def _ai_new_note(self, title: str, body: str):
+        """Turn an assistant reply into a real note next to the current one."""
+        current = self._notas_center.current_path()
+        folder = current.parent if current else self.vault.vault_root
+        note = self.notes.create_note(title, folder)
+        note.path.write_text(
+            note.raw.rstrip() + "\n\n" + body.strip() + "\n", encoding="utf-8"
+        )
+        self._explorer.populate_tree(note.path)
+        self._notas_center.open_note(note.path)
+        self.status_bar.showMessage(f"Nota creada: {note.path.name}", 5000)
 
     # ── Notifications ──────────────────────
 
@@ -351,7 +409,27 @@ class MainWindow(QMainWindow):
     def toggle_theme(self):
         self._theme = "light" if self._theme == "dark" else "dark"
         AppConfig.set_theme(self._theme)
-        self.setStyleSheet(
-            LIGHT_THEME_QSS if self._theme == "light" else DARK_THEME_QSS
-        )
+        theme.set_theme(self._theme)
+
+        # Global sheet first, then every panel's own stylesheet.
+        self.setStyleSheet(DARK_THEME_QSS)
+        theme.restyle(self)
+        self._rebuild_views()
+
         self.icon_rail.set_theme_glyph(self._theme == "dark")
+        self.status_bar.showMessage(
+            "Tema claro" if self._theme == "light" else "Tema oscuro", 4000
+        )
+
+    def _rebuild_views(self):
+        """Redraw the panels that paint their rows from Python, so the new
+        palette reaches the widgets they create on the fly."""
+        self._explorer.populate_tree()
+        self._explorer.refresh_bookmarks()
+        self._habit_panel.refresh_all()
+        self._habit_right.refresh_stats()
+        self._ejercicio_panel.refresh_current()
+        self._tareas_panel.refresh_current()
+        self._proj_left.refresh()
+        self._proj_panel.refresh()
+        self._dashboard.refresh()

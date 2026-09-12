@@ -116,6 +116,18 @@ class AppConfig:
         vault_settings["last_note"] = str(note_path)
         AppConfig._write(s)
 
+    # ── AI assistant ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def get_ai_config() -> dict:
+        return AppConfig._read().get("ai", {})
+
+    @staticmethod
+    def set_ai_config(cfg: dict):
+        s = AppConfig._read()
+        s["ai"] = cfg
+        AppConfig._write(s)
+
     # ── Window geometry ────────────────────────────────────────────────────
 
     @staticmethod

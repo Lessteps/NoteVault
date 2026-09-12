@@ -1,0 +1,118 @@
+{
+  "exercise_config": {
+    "count": 50,
+    "per_day": {
+      "domingo": 3,
+      "jueves": 10,
+      "lunes": 10,
+      "martes": 10,
+      "miercoles": 4,
+      "sabado": 3,
+      "viernes": 10
+    }
+  },
+  "exercise_day": {
+    "day_pct": 0.0,
+    "entry": {
+      "done": true,
+      "notes": "fácil",
+      "reps": 5,
+      "weight": 60.0
+    },
+    "exercise_id": "lunes_0"
+  },
+  "habit_config": {
+    "coding_subtasks": [
+      "theory",
+      "practice",
+      "review"
+    ],
+    "count": 15,
+    "haircare_days": [
+      1
+    ],
+    "hairwash_days": [
+      0,
+      2,
+      4
+    ]
+  },
+  "habit_day": {
+    "active_habit_ids": [
+      "nophone",
+      "bed",
+      "water",
+      "teeth",
+      "food",
+      "shower",
+      "gym",
+      "nofa",
+      "nomusic",
+      "reading",
+      "coding",
+      "math",
+      "language"
+    ],
+    "completed_true": [
+      "nophone"
+    ],
+    "completion_pct": 0.076923,
+    "date": "2026-09-12",
+    "journal": "Diario de ejemplo.\nSegunda línea.",
+    "subtask_coding_theory": true
+  },
+  "project": {
+    "color": "#2383e2",
+    "deadline": "2026-10-30",
+    "name": "Portafolio web",
+    "progress": 0.5,
+    "status": "En curso",
+    "steps": [
+      {
+        "done": true,
+        "due": "2026-09-14",
+        "name": "Diseñar la home"
+      },
+      {
+        "done": false,
+        "due": null,
+        "name": "Publicar"
+      }
+    ]
+  },
+  "reminder_rules": {
+    "due_now": [
+      "a"
+    ],
+    "keys": {
+      "already_shown": "task:d",
+      "due_5_min_ago": "task:a",
+      "due_in_1_hour": "task:b",
+      "in_30_days": "task:g",
+      "no_reminder": "task:f",
+      "stale_10_days": "task:c",
+      "task_completed": "task:e"
+    },
+    "now": "2026-09-12T10:00",
+    "stale": [
+      "c"
+    ],
+    "stale_after_days": 2,
+    "upcoming_14d": [
+      "b"
+    ],
+    "window_days": 14
+  },
+  "task": {
+    "body": "# Ensayo\n\n- Buscar fuentes",
+    "created": "2026-09-12",
+    "due": "2026-09-20",
+    "name": "Ensayo de historia",
+    "priority": 2,
+    "reminder": "2026-09-19T18:00",
+    "reminder_done": false,
+    "start": "2026-09-12",
+    "status": "Sin empezar",
+    "subject": "Historia"
+  }
+}

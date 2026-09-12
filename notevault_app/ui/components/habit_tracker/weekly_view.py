@@ -5,7 +5,7 @@ Notion-style table: one row per day, one column per habit.
 
 from datetime import date, timedelta
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame, QLayout,
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -54,6 +54,8 @@ class WeeklyView(QWidget):
         content.setStyleSheet(f"background:{BG_PAGE};")
         page = QVBoxLayout(content)
         page.setContentsMargins(20, 18, 20, 20)
+        # Keep rows at their natural height; let the area scroll.
+        page.setSizeConstraint(QLayout.SetMinimumSize)
 
         card = card_frame()
         card_lay = QVBoxLayout(card)

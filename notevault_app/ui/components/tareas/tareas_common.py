@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QDate
 BG_PAGE   = "#191919"
 BG_CARD   = "#1f1f1f"
 BG_ROW    = "#1c1c1c"
-BG_ROW_ALT = "#202020"
+BG_ROW_ALT = "#232323"
 BG_HEAD   = "#161616"
 BORDER    = "#2f2f2f"
 TEXT      = "#e6e6e6"

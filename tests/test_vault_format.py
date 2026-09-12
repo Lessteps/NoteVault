@@ -1,0 +1,597 @@
+"""
+Conformance tests for the vault file format.
+
+These are the tests that stop the desktop app from silently breaking the
+Android client. They do two things:
+
+  1. Assert that what the managers write matches `docs/VAULT_FORMAT.md`
+     byte for byte, for every entity.
+  2. Write the fixtures in `tests/conformance/` that the Dart port is
+     verified against, so both implementations are checked with the same
+     inputs and the same expected output.
+
+Run with:  python -m unittest discover -s tests -v
+Regenerate the fixtures with:  python tests/test_vault_format.py --write
+"""
+
+import json
+import re
+import shutil
+import sys
+import tempfile
+import unittest
+from datetime import date, datetime, timedelta
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from notevault_app.core import vault_format as fmt              # noqa: E402
+from notevault_app.core import reminder_scheduler as sched       # noqa: E402
+from notevault_app.core.habit_manager import HabitManager        # noqa: E402
+from notevault_app.core.exercise_manager import ExerciseManager  # noqa: E402
+from notevault_app.core.task_manager import (                    # noqa: E402
+    TaskManager, STATUSES, STATUS_DONE,
+)
+from notevault_app.core.project_manager import (                 # noqa: E402
+    ProjectManager, PROJECT_STATUSES, P_ACTIVE,
+)
+from notevault_app.core.vault_manager import VaultManager        # noqa: E402
+from notevault_app.core.notes_service import NotesService        # noqa: E402
+
+CONFORMANCE = Path(__file__).resolve().parent / "conformance"
+FIXED_DAY = date(2026, 9, 12)
+
+
+class VaultCase(unittest.TestCase):
+    def setUp(self):
+        self.vault = Path(tempfile.mkdtemp(prefix="nvfmt"))
+
+    def tearDown(self):
+        shutil.rmtree(self.vault, ignore_errors=True)
+
+    def read(self, rel: str) -> str:
+        return (self.vault / rel).read_text(encoding="utf-8")
+
+
+class TestLayout(VaultCase):
+    """Where each entity lands on disk."""
+
+    def test_habit_day_path(self):
+        hm = HabitManager(self.vault)
+        hm.save_day(hm.get_day(FIXED_DAY))
+        expected = fmt.LAYOUT["habits_day"].format(
+            year=2026, month=9, date="2026-09-12")
+        self.assertTrue((self.vault / expected).exists(), expected)
+
+    def test_exercise_day_path(self):
+        em = ExerciseManager(self.vault)
+        ex = em.exercises()[0]
+        em.mark_done(FIXED_DAY, ex["id"], True, 60.0, 5, "ok")
+        expected = fmt.LAYOUT["exercise_day"].format(
+            year=2026, month=9, date="2026-09-12")
+        self.assertTrue((self.vault / expected).exists(), expected)
+
+    def test_config_paths(self):
+        HabitManager(self.vault).habits()
+        ExerciseManager(self.vault).exercises()
+        self.assertTrue((self.vault / fmt.LAYOUT["habits_config"]).exists())
+        self.assertTrue((self.vault / fmt.LAYOUT["exercises"]).exists())
+
+    def test_task_and_project_ids(self):
+        task = TaskManager(self.vault).create("T")
+        project = ProjectManager(self.vault).create("P")
+        self.assertRegex(task.id, r"^t\d{8}-[0-9a-f]{6}$")
+        self.assertRegex(project.id, r"^p\d{8}-[0-9a-f]{6}$")
+
+    def test_reserved_dirs_match_the_spec(self):
+        from notevault_app.core.vault_manager import RESERVED_DIRS
+        self.assertEqual(set(RESERVED_DIRS), set(fmt.RESERVED_DIRS))
+
+    def test_every_module_writes_inside_one_folder(self):
+        """The whole point of FORMAT_VERSION 2: one folder to sync."""
+        hm = HabitManager(self.vault)
+        hm.save_day(hm.get_day(FIXED_DAY))
+        em = ExerciseManager(self.vault)
+        em.mark_done(FIXED_DAY, em.exercises()[0]["id"], True)
+        TaskManager(self.vault).create("T")
+        ProjectManager(self.vault).create("P")
+
+        roots = {p.relative_to(self.vault).parts[0]
+                 for p in self.vault.rglob("*") if p.is_file()}
+        self.assertEqual(roots, {fmt.DATA_DIR})
+
+    def test_legacy_layout_is_migrated(self):
+        from notevault_app.core.vault_manager import migrate_vault
+
+        legacy = self.vault / "habits" / "2026" / "09"
+        legacy.mkdir(parents=True)
+        (legacy / "2026-09-12.md").write_text("---\ndate: 2026-09-12\n---\n",
+                                              encoding="utf-8")
+        migrate_vault(self.vault)
+
+        self.assertFalse((self.vault / "habits").exists())
+        self.assertTrue((self.vault / fmt.DATA_DIR / "habits" / "2026" / "09"
+                         / "2026-09-12.md").exists())
+
+    def test_migration_never_overwrites(self):
+        from notevault_app.core.vault_manager import migrate_vault
+
+        current = self.vault / fmt.LAYOUT["habits_config"]
+        current.parent.mkdir(parents=True)
+        current.write_text('{"version": 3}', encoding="utf-8")
+
+        stale = self.vault / "habits"
+        stale.mkdir()
+        (stale / "habits_config.json").write_text('{"version": 1}',
+                                                  encoding="utf-8")
+        migrate_vault(self.vault)
+
+        self.assertEqual(current.read_text(encoding="utf-8"), '{"version": 3}')
+        self.assertTrue((stale / "habits_config.json").exists(),
+                        "el archivo que perdió se conserva, no se borra")
+
+
+class TestHabits(VaultCase):
+    def test_day_file_shape(self):
+        hm = HabitManager(self.vault)
+        day = hm.get_day(FIXED_DAY)
+        day.completed["nophone"] = True
+        day.set_subtask("coding", "theory", True)
+        day.journal = "Diario del día."
+        hm.save_day(day)
+
+        text = self.read(fmt.LAYOUT["habits_day"].format(
+            year=2026, month=9, date=FIXED_DAY.isoformat()))
+        self.assertTrue(text.startswith("---\n"))
+        self.assertIn(f"date: {FIXED_DAY.isoformat()}\n", text)
+        self.assertIn("completed:\n", text)
+        self.assertIn("  nophone: true\n", text)
+        self.assertIn('notes: ""\n', text)
+        self.assertIn('subtasks: {"coding": {"theory": true}}\n', text)
+        self.assertTrue(text.rstrip().endswith("Diario del día."))
+
+    def test_round_trip(self):
+        hm = HabitManager(self.vault)
+        day = hm.get_day(FIXED_DAY)
+        day.completed["bed"] = True
+        day.set_subtask("coding", "practice", True)
+        day.journal = "línea 1\nlínea 2"
+        hm.save_day(day)
+
+        fresh = HabitManager(self.vault).get_day(FIXED_DAY)
+        self.assertTrue(fresh.completed.get("bed"))
+        self.assertTrue(fresh.subtask_done("coding", "practice"))
+        self.assertEqual(fresh.journal, "línea 1\nlínea 2")
+
+    def test_config_version_and_weekdays(self):
+        hm = HabitManager(self.vault)
+        hm.habits()
+        cfg = json.loads(self.read(fmt.LAYOUT["habits_config"]))
+        self.assertIn("version", cfg)
+        self.assertIn("habits", cfg)
+        hairwash = next(h for h in cfg["habits"] if h["id"] == "hairwash")
+        self.assertEqual(hairwash["days"], [0, 2, 4], "0 = lunes")
+
+    def test_percentage_uses_only_that_weekday(self):
+        hm = HabitManager(self.vault)
+        monday = FIXED_DAY - timedelta(days=FIXED_DAY.weekday())
+        day = hm.get_day(monday)
+        for h in hm.habits_for_day(monday):
+            day.completed[h["id"]] = True
+        hm.save_day(day)
+        hm._day_cache.clear()
+        self.assertAlmostEqual(HabitManager(self.vault).day_pct(monday), 1.0)
+
+
+class TestExercise(VaultCase):
+    def test_day_log_shape(self):
+        em = ExerciseManager(self.vault)
+        ex = em.exercises()[0]
+        em.mark_done(FIXED_DAY, ex["id"], True, 60.0, 5, "fácil")
+        data = json.loads(self.read(fmt.LAYOUT["exercise_day"].format(
+            year=2026, month=9, date=FIXED_DAY.isoformat())))
+        self.assertEqual(
+            data[ex["id"]],
+            {"done": True, "weight": 60.0, "reps": 5, "notes": "fácil"},
+        )
+
+    def test_day_keys_have_no_accents(self):
+        em = ExerciseManager(self.vault)
+        days = {e["day"] for e in em.exercises()}
+        self.assertTrue(days.issubset(set(fmt.WEEKDAY_KEYS)), days)
+
+    def test_every_routine_ends_in_stretching(self):
+        em = ExerciseManager(self.vault)
+        for key in fmt.WEEKDAY_KEYS:
+            names = [e["name"].lower() for e in em.exercises_for_day(key)]
+            self.assertTrue(
+                any(n.startswith("estiramiento") for n in names),
+                f"{key} sin estiramientos",
+            )
+
+
+class TestTasks(VaultCase):
+    def test_frontmatter_keys_and_order(self):
+        tm = TaskManager(self.vault)
+        task = tm.create("Ensayo", subject="Historia", due=FIXED_DAY,
+                         start=FIXED_DAY, priority=2,
+                         reminder=datetime(2026, 9, 11, 18, 0))
+        text = self.read(fmt.LAYOUT["task"].format(id=task.id))
+        keys = re.findall(r"^([a-z_]+):", text, re.M)
+        self.assertEqual(keys, list(fmt.TASK_KEYS))
+
+    def test_field_encoding(self):
+        tm = TaskManager(self.vault)
+        task = tm.create("Ensayo", subject="Historia", due=FIXED_DAY,
+                         reminder=datetime(2026, 9, 11, 18, 0))
+        text = self.read(fmt.LAYOUT["task"].format(id=task.id))
+        self.assertIn('name: "Ensayo"\n', text)
+        self.assertIn("due: 2026-09-12\n", text)
+        self.assertIn("reminder: 2026-09-11T18:00\n", text)
+        self.assertIn("reminder_done: false\n", text)
+        self.assertIn("start: \n", text, "una fecha vacía deja la clave sola")
+
+    def test_statuses_match_the_spec(self):
+        self.assertEqual(tuple(STATUSES), fmt.TASK_STATUSES)
+
+    def test_round_trip_with_body(self):
+        tm = TaskManager(self.vault)
+        task = tm.create("Ensayo")
+        tm.update(task.id, body="# Título\n\n- punto")
+        fresh = TaskManager(self.vault).get(task.id)
+        self.assertEqual(fresh.body, "# Título\n\n- punto")
+
+
+class TestProjects(VaultCase):
+    def test_checklist_shape(self):
+        pm = ProjectManager(self.vault)
+        p = pm.create("Portafolio", status=P_ACTIVE)
+        pm.add_step(p.id, "Diseñar la home", FIXED_DAY)
+        pm.add_step(p.id, "Publicar", None)
+        pm.set_step(p.id, 0, done=True)
+
+        text = self.read(fmt.LAYOUT["project"].format(id=p.id))
+        self.assertIn("## Tareas\n", text)
+        self.assertIn("- [x] Diseñar la home | 2026-09-12\n", text)
+        self.assertIn("- [ ] Publicar\n", text)
+
+    def test_statuses_match_the_spec(self):
+        self.assertEqual(tuple(PROJECT_STATUSES), fmt.PROJECT_STATUSES)
+
+    def test_progress_is_derived_not_stored(self):
+        pm = ProjectManager(self.vault)
+        p = pm.create("P")
+        pm.add_step(p.id, "a")
+        pm.add_step(p.id, "b")
+        pm.set_step(p.id, 0, done=True)
+        text = self.read(fmt.LAYOUT["project"].format(id=p.id))
+        self.assertNotIn("progress", text)
+        self.assertAlmostEqual(ProjectManager(self.vault).get(p.id).progress, 0.5)
+
+
+class TestBookmarks(VaultCase):
+    def test_relative_posix_paths(self):
+        (self.vault / "1.PERSONAL").mkdir()
+        note = self.vault / "1.PERSONAL" / "Nota.md"
+        note.write_text("# Nota\n", encoding="utf-8")
+        svc = NotesService(VaultManager(self.vault))
+        svc.toggle_bookmark(note)
+        data = json.loads(self.read(fmt.BOOKMARKS_FILE))
+        self.assertEqual(data, ["1.PERSONAL/Nota.md"])
+
+
+class TestSyncSafety(VaultCase):
+    """The properties that make two devices safe on one folder."""
+
+    def test_only_three_global_files(self):
+        hm = HabitManager(self.vault)
+        hm.habits()
+        hm.save_day(hm.get_day(FIXED_DAY))
+        em = ExerciseManager(self.vault)
+        em.mark_done(FIXED_DAY, em.exercises()[0]["id"], True)
+        TaskManager(self.vault).create("T")
+        ProjectManager(self.vault).create("P")
+
+        globals_found = set()
+        for path in self.vault.rglob("*"):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(self.vault).as_posix()
+            if not re.search(r"\d{4}-\d{2}-\d{2}", rel) and \
+                    not re.search(r"/[tp]\d{8}-[0-9a-f]{6}\.md$", "/" + rel):
+                globals_found.add(rel)
+        self.assertEqual(
+            globals_found,
+            {fmt.LAYOUT["habits_config"], fmt.LAYOUT["exercises"]},
+            "un archivo global nuevo es un punto de conflicto entre dispositivos",
+        )
+
+    def test_conflict_marker_detected(self):
+        self.assertTrue(fmt.is_sync_conflict(
+            "Ejercicio.sync-conflict-20260818-210816-NDAI2SO.md"))
+        self.assertFalse(fmt.is_sync_conflict("Ejercicio.md"))
+
+
+class TestReminderRules(VaultCase):
+    """The rules the Android client has to reproduce exactly."""
+
+    def _task(self, tm, **kw):
+        return tm.create("Tarea", **kw)
+
+    def test_due_now_fires_once(self):
+        tm = TaskManager(self.vault)
+        now = datetime(2026, 9, 12, 10, 0)
+        self._task(tm, reminder=now - timedelta(minutes=5))
+        due = sched.due_now(tm.tasks(force=True), now)
+        self.assertEqual(len(due), 1)
+
+        tm.mark_reminder_shown(due[0].task_id)
+        self.assertEqual(sched.due_now(tm.tasks(force=True), now), [])
+
+    def test_future_reminder_does_not_fire(self):
+        tm = TaskManager(self.vault)
+        now = datetime(2026, 9, 12, 10, 0)
+        self._task(tm, reminder=now + timedelta(hours=1))
+        self.assertEqual(sched.due_now(tm.tasks(force=True), now), [])
+
+    def test_stale_reminders_are_skipped(self):
+        tm = TaskManager(self.vault)
+        now = datetime(2026, 9, 12, 10, 0)
+        self._task(tm, reminder=now - timedelta(days=10))
+        tasks = tm.tasks(force=True)
+        self.assertEqual(sched.due_now(tasks, now), [])
+        self.assertEqual(len(sched.stale(tasks, now)), 1)
+
+    def test_completed_task_never_reminds(self):
+        tm = TaskManager(self.vault)
+        now = datetime(2026, 9, 12, 10, 0)
+        t = self._task(tm, reminder=now - timedelta(minutes=5))
+        tm.update(t.id, status=STATUS_DONE)
+        self.assertEqual(sched.due_now(tm.tasks(force=True), now), [])
+
+    def test_upcoming_is_bounded(self):
+        tm = TaskManager(self.vault)
+        now = datetime(2026, 9, 12, 10, 0)
+        for i in range(1, 40):
+            self._task(tm, reminder=now + timedelta(hours=i))
+        upcoming = sched.upcoming(tm.tasks(force=True), now, limit=10)
+        self.assertEqual(len(upcoming), 10)
+        self.assertEqual(upcoming, sorted(upcoming, key=lambda r: r.when))
+
+    def test_upcoming_respects_the_window(self):
+        tm = TaskManager(self.vault)
+        now = datetime(2026, 9, 12, 10, 0)
+        self._task(tm, reminder=now + timedelta(days=30))
+        self.assertEqual(
+            sched.upcoming(tm.tasks(force=True), now,
+                           window=timedelta(days=14)), [])
+
+    def test_notification_key_is_stable(self):
+        tm = TaskManager(self.vault)
+        now = datetime(2026, 9, 12, 10, 0)
+        t = self._task(tm, reminder=now + timedelta(hours=1))
+        r = sched.build(TaskManager(self.vault).get(t.id), now)
+        self.assertEqual(r.key, f"task:{t.id}")
+
+    def test_summary_wording(self):
+        tm = TaskManager(self.vault)
+        now = datetime(2026, 9, 12, 10, 0)
+        self._task(tm, reminder=now - timedelta(minutes=1))
+        due = sched.due_now(tm.tasks(force=True), now)
+        title, body = sched.summarize(due)
+        self.assertEqual(title, "Recordatorio de tarea")
+        self.assertTrue(body.startswith("• "))
+
+
+class TestExpectedFixture(unittest.TestCase):
+    """EXPECTED.json must keep matching what the code actually produces."""
+
+    def test_fixture_is_current(self):
+        path = CONFORMANCE / "EXPECTED.json"
+        if not path.exists():
+            self.skipTest("ejecuta: python tests/test_vault_format.py --write")
+        stored = json.loads(path.read_text(encoding="utf-8"))
+
+        vault = Path(tempfile.mkdtemp(prefix="nvexp"))
+        try:
+            task_id, project_id = _build_sample(vault)
+            fresh = expected_values(vault, task_id, project_id)
+        finally:
+            shutil.rmtree(vault, ignore_errors=True)
+
+        fresh = json.loads(json.dumps(fresh, sort_keys=True))
+        for section in sorted(stored):
+            self.assertEqual(
+                fresh.get(section), stored[section],
+                "«" + section + "» cambió: actualiza docs/VAULT_FORMAT.md y "
+                "regenera con --write",
+            )
+
+
+def _build_sample(vault) -> tuple:
+    """The canonical sample vault used by the fixture and by its guard."""
+    hm = HabitManager(vault)
+    day = hm.get_day(FIXED_DAY)
+    day.completed["nophone"] = True
+    day.completed["bed"] = False
+    day.set_subtask("coding", "theory", True)
+    day.journal = "Diario de ejemplo.\nSegunda línea."
+    hm.save_day(day)
+
+    em = ExerciseManager(vault)
+    em.mark_done(FIXED_DAY, em.exercises()[0]["id"], True, 60.0, 5, "fácil")
+
+    tm = TaskManager(vault)
+    task = tm.create("Ensayo de historia", subject="Historia",
+                     due=date(2026, 9, 20), start=FIXED_DAY, priority=2,
+                     reminder=datetime(2026, 9, 19, 18, 0))
+    tm.update(task.id, body="# Ensayo\n\n- Buscar fuentes\n")
+
+    pm = ProjectManager(vault)
+    project = pm.create("Portafolio web", status=P_ACTIVE,
+                        deadline=date(2026, 10, 30))
+    pm.add_step(project.id, "Diseñar la home", date(2026, 9, 14))
+    pm.add_step(project.id, "Publicar", None)
+    pm.set_step(project.id, 0, done=True)
+    return task.id, project.id
+
+
+# ── Fixture generation ────────────────────────────────────────────────────
+
+def write_fixtures():
+    """Emit the files the Dart port is verified against.
+
+    The directory is rebuilt from scratch: leaving files from an older layout
+    behind would have the Dart port verified against paths that no longer
+    exist.
+    """
+    shutil.rmtree(CONFORMANCE, ignore_errors=True)
+    CONFORMANCE.mkdir(parents=True, exist_ok=True)
+    vault = Path(tempfile.mkdtemp(prefix="nvfixture"))
+    task_id, project_id = _build_sample(vault)
+    task = TaskManager(vault).get(task_id)
+    project = ProjectManager(vault).get(project_id)
+
+    manifest = {}
+    for path in sorted(vault.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(vault).as_posix()
+        # Ids carry a random suffix; normalise so the fixture is stable.
+        stable = rel.replace(task.id, "TASK_ID").replace(project.id, "PROJECT_ID")
+        body = path.read_text(encoding="utf-8")
+        body = body.replace(task.id, "TASK_ID").replace(project.id, "PROJECT_ID")
+        target = CONFORMANCE / stable
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(body, encoding="utf-8")
+        manifest[stable] = len(body)
+
+    (CONFORMANCE / "MANIFEST.json").write_text(
+        json.dumps({"format_version": fmt.FORMAT_VERSION,
+                    "generated_for": FIXED_DAY.isoformat(),
+                    "files": manifest}, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    # What a correct parser must get out of those bytes. The Dart port is
+    # asserted against this file, so both implementations are held to the
+    # same expected values instead of to each other's behaviour.
+    (CONFORMANCE / "EXPECTED.json").write_text(
+        json.dumps(expected_values(vault, task.id, project.id),
+                   indent=2, ensure_ascii=False, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    shutil.rmtree(vault, ignore_errors=True)
+    print(f"{len(manifest)} ficheros + EXPECTED.json en {CONFORMANCE}")
+
+
+def expected_values(vault, task_id: str, project_id: str) -> dict:
+    """Parse the fixtures with the real managers and record the results."""
+    hm = HabitManager(vault)
+    day = hm.get_day(FIXED_DAY)
+    habits = hm.habits()
+
+    em = ExerciseManager(vault)
+    log = em.get_log(FIXED_DAY)
+    first_ex = em.exercises()[0]
+
+    task = TaskManager(vault).get(task_id)
+    project = ProjectManager(vault).get(project_id)
+
+    return {
+        "habit_day": {
+            "date": FIXED_DAY.isoformat(),
+            "completed_true": sorted(k for k, v in day.completed.items() if v),
+            "journal": day.journal,
+            "subtask_coding_theory": day.subtask_done("coding", "theory"),
+            "active_habit_ids": [h["id"] for h in hm.habits_for_day(FIXED_DAY)],
+            "completion_pct": round(day.completion_pct(habits), 6),
+        },
+        "habit_config": {
+            "count": len(habits),
+            "hairwash_days": next(h["days"] for h in habits if h["id"] == "hairwash"),
+            "haircare_days": next(h["days"] for h in habits if h["id"] == "haircare"),
+            "coding_subtasks": [s["id"] for h in habits if h["id"] == "coding"
+                                for s in h["subtasks"]],
+        },
+        "exercise_day": {
+            "exercise_id": first_ex["id"],
+            "entry": log.entries[first_ex["id"]],
+            "day_pct": round(em.day_pct(FIXED_DAY), 6),
+        },
+        "exercise_config": {
+            "count": len(em.exercises()),
+            "per_day": {k: len(em.exercises_for_day(k)) for k in fmt.WEEKDAY_KEYS},
+        },
+        "task": {
+            "name": task.name,
+            "subject": task.subject,
+            "status": task.status,
+            "priority": task.priority,
+            "created": task.created.isoformat(),
+            "start": task.start.isoformat() if task.start else None,
+            "due": task.due.isoformat() if task.due else None,
+            "reminder": task.reminder.isoformat(timespec="minutes"),
+            "reminder_done": task.reminder_done,
+            "body": task.body,
+        },
+        "project": {
+            "name": project.name,
+            "status": project.status,
+            "color": project.color,
+            "deadline": project.deadline.isoformat(),
+            "steps": [
+                {"name": s.name, "done": s.done,
+                 "due": s.due.isoformat() if s.due else None}
+                for s in project.steps
+            ],
+            "progress": round(project.progress, 6),
+        },
+        "reminder_rules": _reminder_expectations(),
+    }
+
+
+class _FakeTask:
+    """Minimal stand-in so the rules can be exercised without files."""
+
+    def __init__(self, tid, reminder, done=False, is_done=False):
+        self.id = tid
+        self.reminder = reminder
+        self.reminder_done = done
+        self.is_done = is_done
+        self.name = tid
+        self.subject = ""
+        self.due = None
+
+
+def _reminder_expectations() -> dict:
+    """Table-driven cases the Dart scheduler must reproduce exactly."""
+    now = datetime(2026, 9, 12, 10, 0)
+    cases = {
+        "due_5_min_ago":  _FakeTask("a", now - timedelta(minutes=5)),
+        "due_in_1_hour":  _FakeTask("b", now + timedelta(hours=1)),
+        "stale_10_days":  _FakeTask("c", now - timedelta(days=10)),
+        "already_shown":  _FakeTask("d", now - timedelta(minutes=5), done=True),
+        "task_completed": _FakeTask("e", now - timedelta(minutes=5), is_done=True),
+        "no_reminder":    _FakeTask("f", None),
+        "in_30_days":     _FakeTask("g", now + timedelta(days=30)),
+    }
+    tasks = list(cases.values())
+    return {
+        "now": now.isoformat(timespec="minutes"),
+        "stale_after_days": sched.STALE_AFTER.days,
+        "window_days": sched.DEFAULT_WINDOW.days,
+        "due_now": [r.task_id for r in sched.due_now(tasks, now)],
+        "stale": [r.task_id for r in sched.stale(tasks, now)],
+        "upcoming_14d": [r.task_id for r in sched.upcoming(tasks, now)],
+        "keys": {name: "task:" + t.id for name, t in cases.items()},
+    }
+
+
+if __name__ == "__main__":
+    if "--write" in sys.argv:
+        write_fixtures()
+    else:
+        unittest.main()

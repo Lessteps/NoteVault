@@ -1,0 +1,48 @@
+# ── Build artifacts ──────────────────────────────────────────────
+build/
+dist/
+*.spec.bak
+# Compiled thin launcher (rebuilt with: python -m PyInstaller ...)
+SDD_Studio.exe
+
+# ── Python cache ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environments ──────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── App runtime state (user-specific, not source) ─────────────────
+.sdd/
+proyectos/
+*.db
+*.sqlite
+
+# ── Obsidian workspace (machine-specific) ────────────────────────
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# ── IDE / editor ─────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*~
+
+# ── OS noise ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Secrets / keys ───────────────────────────────────────────────
+.env
+*.key
+api_keys.json
+
+# ── Logs ─────────────────────────────────────────────────────────
+*.log
+logs/

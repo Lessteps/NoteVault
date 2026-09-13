@@ -219,6 +219,29 @@ Lista de rutas relativas a la raíz de la vault, con `/` como separador:
 ["1.PERSONAL/3.Exercise/Ejercicio.md"]
 ```
 
+## Adjuntos
+
+Una imagen o un video que se pega o arrastra dentro de una nota se **copia** a
+una carpeta `attachments` junto a esa nota, y se enlaza con una ruta relativa a
+la nota:
+
+```
+1.PERSONAL/Estudio/
+├── Sesion Frontend.md          ![](attachments/diagrama.png)
+└── attachments/
+    ├── diagrama.png
+    └── demo.mp4
+```
+
+- Nunca se sobrescribe un adjunto existente: un nombre repetido pasa a
+  `diagrama 1.png`.
+- La sintaxis de Obsidian `![[archivo.png]]` también se lee: se busca junto a
+  la nota, luego en su `attachments/`, luego en la raíz de la vault y por último
+  por nombre en toda la vault. Al guardar se conserva tal cual.
+- `attachments` no se muestra en el explorador de notas.
+- Imágenes: png, jpg, jpeg, gif, webp, bmp, svg. Videos: mp4, mov, webm, mkv,
+  m4v, avi. Cualquier otro archivo se enlaza como `[nombre](attachments/nombre)`.
+
 ## Notas
 
 Cualquier `.md` fuera de las carpetas reservadas. Se respeta el frontmatter

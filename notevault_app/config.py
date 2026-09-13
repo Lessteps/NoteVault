@@ -116,6 +116,40 @@ class AppConfig:
         vault_settings["last_note"] = str(note_path)
         AppConfig._write(s)
 
+    @staticmethod
+    def get_pinned_tabs(vault: Path) -> list[Path]:
+        """Pinned editor tabs for this vault that still exist, in order."""
+        s = AppConfig._read()
+        rels = s.get("vaults", {}).get(str(vault), {}).get("pinned_tabs", [])
+        out = []
+        for rel in rels:
+            candidate = Path(vault) / rel
+            if candidate.exists():
+                out.append(candidate)
+        return out
+
+    @staticmethod
+    def set_pinned_tabs(vault: Path, paths: list):
+        rels = []
+        for p in paths:
+            try:
+                rels.append(Path(p).relative_to(vault).as_posix())
+            except ValueError:
+                continue
+        s = AppConfig._read()
+        s.setdefault("vaults", {}).setdefault(str(vault), {})["pinned_tabs"] = rels
+        AppConfig._write(s)
+
+    @staticmethod
+    def get_assistant_visible() -> bool:
+        return AppConfig._read().get("assistant_visible", True)
+
+    @staticmethod
+    def set_assistant_visible(visible: bool):
+        s = AppConfig._read()
+        s["assistant_visible"] = bool(visible)
+        AppConfig._write(s)
+
     # ── AI assistant ───────────────────────────────────────────────────────
 
     @staticmethod

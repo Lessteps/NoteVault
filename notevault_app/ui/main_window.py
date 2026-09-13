@@ -81,6 +81,7 @@ class MainWindow(QMainWindow):
         self._chat_width      = 340
         self._nav_anim        = None
         self._insp_anim       = None
+        self._assistant_visible = AppConfig.get_assistant_visible()
 
         self._init_ui()
         self._switch_mode(MODE_HOME)
@@ -195,6 +196,9 @@ class MainWindow(QMainWindow):
         self._notas_center.bookmarks_changed.connect(
             self._explorer.refresh_bookmarks)
         self._notas_center.assistant_toggled.connect(self.toggle_assistant)
+        self._notas_center.set_assistant_visible(self._assistant_visible)
+        self._notas_center.reveal_requested.connect(self._reveal_in_explorer)
+        self._notas_right.close_requested.connect(self.toggle_assistant)
         self._notas_right.insert_requested.connect(
             self._notas_center.insert_markdown)
         self._notas_right.replace_requested.connect(
@@ -289,7 +293,8 @@ class MainWindow(QMainWindow):
     def _apply_mode_layout(self):
         show_left  = self._mode in (MODE_HABITS, MODE_NOTAS, MODE_EJERCICIO,
                                     MODE_PROYECTOS, MODE_TAREAS)
-        show_right = self._mode in (MODE_HABITS, MODE_NOTAS)
+        show_right = (self._mode == MODE_HABITS
+                      or (self._mode == MODE_NOTAS and self._assistant_visible))
 
         self._left_stack.setVisible(show_left)
         self._right_stack.setVisible(show_right)
@@ -299,7 +304,7 @@ class MainWindow(QMainWindow):
         right = self._inspector_width if show_right else 0
         if self._mode == MODE_NOTAS:
             left = max(left, 250)
-            right = 340   # the assistant needs room to read
+            right = self._chat_width if show_right else 0
         self.main_splitter.setSizes([left, max(320, total - left - right), right])
 
     def showEvent(self, event):
@@ -338,8 +343,26 @@ class MainWindow(QMainWindow):
             self._animate_panel(0, "_nav_anim", "_navigator_width")
 
     def toggle_assistant(self):
+        """Show or hide the AI panel in Notas, and remember the choice.
+
+        Visibility is toggled instead of animating the splitter to zero: the
+        panel has a minimum width, so shrinking it by size stopped at that
+        minimum and the button appeared to do nothing.
+        """
+        if self._mode != MODE_NOTAS:
+            return
+        if self._assistant_visible:
+            width = self.main_splitter.sizes()[2]
+            if width > 0:
+                self._chat_width = width
+        self._assistant_visible = not self._assistant_visible
+        AppConfig.set_assistant_visible(self._assistant_visible)
+        self._notas_center.set_assistant_visible(self._assistant_visible)
+        self._apply_mode_layout()
+
+    def _reveal_in_explorer(self, path: Path):
         if self._mode == MODE_NOTAS:
-            self._animate_panel(2, "_insp_anim", "_chat_width")
+            self._explorer.reveal(path)
 
     # ── Vault switching ───────────────────────────────────────────────────
 

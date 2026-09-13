@@ -267,6 +267,7 @@ class AIChatPanel(QWidget):
     insert_requested  = Signal(str)   # markdown to drop into the note
     replace_requested = Signal(str)
     new_note_requested = Signal(str, str)   # (title, body)
+    close_requested   = Signal()
 
     def __init__(self, editor_ref=None, parent=None):
         super().__init__(parent)
@@ -312,6 +313,10 @@ class AIChatPanel(QWidget):
         clear.setFixedWidth(28)
         clear.clicked.connect(self.clear_chat)
         h.addWidget(clear)
+        close = _btn("✕", "Cerrar el asistente")
+        close.setFixedWidth(28)
+        close.clicked.connect(self.close_requested.emit)
+        h.addWidget(close)
         root.addWidget(head)
 
         # Provider line

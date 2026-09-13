@@ -14,23 +14,31 @@ from .vault_manager import (
     VaultManager, Note, is_reserved, is_ignored_dir, MAX_SCAN_NOTES,
 )
 
+from .file_kinds import kind_for
+# Media copied into notes lives here; it is not a note and never listed.
+from .attachments import ATTACHMENTS_DIR
+
 BOOKMARKS_FILE = ".notevault-bookmarks.json"
 
-# "1.PERSONAL", "02 - Ideas", "3.Exercise" -> sort by the leading number.
-_NUM_PREFIX = re.compile(r"^\s*(\d+)\s*[.\-_)]?\s*(.*)$")
+_DIGITS = re.compile(r"(\d+)")
 
 
 def numeric_key(name: str):
-    """Sort key that puts numbered items in numeric (not lexical) order.
+    """Natural order: every run of digits compares as a number.
 
-    "10.Notas" must come after "2.Notas", which plain alphabetical sorting
-    gets wrong. Unnumbered names keep alphabetical order after the numbered
-    ones.
+    Only reading the leading number put "1.10" before "1.2" and "Fase 10"
+    before "Fase 2". Splitting on every digit run orders "1.2" < "1.10",
+    "Paso 9" < "Paso 10" and "0.4" < "1.1". Names that start with a number
+    still come before names that do not, because an empty text chunk sorts
+    before any letter.
     """
-    m = _NUM_PREFIX.match(name)
-    if m:
-        return (0, int(m.group(1)), m.group(2).lower())
-    return (1, 0, name.lower())
+    key = []
+    for i, chunk in enumerate(_DIGITS.split(name)):
+        if i % 2:
+            key.append((0, int(chunk), ""))
+        else:
+            key.append((1, 0, chunk.lower()))
+    return key
 
 
 @dataclass
@@ -134,29 +142,35 @@ class NotesService:
         except (OSError, ValueError):
             return []
 
-        folders, notes = [], []
+        folders, files = [], []
         for entry in entries:
             try:
                 is_dir = entry.is_dir()
             except OSError:
                 continue
             if is_dir:
-                if is_ignored_dir(entry):
+                if is_ignored_dir(entry) or entry.name == ATTACHMENTS_DIR:
                     continue
                 if entry.parent == self.root and is_reserved(entry, self.root):
                     continue
                 folders.append(entry)
-            elif entry.suffix.lower() == ".md" and not entry.name.startswith("."):
-                notes.append(entry)
+            elif not entry.name.startswith(".") and kind_for(entry):
+                files.append(entry)
 
         key = (lambda p: numeric_key(p.name)) if numeric_sort \
             else (lambda p: p.name.lower())
         folders.sort(key=key)
-        notes.sort(key=key)
+        files.sort(key=key)
 
         items = [{"type": "folder", "name": f.name, "path": f, "children": None}
                  for f in folders]
-        items += [{"type": "note", "name": n.stem, "path": n} for n in notes]
+        for f in files:
+            kind = kind_for(f)
+            # Notes show their title; code keeps its extension, which is how
+            # a script is told apart from a note of the same name.
+            items.append({"type": "note", "kind": kind,
+                          "name": f.stem if kind == "note" else f.name,
+                          "path": f})
         return items
 
     def has_children(self, folder: Path) -> bool:
@@ -166,13 +180,13 @@ class NotesService:
             for entry in folder.iterdir():
                 try:
                     if entry.is_dir():
-                        if is_ignored_dir(entry):
+                        if is_ignored_dir(entry) or entry.name == ATTACHMENTS_DIR:
                             continue
                         if entry.parent == self.root and is_reserved(
                                 entry, self.root):
                             continue
                         return True
-                    if entry.suffix.lower() == ".md":
+                    if kind_for(entry):
                         return True
                 except OSError:
                     continue
@@ -281,8 +295,11 @@ class NotesService:
             return path
         if path.is_dir():
             target = path.parent / safe
-        else:
+        elif kind_for(path) == "note":
             target = path.parent / (safe if safe.endswith(".md") else safe + ".md")
+        else:
+            # A script keeps its own extension unless the new name gives one.
+            target = path.parent / (safe if Path(safe).suffix else safe + path.suffix)
         if target == path or target.exists():
             return path
         path.rename(target)

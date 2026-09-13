@@ -21,6 +21,7 @@ from ....core.notes_service import NotesService
 from ....config import AppConfig
 from ... import theme
 from .vault_dialog import VaultDialog
+from .file_icons import icon_for
 
 BG_PANEL   = "#1a1a1e"
 BG_TAB     = "#202024"
@@ -47,7 +48,7 @@ class _TabButton(QPushButton):
         self.setToolTip(tooltip)
         self.setStyleSheet(
             "QPushButton{background:transparent;border:none;border-radius:6px;"
-            f"color:{TEXT_FAINT};font-size:14px;}}"
+            f"color:{TEXT_FAINT};font-size:14px;padding:0px;}}"
             f"QPushButton:hover{{background:#26262e;color:{TEXT};}}"
             f"QPushButton:checked{{background:{ACCENT_SOFT};color:{ACCENT};}}"
         )
@@ -64,7 +65,7 @@ class _ToolButton(QPushButton):
         self.setToolTip(tooltip)
         self.setStyleSheet(
             "QPushButton{background:transparent;border:none;border-radius:5px;"
-            f"color:{TEXT_DIM};font-size:13px;}}"
+            f"color:{TEXT_DIM};font-size:13px;padding:0px;}}"
             f"QPushButton:hover{{background:#26262e;color:{TEXT};}}"
             f"QPushButton:checked{{background:{ACCENT_SOFT};color:{ACCENT};}}"
         )
@@ -358,6 +359,10 @@ class NotesSidebar(QWidget):
             self._tree.setCurrentItem(item)
             self._tree.scrollToItem(item)
 
+    def reveal(self, path: Path):
+        self._active_path = Path(path)
+        self.reveal_active()
+
     def collapse_all(self):
         self._tree.collapseAll()
 
@@ -444,7 +449,7 @@ class NotesSidebar(QWidget):
             active = self._active_path and Path(path) == self._active_path
             marked = self.service.is_bookmarked(path)
             label = data["name"] + ("  🔖" if marked else "")
-            item.setIcon(0, style.standardIcon(QStyle.SP_FileIcon))
+            item.setIcon(0, icon_for(path))
             item.setText(0, label)
             item.setForeground(0, QColor(theme.tint(TEXT if active else TEXT_DIM)))
             if active:

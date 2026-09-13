@@ -1,11 +1,37 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
+from pathlib import Path
+
+_pyside6 = Path(sys.exec_prefix) / 'Lib' / 'site-packages' / 'PySide6'
+_mm_plugins = str(_pyside6 / 'plugins' / 'multimedia')
+
+_extra_binaries = []
+for dll_name in [
+    'avcodec-61.dll', 'avformat-61.dll', 'avutil-59.dll',
+    'swresample-5.dll', 'swscale-8.dll',
+    'Qt6Multimedia.dll', 'Qt6MultimediaWidgets.dll'
+]:
+    dll_path = _pyside6 / dll_name
+    if dll_path.exists():
+        _extra_binaries.append((str(dll_path), '.'))
+
+_mm_dir = _pyside6 / 'plugins' / 'multimedia'
+if _mm_dir.exists():
+    for f in _mm_dir.glob('*.dll'):
+        _extra_binaries.append((str(f), 'PySide6/plugins/multimedia'))
+        _extra_binaries.append((str(f), 'plugins/multimedia'))
 
 a = Analysis(
     ['app_entry.py'],
     pathex=[],
-    binaries=[],
-    datas=[],
+    binaries=_extra_binaries,
+    datas=[
+        (_mm_plugins, 'PySide6/plugins/multimedia'),
+        (_mm_plugins, 'plugins/multimedia'),
+    ],
     hiddenimports=[
+        'PySide6.QtMultimedia',
+        'PySide6.QtMultimediaWidgets',
         'notevault_app',
         'notevault_app.main',
         'notevault_app.config',
@@ -40,6 +66,7 @@ a = Analysis(
         'notevault_app.ui.components.ejercicio.ejercicio_overview',
         'notevault_app.ui.components.ejercicio.ejercicio_tracker',
         'notevault_app.ui.components.ejercicio.ejercicio_manage',
+        'notevault_app.ui.components.ejercicio.ejercicio_video_player',
         'notevault_app.ui.components.ejercicio.ejercicio_registro',
         'notevault_app.core.task_manager',
         'notevault_app.core.vault_format',

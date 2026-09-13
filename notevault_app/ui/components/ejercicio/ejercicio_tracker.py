@@ -4,14 +4,13 @@ Table showing exercises for a day with done checkbox, weight and reps inputs.
 """
 
 from datetime import date
+from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QScrollArea, QCheckBox, QLineEdit, QPushButton, QSizePolicy, QLayout,
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QDesktopServices, QIntValidator, QDoubleValidator
-from PySide6.QtCore import QUrl
-from pathlib import Path
+from PySide6.QtGui import QIntValidator, QDoubleValidator
 
 from ....core.exercise_manager import ExerciseManager
 
@@ -64,6 +63,8 @@ def _input(placeholder: str, width: int, validator=None) -> QLineEdit:
 
 class EjercicioTracker(QWidget):
     data_changed = Signal()
+    # (absolute_video_path, exercise_name, day_key)
+    play_video = Signal(str, str, str)
 
     def __init__(self, manager: ExerciseManager, day_key: str, parent=None):
         super().__init__(parent)
@@ -235,19 +236,29 @@ class EjercicioTracker(QWidget):
         )
         n_lay.addWidget(name_lbl)
 
-        if ex.get("video_path") or ex.get("video"):
-            video_path = Path(ex.get("video_path", "") or ex.get("video", ""))
-            vid_btn = QPushButton(f"▶  {video_path.name or ex.get('video','')}")
+        raw_video = ex.get("video_path") or ex.get("video", "")
+        if raw_video:
+            video_path = Path(raw_video)
+            # Best-effort: resolve bare filename → vault videos dir
+            if not video_path.is_absolute() or not video_path.exists():
+                candidate = self.manager.videos_dir / video_path.name
+                if candidate.exists():
+                    video_path = candidate
+            # Always show the button if the exercise has a video field
+            display_name = video_path.name if video_path.name else raw_video
+            vid_btn = QPushButton(f"\u25b6  {display_name}")
             vid_btn.setCursor(Qt.PointingHandCursor)
             vid_btn.setStyleSheet(
                 f"QPushButton{{background:transparent;border:none;"
                 f"color:{BLUE_LINK};font-size:11px;text-align:left;padding:0;}}"
                 "QPushButton:hover{color:#a0b8ff;}"
             )
-            _vp = video_path
+            _path_str = str(video_path)
+            _name = ex.get("name", "")
+            _dk = self.day_key
             vid_btn.clicked.connect(
-                lambda _, p=_vp: QDesktopServices.openUrl(QUrl.fromLocalFile(str(p)))
-                if p.exists() else None
+                lambda _, p=_path_str, n=_name, dk=_dk:
+                    self.play_video.emit(p, n, dk)
             )
             n_lay.addWidget(vid_btn)
 
@@ -338,6 +349,6 @@ class EjercicioTracker(QWidget):
         notes_in.editingFinished.connect(_save)
         return row
 
-    def set_manager(self, manager: ExerciseManager):
+    def set_manager(self, manager: ExerciseManager, vault_path: str = ""):
         self.manager = manager
         self.refresh()

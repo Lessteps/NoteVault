@@ -33,6 +33,7 @@ vault/
 │   │   └── YYYY/MM/YYYY-MM-DD.md          un archivo por día
 │   ├── ejercicio/
 │   │   ├── exercises.json                 ⚠ global
+│   │   ├── videos/<archivo>.mp4           demostraciones de cada ejercicio
 │   │   └── YYYY/MM/YYYY-MM-DD.json        un archivo por día
 │   ├── tareas/
 │   │   └── <task-id>.md                   un archivo por tarea
@@ -131,6 +132,9 @@ Lista de definiciones de ejercicio:
 
 - `day` es uno de `lunes martes miercoles jueves viernes sabado domingo`
   (sin tildes).
+- `video` es un nombre de archivo. Si `video_path` no existe en este
+  dispositivo, el cliente busca `video` dentro de `.notevault/ejercicio/videos/`;
+  así la ruta absoluta de otro equipo no rompe la reproducción.
 - Toda rutina termina con un ejercicio cuyo nombre empieza por
   `Estiramientos`; si falta, se añade al cargar.
 

@@ -13,21 +13,23 @@ from .ejercicio_overview import EjercicioOverview
 from .ejercicio_tracker import EjercicioTracker
 from .ejercicio_manage import EjercicioManage
 from .ejercicio_registro import EjercicioRegistro
+from .ejercicio_video_player import EjercicioVideoPlayer
 from .exercise_data import DAYS
 
 VIEW_OVERVIEW = 0
 DAYS_KEYS = [d["key"] for d in DAYS]   # indices 1-7
 VIEW_MANAGE   = 8
 VIEW_REGISTRO = 9
+VIEW_VIDEO    = 10
 
 
 class EjercicioPanel(QWidget):
     def __init__(self, manager: ExerciseManager = None, parent=None):
         super().__init__(parent)
         self.setObjectName("centerPanel")
-        # Lazy-create ExerciseManager when vault is known
         self._manager: ExerciseManager | None = manager
         self._trackers: dict[str, EjercicioTracker] = {}
+        self._active_day_key: str = "lunes"
         self._init_ui()
 
     def _init_ui(self):
@@ -43,6 +45,7 @@ class EjercicioPanel(QWidget):
             tracker = EjercicioTracker(
                 self._manager or _dummy_manager(), day["key"]
             )
+            tracker.play_video.connect(self._show_video)
             self._trackers[day["key"]] = tracker
             self._stack.addWidget(tracker)      # 1-7
 
@@ -52,6 +55,10 @@ class EjercicioPanel(QWidget):
 
         self._registro = EjercicioRegistro(self._manager or _dummy_manager())
         self._stack.addWidget(self._registro)   # 9
+
+        self._video_player = EjercicioVideoPlayer()
+        self._video_player.back_requested.connect(self._return_from_video)
+        self._stack.addWidget(self._video_player)  # 10
 
         lay.addWidget(self._stack)
 
@@ -67,9 +74,21 @@ class EjercicioPanel(QWidget):
             self._stack.setCurrentIndex(VIEW_MANAGE)
             self._manage.refresh()
         elif key in self._trackers:
+            self._active_day_key = key
             idx = DAYS_KEYS.index(key) + 1
             self._stack.setCurrentIndex(idx)
             self._trackers[key].refresh()
+
+    def _show_video(self, path: str, name: str, day_key: str):
+        """Switch to the embedded video player."""
+        self._active_day_key = day_key
+        self._video_player.play(path, name, day_key)
+        self._stack.setCurrentIndex(VIEW_VIDEO)
+
+    def _return_from_video(self, day_key: str):
+        """Come back to the tracker that launched the video."""
+        self._video_player.stop()
+        self.show_view(day_key)
 
     def refresh_current(self):
         idx = self._stack.currentIndex()

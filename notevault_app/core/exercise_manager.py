@@ -66,6 +66,7 @@ class ExerciseManager:
         self.vault_root = vault_root
         self.ejercicio_dir = vault_root / vault_format.LAYOUT["exercise_dir"]
         self._config_path = vault_root / vault_format.LAYOUT["exercises"]
+        self.videos_dir = vault_root / vault_format.LAYOUT["exercise_videos_dir"]
         self._exercises: Optional[list] = None
         self._log_cache: dict[date, ExerciseLog] = {}
 

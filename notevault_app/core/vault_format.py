@@ -30,6 +30,7 @@ LAYOUT = {
     "exercise_dir":  f"{DATA_DIR}/ejercicio",
     "exercises":     f"{DATA_DIR}/ejercicio/exercises.json",
     "exercise_day":  f"{DATA_DIR}/ejercicio/{{year}}/{{month:02d}}/{{date}}.json",
+    "exercise_videos_dir": f"{DATA_DIR}/ejercicio/videos",
     "tasks_dir":     f"{DATA_DIR}/tareas",
     "task":          f"{DATA_DIR}/tareas/{{id}}.md",
     "projects_dir":  f"{DATA_DIR}/proyectos",

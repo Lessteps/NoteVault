@@ -239,12 +239,22 @@ class EjercicioTracker(QWidget):
         raw_video = ex.get("video_path") or ex.get("video", "")
         if raw_video:
             video_path = Path(raw_video)
-            # Best-effort: resolve bare filename → vault videos dir
+            # 1. Try exact filename in videos dir
             if not video_path.is_absolute() or not video_path.exists():
                 candidate = self.manager.videos_dir / video_path.name
                 if candidate.exists():
                     video_path = candidate
-            # Always show the button if the exercise has a video field
+            # 2. Fallback: prefix match (e.g. "5.Facepull" finds the long name)
+            if not video_path.exists():
+                stem = video_path.stem.lower()
+                for f in self.manager.videos_dir.glob("*.mp4"):
+                    if f.stem.lower().startswith(stem) or stem.startswith(f.stem.lower()):
+                        video_path = f
+                        break
+            # Only show button if the file was actually found
+            if not video_path.exists():
+                raw_video = ""
+        if raw_video:
             display_name = video_path.name if video_path.name else raw_video
             vid_btn = QPushButton(f"\u25b6  {display_name}")
             vid_btn.setCursor(Qt.PointingHandCursor)

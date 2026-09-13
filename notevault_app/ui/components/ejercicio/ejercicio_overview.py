@@ -160,7 +160,7 @@ class EjercicioOverview(QWidget):
             for ex in day_exs:
                 cb.addItem(ex["name"], ex["id"])
             cb.currentIndexChanged.connect(
-                lambda i, _cb=cb: self._on_filter(_cb.currentData()) if i > 0 else None
+                lambda i, _cb=cb: self._on_filter(_cb.currentData() if i > 0 else "")
             )
             self._day_combos.append(cb)
             combos_lay.addWidget(cb)

@@ -173,3 +173,19 @@ class AppConfig:
         s = AppConfig._read()
         s["window"] = state
         AppConfig._write(s)
+
+    # ── Calendar filters ──────────────────────────────────────────────────
+
+    @staticmethod
+    def get_calendar_filters() -> dict:
+        return AppConfig._read().get("calendar_filters", {
+            "routine": True, "event": True, "habit": True,
+            "exercise": True, "task": True, "project": True
+        })
+
+    @staticmethod
+    def set_calendar_filters(filters: dict):
+        s = AppConfig._read()
+        s["calendar_filters"] = filters
+        AppConfig._write(s)
+

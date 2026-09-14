@@ -20,6 +20,7 @@ from ..core.habit_manager import HabitManager
 from ..core.exercise_manager import ExerciseManager
 from ..core.task_manager import TaskManager
 from ..core.project_manager import ProjectManager
+from ..core.schedule_manager import ScheduleManager
 from ..core.notifier import Notifier, app_icon
 from ..core.notes_service import NotesService
 from . import theme
@@ -38,15 +39,18 @@ from .components.tareas.tareas_left_panel import TareasLeftPanel
 from .components.proyectos.proyectos_panel import ProyectosPanel
 from .components.proyectos.proyectos_left_panel import ProyectosLeftPanel
 from .components.dashboard.dashboard_panel import DashboardPanel
+from .components.calendario.calendario_panel import CalendarioPanel
+from .components.calendario.calendario_left_panel import CalendarioLeftPanel
 
 CENTER_PANEL_INDEX = 1
 
-MODE_HOME      = "home"
-MODE_HABITS    = "habits"
-MODE_EJERCICIO = "ejercicio"
-MODE_NOTAS     = "notas"
-MODE_PROYECTOS = "proyectos"
-MODE_TAREAS    = "tareas"
+MODE_HOME       = "home"
+MODE_CALENDARIO = "calendario"
+MODE_HABITS     = "habits"
+MODE_EJERCICIO  = "ejercicio"
+MODE_NOTAS      = "notas"
+MODE_PROYECTOS  = "proyectos"
+MODE_TAREAS     = "tareas"
 
 
 def _placeholder(text: str, obj: str = "centerPanel") -> QWidget:
@@ -67,13 +71,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("NoteVault")
         self.resize(1400, 880)
 
-        vault_path       = AppConfig.get_active_vault()
-        self.vault       = VaultManager(vault_path)
-        self.habits      = HabitManager(vault_path)
+        vault_path        = AppConfig.get_active_vault()
+        self.vault        = VaultManager(vault_path)
+        self.habits       = HabitManager(vault_path)
         self.exercise_mgr = ExerciseManager(vault_path)
-        self.tasks       = TaskManager(vault_path)
-        self.projects    = ProjectManager(vault_path)
-        self.notes       = NotesService(self.vault)
+        self.tasks        = TaskManager(vault_path)
+        self.projects     = ProjectManager(vault_path)
+        self.schedule_mgr = ScheduleManager(vault_path)
+        self.notes        = NotesService(self.vault)
 
         self._mode = MODE_HOME
         self._navigator_width = 220
@@ -99,6 +104,8 @@ class MainWindow(QMainWindow):
         self.icon_rail.navigator_toggled.connect(self.toggle_explorer)
         self.icon_rail.home_requested.connect(
             lambda: self._switch_mode(MODE_HOME))
+        self.icon_rail.calendario_requested.connect(
+            lambda: self._switch_mode(MODE_CALENDARIO))
         self.icon_rail.habit_tracker_requested.connect(
             lambda: self._switch_mode(MODE_HABITS))
         self.icon_rail.ejercicio_requested.connect(
@@ -117,13 +124,14 @@ class MainWindow(QMainWindow):
         self._left_stack.setMinimumWidth(0)
         self._left_stack.setMaximumWidth(420)
 
-        self._explorer       = NotesSidebar(self.vault, self.notes)
+        self._explorer        = NotesSidebar(self.vault, self.notes)
         self._explorer.vault_switch_requested.connect(self._on_vault_switch)
-        self._habit_left     = HabitLeftPanel(self.habits)
-        self._ejercicio_left = EjercicioLeftPanel()
-        self._tareas_left    = TareasLeftPanel()
-        self._proj_left      = ProyectosLeftPanel(self.projects)
-        self._left_empty     = QWidget()
+        self._habit_left      = HabitLeftPanel(self.habits)
+        self._ejercicio_left  = EjercicioLeftPanel()
+        self._tareas_left     = TareasLeftPanel()
+        self._proj_left       = ProyectosLeftPanel(self.projects)
+        self._calendario_left = CalendarioLeftPanel(self.schedule_mgr)
+        self._left_empty      = QWidget()
         self._left_empty.setObjectName("sidebarPanel")
 
         self._left_stack.addWidget(self._explorer)        # 0 — notas
@@ -132,24 +140,27 @@ class MainWindow(QMainWindow):
         self._left_stack.addWidget(self._left_empty)      # 3 — others
         self._left_stack.addWidget(self._tareas_left)     # 4 — tareas
         self._left_stack.addWidget(self._proj_left)       # 5 — proyectos
+        self._left_stack.addWidget(self._calendario_left) # 6 — calendario
 
         # ── Center stack ──────────────────────────────────────────────────
         self._center_stack = QStackedWidget()
 
-        self._habit_panel    = HabitTrackerPanel(self.habits)
-        self._ejercicio_panel = EjercicioPanel(self.exercise_mgr)
-        self._notas_center   = MarkdownEditor(self.vault, self.notes)
-        self._tareas_panel   = TareasPanel(self.tasks)
-        self._proj_panel     = ProyectosPanel(self.projects)
-        self._dashboard      = DashboardPanel(
+        self._habit_panel      = HabitTrackerPanel(self.habits)
+        self._ejercicio_panel  = EjercicioPanel(self.exercise_mgr)
+        self._notas_center     = MarkdownEditor(self.vault, self.notes)
+        self._tareas_panel     = TareasPanel(self.tasks)
+        self._proj_panel       = ProyectosPanel(self.projects)
+        self._dashboard        = DashboardPanel(
             self.habits, self.exercise_mgr, self.tasks, self.projects)
+        self._calendario_panel = CalendarioPanel(self.schedule_mgr)
 
-        self._center_stack.addWidget(self._habit_panel)     # 0
-        self._center_stack.addWidget(self._ejercicio_panel) # 1
-        self._center_stack.addWidget(self._notas_center)    # 2
-        self._center_stack.addWidget(self._tareas_panel)    # 3 — tareas
-        self._center_stack.addWidget(self._proj_panel)      # 4 — proyectos
-        self._center_stack.addWidget(self._dashboard)       # 5 — vista general
+        self._center_stack.addWidget(self._habit_panel)      # 0
+        self._center_stack.addWidget(self._ejercicio_panel)  # 1
+        self._center_stack.addWidget(self._notas_center)     # 2
+        self._center_stack.addWidget(self._tareas_panel)     # 3 — tareas
+        self._center_stack.addWidget(self._proj_panel)       # 4 — proyectos
+        self._center_stack.addWidget(self._dashboard)        # 5 — vista general
+        self._center_stack.addWidget(self._calendario_panel) # 6 — calendario
 
         # ── Right stack ───────────────────────────────────────────────────
         self._right_stack = QStackedWidget()
@@ -176,6 +187,13 @@ class MainWindow(QMainWindow):
         self._proj_left.board_requested.connect(self._proj_panel.show_board)
         self._proj_left.project_requested.connect(self._proj_panel.open_project)
         self._proj_panel.data_changed.connect(self._proj_left.refresh)
+        self._calendario_left.view_requested.connect(self._calendario_panel.show_view)
+        self._calendario_left.date_selected.connect(self._calendario_panel.set_date)
+        self._calendario_left.filters_changed.connect(self._calendario_panel.set_filters)
+        self._calendario_panel.view_changed.connect(self._calendario_left.set_active_view)
+        self._calendario_panel.date_changed.connect(self._calendario_left.set_active_date)
+        self._calendario_panel.status_message.connect(self.status_bar.showMessage)
+        self._calendario_panel.notify_requested.connect(self._notify)
         self._dashboard.go_habits.connect(lambda: self._switch_mode(MODE_HABITS))
         self._dashboard.go_ejercicio.connect(lambda: self._switch_mode(MODE_EJERCICIO))
         self._dashboard.go_tareas.connect(lambda: self._switch_mode(MODE_TAREAS))
@@ -244,7 +262,7 @@ class MainWindow(QMainWindow):
 
     def _switch_mode(self, mode: str):
         self._mode = mode
-        for k in ["home", "habits", "ejercicio", "proyectos", "notas", "tareas"]:
+        for k in ["home", "calendario", "habits", "ejercicio", "proyectos", "notas", "tareas"]:
             self.icon_rail.set_active(k, k == mode)
 
         if mode == MODE_HOME:
@@ -253,6 +271,13 @@ class MainWindow(QMainWindow):
             self._right_stack.setCurrentIndex(1)
             self._dashboard.refresh()
             self.status_bar.showMessage("Vista General")
+
+        elif mode == MODE_CALENDARIO:
+            self._left_stack.setCurrentIndex(6)
+            self._center_stack.setCurrentIndex(6)
+            self._right_stack.setCurrentIndex(1)
+            self._calendario_panel.refresh_current()
+            self.status_bar.showMessage("Calendario")
 
         elif mode == MODE_HABITS:
             self._left_stack.setCurrentIndex(1)
@@ -292,7 +317,8 @@ class MainWindow(QMainWindow):
 
     def _apply_mode_layout(self):
         show_left  = self._mode in (MODE_HABITS, MODE_NOTAS, MODE_EJERCICIO,
-                                    MODE_PROYECTOS, MODE_TAREAS)
+                                    MODE_PROYECTOS, MODE_TAREAS, MODE_CALENDARIO)
+
         show_right = (self._mode == MODE_HABITS
                       or (self._mode == MODE_NOTAS and self._assistant_visible))
 

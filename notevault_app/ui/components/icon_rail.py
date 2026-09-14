@@ -47,6 +47,7 @@ class IconRail(QWidget):
     proyectos_requested     = Signal()
     notas_requested         = Signal()
     tareas_requested        = Signal()
+    calendario_requested    = Signal()
     theme_toggled           = Signal()
 
     def __init__(self, parent=None):
@@ -71,17 +72,19 @@ class IconRail(QWidget):
         layout.addStretch()
 
         for key, glyph, tip, signal in [
-            ("home",      "◎",  "Vista General",   self.home_requested),
-            ("habits",    "⊙",  "Habit Tracker",   self.habit_tracker_requested),
-            ("ejercicio", "🏋", "Ejercicio",        self.ejercicio_requested),
-            ("proyectos", "◫",  "Proyectos",        self.proyectos_requested),
-            ("notas",     "✎",  "Notas",            self.notas_requested),
-            ("tareas",    "☑",  "Tareas",           self.tareas_requested),
+            ("home",       "◎",  "Vista General",   self.home_requested),
+            ("calendario", "📅", "Calendario",      self.calendario_requested),
+            ("habits",     "⊙",  "Habit Tracker",   self.habit_tracker_requested),
+            ("ejercicio",  "🏋", "Ejercicio",        self.ejercicio_requested),
+            ("proyectos",  "◫",  "Proyectos",        self.proyectos_requested),
+            ("notas",      "✎",  "Notas",            self.notas_requested),
+            ("tareas",     "☑",  "Tareas",           self.tareas_requested),
         ]:
             b = _RailButton(glyph, tip)
             b.clicked.connect(signal.emit)
             layout.addWidget(b, alignment=Qt.AlignHCenter)
             self._buttons[key] = b
+
 
         layout.addStretch()
 

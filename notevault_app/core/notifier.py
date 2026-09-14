@@ -50,6 +50,7 @@ class Notifier:
         self._parent = parent
         self._icon = app_icon(assets_dir)
         self._tray = None
+        self._notified_occurrences = set()
         self.available = QSystemTrayIcon.isSystemTrayAvailable()
         if self.available:
             self._tray = QSystemTrayIcon(self._icon, parent)
@@ -59,6 +60,39 @@ class Notifier:
     @property
     def tray(self):
         return self._tray
+
+    def check_schedule_reminders(self, schedule_mgr):
+        """Check for calendar occurrences scheduled around now and send reminders."""
+        from datetime import datetime, date, timedelta
+        now = datetime.now()
+        today = now.date()
+
+        try:
+            occurrences = schedule_mgr.day(today)
+        except Exception:
+            return
+
+        for occ in occurrences:
+            if not occ.start or occ.done:
+                continue
+            try:
+                h, m = map(int, occ.start.split(":"))
+                occ_time = datetime(today.year, today.month, today.day, h, m)
+            except Exception:
+                continue
+
+            key = (today.isoformat(), occ.id, occ.start)
+            if key in self._notified_occurrences:
+                continue
+
+            # Notify if current time is within [start_time - 5min, start_time + 10min]
+            diff = now - occ_time
+            if timedelta(minutes=-5) <= diff <= timedelta(minutes=10):
+                self._notified_occurrences.add(key)
+                kind_lbl = "Evento" if occ.kind == "event" else ("Rutina" if occ.kind == "routine" else occ.kind.capitalize())
+                title = f"Recordatorio: {occ.title}"
+                body = f"{kind_lbl} programado a las {occ.start}"
+                self.notify(title, body)
 
     def notify(self, title: str, body: str, msecs: int = 12000) -> bool:
         """Show a desktop notification. Returns True if the tray was used."""
@@ -81,3 +115,4 @@ class Notifier:
     def shutdown(self):
         if self._tray is not None:
             self._tray.hide()
+

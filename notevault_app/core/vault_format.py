@@ -6,7 +6,7 @@ The single place that names the vault file format.
 stops the desktop app from quietly breaking the Android client.
 """
 
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 
 # Every module stores its data inside this single folder, so a vault travels
 # as one unit: one Syncthing folder instead of four at the vault root.
@@ -23,19 +23,24 @@ BOOKMARKS_FILE = ".notevault-bookmarks.json"
 
 # Per-module layout, relative to the vault root.
 LAYOUT = {
-    "data_dir":      DATA_DIR,
-    "habits_dir":    f"{DATA_DIR}/habits",
-    "habits_config": f"{DATA_DIR}/habits/habits_config.json",
-    "habits_day":    f"{DATA_DIR}/habits/{{year}}/{{month:02d}}/{{date}}.md",
-    "exercise_dir":  f"{DATA_DIR}/ejercicio",
-    "exercises":     f"{DATA_DIR}/ejercicio/exercises.json",
-    "exercise_day":  f"{DATA_DIR}/ejercicio/{{year}}/{{month:02d}}/{{date}}.json",
+    "data_dir":          DATA_DIR,
+    "habits_dir":        f"{DATA_DIR}/habits",
+    "habits_config":     f"{DATA_DIR}/habits/habits_config.json",
+    "habits_day":        f"{DATA_DIR}/habits/{{year}}/{{month:02d}}/{{date}}.md",
+    "exercise_dir":      f"{DATA_DIR}/ejercicio",
+    "exercises":         f"{DATA_DIR}/ejercicio/exercises.json",
+    "exercise_day":      f"{DATA_DIR}/ejercicio/{{year}}/{{month:02d}}/{{date}}.json",
     "exercise_videos_dir": f"{DATA_DIR}/ejercicio/videos",
-    "tasks_dir":     f"{DATA_DIR}/tareas",
-    "task":          f"{DATA_DIR}/tareas/{{id}}.md",
-    "projects_dir":  f"{DATA_DIR}/proyectos",
-    "project":       f"{DATA_DIR}/proyectos/{{id}}.md",
-    "bookmarks":     BOOKMARKS_FILE,
+    "tasks_dir":         f"{DATA_DIR}/tareas",
+    "task":              f"{DATA_DIR}/tareas/{{id}}.md",
+    "projects_dir":      f"{DATA_DIR}/proyectos",
+    "project":           f"{DATA_DIR}/proyectos/{{id}}.md",
+    "bookmarks":         BOOKMARKS_FILE,
+    "agenda_dir":        f"{DATA_DIR}/agenda",
+    "agenda_routines":   f"{DATA_DIR}/agenda/routines.json",
+    "agenda_events_dir": f"{DATA_DIR}/agenda/events",
+    "agenda_events_day": f"{DATA_DIR}/agenda/events/{{year}}/{{month:02d}}/{{date}}.json",
+    "agenda_settings":   f"{DATA_DIR}/agenda/settings.json",
 }
 
 # 0 = Monday, matching datetime.date.weekday().

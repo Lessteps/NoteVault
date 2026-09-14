@@ -99,9 +99,19 @@ class Project:
         self.color: str = f.get("color", PALETTE[0])
         self.created: Optional[date] = f.get("created") or date.today()
         self.start: Optional[date] = f.get("start")
+        self.start_time: Optional[str] = f.get("start_time")
         self.deadline: Optional[date] = f.get("deadline")
+        self.due_time: Optional[str] = f.get("due_time")
         self.description: str = f.get("description", "")
         self.steps: list = f.get("steps") or []
+
+        known_keys = {
+            "id", "name", "status", "color", "created", "start", "start_time",
+            "deadline", "due_time", "description", "steps", "extra_fields"
+        }
+        self.extra_fields: dict = f.get("extra_fields") if "extra_fields" in f else {
+            k: v for k, v in f.items() if k not in known_keys
+        }
 
     # ── Derived ───────────────────────────────────────────────────────────
 
@@ -186,9 +196,12 @@ class ProjectManager:
                 fm_count += 1
                 continue
             if fm_count == 1:
-                m = re.match(r"^([a-z_]+):\s*(.*)$", line.strip())
+                m = re.match(r"^([a-z_0-9\-]+):\s*(.*)$", line.strip())
                 if m:
-                    fm[m.group(1)] = m.group(2).strip().strip('"')
+                    val = m.group(2).strip()
+                    if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+                        val = val[1:-1]
+                    fm[m.group(1)] = val
             elif fm_count >= 2:
                 body.append(line)
 
@@ -204,6 +217,12 @@ class ProjectManager:
             else:
                 description_lines.append(line)
 
+        known_keys = {
+            "id", "name", "status", "color", "created", "start", "start_time",
+            "deadline", "due_time", "extra_fields"
+        }
+        extra_fields = {k: v for k, v in fm.items() if k not in known_keys}
+
         return Project(
             fm.get("id") or path.stem,
             name=fm.get("name", path.stem),
@@ -211,9 +230,12 @@ class ProjectManager:
             color=fm.get("color", PALETTE[0]),
             created=_parse_date(fm.get("created", "")) or date.today(),
             start=_parse_date(fm.get("start", "")),
+            start_time=fm.get("start_time"),
             deadline=_parse_date(fm.get("deadline", "")),
+            due_time=fm.get("due_time"),
             description="\n".join(description_lines).strip(),
             steps=steps,
+            extra_fields=extra_fields,
         )
 
     # ── Save ──────────────────────────────────────────────────────────────
@@ -228,13 +250,26 @@ class ProjectManager:
             f'color: "{project.color}"',
             f"created: {project.created.isoformat() if project.created else ''}",
             f"start: {project.start.isoformat() if project.start else ''}",
-            f"deadline: {project.deadline.isoformat() if project.deadline else ''}",
+        ]
+        if project.start_time:
+            lines.append(f"start_time: {project.start_time}")
+        lines.append(f"deadline: {project.deadline.isoformat() if project.deadline else ''}")
+        if project.due_time:
+            lines.append(f"due_time: {project.due_time}")
+
+        for k, v in project.extra_fields.items():
+            if isinstance(v, str) and (" " in v or ":" in v) and not (v.startswith('"') or v.startswith("'")):
+                lines.append(f'{k}: "{v}"')
+            else:
+                lines.append(f"{k}: {v}")
+
+        lines.extend([
             "---",
             "",
             project.description.strip(),
             "",
             TASKS_HEADING,
-        ]
+        ])
         lines.extend(s.to_line() for s in project.steps)
         lines.append("")
         self._path(project.id).write_text("\n".join(lines), encoding="utf-8")
@@ -245,8 +280,9 @@ class ProjectManager:
     def create(self, name: str = "Nuevo proyecto", **fields) -> Project:
         pid = f"p{date.today().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}"
         color = fields.pop("color", PALETTE[len(self.projects()) % len(PALETTE)])
+        start = fields.pop("start", date.today())
         project = Project(pid, name=name, created=date.today(),
-                          start=date.today(), color=color, **fields)
+                          start=start, color=color, **fields)
         self.save(project)
         return project
 
@@ -263,6 +299,8 @@ class ProjectManager:
         for k, v in fields.items():
             if hasattr(p, k):
                 setattr(p, k, v)
+            else:
+                p.extra_fields[k] = v
         self.save(p)
         return p
 

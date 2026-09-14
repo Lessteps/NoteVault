@@ -87,13 +87,23 @@ class Task:
         self.name: str = fields.get("name", "Sin título")
         self.created: Optional[date] = fields.get("created") or date.today()
         self.start: Optional[date] = fields.get("start")
+        self.start_time: Optional[str] = fields.get("start_time")
         self.due: Optional[date] = fields.get("due")
+        self.due_time: Optional[str] = fields.get("due_time")
         self.status: str = fields.get("status", STATUS_TODO)
         self.subject: str = fields.get("subject", "")
         self.priority: int = int(fields.get("priority", 1) or 1)
         self.reminder: Optional[datetime] = fields.get("reminder")
         self.reminder_done: bool = bool(fields.get("reminder_done", False))
         self.body: str = fields.get("body", "")
+
+        known_keys = {
+            "id", "name", "created", "start", "start_time", "due", "due_time",
+            "status", "subject", "priority", "reminder", "reminder_done", "body", "extra_fields"
+        }
+        self.extra_fields: dict = fields.get("extra_fields") if "extra_fields" in fields else {
+            k: v for k, v in fields.items() if k not in known_keys
+        }
 
     # ── Helpers ───────────────────────────────────────────────────────────
 
@@ -162,25 +172,37 @@ class TaskManager:
                 fm_count += 1
                 continue
             if fm_count == 1:
-                m = re.match(r"^([a-z_]+):\s*(.*)$", line.strip())
+                m = re.match(r"^([a-z_0-9\-]+):\s*(.*)$", line.strip())
                 if m:
-                    fm[m.group(1)] = m.group(2).strip().strip('"')
+                    val = m.group(2).strip()
+                    if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+                        val = val[1:-1]
+                    fm[m.group(1)] = val
             elif fm_count >= 2:
                 body_lines.append(line)
 
         tid = fm.get("id") or path.stem
+        known_keys = {
+            "id", "name", "created", "start", "start_time", "due", "due_time",
+            "status", "subject", "priority", "reminder", "reminder_done", "extra_fields"
+        }
+        extra_fields = {k: v for k, v in fm.items() if k not in known_keys}
+
         return Task(
             tid,
             name=fm.get("name", path.stem),
             created=parse_date(fm.get("created", "")) or date.today(),
             start=parse_date(fm.get("start", "")),
+            start_time=fm.get("start_time"),
             due=parse_date(fm.get("due", "")),
+            due_time=fm.get("due_time"),
             status=fm.get("status", STATUS_TODO),
             subject=fm.get("subject", ""),
             priority=int(fm.get("priority", "1") or 1),
             reminder=parse_dt(fm.get("reminder", "")),
             reminder_done=fm.get("reminder_done", "false") == "true",
             body="\n".join(body_lines).strip(),
+            extra_fields=extra_fields,
         )
 
     def save(self, task: Task):
@@ -191,17 +213,30 @@ class TaskManager:
             f'name: "{task.name}"',
             f"created: {task.created.isoformat() if task.created else ''}",
             f"start: {task.start.isoformat() if task.start else ''}",
-            f"due: {task.due.isoformat() if task.due else ''}",
+        ]
+        if task.start_time:
+            lines.append(f"start_time: {task.start_time}")
+        lines.append(f"due: {task.due.isoformat() if task.due else ''}")
+        if task.due_time:
+            lines.append(f"due_time: {task.due_time}")
+        lines.extend([
             f"status: {task.status}",
             f'subject: "{task.subject}"',
             f"priority: {task.priority}",
             f"reminder: {task.reminder.isoformat(timespec='minutes') if task.reminder else ''}",
             f"reminder_done: {'true' if task.reminder_done else 'false'}",
+        ])
+        for k, v in task.extra_fields.items():
+            if isinstance(v, str) and (" " in v or ":" in v) and not (v.startswith('"') or v.startswith("'")):
+                lines.append(f'{k}: "{v}"')
+            else:
+                lines.append(f"{k}: {v}")
+        lines.extend([
             "---",
             "",
             task.body.strip(),
             "",
-        ]
+        ])
         self._path(task.id).write_text("\n".join(lines), encoding="utf-8")
         self._cache = None
 
@@ -226,6 +261,8 @@ class TaskManager:
         for k, v in fields.items():
             if hasattr(task, k):
                 setattr(task, k, v)
+            else:
+                task.extra_fields[k] = v
         self.save(task)
         return task
 

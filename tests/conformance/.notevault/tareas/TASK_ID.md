@@ -1,7 +1,7 @@
 ---
 id: TASK_ID
 name: "Ensayo de historia"
-created: 2026-09-12
+created: 2026-09-14
 start: 2026-09-12
 due: 2026-09-20
 status: Sin empezar

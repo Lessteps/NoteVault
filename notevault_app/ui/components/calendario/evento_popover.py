@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 from ... import theme
 from ....core.recurrence import Recurrence
 from ....core.vault_format import WEEKDAY_KEYS
-from ..programacion import RecurrencePicker
+from ..programacion import RecurrencePicker, parse_duration_text, parse_time_text
 from . import (
     GCAL_COLOURS, DEFAULT_COLOUR, WEEKDAYS_ES, colour_name, event_colour,
     fmt_duration, fmt_hm, hm, long_date, parse_hm,
@@ -110,6 +110,11 @@ QMenu::indicator { width: 0px; }
 
 LIST_QSS = """
 #popPopup { background: #202020; border: 1px solid #2f2f2f; }
+QLineEdit#popTimeEntry {
+    background: #252525; border: none; border-bottom: 2px solid #2383e2; border-radius: 0px;
+    color: #e6e6e6; font-size: 14px; padding: 8px 12px;
+    font-family: 'Segoe UI Variable Text', 'Segoe UI', sans-serif;
+}
 QListWidget { background: #202020; border: none; outline: 0; color: #e6e6e6; font-size: 14px; }
 QListWidget::item { padding: 8px 16px; border: none; }
 QListWidget::item:hover { background: #2a2a2a; }
@@ -320,17 +325,30 @@ class _Popup(QFrame):
 
 class _TimeList(_Popup):
     picked = Signal(int)
+    typed = Signal(str)
 
     def __init__(self, parent):
         super().__init__(parent, LIST_QSS)
-        self.setFixedSize(230, 260)
+        self.setFixedSize(260, 300)
+        self.entry = QLineEdit()
+        self.entry.setObjectName("popTimeEntry")
+        self.entry.returnPressed.connect(self._submit)
+        self.body.addWidget(self.entry)
         self.list = QListWidget()
         self.list.setVerticalScrollMode(QListWidget.ScrollPerPixel)
         self.list.itemClicked.connect(self._choose)
         self.list.itemActivated.connect(self._choose)
         self.body.addWidget(self.list)
 
-    def open(self, values, labels, current, anchor):
+    def _submit(self):
+        text = self.entry.text().strip()
+        if text:
+            self.hide()
+            self.typed.emit(text)
+
+    def open(self, values, labels, current, anchor, placeholder=""):
+        self.entry.clear()
+        self.entry.setPlaceholderText(placeholder)
         self.list.clear()
         chosen = None
         for value, label in zip(values, labels):
@@ -343,7 +361,7 @@ class _TimeList(_Popup):
         if chosen is not None:
             self.list.setCurrentItem(chosen)
             self.list.scrollToItem(chosen, QListWidget.PositionAtCenter)
-        self.list.setFocus()
+        self.entry.setFocus()
 
     def _choose(self, item):
         self.hide()
@@ -413,6 +431,7 @@ class EventPopover(QFrame):
 
         self.time_popup = _TimeList(self)
         self.time_popup.picked.connect(self._on_time_picked)
+        self.time_popup.typed.connect(self._on_time_typed)
         self.time_popup.closed.connect(self._close_chips)
         self.date_popup = _DatePopup(self)
         self.date_popup.picked.connect(self._on_date_picked)
@@ -852,7 +871,8 @@ class EventPopover(QFrame):
             values = sorted(values + [self.start])
         self._time_target = "start"
         self._mark_open(self.start_chip, True)
-        self.time_popup.open(values, [fmt_hm(v) for v in values], self.start, self.start_chip)
+        self.time_popup.open(values, [fmt_hm(v) for v in values], self.start, self.start_chip,
+                             "Escribe una hora: 7:05")
 
     def _pick_end(self):
         values = list(range(self.start + 15, DAY_MIN + 1, 15))
@@ -861,16 +881,31 @@ class EventPopover(QFrame):
         labels = [f"{fmt_hm(v)}   ({fmt_duration(v - self.start)})" for v in values]
         self._time_target = "end"
         self._mark_open(self.end_chip, True)
-        self.time_popup.open(values, labels, self.end, self.end_chip)
+        self.time_popup.open(values, labels, self.end, self.end_chip,
+                             "Hora de fin o duración: 2 h 30 min")
 
     def _on_time_picked(self, value: int):
         if self._time_target == "start":
             length = self.end - self.start
-            self.start = value
-            self.end = min(DAY_MIN, value + max(15, length))
+            self.start = min(DAY_MIN - 5, value)
+            self.end = min(DAY_MIN, self.start + max(5, length))
         else:
-            self.end = max(self.start + 15, value)
+            self.end = min(DAY_MIN, max(self.start + 5, value))
         self._sync()
+
+    def _on_time_typed(self, text: str):
+        """A typed start time, or for the end either a clock time or a length."""
+        clock = parse_hm(parse_time_text(text))
+        if self._time_target == "start":
+            if clock is not None:
+                self._on_time_picked(clock)
+            return
+        has_units = any(ch.isalpha() for ch in text)
+        length = parse_duration_text(text)
+        if clock is not None and not has_units and clock > self.start:
+            self._on_time_picked(clock)
+        elif length is not None:
+            self._on_time_picked(self.start + length)
 
     def _pick_repeat(self):
         menu = _menu(self)
@@ -949,7 +984,7 @@ class EventPopover(QFrame):
             title=self.title.text().strip() or "(Sin título)",
             date=self.day,
             start=None if self.all_day else hm(self.start),
-            duration=None if (self.all_day or is_task) else max(15, self.end - self.start),
+            duration=None if (self.all_day or is_task) else max(5, self.end - self.start),
             repeat=self.rule(),
             until=self.until if self.repeat == "custom" else None,
             days=[WEEKDAY_KEYS[i] for i in Recurrence.parse(self.rule()).weekdays_mask()],

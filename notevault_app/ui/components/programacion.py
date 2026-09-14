@@ -4,6 +4,7 @@ something repeats, between which dates, at what hour, for how long, with
 which reminder and colour.
 """
 
+import re
 from datetime import date
 from typing import Optional
 
@@ -11,7 +12,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QSpinBox,
+    QSpinBox, QComboBox,
 )
 
 from ..components.tareas.tareas_common import (
@@ -38,7 +39,7 @@ REMINDER_CHOICES = (
     ("1 hora antes", 60),
 )
 
-DURATION_CHOICES = (15, 30, 45, 60, 90, 120, 180, 240)
+DURATION_CHOICES = (5, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 300)
 
 
 def small_label(text: str) -> QLabel:
@@ -275,33 +276,117 @@ class RecurrencePicker(QWidget):
         self.changed.emit()
 
 
+def parse_time_text(text: str) -> Optional[str]:
+    """'7', '7:05', '07.30', '7h30', '730' -> 'HH:MM'; None when it is not a time."""
+    t = (text or "").strip().lower().replace(" ", "")
+    if not t:
+        return None
+    m = re.fullmatch(r"(\d{1,2})(?:[:.h](\d{1,2})?)?", t)
+    if m:
+        hours, minutes = int(m.group(1)), int(m.group(2) or 0)
+    elif re.fullmatch(r"\d{3,4}", t):
+        hours, minutes = divmod(int(t), 100)
+    else:
+        return None
+    if hours > 23 or minutes > 59:
+        return None
+    return f"{hours:02d}:{minutes:02d}"
+
+
+def parse_duration_text(text: str) -> Optional[int]:
+    """'2 h 30 min', '2h30', '2:30', '1.5 h', '150', '45 min' -> minutes."""
+    t = (text or "").strip().lower().replace(",", ".")
+    if not t:
+        return None
+    m = re.fullmatch(r"(\d{1,2}):(\d{1,2})", t.replace(" ", ""))
+    if m:
+        total = int(m.group(1)) * 60 + int(m.group(2))
+    else:
+        m = re.fullmatch(
+            r"(?:(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hora|horas))?\s*"
+            r"(?:(\d+)\s*(?:m|min|mins|minuto|minutos)?)?", t)
+        if not m or not (m.group(1) or m.group(2)):
+            return None
+        total = round(float(m.group(1) or 0) * 60) + int(m.group(2) or 0)
+    return total if 1 <= total <= 24 * 60 else None
+
+
+def duration_label(minutes: int) -> str:
+    h, rest = divmod(minutes, 60)
+    if not h:
+        return f"{rest} min"
+    return f"{h} h" if not rest else f"{h} h {rest} min"
+
+
+def _select_value(box, value, label: str):
+    """Select value, inserting it in order when it is not one of the presets."""
+    index = box.findData(value)
+    if index < 0:
+        index = box.count()
+        for i in range(box.count()):
+            data = box.itemData(i)
+            if data is not None and data > value:
+                index = i
+                break
+        box.insertItem(index, label, value)
+    box.setCurrentIndex(index)
+
+
+def _make_editable(box, parse, label, placeholder: str):
+    """Let the user type any value; it is read when they press Enter or leave the box."""
+    box.setEditable(True)
+    box.setInsertPolicy(QComboBox.NoInsert)
+    box.setCompleter(None)
+    edit = box.lineEdit()
+    edit.setPlaceholderText(placeholder)
+    edit.setStyleSheet(
+        f"QLineEdit{{background:transparent;border:none;padding:0px;color:{TEXT};font-size:12px;"
+        "font-family:'Segoe UI Variable Text','Segoe UI',sans-serif;}")
+
+    def commit():
+        text = edit.text().strip()
+        exact = box.findText(text, Qt.MatchFixedString)
+        if exact >= 0:
+            box.setCurrentIndex(exact)
+            return
+        if not text and box.findData(None) >= 0:
+            box.setCurrentIndex(box.findData(None))
+            return
+        value = parse(text)
+        if value is None:
+            edit.setText(box.itemText(box.currentIndex()))
+            return
+        _select_value(box, value, label(value))
+
+    edit.editingFinished.connect(commit)
+
+
 def time_combo(allow_empty: bool = True, empty_label: str = "Sin hora", height: int = 30):
     items = [(empty_label, None)] if allow_empty else []
     items += [(f"{m // 60:02d}:{m % 60:02d}", f"{m // 60:02d}:{m % 60:02d}")
               for m in range(0, 24 * 60, 15)]
-    return combo(items, height=height)
+    box = combo(items, height=height)
+    _make_editable(box, parse_time_text, lambda v: v, "Escribe una hora, p. ej. 7:05")
+    box.setToolTip("Elige de la lista o escribe cualquier hora, p. ej. 7:05")
+    return box
 
 
 def set_time(box, value: Optional[str]):
-    if value and box.findData(value) < 0:
-        box.addItem(value, value)
-    box.setCurrentIndex(max(0, box.findData(value)))
+    if value:
+        _select_value(box, value, value)
+    else:
+        box.setCurrentIndex(max(0, box.findData(None)))
 
 
 def duration_combo(height: int = 30):
-    items = []
-    for m in DURATION_CHOICES:
-        h, rest = divmod(m, 60)
-        label = f"{m} min" if not h else (f"{h} h" if not rest else f"{h} h {rest} min")
-        items.append((label, m))
-    return combo(items, height=height)
+    box = combo([(duration_label(m), m) for m in DURATION_CHOICES], height=height)
+    _make_editable(box, parse_duration_text, duration_label, "p. ej. 2 h 30 min")
+    box.setToolTip("Elige de la lista o escribe una duración: 2 h 30 min, 2:30, 150…")
+    return box
 
 
 def set_duration(box, minutes: Optional[int]):
-    if minutes and box.findData(minutes) < 0:
-        box.addItem(f"{minutes} min", minutes)
-    index = box.findData(minutes or 30)
-    box.setCurrentIndex(max(0, index))
+    _select_value(box, minutes or 30, duration_label(minutes or 30))
 
 
 def reminder_combo(height: int = 30):

@@ -17,6 +17,7 @@ from .vista_semana import VistaSemana
 from .vista_mes import VistaMes
 from .vista_agenda import VistaAgenda
 from .evento_editor import EventoEditorDialog
+from . import month_name
 
 VIEW_DIA = 0
 VIEW_SEMANA = 1
@@ -65,11 +66,13 @@ class CalendarioPanel(QWidget):
         bar_lay.setSpacing(10)
 
         # Prev / Hoy / Next Navigation
-        self.prev_btn = QPushButton("◄")
+        self.prev_btn = QPushButton("‹")
         self.prev_btn.setFixedSize(30, 30)
         self.prev_btn.setCursor(Qt.PointingHandCursor)
+        self.prev_btn.setToolTip("Anterior")
         self.prev_btn.setStyleSheet("""
-            QPushButton { background: #25252b; border: 1px solid #33333e; border-radius: 4px; color: #dcdde0; }
+            QPushButton { background: #25252b; border: 1px solid #33333e; border-radius: 4px; color: #dcdde0;
+                          padding: 0px 0px 3px 0px; min-width: 28px; max-width: 28px; font-size: 20px; }
             QPushButton:hover { background: #2a2a32; border-color: #2383e2; }
         """)
         self.prev_btn.clicked.connect(self._nav_prev)
@@ -85,11 +88,13 @@ class CalendarioPanel(QWidget):
         self.today_btn.clicked.connect(self._nav_today)
         bar_lay.addWidget(self.today_btn)
 
-        self.next_btn = QPushButton("►")
+        self.next_btn = QPushButton("›")
         self.next_btn.setFixedSize(30, 30)
         self.next_btn.setCursor(Qt.PointingHandCursor)
+        self.next_btn.setToolTip("Siguiente")
         self.next_btn.setStyleSheet("""
-            QPushButton { background: #25252b; border: 1px solid #33333e; border-radius: 4px; color: #dcdde0; }
+            QPushButton { background: #25252b; border: 1px solid #33333e; border-radius: 4px; color: #dcdde0;
+                          padding: 0px 0px 3px 0px; min-width: 28px; max-width: 28px; font-size: 20px; }
             QPushButton:hover { background: #2a2a32; border-color: #2383e2; }
         """)
         self.next_btn.clicked.connect(self._nav_next)
@@ -226,16 +231,19 @@ class CalendarioPanel(QWidget):
     def _update_header_title(self):
         d = self.current_date
         if self.current_view_idx == VIEW_DIA:
-            self.title_label.setText(d.strftime("%d de %B de %Y").capitalize())
+            self.title_label.setText(f"{d.day} de {month_name(d)} de {d.year}")
         elif self.current_view_idx == VIEW_SEMANA:
             start_w = d - timedelta(days=d.weekday())
             end_w = start_w + timedelta(days=6)
             if start_w.month == end_w.month:
-                self.title_label.setText(f"{start_w.day} - {end_w.day} {start_w.strftime('%B %Y')}".capitalize())
+                self.title_label.setText(
+                    f"{start_w.day} – {end_w.day} de {month_name(start_w)} de {start_w.year}")
             else:
-                self.title_label.setText(f"{start_w.strftime('%d %b')} - {end_w.strftime('%d %b %Y')}".capitalize())
+                self.title_label.setText(
+                    f"{start_w.day} {month_name(start_w)[:3]} – "
+                    f"{end_w.day} {month_name(end_w)[:3]} {end_w.year}")
         elif self.current_view_idx == VIEW_MES:
-            self.title_label.setText(d.strftime("%B de %Y").capitalize())
+            self.title_label.setText(f"{month_name(d).capitalize()} de {d.year}")
         elif self.current_view_idx == VIEW_AGENDA:
             self.title_label.setText("Agenda")
 

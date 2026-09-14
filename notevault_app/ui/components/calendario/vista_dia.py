@@ -19,6 +19,7 @@ from PySide6.QtGui import (
 from ... import theme
 from ....core.schedule_manager import Occurrence
 from .evento_editor import EventoEditorDialog
+from . import month_name, weekday_name
 
 HOUR_HEIGHT = 56       # pixels per hour
 LEFT_MARGIN = 55       # width of time label column
@@ -381,7 +382,9 @@ class VistaDia(QWidget):
         self.refresh()
 
     def refresh(self):
-        self.date_label.setText(self.current_date.strftime("%A, %d de %B de %Y").capitalize())
+        d = self.current_date
+        self.date_label.setText(
+            f"{weekday_name(d).capitalize()}, {d.day} de {month_name(d)} de {d.year}")
         occs = self.schedule_mgr.day(self.current_date)
         settings = self.schedule_mgr.settings()
         sh = settings.get("day_start_hour", 6)

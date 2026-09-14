@@ -14,6 +14,7 @@ from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QFont, QKeySequence, Q
 from ... import theme
 from ....core import vault_format
 from ....core.schedule_manager import Occurrence
+from . import WEEKDAYS_ES
 
 
 class MonthDayCell(QFrame):
@@ -153,8 +154,8 @@ class VistaMes(QWidget):
         header_lay.setContentsMargins(0, 0, 0, 0)
         header_lay.setSpacing(0)
 
-        for k in vault_format.WEEKDAY_KEYS:
-            lbl = QLabel(k.capitalize()[:3])
+        for k in WEEKDAYS_ES:
+            lbl = QLabel(k[:3].capitalize())
             lbl.setAlignment(Qt.AlignCenter)
             lbl.setStyleSheet("font-size: 12px; font-weight: bold; color: #888895;")
             header_lay.addWidget(lbl, stretch=1)
@@ -204,6 +205,7 @@ class VistaMes(QWidget):
         while self.grid_layout.count():
             child = self.grid_layout.takeAt(0)
             if child.widget():
+                child.widget().hide()
                 child.widget().deleteLater()
 
         # Calculate 42-day range (6 weeks)

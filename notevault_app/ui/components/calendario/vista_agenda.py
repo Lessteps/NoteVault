@@ -15,6 +15,7 @@ from PySide6.QtGui import QColor, QFont, QKeySequence, QShortcut
 from ... import theme
 from ....core.schedule_manager import Occurrence
 from .evento_editor import EventoEditorDialog
+from . import month_name, weekday_name
 
 
 class AgendaItemRow(QFrame):
@@ -187,6 +188,7 @@ class VistaAgenda(QWidget):
         while self.list_layout.count():
             child = self.list_layout.takeAt(0)
             if child.widget():
+                child.widget().hide()
                 child.widget().deleteLater()
 
         start_d = self.current_date
@@ -211,7 +213,8 @@ class VistaAgenda(QWidget):
                 elif curr == today + timedelta(days=1):
                     rel_prefix = "Mañana · "
 
-                date_header = QLabel(f"{rel_prefix}{curr.strftime('%A %d de %B').capitalize()}")
+                date_header = QLabel(
+                    f"{rel_prefix}{weekday_name(curr).capitalize()} {curr.day} de {month_name(curr)}")
                 date_header.setStyleSheet("font-size: 13px; font-weight: bold; color: #2383e2; margin-top: 10px; margin-bottom: 2px;")
                 self.list_layout.addWidget(date_header)
 

@@ -18,6 +18,7 @@ from ... import theme
 from ....core import vault_format
 from ....core.schedule_manager import Occurrence
 from .evento_editor import EventoEditorDialog
+from . import WEEKDAYS_ES
 
 HOUR_HEIGHT = 56
 LEFT_MARGIN = 55
@@ -421,7 +422,7 @@ class VistaSemana(QWidget):
         today = date.today()
         for idx in range(7):
             d = start_w + timedelta(days=idx)
-            w_name = vault_format.WEEKDAY_KEYS[idx].capitalize()[:3]
+            w_name = WEEKDAYS_ES[idx][:3].capitalize()
             txt = f"{w_name} {d.day}"
             lbl = self.col_labels[idx]
             lbl.setText(txt)

@@ -192,7 +192,8 @@ class MainWindow(QMainWindow):
         self._calendario_left.filters_changed.connect(self._calendario_panel.set_filters)
         self._calendario_panel.view_changed.connect(self._calendario_left.set_active_view)
         self._calendario_panel.date_changed.connect(self._calendario_left.set_active_date)
-        self._calendario_panel.status_message.connect(self.status_bar.showMessage)
+        self._calendario_panel.status_message.connect(
+            lambda msg: self.status_bar.showMessage(msg, 4000))
         self._calendario_panel.notify_requested.connect(self._notify)
         self._dashboard.go_habits.connect(lambda: self._switch_mode(MODE_HABITS))
         self._dashboard.go_ejercicio.connect(lambda: self._switch_mode(MODE_EJERCICIO))

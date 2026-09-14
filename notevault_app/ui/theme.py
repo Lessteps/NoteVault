@@ -128,6 +128,15 @@ _DARK_TO_LIGHT.update({
     "#fbfbfd": "#171310",   # "brightest" hover -> darkest on light
 })
 
+# Colours used by the calendario module.
+_DARK_TO_LIGHT.update({
+    "#25252b": "#efe7d8",   # nav buttons, event chips
+    "#2d2d38": "#d7c8ab",   # month cell border, table grid
+    "#2f2f38": "#e2d6bf",   # week column separator
+    "#2dd4bf": "#0f8c7d",   # teal
+    "#eab308": "#a87a00",   # yellow
+})
+
 _HEX_RE = re.compile(r"#[0-9a-fA-F]{6}\b")
 _WHITE_RGBA_RE = re.compile(r"rgba\(\s*255\s*,\s*255\s*,\s*255\s*,")
 

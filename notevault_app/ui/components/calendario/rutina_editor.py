@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QDate, QTime
 from ....core import vault_format
+from . import weekday_name
 
 COLOR_PRESETS = [
     ("blue", "#2383e2", "Azul"),
@@ -396,8 +397,8 @@ class RutinaEditorDialog(QDialog):
 
         preview_msg = []
         for d, occs in next_week.items():
-            day_str = d.strftime("%d/%m (%A)")
-            items = [f"• {o.start or 'All-day'} - {o.title} ({o.kind})" for o in occs if o.kind == "routine"]
+            day_str = f"{d.strftime('%d/%m')} ({weekday_name(d)})"
+            items = [f"• {o.start or 'Todo el día'} - {o.title}" for o in occs if o.kind == "routine"]
             if not items:
                 items = ["• Sin rutinas"]
             preview_msg.append(f"{day_str}:\n" + "\n".join(items))

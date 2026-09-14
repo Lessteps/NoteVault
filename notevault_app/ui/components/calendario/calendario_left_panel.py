@@ -16,6 +16,7 @@ from PySide6.QtGui import QFont
 from ....config import AppConfig
 from ....core import vault_format
 from .rutina_editor import RutinaEditorDialog
+from . import month_name
 
 
 def _section_label(text: str) -> QLabel:
@@ -42,11 +43,14 @@ class _NavBtn(QPushButton):
         ico = QLabel(icon)
         ico.setStyleSheet("font-size:13px; background:transparent; border:none;")
         ico.setFixedWidth(20)
+        ico.setAttribute(Qt.WA_TransparentForMouseEvents)
         row.addWidget(ico)
 
-        txt = QLabel(label)
-        txt.setStyleSheet("font-size:12px; background:transparent; border:none;")
-        row.addWidget(txt, stretch=1)
+        self._txt = QLabel(label)
+        self._txt.setAttribute(Qt.WA_TransparentForMouseEvents)
+        row.addWidget(self._txt, stretch=1)
+        self.toggled.connect(self._paint_label)
+        self._paint_label(False)
 
         self.setStyleSheet("""
             QPushButton {
@@ -58,6 +62,11 @@ class _NavBtn(QPushButton):
                 background: #2383e2; color: #ffffff; font-weight: bold;
             }
         """)
+
+    def _paint_label(self, checked: bool):
+        colour = "#ffffff; font-weight:bold" if checked else "#dcdde0"
+        self._txt.setStyleSheet(
+            f"font-size:12px; background:transparent; border:none; color:{colour};")
 
 
 class MiniMonthWidget(QWidget):
@@ -130,9 +139,11 @@ class MiniMonthWidget(QWidget):
         while self.grid.count():
             child = self.grid.takeAt(0)
             if child.widget():
+                child.widget().hide()
                 child.widget().deleteLater()
 
-        self.month_lbl.setText(self.current_month_date.strftime("%B %Y").capitalize())
+        m = self.current_month_date
+        self.month_lbl.setText(f"{month_name(m).capitalize()} {m.year}")
 
         # Weekday headers
         headers = ["L", "M", "X", "J", "V", "S", "D"]
@@ -158,14 +169,17 @@ class MiniMonthWidget(QWidget):
                 is_act = (curr_d == self.active_date)
                 is_tod = (curr_d == today)
 
+                base = "padding: 0px; margin: 0px; min-width: 0px; min-height: 0px; border-radius: 11px; font-size: 10px;"
                 if is_act:
-                    btn.setStyleSheet("background: #2383e2; color: #ffffff; border-radius: 11px; font-size: 10px; font-weight: bold; border: none;")
+                    btn.setStyleSheet(f"QPushButton {{ {base} background: #2383e2; color: #ffffff; font-weight: bold; border: none; }}")
                 elif is_tod:
-                    btn.setStyleSheet("background: #26262e; color: #2383e2; border-radius: 11px; font-size: 10px; font-weight: bold; border: 1px solid #2383e2;")
+                    btn.setStyleSheet(f"QPushButton {{ {base} background: transparent; color: #2383e2; font-weight: bold; border: 1px solid #2383e2; }}")
                 elif is_curr_m:
-                    btn.setStyleSheet("background: transparent; color: #dcdde0; border-radius: 11px; font-size: 10px; border: none;")
+                    btn.setStyleSheet(f"QPushButton {{ {base} background: transparent; color: #dcdde0; border: none; }}"
+                                      f"QPushButton:hover {{ background: #26262e; }}")
                 else:
-                    btn.setStyleSheet("background: transparent; color: #555560; border-radius: 11px; font-size: 10px; border: none;")
+                    btn.setStyleSheet(f"QPushButton {{ {base} background: transparent; color: #555560; border: none; }}"
+                                      f"QPushButton:hover {{ background: #26262e; }}")
 
                 btn.clicked.connect(lambda _, d=curr_d: self._on_date_click(d))
                 self.grid.addWidget(btn, row, col)

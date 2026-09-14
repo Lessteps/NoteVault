@@ -57,7 +57,7 @@ class Recurrence:
 
     @classmethod
     def parse(cls, text: Optional[str]) -> "Recurrence":
-        text = (text or "").strip().lower()
+        text = text.strip().lower() if isinstance(text, str) else ""
         if not text or text == NONE:
             return cls()
         kind, _, args = text.partition(":")

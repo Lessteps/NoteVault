@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ....core.habit_manager import HabitManager, habit_days, DAY_INITIALS
+from ....core.habit_manager import HabitManager, DAY_INITIALS, habit_schedule_text
 from .notion_widgets import (
     card_frame, SectionHeader,
     BG_PAGE, BORDER, TEXT, TEXT_DIM, TEXT_FAINT, BLUE,
@@ -42,30 +42,6 @@ class _DayToggle(QPushButton):
         )
 
 
-def _small_btn(text: str, color: str = TEXT_DIM) -> QPushButton:
-    b = QPushButton(text)
-    b.setCursor(Qt.PointingHandCursor)
-    b.setFixedHeight(24)
-    b.setStyleSheet(
-        f"QPushButton{{background:#1e1e1e;border:1px solid {BORDER};"
-        f"border-radius:5px;color:{color};font-size:11px;padding:0 10px;}}"
-        f"QPushButton:hover{{border-color:{BLUE};color:{TEXT};}}"
-    )
-    return b
-
-
-def _line_edit(placeholder: str, height: int = 30) -> QLineEdit:
-    e = QLineEdit()
-    e.setPlaceholderText(placeholder)
-    e.setFixedHeight(height)
-    e.setStyleSheet(
-        f"QLineEdit{{background:#252525;border:1px solid {BORDER};border-radius:6px;"
-        f"color:{TEXT};font-size:12px;padding:0 10px;}}"
-        f"QLineEdit:focus{{border-color:{BLUE};}}"
-    )
-    return e
-
-
 class HabitManageView(QWidget):
     habits_changed = Signal()
 
@@ -75,7 +51,6 @@ class HabitManageView(QWidget):
         self._selected_icon = ICON_OPTIONS[0]
         self._icon_btns: list = []
         self._new_days: set = set(range(7))
-        self._expanded: set = set()      # habit ids whose detail panel is open
         self._init_ui()
 
     # ── UI scaffolding ────────────────────────────────────────────────────
@@ -105,7 +80,8 @@ class HabitManageView(QWidget):
         list_lay.addWidget(SectionHeader("📋", "Hábitos actuales"))
 
         hint = QLabel(
-            "Pulsa ⚙ en un hábito para elegir sus días y añadir subtareas."
+            "Pulsa ⚙ en un hábito para su frecuencia, horario en el calendario, "
+            "aviso, color, subtareas y pausa."
         )
         hint.setStyleSheet(
             f"color:{TEXT_FAINT};font-size:11px;background:transparent;border:none;"
@@ -211,6 +187,17 @@ class HabitManageView(QWidget):
         add_btn.clicked.connect(self._add_habit)
         add_lay.addWidget(add_btn)
 
+        more_btn = QPushButton("Añadir con más opciones…")
+        more_btn.setCursor(Qt.PointingHandCursor)
+        more_btn.setFixedHeight(34)
+        more_btn.setStyleSheet(
+            f"QPushButton{{background:transparent;border:1px solid {BORDER};border-radius:8px;"
+            f"color:{BLUE};font-size:13px;}}"
+            f"QPushButton:hover{{border-color:{BLUE};}}"
+        )
+        more_btn.clicked.connect(self._add_with_options)
+        add_lay.addWidget(more_btn)
+
         self._status_lbl = QLabel("")
         self._status_lbl.setStyleSheet(
             f"color:{TEXT_DIM};font-size:11px;background:transparent;border:none;"
@@ -242,42 +229,26 @@ class HabitManageView(QWidget):
 
     def _remove_habit(self, habit_id: str):
         self.manager.remove_habit(habit_id)
-        self._expanded.discard(habit_id)
         self.habits_changed.emit()
         self.refresh()
 
-    def _toggle_expand(self, habit_id: str):
-        if habit_id in self._expanded:
-            self._expanded.discard(habit_id)
-        else:
-            self._expanded.add(habit_id)
-        self.refresh()
+    def _add_with_options(self):
+        preset = {
+            "name": self._name_input.text().strip(),
+            "icon": self._selected_icon,
+            "days": sorted(self._new_days) or list(range(7)),
+        }
+        self.open_editor(None, preset)
 
-    def _toggle_day(self, habit: dict, day_index: int, checked: bool):
-        days = set(habit_days(habit))
-        if checked:
-            days.add(day_index)
-        else:
-            days.discard(day_index)
-        if not days:                      # never leave a habit with no days
-            days = set(range(7))
-        self.manager.set_habit_days(habit["id"], sorted(days))
-        self.habits_changed.emit()
-        self.refresh()
-
-    def _add_subtask(self, habit_id: str, editor: QLineEdit):
-        name = editor.text().strip()
-        if not name:
-            return
-        self.manager.add_subtask(habit_id, name)
-        editor.clear()
-        self.habits_changed.emit()
-        self.refresh()
-
-    def _remove_subtask(self, habit_id: str, subtask_id: str):
-        self.manager.remove_subtask(habit_id, subtask_id)
-        self.habits_changed.emit()
-        self.refresh()
+    def open_editor(self, habit_id=None, preset=None):
+        from .habit_editor import HabitEditor
+        habit = self.manager.get_habit(habit_id) if habit_id else None
+        dialog = HabitEditor(self.manager, habit, preset, self)
+        if dialog.exec():
+            if habit is None:
+                self._name_input.clear()
+            self.habits_changed.emit()
+            self.refresh()
 
     # ── Render ────────────────────────────────────────────────────────────
 
@@ -327,11 +298,15 @@ class HabitManageView(QWidget):
         )
         rlay.addWidget(nm, stretch=1)
 
-        # Day summary chip
-        days = habit_days(h)
-        chip_text = ("Todos los días" if len(days) == 7
-                     else " ".join(DAY_INITIALS[d] for d in sorted(days)))
-        chip = QLabel(chip_text)
+        if h.get("in_calendar"):
+            cal = QLabel("📅")
+            cal.setToolTip("Aparece en el calendario")
+            cal.setStyleSheet("font-size:12px;background:transparent;border:none;")
+            rlay.addWidget(cal)
+
+        chip = QLabel(habit_schedule_text(h))
+        chip.setFixedHeight(24)
+        chip.setAlignment(Qt.AlignCenter)
         chip.setStyleSheet(
             f"color:{BLUE};font-size:10px;background:#1e1e1e;border:1px solid {BORDER};"
             "border-radius:5px;padding:3px 8px;"
@@ -350,12 +325,13 @@ class HabitManageView(QWidget):
         gear = QPushButton("⚙")
         gear.setFixedSize(26, 26)
         gear.setCursor(Qt.PointingHandCursor)
+        gear.setToolTip("Editar hábito")
         gear.setStyleSheet(
             "QPushButton{background:transparent;border:none;"
-            f"color:{'#2383e2' if hid in self._expanded else '#7a7a86'};font-size:14px;}}"
+            "color:#7a7a86;font-size:14px;}"
             f"QPushButton:hover{{color:{BLUE};}}"
         )
-        gear.clicked.connect(lambda _, _id=hid: self._toggle_expand(_id))
+        gear.clicked.connect(lambda _, _id=hid: self.open_editor(_id))
         rlay.addWidget(gear)
 
         rm = QPushButton("✕")
@@ -370,103 +346,7 @@ class HabitManageView(QWidget):
         rlay.addWidget(rm)
 
         blay.addWidget(row)
-
-        # ── Detail panel ──────────────────────────────────────────────────
-        if hid in self._expanded:
-            blay.addWidget(self._detail_panel(h))
-
         return block
-
-    def _detail_panel(self, h: dict) -> QWidget:
-        hid = h["id"]
-        panel = QWidget()
-        panel.setStyleSheet("background:transparent;")
-        play = QVBoxLayout(panel)
-        play.setContentsMargins(14, 0, 14, 14)
-        play.setSpacing(8)
-
-        sep = QFrame()
-        sep.setFixedHeight(1)
-        sep.setStyleSheet(f"background:{BORDER};border:none;")
-        play.addWidget(sep)
-
-        # Days
-        d_lbl = QLabel("Días activos")
-        d_lbl.setStyleSheet(
-            f"color:{TEXT_FAINT};font-size:10px;font-weight:600;"
-            "letter-spacing:0.6px;background:transparent;border:none;"
-        )
-        play.addWidget(d_lbl)
-
-        active = set(habit_days(h))
-        days_row = QHBoxLayout()
-        days_row.setSpacing(6)
-        for i, ini in enumerate(DAY_INITIALS):
-            t = _DayToggle(ini, i in active)
-            t.clicked.connect(
-                lambda checked, _h=h, _i=i: self._toggle_day(_h, _i, checked)
-            )
-            days_row.addWidget(t)
-        days_row.addStretch()
-        play.addLayout(days_row)
-
-        # Subtasks
-        s_lbl = QLabel("Subtareas")
-        s_lbl.setStyleSheet(
-            f"color:{TEXT_FAINT};font-size:10px;font-weight:600;"
-            "letter-spacing:0.6px;background:transparent;border:none;"
-        )
-        play.addWidget(s_lbl)
-
-        for s in h.get("subtasks") or []:
-            s_row = QWidget()
-            s_row.setFixedHeight(28)
-            s_row.setStyleSheet("background:transparent;")
-            sl = QHBoxLayout(s_row)
-            sl.setContentsMargins(6, 0, 0, 0)
-            sl.setSpacing(8)
-
-            bullet = QLabel("•")
-            bullet.setStyleSheet(
-                f"color:{TEXT_FAINT};font-size:13px;background:transparent;border:none;"
-            )
-            sl.addWidget(bullet)
-
-            n = QLabel(s["name"])
-            n.setStyleSheet(
-                f"color:{TEXT_DIM};font-size:12px;background:transparent;border:none;"
-            )
-            sl.addWidget(n, stretch=1)
-
-            x = QPushButton("✕")
-            x.setFixedSize(22, 22)
-            x.setCursor(Qt.PointingHandCursor)
-            x.setStyleSheet(
-                "QPushButton{background:transparent;border:none;"
-                "color:#555560;font-size:11px;}"
-                "QPushButton:hover{color:#f2555a;}"
-            )
-            x.clicked.connect(
-                lambda _, _h=hid, _s=s["id"]: self._remove_subtask(_h, _s)
-            )
-            sl.addWidget(x)
-            play.addWidget(s_row)
-
-        add_row = QHBoxLayout()
-        add_row.setSpacing(8)
-        editor = _line_edit("Nueva subtarea...")
-        add_row.addWidget(editor, stretch=1)
-        add_b = _small_btn("+ Añadir", BLUE)
-        add_b.clicked.connect(
-            lambda _, _h=hid, _e=editor: self._add_subtask(_h, _e)
-        )
-        editor.returnPressed.connect(
-            lambda _h=hid, _e=editor: self._add_subtask(_h, _e)
-        )
-        add_row.addWidget(add_b)
-        play.addLayout(add_row)
-
-        return panel
 
     def set_manager(self, manager: HabitManager):
         self.manager = manager

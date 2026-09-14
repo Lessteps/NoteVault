@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import vault_format
+from .recurrence import Recurrence, parse_date as _parse_any_date
 
 STATUS_TODO   = "Sin empezar"
 STATUS_DOING  = "En progreso"
@@ -96,10 +97,13 @@ class Task:
         self.reminder: Optional[datetime] = fields.get("reminder")
         self.reminder_done: bool = bool(fields.get("reminder_done", False))
         self.body: str = fields.get("body", "")
+        self.repeat: str = Recurrence.parse(fields.get("repeat")).to_string()
+        self.repeat_until: Optional[date] = _parse_any_date(fields.get("repeat_until"))
 
         known_keys = {
             "id", "name", "created", "start", "start_time", "due", "due_time",
-            "status", "subject", "priority", "reminder", "reminder_done", "body", "extra_fields"
+            "status", "subject", "priority", "reminder", "reminder_done", "body",
+            "repeat", "repeat_until", "extra_fields"
         }
         self.extra_fields: dict = fields.get("extra_fields") if "extra_fields" in fields else {
             k: v for k, v in fields.items() if k not in known_keys
@@ -110,6 +114,20 @@ class Task:
     @property
     def is_done(self) -> bool:
         return self.status == STATUS_DONE
+
+    @property
+    def rule(self) -> Recurrence:
+        return Recurrence.parse(self.repeat)
+
+    @property
+    def anchor(self) -> Optional[date]:
+        return self.due or self.start
+
+    def occurs_on(self, d: date) -> bool:
+        """Due on d, either once or as one repetition of the rule."""
+        if not self.rule.repeats:
+            return self.due == d or self.start == d
+        return self.rule.occurs_on(d, self.anchor, self.repeat_until)
 
     @property
     def is_overdue(self) -> bool:
@@ -184,7 +202,8 @@ class TaskManager:
         tid = fm.get("id") or path.stem
         known_keys = {
             "id", "name", "created", "start", "start_time", "due", "due_time",
-            "status", "subject", "priority", "reminder", "reminder_done", "extra_fields"
+            "status", "subject", "priority", "reminder", "reminder_done",
+            "repeat", "repeat_until", "extra_fields"
         }
         extra_fields = {k: v for k, v in fm.items() if k not in known_keys}
 
@@ -202,6 +221,8 @@ class TaskManager:
             reminder=parse_dt(fm.get("reminder", "")),
             reminder_done=fm.get("reminder_done", "false") == "true",
             body="\n".join(body_lines).strip(),
+            repeat=fm.get("repeat", ""),
+            repeat_until=fm.get("repeat_until", ""),
             extra_fields=extra_fields,
         )
 
@@ -226,6 +247,13 @@ class TaskManager:
             f"reminder: {task.reminder.isoformat(timespec='minutes') if task.reminder else ''}",
             f"reminder_done: {'true' if task.reminder_done else 'false'}",
         ])
+        # After the fixed keys, where the mobile client keeps keys it does not
+        # model, so both writers produce the same bytes.
+        if task.repeat:
+            quoted = f'"{task.repeat}"' if ":" in task.repeat else task.repeat
+            lines.append(f"repeat: {quoted}")
+            if task.repeat_until:
+                lines.append(f"repeat_until: {task.repeat_until.isoformat()}")
         for k, v in task.extra_fields.items():
             if isinstance(v, str) and (" " in v or ":" in v) and not (v.startswith('"') or v.startswith("'")):
                 lines.append(f'{k}: "{v}"')
@@ -258,13 +286,38 @@ class TaskManager:
         task = self.get(task_id)
         if not task:
             return None
+        was_done = task.is_done
         for k, v in fields.items():
+            if k == "repeat":
+                v = Recurrence.parse(v).to_string()
+            elif k == "repeat_until":
+                v = _parse_any_date(v)
             if hasattr(task, k):
                 setattr(task, k, v)
             else:
                 task.extra_fields[k] = v
+        if task.is_done and not was_done:
+            self._roll_forward(task)
         self.save(task)
         return task
+
+    @staticmethod
+    def _roll_forward(task: Task):
+        """Completing a repeating task moves it to its next date, like a to-do app."""
+        rule = task.rule
+        if not rule.repeats or task.due is None:
+            return
+        nxt = rule.next_after(task.due, task.due, task.repeat_until)
+        if nxt is None:
+            return
+        shift = nxt - task.due
+        task.due = nxt
+        if task.start is not None:
+            task.start = task.start + shift
+        if task.reminder is not None:
+            task.reminder = task.reminder + shift
+            task.reminder_done = False
+        task.status = STATUS_TODO
 
     def delete(self, task_id: str):
         p = self._path(task_id)

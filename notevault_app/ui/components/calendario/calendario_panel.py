@@ -9,11 +9,13 @@ from PySide6.QtCore import Qt, Signal, QEvent, QPoint, QRect, QSize
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QStackedWidget, QFrame,
+    QStackedWidget, QFrame, QMenu,
 )
 
 from ....config import AppConfig
-from ....core.schedule_manager import ScheduleManager
+from ....core.recurrence import Recurrence, parse_date
+from ....core.schedule_manager import ScheduleManager, HABIT_PREFIX
+from ....core.vault_format import WEEKDAY_KEYS
 from .rejilla_horaria import TimeGridView
 from .vista_dia import VistaDia
 from .vista_semana import VistaSemana
@@ -60,6 +62,7 @@ class CalendarioPanel(QWidget):
     view_changed = Signal(str)
     date_changed = Signal(date)
     status_message = Signal(str)
+    open_habits_requested = Signal(str)    # habit id, or "" for the module
 
     def __init__(self, schedule_mgr: ScheduleManager, parent=None):
         super().__init__(parent)
@@ -266,12 +269,44 @@ class CalendarioPanel(QWidget):
 
     def _open_occurrence(self, occ, rect: QRect):
         self.close_popover()
+        if occ.kind == "habit":
+            self._habit_menu(occ, rect)
+            return
         info = self._edit_info(occ)
         if info is None:
             self.status_message.emit(f"«{occ.title}» se edita desde su propio módulo")
             return
         self.popover.open_edit(info)
         self._show_popover(rect)
+
+    def _habit_menu(self, occ, rect: QRect):
+        menu = QMenu(self)
+        menu.setStyleSheet(
+            "QMenu { background: #202020; border: 1px solid #2f2f2f; padding: 6px 0px;"
+            " color: #e6e6e6; font-size: 14px; }"
+            "QMenu::item { padding: 8px 28px 8px 16px; }"
+            "QMenu::item:selected { background: #2a2a2a; }"
+            "QMenu::item:disabled { color: #9b9b9b; }")
+        title = menu.addAction(occ.title)
+        title.setEnabled(False)
+        menu.addSeparator()
+        habit_id = occ.id[len(HABIT_PREFIX):] if occ.id.startswith(HABIT_PREFIX) else ""
+        if habit_id:
+            label = "Desmarcar" if occ.done else "Marcar como hecho"
+            menu.addAction(label).triggered.connect(
+                lambda: self._set_habit_done(occ, not occ.done))
+            menu.addAction("Editar hábito…").triggered.connect(
+                lambda: self.open_habits_requested.emit(habit_id))
+        else:
+            menu.addAction("Abrir Hábitos").triggered.connect(
+                lambda: self.open_habits_requested.emit(""))
+        menu.exec(QPoint(rect.right() + 4, rect.top()))
+
+    def _set_habit_done(self, occ, done: bool):
+        self.schedule_mgr.set_done(occ.date, occ.id, done)
+        self.refresh_current()
+        self.data_changed.emit()
+        self.status_message.emit(f"{occ.title}: {'hecho' if done else 'pendiente'}")
 
     def _show_popover(self, global_rect):
         pop = self.popover
@@ -358,16 +393,21 @@ class CalendarioPanel(QWidget):
                         start=ev.get("start"), duration=ev.get("duration_min"),
                         location=ev.get("location", ""), description=ev.get("notes", ""),
                         reminder_min=_int_or_none(ev.get("reminder_min")),
-                        colour=ev.get("colour"), days=[], subject="")
+                        colour=ev.get("colour"), repeat="", until=None, subject="")
         if occ.kind == "routine":
             rt = next((r for r in sm.routines() if r.get("id") == occ.id), None)
             if rt is None:
                 return None
+            rule = Recurrence.parse(rt.get("repeat"))
+            if not rule.repeats:
+                rule = Recurrence.from_weekdays(
+                    WEEKDAY_KEYS.index(k) for k in rt.get("days", []) if k in WEEKDAY_KEYS)
             return dict(kind="routine", id=occ.id, date=occ.date, title=rt.get("title", ""),
                         start=rt.get("start"), duration=rt.get("duration_min"),
                         location=rt.get("location", ""), description=rt.get("notes", ""),
                         reminder_min=_int_or_none(rt.get("reminder_min")),
-                        colour=rt.get("colour"), days=rt.get("days", []), subject="")
+                        colour=rt.get("colour"), repeat=rule.to_string(),
+                        until=parse_date(rt.get("active_until")), subject="")
         if occ.kind == "task":
             task_id = occ.id[len("task_"):]
             task = sm.task_mgr.get(task_id)
@@ -379,9 +419,10 @@ class CalendarioPanel(QWidget):
             if task.reminder and start is not None and not task.reminder_done:
                 begins = datetime.combine(occ.date, time(start // 60, start % 60))
                 reminder = max(0, int((begins - task.reminder).total_seconds() // 60))
-            return dict(kind="task", id=task_id, date=occ.date, title=task.name,
+            return dict(kind="task", id=task_id, date=task.due or occ.date, title=task.name,
                         start=clock, duration=None, location="", description=task.body,
-                        reminder_min=reminder, colour=None, days=[], subject=task.subject)
+                        reminder_min=reminder, colour=None, repeat=task.repeat,
+                        until=task.repeat_until, subject=task.subject)
         return None
 
     # ── Writing ───────────────────────────────────────────────────────────
@@ -405,7 +446,7 @@ class CalendarioPanel(QWidget):
         fields = dict(title=p["title"], start=p["start"], duration_min=p["duration"],
                       colour=p["colour"], notes=p["description"], location=p["location"],
                       reminder_min=p["reminder_min"])
-        if p["repeat"] == "none":
+        if not p["repeat"]:
             if orig_kind == "routine":
                 sm.remove_routine(orig["id"])
                 sm.add_event(p["date"], **fields)
@@ -422,7 +463,8 @@ class CalendarioPanel(QWidget):
             self._after_write("Evento guardado")
             return
 
-        routine = dict(fields, days=p["days"])
+        routine = dict(fields, days=p["days"], repeat=p["repeat"],
+                       active_until=p["until"].isoformat() if p["until"] else None)
         if orig_kind == "routine":
             sm.update_routine(orig["id"], **routine)
         else:
@@ -439,7 +481,8 @@ class CalendarioPanel(QWidget):
             reminder = datetime.combine(p["date"], time(start // 60, start % 60)) \
                 - timedelta(minutes=p["reminder_min"])
         fields = dict(due=p["date"], due_time=p["start"], body=p["description"],
-                      subject=p["subject"], reminder=reminder, reminder_done=False)
+                      subject=p["subject"], reminder=reminder, reminder_done=False,
+                      repeat=p["repeat"], repeat_until=p["until"] if p["repeat"] else None)
         if p["mode"] == "edit":
             task = tm.get(p["orig"]["id"])
             if task is not None and task.start == task.due:

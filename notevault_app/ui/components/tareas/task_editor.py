@@ -4,7 +4,7 @@ Edits every column of a task plus the markdown body stored in its own
 .md file inside {vault}/tareas/.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QTextEdit,
     QPushButton, QWidget, QComboBox,
@@ -19,6 +19,7 @@ from .tareas_common import (
     COMBO_SS, line_edit, combo, flat_btn, primary_btn, hline,
 )
 from .date_picker import DateButton
+from ..programacion import RecurrencePicker, time_combo, set_time
 
 
 class _StarPicker(QWidget):
@@ -74,7 +75,7 @@ class TaskEditor(QDialog):
         self.manager = manager
         self.task = task
         self.setWindowTitle(task.name or "Tarea")
-        self.setMinimumSize(680, 640)
+        self.setMinimumSize(700, 820)
         self.setStyleSheet(f"QDialog{{background:{BG_PAGE};}}")
         self._deleted = False
         self._build()
@@ -135,8 +136,39 @@ class TaskEditor(QDialog):
         r += 1
 
         grid.addWidget(_field_label("Fecha límite"), r, 0)
+        due_row = QHBoxLayout()
+        due_row.setSpacing(8)
         self._due = DateButton(self.task.due, height=28)
-        grid.addWidget(self._due, r, 1)
+        due_row.addWidget(self._due, stretch=1)
+        self._due_time = time_combo(empty_label="Sin hora", height=28)
+        self._due_time.setFixedWidth(110)
+        self._due_time.setToolTip("Con hora, la tarea aparece a esa hora en Calendario")
+        set_time(self._due_time, self.task.due_time)
+        due_row.addWidget(self._due_time)
+        grid.addLayout(due_row, r, 1)
+        r += 1
+
+        grid.addWidget(_field_label("Repetición"), r, 0, Qt.AlignTop)
+        rep_box = QVBoxLayout()
+        rep_box.setSpacing(8)
+        self._repeat = RecurrencePicker(allow_none=True, show_range=False)
+        self._repeat.set_value(self.task.repeat)
+        self._repeat.changed.connect(self._sync_repeat)
+        rep_box.addWidget(self._repeat)
+        until_row = QHBoxLayout()
+        until_row.setSpacing(8)
+        self._until_label = _field_label("Repetir hasta")
+        self._until_label.setFixedWidth(90)
+        until_row.addWidget(self._until_label)
+        self._until = DateButton(self.task.repeat_until, placeholder="Siempre", height=28)
+        until_row.addWidget(self._until, stretch=1)
+        rep_box.addLayout(until_row)
+        self._repeat_hint = QLabel(
+            "Al marcarla como completada pasa sola a la siguiente fecha.")
+        self._repeat_hint.setStyleSheet(
+            f"color:{TEXT_FAINT};font-size:11px;background:transparent;border:none;")
+        rep_box.addWidget(self._repeat_hint)
+        grid.addLayout(rep_box, r, 1)
         r += 1
 
         grid.addWidget(_field_label("Recordatorio"), r, 0)
@@ -161,6 +193,7 @@ class TaskEditor(QDialog):
 
         grid.setColumnStretch(1, 1)
         lay.addLayout(grid)
+        self._sync_repeat()
         lay.addWidget(hline())
 
         # Markdown body
@@ -215,7 +248,18 @@ class TaskEditor(QDialog):
         self._deleted = True
         self.accept()
 
+    def _sync_repeat(self):
+        repeats = self._repeat.rule() != ""
+        for w in (self._until_label, self._until, self._repeat_hint):
+            w.setVisible(repeats)
+
     def _save(self):
+        if not self._repeat.is_valid():
+            return
+        repeat = self._repeat.rule()
+        due = self._due.value()
+        if repeat and due is None:
+            due = date.today()
         reminder = self._reminder.value()
         if isinstance(reminder, datetime):
             reminder = reminder.replace(second=0, microsecond=0)
@@ -231,7 +275,10 @@ class TaskEditor(QDialog):
             subject=self._subject.currentText().strip(),
             priority=self._priority.value(),
             start=self._start.value(),
-            due=self._due.value(),
+            due=due,
+            due_time=self._due_time.currentData(),
+            repeat=repeat,
+            repeat_until=self._until.value() if repeat else None,
             reminder=reminder,
             reminder_done=reminder_done,
             body=self._body.toPlainText(),

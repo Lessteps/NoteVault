@@ -84,6 +84,27 @@ escribirlos solo cuando el usuario edita explícitamente la configuración.
 - `days`: días de la semana en los que el hábito está activo,
   **0 = lunes … 6 = domingo**. Ausente o vacío significa todos los días.
 - `subtasks`: lista, posiblemente vacía.
+
+Claves opcionales (`HABIT_OPTIONAL_KEYS`); se escriben solo si tienen valor y
+un cliente que no las use debe conservarlas al reescribir el archivo:
+
+| Clave | Ejemplo | Significado |
+|---|---|---|
+| `repeat` | `"every:2"` | Regla de repetición (ver [Repetición](#repetición)). Si existe, **manda sobre `days`**. Solo se guarda para `every` y `monthly`; `daily` y `weekly` se expresan con `days`. |
+| `start_date` | `"2026-09-14"` | Primer día en que cuenta; ancla de `every:N`. |
+| `end_date` | `"2026-12-31"` | Último día en que cuenta. |
+| `paused_from` | `"2026-10-01"` | Inactivo desde ese día (incluido); los días anteriores conservan su porcentaje. |
+| `time` | `"07:30"` | Hora a la que aparece en Calendario. |
+| `duration_min` | `30` | Duración del bloque en Calendario. |
+| `in_calendar` | `true` | Aparece como bloque propio en Calendario. |
+| `reminder_min` | `10` | Aviso de escritorio N minutos antes de `time`. |
+| `colour` | `"#33b679"` | Color del bloque. |
+| `notes` | `"texto"` | Notas libres. |
+
+Con `repeat` presente, `days` se reescribe con todos los días de la semana,
+para que un cliente antiguo que solo lee `days` no oculte el hábito.
+Un hábito está activo un día si no está en pausa ese día, el día cae entre
+`start_date` y `end_date` y la regla (o `days`) cae en él.
 - Al leer una configuración con `version` menor que la actual, se añaden los
   hábitos por defecto que falten **sin borrar** los del usuario.
 
@@ -178,6 +199,34 @@ Cuerpo markdown libre: el "archivo interno" de la tarea.
   bandera que evita que el móvil y el escritorio notifiquen dos veces; ver
   `reminder_scheduler.py`.
 - Los campos de fecha vacíos se escriben como la clave sin valor.
+- Opcionales, en este orden **después de `reminder_done`** y antes de cualquier
+  clave desconocida (`TASK_OPTIONAL_KEYS`):
+  - `repeat: "weekly:0,3"` — regla de [repetición](#repetición). El valor va
+    entre comillas dobles cuando contiene `:` (`repeat: daily` no las lleva).
+  - `repeat_until: 2026-10-31` — solo si hay `repeat`.
+- Una tarea con `repeat` cae en cada día en que cae la regla, anclada en `due`
+  (o `start` si no hay `due`) y hasta `repeat_until`.
+- Al pasar a `Completado`, una tarea con `repeat` **avanza** a la siguiente
+  fecha de la regla: `due` pasa a esa fecha, `start` y `reminder` se desplazan
+  lo mismo, `reminder_done` vuelve a `false` y `status` a `Sin empezar`. Si ya
+  no quedan fechas antes de `repeat_until`, se queda como `Completado`.
+
+## Repetición
+
+Hábitos, tareas y rutinas de Calendario comparten una regla escrita como una
+cadena corta (`core/recurrence.py`, `RECURRENCE_KINDS`):
+
+| Regla | Cae en |
+|---|---|
+| `daily` | Todos los días. |
+| `weekly:0,2,4` | Esos días de la semana (0 = lunes). Con los siete equivale a `daily`. |
+| `every:3` | Cada 3 días contando desde el ancla (`start_date`, `due`, `active_from`). Nunca antes del ancla; sin ancla se comporta como `daily`. |
+| `monthly:1,15` | Esos días del mes. `31` (o `29`, `30`) cae en el último día de los meses más cortos. |
+
+Vacío, `none` o una regla ilegible significan "no se repite". Los números
+fuera de rango se descartan. `tests/conformance/EXPECTED.json`
+(`recurrence_rules`, `habit_rules`, `task.occurs`, `task.roll_forward`) fija
+los días exactos que debe devolver cada implementación.
 
 ## Proyectos
 

@@ -18,6 +18,7 @@ from . import vault_format
 from .exercise_manager import ExerciseManager
 from .habit_manager import HabitManager
 from .project_manager import ProjectManager
+from .recurrence import Recurrence, parse_date
 from .task_manager import TaskManager
 
 logger = logging.getLogger(__name__)
@@ -39,24 +40,41 @@ class Occurrence:
     reminder_min: Optional[int] = None   # minutes before start; None = no reminder
 
 
+HABIT_PREFIX = "habit:"
+
+
+def routine_on(routine: dict, d: date) -> bool:
+    """A routine repeats by its "repeat" rule, or else by its weekday names."""
+    rule = Recurrence.parse(routine.get("repeat"))
+    if not rule.repeats:
+        rule = Recurrence.from_weekdays(
+            vault_format.WEEKDAY_KEYS.index(k) for k in routine.get("days", [])
+            if k in vault_format.WEEKDAY_KEYS)
+        if not rule.repeats:
+            return False
+    return rule.occurs_on(d, parse_date(routine.get("active_from")),
+                          parse_date(routine.get("active_until")))
+
+
 def _reminder(item: dict) -> Optional[int]:
     value = item.get("reminder_min")
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
 
 
 class ScheduleManager:
-    def __init__(self, vault_root: Path):
+    def __init__(self, vault_root: Path, habit_mgr=None, exercise_mgr=None,
+                 task_mgr=None, project_mgr=None):
         self.vault_root = Path(vault_root)
         self.agenda_dir = self.vault_root / vault_format.LAYOUT["agenda_dir"]
         self.agenda_routines = self.vault_root / vault_format.LAYOUT["agenda_routines"]
         self.agenda_events_dir = self.vault_root / vault_format.LAYOUT["agenda_events_dir"]
         self.agenda_settings = self.vault_root / vault_format.LAYOUT["agenda_settings"]
 
-        # Sub-managers for derived occurrences
-        self.habit_mgr = HabitManager(self.vault_root)
-        self.exercise_mgr = ExerciseManager(self.vault_root)
-        self.task_mgr = TaskManager(self.vault_root)
-        self.project_mgr = ProjectManager(self.vault_root)
+        # The app passes its own managers so every module shares one cache.
+        self.habit_mgr = habit_mgr or HabitManager(self.vault_root)
+        self.exercise_mgr = exercise_mgr or ExerciseManager(self.vault_root)
+        self.task_mgr = task_mgr or TaskManager(self.vault_root)
+        self.project_mgr = project_mgr or ProjectManager(self.vault_root)
 
         # Caching
         self._routines_cache: Optional[list[dict]] = None
@@ -243,24 +261,8 @@ class ScheduleManager:
         # 1. Routines
         overrides = day_data.get("overrides", {})
         for r in routines_list:
-            if wkey not in r.get("days", []):
+            if not routine_on(r, d):
                 continue
-
-            af = r.get("active_from")
-            if af:
-                try:
-                    if d < date.fromisoformat(af):
-                        continue
-                except ValueError:
-                    pass
-
-            au = r.get("active_until")
-            if au:
-                try:
-                    if d > date.fromisoformat(au):
-                        continue
-                except ValueError:
-                    pass
 
             rid = r["id"]
             if rid in overrides:
@@ -319,27 +321,26 @@ class ScheduleManager:
 
         # 3. Tasks
         for t in tasks_list:
-            if t.due == d or t.start == d:
-                start_time = None
-                if t.due == d and t.due_time:
-                    start_time = t.due_time
-                elif t.start == d and t.start_time:
-                    start_time = t.start_time
-
-                editable = bool(t.start_time or t.due_time)
-                out.append(Occurrence(
-                    id=f"task_{t.id}",
-                    title=t.name,
-                    kind="task",
-                    date=d,
-                    start=start_time,
-                    duration_min=60 if start_time else None,
-                    colour="#2383e2",
-                    links=[{"type": "task", "id": t.id}],
-                    done=t.is_done,
-                    source="task",
-                    editable=editable,
-                ))
+            if not t.occurs_on(d):
+                continue
+            repeating = t.rule.repeats
+            if repeating or t.due == d:
+                start_time = t.due_time or None
+            else:
+                start_time = t.start_time or None
+            out.append(Occurrence(
+                id=f"task_{t.id}",
+                title=t.name,
+                kind="task",
+                date=d,
+                start=start_time,
+                duration_min=60 if start_time else None,
+                colour="#3f51b5",
+                links=[{"type": "task", "id": t.id}],
+                done=t.is_done and (not repeating or d == t.due),
+                source="task",
+                editable=bool(start_time),
+            ))
 
         # 4. Projects
         for p in projects_list:
@@ -384,22 +385,47 @@ class ScheduleManager:
                 editable=False,
             ))
 
-        # 6. Habits
-        if self.habit_mgr.habits_for_day(d):
-            is_done = self.habit_mgr.day_pct(d) >= 1.0
-            out.append(Occurrence(
-                id=f"habit_{d.isoformat()}",
-                title="Hábitos",
-                kind="habit",
-                date=d,
-                start=None,
-                duration_min=None,
-                colour="#7c5af0",
-                links=[{"type": "habit", "id": "habits"}],
-                done=is_done,
-                source="habit",
-                editable=False,
-            ))
+        # 6. Habits: the ones sent to the calendar get their own block, the
+        # rest are summed up in a single "Hábitos" chip.
+        habits_today = self.habit_mgr.habits_for_day(d)
+        if habits_today:
+            log = self.habit_mgr.get_day(d)
+            grouped = []
+            for h in habits_today:
+                if not h.get("in_calendar"):
+                    grouped.append(h)
+                    continue
+                clock = h.get("time") or None
+                duration = h.get("duration_min")
+                out.append(Occurrence(
+                    id=f"{HABIT_PREFIX}{h['id']}",
+                    title=f"{h.get('icon', '')} {h['name']}".strip(),
+                    kind="habit",
+                    date=d,
+                    start=clock,
+                    duration_min=(duration if isinstance(duration, int) and duration > 0 else 30)
+                    if clock else None,
+                    colour=h.get("colour") or "#7c5af0",
+                    links=[{"type": "habit", "id": h["id"]}],
+                    done=bool(log.completed.get(h["id"], False)),
+                    source="habit",
+                    editable=False,
+                    reminder_min=_reminder(h) if clock else None,
+                ))
+            if grouped:
+                out.append(Occurrence(
+                    id=f"habit_{d.isoformat()}",
+                    title="Hábitos",
+                    kind="habit",
+                    date=d,
+                    start=None,
+                    duration_min=None,
+                    colour="#7c5af0",
+                    links=[{"type": "habit", "id": "habits"}],
+                    done=all(log.completed.get(h["id"], False) for h in grouped),
+                    source="habit",
+                    editable=False,
+                ))
 
         # 7. Sort: all-day items (start is None) first, then start time, then title
         def sort_key(occ: Occurrence):
@@ -461,7 +487,15 @@ class ScheduleManager:
         self.save_day_file(d, day_data)
 
     def set_done(self, d: date, occurrence_id: str, done: bool):
-        """Mark routine or day event as done/undone on date d."""
+        """Mark a routine, event, calendar habit or task as done/undone on date d."""
+        if occurrence_id.startswith(HABIT_PREFIX):
+            self.habit_mgr.set_done(d, occurrence_id[len(HABIT_PREFIX):], done)
+            return
+        if occurrence_id.startswith("task_"):
+            from .task_manager import STATUS_DONE, STATUS_TODO
+            self.task_mgr.update(occurrence_id[len("task_"):],
+                                 status=STATUS_DONE if done else STATUS_TODO)
+            return
         if occurrence_id.startswith("ev_"):
             self.update_event(d, occurrence_id, done=done)
             return

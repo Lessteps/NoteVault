@@ -42,7 +42,8 @@ class AgendaItemRow(QFrame):
         # Done Checkbox
         self.cb = QCheckBox()
         self.cb.setChecked(occ.done)
-        self.cb.setEnabled(occ.editable or occ.source == "routine" or occ.source == "event")
+        self.cb.setEnabled(occ.source in ("routine", "event", "task")
+                           or occ.id.startswith("habit:"))
         self.cb.toggled.connect(self._on_toggled)
         layout.addWidget(self.cb)
 

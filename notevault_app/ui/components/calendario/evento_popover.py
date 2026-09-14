@@ -18,7 +18,9 @@ from PySide6.QtWidgets import (
 )
 
 from ... import theme
+from ....core.recurrence import Recurrence
 from ....core.vault_format import WEEKDAY_KEYS
+from ..programacion import RecurrencePicker
 from . import (
     GCAL_COLOURS, DEFAULT_COLOUR, WEEKDAYS_ES, colour_name, event_colour,
     fmt_duration, fmt_hm, hm, long_date, parse_hm,
@@ -26,7 +28,6 @@ from . import (
 
 DAY_MIN = 24 * 60
 ICON_COL = 44
-WORKDAYS = {"lunes", "martes", "miercoles", "jueves", "viernes"}
 
 REMINDERS = (
     (None, "Sin notificación"),
@@ -434,8 +435,9 @@ class EventPopover(QFrame):
         self.start = 9 * 60
         self.end = 10 * 60
         self.all_day = False
-        self.repeat = "none"
-        self.days: set = set()
+        self.repeat = "none"         # none | daily | weekly | weekdays | monthly | custom
+        self.custom_rule = ""
+        self.until = None
         self.colour = DEFAULT_COLOUR
         self.reminder = 30
         self.expanded = False
@@ -530,23 +532,10 @@ class EventPopover(QFrame):
         repeat_line.addStretch()
         el.addLayout(repeat_line)
 
-        self.days_box = QWidget()
-        dl = QHBoxLayout(self.days_box)
-        dl.setContentsMargins(0, 0, 0, 0)
-        dl.setSpacing(6)
-        self.day_btns = {}
-        for key, letter in zip(WEEKDAY_KEYS, "LMXJVSD"):
-            b = QPushButton(letter)
-            b.setObjectName("popDay")
-            b.setCheckable(True)
-            b.setFixedSize(30, 30)
-            b.setCursor(Qt.PointingHandCursor)
-            b.setToolTip(WEEKDAYS_ES[WEEKDAY_KEYS.index(key)].capitalize())
-            b.toggled.connect(self._days_toggled)
-            dl.addWidget(b)
-            self.day_btns[key] = b
-        dl.addStretch()
-        el.addWidget(self.days_box)
+        self.custom = RecurrencePicker(allow_none=False, show_range=True,
+                                       start_label="Desde", end_label="Hasta")
+        self.custom.changed.connect(self._custom_changed)
+        el.addWidget(self.custom)
         self.time_row.body.addWidget(self.editor)
         root.addWidget(self.time_row)
 
@@ -693,9 +682,12 @@ class EventPopover(QFrame):
         self.title.blockSignals(False)
         self.colour = event_colour(info.get("colour"))
         self.reminder = info.get("reminder_min")
-        if info["kind"] == "routine":
-            self.days = set(info.get("days") or [])
-            self.repeat = self._repeat_for(self.days)
+        self.until = info.get("until")
+        self.repeat, self.custom_rule = self._repeat_for(info.get("repeat") or "")
+        if self.repeat == "custom":
+            self.custom.blockSignals(True)
+            self.custom.set_value(self.custom_rule, None, self.until)
+            self.custom.blockSignals(False)
         for btn, editor, value in ((self.loc_btn, self.loc_edit, info.get("location")),
                                    (self.desc_btn, self.desc_edit, info.get("description")),
                                    (self.subject_btn, self.subject_edit, info.get("subject"))):
@@ -715,23 +707,27 @@ class EventPopover(QFrame):
 
     # ── State -> widgets ──────────────────────────────────────────────────
 
-    def _repeat_for(self, days: set) -> str:
-        if len(days) == 7:
-            return "daily"
-        if days == WORKDAYS:
-            return "weekdays"
-        if days == {WEEKDAY_KEYS[self.day.weekday()]}:
-            return "weekly"
-        return "custom"
-
-    def _repeat_days(self) -> set:
-        own = WEEKDAY_KEYS[self.day.weekday()]
+    def _preset_rules(self) -> dict:
         return {
-            "daily": set(WEEKDAY_KEYS),
-            "weekly": {own},
-            "weekdays": set(WORKDAYS),
-            "custom": set(self.days) or {own},
-        }.get(self.repeat, set())
+            "none": "",
+            "daily": "daily",
+            "weekly": f"weekly:{self.day.weekday()}",
+            "weekdays": "weekly:0,1,2,3,4",
+            "monthly": f"monthly:{self.day.day}",
+        }
+
+    def _repeat_for(self, rule: str):
+        """(menu key, custom rule) for a stored rule string."""
+        rule = Recurrence.parse(rule).to_string()
+        for key, preset in self._preset_rules().items():
+            if rule == preset:
+                return key, ""
+        return "custom", rule
+
+    def rule(self) -> str:
+        if self.repeat == "custom":
+            return self.custom.rule()
+        return self._preset_rules().get(self.repeat, "")
 
     def _repeat_label(self, key: str) -> str:
         weekday = WEEKDAYS_ES[self.day.weekday()]
@@ -740,14 +736,14 @@ class EventPopover(QFrame):
             "daily": "Cada día",
             "weekly": f"Cada semana el {weekday}",
             "weekdays": "Todos los días laborables (de lunes a viernes)",
+            "monthly": f"Cada mes el día {self.day.day}",
             "custom": "Personalizado…",
         }[key]
 
     def _repeat_summary(self) -> str:
-        if self.repeat != "custom":
-            return self._repeat_label(self.repeat)
-        names = [WEEKDAYS_ES[WEEKDAY_KEYS.index(k)][:3] for k in WEEKDAY_KEYS if k in self._repeat_days()]
-        return "Cada semana: " + ", ".join(names)
+        if self.repeat == "custom":
+            return Recurrence.parse(self.custom.rule()).describe()
+        return self._repeat_label(self.repeat)
 
     def _reminder_label(self) -> str:
         if self.reminder is None:
@@ -770,7 +766,10 @@ class EventPopover(QFrame):
             main = f"{main}     {clock}"
         self.sum_main.setText(main)
         sub = ["Todo el día"] if self.all_day else []
-        sub.append("Tarea" if is_task else self._repeat_summary())
+        if is_task:
+            sub.append("Tarea")
+        if not is_task or self.repeat != "none":
+            sub.append(self._repeat_summary())
         self.sum_sub.setText(" · ".join(sub))
 
         self.summary.setVisible(not self.expanded)
@@ -786,13 +785,7 @@ class EventPopover(QFrame):
         self.allday.setChecked(self.all_day)
         self.allday.blockSignals(False)
         self.repeat_chip.setText(f"{self._repeat_label(self.repeat)}   ▾")
-        self.repeat_chip.setVisible(not is_task)
-        self.days_box.setVisible(not is_task and self.repeat == "custom")
-        chosen = self._repeat_days()
-        for key, b in self.day_btns.items():
-            b.blockSignals(True)
-            b.setChecked(key in chosen)
-            b.blockSignals(False)
+        self.custom.setVisible(self.repeat == "custom")
 
         self.loc_row.setVisible(not is_task)
         self.subject_row.setVisible(is_task)
@@ -881,7 +874,7 @@ class EventPopover(QFrame):
 
     def _pick_repeat(self):
         menu = _menu(self)
-        for key in ("none", "daily", "weekly", "weekdays", "custom"):
+        for key in ("none", "daily", "weekly", "weekdays", "monthly", "custom"):
             action = menu.addAction(self._repeat_label(key))
             action.triggered.connect(lambda _c=False, k=key: self._set_repeat(k))
         self._mark_open(self.repeat_chip, True)
@@ -890,13 +883,18 @@ class EventPopover(QFrame):
 
     def _set_repeat(self, key: str):
         if key == "custom" and self.repeat != "custom":
-            self.days = self._repeat_days() or {WEEKDAY_KEYS[self.day.weekday()]}
+            seed = self.custom_rule or self.rule() or f"weekly:{self.day.weekday()}"
+            self.custom.blockSignals(True)
+            self.custom.set_value(seed, None, self.until)
+            self.custom.blockSignals(False)
         self.repeat = key
         self._sync()
 
-    def _days_toggled(self):
-        chosen = {k for k, b in self.day_btns.items() if b.isChecked()}
-        self.days = chosen or {WEEKDAY_KEYS[self.day.weekday()]}
+    def _custom_changed(self):
+        self.custom_rule = self.custom.rule()
+        self.until = self.custom.end()
+        if self.custom.start() and self.custom.start() != self.day:
+            self.day = self.custom.start()
         self._sync()
 
     def _pick_reminder(self):
@@ -952,8 +950,9 @@ class EventPopover(QFrame):
             date=self.day,
             start=None if self.all_day else hm(self.start),
             duration=None if (self.all_day or is_task) else max(15, self.end - self.start),
-            repeat="none" if is_task else self.repeat,
-            days=[k for k in WEEKDAY_KEYS if k in self._repeat_days()],
+            repeat=self.rule(),
+            until=self.until if self.repeat == "custom" else None,
+            days=[WEEKDAY_KEYS[i] for i in Recurrence.parse(self.rule()).weekdays_mask()],
             location=self.loc_edit.text().strip(),
             description=self.desc_edit.toPlainText().strip(),
             subject=self.subject_edit.text().strip(),

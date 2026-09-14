@@ -77,7 +77,9 @@ class MainWindow(QMainWindow):
         self.exercise_mgr = ExerciseManager(vault_path)
         self.tasks        = TaskManager(vault_path)
         self.projects     = ProjectManager(vault_path)
-        self.schedule_mgr = ScheduleManager(vault_path)
+        self.schedule_mgr = ScheduleManager(
+            vault_path, habit_mgr=self.habits, exercise_mgr=self.exercise_mgr,
+            task_mgr=self.tasks, project_mgr=self.projects)
         self.notes        = NotesService(self.vault)
 
         self._mode = MODE_HOME
@@ -195,7 +197,7 @@ class MainWindow(QMainWindow):
         self._calendario_panel.status_message.connect(
             lambda msg: self.status_bar.showMessage(msg, 4000))
         self._calendario_panel.notify_requested.connect(self._notify)
-        self._calendario_panel.data_changed.connect(lambda: self.tasks.tasks(force=True))
+        self._calendario_panel.open_habits_requested.connect(self._open_habit_editor)
         self._calendario_left.create_requested.connect(self._calendario_panel.create_new)
         self._dashboard.go_habits.connect(lambda: self._switch_mode(MODE_HABITS))
         self._dashboard.go_ejercicio.connect(lambda: self._switch_mode(MODE_EJERCICIO))
@@ -292,6 +294,7 @@ class MainWindow(QMainWindow):
             self._left_stack.setCurrentIndex(1)
             self._center_stack.setCurrentIndex(0)
             self._right_stack.setCurrentIndex(0)
+            self._habit_panel.refresh_all()
             self._habit_right.refresh_stats()
             self.status_bar.showMessage("Habit Tracker")
 
@@ -399,6 +402,14 @@ class MainWindow(QMainWindow):
         if self._mode == MODE_NOTAS:
             self._explorer.reveal(path)
 
+    def _open_habit_editor(self, habit_id: str):
+        from .components.habit_tracker.habit_tracker_panel import VIEW_MANAGE
+        self._switch_mode(MODE_HABITS)
+        self._habit_panel.show_view(VIEW_MANAGE)
+        self._habit_left.set_active(VIEW_MANAGE)
+        if habit_id:
+            self._habit_panel._manage.open_editor(habit_id)
+
     # ── Vault switching ───────────────────────────────────────────────────
 
     def _on_vault_switch(self, vault_path: Path):
@@ -408,6 +419,11 @@ class MainWindow(QMainWindow):
         self.exercise_mgr = ExerciseManager(vault_path)
         self.tasks        = TaskManager(vault_path)
         self.projects     = ProjectManager(vault_path)
+        self.schedule_mgr = ScheduleManager(
+            vault_path, habit_mgr=self.habits, exercise_mgr=self.exercise_mgr,
+            task_mgr=self.tasks, project_mgr=self.projects)
+        self._calendario_panel.set_manager(self.schedule_mgr)
+        self._calendario_left.schedule_mgr = self.schedule_mgr
         self.notes = NotesService(self.vault)
         self._explorer.set_vault(self.vault, self.notes)
         self._notas_center.set_vault(self.vault, self.notes)

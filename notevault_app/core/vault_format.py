@@ -61,6 +61,16 @@ TASK_KEYS = ("id", "name", "created", "start", "due", "status", "subject",
              "priority", "reminder", "reminder_done")
 PROJECT_KEYS = ("id", "name", "status", "color", "created", "start", "deadline")
 
+# Optional keys, written only when set. Task ones go after TASK_KEYS, in this
+# order, with a value containing ":" in double quotes.
+TASK_OPTIONAL_KEYS = ("repeat", "repeat_until")
+HABIT_OPTIONAL_KEYS = ("repeat", "start_date", "end_date", "paused_from", "time",
+                       "duration_min", "in_calendar", "reminder_min", "colour", "notes")
+
+# Repetition rules (core/recurrence.py): "daily", "weekly:0,2,4", "every:3",
+# "monthly:1,15". Weekday 0 is Monday; day 31 means the last day of shorter months.
+RECURRENCE_KINDS = ("daily", "weekly", "every", "monthly")
+
 # Marker that Syncthing leaves on a colliding file.
 SYNC_CONFLICT_MARKER = ".sync-conflict-"
 

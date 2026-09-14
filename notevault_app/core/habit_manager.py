@@ -2,12 +2,24 @@
 NoteVault Habit Manager
 Data layer: reads and writes one .md file per day inside {vault}/habits/.
 
-Habit schema (v2)
+Habit schema (v3)
 -----------------
 {
   "id": "...", "name": "...", "icon": "...",
   "days": [0..6],                 # weekdays the habit is active (0 = Monday)
   "subtasks": [{"id": "...", "name": "..."}],
+
+  # Optional, all written only when set:
+  "repeat": "every:2",            # recurrence.py rule; wins over "days"
+  "start_date": "2026-09-14",     # first day it counts (anchor for every:N)
+  "end_date": "2026-12-31",       # last day it counts
+  "paused_from": "2026-10-01",    # inactive from this day on, history kept
+  "time": "07:30",                # shown at this hour in Calendario
+  "duration_min": 30,
+  "in_calendar": true,            # own block in Calendario
+  "reminder_min": 10,             # desktop notification before "time"
+  "colour": "#33b679",
+  "notes": "free text"
 }
 """
 
@@ -19,6 +31,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import vault_format
+from .recurrence import Recurrence, parse_date
 
 CONFIG_VERSION = 3
 ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
@@ -89,8 +102,55 @@ def habit_days(habit: dict) -> list[int]:
     return out or list(ALL_DAYS)
 
 
+def habit_rule(habit: dict) -> Recurrence:
+    rule = Recurrence.parse(habit.get("repeat"))
+    return rule if rule.repeats else Recurrence.from_weekdays(habit_days(habit))
+
+
 def habit_active_on(habit: dict, d: date) -> bool:
-    return d.weekday() in habit_days(habit)
+    paused = parse_date(habit.get("paused_from"))
+    if paused is not None and d >= paused:
+        return False
+    start = parse_date(habit.get("start_date"))
+    end = parse_date(habit.get("end_date"))
+    return habit_rule(habit).occurs_on(d, start, end)
+
+
+def habit_schedule_text(habit: dict) -> str:
+    """'Cada lun, mié, vie · 07:30' — for chips and tooltips."""
+    parts = [habit_rule(habit).describe()]
+    if habit.get("time"):
+        parts.append(habit["time"])
+    if habit.get("paused_from"):
+        parts.append("en pausa")
+    return " · ".join(parts)
+
+
+# Keys a habit may carry besides id / name / icon / days / subtasks.
+OPTIONAL_KEYS = vault_format.HABIT_OPTIONAL_KEYS
+
+
+def _apply_options(habit: dict, options: dict):
+    """Set optional keys; a falsy value removes the key so the file stays lean.
+
+    "days" is kept equal to the weekdays a rule covers, so a client that only
+    reads "days" still sees a sensible schedule.
+    """
+    for key, value in options.items():
+        if key not in OPTIONAL_KEYS:
+            continue
+        if value in (None, "", False) and not (key in ("duration_min", "reminder_min") and value == 0):
+            habit.pop(key, None)
+        else:
+            habit[key] = value
+    if "repeat" in options:
+        rule = Recurrence.parse(habit.get("repeat"))
+        if rule.repeats:
+            habit["days"] = rule.weekdays_mask()
+            if rule.freq in ("daily", "weekly"):
+                habit.pop("repeat", None)   # "days" alone says it all
+        else:
+            habit.pop("repeat", None)
 
 
 class HabitDay:
@@ -106,9 +166,8 @@ class HabitDay:
     # ── Helpers ───────────────────────────────────────────────────────────
 
     def active_habits(self, habits: list[dict]) -> list[dict]:
-        """Only the habits scheduled for this day's weekday."""
-        wd = self.date.weekday()
-        return [h for h in habits if wd in habit_days(h)]
+        """Only the habits scheduled for this day."""
+        return [h for h in habits if habit_active_on(h, self.date)]
 
     def subtask_done(self, habit_id: str, subtask_id: str) -> bool:
         return bool(self.subtasks.get(habit_id, {}).get(subtask_id, False))
@@ -154,6 +213,19 @@ class HabitManager:
 
     def habits_for_day(self, d: date) -> list[dict]:
         return [h for h in self.habits() if habit_active_on(h, d)]
+
+    def get_habit(self, habit_id: str) -> Optional[dict]:
+        return next((h for h in self.habits() if h["id"] == habit_id), None)
+
+    def reload(self):
+        """Forget cached config and day logs; another window may have written them."""
+        self._habits = None
+        self._day_cache.clear()
+
+    def set_done(self, d: date, habit_id: str, done: bool):
+        day = self.get_day(d)
+        day.completed[habit_id] = done
+        self.save_day(day)
 
     def _load_config(self) -> list[dict]:
         raw = None
@@ -338,7 +410,7 @@ class HabitManager:
         return hid
 
     def add_habit(self, name: str, icon: str,
-                  days: Optional[list] = None) -> dict:
+                  days: Optional[list] = None, **options) -> dict:
         habits = self.habits()
         base_id = re.sub(r'[^a-z0-9]', '', name.lower()) or "habit"
         hid = self._unique_id(base_id, {h["id"] for h in habits})
@@ -347,6 +419,7 @@ class HabitManager:
             "days": list(days) if days else list(ALL_DAYS),
             "subtasks": [],
         }
+        _apply_options(h, options)
         habits.append(h)
         self._habits = habits
         self.save_config()
@@ -358,9 +431,11 @@ class HabitManager:
         self.save_config()
 
     def update_habit(self, habit_id: str, **fields):
+        options = {k: fields.pop(k) for k in list(fields) if k in OPTIONAL_KEYS}
         for h in self.habits():
             if h["id"] == habit_id:
                 h.update(fields)
+                _apply_options(h, options)
                 break
         self.save_config()
 

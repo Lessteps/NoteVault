@@ -28,7 +28,8 @@ sys.path.insert(0, str(ROOT))
 
 from notevault_app.core import vault_format as fmt              # noqa: E402
 from notevault_app.core import reminder_scheduler as sched       # noqa: E402
-from notevault_app.core.habit_manager import HabitManager        # noqa: E402
+from notevault_app.core.habit_manager import HabitManager, habit_active_on  # noqa: E402
+from notevault_app.core.recurrence import Recurrence             # noqa: E402
 from notevault_app.core.exercise_manager import ExerciseManager  # noqa: E402
 from notevault_app.core.task_manager import (                    # noqa: E402
     TaskManager, STATUSES, STATUS_DONE,
@@ -418,6 +419,9 @@ def _build_sample(vault) -> tuple:
     day.set_subtask("coding", "theory", True)
     day.journal = "Diario de ejemplo.\nSegunda línea."
     hm.save_day(day)
+    hm.update_habit("reading", repeat="every:2", start_date=FIXED_DAY.isoformat(),
+                    time="21:00", duration_min=30, in_calendar=True,
+                    reminder_min=10, colour="#33b679")
 
     em = ExerciseManager(vault)
     em.mark_done(FIXED_DAY, em.exercises()[0]["id"], True, 60.0, 5, "fácil")
@@ -426,7 +430,8 @@ def _build_sample(vault) -> tuple:
     task = tm.create("Ensayo de historia", subject="Historia",
                      due=date(2026, 9, 20), start=FIXED_DAY, priority=2,
                      reminder=datetime(2026, 9, 19, 18, 0))
-    tm.update(task.id, body="# Ensayo\n\n- Buscar fuentes\n")
+    tm.update(task.id, body="# Ensayo\n\n- Buscar fuentes\n",
+              repeat="weekly:0,3", repeat_until=date(2026, 10, 31))
 
     pm = ProjectManager(vault)
     project = pm.create("Portafolio web", status=P_ACTIVE,
@@ -515,7 +520,12 @@ def expected_values(vault, task_id: str, project_id: str) -> dict:
             "haircare_days": next(h["days"] for h in habits if h["id"] == "haircare"),
             "coding_subtasks": [s["id"] for h in habits if h["id"] == "coding"
                                 for s in h["subtasks"]],
+            "reading": next(h for h in habits if h["id"] == "reading"),
+            "reading_active": [d.isoformat() for d in _window()
+                               if habit_active_on(next(h for h in habits if h["id"] == "reading"), d)],
         },
+        "habit_rules": _habit_rule_expectations(),
+        "recurrence_rules": _recurrence_expectations(),
         "exercise_day": {
             "exercise_id": first_ex["id"],
             "entry": log.entries[first_ex["id"]],
@@ -536,6 +546,10 @@ def expected_values(vault, task_id: str, project_id: str) -> dict:
             "reminder": task.reminder.isoformat(timespec="minutes"),
             "reminder_done": task.reminder_done,
             "body": task.body,
+            "repeat": task.repeat,
+            "repeat_until": task.repeat_until.isoformat() if task.repeat_until else None,
+            "occurs": [d.isoformat() for d in _window(28) if task.occurs_on(d)],
+            "roll_forward": _roll_forward_expectation(task),
         },
         "project": {
             "name": project.name,
@@ -551,6 +565,81 @@ def expected_values(vault, task_id: str, project_id: str) -> dict:
         },
         "reminder_rules": _reminder_expectations(),
     }
+
+
+def _window(days: int = 21) -> list:
+    first = FIXED_DAY - timedelta(days=3)
+    return [first + timedelta(days=i) for i in range(days)]
+
+
+def _recurrence_expectations() -> dict:
+    """Rules, as stored, and the days each one lands on inside the window."""
+    anchor = FIXED_DAY
+    until = FIXED_DAY + timedelta(days=12)
+    cases = {
+        "none": ("", anchor, None),
+        "daily_until": ("daily", anchor, until),
+        "weekly_mon_wed_fri": ("weekly:0,2,4", None, None),
+        "weekly_all_is_daily": ("weekly:0,1,2,3,4,5,6", None, None),
+        "every_3": ("every:3", anchor, None),
+        "monthly_1_15_31": ("monthly:1,15,31", None, None),
+        "garbage": ("weekly:x", None, None),
+    }
+    out = {}
+    for name, (text, first, last) in cases.items():
+        rule = Recurrence.parse(text)
+        nxt = rule.next_after(FIXED_DAY, first, last)
+        out[name] = {
+            "text": text,
+            "anchor": first.isoformat() if first else None,
+            "until": last.isoformat() if last else None,
+            "normalised": rule.to_string(),
+            "weekdays_mask": rule.weekdays_mask(),
+            "describe": rule.describe(),
+            "dates": [d.isoformat() for d in _window(40) if rule.occurs_on(d, first, last)],
+            "next_after_fixed_day": nxt.isoformat() if nxt else None,
+        }
+    out["monthly_31_in_february"] = Recurrence.parse("monthly:31").occurs_on(date(2027, 2, 28))
+    return out
+
+
+def _habit_rule_expectations() -> dict:
+    """habit_active_on for the optional habit keys, checked over the window."""
+    base = {"id": "h", "name": "h", "icon": "", "subtasks": []}
+    cases = {
+        "days_only": {**base, "days": [1, 5]},
+        "missing_days_means_all": {**base},
+        "repeat_wins_over_days": {**base, "days": [0], "repeat": "every:2",
+                                  "start_date": FIXED_DAY.isoformat()},
+        "start_and_end": {**base, "days": [0, 1, 2, 3, 4, 5, 6],
+                          "start_date": (FIXED_DAY + timedelta(days=1)).isoformat(),
+                          "end_date": (FIXED_DAY + timedelta(days=4)).isoformat()},
+        "paused": {**base, "days": [0, 1, 2, 3, 4, 5, 6],
+                   "paused_from": (FIXED_DAY + timedelta(days=2)).isoformat()},
+        "monthly": {**base, "days": [0, 1, 2, 3, 4, 5, 6], "repeat": "monthly:12,20"},
+    }
+    return {name: [d.isoformat() for d in _window() if habit_active_on(h, d)]
+            for name, h in cases.items()}
+
+
+def _roll_forward_expectation(task) -> dict:
+    """Completing a repeating task moves due, start and reminder to the next date."""
+    vault = Path(tempfile.mkdtemp(prefix="nvroll"))
+    try:
+        tm = TaskManager(vault)
+        clone = tm.create(task.name, start=task.start, due=task.due, reminder=task.reminder,
+                          repeat=task.repeat, repeat_until=task.repeat_until)
+        tm.update(clone.id, status="Completado")
+        moved = TaskManager(vault).get(clone.id)
+        return {
+            "due": moved.due.isoformat(),
+            "start": moved.start.isoformat() if moved.start else None,
+            "reminder": moved.reminder.isoformat(timespec="minutes") if moved.reminder else None,
+            "reminder_done": moved.reminder_done,
+            "status": moved.status,
+        }
+    finally:
+        shutil.rmtree(vault, ignore_errors=True)
 
 
 class _FakeTask:

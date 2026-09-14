@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ....core.habit_manager import HabitManager, HabitDay, habit_active_on, habit_days, DAY_NAMES_ES, MONTH_NAMES
+from ....core.habit_manager import HabitManager, HabitDay, habit_active_on, habit_schedule_text, DAY_NAMES_ES, MONTH_NAMES
 from .notion_widgets import (
     ProgressBlocks, NotionCheck, SectionHeader, ViewPill, NavButton,
     card_frame, table_row, cell, notes_edit, vsep, check_container,
@@ -22,10 +22,7 @@ from .weekly_view import format_date
 
 def _habit_tooltip(h: dict) -> str:
     """Name of the habit plus the weekdays it runs on, shown on hover."""
-    days = habit_days(h)
-    when = ("todos los días" if len(days) == 7
-            else ", ".join(DAY_NAMES_ES[d] for d in sorted(days)))
-    return f"{h['icon']}  {h['name']} — {when}"
+    return f"{h['icon']}  {h['name']} — {habit_schedule_text(h)}"
 
 class MonthlyView(QWidget):
     data_changed = Signal()

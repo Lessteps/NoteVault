@@ -321,8 +321,8 @@ Left panel "PROYECTOS": "▦ Tablero" (Todos los proyectos), —, one "●" per 
 
 ### 5.6 Notas (desktop, Obsidian-like)
 Files: `ui/components/notes/` — `notes_sidebar.py`, `markdown_editor.py`, `note_view.py`,
-`command_palette.py`, `file_icons.py`, `ai_chat_panel.py`; core `notes_service.py`, `qt_markdown.py`,
-`attachments.py`, `file_kinds.py`.
+`command_palette.py`, `file_icons.py`, `md_highlighter.py`, `ai_chat_panel.py`; core
+`notes_service.py`, `qt_markdown.py`, `vault_index.py`, `attachments.py`, `file_kinds.py`.
 
 **Explorer (left).** Tabs Files · Search · Bookmarks. Lazy tree (one level read per expand).
 - Lists **notes (`.md`) and source-code files** (`.py .js .ts .jsx .tsx .java .kt .go .rs .c .cpp .cs
@@ -341,6 +341,19 @@ Files: `ui/components/notes/` — `notes_sidebar.py`, `markdown_editor.py`, `not
   explorador", "Mostrar en la carpeta de Windows". Ctrl+W closes (not pinned).
 - **Modes:** "Editor" (rich, WYSIWYG), "Markdown" (raw source, monospace), "Lectura" (read-only
   render). Code files always open in the raw view with formatting disabled and are saved verbatim.
+  Which mode a note opens in is decided **once, when it is loaded**, and remembered for as long as it
+  stays open; recomputing it on every capture re-parsed the whole note and stalled the editor a second
+  after every keystroke.
+- **Markdown mode is a first-class writing surface**, not a fallback: most notes live there.
+  `md_highlighter.py` colours the source the way Obsidian's source mode does — headings sized and
+  tinted with their `#` dimmed, bold/italic/strikethrough/`code`/`==highlight==`, links, `[[wikilinks]]`
+  and `#tags`, list bullets, `[ ]` / `[x]` boxes (a ticked item's text struck through), quote markers,
+  table pipes, rules, fenced code and the YAML frontmatter. The highlighter is switched off for source
+  files, whose `#` and `*` are not markdown. Re-running it never marks the note as edited.
+  Enter continues a bullet, a numbered item (renumbered), a task (`- [ ]`) or a quote, and an empty item
+  ends the list instead of leaving a dangling bullet; Tab / Shift+Tab move an item (or a whole
+  selection) one level; typing `*`, `` ` ``, `_`, `~`, `[`, `(` or `"` with text selected wraps it
+  instead of replacing it.
 - **Safety rule:** the Editor saves by re-serialising the document. Before a note is shown in Editor
   mode, `rich_edit_problem()` imports and re-serialises it in memory; if any word, checkbox, table row,
   image, heading or code fence would be lost, or the text would change on a second pass, the note opens
@@ -352,24 +365,55 @@ Files: `ui/components/notes/` — `notes_sidebar.py`, `markdown_editor.py`, `not
   (Obsidian style). Tab / Shift+Tab move an item down/up a level; Enter on an empty item climbs a level
   then exits the list; Enter after a task starts a new unchecked task. Typing "- ", "* ", "1. ",
   "[ ] " or "- [ ] " at line start converts the line into that list.
-- **Tables:** real editable grids with a shaded header row. Tab moves to the next cell, Tab in the last
-  cell appends a row. Right-click "Tabla ▸" (and the palette): add row above/below, add column
-  left/right, delete row/column/table. Saved as a **GitHub table with aligned pipes** (column widths by
-  display width, wide glyphs count 2; `:---:` / `---:` alignment kept). In Markdown mode, Tab inside a
-  table re-aligns it and moves to the next cell.
+- **Tables are interactive in both editing modes.** In Editor mode they are real grids with a shaded
+  header row; Tab moves to the next cell and Tab in the last cell appends a row. In Markdown mode the
+  same commands rewrite the aligned pipes of the table under the caret, and Tab re-aligns it and moves
+  to the next cell. Right-click "Tabla ▸" and the palette offer: add row above/below, add column
+  left/right, delete row/column/table, and — in Markdown mode — set the column's alignment. Saved as a
+  **GitHub table with aligned pipes** (column widths by display width, wide glyphs count 2;
+  `:---:` / `---:` alignment kept).
+- **Rendered typography** (`style_document()` in `note_view.py`): Qt's markdown importer stacks every
+  block flush against the next, so after the import the views add paragraph and heading spacing, indent
+  quotes behind a coloured vertical bar, shade fenced code, and give tables margins, top-aligned cells
+  and a bold header. Only block margins and backgrounds are touched; `document_to_markdown()` reads
+  none of them, which is verified against the whole vault — the styling must never change a byte that
+  reaches a file.
 - **Ctrl+P command palette:** floating search box; accent-insensitive multi-word filter; ↑↓ Enter Esc.
   Commands grouped "Tabla", "Checklist", "Lista", "Adjunto", "Formato", "Vista", "Pestaña", "Nota";
-  commands that do not apply (e.g. row commands outside a table) are listed but disabled.
+  commands that do not apply (e.g. row commands outside a table) are listed but disabled. The shortcut
+  is registered with `Qt.WindowShortcut`, not `WidgetWithChildrenShortcut`: it used to do nothing
+  whenever the focus sat in the file tree or the assistant, which is exactly where it is right after
+  clicking a note. Opening a note also moves the focus to the visible view. Ctrl+Shift+P is an alias,
+  Ctrl+E toggles Lectura, Ctrl+Shift+T inserts a table.
 - **Attachments:** paste an image, drop files, or "📎 Insertar imagen o video". Files are copied to
   `attachments/` beside the note (see §2). Images render inline scaled to the editor width; videos render
   as a poster card with a play button and open the embedded player on click (double-click in Editor).
 - **Toolbar:** H1 H2 H3 ¶ · B I S </> · A+ A− · • 1. ☑ ❝ ⊞ · 🔗 [[ ]] 📎 ― · ⌘ palette · 🔖 bookmark ·
   Editor / Markdown / Lectura.
-- **Mentions footer:** "Linked mentions" / "Unlinked mentions" for the open note, computed on a worker
-  thread (a vault scan used to freeze the UI for seconds), capped at 60 rows per section ("… y N más.").
-  Not recomputed on autosave.
+- **Mentions footer:** "Linked mentions" / "Unlinked mentions" for the open note, computed on a single
+  worker thread, capped at 60 rows per section ("… y N más."). Not recomputed on autosave, and not
+  computed at all while the footer is collapsed.
 - Autosave 1200 ms after typing; YAML frontmatter is split off and re-attached untouched. Paths longer
   than 260 characters are opened with the Windows `\\?\` prefix.
+
+**The vault text index (`core/vault_index.py`).** Backlinks and full-text search both need to read
+every note. On a real vault that is ~3,000 files and 10 MB: about 3 s warm and half a minute cold, and
+the editor used to pay it on **every note the user opened**, on a thread that holds the GIL — which is
+what made the window stop responding. The index reads each file once and keeps its text until the
+file's mtime or size changes, so:
+- it is filled once in the background shortly after the notes panel is built;
+- a backlink scan is a pass over memory (tens of milliseconds);
+- a save feeds the new text straight back in (`NotesService.note_written`), so nothing waits for a walk;
+- the directory is re-walked at most every 30 s, because stat-ing 3,000 files itself takes seconds;
+- search reads the cached copy and never walks from the UI thread, and the search box is debounced
+  260 ms — it used to run a full-vault read on every keystroke.
+Bookmarks are cached the same way, against the bookmark file's mtime: `is_bookmarked()` is asked once
+per note opened and used to re-read the list and stat every entry.
+
+**Other things that were measured and fixed** (numbers from the user's vault, worth re-checking in any
+port): restyling a note's tables called `setFormat` per table and relaid the document out each time —
+over a second for a note with 74 tables, paid again on every Tab inside a table; wrapping the pass in
+one `beginEditBlock` brings it to under 20 ms, and a single table edit restyles only that table.
 
 **AI assistant (right).** "✦  Asistente" panel (providers configured with ⚙: local LM Studio/Ollama or
 copy-prompt flows). Toggle with the "✦  Asistente" button on the tab row or the "✕" in the panel header;

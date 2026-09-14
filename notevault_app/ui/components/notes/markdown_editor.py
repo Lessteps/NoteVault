@@ -38,7 +38,7 @@ from ....core.qt_markdown import (
 )
 from .note_view import (
     NoteTextEdit, NoteTextBrowser, NoteSourceEdit, set_list_level,
-    toggle_marker, embed_files,
+    toggle_marker, embed_files, style_tables,
 )
 from .command_palette import Command, CommandPalette
 
@@ -148,6 +148,11 @@ class MarkdownEditor(QWidget):
         self._loading = False
         self._reordering = False
         self._mode = MODE_RICH
+        # The mode the visible widget is actually showing. Asking
+        # `_mode_for()` again on every capture re-ran the rich-edit check,
+        # which re-parses the whole note: that is what stalled the editor a
+        # second after every keystroke.
+        self._active = MODE_RICH
         self._pending_mention = None
         self._init_ui()
         self._init_shortcuts()
@@ -203,6 +208,7 @@ class MarkdownEditor(QWidget):
         self._mentions = _MentionsFooter(self.service)
         self._mentions.open_requested.connect(self.open_note_requested.emit)
         root.addWidget(self._mentions)
+        QTimer.singleShot(400, self._mentions.warm_up)
 
         self._status = QLabel("")
         self._status.setFixedHeight(22)
@@ -344,17 +350,25 @@ class MarkdownEditor(QWidget):
         return bar
 
     def _init_shortcuts(self):
+        # Window-level, not WidgetWithChildren: Ctrl+P did nothing whenever
+        # the focus sat in the file tree or the assistant, which is exactly
+        # where it is right after clicking a note. Qt already switches these
+        # off while the notes panel is hidden behind another module.
         def bind(keys, handler):
             sc = QShortcut(QKeySequence(keys), self)
-            sc.setContext(Qt.WidgetWithChildrenShortcut)
+            sc.setContext(Qt.WindowShortcut)
             sc.activated.connect(handler)
 
         bind("Ctrl+P", self.open_palette)
+        bind("Ctrl+Shift+P", self.open_palette)
         bind("Ctrl+W", lambda: self.close_tab(self._current))
         bind("Ctrl+S", self.save_current)
         bind("Ctrl+L", self.toggle_current_task)
         bind("Ctrl+B", self.toggle_bold)
         bind("Ctrl+I", self.toggle_italic)
+        bind("Ctrl+E", lambda: self.set_mode(
+            MODE_READ if self._mode != MODE_READ else MODE_RICH))
+        bind("Ctrl+Shift+T", self.insert_table)
 
     def set_assistant_visible(self, visible: bool):
         self._assistant_btn.setChecked(visible)
@@ -368,6 +382,7 @@ class MarkdownEditor(QWidget):
                 self._tabs.setCurrentIndex(i)
                 if line:
                     self._goto_line(line)
+                self._focus_view()
                 return
         fs = attachments.fs_path(path)
         if not fs.exists():
@@ -399,6 +414,14 @@ class MarkdownEditor(QWidget):
             self._on_tab_changed(index)
         if line:
             self._goto_line(line)
+        self._focus_view()
+
+    def _focus_view(self):
+        """Give the keyboard to whichever view is on screen. Without this the
+        focus stays in the file tree after a click, so typing goes nowhere."""
+        widget = self._stack.currentWidget()
+        if widget is not None:
+            widget.setFocus()
 
     def close_tab(self, index: int):
         if not (0 <= index < len(self._open)):
@@ -554,21 +577,31 @@ class MarkdownEditor(QWidget):
 
     # ── Loading / saving ──────────────────────────────────────────────────
 
-    def _mode_for(self, note: _OpenNote) -> int:
+    def _mode_for(self, note: _OpenNote):
+        """(mode, problem): where the note opens, and why not in the Editor.
+
+        The rich-edit check re-parses the whole note, so it only runs when
+        the Editor is the mode being asked for. In Markdown and Lectura the
+        answer is not needed, and computing it anyway added a third of a
+        second to every note the user opened.
+        """
         if note.is_code:
-            return MODE_RAW
-        if self._mode == MODE_RICH and note.rich_problem():
-            # The Editor saves by re-serialising the note; when that trip
-            # would lose content, the note is edited as raw markdown instead.
-            return MODE_RAW
-        return self._mode
+            return MODE_RAW, None
+        if self._mode != MODE_RICH:
+            return self._mode, None
+        # The Editor saves by re-serialising the note; when that trip would
+        # lose content, the note is edited as raw markdown instead.
+        problem = note.rich_problem()
+        return (MODE_RAW if problem else MODE_RICH), problem
 
     def _view_mode(self) -> int:
-        note = self.current_note()
-        return self._mode_for(note) if note is not None else self._mode
+        """Which widget is on screen. Read, never recomputed: the answer was
+        settled when the note was loaded."""
+        return self._active if self.current_note() is not None else self._mode
 
     def _load_into_view(self, note: _OpenNote):
-        mode = self._mode_for(note)
+        mode, problem = self._mode_for(note)
+        self._active = mode
         for view in (self._rich, self._raw, self._read):
             view.note_path = note.path
         self._rich.vault_root = self._read.vault_root = self.vault.vault_root
@@ -588,8 +621,9 @@ class MarkdownEditor(QWidget):
 
         for b in self._format_btns:
             b.setEnabled(not note.is_code)
-        problem = None if note.is_code else note.rich_problem()
         for i, b in enumerate(self._mode_btns):
+            # Editor stays offered until the check has actually run: pressing
+            # it is what runs it, and an unsafe note bounces back here.
             b.setEnabled(not note.is_code and not (i == MODE_RICH and problem))
             b.setChecked(i == mode)
         self._mode_btns[MODE_RICH].setToolTip(
@@ -647,12 +681,13 @@ class MarkdownEditor(QWidget):
         body = note.body
         if not note.is_code and not body.endswith("\n"):
             body += "\n"
+        text = note.frontmatter + body
         try:
-            attachments.fs_path(note.path).write_text(
-                note.frontmatter + body, encoding="utf-8")
+            attachments.fs_path(note.path).write_text(text, encoding="utf-8")
         except Exception as e:
             self._status.setText(f"No se pudo guardar: {e}")
             return
+        self.service.note_written(note.path, text)
         note.dirty = False
         self._refresh_tab(index)
         self._update_status(note, saved=True)
@@ -875,7 +910,11 @@ class MarkdownEditor(QWidget):
         self._rich.setFocus()
 
     def indent_item(self, delta: int):
-        if not self._ensure_editable() or self._view_mode() == MODE_RAW:
+        if not self._ensure_editable():
+            return
+        if self._view_mode() == MODE_RAW:
+            self._raw.shift_lines(delta)
+            self._raw.setFocus()
             return
         cursor = self._rich.textCursor()
         lst = cursor.block().textList()
@@ -957,9 +996,36 @@ class MarkdownEditor(QWidget):
             return
         self._rich.insert_table(3, 3)
 
-    def _in_rich_table(self) -> bool:
-        return (self.current_note() is not None and self._view_mode() == MODE_RICH
-                and self._rich.current_table() is not None)
+    def _table_view(self):
+        """The view holding the table under the caret, in either mode.
+
+        A table is a real grid in the Editor and aligned pipes in Markdown
+        mode; both surfaces answer the same table commands, so every command
+        works wherever the note happens to be open.
+        """
+        note = self.current_note()
+        if note is None or note.is_code:
+            return None
+        mode = self._view_mode()
+        if mode == MODE_RAW:
+            return self._raw if self._raw.in_table() else None
+        if mode == MODE_RICH:
+            return self._rich if self._rich.current_table() is not None else None
+        return None
+
+    def _in_table(self) -> bool:
+        return self._table_view() is not None
+
+    def _table_command(self, name: str, *args) -> bool:
+        view = self._table_view()
+        if view is None:
+            return False
+        action = getattr(view, name, None)
+        if action is None:
+            return False
+        action(*args)
+        view.setFocus()
+        return True
 
     def align_tables(self):
         note = self.current_note()
@@ -1030,29 +1096,37 @@ class MarkdownEditor(QWidget):
     def _commands(self) -> list:
         note = lambda: self.current_note() is not None                  # noqa: E731
         editable = lambda: note() and not self.current_note().is_code   # noqa: E731
-        table = self._in_rich_table
+        table = self._in_table
+        raw_table = lambda: (self._table_view() is self._raw              # noqa: E731
+                             and self._raw.in_table())
         pinned = lambda: note() and self.current_note().pinned          # noqa: E731
 
-        def table_cmd(action):
-            def run():
-                if self._rich.current_table() is not None:
-                    action()
-            return run
+        def table_cmd(name, *args):
+            return lambda: self._table_command(name, *args)
 
         return [
-            Command("Insertar tabla", "Tabla", self.insert_table, "", editable),
-            Command("Añadir fila abajo", "Tabla",
-                    table_cmd(lambda: self._rich.table_add_row(False)), "Tab en la última celda", table),
-            Command("Añadir fila arriba", "Tabla",
-                    table_cmd(lambda: self._rich.table_add_row(True)), "", table),
+            Command("Insertar tabla", "Tabla", self.insert_table,
+                    "Ctrl+Shift+T", editable),
+            Command("Añadir fila abajo", "Tabla", table_cmd("table_add_row", False),
+                    "Tab en la última celda", table),
+            Command("Añadir fila arriba", "Tabla", table_cmd("table_add_row", True),
+                    "", table),
             Command("Añadir columna a la derecha", "Tabla",
-                    table_cmd(lambda: self._rich.table_add_column(False)), "", table),
+                    table_cmd("table_add_column", False), "", table),
             Command("Añadir columna a la izquierda", "Tabla",
-                    table_cmd(lambda: self._rich.table_add_column(True)), "", table),
-            Command("Eliminar fila", "Tabla", table_cmd(self._rich.table_remove_row), "", table),
-            Command("Eliminar columna", "Tabla", table_cmd(self._rich.table_remove_column), "", table),
-            Command("Eliminar tabla", "Tabla", table_cmd(self._rich.table_delete), "", table),
-            Command("Alinear tablas", "Tabla", self.align_tables, "Tab en modo Markdown", editable),
+                    table_cmd("table_add_column", True), "", table),
+            Command("Eliminar fila", "Tabla", table_cmd("table_remove_row"), "", table),
+            Command("Eliminar columna", "Tabla", table_cmd("table_remove_column"),
+                    "", table),
+            Command("Eliminar tabla", "Tabla", table_cmd("table_delete"), "", table),
+            Command("Alinear la columna a la izquierda", "Tabla",
+                    table_cmd("table_set_alignment", "left"), "", raw_table),
+            Command("Centrar la columna", "Tabla",
+                    table_cmd("table_set_alignment", "center"), "", raw_table),
+            Command("Alinear la columna a la derecha", "Tabla",
+                    table_cmd("table_set_alignment", "right"), "", raw_table),
+            Command("Alinear todas las tablas", "Tabla", self.align_tables,
+                    "Tab dentro de una tabla", editable),
 
             Command("Casilla de tarea", "Checklist", self.insert_checkbox, "", editable),
             Command("Sub-casilla (checklist anidada)", "Checklist",
@@ -1219,6 +1293,21 @@ class MarkdownEditor(QWidget):
         self._show_placeholder(True)
         QTimer.singleShot(0, self._restore_pinned)
 
+    def retheme(self):
+        """Repaint what the notes panel colours from Python after the theme
+        is toggled: the markdown highlighting and the table grids. Nothing is
+        reloaded, so an unsaved edit survives the switch."""
+        self._raw.retheme()
+        for view in (self._rich, self._read):
+            # Restyling goes through the document, so it reaches
+            # textChanged: without the guard a theme switch marked the open
+            # note as edited and queued a save of a file nobody touched.
+            blocked = view.blockSignals(True)
+            try:
+                style_tables(view.document())
+            finally:
+                view.blockSignals(blocked)
+
     def save_all(self):
         if self.current_note() is not None:
             self._capture_current()
@@ -1280,7 +1369,26 @@ class _MentionsJob(QRunnable):
             linked, unlinked = self.service.mentions(note) if note else ([], [])
         except Exception:
             linked, unlinked = [], []
-        self.signals.finished.emit(self.generation, linked, unlinked)
+        try:
+            self.signals.finished.emit(self.generation, linked, unlinked)
+        except RuntimeError:
+            # The editor closed while the scan was running.
+            pass
+
+
+class _IndexWarmup(QRunnable):
+    """Fill the vault text index once, in the background, so the first note
+    the user opens does not wait for three thousand files to be read."""
+
+    def __init__(self, service: NotesService):
+        super().__init__()
+        self.service = service
+
+    def run(self):
+        try:
+            self.service.index.notes()
+        except Exception:
+            pass
 
 
 class _MentionsFooter(QFrame):
@@ -1297,7 +1405,13 @@ class _MentionsFooter(QFrame):
         self.service = service
         self._expanded = True
         self._generation = 0
-        self._signals = _MentionsSignals(self)
+        self._pending = None
+        # One worker, and not a child of this widget: a scan that outlives
+        # the panel must still have a live sender to emit from, and two
+        # scans at once only fight each other over the index.
+        self._pool = QThreadPool()
+        self._pool.setMaxThreadCount(1)
+        self._signals = _MentionsSignals()
         self._signals.finished.connect(self._show_results)
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setStyleSheet(
@@ -1365,6 +1479,9 @@ class _MentionsFooter(QFrame):
         self._scroll.setVisible(self._expanded)
         self.setMinimumHeight(160 if self._expanded else 30)
         self.setMaximumHeight(230 if self._expanded else 30)
+        if self._expanded and self._pending is not None:
+            path, self._pending = self._pending, None
+            self.load(path)
 
     def clear(self):
         self._generation += 1
@@ -1377,12 +1494,22 @@ class _MentionsFooter(QFrame):
             if item.widget():
                 item.widget().deleteLater()
 
+    def warm_up(self):
+        """Read the vault once at start-up, off the UI thread."""
+        self._pool.start(_IndexWarmup(self.service))
+
     def load(self, path: Path):
         self._generation += 1
+        if not self._expanded:
+            # Collapsed: nothing would be shown, so nothing is scanned.
+            self._pending = Path(path)
+            return
         self._clear_rows()
         self._count.setText("…")
-        self._body.addWidget(self._muted("Buscando menciones en la vault…"))
-        QThreadPool.globalInstance().start(
+        self._body.addWidget(self._muted(
+            "Buscando menciones en la vault…" if self.service.index.ready
+            else "Leyendo la vault por primera vez…"))
+        self._pool.start(
             _MentionsJob(self.service, Path(path), self._generation, self._signals)
         )
 

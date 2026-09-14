@@ -216,6 +216,10 @@ class NotesSidebar(QWidget):
         self._search_input = QLineEdit()
         self._search_input.setPlaceholderText("Buscar en todas las notas…")
         self._search_input.setObjectName("inlineSearch")
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(260)
+        self._search_timer.timeout.connect(self.run_search)
         self._search_input.returnPressed.connect(self.run_search)
         self._search_input.textChanged.connect(self._search_typed)
         lay.addWidget(self._search_input)
@@ -639,8 +643,11 @@ class NotesSidebar(QWidget):
 
     def _search_typed(self, text: str):
         if len(text.strip()) >= 3:
-            self.run_search()
+            # Debounced: a search reads every note in the vault, and running
+            # one per keystroke froze the sidebar while typing.
+            self._search_timer.start()
         elif not text.strip():
+            self._search_timer.stop()
             self._search_list.clear()
             self._search_info.setText(
                 "Escribe para buscar en títulos y contenido."

@@ -449,6 +449,7 @@ class MainWindow(QMainWindow):
         palette reaches the widgets they create on the fly."""
         self._explorer.populate_tree()
         self._explorer.refresh_bookmarks()
+        self._notas_center.retheme()
         self._habit_panel.refresh_all()
         self._habit_right.refresh_stats()
         self._ejercicio_panel.refresh_current()

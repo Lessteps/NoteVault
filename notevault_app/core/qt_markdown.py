@@ -13,6 +13,7 @@ The inverse direction is Qt's QTextDocument.setMarkdown(), fed through
 
 import re
 import unicodedata
+from functools import lru_cache
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
@@ -447,6 +448,7 @@ def _fence_count(text: str) -> int:
     return sum(1 for line in text.split("\n") if _FENCE_RE.match(line))
 
 
+@lru_cache(maxsize=48)
 def rich_edit_problem(markdown: str):
     """Why editing this note in the rich Editor would damage it, or None.
 
@@ -454,6 +456,10 @@ def rich_edit_problem(markdown: str):
     editable there when that trip keeps every word, every checkbox, table
     row, image, heading and code fence, and is stable on a second pass.
     Anything else opens in Markdown mode instead.
+
+    The check parses the note twice, which costs a third of a second on the
+    longest notes in a real vault, so the answer is cached: reopening a tab
+    or coming back to a note never pays for it again.
     """
     from collections import Counter
 
@@ -480,7 +486,7 @@ def rich_edit_problem(markdown: str):
 
 # ── Raw markdown tables ───────────────────────────────────────────────────
 
-def _split_row(line: str) -> list:
+def split_row(line: str) -> list:
     inner = line.strip()
     if inner.startswith("|"):
         inner = inner[1:]
@@ -498,7 +504,7 @@ def _split_row(line: str) -> list:
     return cells
 
 
-def _sep_align(cell: str) -> str:
+def sep_align(cell: str) -> str:
     cell = cell.strip()
     if cell.startswith(":") and cell.endswith(":"):
         return "center"
@@ -521,15 +527,15 @@ def table_span(lines: list, index: int):
         last += 1
     if last - first < 1:
         return None
-    if not all(_TABLE_SEP_CELL_RE.match(c) for c in _split_row(lines[first + 1])):
+    if not all(_TABLE_SEP_CELL_RE.match(c) for c in split_row(lines[first + 1])):
         return None
     return first, last
 
 
 def align_table_lines(lines: list) -> list:
     """Re-pad a raw markdown table so every pipe lines up."""
-    rows = [_split_row(l) for l in lines]
-    aligns = [_sep_align(c) for c in rows[1]]
+    rows = [split_row(l) for l in lines]
+    aligns = [sep_align(c) for c in rows[1]]
     body = [rows[0]] + rows[2:]
     indent = lines[0][:len(lines[0]) - len(lines[0].lstrip())]
     return [indent + l for l in format_table(body, aligns).split("\n")]

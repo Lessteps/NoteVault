@@ -12,6 +12,7 @@ or videos pasted or dropped into the note are copied into an `attachments`
 folder beside it.
 """
 
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -26,16 +27,36 @@ from PySide6.QtWidgets import QTextEdit, QTextBrowser, QMenu, QMessageBox
 
 from ....core import attachments
 from ....core.qt_markdown import (
-    EMBED_SCHEME, PLACEHOLDER, table_span, align_table_lines,
+    EMBED_SCHEME, PLACEHOLDER, table_span, align_table_lines, format_table,
+    split_row, sep_align,
 )
 from ... import theme
+from .md_highlighter import MarkdownHighlighter
 
 Marker = QTextBlockFormat.MarkerType
 
 GUIDE_COLOR = "#3a3a4a"
 BORDER = "#33333e"
 HEADER_BG = "#26262e"
+CURRENT_LINE_BG = "#202028"
+CODE_BLOCK_BG = "#202024"
+QUOTE_BAR = "#4848a0"
 MAX_IMAGE_WIDTH = 900
+
+# Spacing for the rendered views, in pixels.
+PARA_GAP = 12
+HEADING_GAP = 21
+LIST_GAP = 3
+CODE_INDENT = 14
+QUOTE_INDENT = 20
+# One list level, in the raw source. Matches qt_markdown.INDENT so a note
+# indented here and a note serialised from the Editor agree.
+INDENT_STEP = "    "
+
+# A list item and a quote in a markdown source, for Enter and Tab.
+_SOURCE_ITEM_RE = re.compile(
+    r"^([ \t]*)([-*+]|\d+[.)])([ \t]+)(\[[ xX]\][ \t]+)?(.*)$")
+_SOURCE_QUOTE_RE = re.compile(r"^[ \t]*>+[ \t]?")
 
 
 # ── Shared behaviour ──────────────────────────────────────────────────────
@@ -96,7 +117,15 @@ class _NoteSurface:
     def _init_surface(self):
         self.note_path = None
         self.vault_root = None
+        self._cursor_shape = None
         self.viewport().setMouseTracking(True)
+
+    def _set_cursor_shape(self, shape):
+        """setCursor() is a window-system call; the mouse moves far more
+        often than the shape actually changes."""
+        if shape != self._cursor_shape:
+            self._cursor_shape = shape
+            self.viewport().setCursor(shape)
 
     # resources ------------------------------------------------------------
 
@@ -134,23 +163,32 @@ class _NoteSurface:
     # indentation guides ---------------------------------------------------
 
     def _paint_guides(self):
+        """Vertical rules: one per nesting level inside a list, and one
+        alongside a blockquote, the way Obsidian marks both."""
         doc = self.document()
         layout = doc.documentLayout()
         vp = self.viewport()
         dx = -self.horizontalScrollBar().value()
         dy = -self.verticalScrollBar().value()
         top, bottom = -dy, -dy + vp.height()
+        quote_prop = QTextFormat.Property.BlockQuoteLevel
 
         painter = QPainter(vp)
-        painter.setPen(QPen(QColor(theme.tint(GUIDE_COLOR)), 1))
+        guide = QPen(QColor(theme.tint(GUIDE_COLOR)), 1)
+        bar = QPen(QColor(theme.tint(QUOTE_BAR)), 3)
         block = self.cursorForPosition(QPoint(0, 0)).block()
         while block.isValid():
             rect = layout.blockBoundingRect(block)
             if rect.top() > bottom:
                 break
+            if rect.bottom() < top:
+                block = block.next()
+                continue
             lst = block.textList()
             line = block.layout().lineAt(0)
-            if lst is not None and rect.bottom() >= top and line.isValid():
+            fmt = block.blockFormat()
+            if lst is not None and line.isValid():
+                painter.setPen(guide)
                 level = lst.format().indent()
                 # Qt lays level n's text out at n steps from the block edge.
                 step = line.x() / max(1, level)
@@ -161,6 +199,11 @@ class _NoteSurface:
                     x = round(base + k * step) + 0.5
                     painter.drawLine(QPointF(x, rect.top() + dy),
                                      QPointF(x, rect.bottom() + dy))
+            elif fmt.hasProperty(quote_prop) and fmt.intProperty(quote_prop):
+                painter.setPen(bar)
+                x = rect.left() + dx + fmt.leftMargin() - QUOTE_INDENT / 2
+                painter.drawLine(QPointF(x, rect.top() + dy),
+                                 QPointF(x, rect.bottom() + dy))
             block = block.next()
         painter.end()
 
@@ -233,7 +276,7 @@ class NoteTextEdit(_NoteSurface, QTextEdit):
     def load_markdown(self, markdown: str):
         self.document().clear()
         self.document().setMarkdown(markdown)
-        style_tables(self.document())
+        style_document(self.document())
 
     # mouse ----------------------------------------------------------------
 
@@ -252,10 +295,9 @@ class NoteTextEdit(_NoteSurface, QTextEdit):
 
     def mouseMoveEvent(self, event):
         pos = event.position().toPoint()
-        if self._marker_hit(pos) is not None:
-            self.viewport().setCursor(Qt.PointingHandCursor)
-        else:
-            self.viewport().setCursor(Qt.IBeamCursor)
+        shape = (Qt.PointingHandCursor if self._marker_hit(pos) is not None
+                 else Qt.IBeamCursor)
+        self._set_cursor_shape(shape)
         super().mouseMoveEvent(event)
 
     # keyboard -------------------------------------------------------------
@@ -358,8 +400,9 @@ class NoteTextEdit(_NoteSurface, QTextEdit):
             if col >= table.columns():
                 row, col = row + 1, 0
             if row >= table.rows():
+                # Only this table changed: restyling the whole document here
+                # cost a second on a note full of tables.
                 table.appendRows(1)
-                style_tables(self.document())
         self.setTextCursor(table.cellAt(row, col).firstCursorPosition())
 
     # tables -----------------------------------------------------------------
@@ -378,8 +421,8 @@ class NoteTextEdit(_NoteSurface, QTextEdit):
         bold.setFontWeight(QFont.Bold)
         for c in range(cols):
             table.cellAt(0, c).firstCursorPosition().insertText(f"Columna {c + 1}", bold)
+        style_table(table)
         cursor.endEditBlock()
-        style_tables(self.document())
         self.setTextCursor(table.cellAt(1 if rows > 1 else 0, 0).firstCursorPosition())
         self.setFocus()
         return table
@@ -393,7 +436,6 @@ class NoteTextEdit(_NoteSurface, QTextEdit):
             row = 1          # the header stays the first row
             above = False
         table.insertRows(row if above else row + 1, 1)
-        style_tables(self.document())
         return True
 
     def table_add_column(self, left: bool):
@@ -402,7 +444,7 @@ class NoteTextEdit(_NoteSurface, QTextEdit):
             return False
         col = table.cellAt(self.textCursor()).column()
         table.insertColumns(col if left else col + 1, 1)
-        style_tables(self.document())
+        style_table(table)      # the new header cell needs its shade
         return True
 
     def table_remove_row(self):
@@ -490,7 +532,7 @@ class NoteTextBrowser(_NoteSurface, QTextBrowser):
     def load_markdown(self, markdown: str):
         self.document().clear()
         self.document().setMarkdown(markdown)
-        style_tables(self.document())
+        style_document(self.document())
 
     def _on_anchor(self, url: QUrl):
         if url.scheme() == "nv-note":
@@ -513,30 +555,350 @@ class NoteTextBrowser(_NoteSurface, QTextBrowser):
     def mouseMoveEvent(self, event):
         pos = event.position().toPoint()
         hand = self._marker_hit(pos) is not None or self._image_at(pos) is not None
-        self.viewport().setCursor(Qt.PointingHandCursor if hand else Qt.ArrowCursor)
+        self._set_cursor_shape(Qt.PointingHandCursor if hand else Qt.ArrowCursor)
         super().mouseMoveEvent(event)
 
 
 # ── Markdown mode and code files ──────────────────────────────────────────
 
 class NoteSourceEdit(QTextEdit):
-    """Plain text. In a note, Tab inside a table re-aligns it; pasted images
-    and dropped files become attachments. For code files it is just an
-    editor, so neither of those applies."""
+    """The Markdown mode, and the view for source files.
+
+    Most notes live here, so it carries the writing comforts Obsidian's
+    source mode has: the markdown is coloured, Enter continues a list or a
+    quote, Tab moves an item between levels or re-aligns the table under the
+    caret, typing a marker around a selection wraps it, and a right click
+    inside a table offers the row and column commands. A code file gets a
+    plain editor with none of that.
+    """
+
+    table_changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.note_path = None
-        self.is_code = False
+        self._is_code = False
         self.setAcceptRichText(False)
+        self.setTabStopDistance(4 * self.fontMetrics().horizontalAdvance(" "))
+        self._highlighter = MarkdownHighlighter(self.document())
+        self.cursorPositionChanged.connect(self._mark_current_line)
+
+    @property
+    def is_code(self) -> bool:
+        return self._is_code
+
+    @is_code.setter
+    def is_code(self, value: bool):
+        value = bool(value)
+        if value == self._is_code:
+            return
+        self._is_code = value
+        # A script is not markdown: colouring its `#` lines as headings and
+        # its `*` as emphasis would be worse than no colour at all.
+        self._highlighter.enabled = not value
+        self._repaint_source()
+
+    def retheme(self):
+        self._repaint_source(self._highlighter.retheme)
+        self._mark_current_line()
+
+    def _repaint_source(self, run=None):
+        """Re-run the highlighter without the editor hearing about it.
+
+        Applying formats goes through the document, so it reaches
+        textChanged; without this guard, recolouring a note — on a theme
+        switch, say — marked it as edited and queued a save of a file
+        nobody had touched.
+        """
+        blocked = self.blockSignals(True)
+        try:
+            (run or self._highlighter.rehighlight)()
+        finally:
+            self.blockSignals(blocked)
+
+    def _mark_current_line(self):
+        line = QTextEdit.ExtraSelection()
+        line.format.setBackground(QColor(theme.tint(CURRENT_LINE_BG)))
+        line.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+        cursor = self.textCursor()
+        cursor.clearSelection()
+        line.cursor = cursor
+        self.setExtraSelections([line])
+
+    # keyboard ---------------------------------------------------------------
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Tab and not self.is_code and self._align_table():
+        key, mods = event.key(), event.modifiers()
+        shift = bool(mods & Qt.ShiftModifier)
+
+        if self._is_code:
+            if key == Qt.Key_Tab:
+                self.textCursor().insertText("    ")
+                return
+            super().keyPressEvent(event)
             return
-        if event.key() == Qt.Key_Tab and self.is_code:
-            self.textCursor().insertText("    ")
+
+        if key in (Qt.Key_Tab, Qt.Key_Backtab):
+            back = shift or key == Qt.Key_Backtab
+            if not back and self._align_table():
+                return
+            if self.shift_lines(-1 if back else +1):
+                return
+            if not back:
+                self.textCursor().insertText("    ")
+                return
             return
+
+        if key in (Qt.Key_Return, Qt.Key_Enter) and not shift \
+                and not self.textCursor().hasSelection():
+            if self._continue_block():
+                return
+
+        if event.text() and self.textCursor().hasSelection() \
+                and self._wrap_selection(event.text()):
+            return
+
         super().keyPressEvent(event)
+
+    def _wrap_selection(self, char: str) -> bool:
+        """Typing a marker with text selected wraps it instead of replacing
+        it, which is how every note app behaves and how a selection stops
+        being destroyed by a stray keystroke."""
+        pairs = {"*": ("*", "*"), "_": ("_", "_"), "`": ("`", "`"),
+                 "~": ("~", "~"), "[": ("[", "]"), "(": ("(", ")"),
+                 "{": ("{", "}"), '"': ('"', '"')}
+        pair = pairs.get(char)
+        if pair is None:
+            return False
+        cursor = self.textCursor()
+        text = cursor.selectedText().replace(" ", "\n")
+        start = min(cursor.anchor(), cursor.position())
+        cursor.insertText(pair[0] + text + pair[1])
+        cursor.setPosition(start + 1)
+        cursor.setPosition(start + 1 + len(text), QTextCursor.KeepAnchor)
+        self.setTextCursor(cursor)
+        return True
+
+    def _continue_block(self) -> bool:
+        """Enter keeps a list, a task list or a quote going, and an empty
+        item ends it instead of leaving a dangling bullet behind."""
+        cursor = self.textCursor()
+        line = cursor.block().text()
+        if cursor.positionInBlock() < len(line.rstrip()):
+            return False        # mid-line: let Enter split the line normally
+
+        m = _SOURCE_ITEM_RE.match(line)
+        if m is None:
+            quote = _SOURCE_QUOTE_RE.match(line)
+            if quote is None:
+                return False
+            if not line[quote.end():].strip():
+                self._replace_block("")
+                return True
+            cursor.insertText("\n" + quote.group(0))
+            return True
+
+        indent, bullet, space, box, text = m.groups()
+        if not (text or "").strip():
+            # An empty item: drop a level, or leave the list entirely.
+            self._replace_block(indent[:-4] + bullet + space + (box or "")
+                                if len(indent) >= 4 else "")
+            return True
+
+        if bullet[:-1].isdigit():
+            bullet = f"{int(bullet[:-1]) + 1}{bullet[-1]}"
+        box = "[ ] " if box else ""
+        cursor.insertText(f"\n{indent}{bullet}{space}{box}")
+        self.setTextCursor(cursor)
+        return True
+
+    def _replace_block(self, text: str):
+        cursor = self.textCursor()
+        cursor.select(QTextCursor.BlockUnderCursor)
+        cursor.removeSelectedText()
+        if cursor.block().text() or cursor.position() > 0:
+            cursor.insertText("\n" + text)
+        else:
+            cursor.insertText(text)
+        self.setTextCursor(cursor)
+
+    def shift_lines(self, delta: int) -> bool:
+        """Indent or outdent every selected line, by one list level."""
+        cursor = self.textCursor()
+        doc = self.document()
+        first = doc.findBlock(min(cursor.anchor(), cursor.position()))
+        last = doc.findBlock(max(cursor.anchor(), cursor.position()))
+        if first == last and not _SOURCE_ITEM_RE.match(first.text()) \
+                and not cursor.hasSelection():
+            return False
+
+        edit = QTextCursor(doc)
+        edit.beginEditBlock()
+        block = first
+        while block.isValid():
+            text = block.text()
+            c = QTextCursor(block)
+            if delta > 0:
+                if text.strip():
+                    c.insertText(INDENT_STEP)
+            else:
+                strip = 0
+                while strip < len(INDENT_STEP) and strip < len(text) \
+                        and text[strip] == " ":
+                    strip += 1
+                if strip:
+                    c.movePosition(QTextCursor.NextCharacter,
+                                   QTextCursor.KeepAnchor, strip)
+                    c.removeSelectedText()
+            if block == last:
+                break
+            block = block.next()
+        edit.endEditBlock()
+        return True
+
+    # tables -----------------------------------------------------------------
+
+    def _table_here(self):
+        """(lines, first, last) of the markdown table under the caret."""
+        lines = self.toPlainText().split("\n")
+        span = table_span(lines, self.textCursor().blockNumber())
+        return (lines, *span) if span else None
+
+    def _write_table(self, lines: list, first: int, last: int, rows: list,
+                     aligns: list):
+        body = format_table(rows, aligns).split("\n")
+        indent = lines[first][:len(lines[first]) - len(lines[first].lstrip())]
+        doc = self.document()
+        edit = QTextCursor(doc)
+        edit.beginEditBlock()
+        start = doc.findBlockByNumber(first)
+        end = doc.findBlockByNumber(last)
+        edit.setPosition(start.position())
+        edit.setPosition(end.position() + end.length() - 1, QTextCursor.KeepAnchor)
+        edit.insertText("\n".join(indent + l for l in body))
+        edit.endEditBlock()
+        self.table_changed.emit()
+
+    def _table_parts(self):
+        found = self._table_here()
+        if found is None:
+            return None
+        lines, first, last = found
+        rows = [split_row(l) for l in lines[first:last + 1]]
+        aligns = [sep_align(c) for c in rows[1]]
+        body = [rows[0]] + rows[2:]
+        row_index = self.textCursor().blockNumber() - first
+        row_index = 0 if row_index <= 1 else row_index - 1
+        col_index = split_row(
+            self.textCursor().block().text()[:self.textCursor().positionInBlock()]
+        )
+        col_index = max(0, len(col_index) - 1)
+        return lines, first, last, body, aligns, row_index, col_index
+
+    def in_table(self) -> bool:
+        return self._table_here() is not None
+
+    def table_add_row(self, above: bool) -> bool:
+        parts = self._table_parts()
+        if parts is None:
+            return False
+        lines, first, last, body, aligns, row, _col = parts
+        if row == 0 and above:
+            row = 1          # the header row stays first
+            above = False
+        body.insert(row if above else row + 1, [""] * len(aligns))
+        self._write_table(lines, first, last, body, aligns)
+        return True
+
+    def table_add_column(self, left: bool) -> bool:
+        parts = self._table_parts()
+        if parts is None:
+            return False
+        lines, first, last, body, aligns, _row, col = parts
+        at = col if left else col + 1
+        at = max(0, min(at, len(aligns)))
+        for i, r in enumerate(body):
+            r.insert(at, f"Columna {at + 1}" if i == 0 else "")
+        aligns.insert(at, "none")
+        self._write_table(lines, first, last, body, aligns)
+        return True
+
+    def table_remove_row(self) -> bool:
+        parts = self._table_parts()
+        if parts is None:
+            return False
+        lines, first, last, body, aligns, row, _col = parts
+        if row == 0 or len(body) <= 2:
+            return False
+        body.pop(row)
+        self._write_table(lines, first, last, body, aligns)
+        return True
+
+    def table_remove_column(self) -> bool:
+        parts = self._table_parts()
+        if parts is None:
+            return False
+        lines, first, last, body, aligns, _row, col = parts
+        if len(aligns) <= 1:
+            return False
+        for r in body:
+            if col < len(r):
+                r.pop(col)
+        aligns.pop(col)
+        self._write_table(lines, first, last, body, aligns)
+        return True
+
+    def table_set_alignment(self, how: str) -> bool:
+        parts = self._table_parts()
+        if parts is None:
+            return False
+        lines, first, last, body, aligns, _row, col = parts
+        aligns[col] = how
+        self._write_table(lines, first, last, body, aligns)
+        return True
+
+    def table_delete(self) -> bool:
+        found = self._table_here()
+        if found is None:
+            return False
+        lines, first, last = found
+        doc = self.document()
+        edit = QTextCursor(doc)
+        edit.beginEditBlock()
+        start = doc.findBlockByNumber(first)
+        end = doc.findBlockByNumber(last)
+        edit.setPosition(start.position())
+        edit.setPosition(end.position() + end.length() - 1, QTextCursor.KeepAnchor)
+        edit.removeSelectedText()
+        edit.deletePreviousChar()
+        edit.endEditBlock()
+        return True
+
+    def contextMenuEvent(self, event):
+        menu = self.createStandardContextMenu(event.pos())
+        if not self._is_code and self.in_table():
+            first = menu.actions()[0] if menu.actions() else None
+            table_menu = QMenu("Tabla", menu)
+            table_menu.addAction("Añadir fila arriba", lambda: self.table_add_row(True))
+            table_menu.addAction("Añadir fila abajo", lambda: self.table_add_row(False))
+            table_menu.addAction("Añadir columna a la izquierda",
+                                 lambda: self.table_add_column(True))
+            table_menu.addAction("Añadir columna a la derecha",
+                                 lambda: self.table_add_column(False))
+            table_menu.addSeparator()
+            table_menu.addAction("Alinear la columna a la izquierda",
+                                 lambda: self.table_set_alignment("left"))
+            table_menu.addAction("Centrar la columna",
+                                 lambda: self.table_set_alignment("center"))
+            table_menu.addAction("Alinear la columna a la derecha",
+                                 lambda: self.table_set_alignment("right"))
+            table_menu.addSeparator()
+            table_menu.addAction("Eliminar fila", self.table_remove_row)
+            table_menu.addAction("Eliminar columna", self.table_remove_column)
+            table_menu.addAction("Eliminar tabla", self.table_delete)
+            menu.insertMenu(first, table_menu)
+            menu.insertSeparator(first)
+        menu.exec(event.globalPos())
 
     def _align_table(self) -> bool:
         cursor = self.textCursor()
@@ -602,26 +964,134 @@ def _table_format() -> QTextTableFormat:
     return fmt
 
 
-def style_tables(doc: QTextDocument):
-    """Give every table the same grid, and the header row its own shade."""
-    for frame in _iter_frames(doc.rootFrame()):
-        if not isinstance(frame, QTextTable):
-            continue
-        fmt = frame.format()
-        base = _table_format()
-        fmt.setBorder(base.border())
-        fmt.setBorderStyle(base.borderStyle())
-        fmt.setBorderBrush(base.borderBrush())
-        fmt.setBorderCollapse(True)
-        fmt.setCellPadding(base.cellPadding())
-        fmt.setCellSpacing(0)
-        frame.setFormat(fmt)
-        header = QColor(theme.tint(HEADER_BG))
-        for c in range(frame.columns()):
-            cell = frame.cellAt(0, c)
-            cfmt = cell.format()
-            cfmt.setBackground(header)
+def style_table(table: QTextTable):
+    """Give one table the grid, and its header row its own shade."""
+    base = _table_format()
+    fmt = table.format()
+    fmt.setBorder(base.border())
+    fmt.setBorderStyle(base.borderStyle())
+    fmt.setBorderBrush(base.borderBrush())
+    fmt.setBorderCollapse(True)
+    fmt.setCellPadding(base.cellPadding())
+    fmt.setCellSpacing(0)
+    fmt.setTopMargin(PARA_GAP)
+    fmt.setBottomMargin(PARA_GAP)
+    table.setFormat(fmt)
+    header = QColor(theme.tint(HEADER_BG))
+    for r in range(table.rows()):
+        for c in range(table.columns()):
+            cell = table.cellAt(r, c)
+            cfmt = cell.format().toTableCellFormat()
+            cfmt.setVerticalAlignment(QTextCharFormat.AlignTop)
+            if r == 0:
+                cfmt.setBackground(header)
             cell.setFormat(cfmt)
+            _drop_leading_blank(cell)
+            if r == 0:
+                # The importer loses the header's weight when the table
+                # follows a quote. The serialiser writes header cells with
+                # plain_bold, so it cannot read this back as emphasis.
+                bold = QTextCharFormat()
+                bold.setFontWeight(QFont.Bold)
+                span = QTextCursor(cell.firstCursorPosition())
+                span.setPosition(cell.lastPosition(), QTextCursor.KeepAnchor)
+                span.mergeCharFormat(bold)
+
+
+def _drop_leading_blank(cell):
+    """Remove the empty paragraph Qt's importer sometimes puts at the top of
+    a cell, which leaves that one cell a line taller than its row.
+
+    The serialiser already skips empty paragraphs inside a cell, so nothing
+    that reaches the file changes.
+    """
+    start = cell.firstCursorPosition()
+    if start.block().text():
+        return
+    end = cell.lastCursorPosition()
+    if start.block() == end.block():
+        return          # the cell really is empty
+    cursor = QTextCursor(start)
+    cursor.movePosition(QTextCursor.NextBlock, QTextCursor.KeepAnchor)
+    cursor.removeSelectedText()
+
+
+def style_document(doc: QTextDocument):
+    """Give a rendered note the air Obsidian gives it.
+
+    Qt's markdown importer stacks every block flush against the next, which
+    reads as a wall of text: paragraphs, headings, quotes and code all run
+    together. This adds the spacing, the quote indent and the code-block
+    shade after the import.
+
+    Only block margins and backgrounds are touched. `document_to_markdown()`
+    reads the heading level, the list, the task marker, the quote level, the
+    code fence and the character formats — none of them — so the styling can
+    never change what is written back to the file.
+    """
+    cursor = QTextCursor(doc)
+    cursor.beginEditBlock()
+    try:
+        code_bg = QColor(theme.tint(CODE_BLOCK_BG))
+        block = doc.begin()
+        first = True
+        while block.isValid():
+            if QTextCursor(block).currentTable() is not None:
+                block = block.next()
+                continue
+            fmt = block.blockFormat()
+            heading = fmt.headingLevel()
+            quote = (fmt.intProperty(QTextFormat.Property.BlockQuoteLevel)
+                     if fmt.hasProperty(QTextFormat.Property.BlockQuoteLevel) else 0)
+            code = fmt.hasProperty(QTextFormat.Property.BlockCodeFence)
+
+            if code:
+                fmt.setTopMargin(0)
+                fmt.setBottomMargin(0)
+                fmt.setLeftMargin(CODE_INDENT)
+                fmt.setBackground(code_bg)
+            elif heading:
+                fmt.setTopMargin(0 if first else HEADING_GAP)
+                fmt.setBottomMargin(HEADING_GAP // 3)
+                fmt.setLeftMargin(0)
+            elif quote:
+                fmt.setTopMargin(2)
+                fmt.setBottomMargin(2)
+                fmt.setLeftMargin(QUOTE_INDENT * quote)
+            elif block.textList() is not None:
+                fmt.setTopMargin(0)
+                fmt.setBottomMargin(LIST_GAP)
+            else:
+                fmt.setTopMargin(0)
+                fmt.setBottomMargin(PARA_GAP)
+                fmt.setLeftMargin(0)
+            QTextCursor(block).setBlockFormat(fmt)
+            first = False
+            block = block.next()
+
+        for frame in _iter_frames(doc.rootFrame()):
+            if isinstance(frame, QTextTable):
+                style_table(frame)
+    finally:
+        cursor.endEditBlock()
+
+
+def style_tables(doc: QTextDocument):
+    """Style every table in the document.
+
+    Each setFormat() relaid the whole document out, so a note with 74 tables
+    took over a second to restyle — once on open and again on every Tab
+    inside a table. Wrapping the pass in a single edit block collapses that
+    into one layout and brings it under 20 ms.
+    """
+    cursor = QTextCursor(doc)
+    cursor.beginEditBlock()
+    try:
+        for frame in _iter_frames(doc.rootFrame()):
+            if isinstance(frame, QTextTable):
+                style_table(frame)
+    finally:
+        cursor.endEditBlock()
 
 
 def _iter_frames(frame):

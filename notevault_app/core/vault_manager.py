@@ -225,9 +225,13 @@ class VaultManager:
                 except (OSError, ValueError):
                     continue
 
+    def note_paths(self, limit: int = MAX_SCAN_NOTES) -> list:
+        """Every note path in the vault, sorted. Walks directories but reads
+        no file, which is what the text index needs to spot new notes."""
+        return sorted(self._walk_note_paths(limit))
+
     def all_notes(self, limit: int = MAX_SCAN_NOTES) -> list:
-        return [Note(p, self.vault_root)
-                for p in sorted(self._walk_note_paths(limit))]
+        return [Note(p, self.vault_root) for p in self.note_paths(limit)]
 
     def all_folders(self) -> list:
         out = []

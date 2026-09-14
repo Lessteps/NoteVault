@@ -11,8 +11,9 @@ from pathlib import Path
 from typing import Optional
 
 from .vault_manager import (
-    VaultManager, Note, is_reserved, is_ignored_dir, MAX_SCAN_NOTES,
+    VaultManager, Note, is_reserved, is_ignored_dir,
 )
+from .vault_index import VaultIndex
 
 from .file_kinds import kind_for
 # Media copied into notes lives here; it is not a note and never listed.
@@ -63,6 +64,8 @@ class NotesService:
 
     def __init__(self, vault: VaultManager):
         self.vault = vault
+        self.index = VaultIndex.for_vault(vault)
+        self._bookmarks_cache = ([], None)      # (paths, mtime of the file)
 
     # ── Paths ─────────────────────────────────────────────────────────────
 
@@ -76,20 +79,30 @@ class NotesService:
     # ── Bookmarks ─────────────────────────────────────────────────────────
 
     def bookmarks(self) -> list:
-        """Bookmarked note paths that still exist, in the saved order."""
+        """Bookmarked note paths that still exist, in the saved order.
+
+        Cached against the file's modification time: the editor asks whether
+        the note it just opened is bookmarked, and re-reading the list plus
+        stat-ing every entry for that one question cost more than loading
+        the note itself.
+        """
         path = self._bookmarks_path()
-        if not path.exists():
+        try:
+            stamp = path.stat().st_mtime_ns
+        except OSError:
+            self._bookmarks_cache = ([], None)
             return []
+        cached, cached_stamp = self._bookmarks_cache
+        if cached_stamp == stamp:
+            return list(cached)
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
+            self._bookmarks_cache = ([], stamp)
             return []
-        out = []
-        for rel in raw:
-            p = self.root / rel
-            if p.exists():
-                out.append(p)
-        return out
+        out = [self.root / rel for rel in raw if (self.root / rel).exists()]
+        self._bookmarks_cache = (out, stamp)
+        return list(out)
 
     def _save_bookmarks(self, paths: list):
         rels = []
@@ -101,6 +114,7 @@ class NotesService:
         self._bookmarks_path().write_text(
             json.dumps(rels, indent=2, ensure_ascii=False), encoding="utf-8"
         )
+        self._bookmarks_cache = ([], None)      # re-read on the next question
 
     def is_bookmarked(self, path: Path) -> bool:
         return Path(path) in self.bookmarks()
@@ -222,16 +236,18 @@ class NotesService:
         if not q:
             return []
         hits = []
-        for note in self.vault.all_notes():
-            try:
-                text = note.raw
-            except Exception:
-                continue
+        # Search runs on the UI thread while the user is still typing, so it
+        # uses whatever the index already holds. Re-walking the vault to
+        # check for new files would stall the window for seconds; the first
+        # fill happens in the background when the notes panel opens.
+        notes = (self.index.cached_notes() if self.index.ready
+                 else self.index.notes())
+        for note in notes:
             if q in note.title.lower():
                 hits.append(SearchHit(note.path, note.title, 0, note.title))
-            if q not in text.lower():
+            if q not in note.lower:
                 continue
-            for i, line in enumerate(text.splitlines(), start=1):
+            for i, line in enumerate(note.text.splitlines(), start=1):
                 if q in line.lower():
                     hits.append(
                         SearchHit(note.path, note.title, i, line.strip()[:180])
@@ -247,13 +263,17 @@ class NotesService:
 
         Linked   = another note contains [[This note]].
         Unlinked = another note writes the title as plain text, with no link.
+
+        The scan runs over the text index, so it costs a pass over memory
+        rather than a read of the whole vault. Call it from a worker thread
+        anyway: the very first call is what fills the index.
         """
         title = note.title.strip()
         if not title:
             return ([], [])
 
         linked, unlinked = [], []
-        scanned = 0
+        needle = title.lower()
         link_re = re.compile(
             r"\[\[\s*" + re.escape(title) + r"\s*(\|[^\]]*)?\]\]", re.IGNORECASE
         )
@@ -261,17 +281,12 @@ class NotesService:
             r"(?<![\w\[])" + re.escape(title) + r"(?![\w\]])", re.IGNORECASE
         )
 
-        for other in self.vault.all_notes(limit=MAX_SCAN_NOTES):
+        for other in self.index.notes():
             if other.path == note.path:
                 continue
-            scanned += 1
-            try:
-                text = other.raw
-            except Exception:
+            if needle not in other.lower:
                 continue
-            if title.lower() not in text.lower():
-                continue
-            for i, line in enumerate(text.splitlines(), start=1):
+            for i, line in enumerate(other.text.splitlines(), start=1):
                 if link_re.search(line):
                     linked.append(Mention(other.path, other.title, i,
                                           line.strip()[:200], True))
@@ -303,6 +318,7 @@ class NotesService:
         if target == path or target.exists():
             return path
         path.rename(target)
+        self.index.forget(path)
         return target
 
     def delete_path(self, path: Path):
@@ -316,7 +332,15 @@ class NotesService:
             dest = trash / f"{path.stem}_{counter}{path.suffix}"
             counter += 1
         path.rename(dest)
+        self.index.forget(path)
         self.remove_bookmark(path)
+
+    def note_written(self, path: Path, text: str):
+        """Called after the editor saves, so the index does not have to wait
+        for its next directory walk to see the new text."""
+        self.index.update(path, text)
 
     def set_vault(self, vault: VaultManager):
         self.vault = vault
+        self.index = VaultIndex.for_vault(vault)
+        self._bookmarks_cache = ([], None)

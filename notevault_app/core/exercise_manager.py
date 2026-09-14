@@ -7,6 +7,8 @@ Daily logs:          {vault}/ejercicio/YYYY/MM/YYYY-MM-DD.json
 
 import json
 import calendar
+import re
+import shutil
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
@@ -124,6 +126,119 @@ class ExerciseManager:
                 })
                 changed = True
         return changed
+
+    # ── Videos ────────────────────────────────────────────────────────────
+
+    VIDEO_EXTS = (".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi")
+
+    @staticmethod
+    def _video_key(name) -> str:
+        """A filename reduced to letters and digits, for comparing names that
+        differ only in punctuation, spacing or case."""
+        return re.sub(r"[^a-z0-9]+", "", Path(str(name)).stem.lower())
+
+    def video_files(self) -> list:
+        if not self.videos_dir.is_dir():
+            return []
+        return sorted(p for p in self.videos_dir.iterdir()
+                      if p.is_file() and p.suffix.lower() in self.VIDEO_EXTS)
+
+    def resolve_video(self, exercise: dict) -> Optional[Path]:
+        """The file an exercise's video points at, or None.
+
+        `video_path` is whatever the user typed or picked and wins when it
+        exists, so a video can live anywhere on disk. `video` is a filename
+        inside the vault's videos folder. Neither has to be exact: the files
+        are usually downloads whose names carry a long title the routine was
+        never going to repeat, so a name that is a prefix of exactly one file
+        (or the other way round) counts as a match.
+        """
+        for raw in (exercise.get("video_path"), exercise.get("video")):
+            hit = self._resolve_one(str(raw or "").strip())
+            if hit is not None:
+                return hit
+        return None
+
+    def _resolve_one(self, raw: str) -> Optional[Path]:
+        if not raw:
+            return None
+        given = Path(raw)
+        # An absolute path the user set by hand, or a path relative to the
+        # vault: both are used exactly as given when the file is there.
+        for candidate in ([given] if given.is_absolute()
+                          else [self.vault_root / given, given]):
+            try:
+                if candidate.is_file():
+                    return candidate
+            except OSError:
+                continue
+
+        files = self.video_files()
+        if not files:
+            return None
+        by_name = {p.name.lower(): p for p in files}
+        exact = by_name.get(given.name.lower())
+        if exact is not None:
+            return exact
+
+        key = self._video_key(given.name)
+        if not key:
+            return None
+        keyed = {self._video_key(p.name): p for p in files}
+        if key in keyed:
+            return keyed[key]
+        # A prefix has to be long enough to mean something and has to pick a
+        # single file, or "1." would match every first exercise of the week.
+        if len(key) >= 5:
+            near = [p for k, p in keyed.items()
+                    if k.startswith(key) or key.startswith(k)]
+            if len(near) == 1:
+                return near[0]
+        return None
+
+    def link_videos(self) -> dict:
+        """Point every exercise at a file in the videos folder where one can
+        be found, and write the result back. Returns what happened."""
+        linked, already, missing = [], [], []
+        changed = False
+        for ex in self.exercises():
+            hit = self.resolve_video(ex)
+            if hit is None:
+                missing.append(ex.get("name", ex.get("id", "")))
+                continue
+            name = hit.name
+            inside = hit.parent.resolve() == self.videos_dir.resolve()
+            want_video = name if inside else ""
+            want_path = "" if inside else str(hit)
+            if ex.get("video") == want_video and ex.get("video_path") == want_path:
+                already.append(ex.get("name", ""))
+                continue
+            ex["video"] = want_video
+            ex["video_path"] = want_path
+            linked.append(f"{ex.get('name', '')}  →  {name}")
+            changed = True
+        if changed:
+            self.save_exercises()
+        return {"linked": linked, "already": already, "missing": missing}
+
+    def import_video(self, exercise_id: str, source: Path) -> Optional[Path]:
+        """Copy a file the user picked into the vault's videos folder and
+        attach it, so the link keeps working on the phone too."""
+        source = Path(source)
+        if not source.is_file():
+            return None
+        self.videos_dir.mkdir(parents=True, exist_ok=True)
+        target = self.videos_dir / source.name
+        if target.resolve() != source.resolve():
+            if target.exists():
+                stem, suffix = target.stem, target.suffix
+                n = 2
+                while target.exists():
+                    target = self.videos_dir / f"{stem} {n}{suffix}"
+                    n += 1
+            shutil.copy2(source, target)
+        self.update_exercise(exercise_id, video=target.name, video_path="")
+        return target
 
     def save_exercises(self):
         self.ejercicio_dir.mkdir(parents=True, exist_ok=True)

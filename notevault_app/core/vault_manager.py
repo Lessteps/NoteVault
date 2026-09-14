@@ -158,6 +158,23 @@ def migrate_vault(root: Path) -> list[str]:
     moved: list[str] = []
     data_root = root / vault_format.DATA_DIR
 
+    # Picking `<vault>/.notevault` as the vault root makes the app write
+    # `<vault>/.notevault/.notevault`, and the videos and day logs land in a
+    # folder nothing reads. Lift anything found there back one level.
+    nested = data_root / vault_format.DATA_DIR
+    if nested.is_dir():
+        for src in sorted(nested.rglob("*")):
+            if not src.is_file():
+                continue
+            dest = data_root / src.relative_to(nested)
+            if dest.exists():
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dest))
+            moved.append(dest.relative_to(root).as_posix())
+        if not any(p.is_file() for p in nested.rglob("*")):
+            shutil.rmtree(nested, ignore_errors=True)
+
     for name in vault_format.LEGACY_DIRS:
         old = root / name
         if not old.is_dir():
@@ -187,8 +204,21 @@ def migrate_vault(root: Path) -> list[str]:
     return moved
 
 
+def normalise_vault_root(path: Path) -> Path:
+    """The vault root for a folder the user picked.
+
+    Picking the data folder itself is the easy mistake — it is the one that
+    shows up in a sync client's folder list — and it makes the app build a
+    second data folder inside it. Selecting `.notevault` means the vault is
+    its parent.
+    """
+    path = Path(path)
+    return path.parent if path.name == vault_format.DATA_DIR else path
+
+
 class VaultManager:
     def __init__(self, vault_root: Path):
+        vault_root = normalise_vault_root(Path(vault_root))
         self.vault_root = vault_root
         self.vault_root.mkdir(parents=True, exist_ok=True)
         migrate_vault(self.vault_root)

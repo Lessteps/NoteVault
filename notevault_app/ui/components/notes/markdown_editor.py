@@ -182,6 +182,7 @@ class MarkdownEditor(QWidget):
         )
         self._rich.textChanged.connect(self._on_text_changed)
         self._rich.media_activated.connect(self._open_media)
+        self._rich.note_link_activated.connect(self._open_wikilink)
         self._stack.addWidget(self._rich)      # 0
 
         self._raw = NoteSourceEdit()
@@ -191,6 +192,7 @@ class MarkdownEditor(QWidget):
             "padding:22px 26px;}"
         )
         self._raw.textChanged.connect(self._on_text_changed)
+        self._raw.note_link_activated.connect(self._open_wikilink)
         self._stack.addWidget(self._raw)       # 1
 
         self._read = NoteTextBrowser()
@@ -1091,12 +1093,48 @@ class MarkdownEditor(QWidget):
         self._read.verticalScrollBar().setValue(scroll)
 
     def _open_wikilink(self, target: str):
-        target = target.strip().lower()
-        for n in self.vault.all_notes():
-            if n.title.lower() == target:
-                self.open_note(n.path)
-                return
-        self._status.setText(f"No existe una nota llamada «{target}».")
+        """Follow a [[wikilink]] to its note, creating it if it is new.
+
+        Resolution follows Obsidian: an exact title first, then a path
+        relative to the vault, then the closest title. A link that points
+        nowhere offers to create the note, so writing a link is also how a
+        note gets started.
+        """
+        raw = target.strip()
+        if not raw:
+            return
+        wanted = raw.lower()
+        notes = self.service.index.cached_notes() or self.vault.all_notes()
+        by_title = {}
+        for n in notes:
+            by_title.setdefault(n.title.lower(), n.path)
+        hit = by_title.get(wanted)
+        if hit is None:
+            # "carpeta/Nota" and "Nota.md" both name a file.
+            rel = self.vault.vault_root / raw
+            for candidate in (rel, rel.with_suffix(".md")):
+                if candidate.is_file():
+                    hit = candidate
+                    break
+        if hit is None:
+            hit = by_title.get(Path(wanted).stem)
+        if hit is not None:
+            self.open_note(Path(hit))
+            return
+
+        current = self.current_path()
+        folder = Path(current).parent if current else self.vault.vault_root
+        answer = QMessageBox.question(
+            self, "La nota no existe",
+            f"No hay ninguna nota llamada «{raw}».\n\n¿Crearla en {folder}?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes,
+        )
+        if answer != QMessageBox.Yes:
+            self._status.setText(f"No existe una nota llamada «{raw}».")
+            return
+        note = self.service.create_note(raw, folder)
+        self.service.index.forget(note.path)
+        self.open_note(note.path)
 
     # ── Command palette ───────────────────────────────────────────────────
 

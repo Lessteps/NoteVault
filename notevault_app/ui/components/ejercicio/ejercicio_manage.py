@@ -198,6 +198,28 @@ class EjercicioManage(QWidget):
         vid_row.addWidget(browse_btn)
         form_lay.addLayout(vid_row)
 
+        # Says, before saving, whether this path will actually open.
+        self._video_state = QLabel("")
+        self._video_state.setWordWrap(True)
+        self._video_state.setStyleSheet(
+            "color:#6f6f6f;font-size:11px;background:transparent;border:none;")
+        form_lay.addWidget(self._video_state)
+        self._f_video.textChanged.connect(self._check_video)
+
+        link_btn = QPushButton("🔗  Vincular videos automáticamente")
+        link_btn.setCursor(Qt.PointingHandCursor)
+        link_btn.setFixedHeight(32)
+        link_btn.setToolTip(
+            "Recorre la carpeta de videos del vault y conecta cada ejercicio "
+            "con su archivo, aunque el nombre guardado sea más corto.")
+        link_btn.setStyleSheet(
+            f"QPushButton{{background:#252525;border:1px solid {BORDER};"
+            "border-radius:8px;color:#e6e6e6;font-size:12px;padding:0 12px;}}"
+            f"QPushButton:hover{{border-color:{ORANGE};color:{ORANGE};}}"
+        )
+        link_btn.clicked.connect(self._link_videos)
+        form_lay.addWidget(link_btn)
+
         # Series × Reps
         row2 = QHBoxLayout()
         row2.setSpacing(10)
@@ -297,13 +319,52 @@ class EjercicioManage(QWidget):
         return row
 
     def _browse_video(self):
+        start = self.manager.videos_dir if self.manager.videos_dir.is_dir() \
+            else Path.home()
         path, _ = QFileDialog.getOpenFileName(
-            self, "Seleccionar video",
-            str(Path.home()),
-            "Videos (*.mp4 *.mkv *.avi *.mov *.webm);;Todos (*.*)",
+            self, "Seleccionar video", str(start),
+            "Videos (*.mp4 *.mkv *.avi *.mov *.webm *.m4v);;Todos (*.*)",
         )
         if path:
             self._f_video.setText(path)
+
+    def _check_video(self, text: str):
+        """Tell the user now, not after saving, whether this will open."""
+        text = text.strip()
+        if not text:
+            self._video_state.setText("")
+            return
+        hit = self.manager.resolve_video({"video_path": text, "video": text})
+        if hit is None:
+            self._video_state.setText(
+                f"✗  No se encuentra «{Path(text).name}». Usa 📂 para elegir el "
+                f"archivo, o déjalo en {self.manager.videos_dir}")
+            self._video_state.setStyleSheet(
+                f"color:{RED};font-size:11px;background:transparent;border:none;")
+            return
+        inside = hit.parent.resolve() == self.manager.videos_dir.resolve()
+        where = "en el vault (se sincroniza al móvil)" if inside \
+            else "fuera del vault: solo abrirá en este PC"
+        self._video_state.setText(f"✓  {hit.name} — {where}")
+        self._video_state.setStyleSheet(
+            f"color:{'#4ade80' if inside else '#e0a13a'};font-size:11px;"
+            "background:transparent;border:none;")
+
+    def _link_videos(self):
+        report = self.manager.link_videos()
+        linked, missing = report["linked"], report["missing"]
+        parts = []
+        if linked:
+            parts.append(f"{len(linked)} vinculados")
+        if report["already"]:
+            parts.append(f"{len(report['already'])} ya estaban")
+        if missing:
+            parts.append(f"{len(missing)} sin video")
+        self._status_lbl.setText("🔗  " + ("  ·  ".join(parts) if parts
+                                           else "No hay nada que vincular."))
+        if linked:
+            self.exercises_changed.emit()
+            self.refresh()
 
     def _save_form(self):
         name = self._f_name.text().strip()

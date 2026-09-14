@@ -113,6 +113,9 @@ def _escape_segment(text: str) -> str:
     return _TAG_START_RE.sub(escape, text)
 
 
+_RULE_LINE_RE = re.compile(r"^ {0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*$")
+
+
 def prepare_markdown(markdown: str) -> str:
     """Rewrite syntax Qt's importer does not know into syntax it does."""
     lines, fence = [], False
@@ -121,6 +124,13 @@ def prepare_markdown(markdown: str) -> str:
             fence = not fence
             lines.append(line)
             continue
+        if not fence and _RULE_LINE_RE.match(line) and lines and lines[-1].strip():
+            # A line of dashes right under a paragraph is a setext heading in
+            # CommonMark, so Qt turned the paragraph above into an H2 and the
+            # rule vanished — and the autosave then wrote "## Texto" into the
+            # file. In Obsidian that line is a horizontal rule, which is what
+            # the user typed it for, and one blank line is all it takes.
+            lines.append("")
         lines.append(line if fence else _escape_unknown_tags(line))
     markdown = "\n".join(lines)
 

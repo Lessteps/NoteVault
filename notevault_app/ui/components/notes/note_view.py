@@ -304,11 +304,58 @@ class _NoteSurface:
         return True
 
 
+_WIKILINK_AT_RE = re.compile(r"\[\[([^\]\n]+?)\]\]")
+
+
+def wikilink_at(text: str, column: int):
+    """The note a `[[wikilink]]` under `column` points at, or None.
+
+    An alias (`[[Note|label]]`) and a heading (`[[Note#Section]]`) are cut
+    away, since both name the same file.
+    """
+    for m in _WIKILINK_AT_RE.finditer(text or ""):
+        if m.start() <= column <= m.end():
+            target = m.group(1).split("|")[0].split("#")[0].strip()
+            return target or None
+    return None
+
+
+class _WikilinkClicks:
+    """Ctrl+click on a `[[wikilink]]` opens that note, in any editing mode.
+
+    Reading mode turns wikilinks into real anchors, but while editing they are
+    plain text, so the two modes people actually write in had no way to follow
+    a link at all.
+    """
+
+    def _wikilink_under(self, pos):
+        cursor = self.cursorForPosition(pos)
+        return wikilink_at(cursor.block().text(), cursor.positionInBlock())
+
+    def _follow_wikilink(self, event) -> bool:
+        if not (event.modifiers() & Qt.ControlModifier):
+            return False
+        target = self._wikilink_under(event.position().toPoint())
+        if not target:
+            return False
+        self.note_link_activated.emit(target)
+        return True
+
+    def _wikilink_cursor(self, event) -> bool:
+        if not (event.modifiers() & Qt.ControlModifier):
+            return False
+        if self._wikilink_under(event.position().toPoint()) is None:
+            return False
+        self._set_cursor_shape(Qt.PointingHandCursor)
+        return True
+
+
 # ── Editor mode ───────────────────────────────────────────────────────────
 
-class NoteTextEdit(_NoteSurface, QTextEdit):
+class NoteTextEdit(_WikilinkClicks, _NoteSurface, QTextEdit):
     media_activated = Signal(str)
     attachment_failed = Signal(str)
+    note_link_activated = Signal(str)      # Ctrl+click on a [[wikilink]]
 
     def __init__(self, parent=None):
         QTextEdit.__init__(self, parent)
@@ -333,6 +380,8 @@ class NoteTextEdit(_NoteSurface, QTextEdit):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
+            if self._follow_wikilink(event):
+                return
             block = self._marker_hit(event.position().toPoint())
             if block is not None:
                 toggle_marker(block)
@@ -345,10 +394,11 @@ class NoteTextEdit(_NoteSurface, QTextEdit):
         super().mouseDoubleClickEvent(event)
 
     def mouseMoveEvent(self, event):
-        pos = event.position().toPoint()
-        shape = (Qt.PointingHandCursor if self._marker_hit(pos) is not None
-                 else Qt.IBeamCursor)
-        self._set_cursor_shape(shape)
+        if not self._wikilink_cursor(event):
+            pos = event.position().toPoint()
+            self._set_cursor_shape(
+                Qt.PointingHandCursor if self._marker_hit(pos) is not None
+                else Qt.IBeamCursor)
         super().mouseMoveEvent(event)
 
     # keyboard -------------------------------------------------------------
@@ -612,7 +662,7 @@ class NoteTextBrowser(_NoteSurface, QTextBrowser):
 
 # ── Markdown mode and code files ──────────────────────────────────────────
 
-class NoteSourceEdit(QTextEdit):
+class NoteSourceEdit(_WikilinkClicks, QTextEdit):
     """The Markdown mode, and the view for source files.
 
     Most notes live here, so it carries the writing comforts Obsidian's
@@ -624,12 +674,15 @@ class NoteSourceEdit(QTextEdit):
     """
 
     table_changed = Signal()
+    note_link_activated = Signal(str)      # Ctrl+click on a [[wikilink]]
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.note_path = None
+        self._cursor_shape = None
         self._is_code = False
         self.setAcceptRichText(False)
+        self.viewport().setMouseTracking(True)
         self.setTabStopDistance(4 * self.fontMetrics().horizontalAdvance(" "))
         self._highlighter = MarkdownHighlighter(self.document())
         self.cursorPositionChanged.connect(self._mark_current_line)
@@ -677,6 +730,16 @@ class NoteSourceEdit(QTextEdit):
         self.setExtraSelections([line])
 
     # keyboard ---------------------------------------------------------------
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and not self._is_code                 and self._follow_wikilink(event):
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._is_code or not self._wikilink_cursor(event):
+            self._set_cursor_shape(Qt.IBeamCursor)
+        super().mouseMoveEvent(event)
 
     def keyPressEvent(self, event):
         key, mods = event.key(), event.modifiers()

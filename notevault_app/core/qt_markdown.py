@@ -176,7 +176,7 @@ def toggle_task(markdown: str, index: int) -> str:
 
 # ── Document -> markdown ──────────────────────────────────────────────────
 
-def _is_mono(fmt) -> bool:
+def is_mono(fmt) -> bool:
     # Only fontFamilies(): QTextCharFormat.fontFamily() crashes on Qt 6.11.
     families = fmt.fontFamilies()
     if not families:
@@ -219,7 +219,7 @@ def _fragment_markdown(frag: QTextFragment, plain_bold: bool) -> str:
 
     if fmt.isAnchor() and fmt.anchorHref():
         return f"{lead}[{core}]({fmt.anchorHref()}){trail}"
-    if _is_mono(fmt):
+    if is_mono(fmt):
         return f"{lead}`{core}`{trail}"
 
     bold = fmt.fontWeight() >= QFont.Bold and not plain_bold

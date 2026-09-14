@@ -372,12 +372,23 @@ Files: `ui/components/notes/` — `notes_sidebar.py`, `markdown_editor.py`, `not
   left/right, delete row/column/table, and — in Markdown mode — set the column's alignment. Saved as a
   **GitHub table with aligned pipes** (column widths by display width, wide glyphs count 2;
   `:---:` / `---:` alignment kept).
+  A rendered table **takes the full writing width** (`QTextLength.PercentageLength, 100`) and shares it
+  between its columns, so a long cell wraps onto several lines. Letting the table hug its longest line,
+  which is Qt's default, is the single thing that makes it not look like the reference.
+  "Insertar tabla…" opens `table_picker.py`, the hover grid every editor has: up to 8 × 8, the label
+  says "4 × 5 · cabecera + 3 filas de datos", arrows adjust, Enter inserts, Esc cancels.
 - **Rendered typography** (`style_document()` in `note_view.py`): Qt's markdown importer stacks every
-  block flush against the next, so after the import the views add paragraph and heading spacing, indent
-  quotes behind a coloured vertical bar, shade fenced code, and give tables margins, top-aligned cells
-  and a bold header. Only block margins and backgrounds are touched; `document_to_markdown()` reads
-  none of them, which is verified against the whole vault — the styling must never change a byte that
-  reaches a file.
+  block flush against the next, so after the import the views add paragraph, heading and list spacing,
+  indent quotes behind a coloured vertical bar, shade fenced code, put `inline code` on a chip, and
+  give tables margins, top-aligned cells and a bold header. Only block margins and backgrounds are
+  touched; `document_to_markdown()` reads neither (it decides what is a code span from the font
+  family, never the background), which is verified against the whole vault — the styling must never
+  change a byte that reaches a file.
+- **Task checkboxes are painted by hand** (`_paint_checkbox`), not left to Qt. Qt draws its marker
+  flush against the first character, so the box and the label read as one word and there is no API for
+  the gap. The painter covers the marker slot with the page colour and draws a rounded square
+  `BOX_GAP` pixels before the text: hollow with a grey border when open, filled with the accent and a
+  white tick when done. A port on another toolkit needs the same result, not the same technique.
 - **Ctrl+P command palette:** floating search box; accent-insensitive multi-word filter; ↑↓ Enter Esc.
   Commands grouped "Tabla", "Checklist", "Lista", "Adjunto", "Formato", "Vista", "Pestaña", "Nota";
   commands that do not apply (e.g. row commands outside a table) are listed but disabled. The shortcut

@@ -41,6 +41,7 @@ from .note_view import (
     toggle_marker, embed_files, style_tables,
 )
 from .command_palette import Command, CommandPalette
+from .table_picker import TablePicker
 
 BG_PAGE   = "#1a1a1e"
 BG_BAR    = "#202024"
@@ -313,7 +314,7 @@ class MarkdownEditor(QWidget):
         add(_ToolBtn("☑", "Casilla de tarea  (Ctrl+L marca / desmarca)", 26),
             self.insert_checkbox)
         add(_ToolBtn("❝", "Cita", 26), self.insert_quote)
-        add(_ToolBtn("⊞", "Insertar tabla", 26), self.insert_table)
+        add(_ToolBtn("⊞", "Insertar tabla", 26), lambda: self.insert_table())
         lay.addWidget(_sep())
 
         add(_ToolBtn("🔗", "Enlace", 26), self.insert_link)
@@ -368,7 +369,7 @@ class MarkdownEditor(QWidget):
         bind("Ctrl+I", self.toggle_italic)
         bind("Ctrl+E", lambda: self.set_mode(
             MODE_READ if self._mode != MODE_READ else MODE_RICH))
-        bind("Ctrl+Shift+T", self.insert_table)
+        bind("Ctrl+Shift+T", lambda: self.insert_table())
 
     def set_assistant_visible(self, visible: bool):
         self._assistant_btn.setChecked(visible)
@@ -984,17 +985,23 @@ class MarkdownEditor(QWidget):
 
     # ── Tables ────────────────────────────────────────────────────────────
 
-    def insert_table(self):
+    def insert_table(self, rows: int = 0, cols: int = 0):
+        """Insert a table of the chosen size. With no size, the picker asks."""
         if not self._ensure_editable():
             return
+        if not (rows and cols):
+            picked = TablePicker(self).pick_over(self._stack)
+            if picked is None:
+                return
+            rows, cols = picked
         if self._view_mode() == MODE_RAW:
             cursor = self._raw.textCursor()
             cursor.movePosition(QTextCursor.EndOfBlock)
-            cursor.insertText("\n\n" + new_table(3, 3) + "\n")
+            cursor.insertText("\n\n" + new_table(rows, cols) + "\n")
             self._raw.setTextCursor(cursor)
             self._raw.setFocus()
             return
-        self._rich.insert_table(3, 3)
+        self._rich.insert_table(rows, cols)
 
     def _table_view(self):
         """The view holding the table under the caret, in either mode.
@@ -1105,7 +1112,7 @@ class MarkdownEditor(QWidget):
             return lambda: self._table_command(name, *args)
 
         return [
-            Command("Insertar tabla", "Tabla", self.insert_table,
+            Command("Insertar tabla…", "Tabla", lambda: self.insert_table(),
                     "Ctrl+Shift+T", editable),
             Command("Añadir fila abajo", "Tabla", table_cmd("table_add_row", False),
                     "Tab en la última celda", table),

@@ -21,14 +21,14 @@ from PySide6.QtGui import (
     QPainter, QColor, QPen, QImage, QFont, QTextCursor, QTextDocument,
     QTextListFormat, QTextBlockFormat, QTextImageFormat, QTextTableFormat,
     QTextCharFormat, QTextFormat, QBrush, QTextTable, QDesktopServices,
-    QTextFrameFormat,
+    QTextFrameFormat, QTextLength,
 )
 from PySide6.QtWidgets import QTextEdit, QTextBrowser, QMenu, QMessageBox
 
 from ....core import attachments
 from ....core.qt_markdown import (
     EMBED_SCHEME, PLACEHOLDER, table_span, align_table_lines, format_table,
-    split_row, sep_align,
+    split_row, sep_align, is_mono as _is_mono,
 )
 from ... import theme
 from .md_highlighter import MarkdownHighlighter
@@ -38,15 +38,28 @@ Marker = QTextBlockFormat.MarkerType
 GUIDE_COLOR = "#3a3a4a"
 BORDER = "#33333e"
 HEADER_BG = "#26262e"
+PAGE_BG = "#1a1a1e"
+# Task checkboxes are painted by hand. Qt draws its own marker flush against
+# the text, and there is no way to ask it for the gap every note app leaves
+# between the box and the label.
+BOX_SIZE = 13
+BOX_GAP = 7
+BOX_BORDER = "#6a6a72"
+BOX_DONE = "#7c5af0"
+INLINE_CODE_BG = "#2a2a32"
 CURRENT_LINE_BG = "#202028"
 CODE_BLOCK_BG = "#202024"
 QUOTE_BAR = "#4848a0"
+# The grid of a table reads as a grid only if its lines are a shade lighter
+# than the panel borders around it.
+TABLE_BORDER = "#44444e"
+TABLE_PADDING = 8
 MAX_IMAGE_WIDTH = 900
 
 # Spacing for the rendered views, in pixels.
 PARA_GAP = 12
 HEADING_GAP = 21
-LIST_GAP = 3
+LIST_GAP = 6
 CODE_INDENT = 14
 QUOTE_INDENT = 20
 # One list level, in the raw source. Matches qt_markdown.INDENT so a note
@@ -199,6 +212,9 @@ class _NoteSurface:
                     x = round(base + k * step) + 0.5
                     painter.drawLine(QPointF(x, rect.top() + dy),
                                      QPointF(x, rect.bottom() + dy))
+                if fmt.marker() != Marker.NoMarker:
+                    self._paint_checkbox(painter, rect, line, dx, dy,
+                                         fmt.marker() == Marker.Checked)
             elif fmt.hasProperty(quote_prop) and fmt.intProperty(quote_prop):
                 painter.setPen(bar)
                 x = rect.left() + dx + fmt.leftMargin() - QUOTE_INDENT / 2
@@ -206,6 +222,41 @@ class _NoteSurface:
                                  QPointF(x, rect.bottom() + dy))
             block = block.next()
         painter.end()
+
+    def _paint_checkbox(self, painter, rect, line, dx, dy, checked: bool):
+        """Cover Qt's marker and draw the box a few pixels to its left.
+
+        Qt paints the marker hard against the first character, which reads as
+        one word; every note app leaves a gap there.
+        """
+        text_x = rect.left() + dx + line.x()
+        top = rect.top() + dy + line.y()
+        slot = QRectF(text_x - self.document().indentWidth(), top,
+                      self.document().indentWidth(), line.height())
+        painter.save()
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(theme.tint(PAGE_BG)))
+        painter.drawRect(slot)
+
+        box = QRectF(text_x - BOX_GAP - BOX_SIZE,
+                     top + (line.height() - BOX_SIZE) / 2,
+                     BOX_SIZE, BOX_SIZE)
+        painter.setRenderHint(QPainter.Antialiasing)
+        if checked:
+            painter.setBrush(QColor(theme.tint(BOX_DONE)))
+            painter.setPen(Qt.NoPen)
+            painter.drawRoundedRect(box, 3, 3)
+            painter.setPen(QPen(QColor("#ffffff"), 2))
+            painter.drawPolyline([
+                QPointF(box.left() + 3, box.center().y()),
+                QPointF(box.center().x() - 0.5, box.bottom() - 3.5),
+                QPointF(box.right() - 2.5, box.top() + 3.5),
+            ])
+        else:
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(QPen(QColor(theme.tint(BOX_BORDER)), 1.4))
+            painter.drawRoundedRect(box.adjusted(0.5, 0.5, -0.5, -0.5), 3, 3)
+        painter.restore()
 
     # checkboxes and media -------------------------------------------------
 
@@ -956,11 +1007,15 @@ def _table_format() -> QTextTableFormat:
     fmt = QTextTableFormat()
     fmt.setBorder(1)
     fmt.setBorderStyle(QTextFrameFormat.BorderStyle.BorderStyle_Solid)
-    fmt.setBorderBrush(QBrush(QColor(theme.tint(BORDER))))
+    fmt.setBorderBrush(QBrush(QColor(theme.tint(TABLE_BORDER))))
     fmt.setBorderCollapse(True)
-    fmt.setCellPadding(6)
+    fmt.setCellPadding(TABLE_PADDING)
     fmt.setCellSpacing(0)
     fmt.setHeaderRowCount(1)
+    # A table takes the whole writing width and shares it between its
+    # columns, so a long cell wraps onto several lines instead of the table
+    # shrinking to its longest line and leaving the page half empty.
+    fmt.setWidth(QTextLength(QTextLength.PercentageLength, 100))
     return fmt
 
 
@@ -976,6 +1031,7 @@ def style_table(table: QTextTable):
     fmt.setCellSpacing(0)
     fmt.setTopMargin(PARA_GAP)
     fmt.setBottomMargin(PARA_GAP)
+    fmt.setWidth(base.width())
     table.setFormat(fmt)
     header = QColor(theme.tint(HEADER_BG))
     for r in range(table.rows()):
@@ -1072,8 +1128,36 @@ def style_document(doc: QTextDocument):
         for frame in _iter_frames(doc.rootFrame()):
             if isinstance(frame, QTextTable):
                 style_table(frame)
+        _shade_inline_code(doc)
     finally:
         cursor.endEditBlock()
+
+
+def _shade_inline_code(doc: QTextDocument):
+    """Put `code spans` on a chip, the way Obsidian does.
+
+    Only the background changes. The serialiser decides what is a code span
+    from the font family, which is left alone, so the backticks come back
+    exactly as they went in.
+    """
+    chip = QTextCharFormat()
+    chip.setBackground(QColor(theme.tint(INLINE_CODE_BG)))
+    fence = QTextFormat.Property.BlockCodeFence
+    block = doc.begin()
+    while block.isValid():
+        if not block.blockFormat().hasProperty(fence):
+            it = block.begin()
+            while not it.atEnd():
+                frag = it.fragment()
+                if frag.isValid() and not frag.charFormat().isImageFormat() \
+                        and _is_mono(frag.charFormat()):
+                    span = QTextCursor(doc)
+                    span.setPosition(frag.position())
+                    span.setPosition(frag.position() + frag.length(),
+                                     QTextCursor.KeepAnchor)
+                    span.mergeCharFormat(chip)
+                it += 1
+        block = block.next()
 
 
 def style_tables(doc: QTextDocument):

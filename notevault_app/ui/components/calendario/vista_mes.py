@@ -139,7 +139,6 @@ class VistaMes(QWidget):
         self.filters: dict = {}
 
         self._build_ui()
-        self._setup_shortcuts()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -170,26 +169,6 @@ class VistaMes(QWidget):
         self.grid_layout.setSpacing(0)
 
         layout.addWidget(self.grid_widget, stretch=1)
-
-    def _setup_shortcuts(self):
-        sc_t = QShortcut(QKeySequence("T"), self, context=Qt.WindowShortcut)
-        sc_t.activated.connect(lambda: self.set_date(date.today()))
-
-        sc_left = QShortcut(QKeySequence(Qt.Key_Left), self, context=Qt.WindowShortcut)
-        sc_left.activated.connect(self._prev_month)
-
-        sc_right = QShortcut(QKeySequence(Qt.Key_Right), self, context=Qt.WindowShortcut)
-        sc_right.activated.connect(self._next_month)
-
-    def _prev_month(self):
-        first = date(self.current_date.year, self.current_date.month, 1) - timedelta(days=1)
-        self.set_date(date(first.year, first.month, 1))
-
-    def _next_month(self):
-        if self.current_date.month == 12:
-            self.set_date(date(self.current_date.year + 1, 1, 1))
-        else:
-            self.set_date(date(self.current_date.year, self.current_date.month + 1, 1))
 
     def set_date(self, d: date):
         self.current_date = d

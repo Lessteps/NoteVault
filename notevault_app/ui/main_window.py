@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QSplitter, QStatusBar,
     QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget,
 )
-from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve
+from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QTimer
 
 from ..config import AppConfig
 from ..core.vault_manager import VaultManager
@@ -195,6 +195,8 @@ class MainWindow(QMainWindow):
         self._calendario_panel.status_message.connect(
             lambda msg: self.status_bar.showMessage(msg, 4000))
         self._calendario_panel.notify_requested.connect(self._notify)
+        self._calendario_panel.data_changed.connect(lambda: self.tasks.tasks(force=True))
+        self._calendario_left.create_requested.connect(self._calendario_panel.create_new)
         self._dashboard.go_habits.connect(lambda: self._switch_mode(MODE_HABITS))
         self._dashboard.go_ejercicio.connect(lambda: self._switch_mode(MODE_EJERCICIO))
         self._dashboard.go_tareas.connect(lambda: self._switch_mode(MODE_TAREAS))
@@ -258,6 +260,12 @@ class MainWindow(QMainWindow):
         self.notifier = Notifier(self, assets)
         if self.notifier.tray is not None:
             self.notifier.tray.activated.connect(lambda _r: self._raise_window())
+
+        self._agenda_timer = QTimer(self)
+        self._agenda_timer.setInterval(30_000)
+        self._agenda_timer.timeout.connect(
+            lambda: self.notifier.check_schedule_reminders(self.schedule_mgr))
+        self._agenda_timer.start()
 
     # ── Mode switching ────────────────────────────────────────────────────
 

@@ -8,10 +8,10 @@ and a "Rutinas" button to launch rutina_editor.
 from datetime import date, timedelta
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox,
-    QFrame, QGridLayout
+    QFrame, QGridLayout, QMenu, QGraphicsDropShadowEffect,
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal, QPoint
+from PySide6.QtGui import QFont, QColor
 
 from ....config import AppConfig
 from ....core import vault_format
@@ -194,6 +194,7 @@ class CalendarioLeftPanel(QWidget):
     """Calendario left sidebar widget."""
 
     view_requested = Signal(str)      # "dia" | "semana" | "mes" | "agenda"
+    create_requested = Signal(str)    # "event" | "task"
     date_selected = Signal(date)
     filters_changed = Signal(dict)
 
@@ -211,10 +212,11 @@ class CalendarioLeftPanel(QWidget):
         layout.setContentsMargins(10, 14, 10, 14)
         layout.setSpacing(14)
 
-        # Header Title
-        title_lbl = QLabel("Calendario")
-        title_lbl.setStyleSheet("font-size: 15px; font-weight: bold; color: #dcdde0; padding-left: 4px;")
-        layout.addWidget(title_lbl)
+        create_line = QHBoxLayout()
+        create_line.setContentsMargins(2, 4, 0, 6)
+        create_line.addWidget(self._create_button())
+        create_line.addStretch()
+        layout.addLayout(create_line)
 
         # 1. View Switcher
         layout.addWidget(_section_label("Vistas"))
@@ -286,6 +288,48 @@ class CalendarioLeftPanel(QWidget):
         """)
         rutinas_btn.clicked.connect(self._open_rutina_editor)
         layout.addWidget(rutinas_btn)
+
+    def _create_button(self) -> QPushButton:
+        btn = QPushButton()
+        btn.setObjectName("calCreate")
+        btn.setFixedSize(158, 54)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet(
+            "QPushButton#calCreate { background: #262626; border: none; border-radius: 16px;"
+            " padding: 0px; min-width: 158px; max-width: 158px; }"
+            "QPushButton#calCreate:hover { background: #2a2a2a; }")
+        shadow = QGraphicsDropShadowEffect(btn)
+        shadow.setBlurRadius(14)
+        shadow.setOffset(0, 2)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        btn.setGraphicsEffect(shadow)
+
+        row = QHBoxLayout(btn)
+        row.setContentsMargins(16, 0, 14, 0)
+        row.setSpacing(10)
+        for text, css in (("+", "font-size: 26px; font-weight: 300; padding-bottom: 3px;"),
+                          ("Crear", "font-size: 14px; font-weight: 600;"),
+                          ("▾", "font-size: 11px;")):
+            lbl = QLabel(text)
+            lbl.setStyleSheet(f"background: transparent; border: none; padding: 0px; color: #e6e6e6; {css}")
+            lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
+            row.addWidget(lbl)
+            if text == "Crear":
+                row.addStretch()
+
+        def open_menu():
+            menu = QMenu(btn)
+            menu.setStyleSheet(
+                "QMenu { background: #202020; border: 1px solid #2f2f2f; padding: 6px 0px;"
+                " color: #e6e6e6; font-size: 14px; }"
+                "QMenu::item { padding: 9px 36px 9px 18px; }"
+                "QMenu::item:selected { background: #2a2a2a; }")
+            menu.addAction("Evento").triggered.connect(lambda: self.create_requested.emit("event"))
+            menu.addAction("Tarea").triggered.connect(lambda: self.create_requested.emit("task"))
+            menu.exec(btn.mapToGlobal(QPoint(0, btn.height() + 4)))
+
+        btn.clicked.connect(open_menu)
+        return btn
 
     def _select_view(self, key: str):
         for k, btn in self._nav_btns.items():

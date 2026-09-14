@@ -6,15 +6,11 @@ Chronological list of occurrences grouped by date.
 from datetime import date, timedelta
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
-    QPushButton, QCheckBox, QSizePolicy, QDialog
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame, QCheckBox,
 )
-from PySide6.QtCore import Qt, Signal, QRect
-from PySide6.QtGui import QColor, QFont, QKeySequence, QShortcut
+from PySide6.QtCore import Qt, Signal, QRect, QPoint
 
-from ... import theme
 from ....core.schedule_manager import Occurrence
-from .evento_editor import EventoEditorDialog
 from . import month_name, weekday_name
 
 
@@ -119,7 +115,7 @@ class VistaAgenda(QWidget):
 
     date_changed = Signal(date)
     data_changed = Signal()
-    notify_requested = Signal(str, str)
+    occurrence_clicked = Signal(object, QRect)
 
     def __init__(self, schedule_mgr, parent=None):
         super().__init__(parent)
@@ -128,7 +124,6 @@ class VistaAgenda(QWidget):
         self.filters: dict = {}
 
         self._build_ui()
-        self._setup_shortcuts()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -163,16 +158,6 @@ class VistaAgenda(QWidget):
 
         self.scroll_area.setWidget(self.list_container)
         layout.addWidget(self.scroll_area, stretch=1)
-
-    def _setup_shortcuts(self):
-        sc_t = QShortcut(QKeySequence("T"), self, context=Qt.WindowShortcut)
-        sc_t.activated.connect(lambda: self.set_date(date.today()))
-
-        sc_left = QShortcut(QKeySequence(Qt.Key_Left), self, context=Qt.WindowShortcut)
-        sc_left.activated.connect(lambda: self.set_date(self.current_date - timedelta(days=7)))
-
-        sc_right = QShortcut(QKeySequence(Qt.Key_Right), self, context=Qt.WindowShortcut)
-        sc_right.activated.connect(lambda: self.set_date(self.current_date + timedelta(days=7)))
 
     def set_date(self, d: date):
         self.current_date = d
@@ -220,7 +205,9 @@ class VistaAgenda(QWidget):
 
                 for occ in vis_occs:
                     row = AgendaItemRow(occ, parent=self)
-                    row.item_clicked.connect(self._on_item_clicked)
+                    row.item_clicked.connect(
+                        lambda occ, r=row: self.occurrence_clicked.emit(
+                            occ, QRect(r.mapToGlobal(QPoint(0, 0)), r.size())))
                     row.done_toggled.connect(self._on_done_toggled)
                     self.list_layout.addWidget(row)
 
@@ -231,21 +218,6 @@ class VistaAgenda(QWidget):
             empty_lbl.setAlignment(Qt.AlignCenter)
             empty_lbl.setStyleSheet("color: #888895; font-size: 13px; margin-top: 40px;")
             self.list_layout.addWidget(empty_lbl)
-
-    def _on_item_clicked(self, occ: Occurrence):
-        if occ.kind == "event" and occ.editable:
-            day_file = self.schedule_mgr.get_day_file(occ.date)
-            event_data = next((ev for ev in day_file.get("events", []) if ev.get("id") == occ.id), None)
-            if event_data:
-                dlg = EventoEditorDialog(self, event_data=event_data, date_val=occ.date)
-                if dlg.exec() == QDialog.Accepted:
-                    if dlg.is_deleted:
-                        self.schedule_mgr.remove_event(occ.date, occ.id)
-                    else:
-                        data = dlg.get_data()
-                        self.schedule_mgr.update_event(occ.date, occ.id, **data)
-                    self.data_changed.emit()
-                    self.refresh()
 
     def _on_done_toggled(self, occ: Occurrence, done: bool):
         self.schedule_mgr.set_done(occ.date, occ.id, done)

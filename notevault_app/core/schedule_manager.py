@@ -36,6 +36,12 @@ class Occurrence:
     done: bool = False
     source: str = ""     # "routine" | "event" | module name — where to write back
     editable: bool = True
+    reminder_min: Optional[int] = None   # minutes before start; None = no reminder
+
+
+def _reminder(item: dict) -> Optional[int]:
+    value = item.get("reminder_min")
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
 
 
 class ScheduleManager:
@@ -291,6 +297,7 @@ class ScheduleManager:
                 done=is_done,
                 source="routine",
                 editable=True,
+                reminder_min=_reminder(r),
             ))
 
         # 2. Day events
@@ -307,6 +314,7 @@ class ScheduleManager:
                 done=bool(ev.get("done", False)),
                 source="event",
                 editable=True,
+                reminder_min=_reminder(ev),
             ))
 
         # 3. Tasks

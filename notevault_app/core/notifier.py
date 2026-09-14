@@ -62,8 +62,8 @@ class Notifier:
         return self._tray
 
     def check_schedule_reminders(self, schedule_mgr):
-        """Check for calendar occurrences scheduled around now and send reminders."""
-        from datetime import datetime, date, timedelta
+        """Notify calendar events and routines whose reminder time has come."""
+        from datetime import datetime, timedelta
         now = datetime.now()
         today = now.date()
 
@@ -73,26 +73,27 @@ class Notifier:
             return
 
         for occ in occurrences:
-            if not occ.start or occ.done:
+            if not occ.start or occ.done or occ.reminder_min is None:
                 continue
             try:
                 h, m = map(int, occ.start.split(":"))
-                occ_time = datetime(today.year, today.month, today.day, h, m)
-            except Exception:
+                begins = datetime(today.year, today.month, today.day, h, m)
+            except ValueError:
                 continue
 
-            key = (today.isoformat(), occ.id, occ.start)
+            key = (today.isoformat(), occ.id, occ.start, occ.reminder_min)
             if key in self._notified_occurrences:
                 continue
-
-            # Notify if current time is within [start_time - 5min, start_time + 10min]
-            diff = now - occ_time
-            if timedelta(minutes=-5) <= diff <= timedelta(minutes=10):
+            # A reminder missed while the app was closed is not worth showing
+            # once the event is well under way.
+            if begins - timedelta(minutes=occ.reminder_min) <= now <= begins + timedelta(minutes=10):
                 self._notified_occurrences.add(key)
-                kind_lbl = "Evento" if occ.kind == "event" else ("Rutina" if occ.kind == "routine" else occ.kind.capitalize())
-                title = f"Recordatorio: {occ.title}"
-                body = f"{kind_lbl} programado a las {occ.start}"
-                self.notify(title, body)
+                if now >= begins:
+                    body = f"Empieza ahora ({h}:{m:02d})"
+                else:
+                    left = int((begins - now).total_seconds() // 60) + 1
+                    body = f"Empieza a las {h}:{m:02d} · en {left} min"
+                self.notify(occ.title, body)
 
     def notify(self, title: str, body: str, msecs: int = 12000) -> bool:
         """Show a desktop notification. Returns True if the tray was used."""

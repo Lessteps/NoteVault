@@ -237,35 +237,82 @@ fuera de rango se descartan. `tests/conformance/EXPECTED.json`
 (`recurrence_rules`, `habit_rules`, `task.occurs`, `task.roll_forward`) fija
 los días exactos que debe devolver cada implementación.
 
-## Proyectos
+## Proyectos (versión 4, tipo Jira)
 
-### `.notevault/proyectos/<project-id>.md`
-
-El id tiene la forma `pYYYYMMDD-xxxxxx`.
-
-```markdown
----
-id: p20260912-a1b2c3
-name: "Portafolio web"
-status: En curso
-color: "#2383e2"
-created: 2026-09-12
-start: 2026-09-12
-deadline: 2026-10-30
----
-
-Descripción libre en markdown.
-
-## Tareas
-- [x] Diseñar la home | 2026-09-14
-- [ ] Maquetar en HTML | 2026-09-20
-- [ ] Publicar
+```
+.notevault/proyectos/<project-id>/<project-id>.md       el proyecto
+.notevault/proyectos/<project-id>/issues/<issue-id>.md  un issue por archivo
 ```
 
-- `status` ∈ `Planeado` · `En curso` · `Pausado` · `Terminado`.
-- La sección `## Tareas` contiene la checklist. Cada línea es
-  `- [ ]` o `- [x]`, el nombre, y opcionalmente ` | fecha ISO`.
-- El progreso del proyecto se deriva de la checklist; no se guarda.
+### Proyecto — `PROJECT_FIELDS`
+
+Frontmatter tipado, en este orden:
+
+| Clave | Tipo | Significado |
+|---|---|---|
+| `id` | id | `pYYYYMMDD-xxxxxx` |
+| `key` | id | Prefijo de las claves visibles (`PW` → `PW-12`). Se deriva del nombre: iniciales de hasta 4 palabras, o las 3 primeras letras si es una sola; sin tildes; si se repite, `PW2`. |
+| `name` | str | |
+| `status` | str | `Planeado` · `En curso` · `Pausado` · `Terminado` |
+| `area` | id | [Área](#áreas) |
+| `colour`, `icon` | str | |
+| `created`, `start`, `deadline` | date | |
+| `columns` | list | Flujo del Kanban; por defecto `Por hacer,En curso,En revisión,Hecho`. |
+| `done_column` | str | La columna que cuenta como hecho. |
+| `in_calendar` | bool | Sus issues con fecha aparecen en el calendario general. |
+
+El cuerpo es la descripción. El progreso se calcula; nunca se guarda.
+
+### Issue — `ISSUE_FIELDS`
+
+| Clave | Tipo | Significado |
+|---|---|---|
+| `id` | id | `xYYYYMMDD-xxxxxx` |
+| `number` | int | Máximo existente + 1. Si dos dispositivos repiten número, el más reciente (por `created`, luego `id`) se renumbera. |
+| `type` | str | `Submeta` · `Tarea` · `Subtarea` · `Error` · `Mejora` |
+| `parent` | id | Padre; vacío = raíz. Un padre inexistente o un ciclo se muestran en la raíz. |
+| `title` | str | |
+| `status` | str | Una de las columnas; un valor desconocido se muestra en la primera. |
+| `priority` | int | 1 Baja · 2 Media · 3 Alta · 4 Urgente |
+| `order` | num | Posición dentro de su columna; al soltar se usa el punto medio entre vecinos. |
+| `estimate_min` | int | Estimación en minutos. |
+| `labels` | list | Etiquetas. |
+| `created`, `start`, `due` | date | |
+| `due_time` | str | `HH:MM` |
+| `repeat`, `repeat_until` | str, date | [Repetición](#repetición). Al llegar a la columna de hecho, `due`, `start` y `reminder` pasan a la siguiente fecha y el issue vuelve a la primera columna. |
+| `in_calendar` | bool | |
+| `reminder`, `reminder_done` | datetime, bool | Mismas reglas que los recordatorios de tareas (clave `issue:<id>`). |
+| `done_at` | date | Se pone al entrar en la columna de hecho y se borra al salir. |
+| `attachments` | list | Rutas relativas a `.notevault/` (`proyectos/adjuntos/AAAA/MM/<issue-id>-1.png`). |
+
+El cuerpo es la descripción (markdown, con checklist `- [ ]`).
+
+Una `Submeta` con hijas agrupa trabajo: no cuenta como issue en el
+progreso ni en las estadísticas; sus estadísticas son las de sus descendientes.
+
+### Estadísticas (se calculan, no se guardan)
+
+- **Resumen**: total, hechos, abiertos, vencidos (`due` < hoy y no hecho),
+  estimado total y hecho, hechos esta semana (desde el lunes).
+- **Burndown**: por cada día desde `start` (o el primer `created`) hasta la
+  entrega o hoy, issues con `created` ≤ día y sin `done_at` ≤ día.
+- **Rendimiento**: issues con `done_at` en cada una de las últimas semanas.
+
+### Migración desde la versión 3
+
+En la versión 3 un proyecto era un solo archivo `proyectos/<id>.md` con una
+checklist bajo `## Tareas`. Al abrir la vault (`migrate_projects()`):
+
+1. Si ya existe la carpeta `proyectos/<id>/`, no se toca nada.
+2. Se crea el proyecto conservando id, nombre, estado, `color` → `colour`,
+   fechas y cualquier clave desconocida (por ejemplo `start_time`), con la
+   descripción sin la sección `## Tareas`.
+3. Cada línea `- [x] paso | fecha` se convierte en un issue `Tarea` con id
+   `x<fecha del id del proyecto>-<n en hexadecimal de 6 cifras>`, `number` y
+   `order` = n, `status` `Hecho` o `Por hacer`, `due` = la fecha, y `done_at`
+   = la fecha si ya pasó, o el día de la migración.
+4. Solo cuando todo está escrito, el archivo antiguo se mueve a
+   `.notevault/.papelera/proyectos-v3/`.
 
 ## Frontmatter tipado (versión 4)
 

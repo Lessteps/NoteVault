@@ -19,7 +19,8 @@ from ..core.vault_manager import VaultManager
 from ..core.habit_manager import HabitManager
 from ..core.exercise_manager import ExerciseManager
 from ..core.task_manager import TaskManager
-from ..core.project_manager import ProjectManager
+from ..core.project_manager import ProjectManager, ProjectCalendarSource
+from ..core import reminder_scheduler
 from ..core.schedule_manager import ScheduleManager
 from ..core.area_manager import AreaManager
 from ..core.goal_manager import GoalManager, GoalCalendarSource
@@ -106,6 +107,7 @@ class MainWindow(QMainWindow):
             vault_path, habit_mgr=self.habits, exercise_mgr=self.exercise_mgr,
             task_mgr=self.tasks, project_mgr=self.projects)
         self.schedule_mgr.register_source("metas", GoalCalendarSource(self.goals))
+        self.schedule_mgr.register_source("proyectos", ProjectCalendarSource(self.projects))
         self.notes        = NotesService(self.vault)
 
     # ── Build UI ──────────────────────────────────────────────────────────
@@ -175,7 +177,7 @@ class MainWindow(QMainWindow):
         self._ejercicio_panel  = EjercicioPanel(self.exercise_mgr)
         self._notas_center     = MarkdownEditor(self.vault, self.notes)
         self._tareas_panel     = TareasPanel(self.tasks)
-        self._proj_panel       = ProyectosPanel(self.projects)
+        self._proj_panel       = ProyectosPanel(self.projects, self.areas)
         self._dashboard        = DashboardPanel(
             self.habits, self.exercise_mgr, self.tasks, self.projects,
             goals=self.goals, areas=self.areas)
@@ -218,6 +220,9 @@ class MainWindow(QMainWindow):
         self._proj_left.board_requested.connect(self._proj_panel.show_board)
         self._proj_left.project_requested.connect(self._proj_panel.open_project)
         self._proj_panel.data_changed.connect(self._proj_left.refresh)
+        self._proj_panel.project_changed.connect(
+            lambda pid: self._proj_left.set_active(pid or "__board__"))
+        self._proj_left.new_requested.connect(self._proj_panel.new_project)
         self._calendario_left.view_requested.connect(self._calendario_panel.show_view)
         self._calendario_left.date_selected.connect(self._calendario_panel.set_date)
         self._calendario_left.filters_changed.connect(self._calendario_panel.set_filters)
@@ -309,7 +314,30 @@ class MainWindow(QMainWindow):
         self._agenda_timer.setInterval(30_000)
         self._agenda_timer.timeout.connect(
             lambda: self.notifier.check_schedule_reminders(self.schedule_mgr))
+        self._agenda_timer.timeout.connect(self._check_issue_reminders)
         self._agenda_timer.start()
+
+    def _check_issue_reminders(self):
+        """Project issues remind with the same rules as tasks; the flag syncs."""
+        try:
+            issues = self.projects.all_issues()
+            for r in reminder_scheduler.stale(issues):
+                pid = next((i.project for i in issues if i.id == r.task_id), None)
+                if pid:
+                    self.projects.update_issue(pid, r.task_id, reminder_done=True)
+            due = reminder_scheduler.due_now(issues)
+        except Exception:
+            return
+        if not due:
+            return
+        for r in due:
+            pid = next((i.project for i in issues if i.id == r.task_id), None)
+            if pid:
+                self.projects.update_issue(pid, r.task_id, reminder_done=True)
+        if len(due) == 1:
+            self._notify("Recordatorio de issue", due[0].body)
+        else:
+            self._notify(f"{len(due)} recordatorios de issues", "\n".join("• " + r.body for r in due))
 
     # ── Mode switching ────────────────────────────────────────────────────
 
@@ -402,7 +430,7 @@ class MainWindow(QMainWindow):
         elif source == "proyectos":
             self._switch_mode(MODE_PROYECTOS)
             if link.get("id"):
-                self._proj_panel.open_project(link["id"])
+                self._proj_panel.open_project(link["id"], link.get("issue", ""))
         elif source == "finanzas":
             self._switch_mode(MODE_FINANZAS)
 
@@ -506,7 +534,7 @@ class MainWindow(QMainWindow):
         self._habit_left.manager = self.habits
         self._ejercicio_panel.set_manager(self.exercise_mgr)
         self._tareas_panel.set_manager(self.tasks)
-        self._proj_panel.set_manager(self.projects)
+        self._proj_panel.set_manager(self.projects, self.areas)
         self._proj_left.set_manager(self.projects)
         self._dashboard.set_managers(
             self.habits, self.exercise_mgr, self.tasks, self.projects,

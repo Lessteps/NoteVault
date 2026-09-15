@@ -19,7 +19,7 @@ env/
 
 # ── App runtime state (user-specific, not source) ─────────────────
 .sdd/
-proyectos/
+/proyectos/
 *.db
 *.sqlite
 

@@ -37,7 +37,7 @@ YELLOW = "#eab308"
 
 PRIORITY_NAMES = {1: "Baja", 2: "Media", 3: "Alta", 4: "Urgente"}
 PRIORITY_COLOURS = {1: "#8b8b96", 2: "#2383e2", 3: "#ff9632", 4: "#f2555a"}
-PRIORITY_GLYPHS = {1: "▽", 2: "=", 3: "△", 4: "⏫"}
+PRIORITY_GLYPHS = {1: "▽", 2: "=", 3: "△", 4: "▲"}
 
 AREA_COLOURS = ("#3f51b5", "#8e24aa", "#33b679", "#f6bf26", "#e67c73",
                 "#039be5", "#f4511e", "#0b8043", "#7986cb", "#616161")

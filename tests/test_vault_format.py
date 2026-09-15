@@ -248,17 +248,17 @@ class TestTasks(VaultCase):
 
 
 class TestProjects(VaultCase):
-    def test_checklist_shape(self):
+    def test_project_and_issue_files(self):
         pm = ProjectManager(self.vault)
-        p = pm.create("Portafolio", status=P_ACTIVE)
-        pm.add_step(p.id, "Diseñar la home", FIXED_DAY)
-        pm.add_step(p.id, "Publicar", None)
-        pm.set_step(p.id, 0, done=True)
-
+        p = pm.create("Portafolio web", status=P_ACTIVE)
+        issue = pm.create_issue(p.id, "Diseñar la home", due=FIXED_DAY, labels=["diseño"])
         text = self.read(fmt.LAYOUT["project"].format(id=p.id))
-        self.assertIn("## Tareas\n", text)
-        self.assertIn("- [x] Diseñar la home | 2026-09-12\n", text)
-        self.assertIn("- [ ] Publicar\n", text)
+        self.assertIn("key: PW\n", text)
+        self.assertIn('columns: "Por hacer,En curso,En revisión,Hecho"\n', text)
+        itext = self.read(fmt.LAYOUT["issue"].format(project=p.id, id=issue.id))
+        self.assertIn("number: 1\n", itext)
+        self.assertIn('status: "Por hacer"\n', itext)
+        self.assertIn('labels: "diseño"\n', itext)
 
     def test_statuses_match_the_spec(self):
         self.assertEqual(tuple(PROJECT_STATUSES), fmt.PROJECT_STATUSES)
@@ -266,12 +266,13 @@ class TestProjects(VaultCase):
     def test_progress_is_derived_not_stored(self):
         pm = ProjectManager(self.vault)
         p = pm.create("P")
-        pm.add_step(p.id, "a")
-        pm.add_step(p.id, "b")
-        pm.set_step(p.id, 0, done=True)
+        a = pm.create_issue(p.id, "a")
+        pm.create_issue(p.id, "b")
+        pm.move(p.id, a.id, "Hecho", 0)
         text = self.read(fmt.LAYOUT["project"].format(id=p.id))
         self.assertNotIn("progress", text)
-        self.assertAlmostEqual(ProjectManager(self.vault).get(p.id).progress, 0.5)
+        fresh = ProjectManager(self.vault)
+        self.assertAlmostEqual(fresh.progress(fresh.get(p.id)), 0.5)
 
 
 class TestBookmarks(VaultCase):
@@ -436,16 +437,50 @@ def _build_sample(vault) -> tuple:
     tm.update(task.id, body="# Ensayo\n\n- Buscar fuentes\n",
               repeat="weekly:0,3", repeat_until=date(2026, 10, 31))
 
-    pm = ProjectManager(vault)
-    project = pm.create("Portafolio web", status=P_ACTIVE,
-                        deadline=date(2026, 10, 30))
-    pm.add_step(project.id, "Diseñar la home", date(2026, 9, 14))
-    pm.add_step(project.id, "Publicar", None)
-    pm.set_step(project.id, 0, done=True)
-
-    ids = {"TASK_ID": task.id, "PROJECT_ID": project.id}
+    ids = {"TASK_ID": task.id}
+    ids.update(_build_projects(vault))
     ids.update(_build_goals(vault, hm))
     return ids
+
+
+LEGACY_PROJECT = (
+    "---\nid: p20260901-aaaaaa\nname: \"Tesis de grado\"\nstatus: En curso\n"
+    "color: \"#a78bfa\"\ncreated: 2026-09-01\nstart: 2026-09-01\n"
+    "start_time: 08:00\ndeadline: 2026-12-15\n---\n\nInvestigación final.\n\n"
+    "## Tareas\n- [x] Elegir tema | 2026-09-05\n- [ ] Marco teórico | 2026-10-01\n"
+    "- [x] Reunión con tutor\n"
+)
+
+
+def _build_projects(vault) -> dict:
+    """Proyectos tipo Jira (FORMAT_VERSION 4), including a migrated v3 file."""
+    legacy = vault / fmt.LAYOUT["project_v3"].format(id="p20260901-aaaaaa")
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(LEGACY_PROJECT, encoding="utf-8")
+    from notevault_app.core.project_manager import migrate_projects
+    migrate_projects(vault, today=FIXED_DAY)
+
+    pm = ProjectManager(vault)
+    project = pm.create("Portafolio web", status=P_ACTIVE, area="programacion",
+                        start=date(2026, 9, 1), deadline=date(2026, 10, 30),
+                        in_calendar=True, description="Sitio personal.",
+                        created=date(2026, 9, 1))
+    goal = pm.create_issue(project.id, "Lanzar la home", type="Submeta", priority=3,
+                           created=date(2026, 9, 1))
+    home = pm.create_issue(project.id, "Maquetar la home", parent=goal.id, priority=4,
+                           estimate_min=240, labels=["frontend", "diseño"],
+                           start=date(2026, 9, 8), due=date(2026, 9, 10), due_time="17:00",
+                           reminder=datetime(2026, 9, 9, 18, 0),
+                           description="- [ ] Header\n- [x] Hero", created=date(2026, 9, 2))
+    bug = pm.create_issue(project.id, "Menú roto en móvil", parent=goal.id, type="Error",
+                          due=date(2026, 9, 20), created=date(2026, 9, 5))
+    weekly = pm.create_issue(project.id, "Revisión semanal", repeat="weekly:4",
+                             due=date(2026, 9, 11), created=date(2026, 9, 1))
+    pm.move(project.id, home.id, "En curso", 0)
+    pm.move(project.id, bug.id, "Hecho", 0)
+    pm.update_issue(project.id, bug.id, done_at=date(2026, 9, 9))
+    return {"PROJECT_ID": project.id, "ISSUE_GOAL": goal.id, "ISSUE_HOME": home.id,
+            "ISSUE_BUG": bug.id, "ISSUE_WEEKLY": weekly.id}
 
 
 GOAL_MONDAY = date(2026, 9, 7)
@@ -530,7 +565,7 @@ def write_fixtures():
 
 def expected_values(vault, ids: dict) -> dict:
     """Parse the fixtures with the real managers and record the results."""
-    task_id, project_id = ids["TASK_ID"], ids["PROJECT_ID"]
+    task_id = ids["TASK_ID"]
     hm = HabitManager(vault)
     day = hm.get_day(FIXED_DAY)
     habits = hm.habits()
@@ -540,7 +575,6 @@ def expected_values(vault, ids: dict) -> dict:
     first_ex = em.exercises()[0]
 
     task = TaskManager(vault).get(task_id)
-    project = ProjectManager(vault).get(project_id)
 
     return {
         "habit_day": {
@@ -588,22 +622,74 @@ def expected_values(vault, ids: dict) -> dict:
             "occurs": [d.isoformat() for d in _window(28) if task.occurs_on(d)],
             "roll_forward": _roll_forward_expectation(task),
         },
-        "project": {
-            "name": project.name,
-            "status": project.status,
-            "color": project.color,
-            "deadline": project.deadline.isoformat(),
-            "steps": [
-                {"name": s.name, "done": s.done,
-                 "due": s.due.isoformat() if s.due else None}
-                for s in project.steps
-            ],
-            "progress": round(project.progress, 6),
-        },
+        "project": _project_expectations(vault, ids),
         "reminder_rules": _reminder_expectations(),
         "store_encoding": _store_expectations(),
         "areas": AreaManager(vault).areas(include_archived=True),
         "goals": _goal_expectations(vault, ids),
+    }
+
+
+def _project_expectations(vault, ids: dict) -> dict:
+    from notevault_app.core.project_manager import ProjectStats, ProjectCalendarSource
+
+    def stable(text):
+        for name, real in ids.items():
+            text = text.replace(real, name)
+        return text
+
+    pm = ProjectManager(vault)
+    project = pm.get(ids["PROJECT_ID"])
+    today = FIXED_DAY
+    stats = ProjectStats(pm, project, today)
+    days, remaining, ideal = stats.burndown()
+    issues = {stable(i.id): i for i in pm.issues(project.id)}
+    migrated = pm.get("p20260901-aaaaaa")
+    source = ProjectCalendarSource(pm)
+    occ = source.occurrences(date(2026, 9, 7), date(2026, 9, 20))
+
+    def view(i):
+        return {"key": i.key, "number": i.number, "type": i.type, "parent": stable(i.parent),
+                "title": i.title, "status": i.status, "priority": i.priority, "order": i.order,
+                "estimate_min": i.estimate_min, "labels": i.labels,
+                "start": i.start.isoformat() if i.start else None,
+                "due": i.due.isoformat() if i.due else None, "due_time": i.due_time,
+                "repeat": i.repeat,
+                "reminder": i.reminder.isoformat(timespec="minutes") if i.reminder else None,
+                "reminder_done": i.reminder_done,
+                "done_at": i.done_at.isoformat() if i.done_at else None,
+                "is_done": i.is_done, "overdue_on_fixed_day": i.is_overdue(today),
+                "description": i.description,
+                "children": [stable(c.id) for c in i.children]}
+
+    return {
+        "project": {"key": project.key, "name": project.name, "status": project.status,
+                    "area": project.area, "colour": project.colour,
+                    "start": project.start.isoformat(), "deadline": project.deadline.isoformat(),
+                    "columns": project.columns, "done_column": project.done_column,
+                    "in_calendar": project.in_calendar, "description": project.description},
+        "issues": {k: view(v) for k, v in sorted(issues.items())},
+        "summary": stats.summary(),
+        "by_status": stats.by_status(),
+        "by_priority": stats.by_priority(),
+        "submetas": [[stable(g.id), s] for g, s in stats.submetas()],
+        "burndown_last_7": [[d.isoformat(), r] for d, r in list(zip(days, remaining))
+                            if d <= today][-7:],
+        "burndown_days": len(days),
+        "throughput_4": [[d.isoformat(), n] for d, n in stats.throughput(4)],
+        "calendar": {d.isoformat(): [stable(o.id) for o in occs] for d, occs in sorted(occ.items())},
+        "derive_key": {"Portafolio web": "PW", "Backend": "BAC", "Árbol de él": "ADE",
+                       "": "PRY"},
+        "migrated": {
+            "key": migrated.key, "name": migrated.name, "status": migrated.status,
+            "colour": migrated.colour, "description": migrated.description,
+            "extra": migrated.extra,
+            "issues": [[i.number, i.title, i.status, i.due.isoformat() if i.due else None,
+                        i.done_at.isoformat() if i.done_at else None]
+                       for i in sorted(pm.issues(migrated.id), key=lambda x: x.number)],
+            "legacy_in_trash": (vault / fmt.LAYOUT["trash_dir"] / "proyectos-v3"
+                                / "p20260901-aaaaaa.md").exists(),
+        },
     }
 
 

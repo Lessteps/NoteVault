@@ -209,7 +209,8 @@ class LineChart(_Chart):
         n = len(self.labels)
         step = max(1, math.ceil(n / max(1, area.width() // 50)))
         for i, lab in enumerate(self.labels):
-            if i % step == 0 or i == n - 1:
+            last_fits = i == n - 1 and (n - 1) % step >= step * 0.6
+            if i % step == 0 or last_fits:
                 x = area.left() + area.width() * i / (n - 1)
                 p.setPen(_c(TEXT_FAINT))
                 p.drawText(QRectF(x - 30, area.bottom() + 4, 60, 14), Qt.AlignCenter, str(lab))

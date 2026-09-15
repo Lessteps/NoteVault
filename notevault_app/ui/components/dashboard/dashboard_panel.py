@@ -157,7 +157,7 @@ class DashboardPanel(QWidget):
 
         due_today = [t for t in self.tasks.tasks() if t.due == today and not t.is_done]
         overdue = [t for t in self.tasks.tasks() if t.is_overdue]
-        p_steps = self.projects.steps_due_on(today)
+        p_steps = self.projects.due_on(today)
 
         strip = QFrame()
         strip.setAttribute(Qt.WA_StyledBackground, True)
@@ -411,83 +411,74 @@ class DashboardPanel(QWidget):
     # Projects ----------------------------------------------------------
 
     def _projects_card(self, today: date) -> QWidget:
-        pairs = self.projects.steps_due_on(today)
+        from ..comun.widgets import BlockProgress
+        pairs = self.projects.due_on(today)
         active = self.projects.active_projects()
-        card, lay = self._card("◫", "Proyectos — tareas de hoy", "#a78bfa",
-                               f"{len(pairs)} hoy")
+        late = sum(1 for _p, i in pairs if i.due < today)
+        card, lay = self._card("◫", "Proyectos — issues de hoy", "#a78bfa",
+                               f"{len(pairs) - late} hoy" + (f" · {late} vencidos" if late else ""))
 
-        if not pairs:
-            if active:
-                lay.addWidget(self._empty(
-                    "Ninguna tarea de proyecto vence hoy. Proyectos en curso:"
-                ))
-                for p in active[:5]:
-                    row = QWidget()
-                    row.setFixedHeight(24)
-                    row.setStyleSheet("background:transparent;")
-                    r = QHBoxLayout(row)
-                    r.setContentsMargins(0, 0, 0, 0)
-                    r.setSpacing(8)
-                    dot = QLabel("●")
-                    dot.setFixedWidth(12)
-                    dot.setStyleSheet(
-                        f"color:{p.color};font-size:11px;"
-                        "background:transparent;border:none;"
-                    )
-                    r.addWidget(dot)
-                    n = QLabel(p.name)
-                    n.setStyleSheet(
-                        f"color:{TEXT_DIM};font-size:12px;"
-                        "background:transparent;border:none;"
-                    )
-                    r.addWidget(n, stretch=1)
-                    pr = QLabel(f"{int(round(p.progress * 100))}%")
-                    pr.setStyleSheet(
-                        f"color:{TEXT_FAINT};font-size:11px;"
-                        "background:transparent;border:none;"
-                    )
-                    r.addWidget(pr)
-                    lay.addWidget(row)
-            else:
-                lay.addWidget(self._empty(
-                    "Aún no hay proyectos. Créalos en el módulo Proyectos "
-                    "y sus tareas del día aparecerán aquí."
-                ))
-            lay.addStretch()
-            return card
-
-        for proj, step in pairs[:8]:
-            idx = proj.steps.index(step)
+        for proj, issue in pairs[:7]:
             row = QWidget()
             row.setFixedHeight(26)
             row.setStyleSheet("background:transparent;")
             r = QHBoxLayout(row)
             r.setContentsMargins(0, 0, 0, 0)
             r.setSpacing(8)
-
-            cb = _check(step.done, proj.color)
-            cb.setToolTip(f"Marcar «{step.name}»")
-            cb.toggled.connect(
-                lambda v, _p=proj.id, _i=idx: self._toggle_step(_p, _i, v)
-            )
+            cb = _check(issue.is_done, proj.colour)
+            cb.setToolTip(f"Mover {issue.key} a «{proj.done_column}»")
+            cb.toggled.connect(lambda v, _p=proj, _i=issue: self._toggle_issue(_p, _i, v))
             r.addWidget(cb)
-
-            n = QLabel(step.name)
-            n.setStyleSheet(
-                f"color:{TEXT};font-size:12px;background:transparent;border:none;"
-            )
+            key = QLabel(issue.key)
+            key.setStyleSheet(f"color:{TEXT_FAINT};font-size:10px;background:transparent;border:none;")
+            r.addWidget(key)
+            n = QLabel(issue.title)
+            n.setToolTip(f"{proj.name} → {issue.title}")
+            n.setStyleSheet(f"color:{TEXT};font-size:12px;background:transparent;border:none;")
             r.addWidget(n, stretch=1)
-
+            if issue.due < today:
+                warn = QLabel(f"⚠ {issue.due.strftime('%d/%m')}")
+                warn.setStyleSheet(f"color:{RED};font-size:10px;background:transparent;border:none;")
+                r.addWidget(warn)
             tag = QLabel(proj.name)
             tag.setStyleSheet(
-                f"color:{proj.color};font-size:10px;background:#252525;border:none;"
-                "border-radius:4px;padding:1px 6px;"
-            )
+                f"color:{proj.colour};font-size:10px;background:#252525;border:none;"
+                "border-radius:4px;padding:1px 6px;")
             r.addWidget(tag)
             lay.addWidget(row)
+        if len(pairs) > 7:
+            lay.addWidget(self._empty(f"+{len(pairs) - 7} issue(s) más en Proyectos."))
 
+        if active:
+            if pairs:
+                lay.addSpacing(4)
+            lay.addWidget(self._empty("Proyectos en curso:" if pairs else
+                                      "Ningún issue vence hoy. Proyectos en curso:"))
+            for p in active[:5]:
+                row = QWidget()
+                row.setFixedHeight(24)
+                row.setStyleSheet("background:transparent;")
+                r = QHBoxLayout(row)
+                r.setContentsMargins(0, 0, 0, 0)
+                r.setSpacing(8)
+                n = QLabel(f"{p.icon or '●'}  {p.name}")
+                n.setStyleSheet(f"color:{TEXT_DIM};font-size:12px;background:transparent;border:none;")
+                r.addWidget(n, stretch=1)
+                r.addWidget(BlockProgress(self.projects.progress(p), p.colour, blocks=10, block=9))
+                lay.addWidget(row)
+        elif not pairs:
+            lay.addWidget(self._empty(
+                "Aún no hay proyectos. Créalos en el módulo Proyectos "
+                "y sus issues del día aparecerán aquí."))
         lay.addStretch()
         return card
+
+    def _toggle_issue(self, project, issue, value: bool):
+        column = project.done_column if value else project.columns[0]
+        self.projects.move(project.id, issue.id, column, 10 ** 6)
+        self.data_changed.emit()
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self.refresh)
 
     # Goals -------------------------------------------------------------
 
@@ -610,12 +601,6 @@ class DashboardPanel(QWidget):
     def _toggle_task(self, task, value: bool):
         self.tasks.update(task.id, status=STATUS_DONE if value else STATUS_TODO)
         self.tasks.tasks(force=True)
-        self.data_changed.emit()
-        self.refresh()
-
-    def _toggle_step(self, pid: str, index: int, value: bool):
-        self.projects.set_step(pid, index, done=value)
-        self.projects.projects(force=True)
         self.data_changed.emit()
         self.refresh()
 

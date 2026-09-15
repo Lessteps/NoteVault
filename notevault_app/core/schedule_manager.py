@@ -409,7 +409,9 @@ class ScheduleManager:
                 is_match = True
 
             if is_match:
-                start_time = p.start_time if (p.start == d and p.start_time) else None
+                clock = getattr(p, "start_time", None) or p.extra.get("start_time") \
+                    if hasattr(p, "extra") else getattr(p, "start_time", None)
+                start_time = clock if (p.start == d and clock) else None
                 out.append(Occurrence(
                     id=f"project_{p.id}",
                     title=p.name,

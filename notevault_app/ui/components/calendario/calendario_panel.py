@@ -50,6 +50,16 @@ QPushButton#calArrow:hover { background: #2a2a2a; }
 """
 
 
+MODULE_NAMES = {"metas": "Metas", "proyectos": "Proyectos", "finanzas": "Finanzas"}
+
+MENU_QSS = (
+    "QMenu { background: #202020; border: 1px solid #2f2f2f; padding: 6px 0px;"
+    " color: #e6e6e6; font-size: 14px; }"
+    "QMenu::item { padding: 8px 28px 8px 16px; }"
+    "QMenu::item:selected { background: #2a2a2a; }"
+    "QMenu::item:disabled { color: #9b9b9b; }")
+
+
 def _int_or_none(value):
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
@@ -63,6 +73,7 @@ class CalendarioPanel(QWidget):
     date_changed = Signal(date)
     status_message = Signal(str)
     open_habits_requested = Signal(str)    # habit id, or "" for the module
+    open_module_requested = Signal(str, dict)   # source ("metas"…), link
 
     def __init__(self, schedule_mgr: ScheduleManager, parent=None):
         super().__init__(parent)
@@ -272,6 +283,9 @@ class CalendarioPanel(QWidget):
         if occ.kind == "habit":
             self._habit_menu(occ, rect)
             return
+        if occ.source in MODULE_NAMES:
+            self._module_menu(occ, rect)
+            return
         info = self._edit_info(occ)
         if info is None:
             self.status_message.emit(f"«{occ.title}» se edita desde su propio módulo")
@@ -300,6 +314,21 @@ class CalendarioPanel(QWidget):
         else:
             menu.addAction("Abrir Hábitos").triggered.connect(
                 lambda: self.open_habits_requested.emit(""))
+        menu.exec(QPoint(rect.right() + 4, rect.top()))
+
+    def _module_menu(self, occ, rect: QRect):
+        """Blocks that belong to Metas, Proyectos or Finanzas: tick them here,
+        edit them in their own module."""
+        menu = QMenu(self)
+        menu.setStyleSheet(MENU_QSS)
+        title = menu.addAction(occ.title)
+        title.setEnabled(False)
+        menu.addSeparator()
+        label = "Desmarcar" if occ.done else "Marcar como hecho"
+        menu.addAction(label).triggered.connect(lambda: self._set_habit_done(occ, not occ.done))
+        link = occ.links[0] if occ.links else {}
+        menu.addAction(f"Abrir en {MODULE_NAMES[occ.source]}").triggered.connect(
+            lambda: self.open_module_requested.emit(occ.source, dict(link)))
         menu.exec(QPoint(rect.right() + 4, rect.top()))
 
     def _set_habit_done(self, occ, done: bool):

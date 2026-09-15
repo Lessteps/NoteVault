@@ -53,16 +53,21 @@ class DashboardPanel(QWidget):
     go_tareas    = Signal()
     go_proyectos = Signal()
     go_notas     = Signal()
+    go_metas     = Signal()
+    goal_opened  = Signal(str)
     data_changed = Signal()
 
     def __init__(self, habits: HabitManager, exercises: ExerciseManager,
-                 tasks: TaskManager, projects: ProjectManager, parent=None):
+                 tasks: TaskManager, projects: ProjectManager, goals=None, areas=None,
+                 parent=None):
         super().__init__(parent)
         self.setObjectName("centerPanel")
         self.habits = habits
         self.exercises = exercises
         self.tasks = tasks
         self.projects = projects
+        self.goals = goals
+        self.areas = areas
         self._init_ui()
 
     # ── UI ────────────────────────────────────────────────────────────────
@@ -123,10 +128,14 @@ class DashboardPanel(QWidget):
         # ── Two-column grid of cards ──────────────────────────────────────
         grid = QGridLayout()
         grid.setSpacing(14)
-        grid.addWidget(self._habits_card(today),   0, 0)
-        grid.addWidget(self._exercise_card(today), 0, 1)
-        grid.addWidget(self._tasks_card(today),    1, 0)
-        grid.addWidget(self._projects_card(today), 1, 1)
+        top = 0
+        if self.goals is not None:
+            grid.addWidget(self._goals_card(today), 0, 0, 1, 2)
+            top = 1
+        grid.addWidget(self._habits_card(today),   top, 0)
+        grid.addWidget(self._exercise_card(today), top, 1)
+        grid.addWidget(self._tasks_card(today),    top + 1, 0)
+        grid.addWidget(self._projects_card(today), top + 1, 1)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         self._page.addLayout(grid)
@@ -480,6 +489,69 @@ class DashboardPanel(QWidget):
         lay.addStretch()
         return card
 
+    # Goals -------------------------------------------------------------
+
+    def _goals_card(self, today: date) -> QWidget:
+        from ..metas.metas_hoy import TodayList
+        from ..comun.widgets import BlockProgress
+        from ....core.goal_manager import FILTER_ACTIVE
+
+        goals = [g for g in self.goals.goals(FILTER_ACTIVE) if g.in_overview]
+        pairs = self.goals.items_due_on(today, goals)
+        done = sum(1 for _g, i in pairs if self.goals.is_done_on(i, today))
+        card, lay = self._card("🎯", "Metas", "#33b679", f"{done}/{len(pairs)} hoy")
+        if not goals:
+            card.setMinimumHeight(84)
+            lay.addWidget(self._empty(
+                "Aún no hay metas en la Vista General. Créalas en el módulo Metas "
+                "y marca «Mostrar en la Vista General»."))
+            lay.addStretch()
+            return card
+
+        cols = QHBoxLayout()
+        cols.setSpacing(24)
+        left = QVBoxLayout()
+        left.setSpacing(6)
+        for g in goals[:6]:
+            row = QWidget()
+            row.setFixedHeight(26)
+            row.setStyleSheet("background:transparent;")
+            row.setCursor(Qt.PointingHandCursor)
+            row.mousePressEvent = lambda _e, gid=g.id: self.goal_opened.emit(gid)
+            r = QHBoxLayout(row)
+            r.setContentsMargins(0, 0, 0, 0)
+            r.setSpacing(8)
+            name = QLabel(f"{g.icon}  {g.name}".strip())
+            name.setToolTip(f"Abrir «{g.name}»")
+            name.setStyleSheet(f"color:{RED if g.is_overdue(today) else TEXT};font-size:12px;"
+                               "background:transparent;border:none;")
+            r.addWidget(name, stretch=1)
+            r.addWidget(BlockProgress(self.goals.progress(g, today), g.colour, blocks=10, block=9))
+            left.addWidget(row)
+        left.addStretch()
+        cols.addLayout(left, 1)
+
+        right = QVBoxLayout()
+        right.setSpacing(2)
+        title = QLabel("Submetas de hoy")
+        title.setStyleSheet(f"color:{TEXT_FAINT};font-size:11px;background:transparent;border:none;")
+        right.addWidget(title)
+        items = TodayList(self.goals, self.areas, compact=True)
+        items.limit = 7
+        items.refresh()
+        items.data_changed.connect(self._goal_toggled)
+        items.goal_opened.connect(self.goal_opened.emit)
+        right.addWidget(items)
+        right.addStretch()
+        cols.addLayout(right, 1)
+        lay.addLayout(cols)
+        return card
+
+    def _goal_toggled(self):
+        self.data_changed.emit()
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self.refresh)
+
     # ── Quick access ──────────────────────────────────────────────────────
 
     def _quick_access(self) -> QWidget:
@@ -506,6 +578,7 @@ class DashboardPanel(QWidget):
             ("🏋  Ejercicio", ORANGE,    self.go_ejercicio),
             ("☑  Tareas",    BLUE,      self.go_tareas),
             ("◫  Proyectos", "#a78bfa", self.go_proyectos),
+            ("🎯  Metas",    "#33b679", self.go_metas),
             ("✎  Notas",     TEXT_DIM,  self.go_notas),
         ]:
             b = flat_btn(text, TEXT_DIM, accent, height=30)
@@ -556,9 +629,11 @@ class DashboardPanel(QWidget):
             elif item.layout():
                 self._clear(item.layout())
 
-    def set_managers(self, habits, exercises, tasks, projects):
+    def set_managers(self, habits, exercises, tasks, projects, goals=None, areas=None):
         self.habits = habits
         self.exercises = exercises
         self.tasks = tasks
         self.projects = projects
+        self.goals = goals
+        self.areas = areas
         self.refresh()

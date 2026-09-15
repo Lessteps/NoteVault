@@ -6,7 +6,7 @@ The single place that names the vault file format.
 stops the desktop app from quietly breaking the Android client.
 """
 
-FORMAT_VERSION = 3
+FORMAT_VERSION = 4
 
 # Every module stores its data inside this single folder, so a vault travels
 # as one unit: one Syncthing folder instead of four at the vault root.
@@ -36,6 +36,19 @@ LAYOUT = {
     "projects_dir":      f"{DATA_DIR}/proyectos",
     "project":           f"{DATA_DIR}/proyectos/{{id}}.md",
     "bookmarks":         BOOKMARKS_FILE,
+    "trash_dir":         f"{DATA_DIR}/.papelera",
+    "areas_dir":         f"{DATA_DIR}/areas",
+    "area":              f"{DATA_DIR}/areas/{{id}}.json",
+    "goals_dir":         f"{DATA_DIR}/metas",
+    "goal":              f"{DATA_DIR}/metas/{{id}}/goal.md",
+    "goal_items_dir":    f"{DATA_DIR}/metas/{{id}}/items",
+    "goal_item":         f"{DATA_DIR}/metas/{{goal}}/items/{{id}}.md",
+    "goal_log_day":      f"{DATA_DIR}/metas/registro/{{year}}/{{month:02d}}/{{date}}.json",
+    "finance_dir":       f"{DATA_DIR}/finanzas",
+    "finance_category":  f"{DATA_DIR}/finanzas/categorias/{{id}}.json",
+    "finance_goal":      f"{DATA_DIR}/finanzas/metas/{{id}}.json",
+    "finance_day":       f"{DATA_DIR}/finanzas/{{year}}/{{month:02d}}/{{date}}.json",
+    "finance_attachments": f"{DATA_DIR}/finanzas/adjuntos/{{year}}/{{month:02d}}",
     "agenda_dir":        f"{DATA_DIR}/agenda",
     "agenda_routines":   f"{DATA_DIR}/agenda/routines.json",
     "agenda_events_dir": f"{DATA_DIR}/agenda/events",
@@ -65,11 +78,75 @@ PROJECT_KEYS = ("id", "name", "status", "color", "created", "start", "deadline")
 # order, with a value containing ":" in double quotes.
 TASK_OPTIONAL_KEYS = ("repeat", "repeat_until")
 HABIT_OPTIONAL_KEYS = ("repeat", "start_date", "end_date", "paused_from", "time",
-                       "duration_min", "in_calendar", "reminder_min", "colour", "notes")
+                       "duration_min", "in_calendar", "reminder_min", "colour", "notes",
+                       "area")
 
 # Repetition rules (core/recurrence.py): "daily", "weekly:0,2,4", "every:3",
 # "monthly:1,15". Weekday 0 is Monday; day 31 means the last day of shorter months.
 RECURRENCE_KINDS = ("daily", "weekly", "every", "monthly")
+
+# ── FORMAT_VERSION 4: Áreas, Metas, Proyectos (tipo Jira) y Finanzas ─────────
+#
+# Markdown entities use the typed frontmatter of core/store.py: each tuple is
+# (key, type) in write order. Types: id, str, int, num, bool, date, datetime,
+# list. Empty values are not written.
+
+PRIORITIES = ("Baja", "Media", "Alta", "Urgente")      # 1..4
+PRIORITY_RANGE_V4 = (1, 4)
+
+AREA_KEYS = ("id", "name", "icon", "colour", "order", "archived")
+
+GOAL_STATUSES = ("Activa", "En pausa", "Completada", "Archivada")
+GOAL_ITEM_STATUSES = ("Pendiente", "En curso", "Hecha")
+
+GOAL_FIELDS = (
+    ("id", "id"), ("name", "str"), ("area", "id"), ("status", "str"),
+    ("priority", "int"), ("start", "date"), ("end", "date"), ("icon", "str"),
+    ("colour", "str"), ("in_overview", "bool"), ("order", "num"), ("created", "date"),
+)
+
+GOAL_ITEM_FIELDS = (
+    ("id", "id"), ("goal", "id"), ("parent", "id"), ("name", "str"),
+    ("status", "str"), ("priority", "int"), ("order", "num"), ("start", "date"),
+    ("due", "date"), ("due_time", "str"), ("duration_min", "int"),
+    ("repeat", "str"), ("repeat_until", "date"), ("in_calendar", "bool"),
+    ("reminder_min", "int"), ("target", "num"), ("unit", "str"), ("value", "num"),
+    ("habit_links", "list"), ("done_at", "date"), ("created", "date"),
+)
+
+PROJECT_V4_STATUSES = PROJECT_STATUSES
+DEFAULT_COLUMNS = ("Por hacer", "En curso", "En revisión", "Hecho")
+ISSUE_TYPES = ("Submeta", "Tarea", "Subtarea", "Error", "Mejora")
+
+PROJECT_FIELDS = (
+    ("id", "id"), ("key", "id"), ("name", "str"), ("status", "str"),
+    ("area", "id"), ("colour", "str"), ("icon", "str"), ("created", "date"),
+    ("start", "date"), ("deadline", "date"), ("columns", "list"),
+    ("done_column", "str"), ("in_calendar", "bool"),
+)
+
+ISSUE_FIELDS = (
+    ("id", "id"), ("number", "int"), ("type", "str"), ("parent", "id"),
+    ("title", "str"), ("status", "str"), ("priority", "int"), ("order", "num"),
+    ("estimate_min", "int"), ("labels", "list"), ("created", "date"),
+    ("start", "date"), ("due", "date"), ("due_time", "str"), ("repeat", "str"),
+    ("repeat_until", "date"), ("in_calendar", "bool"), ("reminder", "datetime"),
+    ("reminder_done", "bool"), ("done_at", "date"), ("attachments", "list"),
+)
+
+MOVEMENT_TYPES = ("gasto", "ingreso", "ahorro", "retiro")
+FINANCE_GOAL_STATUSES = ("Activa", "En pausa", "Cumplida")
+CATEGORY_KEYS = ("id", "name", "icon", "colour", "kind", "budget_month_cents",
+                 "order", "archived")
+FINANCE_GOAL_KEYS = ("id", "name", "icon", "colour", "target_cents", "currency",
+                     "start", "deadline", "show_in_daily", "cadence",
+                     "suggested_cents", "status", "created", "notes")
+MOVEMENT_KEYS = ("id", "type", "amount_cents", "currency", "category", "goal",
+                 "what", "reason", "time", "attachments", "created")
+DEFAULT_CURRENCY = "COP"
+
+# Files attached to module entities (facturas, capturas).
+ATTACHMENT_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".pdf")
 
 # Marker that Syncthing leaves on a colliding file.
 SYNC_CONFLICT_MARKER = ".sync-conflict-"

@@ -56,6 +56,10 @@ def routine_on(routine: dict, d: date) -> bool:
                           parse_date(routine.get("active_until")))
 
 
+def _sort_key(occ: "Occurrence"):
+    return (0 if occ.start is None else 1, occ.start or "", occ.title.lower())
+
+
 def _reminder(item: dict) -> Optional[int]:
     value = item.get("reminder_min")
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
@@ -85,6 +89,47 @@ class ScheduleManager:
 
         # Map of date_str -> (mtime, parsed_day_dict)
         self._day_files_cache: Dict[str, Tuple[float, dict]] = {}
+
+        # Modules added later (Metas, Proyectos, Finanzas) plug in here instead
+        # of being imported: name -> provider.
+        self._sources: Dict[str, object] = {}
+
+    # ── External sources ──────────────────────────────────────────────────
+
+    def register_source(self, name: str, provider):
+        """Add a module's occurrences to the calendar.
+
+        A provider has `prefix` (the start of every occurrence id it emits),
+        `occurrences(first, last) -> {date: [Occurrence]}` and
+        `set_done(d, occurrence_id, done)`. Registering a name again replaces
+        the previous provider, which is what a vault switch needs.
+        """
+        self._sources[name] = provider
+
+    def unregister_source(self, name: str):
+        self._sources.pop(name, None)
+
+    def sources(self) -> dict:
+        return dict(self._sources)
+
+    def _source_for(self, occurrence_id: str):
+        for provider in self._sources.values():
+            prefix = getattr(provider, "prefix", "")
+            if prefix and occurrence_id.startswith(prefix):
+                return provider
+        return None
+
+    def _external(self, first: date, last: date) -> Dict[date, list]:
+        merged: Dict[date, list] = {}
+        for name, provider in self._sources.items():
+            try:
+                found = provider.occurrences(first, last) or {}
+            except Exception:
+                logger.exception("La fuente de calendario %s falló", name)
+                continue
+            for d, occs in found.items():
+                merged.setdefault(d, []).extend(occs)
+        return merged
 
     # ── Routines ──────────────────────────────────────────────────────────
 
@@ -250,8 +295,19 @@ class ScheduleManager:
 
     def day(self, d: date) -> list[Occurrence]:
         """Return the fully resolved occurrences for date d. Pure, does not write."""
-        return self._resolve_day(d, self.routines(), self.get_day_file(d),
-                                 self.task_mgr.tasks(), self.project_mgr.projects())
+        out = self._resolve_day(d, self.routines(), self.get_day_file(d),
+                                self.task_mgr.tasks(), self._projects())
+        extra = self._external(d, d).get(d, [])
+        if extra:
+            out.extend(extra)
+            out.sort(key=_sort_key)
+        return out
+
+    def _projects(self) -> list:
+        # Projects with their own calendar source are drawn by it instead.
+        if "proyectos" in self._sources:
+            return []
+        return self.project_mgr.projects()
 
     def _resolve_day(self, d: date, routines_list: list[dict], day_data: dict,
                      tasks_list: list, projects_list: list) -> list[Occurrence]:
@@ -428,10 +484,7 @@ class ScheduleManager:
                 ))
 
         # 7. Sort: all-day items (start is None) first, then start time, then title
-        def sort_key(occ: Occurrence):
-            return (0 if occ.start is None else 1, occ.start or "", occ.title.lower())
-
-        out.sort(key=sort_key)
+        out.sort(key=_sort_key)
         return out
 
     def range(self, first: date, last: date) -> Dict[date, list[Occurrence]]:
@@ -443,14 +496,19 @@ class ScheduleManager:
 
         routines_list = self.routines()
         tasks_list = self.task_mgr.tasks()
-        projects_list = self.project_mgr.projects()
+        projects_list = self._projects()
+        external = self._external(first, last)
 
         result: Dict[date, list[Occurrence]] = {}
         curr = first
         while curr <= last:
             day_data = self.get_day_file(curr)
-            result[curr] = self._resolve_day(curr, routines_list, day_data,
-                                             tasks_list, projects_list)
+            occs = self._resolve_day(curr, routines_list, day_data,
+                                     tasks_list, projects_list)
+            if external.get(curr):
+                occs.extend(external[curr])
+                occs.sort(key=_sort_key)
+            result[curr] = occs
             curr += timedelta(days=1)
 
         elapsed_ms = (time.perf_counter() - start_t) * 1000.0
@@ -488,6 +546,10 @@ class ScheduleManager:
 
     def set_done(self, d: date, occurrence_id: str, done: bool):
         """Mark a routine, event, calendar habit or task as done/undone on date d."""
+        provider = self._source_for(occurrence_id)
+        if provider is not None:
+            provider.set_done(d, occurrence_id, done)
+            return
         if occurrence_id.startswith(HABIT_PREFIX):
             self.habit_mgr.set_done(d, occurrence_id[len(HABIT_PREFIX):], done)
             return

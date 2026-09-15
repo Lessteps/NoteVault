@@ -1,4 +1,14 @@
 {
+  "areas": [
+    {
+      "archived": false,
+      "colour": "#3f51b5",
+      "icon": "💻",
+      "id": "programacion",
+      "name": "Programación",
+      "order": 1
+    }
+  ],
   "exercise_config": {
     "count": 50,
     "per_day": {
@@ -20,6 +30,163 @@
       "weight": 60.0
     },
     "exercise_id": "lunes_0"
+  },
+  "goals": {
+    "adherence_7_on_14": 0.3333333333333333,
+    "due_on": {
+      "2026-09-07": [
+        "ITEM_REPEAT"
+      ],
+      "2026-09-08": [],
+      "2026-09-09": [
+        "ITEM_REPEAT"
+      ],
+      "2026-09-10": [
+        "ITEM_CHILD"
+      ],
+      "2026-09-11": [
+        "ITEM_REPEAT"
+      ],
+      "2026-09-12": [],
+      "2026-09-13": [],
+      "2026-09-14": [
+        "ITEM_REPEAT"
+      ],
+      "2026-09-15": [],
+      "2026-09-16": [
+        "ITEM_REPEAT"
+      ]
+    },
+    "goal": {
+      "area": "programacion",
+      "colour": "#3f51b5",
+      "description": "Meta de ejemplo.\n\nCon dos párrafos.",
+      "end": "2026-12-31",
+      "icon": "💻",
+      "in_overview": true,
+      "name": "Ser \"backend\"",
+      "overdue_on_2027_01_01": true,
+      "priority": 3,
+      "progress_on_14": 0.625,
+      "start": "2026-09-07",
+      "status": "Activa"
+    },
+    "habit_coding_marked": [
+      "2026-09-07",
+      "2026-09-11"
+    ],
+    "items": {
+      "ITEM_BRANCH": {
+        "children": [
+          "ITEM_CHILD",
+          "ITEM_MEASURE"
+        ],
+        "done_at": null,
+        "due": null,
+        "due_time": "",
+        "duration_min": null,
+        "habit_links": [],
+        "in_calendar": false,
+        "is_leaf": false,
+        "name": "Aprender Django",
+        "notes": "",
+        "order": 2,
+        "parent": "",
+        "priority": 2,
+        "progress_on_14": 0.75,
+        "reminder_min": null,
+        "repeat": "",
+        "start": null,
+        "status": "Pendiente",
+        "target": null,
+        "unit": "",
+        "value": null
+      },
+      "ITEM_CHILD": {
+        "children": [],
+        "done_at": "2026-09-10",
+        "due": "2026-09-10",
+        "due_time": "",
+        "duration_min": null,
+        "habit_links": [],
+        "in_calendar": false,
+        "is_leaf": true,
+        "name": "Tutorial oficial",
+        "notes": "",
+        "order": 1,
+        "parent": "ITEM_BRANCH",
+        "priority": 4,
+        "progress_on_14": 1.0,
+        "reminder_min": null,
+        "repeat": "",
+        "start": null,
+        "status": "Hecha",
+        "target": null,
+        "unit": "",
+        "value": null
+      },
+      "ITEM_MEASURE": {
+        "children": [],
+        "done_at": null,
+        "due": null,
+        "due_time": "",
+        "duration_min": null,
+        "habit_links": [],
+        "in_calendar": false,
+        "is_leaf": true,
+        "name": "API de ejemplo",
+        "notes": "",
+        "order": 2,
+        "parent": "ITEM_BRANCH",
+        "priority": 2,
+        "progress_on_14": 0.5,
+        "reminder_min": null,
+        "repeat": "",
+        "start": null,
+        "status": "Pendiente",
+        "target": 5,
+        "unit": "endpoints",
+        "value": 2.5
+      },
+      "ITEM_REPEAT": {
+        "children": [],
+        "done_at": null,
+        "due": null,
+        "due_time": "18:00",
+        "duration_min": 180,
+        "habit_links": [
+          "coding"
+        ],
+        "in_calendar": true,
+        "is_leaf": true,
+        "name": "Programar 3 horas",
+        "notes": "Notas de la submeta",
+        "order": 1,
+        "parent": "",
+        "priority": 3,
+        "progress_on_14": 0.5,
+        "reminder_min": 15,
+        "repeat": "weekly:0,2,4",
+        "start": "2026-09-07",
+        "status": "Pendiente",
+        "target": 3,
+        "unit": "h",
+        "value": null
+      }
+    },
+    "log_2026_09_07": "{\n  \"items\": {\n    \"GOAL_ID/ITEM_REPEAT\": {\n      \"done\": true,\n      \"at\": \"07:15\"\n    }\n  },\n  \"habit_marks\": {\n    \"coding\": [\n      \"GOAL_ID/ITEM_REPEAT\"\n    ]\n  }\n}\n",
+    "repeat_done": [
+      "2026-09-07",
+      "2026-09-11"
+    ],
+    "repeat_values": {
+      "2026-09-11": 3.5
+    },
+    "streak_on_11": 1,
+    "tree": [
+      "ITEM_REPEAT",
+      "ITEM_BRANCH"
+    ]
   },
   "habit_config": {
     "coding_subtasks": [
@@ -415,6 +582,74 @@
       "b"
     ],
     "window_days": 14
+  },
+  "store_encoding": {
+    "body": "Cuerpo",
+    "extra": {
+      "desconocida": "valor: con dos puntos"
+    },
+    "fields": [
+      [
+        "id",
+        "id"
+      ],
+      [
+        "name",
+        "str"
+      ],
+      [
+        "n",
+        "int"
+      ],
+      [
+        "x",
+        "num"
+      ],
+      [
+        "y",
+        "num"
+      ],
+      [
+        "flag",
+        "bool"
+      ],
+      [
+        "off",
+        "bool"
+      ],
+      [
+        "day",
+        "date"
+      ],
+      [
+        "when",
+        "datetime"
+      ],
+      [
+        "tags",
+        "list"
+      ],
+      [
+        "empty",
+        "str"
+      ]
+    ],
+    "no_body": "---\nid: a\n---\n",
+    "parsed": {
+      "day": "2026-09-12",
+      "flag": true,
+      "id": "x20260912-abcdef",
+      "n": 7,
+      "name": "Comillas \"dobles\" y \\ barra",
+      "tags": [
+        "a",
+        "b c"
+      ],
+      "when": "2026-09-12T18:05:00",
+      "x": 2.5,
+      "y": 3
+    },
+    "text": "---\nid: x20260912-abcdef\nname: \"Comillas \\\"dobles\\\" y \\\\ barra\"\nn: 7\nx: 2.5\ny: 3\nflag: true\nday: 2026-09-12\nwhen: 2026-09-12T18:05\ntags: \"a,b c\"\ndesconocida: \"valor: con dos puntos\"\n---\n\nCuerpo\n"
   },
   "task": {
     "body": "# Ensayo\n\n- Buscar fuentes",

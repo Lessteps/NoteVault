@@ -21,6 +21,8 @@ from ..core.exercise_manager import ExerciseManager
 from ..core.task_manager import TaskManager
 from ..core.project_manager import ProjectManager
 from ..core.schedule_manager import ScheduleManager
+from ..core.area_manager import AreaManager
+from ..core.goal_manager import GoalManager, GoalCalendarSource
 from ..core.notifier import Notifier, app_icon
 from ..core.notes_service import NotesService
 from . import theme
@@ -41,6 +43,8 @@ from .components.proyectos.proyectos_left_panel import ProyectosLeftPanel
 from .components.dashboard.dashboard_panel import DashboardPanel
 from .components.calendario.calendario_panel import CalendarioPanel
 from .components.calendario.calendario_left_panel import CalendarioLeftPanel
+from .components.metas.metas_panel import MetasPanel
+from .components.metas.metas_left_panel import MetasLeftPanel
 
 CENTER_PANEL_INDEX = 1
 
@@ -51,6 +55,10 @@ MODE_EJERCICIO  = "ejercicio"
 MODE_NOTAS      = "notas"
 MODE_PROYECTOS  = "proyectos"
 MODE_TAREAS     = "tareas"
+MODE_METAS      = "metas"
+MODE_FINANZAS   = "finanzas"
+ALL_MODES = (MODE_HOME, MODE_CALENDARIO, MODE_HABITS, MODE_EJERCICIO, MODE_PROYECTOS,
+             MODE_METAS, MODE_FINANZAS, MODE_NOTAS, MODE_TAREAS)
 
 
 def _placeholder(text: str, obj: str = "centerPanel") -> QWidget:
@@ -72,15 +80,7 @@ class MainWindow(QMainWindow):
         self.resize(1400, 880)
 
         vault_path        = AppConfig.get_active_vault()
-        self.vault        = VaultManager(vault_path)
-        self.habits       = HabitManager(vault_path)
-        self.exercise_mgr = ExerciseManager(vault_path)
-        self.tasks        = TaskManager(vault_path)
-        self.projects     = ProjectManager(vault_path)
-        self.schedule_mgr = ScheduleManager(
-            vault_path, habit_mgr=self.habits, exercise_mgr=self.exercise_mgr,
-            task_mgr=self.tasks, project_mgr=self.projects)
-        self.notes        = NotesService(self.vault)
+        self._create_managers(vault_path)
 
         self._mode = MODE_HOME
         self._navigator_width = 220
@@ -92,6 +92,21 @@ class MainWindow(QMainWindow):
 
         self._init_ui()
         self._switch_mode(MODE_HOME)
+
+    def _create_managers(self, vault_path):
+        """One manager per module, shared by every panel that shows its data."""
+        self.vault        = VaultManager(vault_path)
+        self.habits       = HabitManager(vault_path)
+        self.exercise_mgr = ExerciseManager(vault_path)
+        self.tasks        = TaskManager(vault_path)
+        self.projects     = ProjectManager(vault_path)
+        self.areas        = AreaManager(vault_path)
+        self.goals        = GoalManager(vault_path, habit_mgr=self.habits, area_mgr=self.areas)
+        self.schedule_mgr = ScheduleManager(
+            vault_path, habit_mgr=self.habits, exercise_mgr=self.exercise_mgr,
+            task_mgr=self.tasks, project_mgr=self.projects)
+        self.schedule_mgr.register_source("metas", GoalCalendarSource(self.goals))
+        self.notes        = NotesService(self.vault)
 
     # ── Build UI ──────────────────────────────────────────────────────────
 
@@ -118,6 +133,10 @@ class MainWindow(QMainWindow):
             lambda: self._switch_mode(MODE_NOTAS))
         self.icon_rail.tareas_requested.connect(
             lambda: self._switch_mode(MODE_TAREAS))
+        self.icon_rail.metas_requested.connect(
+            lambda: self._switch_mode(MODE_METAS))
+        self.icon_rail.finanzas_requested.connect(
+            lambda: self._switch_mode(MODE_FINANZAS))
         self.icon_rail.theme_toggled.connect(self.toggle_theme)
         self.icon_rail.set_theme_glyph(self._theme == "dark")
 
@@ -143,6 +162,11 @@ class MainWindow(QMainWindow):
         self._left_stack.addWidget(self._tareas_left)     # 4 — tareas
         self._left_stack.addWidget(self._proj_left)       # 5 — proyectos
         self._left_stack.addWidget(self._calendario_left) # 6 — calendario
+        self._metas_left = MetasLeftPanel(self.goals, self.areas)
+        self._left_stack.addWidget(self._metas_left)      # 7 — metas
+        self._finanzas_left = QWidget()
+        self._finanzas_left.setObjectName("sidebarPanel")
+        self._left_stack.addWidget(self._finanzas_left)   # 8 — finanzas
 
         # ── Center stack ──────────────────────────────────────────────────
         self._center_stack = QStackedWidget()
@@ -153,7 +177,8 @@ class MainWindow(QMainWindow):
         self._tareas_panel     = TareasPanel(self.tasks)
         self._proj_panel       = ProyectosPanel(self.projects)
         self._dashboard        = DashboardPanel(
-            self.habits, self.exercise_mgr, self.tasks, self.projects)
+            self.habits, self.exercise_mgr, self.tasks, self.projects,
+            goals=self.goals, areas=self.areas)
         self._calendario_panel = CalendarioPanel(self.schedule_mgr)
 
         self._center_stack.addWidget(self._habit_panel)      # 0
@@ -163,6 +188,10 @@ class MainWindow(QMainWindow):
         self._center_stack.addWidget(self._proj_panel)       # 4 — proyectos
         self._center_stack.addWidget(self._dashboard)        # 5 — vista general
         self._center_stack.addWidget(self._calendario_panel) # 6 — calendario
+        self._metas_panel = MetasPanel(self.goals, self.areas, self.habits)
+        self._center_stack.addWidget(self._metas_panel)      # 7 — metas
+        self._finanzas_panel = _placeholder("💰  Finanzas — próximamente")
+        self._center_stack.addWidget(self._finanzas_panel)   # 8 — finanzas
 
         # ── Right stack ───────────────────────────────────────────────────
         self._right_stack = QStackedWidget()
@@ -204,6 +233,19 @@ class MainWindow(QMainWindow):
         self._dashboard.go_tareas.connect(lambda: self._switch_mode(MODE_TAREAS))
         self._dashboard.go_proyectos.connect(lambda: self._switch_mode(MODE_PROYECTOS))
         self._dashboard.go_notas.connect(lambda: self._switch_mode(MODE_NOTAS))
+        self._dashboard.go_metas.connect(lambda: self._switch_mode(MODE_METAS))
+        self._dashboard.goal_opened.connect(self._open_goal)
+        self._calendario_panel.open_module_requested.connect(self._open_module_link)
+
+        self._metas_left.view_requested.connect(self._metas_panel.show_view)
+        self._metas_left.area_selected.connect(self._metas_panel.set_area)
+        self._metas_left.filter_changed.connect(self._metas_panel.set_filter)
+        self._metas_left.new_goal_requested.connect(self._metas_panel.new_goal)
+        self._metas_left.new_area_requested.connect(self._metas_panel.new_area)
+        self._metas_left.edit_area_requested.connect(self._metas_panel.edit_area)
+        self._metas_panel.view_changed.connect(self._metas_left.set_view)
+        self._metas_panel.data_changed.connect(self._metas_left.refresh)
+        self._metas_panel.calendar_requested.connect(self._goals_calendar)
 
         # ── Notes module ──────────────────────────────────────────────
         self._explorer.note_selected.connect(self._notas_center.open_note)
@@ -273,7 +315,7 @@ class MainWindow(QMainWindow):
 
     def _switch_mode(self, mode: str):
         self._mode = mode
-        for k in ["home", "calendario", "habits", "ejercicio", "proyectos", "notas", "tareas"]:
+        for k in ALL_MODES:
             self.icon_rail.set_active(k, k == mode)
 
         if mode == MODE_HOME:
@@ -325,11 +367,49 @@ class MainWindow(QMainWindow):
             self._proj_panel.refresh()
             self.status_bar.showMessage("Proyectos")
 
+        elif mode == MODE_METAS:
+            self._left_stack.setCurrentIndex(7)
+            self._center_stack.setCurrentIndex(7)
+            self._right_stack.setCurrentIndex(1)
+            self.habits.reload()
+            self._metas_left.refresh()
+            self._metas_panel.refresh()
+            self.status_bar.showMessage("Metas")
+
+        elif mode == MODE_FINANZAS:
+            self._left_stack.setCurrentIndex(8)
+            self._center_stack.setCurrentIndex(8)
+            self._right_stack.setCurrentIndex(1)
+            self._refresh_finanzas()
+            self.status_bar.showMessage("Finanzas")
+
         self._apply_mode_layout()
+
+    def _refresh_finanzas(self):
+        """Filled in by the Finanzas module."""
+
+    def _open_goal(self, gid: str, item_id: str = ""):
+        self._switch_mode(MODE_METAS)
+        self._metas_panel.open_goal(gid, item_id)
+
+    def _goals_calendar(self):
+        self._switch_mode(MODE_CALENDARIO)
+        self._calendario_panel.show_view("semana")
+
+    def _open_module_link(self, source: str, link: dict):
+        if source == "metas":
+            self._open_goal(link.get("id", ""), link.get("item", ""))
+        elif source == "proyectos":
+            self._switch_mode(MODE_PROYECTOS)
+            if link.get("id"):
+                self._proj_panel.open_project(link["id"])
+        elif source == "finanzas":
+            self._switch_mode(MODE_FINANZAS)
 
     def _apply_mode_layout(self):
         show_left  = self._mode in (MODE_HABITS, MODE_NOTAS, MODE_EJERCICIO,
-                                    MODE_PROYECTOS, MODE_TAREAS, MODE_CALENDARIO)
+                                    MODE_PROYECTOS, MODE_TAREAS, MODE_CALENDARIO,
+                                    MODE_METAS, MODE_FINANZAS)
 
         show_right = (self._mode == MODE_HABITS
                       or (self._mode == MODE_NOTAS and self._assistant_visible))
@@ -414,17 +494,11 @@ class MainWindow(QMainWindow):
 
     def _on_vault_switch(self, vault_path: Path):
         AppConfig.set_active_vault(vault_path)
-        self.vault        = VaultManager(vault_path)
-        self.habits       = HabitManager(vault_path)
-        self.exercise_mgr = ExerciseManager(vault_path)
-        self.tasks        = TaskManager(vault_path)
-        self.projects     = ProjectManager(vault_path)
-        self.schedule_mgr = ScheduleManager(
-            vault_path, habit_mgr=self.habits, exercise_mgr=self.exercise_mgr,
-            task_mgr=self.tasks, project_mgr=self.projects)
+        self._create_managers(vault_path)
         self._calendario_panel.set_manager(self.schedule_mgr)
         self._calendario_left.schedule_mgr = self.schedule_mgr
-        self.notes = NotesService(self.vault)
+        self._metas_panel.set_managers(self.goals, self.areas, self.habits)
+        self._metas_left.set_managers(self.goals, self.areas)
         self._explorer.set_vault(self.vault, self.notes)
         self._notas_center.set_vault(self.vault, self.notes)
         self._habit_panel.set_manager(self.habits)
@@ -435,7 +509,8 @@ class MainWindow(QMainWindow):
         self._proj_panel.set_manager(self.projects)
         self._proj_left.set_manager(self.projects)
         self._dashboard.set_managers(
-            self.habits, self.exercise_mgr, self.tasks, self.projects)
+            self.habits, self.exercise_mgr, self.tasks, self.projects,
+            goals=self.goals, areas=self.areas)
         self.status_bar.showMessage(f"Vault: {vault_path.name}")
 
     # ── Notes helpers ─────────────────────────────────────────────────────
@@ -507,4 +582,7 @@ class MainWindow(QMainWindow):
         self._tareas_panel.refresh_current()
         self._proj_left.refresh()
         self._proj_panel.refresh()
+        self._metas_left.refresh()
+        self._metas_panel.refresh()
+        self._refresh_finanzas()
         self._dashboard.refresh()

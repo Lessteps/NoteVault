@@ -48,6 +48,8 @@ class IconRail(QWidget):
     notas_requested         = Signal()
     tareas_requested        = Signal()
     calendario_requested    = Signal()
+    metas_requested         = Signal()
+    finanzas_requested      = Signal()
     theme_toggled           = Signal()
 
     def __init__(self, parent=None):
@@ -77,6 +79,8 @@ class IconRail(QWidget):
             ("habits",     "⊙",  "Habit Tracker",   self.habit_tracker_requested),
             ("ejercicio",  "🏋", "Ejercicio",        self.ejercicio_requested),
             ("proyectos",  "◫",  "Proyectos",        self.proyectos_requested),
+            ("metas",      "🎯", "Metas",            self.metas_requested),
+            ("finanzas",   "💰", "Finanzas",         self.finanzas_requested),
             ("notas",      "✎",  "Notas",            self.notas_requested),
             ("tareas",     "☑",  "Tareas",           self.tareas_requested),
         ]:

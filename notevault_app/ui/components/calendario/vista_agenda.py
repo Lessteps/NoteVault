@@ -42,7 +42,7 @@ class AgendaItemRow(QFrame):
         # Done Checkbox
         self.cb = QCheckBox()
         self.cb.setChecked(occ.done)
-        self.cb.setEnabled(occ.source in ("routine", "event", "task")
+        self.cb.setEnabled(occ.source in ("routine", "event", "task", "metas", "proyectos", "finanzas")
                            or occ.id.startswith("habit:"))
         self.cb.toggled.connect(self._on_toggled)
         layout.addWidget(self.cb)
@@ -106,7 +106,8 @@ class AgendaItemRow(QFrame):
     def _kind_label(self, kind: str) -> str:
         labels = {
             "routine": "Rutina", "event": "Evento", "task": "Tarea",
-            "project": "Proyecto", "exercise": "Ejercicio", "habit": "Hábito"
+            "project": "Proyecto", "exercise": "Ejercicio", "habit": "Hábito",
+            "goal_item": "Meta", "issue": "Issue", "saving": "Ahorro",
         }
         return labels.get(kind, kind.capitalize())
 

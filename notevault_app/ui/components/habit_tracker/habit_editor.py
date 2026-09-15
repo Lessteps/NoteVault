@@ -109,6 +109,18 @@ class HabitEditor(QDialog):
         top.addWidget(self.name, stretch=1)
         page.addLayout(top)
 
+        # Area: goals linked to habits of the same area list them first.
+        from ....core.area_manager import AreaManager
+        from ..comun.widgets import area_combo
+        area_row = QHBoxLayout()
+        area_row.addWidget(small_label("Área"))
+        self.area = area_combo(AreaManager(self.manager.vault_root), h.get("area", ""), 30)
+        self.area.setToolTip("Las metas de la misma área muestran este hábito primero al conectarlos")
+        self.area.setFixedWidth(240)
+        area_row.addWidget(self.area)
+        area_row.addStretch()
+        page.addLayout(area_row)
+
         # Frequency
         card, lay = _section("Frecuencia", "Cuándo toca este hábito. Los porcentajes solo cuentan los días en que toca.")
         self.recurrence = RecurrencePicker(allow_none=False, show_range=True,
@@ -359,6 +371,7 @@ class HabitEditor(QDialog):
             reminder_min=self.reminder.currentData() if clock else None,
             colour=self.colour.value() if in_calendar else None,
             notes=self.notes.toPlainText().strip() or None,
+            area=self.area.currentData() or None,
         )
         if self.habit:
             self.manager.update_habit(self.habit["id"], name=name, icon=self._icon,

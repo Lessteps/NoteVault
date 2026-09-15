@@ -38,6 +38,9 @@ from notevault_app.core.project_manager import (                 # noqa: E402
     ProjectManager, PROJECT_STATUSES, P_ACTIVE,
 )
 from notevault_app.core.vault_manager import VaultManager        # noqa: E402
+from notevault_app.core import store                             # noqa: E402
+from notevault_app.core.area_manager import AreaManager          # noqa: E402
+from notevault_app.core.goal_manager import GoalManager          # noqa: E402
 from notevault_app.core.notes_service import NotesService        # noqa: E402
 
 CONFORMANCE = Path(__file__).resolve().parent / "conformance"
@@ -396,8 +399,8 @@ class TestExpectedFixture(unittest.TestCase):
 
         vault = Path(tempfile.mkdtemp(prefix="nvexp"))
         try:
-            task_id, project_id = _build_sample(vault)
-            fresh = expected_values(vault, task_id, project_id)
+            ids = _build_sample(vault)
+            fresh = expected_values(vault, ids)
         finally:
             shutil.rmtree(vault, ignore_errors=True)
 
@@ -439,7 +442,38 @@ def _build_sample(vault) -> tuple:
     pm.add_step(project.id, "Diseñar la home", date(2026, 9, 14))
     pm.add_step(project.id, "Publicar", None)
     pm.set_step(project.id, 0, done=True)
-    return task.id, project.id
+
+    ids = {"TASK_ID": task.id, "PROJECT_ID": project.id}
+    ids.update(_build_goals(vault, hm))
+    return ids
+
+
+GOAL_MONDAY = date(2026, 9, 7)
+
+
+def _build_goals(vault, hm) -> dict:
+    """Áreas y Metas (FORMAT_VERSION 4)."""
+    am = AreaManager(vault)
+    am.create("Programación", "💻", "#3f51b5")
+    gm = GoalManager(vault, hm, am)
+    goal = gm.create_goal('Ser "backend"', area="programacion", priority=3,
+                          start=GOAL_MONDAY, end=date(2026, 12, 31), icon="💻",
+                          colour="#3f51b5", description="Meta de ejemplo.\n\nCon dos párrafos.")
+    rep = gm.create_item(goal.id, "Programar 3 horas", repeat="weekly:0,2,4",
+                         start=GOAL_MONDAY, due_time="18:00", duration_min=180,
+                         in_calendar=True, reminder_min=15, target=3, unit="h",
+                         habit_links=["coding"], priority=3, notes="Notas de la submeta")
+    branch = gm.create_item(goal.id, "Aprender Django", priority=2)
+    child = gm.create_item(goal.id, "Tutorial oficial", parent=branch.id,
+                           due=date(2026, 9, 10), priority=4)
+    gm.create_item(goal.id, "API de ejemplo", parent=branch.id, target=5, unit="endpoints",
+                   value=2.5)
+    gm.set_done(goal.id, child.id, date(2026, 9, 10), True)
+    gm.set_done(goal.id, rep.id, GOAL_MONDAY, True, at="07:15")
+    gm.set_done(goal.id, rep.id, date(2026, 9, 11), False, value=3.5, at="21:40")
+    return {"GOAL_ID": goal.id, "ITEM_REPEAT": rep.id, "ITEM_BRANCH": branch.id,
+            "ITEM_CHILD": child.id,
+            "ITEM_MEASURE": next(i.id for i in gm.items(goal.id) if i.name == "API de ejemplo")}
 
 
 # ── Fixture generation ────────────────────────────────────────────────────
@@ -454,9 +488,12 @@ def write_fixtures():
     shutil.rmtree(CONFORMANCE, ignore_errors=True)
     CONFORMANCE.mkdir(parents=True, exist_ok=True)
     vault = Path(tempfile.mkdtemp(prefix="nvfixture"))
-    task_id, project_id = _build_sample(vault)
-    task = TaskManager(vault).get(task_id)
-    project = ProjectManager(vault).get(project_id)
+    ids = _build_sample(vault)
+
+    def stable_ids(text: str) -> str:
+        for name, real in ids.items():
+            text = text.replace(real, name)
+        return text
 
     manifest = {}
     for path in sorted(vault.rglob("*")):
@@ -464,9 +501,8 @@ def write_fixtures():
             continue
         rel = path.relative_to(vault).as_posix()
         # Ids carry a random suffix; normalise so the fixture is stable.
-        stable = rel.replace(task.id, "TASK_ID").replace(project.id, "PROJECT_ID")
-        body = path.read_text(encoding="utf-8")
-        body = body.replace(task.id, "TASK_ID").replace(project.id, "PROJECT_ID")
+        stable = stable_ids(rel)
+        body = stable_ids(path.read_text(encoding="utf-8"))
         target = CONFORMANCE / stable
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(body, encoding="utf-8")
@@ -483,7 +519,7 @@ def write_fixtures():
     # asserted against this file, so both implementations are held to the
     # same expected values instead of to each other's behaviour.
     (CONFORMANCE / "EXPECTED.json").write_text(
-        json.dumps(expected_values(vault, task.id, project.id),
+        json.dumps(expected_values(vault, ids),
                    indent=2, ensure_ascii=False, sort_keys=True),
         encoding="utf-8",
     )
@@ -492,8 +528,9 @@ def write_fixtures():
     print(f"{len(manifest)} ficheros + EXPECTED.json en {CONFORMANCE}")
 
 
-def expected_values(vault, task_id: str, project_id: str) -> dict:
+def expected_values(vault, ids: dict) -> dict:
     """Parse the fixtures with the real managers and record the results."""
+    task_id, project_id = ids["TASK_ID"], ids["PROJECT_ID"]
     hm = HabitManager(vault)
     day = hm.get_day(FIXED_DAY)
     habits = hm.habits()
@@ -564,6 +601,83 @@ def expected_values(vault, task_id: str, project_id: str) -> dict:
             "progress": round(project.progress, 6),
         },
         "reminder_rules": _reminder_expectations(),
+        "store_encoding": _store_expectations(),
+        "areas": AreaManager(vault).areas(include_archived=True),
+        "goals": _goal_expectations(vault, ids),
+    }
+
+
+def _store_expectations() -> dict:
+    """Exact frontmatter bytes for every type, including escapes and empties."""
+    fields = (("id", "id"), ("name", "str"), ("n", "int"), ("x", "num"), ("y", "num"),
+              ("flag", "bool"), ("off", "bool"), ("day", "date"), ("when", "datetime"),
+              ("tags", "list"), ("empty", "str"))
+    values = {"id": "x20260912-abcdef", "name": 'Comillas "dobles" y \\ barra', "n": 7,
+              "x": 2.5, "y": 3.0, "flag": True, "off": False, "day": FIXED_DAY,
+              "when": datetime(2026, 9, 12, 18, 5), "tags": ["a", "b c"], "empty": ""}
+    text = store.dump_doc(fields, values, {"desconocida": "valor: con dos puntos"},
+                          "Cuerpo\n")
+    parsed, extra, body = store.parse_doc(text, fields)
+    return {
+        "fields": [list(f) for f in fields],
+        "text": text,
+        "parsed": {k: (v.isoformat() if hasattr(v, "isoformat") else v)
+                   for k, v in parsed.items()},
+        "extra": extra,
+        "body": body,
+        "no_body": store.dump_doc(fields, {"id": "a"}),
+    }
+
+
+def _goal_expectations(vault, ids: dict) -> dict:
+    def stable(text):
+        for name, real in ids.items():
+            text = text.replace(real, name)
+        return text
+
+    hm = HabitManager(vault)
+    gm = GoalManager(vault, hm, AreaManager(vault))
+    goal = gm.get_goal(ids["GOAL_ID"])
+    items = {stable(i.id): i for i in gm.items(goal.id)}
+    today = date(2026, 9, 14)
+
+    def item_view(i):
+        return {
+            "name": i.name, "parent": stable(i.parent), "status": i.status,
+            "priority": i.priority, "order": i.order,
+            "start": i.start.isoformat() if i.start else None,
+            "due": i.due.isoformat() if i.due else None, "due_time": i.due_time,
+            "duration_min": i.duration_min, "repeat": i.repeat,
+            "in_calendar": i.in_calendar, "reminder_min": i.reminder_min,
+            "target": i.target, "unit": i.unit, "value": i.value,
+            "habit_links": i.habit_links,
+            "done_at": i.done_at.isoformat() if i.done_at else None,
+            "notes": i.notes, "is_leaf": i.is_leaf,
+            "children": [stable(c.id) for c in i.children],
+            "progress_on_14": round(gm.item_progress(i, goal, today), 6),
+        }
+
+    rep = items["ITEM_REPEAT"]
+    window = [FIXED_DAY - timedelta(days=5) + timedelta(days=n) for n in range(10)]
+    return {
+        "goal": {"name": goal.name, "area": goal.area, "status": goal.status,
+                 "priority": goal.priority, "start": goal.start.isoformat(),
+                 "end": goal.end.isoformat(), "icon": goal.icon, "colour": goal.colour,
+                 "in_overview": goal.in_overview, "description": goal.description,
+                 "overdue_on_2027_01_01": goal.is_overdue(date(2027, 1, 1)),
+                 "progress_on_14": round(gm.progress(goal, today), 6)},
+        "items": {k: item_view(v) for k, v in sorted(items.items())},
+        "tree": [stable(i.id) for i in gm.tree(goal.id)],
+        "repeat_done": [d.isoformat() for d in window if gm.is_done_on(rep, d)],
+        "repeat_values": {d.isoformat(): gm.value_on(rep, d) for d in window
+                          if gm.value_on(rep, d) is not None},
+        "streak_on_11": gm.streak(rep, goal, date(2026, 9, 11)),
+        "adherence_7_on_14": gm.adherence(goal, 7, today),
+        "due_on": {d.isoformat(): [stable(i.id) for _g, i in gm.items_due_on(d, [goal])]
+                   for d in window},
+        "habit_coding_marked": [d.isoformat() for d in window
+                                if hm.get_day(d).completed.get("coding")],
+        "log_2026_09_07": stable(gm.log_path(GOAL_MONDAY).read_text(encoding="utf-8")),
     }
 
 

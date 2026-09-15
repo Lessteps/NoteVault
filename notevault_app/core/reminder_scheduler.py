@@ -39,22 +39,27 @@ class ScheduledReminder:
     title: str
     body: str
     overdue: bool = False
+    kind: str = "task"
 
     @property
     def key(self) -> str:
         """Stable id, so re-registering replaces instead of duplicating."""
-        return f"task:{self.task_id}"
+        return f"{self.kind}:{self.task_id}"
 
 
 def _describe(task) -> tuple:
-    subject = f" · {task.subject}" if task.subject else ""
-    limit = f" · vence {task.due.strftime('%d/%m')}" if task.due else ""
+    name = getattr(task, "name", None) or getattr(task, "title", "")
+    extra = getattr(task, "subject", "") or getattr(task, "reminder_context", "")
+    subject = f" · {extra}" if extra else ""
+    due = getattr(task, "due", None)
+    limit = f" · vence {due.strftime('%d/%m')}" if due else ""
     when = task.reminder.strftime("%H:%M") if task.reminder else ""
-    return (task.name, f"{task.name}{subject}{limit}  ({when})".strip())
+    return (name, f"{name}{subject}{limit}  ({when})".strip())
 
 
 def build(task, now: Optional[datetime] = None) -> Optional[ScheduledReminder]:
-    """Turn a task into a reminder, or None when it does not need one."""
+    """Turn anything with `reminder`, `reminder_done` and `is_done` (a task, a
+    project issue) into a reminder, or None when it does not need one."""
     now = now or datetime.now()
     if not task.reminder or task.reminder_done:
         return None
@@ -67,6 +72,7 @@ def build(task, now: Optional[datetime] = None) -> Optional[ScheduledReminder]:
         title=title,
         body=body,
         overdue=task.reminder < now,
+        kind=getattr(task, "reminder_kind", "task"),
     )
 
 

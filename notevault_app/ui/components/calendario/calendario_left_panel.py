@@ -259,6 +259,9 @@ class CalendarioLeftPanel(QWidget):
             ("exercise", "Ejercicio", "#ff9632"),
             ("task", "Tareas", "#2383e2"),
             ("project", "Proyectos", "#a78bfa"),
+            ("issue", "Issues de proyectos", "#a78bfa"),
+            ("goal_item", "Metas", "#33b679"),
+            ("saving", "Ahorros", "#eab308"),
         ]
 
         for kind, label_txt, hex_col in filter_defs:

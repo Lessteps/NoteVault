@@ -1,6 +1,6 @@
 # Formato de la vault de NoteVault
 
-> **Versión del formato: 2**
+> **Versión del formato: 4**
 >
 > Este documento es el contrato entre la app de escritorio (Python/PySide6) y
 > la app de Android (Dart/Flutter). Las dos leen y escriben los mismos
@@ -37,8 +37,16 @@ vault/
 │   │   └── YYYY/MM/YYYY-MM-DD.json        un archivo por día
 │   ├── tareas/
 │   │   └── <task-id>.md                   un archivo por tarea
-│   └── proyectos/
-│       └── <project-id>.md                un archivo por proyecto
+│   ├── proyectos/
+│   │   └── <project-id>.md                un archivo por proyecto
+│   ├── agenda/                            calendario (rutinas, eventos por día)
+│   ├── areas/
+│   │   └── <area-id>.json                 un archivo por área
+│   ├── metas/
+│   │   ├── <goal-id>/goal.md              una carpeta por meta
+│   │   ├── <goal-id>/items/<item-id>.md   una submeta por archivo
+│   │   └── registro/YYYY/MM/YYYY-MM-DD.json  checks del día
+│   └── .papelera/                         lo borrado, nunca se elimina de verdad
 ├── .notevault-bookmarks.json              ⚠ global
 └── <lo que sea>/…                         las notas del usuario
 ```
@@ -100,6 +108,7 @@ un cliente que no las use debe conservarlas al reescribir el archivo:
 | `reminder_min` | `10` | Aviso de escritorio N minutos antes de `time`. |
 | `colour` | `"#33b679"` | Color del bloque. |
 | `notes` | `"texto"` | Notas libres. |
+| `area` | `"programacion"` | Id del [área](#áreas) del hábito. |
 
 Con `repeat` presente, `days` se reescribe con todos los días de la semana,
 para que un cliente antiguo que solo lee `days` no oculte el hábito.
@@ -257,6 +266,154 @@ Descripción libre en markdown.
 - La sección `## Tareas` contiene la checklist. Cada línea es
   `- [ ]` o `- [x]`, el nombre, y opcionalmente ` | fecha ISO`.
 - El progreso del proyecto se deriva de la checklist; no se guarda.
+
+## Frontmatter tipado (versión 4)
+
+Metas y Proyectos guardan sus entidades como markdown con un frontmatter de
+**claves tipadas** (`core/store.py`, `lib/core/store.dart`). Cada entidad
+declara su lista de `(clave, tipo)` en `vault_format` y se escribe así:
+
+1. `---`, una línea `clave: valor` por clave **en el orden de la lista**, y
+   después las claves desconocidas en el orden en que se leyeron.
+2. `---`; si hay cuerpo, una línea vacía y el cuerpo sin espacios sobrantes.
+3. El archivo termina en `\n`.
+
+Una clave **sin valor no se escribe** (None, texto vacío, lista vacía o
+`false` en un indicador). Codificación por tipo:
+
+| Tipo | Escrito | Ejemplo |
+|---|---|---|
+| `id` | tal cual | `goal: g20260914-a1b2c3` |
+| `str` | entre comillas dobles, con `\` → `\\` y `"` → `\"` | `name: "Dice \"hola\""` |
+| `int` | dígitos | `priority: 3` |
+| `num` | entero si no tiene decimales, si no el decimal más corto | `target: 2.5` · `value: 3` |
+| `bool` | `true` (nunca `false`) | `in_calendar: true` |
+| `date` | `YYYY-MM-DD` | `due: 2026-10-01` |
+| `datetime` | `YYYY-MM-DDTHH:MM` | `reminder: 2026-09-19T18:00` |
+| `list` | elementos separados por coma, entre comillas | `habit_links: "coding,math"` |
+
+Las claves desconocidas se reescriben siempre entre comillas.
+`EXPECTED.json` (`store_encoding`) fija la salida exacta.
+
+Los JSON de la versión 4 (áreas, registro de metas, finanzas) se escriben con
+sangría de 2 espacios, sin escapar caracteres no ASCII y con `\n` final.
+
+## Papelera
+
+Borrar una meta, una submeta, un issue o un adjunto de módulo **mueve** el
+archivo (o la carpeta) a `.notevault/.papelera/<módulo>/`. Si ya existe un
+archivo con ese nombre se usa `nombre 1.ext`, `nombre 2.ext`… Nada se elimina
+de verdad desde la app.
+
+## Áreas
+
+### `.notevault/areas/<area-id>.json`
+
+```json
+{
+  "id": "programacion",
+  "name": "Programación",
+  "icon": "💻",
+  "colour": "#3f51b5",
+  "order": 1,
+  "archived": false
+}
+```
+
+- Las claves se escriben en ese orden. El id es el nombre sin tildes, en
+  minúsculas y con guiones (`programacion`); si ya existe, `programacion-2`.
+- Metas, proyectos y hábitos guardan el id en su clave `area`.
+- Archivar un área (`archived: true`) no toca lo que apunta a ella: se
+  muestra como "Sin área" mientras esté archivada.
+
+## Metas
+
+### `.notevault/metas/<goal-id>/goal.md`
+
+El id tiene la forma `gYYYYMMDD-xxxxxx`. Claves (`GOAL_FIELDS`, en orden):
+
+| Clave | Tipo | Significado |
+|---|---|---|
+| `id` | id | |
+| `name` | str | |
+| `area` | id | Área; vacía = "Sin área". |
+| `status` | str | `Activa` · `En pausa` · `Completada` · `Archivada` |
+| `priority` | int | 1 Baja · 2 Media · 3 Alta · 4 Urgente |
+| `start`, `end` | date | Al pasar `end` la meta se marca **Vencida**; nunca se borra ni archiva sola. |
+| `icon`, `colour` | str | |
+| `in_overview` | bool | Aparece en la Vista General. |
+| `order` | num | Orden manual en el tablero. |
+| `created` | date | |
+
+El cuerpo es la descripción.
+
+### `.notevault/metas/<goal-id>/items/<item-id>.md`
+
+Una submeta por archivo, id `iYYYYMMDD-xxxxxx`. El árbol se forma con
+`parent` (vacío = primer nivel); una submeta cuyo padre no existe, o que
+formaría un ciclo, se muestra en el primer nivel. Claves (`GOAL_ITEM_FIELDS`):
+
+| Clave | Tipo | Significado |
+|---|---|---|
+| `id`, `goal`, `parent` | id | |
+| `name` | str | |
+| `status` | str | `Pendiente` · `En curso` · `Hecha` (solo submetas únicas) |
+| `priority` | int | 1–4 |
+| `order` | num | Orden entre hermanas; al mover se usa el punto medio entre vecinas. |
+| `start` | date | Ancla de la repetición. |
+| `due`, `due_time` | date, str | Fecha y hora de una submeta única. |
+| `duration_min` | int | Bloque en Calendario. |
+| `repeat`, `repeat_until` | str, date | [Repetición](#repetición); vacía = única. |
+| `in_calendar` | bool | Aparece en Calendario (con `due_time`, como bloque con hora). |
+| `reminder_min` | int | Aviso antes de `due_time`. |
+| `target`, `unit` | num, str | Meta medible: hecha cuando el valor llega a `target`. |
+| `value` | num | Valor acumulado de una submeta única medible. |
+| `habit_links` | list | Hábitos que se marcan al completarla. |
+| `done_at` | date | Día en que una submeta única pasó a Hecha. |
+| `created` | date | |
+
+El cuerpo son las notas. Una submeta con hijas es una **rama**: no se marca a
+mano, está hecha cuando todas sus hijas lo están.
+
+### `.notevault/metas/registro/YYYY/MM/YYYY-MM-DD.json`
+
+Checks de las submetas **repetitivas** ese día, y la procedencia de las marcas
+de hábito que puso Metas:
+
+```json
+{
+  "items": {
+    "g20260914-a1b2c3/i20260914-d4e5f6": {"done": true, "value": 3.5, "at": "21:40"}
+  },
+  "habit_marks": {
+    "coding": ["g20260914-a1b2c3/i20260914-d4e5f6"]
+  }
+}
+```
+
+- Claves ordenadas alfabéticamente; listas de `habit_marks` ordenadas; un día
+  sin nada se borra en lugar de dejar un archivo vacío.
+- Una repetitiva medible está hecha ese día si `value >= target`.
+
+### Conexión con hábitos
+
+Al marcar una submeta con `habit_links`, para cada hábito activo ese día:
+
+- si el hábito **no** estaba marcado, se marca y la submeta queda como fuente
+  en `habit_marks`;
+- si ya estaba marcado **por Metas** (tiene fuentes), se añade la submeta;
+- si ya estaba marcado **a mano** (sin fuentes), no se toca.
+
+Al desmarcar se quita la submeta de las fuentes y, si no queda ninguna, se
+desmarca el hábito. Una marca manual nunca se quita.
+
+### Progreso
+
+- Hoja única: 1 si está hecha; si es medible, `value / target` (máx. 1).
+- Hoja repetitiva: días cumplidos / días programados desde `start` (o el
+  inicio de la meta, o `created`) hasta hoy, sin pasar de `repeat_until` ni
+  del fin de la meta.
+- Rama: media de sus hijas. Meta: media de sus submetas de primer nivel.
 
 ## Marcadores
 

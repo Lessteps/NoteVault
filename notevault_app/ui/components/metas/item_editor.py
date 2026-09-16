@@ -236,6 +236,13 @@ class ItemEditor(QWidget):
             if w:
                 w.setVisible(not repeating)
 
+        # Límite estricto de 2 paneles de dashboard:
+        # Solo submetas de nivel 1 (sin parent) pueden abrir dashboard 2 o tener hijos
+        is_root_submeta = not bool(self.item and self.item.parent)
+        self.full_view_btn.setVisible(is_root_submeta)
+        self.child_btn.setVisible(is_root_submeta)
+        self.is_priority_cb.setVisible(is_root_submeta)
+
     def _save(self):
         if self.item is None:
             return

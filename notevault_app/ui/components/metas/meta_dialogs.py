@@ -47,6 +47,12 @@ class GoalDialog(FormDialog):
         self.overview = self.add_wide(_check("Mostrar en la Vista General",
                                              goal.in_overview if goal else True))
         self.description = self.add_row("Descripción", _text_edit(goal.description if goal else ""))
+        if not goal:
+            self.submetas_text = self.add_row("Submetas iniciales\n(Checklist: 1 por línea)",
+                                              _text_edit("", height=80))
+            self.submetas_text.setPlaceholderText(
+                "p. ej.\nFundamentos y Sintaxis\nProgramación Orientada a Objetos\nFramework Web (FastAPI)\nProyecto Final"
+            )
         if goal:
             self.name.setText(goal.name)
             self.status.setCurrentIndex(max(0, self.status.findData(goal.status)))
@@ -63,6 +69,12 @@ class GoalDialog(FormDialog):
             return
         super().accept()
 
+    def initial_submetas(self) -> list:
+        if not hasattr(self, "submetas_text") or not self.submetas_text:
+            return []
+        lines = [line.strip() for line in self.submetas_text.toPlainText().splitlines()]
+        return [l.lstrip("-*•123456789. ") for l in lines if l.strip()]
+
     def fields(self) -> dict:
         return dict(name=self.name.text().strip(), icon=self.icon.text().strip(),
                     area=self.area.currentData() or "", status=self.status.currentData(),
@@ -70,6 +82,55 @@ class GoalDialog(FormDialog):
                     end=self.end.value(), colour=self.colour.value(),
                     in_overview=self.overview.isChecked(),
                     description=self.description.toPlainText().strip())
+
+
+class SubmetaChecklistDialog(FormDialog):
+    """Diálogo para crear una submeta junto con su lista/checklist de subtareas."""
+
+    def __init__(self, categories: list = None, parent=None):
+        super().__init__("Nueva submeta con checklist", parent, width=520)
+        self.name = self.add_row("Nombre", line_edit("p. ej. Módulo de Autenticación y JWT", 32))
+
+        cats = ["Teoría", "Práctica", "Ejercicios", "Proyectos", "Lectura", "Conceptos", "Repaso"]
+        if categories:
+            for c in categories:
+                if c and c not in cats:
+                    cats.append(c)
+        self.cat_combo = combo([(c, c) for c in cats], 32)
+        self.cat_combo.setEditable(True)
+        self.add_row("Categoría", self.cat_combo)
+
+        self.cb_priority = _check("⭐ Prioritaria (habilita Segundo Dashboard)", True)
+        self.add_wide(self.cb_priority)
+
+        self.checklist_edit = _text_edit("", height=120)
+        self.checklist_edit.setPlaceholderText(
+            "Escribe aquí las subtareas (una por línea), ej:\n"
+            "- Diseñar esquema de tokens y sessions\n"
+            "- Implementar middleware de verificación\n"
+            "- Hashear contraseñas con bcrypt\n"
+            "- Pruebas de integración de endpoints"
+        )
+        self.add_row("Subtareas\n(Checklist)", self.checklist_edit)
+
+        self.finish()
+        self.name.setFocus()
+
+    def accept(self):
+        if not self.name.text().strip():
+            self.name.setFocus()
+            return
+        super().accept()
+
+    def fields(self) -> dict:
+        lines = [line.strip() for line in self.checklist_edit.toPlainText().splitlines()]
+        clean_subtasks = [l.lstrip("-*•123456789. ") for l in lines if l.strip()]
+        return {
+            "name": self.name.text().strip(),
+            "category": self.cat_combo.currentText().strip(),
+            "is_priority": self.cb_priority.isChecked(),
+            "subtasks": clean_subtasks,
+        }
 
 
 class AreaDialog(FormDialog):

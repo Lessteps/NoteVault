@@ -102,7 +102,11 @@ class MetasPanel(QWidget):
         dlg = GoalDialog(self.area_mgr, None, preset, self)
         if dlg.exec() == QDialog.Accepted:
             f = dlg.fields()
+            initial_subs = dlg.initial_submetas()
             goal = self.goal_mgr.create_goal(f.pop("name"), **f)
+            for sub_name in initial_subs:
+                if sub_name:
+                    self.goal_mgr.create_item(goal.id, sub_name)
             self.data_changed.emit()
             self.open_goal(goal.id)
 

@@ -129,6 +129,50 @@ class TestSubmetasCoreAndViews(unittest.TestCase):
         detail._toggle_subtask(fresh_item.children[0].id, True)
         self.assertEqual(detail.t_progress.value.text(), "100 %")
 
+        # Probar añadir subtareas en bloque (checklist multi-línea)
+        detail._add_batch_subtasks(["Definir claves foráneas", "Crear índices B-Tree"])
+        fresh_item2 = self.goal_mgr.get_item(goal.id, item.id)
+        self.assertEqual(len(fresh_item2.children), 3)
+
+        # Verificar que NO existe la señal submeta_opened (límite estricto de 2 paneles)
+        self.assertFalse(hasattr(detail, "submeta_opened"))
+
+        # Conmutar subtarea haciendo clic directo
+        detail._toggle_subtask_by_id(fresh_item2.children[1].id)
+        self.assertTrue(self.goal_mgr.is_done_on(fresh_item2.children[1], date.today()))
+
+    def test_checklist_dialogs_creation(self):
+        from notevault_app.ui.components.metas.meta_dialogs import GoalDialog, SubmetaChecklistDialog
+
+        # 1. Crear meta con checklist inicial
+        goal = self.goal_mgr.create_goal("Arquitectura Cloud")
+        initial_checklist = ["Setup AWS VPC", "Configurar ECS Cluster", "Pipeline CI/CD"]
+        for sub_name in initial_checklist:
+            self.goal_mgr.create_item(goal.id, sub_name)
+
+        items = self.goal_mgr.items(goal.id)
+        self.assertEqual(len(items), 3)
+        self.assertEqual(sorted([i.name for i in items]), sorted(initial_checklist))
+
+        # 2. SubmetaChecklistDialog fields parsing
+        dlg = SubmetaChecklistDialog(categories=["DevOps"], parent=None)
+        dlg.name.setText("Infraestructura como Código")
+        dlg.cat_combo.setEditText("DevOps")
+        dlg.checklist_edit.setPlainText(
+            "- Escribir main.tf\n"
+            "- Configurar backend S3\n"
+            "- Ejecutar terraform apply"
+        )
+        f = dlg.fields()
+        self.assertEqual(f["name"], "Infraestructura como Código")
+        self.assertEqual(f["category"], "DevOps")
+        self.assertTrue(f["is_priority"])
+        self.assertEqual(f["subtasks"], [
+            "Escribir main.tf",
+            "Configurar backend S3",
+            "Ejecutar terraform apply"
+        ])
+
 
 if __name__ == "__main__":
     unittest.main()

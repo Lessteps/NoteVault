@@ -22,9 +22,8 @@ from .submetas_board import CATEGORY_COLOURS
 
 
 class SubmetaDetail(QWidget):
-    back_requested = Signal()           # Regresar a la vista de la meta padre
+    back_requested = Signal()           # Regresar a la vista de la meta padre (Dashboard 1)
     edit_requested = Signal(str)        # Abrir editor lateral de la submeta
-    submeta_opened = Signal(str)        # Abrir submeta hija
     data_changed = Signal()
 
     def __init__(self, goal_mgr, habit_mgr, parent=None):
@@ -77,15 +76,15 @@ class SubmetaDetail(QWidget):
         self.chips.setSpacing(6)
         page.addLayout(self.chips)
 
-        # ── 3. Métricas principales (StatTiles) ────────────────────────────
+        # ── 3. Franja de resumen (Dashboard 2 compacto estilo lista) ──────
         self.tiles = QHBoxLayout()
-        self.tiles.setSpacing(10)
+        self.tiles.setSpacing(8)
         self.t_progress = StatTile("0 %", "Progreso", GREEN)
-        self.t_subtasks = StatTile("0/0", "Subtareas hechas")
-        self.t_adh7 = StatTile("—", "Adherencia 7 días")
-        self.t_adh30 = StatTile("—", "Adherencia 30 días")
-        self.t_streak = StatTile("0", "Racha activa", ORANGE)
-        self.t_left = StatTile("—", "Días restantes")
+        self.t_subtasks = StatTile("0/0", "Completadas")
+        self.t_adh7 = StatTile("—", "Adherencia 7d")
+        self.t_adh30 = StatTile("—", "Adherencia 30d")
+        self.t_streak = StatTile("0", "Racha", ORANGE)
+        self.t_left = StatTile("—", "Fecha límite")
         for t in (self.t_progress, self.t_subtasks, self.t_adh7, self.t_adh30, self.t_streak, self.t_left):
             self.tiles.addWidget(t)
         page.addLayout(self.tiles)
@@ -93,7 +92,7 @@ class SubmetaDetail(QWidget):
         self.progress_bar = BlockProgress(0, GREEN, blocks=30, block=10)
         page.addWidget(self.progress_bar)
 
-        # ── 4. Contenido en Scroll: Subtareas y Notas ──────────────────────
+        # ── 4. Contenido en Scroll: Lista Checklist y Notas ────────────────
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
@@ -105,17 +104,31 @@ class SubmetaDetail(QWidget):
         body_lay.setContentsMargins(0, 8, 0, 16)
         body_lay.setSpacing(14)
 
-        # Gestor interactivo de subtareas
+        # Contenedor central de Lista / Checklist
+        checklist_card = QFrame()
+        checklist_card.setObjectName("checklistCard")
+        checklist_card.setStyleSheet(
+            f"QFrame#checklistCard {{ background: {BG_CARD}; border: 1px solid {BORDER}; "
+            f"border-radius: 8px; }}"
+        )
+        c_lay = QVBoxLayout(checklist_card)
+        c_lay.setContentsMargins(14, 12, 14, 12)
+        c_lay.setSpacing(8)
+
+        # Gestor de subtareas interactivo (modo lista)
         self.subtasks_widget = SubtasksWidget(
-            title="Subtareas y Práctica",
-            placeholder="Añadir subtarea / tema de práctica (ej. ejercicios, teoría)...",
+            title="Lista de Subtareas y Checklist",
+            placeholder="+ Añadir subtarea al checklist (Enter)...",
             colour=GREEN,
         )
         self.subtasks_widget.subtask_added.connect(self._add_subtask)
+        self.subtasks_widget.batch_added.connect(self._add_batch_subtasks)
         self.subtasks_widget.subtask_toggled.connect(self._toggle_subtask)
         self.subtasks_widget.subtask_deleted.connect(self._delete_subtask)
-        self.subtasks_widget.subtask_clicked.connect(self.submeta_opened.emit)
-        body_lay.addWidget(self.subtasks_widget)
+        # Al hacer clic en un item de la lista, solo se conmuta su estado: NUNCA se abre otro dashboard
+        self.subtasks_widget.subtask_clicked.connect(self._toggle_subtask_by_id)
+        c_lay.addWidget(self.subtasks_widget)
+        body_lay.addWidget(checklist_card)
 
         # Notas / Teoría de la submeta
         lbl_notes = label("Notas, Enlaces y Resumen Teórico", TEXT_DIM, 12, bold=True)
@@ -127,7 +140,7 @@ class SubmetaDetail(QWidget):
             f"QTextEdit{{background:{BG_CARD};border:1px solid {BORDER};border-radius:8px;"
             f"color:{TEXT};font-size:13px;padding:10px;font-family:{UI_FONT};}}"
         )
-        self.txt_notes.setMinimumHeight(150)
+        self.txt_notes.setMinimumHeight(130)
 
         self._notes_timer = QTimer(self)
         self._notes_timer.setSingleShot(True)
@@ -242,6 +255,25 @@ class SubmetaDetail(QWidget):
         if not self.item or not title.strip():
             return
         self.goal_mgr.create_item(self.goal.id, title.strip(), parent=self.item.id)
+        self.data_changed.emit()
+        self.refresh()
+
+    def _add_batch_subtasks(self, titles: list):
+        if not self.item or not titles:
+            return
+        for t in titles:
+            if t.strip():
+                self.goal_mgr.create_item(self.goal.id, t.strip(), parent=self.item.id)
+        self.data_changed.emit()
+        self.refresh()
+
+    def _toggle_subtask_by_id(self, child_id: str):
+        child = self.goal_mgr.get_item(self.goal.id, child_id)
+        if not child:
+            return
+        today = date.today()
+        current_done = self.goal_mgr.is_done_on(child, today)
+        self.goal_mgr.set_done(child, today, not current_done)
         self.data_changed.emit()
         self.refresh()
 

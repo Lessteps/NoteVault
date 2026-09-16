@@ -106,7 +106,8 @@ class SubmetasBoard(QWidget):
         self.sort_combo.currentIndexChanged.connect(self._on_sort_changed)
         tool_bar.addWidget(self.sort_combo)
 
-        btn_add = primary_btn("+  Submeta", 28)
+        btn_add = primary_btn("+  Submeta con Checklist", 28)
+        btn_add.setToolTip("Crear nueva submeta con su checklist de subtareas")
         btn_add.clicked.connect(lambda: self.new_submeta_requested.emit(""))
         tool_bar.addWidget(btn_add)
 

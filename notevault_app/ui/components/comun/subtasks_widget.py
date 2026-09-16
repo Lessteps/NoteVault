@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFrame,
+    QTextEdit,
 )
 
 from . import (
@@ -98,6 +99,7 @@ class SubtasksWidget(QWidget):
     """
 
     subtask_added = Signal(str)
+    batch_added = Signal(list)
     subtask_toggled = Signal(str, bool)
     subtask_deleted = Signal(str)
     subtask_clicked = Signal(str)
@@ -142,7 +144,7 @@ class SubtasksWidget(QWidget):
         self.items_box.setSpacing(2)
         self.lay.addLayout(self.items_box)
 
-        # ── Quick Inline Add Input ──────────────────────────
+        # ── Quick Inline Add Input & Batch Checklist Paste ──
         if self._can_add:
             add_row = QHBoxLayout()
             add_row.setSpacing(6)
@@ -161,7 +163,7 @@ class SubtasksWidget(QWidget):
             add_btn = QPushButton("+")
             add_btn.setFixedSize(28, 28)
             add_btn.setCursor(Qt.PointingHandCursor)
-            add_btn.setToolTip("Añadir")
+            add_btn.setToolTip("Añadir subtarea")
             add_btn.setStyleSheet(
                 f"QPushButton {{ background: #252525; border: 1px solid {BORDER}; "
                 f"border-radius: 5px; color: {TEXT_DIM}; font-size: 14px; font-weight: bold; }}"
@@ -170,7 +172,74 @@ class SubtasksWidget(QWidget):
             add_btn.clicked.connect(self._add_from_input)
             add_row.addWidget(add_btn)
 
+            self.btn_batch = QPushButton("📋 Pegar lista")
+            self.btn_batch.setFixedHeight(28)
+            self.btn_batch.setCursor(Qt.PointingHandCursor)
+            self.btn_batch.setToolTip("Pegar varias subtareas en bloque (Checklist multi-línea)")
+            self.btn_batch.setStyleSheet(
+                f"QPushButton {{ background: #202020; border: 1px solid {BORDER}; "
+                f"border-radius: 5px; color: {TEXT_DIM}; font-size: 11px; padding: 0 10px; font-family: {UI_FONT}; }}"
+                f"QPushButton:hover {{ background: #282828; color: {TEXT}; border-color: {GREEN}; }}"
+            )
+            self.btn_batch.clicked.connect(self._toggle_batch)
+            add_row.addWidget(self.btn_batch)
+
             self.lay.addLayout(add_row)
+
+            # Drawer multi-línea para pegar checklist
+            self.batch_box = QWidget()
+            self.batch_box.setVisible(False)
+            b_lay = QVBoxLayout(self.batch_box)
+            b_lay.setContentsMargins(0, 4, 0, 4)
+            b_lay.setSpacing(4)
+            self.batch_text = QTextEdit()
+            self.batch_text.setFixedHeight(80)
+            self.batch_text.setPlaceholderText("Pega aquí varias subtareas (una por línea)...")
+            self.batch_text.setStyleSheet(
+                f"QTextEdit {{ background: #202020; border: 1px solid {BORDER}; "
+                f"border-radius: 5px; color: {TEXT}; font-size: 12px; padding: 6px; font-family: {UI_FONT}; }}"
+            )
+            b_lay.addWidget(self.batch_text)
+
+            b_act = QHBoxLayout()
+            b_act.addStretch()
+            btn_b_cancel = QPushButton("Cancelar")
+            btn_b_cancel.setFixedHeight(24)
+            btn_b_cancel.setStyleSheet(
+                f"QPushButton {{ background: transparent; border: none; color: {TEXT_DIM}; font-size: 11px; font-family: {UI_FONT}; }}"
+                f"QPushButton:hover {{ color: {RED}; }}"
+            )
+            btn_b_cancel.clicked.connect(lambda: self.batch_box.setVisible(False))
+            b_act.addWidget(btn_b_cancel)
+
+            btn_b_add = QPushButton("Añadir al checklist")
+            btn_b_add.setFixedHeight(24)
+            btn_b_add.setStyleSheet(
+                f"QPushButton {{ background: {GREEN}; border: none; border-radius: 4px; color: #000; "
+                f"font-size: 11px; font-weight: bold; padding: 0 10px; font-family: {UI_FONT}; }}"
+                f"QPushButton:hover {{ background: #4ade80; }}"
+            )
+            btn_b_add.clicked.connect(self._apply_batch)
+            b_act.addWidget(btn_b_add)
+            b_lay.addLayout(b_act)
+
+            self.lay.addWidget(self.batch_box)
+
+    def _toggle_batch(self):
+        self.batch_box.setVisible(not self.batch_box.isVisible())
+        if self.batch_box.isVisible():
+            self.batch_text.setFocus()
+
+    def _apply_batch(self):
+        raw = self.batch_text.toPlainText()
+        lines = [l.strip() for l in raw.splitlines()]
+        clean = [l.lstrip("-*•123456789. ") for l in lines if l.strip()]
+        if clean:
+            self.batch_added.emit(clean)
+            for title in clean:
+                self.subtask_added.emit(title)
+        self.batch_text.clear()
+        self.batch_box.setVisible(False)
 
     def set_title(self, text: str):
         self._title_text = text

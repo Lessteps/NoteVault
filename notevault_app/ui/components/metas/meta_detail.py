@@ -124,8 +124,13 @@ class MetaDetail(QWidget):
         tabs.addWidget(self.submeta_view_box)
 
         tabs.addStretch()
+        self.add_checklist_btn = flat_btn("📋 + Con Checklist", height=28)
+        self.add_checklist_btn.setToolTip("Crear submeta especificando una lista o checklist de subtareas iniciales")
+        self.add_checklist_btn.clicked.connect(lambda: self._add_submeta_with_checklist(""))
+        tabs.addWidget(self.add_checklist_btn)
+
         self.add_btn = primary_btn("+  Submeta", 30)
-        self.add_btn.clicked.connect(lambda: self._add_item(""))
+        self.add_btn.clicked.connect(lambda: self._add_submeta_with_checklist(""))
         tabs.addWidget(self.add_btn)
         page.addLayout(tabs)
 
@@ -143,7 +148,7 @@ class MetaDetail(QWidget):
         # 0.1: SubmetasBoard (Cards Dashboard)
         self.submetas_board = SubmetasBoard(goal_mgr, habit_mgr)
         self.submetas_board.submeta_opened.connect(self.open_submeta_detail)
-        self.submetas_board.new_submeta_requested.connect(self._add_item)
+        self.submetas_board.new_submeta_requested.connect(lambda: self._add_submeta_with_checklist(""))
         self.submetas_board.data_changed.connect(self._changed)
         self.submetas_stack.addWidget(self.submetas_board)
 
@@ -173,11 +178,10 @@ class MetaDetail(QWidget):
         self.split = split
         self.submetas_stack.addWidget(split)
 
-        # 0.3: SubmetaDetail (Interfaz propia de la submeta)
+        # 0.3: SubmetaDetail (Segundo Dashboard: vista de lista sin sub-dashboards)
         self.submeta_detail = SubmetaDetail(goal_mgr, habit_mgr)
         self.submeta_detail.back_requested.connect(self.close_submeta_detail)
         self.submeta_detail.edit_requested.connect(self._open_item)
-        self.submeta_detail.submeta_opened.connect(self.open_submeta_detail)
         self.submeta_detail.data_changed.connect(self._changed)
         self.submetas_stack.addWidget(self.submeta_detail)
 
@@ -435,6 +439,31 @@ class MetaDetail(QWidget):
         self.goal_mgr.indent(self.goal.id, iid, direction)
         self._changed()
         self.tree.select_id(iid)
+
+    def _add_submeta_with_checklist(self, parent_id=""):
+        if self.goal is None:
+            return
+        from .meta_dialogs import SubmetaChecklistDialog
+        cats = self.goal_mgr.categories(self.goal.id)
+        dlg = SubmetaChecklistDialog(categories=cats, parent=self)
+        if dlg.exec() == QDialog.Accepted:
+            f = dlg.fields()
+            submeta = self.goal_mgr.create_item(
+                self.goal.id,
+                f["name"],
+                parent=parent_id or "",
+                category=f.get("category", ""),
+                is_priority=f.get("is_priority", True),
+            )
+            for st_title in f.get("subtasks", []):
+                if st_title.strip():
+                    self.goal_mgr.create_item(self.goal.id, st_title.strip(), parent=submeta.id)
+            self._changed()
+            if f.get("is_priority") and not parent_id:
+                self.open_submeta_detail(submeta.id)
+            else:
+                self.show_tab("submetas")
+                self.tree.select_id(submeta.id)
 
     def _add_item(self, parent_id):
         if self.goal is None:

@@ -440,6 +440,7 @@ def _build_sample(vault) -> tuple:
     ids = {"TASK_ID": task.id}
     ids.update(_build_projects(vault))
     ids.update(_build_goals(vault, hm))
+    ids.update(_build_finances(vault))
     return ids
 
 
@@ -484,6 +485,32 @@ def _build_projects(vault) -> dict:
 
 
 GOAL_MONDAY = date(2026, 9, 7)
+
+
+def _build_finances(vault) -> dict:
+    """Finanzas (FORMAT_VERSION 4)."""
+    from notevault_app.core.finance_manager import FinanceManager, GASTO, INGRESO, AHORRO, RETIRO
+    fm = FinanceManager(vault)
+    fm.ensure_defaults()
+    fm.update_category("comida", budget_month_cents=60000000)
+    moto = fm.create_goal("Moto", 20000000, icon="🏍", colour="#33b679", start="2026-09-01",
+                          deadline="2026-10-31", cadence={"mode": "rule", "rule": "weekly:4"},
+                          suggested_cents=5000000, created="2026-09-01", notes="Casco incluido")
+    trip = fm.create_goal("Viaje", 9000000, icon="✈", start="2026-09-01", created="2026-09-01",
+                          cadence={"mode": "period", "period": "week"}, show_in_daily=True)
+    lunch = fm.add(FIXED_DAY, GASTO, 1250000, id="mv20260912-aaaaaa", category="comida",
+                   what="Almuerzo", reason='Día "de oficina"', time="13:10", created="2026-09-12T13:12",
+                   attachments=["finanzas/adjuntos/2026/09/mv20260912-aaaaaa-1.png"])
+    fm.add(FIXED_DAY, INGRESO, 350000000, id="mv20260912-bbbbbb", category="salario", what="Nómina",
+           created="2026-09-12T08:00")
+    fm.add(date(2026, 9, 11), AHORRO, 5000000, id="mv20260911-cccccc", goal=moto["id"],
+           what="Ahorro Moto", created="2026-09-11T20:00")
+    fm.add(FIXED_DAY, RETIRO, 1000000, id="mv20260912-dddddd", goal=moto["id"], reason="Repuesto",
+           created="2026-09-12T21:00")
+    fm.add(date(2026, 8, 31), GASTO, 99, id="mv20260831-eeeeee", created="2026-08-31T23:59")
+    fm.add(date(2026, 9, 9), AHORRO, 9000000, id="mv20260909-ffffff", goal=trip["id"],
+           created="2026-09-09T10:00")
+    return {"FGOAL_MOTO": moto["id"], "FGOAL_TRIP": trip["id"]}
 
 
 def _build_goals(vault, hm) -> dict:
@@ -627,6 +654,7 @@ def expected_values(vault, ids: dict) -> dict:
         "store_encoding": _store_expectations(),
         "areas": AreaManager(vault).areas(include_archived=True),
         "goals": _goal_expectations(vault, ids),
+        "finance": _finance_expectations(vault, ids),
     }
 
 
@@ -690,6 +718,39 @@ def _project_expectations(vault, ids: dict) -> dict:
             "legacy_in_trash": (vault / fmt.LAYOUT["trash_dir"] / "proyectos-v3"
                                 / "p20260901-aaaaaa.md").exists(),
         },
+    }
+
+
+def _finance_expectations(vault, ids: dict) -> dict:
+    from notevault_app.core import finance_manager as fin
+
+    def stable(text):
+        for name, real in ids.items():
+            text = text.replace(real, name)
+        return text
+
+    fm = fin.FinanceManager(vault)
+    moto, trip = ids["FGOAL_MOTO"], ids["FGOAL_TRIP"]
+    window = [date(2026, 9, 7) + timedelta(days=n) for n in range(14)]
+    return {
+        "categories": [c["id"] for c in fm.categories(include_archived=True)],
+        "day_totals": fin.totals(fm.day(FIXED_DAY)),
+        "month_totals": fin.totals(m for _d, m in fm.month(2026, 9)),
+        "august_totals": fin.totals(m for _d, m in fm.month(2026, 8)),
+        "week_totals": fin.totals(m for _d, m in fm.week(FIXED_DAY)),
+        "by_category_sept": fm.by_category(fm.month(2026, 9)),
+        "budget_sept": [[c["id"], used, budget] for c, used, budget in fm.budget_used(2026, 9)],
+        "saved": {"FGOAL_MOTO": fm.saved(moto), "FGOAL_TRIP": fm.saved(trip)},
+        "status": {"FGOAL_MOTO": fm.get_goal(moto)["status"], "FGOAL_TRIP": fm.get_goal(trip)["status"]},
+        "history_moto": {"days": [[d.isoformat(), net, [m["id"] for m in ms]]
+                                  for d, net, ms in fm.history(moto)["days"]],
+                         "months": fm.history(moto)["months"]},
+        "pace_moto_on_fixed_day": fm.pace(moto, FIXED_DAY),
+        "projection_moto_on_fixed_day": (fm.projection(moto, FIXED_DAY) or date.min).isoformat(),
+        "due_checks": {d.isoformat(): [[stable(g["id"]), checked, ids_]
+                                       for g, checked, ids_ in fm.due_checks(d)] for d in window},
+        "format_money": {str(c): fin.format_money(c) for c in (0, 1, 49, 50, 99, 1250000, -120000000)},
+        "format_money_usd": fin.format_money(1250, "USD"),
     }
 
 

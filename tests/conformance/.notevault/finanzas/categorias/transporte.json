@@ -1,0 +1,10 @@
+{
+  "id": "transporte",
+  "name": "Transporte",
+  "icon": "🚌",
+  "colour": "#039be5",
+  "kind": "gasto",
+  "budget_month_cents": 0,
+  "order": 2,
+  "archived": false
+}

@@ -31,6 +31,141 @@
     },
     "exercise_id": "lunes_0"
   },
+  "finance": {
+    "august_totals": {
+      "ahorro": 0,
+      "balance": -99,
+      "gasto": 99,
+      "ingreso": 0,
+      "retiro": 0
+    },
+    "budget_sept": [
+      [
+        "comida",
+        1250000,
+        60000000
+      ]
+    ],
+    "by_category_sept": {
+      "comida": 1250000
+    },
+    "categories": [
+      "comida",
+      "transporte",
+      "vivienda",
+      "servicios",
+      "salud",
+      "educacion",
+      "ocio",
+      "compras",
+      "otros",
+      "salario",
+      "extra",
+      "regalo"
+    ],
+    "day_totals": {
+      "ahorro": 0,
+      "balance": 349750000,
+      "gasto": 1250000,
+      "ingreso": 350000000,
+      "retiro": 1000000
+    },
+    "due_checks": {
+      "2026-09-07": [],
+      "2026-09-08": [],
+      "2026-09-09": [],
+      "2026-09-10": [],
+      "2026-09-11": [
+        [
+          "FGOAL_MOTO",
+          true,
+          [
+            "mv20260911-cccccc"
+          ]
+        ]
+      ],
+      "2026-09-12": [],
+      "2026-09-13": [],
+      "2026-09-14": [],
+      "2026-09-15": [],
+      "2026-09-16": [],
+      "2026-09-17": [],
+      "2026-09-18": [
+        [
+          "FGOAL_MOTO",
+          false,
+          []
+        ]
+      ],
+      "2026-09-19": [],
+      "2026-09-20": []
+    },
+    "format_money": {
+      "-120000000": "-$ 1.200.000",
+      "0": "$ 0",
+      "1": "$ 0",
+      "1250000": "$ 12.500",
+      "49": "$ 0",
+      "50": "$ 1",
+      "99": "$ 1"
+    },
+    "format_money_usd": "$ 12,50",
+    "history_moto": {
+      "days": [
+        [
+          "2026-09-11",
+          5000000,
+          [
+            "mv20260911-cccccc"
+          ]
+        ],
+        [
+          "2026-09-12",
+          -1000000,
+          [
+            "mv20260912-dddddd"
+          ]
+        ]
+      ],
+      "months": [
+        [
+          "2026-09",
+          4000000
+        ]
+      ]
+    },
+    "month_totals": {
+      "ahorro": 14000000,
+      "balance": 335750000,
+      "gasto": 1250000,
+      "ingreso": 350000000,
+      "retiro": 1000000
+    },
+    "pace_moto_on_fixed_day": {
+      "days_left": 49,
+      "per_day": 320000,
+      "per_month": 9600000,
+      "per_week": 2240000,
+      "remaining": 16000000,
+      "saved": 4000000
+    },
+    "projection_moto_on_fixed_day": "2027-01-10",
+    "saved": {
+      "FGOAL_MOTO": 4000000,
+      "FGOAL_TRIP": 9000000
+    },
+    "status": {
+      "FGOAL_MOTO": "Activa",
+      "FGOAL_TRIP": "Cumplida"
+    },
+    "week_totals": {
+      "ahorro": 14000000,
+      "balance": 335750000,
+      "gasto": 1250000,
+      "ingreso": 350000000,
+      "retiro": 1000000
+    }
+  },
   "goals": {
     "adherence_7_on_14": 0.3333333333333333,
     "due_on": {

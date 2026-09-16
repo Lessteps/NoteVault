@@ -1,0 +1,13 @@
+{
+  "movements": [
+    {
+      "id": "mv20260909-ffffff",
+      "type": "ahorro",
+      "amount_cents": 9000000,
+      "currency": "COP",
+      "goal": "FGOAL_TRIP",
+      "attachments": [],
+      "created": "2026-09-09T10:00"
+    }
+  ]
+}

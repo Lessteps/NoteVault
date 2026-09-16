@@ -288,17 +288,8 @@ def parse_money(text: str) -> Optional[int]:
 
 
 def format_money(cents: int, currency: str = "COP", sign: bool = False) -> str:
-    cents = int(cents or 0)
-    neg = cents < 0
-    cents = abs(cents)
-    if currency == "COP":
-        whole = round(cents / 100)
-        text = f"{whole:,}".replace(",", ".")
-    else:
-        whole, rest = divmod(cents, 100)
-        text = f"{whole:,}".replace(",", ".") + f",{rest:02d}"
-    prefix = "-" if neg else ("+" if sign and cents else "")
-    return f"{prefix}$ {text}"
+    from ....core.finance_manager import format_money as _fmt
+    return _fmt(cents, currency, sign)
 
 
 class MoneyEdit(QLineEdit):

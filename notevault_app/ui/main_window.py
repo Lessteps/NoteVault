@@ -24,6 +24,7 @@ from ..core import reminder_scheduler
 from ..core.schedule_manager import ScheduleManager
 from ..core.area_manager import AreaManager
 from ..core.goal_manager import GoalManager, GoalCalendarSource
+from ..core.finance_manager import FinanceManager, FinanceCalendarSource
 from ..core.notifier import Notifier, app_icon
 from ..core.notes_service import NotesService
 from . import theme
@@ -46,6 +47,7 @@ from .components.calendario.calendario_panel import CalendarioPanel
 from .components.calendario.calendario_left_panel import CalendarioLeftPanel
 from .components.metas.metas_panel import MetasPanel
 from .components.metas.metas_left_panel import MetasLeftPanel
+from .components.finanzas.finanzas_panel import FinanzasPanel, FinanzasLeftPanel
 
 CENTER_PANEL_INDEX = 1
 
@@ -108,6 +110,8 @@ class MainWindow(QMainWindow):
             task_mgr=self.tasks, project_mgr=self.projects)
         self.schedule_mgr.register_source("metas", GoalCalendarSource(self.goals))
         self.schedule_mgr.register_source("proyectos", ProjectCalendarSource(self.projects))
+        self.finances     = FinanceManager(vault_path)
+        self.schedule_mgr.register_source("finanzas", FinanceCalendarSource(self.finances))
         self.notes        = NotesService(self.vault)
 
     # ── Build UI ──────────────────────────────────────────────────────────
@@ -166,8 +170,7 @@ class MainWindow(QMainWindow):
         self._left_stack.addWidget(self._calendario_left) # 6 — calendario
         self._metas_left = MetasLeftPanel(self.goals, self.areas)
         self._left_stack.addWidget(self._metas_left)      # 7 — metas
-        self._finanzas_left = QWidget()
-        self._finanzas_left.setObjectName("sidebarPanel")
+        self._finanzas_left = FinanzasLeftPanel(self.finances)
         self._left_stack.addWidget(self._finanzas_left)   # 8 — finanzas
 
         # ── Center stack ──────────────────────────────────────────────────
@@ -180,7 +183,7 @@ class MainWindow(QMainWindow):
         self._proj_panel       = ProyectosPanel(self.projects, self.areas)
         self._dashboard        = DashboardPanel(
             self.habits, self.exercise_mgr, self.tasks, self.projects,
-            goals=self.goals, areas=self.areas)
+            goals=self.goals, areas=self.areas, finances=self.finances)
         self._calendario_panel = CalendarioPanel(self.schedule_mgr)
 
         self._center_stack.addWidget(self._habit_panel)      # 0
@@ -192,7 +195,10 @@ class MainWindow(QMainWindow):
         self._center_stack.addWidget(self._calendario_panel) # 6 — calendario
         self._metas_panel = MetasPanel(self.goals, self.areas, self.habits)
         self._center_stack.addWidget(self._metas_panel)      # 7 — metas
-        self._finanzas_panel = _placeholder("💰  Finanzas — próximamente")
+        self._finanzas_panel = FinanzasPanel(self.finances)
+        self._finanzas_left.view_requested.connect(self._finanzas_panel.show_view)
+        self._finanzas_panel.view_changed.connect(self._finanzas_left.set_view)
+        self._finanzas_panel.data_changed.connect(self._finanzas_left.refresh)
         self._center_stack.addWidget(self._finanzas_panel)   # 8 — finanzas
 
         # ── Right stack ───────────────────────────────────────────────────
@@ -239,6 +245,7 @@ class MainWindow(QMainWindow):
         self._dashboard.go_proyectos.connect(lambda: self._switch_mode(MODE_PROYECTOS))
         self._dashboard.go_notas.connect(lambda: self._switch_mode(MODE_NOTAS))
         self._dashboard.go_metas.connect(lambda: self._switch_mode(MODE_METAS))
+        self._dashboard.go_finanzas.connect(lambda: self._switch_mode(MODE_FINANZAS))
         self._dashboard.goal_opened.connect(self._open_goal)
         self._calendario_panel.open_module_requested.connect(self._open_module_link)
 
@@ -414,7 +421,8 @@ class MainWindow(QMainWindow):
         self._apply_mode_layout()
 
     def _refresh_finanzas(self):
-        """Filled in by the Finanzas module."""
+        self._finanzas_panel.refresh()
+        self._finanzas_left.refresh()
 
     def _open_goal(self, gid: str, item_id: str = ""):
         self._switch_mode(MODE_METAS)
@@ -433,6 +441,8 @@ class MainWindow(QMainWindow):
                 self._proj_panel.open_project(link["id"], link.get("issue", ""))
         elif source == "finanzas":
             self._switch_mode(MODE_FINANZAS)
+            if link.get("id"):
+                self._finanzas_panel.open_goal(link["id"])
 
     def _apply_mode_layout(self):
         show_left  = self._mode in (MODE_HABITS, MODE_NOTAS, MODE_EJERCICIO,
@@ -527,6 +537,8 @@ class MainWindow(QMainWindow):
         self._calendario_left.schedule_mgr = self.schedule_mgr
         self._metas_panel.set_managers(self.goals, self.areas, self.habits)
         self._metas_left.set_managers(self.goals, self.areas)
+        self._finanzas_panel.set_manager(self.finances)
+        self._finanzas_left.set_manager(self.finances)
         self._explorer.set_vault(self.vault, self.notes)
         self._notas_center.set_vault(self.vault, self.notes)
         self._habit_panel.set_manager(self.habits)
@@ -538,7 +550,7 @@ class MainWindow(QMainWindow):
         self._proj_left.set_manager(self.projects)
         self._dashboard.set_managers(
             self.habits, self.exercise_mgr, self.tasks, self.projects,
-            goals=self.goals, areas=self.areas)
+            goals=self.goals, areas=self.areas, finances=self.finances)
         self.status_bar.showMessage(f"Vault: {vault_path.name}")
 
     # ── Notes helpers ─────────────────────────────────────────────────────

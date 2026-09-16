@@ -1,0 +1,10 @@
+{
+  "id": "comida",
+  "name": "Comida",
+  "icon": "🍽",
+  "colour": "#f4511e",
+  "kind": "gasto",
+  "budget_month_cents": 60000000,
+  "order": 1,
+  "archived": false
+}

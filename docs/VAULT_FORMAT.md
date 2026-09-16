@@ -462,6 +462,85 @@ desmarca el hábito. Una marca manual nunca se quita.
   del fin de la meta.
 - Rama: media de sus hijas. Meta: media de sus submetas de primer nivel.
 
+## Finanzas
+
+```
+.notevault/finanzas/
+├── categorias/<cat-id>.json          una categoría por archivo
+├── metas/<fgoal-id>.json             una meta financiera por archivo
+├── AAAA/MM/AAAA-MM-DD.json           movimientos del día
+└── adjuntos/AAAA/MM/<mov-id>-<n>.png facturas y referencias
+```
+
+**Los importes son siempre enteros en centavos** (`amount_cents`,
+`target_cents`…), en disco y en memoria; solo se formatean al mostrarlos. En
+COP se muestra `$ 12.500` (punto de miles, sin decimales, redondeo a la
+unidad); otras monedas con dos decimales (`$ 12,50`).
+
+### `categorias/<cat-id>.json`
+
+```json
+{"id": "comida", "name": "Comida", "icon": "🍽", "colour": "#f4511e",
+ "kind": "gasto", "budget_month_cents": 60000000, "order": 1, "archived": false}
+```
+
+Claves en ese orden (`CATEGORY_KEYS`). `kind` ∈ `gasto` · `ingreso`. El id es el
+nombre sin tildes con guiones. Si la carpeta está vacía se crean: Comida,
+Transporte, Vivienda, Servicios, Salud, Educación, Ocio, Compras, Otros
+(gasto) y Salario, Extra, Regalo (ingreso).
+
+### `metas/<fgoal-id>.json`
+
+Id `fYYYYMMDD-xxxxxx`. Claves en el orden de `FINANCE_GOAL_KEYS`:
+
+```json
+{
+  "id": "f20260914-a1b2c3", "name": "Moto", "icon": "🏍", "colour": "#33b679",
+  "target_cents": 1200000000, "currency": "COP",
+  "start": "2026-09-14", "deadline": "2027-06-30",
+  "show_in_daily": true,
+  "cadence": {"mode": "rule", "rule": "weekly:4"},
+  "suggested_cents": 5000000, "status": "Activa",
+  "created": "2026-09-14", "notes": ""
+}
+```
+
+- `cadence`: `{"mode": "rule", "rule": <regla de Repetición>}` — la casilla
+  «Ahorro Moto» aparece en Diario los días en que cae la regla (ancla `start`);
+  o `{"mode": "period", "period": "week" | "month"}` — aparece todos los días
+  del periodo y queda marcada en cuanto hay un ahorro de la meta en él.
+- Solo aparece en Diario si `show_in_daily` es `true` y `status` es `Activa`.
+- `status` ∈ `Activa` · `En pausa` · `Cumplida`. Pasa sola a `Cumplida` cuando lo
+  ahorrado llega a `target_cents`, y vuelve a `Activa` si un retiro lo baja. Una
+  meta en pausa no cambia sola. Nunca se borra del historial.
+
+### `AAAA/MM/AAAA-MM-DD.json`
+
+```json
+{
+  "movements": [
+    {"id": "mv20260914-0f1e2d", "type": "gasto", "amount_cents": 1250000,
+     "currency": "COP", "category": "comida", "what": "Almuerzo",
+     "reason": "Día de oficina", "time": "13:10",
+     "attachments": ["finanzas/adjuntos/2026/09/mv20260914-0f1e2d-1.png"],
+     "created": "2026-09-14T13:12"}
+  ]
+}
+```
+
+- Claves en el orden de `MOVEMENT_KEYS`: `id`, `type`, `amount_cents`,
+  `currency` siempre; `category`, `goal`, `what`, `reason`, `time` solo si
+  tienen valor; `attachments` siempre (lista, puede ir vacía); `created` si
+  existe; las claves desconocidas al final.
+- `type` ∈ `gasto` · `ingreso` · `ahorro` (a una meta, o ahorro general si no
+  hay `goal`) · `retiro` (sale de un ahorro).
+- Balance = ingresos − gastos − ahorros + retiros.
+- Un día sin movimientos no deja archivo. Mover un movimiento de día escribe
+  primero el día nuevo y después el viejo.
+- Borrar un movimiento manda sus adjuntos a `.papelera/finanzas-adjuntos/`.
+
+`EXPECTED.json` (`finance`) fija totales, cadencias y bytes.
+
 ## Marcadores
 
 ### `.notevault-bookmarks.json`

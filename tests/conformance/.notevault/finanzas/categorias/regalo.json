@@ -1,0 +1,10 @@
+{
+  "id": "regalo",
+  "name": "Regalo",
+  "icon": "🎁",
+  "colour": "#e67c73",
+  "kind": "ingreso",
+  "budget_month_cents": 0,
+  "order": 12,
+  "archived": false
+}

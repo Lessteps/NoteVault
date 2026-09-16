@@ -1,0 +1,10 @@
+{
+  "id": "ocio",
+  "name": "Ocio",
+  "icon": "🎮",
+  "colour": "#e67c73",
+  "kind": "gasto",
+  "budget_month_cents": 0,
+  "order": 7,
+  "archived": false
+}

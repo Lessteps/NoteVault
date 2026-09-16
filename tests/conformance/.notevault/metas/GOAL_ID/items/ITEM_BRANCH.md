@@ -5,5 +5,5 @@ name: "Aprender Django"
 status: "Pendiente"
 priority: 2
 order: 2
-created: 2026-09-14
+created: 2026-09-16
 ---

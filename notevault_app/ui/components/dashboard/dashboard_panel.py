@@ -54,11 +54,12 @@ class DashboardPanel(QWidget):
     go_proyectos = Signal()
     go_notas     = Signal()
     go_metas     = Signal()
+    go_finanzas  = Signal()
     goal_opened  = Signal(str)
     data_changed = Signal()
 
     def __init__(self, habits: HabitManager, exercises: ExerciseManager,
-                 tasks: TaskManager, projects: ProjectManager, goals=None, areas=None,
+                 tasks: TaskManager, projects: ProjectManager, goals=None, areas=None, finances=None,
                  parent=None):
         super().__init__(parent)
         self.setObjectName("centerPanel")
@@ -68,6 +69,7 @@ class DashboardPanel(QWidget):
         self.projects = projects
         self.goals = goals
         self.areas = areas
+        self.finances = finances
         self._init_ui()
 
     # ── UI ────────────────────────────────────────────────────────────────
@@ -136,6 +138,8 @@ class DashboardPanel(QWidget):
         grid.addWidget(self._exercise_card(today), top, 1)
         grid.addWidget(self._tasks_card(today),    top + 1, 0)
         grid.addWidget(self._projects_card(today), top + 1, 1)
+        if self.finances is not None:
+            grid.addWidget(self._finance_card(today), top + 2, 0)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         self._page.addLayout(grid)
@@ -480,6 +484,57 @@ class DashboardPanel(QWidget):
         from PySide6.QtCore import QTimer
         QTimer.singleShot(0, self.refresh)
 
+    # Finances ----------------------------------------------------------
+
+    def _finance_card(self, today: date) -> QWidget:
+        from ....core import finance_manager as fin
+        from ..comun.widgets import Check
+        fm = self.finances
+        day = fin.totals(fm.day(today))
+        this, prev = fm.compare_month(today.year, today.month)
+        checks = fm.due_checks(today)
+        card, lay = self._card("💰", "Finanzas", "#eab308", f"hoy {fin.format_money(day[fin.GASTO])}")
+        rows = [("Gasto de hoy", fin.format_money(day[fin.GASTO]), RED if day[fin.GASTO] else TEXT_DIM),
+                ("Gasto del mes", fin.format_money(this[fin.GASTO]), TEXT)]
+        if prev[fin.GASTO]:
+            diff = this[fin.GASTO] - prev[fin.GASTO]
+            pct = round(100 * diff / prev[fin.GASTO])
+            rows.append(("vs mes anterior", f"{fin.format_money(prev[fin.GASTO])} ({'+' if pct >= 0 else ''}{pct} %)",
+                         RED if diff > 0 else GREEN))
+        rows.append(("Balance del mes", fin.format_money(this["balance"], sign=True),
+                     GREEN if this["balance"] >= 0 else RED))
+        for text, value, colour in rows:
+            r = QHBoxLayout()
+            a = QLabel(text)
+            a.setStyleSheet(f"color:{TEXT_DIM};font-size:12px;background:transparent;border:none;")
+            b = QLabel(value)
+            b.setStyleSheet(f"color:{colour};font-size:12px;font-weight:600;background:transparent;border:none;")
+            r.addWidget(a)
+            r.addStretch()
+            r.addWidget(b)
+            lay.addLayout(r)
+        if checks:
+            lay.addWidget(self._empty("Ahorros de hoy:"))
+        for goal, checked, _ids in checks:
+            r = QHBoxLayout()
+            cb = Check(checked, goal["colour"], 15)
+            cb.toggled_by_user.connect(lambda v, g=goal: self._toggle_saving(g, v))
+            r.addWidget(cb)
+            n = QLabel(f"{goal['icon']}  Ahorro {goal['name']}"
+                       + (f" — {fin.format_money(goal['suggested_cents'])}" if goal["suggested_cents"] else ""))
+            n.setStyleSheet(f"color:{'#63636c' if checked else TEXT};font-size:12px;background:transparent;border:none;")
+            r.addWidget(n, 1)
+            lay.addLayout(r)
+        lay.addStretch()
+        return card
+
+    def _toggle_saving(self, goal, value: bool):
+        from ....core.finance_manager import FinanceCalendarSource
+        FinanceCalendarSource(self.finances).set_done(date.today(), f"saving:{goal['id']}", value)
+        self.data_changed.emit()
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self.refresh)
+
     # Goals -------------------------------------------------------------
 
     def _goals_card(self, today: date) -> QWidget:
@@ -570,6 +625,7 @@ class DashboardPanel(QWidget):
             ("☑  Tareas",    BLUE,      self.go_tareas),
             ("◫  Proyectos", "#a78bfa", self.go_proyectos),
             ("🎯  Metas",    "#33b679", self.go_metas),
+            ("💰  Finanzas", "#eab308", self.go_finanzas),
             ("✎  Notas",     TEXT_DIM,  self.go_notas),
         ]:
             b = flat_btn(text, TEXT_DIM, accent, height=30)
@@ -614,11 +670,12 @@ class DashboardPanel(QWidget):
             elif item.layout():
                 self._clear(item.layout())
 
-    def set_managers(self, habits, exercises, tasks, projects, goals=None, areas=None):
+    def set_managers(self, habits, exercises, tasks, projects, goals=None, areas=None, finances=None):
         self.habits = habits
         self.exercises = exercises
         self.tasks = tasks
         self.projects = projects
         self.goals = goals
         self.areas = areas
+        self.finances = finances
         self.refresh()

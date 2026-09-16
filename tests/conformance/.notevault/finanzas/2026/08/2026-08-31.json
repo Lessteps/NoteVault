@@ -1,0 +1,12 @@
+{
+  "movements": [
+    {
+      "id": "mv20260831-eeeeee",
+      "type": "gasto",
+      "amount_cents": 99,
+      "currency": "COP",
+      "attachments": [],
+      "created": "2026-08-31T23:59"
+    }
+  ]
+}

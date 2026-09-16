@@ -170,6 +170,10 @@ class SpreadsheetTable(QTableView):
             flush()
             rows = out
         self.model_.set_rows(rows)
+        self.clearSpans()
+        for i, r in enumerate(rows):
+            if r.get("_kind") == "group":
+                self.setSpan(i, 0, 1, len(self.model_.columns))
 
     def _activated(self, index):
         row = self.model_.rows[index.row()]

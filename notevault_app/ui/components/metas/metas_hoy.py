@@ -133,6 +133,7 @@ class TodayList(QWidget):
 
     def _toggle(self, goal, item, value):
         self.goal_mgr.set_done(goal.id, item.id, self.day, value)
+        self.refresh()
         self.data_changed.emit()
 
     def _value(self, goal, item, text):
@@ -144,7 +145,9 @@ class TodayList(QWidget):
             self.goal_mgr.set_done(goal.id, item.id, self.day, False)
         else:
             self.goal_mgr.set_done(goal.id, item.id, self.day, False, value=number)
+        self.refresh()
         self.data_changed.emit()
+
 
 
 class MetasHoy(QWidget):

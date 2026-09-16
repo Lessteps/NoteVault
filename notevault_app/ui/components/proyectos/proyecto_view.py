@@ -248,7 +248,13 @@ class ProyectoView(QWidget):
                                           parent=parent or "", type=kind)
         self._changed()
         if issue:
-            self.open_issue(issue.id)
+            if parent:
+                parent_fresh = self.manager.get_issue(self.project.id, parent)
+                if parent_fresh:
+                    self.detail.load(self.project, parent_fresh)
+            else:
+                self.open_issue(issue.id)
+
 
     def _board_for_goal(self, goal_id):
         self.show_tab("tablero")

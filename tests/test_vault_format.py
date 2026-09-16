@@ -431,8 +431,8 @@ def _build_sample(vault) -> tuple:
     em.mark_done(FIXED_DAY, em.exercises()[0]["id"], True, 60.0, 5, "fácil")
 
     tm = TaskManager(vault)
-    task = tm.create("Ensayo de historia", subject="Historia",
-                     due=date(2026, 9, 20), start=FIXED_DAY, priority=2,
+    task = tm.create("Ensayo de historia", created=date(2026, 9, 14), subject="Historia",
+                     due=date(2026, 9, 20), start=date(2026, 9, 12), priority=2,
                      reminder=datetime(2026, 9, 19, 18, 0))
     tm.update(task.id, body="# Ensayo\n\n- Buscar fuentes\n",
               repeat="weekly:0,3", repeat_until=date(2026, 10, 31))

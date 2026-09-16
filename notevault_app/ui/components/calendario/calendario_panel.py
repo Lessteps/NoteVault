@@ -200,6 +200,12 @@ class CalendarioPanel(QWidget):
 
     def refresh_current(self):
         self.schedule_mgr.task_mgr.tasks(force=True)
+        if hasattr(self.schedule_mgr, "project_mgr"):
+            self.schedule_mgr.project_mgr.projects(force=True)
+        metas_source = getattr(self.schedule_mgr, "_sources", {}).get("metas")
+        if metas_source and hasattr(metas_source, "manager"):
+            metas_source.manager._goals_cache = None
+            metas_source.manager._items_cache.clear()
         self.stack.currentWidget().refresh()
         self._update_header_title()
 

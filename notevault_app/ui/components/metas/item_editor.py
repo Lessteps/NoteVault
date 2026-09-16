@@ -29,6 +29,7 @@ class ItemEditor(QWidget):
     saved = Signal(str)             # item id
     deleted = Signal(str)
     add_child_requested = Signal(str)
+    open_full_requested = Signal(str)
     closed = Signal()
 
     def __init__(self, goal_mgr, habit_mgr, parent=None):
@@ -76,6 +77,16 @@ class ItemEditor(QWidget):
         self.priority = priority_combo(2, 30)
         grid.addWidget(self.status, 1, 0)
         grid.addWidget(self.priority, 1, 1)
+
+        grid.addWidget(label("Categoría", TEXT_DIM, 11), 2, 0)
+        grid.addWidget(label("Modo de interfaz", TEXT_DIM, 11), 2, 1)
+        self.category = combo([], 30)
+        self.category.setEditable(True)
+        self.is_priority_cb = QCheckBox("⭐ Prioritaria (detallada)")
+        self.is_priority_cb.setToolTip("Activa tarjeta visual con métricas e interfaz propia de submeta")
+        self.is_priority_cb.setStyleSheet(CHECK_SS)
+        grid.addWidget(self.category, 3, 0)
+        grid.addWidget(self.is_priority_cb, 3, 1)
         v.addLayout(grid)
 
         v.addSpacing(4)
@@ -105,6 +116,10 @@ class ItemEditor(QWidget):
         self.in_calendar.setStyleSheet(CHECK_SS)
         trow.addWidget(self.in_calendar, 3, 1)
         v.addLayout(trow)
+
+        self.due.changed.connect(lambda d: d and self.in_calendar.setChecked(True))
+        self.time.currentIndexChanged.connect(
+            lambda _: self.time.currentData() and self.in_calendar.setChecked(True))
 
         v.addSpacing(4)
         v.addWidget(_section("Meta medible (opcional)"))
@@ -141,9 +156,13 @@ class ItemEditor(QWidget):
         self.delete_btn = flat_btn("Eliminar", RED, RED, height=32)
         self.delete_btn.clicked.connect(self._delete)
         buttons.addWidget(self.delete_btn)
-        self.child_btn = flat_btn("+ Submeta dentro", height=32)
+        self.child_btn = flat_btn("+ Submeta", height=32)
         self.child_btn.clicked.connect(lambda: self.item and self.add_child_requested.emit(self.item.id))
         buttons.addWidget(self.child_btn)
+        self.full_view_btn = flat_btn("🔍 Interfaz ›", BLUE, height=32)
+        self.full_view_btn.setToolTip("Abrir la interfaz propia y detallada de esta submeta")
+        self.full_view_btn.clicked.connect(lambda: self.item and self.open_full_requested.emit(self.item.id))
+        buttons.addWidget(self.full_view_btn)
         buttons.addStretch()
         save = primary_btn("Guardar", height=32)
         save.clicked.connect(self._save)
@@ -168,12 +187,36 @@ class ItemEditor(QWidget):
         self.status.setCurrentIndex(max(0, self.status.findData(item.status)))
         self.status.setEnabled(not branch)
         self.priority.setCurrentIndex(max(0, self.priority.findData(item.priority)))
+
+        # Categorías sugeridas + existentes
+        current_cat = item.category
+        cats = ["", "Teoría", "Práctica", "Ejercicios", "Proyectos", "Lectura", "Conceptos", "Repaso"]
+        for c in self.goal_mgr.categories(goal.id):
+            if c and c not in cats:
+                cats.append(c)
+        if current_cat and current_cat not in cats:
+            cats.append(current_cat)
+        self.category.blockSignals(True)
+        self.category.clear()
+        for c in cats:
+            self.category.addItem(c if c else "Sin categoría", c)
+        idx = self.category.findData(current_cat)
+        if idx >= 0:
+            self.category.setCurrentIndex(idx)
+        else:
+            self.category.setEditText(current_cat)
+        self.category.blockSignals(False)
+
+        self.is_priority_cb.setChecked(item.is_priority)
+
         self.repeat.set_value(item.repeat, item.start, item.repeat_until)
         self.due.set_value(item.due)
         set_time(self.time, item.due_time or None)
         set_duration(self.duration, item.duration_min or 60)
         set_reminder(self.reminder, item.reminder_min)
-        self.in_calendar.setChecked(item.in_calendar)
+        self.in_calendar.setChecked(
+            item.in_calendar or bool(item.due or item.due_time or item.repeat)
+        )
         self.target.setText(fmt_num(item.target) if item.target is not None else "")
         self.unit.setText(item.unit)
         self.value.setText(fmt_num(item.value) if item.value is not None else "")
@@ -203,17 +246,26 @@ class ItemEditor(QWidget):
         if target is not None and target <= 0:
             target = None
         rule = self.repeat.rule()
+        due_val = None if rule else self.due.value()
+        time_val = self.time.currentData() or ""
+        in_cal = self.in_calendar.isChecked() or bool(due_val and time_val)
+        cat_text = self.category.currentText().strip()
+        if cat_text.lower() in ("sin categoría", "sin categoria"):
+            cat_text = ""
+
         fields = dict(
             name=self.name.text().strip() or self.item.name,
+            category=cat_text,
+            is_priority=self.is_priority_cb.isChecked(),
             priority=self.priority.currentData(),
             repeat=rule,
             start=self.repeat.start() if rule else None,
             repeat_until=self.repeat.end() if rule else None,
-            due=None if rule else self.due.value(),
-            due_time=self.time.currentData() or "",
-            duration_min=self.duration.currentData() if self.time.currentData() else None,
-            reminder_min=self.reminder.currentData() if self.time.currentData() else None,
-            in_calendar=self.in_calendar.isChecked(),
+            due=due_val,
+            due_time=time_val,
+            duration_min=self.duration.currentData() if time_val else None,
+            reminder_min=self.reminder.currentData() if time_val else None,
+            in_calendar=in_cal,
             target=target, unit=self.unit.text().strip() if target else "",
             value=(parse_num(self.value.text()) if self.value.text().strip() and not rule else None),
             habit_links=self.habits.selected(),

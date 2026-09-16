@@ -77,8 +77,9 @@ class Project:
         self.done_column: str = values.get("done_column") or self.columns[-1]
         if self.done_column not in self.columns:
             self.columns.append(self.done_column)
-        self.in_calendar: bool = bool(values.get("in_calendar"))
+        self.in_calendar: bool = bool(values.get("in_calendar", False))
         self.description = description
+
         self.extra = dict(extra or {})
 
     # Names the rest of the app used before FORMAT_VERSION 4.
@@ -122,8 +123,9 @@ class Issue:
         self.due_time: str = values.get("due_time") or ""
         self.repeat: str = Recurrence.parse(values.get("repeat")).to_string()
         self.repeat_until: Optional[date] = values.get("repeat_until")
-        self.in_calendar: bool = bool(values.get("in_calendar"))
+        self.in_calendar: bool = bool(values.get("in_calendar", False))
         self.reminder: Optional[datetime] = values.get("reminder")
+
         self.reminder_done: bool = bool(values.get("reminder_done"))
         self.done_at: Optional[date] = values.get("done_at")
         self.attachments: list = list(values.get("attachments") or [])
@@ -647,6 +649,7 @@ class ProjectStats:
 
 class ProjectCalendarSource:
     prefix = "issue:"
+    prefixes = ("issue:", "project:")
 
     def __init__(self, manager: ProjectManager):
         self.manager = manager
@@ -655,6 +658,15 @@ class ProjectCalendarSource:
         from .schedule_manager import Occurrence
         out: dict = {}
         for p in self.manager.projects():
+            if p.in_calendar and p.deadline and first <= p.deadline <= last:
+                out.setdefault(p.deadline, []).append(Occurrence(
+                    id=f"project:{p.id}",
+                    title=f"🏁 {p.name}",
+                    kind="project", date=p.deadline, start=None,
+                    duration_min=None, colour=p.colour,
+                    links=[{"type": "project", "id": p.id}],
+                    done=(p.status == P_DONE), source="proyectos", editable=False,
+                ))
             if p.status == P_DONE:
                 continue
             for i in self.manager.issues(p.id):
@@ -676,6 +688,12 @@ class ProjectCalendarSource:
         return out
 
     def set_done(self, d: date, occurrence_id: str, done: bool):
+        if occurrence_id.startswith("project:"):
+            pid = occurrence_id[len("project:"):]
+            project = self.manager.get(pid)
+            if project is not None:
+                self.manager.update(pid, status=P_DONE if done else P_ACTIVE)
+            return
         pid, _, xid = occurrence_id[len(self.prefix):].partition("/")
         project = self.manager.get(pid)
         if project is None:

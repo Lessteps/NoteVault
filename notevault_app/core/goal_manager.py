@@ -97,6 +97,28 @@ class GoalItem:
         self.extra = dict(extra or {})
         self.children: list = []
 
+    @property
+    def category(self) -> str:
+        return str(self.extra.get("category") or "").strip()
+
+    @category.setter
+    def category(self, val: str):
+        v = (val or "").strip()
+        if v:
+            self.extra["category"] = v
+        else:
+            self.extra.pop("category", None)
+
+    @property
+    def is_priority(self) -> bool:
+        if "is_priority" in self.extra:
+            return bool(self.extra["is_priority"])
+        return self.priority >= 3 or bool(self.children)
+
+    @is_priority.setter
+    def is_priority(self, val: bool):
+        self.extra["is_priority"] = bool(val)
+
     def values(self) -> dict:
         return {k: getattr(self, k) for k, _t in vault_format.GOAL_ITEM_FIELDS}
 
@@ -263,6 +285,8 @@ class GoalManager:
                 setattr(obj, k, v)
             elif k == text_key:
                 setattr(obj, "description" if text_key == "description" else "notes", v or "")
+            elif k in ("category", "is_priority"):
+                setattr(obj, k, v)
 
     # ── Items ─────────────────────────────────────────────────────────────
 
@@ -403,7 +427,9 @@ class GoalManager:
             self.move_item(gid, iid, parent.parent, grand.index(parent) + 1)
 
     def descendants(self, item: GoalItem) -> list:
-        out, stack = [], list(item.children)
+        current = self.get_item(item.goal, item.id) if (item and getattr(item, "goal", None)) else item
+        current = current or item
+        out, stack = [], list(current.children)
         while stack:
             cur = stack.pop()
             out.append(cur)
@@ -473,13 +499,25 @@ class GoalManager:
             return self.is_done_on(item, d or _today())
         return all(self.branch_done(c, d) for c in item.children)
 
-    def set_done(self, gid: str, iid: str, d: date, done: bool, value=None,
+    def set_done(self, gid, iid=None, d: Optional[date] = None, done: Optional[bool] = None, value=None,
                  at: Optional[str] = None) -> Optional[GoalItem]:
+        if isinstance(gid, GoalItem):
+            item_obj = gid
+            return self.set_done(item_obj.goal, item_obj.id, iid, d, value=value, at=at)
         item = self.get_item(gid, iid)
-        if item is None or not item.is_leaf:
+        if item is None:
+            return None
+        if not item.is_leaf:
+            for desc in self.descendants(item):
+                if desc.is_leaf:
+                    self.set_done(gid, desc.id, d, done, value=value, at=at)
+            item.status = ITEM_DONE if done else ITEM_TODO
+            item.done_at = d if done else None
+            self.save_item(item)
             return item
         if item.measurable and value is not None:
             done = value >= item.target
+
         if item.repeating:
             data = self.log(d)
             if done or value is not None:
@@ -571,17 +609,19 @@ class GoalManager:
 
     def item_progress(self, item: GoalItem, goal: Goal, today: Optional[date] = None) -> float:
         today = today or _today()
-        if not item.is_leaf:
-            return sum(self.item_progress(c, goal, today) for c in item.children) / len(item.children)
-        if item.repeating:
-            days = self.scheduled_days(item, goal, today)
+        current = self.get_item(item.goal, item.id) if (item and getattr(item, "goal", None)) else item
+        current = current or item
+        if not current.is_leaf:
+            return sum(self.item_progress(c, goal, today) for c in current.children) / len(current.children)
+        if current.repeating:
+            days = self.scheduled_days(current, goal, today)
             if not days:
                 return 0.0
-            return sum(1 for d in days if self.is_done_on(item, d)) / len(days)
-        if self.is_done_on(item, today):
+            return sum(1 for d in days if self.is_done_on(current, d)) / len(days)
+        if self.is_done_on(current, today):
             return 1.0
-        if item.measurable and isinstance(item.value, (int, float)):
-            return max(0.0, min(1.0, item.value / item.target))
+        if current.measurable and isinstance(current.value, (int, float)):
+            return max(0.0, min(1.0, current.value / current.target))
         return 0.0
 
     def progress(self, goal: Goal, today: Optional[date] = None) -> float:
@@ -602,6 +642,56 @@ class GoalManager:
             else:
                 done += 1 if self.is_done_on(item, today) else 0
         return done, len(leaves)
+
+    def item_leaves(self, item: GoalItem) -> list:
+        """Leaf sub-goals inside this item (or itself if it is a leaf)."""
+        current = self.get_item(item.goal, item.id) if (item and getattr(item, "goal", None)) else item
+        current = current or item
+        if current.is_leaf:
+            return [current]
+        return [i for i in self.descendants(current) if i.is_leaf]
+
+    def item_counts(self, item: GoalItem, goal: Goal, today: Optional[date] = None) -> tuple:
+        """(done leaves, total leaves) for this item's children or descendants."""
+        today = today or _today()
+        current = self.get_item(item.goal, item.id) if (item and getattr(item, "goal", None)) else item
+        current = current or item
+        leaves = [i for i in self.descendants(current) if i.is_leaf]
+        if not leaves:
+            leaves = [current]
+        done = 0
+        for leaf in leaves:
+            if leaf.repeating:
+                done += 1 if (leaf.occurs_on(today, goal) and self.is_done_on(leaf, today)) \
+                    or self.item_progress(leaf, goal, today) >= 1.0 else 0
+            else:
+                done += 1 if self.is_done_on(leaf, today) else 0
+        return done, len(leaves)
+
+    def item_adherence(self, item: GoalItem, goal: Goal, days: int = 7, today: Optional[date] = None) -> Optional[float]:
+        """Adherence of repeating checks inside this item (or itself) in the last `days` days."""
+        today = today or _today()
+        first = today - timedelta(days=days - 1)
+        scheduled = done = 0
+        leaves = [i for i in self.descendants(item) if i.is_leaf]
+        if not leaves:
+            leaves = [item]
+        for leaf in leaves:
+            if not leaf.repeating:
+                continue
+            for d in self.scheduled_days(leaf, goal, today):
+                if d >= first:
+                    scheduled += 1
+                    done += 1 if self.is_done_on(leaf, d) else 0
+        return done / scheduled if scheduled else None
+
+    def categories(self, gid: str) -> list:
+        """Sorted list of unique category names present in this goal's sub-goals."""
+        cats = set()
+        for item in self.items(gid):
+            if item.category:
+                cats.add(item.category)
+        return sorted(cats, key=lambda s: s.lower())
 
     def streak(self, item: GoalItem, goal: Goal, today: Optional[date] = None) -> int:
         today = today or _today()
@@ -710,9 +800,25 @@ class GoalCalendarSource:
     def occurrences(self, first: date, last: date) -> dict:
         from .schedule_manager import Occurrence
         out: dict = {}
-        for goal in self.manager.goals(FILTER_ACTIVE):
-            for item in self.manager.leaves(goal.id):
-                if not item.in_calendar:
+        for goal in self.manager.goals(FILTER_ALL):
+            if goal.status == STATUS_ARCHIVED:
+                continue
+            if goal.end and first <= goal.end <= last:
+                out.setdefault(goal.end, []).append(Occurrence(
+                    id=f"{self.prefix}{goal.id}",
+                    title=f"{goal.icon} 🏁 {goal.name}".strip(),
+                    kind="goal_item",
+                    date=goal.end,
+                    start=None,
+                    duration_min=None,
+                    colour=goal.colour or "#3f51b5",
+                    links=[{"type": "goal", "id": goal.id}],
+                    done=(goal.status == STATUS_DONE),
+                    source="metas",
+                    editable=False,
+                ))
+            for item in self.manager.items(goal.id):
+                if not (item.in_calendar or (item.due and item.due_time)):
                     continue
                 d = first
                 while d <= last:
@@ -737,4 +843,9 @@ class GoalCalendarSource:
 
     def set_done(self, d: date, occurrence_id: str, done: bool):
         gid, _, iid = occurrence_id[len(self.prefix):].partition("/")
+        if not iid:
+            goal = self.manager.get_goal(gid)
+            if goal is not None:
+                self.manager.update_goal(gid, status=STATUS_DONE if done else STATUS_ACTIVE)
+            return
         self.manager.set_done(gid, iid, d, done)

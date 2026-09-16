@@ -10,8 +10,9 @@ from ....core import vault_format
 from ....core.project_manager import TYPE_ICONS, TYPE_COLOURS, T_GOAL, T_SUBTASK
 from ..comun import (
     BG_CARD, BORDER, TEXT, TEXT_DIM, TEXT_FAINT, BLUE, RED, GREEN, UI_FONT, CHECK_SS, label,
-    combo, line_edit, flat_btn, primary_btn, clear_layout, chip,
+    combo, line_edit, flat_btn, primary_btn, clear_layout, chip, SubtasksWidget,
 )
+
 from ..comun.widgets import priority_combo, BlockProgress, Check
 from ..comun.attachment_strip import AttachmentStrip
 from ..programacion import (
@@ -80,9 +81,13 @@ class IssueDetail(QWidget):
             grid.addWidget(w, (r // 2) * 2 + 1, r % 2)
         v.addLayout(grid)
 
-        self.children_box = QVBoxLayout()
-        self.children_box.setSpacing(3)
-        v.addLayout(self.children_box)
+        self.subtasks_widget = SubtasksWidget(title="Subtareas", colour=GREEN, can_add=True)
+        self.subtasks_widget.subtask_added.connect(self._add_child_subtask)
+        self.subtasks_widget.subtask_toggled.connect(self._toggle_child_id)
+        self.subtasks_widget.subtask_deleted.connect(self._delete_child_id)
+        self.subtasks_widget.subtask_clicked.connect(self.open_issue.emit)
+        v.addWidget(self.subtasks_widget)
+
 
         v.addWidget(label("FECHAS", TEXT_FAINT, 10, True))
         dates = QGridLayout()
@@ -188,36 +193,47 @@ class IssueDetail(QWidget):
         self._render_children()
 
     def _render_children(self):
-        clear_layout(self.children_box)
+        if not self.issue:
+            self.subtasks_widget.set_items([])
+            return
         kids = self.issue.children
-        head = QHBoxLayout()
-        head.addWidget(label("HIJAS", TEXT_FAINT, 10, True))
-        if kids:
-            done = sum(1 for k in kids if k.is_done)
-            head.addWidget(BlockProgress(done / len(kids), GREEN, blocks=10, block=8))
-            head.addWidget(label(f"{done}/{len(kids)}", TEXT_DIM, 11))
-        head.addStretch()
-        add = flat_btn("+ Hija", height=24)
-        add.clicked.connect(lambda: self.issue and self.create_child.emit(self.issue.id))
-        head.addWidget(add)
-        self.children_box.addLayout(head)
+        items = []
         for k in kids:
-            row = QHBoxLayout()
-            cb = Check(k.is_done, GREEN, 14)
-            cb.toggled_by_user.connect(lambda v, kid=k: self._toggle_child(kid, v))
-            row.addWidget(cb)
-            name = label(f"{k.key}  {k.title}", TEXT_FAINT if k.is_done else TEXT, 12)
-            name.setCursor(Qt.PointingHandCursor)
-            name.mousePressEvent = lambda _e, kid=k.id: self.open_issue.emit(kid)
-            row.addWidget(name, 1)
-            row.addWidget(label(k.status, TEXT_DIM, 10))
-            self.children_box.addLayout(row)
+            items.append({
+                "id": k.id,
+                "title": f"{k.key}  {k.title}",
+                "done": k.is_done,
+                "badge": k.status,
+            })
+        self.subtasks_widget.set_items(items)
+
+    def _add_child_subtask(self, title: str):
+        if not self.issue or not self.project:
+            return
+        child = self.manager.create_issue(
+            self.project.id, title, parent=self.issue.id, type=T_SUBTASK,
+        )
+        self.saved.emit(self.issue.id)
+        self._reload()
+
+    def _toggle_child_id(self, kid_id: str, value: bool):
+        if not self.project:
+            return
+        column = self.project.done_column if value else self.project.columns[0]
+        self.manager.move(self.project.id, kid_id, column, 10 ** 6)
+        self.saved.emit(kid_id)
+        QTimer.singleShot(0, self._reload)
+
+    def _delete_child_id(self, kid_id: str):
+        if not self.project:
+            return
+        self.manager.delete_issue(self.project.id, kid_id)
+        self.saved.emit(self.issue.id)
+        self._reload()
 
     def _toggle_child(self, kid, value):
-        column = self.project.done_column if value else self.project.columns[0]
-        self.manager.move(self.project.id, kid.id, column, 10 ** 6)
-        self.saved.emit(kid.id)
-        QTimer.singleShot(0, self._reload)
+        self._toggle_child_id(kid.id, value)
+
 
     def _reload(self):
         if self.issue is None:

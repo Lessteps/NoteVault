@@ -152,6 +152,7 @@ class TaskManager:
         self.vault_root = Path(vault_root)
         self.tasks_dir = self.vault_root / vault_format.LAYOUT["tasks_dir"]
         self._cache: Optional[list] = None
+        self._stamp: Optional[tuple] = None
 
     # ── Paths ─────────────────────────────────────────────────────────────
 
@@ -160,10 +161,19 @@ class TaskManager:
 
     # ── Load / save ───────────────────────────────────────────────────────
 
+    @staticmethod
+    def _stamp_of(folder: Path, pattern: str):
+        try:
+            return tuple(sorted((p.as_posix(), p.stat().st_mtime_ns) for p in folder.glob(pattern)))
+        except OSError:
+            return ()
+
     def tasks(self, force: bool = False) -> list:
-        if self._cache is None or force:
+        stamp = self._stamp_of(self.tasks_dir, "*.md")
+        if force or self._cache is None or stamp != self._stamp:
             self._cache = self._load_all()
-        return self._cache
+            self._stamp = stamp
+        return list(self._cache)
 
     def _load_all(self) -> list:
         if not self.tasks_dir.exists():
@@ -271,8 +281,11 @@ class TaskManager:
     # ── CRUD ──────────────────────────────────────────────────────────────
 
     def create(self, name: str = "Nueva tarea", **fields) -> Task:
-        tid = f"t{date.today().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}"
-        task = Task(tid, name=name, created=date.today(), **fields)
+        created = fields.pop("created", None) or date.today()
+        if isinstance(created, str):
+            created = parse_date(created) or date.today()
+        tid = f"t{created.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}"
+        task = Task(tid, name=name, created=created, **fields)
         self.save(task)
         return task
 

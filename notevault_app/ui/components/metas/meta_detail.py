@@ -22,6 +22,8 @@ from ..comun.charts import HeatStrip, BarChart
 from .item_editor import ItemEditor
 from .metas_hoy import TodayList
 from .metas_board import date_line
+from .submetas_board import SubmetasBoard
+from .submeta_detail import SubmetaDetail
 
 TABS = (("submetas", "Submetas"), ("hoy", "Hoy"), ("historial", "Historial"), ("notas", "Notas"))
 
@@ -48,6 +50,7 @@ class MetaDetail(QWidget):
         super().__init__(parent)
         self.goal_mgr, self.area_mgr, self.habit_mgr = goal_mgr, area_mgr, habit_mgr
         self.goal = None
+        self._submeta_view = "cards"
         self.setStyleSheet(f"background:{BG_PAGE};")
         page = QVBoxLayout(self)
         page.setContentsMargins(22, 14, 22, 14)
@@ -105,6 +108,21 @@ class MetaDetail(QWidget):
             b.clicked.connect(lambda _c=False, k=key: self.show_tab(k))
             self.tab_buttons[key] = b
             tabs.addWidget(b)
+        tabs.addSpacing(14)
+
+        # Selector de vista de submetas (Tarjetas vs Árbol)
+        self.submeta_view_box = QWidget()
+        sv_lay = QHBoxLayout(self.submeta_view_box)
+        sv_lay.setContentsMargins(0, 0, 0, 0)
+        sv_lay.setSpacing(4)
+        self.btn_view_cards = flat_btn("▦ Tarjetas", height=28)
+        self.btn_view_cards.clicked.connect(lambda: self.switch_submeta_view("cards"))
+        self.btn_view_tree = flat_btn("📋 Árbol", height=28)
+        self.btn_view_tree.clicked.connect(lambda: self.switch_submeta_view("tree"))
+        sv_lay.addWidget(self.btn_view_cards)
+        sv_lay.addWidget(self.btn_view_tree)
+        tabs.addWidget(self.submeta_view_box)
+
         tabs.addStretch()
         self.add_btn = primary_btn("+  Submeta", 30)
         self.add_btn.clicked.connect(lambda: self._add_item(""))
@@ -114,7 +132,22 @@ class MetaDetail(QWidget):
         self.stack = QStackedWidget()
         page.addWidget(self.stack, stretch=1)
 
-        # Submetas
+        # ── Pestaña 0: Submetas (Stack con Tarjetas, Árbol y Detalle Propio) ──
+        self.submetas_container = QWidget()
+        sub_lay = QVBoxLayout(self.submetas_container)
+        sub_lay.setContentsMargins(0, 0, 0, 0)
+        sub_lay.setSpacing(0)
+
+        self.submetas_stack = QStackedWidget()
+
+        # 0.1: SubmetasBoard (Cards Dashboard)
+        self.submetas_board = SubmetasBoard(goal_mgr, habit_mgr)
+        self.submetas_board.submeta_opened.connect(self.open_submeta_detail)
+        self.submetas_board.new_submeta_requested.connect(self._add_item)
+        self.submetas_board.data_changed.connect(self._changed)
+        self.submetas_stack.addWidget(self.submetas_board)
+
+        # 0.2: Árbol con TreeList y ItemEditor
         split = QSplitter(Qt.Horizontal)
         split.setHandleWidth(8)
         split.setChildrenCollapsible(False)
@@ -132,11 +165,24 @@ class MetaDetail(QWidget):
         self.editor.saved.connect(self._item_saved)
         self.editor.deleted.connect(lambda _i: self._changed(keep_editor=False))
         self.editor.add_child_requested.connect(self._add_item)
+        self.editor.open_full_requested.connect(self.open_submeta_detail)
         self.editor.closed.connect(lambda: self.editor.hide())
         self.editor.hide()
         split.addWidget(self.editor)
         split.setStretchFactor(0, 1)
-        self.stack.addWidget(split)
+        self.split = split
+        self.submetas_stack.addWidget(split)
+
+        # 0.3: SubmetaDetail (Interfaz propia de la submeta)
+        self.submeta_detail = SubmetaDetail(goal_mgr, habit_mgr)
+        self.submeta_detail.back_requested.connect(self.close_submeta_detail)
+        self.submeta_detail.edit_requested.connect(self._open_item)
+        self.submeta_detail.submeta_opened.connect(self.open_submeta_detail)
+        self.submeta_detail.data_changed.connect(self._changed)
+        self.submetas_stack.addWidget(self.submeta_detail)
+
+        sub_lay.addWidget(self.submetas_stack)
+        self.stack.addWidget(self.submetas_container)
 
         # Hoy
         hoy = QWidget()
@@ -183,6 +229,10 @@ class MetaDetail(QWidget):
         self.goal_mgr, self.area_mgr, self.habit_mgr = goal_mgr, area_mgr, habit_mgr
         self.editor.set_managers(goal_mgr, habit_mgr)
         self.today.goal_mgr, self.today.area_mgr = goal_mgr, area_mgr
+        self.submetas_board.goal_mgr = goal_mgr
+        self.submetas_board.habit_mgr = habit_mgr
+        self.submeta_detail.goal_mgr = goal_mgr
+        self.submeta_detail.habit_mgr = habit_mgr
         self.goal = None
 
     # ── Loading ───────────────────────────────────────────────────────────
@@ -197,10 +247,56 @@ class MetaDetail(QWidget):
         for k, b in self.tab_buttons.items():
             b.setChecked(k == key)
         self.stack.setCurrentIndex([k for k, _t in TABS].index(key))
-        self.add_btn.setVisible(key == "submetas")
+        is_sub = (key == "submetas")
+        is_sub_detail = (self.submetas_stack.currentIndex() == 2)
+        self.submeta_view_box.setVisible(is_sub and not is_sub_detail)
+        self.add_btn.setVisible(is_sub and not is_sub_detail)
         self._tab = key
         if self.goal is not None:
             self._render_tab()
+
+    def switch_submeta_view(self, view: str):
+        self._submeta_view = view
+        if view == "cards":
+            self.submetas_stack.setCurrentIndex(0)
+            self.btn_view_cards.setStyleSheet(
+                f"QPushButton{{background:#1e293b;color:#ffffff;border:1px solid {BLUE};"
+                f"border-radius:6px;font-weight:700;padding:0 10px;font-size:12px;font-family:{UI_FONT};}}"
+            )
+            self.btn_view_tree.setStyleSheet(
+                f"QPushButton{{background:transparent;color:{TEXT_DIM};border:1px solid {BORDER};"
+                f"border-radius:6px;font-weight:500;padding:0 10px;font-size:12px;font-family:{UI_FONT};}}"
+                f"QPushButton:hover{{color:{TEXT};}}"
+            )
+            self.submetas_board.set_goal(self.goal)
+        else:
+            self.submetas_stack.setCurrentIndex(1)
+            self.btn_view_tree.setStyleSheet(
+                f"QPushButton{{background:#1e293b;color:#ffffff;border:1px solid {BLUE};"
+                f"border-radius:6px;font-weight:700;padding:0 10px;font-size:12px;font-family:{UI_FONT};}}"
+            )
+            self.btn_view_cards.setStyleSheet(
+                f"QPushButton{{background:transparent;color:{TEXT_DIM};border:1px solid {BORDER};"
+                f"border-radius:6px;font-weight:500;padding:0 10px;font-size:12px;font-family:{UI_FONT};}}"
+                f"QPushButton:hover{{color:{TEXT};}}"
+            )
+            self._render_tree()
+
+    def open_submeta_detail(self, iid: str):
+        item = self.goal_mgr.get_item(self.goal.id, iid)
+        if not item:
+            return
+        self.submeta_detail.load(self.goal, item)
+        self.submetas_stack.setCurrentIndex(2)
+        self.submeta_view_box.setVisible(False)
+        self.add_btn.setVisible(False)
+
+    def close_submeta_detail(self):
+        target_idx = 0 if getattr(self, "_submeta_view", "cards") == "cards" else 1
+        self.submetas_stack.setCurrentIndex(target_idx)
+        self.submeta_view_box.setVisible(self._tab == "submetas")
+        self.add_btn.setVisible(self._tab == "submetas")
+        self.refresh()
 
     def refresh(self):
         if self.goal is None:
@@ -247,7 +343,17 @@ class MetaDetail(QWidget):
     def _render_tab(self):
         key = getattr(self, "_tab", "submetas")
         if key == "submetas":
-            self._render_tree()
+            curr_sub_idx = self.submetas_stack.currentIndex()
+            is_sub_detail = (curr_sub_idx == 2)
+            self.submeta_view_box.setVisible(not is_sub_detail)
+            self.add_btn.setVisible(not is_sub_detail)
+
+            if curr_sub_idx == 0:
+                self.submetas_board.set_goal(self.goal)
+            elif curr_sub_idx == 1:
+                self._render_tree()
+            elif curr_sub_idx == 2:
+                self.submeta_detail.refresh()
         elif key == "hoy":
             self.today.goal_id = self.goal.id
             self.today.day = date.today()
@@ -290,7 +396,8 @@ class MetaDetail(QWidget):
             return {
                 "id": item.id,
                 "text": item.name + (f"   ({len(item.children)})" if not leaf else ""),
-                "checked": done if leaf else None,
+                "checked": done,
+
                 "bold": not leaf,
                 "tooltip": item.notes or item.name,
                 "columns": [

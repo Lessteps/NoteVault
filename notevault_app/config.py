@@ -178,10 +178,15 @@ class AppConfig:
 
     @staticmethod
     def get_calendar_filters() -> dict:
-        return AppConfig._read().get("calendar_filters", {
+        defaults = {
             "routine": True, "event": True, "habit": True,
-            "exercise": True, "task": True, "project": True
-        })
+            "exercise": True, "task": True, "project": True,
+            "issue": True, "goal_item": True, "saving": True,
+        }
+        stored = AppConfig._read().get("calendar_filters", {})
+        merged = dict(defaults)
+        merged.update(stored)
+        return merged
 
     @staticmethod
     def set_calendar_filters(filters: dict):

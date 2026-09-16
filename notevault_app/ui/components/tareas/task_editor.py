@@ -4,6 +4,7 @@ Edits every column of a task plus the markdown body stored in its own
 .md file inside {vault}/tareas/.
 """
 
+import re
 from datetime import date, datetime
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QTextEdit,
@@ -20,6 +21,45 @@ from .tareas_common import (
 )
 from .date_picker import DateButton
 from ..programacion import RecurrencePicker, time_combo, set_time
+from ..comun.subtasks_widget import SubtasksWidget
+
+
+def _parse_subtasks_from_markdown(text: str) -> list:
+    items = []
+    for idx, line in enumerate(text.splitlines()):
+        m = re.match(r"^\s*-\s*\[([ xX])\]\s*(.+)$", line)
+        if m:
+            items.append({
+                "id": str(idx),
+                "title": m.group(2).strip(),
+                "done": m.group(1).lower() == "x",
+            })
+    return items
+
+
+def _update_markdown_subtask(text: str, line_idx: int, done: bool) -> str:
+    lines = text.splitlines()
+    if 0 <= line_idx < len(lines):
+        line = lines[line_idx]
+        m = re.match(r"^(\s*-\s*\[)([ xX])(\]\s*.+)$", line)
+        if m:
+            mark = "x" if done else " "
+            lines[line_idx] = f"{m.group(1)}{mark}{m.group(3)}"
+    return "\n".join(lines)
+
+
+def _remove_markdown_subtask(text: str, line_idx: int) -> str:
+    lines = text.splitlines()
+    if 0 <= line_idx < len(lines):
+        lines.pop(line_idx)
+    return "\n".join(lines)
+
+
+def _append_markdown_subtask(text: str, title: str) -> str:
+    lines = text.splitlines()
+    lines.append(f"- [ ] {title}")
+    return "\n".join(lines)
+
 
 
 class _StarPicker(QWidget):
@@ -194,10 +234,17 @@ class TaskEditor(QDialog):
         grid.setColumnStretch(1, 1)
         lay.addLayout(grid)
         self._sync_repeat()
+        # Subtasks
+        self._subtasks = SubtasksWidget(title="Subtareas", colour=BLUE, can_add=True)
+        self._subtasks.subtask_added.connect(self._on_subtask_added)
+        self._subtasks.subtask_toggled.connect(self._on_subtask_toggled)
+        self._subtasks.subtask_deleted.connect(self._on_subtask_deleted)
+        lay.addWidget(self._subtasks)
         lay.addWidget(hline())
 
         # Markdown body
         body_lbl = QLabel("📄  Contenido (markdown)")
+
         body_lbl.setStyleSheet(
             f"color:{TEXT_DIM};font-size:12px;font-weight:600;"
             "background:transparent;border:none;"
@@ -206,7 +253,10 @@ class TaskEditor(QDialog):
 
         self._body = QTextEdit()
         self._body.setPlainText(self.task.body)
+        self._reload_subtasks()
+        self._body.textChanged.connect(self._reload_subtasks)
         self._body.setPlaceholderText(
+
             "# Notas de la tarea\n\n- Lo que hay que hacer\n- Recursos\n"
         )
         self._body.setStyleSheet(
@@ -248,7 +298,41 @@ class TaskEditor(QDialog):
         self._deleted = True
         self.accept()
 
+    def _reload_subtasks(self):
+        items = _parse_subtasks_from_markdown(self._body.toPlainText())
+        self._subtasks.set_items(items)
+
+    def _on_subtask_added(self, title: str):
+        text = _append_markdown_subtask(self._body.toPlainText(), title)
+        self._body.blockSignals(True)
+        self._body.setPlainText(text)
+        self._body.blockSignals(False)
+        self._reload_subtasks()
+
+    def _on_subtask_toggled(self, item_id: str, done: bool):
+        try:
+            line_idx = int(item_id)
+        except ValueError:
+            return
+        text = _update_markdown_subtask(self._body.toPlainText(), line_idx, done)
+        self._body.blockSignals(True)
+        self._body.setPlainText(text)
+        self._body.blockSignals(False)
+        self._reload_subtasks()
+
+    def _on_subtask_deleted(self, item_id: str):
+        try:
+            line_idx = int(item_id)
+        except ValueError:
+            return
+        text = _remove_markdown_subtask(self._body.toPlainText(), line_idx)
+        self._body.blockSignals(True)
+        self._body.setPlainText(text)
+        self._body.blockSignals(False)
+        self._reload_subtasks()
+
     def _sync_repeat(self):
+
         repeats = self._repeat.rule() != ""
         for w in (self._until_label, self._until, self._repeat_hint):
             w.setVisible(repeats)

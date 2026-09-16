@@ -114,8 +114,14 @@ class ScheduleManager:
 
     def _source_for(self, occurrence_id: str):
         for provider in self._sources.values():
+            prefixes = getattr(provider, "prefixes", None)
+            if prefixes and any(occurrence_id.startswith(p) for p in prefixes):
+                return provider
             prefix = getattr(provider, "prefix", "")
-            if prefix and occurrence_id.startswith(prefix):
+            if isinstance(prefix, (tuple, list)):
+                if any(occurrence_id.startswith(p) for p in prefix):
+                    return provider
+            elif prefix and occurrence_id.startswith(prefix):
                 return provider
         return None
 

@@ -4,11 +4,12 @@ and Tab / Shift+Tab to indent. The owner keeps the data: every change is
 emitted as a signal and the owner rebuilds the tree from disk.
 """
 
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal, QSize, QTimer
 from PySide6.QtGui import QColor, QBrush, QFont
 from PySide6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QAbstractItemView, QHeaderView, QMenu,
 )
+
 
 from ... import theme
 from . import BORDER, TEXT, TEXT_DIM, TEXT_FAINT, BLUE, UI_FONT
@@ -142,7 +143,15 @@ class TreeList(QTreeWidget):
     def _item_changed(self, item, column):
         if self._building or column != 0 or not (item.flags() & Qt.ItemIsUserCheckable):
             return
-        self.checked.emit(item.data(0, ID_ROLE), item.checkState(0) == Qt.Checked)
+        is_checked = (item.checkState(0) == Qt.Checked)
+        nid = item.data(0, ID_ROLE)
+        font = item.font(0)
+        font.setStrikeOut(is_checked)
+        item.setFont(0, font)
+        colour = TEXT_FAINT if is_checked else TEXT
+        item.setForeground(0, QBrush(QColor(theme.tint(colour))))
+        QTimer.singleShot(0, lambda: self.checked.emit(nid, is_checked))
+
 
     def startDrag(self, actions):
         item = self.currentItem()

@@ -92,3 +92,7 @@ def fmt_day(d) -> str:
 def fmt_short(d) -> str:
     months = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
     return f"{d.day} {months[d.month - 1]}" if d else "—"
+
+
+from .subtasks_widget import SubtasksWidget
+

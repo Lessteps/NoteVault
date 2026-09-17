@@ -1,0 +1,134 @@
+"""
+Unit tests for frontmatter utilities and workspace manager.
+"""
+
+import shutil
+import tempfile
+import unittest
+from pathlib import Path
+
+from notevault_app.core.frontmatter_utils import (
+    parse_frontmatter, dump_frontmatter, update_frontmatter, sanitize_properties
+)
+from notevault_app.core.workspace_manager import WorkspaceManager, sanitize_workspace
+
+
+class TestFrontmatterUtils(unittest.TestCase):
+    def test_parse_frontmatter_types(self):
+        text = """---
+subject: mathematics
+topic: derivatives
+difficulty: 3
+mastery: 0.75
+goal_level: 2
+status: learning
+active: true
+tags: [calculus, math, analysis]
+---
+# Derivadas
+Contenido de la nota.
+"""
+        data, body = parse_frontmatter(text)
+        self.assertEqual(data["subject"], "mathematics")
+        self.assertEqual(data["topic"], "derivatives")
+        self.assertEqual(data["difficulty"], 3)
+        self.assertEqual(data["mastery"], 0.75)
+        self.assertEqual(data["goal_level"], 2)
+        self.assertEqual(data["status"], "learning")
+        self.assertTrue(data["active"])
+        self.assertEqual(data["tags"], ["calculus", "math", "analysis"])
+        self.assertIn("# Derivadas", body)
+
+    def test_dump_frontmatter(self):
+        data = {
+            "subject": "programming",
+            "technology": "python",
+            "difficulty": 4,
+            "mastery": 0.5,
+            "tags": ["python", "algorithms"],
+        }
+        yaml_str = dump_frontmatter(data)
+        self.assertTrue(yaml_str.startswith("---\n"))
+        self.assertTrue(yaml_str.endswith("---\n"))
+        self.assertIn("subject: programming", yaml_str)
+        self.assertIn("tags: [\"python\", \"algorithms\"]", yaml_str)
+
+    def test_update_frontmatter(self):
+        original = """---
+subject: english
+mastery: 0.2
+---
+Hello world
+"""
+        updated = update_frontmatter(original, {"mastery": 0.85, "level": "B2"})
+        data, body = parse_frontmatter(updated)
+        self.assertEqual(data["mastery"], 0.85)
+        self.assertEqual(data["level"], "B2")
+        self.assertEqual(data["subject"], "english")
+        self.assertEqual(body.strip(), "Hello world")
+
+    def test_sanitize_properties(self):
+        raw = {
+            "mastery": 1.5,
+            "difficulty": 10,
+            "goal_level": 99,
+            "tags": "single-tag",
+        }
+        clean = sanitize_properties(raw)
+        self.assertEqual(clean["mastery"], 1.0)
+        self.assertEqual(clean["difficulty"], 5)
+        self.assertEqual(clean["goal_level"], 4)
+        self.assertEqual(clean["tags"], ["single-tag"])
+
+
+class TestWorkspaceManager(unittest.TestCase):
+    def setUp(self):
+        self.vault = Path(tempfile.mkdtemp(prefix="nv_ws_test"))
+
+    def tearDown(self):
+        shutil.rmtree(self.vault, ignore_errors=True)
+
+    def test_default_workspaces_initialized(self):
+        wm = WorkspaceManager(self.vault)
+        workspaces = wm.workspaces()
+        ids = {w["id"] for w in workspaces}
+        self.assertIn("mathematics", ids)
+        self.assertIn("programming", ids)
+        self.assertIn("english", ids)
+        self.assertIn("general", ids)
+
+    def test_detect_by_path(self):
+        wm = WorkspaceManager(self.vault)
+        ws_math = wm.detect_for_path("Matemáticas/Cálculo/Derivadas.md")
+        self.assertEqual(ws_math["id"], "mathematics")
+
+        ws_prog = wm.detect_for_path("Programación/Frontend/React.md")
+        self.assertEqual(ws_prog["id"], "programming")
+
+        ws_eng = wm.detect_for_path("Inglés/Vocabulario/Tech.md")
+        self.assertEqual(ws_eng["id"], "english")
+
+        ws_gen = wm.detect_for_path("Personal/Ideas.md")
+        self.assertEqual(ws_gen["id"], "general")
+
+    def test_detect_by_frontmatter(self):
+        wm = WorkspaceManager(self.vault)
+        # Even if stored in another folder, frontmatter subject overrides
+        ws = wm.detect_for_path("RandomFolder/Test.md", {"subject": "programming"})
+        self.assertEqual(ws["id"], "programming")
+
+    def test_features_config(self):
+        wm = WorkspaceManager(self.vault)
+        math = wm.get("mathematics")
+        self.assertTrue(math["features"]["calculator"])
+        self.assertTrue(math["features"]["latex"])
+        self.assertFalse(math["features"]["code_execution"])
+
+        prog = wm.get("programming")
+        self.assertTrue(prog["features"]["code_execution"])
+        self.assertTrue(prog["features"]["debugging"])
+        self.assertFalse(prog["features"]["calculator"])
+
+
+if __name__ == "__main__":
+    unittest.main()

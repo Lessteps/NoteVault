@@ -95,4 +95,5 @@ def fmt_short(d) -> str:
 
 
 from .subtasks_widget import SubtasksWidget
+from .linked_folder_notes_widget import LinkedFolderNotesWidget, NotePickerDialog
 

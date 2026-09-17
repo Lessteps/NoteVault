@@ -57,6 +57,19 @@ LAYOUT = {
     "agenda_events_dir": f"{DATA_DIR}/agenda/events",
     "agenda_events_day": f"{DATA_DIR}/agenda/events/{{year}}/{{month:02d}}/{{date}}.json",
     "agenda_settings":   f"{DATA_DIR}/agenda/settings.json",
+    "workspaces_dir":    f"{DATA_DIR}/workspaces",
+    "workspace":         f"{DATA_DIR}/workspaces/{{id}}.json",
+    "study_dir":         f"{DATA_DIR}/estudio",
+    "study_exercises_dir": f"{DATA_DIR}/estudio/ejercicios",
+    "study_exercise":    f"{DATA_DIR}/estudio/ejercicios/{{id}}.json",
+    "study_srs_dir":     f"{DATA_DIR}/estudio/srs",
+    "study_srs_item":    f"{DATA_DIR}/estudio/srs/{{id}}.json",
+    "study_errors_dir":  f"{DATA_DIR}/estudio/errores",
+    "study_error":       f"{DATA_DIR}/estudio/errores/{{id}}.json",
+    "study_goals_dir":   f"{DATA_DIR}/estudio/metas",
+    "study_goal":        f"{DATA_DIR}/estudio/metas/{{id}}.json",
+    "study_projects_dir": f"{DATA_DIR}/estudio/proyectos",
+    "study_project":     f"{DATA_DIR}/estudio/proyectos/{{id}}.json",
 }
 
 # 0 = Monday, matching datetime.date.weekday().
@@ -135,6 +148,7 @@ ISSUE_FIELDS = (
     ("start", "date"), ("due", "date"), ("due_time", "str"), ("repeat", "str"),
     ("repeat_until", "date"), ("in_calendar", "bool"), ("reminder", "datetime"),
     ("reminder_done", "bool"), ("done_at", "date"), ("attachments", "list"),
+    ("updated", "datetime"),
 )
 
 MOVEMENT_TYPES = ("gasto", "ingreso", "ahorro", "retiro")

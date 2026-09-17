@@ -17,6 +17,8 @@ VIEW_DETAIL = 1
 class ProyectosPanel(QWidget):
     data_changed = Signal()
     project_changed = Signal(str)       # "" when back on the board
+    open_note_requested = Signal(object)
+    reveal_in_os_requested = Signal(object)
 
     def __init__(self, manager: ProjectManager, area_mgr=None, parent=None):
         super().__init__(parent)
@@ -38,6 +40,8 @@ class ProyectosPanel(QWidget):
         self._view.back_requested.connect(self.show_board)
         self._view.edit_requested.connect(self.edit_project)
         self._view.data_changed.connect(self.data_changed.emit)
+        self._view.open_note_requested.connect(self.open_note_requested.emit)
+        self._view.reveal_in_os_requested.connect(self.reveal_in_os_requested.emit)
         lay.addWidget(self._stack)
 
     def show_view(self, key: str):

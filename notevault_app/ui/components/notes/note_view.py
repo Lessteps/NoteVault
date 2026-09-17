@@ -592,6 +592,8 @@ class NoteTextEdit(_WikilinkClicks, _NoteSurface, QTextEdit):
             table_menu.addAction("Eliminar tabla", self.table_delete)
             menu.insertMenu(first, table_menu)
             menu.insertSeparator(first)
+        if hasattr(self, "context_menu_builder") and callable(self.context_menu_builder):
+            self.context_menu_builder(menu)
         menu.exec(event.globalPos())
 
     # paste and drop ---------------------------------------------------------
@@ -1012,6 +1014,8 @@ class NoteSourceEdit(_WikilinkClicks, QTextEdit):
             table_menu.addAction("Eliminar tabla", self.table_delete)
             menu.insertMenu(first, table_menu)
             menu.insertSeparator(first)
+        if hasattr(self, "context_menu_builder") and callable(self.context_menu_builder):
+            self.context_menu_builder(menu)
         menu.exec(event.globalPos())
 
     def _align_table(self) -> bool:

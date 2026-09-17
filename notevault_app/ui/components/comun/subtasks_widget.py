@@ -23,13 +23,15 @@ class SubtaskRow(QWidget):
     deleted = Signal(str)
     clicked = Signal(str)
     renamed = Signal(str, str)
+    status_changed = Signal(str, str)
 
     def __init__(self, item_id: str, title: str, done: bool = False,
-                 badge: str = "", colour: str = GREEN, parent=None):
+                 badge: str = "", statuses: list = None, colour: str = GREEN, parent=None):
         super().__init__(parent)
         self.item_id = item_id
         self._done = done
         self._colour = colour
+        self._statuses = list(statuses or [])
         self.setStyleSheet("background: transparent;")
 
         lay = QHBoxLayout(self)
@@ -49,9 +51,21 @@ class SubtaskRow(QWidget):
 
         # Optional Badge (e.g. status or key)
         if badge:
-            self.badge_lbl = QLabel(badge)
-            self.badge_lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; font-family: {UI_FONT};")
-            lay.addWidget(self.badge_lbl)
+            if self._statuses:
+                self.badge_btn = QPushButton(badge)
+                self.badge_btn.setCursor(Qt.PointingHandCursor)
+                self.badge_btn.setToolTip("Cambiar estado de la subtarea")
+                self.badge_btn.setStyleSheet(
+                    f"QPushButton {{ background: rgba(255,255,255,0.06); border: 1px solid {BORDER}; "
+                    f"border-radius: 4px; color: {TEXT_DIM}; font-size: 10px; padding: 2px 6px; font-family: {UI_FONT}; }}"
+                    f"QPushButton:hover {{ background: rgba(35,131,226,0.2); color: {TEXT}; border-color: {BLUE}; }}"
+                )
+                self.badge_btn.clicked.connect(self._on_status_clicked)
+                lay.addWidget(self.badge_btn)
+            else:
+                self.badge_lbl = QLabel(badge)
+                self.badge_lbl.setStyleSheet(f"color: {TEXT_DIM}; font-size: 10px; font-family: {UI_FONT};")
+                lay.addWidget(self.badge_lbl)
 
         # Delete Button (✕)
         self.del_btn = QPushButton("✕")
@@ -67,6 +81,17 @@ class SubtaskRow(QWidget):
         lay.addWidget(self.del_btn)
 
         self._update_style()
+
+    def _on_status_clicked(self):
+        if not self._statuses:
+            return
+        from PySide6.QtWidgets import QMenu
+        from PySide6.QtCore import QPoint
+        menu = QMenu(self)
+        for s in self._statuses:
+            act = menu.addAction(s)
+            act.triggered.connect(lambda _c=False, st=s: self.status_changed.emit(self.item_id, st))
+        menu.exec(self.badge_btn.mapToGlobal(QPoint(0, self.badge_btn.height())))
 
     def set_done(self, done: bool):
         self._done = done
@@ -95,6 +120,7 @@ class SubtasksWidget(QWidget):
         subtask_toggled(id, done)
         subtask_deleted(id)
         subtask_clicked(id)
+        subtask_status_changed(id, status)
         changed()
     """
 
@@ -103,6 +129,7 @@ class SubtasksWidget(QWidget):
     subtask_toggled = Signal(str, bool)
     subtask_deleted = Signal(str)
     subtask_clicked = Signal(str)
+    subtask_status_changed = Signal(str, str)
     changed = Signal()
 
     def __init__(self, title: str = "SUBTAREAS", colour: str = GREEN,
@@ -270,11 +297,13 @@ class SubtasksWidget(QWidget):
             title = str(it.get("title", ""))
             done = bool(it.get("done", False))
             badge = str(it.get("badge", ""))
+            statuses = it.get("statuses") or []
 
-            row = SubtaskRow(iid, title, done, badge=badge, colour=self._colour)
+            row = SubtaskRow(iid, title, done, badge=badge, statuses=statuses, colour=self._colour)
             row.toggled.connect(self._on_item_toggled)
             row.deleted.connect(self._on_item_deleted)
             row.clicked.connect(self.subtask_clicked.emit)
+            row.status_changed.connect(self.subtask_status_changed.emit)
             self.items_box.addWidget(row)
 
     def _on_item_toggled(self, item_id: str, done: bool):

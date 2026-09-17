@@ -129,6 +129,7 @@ class Issue:
         self.reminder_done: bool = bool(values.get("reminder_done"))
         self.done_at: Optional[date] = values.get("done_at")
         self.attachments: list = list(values.get("attachments") or [])
+        self.updated: Optional[datetime] = values.get("updated")
         self.description = description
         self.extra = dict(extra or {})
         self.children: list = []
@@ -191,6 +192,11 @@ class ProjectManager:
     def issue_path(self, pid: str, xid: str) -> Path:
         return self.vault_root / vault_format.LAYOUT["issue"].format(project=pid, id=xid)
 
+    def notes_dir(self, pid: str) -> Path:
+        folder = self.project_path(pid).parent / "notas"
+        folder.mkdir(parents=True, exist_ok=True)
+        return folder
+
     @staticmethod
     def _stamp_of(folder: Path, pattern: str):
         try:
@@ -244,6 +250,7 @@ class ProjectManager:
         })
         self._apply(project, fields)
         self.save(project)
+        self.notes_dir(project.id)
         return project
 
     def update(self, pid: str, **fields) -> Optional[Project]:
@@ -266,6 +273,8 @@ class ProjectManager:
                 setattr(project, k, v)
             elif k == "description":
                 project.description = v or ""
+            elif k == "extra":
+                project.extra.update(dict(v or {}))
 
     def delete(self, pid: str):
         store.to_trash(self.vault_root, self.project_path(pid).parent, "proyectos")
@@ -383,12 +392,13 @@ class ProjectManager:
         if status not in project.columns:
             status = project.columns[0]
         column = [i for i in issues if i.status == status]
+        issue_type = fields.pop("type", T_TASK)
         issue = Issue({
             "id": store.new_id("x"), "project": pid,
             "number": max([i.number for i in issues] or [0]) + 1,
-            "type": T_TASK, "title": title.strip() or "Nuevo issue", "status": status,
+            "type": issue_type, "title": title.strip() or "Nuevo issue", "status": status,
             "priority": 2, "order": max([i.order for i in column] or [0]) + 1,
-            "created": _today(),
+            "created": _today(), "updated": datetime.now(),
         })
         issue.done_column = project.done_column
         issue.key_prefix = project.key
@@ -411,6 +421,8 @@ class ProjectManager:
                 setattr(issue, k, v)
             elif k == "description":
                 issue.description = v or ""
+            elif k == "extra":
+                issue.extra.update(dict(v or {}))
 
     @staticmethod
     def _stamp_done(issue: Issue, done_column: str, day: Optional[date] = None):
@@ -428,6 +440,7 @@ class ProjectManager:
         if "reminder" in fields and fields["reminder"] != issue.reminder:
             issue.reminder_done = False
         self._apply_issue(issue, fields)
+        issue.updated = datetime.now()
         if issue.status not in project.columns:
             issue.status = project.columns[0]
         self._stamp_done(issue, project.done_column)
@@ -481,10 +494,14 @@ class ProjectManager:
         was_done = issue.is_done
         issue.status = status
         issue.order = int(order) if float(order).is_integer() else round(order, 6)
+        issue.updated = datetime.now()
         self._stamp_done(issue, project.done_column)
         if issue.is_done and not was_done and issue.repeat:
             self._roll_forward(issue, project)
         self.save_issue(issue)
+
+    def set_issue_status(self, pid: str, xid: str, status: str):
+        self.move(pid, xid, status, 10 ** 6)
 
     def reparent(self, pid: str, xid: str, parent: Optional[str]):
         issue = self.get_issue(pid, xid)

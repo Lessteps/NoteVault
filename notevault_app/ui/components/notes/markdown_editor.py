@@ -42,6 +42,10 @@ from .note_view import (
 )
 from .command_palette import Command, CommandPalette
 from .table_picker import TablePicker
+from .note_properties_dialog import NotePropertiesDialog
+from .english_audio_panel import EnglishAudioPanel
+from ....core.frontmatter_utils import parse_frontmatter, dump_frontmatter, sanitize_properties
+from ....core.workspace_manager import WorkspaceManager
 
 BG_PAGE   = "#1a1a1e"
 BG_BAR    = "#202024"
@@ -138,12 +142,15 @@ class MarkdownEditor(QWidget):
     bookmarks_changed   = Signal()
     assistant_toggled   = Signal()
     reveal_requested    = Signal(Path)
+    context_action_requested = Signal(str, str, dict)
 
     def __init__(self, vault: VaultManager, service: NotesService, parent=None):
         super().__init__(parent)
         self.setObjectName("centerPanel")
         self.vault = vault
         self.service = service
+        self._workspace_manager = WorkspaceManager(self.vault.vault_root)
+        self._current_workspace = self._workspace_manager.get("general")
         self._open: list = []          # list[_OpenNote], parallel to the tab bar
         self._current: int = -1
         self._loading = False
@@ -169,6 +176,7 @@ class MarkdownEditor(QWidget):
 
         root.addWidget(self._build_tab_row())
         root.addWidget(self._build_toolbar())
+        root.addWidget(self._build_workspace_bar())
 
         self._stack = QStackedWidget()
 
@@ -183,6 +191,7 @@ class MarkdownEditor(QWidget):
         self._rich.textChanged.connect(self._on_text_changed)
         self._rich.media_activated.connect(self._open_media)
         self._rich.note_link_activated.connect(self._open_wikilink)
+        self._rich.context_menu_builder = self._build_editor_context_menu
         self._stack.addWidget(self._rich)      # 0
 
         self._raw = NoteSourceEdit()
@@ -193,6 +202,7 @@ class MarkdownEditor(QWidget):
         )
         self._raw.textChanged.connect(self._on_text_changed)
         self._raw.note_link_activated.connect(self._open_wikilink)
+        self._raw.context_menu_builder = self._build_editor_context_menu
         self._stack.addWidget(self._raw)       # 1
 
         self._read = NoteTextBrowser()
@@ -351,6 +361,286 @@ class MarkdownEditor(QWidget):
             lay.addWidget(b)
 
         return bar
+
+    def _build_workspace_bar(self) -> QWidget:
+        self._ws_frame = QFrame()
+        self._ws_frame.setAttribute(Qt.WA_StyledBackground, True)
+        self._ws_frame.setFixedHeight(34)
+        self._ws_frame.setStyleSheet(
+            f"QFrame{{background:{BG_BAR};border:none;border-bottom:1px solid {BORDER};}}"
+        )
+        lay = QHBoxLayout(self._ws_frame)
+        lay.setContentsMargins(10, 0, 10, 0)
+        lay.setSpacing(8)
+
+        # Breadcrumb: 📁 Carpeta › Subcarpeta › Nota.md
+        self._breadcrumb_lbl = QLabel("")
+        self._breadcrumb_lbl.setStyleSheet(
+            f"color:{TEXT_DIM};font-size:12px;font-weight:500;"
+        )
+        lay.addWidget(self._breadcrumb_lbl)
+
+        # OS Explorer button
+        self._reveal_file_btn = QPushButton("📁 Ver en file")
+        self._reveal_file_btn.setToolTip("Abrir archivo en el explorador del sistema")
+        self._reveal_file_btn.setCursor(Qt.PointingHandCursor)
+        self._reveal_file_btn.setStyleSheet(
+            f"QPushButton {{ background: transparent; border: 1px solid {BORDER}; "
+            f"border-radius: 4px; color: {TEXT_DIM}; font-size: 11px; padding: 2px 8px; }}"
+            f"QPushButton:hover {{ background: #2e2e38; color: {TEXT}; border-color: {ACCENT}; }}"
+        )
+        self._reveal_file_btn.clicked.connect(self._reveal_current_in_os)
+        lay.addWidget(self._reveal_file_btn)
+
+        # Workspace badge (shown only when specific workspace like Mathematics/Programming/English is active)
+        self._ws_badge = QLabel("")
+        self._ws_badge.setStyleSheet(
+            "QLabel { background: rgba(124, 90, 240, 0.15); color: #bca6f7; "
+            "border: 1px solid rgba(124, 90, 240, 0.35); border-radius: 4px; "
+            "padding: 2px 8px; font-weight: bold; font-size: 11px; }"
+        )
+        self._ws_badge.setVisible(False)
+        lay.addWidget(self._ws_badge)
+
+        # Properties edit button
+        self._props_btn = QPushButton("Propiedades ⚙")
+        self._props_btn.setCursor(Qt.PointingHandCursor)
+        self._props_btn.setStyleSheet(
+            f"QPushButton {{ background: transparent; border: 1px solid {BORDER}; "
+            f"border-radius: 4px; color: {TEXT_DIM}; font-size: 11px; padding: 2px 8px; }}"
+            f"QPushButton:hover {{ background: #2e2e38; color: {TEXT}; border-color: {ACCENT}; }}"
+        )
+        self._props_btn.clicked.connect(self._open_properties_dialog)
+        lay.addWidget(self._props_btn)
+
+        # Properties summary chip
+        self._props_summary = QLabel("")
+        self._props_summary.setStyleSheet(f"color: {TEXT_FAINT}; font-size: 11px;")
+        self._props_summary.setVisible(False)
+        lay.addWidget(self._props_summary)
+
+        lay.addStretch()
+
+        # Context action buttons container
+        self._context_actions_box = QWidget()
+        self._context_actions_lay = QHBoxLayout(self._context_actions_box)
+        self._context_actions_lay.setContentsMargins(0, 0, 0, 0)
+        self._context_actions_lay.setSpacing(4)
+        lay.addWidget(self._context_actions_box)
+
+        return self._ws_frame
+
+    def _reveal_current_in_os(self):
+        note = self.current_note()
+        if not note or not note.path.exists():
+            return
+        try:
+            import subprocess
+            subprocess.Popen(f'explorer.exe /select,"{note.path.resolve()}"')
+        except Exception:
+            pass
+
+    def _update_workspace_bar(self, note: _OpenNote):
+        if not hasattr(self, "_ws_frame"):
+            return
+        if note.is_code:
+            self._ws_frame.setVisible(False)
+            return
+        self._ws_frame.setVisible(True)
+
+        try:
+            rel_parts = note.path.relative_to(self.vault.vault_root).parts
+            breadcrumb_text = " › ".join(rel_parts)
+            self._breadcrumb_lbl.setText(f"📁 {breadcrumb_text}")
+        except Exception:
+            self._breadcrumb_lbl.setText(f"📁 {note.path.name}")
+
+        fm_data, _ = parse_frontmatter(note.frontmatter)
+        try:
+            rel_path = str(note.path.relative_to(self.vault.vault_root))
+        except ValueError:
+            rel_path = note.path.name
+
+        ws = self._workspace_manager.detect_for_path(rel_path, fm_data)
+        self._current_workspace = ws
+
+        ws_id = ws.get("id", "general")
+        if ws_id and ws_id != "general":
+            self._ws_badge.setText(f"{ws.get('icon', '📁')} {ws.get('name', '')}")
+            self._ws_badge.setVisible(True)
+        else:
+            self._ws_badge.setVisible(False)
+
+        # Summary text: only show if explicit study properties exist in frontmatter
+        has_custom_props = bool(fm_data.get("topic") or fm_data.get("difficulty") or fm_data.get("mastery"))
+        if has_custom_props:
+            diff = fm_data.get("difficulty", 1)
+            stars = "★" * int(diff) + "☆" * (5 - int(diff))
+            mastery = int(float(fm_data.get("mastery", 0.0)) * 100)
+            status = fm_data.get("status", "learning")
+            topic = fm_data.get("topic", "")
+
+            chips = [f"Dificultad: {stars}"]
+            if topic:
+                chips.append(f"Tema: {topic}")
+            chips.append(f"Maestría: {mastery}%")
+            chips.append(f"Estado: {status}")
+            self._props_summary.setText("  •  ".join(chips))
+            self._props_summary.setVisible(True)
+        else:
+            self._props_summary.setText("")
+            self._props_summary.setVisible(False)
+
+        # Rebuild action buttons
+        while self._context_actions_lay.count():
+            item = self._context_actions_lay.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        ws_id = ws.get("id", "general")
+        buttons = []
+        if ws_id == "mathematics":
+            buttons = [
+                ("∑ Resolver", "solve", "Resolver o simplificar expresión matemática"),
+                ("d/dx Derivar", "derive", "Calcular derivada simbólica"),
+                ("∫ Integrar", "integrate", "Calcular integral simbólica"),
+                ("📈 Graficar", "graph", "Graficar función matemática"),
+                ("TeX LaTeX", "latex", "Convertir o formatear expresión a LaTeX"),
+                ("⚡ Ejercicio", "exercise", "Generar ejercicio de matemáticas"),
+            ]
+        elif ws_id == "programming":
+            buttons = [
+                ("▶ Ejecutar", "run", "Ejecutar código seleccionado en sandbox local"),
+                ("🧪 Probar", "test", "Ejecutar o generar pruebas unitarias"),
+                ("🐞 Depurar", "debug", "Depurar y analizar errores en el código"),
+                ("💡 Explicar", "explain", "Explicar lógica o complejidad del código"),
+                ("⚡ Ejercicio", "exercise", "Generar reto de programación"),
+            ]
+        elif ws_id == "english":
+            buttons = [
+                ("📖 Vocabulario", "vocabulary", "Extraer y crear ficha de vocabulario"),
+                ("🔤 Gramática", "grammar", "Explicar estructura y regla gramatical"),
+                ("🎧 Listening", "listening", "Abrir panel de práctica de listening con TTS"),
+                ("🎙 Speaking", "speaking", "Abrir panel de práctica de speaking"),
+                ("🧩 Cloze", "cloze", "Crear ejercicio de rellenar huecos"),
+                ("⚡ Ejercicio", "exercise", "Generar ejercicio de inglés"),
+            ]
+        else:
+            buttons = [
+                ("💡 Explicar", "explain", "Explicar concepto detalladamente"),
+                ("📑 Resumir", "summarize", "Resumir contenido clave"),
+                ("📇 Flashcard", "flashcard", "Crear flashcard de active recall"),
+                ("⚡ Ejercicio", "exercise", "Generar ejercicio de repaso"),
+            ]
+
+        for label, act_id, tip in buttons:
+            btn = QPushButton(label)
+            btn.setToolTip(tip)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet(
+                f"QPushButton {{ background: #28282e; border: 1px solid {BORDER}; "
+                f"border-radius: 4px; color: {TEXT}; font-size: 11px; padding: 2px 8px; }}"
+                f"QPushButton:hover {{ background: rgba(124, 90, 240, 0.25); border-color: {ACCENT}; color: #ffffff; }}"
+            )
+            btn.clicked.connect(lambda _=False, a=act_id: self._trigger_context_action(a))
+            self._context_actions_lay.addWidget(btn)
+
+    def _open_properties_dialog(self):
+        note = self.current_note()
+        if note is None:
+            return
+        fm_data, _ = parse_frontmatter(note.frontmatter)
+        dlg = NotePropertiesDialog(fm_data, note.title, self)
+        if dlg.exec():
+            new_props = dlg.get_properties()
+            note.frontmatter = dump_frontmatter(new_props)
+            note.dirty = True
+            self._save(self._current)
+            self._update_workspace_bar(note)
+
+    def _trigger_context_action(self, action_id: str):
+        note = self.current_note()
+        if note is None:
+            return
+        # English audio actions open the dedicated panel directly
+        if action_id in ("listening", "speaking"):
+            self._open_english_audio(action_id)
+            return
+        sel = self.current_selection().strip()
+        context_text = sel if sel else note.body[:1000]
+        fm_data, _ = parse_frontmatter(note.frontmatter)
+        meta = {
+            "path": str(note.path),
+            "title": note.title,
+            "workspace": self._current_workspace.get("id", "general") if self._current_workspace else "general",
+            "frontmatter": fm_data,
+        }
+        self.context_action_requested.emit(action_id, context_text, meta)
+
+    def _open_english_audio(self, initial_tab: str = "listening"):
+        """Open the English Listening/Speaking panel as a floating dialog."""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Práctica de Inglés — Audio")
+        dlg.resize(560, 560)
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(0, 0, 0, 0)
+        panel = EnglishAudioPanel(self.vault.vault_root, dlg)
+        if initial_tab == "speaking":
+            panel._switch_tab(1)
+        lay.addWidget(panel)
+        dlg.exec()
+
+    def _build_editor_context_menu(self, menu: QMenu):
+        note = self.current_note()
+        if note is None or note.is_code:
+            return
+        ws = self._current_workspace or {}
+        ws_id = ws.get("id", "general")
+
+        study_menu = QMenu(f"Acciones de Estudio ({ws.get('name', 'General')})", menu)
+
+        if ws_id == "mathematics":
+            study_menu.addAction("∑ Resolver / Simplificar", lambda: self._trigger_context_action("solve"))
+            study_menu.addAction("d/dx Derivar expresión", lambda: self._trigger_context_action("derive"))
+            study_menu.addAction("∫ Integrar expresión", lambda: self._trigger_context_action("integrate"))
+            study_menu.addAction("📈 Graficar función", lambda: self._trigger_context_action("graph"))
+            study_menu.addAction("TeX Convertir a LaTeX", lambda: self._trigger_context_action("latex"))
+            study_menu.addAction("⚡ Descomponer solución", lambda: self._trigger_context_action("decompose"))
+            study_menu.addAction("✔ Verificar razonamiento", lambda: self._trigger_context_action("verify"))
+            study_menu.addSeparator()
+            study_menu.addAction("⚡ Generar Ejercicio Matemático", lambda: self._trigger_context_action("exercise"))
+        elif ws_id == "programming":
+            study_menu.addAction("▶ Ejecutar código", lambda: self._trigger_context_action("run"))
+            study_menu.addAction("🧪 Generar / Ejecutar Tests", lambda: self._trigger_context_action("test"))
+            study_menu.addAction("🐞 Depurar y analizar error", lambda: self._trigger_context_action("debug"))
+            study_menu.addAction("💡 Explicar lógica / Complejidad", lambda: self._trigger_context_action("explain"))
+            study_menu.addAction("⚡ Optimizar algoritmo", lambda: self._trigger_context_action("optimize"))
+            study_menu.addAction("🔀 Generar variante de problema", lambda: self._trigger_context_action("variant"))
+            study_menu.addSeparator()
+            study_menu.addAction("⚡ Generar Reto de Código", lambda: self._trigger_context_action("exercise"))
+        elif ws_id == "english":
+            study_menu.addAction("🌐 Traducir selección", lambda: self._trigger_context_action("translate"))
+            study_menu.addAction("📖 Extraer a Vocabulario", lambda: self._trigger_context_action("vocabulary"))
+            study_menu.addAction("🔤 Explicar Gramática", lambda: self._trigger_context_action("grammar"))
+            study_menu.addAction("🧩 Crear ejercicio Cloze", lambda: self._trigger_context_action("cloze"))
+            study_menu.addAction("🎧 Generar Audio / Dictado", lambda: self._trigger_context_action("listening"))
+            study_menu.addAction("💬 Generar Preguntas de Conversación", lambda: self._trigger_context_action("questions"))
+            study_menu.addSeparator()
+            study_menu.addAction("⚡ Generar Ejercicio de Inglés", lambda: self._trigger_context_action("exercise"))
+        else:
+            study_menu.addAction("💡 Explicar concepto", lambda: self._trigger_context_action("explain"))
+            study_menu.addAction("📑 Resumir en 5 puntos", lambda: self._trigger_context_action("summarize"))
+            study_menu.addAction("📇 Crear Flashcard de Active Recall", lambda: self._trigger_context_action("flashcard"))
+            study_menu.addAction("🔍 Extraer Conceptos Clave", lambda: self._trigger_context_action("extract_concepts"))
+            study_menu.addAction("❓ Crear Preguntas de Repaso", lambda: self._trigger_context_action("questions"))
+            study_menu.addAction("🔗 Vincular con otras notas", lambda: self._trigger_context_action("link_concepts"))
+            study_menu.addSeparator()
+            study_menu.addAction("⚡ Generar Ejercicio de Práctica", lambda: self._trigger_context_action("exercise"))
+
+        first = menu.actions()[0] if menu.actions() else None
+        menu.insertMenu(first, study_menu)
+        menu.insertSeparator(first)
 
     def _init_shortcuts(self):
         # Window-level, not WidgetWithChildren: Ctrl+P did nothing whenever
@@ -634,6 +924,7 @@ class MarkdownEditor(QWidget):
             "para no dañarla." if problem else "Edición con formato, como en Word")
         self._bm_btn.setChecked(self.service.is_bookmarked(note.path))
         self._update_status(note)
+        self._update_workspace_bar(note)
         if problem and self._mode == MODE_RICH:
             self._status.setText(
                 f"{self._status.text()}   ·   ⚠ abierta en Markdown: en el Editor {problem}")
@@ -716,6 +1007,8 @@ class MarkdownEditor(QWidget):
 
     def _show_placeholder(self, show: bool):
         if show:
+            if hasattr(self, "_ws_frame"):
+                self._ws_frame.setVisible(False)
             self._loading = True
             self._read.note_path = None
             self._read.setHtml(

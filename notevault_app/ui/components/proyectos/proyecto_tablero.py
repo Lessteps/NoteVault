@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QCheckBox
 
-from ....core.project_manager import TYPE_ICONS, T_GOAL
+from ....core.project_manager import TYPE_ICONS, T_GOAL, T_SUBTASK
 from ..comun import (
     TEXT_DIM, TEXT_FAINT, RED, ORANGE, CHECK_SS, PRIORITY_NAMES, PRIORITY_COLOURS, label, combo,
     line_edit, fmt_short,
@@ -99,6 +99,10 @@ class ProyectoTablero(QWidget):
         for i in issues:
             if i.type == T_GOAL and i.children:
                 continue                    # sub-goals are groups, not cards
+            # Subtasks are shown inside the parent card, not as separate top-level cards
+            parent_issue = by_id.get(i.parent)
+            if i.type == T_SUBTASK or (parent_issue is not None and parent_issue.type != T_GOAL):
+                continue
             if q and not i.matches(q):
                 continue
             if self.f_priority.currentData() and i.priority != self.f_priority.currentData():
@@ -131,10 +135,22 @@ class ProyectoTablero(QWidget):
                     due_colour = RED
                 elif (i.due - today).days <= 2 and not i.is_done:
                     due_colour = ORANGE
+            subtasks = [
+                {
+                    "id": s.id,
+                    "key": s.key,
+                    "title": s.title,
+                    "done": s.is_done,
+                    "status": s.status,
+                    "priority": s.priority,
+                }
+                for s in i.children
+            ]
             return {"id": i.id, "key": i.key, "title": i.title, "priority": i.priority,
                     "type_icon": TYPE_ICONS.get(i.type, ""), "due_text": due_text,
                     "due_colour": due_colour, "labels": i.labels, "done": i.is_done,
                     "parent_text": goal.title if goal and mode != "submeta" else "",
+                    "subtasks": subtasks,
                     "tooltip": f"{i.key} · {i.type}\n{i.title}"}
 
         lanes = None

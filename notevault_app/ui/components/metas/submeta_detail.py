@@ -15,6 +15,7 @@ from ....core import goal_manager as gm
 from ..comun import (
     BG_PAGE, BG_CARD, BORDER, TEXT, TEXT_DIM, TEXT_FAINT, BLUE, RED, GREEN, ORANGE, UI_FONT,
     label, chip, priority_chip, clear_layout, flat_btn, primary_btn, line_edit,
+    LinkedFolderNotesWidget,
 )
 from ..comun.widgets import StatTile, BlockProgress
 from ..comun.subtasks_widget import SubtasksWidget
@@ -25,6 +26,8 @@ class SubmetaDetail(QWidget):
     back_requested = Signal()           # Regresar a la vista de la meta padre (Dashboard 1)
     edit_requested = Signal(str)        # Abrir editor lateral de la submeta
     data_changed = Signal()
+    open_note_requested = Signal(str)
+    reveal_in_os_requested = Signal(str)
 
     def __init__(self, goal_mgr, habit_mgr, parent=None):
         super().__init__(parent)
@@ -129,6 +132,13 @@ class SubmetaDetail(QWidget):
         self.subtasks_widget.subtask_clicked.connect(self._toggle_subtask_by_id)
         c_lay.addWidget(self.subtasks_widget)
         body_lay.addWidget(checklist_card)
+
+        # Carpeta en disco y notas vinculadas
+        self.linked_widget = LinkedFolderNotesWidget(vault_root=getattr(self.goal_mgr, "vault_root", None))
+        self.linked_widget.open_note_requested.connect(self.open_note_requested.emit)
+        self.linked_widget.reveal_in_os_requested.connect(self.reveal_in_os_requested.emit)
+        self.linked_widget.data_changed.connect(self._save_linked)
+        body_lay.addWidget(self.linked_widget)
 
         # Notas / Teoría de la submeta
         lbl_notes = label("Notas, Enlaces y Resumen Teórico", TEXT_DIM, 12, bold=True)
@@ -237,7 +247,15 @@ class SubmetaDetail(QWidget):
             })
         self.subtasks_widget.set_items(children_items)
 
-        # 4. Notas
+        # 4. Carpeta y Notas vinculadas
+        self.linked_widget.set_vault_root(getattr(self.goal_mgr, "vault_root", None))
+        extra = it.extra or {}
+        self.linked_widget.set_data(
+            folder=extra.get("linked_folder", ""),
+            notes=extra.get("linked_notes", []),
+        )
+
+        # 5. Notas
         if not self.txt_notes.hasFocus():
             self.txt_notes.blockSignals(True)
             self.txt_notes.setPlainText(it.notes)
@@ -299,6 +317,16 @@ class SubmetaDetail(QWidget):
             return
         text = self.txt_notes.toPlainText()
         self.goal_mgr.update_item(self.goal.id, self.item.id, notes=text)
+        self.data_changed.emit()
+
+    def _save_linked(self):
+        if not self.goal or not self.item:
+            return
+        folder, notes = self.linked_widget.get_data()
+        extra = dict(self.item.extra or {})
+        extra["linked_folder"] = folder
+        extra["linked_notes"] = notes
+        self.goal_mgr.update_item(self.goal.id, self.item.id, extra=extra)
         self.data_changed.emit()
 
     def _delete_item(self):

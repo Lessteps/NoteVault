@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget, QSplitter, QTextEdit, QPushButton,
-    QInputDialog, QMessageBox,
+    QInputDialog, QMessageBox, QDialog,
 )
 
 from ....core.project_manager import PROJECT_STATUS_COLORS, T_GOAL, T_SUBTASK, T_TASK
@@ -20,6 +20,8 @@ from .proyecto_resumen import ProyectoResumen
 from .proyecto_tablero import ProyectoTablero
 from .proyecto_lista import ProyectoLista
 from .proyecto_calendario import ProyectoCalendario
+from .proyecto_dialogs import CreateIssueDialog
+from .proyecto_notas import ProyectoNotas
 
 TABS = (("resumen", "Resumen"), ("tablero", "Tablero"), ("lista", "Lista"),
         ("calendario", "Calendario"), ("notas", "Notas"))
@@ -42,6 +44,8 @@ class ProyectoView(QWidget):
     back_requested = Signal()
     edit_requested = Signal(str)
     data_changed = Signal()
+    open_note_requested = Signal(object)
+    reveal_in_os_requested = Signal(object)
 
     def __init__(self, manager, area_mgr=None, parent=None):
         super().__init__(parent)
@@ -84,6 +88,10 @@ class ProyectoView(QWidget):
         head.addStretch()
         self.progress = BlockProgress(0, GREEN, blocks=20, block=10)
         head.addWidget(self.progress)
+        add_submeta = flat_btn("+  Submeta", "#a78bfa", "#a78bfa", height=32)
+        add_submeta.setToolTip("Plantear una nueva Submeta / Objetivo en este proyecto")
+        add_submeta.clicked.connect(lambda: self.create_issue(kind=T_GOAL))
+        head.addWidget(add_submeta)
         create = primary_btn("+  Crear issue", 32)
         create.setToolTip("Atajo: C")
         create.clicked.connect(lambda: self.create_issue())
@@ -109,16 +117,7 @@ class ProyectoView(QWidget):
         self.tablero = ProyectoTablero(manager)
         self.lista = ProyectoLista(manager)
         self.calendario = ProyectoCalendario(manager)
-        self.notes = QTextEdit()
-        self.notes.setPlaceholderText("Descripción del proyecto, objetivos, enlaces…")
-        self.notes.setStyleSheet(
-            f"QTextEdit{{background:{BG_CARD};border:1px solid {BORDER};border-radius:10px;color:{TEXT};"
-            f"font-size:13px;padding:10px;font-family:{UI_FONT};}}")
-        self._notes_timer = QTimer(self)
-        self._notes_timer.setSingleShot(True)
-        self._notes_timer.setInterval(800)
-        self._notes_timer.timeout.connect(self._save_notes)
-        self.notes.textChanged.connect(self._notes_timer.start)
+        self.notes = ProyectoNotas(manager)
         for w in (self.resumen, self.tablero, self.lista, self.calendario, self.notes):
             self.stack.addWidget(w)
         split.addWidget(self.stack)
@@ -131,6 +130,8 @@ class ProyectoView(QWidget):
         for view in (self.resumen, self.tablero, self.lista, self.calendario):
             view.open_issue.connect(self.open_issue)
         self.resumen.show_in_board.connect(self._board_for_goal)
+        self.resumen.create_submeta.connect(lambda: self.create_issue(kind=T_GOAL))
+        self.resumen.create_child_task.connect(lambda gid: self.create_issue(parent=gid, kind=T_TASK))
         self.tablero.create_in.connect(lambda col: self.create_issue(status=col))
         self.lista.create_child.connect(lambda pid: self.create_issue(parent=pid))
         for view in (self.tablero, self.lista, self.calendario):
@@ -140,6 +141,10 @@ class ProyectoView(QWidget):
         self.detail.closed.connect(self.detail.hide)
         self.detail.open_issue.connect(self.open_issue)
         self.detail.create_child.connect(lambda pid: self.create_issue(parent=pid))
+        self.detail.open_note_requested.connect(self.open_note_requested.emit)
+        self.detail.reveal_in_os_requested.connect(self.reveal_in_os_requested.emit)
+        self.lista.open_note_requested.connect(self.open_note_requested.emit)
+        self.lista.reveal_in_os_requested.connect(self.reveal_in_os_requested.emit)
 
         sc = QShortcut(QKeySequence("C"), self)
         sc.setContext(Qt.WidgetWithChildrenShortcut)
@@ -148,7 +153,7 @@ class ProyectoView(QWidget):
 
     def set_managers(self, manager, area_mgr):
         self.manager, self.area_mgr = manager, area_mgr
-        for view in (self.resumen, self.tablero, self.lista, self.calendario):
+        for view in (self.resumen, self.tablero, self.lista, self.calendario, self.notes):
             view.manager = manager
         self.detail.set_manager(manager)
         self.project = None
@@ -214,10 +219,8 @@ class ProyectoView(QWidget):
             self.lista.load(self.project)
         elif key == "calendario":
             self.calendario.load(self.project)
-        elif key == "notas" and not self.notes.hasFocus():
-            self.notes.blockSignals(True)
-            self.notes.setPlainText(self.project.description)
-            self.notes.blockSignals(False)
+        elif key == "notas":
+            self.notes.load_project(self.project)
 
     # ── Issues ────────────────────────────────────────────────────────────
 
@@ -234,23 +237,29 @@ class ProyectoView(QWidget):
             return
         self.create_issue()
 
-    def create_issue(self, status: str = "", parent: str = ""):
+    def create_issue(self, status: str = "", parent: str = "", kind: str = ""):
         if self.project is None:
             return
         parent_issue = self.manager.get_issue(self.project.id, parent) if parent else None
-        kind = T_SUBTASK if parent_issue is not None and parent_issue.type != T_GOAL else T_TASK
-        title, ok = QInputDialog.getText(
-            self, "Crear issue",
-            f"Título{' (hija de ' + parent_issue.key + ')' if parent_issue else ''}:")
-        if not ok or not title.strip():
+        initial_type = kind or (T_SUBTASK if parent_issue is not None and parent_issue.type != T_GOAL else T_TASK)
+        dlg = CreateIssueDialog(self.project, self.manager, initial_type=initial_type,
+                                initial_parent=parent or "", initial_status=status, parent=self)
+        if dlg.exec() != QDialog.Accepted:
             return
-        issue = self.manager.create_issue(self.project.id, title.strip(), status=status or None,
-                                          parent=parent or "", type=kind)
+        data = dlg.fields()
+        issue = self.manager.create_issue(
+            self.project.id,
+            data["title"],
+            status=data["status"] or None,
+            parent=data["parent"] or "",
+            type=data["type"],
+            priority=data["priority"],
+        )
         self._changed()
         if issue:
-            if parent:
-                parent_fresh = self.manager.get_issue(self.project.id, parent)
-                if parent_fresh:
+            if data["parent"]:
+                parent_fresh = self.manager.get_issue(self.project.id, data["parent"])
+                if parent_fresh and self.detail.isVisible():
                     self.detail.load(self.project, parent_fresh)
             else:
                 self.open_issue(issue.id)
@@ -265,11 +274,6 @@ class ProyectoView(QWidget):
         if keep_detail and self.detail.isVisible() and self.detail.issue is not None:
             pass
         self.data_changed.emit()
-
-    def _save_notes(self):
-        if self.project and self.notes.toPlainText().strip() != self.project.description:
-            self.manager.update(self.project.id, description=self.notes.toPlainText().strip())
-            self.project = self.manager.get(self.project.id)
 
     def _delete_project(self):
         if self.project is None:

@@ -13,7 +13,7 @@ from ....core.store import fmt_num
 from ..comun import (
     BG_PAGE, BG_CARD, BORDER, TEXT, TEXT_DIM, TEXT_FAINT, BLUE, RED, GREEN, ORANGE, UI_FONT,
     label, chip, priority_chip, clear_layout, flat_btn, primary_btn, line_edit,
-    PRIORITY_COLOURS, PRIORITY_NAMES,
+    PRIORITY_COLOURS, PRIORITY_NAMES, LinkedFolderNotesWidget,
 )
 from ..comun.nav import _rgba
 from ..comun.widgets import StatTile, BlockProgress
@@ -45,6 +45,8 @@ class MetaDetail(QWidget):
     back_requested = Signal()
     edit_goal_requested = Signal(str)
     data_changed = Signal()
+    open_note_requested = Signal(str)
+    reveal_in_os_requested = Signal(str)
 
     def __init__(self, goal_mgr, area_mgr, habit_mgr, parent=None):
         super().__init__(parent)
@@ -183,6 +185,8 @@ class MetaDetail(QWidget):
         self.submeta_detail.back_requested.connect(self.close_submeta_detail)
         self.submeta_detail.edit_requested.connect(self._open_item)
         self.submeta_detail.data_changed.connect(self._changed)
+        self.submeta_detail.open_note_requested.connect(self.open_note_requested.emit)
+        self.submeta_detail.reveal_in_os_requested.connect(self.reveal_in_os_requested.emit)
         self.submetas_stack.addWidget(self.submeta_detail)
 
         sub_lay.addWidget(self.submetas_stack)
@@ -206,7 +210,19 @@ class MetaDetail(QWidget):
         self.hist.setSizeConstraint(QLayout.SetMinimumSize)
         self.stack.addWidget(self._scroll(hist))
 
-        # Notas
+        # Notas y Carpetas Vinculadas
+        notes_box = QWidget()
+        notes_lay = QVBoxLayout(notes_box)
+        notes_lay.setContentsMargins(0, 8, 0, 0)
+        notes_lay.setSpacing(10)
+
+        self.linked_widget = LinkedFolderNotesWidget(vault_root=getattr(goal_mgr, "vault_root", None))
+        self.linked_widget.open_note_requested.connect(self.open_note_requested.emit)
+        self.linked_widget.reveal_in_os_requested.connect(self.reveal_in_os_requested.emit)
+        self.linked_widget.data_changed.connect(self._save_linked)
+        notes_lay.addWidget(self.linked_widget)
+
+        notes_lay.addWidget(label("DESCRIPCIÓN Y NOTAS DE LA META", TEXT_FAINT, 10, True))
         self.notes = QTextEdit()
         self.notes.setPlaceholderText("Describe la meta, por qué importa y cómo sabrás que la lograste…")
         self.notes.setStyleSheet(
@@ -217,7 +233,8 @@ class MetaDetail(QWidget):
         self._notes_timer.setInterval(800)
         self._notes_timer.timeout.connect(self._save_notes)
         self.notes.textChanged.connect(self._notes_timer.start)
-        self.stack.addWidget(self.notes)
+        notes_lay.addWidget(self.notes, 1)
+        self.stack.addWidget(notes_box)
         self.show_tab("submetas")
 
     def _scroll(self, widget):
@@ -237,6 +254,7 @@ class MetaDetail(QWidget):
         self.submetas_board.habit_mgr = habit_mgr
         self.submeta_detail.goal_mgr = goal_mgr
         self.submeta_detail.habit_mgr = habit_mgr
+        self.linked_widget.set_vault_root(getattr(goal_mgr, "vault_root", None))
         self.goal = None
 
     # ── Loading ───────────────────────────────────────────────────────────
@@ -365,6 +383,12 @@ class MetaDetail(QWidget):
         elif key == "historial":
             self._render_history()
         elif key == "notas":
+            extra = self.goal.extra or {}
+            self.linked_widget.set_vault_root(getattr(self.goal_mgr, "vault_root", None))
+            self.linked_widget.set_data(
+                folder=extra.get("linked_folder", ""),
+                notes=extra.get("linked_notes", []),
+            )
             if not self.notes.hasFocus():
                 self.notes.blockSignals(True)
                 self.notes.setPlainText(self.goal.description)
@@ -551,6 +575,17 @@ class MetaDetail(QWidget):
         if self.goal and self.notes.toPlainText().strip() != self.goal.description:
             self.goal_mgr.update_goal(self.goal.id, description=self.notes.toPlainText().strip())
             self.goal = self.goal_mgr.get_goal(self.goal.id)
+
+    def _save_linked(self):
+        if not self.goal:
+            return
+        folder, notes = self.linked_widget.get_data()
+        extra = dict(self.goal.extra or {})
+        extra["linked_folder"] = folder
+        extra["linked_notes"] = notes
+        self.goal_mgr.update_goal(self.goal.id, extra=extra)
+        self.goal = self.goal_mgr.get_goal(self.goal.id)
+        self.data_changed.emit()
 
     def _delete_goal(self):
         if self.goal is None:

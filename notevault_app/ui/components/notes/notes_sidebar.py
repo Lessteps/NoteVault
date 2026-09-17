@@ -22,6 +22,7 @@ from ....config import AppConfig
 from ... import theme
 from .vault_dialog import VaultDialog
 from .file_icons import icon_for
+from .knowledge_graph_widget import KnowledgeGraphWidget
 
 BG_PANEL   = "#1a1a1e"
 BG_TAB     = "#202024"
@@ -35,6 +36,7 @@ ACCENT_SOFT = "rgba(124, 90, 240, 0.18)"
 TAB_FILES     = 0
 TAB_SEARCH    = 1
 TAB_BOOKMARKS = 2
+TAB_GRAPH     = 3
 
 
 class _TabButton(QPushButton):
@@ -100,6 +102,9 @@ class NotesSidebar(QWidget):
         self._stack.addWidget(self._build_files_page())      # 0
         self._stack.addWidget(self._build_search_page())     # 1
         self._stack.addWidget(self._build_bookmarks_page())  # 2
+        self._graph_widget = KnowledgeGraphWidget(self.vault.vault_root)
+        self._graph_widget.open_note_requested.connect(self._open_graph_note)
+        self._stack.addWidget(self._graph_widget)            # 3
         root.addWidget(self._stack, stretch=1)
 
         root.addWidget(self._build_vault_switcher())
@@ -125,6 +130,7 @@ class NotesSidebar(QWidget):
             ("🗀", "Files — explorador de archivos"),
             ("🔍", "Search — buscar en todas las notas"),
             ("🔖", "Bookmarks — notas marcadas"),
+            ("🕸", "Grafo — mapa interactivo del conocimiento"),
         ]):
             b = _TabButton(glyph, tip)
             b.clicked.connect(lambda _=False, i=idx: self.set_tab(i))
@@ -303,6 +309,8 @@ class NotesSidebar(QWidget):
             self.refresh_bookmarks()
         elif index == TAB_SEARCH:
             self._search_input.setFocus()
+        elif index == TAB_GRAPH:
+            self._graph_widget.reload()
 
     # ── Tool actions ──────────────────────────────────────────────────────
 
@@ -324,8 +332,15 @@ class NotesSidebar(QWidget):
         )
         if not ok or not title.strip():
             return
-        note = self.service.create_note(title.strip(), folder)
+        clean_title = title.strip()
+        note = self.service.create_note(clean_title, folder)
+        item = self._find_item(folder)
+        if item is not None:
+            data = item.data(0, Qt.UserRole) or {}
+            data["loaded"] = False
+            item.setData(0, Qt.UserRole, data)
         self.populate_tree(note.path)
+        self.reveal(note.path)
         self.note_selected.emit(note.path)
 
     def new_folder(self):
@@ -336,8 +351,14 @@ class NotesSidebar(QWidget):
         )
         if not ok or not name.strip():
             return
-        self.service.create_folder(name.strip(), parent)
+        created_folder = self.service.create_folder(name.strip(), parent)
+        item = self._find_item(parent)
+        if item is not None:
+            data = item.data(0, Qt.UserRole) or {}
+            data["loaded"] = False
+            item.setData(0, Qt.UserRole, data)
         self.populate_tree(self._active_path)
+        self._reveal_path(created_folder)
 
     def _toggle_sort(self):
         self._numeric_sort = self._btn_sort.isChecked()
@@ -548,17 +569,39 @@ class NotesSidebar(QWidget):
             item.setExpanded(not item.isExpanded())
 
     def _filter_tree(self, query: str):
-        q = (query or "").lower()
+        q = (query or "").strip().lower()
+        if not q:
+            def unhide(item):
+                item.setHidden(False)
+                for i in range(item.childCount()):
+                    unhide(item.child(i))
+            root = self._tree.invisibleRootItem()
+            for i in range(root.childCount()):
+                unhide(root.child(i))
+            return
+
+        # Pre-load any matching files so lazy folders don't hide matches
+        try:
+            for p in self.vault.vault_root.rglob("*"):
+                if p.name.startswith(".") or ".notevault" in p.parts or ".trash" in p.parts:
+                    continue
+                if q in p.name.lower():
+                    self._reveal_path(p)
+        except Exception:
+            pass
 
         def apply(item):
             text = item.text(0).lower()
-            hit = not q or q in text
+            data = item.data(0, Qt.UserRole) or {}
+            if data.get("type") == "placeholder":
+                return False
+            hit = q in text
             child_hit = False
             for i in range(item.childCount()):
                 if apply(item.child(i)):
                     child_hit = True
             item.setHidden(not (hit or child_hit))
-            if q and child_hit:
+            if child_hit:
                 item.setExpanded(True)
             return hit or child_hit
 
@@ -728,5 +771,12 @@ class NotesSidebar(QWidget):
         self.service = service
         self._active_path = None
         self._vault_name_label.setText(vault.vault_root.name)
+        self._graph_widget.set_vault(vault.vault_root)
         self.populate_tree()
         self.refresh_bookmarks()
+
+    def _open_graph_note(self, note_id: str):
+        """Open a note from the knowledge graph by its vault-relative posix path."""
+        path = self.vault.vault_root / note_id
+        if path.exists():
+            self.note_selected.emit(path)

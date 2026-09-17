@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 from ... import theme
 from . import (
-    BORDER, TEXT, TEXT_DIM, TEXT_FAINT, BLUE, RED, UI_FONT, PRIORITY_COLOURS,
+    BORDER, TEXT, TEXT_DIM, TEXT_FAINT, BLUE, RED, GREEN, UI_FONT, PRIORITY_COLOURS,
     PRIORITY_GLYPHS, label, clear_layout,
 )
 
@@ -40,14 +40,19 @@ def _font(size, bold=False):
 
 class CardDelegate(QStyledItemDelegate):
     """card: {id, key, title, priority, type_icon, due_text, due_colour,
-    labels: [str], parent_text, done}"""
+    labels: [str], parent_text, done, subtasks: [...]}"""
 
     def sizeHint(self, option, index):
         card = index.data(CARD_ROLE) or {}
         width = max(120, option.rect.width() or COLUMN_WIDTH - 24)
         fm_lines = 1 if len(card.get("title", "")) * 7 < width - 30 else 2
         extra = 16 if card.get("parent_text") else 0
-        return QSize(width, 70 + 17 * fm_lines + extra)
+        subtasks = card.get("subtasks") or []
+        subtask_extra = 0
+        if subtasks:
+            visible_count = min(len(subtasks), 4)
+            subtask_extra = 22 + visible_count * 16 + (14 if len(subtasks) > 4 else 0)
+        return QSize(width, 70 + 17 * fm_lines + extra + subtask_extra)
 
     def paint(self, p: QPainter, option, index):
         card = index.data(CARD_ROLE) or {}
@@ -90,6 +95,57 @@ class CardDelegate(QStyledItemDelegate):
             p.setPen(_c(TEXT_DIM))
             p.drawText(QRectF(chip_x, y, tw, 16), Qt.AlignCenter, text)
             chip_x += tw + 4
+        if card.get("labels"):
+            y += 20
+
+        # Subtasks block inside the parent card
+        subtasks = card.get("subtasks") or []
+        if subtasks:
+            done_cnt = sum(1 for s in subtasks if s.get("done"))
+            total_cnt = len(subtasks)
+            # Progress line
+            p.setFont(_font(10, True))
+            p.setPen(_c(TEXT_DIM))
+            p.drawText(QRectF(x, y, w - 70, 14), Qt.AlignLeft | Qt.AlignVCenter, f"↳ Subtareas: {done_cnt}/{total_cnt}")
+            # Mini progress bar
+            bar_w = 60
+            bar_h = 4
+            bx = r.right() - 10 - bar_w
+            by = y + 5
+            p.setPen(Qt.NoPen)
+            p.setBrush(_c("#333338"))
+            p.drawRoundedRect(QRectF(bx, by, bar_w, bar_h), 2, 2)
+            if total_cnt > 0 and done_cnt > 0:
+                p.setBrush(_c(GREEN))
+                p.drawRoundedRect(QRectF(bx, by, bar_w * (done_cnt / total_cnt), bar_h), 2, 2)
+            y += 18
+
+            # Paint up to 4 subtask items
+            p.setFont(_font(10))
+            for s in subtasks[:4]:
+                is_done = s.get("done", False)
+                s_icon = "☑" if is_done else "☐"
+                p.setPen(_c(GREEN if is_done else TEXT_FAINT))
+                p.drawText(QRectF(x + 4, y, 14, 14), Qt.AlignLeft | Qt.AlignVCenter, s_icon)
+
+                p.setPen(_c(TEXT_FAINT if is_done else TEXT_DIM))
+                title_w = w - 75
+                stitle = p.fontMetrics().elidedText(s.get("title", ""), Qt.ElideRight, int(title_w))
+                p.drawText(QRectF(x + 20, y, title_w, 14), Qt.AlignLeft | Qt.AlignVCenter, stitle)
+
+                s_status = s.get("status", "")
+                if s_status:
+                    p.setPen(_c(GREEN if is_done else TEXT_FAINT))
+                    p.drawText(QRectF(r.right() - 65, y, 55, 14), Qt.AlignRight | Qt.AlignVCenter, s_status)
+                y += 16
+
+            if len(subtasks) > 4:
+                p.setPen(_c(TEXT_FAINT))
+                p.setFont(_font(9, False))
+                p.drawText(QRectF(x + 20, y, w - 20, 14), Qt.AlignLeft | Qt.AlignVCenter, f"+{len(subtasks) - 4} más…")
+                y += 14
+            y += 4
+
         y = r.bottom() - 22
 
         p.setFont(_font(11))

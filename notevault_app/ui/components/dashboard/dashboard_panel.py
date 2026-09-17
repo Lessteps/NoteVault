@@ -24,6 +24,7 @@ from ..tareas.tareas_common import (
     BG_PAGE, BG_CARD, BORDER, TEXT, TEXT_DIM, TEXT_FAINT,
     BLUE, GREEN, ORANGE, RED, STAR, flat_btn,
 )
+from ..comun import line_edit, combo
 
 DAY_KEYS = ["lunes", "martes", "miercoles", "jueves",
             "viernes", "sabado", "domingo"]
@@ -525,6 +526,69 @@ class DashboardPanel(QWidget):
             n.setStyleSheet(f"color:{'#63636c' if checked else TEXT};font-size:12px;background:transparent;border:none;")
             r.addWidget(n, 1)
             lay.addLayout(r)
+
+        # ── Inline quick entry ─────────────────────────────────────────────
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet(f"QFrame{{background:{BORDER};border:none;}}")
+        sep.setFixedHeight(1)
+        lay.addSpacing(6)
+        lay.addWidget(sep)
+        lay.addSpacing(4)
+
+        from ..comun.widgets import MoneyEdit
+        type_box = combo(
+            [(fin.TYPE_LABELS[t], t) for t in (fin.GASTO, fin.INGRESO, fin.AHORRO)], 30
+        )
+        q_amount = MoneyEdit(height=30)
+        q_amount.setFixedWidth(120)
+        q_what = line_edit("En qué", 30)
+
+        ACCENT = {"gasto": RED, "ingreso": GREEN, "ahorro": "#eab308"}
+
+        def _update_type_style():
+            kind = type_box.currentData()
+            a = ACCENT.get(kind, BLUE)
+            type_box.setStyleSheet(
+                f"QComboBox{{background:#252525;border:1px solid {a};border-radius:6px;"
+                f"color:{TEXT};font-size:12px;padding:0 8px;}}"
+                "QComboBox::drop-down{border:none;}"
+                f"QAbstractItemView{{background:#252525;color:{TEXT};}}"
+            )
+
+        type_box.currentIndexChanged.connect(lambda _: _update_type_style())
+        _update_type_style()
+
+        save_btn = flat_btn("↵ Guardar", height=30)
+
+        def _do_quick_save():
+            cents = q_amount.cents()
+            if not cents:
+                q_amount.setFocus()
+                return
+            what_text = q_what.text().strip()
+            if not what_text:
+                q_what.setFocus()
+                return
+            from datetime import datetime
+            kind = type_box.currentData()
+            self.finances.add(today, kind, cents, what=what_text,
+                              time=datetime.now().strftime("%H:%M"))
+            self.data_changed.emit()
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, self.refresh)
+
+        save_btn.clicked.connect(_do_quick_save)
+        q_amount.returnPressed.connect(_do_quick_save)
+        q_what.returnPressed.connect(_do_quick_save)
+
+        qrow = QHBoxLayout()
+        qrow.setSpacing(6)
+        qrow.addWidget(type_box)
+        qrow.addWidget(q_amount)
+        qrow.addWidget(q_what, 1)
+        qrow.addWidget(save_btn)
+        lay.addLayout(qrow)
         lay.addStretch()
         return card
 

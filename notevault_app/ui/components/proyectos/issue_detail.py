@@ -8,9 +8,11 @@ from PySide6.QtWidgets import (
 
 from ....core import vault_format
 from ....core.project_manager import TYPE_ICONS, TYPE_COLOURS, T_GOAL, T_SUBTASK
+from .rubric_dialog import open_rubric
 from ..comun import (
     BG_CARD, BORDER, TEXT, TEXT_DIM, TEXT_FAINT, BLUE, RED, GREEN, UI_FONT, CHECK_SS, label,
     combo, line_edit, flat_btn, primary_btn, clear_layout, chip, SubtasksWidget,
+    LinkedFolderNotesWidget,
 )
 
 from ..comun.widgets import priority_combo, BlockProgress, Check
@@ -31,6 +33,8 @@ class IssueDetail(QWidget):
     closed = Signal()
     open_issue = Signal(str)
     create_child = Signal(str)
+    open_note_requested = Signal(str)
+    reveal_in_os_requested = Signal(str)
 
     def __init__(self, manager, parent=None):
         super().__init__(parent)
@@ -57,6 +61,8 @@ class IssueDetail(QWidget):
         head = QHBoxLayout()
         self.key = label("", TEXT_FAINT, 12, True)
         head.addWidget(self.key)
+        self.modified_lbl = label("", TEXT_FAINT, 10)
+        head.addWidget(self.modified_lbl)
         head.addStretch()
         close = flat_btn("✕", height=24)
         close.setFixedWidth(30)
@@ -86,6 +92,7 @@ class IssueDetail(QWidget):
         self.subtasks_widget.subtask_toggled.connect(self._toggle_child_id)
         self.subtasks_widget.subtask_deleted.connect(self._delete_child_id)
         self.subtasks_widget.subtask_clicked.connect(self.open_issue.emit)
+        self.subtasks_widget.subtask_status_changed.connect(self._change_child_status)
         v.addWidget(self.subtasks_widget)
 
 
@@ -132,6 +139,12 @@ class IssueDetail(QWidget):
         self.checklist = label("", TEXT_FAINT, 11)
         v.addWidget(self.checklist)
 
+        v.addWidget(label("CARPETA Y NOTAS VINCULADAS", TEXT_FAINT, 10, True))
+        self.linked_widget = LinkedFolderNotesWidget(vault_root=manager.vault_root)
+        self.linked_widget.open_note_requested.connect(self.open_note_requested.emit)
+        self.linked_widget.reveal_in_os_requested.connect(self.reveal_in_os_requested.emit)
+        v.addWidget(self.linked_widget)
+
         v.addWidget(label("ADJUNTOS", TEXT_FAINT, 10, True))
         self.attachments = AttachmentStrip(manager.vault_root, "proyectos", "x")
         self.attachments.changed.connect(self._attachments_changed)
@@ -141,11 +154,16 @@ class IssueDetail(QWidget):
         self.delete_btn = flat_btn("Eliminar", RED, RED, height=32)
         self.delete_btn.clicked.connect(self._delete)
         buttons.addWidget(self.delete_btn)
+        self._rubric_btn = flat_btn("📊 Rúbrica", height=32)
+        self._rubric_btn.setToolTip("Evaluar este issue con rúbrica")
+        self._rubric_btn.clicked.connect(self._open_rubric)
+        buttons.addWidget(self._rubric_btn)
         buttons.addStretch()
         save = primary_btn("Guardar", height=32)
         save.clicked.connect(self.save)
         buttons.addWidget(save)
         v.addLayout(buttons)
+        self._rubric_scores: dict = {}
         self.hint = label("", TEXT_FAINT, 11, wrap=True)
         v.addWidget(self.hint)
         v.addStretch()
@@ -155,10 +173,17 @@ class IssueDetail(QWidget):
     def set_manager(self, manager):
         self.manager = manager
         self.attachments.vault_root = manager.vault_root
+        self.linked_widget.set_vault_root(manager.vault_root)
 
     def load(self, project, issue):
         self.project, self.issue = project, issue
         self.key.setText(f"{TYPE_ICONS.get(issue.type, '')}  {issue.key}")
+        if issue.updated:
+            self.modified_lbl.setText(f"· Modificado {issue.updated.strftime('%d/%m/%Y %H:%M')}")
+        elif issue.created:
+            self.modified_lbl.setText(f"· Creado {issue.created.strftime('%d/%m/%Y')}")
+        else:
+            self.modified_lbl.setText("")
         self.title.setText(issue.title)
         self.type.setCurrentIndex(max(0, self.type.findData(issue.type)))
         self.status.clear()
@@ -189,6 +214,12 @@ class IssueDetail(QWidget):
         total = done + issue.description.count("- [ ]")
         self.checklist.setText(f"Checklist: {done}/{total}" if total else "")
         self.attachments.set_owner(issue.id, issue.attachments)
+        extra = issue.extra or {}
+        self.linked_widget.set_project_notes_dir(self.manager.notes_dir(project.id))
+        self.linked_widget.set_data(
+            folder=extra.get("linked_folder", ""),
+            notes=extra.get("linked_notes", []),
+        )
         self.hint.setText("")
         self._render_children()
 
@@ -198,14 +229,23 @@ class IssueDetail(QWidget):
             return
         kids = self.issue.children
         items = []
+        statuses = list(self.project.columns) if self.project else []
         for k in kids:
             items.append({
                 "id": k.id,
                 "title": f"{k.key}  {k.title}",
                 "done": k.is_done,
                 "badge": k.status,
+                "statuses": statuses,
             })
         self.subtasks_widget.set_items(items)
+
+    def _change_child_status(self, kid_id: str, new_status: str):
+        if not self.project:
+            return
+        self.manager.set_issue_status(self.project.id, kid_id, new_status)
+        self.saved.emit(self.issue.id)
+        QTimer.singleShot(0, self._reload)
 
     def _add_child_subtask(self, title: str):
         if not self.issue or not self.project:
@@ -267,11 +307,28 @@ class IssueDetail(QWidget):
             repeat=rule, labels=[s.strip() for s in self.labels.text().split(",") if s.strip()],
             description=self.description.toPlainText().strip(),
         )
+        folder, notes = self.linked_widget.get_data()
+        extra = dict(self.issue.extra or {})
+        extra["linked_folder"] = folder
+        extra["linked_notes"] = notes
+        fields["extra"] = extra
         self.manager.update_issue(self.project.id, self.issue.id, **fields)
         self.hint.setText("Guardado ✓")
         iid = self.issue.id
         self.saved.emit(iid)
         QTimer.singleShot(0, self._reload)
+
+    def _open_rubric(self):
+        if self.issue is None:
+            return
+        title = f"{self.issue.key} — {self.issue.title}"
+        scores = open_rubric(title=title, existing_scores=self._rubric_scores or None, parent=self)
+        if scores is not None:
+            self._rubric_scores = scores
+            pct = scores.get("_pct", 0)
+            self.hint.setText(
+                f"Rúbrica: {scores.get('_total', 0)}/{scores.get('_max', 0)} ({pct}%)"
+            )
 
     def _delete(self):
         if self.issue is None:

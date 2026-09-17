@@ -287,6 +287,8 @@ class GoalManager:
                 setattr(obj, "description" if text_key == "description" else "notes", v or "")
             elif k in ("category", "is_priority"):
                 setattr(obj, k, v)
+            elif k == "extra":
+                obj.extra.update(dict(v or {}))
 
     # ── Items ─────────────────────────────────────────────────────────────
 

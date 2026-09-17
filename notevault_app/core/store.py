@@ -27,6 +27,7 @@ written. Value encoding depends on the key's declared type:
     list      comma-separated inside double quotes   "coding,math"
 """
 
+import ast
 import json
 import os
 import re
@@ -219,7 +220,17 @@ def parse_doc(text: str, fields) -> tuple:
         if key in types:
             values[key] = decode(types[key], raw)
         else:
-            extra[key] = unquote(raw)
+            txt = unquote(raw)
+            if (txt.startswith("[") and txt.endswith("]")) or (txt.startswith("{") and txt.endswith("}")):
+                try:
+                    extra[key] = json.loads(txt)
+                except Exception:
+                    try:
+                        extra[key] = ast.literal_eval(txt)
+                    except Exception:
+                        extra[key] = txt
+            else:
+                extra[key] = txt
     if end is not None:
         body = lines[end + 1:]
     return values, extra, "\n".join(body).strip()
@@ -232,8 +243,13 @@ def dump_doc(fields, values: dict, extra: Optional[dict] = None, body: str = "")
         if text is not None:
             out.append(f"{key}: {text}")
     for key, value in (extra or {}).items():
-        if str(value) != "":
-            out.append(f"{key}: {quote(value)}")
+        if value is not None and str(value) != "":
+            if isinstance(value, (list, tuple)):
+                out.append(f"{key}: {json.dumps(list(value), ensure_ascii=False)}")
+            elif isinstance(value, (dict, bool, int, float)):
+                out.append(f"{key}: {json.dumps(value, ensure_ascii=False)}")
+            else:
+                out.append(f"{key}: {quote(value)}")
     out.append("---")
     body = (body or "").strip()
     if body:

@@ -7,10 +7,10 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QFrame, QLayout,
 )
 
-from ....core.project_manager import ProjectStats, TYPE_ICONS
+from ....core.project_manager import ProjectStats, TYPE_ICONS, PROJECT_STATUS_COLORS
 from ..comun import (
     BG_PAGE, BG_CARD, BORDER, TEXT, TEXT_DIM, TEXT_FAINT, GREEN, RED, ORANGE, BLUE,
-    PRIORITY_NAMES, PRIORITY_COLOURS, label, clear_layout, flat_btn, fmt_short,
+    PRIORITY_NAMES, PRIORITY_COLOURS, label, clear_layout, flat_btn, fmt_short, chip,
 )
 from ..comun.widgets import StatTile, BlockProgress
 from ..comun.charts import BarChart, DonutChart, LineChart
@@ -32,6 +32,8 @@ def _panel() -> tuple:
 class ProyectoResumen(QWidget):
     show_in_board = Signal(str)      # submeta id
     open_issue = Signal(str)
+    create_submeta = Signal()
+    create_child_task = Signal(str)
 
     def __init__(self, manager, parent=None):
         super().__init__(parent)
@@ -64,6 +66,10 @@ class ProyectoResumen(QWidget):
             tiles.addWidget(t)
         self.page.addLayout(tiles)
 
+        # ── Sección principal: Metas y Submetas ────────────────────────────
+        subs, self.subs = _panel()
+        self.page.addWidget(subs)
+
         charts = QGridLayout()
         charts.setSpacing(12)
         p1, l1 = _panel()
@@ -85,9 +91,6 @@ class ProyectoResumen(QWidget):
         charts.setColumnStretch(0, 1)
         charts.setColumnStretch(1, 1)
         self.page.addLayout(charts)
-
-        subs, self.subs = _panel()
-        self.page.addWidget(subs)
         self.page.addStretch()
 
     def load(self, project):
@@ -136,31 +139,76 @@ class ProyectoResumen(QWidget):
 
         clear_layout(self.subs)
         head = QHBoxLayout()
-        head.addWidget(label("◆  Submetas", TEXT, 14, True))
+        head.addWidget(label("◆  Metas y Submetas del Proyecto", TEXT, 15, True))
         head.addStretch()
+        add_btn = flat_btn("+  Nueva Submeta", "#a78bfa", "#a78bfa", height=26)
+        add_btn.setToolTip("Crear una nueva Submeta / Objetivo en este proyecto")
+        add_btn.clicked.connect(self.create_submeta.emit)
+        head.addWidget(add_btn)
         self.subs.addLayout(head)
+
         rows = stats.submetas()
         if not rows:
-            self.subs.addWidget(label("Crea issues de tipo «Submeta» y cuelga tareas de ellas para ver "
-                                      "aquí su avance por separado.", TEXT_FAINT, 12, wrap=True))
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(6)
-        for c, text in enumerate(("Submeta", "Progreso", "Hechas", "Vencidas", "Estimado", "")):
-            grid.addWidget(label(text.upper(), TEXT_FAINT, 10, True), 0, c)
-        for r, (goal, gs) in enumerate(rows, start=1):
-            name = label(f"{goal.key}  {goal.title}", TEXT, 12)
-            name.setCursor(Qt.PointingHandCursor)
-            name.mousePressEvent = lambda _e, gid=goal.id: self.open_issue.emit(gid)
-            grid.addWidget(name, r, 0)
-            grid.addWidget(BlockProgress(gs["progress"], self.project.colour), r, 1)
-            grid.addWidget(label(f"{gs['done']}/{gs['total']}", TEXT_DIM, 12), r, 2)
-            grid.addWidget(label(str(gs["overdue"]), RED if gs["overdue"] else TEXT_FAINT, 12), r, 3)
-            est = gs["estimate_min"]
-            grid.addWidget(label(f"{round(gs['estimate_done_min'] / 60, 1):g}/{round(est / 60, 1):g} h"
-                                 if est else "—", TEXT_DIM, 12), r, 4)
-            btn = flat_btn("Ver en tablero", height=24)
-            btn.clicked.connect(lambda _c=False, gid=goal.id: self.show_in_board.emit(gid))
-            grid.addWidget(btn, r, 5)
-        grid.setColumnStretch(0, 1)
-        self.subs.addLayout(grid)
+            empty_box = QWidget()
+            ev = QVBoxLayout(empty_box)
+            ev.setContentsMargins(8, 12, 8, 12)
+            ev.addWidget(label(
+                "Aún no has planteado Submetas u Objetivos para este proyecto.\n"
+                "Haz clic en «+ Nueva Submeta» para definir una fase u objetivo y organizar tus tareas.",
+                TEXT_FAINT, 12, wrap=True
+            ))
+            self.subs.addWidget(empty_box)
+        else:
+            for goal, gs in rows:
+                card_frame = QFrame()
+                card_frame.setStyleSheet(
+                    f"QFrame{{background:#202024;border:1px solid {BORDER};border-radius:8px;padding:6px;}}"
+                )
+                cv = QVBoxLayout(card_frame)
+                cv.setContentsMargins(10, 8, 10, 8)
+                cv.setSpacing(6)
+
+                frow = QHBoxLayout()
+                frow.setSpacing(8)
+                gtitle = label(f"◆  {goal.key}  {goal.title}", TEXT, 13, True)
+                gtitle.setCursor(Qt.PointingHandCursor)
+                gtitle.mousePressEvent = lambda _e, gid=goal.id: self.open_issue.emit(gid)
+                frow.addWidget(gtitle)
+                frow.addWidget(chip(goal.status, "#a78bfa"))
+                frow.addStretch()
+                frow.addWidget(BlockProgress(gs["progress"], self.project.colour, blocks=10))
+                frow.addWidget(label(f"{gs['done']}/{gs['total']} hechas", TEXT_DIM, 11))
+
+                add_t_btn = flat_btn("+ Tarea", height=22)
+                add_t_btn.setToolTip(f"Añadir tarea bajo {goal.key}")
+                add_t_btn.clicked.connect(lambda _c=False, gid=goal.id: self.create_child_task.emit(gid))
+                frow.addWidget(add_t_btn)
+
+                board_btn = flat_btn("Ver en tablero", height=22)
+                board_btn.clicked.connect(lambda _c=False, gid=goal.id: self.show_in_board.emit(gid))
+                frow.addWidget(board_btn)
+                cv.addLayout(frow)
+
+                # Tareas dependientes
+                kids = goal.children
+                if kids:
+                    kv = QVBoxLayout()
+                    kv.setContentsMargins(16, 4, 4, 4)
+                    kv.setSpacing(4)
+                    for k in kids:
+                        krow = QHBoxLayout()
+                        krow.setSpacing(6)
+                        kicon = label(TYPE_ICONS.get(k.type, "☑"), TEXT_FAINT, 11)
+                        ktitle = label(f"{k.key}  {k.title}", TEXT if not k.is_done else TEXT_FAINT, 11)
+                        ktitle.setCursor(Qt.PointingHandCursor)
+                        ktitle.mousePressEvent = lambda _e, kid=k.id: self.open_issue.emit(kid)
+                        krow.addWidget(kicon)
+                        krow.addWidget(ktitle)
+                        krow.addStretch()
+                        krow.addWidget(chip(k.status, GREEN if k.is_done else TEXT_DIM))
+                        kv.addLayout(krow)
+                    cv.addLayout(kv)
+                else:
+                    cv.addWidget(label("   ↳ Sin tareas asignadas aún. Usa «+ Tarea» para desglosarla.", TEXT_FAINT, 11))
+
+                self.subs.addWidget(card_frame)

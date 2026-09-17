@@ -9,12 +9,14 @@ from PySide6.QtWidgets import (
 )
 
 from ....core import vault_format
-from ....core.project_manager import PROJECT_STATUSES, derive_key
+from ....core.project_manager import (
+    PROJECT_STATUSES, derive_key, TYPE_ICONS, T_GOAL, T_TASK, T_SUBTASK,
+)
 from ..comun import (
     TEXT, TEXT_DIM, TEXT_FAINT, BORDER, BLUE, UI_FONT, CHECK_SS, line_edit, combo, flat_btn,
     label,
 )
-from ..comun.widgets import FormDialog, area_combo, ColourPicker, icon_edit
+from ..comun.widgets import FormDialog, area_combo, ColourPicker, icon_edit, priority_combo
 from ..tareas.date_picker import DateButton
 
 
@@ -168,3 +170,69 @@ class ProjectDialog(FormDialog):
                     deadline=self.deadline.value(), colour=self.colour.value(),
                     in_calendar=self.in_calendar.isChecked(),
                     _columns=columns, _done=done, _renames=renames)
+
+
+class CreateIssueDialog(FormDialog):
+    """Diálogo completo para crear un issue o plantear una Submeta en el proyecto."""
+
+    def __init__(self, project, manager, initial_type=T_TASK, initial_parent="",
+                 initial_status="", parent=None):
+        title = "Nueva Submeta" if initial_type == T_GOAL else "Crear issue"
+        super().__init__(title, parent, width=460)
+        self.project = project
+        self.manager = manager
+
+        self.title_input = self.add_row(
+            "Título",
+            line_edit("p. ej. Fase 1: Arquitectura y modelos" if initial_type == T_GOAL else "Título del issue", 32)
+        )
+        self.type_combo = self.add_row(
+            "Tipo",
+            combo([(f"{TYPE_ICONS[t]}  {t}", t) for t in vault_format.ISSUE_TYPES], 32)
+        )
+        self.type_combo.setCurrentIndex(max(0, self.type_combo.findData(initial_type)))
+
+        self.parent_combo = self.add_row("Padre", combo([], 32))
+        self._fill_parents(initial_parent)
+
+        cols = [(c, c) for c in project.columns]
+        self.status_combo = self.add_row("Estado", combo(cols, 32))
+        if initial_status and self.status_combo.findData(initial_status) >= 0:
+            self.status_combo.setCurrentIndex(self.status_combo.findData(initial_status))
+
+        self.priority_combo = self.add_row("Prioridad", priority_combo(2, 32))
+        self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+
+        self.finish()
+        self.title_input.setFocus()
+
+    def _fill_parents(self, selected_parent=""):
+        self.parent_combo.clear()
+        self.parent_combo.addItem("Sin padre", "")
+        for other in sorted(self.manager.issues(self.project.id), key=lambda i: (i.order, i.number)):
+            if other.type in (T_GOAL, T_TASK):
+                self.parent_combo.addItem(f"{TYPE_ICONS.get(other.type, '')} {other.key} {other.title}", other.id)
+        if selected_parent:
+            self.parent_combo.setCurrentIndex(max(0, self.parent_combo.findData(selected_parent)))
+
+    def _on_type_changed(self):
+        t = self.type_combo.currentData()
+        if t == T_GOAL and self.parent_combo.currentIndex() != 0:
+            # Submetas normalmente son raíz o agrupan tareas
+            pass
+
+    def accept(self):
+        if not self.title_input.text().strip():
+            self.title_input.setFocus()
+            return
+        super().accept()
+
+    def fields(self) -> dict:
+        return {
+            "title": self.title_input.text().strip(),
+            "type": self.type_combo.currentData(),
+            "parent": self.parent_combo.currentData() or "",
+            "status": self.status_combo.currentData(),
+            "priority": self.priority_combo.currentData(),
+        }
+

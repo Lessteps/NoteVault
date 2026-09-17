@@ -137,6 +137,26 @@ _DARK_TO_LIGHT.update({
     "#eab308": "#a87a00",   # yellow
 })
 
+# Slate palette & modern hexes used in Metas and Proyectos
+_DARK_TO_LIGHT.update({
+    "#0f172a": "#f1efe9",   # slate-900 -> very light background
+    "#1e293b": "#e8e3d8",   # slate-800 -> light card surface
+    "#334155": "#d9d0bf",   # slate-700 -> light border / pill
+    "#475569": "#857b66",   # slate-600 -> text faint
+    "#64748b": "#5f5747",   # slate-500 -> text dim
+    "#94a3b8": "#463f33",   # slate-400 -> text normal
+    "#1c1c20": "#fffaf1",   # dark editor well -> white paper
+    "#28282e": "#efe7d8",   # action button -> light button
+    "#38bdf8": "#0284c7",   # sky blue (darkened for light theme)
+    "#a855f7": "#7e22ce",   # purple (darkened for light theme)
+    "#ec4899": "#be185d",   # pink (darkened for light theme)
+    "#f43f5e": "#e11d48",   # rose (darkened for light theme)
+    "#10b981": "#047857",   # emerald (darkened for light theme)
+    "#f8fafc": "#171310",   # slate-50 -> darkest text in light theme
+    "#f1f5f9": "#2b2620",   # slate-100 -> dark text in light theme
+    "#243044": "#e0d8cb",   # slate card hover
+})
+
 _HEX_RE = re.compile(r"#[0-9a-fA-F]{6}\b")
 _WHITE_RGBA_RE = re.compile(r"rgba\(\s*255\s*,\s*255\s*,\s*255\s*,")
 

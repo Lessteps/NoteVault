@@ -229,6 +229,8 @@ class MainWindow(QMainWindow):
         self._proj_panel.project_changed.connect(
             lambda pid: self._proj_left.set_active(pid or "__board__"))
         self._proj_left.new_requested.connect(self._proj_panel.new_project)
+        self._proj_panel.open_note_requested.connect(self.open_note_at_path)
+        self._proj_panel.reveal_in_os_requested.connect(self.reveal_in_os)
         self._calendario_left.view_requested.connect(self._calendario_panel.show_view)
         self._calendario_left.date_selected.connect(self._calendario_panel.set_date)
         self._calendario_left.filters_changed.connect(self._calendario_panel.set_filters)
@@ -258,6 +260,8 @@ class MainWindow(QMainWindow):
         self._metas_panel.view_changed.connect(self._metas_left.set_view)
         self._metas_panel.data_changed.connect(self._metas_left.refresh)
         self._metas_panel.calendar_requested.connect(self._goals_calendar)
+        self._metas_panel.open_note_requested.connect(self.open_note_at_path)
+        self._metas_panel.reveal_in_os_requested.connect(self.reveal_in_os)
 
         # ── Notes module ──────────────────────────────────────────────
         self._explorer.note_selected.connect(self._notas_center.open_note)
@@ -275,6 +279,7 @@ class MainWindow(QMainWindow):
         self._notas_center.assistant_toggled.connect(self.toggle_assistant)
         self._notas_center.set_assistant_visible(self._assistant_visible)
         self._notas_center.reveal_requested.connect(self._reveal_in_explorer)
+        self._notas_center.context_action_requested.connect(self._on_context_action_requested)
         self._notas_right.close_requested.connect(self.toggle_assistant)
         self._notas_right.insert_requested.connect(
             self._notas_center.insert_markdown)
@@ -520,6 +525,45 @@ class MainWindow(QMainWindow):
         if self._mode == MODE_NOTAS:
             self._explorer.reveal(path)
 
+    def open_note_at_path(self, note_path):
+        """Switch to Notas mode, reveal the note in the explorer and open it in the editor."""
+        if not note_path:
+            return
+        p = Path(note_path)
+        if not p.is_absolute():
+            p = self.vault.vault_root / p
+        if not p.exists():
+            return
+        if p.suffix.lower() != ".md":
+            try:
+                import os
+                os.startfile(str(p))
+            except Exception:
+                pass
+            return
+        self._switch_mode(MODE_NOTAS)
+        self._notas_center.open_note(p)
+        self._explorer.reveal(p)
+
+    def reveal_in_os(self, path_str):
+        """Open file or folder in system file explorer."""
+        if not path_str:
+            return
+        p = Path(path_str)
+        if not p.is_absolute():
+            p = self.vault.vault_root / p
+        if not p.exists():
+            return
+        try:
+            import os
+            import subprocess
+            if p.is_dir():
+                os.startfile(str(p))
+            else:
+                subprocess.Popen(f'explorer.exe /select,"{p.resolve()}"')
+        except Exception:
+            pass
+
     def _open_habit_editor(self, habit_id: str):
         from .components.habit_tracker.habit_tracker_panel import VIEW_MANAGE
         self._switch_mode(MODE_HABITS)
@@ -626,3 +670,37 @@ class MainWindow(QMainWindow):
         self._metas_panel.refresh()
         self._refresh_finanzas()
         self._dashboard.refresh()
+
+    def _on_context_action_requested(self, action_id: str, context_text: str, meta: dict):
+        if not self._assistant_visible:
+            self.toggle_assistant()
+
+        prompts = {
+            "solve": f"Resuelve o simplifica paso a paso la siguiente expresión matemática de la nota:\n\n```text\n{context_text}\n```",
+            "derive": f"Calcula la derivada simbólica paso a paso de la siguiente expresión:\n\n```text\n{context_text}\n```",
+            "integrate": f"Calcula la integral simbólica paso a paso de la siguiente expresión:\n\n```text\n{context_text}\n```",
+            "graph": f"Analiza matemáticamente y describe las propiedades para graficar (raíces, asíntotas, máximos y mínimos) de la función:\n\n```text\n{context_text}\n```",
+            "latex": f"Convierte o formatea la siguiente expresión a LaTeX limpio y profesional:\n\n```text\n{context_text}\n```",
+            "decompose": f"Descompón paso a paso la solución del siguiente problema e identifica el método utilizado:\n\n```text\n{context_text}\n```",
+            "verify": f"Verifica la corrección matemática y el razonamiento del siguiente desarrollo, señalando cualquier error:\n\n```text\n{context_text}\n```",
+            "run": f"Analiza y simula la ejecución paso a paso del siguiente código, indicando la salida esperada y posibles fallos:\n\n```python\n{context_text}\n```",
+            "test": f"Diseña una suite completa de pruebas unitarias para el siguiente código, cubriendo casos normales y casos límite:\n\n```python\n{context_text}\n```",
+            "debug": f"Depura el siguiente código. Identifica el error exacto, explica la causa raíz y propón la solución corregida:\n\n```python\n{context_text}\n```",
+            "explain": f"Explica de forma didáctica y clara la lógica del siguiente fragmento, incluyendo complejidad algorítmica si aplica:\n\n```text\n{context_text}\n```",
+            "optimize": f"Optimiza el siguiente código para mejorar su eficiencia temporal y espacial, explicando las mejoras:\n\n```python\n{context_text}\n```",
+            "variant": f"Genera una variante desafiante del siguiente problema para entrenar la misma habilidad:\n\n```text\n{context_text}\n```",
+            "translate": f"Traduce de forma fluida y precisa el siguiente texto, añadiendo notas lingüísticas si es necesario:\n\n```text\n{context_text}\n```",
+            "vocabulary": f"Extrae el vocabulario clave del siguiente texto con su significado contextual, categoría gramatical, pronunciación IPA y ejemplo:\n\n```text\n{context_text}\n```",
+            "grammar": f"Explica la estructura gramatical utilizada en el siguiente texto, reglas, excepciones y posibles errores comunes:\n\n```text\n{context_text}\n```",
+            "cloze": f"Genera un ejercicio tipo cloze (rellenar huecos) basado en el siguiente texto con opciones múltiples y solución explicada:\n\n```text\n{context_text}\n```",
+            "listening": f"Genera un guión de comprensión auditiva con preguntas de opción múltiple y vocabulario clave a partir de:\n\n```text\n{context_text}\n```",
+            "questions": f"Formula 5 preguntas de comprensión y reflexión activa basadas en:\n\n```text\n{context_text}\n```",
+            "summarize": f"Sintetiza los puntos fundamentales del siguiente contenido en 5 ideas clave con formato markdown:\n\n```text\n{context_text}\n```",
+            "flashcard": f"Crea una tarjeta de recuperación activa (pregunta frontal y respuesta detallada al reverso) sobre:\n\n```text\n{context_text}\n```",
+            "extract_concepts": f"Extrae y define los conceptos principales presentes en:\n\n```text\n{context_text}\n```",
+            "link_concepts": f"Identifica conceptos relacionados y prerrequisitos para vincular con otras notas a partir de:\n\n```text\n{context_text}\n```",
+            "exercise": f"Genera un ejercicio interactivo de práctica activa adecuado al nivel del siguiente tema:\n\n```text\n{context_text}\n```",
+        }
+
+        query = prompts.get(action_id, f"Analiza y explica en profundidad el siguiente contenido:\n\n{context_text}")
+        self._notas_right.ask(query)

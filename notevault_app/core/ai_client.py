@@ -113,12 +113,21 @@ PROVIDERS = [
 PROVIDER_BY_KEY = {p.key: p for p in PROVIDERS}
 
 SYSTEM_PROMPT = (
-    "Eres el asistente de escritura de NoteVault, una app de notas en "
+    "Eres el asistente de estudio y aprendizaje de NoteVault, una app de notas en "
     "markdown. Respondes en español salvo que te pidan otro idioma. "
     "Cuando generes contenido para una nota devuelve markdown limpio: "
     "títulos con #, listas con -, negrita con **. No expliques lo que vas "
     "a hacer, entrega directamente el contenido."
 )
+
+AI_MODES = {
+    "tutor": "Modo Tutor: Explica con claridad pedagógica y sin jerga innecesaria. Prioriza la comprensión profunda.",
+    "socratic": "Modo Socrático: No des la respuesta directa inmediatamente. Guía mediante preguntas reflexivas y pistas progresivas para que el estudiante descubra la solución.",
+    "examiner": "Modo Examinador: Evalúa el conocimiento formulando preguntas rigurosas, desafiando supuestos y calificando la precisión de las respuestas.",
+    "evaluator": "Modo Evaluador: Analiza detalladamente el trabajo o respuesta entregada. Clasifica errores, evalúa criterios y proporciona retroalimentación constructiva.",
+    "generator": "Modo Generador: Crea ejercicios y problemas estructurados con restricciones estrictas de nivel, tema y objetivos formativos.",
+    "debugger": "Modo Depurador: Analiza fallos de código o razonamiento paso a paso, ayudando a aislar la causa raíz y verificar la corrección.",
+}
 
 
 @dataclass
@@ -267,9 +276,16 @@ def list_models(cfg: AIConfig) -> list:
 
 def build_messages(cfg: AIConfig, history: list, question: str,
                    note_title: str = "", note_body: str = "",
-                   selection: str = "") -> list:
+                   selection: str = "", mode: str = "tutor",
+                   workspace_prompt: str = "") -> list:
     """history is a list of {'role','content'} already exchanged."""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    sys_content = SYSTEM_PROMPT
+    if workspace_prompt:
+        sys_content += f"\n\nContexto de disciplina:\n{workspace_prompt}"
+    if mode in AI_MODES:
+        sys_content += f"\n\nDirectiva de modo activo:\n{AI_MODES[mode]}"
+
+    messages = [{"role": "system", "content": sys_content}]
 
     context = ""
     if cfg.include_note and (note_title or note_body):

@@ -15,6 +15,8 @@ class MetasPanel(QWidget):
     data_changed = Signal()
     view_changed = Signal(str)
     calendar_requested = Signal()
+    open_note_requested = Signal(str)
+    reveal_in_os_requested = Signal(str)
 
     def __init__(self, goal_mgr, area_mgr, habit_mgr, parent=None):
         super().__init__(parent)
@@ -37,6 +39,8 @@ class MetasPanel(QWidget):
         self.detail.back_requested.connect(self.show_board)
         self.detail.edit_goal_requested.connect(self.edit_goal)
         self.detail.data_changed.connect(self.data_changed.emit)
+        self.detail.open_note_requested.connect(self.open_note_requested.emit)
+        self.detail.reveal_in_os_requested.connect(self.reveal_in_os_requested.emit)
         self.today.goal_opened.connect(self.open_goal)
         self.today.data_changed.connect(self.data_changed.emit)
 

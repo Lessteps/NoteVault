@@ -1622,6 +1622,10 @@ class MarkdownEditor(QWidget):
         self.vault = vault
         self.service = service
         self._mentions.service = service
+        # Re-point workspace detection at the new vault; otherwise the study
+        # toolbar keeps reading profiles from the previous vault's .notevault.
+        self._workspace_manager = WorkspaceManager(vault.vault_root)
+        self._current_workspace = self._workspace_manager.get("general")
         self._reordering = True
         while self._tabs.count():
             self._tabs.removeTab(0)

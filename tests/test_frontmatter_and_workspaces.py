@@ -129,6 +129,52 @@ class TestWorkspaceManager(unittest.TestCase):
         self.assertTrue(prog["features"]["debugging"])
         self.assertFalse(prog["features"]["calculator"])
 
+    def test_ensure_folder_creates_structure_and_index(self):
+        wm = WorkspaceManager(self.vault)
+        r = wm.ensure_folder("mathematics", with_structure=True)
+        self.assertTrue(r["created"])
+        self.assertTrue(r["path"].is_dir())
+        self.assertEqual(r["path"].name, "Matemáticas")
+        self.assertTrue(r["index"].exists())
+        self.assertGreater(len(r["subfolders"]), 0)
+        # The index carries subject: so the mode survives a rename.
+        self.assertIn("subject: mathematics", r["index"].read_text(encoding="utf-8"))
+
+    def test_ensure_folder_is_idempotent(self):
+        wm = WorkspaceManager(self.vault)
+        wm.ensure_folder("english", with_structure=False)
+        again = wm.ensure_folder("english", with_structure=False)
+        self.assertFalse(again["created"])
+
+    def test_ensure_folder_reuses_name_variant(self):
+        # A folder called "Math" already exists → no duplicate "Matemáticas".
+        (self.vault / "Math").mkdir()
+        wm = WorkspaceManager(self.vault)
+        r = wm.ensure_folder("mathematics", with_structure=False)
+        self.assertFalse(r["created"])
+        self.assertEqual(r["path"].name, "Math")
+        self.assertFalse((self.vault / "Matemáticas").exists())
+
+    def test_ensure_folder_without_structure(self):
+        wm = WorkspaceManager(self.vault)
+        r = wm.ensure_folder("programming", with_structure=False)
+        self.assertEqual(r["subfolders"], [])
+        self.assertTrue(r["path"].is_dir())
+
+    def test_detect_ignores_deep_folders(self):
+        # 'code' in a deep folder must not flip a note to programming.
+        wm = WorkspaceManager(self.vault)
+        ws = wm.detect_for_path("PROJECTS/app/code/note.md")
+        self.assertEqual(ws["id"], "general")
+
+    def test_detect_handles_decomposed_accents(self):
+        # Syncthing from Android can deliver NFD-encoded accents.
+        import unicodedata
+        wm = WorkspaceManager(self.vault)
+        nfd = unicodedata.normalize("NFD", "Matemáticas")
+        ws = wm.detect_for_path(f"{nfd}/Cálculo/nota.md")
+        self.assertEqual(ws["id"], "mathematics")
+
 
 if __name__ == "__main__":
     unittest.main()

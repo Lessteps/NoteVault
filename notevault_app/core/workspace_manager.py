@@ -5,10 +5,23 @@ Stores each profile in .notevault/workspaces/<workspace-id>.json.
 """
 
 import json
+import unicodedata
 from pathlib import Path
 from typing import Any, Optional
 
 from . import store, vault_format
+
+# How many leading folder components of a note's path are inspected when
+# guessing its workspace. Keeps `PROJECTS/app/code/note.md` from being read
+# as Programming just because a deep folder is called "code".
+DETECT_MAX_DEPTH = 2
+
+
+def _norm(text: str) -> str:
+    """Case-fold + NFC-normalise, so accents that arrive from Android/Syncthing
+    as decomposed characters (NFD) still match 'Matemáticas'."""
+    return unicodedata.normalize("NFC", str(text)).strip().lower()
+
 
 DEFAULT_WORKSPACES = [
     {
@@ -16,6 +29,7 @@ DEFAULT_WORKSPACES = [
         "name": "Matemáticas",
         "icon": "📐",
         "folders": ["Matemáticas", "Matematicas", "Math", "Mathematics"],
+        "starter_folders": ["Álgebra", "Cálculo", "Estadística", "Fórmulas"],
         "features": {
             "calculator": True,
             "graphing": True,
@@ -43,6 +57,7 @@ DEFAULT_WORKSPACES = [
         "name": "Programación",
         "icon": "💻",
         "folders": ["Programación", "Programacion", "Programming", "Coding", "Code"],
+        "starter_folders": ["Fundamentos", "Algoritmos", "Proyectos", "Snippets"],
         "features": {
             "calculator": False,
             "graphing": False,
@@ -71,6 +86,7 @@ DEFAULT_WORKSPACES = [
         "name": "Inglés",
         "icon": "🌐",
         "folders": ["Inglés", "Ingles", "English", "Idiomas", "Languages"],
+        "starter_folders": ["Vocabulario", "Gramática", "Lecturas", "Writing"],
         "features": {
             "calculator": False,
             "graphing": False,
@@ -136,11 +152,18 @@ def sanitize_workspace(raw: dict[str, Any], fallback_id: str = "") -> dict[str, 
     elif not isinstance(folders, list):
         folders = []
 
+    starter = raw.get("starter_folders", [])
+    if isinstance(starter, str):
+        starter = [starter]
+    elif not isinstance(starter, list):
+        starter = []
+
     return {
         "id": ws_id,
         "name": str(raw.get("name") or ws_id.capitalize()),
         "icon": str(raw.get("icon") or "📁"),
         "folders": [str(f) for f in folders],
+        "starter_folders": [str(f) for f in starter],
         "features": {str(k): bool(v) for k, v in features.items()},
         "system_prompt": str(raw.get("system_prompt") or ""),
     }
@@ -197,6 +220,90 @@ class WorkspaceManager:
         self._cache = None
         return clean
 
+    # ── Study folder creation ────────────────────────────────────────────
+
+    def folder_name(self, ws_id: str) -> str:
+        """The canonical folder name to create for a workspace."""
+        ws = self.get(ws_id)
+        if ws and ws.get("folders"):
+            return ws["folders"][0]
+        return (ws or {}).get("name", ws_id.capitalize())
+
+    def find_existing_folder(self, ws_id: str) -> Optional[Path]:
+        """Return an already-present top-level folder for this workspace, if any
+        of its known name variants exists (accent-insensitive). Else None."""
+        ws = self.get(ws_id)
+        if not ws:
+            return None
+        variants = {_norm(f) for f in ws.get("folders", [])}
+        variants.add(_norm(ws["name"]))
+        try:
+            entries = list(self.vault_root.iterdir())
+        except (OSError, ValueError):
+            return None
+        for entry in entries:
+            try:
+                if entry.is_dir() and _norm(entry.name) in variants:
+                    return entry
+            except OSError:
+                continue
+        return None
+
+    def ensure_folder(self, ws_id: str, with_structure: bool = True) -> dict[str, Any]:
+        """Create the study folder at the vault root if it does not exist.
+
+        Never overwrites anything. Returns:
+          {"path": Path, "created": bool, "index": Path|None, "subfolders": [Path]}
+        """
+        ws = self.get(ws_id)
+        if not ws:
+            raise ValueError(f"workspace desconocido: {ws_id}")
+
+        existing = self.find_existing_folder(ws_id)
+        created = existing is None
+        folder = existing or (self.vault_root / self.folder_name(ws_id))
+        folder.mkdir(parents=True, exist_ok=True)
+
+        subfolders: list[Path] = []
+        if with_structure:
+            for sub in ws.get("starter_folders", []):
+                sp = folder / sub
+                if not sp.exists():
+                    sp.mkdir(parents=True, exist_ok=True)
+                subfolders.append(sp)
+
+        # An index note carries `subject:` so the workspace is recognised even
+        # if the folder is later renamed. Written only when absent.
+        index = folder / "00 Índice.md"
+        if not index.exists():
+            body = (
+                f"---\n"
+                f"title: Índice de {ws['name']}\n"
+                f"subject: {ws['id']}\n"
+                f"topic: {ws['name']}\n"
+                f"type: index\n"
+                f"difficulty: 1\n"
+                f"mastery: 0.0\n"
+                f"tags: [estudio, {ws['id']}]\n"
+                f"---\n\n"
+                f"# {ws.get('icon', '')} {ws['name']}\n\n"
+                f"Espacio de estudio de {ws['name']}. "
+                f"Crea aquí tus notas; las herramientas de {ws['name']} se activan solas.\n"
+            )
+            try:
+                index.write_text(body, encoding="utf-8")
+            except OSError:
+                index = None
+        else:
+            index = index if index.exists() else None
+
+        return {
+            "path": folder,
+            "created": created,
+            "index": index,
+            "subfolders": subfolders,
+        }
+
     def detect_for_path(self, rel_path: str, frontmatter: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         """
         Detect which workspace profile applies to a given relative note path.
@@ -208,24 +315,26 @@ class WorkspaceManager:
         all_ws = self.workspaces()
         general = self.get("general") or sanitize_workspace(DEFAULT_WORKSPACES[-1])
 
-        # 1. Frontmatter check
+        # 1. Frontmatter check (subject/workspace wins over any folder guess)
         if frontmatter and isinstance(frontmatter, dict):
-            explicit = str(frontmatter.get("workspace") or frontmatter.get("subject") or "").strip().lower()
+            explicit = _norm(frontmatter.get("workspace") or frontmatter.get("subject") or "")
             if explicit:
                 for ws in all_ws:
-                    if ws["id"] == explicit or ws["name"].lower() == explicit:
+                    if _norm(ws["id"]) == explicit or _norm(ws["name"]) == explicit:
                         return ws
 
-        # 2. Path components check
+        # 2. Path components check — only the first DETECT_MAX_DEPTH folders,
+        #    never the filename, so a deep stray folder can't flip the mode.
         clean_path = Path(rel_path.replace("\\", "/"))
-        parts = [p.lower() for p in clean_path.parts]
+        dir_parts = [_norm(p) for p in clean_path.parts[:-1]][:DETECT_MAX_DEPTH]
 
         for ws in all_ws:
             if ws["id"] == "general":
                 continue
-            candidates = [f.lower() for f in ws.get("folders", [])] + [ws["id"].lower(), ws["name"].lower()]
-            for part in parts:
-                if part in candidates:
-                    return ws
+            candidates = {_norm(f) for f in ws.get("folders", [])}
+            candidates.add(_norm(ws["id"]))
+            candidates.add(_norm(ws["name"]))
+            if any(part in candidates for part in dir_parts):
+                return ws
 
         return general

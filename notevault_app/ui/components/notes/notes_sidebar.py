@@ -18,11 +18,13 @@ from PySide6.QtWidgets import QStyle
 
 from ....core.vault_manager import VaultManager
 from ....core.notes_service import NotesService
+from ....core.workspace_manager import WorkspaceManager
 from ....config import AppConfig
 from ... import theme
 from .vault_dialog import VaultDialog
 from .file_icons import icon_for
 from .knowledge_graph_widget import KnowledgeGraphWidget
+from .study_folders_dialog import StudyFoldersDialog
 
 BG_PANEL   = "#1a1a1e"
 BG_TAB     = "#202024"
@@ -84,6 +86,7 @@ class NotesSidebar(QWidget):
         self.setObjectName("sidebarPanel")
         self.vault = vault
         self.service = service
+        self._ws_mgr = WorkspaceManager(vault.vault_root)
         self._numeric_sort = True
         self._active_path: Path = None
         self._init_ui()
@@ -164,6 +167,10 @@ class NotesSidebar(QWidget):
         self._btn_new_folder = _ToolButton("🗀", "Nueva carpeta")
         self._btn_new_folder.clicked.connect(self.new_folder)
         lay.addWidget(self._btn_new_folder)
+
+        self._btn_study = _ToolButton("🎓", "Crear espacios de estudio (Matemáticas, Inglés, Programación)")
+        self._btn_study.clicked.connect(self.open_study_folders)
+        lay.addWidget(self._btn_study)
 
         self._btn_sort = _ToolButton("⇅", "Ordenar por numeración")
         self._btn_sort.setCheckable(True)
@@ -359,6 +366,22 @@ class NotesSidebar(QWidget):
             item.setData(0, Qt.UserRole, data)
         self.populate_tree(self._active_path)
         self._reveal_path(created_folder)
+
+    def open_study_folders(self):
+        dlg = StudyFoldersDialog(self._ws_mgr, self)
+        dlg.folders_changed.connect(self._on_study_folders_changed)
+        dlg.open_note_requested.connect(self._on_study_index_open)
+        dlg.exec()
+
+    def _on_study_folders_changed(self):
+        self.set_tab(TAB_FILES)
+        self.populate_tree(self._active_path)
+        # Rebuild the graph next time it is shown, since notes/folders changed.
+        self._graph_widget.set_vault(self.vault.vault_root)
+
+    def _on_study_index_open(self, path: Path):
+        self._reveal_path(path)
+        self.note_selected.emit(path)
 
     def _toggle_sort(self):
         self._numeric_sort = self._btn_sort.isChecked()
@@ -769,6 +792,7 @@ class NotesSidebar(QWidget):
     def set_vault(self, vault: VaultManager, service: NotesService):
         self.vault = vault
         self.service = service
+        self._ws_mgr = WorkspaceManager(vault.vault_root)
         self._active_path = None
         self._vault_name_label.setText(vault.vault_root.name)
         self._graph_widget.set_vault(vault.vault_root)

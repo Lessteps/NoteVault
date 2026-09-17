@@ -139,6 +139,29 @@ def is_ignored_dir(path: Path) -> bool:
     return path.name in IGNORED_DIRS or path.name.startswith(".")
 
 
+# Name of the optional, user-editable file (inside the data folder) that lists
+# top-level folders to keep out of the notes explorer, graph and text index —
+# one folder name per line. Lets a vault that also holds big code projects
+# (e.g. FULLSTACK_DEVELOPMENT, PROJECTS) skip scanning thousands of stray .md
+# files without hardcoding anyone's folder names into the app.
+EXCLUDE_FILE = "explorer-ignore.txt"
+
+
+def load_excluded_top_dirs(root: Path) -> set[str]:
+    """Read the per-vault top-level exclusion list. Missing file → empty set."""
+    path = root / vault_format.DATA_DIR / EXCLUDE_FILE
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, ValueError):
+        return set()
+    out = set()
+    for line in lines:
+        name = line.strip()
+        if name and not name.startswith("#"):
+            out.add(name)
+    return out
+
+
 def is_reserved(path: Path, root: Path) -> bool:
     """True when path lives inside one of the module data folders."""
     try:
@@ -223,11 +246,30 @@ class VaultManager:
         self.vault_root.mkdir(parents=True, exist_ok=True)
         migrate_vault(self.vault_root)
         self._backlink_index: dict[str, list[Path]] = {}
+        self._excluded_top: set[str] = set()
+        self._excluded_stamp = None
+        self._refresh_excluded()
+
+    def _refresh_excluded(self):
+        """Reload the top-level exclusion list when its file changes."""
+        p = self.vault_root / vault_format.DATA_DIR / EXCLUDE_FILE
+        try:
+            stamp = p.stat().st_mtime_ns
+        except OSError:
+            stamp = None
+        if stamp != self._excluded_stamp:
+            self._excluded_stamp = stamp
+            self._excluded_top = load_excluded_top_dirs(self.vault_root)
+
+    def _is_excluded_top(self, entry: Path) -> bool:
+        return (entry.parent == self.vault_root
+                and entry.name in self._excluded_top)
 
     # ── File tree ────────────────────────────────────────────────────────
 
     def _walk_note_paths(self, limit: int = MAX_SCAN_NOTES):
         """Yield markdown paths, skipping module data and tooling folders."""
+        self._refresh_excluded()
         count = 0
         stack = [self.vault_root]
         while stack:
@@ -240,6 +282,8 @@ class VaultManager:
                 try:
                     if entry.is_dir():
                         if is_ignored_dir(entry):
+                            continue
+                        if self._is_excluded_top(entry):
                             continue
                         if entry.parent == self.vault_root and is_reserved(
                                 entry, self.vault_root):
@@ -264,6 +308,7 @@ class VaultManager:
         return [Note(p, self.vault_root) for p in self.note_paths(limit)]
 
     def all_folders(self) -> list:
+        self._refresh_excluded()
         out = []
         stack = [self.vault_root]
         while stack:
@@ -278,6 +323,8 @@ class VaultManager:
                         continue
                 except OSError:
                     continue
+                if self._is_excluded_top(entry):
+                    continue
                 if entry.parent == self.vault_root and is_reserved(
                         entry, self.vault_root):
                     continue
@@ -287,7 +334,8 @@ class VaultManager:
 
     def tree(self) -> list[dict]:
         """Return a nested dict tree for the file explorer."""
-        return _build_tree(self.vault_root, self.vault_root)
+        self._refresh_excluded()
+        return _build_tree(self.vault_root, self.vault_root, self._excluded_top)
 
     # ── Note CRUD ────────────────────────────────────────────────────────
 
@@ -376,7 +424,7 @@ class VaultManager:
         return {"notes": notes, "folders": 0, "words": 0}
 
 
-def _build_tree(folder: Path, root: Path) -> list[dict]:
+def _build_tree(folder: Path, root: Path, excluded_top: set[str] = frozenset()) -> list[dict]:
     items = []
     try:
         entries = sorted(folder.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
@@ -390,12 +438,14 @@ def _build_tree(folder: Path, root: Path) -> list[dict]:
             continue
         if entry.parent == root and entry.name in RESERVED_DIRS:
             continue   # module data folders are not notes
+        if entry.parent == root and entry.name in excluded_top:
+            continue   # user-excluded top-level code/project folders
         if entry.is_dir():
             items.append({
                 "type": "folder",
                 "name": entry.name,
                 "path": entry,
-                "children": _build_tree(entry, root),
+                "children": _build_tree(entry, root, excluded_top),
             })
         elif entry.suffix == ".md":
             items.append({

@@ -11,6 +11,21 @@ from .vault_manager import VaultManager
 from .frontmatter_utils import parse_frontmatter
 
 
+def _safe_int(value: Any, default: int = 0) -> int:
+    """Parse a frontmatter value to int, tolerating strings like 'Beginner'."""
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 class KnowledgeGraph:
     def __init__(self, vault_root: Path):
         self.vault_root = Path(vault_root)
@@ -30,16 +45,20 @@ class KnowledgeGraph:
         edges = []
         nodes_by_title: dict[str, str] = {} # title.lower() -> node_id
 
+        # Parse each note's frontmatter exactly once and reuse below.
+        fm_by_note: dict[int, dict] = {}
+
         # 1. Build nodes
         for note in notes:
             node_id = str(note.rel_path.as_posix())
             fm, _ = parse_frontmatter(note.raw)
+            fm_by_note[id(note)] = fm
 
             subj = str(fm.get("subject") or "general").lower()
             topic = str(fm.get("topic") or "").strip()
             ntype = str(fm.get("type") or "concept").lower()
-            difficulty = int(fm.get("difficulty") or 1)
-            mastery = float(fm.get("mastery") or 0.0)
+            difficulty = _safe_int(fm.get("difficulty"), 1)
+            mastery = _safe_float(fm.get("mastery"), 0.0)
 
             node = {
                 "id": node_id,
@@ -53,10 +72,13 @@ class KnowledgeGraph:
             nodes.append(node)
             nodes_by_title[note.title.lower()] = node_id
 
+        # Track edges by (source, target) so dedup stays O(1) instead of O(E²).
+        edge_pairs: set[tuple[str, str]] = set()
+
         # 2. Build edges from frontmatter relations and wikilinks
         for note in notes:
             source_id = str(note.rel_path.as_posix())
-            fm, _ = parse_frontmatter(note.raw)
+            fm = fm_by_note.get(id(note)) or {}
 
             # Prerequisite relations
             prereqs = fm.get("prerequisites") or fm.get("requires", [])
@@ -65,7 +87,8 @@ class KnowledgeGraph:
             for p in prereqs:
                 target_title = str(p).strip().lower()
                 target_id = nodes_by_title.get(target_title)
-                if target_id:
+                if target_id and (target_id, source_id) not in edge_pairs:
+                    edge_pairs.add((target_id, source_id))
                     edges.append({
                         "source": target_id,
                         "target": source_id,
@@ -79,7 +102,8 @@ class KnowledgeGraph:
             for u in uses_list:
                 target_title = str(u).strip().lower()
                 target_id = nodes_by_title.get(target_title)
-                if target_id:
+                if target_id and (source_id, target_id) not in edge_pairs:
+                    edge_pairs.add((source_id, target_id))
                     edges.append({
                         "source": source_id,
                         "target": target_id,
@@ -90,18 +114,14 @@ class KnowledgeGraph:
             for link in note.wikilinks:
                 target_title = link.strip().lower()
                 target_id = nodes_by_title.get(target_title)
-                if target_id and target_id != source_id:
-                    # Check if already added with a specific relation
-                    exists = any(
-                        e["source"] == source_id and e["target"] == target_id
-                        for e in edges
-                    )
-                    if not exists:
-                        edges.append({
-                            "source": source_id,
-                            "target": target_id,
-                            "relation_type": "related",
-                        })
+                if target_id and target_id != source_id \
+                        and (source_id, target_id) not in edge_pairs:
+                    edge_pairs.add((source_id, target_id))
+                    edges.append({
+                        "source": source_id,
+                        "target": target_id,
+                        "relation_type": "related",
+                    })
 
         return {
             "nodes": nodes,

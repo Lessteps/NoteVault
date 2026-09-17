@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox,
     QFrame, QSizePolicy,
 )
-from PySide6.QtCore import Qt, Signal, QPointF, QRectF, QTimer
+from PySide6.QtCore import Qt, Signal, QPointF, QRectF, QTimer, QThread, QObject
 from PySide6.QtGui import QPainter, QPen, QColor, QFont, QBrush, QPainterPath
 
 from ....core.knowledge_graph import KnowledgeGraph
@@ -43,47 +43,83 @@ REPULSION   = 8000.0
 ATTRACTION  = 0.06
 DAMPING     = 0.85
 ITERATIONS  = 80
+MAX_LAYOUT_NODES = 400  # beyond this the O(n²) layout is skipped for a grid
+
+
+def _iterations_for(n: int) -> int:
+    """The O(n²) layout cost is n² per pass — scale passes down as n grows."""
+    if n <= 60:
+        return 80
+    if n <= 150:
+        return 40
+    if n <= 250:
+        return 22
+    return 12
+
+
+def _grid_layout(ids: list[str]) -> dict[str, QPointF]:
+    """Cheap deterministic grid — used when there are too many nodes to spring."""
+    import math as _m
+    cols = max(1, int(_m.ceil(_m.sqrt(len(ids)))))
+    spacing = 70
+    pos = {}
+    for i, nid in enumerate(ids):
+        r, c = divmod(i, cols)
+        pos[nid] = QPointF(c * spacing, r * spacing)
+    return pos
 
 
 def _layout_nodes(nodes: list[dict], edges: list[dict]) -> dict[str, QPointF]:
-    """Force-directed layout: repulsion + spring attraction."""
+    """Force-directed layout: repulsion + spring attraction.
+
+    Iteration count scales down with node count, and very large graphs fall
+    back to a grid so the UI thread is never blocked for seconds.
+    """
     ids = [n["id"] for n in nodes]
     if not ids:
         return {}
+    if len(ids) > MAX_LAYOUT_NODES:
+        return _grid_layout(ids)
+
+    iterations = _iterations_for(len(ids))
     rng = random.Random(42)
-    pos = {nid: QPointF(rng.uniform(-300, 300), rng.uniform(-300, 300)) for nid in ids}
-    vel = {nid: QPointF(0, 0) for nid in ids}
+    # Plain float tuples in local lists are far cheaper than QPointF per op.
+    px = {nid: rng.uniform(-300, 300) for nid in ids}
+    py = {nid: rng.uniform(-300, 300) for nid in ids}
+    vx = {nid: 0.0 for nid in ids}
+    vy = {nid: 0.0 for nid in ids}
     id_set = set(ids)
 
-    for _ in range(ITERATIONS):
-        force = {nid: QPointF(0, 0) for nid in ids}
+    for _ in range(iterations):
+        fx = {nid: 0.0 for nid in ids}
+        fy = {nid: 0.0 for nid in ids}
         # Repulsion between all pairs
         for i, a in enumerate(ids):
+            pax, pay = px[a], py[a]
             for b in ids[i + 1:]:
-                dx = pos[a].x() - pos[b].x()
-                dy = pos[a].y() - pos[b].y()
-                dist = math.hypot(dx, dy) or 1.0
-                f = REPULSION / (dist * dist)
-                fx, fy = f * dx / dist, f * dy / dist
-                force[a] += QPointF(fx, fy)
-                force[b] -= QPointF(fx, fy)
+                dx = pax - px[b]
+                dy = pay - py[b]
+                dist2 = dx * dx + dy * dy or 1.0
+                dist = math.sqrt(dist2)
+                f = REPULSION / dist2
+                ox, oy = f * dx / dist, f * dy / dist
+                fx[a] += ox; fy[a] += oy
+                fx[b] -= ox; fy[b] -= oy
         # Attraction along edges
         for e in edges:
             s, t = e.get("source"), e.get("target")
             if s in id_set and t in id_set:
-                dx = pos[t].x() - pos[s].x()
-                dy = pos[t].y() - pos[s].y()
-                f = ATTRACTION
-                force[s] += QPointF(dx * f, dy * f)
-                force[t] -= QPointF(dx * f, dy * f)
+                dx = px[t] - px[s]
+                dy = py[t] - py[s]
+                fx[s] += dx * ATTRACTION; fy[s] += dy * ATTRACTION
+                fx[t] -= dx * ATTRACTION; fy[t] -= dy * ATTRACTION
         # Update positions
         for nid in ids:
-            vel[nid] = QPointF(
-                (vel[nid].x() + force[nid].x()) * DAMPING,
-                (vel[nid].y() + force[nid].y()) * DAMPING,
-            )
-            pos[nid] += vel[nid]
-    return pos
+            vx[nid] = (vx[nid] + fx[nid]) * DAMPING
+            vy[nid] = (vy[nid] + fy[nid]) * DAMPING
+            px[nid] += vx[nid]
+            py[nid] += vy[nid]
+    return {nid: QPointF(px[nid], py[nid]) for nid in ids}
 
 
 class _GraphCanvas(QWidget):
@@ -107,10 +143,11 @@ class _GraphCanvas(QWidget):
         self._subject_filter = "all"
         self._min_mastery = 0.0
 
-    def load(self, nodes: list[dict], edges: list[dict]):
+    def load(self, nodes: list[dict], edges: list[dict],
+             pos: Optional[dict[str, QPointF]] = None):
         self._nodes = nodes
         self._edges = edges
-        self._pos = _layout_nodes(nodes, edges)
+        self._pos = pos if pos is not None else _layout_nodes(nodes, edges)
         # Center the layout
         if self._pos:
             cx = sum(p.x() for p in self._pos.values()) / len(self._pos)
@@ -282,6 +319,26 @@ class _GraphCanvas(QWidget):
         self.update()
 
 
+class _GraphBuildWorker(QObject):
+    """Builds the graph and its layout off the UI thread."""
+    done = Signal(list, list, dict)   # nodes, edges, pos
+    failed = Signal(str)
+
+    def __init__(self, kg: KnowledgeGraph):
+        super().__init__()
+        self._kg = kg
+
+    def run(self):
+        try:
+            graph = self._kg.build_graph()
+            nodes = graph.get("nodes", [])
+            edges = graph.get("edges", [])
+            pos = _layout_nodes(nodes, edges)
+            self.done.emit(nodes, edges, pos)
+        except Exception as exc:  # noqa: BLE001 — surfaced to the status label
+            self.failed.emit(str(exc))
+
+
 class KnowledgeGraphWidget(QWidget):
     """Sidebar-embeddable panel for the interactive knowledge graph."""
 
@@ -291,8 +348,13 @@ class KnowledgeGraphWidget(QWidget):
         super().__init__(parent)
         self.vault_root = vault_root
         self._kg = KnowledgeGraph(vault_root)
+        self._loaded = False
+        self._building = False
+        self._thread = None
+        self._worker = None
         self._init_ui()
-        QTimer.singleShot(0, self.reload)
+        # Lazy: the graph is only built the first time the tab is opened, never
+        # at startup — scanning the whole vault + layout must not block launch.
 
     def _init_ui(self):
         root = QVBoxLayout(self)
@@ -379,19 +441,46 @@ class KnowledgeGraphWidget(QWidget):
         self._status.setFixedHeight(18)
         root.addWidget(self._status)
 
+    def ensure_loaded(self):
+        """Build the graph once, on first view. Cheap no-op afterwards."""
+        if not self._loaded and not self._building:
+            self.reload()
+
     def reload(self):
-        self._status.setText("Indexando vault…")
-        try:
-            graph = self._kg.build_graph()
-        except Exception as exc:
-            self._status.setText(f"Error: {exc}")
+        if self._building:
             return
-        nodes = graph.get("nodes", [])
-        edges = graph.get("edges", [])
-        self._canvas.load(nodes, edges)
-        n = len(nodes)
-        e = len(edges)
-        self._status.setText(f"{n} nodos · {e} aristas — arrastra para mover, scroll para zoom")
+        self._building = True
+        self._btn_reload.setEnabled(False)
+        self._status.setText("Indexando vault… (en segundo plano)")
+
+        self._thread = QThread(self)
+        self._worker = _GraphBuildWorker(self._kg)
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.run)
+        self._worker.done.connect(self._on_build_done)
+        self._worker.failed.connect(self._on_build_failed)
+        # Tear the thread down once either signal has been handled.
+        self._worker.done.connect(self._thread.quit)
+        self._worker.failed.connect(self._thread.quit)
+        self._thread.finished.connect(self._worker.deleteLater)
+        self._thread.start()
+
+    def _on_build_done(self, nodes, edges, pos):
+        self._canvas.load(nodes, edges, pos)
+        self._loaded = True
+        self._building = False
+        self._btn_reload.setEnabled(True)
+        n, e = len(nodes), len(edges)
+        extra = "  (layout en cuadrícula)" if n > MAX_LAYOUT_NODES else ""
+        self._status.setText(
+            f"{n} nodos · {e} aristas — arrastra para mover, scroll para zoom{extra}"
+        )
+
+    def _on_build_failed(self, msg: str):
+        self._loaded = True
+        self._building = False
+        self._btn_reload.setEnabled(True)
+        self._status.setText(f"Error: {msg}")
 
     def _on_filter_changed(self, idx: int):
         mapping = ["all", "mathematics", "programming", "english", "general"]
@@ -400,4 +489,5 @@ class KnowledgeGraphWidget(QWidget):
     def set_vault(self, vault_root: Path):
         self.vault_root = vault_root
         self._kg = KnowledgeGraph(vault_root)
-        self.reload()
+        # Invalidate; rebuild lazily next time the tab is shown.
+        self._loaded = False

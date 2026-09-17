@@ -310,7 +310,7 @@ class NotesSidebar(QWidget):
         elif index == TAB_SEARCH:
             self._search_input.setFocus()
         elif index == TAB_GRAPH:
-            self._graph_widget.reload()
+            self._graph_widget.ensure_loaded()
 
     # ── Tool actions ──────────────────────────────────────────────────────
 

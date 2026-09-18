@@ -230,30 +230,162 @@ class NotesService:
 
     # ── Search ────────────────────────────────────────────────────────────
 
+    # ── Search ────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_query(raw: str):
+        """Parse a search query into structured filters.
+
+        Supported operators (AND-combined):
+          tag:value       — note must have this tag
+          path:value      — vault-relative path contains value
+          property:value  — any frontmatter key contains value
+          key:value       — shorthand for property (if key not a reserved op)
+          "exact phrase"  — body/title contains this literal string
+          plain text      — title or body contains each word
+
+        Returns a dict with keys:
+          tags, path_frags, properties, phrases, terms
+        """
+        filters: dict = {
+            "tags": [],
+            "path_frags": [],
+            "properties": [],
+            "phrases": [],
+            "terms": [],
+        }
+        # Extract quoted phrases first
+        rest = raw
+        for phrase in re.findall(r'"([^"]+)"', rest):
+            filters["phrases"].append(phrase.lower())
+        rest = re.sub(r'"[^"]*"', "", rest)
+
+        KNOWN_OPS = {"tag", "path", "property"}
+        for token in rest.split():
+            if ":" in token:
+                key, _, val = token.partition(":")
+                key_l, val_l = key.lower(), val.lower()
+                if key_l == "tag":
+                    filters["tags"].append(val_l)
+                elif key_l == "path":
+                    filters["path_frags"].append(val_l)
+                elif key_l in ("property", "prop"):
+                    filters["properties"].append(val_l)
+                else:
+                    # Treat unknown key:val as a property filter
+                    filters["properties"].append(f"{key_l}:{val_l}")
+            elif token:
+                filters["terms"].append(token.lower())
+        return filters
+
+    def _note_matches(self, note, filters: dict, tag_idx=None) -> bool:
+        """Return True if *note* satisfies all active filters (AND logic)."""
+        # tag: filter
+        if filters["tags"]:
+            from .tag_index import TagIndex, _extract_inline_tags, _extract_fm_tags
+            if tag_idx is None:
+                tag_idx = TagIndex.for_vault(self.index)
+            note_tags_lower = {t.lower() for t in tag_idx.tags_for_path(note.path)}
+            for wanted in filters["tags"]:
+                if not any(wanted in t for t in note_tags_lower):
+                    return False
+
+        # path: filter
+        rel = note.path.as_posix().lower()
+        for frag in filters["path_frags"]:
+            if frag not in rel:
+                return False
+
+        # property: filter  (scan frontmatter lines)
+        if filters["properties"]:
+            fm_text = ""
+            if note.text.startswith("---"):
+                end = note.text.find("\n---", 3)
+                if end != -1:
+                    fm_text = note.text[3:end].lower()
+            for prop in filters["properties"]:
+                if ":" in prop:
+                    key, _, val = prop.partition(":")
+                    if key not in fm_text or val not in fm_text:
+                        return False
+                else:
+                    if prop not in fm_text:
+                        return False
+
+        # phrase filters
+        for phrase in filters["phrases"]:
+            if phrase not in note.lower and phrase not in note.title.lower():
+                return False
+
+        # plain term filters (each term must appear somewhere)
+        for term in filters["terms"]:
+            if term not in note.title.lower() and term not in note.lower:
+                return False
+
+        return True
+
     def search(self, query: str, limit: int = 200) -> list:
-        """Case-insensitive search over titles and body lines."""
-        q = query.strip().lower()
-        if not q:
+        """Search with optional operators: tag:, path:, property:, "phrase", terms.
+
+        All operators combine with AND. Falls back to plain full-text search
+        when no operators are present (same behaviour as before).
+        """
+        raw = query.strip()
+        if not raw:
             return []
-        hits = []
-        # Search runs on the UI thread while the user is still typing, so it
-        # uses whatever the index already holds. Re-walking the vault to
-        # check for new files would stall the window for seconds; the first
-        # fill happens in the background when the notes panel opens.
+
+        filters = self._parse_query(raw)
+        has_operators = any([
+            filters["tags"], filters["path_frags"],
+            filters["properties"], filters["phrases"],
+        ])
+
         notes = (self.index.cached_notes() if self.index.ready
                  else self.index.notes())
-        for note in notes:
-            if q in note.title.lower():
-                hits.append(SearchHit(note.path, note.title, 0, note.title))
-            if q not in note.lower:
-                continue
-            for i, line in enumerate(note.text.splitlines(), start=1):
-                if q in line.lower():
-                    hits.append(
-                        SearchHit(note.path, note.title, i, line.strip()[:180])
+
+        hits = []
+
+        if has_operators or filters["terms"]:
+            from .tag_index import TagIndex
+            tag_idx = TagIndex.for_vault(self.index) if filters["tags"] else None
+            if tag_idx and notes:
+                tag_idx.build(notes)
+
+            for note in notes:
+                if not self._note_matches(note, filters, tag_idx):
+                    continue
+                # Emit one SearchHit per matching body line (or a title hit)
+                matched_lines = False
+                for i, line in enumerate(note.text.splitlines(), start=1):
+                    ll = line.lower()
+                    relevant = (
+                        any(t in ll for t in filters["terms"])
+                        or any(p in ll for p in filters["phrases"])
+                        or (not filters["terms"] and not filters["phrases"])
                     )
-                    if len(hits) >= limit:
-                        return hits
+                    if relevant:
+                        hits.append(SearchHit(note.path, note.title, i,
+                                              line.strip()[:180]))
+                        matched_lines = True
+                        if len(hits) >= limit:
+                            return hits
+                if not matched_lines:
+                    hits.append(SearchHit(note.path, note.title, 0, note.title))
+        else:
+            # Plain search: backward compatible
+            q = raw.lower()
+            for note in notes:
+                if q in note.title.lower():
+                    hits.append(SearchHit(note.path, note.title, 0, note.title))
+                if q not in note.lower:
+                    continue
+                for i, line in enumerate(note.text.splitlines(), start=1):
+                    if q in line.lower():
+                        hits.append(
+                            SearchHit(note.path, note.title, i, line.strip()[:180])
+                        )
+                        if len(hits) >= limit:
+                            return hits
         return hits
 
     # ── Mentions ──────────────────────────────────────────────────────────

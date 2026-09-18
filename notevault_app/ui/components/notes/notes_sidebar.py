@@ -299,7 +299,9 @@ class NotesSidebar(QWidget):
         lay.setSpacing(5)
 
         self._search_input = QLineEdit()
-        self._search_input.setPlaceholderText("Buscar en todas las notas…")
+        self._search_input.setPlaceholderText(
+            "Buscar… tag:python  path:carpeta  property:clave  \"frase\""
+        )
         self._search_input.setObjectName("inlineSearch")
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
@@ -309,7 +311,9 @@ class NotesSidebar(QWidget):
         self._search_input.textChanged.connect(self._search_typed)
         lay.addWidget(self._search_input)
 
-        self._search_info = QLabel("Escribe para buscar en títulos y contenido.")
+        self._search_info = QLabel(
+            "Escribe para buscar. Operadores: tag:x  path:carpeta  property:clave  \"frase exacta\""
+        )
         self._search_info.setWordWrap(True)
         self._search_info.setStyleSheet(
             f"color:{TEXT_FAINT};font-size:10px;background:transparent;border:none;"

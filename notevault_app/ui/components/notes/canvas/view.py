@@ -8,14 +8,15 @@ Later phases add: note nodes, media (image/audio/video), edges, flowchart
 shapes and freehand drawing (see docs/PLAN_CANVAS_Y_BACKLINKS.md).
 """
 
+import copy
 from pathlib import Path
 
 from PySide6.QtWidgets import (
     QGraphicsView, QApplication, QFrame, QHBoxLayout, QPushButton, QInputDialog,
     QFileDialog, QGraphicsPathItem, QMenu,
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QPointF
-from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath
+from PySide6.QtCore import Qt, QTimer, Signal, QPointF, QRectF
+from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath, QImage
 
 from .... import theme  # noqa: F401  (kept for future theme-aware repaint)
 from .....core import canvas_format as cf
@@ -23,7 +24,7 @@ from .....core import attachments
 from .scene import CanvasScene
 from .items import (
     TextNodeItem, NoteNodeItem, MediaNodeItem, BaseNodeItem, ShapeNodeItem,
-    DrawingNodeItem, color_for
+    DrawingNodeItem, GroupNodeItem, LinkNodeItem, color_for
 )
 from .edges import EdgeItem
 from .shapes import SHAPE_INFO
@@ -70,6 +71,10 @@ class CanvasView(QGraphicsView):
         self._loading = False
         self._panning = False
         self._pan_start = QPointF()
+        self._snap_to_grid = False
+        self._clipboard_nodes = []
+        self._clipboard_edges = []
+        self._btn_snap = None
 
         self._save_timer = QTimer(self)
         self._save_timer.setSingleShot(True)
@@ -93,10 +98,15 @@ class CanvasView(QGraphicsView):
         lay.setSpacing(2)
         self._add_tool(lay, "＋ Nota", self._pick_and_add_note)
         self._add_tool(lay, "＋ Texto", self._add_text_center)
+        self._add_tool(lay, "＋ Grupo", self._add_group_center)
+        self._add_tool(lay, "＋ Enlace", self._pick_and_add_link)
         self._add_tool(lay, "＋ Media", self._pick_and_add_media)
         self._add_shape_tool(lay)
         self._add_drawing_tool(lay)
         self._add_tool(lay, "＋ Conectar", self._pick_and_connect)
+        self._btn_snap = self._add_tool(lay, "🧲 Snap", self._toggle_snap)
+        self._add_tool(lay, "⤢ Ajustar", self.zoom_to_fit)
+        self._add_tool(lay, "📷 Exportar", lambda: self.export_to_png())
         bar.adjustSize()
         bar.move(12, 12)
         return bar
@@ -272,12 +282,16 @@ class CanvasView(QGraphicsView):
         if node.type == "file" and node.file:
             root = self._vault_root()
             abs_path = (root / node.file) if root else Path(node.file)
-            media = node.nv.get("media") or attachments.kind_of(abs_path)
+            media = (node.nv or {}).get("media") or attachments.kind_of(abs_path)
             if media in ("image", "audio", "video"):
                 item = MediaNodeItem(node, abs_path, media)
             else:
                 item = NoteNodeItem(node, abs_path, self.service)
                 item.open_requested.connect(self.open_note_requested.emit)
+        elif node.type == "group":
+            item = GroupNodeItem(node)
+        elif node.type == "link":
+            item = LinkNodeItem(node)
         elif node.type == "nv-shape":
             item = ShapeNodeItem(node)
         elif node.type == "nv-drawing":
@@ -286,6 +300,11 @@ class CanvasView(QGraphicsView):
             item = TextNodeItem(node)
         else:
             item = TextNodeItem(node)
+        if node.nv and "zIndex" in node.nv:
+            try:
+                item.setZValue(float(node.nv["zIndex"]))
+            except Exception:
+                pass
         item.geometry_changed.connect(lambda n=node: self._on_node_geometry_changed(n.id))
         item.edited.connect(self._schedule_save)
         item.connection_drag_started.connect(self._on_connection_drag_started)
@@ -450,6 +469,133 @@ class CanvasView(QGraphicsView):
         item.setSelected(True)
         self._schedule_save()
         return item
+
+    def _add_group_center(self):
+        self.add_group_node(self._viewport_center_scene())
+
+    def add_group_node(self, scene_pos: QPointF, label: str = "Grupo") -> GroupNodeItem:
+        node = cf.CanvasNode(
+            id=cf.new_id(),
+            type="group",
+            x=scene_pos.x(),
+            y=scene_pos.y(),
+            width=400,
+            height=300,
+            label=label,
+        )
+        self._doc.nodes.append(node)
+        self._scene.clearSelection()
+        item = self._add_item_for(node)
+        item.setSelected(True)
+        self._schedule_save()
+        return item
+
+    def _pick_and_add_link(self):
+        url, ok = QInputDialog.getText(
+            self, "Añadir enlace", "URL del enlace web:", text="https://"
+        )
+        if ok and url.strip():
+            self.add_link_node(self._viewport_center_scene(), url.strip())
+
+    def add_link_node(self, scene_pos: QPointF, url: str = "https://") -> LinkNodeItem:
+        node = cf.CanvasNode(
+            id=cf.new_id(),
+            type="link",
+            x=scene_pos.x(),
+            y=scene_pos.y(),
+            width=320,
+            height=80,
+            url=url,
+        )
+        self._doc.nodes.append(node)
+        self._scene.clearSelection()
+        item = self._add_item_for(node)
+        item.setSelected(True)
+        self._schedule_save()
+        return item
+
+    def _toggle_snap(self):
+        self._snap_to_grid = not self._snap_to_grid
+        if getattr(self, "_btn_snap", None) is not None:
+            if self._snap_to_grid:
+                self._btn_snap.setStyleSheet("background:#7c5af0;color:#ffffff;padding:5px 10px;border-radius:6px;font-size:12px;")
+            else:
+                self._btn_snap.setStyleSheet("")
+
+    def zoom_to_fit(self):
+        rect = self._scene.itemsBoundingRect()
+        if not rect.isEmpty() and rect.width() > 0 and rect.height() > 0:
+            self.fitInView(rect.adjusted(-50, -50, 50, 50), Qt.KeepAspectRatio)
+
+    def export_to_png(self, target_path=None):
+        if target_path is None:
+            fname, _ = QFileDialog.getSaveFileName(
+                self, "Exportar canvas como PNG", "", "PNG Image (*.png)"
+            )
+            if not fname:
+                return None
+            target_path = Path(fname)
+        else:
+            target_path = Path(target_path)
+
+        rect = self._scene.itemsBoundingRect().adjusted(-30, -30, 30, 30)
+        if rect.width() <= 0 or rect.height() <= 0:
+            rect = QRectF(0, 0, 800, 600)
+
+        img = QImage(int(rect.width()), int(rect.height()), QImage.Format_ARGB32)
+        img.fill(QColor("#1e1e24"))
+        painter = QPainter(img)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.TextAntialiasing)
+        self._scene.render(painter, target=QRectF(img.rect()), source=rect)
+        painter.end()
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        img.save(str(target_path), "PNG")
+        return target_path
+
+    def copy_selected(self):
+        selected_nodes = [it.node for it in self._scene.selectedItems() if isinstance(it, BaseNodeItem)]
+        if not selected_nodes:
+            return
+        selected_node_ids = {n.id for n in selected_nodes}
+        self._clipboard_nodes = [copy.deepcopy(n) for n in selected_nodes]
+        self._clipboard_edges = [
+            copy.deepcopy(e) for e in self._doc.edges
+            if e.fromNode in selected_node_ids and e.toNode in selected_node_ids
+        ]
+
+    def paste(self, offset: QPointF = QPointF(30, 30)):
+        if not self._clipboard_nodes:
+            return
+        self._scene.clearSelection()
+        id_map = {}
+        for orig_node in self._clipboard_nodes:
+            node = copy.deepcopy(orig_node)
+            new_id = cf.new_id()
+            id_map[node.id] = new_id
+            node.id = new_id
+            node.x += offset.x()
+            node.y += offset.y()
+            orig_node.x += offset.x()
+            orig_node.y += offset.y()
+            self._doc.nodes.append(node)
+            item = self._add_item_for(node)
+            item.setSelected(True)
+
+        for orig_edge in self._clipboard_edges:
+            if orig_edge.fromNode in id_map and orig_edge.toNode in id_map:
+                edge = copy.deepcopy(orig_edge)
+                edge.id = cf.new_id()
+                edge.fromNode = id_map[edge.fromNode]
+                edge.toNode = id_map[edge.toNode]
+                self._doc.edges.append(edge)
+                self._add_edge_item_for(edge)
+
+        self._schedule_save()
+
+    def duplicate_selected(self):
+        self.copy_selected()
+        self.paste(QPointF(40, 40))
 
     # ── drag & drop from the explorer / OS ──────────────────────────────
     def _paths_from_mime(self, mime):
@@ -653,11 +799,186 @@ class CanvasView(QGraphicsView):
         super().mouseDoubleClickEvent(event)
 
     def keyPressEvent(self, event):
+        if event.modifiers() & Qt.ControlModifier:
+            if event.key() == Qt.Key_C:
+                self.copy_selected()
+                event.accept()
+                return
+            if event.key() == Qt.Key_V:
+                self.paste()
+                event.accept()
+                return
+            if event.key() == Qt.Key_D:
+                self.duplicate_selected()
+                event.accept()
+                return
+            if event.key() == Qt.Key_A:
+                for item in self._scene.items():
+                    if isinstance(item, (BaseNodeItem, EdgeItem)):
+                        item.setSelected(True)
+                event.accept()
+                return
+            if event.key() == Qt.Key_0:
+                self.zoom_to_fit()
+                event.accept()
+                return
+
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
             self._delete_selected()
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def contextMenuEvent(self, event):
+        item = self.itemAt(event.pos())
+        menu = QMenu(self)
+        menu.setStyleSheet(
+            "QMenu{background:#26262c;border:1px solid #3a3a46;color:#dcdde0;padding:4px;}"
+            "QMenu::item{padding:5px 18px;border-radius:4px;font-size:12px;}"
+            "QMenu::item:selected{background:#7c5af0;color:#ffffff;}"
+        )
+        if isinstance(item, BaseNodeItem):
+            color_menu = menu.addMenu("🎨 Color")
+            colors = [
+                ("Por defecto", ""),
+                ("Rojo (1)", "1"),
+                ("Naranja (2)", "2"),
+                ("Amarillo (3)", "3"),
+                ("Verde (4)", "4"),
+                ("Cian (5)", "5"),
+                ("Púrpura (6)", "6"),
+            ]
+            for name, c_id in colors:
+                act = color_menu.addAction(name)
+                act.triggered.connect(lambda chk, c=c_id, it=item: self._set_node_color(it, c))
+
+            menu.addSeparator()
+            is_locked = item.is_locked
+            act_lock = menu.addAction("🔓 Desbloquear" if is_locked else "🔒 Bloquear")
+            act_lock.triggered.connect(lambda: item.set_locked(not is_locked))
+
+            act_front = menu.addAction("⬆ Traer al frente")
+            act_front.triggered.connect(lambda: self._adjust_z_value(item, 1))
+
+            act_back = menu.addAction("⬇ Enviar al fondo")
+            act_back.triggered.connect(lambda: self._adjust_z_value(item, -1))
+
+            menu.addSeparator()
+            act_dup = menu.addAction("Duplicar")
+            act_dup.setShortcut("Ctrl+D")
+            act_dup.triggered.connect(self.duplicate_selected)
+
+            act_del = menu.addAction("Eliminar")
+            act_del.triggered.connect(self._delete_selected)
+
+        elif isinstance(item, EdgeItem):
+            style_menu = menu.addMenu("Estilo de línea")
+            for st, st_label in [("solid", "Sólida"), ("dashed", "Guiones"), ("dotted", "Puntos")]:
+                act = style_menu.addAction(st_label)
+                act.triggered.connect(lambda chk, s=st, e=item: self._set_edge_style(e, s))
+
+            routing_menu = menu.addMenu("Enrutamiento")
+            for r, r_label in [("bezier", "Curva (Bézier)"), ("straight", "Línea recta"), ("orthogonal", "Ortogonal")]:
+                act = routing_menu.addAction(r_label)
+                act.triggered.connect(lambda chk, rt=r, e=item: self._set_edge_routing(e, rt))
+
+            arrows_menu = menu.addMenu("Flechas")
+            for f_end, t_end, ar_label in [
+                ("none", "arrow", "Destino"),
+                ("arrow", "none", "Origen"),
+                ("arrow", "arrow", "Ambos extremos"),
+                ("none", "none", "Sin flechas"),
+            ]:
+                act = arrows_menu.addAction(ar_label)
+                act.triggered.connect(lambda chk, fe=f_end, te=t_end, e=item: self._set_edge_arrows(e, fe, te))
+
+            color_menu = menu.addMenu("🎨 Color")
+            colors = [
+                ("Por defecto", ""),
+                ("Rojo (1)", "1"),
+                ("Naranja (2)", "2"),
+                ("Amarillo (3)", "3"),
+                ("Verde (4)", "4"),
+                ("Cian (5)", "5"),
+                ("Púrpura (6)", "6"),
+            ]
+            for name, c_id in colors:
+                act = color_menu.addAction(name)
+                act.triggered.connect(lambda chk, c=c_id, e=item: self._set_edge_color(e, c))
+
+            menu.addSeparator()
+            act_del = menu.addAction("Eliminar conexión")
+            act_del.triggered.connect(self._delete_selected)
+
+        else:
+            scene_pt = self.mapToScene(event.pos())
+            act_note = menu.addAction("＋ Nota")
+            act_note.triggered.connect(self._pick_and_add_note)
+
+            act_text = menu.addAction("＋ Texto")
+            act_text.triggered.connect(lambda: self.add_text_node(scene_pt))
+
+            act_group = menu.addAction("＋ Grupo")
+            act_group.triggered.connect(lambda: self.add_group_node(scene_pt))
+
+            act_link = menu.addAction("＋ Enlace")
+            act_link.triggered.connect(self._pick_and_add_link)
+
+            act_media = menu.addAction("＋ Media")
+            act_media.triggered.connect(self._pick_and_add_media)
+
+            menu.addSeparator()
+            if self._clipboard_nodes:
+                act_paste = menu.addAction("Pegar")
+                act_paste.setShortcut("Ctrl+V")
+                act_paste.triggered.connect(lambda: self.paste(QPointF(20, 20)))
+
+            act_fit = menu.addAction("⤢ Ajustar vista")
+            act_fit.setShortcut("Ctrl+0")
+            act_fit.triggered.connect(self.zoom_to_fit)
+
+            act_export = menu.addAction("📷 Exportar como PNG…")
+            act_export.triggered.connect(lambda: self.export_to_png())
+
+        menu.exec(event.globalPos())
+
+    def _set_node_color(self, item: BaseNodeItem, color_code: str):
+        item.node.color = color_code
+        item.update()
+        self._schedule_save()
+
+    def _adjust_z_value(self, item: BaseNodeItem, delta: float):
+        new_z = item.zValue() + delta
+        item.setZValue(new_z)
+        if item.node.nv is None:
+            item.node.nv = {}
+        item.node.nv["zIndex"] = new_z
+        self._schedule_save()
+
+    def _set_edge_style(self, edge_item: EdgeItem, style: str):
+        if edge_item.edge.nv is None:
+            edge_item.edge.nv = {}
+        edge_item.edge.nv["style"] = style
+        edge_item.update_path()
+        self._schedule_save()
+
+    def _set_edge_routing(self, edge_item: EdgeItem, routing: str):
+        if edge_item.edge.nv is None:
+            edge_item.edge.nv = {}
+        edge_item.edge.nv["routing"] = routing
+        edge_item.update_path()
+        self._schedule_save()
+
+    def _set_edge_arrows(self, edge_item: EdgeItem, from_end: str, to_end: str):
+        edge_item.edge.fromEnd = from_end
+        edge_item.edge.toEnd = to_end
+        edge_item.update_path()
+        self._schedule_save()
+
+    def _set_edge_color(self, edge_item: EdgeItem, color: str):
+        edge_item.edge.color = color
+        edge_item.update_path()
+        self._schedule_save()
 
     def _delete_selected(self):
         removed = False

@@ -316,9 +316,9 @@ comparando el resultado).
       (editor/canvas) y enruta por extensión (`_open_notes_path`);
       comando "Nuevo canvas…" en el Command Palette (`new_canvas` +
       `canvas_actions.create_canvas`); `flush()` en `closeEvent`.
+      Opción "Nuevo canvas aquí" y "Nuevo canvas en la raíz" en el menú
+      contextual del explorador.
       Tests: `test_canvas_format.py` (8), `test_canvas_view.py` (5).
-      PENDIENTE menor: opción "Nuevo canvas" en el menú contextual del
-      explorador (hoy solo por Command Palette).
 - [x] C1 — nodos de nota (editar desde canvas). `NoteNodeItem` (items.py):
       cabecera = asa de arrastre + doble clic abre la nota completa; cuerpo =
       `QTextEdit` en proxy que guarda el `.md` en vivo (debounce 700 ms)
@@ -364,4 +364,13 @@ comparando el resultado).
       de paleta (1..6 + blanco) y grosores (2, 4, 8 px). Persistencia de trazos
       en el archivo `.canvas` bajo `type: "nv-drawing"` con `nv.strokes`. Tests:
       `test_canvas_drawing.py` (6).
-- [ ] C6 — pulido y extras
+- [x] C6 — pulido y extras. `GroupNodeItem` (`type: "group"`, contenedor con
+      título editable que arrastra hijos), `LinkNodeItem` (`type: "link"`,
+      tarjeta de enlace con botón de apertura en navegador), bloqueo de nodos
+      (`locked`), orden Z persistente (`zIndex`), rejilla magnética opcional
+      ("🧲 Snap", pasos de 20 px), portapapeles completo (copiar Ctrl+C,
+      pegar Ctrl+V, duplicar Ctrl+D con remapeo de aristas), menús contextuales
+      ricos (paleta Obsidian 1..6, estilo/flechas de líneas, z-order, bloqueo),
+      "⤢ Ajustar" (zoom-to-fit) y "📷 Exportar" a imagen PNG de alta fidelidad.
+      Menú contextual del explorador con "Nuevo canvas aquí" y "Nuevo canvas en
+      la raíz". Tests: `test_canvas_polish.py` (7).

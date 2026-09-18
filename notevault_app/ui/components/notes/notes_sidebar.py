@@ -543,6 +543,19 @@ class NotesSidebar(QWidget):
         self.reveal(note.path)
         self.note_selected.emit(note.path)
 
+    def new_canvas(self, folder: Path = None):
+        target = folder if folder is not None else self._target_folder()
+        win = self.window()
+        if hasattr(win, "new_canvas"):
+            win.new_canvas(target)
+        else:
+            from .canvas_actions import create_canvas
+            p = create_canvas(self.vault, self.service, target)
+            if p:
+                self.populate_tree(p)
+                self.reveal(p)
+                self.note_selected.emit(p)
+
     def new_folder(self):
         parent = self._target_folder()
         rel = self._rel(parent)
@@ -832,6 +845,7 @@ class NotesSidebar(QWidget):
         menu = QMenu(self)
         if item is None:
             menu.addAction("Nueva nota en la raíz", self.new_note)
+            menu.addAction("Nuevo canvas en la raíz", lambda: self.new_canvas(self.vault.vault_root))
             menu.addAction("Nueva carpeta en la raíz", self.new_folder)
             menu.exec(self._tree.viewport().mapToGlobal(pos))
             return
@@ -849,6 +863,7 @@ class NotesSidebar(QWidget):
             )
         else:
             menu.addAction("Nueva nota aquí", self.new_note)
+            menu.addAction("Nuevo canvas aquí", lambda: self.new_canvas(path))
             menu.addAction("Nueva carpeta aquí", self.new_folder)
             menu.addAction("Abrir todas las notas de la carpeta",
                            lambda: self._open_folder_notes(path))

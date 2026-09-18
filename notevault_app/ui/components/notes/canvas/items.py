@@ -11,10 +11,13 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QGraphicsObject, QGraphicsTextItem, QGraphicsProxyWidget, QTextEdit, QStyle,
-    QWidget, QHBoxLayout, QPushButton, QSlider, QLabel,
+    QWidget, QHBoxLayout, QPushButton, QSlider, QLabel, QInputDialog,
 )
 from PySide6.QtCore import Qt, QRectF, QPointF, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QPen, QBrush, QFont, QPainterPath, QPixmap, QTextOption
+from PySide6.QtGui import (
+    QColor, QPen, QBrush, QFont, QPainterPath, QPixmap, QTextOption,
+    QDesktopServices
+)
 
 from .....core import attachments
 from .shapes import shape_path, shape_internal_paths
@@ -86,11 +89,24 @@ class BaseNodeItem(QGraphicsObject):
         self._hovered = False
         self._press_local = QPointF()
         self._press_size = (node.width, node.height)
-        self.setFlag(QGraphicsObject.ItemIsMovable, True)
+        is_locked = bool((node.nv or {}).get("locked", False))
+        self.setFlag(QGraphicsObject.ItemIsMovable, not is_locked)
         self.setFlag(QGraphicsObject.ItemIsSelectable, True)
         self.setFlag(QGraphicsObject.ItemSendsGeometryChanges, True)
         self.setPos(node.x, node.y)
         self.setAcceptHoverEvents(True)
+
+    @property
+    def is_locked(self) -> bool:
+        return bool((self.node.nv or {}).get("locked", False))
+
+    def set_locked(self, locked: bool):
+        if self.node.nv is None:
+            self.node.nv = {}
+        self.node.nv["locked"] = locked
+        self.setFlag(QGraphicsObject.ItemIsMovable, not locked)
+        self.update()
+        self.edited.emit()
 
     # geometry ---------------------------------------------------------------
     def boundingRect(self) -> QRectF:
@@ -175,6 +191,9 @@ class BaseNodeItem(QGraphicsObject):
         super().hoverMoveEvent(event)
 
     def mousePressEvent(self, event):
+        if self.is_locked:
+            super().mousePressEvent(event)
+            return
         if event.button() == Qt.LeftButton:
             side = self.port_at(event.pos())
             if side:
@@ -194,6 +213,10 @@ class BaseNodeItem(QGraphicsObject):
             delta = event.scenePos() - self._press_local
             w = max(MIN_W, self._press_size[0] + delta.x())
             h = max(MIN_H, self._press_size[1] + delta.y())
+            view = self.scene().views()[0] if self.scene() and self.scene().views() else None
+            if view and getattr(view, "_snap_to_grid", False):
+                w = max(MIN_W, round(w / 20.0) * 20.0)
+                h = max(MIN_H, round(h / 20.0) * 20.0)
             self.prepareGeometryChange()
             self.node.width, self.node.height = w, h
             self.update()
@@ -212,6 +235,13 @@ class BaseNodeItem(QGraphicsObject):
         super().mouseReleaseEvent(event)
 
     def itemChange(self, change, value):
+        if change == QGraphicsObject.ItemPositionChange and self.scene():
+            view = self.scene().views()[0] if self.scene().views() else None
+            if view and getattr(view, "_snap_to_grid", False):
+                new_pos = value
+                snapped_x = round(new_pos.x() / 20.0) * 20.0
+                snapped_y = round(new_pos.y() / 20.0) * 20.0
+                return QPointF(snapped_x, snapped_y)
         if change == QGraphicsObject.ItemPositionHasChanged:
             self.node.x = float(self.pos().x())
             self.node.y = float(self.pos().y())
@@ -415,6 +445,143 @@ class DrawingNodeItem(BaseNodeItem):
                 self.edited.emit()
                 return True
         return False
+
+
+class GroupNodeItem(BaseNodeItem):
+    """A container card with a title that groups and moves nodes inside it."""
+
+    def __init__(self, node, parent=None):
+        super().__init__(parent=parent, node=node)
+        self.setZValue(-2)
+        self._text = QGraphicsTextItem(self)
+        self._text.setDefaultTextColor(QColor("#a6a8b1"))
+        self._text.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self._text.setPlainText(node.label or "Grupo")
+        self._text.setPos(12, 6)
+        self._drag_start_pos = QPointF()
+        self._dragged_children = []
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(painter.RenderHint.Antialiasing)
+        rect = self._node_rect().adjusted(0.5, 0.5, -0.5, -0.5)
+        group_col = color_for(self.node.color) if self.node.color else QColor("#1e1e24")
+        bg = QColor(group_col)
+        bg.setAlpha(40)
+        painter.setBrush(QBrush(bg))
+        selected = bool(option.state & QStyle.State_Selected)
+        border_col = BORDER_SEL if selected else (color_for(self.node.color) if self.node.color else QColor("#444452"))
+        pen = QPen(border_col, 1.8 if selected else 1.2, Qt.DashLine if not selected else Qt.SolidLine)
+        painter.setPen(pen)
+        painter.drawRoundedRect(rect, 10, 10)
+
+        self._text.setPlainText(self.node.label or "Grupo")
+
+        if selected:
+            painter.setBrush(QBrush(GRIP))
+            painter.setPen(Qt.NoPen)
+            g = self._grip_rect()
+            painter.drawRoundedRect(g.adjusted(3, 3, -1, -1), 2, 2)
+        if selected or self._hovered:
+            self._draw_ports(painter)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.pos().y() <= 36:
+            self._edit_label()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def _edit_label(self):
+        text, ok = QInputDialog.getText(
+            None, "Etiqueta del grupo", "Nombre del grupo:",
+            text=self.node.label or "Grupo"
+        )
+        if ok:
+            self.node.label = text.strip()
+            self._text.setPlainText(self.node.label)
+            self.update()
+            self.edited.emit()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and not self._resizing and not self.is_locked:
+            self._drag_start_pos = self.pos()
+            self._dragged_children = []
+            if self.scene():
+                group_scene_rect = self.mapRectToScene(self._node_rect())
+                for item in self.scene().items(group_scene_rect, Qt.IntersectsItemBoundingRect):
+                    if isinstance(item, BaseNodeItem) and item != self and not isinstance(item, GroupNodeItem):
+                        if not item.isSelected():
+                            self._dragged_children.append((item, item.pos() - self.pos()))
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        if self._dragged_children and not self._resizing and not self.is_locked:
+            for child, rel_offset in self._dragged_children:
+                child.setPos(self.pos() + rel_offset)
+
+
+class LinkNodeItem(BaseNodeItem):
+    """A card linking to an external website with an open button."""
+
+    def __init__(self, node, parent=None):
+        super().__init__(parent=parent, node=node)
+        self._proxy = None
+        self._build_ui()
+
+    def _build_ui(self):
+        widget = QWidget()
+        widget.setStyleSheet("background:transparent;")
+        lay = QHBoxLayout(widget)
+        lay.setContentsMargins(12, 8, 12, 8)
+        lay.setSpacing(10)
+
+        icon_lbl = QLabel("🔗")
+        icon_lbl.setStyleSheet("font-size:18px;color:#7c5af0;")
+        lay.addWidget(icon_lbl)
+
+        url_lbl = QLabel(self.node.url or "https://")
+        url_lbl.setStyleSheet("color:#dcdde0;font-size:11px;font-family:'Segoe UI';")
+        url_lbl.setWordWrap(True)
+        lay.addWidget(url_lbl, 1)
+
+        btn = QPushButton("Abrir ↗")
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet(
+            "QPushButton{background:#3a3a46;color:#ffffff;border:none;"
+            "padding:4px 10px;border-radius:4px;font-size:11px;}"
+            "QPushButton:hover{background:#7c5af0;}"
+        )
+        btn.clicked.connect(self._open_url)
+        lay.addWidget(btn)
+
+        self._proxy = QGraphicsProxyWidget(self)
+        self._proxy.setWidget(widget)
+        self._proxy.setGeometry(QRectF(0, 0, self.node.width, self.node.height))
+
+    def _open_url(self):
+        url = (self.node.url or "").strip()
+        if url:
+            if not (url.startswith("http://") or url.startswith("https://")):
+                url = "https://" + url
+            QDesktopServices.openUrl(QUrl(url))
+
+    def paint_content(self, painter, rect):
+        if self._proxy:
+            self._proxy.setGeometry(QRectF(0, 0, self.node.width, self.node.height))
+
+    def mouseDoubleClickEvent(self, event):
+        url, ok = QInputDialog.getText(
+            None, "Editar enlace", "URL del enlace:", text=self.node.url or "https://"
+        )
+        if ok and url.strip():
+            self.node.url = url.strip()
+            if self._proxy:
+                self._proxy.deleteLater()
+            self._build_ui()
+            self.update()
+            self.edited.emit()
+        event.accept()
 
 
 HEADER_H = 26.0

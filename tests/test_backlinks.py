@@ -67,6 +67,23 @@ class TestBacklinks(unittest.TestCase):
         self.editor.note_saved.emit(self.dir / "Target.md")
         self.assertTrue(self.editor._mentions_refresh.isActive())
 
+    def test_wikilink_plain_click_follows(self):
+        # A plain left-click (no Ctrl) on a [[wikilink]] must follow it now.
+        from PySide6.QtGui import QMouseEvent
+        from PySide6.QtCore import QPointF, QEvent
+        from notevault_app.ui.components.notes.note_view import NoteTextEdit
+
+        edit = NoteTextEdit()
+        edit.load_markdown("ver [[Target]] aqui")
+        fired = []
+        edit.note_link_activated.connect(fired.append)
+        # Pretend the cursor under the click sits on the wikilink.
+        edit._wikilink_under = lambda pos: "Target"
+        ev = QMouseEvent(QEvent.MouseButtonPress, QPointF(5, 5),
+                         Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+        self.assertTrue(edit._follow_wikilink(ev))
+        self.assertEqual(fired, ["Target"])
+
     def _buttons(self, layout):
         out = []
         for i in range(layout.count()):

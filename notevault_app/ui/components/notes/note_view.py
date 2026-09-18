@@ -333,8 +333,9 @@ class _WikilinkClicks:
         return wikilink_at(cursor.block().text(), cursor.positionInBlock())
 
     def _follow_wikilink(self, event) -> bool:
-        if not (event.modifiers() & Qt.ControlModifier):
-            return False
+        # A plain left-click on a [[wikilink]] follows it, like a link should,
+        # in every editing mode (Obsidian's Live Preview behaviour). Holding a
+        # modifier still works, so Ctrl+click keeps opening the note too.
         target = self._wikilink_under(event.position().toPoint())
         if not target:
             return False
@@ -342,8 +343,6 @@ class _WikilinkClicks:
         return True
 
     def _wikilink_cursor(self, event) -> bool:
-        if not (event.modifiers() & Qt.ControlModifier):
-            return False
         if self._wikilink_under(event.position().toPoint()) is None:
             return False
         self._set_cursor_shape(Qt.PointingHandCursor)

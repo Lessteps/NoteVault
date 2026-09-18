@@ -300,9 +300,11 @@ comparando el resultado).
       `QTimer` single-shot de 700 ms (`_mentions_refresh`) que llama
       `refresh_mentions()`; el índice ya se actualiza incrementalmente en
       `note_written`. Tests en `tests/test_backlinks.py` (4).
-      NOTA pendiente de confirmar con el usuario: en modo edición los
-      `[[wikilinks]]` del cuerpo siguen requiriendo Ctrl+click
-      (`note_view.py:336`); si el usuario se refería a eso, relajarlo.
+- [x] Parte A.3 — `[[wikilinks]]` del cuerpo se abren con click normal (sin
+      Ctrl) en todos los modos de edición. El mixin `_WikilinkClicks`
+      (`note_view.py`) ya no exige `ControlModifier` en `_follow_wikilink` /
+      `_wikilink_cursor`; el modo lectura ya navegaba por anclas. El usuario
+      confirmó que se refería a AMBOS (panel de menciones + wikilinks).
 - [x] C0 — andamiaje `.canvas` + explorador + abrir/guardar. Hecho:
       `core/canvas_format.py` (modelo Obsidian+nv, load/dump/create_empty);
       `.canvas` es kind "canvas" en `file_kinds.py` y aparece en el árbol con

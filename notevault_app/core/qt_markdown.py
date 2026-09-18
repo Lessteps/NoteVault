@@ -218,11 +218,19 @@ def prepare_for_reading(markdown: str) -> str:
     """prepare_markdown(), plus wikilinks turned into clickable links.
 
     Only for the read-only view: this output is never serialised back.
+    Shows only the file name when no alias is provided for cleaner visualization.
     """
-    text = _WIKILINK_RE.sub(
-        lambda m: f"[{m.group(2) or m.group(1)}](<nv-note:{m.group(1).strip()}>)",
-        markdown or "",
-    )
+    def _to_link(m: re.Match) -> str:
+        target = m.group(1).strip()
+        alias = (m.group(2) or "").strip()
+        if alias:
+            label = alias
+        else:
+            clean = target.split("#")[0].strip()
+            label = Path(clean).name if ("/" in clean or "\\" in clean) else clean
+        return f"[{label}](<nv-note:{target}>)"
+
+    text = _WIKILINK_RE.sub(_to_link, markdown or "")
     return prepare_markdown(text)
 
 

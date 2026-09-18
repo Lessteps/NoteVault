@@ -435,23 +435,49 @@ class VaultManager:
         self._backlink_index = {}
         for note in self.all_notes():
             for link in note.wikilinks:
-                self._backlink_index.setdefault(link.lower(), []).append(note.path)
+                clean = link.split("#")[0].strip().lower()
+                stem = Path(clean).stem.lower()
+                name = Path(clean).name.lower()
+                for key in {clean, stem, name}:
+                    if key:
+                        self._backlink_index.setdefault(key, []).append(note.path)
 
     def get_backlinks(self, note: Note) -> list[Note]:
         self.rebuild_backlinks()
-        refs = self._backlink_index.get(note.title.lower(), [])
-        return [Note(p, self.vault_root) for p in refs if p != note.path]
+        keys = {note.title.lower(), note.path.name.lower()}
+        try:
+            rel = note.path.relative_to(self.vault_root).as_posix().lower()
+            keys.add(rel)
+            keys.add(Path(rel).with_suffix("").as_posix().lower())
+        except Exception:
+            pass
+        matched_paths = set()
+        for k in keys:
+            for p in self._backlink_index.get(k, []):
+                if p != note.path:
+                    matched_paths.add(p)
+        return [Note(p, self.vault_root) for p in matched_paths]
 
     # ── Resolve wikilink ─────────────────────────────────────────────────
 
     def resolve_link(self, link_text: str) -> Optional[Note]:
         """Find a note by title (case-insensitive, partial match ok)."""
-        target = link_text.lower()
+        clean = link_text.split("#")[0].split("|")[0].strip()
+        target = clean.lower()
+        target_stem = Path(clean).stem.lower()
+        target_name = Path(clean).name.lower()
+
+        rel_candidate = self.vault_root / clean
+        if rel_candidate.is_file():
+            return Note(rel_candidate, self.vault_root)
+        if rel_candidate.with_suffix(".md").is_file():
+            return Note(rel_candidate.with_suffix(".md"), self.vault_root)
+
         for note in self.all_notes():
-            if note.title.lower() == target:
+            if note.title.lower() in (target, target_stem) or note.path.name.lower() in (target, target_name):
                 return note
         for note in self.all_notes():
-            if target in note.title.lower():
+            if target_stem and target_stem in note.title.lower():
                 return note
         return None
 

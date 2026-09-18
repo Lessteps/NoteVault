@@ -96,5 +96,50 @@ class TestBacklinks(unittest.TestCase):
         return out
 
 
+    def test_mentions_detects_subfolder_and_ext_links(self):
+        (self.dir / "Subfolder").mkdir(exist_ok=True)
+        (self.dir / "OtherSource.md").write_text(
+            "# Other\n\nEnlace: [[Subfolder/Target.md]]\n", encoding="utf-8")
+        self.service.index.clear()
+        linked, unlinked = self.service.mentions(self._target_note())
+        titles = [m.title for m in linked]
+        self.assertIn("OtherSource", titles)
+
+    def test_prepare_for_reading_shows_only_filename(self):
+        from notevault_app.core.qt_markdown import prepare_for_reading
+        src = "1. [[PHASE_0_PROBLEM_RECOGNITION/1.Problem_Statement.md]] (D1)\n2. [[path/to/note.md|Mi Alias]]"
+        res = prepare_for_reading(src)
+        self.assertIn("[1.Problem_Statement.md](<nv-note:PHASE_0_PROBLEM_RECOGNITION/1.Problem_Statement.md>)", res)
+        self.assertIn("[Mi Alias](<nv-note:path/to/note.md>)", res)
+
+    def test_clean_mention_line_shows_only_filename(self):
+        line = "1. [[PHASE_0_PROBLEM_RECOGNITION/1.Problem_Statement.md]] (D1)"
+        cleaned = self.editor._mentions._clean_mention_line(line)
+        self.assertEqual(cleaned, "1. [[1.Problem_Statement.md]] (D1)")
+
+    def test_highlighter_wikilink_collapsing(self):
+        from notevault_app.ui.components.notes.note_view import NoteSourceEdit
+        edit = NoteSourceEdit()
+        edit.setPlainText("Line 0: [[folder/file.md]]\nLine 1: [[folder2/file2.md]]")
+        hl = edit._highlighter
+
+        # Block 0 active, block 1 inactive
+        hl.active_block = 0
+        hl.rehighlight()
+        b0_fmts = hl.document().findBlockByNumber(0).layout().formats()
+        b1_fmts = hl.document().findBlockByNumber(1).layout().formats()
+        # Active line has 1 format (full link), inactive line has 3 (hide, show, hide)
+        self.assertEqual(len(b0_fmts), 1)
+        self.assertEqual(len(b1_fmts), 3)
+
+        # Now switch active block to 1
+        hl.active_block = 1
+        hl.rehighlight()
+        b0_fmts_after = hl.document().findBlockByNumber(0).layout().formats()
+        b1_fmts_after = hl.document().findBlockByNumber(1).layout().formats()
+        self.assertEqual(len(b0_fmts_after), 3)
+        self.assertEqual(len(b1_fmts_after), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

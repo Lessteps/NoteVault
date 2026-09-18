@@ -12,6 +12,7 @@ Nothing here changes the file. It only paints.
 """
 
 import re
+from pathlib import Path
 
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 
@@ -71,8 +72,8 @@ def _base_point_size(document) -> float:
 # Inline patterns, applied in order. Earlier rules win over later ones on the
 # same span, so links are matched before emphasis.
 _INLINE = [
-    # ![[embed]] and [[wikilink]]
-    (re.compile(r"!?\[\[[^\]\n]+\]\]"), dict(color=C_WIKILINK)),
+    # ![[embed]]
+    (re.compile(r"!\[\[[^\]\n]+\]\]"), dict(color=C_WIKILINK)),
     # [label](target)
     (re.compile(r"!?\[[^\]\n]*\]\([^)\n]*\)"), dict(color=C_LINK)),
     # bare URL
@@ -98,6 +99,7 @@ _INLINE = [
 # Every character any inline rule can start on. A line without one of these
 # cannot match any of them.
 _INLINE_HINT_RE = re.compile(r"[\[\]`*_~=#!h]")
+_WIKILINK_RE = re.compile(r"(?<!!)\[\[([^\]\n]+)\]\]")
 
 _FENCE_RE   = re.compile(r"^\s{0,3}(```|~~~)")
 _HEADING_RE = re.compile(r"^(\s{0,3})(#{1,6})(\s+)(.*)$")
@@ -115,6 +117,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
     def __init__(self, document):
         super().__init__(document)
         self.enabled = True
+        self.active_block: int = -1
         self._build_formats()
 
     def _build_formats(self):
@@ -131,6 +134,12 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         self.f_hr = _fmt(C_HR, bold=True)
         self.f_table = _fmt(C_TABLE)
         self.f_front = _fmt(C_FRONT, italic=True)
+        self.f_wikilink_full = _fmt(C_WIKILINK)
+        self.f_wikilink_hide = QTextCharFormat()
+        self.f_wikilink_hide.setFontPointSize(0.1)
+        self.f_wikilink_hide.setForeground(QColor(0, 0, 0, 0))
+        self.f_wikilink_show = _fmt(C_WIKILINK)
+        self.f_wikilink_show.setFontUnderline(True)
         self.f_inline = [(rx, _fmt(**kw)) for rx, kw in _INLINE]
 
     def retheme(self):
@@ -208,15 +217,63 @@ class MarkdownHighlighter(QSyntaxHighlighter):
                     if ch == "|" and (i == 0 or text[i - 1] != "\\"):
                         self.setFormat(i, 1, self.f_table)
 
-        self._paint_inline(text, body_start)
+        self._paint_inline(text, body_start, self.currentBlock().blockNumber())
 
-    def _paint_inline(self, text: str, start: int):
+    def _paint_inline(self, text: str, start: int, block_num: int = -1):
         # Most lines are plain prose. Running fourteen regexes over each of
         # them is the bulk of the highlighting cost, so a line with none of
         # the characters any of them can match is skipped outright.
         if not _INLINE_HINT_RE.search(text, start):
             return
         taken = [False] * len(text)
+
+        # Wikilinks: expanded with full path on active block, collapsed to filename on inactive blocks
+        for m in _WIKILINK_RE.finditer(text, start):
+            a, b = m.start(), m.end()
+            if any(taken[a:b]):
+                continue
+            if block_num == self.active_block:
+                merged = QTextCharFormat(self.format(a))
+                merged.merge(self.f_wikilink_full)
+                self.setFormat(a, b - a, merged)
+            else:
+                inner = m.group(1)
+                parts = inner.split("|", 1)
+                target = parts[0].strip()
+                alias = parts[1].strip() if len(parts) > 1 else ""
+                clean_target = target.split("#", 1)[0].strip()
+
+                if alias:
+                    alias_start = m.start(1) + len(parts[0]) + 1
+                    alias_len = len(alias)
+                    self.setFormat(a, alias_start - a, self.f_wikilink_hide)
+                    merged = QTextCharFormat(self.format(alias_start))
+                    merged.merge(self.f_wikilink_show)
+                    self.setFormat(alias_start, alias_len, merged)
+                    self.setFormat(alias_start + alias_len, b - (alias_start + alias_len), self.f_wikilink_hide)
+                elif "/" in clean_target or "\\" in clean_target:
+                    filename = Path(clean_target).name
+                    fn_idx = m.group(0).find(filename)
+                    if fn_idx != -1:
+                        fn_start = a + fn_idx
+                        fn_len = len(filename)
+                        self.setFormat(a, fn_start - a, self.f_wikilink_hide)
+                        merged = QTextCharFormat(self.format(fn_start))
+                        merged.merge(self.f_wikilink_show)
+                        self.setFormat(fn_start, fn_len, merged)
+                        self.setFormat(fn_start + fn_len, b - (fn_start + fn_len), self.f_wikilink_hide)
+                    else:
+                        merged = QTextCharFormat(self.format(a))
+                        merged.merge(self.f_wikilink_show)
+                        self.setFormat(a, b - a, merged)
+                else:
+                    merged = QTextCharFormat(self.format(a))
+                    merged.merge(self.f_wikilink_show)
+                    self.setFormat(a, b - a, merged)
+
+            for i in range(a, b):
+                taken[i] = True
+
         for rx, fmt in self.f_inline:
             for m in rx.finditer(text, start):
                 a, b = m.start(), m.end()

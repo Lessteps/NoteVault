@@ -451,9 +451,14 @@ class NotesService:
 
         linked, unlinked = [], []
         needle = title.lower()
-        link_re = re.compile(
-            r"\[\[\s*" + re.escape(title) + r"\s*(\|[^\]]*)?\]\]", re.IGNORECASE
-        )
+        target_ids = {needle, note.path.name.lower(), note.path.stem.lower()}
+        try:
+            rel = note.path.relative_to(self.vault.vault_root).as_posix().lower()
+            target_ids.add(rel)
+            target_ids.add(Path(rel).with_suffix("").as_posix().lower())
+        except Exception:
+            pass
+
         plain_re = re.compile(
             r"(?<![\w\[])" + re.escape(title) + r"(?![\w\]])", re.IGNORECASE
         )
@@ -464,7 +469,15 @@ class NotesService:
             if needle not in other.lower:
                 continue
             for i, line in enumerate(other.text.splitlines(), start=1):
-                if link_re.search(line):
+                is_linked = False
+                for wm in re.finditer(r"\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]", line):
+                    raw_target = wm.group(1).strip().lower()
+                    stem = Path(raw_target).stem.lower()
+                    name = Path(raw_target).name.lower()
+                    if raw_target in target_ids or name in target_ids or stem == needle:
+                        is_linked = True
+                        break
+                if is_linked:
                     linked.append(Mention(other.path, other.title, i,
                                           line.strip()[:200], True))
                 elif plain_re.search(line):

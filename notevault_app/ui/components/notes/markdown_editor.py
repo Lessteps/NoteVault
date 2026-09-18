@@ -2105,12 +2105,23 @@ class _MentionsFooter(QFrame):
         )
         return lbl
 
+    def _clean_mention_line(self, line: str) -> str:
+        def _repl(m: re.Match) -> str:
+            alias = (m.group(2) or "").strip()
+            if alias:
+                return f"[[{alias}]]"
+            clean = m.group(1).split("#")[0].strip()
+            name = Path(clean).name if ("/" in clean or "\\" in clean) else clean
+            return f"[[{name}]]"
+        return re.sub(r"\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]", _repl, line or "")
+
     def _row(self, mention) -> QWidget:
         btn = QPushButton()
         btn.setCursor(Qt.PointingHandCursor)
         btn.setMinimumHeight(34)
         btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        btn.setText(f"{mention.title}   ·   {mention.line}")
+        clean_line = self._clean_mention_line(mention.line)
+        btn.setText(f"{mention.title}   ·   {clean_line}")
         btn.setToolTip(f"{mention.path}  (línea {mention.line_no})")
         color = ACCENT if mention.linked else TEXT_DIM
         btn.setStyleSheet(

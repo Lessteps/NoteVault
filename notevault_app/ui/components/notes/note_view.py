@@ -686,6 +686,7 @@ class NoteSourceEdit(_WikilinkClicks, QTextEdit):
         self.viewport().setMouseTracking(True)
         self.setTabStopDistance(4 * self.fontMetrics().horizontalAdvance(" "))
         self._highlighter = MarkdownHighlighter(self.document())
+        self._current_block_number = -1
         self.cursorPositionChanged.connect(self._mark_current_line)
 
     @property
@@ -729,6 +730,20 @@ class NoteSourceEdit(_WikilinkClicks, QTextEdit):
         cursor.clearSelection()
         line.cursor = cursor
         self.setExtraSelections([line])
+
+        cur_block = cursor.blockNumber()
+        prev_block = getattr(self, "_current_block_number", -1)
+        if cur_block != prev_block:
+            self._current_block_number = cur_block
+            if hasattr(self, "_highlighter") and self._highlighter.enabled:
+                self._highlighter.active_block = cur_block
+                if prev_block >= 0:
+                    pb = self.document().findBlockByNumber(prev_block)
+                    if pb.isValid():
+                        self._highlighter.rehighlightBlock(pb)
+                cb = cursor.block()
+                if cb.isValid():
+                    self._highlighter.rehighlightBlock(cb)
 
     # keyboard ---------------------------------------------------------------
 

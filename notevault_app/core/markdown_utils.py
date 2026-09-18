@@ -4,6 +4,7 @@ Render markdown to HTML for the preview pane using QTextBrowser.
 """
 
 import re
+from pathlib import Path
 
 
 def to_html(markdown: str, vault_manager=None) -> str:
@@ -159,8 +160,11 @@ def inline(text: str) -> str:
 
     # Wikilinks [[Title]] or [[Title|Alias]]
     def wikilink(m):
-        target = m.group(1)
-        alias = m.group(2) or target
+        target = m.group(1).strip()
+        alias = m.group(2)
+        if not alias:
+            clean = target.split("#")[0].strip()
+            alias = Path(clean).name if ("/" in clean or "\\" in clean) else clean
         return f'<a href="nv://note/{target}" style="color:#7c5af0;">{alias}</a>'
 
     text = re.sub(r"\[\[([^\]|]+?)(?:\|([^\]]+))?\]\]", wikilink, text)

@@ -13,7 +13,8 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QGraphicsView, QApplication, QFrame, QHBoxLayout, QPushButton, QInputDialog,
-    QFileDialog, QGraphicsPathItem, QMenu,
+    QFileDialog, QGraphicsPathItem, QMenu, QGraphicsTextItem, QGraphicsProxyWidget,
+    QTextEdit, QLineEdit,
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QPointF, QRectF
 from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath, QImage
@@ -817,7 +818,44 @@ class CanvasView(QGraphicsView):
             return
         super().mouseDoubleClickEvent(event)
 
+    def _is_editor_focused(self) -> bool:
+        focus_item = self._scene.focusItem()
+        if focus_item is not None:
+            if isinstance(focus_item, QGraphicsTextItem) and bool(
+                focus_item.textInteractionFlags() & (Qt.TextEditorInteraction | Qt.TextEditable)
+            ):
+                return True
+            if isinstance(focus_item, QGraphicsProxyWidget):
+                w = focus_item.widget()
+                if w and (
+                    isinstance(w, (QTextEdit, QLineEdit))
+                    or w.findChild(QTextEdit) is not None
+                    or w.findChild(QLineEdit) is not None
+                    or w.hasFocus()
+                ):
+                    return True
+        fw = QApplication.focusWidget()
+        if fw is not None and isinstance(fw, (QTextEdit, QLineEdit)):
+            parent = fw
+            while parent:
+                if parent == self:
+                    return True
+                parent = parent.parentWidget()
+        return False
+
     def keyPressEvent(self, event):
+        if self._is_editor_focused():
+            if event.key() == Qt.Key_Escape:
+                self._scene.clearFocus()
+                fw = QApplication.focusWidget()
+                if fw:
+                    fw.clearFocus()
+                self.setFocus()
+                event.accept()
+                return
+            super().keyPressEvent(event)
+            return
+
         if event.modifiers() & Qt.ControlModifier:
             if event.key() == Qt.Key_C:
                 self.copy_selected()

@@ -148,6 +148,47 @@ class TestCanvasPolish(unittest.TestCase):
         self.assertGreater(self.view.transform().m11(), scale_before)
 
 
+    def test_canvas_editor_text_backspace_and_delete(self):
+        from PySide6.QtGui import QKeyEvent
+        from notevault_app.ui.components.notes.canvas.items import NoteNodeItem
+        from notevault_app.core.canvas_format import CanvasNode
+
+        # 1. Text node item
+        text_node = self.view.add_text_node(QPointF(0, 0), "ABCDEF")
+        text_node._begin_edit()
+        cur = text_node._text.textCursor()
+        cur.movePosition(cur.MoveOperation.End)
+        text_node._text.setTextCursor(cur)
+
+        # Backspace should delete 'F'
+        ev_bs = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key_Backspace, Qt.NoModifier)
+        self.view.keyPressEvent(ev_bs)
+        self.assertEqual(text_node._text.toPlainText(), "ABCDE")
+
+        # Delete at pos 0 should delete 'A'
+        cur.setPosition(0)
+        text_node._text.setTextCursor(cur)
+        ev_del = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key_Delete, Qt.NoModifier)
+        self.view.keyPressEvent(ev_del)
+        self.assertEqual(text_node._text.toPlainText(), "BCDE")
+
+        # 2. Note node item
+        note_file = self.dir / "TestNote.md"
+        note_file.write_text("Hello World", encoding="utf-8")
+        cnode = CanvasNode(id="n_test", x=100, y=100, width=200, height=150, type="file", file=str(note_file))
+        note_item = NoteNodeItem(cnode, note_file, self.view.service)
+        self.view._scene.addItem(note_item)
+
+        note_item._proxy.setFocus()
+        note_item._editor.setFocus()
+        ncur = note_item._editor.textCursor()
+        ncur.movePosition(ncur.MoveOperation.End)
+        note_item._editor.setTextCursor(ncur)
+
+        self.view.keyPressEvent(ev_bs)
+        self.assertEqual(note_item._editor.toPlainText(), "Hello Worl")
+
+
 if __name__ == "__main__":
     unittest.main()
 

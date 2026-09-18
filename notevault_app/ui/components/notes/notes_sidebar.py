@@ -28,10 +28,16 @@ from .knowledge_graph_widget import KnowledgeGraphWidget
 from .study_folders_dialog import StudyFoldersDialog
 
 class _DraggableTree(QTreeWidget):
-    """QTreeWidget that intercepts drops and delegates to NotesSidebar."""
+    """QTreeWidget with Obsidian-style fluid drag & drop.
+
+    The whole drag gesture is handed to Qt (drop indicator, edge auto-scroll,
+    hover auto-expand of folders); only the final drop is intercepted so the
+    filesystem move happens through the sidebar instead of Qt reparenting the
+    widget items itself.
+    """
 
     # sidebar sets this after construction
-    drop_handler = None  # callable(src_path, dest_folder) | None
+    drop_handler = None  # callable(list[Path], dest_folder|None) | None
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -39,58 +45,75 @@ class _DraggableTree(QTreeWidget):
         self.setAcceptDrops(True)
         self.setDragDropMode(QAbstractItemView.InternalMove)
         self.setDefaultDropAction(Qt.MoveAction)
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        # Visual feedback that makes the drag feel fluid.
+        self.setDropIndicatorShown(True)
+        self.setAutoScroll(True)
+        self.setAutoScrollMargin(24)
+        # Hovering a folder while dragging expands it, like Obsidian.
+        self.setAutoExpandDelay(450)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.source() is self:
-            event.acceptProposedAction()
+            super().dragEnterEvent(event)
         else:
             event.ignore()
 
     def dragMoveEvent(self, event):
-        if event.source() is self:
-            event.acceptProposedAction()
-        else:
+        if event.source() is not self:
             event.ignore()
+            return
+        # Let Qt draw the drop indicator, auto-scroll and auto-expand. Its
+        # internal validation also rejects illegal drops (a folder onto its
+        # own descendant) by leaving the event un-accepted.
+        super().dragMoveEvent(event)
+
+    def _dest_folder_for(self, event) -> "tuple[bool, Path|None]":
+        """Return (ok, dest_folder). dest_folder is None for the vault root."""
+        item = self.itemAt(event.position().toPoint())
+        if item is None:
+            return True, None  # dropped on empty space → root
+
+        pos = self.dropIndicatorPosition()
+        data = item.data(0, Qt.UserRole) or {}
+
+        # Dropping *onto* a folder moves into it; onto a note, or between
+        # rows, targets the containing folder (sibling placement).
+        if pos == QAbstractItemView.OnItem and data.get("type") == "folder":
+            return True, Path(data["path"])
+
+        parent = item.parent()
+        if parent is None:
+            return True, None  # sibling of a top-level item → root
+        pdata = parent.data(0, Qt.UserRole) or {}
+        if pdata.get("path"):
+            return True, Path(pdata["path"])
+        return True, None
 
     def dropEvent(self, event: QDropEvent):
         if event.source() is not self or self.drop_handler is None:
             event.ignore()
             return
 
-        # Determine source items (currently selected/dragged)
         src_items = self.selectedItems()
         if not src_items:
             event.ignore()
             return
 
-        # Determine destination folder from drop position
-        dest_item = self.itemAt(event.position().toPoint())
-        if dest_item is None:
+        ok, dest_folder = self._dest_folder_for(event)
+        if not ok:
             event.ignore()
             return
 
-        dest_data = dest_item.data(0, Qt.UserRole) or {}
-        if dest_data.get("type") == "folder":
-            dest_folder = Path(dest_data["path"])
-        elif dest_data.get("type") == "note":
-            parent = dest_item.parent()
-            if parent is None:
-                dest_folder = None  # root
-            else:
-                parent_data = parent.data(0, Qt.UserRole) or {}
-                dest_folder = Path(parent_data["path"]) if parent_data.get("path") else None
-        else:
-            event.ignore()
-            return
-
-        # Prevent the widget from doing its own visual move
+        # We move files ourselves, so stop Qt from reparenting the widgets.
         event.setDropAction(Qt.IgnoreAction)
         event.accept()
 
-        for item in src_items:
-            data = item.data(0, Qt.UserRole) or {}
-            if data.get("path"):
-                self.drop_handler(Path(data["path"]), dest_folder)
+        src_paths = [Path(d["path"])
+                     for it in src_items
+                     if (d := (it.data(0, Qt.UserRole) or {})).get("path")]
+        if src_paths:
+            self.drop_handler(src_paths, dest_folder)
 
 
 BG_PANEL   = "#1a1a1e"
@@ -986,16 +1009,80 @@ class NotesSidebar(QWidget):
         if path.exists():
             self.note_selected.emit(path)
 
-    def _on_tree_drop(self, src_path: Path, dest_folder):
-        """Called by _DraggableTree when a drag-drop completes."""
-        if dest_folder is None:
-            dest_folder = self.vault.vault_root
-        dest_folder = Path(dest_folder)
-        try:
-            new_path = self.service.move_path(src_path, dest_folder)
-        except Exception as exc:
-            QMessageBox.warning(self, "No se pudo mover",
-                                f"{src_path.name}\n\n{exc}")
+    def _on_tree_drop(self, src_paths, dest_folder):
+        """Called by _DraggableTree when a drag-drop completes.
+
+        Only the affected rows are touched (source items removed, destination
+        folder reloaded), so a big vault does not flash through a full rebuild.
+        """
+        if isinstance(src_paths, (str, Path)):
+            src_paths = [src_paths]
+        dest = Path(dest_folder) if dest_folder is not None else self.vault.vault_root
+
+        moved = []
+        for src_path in src_paths:
+            src_path = Path(src_path)
+            try:
+                new_path = self.service.move_path(src_path, dest)
+            except Exception as exc:
+                QMessageBox.warning(self, "No se pudo mover",
+                                    f"{src_path.name}\n\n{exc}")
+                continue
+            if new_path == src_path:
+                continue  # no-op (dropped where it already lived)
+            moved.append((src_path, new_path))
+
+        if not moved:
             return
-        self.note_moved.emit(src_path, new_path)
-        self.populate_tree(new_path if new_path.is_file() else None)
+
+        self._tree.setUpdatesEnabled(False)
+        try:
+            for src_path, _new in moved:
+                old_item = self._find_item(src_path)
+                if old_item is not None:
+                    parent = old_item.parent() or self._tree.invisibleRootItem()
+                    parent.removeChild(old_item)
+            self._refresh_folder(dest)
+        finally:
+            self._tree.setUpdatesEnabled(True)
+
+        last = moved[-1][1]
+        if last.is_file():
+            self._active_path = last
+            item = self._find_item(last)
+            if item is not None:
+                self._tree.setCurrentItem(item)
+
+        for src_path, new_path in moved:
+            self.note_moved.emit(src_path, new_path)
+        self._update_stats()
+
+    def _refresh_folder(self, folder: Path):
+        """Re-read one folder's children in place, or the root top level."""
+        folder = Path(folder)
+        if folder == self.vault.vault_root:
+            item = None
+        else:
+            item = self._find_item(folder)
+
+        if item is None:
+            # Root, or a destination folder not currently visible: rebuild the
+            # top level (still lazy, so cost is bounded by open folders).
+            expanded = self._expanded_paths()
+            self._tree.clear()
+            for data in self.service.children_of(self.root, self._numeric_sort):
+                self._add_item(self._tree.invisibleRootItem(), data)
+            for f in sorted(expanded, key=len):
+                found = self._find_item(Path(f))
+                if found is not None:
+                    found.setExpanded(True)
+            if self._filter.text():
+                self._filter_tree(self._filter.text())
+            return
+
+        data = item.data(0, Qt.UserRole) or {}
+        item.takeChildren()
+        data["loaded"] = False
+        item.setData(0, Qt.UserRole, data)
+        self._load_children(item)
+        item.setExpanded(True)

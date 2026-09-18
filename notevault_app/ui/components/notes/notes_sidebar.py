@@ -19,6 +19,7 @@ from PySide6.QtWidgets import QStyle
 from ....core.vault_manager import VaultManager
 from ....core.notes_service import NotesService
 from ....core.workspace_manager import WorkspaceManager
+from ....core.tag_index import TagIndex
 from ....config import AppConfig
 from ... import theme
 from .vault_dialog import VaultDialog
@@ -105,6 +106,7 @@ TAB_FILES     = 0
 TAB_SEARCH    = 1
 TAB_BOOKMARKS = 2
 TAB_GRAPH     = 3
+TAB_TAGS      = 4
 
 
 class _TabButton(QPushButton):
@@ -175,6 +177,7 @@ class NotesSidebar(QWidget):
         self._graph_widget = KnowledgeGraphWidget(self.vault.vault_root)
         self._graph_widget.open_note_requested.connect(self._open_graph_note)
         self._stack.addWidget(self._graph_widget)            # 3
+        self._stack.addWidget(self._build_tags_page())       # 4
         root.addWidget(self._stack, stretch=1)
 
         root.addWidget(self._build_vault_switcher())
@@ -201,6 +204,7 @@ class NotesSidebar(QWidget):
             ("🔍", "Search — buscar en todas las notas"),
             ("🔖", "Bookmarks — notas marcadas"),
             ("🕸", "Grafo — mapa interactivo del conocimiento"),
+            ("#", "Tags — índice de etiquetas"),
         ]):
             b = _TabButton(glyph, tip)
             b.clicked.connect(lambda _=False, i=idx: self.set_tab(i))
@@ -344,6 +348,79 @@ class NotesSidebar(QWidget):
         lay.addWidget(self._bm_list, stretch=1)
         return page
 
+    # ── Tags page ─────────────────────────────────────────────────────────
+
+    def _build_tags_page(self) -> QWidget:
+        page = QWidget()
+        page.setStyleSheet(f"background:{BG_PANEL};")
+        lay = QVBoxLayout(page)
+        lay.setContentsMargins(6, 6, 4, 6)
+        lay.setSpacing(5)
+
+        self._tags_list = QListWidget()
+        self._tags_list.setFrameShape(QListWidget.NoFrame)
+        self._tags_list.setStyleSheet(
+            f"QListWidget{{background:transparent;border:none;color:{TEXT_DIM};}}"
+            f"QListWidget::item{{padding:3px 4px;}}"
+            f"QListWidget::item:selected{{background:{ACCENT_SOFT};color:{ACCENT};}}"
+        )
+        self._tags_list.itemClicked.connect(self._on_tag_clicked)
+        lay.addWidget(self._tags_list, stretch=1)
+
+        # Note list for the selected tag
+        self._tag_notes_label = QLabel("")
+        self._tag_notes_label.setStyleSheet(
+            f"color:{TEXT_FAINT};font-size:10px;background:transparent;border:none;padding:2px 4px;"
+        )
+        lay.addWidget(self._tag_notes_label)
+
+        self._tag_notes_list = QListWidget()
+        self._tag_notes_list.setFrameShape(QListWidget.NoFrame)
+        self._tag_notes_list.setStyleSheet(
+            f"QListWidget{{background:transparent;border:none;color:{TEXT_DIM};}}"
+            f"QListWidget::item{{padding:3px 4px;}}"
+            f"QListWidget::item:selected{{background:{ACCENT_SOFT};color:{TEXT};}}"
+        )
+        self._tag_notes_list.itemClicked.connect(self._on_tag_note_clicked)
+        self._tag_notes_list.hide()
+        lay.addWidget(self._tag_notes_list, stretch=1)
+        return page
+
+    def _refresh_tags(self):
+        """Build the tag index from the in-memory note index and populate the list."""
+        tag_idx = TagIndex.for_vault(self.service.index)
+        notes = self.service.index.cached_notes()
+        if notes:
+            tag_idx.build(notes)
+        else:
+            QTimer.singleShot(300, self._refresh_tags)
+            return
+
+        self._tags_list.clear()
+        self._tag_notes_list.hide()
+        self._tag_notes_label.setText("")
+        for tag, count in tag_idx.all_tags_sorted():
+            item = QListWidgetItem(f"#{tag}  ({count})")
+            item.setData(Qt.UserRole, tag)
+            self._tags_list.addItem(item)
+
+    def _on_tag_clicked(self, item: QListWidgetItem):
+        tag = item.data(Qt.UserRole)
+        tag_idx = TagIndex.for_vault(self.service.index)
+        paths = tag_idx.paths_for_tag(tag)
+        self._tag_notes_label.setText(f"#{tag} — {len(paths)} nota(s)")
+        self._tag_notes_list.clear()
+        for p in sorted(paths, key=lambda x: x.stem.lower()):
+            ni = QListWidgetItem(p.stem)
+            ni.setData(Qt.UserRole, p)
+            self._tag_notes_list.addItem(ni)
+        self._tag_notes_list.show()
+
+    def _on_tag_note_clicked(self, item: QListWidgetItem):
+        path = item.data(Qt.UserRole)
+        if path:
+            self.note_selected.emit(Path(path))
+
     # ── Vault switcher ────────────────────────────────────────────────────
 
     def _build_vault_switcher(self) -> QWidget:
@@ -386,6 +463,8 @@ class NotesSidebar(QWidget):
             self._search_input.setFocus()
         elif index == TAB_GRAPH:
             self._graph_widget.ensure_loaded()
+        elif index == TAB_TAGS:
+            self._refresh_tags()
 
     # ── Tool actions ──────────────────────────────────────────────────────
 

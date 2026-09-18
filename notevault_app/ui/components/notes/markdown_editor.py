@@ -221,9 +221,19 @@ class MarkdownEditor(QWidget):
         root.addWidget(self._stack, stretch=1)
 
         self._mentions = _MentionsFooter(self.service)
-        self._mentions.open_requested.connect(self.open_note_requested.emit)
+        self._mentions.open_requested.connect(self._open_from_mention)
         root.addWidget(self._mentions)
         QTimer.singleShot(400, self._mentions.warm_up)
+
+        # Backlinks refresh themselves a short moment after any note is saved,
+        # so a link added in one note shows up as a backlink in another without
+        # the user reopening it. A single-shot timer collapses the rapid-fire
+        # autosaves into one scan, which keeps the editor from freezing.
+        self._mentions_refresh = QTimer(self)
+        self._mentions_refresh.setSingleShot(True)
+        self._mentions_refresh.setInterval(700)
+        self._mentions_refresh.timeout.connect(self.refresh_mentions)
+        self.note_saved.connect(lambda _p: self._mentions_refresh.start())
 
         self._status = QLabel("")
         self._status.setFixedHeight(22)
@@ -1858,6 +1868,12 @@ class MarkdownEditor(QWidget):
         if path and not self.current_note().is_code:
             self._mentions.load(path)
 
+    def _open_from_mention(self, path: Path, line: int = 0):
+        """A click on a backlink/mention row opens that note and jumps to the
+        exact line of the match, so the jump is visible even when the note is
+        already open in another tab."""
+        self.open_note(Path(path), int(line or 0))
+
 
 def _show_in_folder(path: Path):
     try:
@@ -1936,7 +1952,7 @@ class _MentionsFooter(QFrame):
     result that arrives after the user moved to another note is discarded.
     """
 
-    open_requested = Signal(Path)
+    open_requested = Signal(Path, int)   # (note path, line number of the match)
 
     def __init__(self, service: NotesService, parent=None):
         super().__init__(parent)
@@ -1981,7 +1997,7 @@ class _MentionsFooter(QFrame):
         self._toggle.clicked.connect(self._toggle_expanded)
         h.addWidget(self._toggle)
 
-        self._title = QLabel("Linked mentions")
+        self._title = QLabel("Menciones enlazadas")
         self._title.setStyleSheet(
             f"color:{TEXT};font-size:12px;font-weight:600;"
             "background:transparent;border:none;"
@@ -2056,10 +2072,10 @@ class _MentionsFooter(QFrame):
             return
         self._clear_rows()
         self._count.setText(str(len(linked)))
-        self._add_section(linked, "No backlinks found.")
+        self._add_section(linked, "No hay backlinks todavía.")
 
         self._body.addSpacing(8)
-        sub = QLabel(f"Unlinked mentions  ·  {len(unlinked)}")
+        sub = QLabel(f"Menciones sin enlazar  ·  {len(unlinked)}")
         sub.setStyleSheet(
             f"color:{TEXT};font-size:12px;font-weight:600;"
             "background:transparent;border:none;"
@@ -2101,6 +2117,7 @@ class _MentionsFooter(QFrame):
             "QPushButton:hover{background:#2e2e38;}"
         )
         btn.clicked.connect(
-            lambda _=False, p=mention.path: self.open_requested.emit(Path(p))
+            lambda _=False, p=mention.path, ln=mention.line_no:
+                self.open_requested.emit(Path(p), int(ln or 0))
         )
         return btn

@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 APP_DIR = Path(__file__).resolve().parent
 
@@ -192,5 +193,56 @@ class AppConfig:
     def set_calendar_filters(filters: dict):
         s = AppConfig._read()
         s["calendar_filters"] = filters
+        AppConfig._write(s)
+
+    # ── Templates ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def get_templates_dir(vault_root: Path) -> Path:
+        s = AppConfig._read()
+        stored = s.get("templates_dir")
+        if stored:
+            p = Path(stored)
+            if p.is_absolute():
+                return p
+        return vault_root / "Plantillas"
+
+    @staticmethod
+    def set_templates_dir(path: Path):
+        s = AppConfig._read()
+        s["templates_dir"] = str(path)
+        AppConfig._write(s)
+
+    # ── Daily Notes ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def get_daily_notes_dir(vault_root: Path) -> Path:
+        s = AppConfig._read()
+        stored = s.get("daily_notes_dir")
+        if stored:
+            p = Path(stored)
+            if p.is_absolute():
+                return p
+        return vault_root / "Diario"
+
+    @staticmethod
+    def set_daily_notes_dir(path: Path):
+        s = AppConfig._read()
+        s["daily_notes_dir"] = str(path)
+        AppConfig._write(s)
+
+    @staticmethod
+    def get_daily_notes_template() -> Optional[Path]:
+        s = AppConfig._read()
+        stored = s.get("daily_notes_template")
+        return Path(stored) if stored else None
+
+    @staticmethod
+    def set_daily_notes_template(path: Optional[Path]):
+        s = AppConfig._read()
+        if path:
+            s["daily_notes_template"] = str(path)
+        else:
+            s.pop("daily_notes_template", None)
         AppConfig._write(s)
 

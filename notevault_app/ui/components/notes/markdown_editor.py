@@ -46,6 +46,8 @@ from .note_properties_dialog import NotePropertiesDialog
 from .english_audio_panel import EnglishAudioPanel
 from ....core.frontmatter_utils import parse_frontmatter, dump_frontmatter, sanitize_properties
 from ....core.workspace_manager import WorkspaceManager
+from ....core.templates import list_templates, read_and_expand
+from ....core.daily_notes import open_or_create_today
 
 BG_PAGE   = "#1a1a1e"
 BG_BAR    = "#202024"
@@ -662,6 +664,7 @@ class MarkdownEditor(QWidget):
         bind("Ctrl+E", lambda: self.set_mode(
             MODE_READ if self._mode != MODE_READ else MODE_RICH))
         bind("Ctrl+Shift+T", lambda: self.insert_table())
+        bind("Ctrl+Shift+D", self._open_daily_note)
 
     def set_assistant_visible(self, visible: bool):
         self._assistant_btn.setChecked(visible)
@@ -1506,6 +1509,13 @@ class MarkdownEditor(QWidget):
                     "Ctrl+W", lambda: note() and not self.current_note().pinned),
             Command("Guardar", "Nota", self.save_current, "Ctrl+S", note),
             Command("Marcador", "Nota", self._toggle_bookmark_command, "", note),
+
+            Command("Insertar plantilla…", "Plantillas",
+                    self._insert_template, "", editable),
+            Command("Nueva nota desde plantilla…", "Plantillas",
+                    self._new_note_from_template, ""),
+            Command("Abrir nota de hoy", "Diario",
+                    self._open_daily_note, "Ctrl+Shift+D"),
         ]
 
     def open_palette(self):
@@ -1520,6 +1530,60 @@ class MarkdownEditor(QWidget):
     def _toggle_bookmark_command(self):
         self._bm_btn.setChecked(not self._bm_btn.isChecked())
         self.toggle_bookmark()
+
+    # ── Templates ─────────────────────────────────────────────────────────
+
+    def _templates_dir(self):
+        return AppConfig.get_templates_dir(self.vault.vault_root)
+
+    def _pick_template(self) -> str | None:
+        """Show a dialog listing available templates; return expanded text or None."""
+        tmpl_dir = self._templates_dir()
+        templates = list_templates(tmpl_dir)
+        if not templates:
+            QMessageBox.information(
+                self, "Sin plantillas",
+                f"No hay plantillas en:\n{tmpl_dir}\n\n"
+                "Crea archivos .md en esa carpeta para usarlos como plantillas.",
+            )
+            return None
+        names = [p.stem for p in templates]
+        name, ok = QInputDialog.getItem(
+            self, "Insertar plantilla", "Plantilla:", names, 0, False)
+        if not ok:
+            return None
+        chosen = templates[names.index(name)]
+        note = self.current_note()
+        ctx = {"title": note.title if note else ""}
+        return read_and_expand(chosen, ctx)
+
+    def _insert_template(self):
+        text = self._pick_template()
+        if text is None:
+            return
+        editor = self._editor()
+        cursor = editor.textCursor()
+        cursor.insertText(text)
+
+    def _new_note_from_template(self):
+        text = self._pick_template()
+        if text is None:
+            return
+        title, ok = QInputDialog.getText(self, "Nueva nota", "Título:")
+        if not ok or not title.strip():
+            return
+        title = title.strip()
+        note = self.service.create_note(title)
+        note.save(text.replace("{{title}}", title))
+        self.open_note_requested.emit(note.path)
+
+    # ── Daily Notes ───────────────────────────────────────────────────────
+
+    def _open_daily_note(self):
+        daily_dir = AppConfig.get_daily_notes_dir(self.vault.vault_root)
+        tmpl_path = AppConfig.get_daily_notes_template()
+        path = open_or_create_today(self.vault.vault_root, daily_dir, tmpl_path)
+        self.open_note_requested.emit(path)
 
     # raw-mode helpers ----------------------------------------------------
 

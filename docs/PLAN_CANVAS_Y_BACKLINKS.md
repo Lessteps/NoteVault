@@ -357,5 +357,11 @@ comparando el resultado).
       centrado editable in-place, asa de redimensionamiento y puertos para
       aristas. Botón "＋ Forma ▾" con menú desplegable en la toolbar y persistencia
       bajo `type: "nv-shape"` con `nv.shape`. Tests: `test_canvas_shapes.py` (5).
-- [ ] C5 — dibujo a mano alzada
+- [x] C5 — dibujo a mano alzada. `drawing.py` (cálculo de límites, conversión a
+      trazados vectoriales y hit-testing para borrador) + `DrawingNodeItem`
+      (items.py) con fondo transparente, trazos de colores y grosores ajustables.
+      Herramienta "✎ Dibujo ▾" en la toolbar con modos Lápiz, Borrador, selector
+      de paleta (1..6 + blanco) y grosores (2, 4, 8 px). Persistencia de trazos
+      en el archivo `.canvas` bajo `type: "nv-drawing"` con `nv.strokes`. Tests:
+      `test_canvas_drawing.py` (6).
 - [ ] C6 — pulido y extras

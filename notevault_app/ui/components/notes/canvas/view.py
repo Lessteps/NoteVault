@@ -21,9 +21,17 @@ from .... import theme  # noqa: F401  (kept for future theme-aware repaint)
 from .....core import canvas_format as cf
 from .....core import attachments
 from .scene import CanvasScene
-from .items import TextNodeItem, NoteNodeItem, MediaNodeItem, BaseNodeItem, ShapeNodeItem
+from .items import (
+    TextNodeItem, NoteNodeItem, MediaNodeItem, BaseNodeItem, ShapeNodeItem,
+    DrawingNodeItem, color_for
+)
 from .edges import EdgeItem
 from .shapes import SHAPE_INFO
+from .drawing import stroke_to_path, calculate_bounds
+
+MODE_SELECT = 0
+MODE_DRAW = 1
+MODE_ERASE = 2
 
 _MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg",
                ".mp3", ".wav", ".ogg", ".m4a", ".flac",
@@ -54,6 +62,11 @@ class CanvasView(QGraphicsView):
         self._connecting_src = None
         self._connecting_side = None
         self._temp_edge = None
+        self._mode = MODE_SELECT
+        self._pen_color = "1"
+        self._pen_width = 3.0
+        self._current_stroke_pts = []
+        self._temp_drawing_path = None
         self._loading = False
         self._panning = False
         self._pan_start = QPointF()
@@ -82,6 +95,7 @@ class CanvasView(QGraphicsView):
         self._add_tool(lay, "＋ Texto", self._add_text_center)
         self._add_tool(lay, "＋ Media", self._pick_and_add_media)
         self._add_shape_tool(lay)
+        self._add_drawing_tool(lay)
         self._add_tool(lay, "＋ Conectar", self._pick_and_connect)
         bar.adjustSize()
         bar.move(12, 12)
@@ -93,6 +107,62 @@ class CanvasView(QGraphicsView):
         btn.clicked.connect(slot)
         layout.addWidget(btn)
         return btn
+
+    def _add_drawing_tool(self, layout):
+        btn = QPushButton("✎ Dibujo ▾")
+        btn.setCursor(Qt.PointingHandCursor)
+        menu = QMenu(btn)
+        menu.setStyleSheet(
+            "QMenu{background:#26262c;border:1px solid #3a3a46;color:#dcdde0;padding:4px;}"
+            "QMenu::item{padding:5px 18px;border-radius:4px;font-size:12px;}"
+            "QMenu::item:selected{background:#7c5af0;color:#ffffff;}")
+
+        act_draw = menu.addAction("✎ Lápiz")
+        act_draw.triggered.connect(lambda: self.set_mode(MODE_DRAW))
+
+        act_erase = menu.addAction("⌫ Borrador")
+        act_erase.triggered.connect(lambda: self.set_mode(MODE_ERASE))
+
+        act_select = menu.addAction("↖ Seleccionar")
+        act_select.triggered.connect(lambda: self.set_mode(MODE_SELECT))
+
+        menu.addSeparator()
+
+        color_menu = menu.addMenu("Color del trazo")
+        colors = [
+            ("Rojo", "1"), ("Naranja", "2"), ("Amarillo", "3"),
+            ("Verde", "4"), ("Cian", "5"), ("Púrpura", "6"), ("Blanco", "#ffffff"),
+        ]
+        for name, col in colors:
+            c_act = color_menu.addAction(name)
+            c_act.triggered.connect(lambda chk, c=col: self.set_pen_color(c))
+
+        width_menu = menu.addMenu("Grosor del trazo")
+        widths = [("Fino (2px)", 2.0), ("Medio (4px)", 4.0), ("Grueso (8px)", 8.0)]
+        for label, w in widths:
+            w_act = width_menu.addAction(label)
+            w_act.triggered.connect(lambda chk, width=w: self.set_pen_width(width))
+
+        btn.setMenu(menu)
+        layout.addWidget(btn)
+        return btn
+
+    def set_mode(self, mode: int):
+        self._mode = mode
+        if mode == MODE_DRAW:
+            self.setCursor(Qt.CrossCursor)
+        elif mode == MODE_ERASE:
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def set_pen_color(self, color: str):
+        self._pen_color = color
+        self.set_mode(MODE_DRAW)
+
+    def set_pen_width(self, width: float):
+        self._pen_width = width
+        self.set_mode(MODE_DRAW)
 
     def _add_shape_tool(self, layout):
         btn = QPushButton("＋ Forma ▾")
@@ -210,6 +280,8 @@ class CanvasView(QGraphicsView):
                 item.open_requested.connect(self.open_note_requested.emit)
         elif node.type == "nv-shape":
             item = ShapeNodeItem(node)
+        elif node.type == "nv-drawing":
+            item = DrawingNodeItem(node)
         elif node.type == "text":
             item = TextNodeItem(node)
         else:
@@ -430,6 +502,21 @@ class CanvasView(QGraphicsView):
             event.accept()
 
     def mousePressEvent(self, event):
+        if self._mode == MODE_DRAW and event.button() == Qt.LeftButton:
+            scene_pos = self.mapToScene(event.position().toPoint())
+            self._current_stroke_pts = [[scene_pos.x(), scene_pos.y()]]
+            self._temp_drawing_path = QGraphicsPathItem()
+            col = color_for(self._pen_color)
+            pen = QPen(col, self._pen_width, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+            self._temp_drawing_path.setPen(pen)
+            self._temp_drawing_path.setZValue(50)
+            self._scene.addItem(self._temp_drawing_path)
+            event.accept()
+            return
+        if self._mode == MODE_ERASE and event.button() == Qt.LeftButton:
+            self._erase_at(event.position().toPoint())
+            event.accept()
+            return
         if event.button() == Qt.MiddleButton or (
                 event.button() == Qt.LeftButton
                 and not self.itemAt(event.position().toPoint())
@@ -442,6 +529,17 @@ class CanvasView(QGraphicsView):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self._mode == MODE_DRAW and self._temp_drawing_path is not None:
+            scene_pos = self.mapToScene(event.position().toPoint())
+            self._current_stroke_pts.append([scene_pos.x(), scene_pos.y()])
+            path = stroke_to_path(self._current_stroke_pts)
+            self._temp_drawing_path.setPath(path)
+            event.accept()
+            return
+        if self._mode == MODE_ERASE and (event.buttons() & Qt.LeftButton):
+            self._erase_at(event.position().toPoint())
+            event.accept()
+            return
         if self._connecting_src is not None and self._temp_edge is not None:
             p1 = self._connecting_src.side_point(self._connecting_side)
             p2 = self.mapToScene(event.position().toPoint())
@@ -462,6 +560,17 @@ class CanvasView(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self._mode == MODE_DRAW and self._temp_drawing_path is not None:
+            self._scene.removeItem(self._temp_drawing_path)
+            self._temp_drawing_path = None
+            if len(self._current_stroke_pts) >= 2:
+                self.add_drawing_stroke(self._current_stroke_pts, self._pen_color, self._pen_width)
+            self._current_stroke_pts = []
+            event.accept()
+            return
+        if self._mode == MODE_ERASE:
+            event.accept()
+            return
         if self._connecting_src is not None:
             if self._temp_edge is not None:
                 self._scene.removeItem(self._temp_edge)
@@ -496,6 +605,44 @@ class CanvasView(QGraphicsView):
             event.accept()
             return
         super().mouseReleaseEvent(event)
+
+    def add_drawing_stroke(self, points: list, color: str = "1", width: float = 3.0):
+        min_x, min_y, max_x, max_y = calculate_bounds([{"points": points, "width": width}])
+        w = max(40.0, max_x - min_x)
+        h = max(30.0, max_y - min_y)
+        local_pts = [[p[0] - min_x, p[1] - min_y] for p in points]
+        stroke_data = {"points": local_pts, "color": color, "width": width}
+        node = cf.CanvasNode(
+            id=cf.new_id(),
+            type="nv-drawing",
+            x=min_x,
+            y=min_y,
+            width=w,
+            height=h,
+            nv={"strokes": [stroke_data]}
+        )
+        self._doc.nodes.append(node)
+        self._scene.clearSelection()
+        item = self._add_item_for(node)
+        self._schedule_save()
+        return item
+
+    def _erase_at(self, view_pos):
+        scene_pos = self.mapToScene(view_pos)
+        to_delete = []
+        for it in list(self._items.values()):
+            if isinstance(it, DrawingNodeItem):
+                local_pos = it.mapFromScene(scene_pos)
+                if it.remove_stroke_at(local_pos):
+                    if not (it.node.nv or {}).get("strokes"):
+                        to_delete.append(it)
+                    self._schedule_save()
+        for it in to_delete:
+            nid = it.node.id
+            self._doc.nodes = [n for n in self._doc.nodes if n.id != nid]
+            self._scene.removeItem(it)
+            self._items.pop(nid, None)
+            self._schedule_save()
 
     def mouseDoubleClickEvent(self, event):
         item = self.itemAt(event.position().toPoint())

@@ -18,6 +18,7 @@ from PySide6.QtGui import QColor, QPen, QBrush, QFont, QPainterPath, QPixmap, QT
 
 from .....core import attachments
 from .shapes import shape_path, shape_internal_paths
+from .drawing import stroke_to_path, hit_test_stroke
 
 try:
     from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -351,6 +352,69 @@ class ShapeNodeItem(BaseNodeItem):
         if new_text != self.node.text:
             self.node.text = new_text
             self.edited.emit()
+
+
+class DrawingNodeItem(BaseNodeItem):
+    """A freehand drawing card containing vector pen strokes."""
+
+    def __init__(self, node, parent=None):
+        super().__init__(parent=parent, node=node)
+        if self.node.nv is None:
+            self.node.nv = {}
+        if "strokes" not in self.node.nv:
+            self.node.nv["strokes"] = []
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(painter.RenderHint.Antialiasing)
+        selected = bool(option.state & QStyle.State_Selected)
+
+        if selected:
+            rect = self._node_rect().adjusted(0.5, 0.5, -0.5, -0.5)
+            pen = QPen(BORDER_SEL, 1.2, Qt.DashLine)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(rect, 4, 4)
+
+        strokes = (self.node.nv or {}).get("strokes", [])
+        for stroke in strokes:
+            pts = stroke.get("points", [])
+            if not pts:
+                continue
+            col_tok = stroke.get("color", "1")
+            col = color_for(col_tok)
+            w = float(stroke.get("width", 3.0))
+            pen = QPen(col, w, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            path = stroke_to_path(pts)
+            painter.drawPath(path)
+
+        if selected:
+            painter.setBrush(QBrush(GRIP))
+            painter.setPen(Qt.NoPen)
+            g = self._grip_rect()
+            painter.drawRoundedRect(g.adjusted(3, 3, -1, -1), 2, 2)
+        if selected or self._hovered:
+            self._draw_ports(painter)
+
+    def add_stroke(self, stroke: dict):
+        if self.node.nv is None:
+            self.node.nv = {}
+        if "strokes" not in self.node.nv:
+            self.node.nv["strokes"] = []
+        self.node.nv["strokes"].append(stroke)
+        self.update()
+        self.edited.emit()
+
+    def remove_stroke_at(self, local_point: QPointF) -> bool:
+        strokes = (self.node.nv or {}).get("strokes", [])
+        for i in reversed(range(len(strokes))):
+            if hit_test_stroke(strokes[i], local_point):
+                strokes.pop(i)
+                self.update()
+                self.edited.emit()
+                return True
+        return False
 
 
 HEADER_H = 26.0

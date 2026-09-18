@@ -378,6 +378,57 @@ class VaultManager:
         dest = trash / note.path.name
         note.path.rename(dest)
 
+    def move_path(self, src: Path, dest_folder: Path) -> Path:
+        """Move a note or folder into dest_folder. Returns the new path.
+
+        Rules:
+        - dest_folder must be a directory inside the vault.
+        - Cannot move a folder into itself or a descendant.
+        - Cannot move into .notevault or reserved dirs.
+        - If name collision, adds ' 2', ' 3', … suffix.
+        - Silently returns src if src == dest_folder / src.name (already there).
+        """
+        src = Path(src)
+        dest_folder = Path(dest_folder)
+
+        if not src.exists():
+            raise FileNotFoundError(f"Source not found: {src}")
+        if not dest_folder.is_dir():
+            raise NotADirectoryError(f"Destination is not a directory: {dest_folder}")
+
+        # Reject moves into reserved/excluded locations
+        try:
+            dest_folder.relative_to(self.vault_root)
+        except ValueError:
+            raise ValueError("Destination is outside the vault")
+
+        rel_parts = dest_folder.relative_to(self.vault_root).parts
+        if rel_parts and rel_parts[0] in RESERVED_DIRS:
+            raise ValueError("Cannot move into a reserved folder")
+
+        # Prevent moving a folder into its own subtree
+        if src.is_dir():
+            try:
+                dest_folder.relative_to(src)
+                return src  # destination is inside source — no-op
+            except ValueError:
+                pass
+
+        target = dest_folder / src.name
+        if target == src:
+            return src  # already in place
+
+        # Resolve name collision
+        if target.exists():
+            stem, suffix = src.stem, src.suffix
+            counter = 2
+            while target.exists():
+                target = dest_folder / f"{stem} {counter}{suffix}"
+                counter += 1
+
+        shutil.move(str(src), str(target))
+        return target
+
     # ── Backlinks ────────────────────────────────────────────────────────
 
     def rebuild_backlinks(self):

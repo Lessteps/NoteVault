@@ -10,10 +10,10 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
     QTreeWidget, QTreeWidgetItem, QLineEdit, QStackedWidget, QListWidget,
     QListWidgetItem, QInputDialog, QMessageBox, QMenu, QFileDialog, QDialog,
-    QApplication,
+    QApplication, QAbstractItemView,
 )
 from PySide6.QtCore import Qt, Signal, QPoint, QTimer
-from PySide6.QtGui import QFont, QColor, QAction
+from PySide6.QtGui import QFont, QColor, QAction, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import QStyle
 
 from ....core.vault_manager import VaultManager
@@ -25,6 +25,72 @@ from .vault_dialog import VaultDialog
 from .file_icons import icon_for
 from .knowledge_graph_widget import KnowledgeGraphWidget
 from .study_folders_dialog import StudyFoldersDialog
+
+class _DraggableTree(QTreeWidget):
+    """QTreeWidget that intercepts drops and delegates to NotesSidebar."""
+
+    # sidebar sets this after construction
+    drop_handler = None  # callable(src_path, dest_folder) | None
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDefaultDropAction(Qt.MoveAction)
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.source() is self:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.source() is self:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: QDropEvent):
+        if event.source() is not self or self.drop_handler is None:
+            event.ignore()
+            return
+
+        # Determine source items (currently selected/dragged)
+        src_items = self.selectedItems()
+        if not src_items:
+            event.ignore()
+            return
+
+        # Determine destination folder from drop position
+        dest_item = self.itemAt(event.position().toPoint())
+        if dest_item is None:
+            event.ignore()
+            return
+
+        dest_data = dest_item.data(0, Qt.UserRole) or {}
+        if dest_data.get("type") == "folder":
+            dest_folder = Path(dest_data["path"])
+        elif dest_data.get("type") == "note":
+            parent = dest_item.parent()
+            if parent is None:
+                dest_folder = None  # root
+            else:
+                parent_data = parent.data(0, Qt.UserRole) or {}
+                dest_folder = Path(parent_data["path"]) if parent_data.get("path") else None
+        else:
+            event.ignore()
+            return
+
+        # Prevent the widget from doing its own visual move
+        event.setDropAction(Qt.IgnoreAction)
+        event.accept()
+
+        for item in src_items:
+            data = item.data(0, Qt.UserRole) or {}
+            if data.get("path"):
+                self.drop_handler(Path(data["path"]), dest_folder)
+
 
 BG_PANEL   = "#1a1a1e"
 BG_TAB     = "#202024"
@@ -80,6 +146,7 @@ class NotesSidebar(QWidget):
     note_selected_at_line  = Signal(Path, int)
     vault_switch_requested = Signal(Path)
     bookmarks_changed      = Signal()
+    note_moved             = Signal(Path, Path)   # (old_path, new_path)
 
     def __init__(self, vault: VaultManager, service: NotesService, parent=None):
         super().__init__(parent)
@@ -204,7 +271,8 @@ class NotesSidebar(QWidget):
         self._filter.textChanged.connect(self._filter_tree)
         lay.addWidget(self._filter)
 
-        self._tree = QTreeWidget()
+        self._tree = _DraggableTree()
+        self._tree.drop_handler = self._on_tree_drop
         self._tree.setHeaderHidden(True)
         self._tree.setIndentation(14)
         self._tree.setRootIsDecorated(True)
@@ -804,3 +872,17 @@ class NotesSidebar(QWidget):
         path = self.vault.vault_root / note_id
         if path.exists():
             self.note_selected.emit(path)
+
+    def _on_tree_drop(self, src_path: Path, dest_folder):
+        """Called by _DraggableTree when a drag-drop completes."""
+        if dest_folder is None:
+            dest_folder = self.vault.vault_root
+        dest_folder = Path(dest_folder)
+        try:
+            new_path = self.service.move_path(src_path, dest_folder)
+        except Exception as exc:
+            QMessageBox.warning(self, "No se pudo mover",
+                                f"{src_path.name}\n\n{exc}")
+            return
+        self.note_moved.emit(src_path, new_path)
+        self.populate_tree(new_path if new_path.is_file() else None)

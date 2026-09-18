@@ -266,6 +266,7 @@ class MainWindow(QMainWindow):
         # ── Notes module ──────────────────────────────────────────────
         self._explorer.note_selected.connect(self._notas_center.open_note)
         self._explorer.note_selected_at_line.connect(self._notas_center.open_note)
+        self._explorer.note_moved.connect(self._notas_center.on_note_moved)
         self._explorer.bookmarks_changed.connect(
             self._notas_center.refresh_mentions)
         self._notas_center.active_note_changed.connect(self._on_note_changed)

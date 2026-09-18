@@ -335,6 +335,18 @@ class NotesService:
         self.index.forget(path)
         self.remove_bookmark(path)
 
+    def move_path(self, src: Path, dest_folder: Path) -> Path:
+        """Move a note or folder into dest_folder; invalidates the old index entry."""
+        src = Path(src)
+        new_path = self.vault.move_path(src, dest_folder)
+        self.index.forget(src)
+        if new_path.is_file():
+            try:
+                self.index.update(new_path, new_path.read_text(encoding="utf-8", errors="replace"))
+            except OSError:
+                pass
+        return new_path
+
     def note_written(self, path: Path, text: str):
         """Called after the editor saves, so the index does not have to wait
         for its next directory walk to see the new text."""

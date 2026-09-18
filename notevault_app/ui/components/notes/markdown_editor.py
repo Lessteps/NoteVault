@@ -1635,6 +1635,23 @@ class MarkdownEditor(QWidget):
         self._show_placeholder(True)
         QTimer.singleShot(0, self._restore_pinned)
 
+    def on_note_moved(self, old_path: Path, new_path: Path):
+        """Update any open tab whose path matches old_path after a drag-move."""
+        old_path = Path(old_path)
+        new_path = Path(new_path)
+        for i, note in enumerate(self._open):
+            if note.path == old_path:
+                note.path = new_path
+                self._refresh_tab(i)
+                return
+            # Also handle notes inside a moved folder
+            try:
+                rel = note.path.relative_to(old_path)
+                note.path = new_path / rel
+                self._refresh_tab(i)
+            except ValueError:
+                pass
+
     def retheme(self):
         """Repaint what the notes panel colours from Python after the theme
         is toggled: the markdown highlighting and the table grids. Nothing is

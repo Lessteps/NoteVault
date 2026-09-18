@@ -14,6 +14,7 @@ The inverse direction is Qt's QTextDocument.setMarkdown(), fed through
 import re
 import unicodedata
 from functools import lru_cache
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
@@ -145,6 +146,72 @@ def prepare_markdown(markdown: str) -> str:
 
 _WIKILINK_RE = re.compile(r"(?<!!)\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]")
 _TASK_LINE_RE = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+\[)([ xX])(\])")
+
+
+_TRANSCLUDE_RE = re.compile(r"!\[\[([^\]|#]+?)(?:#([^\]|]*))?\]\]")
+
+
+def expand_transclusions(markdown: str, resolve_fn, depth: int = 0,
+                         _seen: frozenset = frozenset()) -> str:
+    """Replace ![[note]] with the body of that note (read-only rendering).
+
+    *resolve_fn(title) -> str | None* returns the body of the note with
+    that title, or None if not found. At most 3 levels of nesting;
+    cycles are detected via *_seen* (set of already-expanded note titles).
+    """
+    if depth >= 3:
+        return markdown
+
+    def _replace(m: re.Match) -> str:
+        ref = m.group(1).strip()
+        heading = (m.group(2) or "").strip()
+        ref_lower = ref.lower()
+
+        if ref_lower in _seen:
+            return f"> *↩ {ref} (referencia circular)*"
+
+        body = resolve_fn(ref)
+        if body is None:
+            return m.group(0)   # keep original if not found
+
+        if heading:
+            # Extract only the section under that heading
+            lines = body.splitlines()
+            section, in_section, level = [], False, 0
+            for line in lines:
+                hm = re.match(r"^(#{1,6})\s+(.*)", line)
+                if hm:
+                    if not in_section and hm.group(2).strip().lower() == heading.lower():
+                        in_section = True
+                        level = len(hm.group(1))
+                        section.append(line)
+                    elif in_section and len(hm.group(1)) <= level:
+                        break
+                    elif in_section:
+                        section.append(line)
+                elif in_section:
+                    section.append(line)
+            body = "\n".join(section) if section else body
+
+        nested_seen = _seen | {ref_lower}
+        expanded = expand_transclusions(body, resolve_fn, depth + 1, nested_seen)
+
+        block = f"\n\n> **↩ {ref}**\n\n"
+        for line in expanded.splitlines():
+            block += f"> {line}\n"
+        block += "\n"
+        return block
+
+    # Only replace ![[...]] that are NOT plain image embeds (those have a known extension)
+    def _maybe_replace(m: re.Match) -> str:
+        ref = m.group(1).strip()
+        from .attachments import IMAGE_EXTS, VIDEO_EXTS, AUDIO_EXTS, PDF_EXTS
+        suffix = Path(ref).suffix.lower()
+        if suffix in IMAGE_EXTS | VIDEO_EXTS | AUDIO_EXTS | PDF_EXTS:
+            return m.group(0)  # leave image/media embeds alone
+        return _replace(m)
+
+    return _TRANSCLUDE_RE.sub(_maybe_replace, markdown)
 
 
 def prepare_for_reading(markdown: str) -> str:

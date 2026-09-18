@@ -17,6 +17,8 @@ ATTACHMENTS_DIR = "attachments"
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
 VIDEO_EXTS = {".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi"}
+AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac"}
+PDF_EXTS   = {".pdf"}
 
 _UNSAFE = re.compile(r'[\\/:*?"<>|]+')
 
@@ -27,6 +29,10 @@ def kind_of(path) -> Optional[str]:
         return "image"
     if ext in VIDEO_EXTS:
         return "video"
+    if ext in AUDIO_EXTS:
+        return "audio"
+    if ext in PDF_EXTS:
+        return "pdf"
     return None
 
 

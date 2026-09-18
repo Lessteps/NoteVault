@@ -34,7 +34,7 @@ from ....core import markdown_utils, attachments
 from ....core.file_kinds import kind_for
 from ....core.qt_markdown import (
     document_to_markdown, prepare_markdown, prepare_for_reading, toggle_task,
-    format_markdown_tables, new_table, rich_edit_problem,
+    format_markdown_tables, new_table, rich_edit_problem, expand_transclusions,
 )
 from .note_view import (
     NoteTextEdit, NoteTextBrowser, NoteSourceEdit, set_list_level,
@@ -908,7 +908,8 @@ class MarkdownEditor(QWidget):
             if mode == MODE_RAW:
                 self._raw.setPlainText(note.body)
             elif mode == MODE_READ:
-                self._read.load_markdown(prepare_for_reading(note.body))
+                body = expand_transclusions(note.body, self._resolve_transclude)
+                self._read.load_markdown(prepare_for_reading(body))
             else:
                 self._rich.load_markdown(prepare_markdown(note.body))
         finally:
@@ -1383,7 +1384,8 @@ class MarkdownEditor(QWidget):
         scroll = self._read.verticalScrollBar().value()
         self._loading = True
         try:
-            self._read.load_markdown(prepare_for_reading(note.body))
+            body = expand_transclusions(note.body, self._resolve_transclude)
+            self._read.load_markdown(prepare_for_reading(body))
         finally:
             self._loading = False
         self._read.verticalScrollBar().setValue(scroll)
@@ -1698,6 +1700,16 @@ class MarkdownEditor(QWidget):
         self._current = -1
         self._show_placeholder(True)
         QTimer.singleShot(0, self._restore_pinned)
+
+    def _resolve_transclude(self, title: str):
+        """Return the body of the note with *title*, or None if not found."""
+        note = self.vault.resolve_link(title)
+        if note is None:
+            return None
+        try:
+            return note.body
+        except Exception:
+            return None
 
     def on_note_moved(self, old_path: Path, new_path: Path):
         """Update any open tab whose path matches old_path after a drag-move."""

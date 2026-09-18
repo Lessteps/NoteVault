@@ -11,11 +11,19 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QGraphicsObject, QGraphicsTextItem, QGraphicsProxyWidget, QTextEdit, QStyle,
+    QWidget, QHBoxLayout, QPushButton, QSlider, QLabel,
 )
-from PySide6.QtCore import Qt, QRectF, QPointF, QTimer, Signal
-from PySide6.QtGui import QColor, QPen, QBrush, QFont, QPainterPath
+from PySide6.QtCore import Qt, QRectF, QPointF, QTimer, QUrl, Signal
+from PySide6.QtGui import QColor, QPen, QBrush, QFont, QPainterPath, QPixmap
 
 from .....core import attachments
+
+try:
+    from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+    from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
+    _HAS_MEDIA = True
+except Exception:                       # pragma: no cover - multimedia missing
+    _HAS_MEDIA = False
 
 # Same frontmatter block the markdown editor uses; kept verbatim on save.
 _FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n?", re.S)
@@ -316,3 +324,132 @@ class NoteNodeItem(BaseNodeItem):
             event.accept()
             return
         super().mouseDoubleClickEvent(event)
+
+
+def _fmt_ms(ms: int) -> str:
+    s = max(0, ms) // 1000
+    return f"{s // 60}:{s % 60:02d}"
+
+
+class MediaNodeItem(BaseNodeItem):
+    """An image, audio clip or video embedded in the board. Images paint
+    directly; audio and video get a small transport (play/pause + seek)."""
+
+    def __init__(self, node, abs_path, media_kind, parent=None):
+        super().__init__(parent=parent, node=node)
+        self.abs_path = Path(abs_path)
+        self.media_kind = media_kind
+        self._pixmap = None
+        self._player = None
+        self._video_item = None
+        self._controls = None
+
+        if media_kind == "image":
+            self._pixmap = QPixmap(str(attachments.fs_path(self.abs_path)))
+        elif media_kind in ("audio", "video") and _HAS_MEDIA:
+            self._build_player(media_kind)
+        self._layout_media()
+
+    # ── media plumbing ──────────────────────────────────────────────────
+    def _build_player(self, kind):
+        self._player = QMediaPlayer()
+        self._audio = QAudioOutput()
+        self._player.setAudioOutput(self._audio)
+        if kind == "video":
+            self._video_item = QGraphicsVideoItem(self)
+            self._player.setVideoOutput(self._video_item)
+        self._player.setSource(QUrl.fromLocalFile(str(self.abs_path.resolve())))
+
+        panel = QWidget()
+        panel.setStyleSheet(
+            "background:#2f2f38;border-radius:6px;"
+            "QPushButton{background:transparent;border:none;color:#dcdde0;}"
+            "QLabel{color:#b8b8c0;font-size:10px;}")
+        row = QHBoxLayout(panel)
+        row.setContentsMargins(6, 2, 6, 2)
+        row.setSpacing(6)
+        self._play_btn = QPushButton("▶")
+        self._play_btn.setCursor(Qt.PointingHandCursor)
+        self._play_btn.setFixedWidth(24)
+        self._play_btn.clicked.connect(self._toggle_play)
+        row.addWidget(self._play_btn)
+        self._seek = QSlider(Qt.Horizontal)
+        self._seek.setRange(0, 0)
+        self._seek.sliderMoved.connect(self._player.setPosition)
+        row.addWidget(self._seek, 1)
+        self._time = QLabel("0:00")
+        row.addWidget(self._time)
+
+        self._controls = QGraphicsProxyWidget(self)
+        self._controls.setWidget(panel)
+
+        self._player.positionChanged.connect(self._on_pos)
+        self._player.durationChanged.connect(self._on_dur)
+        self._player.playbackStateChanged.connect(self._on_state)
+
+    def _toggle_play(self):
+        if self._player is None:
+            return
+        if self._player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self._player.pause()
+        else:
+            self._player.play()
+
+    def _on_pos(self, ms):
+        if not self._seek.isSliderDown():
+            self._seek.setValue(ms)
+        self._time.setText(_fmt_ms(ms))
+
+    def _on_dur(self, ms):
+        self._seek.setRange(0, ms)
+
+    def _on_state(self, state):
+        playing = state == QMediaPlayer.PlaybackState.PlayingState
+        self._play_btn.setText("⏸" if playing else "▶")
+
+    def stop(self):
+        if self._player is not None:
+            self._player.stop()
+
+    # ── layout ──────────────────────────────────────────────────────────
+    CTRL_H = 28.0
+
+    def _layout_media(self):
+        w, h = self.node.width, self.node.height
+        if self._video_item is not None:
+            from PySide6.QtCore import QSizeF
+            self._video_item.setPos(4, 4)
+            self._video_item.setSize(QSizeF(w - 8, h - self.CTRL_H - 8))
+        if self._controls is not None:
+            panel = self._controls.widget()
+            panel.setFixedSize(int(w - 8), int(self.CTRL_H - 4))
+            self._controls.setPos(4, h - self.CTRL_H)
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        if self._resizing:
+            self._layout_media()
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        self._layout_media()
+
+    # ── painting ────────────────────────────────────────────────────────
+    def paint_content(self, painter, rect):
+        if self.media_kind == "image" and self._pixmap and not self._pixmap.isNull():
+            area = rect.adjusted(4, 4, -4, -4)
+            scaled = self._pixmap.scaled(
+                area.size().toSize(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            x = area.left() + (area.width() - scaled.width()) / 2
+            y = area.top() + (area.height() - scaled.height()) / 2
+            painter.drawPixmap(int(x), int(y), scaled)
+        elif self.media_kind == "audio":
+            painter.setPen(QPen(color_for(self.node.color)))
+            f = QFont("Segoe UI", 9)
+            f.setBold(True)
+            painter.setFont(f)
+            painter.drawText(rect.adjusted(10, 6, -10, 0),
+                             Qt.AlignTop | Qt.AlignLeft, "♪  " + self.abs_path.stem)
+        elif self.media_kind == "video" and not _HAS_MEDIA:
+            painter.setPen(QPen(color_for(self.node.color)))
+            painter.drawText(rect, Qt.AlignCenter, "▶ " + self.abs_path.name)

@@ -12,14 +12,20 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QGraphicsView, QApplication, QFrame, QHBoxLayout, QPushButton, QInputDialog,
+    QFileDialog,
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QPointF
 from PySide6.QtGui import QPainter
 
 from .... import theme  # noqa: F401  (kept for future theme-aware repaint)
 from .....core import canvas_format as cf
+from .....core import attachments
 from .scene import CanvasScene
-from .items import TextNodeItem, NoteNodeItem, BaseNodeItem
+from .items import TextNodeItem, NoteNodeItem, MediaNodeItem, BaseNodeItem
+
+_MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg",
+               ".mp3", ".wav", ".ogg", ".m4a", ".flac",
+               ".mp4", ".webm", ".mov", ".mkv", ".avi"}
 
 
 class CanvasView(QGraphicsView):
@@ -68,6 +74,7 @@ class CanvasView(QGraphicsView):
         lay.setSpacing(2)
         self._add_tool(lay, "＋ Nota", self._pick_and_add_note)
         self._add_tool(lay, "＋ Texto", self._add_text_center)
+        self._add_tool(lay, "＋ Media", self._pick_and_add_media)
         bar.adjustSize()
         bar.move(12, 12)
         return bar
@@ -103,6 +110,14 @@ class CanvasView(QGraphicsView):
         if note is not None:
             self.add_note_node(note.path, self._viewport_center_scene())
 
+    def _pick_and_add_media(self):
+        fname, _ = QFileDialog.getOpenFileName(
+            self, "Añadir imagen, audio o video", "",
+            "Media (*.png *.jpg *.jpeg *.gif *.webp *.bmp *.svg "
+            "*.mp3 *.wav *.ogg *.m4a *.flac *.mp4 *.webm *.mov *.mkv *.avi)")
+        if fname:
+            self.add_media_node(Path(fname), self._viewport_center_scene())
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if getattr(self, "_toolbar", None) is not None:
@@ -136,8 +151,12 @@ class CanvasView(QGraphicsView):
         if node.type == "file" and node.file:
             root = self._vault_root()
             abs_path = (root / node.file) if root else Path(node.file)
-            item = NoteNodeItem(node, abs_path, self.service)
-            item.open_requested.connect(self.open_note_requested.emit)
+            media = node.nv.get("media") or attachments.kind_of(abs_path)
+            if media in ("image", "audio", "video"):
+                item = MediaNodeItem(node, abs_path, media)
+            else:
+                item = NoteNodeItem(node, abs_path, self.service)
+                item.open_requested.connect(self.open_note_requested.emit)
         elif node.type == "text":
             item = TextNodeItem(node)
         else:
@@ -198,6 +217,35 @@ class CanvasView(QGraphicsView):
         self._schedule_save()
         return item
 
+    def add_media_node(self, media_path, scene_pos: QPointF):
+        """Copy an image/audio/video into the vault and embed it as a media
+        node. Files already in the vault are referenced where they are."""
+        media_path = Path(media_path)
+        root = self._vault_root()
+        kind = attachments.kind_of(media_path) or "image"
+        stored = media_path
+        if root is not None:
+            try:
+                media_path.relative_to(root)      # already inside the vault
+            except ValueError:
+                # Import beside the canvas file (its attachments folder).
+                anchor = self._path or (root / "canvas")
+                stored = attachments.import_file(anchor, media_path)
+        try:
+            rel = stored.relative_to(root).as_posix() if root else str(stored)
+        except ValueError:
+            rel = str(stored)
+        w, h = (360, 260) if kind == "video" else (
+            (320, 240) if kind == "image" else (280, 64))
+        node = cf.CanvasNode(id=cf.new_id(), type="file",
+                             x=scene_pos.x(), y=scene_pos.y(),
+                             width=w, height=h, file=rel, nv={"media": kind})
+        self._doc.nodes.append(node)
+        item = self._add_item_for(node)
+        item.setSelected(True)
+        self._schedule_save()
+        return item
+
     # ── drag & drop from the explorer / OS ──────────────────────────────
     def _paths_from_mime(self, mime):
         paths = []
@@ -229,11 +277,8 @@ class CanvasView(QGraphicsView):
             offset = QPointF(pos.x() + i * 24, pos.y() + i * 24)
             if p.suffix.lower() == ".md":
                 self.add_note_node(p, offset)
-            elif p.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif", ".webp",
-                                      ".bmp", ".svg", ".mp3", ".wav", ".ogg",
-                                      ".m4a", ".mp4", ".webm", ".mov"):
-                # Media nodes arrive in C2; for now drop them as file nodes.
-                self.add_note_node(p, offset)
+            elif p.suffix.lower() in _MEDIA_EXTS:
+                self.add_media_node(p, offset)
         event.acceptProposedAction()
 
     # ── interaction: pan + zoom ─────────────────────────────────────────
@@ -302,6 +347,8 @@ class CanvasView(QGraphicsView):
         removed = False
         for item in list(self._scene.selectedItems()):
             if isinstance(item, BaseNodeItem):
+                if hasattr(item, "stop"):
+                    item.stop()
                 nid = item.node.id
                 self._doc.nodes = [n for n in self._doc.nodes if n.id != nid]
                 self._doc.edges = [e for e in self._doc.edges

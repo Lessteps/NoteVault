@@ -331,7 +331,15 @@ comparando el resultado).
       `open_note_requested` → editor. Tests: `test_canvas_notes.py` (5).
       NOTA: nodos media (.png/.mp3/.mp4…) hoy caen a nodo de nota; se
       reemplazan en C2.
-- [ ] C2 — texto + imagen/audio/video
+- [x] C2 — texto + imagen/audio/video. `MediaNodeItem` (items.py): imagen
+      (QPixmap escalado con aspecto), audio y video (QMediaPlayer +
+      QAudioOutput; video con `QGraphicsVideoItem` nativo de la escena) con
+      transporte play/pausa + slider de posición + tiempo. `add_media_node`
+      copia el archivo a los adjuntos de la vault (`attachments.import_file`)
+      si viene de fuera y lo referencia relativo con `nv.media`. Botón
+      "＋ Media" (diálogo) en la toolbar y drop de medios desde el explorador/SO.
+      `stop()` al borrar. Tests: `test_canvas_media.py` (5). TextNode ya venía
+      de C0.
 - [ ] C3 — aristas/líneas
 - [ ] C4 — formas de diagrama de flujo
 - [ ] C5 — dibujo a mano alzada

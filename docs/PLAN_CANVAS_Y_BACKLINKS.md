@@ -319,7 +319,18 @@ comparando el resultado).
       Tests: `test_canvas_format.py` (8), `test_canvas_view.py` (5).
       PENDIENTE menor: opción "Nuevo canvas" en el menú contextual del
       explorador (hoy solo por Command Palette).
-- [ ] C1 — nodos de nota (editar desde canvas)
+- [x] C1 — nodos de nota (editar desde canvas). `NoteNodeItem` (items.py):
+      cabecera = asa de arrastre + doble clic abre la nota completa; cuerpo =
+      `QTextEdit` en proxy que guarda el `.md` en vivo (debounce 700 ms)
+      preservando el frontmatter crudo. `CanvasView` recibe contexto
+      (vault/service) via constructor y `set_context`; nodos `type=file` (.md)
+      se renderizan como `NoteNodeItem`. Añadir notas: toolbar flotante
+      ("＋ Nota" con selector, "＋ Texto") y **arrastrar desde el explorador**
+      (el árbol ahora añade `text/uri-list` a su drag sin romper el move
+      interno; el canvas acepta drops de `.md`). `open_requested` →
+      `open_note_requested` → editor. Tests: `test_canvas_notes.py` (5).
+      NOTA: nodos media (.png/.mp3/.mp4…) hoy caen a nodo de nota; se
+      reemplazan en C2.
 - [ ] C2 — texto + imagen/audio/video
 - [ ] C3 — aristas/líneas
 - [ ] C4 — formas de diagrama de flujo

@@ -6,9 +6,26 @@ are movable and resizable (a grip in the bottom-right corner), and a text node
 is editable in place on double-click, the way Obsidian's canvas works.
 """
 
-from PySide6.QtWidgets import QGraphicsObject, QGraphicsTextItem, QStyle
-from PySide6.QtCore import Qt, QRectF, QPointF, Signal
+import re
+from pathlib import Path
+
+from PySide6.QtWidgets import (
+    QGraphicsObject, QGraphicsTextItem, QGraphicsProxyWidget, QTextEdit, QStyle,
+)
+from PySide6.QtCore import Qt, QRectF, QPointF, QTimer, Signal
 from PySide6.QtGui import QColor, QPen, QBrush, QFont, QPainterPath
+
+from .....core import attachments
+
+# Same frontmatter block the markdown editor uses; kept verbatim on save.
+_FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n?", re.S)
+
+
+def _split_frontmatter(text: str):
+    m = _FRONTMATTER_RE.match(text or "")
+    if not m:
+        return "", text or ""
+    return m.group(0), (text or "")[m.end():]
 
 # Palette (dark), matching the rest of the notes module.
 BG_NODE   = QColor("#26262c")
@@ -188,3 +205,114 @@ class TextNodeItem(BaseNodeItem):
         if new_text != self.node.text:
             self.node.text = new_text
             self.edited.emit()
+
+
+HEADER_H = 26.0
+
+
+class NoteNodeItem(BaseNodeItem):
+    """A vault note embedded in the board. The title bar is the drag handle
+    and opens the full note; the body is a live editor that writes straight
+    back to the .md file, so a note can be modified from the canvas."""
+
+    open_requested = Signal(object)   # absolute Path of the note
+
+    def __init__(self, node, abs_path, service=None, parent=None):
+        super().__init__(parent=parent, node=node)
+        self.abs_path = Path(abs_path)
+        self.service = service
+        self._frontmatter = ""
+
+        self._editor = QTextEdit()
+        self._editor.setObjectName("canvasNoteEditor")
+        self._editor.setFrameShape(QTextEdit.NoFrame)
+        self._editor.setStyleSheet(
+            "QTextEdit{background:transparent;border:none;color:#dcdde0;"
+            "font-family:'Segoe UI';font-size:13px;}")
+        self._proxy = QGraphicsProxyWidget(self)
+        self._proxy.setWidget(self._editor)
+
+        self._save_timer = QTimer()
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(700)
+        self._save_timer.timeout.connect(self._save_body)
+        self._editor.textChanged.connect(self._save_timer.start)
+
+        self._load_file()
+        self._layout_proxy()
+
+    # ── file I/O ────────────────────────────────────────────────────────
+    def title(self) -> str:
+        return self.abs_path.stem
+
+    def _load_file(self):
+        try:
+            raw = attachments.fs_path(self.abs_path).read_text(
+                encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            raw = ""
+        self._frontmatter, body = _split_frontmatter(raw)
+        self._editor.blockSignals(True)
+        self._editor.setPlainText(body)
+        self._editor.blockSignals(False)
+
+    def _save_body(self):
+        body = self._editor.toPlainText()
+        if body and not body.endswith("\n"):
+            body += "\n"
+        text = self._frontmatter + body
+        try:
+            attachments.fs_path(self.abs_path).write_text(text, encoding="utf-8")
+        except (OSError, ValueError):
+            return
+        if self.service is not None:
+            try:
+                self.service.note_written(self.abs_path, text)
+            except Exception:
+                pass
+
+    def flush(self):
+        if self._save_timer.isActive():
+            self._save_timer.stop()
+            self._save_body()
+
+    # ── layout ──────────────────────────────────────────────────────────
+    def _layout_proxy(self):
+        w = max(MIN_W, self.node.width)
+        h = max(MIN_H, self.node.height)
+        self._proxy.setPos(6, HEADER_H)
+        self._editor.setFixedSize(int(w - 12), int(h - HEADER_H - GRIP_SIZE))
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        if self._resizing:
+            self._layout_proxy()
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        self._layout_proxy()
+
+    # ── painting ────────────────────────────────────────────────────────
+    def paint_content(self, painter, rect):
+        # Title bar background + title text.
+        painter.save()
+        header = QRectF(rect.left(), rect.top(), rect.width(), HEADER_H)
+        path = QPainterPath()
+        path.addRoundedRect(header, 8, 8)
+        painter.setClipPath(path)
+        painter.fillRect(header, QColor("#2f2f38"))
+        painter.restore()
+        painter.setPen(QPen(color_for(self.node.color)))
+        f = QFont("Segoe UI", 9)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.drawText(header.adjusted(10, 0, -10, 0),
+                         Qt.AlignVCenter | Qt.AlignLeft, self.title())
+
+    # ── open on header double-click ─────────────────────────────────────
+    def mouseDoubleClickEvent(self, event):
+        if event.pos().y() < HEADER_H:
+            self.open_requested.emit(self.abs_path)
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)

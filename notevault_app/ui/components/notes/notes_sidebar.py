@@ -53,6 +53,25 @@ class _DraggableTree(QTreeWidget):
         # Hovering a folder while dragging expands it, like Obsidian.
         self.setAutoExpandDelay(450)
 
+    def mimeData(self, items):
+        """Add file URLs to the drag so a note can also be dropped onto the
+        canvas (or another app). Internal move is unaffected: dropEvent keys
+        off event.source() and selectedItems(), not this mime."""
+        data = super().mimeData(items)
+        try:
+            from PySide6.QtCore import QUrl
+            urls = []
+            for it in items:
+                d = it.data(0, Qt.UserRole) or {}
+                p = d.get("path")
+                if p:
+                    urls.append(QUrl.fromLocalFile(str(p)))
+            if urls:
+                data.setUrls(urls)
+        except Exception:
+            pass
+        return data
+
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.source() is self:
             super().dragEnterEvent(event)

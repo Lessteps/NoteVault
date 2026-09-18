@@ -190,7 +190,7 @@ class MainWindow(QMainWindow):
 
         # The notes centre is a stack: the markdown editor, or the canvas view
         # when a .canvas file is open. Signals still come from _notas_center.
-        self._canvas_view = CanvasView()
+        self._canvas_view = CanvasView(self.vault, self.notes)
         self._notas_stack = QStackedWidget()
         self._notas_stack.addWidget(self._notas_center)      # 0 — editor
         self._notas_stack.addWidget(self._canvas_view)       # 1 — canvas
@@ -621,6 +621,7 @@ class MainWindow(QMainWindow):
         self._finanzas_left.set_manager(self.finances)
         self._explorer.set_vault(self.vault, self.notes)
         self._notas_center.set_vault(self.vault, self.notes)
+        self._canvas_view.set_context(self.vault, self.notes)
         self._habit_panel.set_manager(self.habits)
         self._habit_right.set_manager(self.habits)
         self._habit_left.manager = self.habits

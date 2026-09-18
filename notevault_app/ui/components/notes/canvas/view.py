@@ -375,7 +375,11 @@ class CanvasView(QGraphicsView):
 
     def _save_now(self):
         if self._path is not None:
-            cf.dump(self._path, self._doc)
+            try:
+                if self._path.parent.exists():
+                    cf.dump(self._path, self._doc)
+            except Exception:
+                pass
 
     def flush(self):
         """Write pending changes right now (e.g. before the app closes)."""
@@ -635,16 +639,31 @@ class CanvasView(QGraphicsView):
     # ── interaction: pan + zoom ─────────────────────────────────────────
     def wheelEvent(self, event):
         if event.modifiers() & Qt.ControlModifier:
-            factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
-            self.scale(factor, factor)
+            delta_y = event.angleDelta().y()
+            if delta_y != 0:
+                factor = 1.15 if delta_y > 0 else 1 / 1.15
+                current_scale = self.transform().m11()
+                if (factor > 1 and current_scale < 6.0) or (factor < 1 and current_scale > 0.08):
+                    self.scale(factor, factor)
             event.accept()
         else:
-            # Plain wheel scrolls the board vertically; Shift scrolls sideways.
-            delta = event.angleDelta().y()
+            delta_y = event.angleDelta().y()
+            delta_x = event.angleDelta().x()
+
             if event.modifiers() & Qt.ShiftModifier:
-                self.translate(delta / 3, 0)
+                if delta_y != 0:
+                    self.horizontalScrollBar().setValue(
+                        self.horizontalScrollBar().value() - delta_y
+                    )
             else:
-                self.translate(0, delta / 3)
+                if delta_y != 0:
+                    self.verticalScrollBar().setValue(
+                        self.verticalScrollBar().value() - delta_y
+                    )
+                if delta_x != 0:
+                    self.horizontalScrollBar().setValue(
+                        self.horizontalScrollBar().value() - delta_x
+                    )
             event.accept()
 
     def mousePressEvent(self, event):

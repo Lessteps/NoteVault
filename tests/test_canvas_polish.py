@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication, QGraphicsObject
-from PySide6.QtCore import QPointF
+from PySide6.QtCore import QPointF, Qt
 
 from notevault_app.core import canvas_format as cf
 from notevault_app.ui.components.notes.canvas import CanvasView
@@ -113,6 +113,41 @@ class TestCanvasPolish(unittest.TestCase):
         # Ensure no exception and transform is non-identity
         self.assertIsNotNone(self.view.transform())
 
+    def test_wheel_scroll_vertical_and_zoom(self):
+        from PySide6.QtGui import QWheelEvent
+        from PySide6.QtCore import QPoint
+
+        self.view.resize(800, 600)
+        self.view.show()
+        app.processEvents()
+
+        initial_v = self.view.verticalScrollBar().value()
+        # Scroll up (angleDelta.y = 120)
+        ev_up = QWheelEvent(
+            QPointF(400, 300), QPointF(400, 300), QPoint(0, 0), QPoint(0, 120),
+            Qt.NoButton, Qt.NoModifier, Qt.ScrollUpdate, False
+        )
+        self.view.wheelEvent(ev_up)
+        self.assertEqual(self.view.verticalScrollBar().value(), initial_v - 120)
+
+        # Scroll down (angleDelta.y = -120)
+        ev_down = QWheelEvent(
+            QPointF(400, 300), QPointF(400, 300), QPoint(0, 0), QPoint(0, -120),
+            Qt.NoButton, Qt.NoModifier, Qt.ScrollUpdate, False
+        )
+        self.view.wheelEvent(ev_down)
+        self.assertEqual(self.view.verticalScrollBar().value(), initial_v)
+
+        # Zoom with Ctrl + Wheel
+        scale_before = self.view.transform().m11()
+        ev_zoom = QWheelEvent(
+            QPointF(400, 300), QPointF(400, 300), QPoint(0, 0), QPoint(0, 120),
+            Qt.NoButton, Qt.ControlModifier, Qt.ScrollUpdate, False
+        )
+        self.view.wheelEvent(ev_zoom)
+        self.assertGreater(self.view.transform().m11(), scale_before)
+
 
 if __name__ == "__main__":
     unittest.main()
+

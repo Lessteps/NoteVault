@@ -1534,6 +1534,11 @@ class MarkdownEditor(QWidget):
                     self._open_daily_note, "Ctrl+Shift+D"),
             Command("Atajos de teclado…", "Configuración",
                     self._open_hotkeys_dialog, "Ctrl+,"),
+
+            Command("Guardar distribución…", "Distribuciones",
+                    lambda: self.window().save_layout_dialog(), ""),
+            Command("Cargar distribución…", "Distribuciones",
+                    lambda: self.window().load_layout_dialog(), ""),
         ]
 
     def open_palette(self):

@@ -16,6 +16,7 @@ from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QTimer
 
 from ..config import AppConfig
 from ..core.vault_manager import VaultManager
+from ..core.layouts import list_layouts, save_layout, load_layout, capture_layout
 from ..core.habit_manager import HabitManager
 from ..core.exercise_manager import ExerciseManager
 from ..core.task_manager import TaskManager
@@ -630,6 +631,87 @@ class MainWindow(QMainWindow):
         self.showNormal()
         self.raise_()
         self.activateWindow()
+
+    # ── Distribuciones (layouts) ──────────────────────────────────────────
+
+    def save_layout_dialog(self):
+        """Prompt for a name and save the current panel distribution."""
+        from PySide6.QtWidgets import QInputDialog
+        vault_root = self.vault.vault_root
+        names = list_layouts(vault_root)
+        default = f"Distribución {len(names) + 1}"
+        name, ok = QInputDialog.getText(
+            self, "Guardar distribución", "Nombre:", text=default)
+        if not ok or not name.strip():
+            return
+        self._do_save_layout(name.strip())
+        self.status_bar.showMessage(f"Distribución guardada: {name.strip()}", 4000)
+
+    def _do_save_layout(self, name: str):
+        sizes = self.main_splitter.sizes()
+        open_notes = []
+        active_note = None
+        for note in self._notas_center._open:
+            try:
+                rel = note.path.relative_to(self.vault.vault_root).as_posix()
+                open_notes.append(rel)
+            except ValueError:
+                pass
+        active = self._notas_center.current_path()
+        if active:
+            try:
+                active_note = active.relative_to(self.vault.vault_root).as_posix()
+            except ValueError:
+                pass
+        data = capture_layout(
+            splitter_sizes=sizes,
+            left_visible=self._left_stack.isVisible(),
+            right_visible=self._right_stack.isVisible(),
+            open_notes=open_notes,
+            active_note=active_note,
+        )
+        data["mode"] = self._mode
+        save_layout(self.vault.vault_root, name, data)
+
+    def load_layout_dialog(self):
+        """Show a picker and restore the chosen distribution."""
+        from PySide6.QtWidgets import QInputDialog
+        vault_root = self.vault.vault_root
+        names = list_layouts(vault_root)
+        if not names:
+            self.status_bar.showMessage("No hay distribuciones guardadas.", 4000)
+            return
+        name, ok = QInputDialog.getItem(
+            self, "Cargar distribución", "Distribución:", names, 0, False)
+        if not ok:
+            return
+        data = load_layout(vault_root, name)
+        if not data:
+            self.status_bar.showMessage(f"No se encontró: {name}", 4000)
+            return
+        self._apply_layout(data)
+        self.status_bar.showMessage(f"Distribución cargada: {name}", 4000)
+
+    def _apply_layout(self, data: dict):
+        mode = data.get("mode", self._mode)
+        self._switch_mode(mode)
+
+        sizes = data.get("splitter_sizes")
+        if sizes and len(sizes) == 3:
+            self.main_splitter.setSizes(sizes)
+
+        open_notes = data.get("open_notes", [])
+        active_note = data.get("active_note")
+        vault_root = self.vault.vault_root
+        if open_notes and mode == MODE_NOTAS:
+            for rel in open_notes:
+                p = vault_root / rel
+                if p.exists():
+                    self._notas_center.open_note(p)
+            if active_note:
+                ap = vault_root / active_note
+                if ap.exists():
+                    self._notas_center.open_note(ap)
 
     def closeEvent(self, event):
         try:

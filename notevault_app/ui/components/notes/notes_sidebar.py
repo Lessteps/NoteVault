@@ -898,15 +898,18 @@ class NotesSidebar(QWidget):
 
     # ── Bookmarks ─────────────────────────────────────────────────────────
 
+    _BM_ICONS = {"note": "🔖", "heading": "📌", "search": "🔍", "file": "📄"}
+
     def refresh_bookmarks(self):
         self._bm_list.clear()
-        for p in self.service.bookmarks():
-            item = QListWidgetItem("🔖  " + p.stem)
-            item.setData(Qt.UserRole, str(p))
-            try:
-                item.setToolTip(str(p.relative_to(self.vault.vault_root)))
-            except ValueError:
-                item.setToolTip(str(p))
+        for bm in self.service.bookmarks_rich():
+            bm_type = bm.get("type", "note")
+            target = bm.get("target", "")
+            label = bm.get("label") or target
+            icon = self._BM_ICONS.get(bm_type, "🔖")
+            item = QListWidgetItem(f"{icon}  {label}")
+            item.setData(Qt.UserRole, bm)
+            item.setToolTip(target)
             self._bm_list.addItem(item)
         if self._bm_list.count() == 0:
             empty = QListWidgetItem("Sin marcadores todavía")
@@ -914,19 +917,46 @@ class NotesSidebar(QWidget):
             self._bm_list.addItem(empty)
 
     def _open_bookmark(self, item: QListWidgetItem):
-        raw = item.data(Qt.UserRole)
-        if raw:
-            self._active_path = Path(raw)
-            self.note_selected.emit(Path(raw))
+        bm = item.data(Qt.UserRole)
+        if not bm:
+            return
+        bm_type = bm.get("type", "note")
+        target = bm.get("target", "")
+        if bm_type == "note":
+            path = self.vault.vault_root / target
+            if path.exists():
+                self._active_path = path
+                self.note_selected.emit(path)
+        elif bm_type == "heading":
+            # target is "rel_path#heading text"
+            if "#" in target:
+                rel, _, heading = target.partition("#")
+                path = self.vault.vault_root / rel
+                if path.exists():
+                    self._active_path = path
+                    self.note_selected.emit(path)
+        elif bm_type == "search":
+            self.set_tab(TAB_SEARCH)
+            self._search_input.setText(target)
+            self.run_search()
+        elif bm_type == "file":
+            path = self.vault.vault_root / target
+            if path.exists():
+                import os
+                os.startfile(str(path))
 
     def _bm_menu(self, pos: QPoint):
         item = self._bm_list.itemAt(pos)
         if item is None or not item.data(Qt.UserRole):
             return
-        path = Path(item.data(Qt.UserRole))
+        bm = item.data(Qt.UserRole)
+        target = bm.get("target", "")
+        bm_type = bm.get("type", "note")
         menu = QMenu(self)
-        menu.addAction("Abrir", lambda: self.note_selected.emit(path))
-        menu.addAction("Quitar de marcadores", lambda: self._toggle_bookmark(path))
+        menu.addAction("Abrir", lambda: self._open_bookmark(item))
+        menu.addAction("Quitar marcador",
+                       lambda: (self.service.remove_bookmark_rich(bm_type, target),
+                                self.refresh_bookmarks()))
         menu.exec(self._bm_list.viewport().mapToGlobal(pos))
 
     # ── External hooks ────────────────────────────────────────────────────

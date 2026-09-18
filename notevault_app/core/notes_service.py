@@ -78,14 +78,21 @@ class NotesService:
 
     # ── Bookmarks ─────────────────────────────────────────────────────────
 
-    def bookmarks(self) -> list:
-        """Bookmarked note paths that still exist, in the saved order.
+    # ── Bookmarks (rich format) ───────────────────────────────────────────
+    # Each bookmark is a dict: {type, target, label}
+    # type: "note" | "heading" | "search" | "file"
+    # target: vault-relative path string (note/heading/file) or search query
+    # label: display name (optional, defaults to target stem)
 
-        Cached against the file's modification time: the editor asks whether
-        the note it just opened is bookmarked, and re-reading the list plus
-        stat-ing every entry for that one question cost more than loading
-        the note itself.
-        """
+    @staticmethod
+    def _migrate_bookmark(entry) -> dict:
+        """Convert old-format string entries to new dict format."""
+        if isinstance(entry, str):
+            return {"type": "note", "target": entry, "label": Path(entry).stem}
+        return entry
+
+    def bookmarks_rich(self) -> list[dict]:
+        """All bookmarks in rich dict format, cached by file mtime."""
         path = self._bookmarks_path()
         try:
             stamp = path.stat().st_mtime_ns
@@ -100,43 +107,81 @@ class NotesService:
         except Exception:
             self._bookmarks_cache = ([], stamp)
             return []
-        out = [self.root / rel for rel in raw if (self.root / rel).exists()]
-        self._bookmarks_cache = (out, stamp)
-        return list(out)
+        entries = [self._migrate_bookmark(e) for e in raw]
+        self._bookmarks_cache = (entries, stamp)
+        return list(entries)
+
+    def bookmarks(self) -> list:
+        """Bookmarked note paths that still exist (backward-compat, note type only)."""
+        out = []
+        for bm in self.bookmarks_rich():
+            if bm.get("type") == "note":
+                p = self.root / bm["target"]
+                if p.exists():
+                    out.append(p)
+        return out
+
+    def _save_bookmarks_rich(self, entries: list[dict]):
+        self._bookmarks_path().write_text(
+            json.dumps(entries, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        self._bookmarks_cache = ([], None)
 
     def _save_bookmarks(self, paths: list):
-        rels = []
+        """Backward-compat: save a list of Paths as note bookmarks."""
+        entries = []
         for p in paths:
             try:
-                rels.append(str(Path(p).relative_to(self.root)).replace("\\", "/"))
+                rel = str(Path(p).relative_to(self.root)).replace("\\", "/")
+                entries.append({"type": "note", "target": rel,
+                                "label": Path(p).stem})
             except ValueError:
                 continue
-        self._bookmarks_path().write_text(
-            json.dumps(rels, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
-        self._bookmarks_cache = ([], None)      # re-read on the next question
+        self._save_bookmarks_rich(entries)
 
     def is_bookmarked(self, path: Path) -> bool:
         return Path(path) in self.bookmarks()
 
     def toggle_bookmark(self, path: Path) -> bool:
-        """Add or remove a bookmark. Returns the new state."""
+        """Add or remove a note bookmark. Returns the new state."""
         path = Path(path)
-        current = self.bookmarks()
-        if path in current:
-            current.remove(path)
-            self._save_bookmarks(current)
+        try:
+            rel = str(path.relative_to(self.root)).replace("\\", "/")
+        except ValueError:
             return False
-        current.append(path)
-        self._save_bookmarks(current)
+        entries = self.bookmarks_rich()
+        for i, bm in enumerate(entries):
+            if bm.get("type") == "note" and bm.get("target") == rel:
+                entries.pop(i)
+                self._save_bookmarks_rich(entries)
+                return False
+        entries.append({"type": "note", "target": rel, "label": path.stem})
+        self._save_bookmarks_rich(entries)
         return True
 
+    def add_bookmark(self, bm_type: str, target: str, label: str = "") -> None:
+        """Add a bookmark of any type. Duplicates (same type+target) are skipped."""
+        entries = self.bookmarks_rich()
+        for bm in entries:
+            if bm.get("type") == bm_type and bm.get("target") == target:
+                return
+        entries.append({"type": bm_type, "target": target,
+                        "label": label or target})
+        self._save_bookmarks_rich(entries)
+
+    def remove_bookmark_rich(self, bm_type: str, target: str) -> None:
+        entries = self.bookmarks_rich()
+        entries = [b for b in entries
+                   if not (b.get("type") == bm_type and b.get("target") == target)]
+        self._save_bookmarks_rich(entries)
+
     def remove_bookmark(self, path: Path):
-        current = self.bookmarks()
         path = Path(path)
-        if path in current:
-            current.remove(path)
-            self._save_bookmarks(current)
+        try:
+            rel = str(path.relative_to(self.root)).replace("\\", "/")
+        except ValueError:
+            return
+        self.remove_bookmark_rich("note", rel)
 
     # ── Tree ──────────────────────────────────────────────────────────────
 

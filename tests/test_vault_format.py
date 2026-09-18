@@ -283,7 +283,11 @@ class TestBookmarks(VaultCase):
         svc = NotesService(VaultManager(self.vault))
         svc.toggle_bookmark(note)
         data = json.loads(self.read(fmt.BOOKMARKS_FILE))
-        self.assertEqual(data, ["1.PERSONAL/Nota.md"])
+        # New format: list of dicts with type/target/label
+        self.assertIsInstance(data, list)
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["type"], "note")
+        self.assertEqual(data[0]["target"], "1.PERSONAL/Nota.md")
 
 
 class TestSyncSafety(VaultCase):

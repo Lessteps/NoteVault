@@ -57,10 +57,29 @@ def _code_icon(label: str, color: str, tint_key: str) -> QIcon:
     return QIcon(pm)
 
 
+@lru_cache(maxsize=None)
+def _canvas_icon(tint_key: str) -> QIcon:
+    pm, p = _canvas()
+    accent = QColor(theme.tint("#7c5af0"))
+    node = QColor(theme.tint("#888895"))
+    # Two little cards joined by a connector: the sign of a board.
+    p.setPen(QPen(node, 1.1))
+    p.setBrush(Qt.NoBrush)
+    p.drawRoundedRect(QRectF(1.5, 2.5, 5.5, 4.0), 1.0, 1.0)
+    p.drawRoundedRect(QRectF(9.0, 9.0, 5.5, 4.0), 1.0, 1.0)
+    p.setPen(QPen(accent, 1.2))
+    p.drawLine(QPointF(7.0, 4.5), QPointF(9.0, 11.0))
+    p.end()
+    return QIcon(pm)
+
+
 def icon_for(path) -> QIcon:
     # The tint key keys the cache by theme, so toggling the theme repaints.
     tint_key = theme.current()
-    if kind_for(path) == "code":
+    kind = kind_for(path)
+    if kind == "code":
         label, color = badge_for(path)
         return _code_icon(label, color, tint_key)
+    if kind == "canvas":
+        return _canvas_icon(tint_key)
     return _note_icon(tint_key)

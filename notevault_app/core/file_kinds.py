@@ -10,6 +10,10 @@ from pathlib import Path
 
 NOTE_EXTS = {".md"}
 
+# A visual board. Listed in the explorer with its own icon and opened in the
+# canvas view instead of the markdown editor.
+CANVAS_EXTS = {".canvas"}
+
 # extension -> (badge text, badge colour); colours follow each language's
 # usual brand colour so a file is recognisable at a glance.
 CODE_EXTS = {
@@ -30,10 +34,12 @@ CODE_EXTS = {
 
 
 def kind_for(path) -> str:
-    """'note', 'code' or '' for files the explorer does not list."""
+    """'note', 'code', 'canvas' or '' for files the explorer does not list."""
     ext = Path(str(path)).suffix.lower()
     if ext in NOTE_EXTS:
         return "note"
+    if ext in CANVAS_EXTS:
+        return "canvas"
     if ext in CODE_EXTS:
         return "code"
     return ""

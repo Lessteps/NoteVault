@@ -1549,6 +1549,8 @@ class MarkdownEditor(QWidget):
                     lambda: self.window().save_layout_dialog(), ""),
             Command("Cargar distribución…", "Distribuciones",
                     lambda: self.window().load_layout_dialog(), ""),
+            Command("Nuevo canvas…", "Canvas",
+                    lambda: self.window().new_canvas(), ""),
         ]
 
     def open_palette(self):

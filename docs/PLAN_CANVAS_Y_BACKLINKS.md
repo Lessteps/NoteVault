@@ -303,7 +303,20 @@ comparando el resultado).
       NOTA pendiente de confirmar con el usuario: en modo edición los
       `[[wikilinks]]` del cuerpo siguen requiriendo Ctrl+click
       (`note_view.py:336`); si el usuario se refería a eso, relajarlo.
-- [ ] C0 — andamiaje `.canvas` + explorador + abrir/guardar
+- [x] C0 — andamiaje `.canvas` + explorador + abrir/guardar. Hecho:
+      `core/canvas_format.py` (modelo Obsidian+nv, load/dump/create_empty);
+      `.canvas` es kind "canvas" en `file_kinds.py` y aparece en el árbol con
+      icono propio (`file_icons.py`); paquete
+      `ui/components/notes/canvas/` (`scene.py` rejilla, `items.py`
+      BaseNodeItem movible/redimensionable + TextNodeItem editable en línea,
+      `view.py` CanvasView con pan/zoom/crear-texto/borrar/autoguardado);
+      `main_window` envuelve el centro de notas en un `QStackedWidget`
+      (editor/canvas) y enruta por extensión (`_open_notes_path`);
+      comando "Nuevo canvas…" en el Command Palette (`new_canvas` +
+      `canvas_actions.create_canvas`); `flush()` en `closeEvent`.
+      Tests: `test_canvas_format.py` (8), `test_canvas_view.py` (5).
+      PENDIENTE menor: opción "Nuevo canvas" en el menú contextual del
+      explorador (hoy solo por Command Palette).
 - [ ] C1 — nodos de nota (editar desde canvas)
 - [ ] C2 — texto + imagen/audio/video
 - [ ] C3 — aristas/líneas

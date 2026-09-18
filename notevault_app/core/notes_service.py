@@ -228,7 +228,7 @@ class NotesService:
             # Notes show their title; code keeps its extension, which is how
             # a script is told apart from a note of the same name.
             items.append({"type": "note", "kind": kind,
-                          "name": f.stem if kind == "note" else f.name,
+                          "name": f.name if kind == "code" else f.stem,
                           "path": f})
         return items
 

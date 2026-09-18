@@ -34,6 +34,7 @@ from .components.icon_rail import IconRail
 from .components.notes.notes_sidebar import NotesSidebar
 from .components.notes.markdown_editor import MarkdownEditor
 from .components.notes.ai_chat_panel import AIChatPanel
+from .components.notes.canvas import CanvasView
 from .components.habit_tracker.habit_tracker_panel import HabitTrackerPanel
 from .components.habit_right_panel import HabitRightPanel
 from .components.habit_left_panel import HabitLeftPanel
@@ -187,9 +188,16 @@ class MainWindow(QMainWindow):
             goals=self.goals, areas=self.areas, finances=self.finances)
         self._calendario_panel = CalendarioPanel(self.schedule_mgr)
 
+        # The notes centre is a stack: the markdown editor, or the canvas view
+        # when a .canvas file is open. Signals still come from _notas_center.
+        self._canvas_view = CanvasView()
+        self._notas_stack = QStackedWidget()
+        self._notas_stack.addWidget(self._notas_center)      # 0 — editor
+        self._notas_stack.addWidget(self._canvas_view)       # 1 — canvas
+
         self._center_stack.addWidget(self._habit_panel)      # 0
         self._center_stack.addWidget(self._ejercicio_panel)  # 1
-        self._center_stack.addWidget(self._notas_center)     # 2
+        self._center_stack.addWidget(self._notas_stack)      # 2
         self._center_stack.addWidget(self._tareas_panel)     # 3 — tareas
         self._center_stack.addWidget(self._proj_panel)       # 4 — proyectos
         self._center_stack.addWidget(self._dashboard)        # 5 — vista general
@@ -265,14 +273,14 @@ class MainWindow(QMainWindow):
         self._metas_panel.reveal_in_os_requested.connect(self.reveal_in_os)
 
         # ── Notes module ──────────────────────────────────────────────
-        self._explorer.note_selected.connect(self._notas_center.open_note)
-        self._explorer.note_selected_at_line.connect(self._notas_center.open_note)
+        self._explorer.note_selected.connect(self._open_notes_path)
+        self._explorer.note_selected_at_line.connect(self._open_notes_path)
         self._explorer.note_moved.connect(self._notas_center.on_note_moved)
         self._explorer.bookmarks_changed.connect(
             self._notas_center.refresh_mentions)
         self._notas_center.active_note_changed.connect(self._on_note_changed)
-        self._notas_center.open_note_requested.connect(
-            self._notas_center.open_note)
+        self._notas_center.open_note_requested.connect(self._open_notes_path)
+        self._canvas_view.open_note_requested.connect(self._open_notes_path)
         # note_saved is NOT connected to populate_tree: auto-save fires every
         # 1.2 s and a full tree rebuild on each save would freeze the UI.
         # New notes are added to the tree by new_note() in NotesSidebar itself.
@@ -536,7 +544,7 @@ class MainWindow(QMainWindow):
             p = self.vault.vault_root / p
         if not p.exists():
             return
-        if p.suffix.lower() != ".md":
+        if p.suffix.lower() not in (".md", ".canvas"):
             try:
                 import os
                 os.startfile(str(p))
@@ -544,8 +552,34 @@ class MainWindow(QMainWindow):
                 pass
             return
         self._switch_mode(MODE_NOTAS)
-        self._notas_center.open_note(p)
+        self._open_notes_path(p)
         self._explorer.reveal(p)
+
+    def _open_notes_path(self, path, line: int = 0):
+        """Route a file in the notes workspace: a .canvas opens the canvas view,
+        anything else opens the markdown/code editor."""
+        if not path:
+            return
+        p = Path(path)
+        if p.suffix.lower() == ".canvas":
+            self._notas_stack.setCurrentIndex(1)
+            self._canvas_view.load(p)
+        else:
+            self._notas_stack.setCurrentIndex(0)
+            self._notas_center.open_note(p, line)
+
+    def new_canvas(self, folder=None):
+        """Create a new .canvas in the given folder (or the vault root) and open
+        it. Returns the created path."""
+        from .components.notes.canvas_actions import create_canvas
+        p = create_canvas(self.vault, self.notes, folder)
+        if p is None:
+            return None
+        self._switch_mode(MODE_NOTAS)
+        self._explorer.populate_tree()
+        self._open_notes_path(p)
+        self._explorer.reveal(p)
+        return p
 
     def reveal_in_os(self, path_str):
         """Open file or folder in system file explorer."""
@@ -714,6 +748,10 @@ class MainWindow(QMainWindow):
                     self._notas_center.open_note(ap)
 
     def closeEvent(self, event):
+        try:
+            self._canvas_view.flush()
+        except Exception:
+            pass
         try:
             self.notifier.shutdown()
         except Exception:

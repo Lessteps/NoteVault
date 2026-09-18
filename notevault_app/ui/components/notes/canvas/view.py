@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QGraphicsView, QApplication, QFrame, QHBoxLayout, QPushButton, QInputDialog,
-    QFileDialog, QGraphicsPathItem,
+    QFileDialog, QGraphicsPathItem, QMenu,
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QPointF
 from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath
@@ -21,8 +21,9 @@ from .... import theme  # noqa: F401  (kept for future theme-aware repaint)
 from .....core import canvas_format as cf
 from .....core import attachments
 from .scene import CanvasScene
-from .items import TextNodeItem, NoteNodeItem, MediaNodeItem, BaseNodeItem
+from .items import TextNodeItem, NoteNodeItem, MediaNodeItem, BaseNodeItem, ShapeNodeItem
 from .edges import EdgeItem
+from .shapes import SHAPE_INFO
 
 _MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg",
                ".mp3", ".wav", ".ogg", ".m4a", ".flac",
@@ -80,6 +81,7 @@ class CanvasView(QGraphicsView):
         self._add_tool(lay, "＋ Nota", self._pick_and_add_note)
         self._add_tool(lay, "＋ Texto", self._add_text_center)
         self._add_tool(lay, "＋ Media", self._pick_and_add_media)
+        self._add_shape_tool(lay)
         self._add_tool(lay, "＋ Conectar", self._pick_and_connect)
         bar.adjustSize()
         bar.move(12, 12)
@@ -89,6 +91,22 @@ class CanvasView(QGraphicsView):
         btn = QPushButton(label)
         btn.setCursor(Qt.PointingHandCursor)
         btn.clicked.connect(slot)
+        layout.addWidget(btn)
+        return btn
+
+    def _add_shape_tool(self, layout):
+        btn = QPushButton("＋ Forma ▾")
+        btn.setCursor(Qt.PointingHandCursor)
+        menu = QMenu(btn)
+        menu.setStyleSheet(
+            "QMenu{background:#26262c;border:1px solid #3a3a46;color:#dcdde0;padding:4px;}"
+            "QMenu::item{padding:5px 18px;border-radius:4px;font-size:12px;}"
+            "QMenu::item:selected{background:#7c5af0;color:#ffffff;}")
+        for kind, info in SHAPE_INFO.items():
+            act = menu.addAction(info["name"])
+            act.setToolTip(info.get("desc", ""))
+            act.triggered.connect(lambda chk, k=kind: self.add_shape_node(k, self._viewport_center_scene()))
+        btn.setMenu(menu)
         layout.addWidget(btn)
         return btn
 
@@ -190,11 +208,11 @@ class CanvasView(QGraphicsView):
             else:
                 item = NoteNodeItem(node, abs_path, self.service)
                 item.open_requested.connect(self.open_note_requested.emit)
+        elif node.type == "nv-shape":
+            item = ShapeNodeItem(node)
         elif node.type == "text":
             item = TextNodeItem(node)
         else:
-            # Unknown/other node types render as a plain card for now; later
-            # phases (shapes, drawing, media) replace these with real items.
             item = TextNodeItem(node)
         item.geometry_changed.connect(lambda n=node: self._on_node_geometry_changed(n.id))
         item.edited.connect(self._schedule_save)
@@ -333,6 +351,27 @@ class CanvasView(QGraphicsView):
         node = cf.CanvasNode(id=cf.new_id(), type="file",
                              x=scene_pos.x(), y=scene_pos.y(),
                              width=w, height=h, file=rel, nv={"media": kind})
+        self._doc.nodes.append(node)
+        self._scene.clearSelection()
+        item = self._add_item_for(node)
+        item.setSelected(True)
+        self._schedule_save()
+        return item
+
+    def add_shape_node(self, shape_kind: str, scene_pos: QPointF, text: str = ""):
+        info = SHAPE_INFO.get(shape_kind, {})
+        w, h = info.get("default_size", (160.0, 60.0))
+        label = text if text else info.get("name", "Forma")
+        node = cf.CanvasNode(
+            id=cf.new_id(),
+            type="nv-shape",
+            x=scene_pos.x(),
+            y=scene_pos.y(),
+            width=w,
+            height=h,
+            text=label,
+            nv={"shape": shape_kind}
+        )
         self._doc.nodes.append(node)
         self._scene.clearSelection()
         item = self._add_item_for(node)

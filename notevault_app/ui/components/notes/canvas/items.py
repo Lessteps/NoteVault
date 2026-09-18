@@ -14,9 +14,10 @@ from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QPushButton, QSlider, QLabel,
 )
 from PySide6.QtCore import Qt, QRectF, QPointF, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QPen, QBrush, QFont, QPainterPath, QPixmap
+from PySide6.QtGui import QColor, QPen, QBrush, QFont, QPainterPath, QPixmap, QTextOption
 
 from .....core import attachments
+from .shapes import shape_path, shape_internal_paths
 
 try:
     from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -253,6 +254,86 @@ class TextNodeItem(BaseNodeItem):
         cursor.movePosition(cursor.MoveOperation.End)
         self._text.setTextCursor(cursor)
         # commit when focus leaves the editor
+        self._text.focusOutEvent = self._wrap_focus_out(self._text.focusOutEvent)
+
+    def _wrap_focus_out(self, original):
+        def handler(ev):
+            self._end_edit()
+            original(ev)
+        return handler
+
+    def _end_edit(self):
+        if not self._editing:
+            return
+        self._editing = False
+        self._text.setTextInteractionFlags(Qt.NoTextInteraction)
+        new_text = self._text.toPlainText()
+        if new_text != self.node.text:
+            self.node.text = new_text
+            self.edited.emit()
+
+
+class ShapeNodeItem(BaseNodeItem):
+    """A flowchart shape card (start/end, decision, process, io, etc.)."""
+
+    def __init__(self, node, parent=None):
+        super().__init__(parent=parent, node=node)
+        self._text = QGraphicsTextItem(self)
+        self._text.setDefaultTextColor(TEXT)
+        self._text.setFont(QFont("Segoe UI", 10))
+        opt = QTextOption(Qt.AlignCenter)
+        self._text.document().setDefaultTextOption(opt)
+        self._text.setPlainText(node.text or "")
+        self._editing = False
+        self._position_text()
+
+    def _position_text(self):
+        w, h = self.node.width, self.node.height
+        tw = max(20.0, w - 24.0)
+        self._text.setTextWidth(tw)
+        th = self._text.boundingRect().height()
+        ty = max(2.0, (h - th) / 2.0)
+        self._text.setPos(12.0, ty)
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(painter.RenderHint.Antialiasing)
+        w, h = self.node.width, self.node.height
+        kind = (self.node.nv or {}).get("shape", "process")
+        path = shape_path(kind, w, h)
+        selected = bool(option.state & QStyle.State_Selected)
+
+        # Background and border
+        painter.setBrush(QBrush(BG_NODE))
+        pen_col = BORDER_SEL if selected else color_for(self.node.color)
+        pen = QPen(pen_col, 2.0 if selected else 1.5)
+        painter.setPen(pen)
+        painter.drawPath(path)
+
+        # Decorative internal lines
+        for ip in shape_internal_paths(kind, w, h):
+            painter.drawPath(ip)
+
+        self._position_text()
+
+        if selected:
+            painter.setBrush(QBrush(GRIP))
+            painter.setPen(Qt.NoPen)
+            g = self._grip_rect()
+            painter.drawRoundedRect(g.adjusted(3, 3, -1, -1), 2, 2)
+        if selected or self._hovered:
+            self._draw_ports(painter)
+
+    def mouseDoubleClickEvent(self, event):
+        self._begin_edit()
+        event.accept()
+
+    def _begin_edit(self):
+        self._editing = True
+        self._text.setTextInteractionFlags(Qt.TextEditorInteraction)
+        self._text.setFocus(Qt.MouseFocusReason)
+        cursor = self._text.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        self._text.setTextCursor(cursor)
         self._text.focusOutEvent = self._wrap_focus_out(self._text.focusOutEvent)
 
     def _wrap_focus_out(self, original):

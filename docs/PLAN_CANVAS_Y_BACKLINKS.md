@@ -350,6 +350,12 @@ comparando el resultado).
       nodos sobre el lienzo + botón "＋ Conectar" en la toolbar. Borrado de
       aristas (Delete) y borrado en cascada al eliminar nodos. Tests:
       `test_canvas_edges.py` (6).
-- [ ] C4 — formas de diagrama de flujo
+- [x] C4 — formas de diagrama de flujo. `shapes.py` (geometría de las 10 formas
+      estándar: inicio/fin, proceso, decisión, E/S, conector, subrutina, base de
+      datos, entrada manual, display/documento, comentario) + `ShapeNodeItem`
+      (items.py) con trazado vectorial, líneas decorativas interiores, texto
+      centrado editable in-place, asa de redimensionamiento y puertos para
+      aristas. Botón "＋ Forma ▾" con menú desplegable en la toolbar y persistencia
+      bajo `type: "nv-shape"` con `nv.shape`. Tests: `test_canvas_shapes.py` (5).
 - [ ] C5 — dibujo a mano alzada
 - [ ] C6 — pulido y extras

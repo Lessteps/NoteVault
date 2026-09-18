@@ -644,27 +644,41 @@ class MarkdownEditor(QWidget):
         menu.insertMenu(first, study_menu)
         menu.insertSeparator(first)
 
+    # Default key bindings: {command_id: (default_keys, handler)}
+    _DEFAULT_SHORTCUTS = None  # built lazily
+
+    def _get_default_shortcuts(self) -> dict:
+        return {
+            "palette":       ("Ctrl+P",         self.open_palette),
+            "palette_alt":   ("Ctrl+Shift+P",    self.open_palette),
+            "close_tab":     ("Ctrl+W",          lambda: self.close_tab(self._current)),
+            "save":          ("Ctrl+S",          self.save_current),
+            "toggle_task":   ("Ctrl+L",          self.toggle_current_task),
+            "bold":          ("Ctrl+B",          self.toggle_bold),
+            "italic":        ("Ctrl+I",          self.toggle_italic),
+            "toggle_read":   ("Ctrl+E",          lambda: self.set_mode(
+                                MODE_READ if self._mode != MODE_READ else MODE_RICH)),
+            "insert_table":  ("Ctrl+Shift+T",    lambda: self.insert_table()),
+            "daily_note":    ("Ctrl+Shift+D",    self._open_daily_note),
+            "hotkeys_dialog":("Ctrl+,",          self._open_hotkeys_dialog),
+        }
+
     def _init_shortcuts(self):
         # Window-level, not WidgetWithChildren: Ctrl+P did nothing whenever
         # the focus sat in the file tree or the assistant, which is exactly
         # where it is right after clicking a note. Qt already switches these
         # off while the notes panel is hidden behind another module.
-        def bind(keys, handler):
+        overrides = AppConfig.get_hotkeys()
+        self._shortcuts = {}
+
+        for cmd_id, (default_keys, handler) in self._get_default_shortcuts().items():
+            keys = overrides.get(cmd_id, default_keys)
+            if not keys:
+                continue
             sc = QShortcut(QKeySequence(keys), self)
             sc.setContext(Qt.WindowShortcut)
             sc.activated.connect(handler)
-
-        bind("Ctrl+P", self.open_palette)
-        bind("Ctrl+Shift+P", self.open_palette)
-        bind("Ctrl+W", lambda: self.close_tab(self._current))
-        bind("Ctrl+S", self.save_current)
-        bind("Ctrl+L", self.toggle_current_task)
-        bind("Ctrl+B", self.toggle_bold)
-        bind("Ctrl+I", self.toggle_italic)
-        bind("Ctrl+E", lambda: self.set_mode(
-            MODE_READ if self._mode != MODE_READ else MODE_RICH))
-        bind("Ctrl+Shift+T", lambda: self.insert_table())
-        bind("Ctrl+Shift+D", self._open_daily_note)
+            self._shortcuts[cmd_id] = sc
 
     def set_assistant_visible(self, visible: bool):
         self._assistant_btn.setChecked(visible)
@@ -1518,6 +1532,8 @@ class MarkdownEditor(QWidget):
                     self._new_note_from_template, ""),
             Command("Abrir nota de hoy", "Diario",
                     self._open_daily_note, "Ctrl+Shift+D"),
+            Command("Atajos de teclado…", "Configuración",
+                    self._open_hotkeys_dialog, "Ctrl+,"),
         ]
 
     def open_palette(self):
@@ -1532,6 +1548,88 @@ class MarkdownEditor(QWidget):
     def _toggle_bookmark_command(self):
         self._bm_btn.setChecked(not self._bm_btn.isChecked())
         self.toggle_bookmark()
+
+    # ── Hotkeys dialog ────────────────────────────────────────────────────
+
+    def _open_hotkeys_dialog(self):
+        from PySide6.QtWidgets import (
+            QDialog, QTableWidget, QTableWidgetItem, QHeaderView,
+            QDialogButtonBox, QKeySequenceEdit,
+        )
+        from PySide6.QtCore import Qt as _Qt
+
+        overrides = AppConfig.get_hotkeys()
+        defaults = self._get_default_shortcuts()
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Atajos de teclado")
+        dlg.resize(520, 400)
+        lay = QVBoxLayout(dlg)
+
+        table = QTableWidget(len(defaults), 3)
+        table.setHorizontalHeaderLabels(["Comando", "Por defecto", "Atajo personalizado"])
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectRows)
+
+        for row, (cmd_id, (default_key, _)) in enumerate(defaults.items()):
+            name_map = {
+                "palette": "Abrir Command Palette",
+                "palette_alt": "Command Palette (alternativo)",
+                "close_tab": "Cerrar pestaña",
+                "save": "Guardar",
+                "toggle_task": "Marcar/desmarcar casilla",
+                "bold": "Negrita",
+                "italic": "Cursiva",
+                "toggle_read": "Cambiar modo Lectura/Editor",
+                "insert_table": "Insertar tabla",
+                "daily_note": "Abrir nota de hoy",
+                "hotkeys_dialog": "Atajos de teclado",
+            }
+            table.setItem(row, 0, QTableWidgetItem(name_map.get(cmd_id, cmd_id)))
+            table.setItem(row, 1, QTableWidgetItem(default_key))
+            current = overrides.get(cmd_id, default_key)
+            edit_item = QTableWidgetItem(current)
+            edit_item.setData(_Qt.UserRole, cmd_id)
+            edit_item.setFlags(edit_item.flags() | _Qt.ItemIsEditable)
+            table.setItem(row, 2, edit_item)
+
+        table.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)
+        lay.addWidget(table)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+                                | QDialogButtonBox.Reset)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        btns.button(QDialogButtonBox.Reset).clicked.connect(
+            lambda: [table.item(r, 2).setText(
+                list(defaults.values())[r][0])
+                for r in range(table.rowCount())])
+        lay.addWidget(btns)
+
+        if dlg.exec() != QDialog.Accepted:
+            return
+
+        # Detect conflicts
+        new_overrides = {}
+        for row in range(table.rowCount()):
+            cmd_id = table.item(row, 2).data(_Qt.UserRole)
+            default_key = table.item(row, 1).text()
+            custom_key = table.item(row, 2).text().strip()
+            if custom_key and custom_key != default_key:
+                new_overrides[cmd_id] = custom_key
+            elif cmd_id in overrides:
+                AppConfig.clear_hotkey(cmd_id)
+
+        for cmd_id, keys in new_overrides.items():
+            AppConfig.set_hotkey(cmd_id, keys)
+
+        # Reinit shortcuts
+        for sc in self._shortcuts.values():
+            sc.setParent(None)
+        self._init_shortcuts()
 
     # ── Templates ─────────────────────────────────────────────────────────
 

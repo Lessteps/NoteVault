@@ -246,3 +246,24 @@ class AppConfig:
             s.pop("daily_notes_template", None)
         AppConfig._write(s)
 
+    # ── Hotkeys ────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def get_hotkeys() -> dict:
+        """Return {command_id: key_sequence_string} overrides."""
+        return AppConfig._read().get("hotkeys", {})
+
+    @staticmethod
+    def set_hotkey(command_id: str, key_sequence: str):
+        s = AppConfig._read()
+        hotkeys = s.setdefault("hotkeys", {})
+        if key_sequence:
+            hotkeys[command_id] = key_sequence
+        else:
+            hotkeys.pop(command_id, None)
+        AppConfig._write(s)
+
+    @staticmethod
+    def clear_hotkey(command_id: str):
+        AppConfig.set_hotkey(command_id, "")
+

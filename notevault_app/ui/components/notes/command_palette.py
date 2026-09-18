@@ -32,6 +32,7 @@ class Command:
     run: Callable[[], object]
     shortcut: str = ""
     enabled: Callable[[], bool] = lambda: True
+    id: str = ""            # stable id for hotkey overrides; defaults to title
 
 
 def _fold(text: str) -> str:

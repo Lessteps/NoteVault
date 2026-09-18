@@ -12,16 +12,17 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QGraphicsView, QApplication, QFrame, QHBoxLayout, QPushButton, QInputDialog,
-    QFileDialog,
+    QFileDialog, QGraphicsPathItem,
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QPointF
-from PySide6.QtGui import QPainter
+from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath
 
 from .... import theme  # noqa: F401  (kept for future theme-aware repaint)
 from .....core import canvas_format as cf
 from .....core import attachments
 from .scene import CanvasScene
 from .items import TextNodeItem, NoteNodeItem, MediaNodeItem, BaseNodeItem
+from .edges import EdgeItem
 
 _MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg",
                ".mp3", ".wav", ".ogg", ".m4a", ".flac",
@@ -48,6 +49,10 @@ class CanvasView(QGraphicsView):
         self._path = None
         self._doc = cf.CanvasDoc()
         self._items = {}          # node id -> BaseNodeItem
+        self._edge_items = {}     # edge id -> EdgeItem
+        self._connecting_src = None
+        self._connecting_side = None
+        self._temp_edge = None
         self._loading = False
         self._panning = False
         self._pan_start = QPointF()
@@ -75,6 +80,7 @@ class CanvasView(QGraphicsView):
         self._add_tool(lay, "＋ Nota", self._pick_and_add_note)
         self._add_tool(lay, "＋ Texto", self._add_text_center)
         self._add_tool(lay, "＋ Media", self._pick_and_add_media)
+        self._add_tool(lay, "＋ Conectar", self._pick_and_connect)
         bar.adjustSize()
         bar.move(12, 12)
         return bar
@@ -91,6 +97,30 @@ class CanvasView(QGraphicsView):
 
     def _add_text_center(self):
         self.add_text_node(self._viewport_center_scene())
+
+    def _pick_and_connect(self):
+        if len(self._items) < 2:
+            return
+        items_list = list(self._items.values())
+        labels = []
+        for it in items_list:
+            lbl = getattr(it.node, "text", "") or getattr(it.node, "file", "") or it.node.id
+            lbl = (lbl.splitlines()[0] if lbl else it.node.id)[:25]
+            labels.append(f"{lbl} ({it.node.id[:6]})")
+        src_label, ok1 = QInputDialog.getItem(
+            self, "Conectar nodos", "Nodo origen:", labels, 0, False)
+        if not ok1 or not src_label:
+            return
+        dst_labels = [l for l in labels if l != src_label]
+        dst_label, ok2 = QInputDialog.getItem(
+            self, "Conectar nodos", "Nodo destino:", dst_labels, 0, False)
+        if not ok2 or not dst_label:
+            return
+        src_idx = labels.index(src_label)
+        dst_idx = labels.index(dst_label)
+        src_node = items_list[src_idx].node
+        dst_node = items_list[dst_idx].node
+        self.add_edge(src_node.id, dst_node.id)
 
     def _pick_and_add_note(self):
         if self.vault is None:
@@ -143,8 +173,11 @@ class CanvasView(QGraphicsView):
         self._loading = True
         self._scene.clear()
         self._items.clear()
+        self._edge_items.clear()
         for node in self._doc.nodes:
             self._add_item_for(node)
+        for edge in self._doc.edges:
+            self._add_edge_item_for(edge)
         self._loading = False
 
     def _add_item_for(self, node) -> BaseNodeItem:
@@ -163,11 +196,69 @@ class CanvasView(QGraphicsView):
             # Unknown/other node types render as a plain card for now; later
             # phases (shapes, drawing, media) replace these with real items.
             item = TextNodeItem(node)
-        item.geometry_changed.connect(self._schedule_save)
+        item.geometry_changed.connect(lambda n=node: self._on_node_geometry_changed(n.id))
         item.edited.connect(self._schedule_save)
+        item.connection_drag_started.connect(self._on_connection_drag_started)
         self._scene.addItem(item)
         self._items[node.id] = item
         return item
+
+    def _on_node_geometry_changed(self, node_id: str):
+        for edge_item in self._edge_items.values():
+            if edge_item.edge.fromNode == node_id or edge_item.edge.toNode == node_id:
+                edge_item.update_path()
+        self._schedule_save()
+
+    def _add_edge_item_for(self, edge: cf.CanvasEdge):
+        src = self._items.get(edge.fromNode)
+        dst = self._items.get(edge.toNode)
+        if src is None or dst is None:
+            return None
+        edge_item = EdgeItem(edge, src, dst, on_changed=self._schedule_save)
+        self._scene.addItem(edge_item)
+        self._edge_items[edge.id] = edge_item
+        return edge_item
+
+    def add_edge(self, from_node_id: str, to_node_id: str,
+                 from_side: str = "right", to_side: str = "left",
+                 label: str = "", color: str = "", style: str = "solid",
+                 routing: str = "bezier", from_end: str = "none",
+                 to_end: str = "arrow"):
+        nv_ext = {}
+        if style != "solid":
+            nv_ext["style"] = style
+        if routing != "bezier":
+            nv_ext["routing"] = routing
+        edge = cf.CanvasEdge(
+            id=cf.new_id(),
+            fromNode=from_node_id,
+            toNode=to_node_id,
+            fromSide=from_side,
+            toSide=to_side,
+            fromEnd=from_end,
+            toEnd=to_end,
+            color=color,
+            label=label,
+            nv=nv_ext
+        )
+        self._doc.edges.append(edge)
+        edge_item = self._add_edge_item_for(edge)
+        self._schedule_save()
+        return edge_item
+
+    def _on_connection_drag_started(self, item, side: str, scene_pos: QPointF):
+        self._connecting_src = item
+        self._connecting_side = side
+        self._temp_edge = QGraphicsPathItem()
+        pen = QPen(QColor("#7c5af0"), 2.0, Qt.DashLine)
+        pen.setCapStyle(Qt.RoundCap)
+        self._temp_edge.setPen(pen)
+        self._temp_edge.setZValue(100)
+        p1 = item.side_point(side)
+        path = QPainterPath(p1)
+        path.lineTo(scene_pos)
+        self._temp_edge.setPath(path)
+        self._scene.addItem(self._temp_edge)
 
     def _schedule_save(self):
         if not self._loading:
@@ -195,6 +286,7 @@ class CanvasView(QGraphicsView):
                              x=scene_pos.x(), y=scene_pos.y(),
                              width=250, height=100, text=text)
         self._doc.nodes.append(node)
+        self._scene.clearSelection()
         item = self._add_item_for(node)
         item.setSelected(True)
         self._schedule_save()
@@ -212,6 +304,7 @@ class CanvasView(QGraphicsView):
                              x=scene_pos.x(), y=scene_pos.y(),
                              width=320, height=220, file=rel)
         self._doc.nodes.append(node)
+        self._scene.clearSelection()
         item = self._add_item_for(node)
         item.setSelected(True)
         self._schedule_save()
@@ -241,6 +334,7 @@ class CanvasView(QGraphicsView):
                              x=scene_pos.x(), y=scene_pos.y(),
                              width=w, height=h, file=rel, nv={"media": kind})
         self._doc.nodes.append(node)
+        self._scene.clearSelection()
         item = self._add_item_for(node)
         item.setSelected(True)
         self._schedule_save()
@@ -309,6 +403,14 @@ class CanvasView(QGraphicsView):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self._connecting_src is not None and self._temp_edge is not None:
+            p1 = self._connecting_src.side_point(self._connecting_side)
+            p2 = self.mapToScene(event.position().toPoint())
+            path = QPainterPath(p1)
+            path.lineTo(p2)
+            self._temp_edge.setPath(path)
+            event.accept()
+            return
         if self._panning:
             delta = event.position() - self._pan_start
             self._pan_start = event.position()
@@ -321,6 +423,34 @@ class CanvasView(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self._connecting_src is not None:
+            if self._temp_edge is not None:
+                self._scene.removeItem(self._temp_edge)
+                self._temp_edge = None
+            scene_pos = self.mapToScene(event.position().toPoint())
+            target = None
+            for it in self._scene.items(scene_pos):
+                if isinstance(it, BaseNodeItem) and it != self._connecting_src:
+                    target = it
+                    break
+            if target is not None:
+                local_pos = target.mapFromScene(scene_pos)
+                target_side = target.port_at(local_pos, threshold=24.0)
+                if not target_side:
+                    p1 = self._connecting_src.side_point(self._connecting_side)
+                    best_dist = None
+                    for s in ("top", "right", "bottom", "left"):
+                        sp = target.side_point(s)
+                        d = (sp.x() - p1.x()) ** 2 + (sp.y() - p1.y()) ** 2
+                        if best_dist is None or d < best_dist:
+                            best_dist = d
+                            target_side = s
+                self.add_edge(self._connecting_src.node.id, target.node.id,
+                              from_side=self._connecting_side, to_side=target_side or "left")
+            self._connecting_src = None
+            self._connecting_side = None
+            event.accept()
+            return
         if self._panning:
             self._panning = False
             self.setCursor(Qt.ArrowCursor)
@@ -345,11 +475,25 @@ class CanvasView(QGraphicsView):
 
     def _delete_selected(self):
         removed = False
-        for item in list(self._scene.selectedItems()):
+        selected = list(self._scene.selectedItems())
+        for item in selected:
+            if isinstance(item, EdgeItem):
+                eid = item.edge.id
+                self._doc.edges = [e for e in self._doc.edges if e.id != eid]
+                self._scene.removeItem(item)
+                self._edge_items.pop(eid, None)
+                removed = True
+
+        for item in selected:
             if isinstance(item, BaseNodeItem):
                 if hasattr(item, "stop"):
                     item.stop()
                 nid = item.node.id
+                edges_to_del = [e for e in self._doc.edges if e.fromNode == nid or e.toNode == nid]
+                for e in edges_to_del:
+                    if e.id in self._edge_items:
+                        self._scene.removeItem(self._edge_items[e.id])
+                        self._edge_items.pop(e.id, None)
                 self._doc.nodes = [n for n in self._doc.nodes if n.id != nid]
                 self._doc.edges = [e for e in self._doc.edges
                                    if e.fromNode != nid and e.toNode != nid]

@@ -57,6 +57,9 @@ GRIP_SIZE = 14.0
 MIN_W, MIN_H = 80.0, 40.0
 
 
+PORT_RADIUS = 5.0
+
+
 def color_for(token: str) -> QColor:
     if token in CANVAS_COLORS:
         return CANVAS_COLORS[token]
@@ -72,11 +75,13 @@ class BaseNodeItem(QGraphicsObject):
 
     geometry_changed = Signal()      # moved or resized: view saves + reroutes edges
     edited = Signal()                # payload (text/etc.) changed
+    connection_drag_started = Signal(object, str, object)  # (item, side, scene_pos)
 
     def __init__(self, node, parent=None):
         super().__init__(parent)
         self.node = node
         self._resizing = False
+        self._hovered = False
         self._press_local = QPointF()
         self._press_size = (node.width, node.height)
         self.setFlag(QGraphicsObject.ItemIsMovable, True)
@@ -87,6 +92,9 @@ class BaseNodeItem(QGraphicsObject):
 
     # geometry ---------------------------------------------------------------
     def boundingRect(self) -> QRectF:
+        return QRectF(-6, -6, self.node.width + 12, self.node.height + 12)
+
+    def _node_rect(self) -> QRectF:
         return QRectF(0, 0, self.node.width, self.node.height)
 
     def _grip_rect(self) -> QRectF:
@@ -96,7 +104,7 @@ class BaseNodeItem(QGraphicsObject):
     # painting ---------------------------------------------------------------
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(painter.RenderHint.Antialiasing)
-        rect = self.boundingRect().adjusted(0.5, 0.5, -0.5, -0.5)
+        rect = self._node_rect().adjusted(0.5, 0.5, -0.5, -0.5)
         painter.setBrush(QBrush(BG_NODE))
         selected = bool(option.state & QStyle.State_Selected)
         pen = QPen(BORDER_SEL if selected else color_for(self.node.color),
@@ -109,25 +117,74 @@ class BaseNodeItem(QGraphicsObject):
             painter.setPen(Qt.NoPen)
             g = self._grip_rect()
             painter.drawRoundedRect(g.adjusted(3, 3, -1, -1), 2, 2)
+        if selected or self._hovered:
+            self._draw_ports(painter)
+
+    def _draw_ports(self, painter):
+        w, h = self.node.width, self.node.height
+        ports = [
+            QPointF(w / 2, 0),
+            QPointF(w / 2, h),
+            QPointF(0, h / 2),
+            QPointF(w, h / 2),
+        ]
+        painter.setPen(QPen(QColor("#ffffff"), 1.2))
+        painter.setBrush(QBrush(QColor("#7c5af0")))
+        for pt in ports:
+            painter.drawEllipse(pt, PORT_RADIUS, PORT_RADIUS)
+
+    def port_at(self, local_pos: QPointF, threshold: float = 12.0) -> str:
+        w, h = self.node.width, self.node.height
+        ports = {
+            "top": QPointF(w / 2, 0),
+            "bottom": QPointF(w / 2, h),
+            "left": QPointF(0, h / 2),
+            "right": QPointF(w, h / 2),
+        }
+        for side, pt in ports.items():
+            dx = local_pos.x() - pt.x()
+            dy = local_pos.y() - pt.y()
+            if (dx * dx + dy * dy) <= (threshold * threshold):
+                return side
+        return ""
 
     def paint_content(self, painter, rect):
         """Overridden by subclasses; base draws nothing."""
 
     # mouse ------------------------------------------------------------------
+    def hoverEnterEvent(self, event):
+        self._hovered = True
+        self.update()
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        self._hovered = False
+        self.setCursor(Qt.ArrowCursor)
+        self.update()
+        super().hoverLeaveEvent(event)
+
     def hoverMoveEvent(self, event):
-        if self.isSelected() and self._grip_rect().contains(event.pos()):
+        if self.port_at(event.pos()):
+            self.setCursor(Qt.CrossCursor)
+        elif self.isSelected() and self._grip_rect().contains(event.pos()):
             self.setCursor(Qt.SizeFDiagCursor)
         else:
             self.setCursor(Qt.ArrowCursor)
         super().hoverMoveEvent(event)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and self._grip_rect().contains(event.pos()):
-            self._resizing = True
-            self._press_local = event.scenePos()
-            self._press_size = (self.node.width, self.node.height)
-            event.accept()
-            return
+        if event.button() == Qt.LeftButton:
+            side = self.port_at(event.pos())
+            if side:
+                self.connection_drag_started.emit(self, side, event.scenePos())
+                event.accept()
+                return
+            if self._grip_rect().contains(event.pos()):
+                self._resizing = True
+                self._press_local = event.scenePos()
+                self._press_size = (self.node.width, self.node.height)
+                event.accept()
+                return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):

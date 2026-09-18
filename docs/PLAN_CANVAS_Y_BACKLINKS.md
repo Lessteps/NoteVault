@@ -340,7 +340,16 @@ comparando el resultado).
       "＋ Media" (diálogo) en la toolbar y drop de medios desde el explorador/SO.
       `stop()` al borrar. Tests: `test_canvas_media.py` (5). TextNode ya venía
       de C0.
-- [ ] C3 — aristas/líneas
+- [x] C3 — aristas/líneas para unir. `EdgeItem` (edges.py): conectores entre
+      puertos de nodos con curvatura bézier suave, recta u ortogonal; flechas
+      en extremos (`toEnd`/`fromEnd`), etiquetas de texto (`label`) con fondo
+      redondeado, estilos de línea (sólida/discontinua/punteada) y paleta de
+      colores. Re-ruteo automático en vivo al mover o redimensionar nodos.
+      Puertos de conexión circulares en los 4 costados de cada nodo visibles
+      en hover/selección, arrastre interactivo desde puertos para enlazar
+      nodos sobre el lienzo + botón "＋ Conectar" en la toolbar. Borrado de
+      aristas (Delete) y borrado en cascada al eliminar nodos. Tests:
+      `test_canvas_edges.py` (6).
 - [ ] C4 — formas de diagrama de flujo
 - [ ] C5 — dibujo a mano alzada
 - [ ] C6 — pulido y extras

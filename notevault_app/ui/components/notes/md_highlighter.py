@@ -53,6 +53,7 @@ def _fmt(color=None, *, bold=False, italic=False, mono=False, strike=False,
         f.setFontStrikeOut(True)
     if mono:
         f.setFontFamilies(["Cascadia Mono", "Consolas", "monospace"])
+        f.setFontFixedPitch(True)
     if point_size:
         f.setFontPointSize(point_size)
     return f
@@ -71,29 +72,36 @@ def _base_point_size(document) -> float:
 
 # Inline patterns, applied in order. Earlier rules win over later ones on the
 # same span, so links are matched before emphasis.
+#
+# The third item is the *delimiter length* used for Obsidian-style Live Preview:
+# on an inactive line the delimiter runs of that length on each side are
+# concealed and only the inner text is styled (``**bold**`` reads as **bold**).
+#   None → never conceal, colour the whole match (links, urls, tags)
+#   n    → conceal ``n`` characters on each side
+#   -1   → conceal ``len(match.group(1))`` on each side (fenced-backtick code)
 _INLINE = [
     # ![[embed]]
-    (re.compile(r"!\[\[[^\]\n]+\]\]"), dict(color=C_WIKILINK)),
+    (re.compile(r"!\[\[[^\]\n]+\]\]"), dict(color=C_WIKILINK), None),
     # [label](target)
-    (re.compile(r"!?\[[^\]\n]*\]\([^)\n]*\)"), dict(color=C_LINK)),
+    (re.compile(r"!?\[[^\]\n]*\]\([^)\n]*\)"), dict(color=C_LINK), None),
     # bare URL
-    (re.compile(r"(?<![(<\w])https?://[^\s)>\]]+"), dict(color=C_LINK)),
+    (re.compile(r"(?<![(<\w])https?://[^\s)>\]]+"), dict(color=C_LINK), None),
     # `code`
     (re.compile(r"(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)"),
-     dict(color=C_CODE, mono=True, background=C_CODE_BG)),
+     dict(color=C_CODE, mono=True, background=C_CODE_BG), -1),
     # ***both***, **bold**, *italic*
     (re.compile(r"(?<!\*)\*\*\*(?!\s)(.+?)(?<!\s)\*\*\*(?!\*)"),
-     dict(bold=True, italic=True)),
-    (re.compile(r"(?<!\*)\*\*(?!\s)(.+?)(?<!\s)\*\*(?!\*)"), dict(bold=True)),
-    (re.compile(r"(?<![\*\w])\*(?!\s|\*)(.+?)(?<!\s)\*(?![\*\w])"), dict(italic=True)),
-    (re.compile(r"(?<![_\w])__(?!\s)(.+?)(?<!\s)__(?![_\w])"), dict(bold=True)),
-    (re.compile(r"(?<![_\w])_(?!\s|_)(.+?)(?<!\s)_(?![_\w])"), dict(italic=True)),
+     dict(bold=True, italic=True), 3),
+    (re.compile(r"(?<!\*)\*\*(?!\s)(.+?)(?<!\s)\*\*(?!\*)"), dict(bold=True), 2),
+    (re.compile(r"(?<![\*\w])\*(?!\s|\*)(.+?)(?<!\s)\*(?![\*\w])"), dict(italic=True), 1),
+    (re.compile(r"(?<![_\w])__(?!\s)(.+?)(?<!\s)__(?![_\w])"), dict(bold=True), 2),
+    (re.compile(r"(?<![_\w])_(?!\s|_)(.+?)(?<!\s)_(?![_\w])"), dict(italic=True), 1),
     # ~~struck~~
-    (re.compile(r"~~(?!\s)(.+?)(?<!\s)~~"), dict(strike=True, color=C_DONE)),
+    (re.compile(r"~~(?!\s)(.+?)(?<!\s)~~"), dict(strike=True, color=C_DONE), 2),
     # ==highlight==
-    (re.compile(r"==(?!\s)(.+?)(?<!\s)=="), dict(color=C_CODE, bold=True)),
+    (re.compile(r"==(?!\s)(.+?)(?<!\s)=="), dict(color=C_CODE, bold=True), 2),
     # #tag, but never a heading (which starts the line) and never a colour
-    (re.compile(r"(?<![\w&#])#(?!\d)[\w/\-]{2,}"), dict(color=C_TAG)),
+    (re.compile(r"(?<![\w&#])#(?!\d)[\w/\-]{2,}"), dict(color=C_TAG), None),
 ]
 
 # Every character any inline rule can start on. A line without one of these
@@ -105,9 +113,12 @@ _FENCE_RE   = re.compile(r"^\s{0,3}(```|~~~)")
 _HEADING_RE = re.compile(r"^(\s{0,3})(#{1,6})(\s+)(.*)$")
 _QUOTE_RE   = re.compile(r"^\s{0,3}(>+\s?)")
 _BULLET_RE  = re.compile(r"^(\s*)([-*+]|\d+[.)])(\s+)")
-_TASK_RE    = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+)(\[([ xX])\])(\s*)(.*)$")
+_TASK_RE    = re.compile(r"^(\s*)([-*+]|\d+[.)])(\s+)(\[([ xX])\])(\s*)(.*)$")
 _HR_RE      = re.compile(r"^\s{0,3}(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$")
 _TABLE_RE   = re.compile(r"^\s*\|.*")
+# The |---|:--:|---| alignment row under a table header: only pipes, dashes,
+# colons and spaces, and at least one dash.
+_TABLE_SEP_RE = re.compile(r"^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$")
 _FRONT_RE   = re.compile(r"^---\s*$")
 
 
@@ -133,6 +144,14 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         self.f_done_text = _fmt(C_DONE, strike=True)
         self.f_hr = _fmt(C_HR, bold=True)
         self.f_table = _fmt(C_TABLE)
+        # A table row is set in a monospace face so its columns line up into a
+        # real grid; the pipes are made invisible (but keep their width) so the
+        # painted grid lines show instead. On the caret's row the pipes stay
+        # visible so the raw table can still be edited.
+        self.f_table_mono = _fmt(mono=True)
+        self.f_pipe_hidden = QTextCharFormat()
+        self.f_pipe_hidden.setFontFamilies(["Cascadia Mono", "Consolas", "monospace"])
+        self.f_pipe_hidden.setForeground(QColor(0, 0, 0, 0))
         self.f_front = _fmt(C_FRONT, italic=True)
         self.f_wikilink_full = _fmt(C_WIKILINK)
         self.f_wikilink_hide = QTextCharFormat()
@@ -140,7 +159,19 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         self.f_wikilink_hide.setForeground(QColor(0, 0, 0, 0))
         self.f_wikilink_show = _fmt(C_WIKILINK)
         self.f_wikilink_show.setFontUnderline(True)
-        self.f_inline = [(rx, _fmt(**kw)) for rx, kw in _INLINE]
+        # A run painted with this vanishes: near-zero size + transparent ink, so
+        # concealed markdown markers take no visible space (the same trick the
+        # wikilink concealment uses).
+        self.f_hide = QTextCharFormat()
+        self.f_hide.setFontPointSize(0.1)
+        self.f_hide.setForeground(QColor(0, 0, 0, 0))
+
+        # Box & bullet placeholder concealment: transparent foreground with normal font size
+        # so the painted checkbox glyph/bullet has dedicated space without text overlap.
+        self.f_box_conceal = QTextCharFormat()
+        self.f_box_conceal.setForeground(QColor(0, 0, 0, 0))
+
+        self.f_inline = [(rx, _fmt(**kw), dl) for rx, kw, dl in _INLINE]
 
     def retheme(self):
         self._build_formats()
@@ -171,53 +202,96 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             self.setFormat(0, len(text), self.f_code_block)
             if previous != IN_CODE:
                 self.setCurrentBlockState(IN_CODE)
+            self.currentBlock().setUserState(IN_CODE)
             return
         if previous == IN_CODE:
             self.setFormat(0, len(text), self.f_code_block)
             self.setCurrentBlockState(IN_CODE)
+            self.currentBlock().setUserState(IN_CODE)
             return
+        self.currentBlock().setUserState(0)
 
         if _HR_RE.match(text) and text.strip():
             self.setFormat(0, len(text), self.f_hr)
             return
+
+        # Live Preview: on every line except the one the caret sits on, the raw
+        # markers are concealed and only the rendered text remains; the caret's
+        # line shows its markers (dimmed) so it can still be edited.
+        blk = self.currentBlock().blockNumber()
+        active = blk == self.active_block
 
         body_start = 0
         heading = _HEADING_RE.match(text)
         if heading:
             level = len(heading.group(2))
             self.setFormat(0, len(text), self.f_heading[level])
-            self.setFormat(heading.start(2), len(heading.group(2)), self.f_marker)
+            if active:
+                self.setFormat(heading.start(2), len(heading.group(2)), self.f_marker)
+            else:
+                # Hide the leading indent, the #'s and the space after them.
+                self.setFormat(0, heading.start(4), self.f_hide)
             body_start = heading.start(4)
         else:
             quote = _QUOTE_RE.match(text)
             if quote:
                 self.setFormat(0, len(text), self.f_quote)
-                self.setFormat(0, quote.end(1), self.f_marker)
+                self.setFormat(0, quote.end(1),
+                               self.f_marker if active else self.f_hide)
                 body_start = quote.end(1)
 
             task = _TASK_RE.match(text)
             if task:
-                self.setFormat(task.start(1), len(task.group(1)), self.f_bullet)
-                done = task.group(3) in "xX"
-                self.setFormat(task.start(2), len(task.group(2)),
-                               self.f_box_done if done else self.f_box_open)
-                if done and task.group(5):
-                    self.setFormat(task.start(5), len(task.group(5)),
-                                   self.f_done_text)
-                body_start = max(body_start, task.start(5))
+                b_char = task.group(2)
+                b_space = task.group(3)
+                box_raw = task.group(4)
+                done = task.group(5) in "xX"
+                body = task.group(7)
+
+                if active:
+                    self.setFormat(task.start(2), len(b_char), self.f_bullet)
+                    self.setFormat(task.start(4), len(box_raw),
+                                   self.f_box_done if done else self.f_box_open)
+                else:
+                    if b_char in "-*+":
+                        self.setFormat(task.start(2), len(b_char) + len(b_space), self.f_hide)
+                    self.setFormat(task.start(4), len(box_raw), self.f_box_conceal)
+
+                if done and body:
+                    self.setFormat(task.start(7), len(body), self.f_done_text)
+                body_start = max(body_start, task.start(7))
             else:
                 bullet = _BULLET_RE.match(text)
                 if bullet:
-                    self.setFormat(bullet.start(2), len(bullet.group(2)),
-                                   self.f_bullet)
+                    b_char = bullet.group(2)
+                    if active:
+                        self.setFormat(bullet.start(2), len(b_char), self.f_bullet)
+                    else:
+                        if b_char in "-*+":
+                            self.setFormat(bullet.start(2), len(b_char), self.f_box_conceal)
+                        else:
+                            self.setFormat(bullet.start(2), len(b_char), self.f_bullet)
                     body_start = max(body_start, bullet.end(3))
 
             if _TABLE_RE.match(text):
-                for i, ch in enumerate(text):
-                    if ch == "|" and (i == 0 or text[i - 1] != "\\"):
-                        self.setFormat(i, 1, self.f_table)
+                # Monospace so the columns line up into a grid.
+                self.setFormat(0, len(text), self.f_table_mono)
+                if _TABLE_SEP_RE.match(text) and not active:
+                    # Hide the |---| alignment row on inactive tables.
+                    self.setFormat(0, len(text), self.f_hide)
+                else:
+                    for i, ch in enumerate(text):
+                        if ch == "|" and (i == 0 or text[i - 1] != "\\"):
+                            # Visible pipe on the caret's row (editable); an
+                            # invisible, width-keeping pipe elsewhere so the
+                            # painted grid lines take over.
+                            self.setFormat(i, 1,
+                                           self.f_table if active else self.f_pipe_hidden)
+                # A table row carries no other inline markdown to style, and
+                # running the inline rules would break the column alignment.
+                return
 
-        self._paint_inline(text, body_start, self.currentBlock().blockNumber())
+        self._paint_inline(text, body_start, blk)
 
     def _paint_inline(self, text: str, start: int, block_num: int = -1):
         # Most lines are plain prose. Running fourteen regexes over each of
@@ -263,22 +337,44 @@ class MarkdownHighlighter(QSyntaxHighlighter):
                         self.setFormat(fn_start, fn_len, merged)
                         self.setFormat(fn_start + fn_len, b - (fn_start + fn_len), self.f_wikilink_hide)
                     else:
-                        merged = QTextCharFormat(self.format(a))
+                        fn_start = a + 2
+                        fn_len = b - a - 4
+                        self.setFormat(a, 2, self.f_wikilink_hide)
+                        merged = QTextCharFormat(self.format(fn_start))
                         merged.merge(self.f_wikilink_show)
-                        self.setFormat(a, b - a, merged)
+                        self.setFormat(fn_start, fn_len, merged)
+                        self.setFormat(fn_start + fn_len, 2, self.f_wikilink_hide)
                 else:
-                    merged = QTextCharFormat(self.format(a))
+                    fn_start = a + 2
+                    fn_len = b - a - 4
+                    self.setFormat(a, 2, self.f_wikilink_hide)
+                    merged = QTextCharFormat(self.format(fn_start))
                     merged.merge(self.f_wikilink_show)
-                    self.setFormat(a, b - a, merged)
+                    self.setFormat(fn_start, fn_len, merged)
+                    self.setFormat(fn_start + fn_len, 2, self.f_wikilink_hide)
 
             for i in range(a, b):
                 taken[i] = True
 
-        for rx, fmt in self.f_inline:
+        active = block_num == self.active_block
+        for rx, fmt, dlen in self.f_inline:
             for m in rx.finditer(text, start):
                 a, b = m.start(), m.end()
                 if any(taken[a:b]):
                     continue
+                if dlen is not None and not active:
+                    # Live Preview: hide the delimiters, style only the inner
+                    # text, so ``**bold**`` reads as bold with no asterisks.
+                    dl = len(m.group(1)) if dlen == -1 else dlen
+                    if b - a > 2 * dl:
+                        merged = QTextCharFormat(self.format(a + dl))
+                        merged.merge(fmt)
+                        self.setFormat(a, dl, self.f_hide)
+                        self.setFormat(a + dl, (b - dl) - (a + dl), merged)
+                        self.setFormat(b - dl, dl, self.f_hide)
+                        for i in range(a, b):
+                            taken[i] = True
+                        continue
                 merged = QTextCharFormat(self.format(a))
                 merged.merge(fmt)
                 self.setFormat(a, b - a, merged)

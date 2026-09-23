@@ -1,0 +1,200 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D6",
+  "deliverable": "Communication Pattern Decision",
+  "purpose": "Formalizar mediante un Architecture Decision Record (ADR-004) los protocolos y patrones de comunicación del sistema, adoptando HTTPS / RESTful y Server Actions para la interacción Client-Server, WebSockets gestionados (Supabase Realtime) para eventos push en vivo, e invocación directa en memoria (in-process method calls) para la interacción entre módulos del Monolito Modular, descartando la complejidad innecesaria de gRPC y message brokers distribuidos.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| API Conceptual Design (P4-D9) | [[PHASE_4_SYSTEM_MODELING/9.API_Conceptual_Design/9.API_Conceptual_Design.md]] | Provee los contratos RESTful, endpoints semánticos y esquemas de payload. |\n| System Decomposition Decision (P5-D4) | [[PHASE_5_ARCHITECTURAL_DESIGN/4.System Decomposition Decision/4.System Decomposition Decision.md]] | Confirma la arquitectura Modular Monolith, descartando la necesidad de protocolos de red Server-Server. |\n| Notification Matrix (P4-D10) | [[PHASE_4_SYSTEM_MODELING/10.Notification_Matrix/10.Notification_Matrix.md]] | Especifica los eventos en tiempo real que justifican el canal push por WebSockets. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Evaluación de Necesidades de API y Red (API & Network Needs Evaluation)",
+      "summary": "Analizar las necesidades de comunicación cliente-servidor y tiempo real frente a los contratos de D9 y la topología de D4.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Análisis Client-Server (REST/Server Actions) y Tiempo Real (WebSockets)",
+          "objective": "Determinar los protocolos óptimos para transferencia de datos y notificaciones en vivo sin sobrecarga de red.",
+          "input": "Endpoints D9, requerimientos de latencia D1 y señales real-time de D12.",
+          "raw_data_title": "Matriz de Evaluación de Protocolos de Comunicación",
+          "raw_data": "| Canal de Comunicación | Tipo de Tráfico | Protocolo Candidato | Dictamen y Justificación |\n|---|---|---|---|\n| Client -> Server (Mutaciones y Consultas) | Solicitudes síncronas HTTP | HTTPS / REST + Next.js Server Actions | Seleccionado: Alineado 100% con los contratos de D9 y caching perimetral |\n| Client <-> Client (Fetching Dinámico) | Datos jerárquicos o variables | GraphQL | Descartado: No existe over-fetching grave; añade complejidad de schema redundante |\n| Server -> Client (Alertas en Vivo) | Notificación push asíncrona | WebSockets / WSS (Supabase Realtime) | Seleccionado: Satisface latencia <500ms en dashboard de anfitriones (Escenario 5) |\n| Server -> Server (Entre Módulos) | Orquestación transaccional | In-Process Method Calls (En Memoria) | Seleccionado: Monolito Modular permite llamadas locales sin latencia de red |\n| Server -> Server (Distribuido) | Comunicación inter-servicio | gRPC / Kafka / RabbitMQ | Descartado: Innecesario y sobre-ingeniería en un Monolito Modular unificado |",
+          "exit_label": "Protocolos Client-Server y Realtime Rigurosamente Seleccionados",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Evaluación de Protocolos y Descarte de Complejidad Innecesaria",
+              "objective": "Garantizar eficiencia técnica y evitar protocolos de red redundantes.",
+              "how_to": {
+                "steps": [
+                  "1. Auditar los contratos REST definidos en D9.",
+                  "2. Evaluar si la aplicación se beneficia de Server Actions tipadas en Next.js.",
+                  "3. Comprobar que los eventos de alerta justifiquen una conexión WebSocket.",
+                  "4. Descartar formalmente gRPC o Apache Kafka debido al uso de Monolito Modular."
+                ],
+                "table_columns": [
+                  "Canal",
+                  "Protocolo Seleccionado",
+                  "Alternativas Descartadas",
+                  "Justificación"
+                ],
+                "table_rules": [
+                  "La comunicación Client-Server debe respetar la semántica HTTP de D9",
+                  "Los eventos en tiempo real deben utilizar canales gestionados sobre TLS (WSS)",
+                  "La comunicación inter-módulo no debe incurrir en saltos de red TCP/IP"
+                ],
+                "restrictions": "Prohibido configurar brokers distribuidos pesados (Kafka) para un proyecto en fase inicial.",
+                "done_when": "Evaluación de protocolos completada con dictamen claro por canal de comunicación."
+              },
+              "example_title": "Evaluación de Protocolos D6",
+              "example": "```markdown\n## Evaluación de Necesidades:\n- Client-Server: RESTful HTTPS + Next.js Server Actions (Type-safe).\n- Server-to-Client: WebSockets vía Supabase Realtime (WSS).\n- Server-to-Server: In-process TypeScript calls (Cero red).\n- Descarte: GraphQL y gRPC por sobrecarga técnica no justificada.\n```",
+              "link_label": "Protocolos Evaluados -> Redacción del ADR-004"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Redacción del ADR-004 de Patrones de Comunicación (ADR Formulation)",
+      "summary": "Formalizar la decisión de arquitectura bajo el estándar Context, Options, Decision y Consequences.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Formalización de Protocolos de Comunicación y Descarte de gRPC",
+          "objective": "Estructurar el documento ADR-004 con claridad absoluta sobre canales síncronos y asíncronos.",
+          "input": "Evaluación de necesidades del Step 1 y directivas de simplicidad.",
+          "raw_data_title": "Estructura del ADR-004 de Patrones de Comunicación",
+          "raw_data": "| Campo ADR | Contenido Clave Formalizado |\n|---|---|\n| Título | ADR-004: Adopción de REST, Server Actions y WebSockets (Supabase Realtime) sobre Monolito Modular |\n| Context | Monolito Modular en Next.js (D4), contratos REST diseñados (D9) y necesidad de push instantáneo para anfitriones |\n| Options Considered | 1. REST + Server Actions + Supabase Realtime (Aprobada) <br> 2. GraphQL unificado con Subscriptions <br> 3. Microservicios con gRPC y RabbitMQ |\n| Decision | Adoptar HTTPS/REST semántico y Server Actions para Client-Server; Supabase Realtime (WSS) para eventos push; llamadas in-process para inter-módulo |\n| Consequences (+) | Tipado estricto extremo a extremo (End-to-End Type Safety), compatibilidad nativa con caching HTTP/CDN, cero latencia inter-módulo |\n| Consequences (-) | Mantenimiento de dos canales en el cliente (HTTP para mutaciones y WSS para subscripciones reactivas) |",
+          "exit_label": "ADR-004 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Redacción Canónica de la Decisión de Comunicación",
+              "objective": "Documentar formalmente el ADR-004.",
+              "how_to": {
+                "steps": [
+                  "1. Enunciar el Contexto citando D4 (Monolito) y D9 (APIs REST).",
+                  "2. Listar las Opciones Consideradas detallando complejidad operativa.",
+                  "3. Enunciar la Decisión separando Client-Server, Realtime e Inter-módulo.",
+                  "4. Especificar Consecuencias positivas y mitigación de complejidad."
+                ],
+                "table_columns": [
+                  "Sección ADR",
+                  "Decisión Técnica",
+                  "Comprobación"
+                ],
+                "table_rules": [
+                  "El ADR debe explicitar la ausencia de protocolos de red internos entre módulos",
+                  "Garantizar que los endpoints REST coincidan con las rutas de D9",
+                  "El documento debe archivar el acuerdo técnico inmutable"
+                ],
+                "restrictions": "No admitir ambigüedades sobre cómo se transmiten los eventos asíncronos al navegador.",
+                "done_when": "ADR-004 completamente redactado en las 5 secciones estándar."
+              },
+              "example_title": "ADR-004: Patrones de Comunicación",
+              "example": "```markdown\n# ADR-004: Patrones de Comunicación del Sistema\n\n## Context\nModular Monolith en Vercel, contratos REST de D9 y requerimientos push.\n\n## Decision\n- Client-Server: REST / Server Actions.\n- Real-Time: Supabase Realtime (WebSockets).\n- Inter-módulo: In-process TypeScript function calls.\n\n## Consequences\n- Positive: Simplicidad extrema, caching en CDN, cero red interna.\n- Negative: Exige reconexión automática en WebSockets móviles.\n```",
+              "link_label": "ADR-004 Redactado -> Topología de Flujos de Comunicación"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Topología de Flujos de Comunicación (Communication Flow Architecture)",
+      "summary": "Trazar en Mermaid los canales de tráfico síncrono, asíncrono y de subscripción en vivo entre componentes.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Diagramación Mermaid de Interacción Síncrona, Asíncrona y Realtime",
+          "objective": "Visualizar la coexistencia armónica de HTTP, WebSockets y llamadas en memoria.",
+          "input": "Decisiones del ADR-004 y mapa de componentes del sistema.",
+          "raw_data_title": "Matriz de Canales y Flujos de Comunicación",
+          "raw_data": "| Flujo de Comunicación | Protocolo Utilizado | Origen y Destino | Naturaleza del Flujo |\n|---|---|---|---|\n| Consulta de Catálogo y Checkout | HTTPS (TLS 1.3) / REST | Navegador -> Vercel Edge / Serverless | Síncrono bloqueante (Request / Response) |\n| Invocación entre Módulos | In-Memory Function Call | Módulo Booking -> Módulo Catalog | Síncrono local (<1ms, sin serialización) |\n| Despacho de Cobro a Pasarela | HTTPS REST API | Módulo Billing -> Wompi API Gateway | Síncrono externo con timeout de 5 segundos |\n| Notificación en Vivo a Dashboard | WSS (WebSocket Seguro) | Supabase Realtime -> Navegador del Host | Asíncrono reactivo (Server Push) |\n| Despacho a Worker en Background | Async Event Emission | Supabase Engine -> Notification Worker | Asíncrono no bloqueante |",
+          "exit_label": "Diagrama de Flujos de Comunicación Completado",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Modelado de Canales y Protocolos en Mermaid",
+              "objective": "Construir el diagrama de comunicación integral del sistema.",
+              "how_to": {
+                "steps": [
+                  "1. Dibujar el canal primario HTTPS entre cliente y Next.js.",
+                  "2. Ilustrar las llamadas en memoria entre módulos internos del monolito.",
+                  "3. Representar el canal persistente WebSocket directo a Supabase Realtime.",
+                  "4. Incluir los webhooks externos de Wompi y WhatsApp."
+                ],
+                "table_columns": [
+                  "Canal",
+                  "Protocolo",
+                  "Dirección",
+                  "Sincronía"
+                ],
+                "table_rules": [
+                  "Las flechas deben indicar el protocolo de red exacto (HTTPS, WSS, In-Memory)",
+                  "Diferenciar claramente las comunicaciones de red de las llamadas locales",
+                  "Garantizar que todas las integraciones externas utilicen HTTPS cifrado"
+                ],
+                "restrictions": "Prohibido omitir el protocolo o formato de datos en las etiquetas de conexión.",
+                "done_when": "Diagrama Mermaid de flujos de comunicación validado y completo."
+              },
+              "example_title": "Flujos de Comunicación en Mermaid",
+              "example": "```mermaid\ngraph LR\n    subgraph Client_Tier [Capa Cliente]\n        Browser[\"Browser / Mobile Client\"]\n    end\n    subgraph Server_Tier [Capa Servidor: Next.js Monolito]\n        API[\"API Routes / Server Actions\"]\n        subgraph Internal_Modules [Llamadas In-Process]\n            Booking[\"Booking Module\"]\n            Catalog[\"Catalog Module\"]\n        end\n    end\n    subgraph BaaS_Tier [Supabase Cloud]\n        DB[(\"PostgreSQL Database\")]\n        Realtime[\"Realtime WebSocket Server\"]\n    end\n    Browser -->|HTTPS REST / JSON| API\n    API --> Booking\n    Booking -->|TypeScript In-Memory Call| Catalog\n    Booking -->|SQL over Pooler| DB\n    DB -.->|Postgres Changes| Realtime\n    Realtime -.->|WSS Push Events| Browser\n```",
+              "link_label": "Flujos Diagramados -> Ensamblaje D6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de Patrones de Comunicación y Consumidores Downstream (Assembly & Handoff)",
+      "summary": "Consolidar el entregable D6 y articular sus directivas para D8 (CI/CD) y D9 (C4 Component Diagram).",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación del Documento D6 e Implicaciones para D8 y D9",
+          "objective": "Publicar el entregable D6 como norma formal de interoperabilidad técnica.",
+          "input": "ADR-004, evaluación de necesidades y diagrama de flujos de comunicación.",
+          "raw_data_title": "Directivas de Consumo Downstream",
+          "raw_data": "| Entregable Consumidor | Directiva Técnica Heredada de D6 | Impacto en Arquitectura |\n|---|---|---|\n| D8 (CI/CD Strategy) | Valida contratos TypeScript y linters de rutas REST en pipelines | Asegura que no se rompan contratos entre frontend y backend |\n| D9 (Component Diagram C4) | Etiquetado estricto de protocolos en flechas del C4 Container | Toda flecha del C4 declarará HTTPS, WSS o In-Memory según D6 |\n| D10 (ADR Consolidation) | Indexa ADR-004 en el registro maestro de decisiones | Formaliza la política de comunicación ante revisiones de seguridad |",
+          "exit_label": "Entregable D6 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento Maestro D6",
+              "objective": "Consolidar el entregable D6 en formato formal para la arquitectura.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el archivo en sus 3 secciones canónicas: Metadata, ADR-004 y Diagrama de Comunicación.",
+                  "2. Verificar que se expliciten las directivas para Client-Server, Realtime e Inter-módulo.",
+                  "3. Documentar las implicaciones para D8 y D9.",
+                  "4. Validar el cumplimiento total de traducción al español."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Contenido",
+                  "Normativa",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe archivar formalmente los protocolos de red acordados",
+                  "Asegurar coherencia absoluta con D3, D4 y D9 de Fase 4",
+                  "Verificar que no existan contradicciones de sincronía"
+                ],
+                "restrictions": "No admitir protocolos propietarios o no estándar en las interfaces públicas.",
+                "done_when": "Documento D6 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Entregable D6",
+              "example": "```markdown\n# Deliverable 6 (D6): Communication Pattern Decision\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n## 2. Architectural Decision Record (ADR-004)\n[ADR completo de patrones de comunicación]\n\n## 3. Communication Flow Diagram\n[Diagrama Mermaid con protocolos]\n```",
+              "link_label": "Comunicación Ensamblada -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Communication Pattern Decision (D6)",
+    "markdown": "# Deliverable 6 (D6): Communication Pattern Decision\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n---\n\n## 1. Architectural Decision Record (ADR-004)\n\n### ADR-004: Adopción de REST, Next.js Server Actions y WebSockets (Supabase Realtime) sobre Monolito Modular\n\n#### Context\nEl sistema ha sido estructurado como un Monolito Modular en Next.js (`[[PHASE_5_ARCHITECTURAL_DESIGN/4.System_Decomposition_Decision/4.System_Decomposition_Decision.md]]`), respaldado por una base de datos PostgreSQL gestionada en Supabase Cloud (`[[PHASE_5_ARCHITECTURAL_DESIGN/3.Deployment_Topology_Decision/3.Deployment_Topology_Decision.md]]`). Los contratos conceptuales de endpoints (`[[PHASE_4_SYSTEM_MODELING/9.API_Conceptual_Design/9.API_Conceptual_Design.md]]`) definieron una semántica RESTful con verbos HTTP estándar y payloads JSON. Adicionalmente, el Escenario 5 del Quality Attributes Map (`[[PHASE_5_ARCHITECTURAL_DESIGN/1.Quality Attributes Map/1.Quality Attributes Map.md]]`) y la matriz de notificaciones (`[[PHASE_4_SYSTEM_MODELING/10.Notification_Matrix/10.Notification_Matrix.md]]`) exigen que los anfitriones reciban alertas de reserva en su dashboard con latencias sub-500ms sin recargar la página.\n\n#### Options Considered\n1. **RESTful HTTPS + Server Actions + WebSockets Gestionados (Seleccionada):** Utilizar HTTPS estándar para consultas públicas y Server Actions tipadas para mutaciones de formulario; canal persistente WSS gestionado por Supabase Realtime para eventos push; y llamadas locales de TypeScript (*in-process*) para la comunicación entre módulos internos.\n2. **GraphQL Unificado con Subscriptions (Descartada):** Añadiría una capa de complejidad considerable al requerir la definición manual de schemas, resolvers y un servidor de WebSocket custom para subscriptions, sin aportar ventajas tangibles dado que las pantallas de UI ya tienen contratos de datos estables y específicos.\n3. **Arquitectura Orientada a Eventos Distribuida con gRPC y Kafka (Descartada):** Sobre-ingeniería radical para un Monolito Modular. La serialización binaria protobuf y el despliegue de clusters Kafka son injustificables cuando todos los módulos residen en el mismo proceso de Node.js.\n\n#### Decision\nSe decide adoptar la siguiente estrategia de comunicación multidimensional:\n- **Canal Client-to-Server (Mutaciones y Consultas):**\n  - Consultas de catálogo y lectura pública: **HTTPS / RESTful** con respuestas cacheadas en CDN.\n  - Mutaciones de formularios y checkout: **Next.js Server Actions** con validación mediante esquemas Zod (garantizando *End-to-End Type Safety* directo desde el cliente al servidor sin endpoints intermedios).\n- **Canal Server-to-Client (Eventos en Tiempo Real):**\n  - Subscripciones en vivo: **WebSockets Seguros (WSS)** mediante el cliente oficial de **Supabase Realtime**, suscrito directamente a eventos `INSERT` o `UPDATE` de la tabla `bookings` autorizados por RLS.\n- **Canal Inter-Módulo (Server-to-Server):**\n  - Invocación síncrona: **Llamadas locales de función TypeScript en memoria** (*in-process method calls*), eliminando el retardo de red inter-servicio.\n  - Desacoplamiento asíncrono: Emisión de eventos tipados en memoria o mutaciones de base de datos capturadas por Supabase Realtime.\n\n#### Consequences\n- **Positivas:**\n  - Máxima simplicidad arquitectónica y velocidad de ejecución (<1ms entre módulos).\n  - Seguridad de tipos absoluta entre Frontend y Backend en tiempo de compilación.\n  - Infraestructura de tiempo real delegada a Supabase, evitando la gestión de servidores WebSocket autohospedados.\n  - Compatibilidad total con Edge Caching e ISR en Vercel.\n- **Negativas / Riesgos:**\n  - El Frontend debe manejar reconexiones automáticas del canal WebSocket ante caídas intermitentes de red móvil (manejado de forma transparente por el SDK de Supabase).\n\n---\n\n## 2. Diagrama de Flujos de Comunicación y Protocolos\n\n```mermaid\ngraph LR\n    subgraph Client_Layer [Capa Cliente]\n        Browser[\"Navegador Web / App Móvil\"]\n    end\n    subgraph Edge_Compute [Vercel Global Edge & Compute]\n        Edge[\"Edge CDN (Static / ISR Cache)\"]\n        ServerAction[\"Next.js Server Actions (Mutation Engine)\"]\n        subgraph Modular_Monolith [Llamadas en Memoria (In-Process)]\n            BookingMod[\"Booking Module\"]\n            CatalogMod[\"Catalog Module\"]\n            BillingMod[\"Billing Module (Wompi ACL)\"]\n        end\n    end\n    subgraph Cloud_BaaS [Supabase Cloud Infrastructure]\n        DB[(\"PostgreSQL 16 Engine\")]\n        Realtime[\"Supabase Realtime Server (Elixir Cluster)\"]\n    end\n    subgraph External_APIs [Servicios Externos]\n        WompiGateway[\"Wompi Payment Gateway\"]\n    end\n\n    Browser -->|HTTPS GET: <200ms| Edge\n    Browser -->|HTTPS POST: Server Action (Zod Payload)| ServerAction\n    ServerAction --> BookingMod\n    BookingMod -->|TypeScript Method Call: <1ms| CatalogMod\n    BookingMod -->|TypeScript Method Call: <1ms| BillingMod\n    BillingMod -->|HTTPS REST API Call (Mutual TLS)| WompiGateway\n    BookingMod -->|SQL Transaccional / SSL| DB\n    DB -.->|Postgres WAL Replication| Realtime\n    Realtime -.->|WSS (Push Notification): <500ms| Browser\n```\n\n---\n\n## 3. Implicaciones para Entregables Downstream\n\n- **Hacia D8 (CI/CD & Environments Strategy):** Los pipelines de integración continua ejecutarán linters de TypeScript (`tsc --noEmit`) para validar la integridad de las Server Actions y contratos de interfaz en cada commit.\n- **Hacia D9 (Component Diagram C4):** Cada enlace entre contenedores y componentes del diagrama C4 Container (Nivel 2) se etiquetará obligatoriamente con el protocolo correspondiente (`HTTPS / REST`, `WSS` o `In-Process`).\n- **Hacia D10 (ADR Consolidation):** Se indexa el ADR-004 como la decisión rectora de comunicación del proyecto."
+  }
+}

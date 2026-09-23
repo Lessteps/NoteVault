@@ -1,0 +1,151 @@
+{
+  "phase": "PHASE 6: TECHNICAL DESIGN",
+  "deliverable_code": "D8",
+  "deliverable": "Third-Party Integrations & Webhooks",
+  "purpose": "Definir técnicamente las llamadas salientes (outbound) y la ingesta de webhooks entrantes (inbound) para el módulo Billing & Payouts interactuando con la pasarela bancaria Wompi, especificando políticas de reintentos con backoff exponencial, validación criptográfica estricta de firmas SHA-256 y reglas de idempotencia para prevenir fraudes o dobles ejecuciones.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| System Sequence Diagrams (P4-D7) | [[PHASE_4_SYSTEM_MODELING/7.System Sequence Diagrams/7.System Sequence Diagrams.md]] | Identifica en qué puntos de la secuencia de pago ocurren las llamadas a Wompi. |\n| Configuration & Secrets (P6-D3) | [[PHASE_6_TECHNICAL_DESIGN/3.Configuration & Environment Secrets/3.Configuration & Environment Secrets.md]] | Confirma las variables `WOMPI_PRIVATE_KEY` y `WOMPI_WEBHOOK_SECRET` cerrando el fallback. |\n| State Machine Diagrams (P4-D8) | [[PHASE_4_SYSTEM_MODELING/8.State Machine Diagrams/8.State Machine Diagrams.md]] | Identifica la transición de pago y reserva disparada por el webhook `transaction.updated`. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Integraciones Salientes API/SDK (Outbound Integrations)",
+      "summary": "Mapear las llamadas HTTP salientes hacia Wompi para cobros tokenizados y reembolsos con políticas de reintentos.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Llamadas REST Críticas y Política de Reintentos",
+          "objective": "Garantizar resiliencia ante caídas temporales de pasarela distinguiendo errores de red 5xx de rechazos 4xx.",
+          "input": "Credenciales de Wompi de Fase 6 (D3) y secuencias de cobro de Fase 4 (D7).",
+          "raw_data_title": "Matriz de Llamadas Salientes y Estrategia de Reintentos",
+          "raw_data": "| Operación Saliente | Mecanismo de Red | Autenticación | Criticidad / Naturaleza | Política de Reintentos |\n|---|---|---|---|---|\n| Tokenización / Cobro (`POST /v1/transactions`) | REST (`fetch` / `axios`) | `WOMPI_PRIVATE_KEY` (Server) | Síncrona y bloqueante para reserva | 2 reintentos con backoff exponencial (1s, 3s) solo ante 5xx/timeout. Cero reintentos ante 4xx |\n| Reembolso (`POST /v1/transactions/{id}/refunds`) | REST (`fetch` / `axios`) | `WOMPI_PRIVATE_KEY` (Server) | Asíncrona (delegada a Worker) | 3 reintentos con intervalo amplio (10s, 30s, 60s) en caso de fallos de red |",
+          "exit_label": "Integraciones Salientes Formalizadas",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Especificación de Conexión Saliente Wompi",
+              "objective": "Documentar los endpoints salientes y payloads de cobro y reembolso.",
+              "how_to": {
+                "steps": [
+                  "1. Adoptar llamadas REST estándar con fetch nativo ante ausencia de SDK Node oficial.",
+                  "2. Inyectar WOMPI_PRIVATE_KEY como Bearer Token en headers de autorización.",
+                  "3. Configurar backoff exponencial de 1000ms y 3000ms ante errores 5xx.",
+                  "4. Abortar inmediatamente sin reintentar ante respuestas 4xx de tarjetas declinadas."
+                ],
+                "table_columns": [
+                  "Operación",
+                  "Endpoint Wompi",
+                  "Header Auth",
+                  "Condición Reintento"
+                ],
+                "table_rules": [
+                  "Prohibido reintentar transacciones que respondan con errores de validación 4xx",
+                  "Los reembolsos deben ejecutarse de manera asíncrona mediante workers",
+                  "Los montos monetarios deben enviarse en centavos de COP"
+                ],
+                "restrictions": "Prohibido exponer la llave privada de Wompi en llamadas generadas desde el cliente.",
+                "done_when": "Especificación de llamadas salientes y manejo de excepciones completado."
+              },
+              "example_title": "Llamada Saliente Wompi D8",
+              "example": "```typescript\nconst response = await fetch(`https://sandbox.wompi.co/v1/transactions/${transactionId}/refunds`, {\n  method: 'POST',\n  headers: {\n    'Authorization': `Bearer ${process.env.WOMPI_PRIVATE_KEY}`,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({ amount_in_cents: amount, reason: 'CANCELED_BY_HOST' })\n});\n```",
+              "link_label": "Salidas Formalizadas -> Webhooks Entrantes"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Webhooks Entrantes y Validación de Firmas (Inbound Webhooks)",
+      "summary": "Establecer el endpoint receptor de notificaciones asíncronas de Wompi con validación criptográfica SHA-256.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Ingesta de Webhook transaction.updated y Criptografía SHA-256",
+          "objective": "Blindar el endpoint de webhook contra suplantación o inyección fraudulenta de pagos aprobados.",
+          "input": "Secreto `WOMPI_WEBHOOK_SECRET` de Fase 6 (D3) y especificación de eventos de Wompi.",
+          "raw_data_title": "Parámetros de Ingesta y Verificación Criptográfica",
+          "raw_data": "| Parámetro del Webhook | Especificación Técnica | Detalle de Implementación |\n|---|---|---|\n| Evento Soportado | `transaction.updated` | Disparado cuando el pago se aprueba, declina o anula en bancos colombianos |\n| Endpoint de Captura | `POST /api/webhooks/wompi` | Route Handler público sin guardián de cookies regular |\n| Algoritmo de Firma | SHA-256 Checksum | `SHA256(properties.id + properties.status + amount_in_cents + timestamp + WOMPI_WEBHOOK_SECRET)` |\n| Código de Rechazo | HTTP 403 Forbidden | Rechazo inmediato si el checksum local no coincide exactamente con el payload |\n| Formato del Payload | JSON con bloque data y signature | Campos mínimos: `id, amount_in_cents, reference, status, payment_method_type` |",
+          "exit_label": "Verificación Criptográfica de Webhook Formalizada",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Definición del Endpoint y Verificación Criptográfica",
+              "objective": "Especificar la rutina de validación de firma previa a cualquier procesamiento en base de datos.",
+              "how_to": {
+                "steps": [
+                  "1. Crear endpoint público POST /api/webhooks/wompi.",
+                  "2. Extraer propiedades firmadas y concatenar con WOMPI_WEBHOOK_SECRET.",
+                  "3. Calcular digest SHA-256 y comparar con signature.checksum.",
+                  "4. Responder HTTP 403 Forbidden si los valores difieren."
+                ],
+                "table_columns": [
+                  "Propiedad",
+                  "Fuente",
+                  "Cálculo",
+                  "Veredicto"
+                ],
+                "table_rules": [
+                  "Ninguna línea de código de negocio puede ejecutarse antes de validar la firma",
+                  "La comparación de hashes debe realizarse de forma segura",
+                  "El endpoint debe estar excluido del guardián de cookies de usuario"
+                ],
+                "restrictions": "Prohibido procesar payloads de webhook no firmados o con firmas inválidas.",
+                "done_when": "Algoritmo de verificación de firma documentado y verificado."
+              },
+              "example_title": "Verificación de Firma D8",
+              "example": "```json\n{\n  \"event\": \"transaction.updated\",\n  \"data\": {\n    \"transaction\": {\n      \"id\": \"123-abc\",\n      \"amount_in_cents\": 15000000,\n      \"reference\": \"booking-uuid\",\n      \"status\": \"APPROVED\"\n    }\n  },\n  \"signature\": {\n    \"checksum\": \"c2b...hash...1f8\"\n  }\n}\n```",
+              "link_label": "Firmas Aseguradas -> Control de Idempotencia"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Mecanismo de Idempotencia y Blindaje Financiero (Idempotency Control)",
+      "summary": "Implementar el control de eventos duplicados para garantizar que entregas repetidas no dupliquen efectos.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Control de Procesamiento Duplicado y Resiliencia",
+          "objective": "Garantizar que eventos repetidos devuelvan HTTP 200 sin reenviar correos ni reejecutar cobros.",
+          "input": "Estados de la tabla `payments` y transiciones de la máquina de estados de Fase 4 (D8).",
+          "raw_data_title": "Matriz de Comportamiento ante Eventos Duplicados",
+          "raw_data": "| Escenario de Ingesta | Estado en Base de Datos | Respuesta HTTP a Wompi | Acción Secundaria (Gatillos) |\n|---|---|---|---|\n| Webhook Nuevo (Transacción pendiente) | `payments.status = 'PENDING'` | HTTP 200 OK | Actualiza pago a APPROVED, aprueba reserva y notifica |\n| Webhook Duplicado (Mismo status) | `payments.status = 'APPROVED'` | HTTP 200 OK | Aborta proceso; NO reenvía emails ni reejecuta reservas |\n| Webhook con Firma Inválida | No evaluado en base de datos | HTTP 403 Forbidden | Bloqueo perimetral y registro de alerta de seguridad |\n| Webhook con Referencia Inexistente | Referencia no hallada en `bookings` | HTTP 400 Bad Request | Registro de discrepancia y notificación a soporte |",
+          "exit_label": "Idempotencia y Blindaje Financiero Certificados",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Formalización de Idempotencia y Cierre de Dependencias",
+              "objective": "Documentar la regla de idempotencia y formalizar el cierre de las dependencias pendientes de D3.",
+              "how_to": {
+                "steps": [
+                  "1. Consultar estado actual del pago en la tabla payments por reference.",
+                  "2. Comparar el status de base de datos con el status entrante del webhook.",
+                  "3. Responder HTTP 200 OK inmediatamente si el pago ya fue aplicado.",
+                  "4. Confirmar formalmente los secretos de Wompi cerrando la etiqueta de D3."
+                ],
+                "table_columns": [
+                  "Evento",
+                  "Chequeo BD",
+                  "Respuesta",
+                  "Efecto Secundario"
+                ],
+                "table_rules": [
+                  "Wompi debe recibir siempre 200 OK ante eventos duplicados para detener reintentos",
+                  "Las notificaciones por email/WhatsApp solo se disparan en el primer procesamiento",
+                  "La confirmación de Wompi cierra definitivamente la dependencia cruzada con D3"
+                ],
+                "restrictions": "Prohibido responder errores 5xx ante webhooks duplicados legítimos.",
+                "done_when": "Matriz de idempotencia documentada y dependencias de D3 completamente cerradas."
+              },
+              "example_title": "Control de Idempotencia D8",
+              "example": "```text\n1. Buscar payment por reference.\n2. IF payment.status === 'APPROVED' AND incoming.status === 'APPROVED':\n   RETURN HTTP 200 OK (Idempotente: no enviar email de nuevo).\n3. ELSE: Actualizar status y disparar notificaciones.\n```",
+              "link_label": "Idempotencia Formalizada -> Entregable D8"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverable_output": "# Deliverable 8 (D8): Third-Party Integrations & Webhooks\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 6 — Technical Design\n**Módulo:** MOD-Billing\n**Estado:** Approved\n\n*Backlink a Fase 4 y Fase 6 (D3):* Este entregable documenta el mecanismo físico de interacción con las pasarelas externas que mueven el dinero, consumiendo los secretos que marcamos como pendientes en el D3 (Configuration & Secrets).\n\n---\n\n## 2. Llamadas Salientes API/SDK (Outbound)\n\nDado que la pasarela **Wompi** no cuenta con un SDK oficial moderno para Node.js, las integraciones se harán mediante llamadas REST estándar con control de errores explícito.\n\n### 2.1 Wompi: Tokenización y Cobros\n- **Mecanismo:** Llamada REST `POST /v1/transactions` (Client-side vía Widget o Server-side).\n- **Autenticación:** Requiere `WOMPI_PUBLISHABLE_KEY` (Cliente) o `WOMPI_PRIVATE_KEY` (Servidor).\n- **Naturaleza:** Síncrona y crítica. Determina si el flujo del `Booking Engine` avanza.\n- **Política de Reintentos (Server-side):**\n  - **Máximo Reintentos:** 2\n  - **Estrategia Backoff:** Exponencial (1000ms, 3000ms).\n  - **Condición:** Solo reintentar ante Timeouts (`ECONNABORTED`) o Errores de Red de Wompi (`500`, `502`, `503`). \n  - **Excepción Estricta:** Errores `4xx` (Tarjetas declinadas, sin fondos, bloqueadas por fraude) **NO se reintentan**, fallan instantáneamente y se devuelve el error al frontend.\n\n### 2.2 Wompi: Reembolsos (Refunds)\n- **Mecanismo:** Llamada REST `POST /v1/transactions/{id}/refunds`.\n- **Autenticación:** Requiere `WOMPI_PRIVATE_KEY` estricto (Server-only).\n- **Naturaleza:** Asíncrona (Background Job). No bloquea al Finquero que está cancelando la reserva desde la UI.\n- **Política de Reintentos:** 3 reintentos con intervalo amplio (10s, 30s, 60s) en caso de fallos de la pasarela.\n\n---\n\n## 3. Definiciones de Webhooks Entrantes (Inbound)\n\nLos Webhooks de Wompi informan al sistema de forma asíncrona cuando Nequi, PSE o las redes de tarjetas finalizan el proceso (ej. un pago en efectivo tarda minutos en ser confirmado).\n\n### 3.1 Webhook: `transaction.updated`\n\n**Endpoint de Captura:** `POST /api/webhooks/wompi`\n\n> [!WARNING]\n> Este endpoint es la puerta de entrada a la manipulación financiera del sistema. Las validaciones criptográficas son obligatorias para evitar inyecciones (fraude).\n\n#### 1. Validación de Firma (Seguridad)\nNo confiaremos en el cuerpo del webhook si no está firmado. \n- Extraer `data.transaction.id`, `data.transaction.status`, `data.transaction.amount_in_cents`, el `timestamp` y combinarlos con la clave privada `WOMPI_WEBHOOK_SECRET`.\n- Ejecutar cálculo local en SHA-256.\n- Comparar con la clave proveída en `signature.checksum`. Si el match es fallido, devolver **HTTP 403 Forbidden**.\n\n#### 2. Regla de Idempotencia\nWompi advierte que la red puede demorarse y enviar el mismo evento dos veces.\n- Buscar en base de datos la reserva (`bookings`) o pago (`payments`) usando `data.transaction.reference`.\n- **Verificación:** Si la tabla ya indica que este pago está `APPROVED` y el webhook entrante dice `APPROVED`, abortar el proceso y retornar **HTTP 200 OK** para que Wompi deje de insistir, pero **no ejecutar** los gatillos secundarios (ej. no enviar el correo electrónico dos veces).\n\n#### 3. Payload Estándar Esperado\n```json\n{\n  \"event\": \"transaction.updated\",\n  \"data\": {\n    \"transaction\": {\n      \"id\": \"123-abc\",\n      \"amount_in_cents\": 15000000,\n      \"reference\": \"booking-uuid\",\n      \"customer_email\": \"turista@example.com\",\n      \"status\": \"APPROVED\",\n      \"payment_method_type\": \"NEQUI\"\n    }\n  },\n  \"environment\": \"test\",\n  \"signature\": {\n    \"properties\": [\n      \"transaction.id\",\n      \"transaction.status\",\n      \"transaction.amount_in_cents\"\n    ],\n    \"checksum\": \"c2b...hash...1f8\"\n  },\n  \"timestamp\": 1614092400\n}\n```\n\n---\n\n## 4. Downstream Consumers\n- **Phase 6 — D10 (Async Workers & Job Scheduling):** Usará la definición del Reembolso (Refund) para programar las colas asíncronas de trabajo.\n- **Phase 7 — D8 (External Integrations Implementation):** El programador escribirá el controlador `wompi.controller.ts` asegurándose de transcribir la lógica criptográfica de SHA-256 para los Webhooks."
+}

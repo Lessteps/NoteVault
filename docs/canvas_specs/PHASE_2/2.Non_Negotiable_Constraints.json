@@ -1,0 +1,446 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D2",
+  "deliverable": "Non-Negotiable Constraints (Restricciones No Negociables)",
+  "purpose": "Este entregable convierte las restricciones cualitativas del negocio (legales, operativas, comerciales) obtenidas en la Fase 1, en reglas de ingeniería cuantificables y no negociables. Una Restricción No Negociable (RNN) no dicta qué hace el sistema, sino las fronteras operativas y de calidad que gobiernan la solución (presupuesto de infraestructura, privacidad legal, SLAs de disponibilidad). Si una restricción no tiene un número exacto o criterio binario verificable, es literatura, no ingeniería.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_technical_feasibility]] | Restricciones técnicas duras reveladas en Fase 1 (P1-D4). |\n| [[example_output_legal_clearance]] | Restricciones legales que impactan el diseño del sistema (P1-D5). |\n| [[example_output_viability]] | SLAs financieros para sostener el Break-Even operativo (P1-D7). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría y Extracción de Restricciones (Verify Entry)",
+      "summary": "Extraer las restricciones crudas técnicas, legales y financieras obtenidas en la Fase 1 sin inventar SLAs ideales.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Auditoría técnica de riesgos operativos",
+          "objective": "Extraer del entregable P1-D4 las condiciones de red, concurrencia y persistencia que limitan el sistema.",
+          "input": "Hallazgos técnicos y Spike de [[example_output_technical_feasibility]] (P1-D4).",
+          "raw_data_title": "Restricción Técnica Cruda",
+          "raw_data": "Técnica: Las fincas rurales tienen conectividad móvil intermitente y hardware modesto; el sistema debe evitar colisiones de reservas y cargar en redes lentas.",
+          "exit_label": "RESTRICCIÓN TÉCNICA EXTRAÍDA → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Extracción de limitantes técnicas de P1-D4",
+              "objective": "Identificar los obstáculos de conectividad y hardware que restringen la arquitectura del sistema.",
+              "how_to": {
+                "steps": [
+                  "Consultar los hallazgos del Spike de factibilidad en P1-D4.",
+                  "Extraer las citas textuales relativas a la precariedad de red en entornos rurales.",
+                  "Identificar el riesgo de concurrencia e inconsistencias por reconexiones asíncronas.",
+                  "Registrar la restricción técnica cruda en la matriz de entrada."
+                ],
+                "table_columns": "Origen | Restricción Cruda Extraída | Cita Textual de Fase 1",
+                "table_rules": "Extracción textual de limitantes reales documentadas en campo.",
+                "restrictions": [
+                  "No inventar condiciones técnicas que no figuren en P1-D4.",
+                  "Focalizar en los riesgos operativos que pueden romper la experiencia de usuario."
+                ],
+                "done_when": "Restricciones técnicas operativas documentadas con cita textual."
+              },
+              "example_title": "Restricciones Técnicas Crudas Extraídas",
+              "example": "| Origen | Restricción Cruda Extraída | Cita Textual |\n| --- | --- | --- |\n| Técnica (P1-D4) | Las fincas rurales tienen conectividad intermitente y la interfaz debe cargar en redes lentas sin cruces de reserva. | 'Las fincas suelen usar conectividad móvil 3G intermitente y no pueden cargar portales web pesados.' |",
+              "link_label": "restricciones técnicas van a auditoría legal (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Auditoría legal de restricciones regulatorias",
+          "objective": "Extraer de P1-D5 las obligaciones de cumplimiento sobre datos personales y transacciones financieras.",
+          "input": "Restricciones normativas de [[example_output_legal_clearance]] (P1-D5).",
+          "raw_data_title": "Restricción Legal Cruda",
+          "raw_data": "Legal: Cumplimiento de Habeas Data (Ley 1581) y no almacenamiento de datos de tarjetas de crédito en servidores propios (delegación total en pasarela PCI).",
+          "exit_label": "RESTRICCIÓN LEGAL EXTRAÍDA → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Extracción de barreras normativas de P1-D5",
+              "objective": "Localizar los mandatos jurídicos que condicionan el almacenamiento y tratamiento de información.",
+              "how_to": {
+                "steps": [
+                  "Revisar el registro de despeje legal en P1-D5.",
+                  "Extraer la restricción sobre datos personales y políticas de consentimiento.",
+                  "Extraer el mandato de delegación PCI para no procesar números de tarjeta.",
+                  "Documentar la restricción regulatoria textual en la matriz de entrada."
+                ],
+                "table_columns": "Origen | Restricción Regulatoria Extraída | Cita Textual de Fase 1",
+                "table_rules": "Obligaciones normativas y de seguridad obligatorias.",
+                "restrictions": [
+                  "No omitir design constraints de seguridad y privacidad.",
+                  "Asegurar consistencia con las leyes de la jurisdicción operativa."
+                ],
+                "done_when": "Restricciones legales crudas documentadas y referenciadas."
+              },
+              "example_title": "Restricciones Legales Crudas Extraídas",
+              "example": "| Origen | Restricción Cruda Extraída | Cita Textual |\n| --- | --- | --- |\n| Legal (P1-D5) | Protección estricta de datos personales y prohibición de almacenar números de tarjetas en infraestructura propia. | 'Delegar 100% de la captura de tarjetas en iframe o SDK tokenizado de Wompi.' |",
+              "link_label": "restricciones legales van a auditoría financiera (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Auditoría financiera de sustentabilidad",
+          "objective": "Extraer de P1-D7 los techos presupuestales y SLAs requeridos para mantener el Break-Even.",
+          "input": "Economía unitaria y costos fijos de [[example_output_viability]] (P1-D7).",
+          "raw_data_title": "Restricción Financiera Cruda",
+          "raw_data": "Financiera: Costos de infraestructura fija acotados para sostener el margen unitario del 83.3% y alcanzar el Break-Even con 30 fincas activas.",
+          "exit_label": "POOL DE RESTRICCIONES CRUDAS CONSOLIDADO → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Extracción de límites de costo de P1-D7",
+              "objective": "Identificar los techos de gasto operativo en nube para evitar sobrecostos destructivos.",
+              "how_to": {
+                "steps": [
+                  "Consultar el presupuesto mensual de servidores en P1-D7.",
+                  "Extraer el límite máximo de costo de infraestructura permisible.",
+                  "Vincular el costo técnico con la supervivencia del modelo de negocio.",
+                  "Consolidar la tabla completa del pool de restricciones crudas."
+                ],
+                "table_columns": "Origen | Restricción Financiera Extraída | Cita Textual de Fase 1",
+                "table_rules": "Cifras de costos alineadas con la viabilidad aprobada.",
+                "restrictions": [
+                  "No autorizar arquitecturas cuyos costos superen el presupuesto fijo mensual.",
+                  "Garantizar que el OPEX no destruya el margen de contribución."
+                ],
+                "done_when": "Restricciones financieras crudas consolidadas en el pool de entrada."
+              },
+              "example_title": "Restricciones Financieras Crudas Extraídas",
+              "example": "| Origen | Restricción Cruda Extraída | Cita Textual |\n| --- | --- | --- |\n| Financiera (P1-D7) | El costo fijo de infraestructura no debe sobrepasar el techo presupuestal para sostener el Break-Even. | 'Costos fijos mensuales de infraestructura acotados para no quebrar el Break-Even en etapa inicial.' |",
+              "link_label": "pool de restricciones crudas va a categorización ISO 25010 (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Cuantificación y Clasificación ISO 25010",
+      "summary": "Transformar adjetivos en métricas binarias verificables según la taxonomía ISO 25010.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Clasificación según estándar ISO 25010",
+          "objective": "Asignar cada restricción cruda a una característica de calidad canónica de la norma ISO 25010.",
+          "input": "Pool de restricciones crudas de Step 1.",
+          "raw_data_title": "Categorías ISO 25010",
+          "raw_data": "RNN-01: Performance Efficiency. RNN-02: Reliability (Concurrency). RNN-03: Usability / Accessibility. RNN-04: Security.",
+          "exit_label": "RESTRICCIONES CATEGORIZADAS ISO 25010 → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Categorización en taxonomía ISO 25010",
+              "objective": "Normalizar las demandas del negocio en dimensiones técnicas reconocidas por la ingeniería de software.",
+              "how_to": {
+                "steps": [
+                  "Clasificar cada restricción en una categoría ISO 25010: Performance, Reliability, Security, Usability, Maintainability.",
+                  "Asignar un identificador único correlativo (RNN-01, RNN-02, RNN-03, RNN-04).",
+                  "Documentar la relación entre el dolor del negocio y la dimensión de calidad de software.",
+                  "Estructurar la tabla preliminar de clasificación."
+                ],
+                "table_columns": "ID | Categoría (ISO 25010) | Restricción Original Cualitativa",
+                "table_rules": "Uso de las 8 características principales de ISO 25010.",
+                "restrictions": [
+                  "No clasificar requerimientos funcionales como restricciones no negociables.",
+                  "Evitar categorías ambiguas no contempladas en el estándar."
+                ],
+                "done_when": "Restricciones clasificadas con su ID y categoría ISO 25010."
+              },
+              "example_title": "Clasificación ISO 25010 de Restricciones",
+              "example": "| ID | Categoría (ISO 25010) | Restricción Original |\n| --- | --- | --- |\n| RNN-01 | Performance Efficiency | Acceso rápido y fluido en dispositivos móviles y redes variables. |\n| RNN-02 | Reliability (Concurrency) | Prevención estricta de inconsistencias y solapamiento de reservas. |\n| RNN-03 | Usability / Accessibility | Experiencia simple y sin fricción cognitiva para finqueros y turistas. |\n| RNN-04 | Security | Protección de información financiera y cumplimiento legal. |",
+              "link_label": "categorización va a cuantificación numérica (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Cuantificación numérica y umbrales binarios",
+          "objective": "Sustituir adjetivos vagos por métricas objetivas con umbrales estrictos de Pasa/No Pasa.",
+          "input": "Restricciones categorizadas de Step 2.1.",
+          "raw_data_title": "Métricas Cuantificadas",
+          "raw_data": "RNN-01: LCP < 2.5s en 3G Fast, bundle < 1.5MB. RNN-02: P95 < 400ms bajo 50 requests concurrentes, 100% ACID. RNN-03: WhatsApp < 10s. RNN-04: TLS 1.3, 0 datos de tarjeta.",
+          "exit_label": "UMBRALES NUMÉRICOS ASIGNADOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Sustitución de adjetivos por umbrales numéricos",
+              "objective": "Eliminar palabras como 'rápido' o 'seguro' imponiendo valores verificables por scripts o benchmarks.",
+              "how_to": {
+                "steps": [
+                  "Reemplazar 'rápido' por métricas Web Vitals (LCP < 2.5s) y límites de tamaño de bundle (< 1.5MB).",
+                  "Reemplazar 'confiable' por percentiles de latencia (P95 < 400ms) y transaccionalidad ACID atómica.",
+                  "Reemplazar 'usable' por tiempos de entrega de mensajes (< 10s) y flujo sin registro forzoso.",
+                  "Reemplazar 'seguro' por estándares de cifrado (TLS 1.3) y almacenamiento cero de PAN.",
+                  "Verificar que cada umbral sea estrictamente binario (cumple o no cumple)."
+                ],
+                "table_columns": "ID | Categoría ISO 25010 | Métrica Cuantificada (Pasa / No Pasa)",
+                "table_rules": "Obligatorio umbral numérico o condición booleana exacta.",
+                "restrictions": [
+                  "Prohibido cualquier término subjetivo sin cifra asociada.",
+                  "Los umbrales deben ser alcanzables con la tecnología prevista."
+                ],
+                "done_when": "Métricas cuantificables asignadas a todas las restricciones."
+              },
+              "example_title": "Métricas Cuantificables Binarias",
+              "example": "| ID | Categoría ISO 25010 | Métrica Cuantificada (Pasa/No Pasa) |\n| --- | --- | --- |\n| RNN-01 | Performance Efficiency | LCP < 2.5s en 3G Fast simulado. Bundle optimizado vía Vite (< 1.5MB). |\n| RNN-02 | Reliability (Concurrency) | API con bloqueo transaccional ACID en PostgreSQL. P95 < 400ms bajo 50 requests concurrentes. |\n| RNN-03 | Usability / Accessibility | Checkout directo sin login forzoso. Alertas WhatsApp entregadas en < 10s tras eventos. |\n| RNN-04 | Security | Cifrado TLS 1.3 en transporte API. Cero datos de tarjetas en DB propia (100% Wompi). |",
+              "link_label": "métricas van a filtrado de verificabilidad (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Filtrado de restricciones verificables",
+          "objective": "Auditar que cada restricción pueda ser probada por un test automatizado, benchmark o factura.",
+          "input": "Métricas cuantificadas de Step 2.2.",
+          "raw_data_title": "Verificabilidad de Métricas",
+          "raw_data": "100% de métricas verificables: Lighthouse para LCP/Bundle, k6 para P95/concurrencia, tests de integración para WhatsApp y auditoría estática para TLS/Wompi.",
+          "exit_label": "RESTRICCIONES CUANTIFICADAS Y VERIFICABLES → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Descarte de enunciados no automatizables",
+              "objective": "Asegurar que cada RNN se convierta en una prueba objetiva de aceptación en CI/CD.",
+              "how_to": {
+                "steps": [
+                  "Determinar la herramienta de verificación objetiva para cada métrica (Lighthouse, k6, Jest, JUnit).",
+                  "Descartar cualquier requerimiento que dependa de opiniones o sensaciones subjetivas.",
+                  "Confirmar que los umbrales puedan incorporarse como quality gates en el pipeline.",
+                  "Consolidar la matriz depurada de restricciones cuantificadas."
+                ],
+                "table_columns": "ID RNN | Métrica Umbral | Herramienta de Medición / Verificación | Automatizable en CI",
+                "table_rules": "Toda restricción debe tener un método de prueba objetivo.",
+                "restrictions": [
+                  "No admitir restricciones que no puedan ser auditadas por código o métricas.",
+                  "Garantizar que la ejecución de la prueba sea repetible."
+                ],
+                "done_when": "Verificabilidad confirmada para todas las RNN."
+              },
+              "example_title": "Verificabilidad Automatizable de Restricciones",
+              "example": "| ID RNN | Métrica | Herramienta de Prueba |\n| --- | --- | --- |\n| RNN-01 | LCP < 2.5s, Bundle < 1.5MB | Google Lighthouse CI / Webpack Bundle Analyzer |\n| RNN-02 | P95 < 400ms con 50 req/s | Pruebas de carga con k6 / Gatling |\n| RNN-03 | Notificación WhatsApp < 10s | Webhooks test suite en integración |\n| RNN-04 | TLS 1.3, Cero datos PAN | SSL Labs test y escaneo estático SonarQube |",
+              "link_label": "verificabilidad va a asignación de capa arquitectónica (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Asignación Arquitectónica de Responsabilidad",
+      "summary": "Asignar explícitamente a qué capa del sistema le corresponde garantizar cada restricción no negociable.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Asignación de capa física o lógica responsable",
+          "objective": "Designar sin ambigüedad si la RNN corresponde a Frontend, Backend, Base de Datos o DevOps.",
+          "input": "Matriz de restricciones cuantificadas de Step 2.",
+          "raw_data_title": "Capas Asignadas",
+          "raw_data": "RNN-01: Frontend (React + Vite). RNN-02: Backend (Java Spring Boot) + PostgreSQL. RNN-03: Frontend / Backend (WhatsApp API). RNN-04: Backend / DevOps.",
+          "exit_label": "CAPAS ARQUITECTÓNICAS ASIGNADAS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Asignación explícita de capa arquitectónica",
+              "objective": "Fijar el ámbito de responsabilidad para saber inequívocamente qué componente debe proteger cada métrica.",
+              "how_to": {
+                "steps": [
+                  "Analizar la naturaleza técnica de la métrica (cliente, servidor, transporte o base de datos).",
+                  "Asignar la capa responsable principal: Frontend, Backend API, Base de Datos o Infraestructura/DevOps.",
+                  "Evitar delegaciones compartidas difusas que diluyan la rendición de cuentas.",
+                  "Incorporar la capa responsable en la tabla de asignación."
+                ],
+                "table_columns": "ID RNN | Métrica Cuantificada | Capa Responsable Principal",
+                "table_rules": "Asignación unívoca de capa arquitectónica por cada restricción.",
+                "restrictions": [
+                  "No dejar restricciones asignadas a 'todo el sistema'.",
+                  "Vincular la capa con el rol de desarrollo correspondiente."
+                ],
+                "done_when": "Capa arquitectónica responsable asignada a todas las RNN."
+              },
+              "example_title": "Asignación de Capas Arquitectónicas",
+              "example": "| ID RNN | Métrica Cuantificada | Capa Responsable |\n| --- | --- | --- |\n| RNN-01 | LCP < 2.5s en 3G, Bundle < 1.5MB | Frontend (React + Vite) |\n| RNN-02 | Transacciones ACID, P95 < 400ms | Backend (Java Spring Boot) |\n| RNN-03 | Checkout directo, WhatsApp < 10s | Frontend / Backend (WhatsApp API) |\n| RNN-04 | TLS 1.3, Cero datos de tarjetas | Backend / DevOps |",
+              "link_label": "capas van a mecanismos de cumplimiento (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Definición del mecanismo técnico de cumplimiento",
+          "objective": "Especificar la táctica de ingeniería que la capa empleará para asegurar la métrica.",
+          "input": "Capas asignadas de Step 3.1.",
+          "raw_data_title": "Mecanismos de Cumplimiento",
+          "raw_data": "RNN-01: bundle optimizado vía Vite y Tailwind purgado. RNN-02: bloqueos optimistas y aislamiento Serializable en PostgreSQL. RNN-03: Webhooks asíncronos en Spring Boot. RNN-04: tokens de un solo uso Wompi.",
+          "exit_label": "MECANISMOS TÉCNICOS ESPECIFICADOS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Especificación de la estrategia de mitigación técnica",
+              "objective": "Describir cómo el código y la infraestructura resolverán concretamente cada limitante.",
+              "how_to": {
+                "steps": [
+                  "Definir el patrón o técnica arquitectónica para cumplir la restricción.",
+                  "Indicar librerías, configuraciones de servidor o mecanismos de aislamiento.",
+                  "Verificar que la estrategia técnica no introduzca complejidad accidental desmedida.",
+                  "Documentar el mecanismo en la matriz de asignación arquitectónica."
+                ],
+                "table_columns": "ID RNN | Capa Responsable | Mecanismo de Cumplimiento (Breve)",
+                "table_rules": "Explicación concisa y técnica del cómo se resuelve.",
+                "restrictions": [
+                  "No redactar explicaciones vagas sin patrón técnico.",
+                  "Garantizar compatibilidad con el stack de desarrollo previsto."
+                ],
+                "done_when": "Mecanismo técnico especificado para cada restricción no negociable."
+              },
+              "example_title": "Mecanismos de Cumplimiento Técnico",
+              "example": "| ID RNN | Capa | Mecanismo de Cumplimiento |\n| --- | --- | --- |\n| RNN-01 | Frontend | Code-splitting con Vite, compresión de imágenes WebP y Tailwind CSS purgado. |\n| RNN-02 | Backend | Transacciones ACID gestionadas por Spring Boot con bloqueos optimistas en PostgreSQL. |\n| RNN-03 | Frontend / Backend | Checkout en una sola pantalla sin login y despacho de WhatsApp mediante workers asíncronos. |\n| RNN-04 | Backend / DevOps | Certificados SSL automatizados TLS 1.3 y uso exclusivo del SDK tokenizado de Wompi. |",
+              "link_label": "mecanismos van a rendición de cuentas (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Auditoría de trazabilidad y rendición de cuentas",
+          "objective": "Verificar que ante un fallo de la métrica en producción sea evidente qué componente debe ajustarse.",
+          "input": "Matriz de asignación y mecanismos de 3.1 y 3.2.",
+          "raw_data_title": "Trazabilidad de Responsabilidad",
+          "raw_data": "Rendición de cuentas establecida: Frontend responde por bundle y LCP; Backend responde por P95, transaccionalidad y seguridad de pagos.",
+          "exit_label": "RESPONSABILIDAD ARQUITECTÓNICA ASIGNADA Y TRAZABLE → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Verificación de titularidad arquitectónica",
+              "objective": "Asegurar que cada restricción cuente con un propietario claro en el equipo de desarrollo.",
+              "how_to": {
+                "steps": [
+                  "Vincular cada capa técnica con el rol de desarrollo responsable (Frontend Dev / Backend Dev / DevOps).",
+                  "Comprobar que no existan contradicciones entre los mecanismos de cumplimiento.",
+                  "Validar que el equipo conozca y acepte la titularidad de las restricciones asignadas.",
+                  "Consolidar la matriz de asignación arquitectónica completa."
+                ],
+                "table_columns": "ID RNN | Métrica | Capa | Propietario Técnico | Estado de Trazabilidad",
+                "table_rules": "Titularidad unívoca y sin vacíos de responsabilidad.",
+                "restrictions": [
+                  "No permitir zonas de nadie entre capas de software.",
+                  "Exigir validación del Tech Lead sobre las asignaciones."
+                ],
+                "done_when": "Titularidad arquitectónica verificada y aceptada por el equipo."
+              },
+              "example_title": "Matriz de Asignación y Rendición de Cuentas",
+              "example": "| ID | Métrica Cuantificada | Capa Responsable | Mecanismo de Cumplimiento |\n| --- | --- | --- | --- |\n| RNN-01 | LCP < 2.5s en 3G, Bundle < 1.5MB | Frontend (React + Vite) | Generación de bundle optimizado sin código de terceros pesado. |\n| RNN-02 | ACID, P95 < 400ms bajo carga | Backend (Java Spring Boot) | Bloqueo transaccional atómico y pool de conexiones HikariCP. |\n| RNN-03 | WhatsApp < 10s, Checkout sin login | Frontend / Backend | Workers asíncronos para notificaciones y flujo directo. |\n| RNN-04 | TLS 1.3, Cero datos de tarjetas | Backend / DevOps | Iframe tokenizado Wompi y configuración de certificados estrictos. |",
+              "link_label": "asignación va a fusión estructurada maestro (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Consolidar la Matriz Maestra de RNN, auditar compuerta condicional y formalizar publicación.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de la matriz maestra de RNN",
+          "objective": "Integrar categoría ISO, restricción original, métrica binaria y capa en una tabla unificada.",
+          "input": "Resultados de Steps 1 al 3.",
+          "raw_data_title": "Matriz Maestra Consolidada",
+          "raw_data": "Tabla maestra de 4 RNN unificando ID, categoría ISO 25010, restricción original, métrica cuantificada y capa responsable.",
+          "exit_label": "MATRIZ MAESTRA INTEGRADA → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Fusión estructurada de tablas maestras",
+              "objective": "Compilar la tabla oficial de restricciones no negociables que condicionará la selección del stack.",
+              "how_to": {
+                "steps": [
+                  "Unificar los datos de los steps previos en las columnas estándar oficiales.",
+                  "Formatear la tabla con IDs correlativos RNN-01 a RNN-04.",
+                  "Comprobar la concordancia textual con los entregables de Fase 1.",
+                  "Estructurar el documento en sus 3 secciones estándar."
+                ],
+                "table_columns": "ID | Categoría ISO 25010 | Restricción Original | Métrica Cuantificada (Pasa/No Pasa) | Capa Responsable",
+                "table_rules": "Uso de la plantilla oficial de la metodología.",
+                "restrictions": [
+                  "No omitir ninguna columna de la matriz maestra.",
+                  "Garantizar que todas las métricas conserven sus umbrales numéricos."
+                ],
+                "done_when": "Matriz maestra consolidada en el formato estándar."
+              },
+              "example_title": "Matriz Maestra de Restricciones No Negociables",
+              "example": "### 2. Matriz Maestra de Restricciones No Negociables\n| ID | Categoría ISO 25010 | Restricción Original | Métrica Cuantificada (Pasa/No Pasa) | Capa Responsable |\n| --- | --- | --- | --- | --- |\n| RNN-01 | Performance Efficiency | Acceso rápido y fluido en dispositivos móviles y redes variables. | LCP < 2.5s en 3G Fast simulado. Bundle de React + Tailwind optimizado vía Vite (< 1.5MB). | Frontend (React + Vite) |\n| RNN-02 | Reliability (Concurrency) | Prevención estricta de inconsistencias y solapamiento de reservas. | API Java con bloqueo transaccional ACID en PostgreSQL. P95 < 400ms bajo 50 requests concurrentes. | Backend (Java Spring Boot) |\n| RNN-03 | Usability / Accessibility | Experiencia simple y sin fricción cognitiva para finqueros y turistas. | Flujo de checkout directo sin login forzoso para el turista. Alertas a WhatsApp entregadas en < 10s tras eventos de reserva. | Frontend / Backend (WhatsApp API) |\n| RNN-04 | Security | Protección de información financiera y cumplimiento legal. | Cifrado TLS 1.3 en transporte API. Cero datos de tarjetas en base de datos propia (100% tokenizado por Wompi). | Backend / DevOps |",
+              "link_label": "matriz maestra va a control de calidad binario (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Verificación de compuerta condicional y español",
+          "objective": "Comprobar que todas las métricas sean demostrables en test y redactadas en español formal.",
+          "input": "Documento integrado de 4.1.",
+          "raw_data_title": "Auditoría de Compuerta",
+          "raw_data": "100% de métricas cuantificadas sin adjetivos subjetivos. Encabezados y metadatos en español absoluto. Compuerta de fase superada.",
+          "exit_label": "COMPUERTA CONDICIONAL SUPERADA → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Control de calidad de métricas binarias",
+              "objective": "Validar el cumplimiento estricto de las reglas condicionales del entregable.",
+              "how_to": {
+                "steps": [
+                  "Revisar cada fila verificando la ausencia total de adjetivos vagos ('rápido', 'bueno', 'seguro').",
+                  "Comprobar que todos los encabezados y metadatos estén traducidos a español absoluto.",
+                  "Formular la implicación de compuerta para la selección del stack en P2-D3.",
+                  "Registrar el resultado conforme en la lista de chequeo."
+                ],
+                "table_columns": "Criterio de Compuerta | Condición de Aprobación | Estatus de Verificación",
+                "table_rules": "Validación obligatoria del 100% de métricas cuantificadas.",
+                "restrictions": [
+                  "Rechazar si subsiste algún adjetivo subjetivo sin métrica.",
+                  "Asegurar que la compuerta condicione explícitamente el entregable D3."
+                ],
+                "done_when": "Compuerta condicional verificada y aprobada."
+              },
+              "example_title": "Verificación de Compuerta de Fase",
+              "example": "### 3. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No.\n- **Condición:** Proceed. La RNN-01 exige optimización en el bundle de React + Tailwind. La RNN-02 fundamenta la elección de Java Spring Boot y PostgreSQL para garantizar atomicidad y control de concurrencia. Las restricciones serán respetadas en la selección del Stack (D3).",
+              "link_label": "control de calidad va a publicación y cierre formal (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Registro de metadatos y publicación oficial",
+          "objective": "Sellar el entregable oficial en la Base de Conocimiento y autorizar el paso a Stack Decision.",
+          "input": "Documento final validado.",
+          "raw_data_title": "Cierre Formal P2-D2",
+          "raw_data": "Proyecto: Nos Fuimos de Finca. Fase 2, D2 de 13. Estado: Approved. Restricciones No Negociables formalmente publicadas.",
+          "exit_label": "RESTRICCIONES NO NEGOCIABLES FORMALMENTE APROBADAS",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Sello formal y archivo del entregable P2-D2",
+              "objective": "Publicar el marco de restricciones que gobernará todas las decisiones de arquitectura de Fase 2.",
+              "how_to": {
+                "steps": [
+                  "Completar la cabecera estándar de metadatos con el estado oficial 'Approved'.",
+                  "Publicar el documento en `docs/02-project-kickoff/02. Restricciones No Negociables.md`.",
+                  "Actualizar el archivo de progreso PROGRESS.md con las métricas del entregable.",
+                  "Habilitar el inicio del entregable P2-D3 (Stack Decision)."
+                ],
+                "table_columns": "Campo de Metadatos | Valor Registrado | Significado Metodológico",
+                "table_rules": "Registro oficial de cierre de entregable.",
+                "restrictions": [
+                  "No modificar los umbrales una vez archivado.",
+                  "Utilizar las RNN como criterios de evaluación mandatorios en P2-D3."
+                ],
+                "done_when": "Metadatos registrados y entregable P2-D2 formalmente aprobado."
+              },
+              "example_title": "Certificación Final de Restricciones No Negociables",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 2 — Project Kickoff  \n**Entregable:** 2 de 13  \n**Estado:** Aprobado  \n\nEstado al cerrar este step: **Approved**. 4 Restricciones No Negociables (RNN) cuantificadas bajo estándar ISO 25010 con umbrales binarios de pasa/no pasa y capas arquitectónicas responsables asignadas.",
+              "link_label": "cierre formal del entregable P2-D2"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

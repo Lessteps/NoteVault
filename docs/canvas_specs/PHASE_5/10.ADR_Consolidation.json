@@ -1,0 +1,152 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D10",
+  "deliverable": "ADR Consolidation",
+  "purpose": "Indexar y consolidar todos los Architectural Decision Records (ADRs) generados en la Fase 5 en un registro maestro unificado, estableciendo trazabilidad histórica, estados formales de aprobación y sintetizando el trade-off técnico dominante aceptado por el equipo para orientar la implementación en la Fase 6.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Deployment Topology Decision (P5-D3) | [[PHASE_5_ARCHITECTURAL_DESIGN/3.Deployment Topology Decision/3.Deployment Topology Decision.md]] | ADR fuente a indexar (ADR-001: Serverless PaaS + BaaS). |\n| System Decomposition Decision (P5-D4) | [[PHASE_5_ARCHITECTURAL_DESIGN/4.System Decomposition Decision/4.System Decomposition Decision.md]] | ADR fuente a indexar (ADR-002: Modular Monolith). |\n| Architectural Style Selection (P5-D5) | [[PHASE_5_ARCHITECTURAL_DESIGN/5.Architectural Style Selection/5.Architectural Style Selection.md]] | ADR fuente a indexar (ADR-003: Estilos Híbridos Clean/Layered). |\n| Communication Pattern Decision (P5-D6) | [[PHASE_5_ARCHITECTURAL_DESIGN/6.Communication Pattern Decision/6.Communication Pattern Decision.md]] | ADR fuente a indexar (ADR-004: REST + WebSockets WSS). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Recolección de ADRs (Collect ADRs)",
+      "summary": "Recopilar las cuatro decisiones arquitectónicas fundacionales de la Fase 5 verificando su existencia y enlaces físicos.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Recuperación de Decisiones Arquitectónicas Fundacionales",
+          "objective": "Extraer los títulos, identificadores y rutas de los ADRs generados en los entregables D3, D4, D5 y D6.",
+          "input": "Entregables aprobados D3, D4, D5 y D6 de la Fase 5.",
+          "raw_data_title": "Inventario de ADRs de la Fase 5",
+          "raw_data": "| ID | Título de la Decisión | Entregable Fuente | Ruta Relativa del Documento |\n|---|---|---|---|\n| ADR-001 | Adopción de Topología Serverless PaaS (Vercel) y BaaS (Supabase) | D3 (Deployment Topology) | `[[PHASE_5_ARCHITECTURAL_DESIGN/3.Deployment_Topology_Decision/example_output_d3_deployment_topology.md]]` |\n| ADR-002 | Adopción de Patrón \"Modular Monolith\" sobre Arquitectura Serverless | D4 (System Decomposition) | `[[PHASE_5_ARCHITECTURAL_DESIGN/4.System_Decomposition_Decision/example_output_d4_system_decomposition.md]]` |\n| ADR-003 | Selección de Estilos Híbridos (Clean Architecture vs Layered) por Módulo | D5 (Architectural Style) | `[[PHASE_5_ARCHITECTURAL_DESIGN/5.Architectural_Style_Selection/example_output_d5_architectural_style.md]]` |\n| ADR-004 | Adopción de REST y WebSockets (Supabase Realtime) sobre Monolito | D6 (Communication Pattern) | `[[PHASE_5_ARCHITECTURAL_DESIGN/6.Communication_Pattern_Decision/example_output_d6_communication_pattern.md]]` |",
+          "exit_label": "ADRs Fundacionales Recopilados y Enlazados",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Validación de Integridad y Enlaces Físicos de ADRs",
+              "objective": "Asegurar que cada ADR referenciado exista físicamente y posea estado cerrado.",
+              "how_to": {
+                "steps": [
+                  "1. Localizar los archivos Markdown de los entregables D3, D4, D5 y D6.",
+                  "2. Extraer el identificador único secuencial (ADR-001 a ADR-004).",
+                  "3. Verificar que los backlinks apunten a rutas navegables válidas.",
+                  "4. Detener el proceso si algún ADR se encuentra ausente o incompleto."
+                ],
+                "table_columns": [
+                  "ADR ID",
+                  "Entregable Padre",
+                  "Existencia Física",
+                  "Integridad de Contenido"
+                ],
+                "table_rules": [
+                  "La numeración de ADRs debe ser estrictamente secuencial y sin huecos",
+                  "No se indexan decisiones sin documento formal de soporte",
+                  "Todo enlace debe ser relativo y bidireccional"
+                ],
+                "restrictions": "Prohibido omitir decisiones arquitectónicas formalizadas en la fase.",
+                "done_when": "Todos los ADRs de D3 a D6 inventariados y verificados contra el sistema de archivos."
+              },
+              "example_title": "Lista de ADRs Recolectados D10",
+              "example": "```markdown\n## ADRs Recolectados\n- **D3:** ADR-001: Adopción de Topología Serverless PaaS (Vercel) y BaaS (Supabase) — `[[PHASE_5_ARCHITECTURAL_DESIGN/3.Deployment_Topology_Decision/example_output_d3_deployment_topology.md]]`\n- **D4:** ADR-002: Adopción de Patrón \"Modular Monolith\" sobre Arquitectura Serverless — `[[PHASE_5_ARCHITECTURAL_DESIGN/4.System_Decomposition_Decision/example_output_d4_system_decomposition.md]]`\n- **D5:** ADR-003: Selección de Estilos Híbridos (Clean Architecture vs Layered) por Módulo — `[[PHASE_5_ARCHITECTURAL_DESIGN/5.Architectural_Style_Selection/example_output_d5_architectural_style.md]]`\n- **D6:** ADR-004: Adopción de REST y WebSockets (Supabase Realtime) sobre Monolito — `[[PHASE_5_ARCHITECTURAL_DESIGN/6.Communication_Pattern_Decision/example_output_d6_communication_pattern.md]]`\n```",
+              "link_label": "ADRs Recolectados -> Construcción de Tabla Maestra"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Construcción de la Tabla de Registro (Build Registry Table)",
+      "summary": "Estructurar la tabla central de consulta con identificador, título, estado vinculante, fecha y enlace.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Consolidación de Metadatos y Estados de Aprobación",
+          "objective": "Consolidar el estado vinculante de cada ADR para que el equipo de desarrollo respete sus directrices.",
+          "input": "Lista de ADRs del Step 1 y estados declarados en sus headers.",
+          "raw_data_title": "Registro Maestro Consolidado de ADRs",
+          "raw_data": "| ID | Title | Status | Date | Link |\n|---|---|---|---|---|\n| ADR-001 | Adopción de Topología Serverless PaaS (Vercel) y BaaS (Supabase) | Accepted | 2026-07-13 | `[[3.Deployment_Topology.md]]` |\n| ADR-002 | Adopción de Patrón \"Modular Monolith\" sobre Arquitectura Serverless | Accepted | 2026-07-13 | `[[4.System_Decomposition.md]]` |\n| ADR-003 | Selección de Estilos Híbridos (Clean Architecture vs Layered) por Módulo | Accepted | 2026-07-13 | `[[5.Architectural_Style.md]]` |\n| ADR-004 | Adopción de REST y WebSockets (Supabase Realtime) sobre Monolito | Accepted | 2026-07-13 | `[[6.Communication_Pattern.md]]` |",
+          "exit_label": "Tabla Maestra de Registro Compilada",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Formalización de Estados y Enlaces de Registro",
+              "objective": "Construir la tabla markdown estandarizada de referencia rápida.",
+              "how_to": {
+                "steps": [
+                  "1. Generar encabezado con columnas ID, Title, Status, Date y Link.",
+                  "2. Registrar cada decisión con su identificador canónico ADR-XXX.",
+                  "3. Asignar el estado formal (Accepted para decisiones vinculantes cerradas).",
+                  "4. Incorporar la fecha oficial de consolidación y el enlace markdown."
+                ],
+                "table_columns": [
+                  "ID",
+                  "Título",
+                  "Estado",
+                  "Fecha",
+                  "Enlace Documental"
+                ],
+                "table_rules": [
+                  "El estado debe ser Accepted para autorizar la entrada a Fase 6",
+                  "Los enlaces deben permitir navegación con un solo clic",
+                  "Las descripciones deben ser títulos ejecutivos comprensibles"
+                ],
+                "restrictions": "Prohibido registrar estados Proposed sin plan de resolución explícito.",
+                "done_when": "Tabla markdown de registro compilada y verificada contra estándares de documentación."
+              },
+              "example_title": "Tabla de Registro Formal D10",
+              "example": "```markdown\n## ADR Registry Table\n\n| ID | Title | Status | Date | Link |\n|---|---|---|---|---|\n| ADR-001 | Adopción de Topología Serverless PaaS (Vercel) y BaaS (Supabase) | Accepted | 2026-07-13 | [[3.Deployment_Topology.md]] |\n| ADR-002 | Adopción de Patrón \"Modular Monolith\" sobre Arquitectura Serverless | Accepted | 2026-07-13 | [[4.System_Decomposition.md]] |\n| ADR-003 | Selección de Estilos Híbridos (Clean Architecture vs Layered) por Módulo | Accepted | 2026-07-13 | [[5.Architectural_Style.md]] |\n| ADR-004 | Adopción de REST y WebSockets (Supabase Realtime) sobre Monolito | Accepted | 2026-07-13 | [[6.Communication_Pattern.md]] |\n```",
+              "link_label": "Registro Compilado -> Síntesis de Trade-offs"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Síntesis de Trade-offs y Consecuencias (Summarize Consequences)",
+      "summary": "Sintetizar en un párrafo ejecutivo el trade-off técnico dominante aceptado por el conjunto de decisiones.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Análisis Holístico de Consecuencias y Compensaciones",
+          "objective": "Articular la filosofía arquitectónica global que rige el sistema para orientar a los desarrolladores.",
+          "input": "Secciones de consecuencias de los ADR-001 a ADR-004.",
+          "raw_data_title": "Matriz de Beneficios y Riesgos Arquitectónicos Aceptados",
+          "raw_data": "| Decisión | Riesgo Técnico Asumido | Beneficio Directo Obtenido | Mecanismo de Mitigación |\n|---|---|---|---|\n| Topología Serverless/BaaS (ADR-001) | Vendor Lock-in (Supabase/Vercel) | Time-to-Market inmediato y Cero DevOps | Uso de PostgreSQL estándar y desacoplamiento con interfaces |\n| Modular Monolith (ADR-002) | Riesgo de acoplamiento espagueti | Máxima velocidad de iteración y despliegue único | Monitoreo estricto de dependencias en CI e interfaces de módulo |\n| Estilos Híbridos (ADR-003) | Sobrecarga cognitiva por disparidad de capas | Blindaje en dominios de dinero y agilidad en UI | Clean Architecture estricta solo en Booking y Billing |\n| REST + WSS (ADR-004) | Múltiples endpoints manuales (sin GraphQL) | Notificaciones push nativas y simplicidad de red | Tipado estricto compartido extremo a extremo con TypeScript |",
+          "exit_label": "Trade-off Dominante Sintetizado",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Redacción del Resumen Ejecutivo de Trade-offs",
+              "objective": "Producir una síntesis ejecutiva coherente que transmita el espíritu de la arquitectura.",
+              "how_to": {
+                "steps": [
+                  "1. Identificar el trade-off dominante que une a los cuatro ADRs.",
+                  "2. Exponer claramente los riesgos y compromisos asumidos conscientemente.",
+                  "3. Destacar el beneficio fundamental obtenido (velocidad y simplicidad).",
+                  "4. Detallar la mitigación asimétrica implementada en la arquitectura."
+                ],
+                "table_columns": [
+                  "Eje de Decisión",
+                  "Compromiso Aceptado",
+                  "Valor Aportado",
+                  "Mitigación"
+                ],
+                "table_rules": [
+                  "El resumen debe ser un texto fluido y no una simple repetición de listas de cada ADR",
+                  "Debe quedar claro para cualquier desarrollador por qué no se eligieron microservicios o Kubernetes",
+                  "Debe enfatizar la protección asimétrica en áreas de dinero"
+                ],
+                "restrictions": "Prohibido redactar resúmenes genéricos que no citen decisiones específicas.",
+                "done_when": "Párrafo ejecutivo redactado y alineado con la visión de producto y arquitectura."
+              },
+              "example_title": "Resumen Ejecutivo de Trade-offs D10",
+              "example": "```markdown\n## Architectural Trade-off Summary\n\n**El Trade-off Dominante: Agilidad Operativa extrema a cambio de Vendor Lock-in parcial y Disciplina de Equipo.**\nEl conjunto de decisiones arquitectónicas de la Fase 5 prioriza drásticamente el *Time-to-Market* y la reducción a cero del mantenimiento de infraestructura (Cero DevOps). Aceptamos el riesgo técnico de anclar fuertemente la aplicación a plataformas específicas (Vercel Serverless y el SDK de Supabase) y el riesgo organizacional de construir un **Monolito Modular** (que requiere alta disciplina para no degenerar en \"código espagueti\"). A cambio, el equipo se libera totalmente de gestionar microservicios, clústeres o redes complejas (GraphQL/Message Brokers), permitiéndole iterar el producto a máxima velocidad. Para mitigar los riesgos del monolito, implementamos una protección asimétrica: las áreas críticas donde fluye el dinero (Booking y Billing) están aisladas con *Clean Architecture*, mientras que las áreas visuales (Catálogo) fluyen libremente para no ralentizar el desarrollo.\n```",
+              "link_label": "Síntesis Finalizada -> Entregable Consolidado D10"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverable_output": "# Entregable 10 (D10): ADR Consolidation\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n*Backlink a Fase 11:* Este documento será absorbido por la Fase 11 como el núcleo inicial de la bitácora histórica arquitectónica del proyecto.\n\n---\n\n## 2. ADR Registry Table\n\nEl siguiente registro consolida todas las decisiones de alto nivel tomadas y documentadas a lo largo de la Fase 5. Las 4 decisiones fundacionales se consideran `Accepted` y son de carácter vinculante para el equipo de desarrollo de la Fase 6.\n\n| ID | Title | Status | Date | Link |\n|---|---|---|---|---|\n| ADR-001 | Adopción de Topología Serverless PaaS (Vercel) y BaaS (Supabase) | Accepted | 2026-07-13 | [[3.Deployment_Topology_Decision/example_output_d3_deployment_topology.md\\|D3: Deployment Topology]] |\n| ADR-002 | Adopción de Patrón \"Modular Monolith\" sobre Arquitectura Serverless | Accepted | 2026-07-13 | [[4.System_Decomposition_Decision/example_output_d4_system_decomposition.md\\|D4: System Decomposition]] |\n| ADR-003 | Selección de Estilos Híbridos (Clean Architecture vs Layered) por Módulo | Accepted | 2026-07-13 | [[5.Architectural_Style_Selection/example_output_d5_architectural_style.md\\|D5: Architectural Style]] |\n| ADR-004 | Adopción de REST y WebSockets (Supabase Realtime) sobre Monolito | Accepted | 2026-07-13 | [[6.Communication_Pattern_Decision/example_output_d6_communication_pattern.md\\|D6: Communication Pattern]] |\n\n---\n\n## 3. Architectural Trade-off Summary\n\n**El Trade-off Dominante: Agilidad Operativa extrema a cambio de Vendor Lock-in y Disciplina de Equipo.**\n\nEl conjunto de decisiones arquitectónicas de la Fase 5 prioriza drásticamente el *Time-to-Market* y la reducción a cero del mantenimiento de infraestructura (Cero DevOps). Aceptamos el riesgo técnico de anclar fuertemente la aplicación a plataformas específicas (Vercel Serverless y el SDK nativo de Supabase) y el riesgo organizacional de construir un **Monolito Modular** (que requiere alta disciplina de los programadores para no degenerar en código acoplado). \n\nA cambio de asumir estos riesgos, el equipo se libera totalmente de gestionar Kubernetes, redes de microservicios o Message Brokers pesados, permitiéndole iterar el producto a máxima velocidad con un solo pipeline de CI/CD. \n\nPara mitigar la debilidad del monolito, hemos implementado una política de protección asimétrica (ADR-003): las áreas críticas donde fluye el dinero (Reservas y Pagos) están aisladas con *Clean Architecture*, mientras que las áreas visuales (Catálogo) fluyen con un estilo más laxo para no frenar el desarrollo.\n\n---\n\n## 4. Downstream Consumers\nEste entregable es input obligatorio para:\n- **D11 (Phase 5 RTM Update & Brief):** Servirá como punto de comprobación de que todas las directrices arquitectónicas fueron cerradas y unificadas antes del paso a la Fase 6.\n- **Phase 11 — D2 (ADR Log):** Este registro es la semilla principal del archivo histórico definitivo del proyecto."
+}

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QSplitter, QStatusBar,
     QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget,
 )
-from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QTimer
+from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QTimer, QSize
 
 from ..config import AppConfig
 from ..core.vault_manager import VaultManager
@@ -32,9 +32,9 @@ from . import theme
 from .styles import DARK_THEME_QSS
 from .components.icon_rail import IconRail
 from .components.notes.notes_sidebar import NotesSidebar
-from .components.notes.markdown_editor import MarkdownEditor
+from .components.notes.split_notes import SplitNotes
 from .components.notes.ai_chat_panel import AIChatPanel
-from .components.notes.canvas import CanvasView
+from .components.notes.concept_map_panel import ConceptMapPanel
 from .components.habit_tracker.habit_tracker_panel import HabitTrackerPanel
 from .components.habit_right_panel import HabitRightPanel
 from .components.habit_left_panel import HabitLeftPanel
@@ -77,6 +77,21 @@ def _placeholder(text: str, obj: str = "centerPanel") -> QWidget:
     return w
 
 
+class _ResponsiveStackedWidget(QStackedWidget):
+    """Reports size hints based on the current page to enable responsive shrinking."""
+
+    def minimumSizeHint(self):
+        w = self.currentWidget()
+        if w is not None:
+            sz = w.minimumSizeHint()
+            return QSize(min(sz.width(), 320), min(sz.height(), 200))
+        return QSize(320, 200)
+
+    def sizeHint(self):
+        w = self.currentWidget()
+        return w.sizeHint() if w is not None else super().sizeHint()
+
+
 class MainWindow(QMainWindow):
 
     def __init__(self):
@@ -94,8 +109,14 @@ class MainWindow(QMainWindow):
         self._nav_anim        = None
         self._insp_anim       = None
         self._assistant_visible = AppConfig.get_assistant_visible()
+        self._user_hidden_right = False
+        self._user_hidden_left  = False
+        self._auto_collapsed_right = False
+        self._auto_collapsed_left  = False
 
+        self.setMinimumSize(480, 360)
         self._init_ui()
+        self._init_web()
         self._switch_mode(MODE_HOME)
 
     def _create_managers(self, vault_path):
@@ -119,6 +140,7 @@ class MainWindow(QMainWindow):
     # ── Build UI ──────────────────────────────────────────────────────────
 
     def _init_ui(self):
+        theme.load_fonts()
         theme.install()
         self._theme = AppConfig.get_theme()
         theme.set_theme(self._theme)
@@ -176,11 +198,12 @@ class MainWindow(QMainWindow):
         self._left_stack.addWidget(self._finanzas_left)   # 8 — finanzas
 
         # ── Center stack ──────────────────────────────────────────────────
-        self._center_stack = QStackedWidget()
+        self._center_stack = _ResponsiveStackedWidget()
 
         self._habit_panel      = HabitTrackerPanel(self.habits)
         self._ejercicio_panel  = EjercicioPanel(self.exercise_mgr)
-        self._notas_center     = MarkdownEditor(self.vault, self.notes)
+        self._notas_center     = SplitNotes(self.vault, self.notes)
+        self._notas_map        = ConceptMapPanel(self.vault, self.notes)
         self._tareas_panel     = TareasPanel(self.tasks)
         self._proj_panel       = ProyectosPanel(self.projects, self.areas)
         self._dashboard        = DashboardPanel(
@@ -188,16 +211,9 @@ class MainWindow(QMainWindow):
             goals=self.goals, areas=self.areas, finances=self.finances)
         self._calendario_panel = CalendarioPanel(self.schedule_mgr)
 
-        # The notes centre is a stack: the markdown editor, or the canvas view
-        # when a .canvas file is open. Signals still come from _notas_center.
-        self._canvas_view = CanvasView(self.vault, self.notes)
-        self._notas_stack = QStackedWidget()
-        self._notas_stack.addWidget(self._notas_center)      # 0 — editor
-        self._notas_stack.addWidget(self._canvas_view)       # 1 — canvas
-
         self._center_stack.addWidget(self._habit_panel)      # 0
         self._center_stack.addWidget(self._ejercicio_panel)  # 1
-        self._center_stack.addWidget(self._notas_stack)      # 2
+        self._center_stack.addWidget(self._notas_center)     # 2
         self._center_stack.addWidget(self._tareas_panel)     # 3 — tareas
         self._center_stack.addWidget(self._proj_panel)       # 4 — proyectos
         self._center_stack.addWidget(self._dashboard)        # 5 — vista general
@@ -209,6 +225,7 @@ class MainWindow(QMainWindow):
         self._finanzas_panel.view_changed.connect(self._finanzas_left.set_view)
         self._finanzas_panel.data_changed.connect(self._finanzas_left.refresh)
         self._center_stack.addWidget(self._finanzas_panel)   # 8 — finanzas
+        self._center_stack.addWidget(self._notas_map)        # 9 — generador de mapas
 
         # ── Right stack ───────────────────────────────────────────────────
         self._right_stack = QStackedWidget()
@@ -274,13 +291,21 @@ class MainWindow(QMainWindow):
 
         # ── Notes module ──────────────────────────────────────────────
         self._explorer.note_selected.connect(self._open_notes_path)
+        self._explorer.note_selected_new_tab.connect(
+            lambda p: self._open_notes_path(p, new_tab=True)
+        )
         self._explorer.note_selected_at_line.connect(self._open_notes_path)
         self._explorer.note_moved.connect(self._notas_center.on_note_moved)
+        self._explorer.note_created.connect(self._notas_center.on_note_created)
+        self._explorer.note_deleted.connect(self._notas_center.on_note_deleted)
         self._explorer.bookmarks_changed.connect(
             self._notas_center.refresh_mentions)
+        # Concept-map generator: reachable from the explorer's 🗺 Mapa button.
+        self._explorer.generate_map_requested.connect(self._show_map_generator)
+        self._notas_map.map_created.connect(self._on_map_created)
+        self._notas_map.open_requested.connect(self._open_notes_path)
         self._notas_center.active_note_changed.connect(self._on_note_changed)
         self._notas_center.open_note_requested.connect(self._open_notes_path)
-        self._canvas_view.open_note_requested.connect(self._open_notes_path)
         # note_saved is NOT connected to populate_tree: auto-save fires every
         # 1.2 s and a full tree rebuild on each save would freeze the UI.
         # New notes are added to the tree by new_note() in NotesSidebar itself.
@@ -309,7 +334,9 @@ class MainWindow(QMainWindow):
         self.main_splitter.setCollapsible(CENTER_PANEL_INDEX, False)
         self.main_splitter.setCollapsible(2, True)
         self.main_splitter.setStretchFactor(CENTER_PANEL_INDEX, 1)
-        self._right_stack.setMinimumWidth(140)
+        self._center_stack.setMinimumWidth(320)
+        self._left_stack.setMinimumWidth(0)
+        self._right_stack.setMinimumWidth(0)
         self._right_stack.setMaximumWidth(520)
 
         # ── Central widget ────────────────────────────────────────────────
@@ -511,6 +538,7 @@ class MainWindow(QMainWindow):
 
     def toggle_explorer(self):
         if self._mode == MODE_NOTAS:
+            self._user_hidden_left = self._left_stack.isVisible()
             self._animate_panel(0, "_nav_anim", "_navigator_width")
 
     def toggle_assistant(self):
@@ -527,9 +555,44 @@ class MainWindow(QMainWindow):
             if width > 0:
                 self._chat_width = width
         self._assistant_visible = not self._assistant_visible
+        self._user_hidden_right = not self._assistant_visible
         AppConfig.set_assistant_visible(self._assistant_visible)
         self._notas_center.set_assistant_visible(self._assistant_visible)
         self._apply_mode_layout()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        w = self.width()
+
+        # Breakpoint 1: < 900px auto-collapse right stack (assistant)
+        if w < 900:
+            if self._right_stack.isVisible() and not self._auto_collapsed_right:
+                self._auto_collapsed_right = True
+                self._right_stack.setVisible(False)
+        elif w >= 900:
+            if self._auto_collapsed_right:
+                self._auto_collapsed_right = False
+                if not self._user_hidden_right and (
+                    self._mode == MODE_HABITS
+                    or (self._mode == MODE_NOTAS and self._assistant_visible)
+                ):
+                    self._right_stack.setVisible(True)
+
+        # Breakpoint 2: < 680px also auto-collapse left stack (explorer/nav)
+        if w < 680:
+            if self._left_stack.isVisible() and not self._auto_collapsed_left:
+                self._auto_collapsed_left = True
+                self._left_stack.setVisible(False)
+        elif w >= 680:
+            if self._auto_collapsed_left:
+                self._auto_collapsed_left = False
+                if not self._user_hidden_left:
+                    show_left = self._mode in (
+                        MODE_HABITS, MODE_NOTAS, MODE_EJERCICIO,
+                        MODE_PROYECTOS, MODE_TAREAS, MODE_CALENDARIO,
+                        MODE_METAS, MODE_FINANZAS,
+                    )
+                    self._left_stack.setVisible(show_left)
 
     def _reveal_in_explorer(self, path: Path):
         if self._mode == MODE_NOTAS:
@@ -555,29 +618,33 @@ class MainWindow(QMainWindow):
         self._open_notes_path(p)
         self._explorer.reveal(p)
 
-    def _open_notes_path(self, path, line: int = 0):
-        """Route a file in the notes workspace: a .canvas opens the canvas view,
-        anything else opens the markdown/code editor."""
+    def _open_notes_path(self, path, line: int = 0, new_tab: bool = False):
+        """Open a file in the notes workspace (editor handles both .md and .canvas)."""
         if not path:
             return
-        p = Path(path)
-        if p.suffix.lower() == ".canvas":
-            self._notas_stack.setCurrentIndex(1)
-            self._canvas_view.load(p)
-        else:
-            self._notas_stack.setCurrentIndex(0)
-            self._notas_center.open_note(p, line)
+        # Coming back from the map generator: show the editor again.
+        self._center_stack.setCurrentWidget(self._notas_center)
+        self._notas_center.open_note(Path(path), line, new_tab=new_tab)
+
+    def _show_map_generator(self):
+        """Swap the notes centre to the concept-map generator."""
+        self._switch_mode(MODE_NOTAS)
+        self._center_stack.setCurrentWidget(self._notas_map)
+
+    def _on_map_created(self, path):
+        """A map was written: refresh the tree so it shows up."""
+        self._explorer.populate_tree()
+        self._explorer.reveal(Path(path))
 
     def new_canvas(self, folder=None):
-        """Create a new .canvas in the given folder (or the vault root) and open
-        it. Returns the created path."""
+        """Create a new .canvas in the given folder (or the vault root) and open it."""
         from .components.notes.canvas_actions import create_canvas
         p = create_canvas(self.vault, self.notes, folder)
         if p is None:
             return None
         self._switch_mode(MODE_NOTAS)
         self._explorer.populate_tree()
-        self._open_notes_path(p)
+        self._notas_center.open_note(p)
         self._explorer.reveal(p)
         return p
 
@@ -621,7 +688,8 @@ class MainWindow(QMainWindow):
         self._finanzas_left.set_manager(self.finances)
         self._explorer.set_vault(self.vault, self.notes)
         self._notas_center.set_vault(self.vault, self.notes)
-        self._canvas_view.set_context(self.vault, self.notes)
+        self._notas_map.set_vault(self.vault, self.notes)
+        self._web.set_vault(vault_path)
         self._habit_panel.set_manager(self.habits)
         self._habit_right.set_manager(self.habits)
         self._habit_left.manager = self.habits
@@ -748,9 +816,85 @@ class MainWindow(QMainWindow):
                 if ap.exists():
                     self._notas_center.open_note(ap)
 
+    # ── WEB module (opened only from the Ctrl+P command palette) ──────────
+
+    def _init_web(self):
+        from PySide6.QtGui import QShortcut, QKeySequence
+        from .components.web import controller as web_controller
+        from .components.notes.command_palette import register_global_commands
+        self._web = web_controller()
+        self._web.set_vault(self.vault.vault_root)
+        self._web.add_to_canvas_requested.connect(self._add_web_page_to_canvas)
+        register_global_commands(self._web_commands)
+        # Inside Notas the editor owns Ctrl+P; everywhere else this one opens
+        # the same palette with the app-wide commands (WEB).
+        keys = AppConfig.get_hotkeys().get("palette", "Ctrl+P") or "Ctrl+P"
+        self._global_palette = QShortcut(QKeySequence(keys), self)
+        self._global_palette.setContext(Qt.WindowShortcut)
+        self._global_palette.activated.connect(self._open_global_palette)
+        self._center_stack.currentChanged.connect(self._sync_global_palette)
+        self._sync_global_palette()
+
+    def _sync_global_palette(self, *_):
+        self._global_palette.setEnabled(
+            self._center_stack.currentWidget() is not self._notas_center)
+
+    def _open_global_palette(self):
+        from .components.notes.command_palette import CommandPalette, global_commands
+        palette = CommandPalette(global_commands(), self)
+        if palette.popup_over(self._center_stack) and palette.chosen is not None:
+            palette.chosen.run()
+
+    def _web_commands(self) -> list:
+        from .components.notes.command_palette import Command
+        has_canvas = lambda: self._notas_center.current_canvas() is not None  # noqa: E731
+        return [
+            Command("Abrir navegador WEB", "WEB", self._web.open_window),
+            Command("Abrir una dirección en WEB…", "WEB", self._web_open_url),
+            Command("Restricciones de contenido…", "WEB", self._web_restrictions),
+            Command("Añadir página web al canvas…", "WEB", self._web_card_prompt,
+                    "", has_canvas),
+        ]
+
+    def _web_open_url(self):
+        from PySide6.QtWidgets import QInputDialog
+        url, ok = QInputDialog.getText(self, "WEB", "Dirección o búsqueda:")
+        if ok and url.strip():
+            self._web.open_window(url.strip())
+
+    def _web_restrictions(self):
+        if self._web.open_window():
+            self._web.window().show_restrictions()
+
+    def _web_card_prompt(self):
+        canvas = self._notas_center.current_canvas()
+        if canvas is not None:
+            canvas._pick_and_add_link()
+
+    def _add_web_page_to_canvas(self, url: str, title: str):
+        from PySide6.QtWidgets import QMessageBox
+        canvas = self._notas_center.current_canvas()
+        win = self._web.window(create=False)
+        if canvas is None:
+            QMessageBox.information(
+                win or self, "Añadir al canvas",
+                "Abre primero un canvas en Notas; la página se añadirá en el centro de lo que "
+                "estés viendo.")
+            return
+        canvas.add_web_page(url, title)
+        if win is not None:
+            win.statusBar().showMessage("Página añadida al canvas", 4000)
+
     def closeEvent(self, event):
         try:
-            self._canvas_view.flush()
+            self._web.shutdown()
+            win = self._web.window(create=False)
+            if win is not None:
+                win.close()
+        except Exception:
+            pass
+        try:
+            self._notas_center.flush_canvas()
         except Exception:
             pass
         try:

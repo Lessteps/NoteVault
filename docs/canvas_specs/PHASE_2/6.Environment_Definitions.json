@@ -1,0 +1,327 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D6",
+  "deliverable": "Environment Definitions (Definición de Entornos)",
+  "purpose": "Este entregable define los 'universos paralelos' donde el sistema existirá. Tradicionalmente son Dev, Staging y Production. Probar código en Producción directamente es la receta para destruir la base de datos de clientes reales. Sin embargo, tener demasiados entornos en un MVP es un despilfarro económico.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_stack_decision]] | Determina si las herramientas SaaS y de hosting soportan entornos múltiples (P2-D3). |\n| [[example_output_non_negotiable_constraints]] | Métrica presupuestal máxima que limitará la clonación de infraestructuras (P2-D2). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Determinación de Universos (Entornos Requeridos)",
+      "summary": "Elegir el número mínimo absoluto de entornos físicos necesarios para aislar pruebas sin violar los límites de presupuesto.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Evaluación de Restricciones Presupuestales y Stack",
+          "objective": "Verificar el techo de OPEX mensual y la capacidad del stack para soportar instancias paralelas.",
+          "input": "[[example_output_non_negotiable_constraints]] (D2) y [[example_output_stack_decision]] (D3).",
+          "raw_data_title": "Parámetros Presupuestales y Técnicos",
+          "raw_data": "Presupuesto OPEX estricto. Stack híbrido: Local (IDEs/Docker), Staging en PaaS gratuito/bajo costo y Producción en VPC protegida.",
+          "exit_label": "RESTRICCIONES Y CAPACIDADES EVALUADAS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Análisis de Costo OPEX y Viabilidad Multientorno",
+              "objective": "Determinar si el presupuesto permite múltiples infraestructuras en la nube o si se restringe a lo esencial.",
+              "how_to": {
+                "steps": [
+                  "Consultar el límite presupuestal mensual en P2-D2.",
+                  "Revisar el esquema de costos por entorno en las plataformas de hosting de D3.",
+                  "Descartar entornos corporativos intermedios innecesarios (QA, UAT).",
+                  "Determinar la cuota operativa para hosting de pruebas."
+                ],
+                "table_columns": "Plataforma de Hosting | Modelo de Precios | Capacidad de Despliegue Paralelo",
+                "table_rules": "No planificar más entornos de los que el presupuesto OPEX puede sostener de forma recurrente.",
+                "restrictions": [
+                  "Prohibido provisionar infraestructura costosa para etapas tempranas de MVP."
+                ],
+                "done_when": "Techo de gasto y plataformas evaluadas para despliegue multientorno."
+              },
+              "example_title": "Evaluación de Costos por Entorno",
+              "example": "| Entorno Propuesto | Plataforma de Hosting | Costo Mensual Estimado |\n| --- | --- | --- |\n| Local (Dev) | Estaciones de desarrollo personales | $0 USD (Recursos locales) |\n| Staging | PaaS nivel hobby / pruebas | $0 - $7 USD |\n| Producción | Instancia gestionada con SLA | $15 USD (Dentro del límite RNN) |",
+              "link_label": "análisis de costos pasa a selección de entornos (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Selección de Entornos Mínimos Operativos",
+          "objective": "Definir la tríada o díada de entornos que cubrirá el ciclo de vida del software sin fricción.",
+          "input": "Análisis de costos y arquitectura de P2-D3.",
+          "raw_data_title": "Entornos Seleccionados",
+          "raw_data": "Tríada seleccionada: Local (Dev), Staging (Pre-producción) y Producción. Cada uno con misión específica.",
+          "exit_label": "ENTORNOS SELECCIONADOS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Mapeo de Entornos Local, Staging y Producción",
+              "objective": "Asignar la misión primordial y el alcance funcional de cada universo de ejecución.",
+              "how_to": {
+                "steps": [
+                  "Definir el entorno Local como espacio de codificación individual y pruebas rápidas.",
+                  "Definir el entorno Staging para validación de Pull Requests e integración previa a release.",
+                  "Definir el entorno Producción con 100% SLA y estabilidad para usuarios finales.",
+                  "Comprobar que ningún desarrollador requiera probar directamente en Producción."
+                ],
+                "table_columns": "Entorno | Misión Primordial | Responsable del Ciclo de Vida",
+                "table_rules": "Cada entorno debe tener un propósito inequívoco y delimitado.",
+                "restrictions": [
+                  "Prohibido mezclar pruebas manuales de desarrollo con el entorno público de Producción."
+                ],
+                "done_when": "Mapeo de misiones de los entornos completado."
+              },
+              "example_title": "Misiones Primordiales de Entornos",
+              "example": "| Entorno | Misión Primordial | Responsable |\n| --- | --- | --- |\n| Local (Dev) | Escritura de código en máquinas locales sin riesgo | Desarrollador individual |\n| Staging | Validar flujos de integración y PRs antes de fusionar | CTO / QA Manual |\n| Producción | Tráfico real con 100% SLA garantizado | Clientes finales y plataforma |",
+              "link_label": "misiones pasan a definición de topología web y componentes (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Topología Web y Reglas de Acceso",
+          "objective": "Especificar las URLs, subdominios y componentes tecnológicos activos en cada entorno.",
+          "input": "Entornos seleccionados y arquitectura monorepo de P2-D4.",
+          "raw_data_title": "Topología de Acceso",
+          "raw_data": "Local: localhost:8080/5173. Staging: subdominio de test y backend temporal. Prod: dominio oficial nff.com.co.",
+          "exit_label": "MAPA DE ENTORNOS OFICIAL BLOQUEADO → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Formalización del Mapa de Entornos Oficiales",
+              "objective": "Consolidar la tabla oficial de entornos con sus componentes y medios de acceso.",
+              "how_to": {
+                "steps": [
+                  "Asignar las rutas y URLs correspondientes a cada entorno.",
+                  "Listar los componentes activos en cada nivel (IDEs, Docker, servidores PaaS).",
+                  "Consolidar la tabla del mapa de entornos oficiales.",
+                  "Verificar el cumplimiento del pass condition de claridad en áreas seguras vs de riesgo."
+                ],
+                "table_columns": "Entorno | Misión Principal | Componentes Activos",
+                "table_rules": "Debe quedar documentado dónde se ubica físicamente cada servicio por entorno.",
+                "restrictions": [
+                  "No dejar URLs de producción expuestas como zonas de testeo."
+                ],
+                "done_when": "Tabla oficial de mapa de entornos formalizada."
+              },
+              "example_title": "Mapa de Entornos Oficiales (Step 1 Output)",
+              "example": "| Entorno | Misión Principal | Componentes Activos |\n| --- | --- | --- |\n| Local (Dev) | Escritura de código en máquinas locales. | IDEs, Base de Datos local (Dockerizada o en memoria H2), Servidor local Java, Dev Server de Vite (JS). |\n| Staging | Validar flujos de integración y Pull Requests antes de fusionar. QA Manual. | Servidor en PaaS (Railway/Render) de pruebas. DB PostgreSQL temporal. |\n| Producción | Tráfico real. 100% SLA garantizado para agencias y turistas. | Instancia aislada de BD y Servidor Java + Hosting estático para JS. |",
+              "link_label": "mapa de entornos pasa a aislamiento de bases de datos y secretos (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Aislamiento de Datos (Bases de Datos y Secretos)",
+      "summary": "Establecer las barreras físicas e inviolables para impedir que datos ficticios contaminen producción o que pruebas ejecuten transacciones reales.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Estrategia de Segregación de Bases de Datos",
+          "objective": "Garantizar que las instancias de almacenamiento de datos de pruebas jamás se comuniquen con producción.",
+          "input": "Base de datos PostgreSQL definida en D3 y mapa de entornos de Step 1.",
+          "raw_data_title": "Segregación de Base de Datos",
+          "raw_data": "Local y Staging usan semillas con datos falsos (mock data). Producción en VPC privada con acceso restringido.",
+          "exit_label": "SEGREGACIÓN DE BASES DE DATOS ESTABLECIDA → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Aislamiento de Datos Locales, Staging y VPC Producción",
+              "objective": "Definir las políticas de conexión, ofuscación y almacenamiento para cada base de datos.",
+              "how_to": {
+                "steps": [
+                  "Establecer el uso de bases de datos locales dockerizadas o en memoria para Dev.",
+                  "Configurar una base de datos PostgreSQL separada y temporal para Staging con datos mock.",
+                  "Aislar la base de datos de Producción en una VPC privada sin puertos públicos expuestos.",
+                  "Redactar la prohibición absoluta de ejecutar scripts de prueba sobre la BD productiva."
+                ],
+                "table_columns": "Capa de Datos | Estrategia de Aislamiento | Riesgo Mitigado",
+                "table_rules": "Queda estrictamente prohibido compartir credenciales de BD entre Staging y Producción.",
+                "restrictions": [
+                  "Prohibido realizar copias directas de datos sensibles de producción hacia local sin anonimizar."
+                ],
+                "done_when": "Políticas de aislamiento de bases de datos completamente redactadas."
+              },
+              "example_title": "Políticas de Aislamiento de Bases de Datos",
+              "example": "| Entorno | Estrategia de Aislamiento de BD | Mecanismo de Seguridad |\n| --- | --- | --- |\n| Local / Staging | Base de datos inyectada con datos de prueba (Mock Data) | Scripts de seed reproducibles |\n| Producción | Instancia PostgreSQL en VPC privada | Cero acceso público, solo red interna del backend |",
+              "link_label": "aislamiento de BD pasa a segregación de pagos y APIs de terceros (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Contención de Servicios Financieros y de Mensajería",
+          "objective": "Aislar las pasarelas de pago y proveedores de mensajería para evitar cargos reales o notificaciones espurias.",
+          "input": "Integraciones de Wompi y Meta WABA de P2-D3.",
+          "raw_data_title": "Contención Financiera y Comunicaciones",
+          "raw_data": "Wompi: llaves pub_test/prv_test en staging; pub_prod/prv_prod en prod. WABA: sandbox para test, número oficial en prod.",
+          "exit_label": "SERVICIOS FINANCIEROS Y COMUNICACIONES AISLADOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Gestión de Credenciales Sandbox y Producción",
+              "objective": "Vincular cada entorno a las credenciales de prueba o de producción de los proveedores externos.",
+              "how_to": {
+                "steps": [
+                  "Asignar llaves sandbox (pub_test_/prv_test_) de Wompi a Local y Staging.",
+                  "Asignar llaves de producción (pub_prod_/prv_prod_) exclusivamente a Producción mediante variables de entorno.",
+                  "Configurar el sandbox de Meta WhatsApp apuntando únicamente a números de los fundadores.",
+                  "Validar que sea imposible emitir cobros reales o spam desde Staging."
+                ],
+                "table_columns": "Servicio Externo | Configuración Local / Staging | Configuración Producción",
+                "table_rules": "Toda transacción financiera en pruebas debe ejecutarse en modo sandbox.",
+                "restrictions": [
+                  "Prohibido comitear llaves privadas o credenciales al código fuente."
+                ],
+                "done_when": "Credenciales y endpoints de terceros categorizados por entorno."
+              },
+              "example_title": "Segregación de Servicios Externos",
+              "example": "| Servicio Externo | Configuración Local / Staging | Configuración Producción |\n| --- | --- | --- |\n| Pasarela de Pagos (Wompi) | Uso obligatorio de Llaves Públicas/Privadas TEST (pub_test_... / prv_test_...) | Uso exclusivo de Llaves PROD (pub_prod_... / prv_prod_...) |\n| Mensajería (Meta WABA) | Número Sandbox de Meta o Mock de servicio en Local | Número Verificado Oficial con autorización a clientes |",
+              "link_label": "segregación de servicios pasa a matriz maestra de contención (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Matriz Maestra de Aislamiento y Secretos",
+          "objective": "Consolidar las reglas de contención de datos en la matriz oficial de salida.",
+          "input": "Reglas de base de datos (2.1) e integraciones (2.2).",
+          "raw_data_title": "Matriz Maestra de Contención",
+          "raw_data": "Matriz completa con reglas para PostgreSQL, Wompi y Meta WABA contrastando Staging vs Producción.",
+          "exit_label": "MATRIZ DE AISLAMIENTO OFICIAL COMPLETA → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Formalización de la Matriz de Contención de Datos",
+              "objective": "Construir la tabla comparativa oficial de contención de datos por servicio de terceros.",
+              "how_to": {
+                "steps": [
+                  "Redactar las especificaciones para PostgreSQL, Wompi y Meta WABA.",
+                  "Contrastar la regla para Local/Staging frente a Producción.",
+                  "Consolidar la tabla oficial de aislamiento.",
+                  "Asegurar el cumplimiento del pass condition de imposibilidad matemática de cobro indebido."
+                ],
+                "table_columns": "Servicio de Tercero | Regla para Local / Staging | Regla para Producción",
+                "table_rules": "Cada servicio externo debe contar con reglas disyuntivas claras.",
+                "restrictions": [
+                  "No dejar ningún servicio externo sin su regla de contención explícita."
+                ],
+                "done_when": "Matriz maestra de contención de datos completada y validada."
+              },
+              "example_title": "Aislamiento de Datos Externos (Step 2 Output)",
+              "example": "| Servicio de Tercero | Regla para Local / Staging | Regla para Producción |\n| --- | --- | --- |\n| Base de Datos (PostgreSQL) | BD Inyectada con datos 'Fake' (Mock data) en local y Staging. | Base de Datos ofuscada, aislada y sin puertos expuestos a red pública (Solo VPC). |\n| Pasarela de Pagos (Wompi) | Uso obligatorio de Llaves Públicas/Privadas TEST (`pub_test_...` / `prv_test_...`). | Uso exclusivo de Llaves PROD (`pub_prod_...` / `prv_prod_...`). |\n| Mensajería (Meta WABA) | Número Sandbox de Meta o Mock de servicio en Local. | Número Verificado Oficial. Autorizado para enviar mensajes a cualquier cliente. |",
+              "link_label": "matriz de contención pasa a ensamblaje del documento final (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar la bitácora de URLs, mapa de entornos y políticas de contención de datos en el documento maestro oficial.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Consolidación de Metadatos y Mapa de Entornos",
+          "objective": "Ensamblar la ficha técnica y la tabla del mapa de entornos en formato oficial.",
+          "input": "Metadatos del proyecto y mapa de entornos de Step 1.",
+          "raw_data_title": "Metadatos y Mapa de Entornos",
+          "raw_data": "Proyecto: Nos Fuimos de Finca, Fase 2, D6, Estado Aprobado. Mapa de entornos con Local, Staging y Producción.",
+          "exit_label": "METADATOS Y MAPA ENSAMBLADOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Integración de Metadatos y Topología de Entornos",
+              "objective": "Redactar las secciones 1 y 2 del documento oficial verificando fidelidad de datos.",
+              "how_to": {
+                "steps": [
+                  "Llenar los metadatos (Proyecto, Fase, Entregable, Estado).",
+                  "Adjuntar la tabla del Mapa de Entornos Oficiales con sus componentes activos.",
+                  "Verificar que las definiciones concuerden con las decisiones de D2, D3 y D4.",
+                  "Asegurar coherencia visual y de formato."
+                ],
+                "table_columns": "Sección | Contenido Ensamblado | Origen de Datos",
+                "table_rules": "Cumplir con el formato estándar Markdown de la plantilla de salida.",
+                "restrictions": [
+                  "No omitir ninguno de los tres entornos validados en la arquitectura."
+                ],
+                "done_when": "Secciones 1 y 2 ensambladas correctamente."
+              },
+              "example_title": "Metadatos y Mapa de Entornos Ensamblados",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 2 — Project Kickoff\n**Entregable:** 6 de 13\n**Estado:** Aprobado\n\n### 2. Mapa de Entornos Oficiales\n| Entorno | Misión Principal | Componentes Activos |\n| --- | --- | --- |\n| Local (Dev) | Escritura de código en máquinas locales. | IDEs, Base de Datos local (Dockerizada o en memoria H2), Servidor local Java, Dev Server de Vite (JS). |\n| Staging | Validar flujos de integración y Pull Requests antes de fusionar. QA Manual. | Servidor en PaaS (Railway/Render) de pruebas. DB PostgreSQL temporal. |\n| Producción | Tráfico real. 100% SLA garantizado para agencias y turistas. | Instancia aislada de BD y Servidor Java + Hosting estático para JS. |",
+              "link_label": "mapa base pasa a anexar contención y compuerta (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Integración de Contención y Compuerta de Fase",
+          "objective": "Incorporar la matriz de aislamiento y evaluar el cumplimiento de la compuerta de fase.",
+          "input": "Matriz de aislamiento de datos (Step 2) y reglas de compuerta condicional.",
+          "raw_data_title": "Contención y Compuerta D6",
+          "raw_data": "Matriz de contención integrada. Condición: Proceed. El aislamiento garantiza que no haya corrupción de datos reales.",
+          "exit_label": "CONTENCIÓN Y COMPUERTA INCORPORADAS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Incorporación de Reglas de Aislamiento y Compuerta",
+              "objective": "Integrar las secciones 3 y 4 del documento y documentar el veredicto de la compuerta condicional.",
+              "how_to": {
+                "steps": [
+                  "Insertar la tabla de Aislamiento de Datos Externos (Contención).",
+                  "Evaluar la compuerta: ¿Existen entornos aislados con bases y credenciales separadas?",
+                  "Redactar la declaración formal de avance (Proceed).",
+                  "Verificar que la compuerta no presente advertencias de seguridad."
+                ],
+                "table_columns": "Sección | Elemento de Gobernanza | Veredicto",
+                "table_rules": "Si Staging apunta a la base de datos de producción, detener de inmediato.",
+                "restrictions": [
+                  "Prohibido proceder si no se garantiza la segregación de pagos de producción."
+                ],
+                "done_when": "Secciones de contención y compuerta de fase formalizadas."
+              },
+              "example_title": "Contención y Compuerta de Fase",
+              "example": "### 3. Aislamiento de Datos Externos (Contención)\n| Servicio de Tercero | Regla para Local / Staging | Regla para Producción |\n| --- | --- | --- |\n| Base de Datos (PostgreSQL) | BD Inyectada con datos 'Fake' (Mock data) en local y Staging. | Base de Datos ofuscada, aislada y sin puertos expuestos a red pública (Solo VPC). |\n| Pasarela de Pagos (Wompi) | Uso obligatorio de Llaves Públicas/Privadas TEST (`pub_test_...` / `prv_test_...`). | Uso exclusivo de Llaves PROD (`pub_prod_...` / `prv_prod_...`). |\n| Mensajería (Meta WABA) | Número Sandbox de Meta o Mock de servicio en Local. | Número Verificado Oficial. Autorizado para enviar mensajes a cualquier cliente. |\n\n### 4. Implicación de Compuerta de Fase\n- **Condición:** Proceed. El aislamiento garantiza que los programadores no modifiquen datos de producción mientras compilan Java en local.",
+              "link_label": "documento completo pasa a verificación final y emisión (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Validación de Integridad y Publicación Oficial",
+          "objective": "Validar la completitud del artefacto contra el entregable de referencia y oficializar su entrega.",
+          "input": "Documento completo ensamblado y archivo de salida oficial.",
+          "raw_data_title": "Validación y Entrega D6",
+          "raw_data": "Verificado contra example_output_environment_definitions.md. Aprobado para publicación en docs/02-project-kickoff.",
+          "exit_label": "ENTREGABLE D6 PUBLICADO Y COMPLETADO",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Emisión Oficial del Documento D6",
+              "objective": "Publicar el archivo oficial de Definición de Entornos listo para consulta del equipo y onboarding.",
+              "how_to": {
+                "steps": [
+                  "Verificar que todas las secciones del documento estén completas.",
+                  "Comprobar el enlace al artefacto [[example_output_environment_definitions]].",
+                  "Confirmar que el estado del documento sea Aprobado.",
+                  "Registrar el hito en el control de progreso del proyecto."
+                ],
+                "table_columns": "Criterio de Validación | Estado | Observación",
+                "table_rules": "El documento emitido es la referencia obligatoria para la configuración de despliegues.",
+                "restrictions": [
+                  "No concluir sin asegurar que las variables maestras estén catalogadas."
+                ],
+                "done_when": "Entregable D6 formalmente emitido y publicado."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_environment_definitions]]`.\n\nUbicación oficial: `docs/02-project-kickoff/06. Entornos.md`.\nEstado: Aprobado por Compuerta de Fase.",
+              "link_label": "entrega completada - fin de flujo D6"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

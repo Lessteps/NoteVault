@@ -1,0 +1,201 @@
+{
+  "phase": "PHASE 4: SYSTEM MODELING",
+  "deliverable_code": "D8",
+  "deliverable": "State Machine & Activity Diagrams",
+  "purpose": "Modelar el ciclo de vida riguroso y determinista de las entidades de negocio críticas (Reservas, Desembolsos, Pagos, Inmuebles), formalizando sus estados iniciales, intermedios y terminales, junto con los eventos disparadores (Triggers), condiciones booleanas de guardia (Guards) y efectos secundarios inmediatos (Side Effects/Actions).",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Module Specification (P3-D7) | [[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification/7.Module_Specification.md]] | Fuente primaria de Business Rules y keywords de cambio de estado (pendiente, confirmado, expirado). |\n| Conceptual ERD (D6) | [[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]] | Identifica las entidades de datos persistentes del sistema susceptibles a transiciones de estado. |\n| Sequence Diagrams (D7) | [[PHASE_4_SYSTEM_MODELING/7.System_Sequence_Diagrams/7.System_Sequence_Diagrams.md]] | Identifica las interacciones, webhooks y clics de usuario que disparan los cambios de estado. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Identificación del Ciclo de Vida (Lifecycle Identification)",
+      "summary": "Analizar las entidades del ERD contra las reglas de negocio de Fase 3 para clasificar estados iniciales, intermedios y terminales.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Identificación y Clasificación de Entidades con Ciclo de Vida",
+          "objective": "Extraer las entidades con ciclo de vida discreto y registrar sus transiciones crudas sin saltos de datos.",
+          "input": "Entidades del ERD (D6) y Business Rules de Module Specification (P3-D7).",
+          "raw_data_title": "Inventario de Entidades y Estados Discretos",
+          "raw_data": "| Entidad | Estado Inicial | Estados Intermedios | Estados Terminales | Transiciones Crudas Identificadas |\n|---|---|---|---|---|\n| Bookings | PENDING_PAYMENT | PENDING_APPROVAL, CONFIRMED | COMPLETED, CANCELLED | PENDING_PAYMENT -> PENDING_APPROVAL, PENDING_APPROVAL -> CONFIRMED, CONFIRMED -> COMPLETED, etc. |\n| Payouts | PENDING | PROCESSING | PAID, FAILED | PENDING -> PROCESSING, PROCESSING -> PAID, PROCESSING -> FAILED, FAILED -> PROCESSING |\n| Payments | PENDING | - | PAID, FAILED, REFUNDED | PENDING -> PAID, PENDING -> FAILED, PAID -> REFUNDED |\n| Properties | DRAFT | SUBMITTED, IN_REVIEW, SUSPENDED | PUBLISHED, REJECTED, ARCHIVED | DRAFT -> SUBMITTED, SUBMITTED -> IN_REVIEW, IN_REVIEW -> PUBLISHED, etc. |",
+          "exit_label": "Entidades y Transiciones Crudas Identificadas",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Clasificación de Estados Discretos y Topología de Ciclo de Vida",
+              "objective": "Definir los límites de estados para cada entidad asegurando ausencia de bucles infinitos no terminales.",
+              "how_to": {
+                "steps": [
+                  "1. Buscar en Business Rules de Fase 3 las keywords de estado ('estado', 'status', 'pendiente', 'aprobado', 'cancelado').",
+                  "2. Descartar entidades pasivas que no tienen estados discretos.",
+                  "3. Para cada entidad con estado, listar Initial State ([*] -> Estado), Intermedios y Terminales (Estado -> [*]).",
+                  "4. Construir la tabla de transiciones de estado crudas (Desde -> Hasta)."
+                ],
+                "table_columns": [
+                  "Entidad",
+                  "Estado Inicial",
+                  "Intermedios",
+                  "Terminales"
+                ],
+                "table_rules": [
+                  "Toda máquina de estados debe tener al menos un estado inicial y un estado terminal",
+                  "No deben existir estados aislados sin camino de entrada o salida",
+                  "Las entidades deben coincidir exactamente con el ERD de D6"
+                ],
+                "restrictions": "Prohibido modelar máquinas de estados para entidades estáticas sin ciclo de vida.",
+                "done_when": "Todas las entidades con ciclo de vida catalogadas con sus estados discretos."
+              },
+              "example_title": "Transiciones Crudas de Bookings",
+              "example": "```markdown\n## Entidad: Bookings\n- Initial State: PENDING_PAYMENT\n- Estados Intermedios: PENDING_APPROVAL, CONFIRMED\n- Terminal States: COMPLETED, CANCELLED\n\n### Transiciones Crudas\n- PENDING_PAYMENT -> PENDING_APPROVAL\n- PENDING_PAYMENT -> CANCELLED\n- PENDING_APPROVAL -> CONFIRMED\n- PENDING_APPROVAL -> CANCELLED\n- CONFIRMED -> COMPLETED\n- CONFIRMED -> CANCELLED\n```",
+              "link_label": "Transiciones Crudas -> Triggers y Guards"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Formalización de Triggers y Guards (Eventos y Condiciones)",
+      "summary": "Convertir transiciones crudas en reglas deterministas asignando eventos disparadores y condiciones booleanas de guardia.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Mapeo de Disparadores y Condiciones Lógicas de Guardia",
+          "objective": "Vincular eventos de red, webhooks y clics con validaciones matemáticas y de negocio obligatorias.",
+          "input": "Transiciones crudas del Step 1 y actores/flujos de D7.",
+          "raw_data_title": "Matriz de Triggers y Guard Conditions",
+          "raw_data": "| Entidad | Transición | Trigger (Evento Disparador) | Guard Condition [Condición Booleana] |\n|---|---|---|---|\n| Bookings | PENDING_PAYMENT -> PENDING_APPROVAL | Webhook Wompi (Approve) | [payment.amount == total_price] |\n| Bookings | PENDING_PAYMENT -> CANCELLED | Cron(Timeout) | [elapsed_time > 15 mins] |\n| Bookings | PENDING_APPROVAL -> CONFIRMED | WhatsApp API (Approve) | [elapsed_time < 90 mins] |\n| Bookings | PENDING_APPROVAL -> CANCELLED | WhatsApp API (Reject) / Cron | [elapsed_time >= 90 mins] |\n| Payouts | PENDING -> PROCESSING | Cron(Facturación Diaria) | [bank_account != null] |\n| Properties | SUBMITTED -> IN_REVIEW | Admin Clicks 'Start Review' | [docs_complete == true] |",
+          "exit_label": "Triggers y Guards Rigurosamente Formalizados",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Diagramación de Estados con Sintaxis Trigger [Guard]",
+              "objective": "Generar diagramas Mermaid stateDiagram-v2 con anotaciones completas.",
+              "how_to": {
+                "steps": [
+                  "1. Especificar para cada transición el evento causante (Trigger).",
+                  "2. Encerrar entre corchetes rectangulares las condiciones obligatorias: `[guard]`.",
+                  "3. Documentar las ramas de timeout cuando apliquen límites temporales de negocio.",
+                  "4. Validar que si la condición de guardia es falsa, la transición no se ejecuta."
+                ],
+                "table_columns": [
+                  "Transición",
+                  "Trigger",
+                  "Guard Condition",
+                  "Efecto de Rechazo"
+                ],
+                "table_rules": [
+                  "Toda transición condicional debe explicitar su Guard entre corchetes",
+                  "Los triggers de pago deben validar montos exactos",
+                  "Los timeouts deben explicitar los minutos límites de regla de negocio"
+                ],
+                "restrictions": "No dejar transiciones automáticas sin evento detonante explícito.",
+                "done_when": "Diagramas de estados formalizados con etiquetas Trigger [Guard] en Mermaid."
+              },
+              "example_title": "Especificación de Transición Determinista",
+              "example": "```mermaid\nstateDiagram-v2\n    [*] --> PENDING_PAYMENT : Checkout Iniciado\n    PENDING_PAYMENT --> PENDING_APPROVAL : Webhook Wompi(Approve) [payment.amount == total_price]\n    PENDING_PAYMENT --> CANCELLED : Cron(Timeout) [> 15 mins]\n    PENDING_APPROVAL --> CONFIRMED : WA API(Approve) [< 90 mins]\n    PENDING_APPROVAL --> CANCELLED : Cron(Timeout) [> 90 mins]\n```",
+              "link_label": "Triggers y Guards Validados -> Lógica de Actividades"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Lógica Algorítmica y Efectos Secundarios (Activity Logic & Side Effects)",
+      "summary": "Documentar las acciones secundarias atómicas ejecutadas tras cada transición y detallar flujos algorítmicos complejos.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Modelado de Side Effects y Diagramas de Actividad Algorítmicos",
+          "objective": "Especificar las acciones post-transición (bloqueo de fechas, reembolsos, emisión de notificaciones) y diagramar bifurcaciones complejas.",
+          "input": "Triggers y Guards del Step 2 y requerimientos de notificación de Fase 3.",
+          "raw_data_title": "Acciones y Efectos Secundarios por Transición",
+          "raw_data": "| Entidad | Transición | Side Effects / Actions (/ Action) | Impacto en Otros Módulos |\n|---|---|---|---|\n| Bookings | PENDING_PAYMENT -> PENDING_APPROVAL | / CreateSoftLock(15 mins), SendWhatsAppApprovalRequest() | MOD-CALENDAR, MOD-NOTIFICATION |\n| Bookings | PENDING_APPROVAL -> CONFIRMED | / CommitHardLock(), NotifyGuest(Push, Email) | MOD-CALENDAR, MOD-NOTIFICATION |\n| Bookings | PENDING_APPROVAL -> CANCELLED | / ReleaseSoftLock(), TriggerRefund() | MOD-PAYMENT, MOD-NOTIFICATION |\n| Bookings | CONFIRMED -> COMPLETED | / GeneratePayout() | MOD-PAYOUT (Crea registro en Payouts) |\n| Payouts | PROCESSING -> PAID | / SendHostAlert(Push) | MOD-NOTIFICATION |",
+          "exit_label": "Side Effects Asignados y Diagramas de Actividad Listos",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Asignación de Acciones Atómicas y Diagramación de Flujo Algorítmico",
+              "objective": "Completar la notación `/ Action()` en cada transición de estado e ilustrar ramificaciones algorítmicas cuando aplique.",
+              "how_to": {
+                "steps": [
+                  "1. Agregar la barra inclinada `/` seguida del nombre de la acción en la transición de estado.",
+                  "2. Conectar las acciones con los módulos downstream correspondientes (Payouts, Notificaciones).",
+                  "3. Si una transición involucra un motor de cálculo o bifurcaciones de precios complejas, trazar un flowchart TD de actividad.",
+                  "4. Justificar formalmente la necesidad o ausencia de diagramas de actividad adicionales."
+                ],
+                "table_columns": [
+                  "Transición",
+                  "Acción Ejecutada",
+                  "Módulo Destino",
+                  "Tipo de Proceso"
+                ],
+                "table_rules": [
+                  "Toda acción que afecte inventario debe especificar liberación o bloqueo de lock",
+                  "Los reembolsos deben dispararse ante cancelaciones por timeout o rechazo de anfitrión",
+                  "La generación de pagos a anfitriones solo ocurre al completarse la estadía"
+                ],
+                "restrictions": "No omitir el manejo de reversión de locks ante transiciones de cancelación.",
+                "done_when": "Todas las transiciones cuentan con sus side effects mapeados y validados."
+              },
+              "example_title": "Transiciones con Side Effects Completos",
+              "example": "```mermaid\nstateDiagram-v2\n    PENDING_PAYMENT --> PENDING_APPROVAL : Webhook Wompi(Approve) [payment.amt == total_price] / CreateSoftLock(), SendWARequest()\n    PENDING_APPROVAL --> CONFIRMED : WA API(Approve) [< 90 mins] / CommitHardLock(), NotifyGuest()\n    PENDING_APPROVAL --> CANCELLED : Cron(Timeout) [> 90 mins] / ReleaseSoftLock(), TriggerRefund()\n    CONFIRMED --> COMPLETED : System.Timer [now >= check_in] / GeneratePayout()\n```",
+              "link_label": "Side Effects Validados -> Ensamblaje Matriz de Estados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de la Matriz de Estados e Implicaciones Downstream (Assembly & Implications)",
+      "summary": "Consolidar el entregable D8 con los 4 ciclos de vida críticos, tablas de transición y sus impactos en APIs y seguridad.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Diagramas de Estado y Matriz de Transiciones",
+          "objective": "Ensamblar el documento maestro de máquinas de estado con trazabilidad a Fase 3 y directivas para D9 y D11.",
+          "input": "Diagramas de estados completados para Bookings, Payouts, Payments y Properties.",
+          "raw_data_title": "Resumen de Entidades Modeladas e Implicaciones",
+          "raw_data": "| Entidad | Número de Estados | Transiciones Críticas | Implicación Directa en D9 (API Design) |\n|---|---|---|---|\n| Bookings | 5 estados | 7 transiciones | Endpoints: POST /bookings/checkout, PATCH /bookings/{id}/wa-response, POST /cancel |\n| Payouts | 4 estados | 4 transiciones | Endpoints: POST /payouts/batch-process, PATCH /payouts/{id}/bank-update |\n| Payments | 4 estados | 4 transiciones | Webhooks: POST /webhooks/wompi-transactions, POST /payments/{id}/refund |\n| Properties | 6 estados | 8 transiciones | Endpoints: POST /properties/submit, PATCH /admin/properties/{id}/review |",
+          "exit_label": "Entregable D8 Formalmente Ensamblado y Validado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Generación del Documento D8 y Matriz de Transiciones",
+              "objective": "Publicar la especificación formal de ciclos de vida del sistema.",
+              "how_to": {
+                "steps": [
+                  "1. Compilar los diagramas Mermaid stateDiagram-v2 para cada una de las 4 entidades clave.",
+                  "2. Incluir la tabla detallada de Transición, Trigger, Guard Condition y Action.",
+                  "3. Documentar las implicaciones para D9 (diseño de APIs), D10 (notificaciones) y D11 (autorización por roles).",
+                  "4. Verificar cumplimiento estricto de las reglas de traducción y formato."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Entidad",
+                  "Diagramas",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "Debe cubrirse el 100% de las entidades con ciclo de vida del ERD D6",
+                  "Cada transición debe tener correspondencia con una operación de API o evento de sistema",
+                  "Garantizar consistencia de nombres con D6 y D7"
+                ],
+                "restrictions": "No admitir transiciones ambiguas o sin definición de guard cuando exista riesgo de concurrencia.",
+                "done_when": "Documento D8 completo con 4 máquinas de estados y tablas de soporte."
+              },
+              "example_title": "Matriz de Transiciones D8",
+              "example": "```markdown\n| Transición | Trigger | Guard Condition | Action |\n|---|---|---|---|\n| PENDING_PAYMENT -> PENDING_APPROVAL | Webhook Wompi | payment.amt == total_price | CreateSoftLock(), SendWARequest() |\n| PENDING_APPROVAL -> CONFIRMED | WhatsApp API | elapsed < 90 mins | CommitHardLock(), NotifyGuest() |\n| PENDING_APPROVAL -> CANCELLED | Timeout Cron | elapsed >= 90 mins | ReleaseSoftLock(), TriggerRefund() |\n| CONFIRMED -> COMPLETED | Timer | now >= check_in | GeneratePayout() |\n```",
+              "link_label": "Matriz Ensamblada -> Entregable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — State Machine & Activity Diagrams (D8)",
+    "markdown": "# Deliverable 8 (D8): State Machine & Activity Diagrams\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Alcance:** Global (Reservas, Propiedades, Pagos, Desembolsos)\n**Estado:** Aprobado\n\n---\n\n## 1. Bookings (Reservas) State Machine\n\n*Backlink a Fase 3:* Implementa las reglas de negocio estrictas de `[[PHASE_3_REQUIREMENTS_ENGINEERING/8.Business_Rules_and_Constraints.md]]` (específicamente la ventana de 15 min de pago y la ventana de 90 min de aprobación B2B vía WhatsApp).\n*Construido a partir del ERD (D6) y Secuencias (D7).*\n\n```mermaid\nstateDiagram-v2\n    [*] --> PENDING_PAYMENT : Checkout Iniciado\n\n    PENDING_PAYMENT --> PENDING_APPROVAL : Webhook Wompi(Approve) [payment.amt == total_price] / CreateSoftLock(), SendWARequest()\n    PENDING_PAYMENT --> CANCELLED : Cron(Timeout) [> 15 mins] / ReleaseLock()\n    PENDING_PAYMENT --> CANCELLED : Webhook Wompi(Decline)\n\n    PENDING_APPROVAL --> CONFIRMED : WA API(Approve) [< 90 mins] / CommitHardLock(), NotifyGuest()\n    PENDING_APPROVAL --> CANCELLED : WA API(Reject) / ReleaseSoftLock(), TriggerRefund()\n    PENDING_APPROVAL --> CANCELLED : Cron(Timeout) [> 90 mins] / ReleaseSoftLock(), TriggerRefund()\n\n    CONFIRMED --> COMPLETED : System.Timer [now >= check_in] / GeneratePayout()\n    CONFIRMED --> CANCELLED : API.Cancel(Reason) [valid_policy] / Refund()\n\n    COMPLETED --> [*]\n    CANCELLED --> [*]\n```\n\n---\n\n## 2. Payouts (Desembolsos a Anfitriones) State Machine\n\nGestiona el envío de fondos (menos comisión de plataforma) a la cuenta bancaria del Finquero.\n\n```mermaid\nstateDiagram-v2\n    [*] --> PENDING : Booking.COMPLETED [bank_account != null]\n    PENDING --> PROCESSING : Cron(Facturación Diaria)\n    PROCESSING --> PAID : BankAPI(Success) / SendHostAlert(Push)\n    PROCESSING --> FAILED : BankAPI(Error) / SendHostAlert(WA)\n    FAILED --> PROCESSING : User(UpdateBankAccount)\n    PAID --> [*]\n```\n\n---\n\n## 3. Payments (Pagos Entrantes) State Machine\n\nGestión del dinero que entra desde el turista vía tarjeta de crédito o PSE.\n\n```mermaid\nstateDiagram-v2\n    [*] --> PENDING : Redirect to Wompi\n    PENDING --> PAID : Webhook(Transaction.Approved)\n    PENDING --> FAILED : Webhook(Transaction.Declined)\n    PAID --> REFUNDED : Booking.CANCELLED [RefundPolicy==True] / Wompi.Void()\n    FAILED --> [*]\n    REFUNDED --> [*]\n```\n\n---\n\n## 4. Properties (Inmuebles y Publicaciones) State Machine\n\nCiclo de vida de validación y curaduría de fincas antes de publicarse en el catálogo público.\n\n```mermaid\nstateDiagram-v2\n    [*] --> DRAFT : Host crea borrador\n    DRAFT --> SUBMITTED : Host envía a revisión [docs_complete == true]\n    SUBMITTED --> IN_REVIEW : Admin inicia validación KYC\n    IN_REVIEW --> PUBLISHED : Admin aprueba [compliance_ok == true] / IndexInSearch()\n    IN_REVIEW --> REJECTED : Admin rechaza [motivo_adjunto] / NotifyHost()\n    PUBLISHED --> SUSPENDED : Denuncia o incumplimiento de normas\n    SUSPENDED --> PUBLISHED : Resolución de apelación favorable\n    PUBLISHED --> ARCHIVED : Host desactiva propiedad\n```\n\n---\n\n## Implicaciones para Siguientes Entregables\n\n- **Hacia D9 (API Conceptual Design):** Cada transición con trigger de usuario o webhook define exactamente los endpoints REST (`POST /api/v1/bookings`, `POST /api/v1/webhooks/wompi`, `PATCH /api/v1/properties/{id}/review`).\n- **Hacia D10 (Notification Matrix):** Las acciones (`SendWARequest()`, `NotifyGuest()`, `SendHostAlert()`) alimentan la matriz de canales y plantillas de comunicación.\n- **Hacia D11 (Authorization Matrix):** Las condiciones de guardia (`[compliance_ok == true]`, `[elapsed < 90 mins]`) determinan qué roles (`HOST`, `ADMIN`, `SYSTEM_CRON`) tienen permisos exclusivos para ejecutar cada transición."
+  }
+}

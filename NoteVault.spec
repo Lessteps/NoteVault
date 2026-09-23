@@ -35,13 +35,18 @@ a = Analysis(
     hiddenimports=[
         'PySide6.QtMultimedia',
         'PySide6.QtMultimediaWidgets',
+        'PySide6.QtOpenGLWidgets',
         'watchdog.observers',
         'watchdog.observers.polling',
     ] + collect_submodules('notevault_app'),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'matplotlib', 'numpy', 'scipy', 'pandas'],
+    # QtWebEngine is NOT bundled: it lives in ./web_runtime (tools/build_web_runtime.py)
+    # and core/web_runtime.py loads it the first time the WEB module opens.
+    excludes=['tkinter', 'matplotlib', 'numpy', 'scipy', 'pandas',
+              'PySide6.QtWebEngineCore', 'PySide6.QtWebEngineWidgets',
+              'PySide6.QtWebEngineQuick', 'PySide6.QtWebChannel'],
     noarchive=False,
     optimize=1,
 )

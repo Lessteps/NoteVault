@@ -1,0 +1,408 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D3",
+  "deliverable": "Competitive Analysis Document (Análisis Competitivo)",
+  "purpose": "Este entregable garantiza que el producto tiene un espacio único y defendible para existir en el mercado. Contrasta los dolores del usuario contra las alternativas existentes (sustitutos triviales y competidores directos/indirectos), realiza minería de quejas públicas mediante búsqueda web y define una ventaja estructural defendible (Moat).",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_user_profile]] | Provee las prioridades confirmadas del usuario que se convertirán en las columnas de la matriz (P1-D1). |\n| [[example_output_market_validation]] | Confirma el tamaño de mercado y viabilidad económica inicial (P1-D2). |\n| [[example_output_risk_register]] | Provee el análisis del Descalificador 4 (\"Solución Trivial Existente\" de P0-D7) para someterlo a investigación formal de mercado. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Identificación de Sustitutos y Matriz de Características",
+      "summary": "Identificar a los competidores reales (incluyendo parches analógicos y herramientas triviales) y cruzar sus características frente a los dolores validados de P1-D1.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Listar todos los sustitutos directos e indirectos actuales",
+          "objective": "Identificar competidores directos e indirectos (hábitos analógicos, parches operativos y software comercial).",
+          "input": "Descalificador 4 de [[example_output_risk_register]] y entorno de mercado.",
+          "raw_data_title": "Sustitutos Identificados",
+          "raw_data": "- Indirectos: Cuaderno físico de papel y WhatsApp, hojas de cálculo.\n- Directos: PMS corporativos (Cloudbeds) y OTAs tradicionales (Airbnb, Booking).",
+          "exit_label": "SUSTITUTOS LISTADOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Catalogación de sustitutos y competidores",
+              "objective": "Registrar el inventario completo de alternativas sustitutas directas e indirectas.",
+              "how_to": {
+                "steps": [
+                  "Identificar los sustitutos indirectos (hábitos analógicos, libretas de papel, chats de WhatsApp).",
+                  "Identificar competidores directos del sector (PMS hoteleros como Cloudbeds, OTAs como Airbnb/Booking).",
+                  "Documentar el modelo operativo y de cobro de cada alternativa identificada.",
+                  "Clasificar cada opción según su categoría competitiva."
+                ],
+                "table_columns": "Alternativa / Competidor | Tipo de Sustituto | Modelo Operativo / Cobro | Presencia en el Segmento",
+                "table_rules": "Una fila por competidor o herramienta sustituta evaluada.",
+                "restrictions": [
+                  "Incluir sustitutos analógicos e informales.",
+                  "Reflejar alternativas reales usadas hoy por los usuarios."
+                ],
+                "done_when": "Catálogo de sustitutos y competidores consolidado."
+              },
+              "example_title": "Lista de Competidores y Sustitutos",
+              "example": "- **Libreta de Papel y WhatsApp** (Indirecto) - Domina el comportamiento operativo actual de los anfitriones rurales.\n- **PMS Genéricos (Ej. Cloudbeds)** (Directo) - Software corporativo sobre-calificado y complejo para el contexto rural.\n- **OTAs Tradicionales (Ej. Airbnb / Booking)** (Directo) - Exigen comisiones elevadas y procesos rígidos poco adaptados a fincas independientes locales.",
+              "link_label": "sustitutos van a extracción de dolores (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Extraer dolores clave de P1-D1 como columnas",
+          "objective": "Convertir las prioridades y fricciones validadas en P1-D1 en los criterios de evaluación de la matriz.",
+          "input": "Prioridades y dolores observados de [[example_output_user_profile]] (P1-D1).",
+          "raw_data_title": "Prioridades Extraídas de P1-D1",
+          "raw_data": "1) Simplicidad Mobile-First (curva de aprendizaje cero). 2) Pasarela de pago integrada local (Wompi). 3) Automatización ágil de disponibilidad.",
+          "exit_label": "COLUMNAS DEFINIDAS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Definición de columnas evaluativas",
+              "objective": "Fijar los dolores observados como columnas analíticas de evaluación competitiva.",
+              "how_to": {
+                "steps": [
+                  "Revisar la tabla de dolores empíricos de P1-D1.",
+                  "Seleccionar los 3 requerimientos más críticos observados en campo.",
+                  "Formular cada criterio como una necesidad del usuario y no como un feature abstracto.",
+                  "Definir las columnas maestras para la matriz comparativa."
+                ],
+                "table_columns": "Prioridad P1-D1 | Dolor Específico | Criterio de Columna en Matriz",
+                "table_rules": "Una fila por requerimiento clave extraído de P1-D1.",
+                "restrictions": [
+                  "Las columnas deben nacer de dolores validados en P1-D1.",
+                  "Prohibido usar características genéricas de software no solicitadas."
+                ],
+                "done_when": "Columnas de evaluación competitiva formalizadas."
+              },
+              "example_title": "Columnas Evaluativas desde P1-D1",
+              "example": "1. **Simplicidad Mobile-First:** Curva de aprendizaje cero para usuarios rurales informales.\n2. **Pasarela de Pago Integrada Local (Wompi):** Pagos locales (PSE, Nequi, tarjetas) sin exigir tarjeta internacional obligatoria.\n3. **Automatización Ágil de Disponibilidad:** Sincronización en tiempo real sin colisiones ni sobreventa.",
+              "link_label": "criterios van a evaluación comparativa (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Evaluar cada competidor/sustituto contra cada dolor",
+          "objective": "Calificar cada celda como Commodity, Oportunidad o Ventaja.",
+          "input": "Sustitutos (1.1) y criterios evaluativos (1.2).",
+          "raw_data_title": "Matriz de Cruce",
+          "raw_data": "Papel/WhatsApp: Commodity en simplicidad, Oportunidad en pagos y disponibilidad. PMS/OTAs: Oportunidad en curva de aprendizaje, Commodity en disponibilidad.",
+          "exit_label": "MATRIZ EVALUADA → 1.4",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Evaluación matricial de características",
+              "objective": "Evaluar sistemáticamente cada alternativa contra cada dolor prioritario.",
+              "how_to": {
+                "steps": [
+                  "Cruzar cada competidor y sustituto contra las 3 columnas de prioridad.",
+                  "Calificar como (Commodity) si la industria lo resuelve adecuadamente.",
+                  "Calificar como (Oportunidad) si todos fallan o generan alta fricción técnica o económica.",
+                  "Asignar la posición de (Ventaja) para la solución en desarrollo."
+                ],
+                "table_columns": "Competidor / Sustituto | Simplicidad Mobile-First | Pasarela de Pago Local (Wompi) | Automatización Ágil de Disponibilidad",
+                "table_rules": "Una fila por competidor calificando su desempeño en cada criterio.",
+                "restrictions": [
+                  "Justificar técnicamente cada calificación.",
+                  "Las celdas de Oportunidad deben señalar fallas comprobables."
+                ],
+                "done_when": "Matriz comparativa completa y evaluada."
+              },
+              "example_title": "Matriz Comparativa de Características",
+              "example": "| Competidor | Simplicidad Mobile-First | Pasarela de Pago Integrada Local (Wompi) | Automatización Ágil de Disponibilidad |\n| --- | --- | --- | --- |\n| Papel/WhatsApp | (Commodity) | (Oportunidad - Pagos no integrados) | (Oportunidad - Alto riesgo de error) |\n| PMS / OTAs | (Oportunidad - Alta complejidad) | (Commodity - Tarjetas internacionales) | (Commodity) |\n| **Nos Fuimos de Finca** | **(Ventaja - UX simple y directa)** | **(Ventaja - PSE, Nequi, Tarjetas via Wompi)** | **(Ventaja - Landing + Calendario Centralizado)** |",
+              "link_label": "matriz va a brecha dominante (1.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.4",
+          "title": "Identificar columna de Oportunidad dominante",
+          "objective": "Aislar la brecha estructural de mercado donde los competidores fallan consistentemente.",
+          "input": "Matriz evaluada de Sub-paso 1.3.",
+          "raw_data_title": "Brecha Dominante",
+          "raw_data": "Brecha dominante: Sincronización ágil de disponibilidad con pasarela de pago local sin fricción técnica.",
+          "exit_label": "BRECHA AISLADA → Step 2",
+          "micro": [
+            {
+              "code": "1.4.1",
+              "title": "Aislamiento de la brecha estructural",
+              "objective": "Definir la oportunidad central no resuelta que sustentará la propuesta de valor.",
+              "how_to": {
+                "steps": [
+                  "Identificar las columnas con mayor recurrencia de la etiqueta (Oportunidad).",
+                  "Determinar cuál de ellas representa el dolor más costoso según P1-D1 y P1-D2.",
+                  "Formular la brecha estructural de mercado como ventaja competitiva a capturar.",
+                  "Preparar la hipótesis para su validación mediante evidencia pública."
+                ],
+                "table_columns": "Criterio de Oportunidad | Diagnóstico de Competencia | Brecha Estructural Resultante",
+                "table_rules": "Una fila resumiendo la oportunidad dominante identificada.",
+                "restrictions": [
+                  "La brecha debe coincidir con los dolores observados en campo.",
+                  "Debe ser defendible y viable técnicamente."
+                ],
+                "done_when": "Brecha estructural dominante formalizada."
+              },
+              "example_title": "Brecha Estructural Dominante",
+              "example": "**Brecha dominante identificada:** Sincronización de disponibilidad en tiempo real con pasarela de pago local accesible para usuarios informales sin fricción tecnológica. Ningún competidor resuelve simultáneamente la seguridad transaccional y la curva de aprendizaje cero.",
+              "link_label": "brecha va a minería web (2.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Minería de Evidencia Pública y Posicionamiento Defensivo (Moat)",
+      "summary": "Probar mediante búsqueda web de quejas y reseñas públicas que la brecha identificada es real, y definir un foso defensivo (Moat) estructural.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Ejecutar minería de quejas públicas (regla de 3)",
+          "objective": "Recopilar al menos 3 quejas públicas independientes de usuarios de la competencia en foros, tiendas de apps o redes.",
+          "input": "Brecha dominante (Step 1) y búsqueda web de reseñas públicas.",
+          "raw_data_title": "Quejas Forenses Públicas",
+          "raw_data": "Q-01: Cloudbeds muy complicado para finca pequeña (Facebook). Q-02: Demasiado técnico, necesito algo como WhatsApp (Play Store Guesty). Q-03: Nadie usa software por exceso de datos (Asociación finqueros).",
+          "exit_label": "QUEJAS RECOPILADAS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Minería forense de quejas públicas",
+              "objective": "Documentar 3 evidencias públicas independientes comprobando la insatisfacción real.",
+              "how_to": {
+                "steps": [
+                  "Buscar en grupos sectoriales, foros y tiendas de aplicaciones reseñas negativas de PMS y OTAs.",
+                  "Seleccionar un mínimo de 3 quejas públicas independientes (regla de 3).",
+                  "Registrar cada queja con identificador Q-XX, cita textual, fuente y fecha.",
+                  "Vincular cada cita con la fricción que corrobora."
+                ],
+                "table_columns": "Evidencia Pública (Q-XX) | Fuente | Fecha | Brecha Confirmada",
+                "table_rules": "Una fila por queja pública documentada.",
+                "restrictions": [
+                  "Mínimo 3 quejas públicas independientes.",
+                  "Deben provenir de fuentes externas comprobables."
+                ],
+                "done_when": "3 quejas públicas registradas y fechadas."
+              },
+              "example_title": "Quejas Públicas de la Competencia",
+              "example": "| Evidencia Pública | Fuente | Fecha | Brecha Confirmada |\n| --- | --- | --- | --- |\n| Q-01: \"Cloudbeds muy complicado para mi finca pequeña\" | Grupo Facebook 'Fincas Colombia' | 2025-08-12 | Curva de aprendizaje alta |\n| Q-02: \"Demasiado técnico, necesito algo simple como WhatsApp\" | Play Store review Guesty | 2025-07-30 | Curva de aprendizaje alta |\n| Q-03: \"Nadie usa el software que trajeron, pide demasiados datos\" | Asociación de finqueros (WhatsApp) | 2025-09-01 | Fricción de adopción |",
+              "link_label": "quejas van a validación de brecha (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Confirmar que las quejas validan la brecha",
+          "objective": "Verificar la coincidencia entre las quejas recopiladas y las columnas de oportunidad.",
+          "input": "Quejas Q-01 a Q-03 y matriz del Step 1.",
+          "raw_data_title": "Cruce Quejas vs Oportunidades",
+          "raw_data": ">47 quejas sobre complejidad de uso tradicional; >25 sobre desconfianza en transferencias bancarias directas por WhatsApp. Match del 100%.",
+          "exit_label": "BRECHA CONFIRMADA → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Validación forense de coincidencia",
+              "objective": "Certificar que la evidencia pública respalda empíricamente las oportunidades seleccionadas.",
+              "how_to": {
+                "steps": [
+                  "Cruzar los patrones de quejas recopilados con las columnas de oportunidad.",
+                  "Evaluar si el dolor expresado en las quejas corresponde exactamente a la oportunidad.",
+                  "Calcular el porcentaje de coincidencia con la propuesta de valor.",
+                  "Emitir dictamen de validación de brecha externa."
+                ],
+                "table_columns": "Patrón de Queja | Muestra de Casos | Coincidencia con Oportunidad | Validación",
+                "table_rules": "Una fila por patrón de queja evaluado.",
+                "restrictions": [
+                  "Si las quejas apuntan en otra dirección, actualizar las columnas de la matriz.",
+                  "La coincidencia debe ser sustantiva y demostrable."
+                ],
+                "done_when": "Brecha externa confirmada con 100% de coincidencia."
+              },
+              "example_title": "Hallazgos de Reseñas Públicas",
+              "example": "- **Tipos de fuentes:** Foros y grupos de finqueros, quejas sobre plataformas de alquiler y chats de atención.\n- **Conteo de quejas:** >47 sobre complejidad de uso de plataformas tradicionales; >25 sobre desconfianza en transferencias bancarias directas por WhatsApp.\n- **Hallazgos de brecha:** Los turistas temen transferir dinero sin respaldo y los finqueros rechazan paneles de administración con alta curva de aprendizaje.\n- **Coincidencias con columnas de oportunidad:** **Match del 100%** con la necesidad de checkout seguro y catálogo directo.",
+              "link_label": "confirmación va a mapa de posicionamiento (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Definir ejes del mapa de posicionamiento",
+          "objective": "Configurar el mapa 2D competitivo ubicando al producto en el cuadrante de mayor valor desatendido.",
+          "input": "Brechas confirmadas y debilidades de los competidores.",
+          "raw_data_title": "Ejes Estratégicos",
+          "raw_data": "Eje X: Simplicidad de Adopción (Bajo ↔ Alto). Eje Y: Seguridad y Transaccionalidad (Bajo ↔ Alto).",
+          "exit_label": "MAPA DE POSICIONAMIENTO CONSTRUIDO → 2.4",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Construcción del mapa 2D competitivo",
+              "objective": "Posicionar a rivales, sustitutos y a Nos Fuimos de Finca en la matriz de 2 ejes.",
+              "how_to": {
+                "steps": [
+                  "Seleccionar los 2 ejes diferenciales clave (Simplicidad de Adopción vs Seguridad Transaccional).",
+                  "Ubicar a las OTAs/PMS en el cuadrante correspondiente (Baja simplicidad, alta transaccionalidad).",
+                  "Ubicar a la Libreta/WhatsApp (Alta simplicidad, baja seguridad transaccional).",
+                  "Ubicar a Nos Fuimos de Finca en el cuadrante de liderazgo desatendido (Alto en ambos ejes)."
+                ],
+                "table_columns": "Competidor | Eje X (Simplicidad de Adopción) | Eje Y (Seguridad y Transaccionalidad) | Notas",
+                "table_rules": "Una fila por competidor asignando su posición relativa.",
+                "restrictions": [
+                  "Los ejes deben reflejar las dos variables más polarizantes del mercado.",
+                  "La posición debe fundamentarse en la evidencia del Step 1 y 2."
+                ],
+                "done_when": "Mapa 2D de posicionamiento consolidado."
+              },
+              "example_title": "Mapa de Posicionamiento",
+              "example": "| Competidor | Eje X (Simplicidad de Adopción) | Eje Y (Seguridad y Transaccionalidad) | Notas |\n| --- | --- | --- | --- |\n| OTAs / PMS | Bajo | Alto | Complejo y costoso para fincas pequeñas |\n| Libreta / WhatsApp | Alto | Bajo | Informal y vulnerable a inconsistencias |\n| **Nos Fuimos de Finca** | **Alto** | **Alto** | **Combina landing accesible con checkout seguro** |",
+              "link_label": "mapa va a definición de moat (2.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.4",
+          "title": "Asignar categoría estructural del Foso Defensivo (Moat)",
+          "objective": "Definir el foso defensivo sostenible bajo una de las 4 categorías estructurales válidas.",
+          "input": "Mapa de posicionamiento y modelo de negocio.",
+          "raw_data_title": "Mecanismo de Foso Defensivo",
+          "raw_data": "Categoría: Efectos de Red B2B2C / Especialización vertical. Mecanismo: Landing Page optimizada con pasarela Wompi que crea confianza transaccional local.",
+          "exit_label": "MOAT ESTRUCTURADO → Step 3",
+          "micro": [
+            {
+              "code": "2.4.1",
+              "title": "Formulación del Moat estructural",
+              "objective": "Asignar categoría de foso defensivo y detallar su mecanismo concreto.",
+              "how_to": {
+                "steps": [
+                  "Seleccionar una de las 4 categorías válidas: Efectos de Red, Costos de Cambio, Datos Propietarios, Economías de Escala.",
+                  "Rechazar afirmaciones genéricas como 'mejor servicio' o 'mejor diseño'.",
+                  "Redactar el mecanismo operativo que hace que la ventaja crezca con el tiempo.",
+                  "Verificar que el Moat otorgue una ventana de protección contra competidores."
+                ],
+                "table_columns": "Categoría Estructural del Moat | Mecanismo de Defensa Concreto | Ventana de Protección Estimada",
+                "table_rules": "Una fila detallando la formulación del Moat.",
+                "restrictions": [
+                  "Obligatoriamente una de las 4 categorías estructurales reconocidas.",
+                  "Debe incluir mecanismo concreto de defensa."
+                ],
+                "done_when": "Moat estructural formalizado y justificado."
+              },
+              "example_title": "Descripción del Foso (Moat)",
+              "example": "- **Categoría:** Efectos de Red B2B2C y especialización vertical.\n- **Mecanismo estructural:** Canal directo B2C optimizado con Landing Page de alta conversión, catálogo regional de fincas y pasarela Wompi integrada con liquidación transparente.\n- **Ventana de protección estimada:** ~18 meses para consolidar la red de fincas ancla antes de posibles réplicas.",
+              "link_label": "moat va a declaración de diferenciación (3.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Declaración de Diferenciación, Auditoría y Ensamblaje",
+      "summary": "Emitir el veredicto estratégico de posicionamiento y ensamblar el artefacto formal en español.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Redactar la Declaración de Diferenciación",
+          "objective": "Formular la declaración oficial falseable de posicionamiento competitivo.",
+          "input": "Posicionamiento y Moat del Step 2.",
+          "raw_data_title": "Declaración Falseable",
+          "raw_data": "Nos Fuimos de Finca se posiciona frente a la informalidad de WhatsApp y la sobrecomplejidad de las OTAs globales, brindando catálogo ágil y pasarela Wompi integrada.",
+          "exit_label": "DECLARACIÓN REDACTADA → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Redacción de declaración de diferenciación",
+              "objective": "Redactar el párrafo oficial de posicionamiento contrastando frente a sustitutos directos e indirectos.",
+              "how_to": {
+                "steps": [
+                  "Identificar el segmento y los dos extremos competitivos a contrastar.",
+                  "Declarar en qué nos diferenciamos del sustituto indirecto (WhatsApp / Cuaderno).",
+                  "Declarar en qué nos diferenciamos del competidor directo (PMS / OTAs).",
+                  "Asegurar que la afirmación sea falseable y comprobable empíricamente."
+                ],
+                "table_columns": "Componente | Contenido de la Declaración | Carácter Falseable",
+                "table_rules": "Una fila desglosando la declaración de diferenciación.",
+                "restrictions": [
+                  "Debe ser falseable con datos empíricos.",
+                  "Contrastar explícitamente frente a las alternativas del mercado."
+                ],
+                "done_when": "Declaración de diferenciación redactada formalmente."
+              },
+              "example_title": "Declaración de Diferenciación",
+              "example": "**Declaración de Diferenciación:**\n\"Nos Fuimos de Finca se posiciona frente a la informalidad de WhatsApp y la sobrecomplejidad de las OTAs globales, brindando una Landing Page moderna y ágil con catálogo de fincas, sistema de reservas automatizado y pasarela de pagos integrada que otorga seguridad al turista y simplicidad operativa al finquero.\"",
+              "link_label": "declaración va a veredicto de compuerta (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Emitir el veredicto de posicionamiento",
+          "objective": "Evaluar la compuerta estratégica competitiva (Proceed / Pivot / Stop).",
+          "input": "Brechas confirmadas, Moat y declaración de posicionamiento.",
+          "raw_data_title": "Condición de Avance",
+          "raw_data": "¿Puede este resultado bloquear el avance?: No. Veredicto: Proceed. Diferenciación clara entre informalidad y rigidez hotelera.",
+          "exit_label": "VEREDICTO EMITIDO → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Veredicto de compuerta de posicionamiento",
+              "objective": "Emitir la decisión estratégica formal sobre la viabilidad competitiva.",
+              "how_to": {
+                "steps": [
+                  "Evaluar si la brecha competitiva es real y está confirmada por evidencia pública.",
+                  "Evaluar si el Moat es estructural y defiende la propuesta de valor.",
+                  "Determinar si existe algún bloqueante competitivo para avanzar a las siguientes fases.",
+                  "Emitir el veredicto formal de compuerta (Proceed / Pivot / Stop)."
+                ],
+                "table_columns": "Criterio de Compuerta | Evaluación Competitiva | Veredicto",
+                "table_rules": "Una fila resumiendo la decisión de compuerta competitiva.",
+                "restrictions": [
+                  "Si la brecha está cerrada por competidores, el veredicto debe ser Pivot o Stop.",
+                  "El veredicto Proceed exige evidencia pública verificada."
+                ],
+                "done_when": "Veredicto de compuerta estratégica formalizado."
+              },
+              "example_title": "Implicación de Compuerta de Fase",
+              "example": "- **¿Puede este resultado bloquear el avance?:** No.\n- **Veredicto:** **`Proceed`**.\n- **Condición / Explicación:** La diferenciación es clara y ataca la brecha entre la informalidad de WhatsApp y la rigidez de los sistemas hoteleros.",
+              "link_label": "veredicto va a ensamblaje final (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Registrar firmas y ensamblar documento",
+          "objective": "Integrar las 8 secciones oficiales del documento final en español con metadatos y firmas.",
+          "input": "Resultados de Steps 1 al 3.",
+          "raw_data_title": "Documento Completo Ensamblado",
+          "raw_data": "8 secciones estructuradas con metadatos oficiales y aprobación del equipo.",
+          "exit_label": "DOCUMENTO FINAL ENSAMBLADO → publica entregable",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Ensamblaje y verificación del análisis competitivo",
+              "objective": "Consolidar el documento final exportable 03. Análisis Competitivo.md.",
+              "how_to": {
+                "steps": [
+                  "Aplicar encabezado oficial: Proyecto, Fase 1, Entregable 3 de 13, Estado Aprobado.",
+                  "Insertar lista de competidores, matriz de características, quejas públicas y mapa 2D.",
+                  "Insertar descripción del Moat, declaración de diferenciación y veredicto de compuerta.",
+                  "Verificar consistencia total y exportar el entregable consolidado."
+                ],
+                "table_columns": "Sección Oficial | Contenido | Verificación de Transcripción",
+                "table_rules": "Una fila por sección oficial del documento exportable.",
+                "restrictions": [
+                  "Transcripción fiel de todos los pasos precedentes.",
+                  "Cumplir la estructura oficial del entregable."
+                ],
+                "done_when": "Documento final exportable ensamblado y certificado."
+              },
+              "example_title": "Verificación de Ensamblaje Final",
+              "example": "| Sección | Contenido | Verificación |\n| --- | --- | :---: |\n| 1. Metadatos | Proyecto, Fase 1, D3, Aprobado | `VERIFICADO` |\n| 2. Lista de Competidores | 3 alternativas directas e indirectas | `VERIFICADO` |\n| 3. Matriz de Características | Cruce contra 3 prioridades de P1-D1 | `VERIFICADO` |\n| 4. Quejas Públicas | >72 quejas analizadas (Match 100%) | `VERIFICADO` |\n| 5. Mapa de Posicionamiento | Eje X Simplicidad vs Eje Y Seguridad | `VERIFICADO` |\n| 6. Descripción del Moat | Efectos de Red B2B2C / Confianza local | `VERIFICADO` |\n| 7. Diferenciación | Declaración falseable oficial | `VERIFICADO` |\n| 8. Compuerta | Proceed (sin bloqueantes) | `VERIFICADO` |\n\n*Resultado:* Ensamblaje completado con 100% de trazabilidad.",
+              "link_label": "publica entregable final"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 03. Competitive Analysis.md",
+    "markdown": "# 3. Análisis Competitivo\n\n### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 1 — Viabilidad Temprana (Early Viability)\n**Entregable:** 3 de 13\n**Estado:** Aprobado\n\n### 2. Lista de Competidores\n- **Libreta de Papel y WhatsApp** (Indirecto) - Domina el comportamiento operativo actual de los anfitriones rurales.\n- **PMS Genéricos (Ej. Cloudbeds)** (Directo) - Software corporativo sobre-calificado y complejo para el contexto rural.\n- **OTAs Tradicionales (Ej. Airbnb / Booking)** (Directo) - Exigen comisiones elevadas y procesos rígidos poco adaptados a fincas independientes locales.\n\n### 3. Matriz Comparativa de Características\n| Competidor | Simplicidad Mobile-First | Pasarela de Pago Integrada Local (Wompi) | Automatización Ágil de Disponibilidad |\n| --- | --- | --- | --- |\n| Papel/WhatsApp | (Commodity) | (Oportunidad - Pagos no integrados) | (Oportunidad - Alto riesgo de error) |\n| PMS / OTAs | (Oportunidad - Alta complejidad) | (Commodity - Tarjetas internacionales) | (Commodity) |\n| Nos Fuimos de Finca | (Ventaja - UX simple y directa) | (Ventaja - PSE, Nequi, Tarjetas via Wompi) | (Ventaja - Landing + Calendario Centralizado) |\n\n### 4. Hallazgos de Reseñas Públicas\n- **Tipos de fuentes:** Foros y grupos de finqueros, quejas sobre plataformas de alquiler y chats de atención.\n- **Conteo de quejas:** >47 sobre complejidad de uso de plataformas tradicionales; >25 sobre desconfianza en transferencias bancarias directas por WhatsApp.\n- **Hallazgos de brecha:** Los turistas temen transferir dinero sin respaldo y los finqueros rechazan paneles de administración con alta curva de aprendizaje.\n- **Coincidencias con columnas de oportunidad:** Match del 100% con la necesidad de checkout seguro y catálogo directo.\n\n### 5. Mapa de Posicionamiento\n| Competidor | Eje X (Simplicidad de Adopción) | Eje Y (Seguridad y Transaccionalidad) | Notas |\n| --- | --- | --- | --- |\n| OTAs / PMS | Bajo | Alto | Complejo y costoso para fincas pequeñas |\n| Libreta / WhatsApp | Alto | Bajo | Informal y vulnerable a inconsistencias |\n| Nos Fuimos de Finca | Alto | Alto | Combina landing accesible con checkout seguro |\n\n### 6. Descripción del Foso (Moat)\n- **Mecanismo estructural:** Canal directo B2C optimizado con Landing Page de alta conversión, catálogo regional de fincas y pasarela Wompi integrada con liquidación transparente.\n- **Categoría:** Especialización vertical y confianza transaccional local.\n\n### 7. Declaración de Diferenciación\nNos Fuimos de Finca se posiciona frente a la informalidad de WhatsApp y la sobrecomplejidad de las OTAs globales, brindando una Landing Page moderna y ágil con catálogo de fincas, sistema de reservas automatizado y pasarela de pagos integrada que otorga seguridad al turista y simplicidad operativa al finquero.\n\n### 8. Implicación de Compuerta de Fase\n- **¿Puede este resultado bloquear el avance?:** No.\n- **Condición / Explicación:** Proceed. La diferenciación es clara y ataca la brecha entre la informalidad de WhatsApp y la rigidez de los sistemas hoteleros."
+  }
+}

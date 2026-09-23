@@ -1,0 +1,175 @@
+{
+  "phase": "Phase 4",
+  "deliverable_code": "D1",
+  "deliverable": "Content Strategy & Information Architecture (Estrategia de Contenido y Arquitectura de Información)",
+  "purpose": "Este entregable establece la arquitectura estructural de navegación y taxonomía de información para todo el ecosistema frontend de la plataforma. Traduce la descomposición modular y las especificaciones atómicas de la Fase 3 en un mapa jerárquico de pantallas, deslindando las vistas públicas B2C de las áreas protegidas B2B, inventariando vistas auxiliares obligatorias y blindando el enrutamiento mediante una matriz de control de acceso RBAC implementable en middleware.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification.md]] | Módulos funcionales, User Stories, Casos de Uso y flujos de pantalla (Fase 3, D7). |\n| [[PHASE_3_REQUIREMENTS_ENGINEERING/2.Actor_and_Role_Definition]] | Catálogo de roles técnicos, permisos RBAC y fronteras de acceso (Fase 3, D2). |\n| [[PHASE_3_REQUIREMENTS_ENGINEERING/6.Non-Functional_Requirements]] | Restricciones de seguridad, páginas de error requeridas y SLAs de rendimiento (Fase 3, D6). |\n| [[PHASE_3_REQUIREMENTS_ENGINEERING/8.System_Requirements_Specification]] | Libro Blanco del SRS maestro y Matriz de Trazabilidad RTM (Fase 3, D8). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Information Inventory (Domain Mapping)",
+      "summary": "Analizar los módulos de backend de la Fase 3 y clasificarlos en vistas frontend direccionables o componentes anidados, resolviendo la asimetría de experiencia según el rol del usuario.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Mapeo de Dominio a Vistas Frontend",
+          "objective": "Traducir los módulos funcionales en patrones de vista concretos según la necesidad UX atómica de cada actor.",
+          "input": "[[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification.md]] y perfiles de usuario.",
+          "raw_data_title": "Inventario de Vistas Derivadas por Módulo",
+          "raw_data": "- MOD-SRCH: Resultados de búsqueda con scroll infinito (Turista).\n- MOD-PROP: Ficha pública de finca (Turista) vs formulario de gestión (Finquero).\n- MOD-CAL: Widget embebido (Turista) vs calendario de administración (Finquero).\n- MOD-RSV: Wizard de checkout paso a paso (Turista) vs lista de solicitudes (Finquero).\n- MOD-PAY: Modal transitorio antifraude con polling (Sistema).\n- MOD-DASH: Analíticas financieras (Finquero) vs matriz multi-finca (Agencia).\n- MOD-AUTH: Formulario compartido de login/registro vs wizard de onboarding KYC.\n- MOD-NOT: Widget embebido de alertas en tiempo real en dashboard.",
+          "exit_label": "COMPLETE → 13 vistas funcionales mapeadas con patrones UX asignados (2.1)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Matriz de Mapeo Dominio a Vista",
+              "objective": "Catalogar cada módulo identificando el rol, tipo de acceso y patrón de interfaz correspondiente.",
+              "how_to": {
+                "steps": [
+                  "1. Evaluar cada uno de los módulos de la Fase 3.",
+                  "2. Diferenciar las necesidades de interfaz para el Turista (B2C) frente al Finquero/Agencia (B2B).",
+                  "3. Clasificar la vista en Direccionable (con URL propia) o Anidada (embebida en otra pantalla).",
+                  "4. Asignar el patrón de diseño UX idóneo (Wizard, Detail, Form, Dashboard, etc.)."
+                ],
+                "table_columns": "Módulo Origen (Fase 3) | Rol | Tipo de Acceso | Necesidad UX Atómica | Patrón de Vista",
+                "table_rules": "Cada módulo debe estar representado respetando la asimetría de roles.",
+                "restrictions": [
+                  "No crear vistas monolíticas que mezclen flujos de turistas con herramientas de propietarios",
+                  "Mantener los widgets anidados dentro de sus vistas anfitrionas"
+                ],
+                "done_when": "Las 13 vistas de negocio están catalogadas con su patrón de interfaz"
+              },
+              "example_title": "Matriz de Mapeo de Dominio a Vistas Frontend",
+              "example": "| Módulo Origen (Fase 3) | Rol | Tipo de Acceso | Necesidad UX Atómica | Patrón de Vista |\n| :--- | :--- | :--- | :--- | :--- |\n| **`MOD-SRCH`** | Turista | Direccionable | Encontrar la finca ideal cruzando filtros, fechas y amenidades. | **Search Results View** (List + Infinite Scroll) |\n| **`MOD-PROP`** | Turista | Direccionable | Ver fotos HD en alta velocidad, leer precios antes de reservar. | **Detail View** (Public Profile, LCP Optimizado) |\n| **`MOD-PROP`** | Finquero | Direccionable | Subir fotos asíncronamente y editar precio base. | **Form View** (Management Form, Segregated B2B) |\n| **`MOD-CAL`** | Turista | Anidado | Saber qué días están libres antes de iniciar el checkout. | **Widget Embebido** (Date Picker, dentro de Perfil Finca) |\n| **`MOD-CAL`** | Finquero | Direccionable | Bloquear manualmente fechas y ver estado del calendario. | **Dashboard View** (Calendar Admin, Segregated B2B) |\n| **`MOD-RSV`** | Turista | Direccionable | Ver subtotal, ingresar datos personales e ir a pago. | **Wizard** (Checkout Step-by-Step) |\n| **`MOD-RSV`** | Finquero | Direccionable | Aprobar o rechazar solicitudes de reserva entrantes. | **List View** + **Action Modal** (Segregated B2B) |\n| **`MOD-PAY`** | Sistema | Anidado | Redirigir al Turista a pasarela externa y esperar confirmación. | **Action Modal** (Loading/Polling State, Transitorio) |\n| **`MOD-DASH`** | Finquero | Direccionable | Ver gráfico de ganancias del mes y exportar reporte CSV. | **Dashboard View** (Analytics, Segregated B2B) |\n| **`MOD-DASH`** | Agencia | Direccionable | Ver macro-calendario cruzado de todas sus reservas de fincas. | **Dashboard View** (Matrix View, Segregated B2B) |\n| **`MOD-AUTH`** | Turista / Finquero / Agencia | Direccionable | Registrarse, iniciar sesión o recuperar contraseña. | **Form View** (Auth Shared Flow) |\n| **`MOD-AUTH`** | Finquero | Direccionable | Subir RUT y documentos para validación KYC. | **Wizard** (Onboarding KYC, Segregated B2B) |\n| **`MOD-NOT`** | Finquero / Agencia | Anidado | Ver historial de alertas en tiempo real dentro del dashboard. | **Widget Embebido** (In-App Notification Center) |",
+              "link_label": "vistas de dominio mapeadas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Auxiliary & Support Views",
+      "summary": "Identificar e inventariar las vistas de soporte transversal originadas por requisitos de seguridad, manejo de fallos HTTP y obligaciones legales de pasarela y privacidad.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Vistas Auxiliares de Seguridad, Legal y Transaccional",
+          "objective": "Catalogar las rutas del sistema para errores de red, expiración de locks y cumplimiento regulatorio.",
+          "input": "[[PHASE_3_REQUIREMENTS_ENGINEERING/6.Non-Functional_Requirements]] y regulaciones de comercio electrónico.",
+          "raw_data_title": "8 Vistas Auxiliares Obligatorias",
+          "raw_data": "- Seguridad: Error 404 (No Encontrado), Error 403 (Prohibido), Error 500 (Fallo Interno), Error 410 (Lock Expirado 120m).\n- Transaccional: /checkout/processing (Spinner antifraude con polling de webhook).\n- Legal: /terminos-y-condiciones (Bloqueante Wompi), /politica-de-privacidad (Habeas Data Ley 1581).\n- Preferencias: /dashboard/settings (Configuración de cuenta B2B).",
+          "exit_label": "COMPLETE → Vistas auxiliares inventariadas para integración en el sitemap (3.1)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Inventario de Vistas Auxiliares y de Soporte",
+              "objective": "Estructurar la tabla de vistas de soporte con su ruta de routing y justificación técnica.",
+              "how_to": {
+                "steps": [
+                  "1. Identificar los códigos de estado HTTP que requieren pantallas personalizadas de usuario.",
+                  "2. Documentar las vistas legales exigidas por pasarelas de pago y reguladores.",
+                  "3. Especificar los estados intermedios transaccionales para prevenir doble cobro."
+                ],
+                "table_columns": "Categoría | Ruta de Routing | Propósito / Justificación Técnica",
+                "table_rules": "Las páginas de error nunca deben exponer stack traces al usuario.",
+                "restrictions": [
+                  "No omitir la vista de expiración de sesión de checkout (/410)",
+                  "Garantizar que los términos y privacidad sean accesibles públicamente"
+                ],
+                "done_when": "Las 8 vistas auxiliares están formalizadas y justificadas"
+              },
+              "example_title": "Inventario de Vistas Auxiliares y de Soporte",
+              "example": "| Categoría | Ruta de Routing | Propósito / Justificación Técnica |\n| :--- | :--- | :--- |\n| **Seguridad (Error)** | `/404` | Ruta inexistente o finca eliminada (soft-delete). CTA: \"Volver al Buscador\". |\n| **Seguridad (Error)** | `/403` | Rol autenticado sin permiso sobre el recurso. No revela existencia del recurso. |\n| **Seguridad (Error)** | `/500` | Falla crítica del SSR o base de datos. Nunca expone stack traces al cliente. |\n| **Seguridad (Expiración)** | `/410` | Sesión de pago expirada (TTL 120 min de `MOD-RSV`/`MOD-PAY`). |\n| **Transaccional (Loading)** | `/checkout/processing` | Spinner/Skeleton antifraude durante espera de confirmación de pasarela. Previene doble cobro. |\n| **Legal & Compliance** | `/terminos-y-condiciones` | Requisito bloqueante de la pasarela de pago (`MOD-PAY`) para aprobación del widget de cobro. |\n| **Legal & Compliance** | `/politica-de-privacidad` | Requisito Habeas Data (Ley 1581) para recolección de emails (`MOD-NOT`) e identidades (`MOD-AUTH`). |\n| **Settings (Preferencias)** | `/dashboard/settings` | Panel de configuración de cuenta del Finquero. Requiere JWT válido. |",
+              "link_label": "vistas auxiliares catalogadas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Sitemap & Navigation Taxonomy",
+      "summary": "Construir la taxonomía completa del sitio aplicando la Ley de Pertenencia (un único padre lógico por nodo) y la Ley de Flujo Causal, modelando el árbol de navegación jerárquico.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Sitemap Jerárquico y Taxonomía de Navegación",
+          "objective": "Modelar el árbol de navegación completo enlazando vistas funcionales y auxiliares en una arquitectura limpia.",
+          "input": "Vistas funcionales del Step 1 y vistas auxiliares del Step 2.",
+          "raw_data_title": "Estructura del Árbol de Navegación",
+          "raw_data": "- Raíz B2C (/): Búsqueda -> Finca -> Checkout -> Processing -> Confirmación.\n- Raíz B2B (/host): Landing Propietarios -> Login/Registro -> Onboarding KYC -> Dashboard Hub.\n- Dashboard Hub: Analíticas (/finanzas), Fincas (/fincas), Calendario (/calendario), Reservas (/reservas), Settings.\n- Footer Transversal: Términos y Condiciones, Política de Privacidad.",
+          "exit_label": "COMPLETE → Taxonomía y sitemap jerárquico consolidados (4.1)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Taxonomía de Navegación y Sitemap Jerárquico",
+              "objective": "Definir las rutas frontend canónicas y la jerarquía padre-hijo de todas las pantallas.",
+              "how_to": {
+                "steps": [
+                  "1. Organizar las pantallas bajo los dos pilares raíz del negocio: Marketplace B2C y Portal B2B.",
+                  "2. Asignar rutas limpias y descriptivas en kebab-case respetando parámetros dinámicos ([slug], [id]).",
+                  "3. Modelar la secuencia causal de navegación desde la exploración hasta la confirmación de compra."
+                ],
+                "table_columns": "ID Nodo | Etiqueta de Vista | Ruta Frontend | Tipo de Vista | Nodo Padre Jerárquico | Módulo Responsable",
+                "table_rules": "Cada pantalla debe tener exactamente un padre lógico directo.",
+                "restrictions": [
+                  "No crear bucles de navegación sin salida",
+                  "Garantizar que todas las rutas del sistema estén representadas en el sitemap"
+                ],
+                "done_when": "El sitemap jerárquico cubre la totalidad de vistas con sus rutas frontend"
+              },
+              "example_title": "Taxonomía de Navegación y Sitemap Jerárquico",
+              "example": "| ID Nodo | Etiqueta de Vista | Ruta Frontend | Tipo de Vista | Nodo Padre Jerárquico | Módulo Responsable |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n| `N-01` | Marketplace B2C (Home) | `/` | Direccionable Pública | *(Raíz B2C)* | `MOD-SRCH` |\n| `N-02` | Landing Finqueros B2B | `/host` | Direccionable Pública | *(Raíz B2B)* | `MOD-PROP` |\n| `N-03` | Resultados de Búsqueda | `/search` | Direccionable Pública | `N-01` (Home) | `MOD-SRCH` |\n| `N-04` | Perfil de Finca | `/finca/[slug]` | Direccionable Pública | `N-03` (Búsqueda) | `MOD-PROP` |\n| `N-05` | Wizard de Checkout | `/checkout/[id]` | Direccionable Protegida | `N-04` (Finca) | `MOD-RSV` |\n| `N-06` | Auth Hub (Login/Registro) | `/login`, `/register` | Direccionable Compartida | `N-02` (Landing B2B) | `MOD-AUTH` |\n| `N-07` | Onboarding KYC | `/onboarding` | Wizard Segregado B2B | `N-06` (Auth Hub) | `MOD-AUTH` |\n| `N-08` | Dashboard Hub B2B | `/dashboard` | Hub Segregado B2B | `N-07` (Onboarding KYC) | `MOD-DASH` |\n| `N-09` | Analíticas y Finanzas | `/dashboard/finanzas` | Dashboard Segregado B2B | `N-08` (Dashboard) | `MOD-DASH` |\n| `N-10` | Gestión de Fincas | `/dashboard/fincas` | Formulario Segregado B2B | `N-08` (Dashboard) | `MOD-PROP` |\n| `N-11` | Calendario y Bloqueos | `/dashboard/calendario` | Calendario Segregado B2B | `N-08` (Dashboard) | `MOD-CAL` |\n| `N-12` | Reservas Recibidas | `/dashboard/reservas` | Lista Segregada B2B | `N-08` (Dashboard) | `MOD-RSV` |\n| `N-13` | Legales (TyC / Privacidad) | `/terminos`, `/privacidad` | Páginas Públicas | *(Footer Global)* | Legal & Compliance |",
+              "link_label": "sitemap jerárquico construido"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "RBAC Mapping & Routing Security",
+      "summary": "Mapear cada nodo del Sitemap contra los roles de usuario de la Fase 3 (D2), definiendo la estrategia de renderizado UI y las reglas de redirección forzosa en middleware de enrutamiento.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Matriz RBAC UI y Restricciones de Routing",
+          "objective": "Especificar las políticas de autorización por pantalla y las reglas de redirección ante accesos no permitidos.",
+          "input": "Sitemap del Step 3 y matriz RBAC de [[PHASE_3_REQUIREMENTS_ENGINEERING/2.Actor_and_Role_Definition]].",
+          "raw_data_title": "Reglas de Acceso y Redirección en Middleware",
+          "raw_data": "- Buscador B2C (/): Acceso irrestricto (Shared View).\n- Perfil Finca (/finca/[slug]): Acceso público; si es dueño inyecta barra de edición.\n- Checkout (/checkout/[id]): Requiere Soft-Lock válido; si expiró -> HTTP 302 a /finca/[slug].\n- Login (/login): Si ya está autenticado B2B -> HTTP 302 a /dashboard.\n- Onboarding (/onboarding): Solo B2B pendiente; si ya está verificado -> /dashboard.\n- Dashboard (/dashboard/*): Requiere JWT B2B y KYC aprobado; si anónimo -> /login.",
+          "exit_label": "PUBLISH → Deliverable Completo: 1. Estrategia de Contenido y Arquitectura de Información",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Matriz de Control de Acceso y Routing Security",
+              "objective": "Consolidar las reglas de enrutamiento seguro y evaluar la compuerta de calidad de arquitectura de información.",
+              "how_to": {
+                "steps": [
+                  "1. Mapear cada ruta del sitemap contra los roles permitidos (TOURIST, OWNER_API, AGENCY_USER).",
+                  "2. Definir la estrategia de UI: Shared View (vista compartida con variaciones) o Segregated (exclusiva).",
+                  "3. Declarar la regla de routing inverso ante intentos de acceso no autorizado o tokens expirados.",
+                  "4. Auditar los 5 criterios de la compuerta de calidad para autorizar la transición a D2."
+                ],
+                "table_columns": "Nodo del Sitemap (Ruta Frontend) | Roles Permitidos | Estrategia UI | Regla de Routing Inverso (Bloqueo Middleware)",
+                "table_rules": "Ninguna ruta protegida puede quedar sin regla de redirección explícita.",
+                "restrictions": [
+                  "No confiar en validaciones de frontend sin respaldo en middleware",
+                  "Asegurar que las vistas legales sean siempre públicas"
+                ],
+                "done_when": "La matriz RBAC de routing está completa y aprueba el Quality Gate"
+              },
+              "example_title": "Matriz RBAC UI y Restricciones de Routing",
+              "example": "| Nodo del Sitemap (Ruta Frontend) | Roles Permitidos | Estrategia UI | Regla de Routing Inverso (Bloqueo Middleware) |\n| :--- | :--- | :--- | :--- |\n| **Buscador B2C** (`/`) | `TOURIST`, `OWNER_API`, `AGENCY_USER` | Shared View | Ninguno. Acceso irrestricto público. |\n| **Perfil Finca** (`/finca/[slug]`) | `TOURIST`, `OWNER_API`, `AGENCY_USER` | Shared View | Si el usuario es el dueño (`OWNER_API`), inyecta barra 'Modo Vista Previa'. |\n| **Checkout Wizard** (`/checkout/[id]`) | `TOURIST`, `AGENCY_USER` (con ID) | Segregated | Si el Soft-Lock ID no existe o expiró → HTTP 302 a `/finca/[slug]`. |\n| **Login B2B** (`/login`) | `TOURIST` (no auth) | Segregated | Si JWT activo + `OWNER_API`/`AGENCY_USER` → HTTP 302 a `/dashboard`. |\n| **Onboarding KYC** (`/onboarding`) | `OWNER_API` (pending) | Segregated | Si KYC ya aprobado → `/dashboard`. Si `TOURIST` → `/login`. |\n| **Dashboard Hub** (`/dashboard/*`) | `OWNER_API` (Ok), `AGENCY_USER` | Segregated | Sin JWT → `/login`. Si `TOURIST` → `/`. Si KYC pending → `/onboarding`. |\n| **`/terminos`, `/privacidad`** | `guest`, `finquero`, `admin` | Shared View | Acceso público obligatorio (requisito regulatorio pasarela y Habeas Data). |\n| **`/404`, `/403`, `/500`, `/410`** | `guest`, `finquero`, `admin` | Shared View | Acceso público sin bloqueo de ruta. |",
+              "link_label": "routing seguro y compuerta aprobada"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 1. Estrategia de Contenido y Arquitectura de Información.md",
+    "markdown": "# Entregable 1 (D1): Estrategia de Contenido y Arquitectura de Información\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Entregable:** 1 de 15 (Arquitectura de Información)\n**Estado:** Aprobado\n\n---\n\n### 1. Inventario de Información (Domain Mapping)\n\nEl ecosistema Frontend se descompone en función de los 8 módulos críticos de backend definidos en `[[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification.md]]`. La asimetría de rol es la conclusión arquitectónica central: un mismo módulo genera vistas radicalmente distintas según el actor.\n\n| Módulo Origen (Fase 3) | Rol | Tipo de Acceso | Necesidad UX Atómica | Patrón de Vista |\n|:---|:---|:---|:---|:---|\n| **`MOD-SRCH`** | Turista | Direccionable | Encontrar la finca ideal cruzando filtros, fechas y amenidades. | **Search Results View** (List + Infinite Scroll) |\n| **`MOD-PROP`** | Turista | Direccionable | Ver fotos HD en alta velocidad, leer precios antes de reservar. | **Detail View** (Public Profile, LCP Optimizado) |\n| **`MOD-PROP`** | Finquero | Direccionable | Subir fotos asíncronamente y editar precio base. | **Form View** (Management Form, Segregated B2B) |\n| **`MOD-CAL`** | Turista | Anidado | Saber qué días están libres antes de iniciar el checkout. | **Widget Embebido** (Date Picker, dentro de Perfil Finca) |\n| **`MOD-CAL`** | Finquero | Direccionable | Bloquear manualmente fechas y ver estado del calendario. | **Dashboard View** (Calendar Admin, Segregated B2B) |\n| **`MOD-RSV`** | Turista | Direccionable | Ver subtotal, ingresar datos personales e ir a pago. | **Wizard** (Checkout Step-by-Step) |\n| **`MOD-RSV`** | Finquero | Direccionable | Aprobar o rechazar solicitudes de reserva entrantes. | **List View** + **Action Modal** (Segregated B2B) |\n| **`MOD-PAY`** | Sistema | Anidado | Redirigir al Turista a pasarela externa y esperar confirmación. | **Action Modal** (Loading/Polling State, Transitorio) |\n| **`MOD-DASH`** | Finquero | Direccionable | Ver gráfico de ganancias del mes y exportar reporte CSV. | **Dashboard View** (Analytics, Segregated B2B) |\n| **`MOD-DASH`** | Agencia | Direccionable | Ver macro-calendario cruzado de todas sus reservas de fincas. | **Dashboard View** (Matrix View, Segregated B2B) |\n| **`MOD-AUTH`** | Turista / Finquero / Agencia | Direccionable | Registrarse, iniciar sesión o recuperar contraseña. | **Form View** (Auth Shared Flow) |\n| **`MOD-AUTH`** | Finquero | Direccionable | Subir RUT y documentos para validación KYC. | **Wizard** (Onboarding KYC, Segregated B2B) |\n| **`MOD-NOT`** | Finquero / Agencia | Anidado | Ver historial de alertas en tiempo real dentro del dashboard. | **Widget Embebido** (In-App Notification Center) |\n\n---\n\n### 2. Vistas Auxiliares y de Soporte\n\nVistas transversales de sistema que no nacen de módulos funcionales sino de obligaciones de infraestructura y cumplimiento legal. Fuente: `[[PHASE_3_REQUIREMENTS_ENGINEERING/6.Non-Functional_Requirements]]`.\n\n| Categoría | Ruta de Routing | Propósito / Justificación |\n|:---|:---|:---|\n| **Seguridad (Error)** | `/404` | Ruta inexistente o finca eliminada (soft-delete). CTA: \"Volver al Buscador\". |\n| **Seguridad (Error)** | `/403` | Rol autenticado sin permiso sobre el recurso. No revela existencia del recurso. |\n| **Seguridad (Error)** | `/500` | Falla crítica del SSR o base de datos. Nunca expone stack traces. |\n| **Seguridad (Expiración)** | `/410` | Sesión de pago expirada (TTL 120 min de `MOD-RSV`/`MOD-PAY`). |\n| **Transaccional (Loading)** | `/checkout/processing` | Spinner/Skeleton antifraude durante espera de confirmación de pasarela. Previene doble cobro. |\n| **Legal & Compliance** | `/terminos-y-condiciones` | Requisito bloqueante de la pasarela de pago (`MOD-PAY`) para aprobación del widget de cobro. |\n| **Legal & Compliance** | `/politica-de-privacidad` | Requisito Habeas Data (Ley 1581) para recolección de emails (`MOD-NOT`) e identidades (`MOD-AUTH`). |\n| **Settings (Preferencias)** | `/dashboard/settings` | Panel de configuración de cuenta del Finquero. Requiere JWT válido. |\n\n---\n\n### 3. Sitemap Jerárquico (Visual Mermaid)\n\nConstrucción basada en: Ley de Pertenencia (un único padre lógico por nodo) + Ley de Flujo Causal (orden real de uso del usuario). Referencia: `[[example_step_3_sitemap.md]]`.\n\n```mermaid\ngraph TD\n    %% Nodos Raíz (Fronteras Monolíticas)\n    B2C_Root[Marketplace B2C<br>/]\n    B2B_Root[Landing Finqueros B2B<br>/host]\n\n    %% Flujo Turista (B2C)\n    B2C_Root --> Buscador[Resultados Buscador<br>MOD-SRCH]\n    Buscador --> FincaPublic[Perfil Finca<br>/finca/slug]\n    FincaPublic --> CalWidget[Widget Fechas<br>MOD-CAL / Anidado]\n    CalWidget --> Checkout[Wizard Reserva<br>/checkout/id]\n    Checkout --> Processing[Loading Antifraude<br>/checkout/processing]\n    Processing --> Wompi{Pasarela Pago<br>MOD-PAY}\n    Wompi --> Success[Confirmación / Error<br>MOD-RSV]\n\n    %% Flujo Legales (Transversal)\n    B2C_Root -.-> Footer[Footer Global / Legales]\n    B2B_Root -.-> Footer\n    Footer --> TyC[Términos y Condiciones]\n    Footer --> Privacy[Política de Privacidad]\n\n    %% Flujo Finquero (B2B Auth Wall)\n    B2B_Root --> Auth[Login / Registro<br>MOD-AUTH]\n    Auth --> Recovery[Recuperar Contraseña]\n    Auth --> KYC{Onboarding KYC<br>Validación RUT}\n\n    %% Flujo Finquero Privado (Dashboard Protegido)\n    KYC -- Aprobado --> Dashboard[Dashboard B2B Hub<br>/dashboard]\n    Dashboard --> Analytics[Analíticas Finanzas<br>MOD-DASH]\n    Dashboard --> NotCenter[Centro Notificaciones<br>MOD-NOT]\n    Dashboard --> PropMgmt[Gestión de Fincas<br>MOD-PROP]\n    Dashboard --> CalMgmt[Bloqueos Calendario<br>MOD-CAL]\n    Dashboard --> RsvList[Reservas Recibidas<br>MOD-RSV]\n    Dashboard --> Settings[Configuración de Cuenta]\n```\n\n---\n\n### 5. Matriz RBAC UI y Restricciones de Routing\n\nDocumentado en `[[example_step_4_rbac_mapping.md]]`. Las redirecciones aplican en el middleware de Next.js (Fase 6).\n\n| Nodo del Sitemap (Ruta Frontend) | Roles Permitidos | Estrategia UI | Regla de Routing Inverso (Bloqueo) |\n|:---|:---|:---|:---|\n| **Buscador B2C** (`/`) | `TOURIST`, `OWNER_API`, `AGENCY_USER` | Shared View | Ninguno. Acceso irrestricto. |\n| **Perfil Finca** (`/finca/[slug]`) | `TOURIST`, `OWNER_API`, `AGENCY_USER` | Shared View | Si es el dueño (`OWNER_API`), inyecta \"Vista Previa\". |\n| **Checkout Wizard** (`/checkout/[id]`) | `TOURIST`, `AGENCY_USER` (con ID) | Segregated | Si el Soft-Lock ID es inválido → HTTP 302 a `/finca/[slug]`. |\n| **Login B2B** (`/login`) | `TOURIST` (no auth) | Segregated | Si JWT activo + `OWNER_API`/`AGENCY_USER` → HTTP 302 a `/dashboard`. |\n| **Onboarding KYC** (`/onboarding`) | `OWNER_API` (pending) | Segregated | KYC aprobado → `/dashboard`. `TOURIST` → `/login`. |\n| **Dashboard Hub** (`/dashboard/*`) | `OWNER_API` (Ok), `AGENCY_USER` | Segregated | Sin JWT → `/login`. `TOURIST` → `/`. KYC pending → `/onboarding`. |\n| **`/terminos`, `/privacidad`** | `guest`, `finquero` | Shared View | Acceso público obligatorio (requisito regulatorio). |\n| **`/404`, `/403`, `/500`, `/410`** | `guest`, `finquero` | Shared View | Acceso público obligatorio. Sin bloqueo de ruta. |\n"
+  }
+}

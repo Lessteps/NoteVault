@@ -1,0 +1,201 @@
+{
+  "phase": "PHASE 4: SYSTEM MODELING",
+  "deliverable_code": "D7",
+  "deliverable": "System Sequence Diagrams",
+  "purpose": "Modelar el comportamiento dinámico del sistema detallando las interacciones cronológicas entre actores humanos, capas de cliente (Frontend), servicios backend (APIs), bases de datos y servicios externos, distinguiendo llamadas síncronas de delegaciones asíncronas y formalizando el manejo exhaustivo de errores mediante bloques alt con códigos HTTP estándar.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| User Flows (D2) | [[PHASE_4_SYSTEM_MODELING/2.User_Flows_Task_Flows/2.User_Flows_Task_Flows.md]] | Identifica las interacciones críticas y secuencias paso a paso que requieren modelado técnico. |\n| Conceptual ERD (D6) | [[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]] | Identifica las entidades y tablas de base de datos impactadas por las transacciones. |\n| Functional Module Decomposition (P3-D5) | [[PHASE_3_REQUIREMENTS_ENGINEERING/5.Functional_Module_Decomposition/5.Functional_Module_Decomposition.md]] | Provee los identificadores de módulo oficiales (ej. MOD-BOOKING, MOD-AUTH) que deben reutilizarse sin alteración. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Identificación de Fronteras (Boundary Identification)",
+      "summary": "Analizar los flujos lógicos de D2 e identificar cada actor y participante sistémico declarando lifelines en Mermaid según la topología de seguridad.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Identificación y Declaración de Fronteras (Lifelines)",
+          "objective": "Desglosar las entidades que intervienen en el flujo transaccional y declararlas formalmente como actor o participant en Mermaid.",
+          "input": "Flujos lógicos de D2 y tablas de persistencia identificadas en el ERD (D6).",
+          "raw_data_title": "Matriz de Fronteras y Participantes Identificados",
+          "raw_data": "| Capa / Frontera | Tipo Mermaid | Identificador | Rol en el Flujo |\n|---|---|---|---|\n| Turista | actor | U | Usuario final que inicia la transacción interactuando con la UI |\n| Frontend (Browser) | participant | C | Cliente web/móvil que captura eventos y renderiza respuestas |\n| Booking API | participant | API | Backend (MOD-BOOKING) que orquesta la lógica de negocio |\n| Base de Datos | participant | DB | PostgreSQL; almacena reservas y pagos de forma atómica |\n| Pasarela de Pagos | participant | PAY | Wompi API; procesa transacciones bancarias y tarjetas |\n| Worker Asíncrono | participant | Q | Cola de mensajería/Background Worker para tareas diferidas |",
+          "exit_label": "Lifelines Declaradas y Topología de Red Validada",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Declaración de Topología y Fronteras en Mermaid",
+              "objective": "Estructurar la cabecera del diagrama de secuencia con lifelines explícitas.",
+              "how_to": {
+                "steps": [
+                  "1. Extraer del flujo D2 el actor humano y declararlo con sintaxis `actor U as [Nombre]`.",
+                  "2. Declarar el Frontend como `participant C as Frontend (Browser)`.",
+                  "3. Declarar el Backend con su módulo exacto de D5 como `participant API as Booking API (MOD-BOOKING)`.",
+                  "4. Declarar las bases de datos y servicios externos con participantes dedicados.",
+                  "5. Validar que el cliente nunca se conecte directamente a la base de datos ni a servicios protegidos."
+                ],
+                "table_columns": [
+                  "Frontera",
+                  "Sintaxis Mermaid",
+                  "Aislamiento de Capa",
+                  "Regla de Seguridad"
+                ],
+                "table_rules": [
+                  "El actor humano solo interactúa directamente con el Frontend (C)",
+                  "Toda comunicación externa o persistente debe pasar obligatoriamente por el Backend API",
+                  "Los identificadores de módulo deben coincidir exactamente con Fase 3 D5"
+                ],
+                "restrictions": "Prohibido conectar Frontend directamente con la base de datos o con APIs privadas de pago sin pasar por el backend.",
+                "done_when": "Cabecera Mermaid completa con 6 lifelines y validación de compuertas condicionales aprobada."
+              },
+              "example_title": "Declaración de Lifelines en Mermaid",
+              "example": "```mermaid\nsequenceDiagram\n    actor U as Turista\n    participant C as Frontend (Browser)\n    participant API as Booking API (MOD-BOOKING)\n    participant DB as PostgreSQL\n    participant PAY as Wompi API\n    participant Q as Background Worker\n```",
+              "link_label": "Fronteras Establecidas -> Mapeo Síncrono/Asíncrono"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Modelado Síncrono y Asíncrono (Sync & Async Mapping)",
+      "summary": "Mapear cada interacción del flujo a flechas síncronas o asíncronas optimizando la latencia percibida por el usuario.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Mapeo de Flujos Síncronos y Asíncronos",
+          "objective": "Clasificar cada mensaje según requiera respuesta inmediata bloqueante o delegación diferida en worker.",
+          "input": "Lifelines del Step 1 y acciones paso a paso del flujo D2.",
+          "raw_data_title": "Clasificación de Interacciones por Latencia",
+          "raw_data": "| Interacción | Origen -> Destino | Tipo Flecha | Justificación Arquitectónica |\n|---|---|---|---|\n| Clic en Pagar | U -> C | Síncrona (`->>`) | Evento de interfaz directo del usuario |\n| Solicitud POST Reserva | C -> API | Síncrona (`->>`) | Petición HTTP bloqueante con payload completo |\n| Cobro Pasarela | API -> PAY | Síncrona (`->>`) | Debe validarse fondos antes de reservar cupo |\n| INSERT Booking & Payment | API -> DB | Síncrona (`->>`) | Transacción ACID obligatoria en BD |\n| Evento booking.confirmed | API -) Q | Asíncrona (`-)`) | Envío de email/push diferido sin bloquear UI |\n| Respuesta 201 Created | API -->> C | Síncrona (`-->>`) | Backend responde de inmediato tras encolar evento |",
+          "exit_label": "Interacciones Clasificadas y Diagrama Base Generado",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Construcción de Flujos Síncronos y Delegación Asíncrona",
+              "objective": "Trazar las flechas de comunicación distinguiendo `->>` de `-)` para maximizar respuesta rápida.",
+              "how_to": {
+                "steps": [
+                  "1. Trazar petición HTTP síncrona `C->>API: POST /api/v1/bookings` con tokens y parámetros.",
+                  "2. Modelar validación y persistencia síncrona con la base de datos.",
+                  "3. Identificar procesos lentos (notificaciones por email/SMS) y delegarlos mediante flecha asíncrona `API-)Q`.",
+                  "4. Emitir respuesta HTTP 201 Created al cliente de inmediato sin esperar al worker."
+                ],
+                "table_columns": [
+                  "Paso",
+                  "Flecha",
+                  "Mensaje",
+                  "Comportamiento"
+                ],
+                "table_rules": [
+                  "Transacciones de cobro y persistencia deben ser síncronas",
+                  "Notificaciones y analítica deben delegarse asíncronamente con flecha -)",
+                  "El backend debe responder al frontend inmediatamente tras el encolamiento"
+                ],
+                "restrictions": "No bloquear la respuesta HTTP esperando el envío de correos o reportes analíticos.",
+                "done_when": "Diagrama de secuencia base con flechas síncronas y asíncronas claramente diferenciadas."
+              },
+              "example_title": "Secuencia con Delegación Asíncrona",
+              "example": "```mermaid\nsequenceDiagram\n    actor U as Turista\n    participant C as Frontend (Browser)\n    participant API as Booking API (MOD-BOOKING)\n    participant DB as PostgreSQL\n    participant PAY as Wompi API\n    participant Q as Background Worker\n\n    U->>C: Clic en \"Pagar\"\n    C->>API: POST /api/v1/bookings (token_pago, property_id, check_in, check_out)\n    API->>PAY: Procesar Cobro (total_price en centavos)\n    PAY-->>API: 200 OK (referencia aprobada)\n    API->>DB: INSERT INTO bookings (status=CONFIRMED)\n    DB-->>API: Fila creada (booking_id)\n    API->>DB: INSERT INTO payments (booking_id, amount, status=PAID)\n    DB-->>API: Fila creada (payment_id)\n    API-)Q: Emitir evento \"booking.confirmed\" (Async — enviar emails y push)\n    API-->>C: 201 Created (booking_id, total_price)\n    C-->>U: Mostrar Pantalla de Recibo (Confirmation Screen)\n```",
+              "link_label": "Flujo Base -> Modelado de Bloques Alt para Errores"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Manejo de Errores con Bloques ALT (Alt/Opt Error Handling)",
+      "summary": "Envolver las llamadas de riesgo en bloques condicionales alt especificando condiciones de éxito y códigos HTTP exactos de fallo.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Envoltorio en Bloques Alt y Definición de Sad Paths",
+          "objective": "Formalizar los caminos alternativos (fechas ocupadas, pagos declinados, fallos de persistencia) con códigos HTTP precisos.",
+          "input": "Diagrama del Step 2 y estados de error visuales de los Mockups (D5).",
+          "raw_data_title": "Puntos Críticos de Falla y Respuestas HTTP",
+          "raw_data": "| Punto de Falla | Condición de Rechazo | Código HTTP | Mensaje UI (Toast / Modal) |\n|---|---|---|---|\n| Conflicto de Fechas | Fechas reservadas concurrentemente | 409 Conflict | Toast Amarillo: Fechas no disponibles |\n| Rechazo Pasarela | Fondos insuficientes / Tarjeta declinada | 402 Payment Required | Toast Rojo: Tu tarjeta fue declinada |\n| Fallo en BD | Deadlock o caída de persistencia | 500 Internal Error | Modal de contingencia y reversión |",
+          "exit_label": "Diagrama Completo con Bloques Alt y Códigos HTTP",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Definición de Bloques Alt para Happy Path y Sad Paths",
+              "objective": "Integrar bloques `alt` / `else` en Mermaid cubriendo todos los escenarios alternativos.",
+              "how_to": {
+                "steps": [
+                  "1. Envolver verificación de disponibilidad en bloque `alt Fechas aún disponibles` y rama `else Fechas ya Ocupadas (409 Conflict)`.",
+                  "2. Envolver el cobro en sub-bloque `alt Pago Aprobado por la Pasarela` y rama `else Pago Declinado por la Pasarela (402 Payment Required)`.",
+                  "3. Asignar mensajes visuales concretos a cada rama de error para consumo del Frontend."
+                ],
+                "table_columns": [
+                  "Bloque",
+                  "Condición Éxito",
+                  "Condición Fallo",
+                  "Código HTTP"
+                ],
+                "table_rules": [
+                  "Cada camino de error debe especificar un código HTTP estándar (402, 409, 500)",
+                  "La respuesta del frontend debe correlacionarse con un componente visual definido en D5",
+                  "El happy path debe culminar en 201 Created y emisión asíncrona"
+                ],
+                "restrictions": "No omitir el código HTTP en las ramas de error ni usar mensajes de fallo genéricos.",
+                "done_when": "Diagrama Mermaid final completo con bloques alt anidados y códigos HTTP exactos."
+              },
+              "example_title": "Diagrama Mermaid con Bloques Alt",
+              "example": "```mermaid\nsequenceDiagram\n    actor U as Turista\n    participant C as Frontend (Browser)\n    participant API as Booking API (MOD-BOOKING)\n    participant DB as PostgreSQL\n    participant PAY as Wompi API\n    participant Q as Background Worker\n\n    U->>C: Clic en \"Pagar\"\n    C->>API: POST /api/v1/bookings (token_pago, property_id, check_in, check_out)\n\n    alt Fechas aún disponibles\n        API->>DB: SELECT COUNT(*) FROM bookings WHERE property_id AND check_in conflictan\n        DB-->>API: 0 conflictos (disponible)\n\n        API->>PAY: Procesar Cobro (total_price en centavos)\n\n        alt Pago Aprobado por la Pasarela\n            PAY-->>API: 200 OK (gateway_reference, transaction_id)\n            API->>DB: INSERT INTO bookings (status=CONFIRMED)\n            DB-->>API: booking_id generado\n            API->>DB: INSERT INTO payments (status=PAID, gateway_reference)\n            DB-->>API: payment_id generado\n            API-)Q: Emitir evento \"booking.confirmed\" (Async)\n            API-->>C: 201 Created (booking_id, total_price)\n            C-->>U: Mostrar Pantalla de Recibo (Confirmation Screen)\n\n        else Pago Declinado por la Pasarela\n            PAY-->>API: 402 Payment Required (Fondos Insuficientes / Tarjeta Expirada)\n            API-->>C: 402 Payment Required (código: PAYMENT_DECLINED)\n            C-->>U: Toast Rojo → \"Tu tarjeta fue declinada. Intenta con otro método.\"\n        end\n\n    else Fechas ya Ocupadas (409 Conflict)\n        API-->>C: 409 Conflict (código: DATES_UNAVAILABLE)\n        C-->>U: Toast Amarillo → \"Alguien reservó estas fechas. Selecciona nuevas fechas.\"\n    end\n```",
+              "link_label": "Bloques Alt Validados -> Ensamblaje del Índice Maestro"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Índice Maestro y Salidas por Módulo (Index & Module Assembly)",
+      "summary": "Compilar el índice central del entregable D7 y formalizar los subarchivos por módulo con sus implicaciones downstream.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Estructuración del Índice Maestro e Implicaciones Downstream",
+          "objective": "Articular la jerarquía de archivos y documentar el impacto en D8 (State Machines), D9 (API Design) y D11 (Security).",
+          "input": "Diagramas de secuencia completados y lista de módulos críticos de Fase 3 D5.",
+          "raw_data_title": "Inventario de Módulos e Impacto Downstream",
+          "raw_data": "| Módulo | Flujo Principal Modelado | Bloques Alt Clave | Consumidor Downstream Principal |\n|---|---|---|---|\n| MOD-BOOKING | Proceso transaccional de reserva y pago | 409 Conflict, 402 Payment Required | D8 (Máquina de estados de reservas) y D9 (Endpoints POST /bookings) |\n| MOD-AUTH | Autenticación y emisión de tokens JWT | 401 Unauthorized, 429 Rate Limited | D11 (Matriz de Seguridad) y D9 (Endpoints de Auth) |\n| MOD-HOSTING | Publicación de finca y subida de imágenes | 413 Payload Too Large, 422 Unprocessable | D9 (Endpoints multipart) y D8 (Estados de Finca) |\n| MOD-CALENDAR | Sincronización y bloqueo de calendarios iCal | 504 Gateway Timeout, 409 Sync Conflict | D8 (Estados de Disponibilidad) y D12 (Señales Arquitectónicas) |",
+          "exit_label": "Índice Maestro e Implicaciones Formalmente Aprobadas",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Índice Maestro y Submódulos",
+              "objective": "Consolidar el entregable D7 listo para consumo arquitectónico.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el archivo raíz `system_sequence_diagrams.md` con enlaces a submódulos.",
+                  "2. Generar subarchivos individuales en `example_outputs/` por cada módulo crítico.",
+                  "3. Documentar implicaciones de fase para Frontend (códigos HTTP a capturar) y Backend (workers asíncronos).",
+                  "4. Validar la regla de traducción al 100% al español."
+                ],
+                "table_columns": [
+                  "Componente",
+                  "Archivo",
+                  "Contenido",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El índice maestro debe listar todos los módulos modelados sin excepción",
+                  "Cada submódulo debe incluir descripción, diagrama Mermaid completo e implicaciones de fase",
+                  "No consolidar módulos en un solo archivo plano"
+                ],
+                "restrictions": "No inventar nombres de módulos fuera de los definidos en D5 de Fase 3.",
+                "done_when": "Estructura documental completa y verificada contra compuertas condicionales."
+              },
+              "example_title": "Estructura del Índice Maestro D7",
+              "example": "```markdown\n# Deliverable 7 (D7): System Sequence Diagrams\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — System Modeling\n**Estado:** Aprobado\n\n## Módulos Modelados\n- [[example_outputs/MOD-BOOKING]]: Proceso transaccional completo de reserva y pago.\n- [[example_outputs/MOD-AUTH]]: Proceso de autenticación y rotación de tokens JWT.\n- [[example_outputs/MOD-HOSTING]]: Proceso de creación y validación de propiedades.\n- [[example_outputs/MOD-CALENDAR]]: Sincronización y bloqueo de disponibilidad.\n\n### Implicaciones de Fase Generales\n- Proceder a D8: State Machine & Activity Diagrams.\n```",
+              "link_label": "Índice Maestro Ensamblado -> Deliverable Final"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — System Sequence Diagrams (D7)",
+    "markdown": "# Deliverable 7 (D7): System Sequence Diagrams\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Estado:** Aprobado\n\nEste documento es el índice central de los diagramas de secuencia del sistema, organizados por módulos críticos. Cada módulo tiene un subarchivo dedicado en la carpeta `example_outputs/`.\n\n---\n\n## Módulos Modelados\n\n*Backlink a Fase 3:* Estos diagramas de secuencia se basan en los flujos transaccionales definidos en los requerimientos de `[[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification.md]]` y el mapeo de `[[PHASE_4_SYSTEM_MODELING/2.User_Flows_Task_Flows/example_output_d2_user_flows.md]]`.\n\n- `[[example_outputs/MOD-BOOKING]]`: Proceso transaccional completo de reserva y pago (incluyendo manejo de fechas ocupadas y pagos declinados).\n- `[[example_outputs/MOD-AUTH]]`: Flujo de autenticación con Google OAuth y generación de tokens de sesión JWT.\n- `[[example_outputs/MOD-HOSTING]]`: Creación y publicación de finca con carga asíncrona de imágenes.\n- `[[example_outputs/MOD-CALENDAR]]`: Sincronización de disponibilidad con calendarios externos (iCal).\n\n---\n\n## Resumen Técnico del Módulo de Reserva (MOD-BOOKING)\n\n```mermaid\nsequenceDiagram\n    actor U as Turista\n    participant C as Frontend (Browser)\n    participant API as Booking API (MOD-BOOKING)\n    participant DB as PostgreSQL\n    participant PAY as Wompi API\n    participant Q as Background Worker\n\n    U->>C: Clic en \"Pagar\"\n    C->>API: POST /api/v1/bookings (token_pago, property_id, check_in, check_out)\n\n    alt Fechas aún disponibles\n        API->>DB: SELECT COUNT(*) FROM bookings WHERE property_id AND check_in conflictan\n        DB-->>API: 0 conflictos (disponible)\n\n        API->>PAY: Procesar Cobro (total_price en centavos)\n\n        alt Pago Aprobado por la Pasarela\n            PAY-->>API: 200 OK (gateway_reference, transaction_id)\n            API->>DB: INSERT INTO bookings (status=CONFIRMED)\n            DB-->>API: booking_id generado\n            API->>DB: INSERT INTO payments (status=PAID, gateway_reference)\n            DB-->>API: payment_id generado\n            API-)Q: Emitir evento \"booking.confirmed\" (Async — enviar emails y push)\n            API-->>C: 201 Created (booking_id, total_price)\n            C-->>U: Mostrar Pantalla de Recibo (Confirmation Screen)\n\n        else Pago Declinado por la Pasarela\n            PAY-->>API: 402 Payment Required (Fondos Insuficientes / Tarjeta Expirada)\n            API-->>C: 402 Payment Required (código: PAYMENT_DECLINED)\n            C-->>U: Toast Rojo → \"Tu tarjeta fue declinada. Intenta con otro método.\"\n        end\n\n    else Fechas ya Ocupadas (409 Conflict)\n        API-->>C: 409 Conflict (código: DATES_UNAVAILABLE)\n        C-->>U: Toast Amarillo → \"Alguien reservó estas fechas. Selecciona nuevas fechas.\"\n    end\n```\n\n---\n\n## Implicaciones para Siguientes Entregables\n\n- **Hacia D8 (State Machines):** Los estados reflejados en el diagrama (`CONFIRMED`, `PAID`, `PAYMENT_DECLINED`) son la base directa para modelar el ciclo de vida de la entidad `Booking` y sus transiciones de estado.\n- **Hacia D9 (API Conceptual Design):** La petición `POST /api/v1/bookings` con sus parámetros de entrada y sus códigos de respuesta (`201`, `402`, `409`) se convierte en la especificación exacta del endpoint en el diseño conceptual de la API.\n- **Hacia D11 (Authorization Matrix):** La llamada a la Booking API requiere validar que el Turista esté autenticado y que el token de pago pertenezca a la sesión activa antes de proceder con el cobro.\n- **Hacia el Frontend:** El equipo de UI sabe exactamente qué código capturar (`402` o `409`) y qué componente visual renderizar (`Toast Rojo` o `Toast Amarillo`) sin necesidad de consultar al backend."
+  }
+}

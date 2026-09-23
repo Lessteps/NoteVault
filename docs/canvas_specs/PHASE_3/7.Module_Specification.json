@@ -1,0 +1,177 @@
+{
+  "phase": "Phase 3",
+  "deliverable_code": "D7",
+  "deliverable": "Module Specification (Especificación Detallada de Módulos — Capa 2)",
+  "purpose": "Este entregable desciende a la Capa 2 de la ingeniería de requisitos para formalizar la especificación atómica, exhaustiva y autocontenida de cada módulo del sistema. Aísla requerimientos funcionales y no funcionales por componente, traduce capacidades técnicas en Historias de Usuario (User Stories) orientadas al valor humano, especifica Casos de Uso (Use Cases) blindados con Flujos Excepcionales y modela diagramas de actividad que guían directamente la codificación y las pruebas automatizadas.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[example_output_module_decomposition]] | Arquitectura de 6 módulos funcionales, contratos anatómicos y matriz RTM (Fase 3, D5). |\n| [[example_output_requirements_elicitation]] | Catálogo maestro de 20 Requerimientos Candidatos (CR) clasificados bajo FURPS+ (Fase 3, D4). |\n| [[example_output_non_functional]] | 9 Requisitos No Funcionales (NFR) cuantificables con herramientas de prueba (Fase 3, D6). |\n| [[example_output_actor_and_role]] | Matriz de permisos RBAC, identidades de usuario y restricciones de acceso (Fase 3, D2). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Requisitos Funcionales y Chequeo de Conflictos Intra-Módulo (Verify Entry)",
+      "summary": "Aplicar el principio de aislamiento funcional: extraer del registro maestro de requisitos únicamente aquellos que impactan al módulo analizado, delimitando sus reglas de negocio y restricciones de infraestructura.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Filtrado y Aislamiento Funcional del Módulo",
+          "objective": "Aislar los requerimientos funcionales (FR) y no funcionales (NFR) específicos del módulo bajo análisis.",
+          "input": "[[example_output_module_decomposition]], [[example_output_requirements_elicitation]] y [[example_output_non_functional]].",
+          "raw_data_title": "Requisitos Filtrados para MOD-AUTH",
+          "raw_data": "- Funcionales: Registro de usuarios por rol (CR-AUTH-01), Login con correo (CR-AUTH-02), Recuperación de clave (CR-AUTH-03), Silent Refresh (CR-AUTH-04), Double Opt-In (CR-AUTH-05), Logout seguro (CR-AUTH-06), Cambio de clave (CR-AUTH-07), Carga RUT KYC (CR-015).\n- No Funcionales: Hashing Argon2id (NFR-004), Cookies JWT HttpOnly con expiración 15m (NFR-005).",
+          "exit_label": "COMPLETE → Requisitos funcionales y de infraestructura aislados (2.1)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Inventario de Requisitos Aislados del Módulo",
+              "objective": "Construir la fuente única de la verdad funcional para el módulo seleccionado.",
+              "how_to": {
+                "steps": [
+                  "1. Seleccionar el módulo a especificar según el orden de descomposición de D5.",
+                  "2. Extraer del RTM de D4 los requerimientos funcionales asignados a este componente.",
+                  "3. Extraer del catálogo de D6 los requerimientos no funcionales que rigen su infraestructura.",
+                  "4. Verificar la ausencia de conflictos lógicos entre reglas de negocio y restricciones técnicas."
+                ],
+                "table_columns": "ID Requisito | Tipo | Descripción de la Capacidad / Regla de Arquitectura | Origen Documental",
+                "table_rules": "Todos los requerimientos deben provenir estrictamente de D4 y D6 sin agregados no trazados.",
+                "restrictions": [
+                  "No incluir requerimientos pertenecientes a otros módulos del sistema",
+                  "Resolver de inmediato cualquier contradicción entre agilidad y seguridad"
+                ],
+                "done_when": "El módulo cuenta con su conjunto aislado y coherente de requerimientos FR y NFR"
+              },
+              "example_title": "Requerimientos Base Aislados de MOD-AUTH",
+              "example": "| ID Requisito | Tipo | Descripción de la Capacidad / Regla de Arquitectura | Origen Documental |\n| --- | --- | --- | --- |\n| **`CR-AUTH-01`** | Funcional (FR) | El sistema debe permitir el registro de usuarios diferenciando roles (`ROLE_HOST`, `ROLE_CUSTOMER`, etc.). | [[4.Requirements_Elicitation]] |\n| **`CR-AUTH-02`** | Funcional (FR) | El sistema debe permitir el inicio de sesión (Login) utilizando correo electrónico y contraseña. | [[4.Requirements_Elicitation]] |\n| **`CR-AUTH-03`** | Funcional (FR) | El sistema debe proveer recuperación segura de contraseña vía email con enlace temporal. | [[4.Requirements_Elicitation]] |\n| **`CR-AUTH-04`** | Funcional (FR) | El sistema debe mantener la sesión viva mediante rotación de Refresh Tokens sin fricción. | [[4.Requirements_Elicitation]] |\n| **`CR-AUTH-05`** | Funcional (FR) | El sistema debe exigir Verificación de Correo (Double Opt-In) antes de habilitar el primer login. | [[4.Requirements_Elicitation]] |\n| **`CR-AUTH-06`** | Funcional (FR) | El sistema debe permitir el cierre de sesión seguro (Logout) revocando los tokens activos en BD. | [[4.Requirements_Elicitation]] |\n| **`CR-AUTH-07`** | Funcional (FR) | El sistema debe permitir al usuario autenticado cambiar su contraseña desde su perfil interno. | [[4.Requirements_Elicitation]] |\n| **`CR-015`** | Funcional (FR) | El Finquero debe cargar su RUT en PDF y someterse a validación KYC manual para publicar fincas. | [[4.Requirements_Elicitation]] |\n| **`NFR-004`** | No Funcional (NFR) | Hashing obligatorio de contraseñas utilizando el algoritmo estandarizado Argon2id. | [[6.Non-Functional_Requirements]] |\n| **`NFR-005`** | No Funcional (NFR) | Tokens JWT con expiración estricta (15 min) transmitidos exclusivamente en cookies HttpOnly/Secure. | [[6.Non-Functional_Requirements]] |",
+              "link_label": "requisitos aislados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Historias de Usuario (User Stories con Criterios Gherkin)",
+      "summary": "Traducir los requerimientos técnicos aislados en Historias de Usuario centradas en el valor y beneficio humano, aplicando la fórmula canónica 'Como [Actor] Quiero [Acción] Para poder [Beneficio]'.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Construcción de Historias de Usuario con Valor Humano",
+          "objective": "Formalizar las 9 Historias de Usuario asegurando que cada capacidad represente una promesa de valor medible.",
+          "input": "Requisitos aislados del Step 1 y catálogo de actores de [[example_output_actor_and_role]].",
+          "raw_data_title": "Historias de Usuario de Identidad y Acceso",
+          "raw_data": "US-AUTH-01 (Registro Finquero), US-AUTH-02 (Login Seguro), US-AUTH-03 (Recuperación Clave), US-AUTH-04 (Carga RUT KYC), US-AUTH-05 (Navegación Turista sin Fricción), US-AUTH-06 (Sesión Continua con Silent Refresh), US-AUTH-07 (Double Opt-In Anti-Bots), US-AUTH-08 (Logout Idempotente), US-AUTH-09 (Cambio de Clave Preventivo).",
+          "exit_label": "COMPLETE → Historias de usuario validadas con justificación de valor (3.1)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Catálogo de Historias de Usuario (US)",
+              "objective": "Estructurar la tabla de Historias de Usuario vinculando cada necesidad a su valor de negocio y FR.",
+              "how_to": {
+                "steps": [
+                  "1. Identificar el actor beneficiario de cada requerimiento funcional.",
+                  "2. Redactar la acción operativa concreta deseada por el usuario.",
+                  "3. Explicitar el beneficio de negocio verificando que aporte valor real al producto.",
+                  "4. Asociar el código FR correspondiente para preservar la trazabilidad."
+                ],
+                "table_columns": "ID US | Actor | Como [Actor] Quiero... | Para poder... | Requisito Relacionado",
+                "table_rules": "Prohibido programar funcionalidades que no cuenten con beneficio humano justificado.",
+                "restrictions": [
+                  "No redactar historias de usuario genéricas sin actor específico",
+                  "Garantizar que el beneficio sea medible y no una repetición de la acción"
+                ],
+                "done_when": "Las 9 Historias de Usuario están formalizadas con actor, acción y beneficio claro"
+              },
+              "example_title": "Catálogo de Historias de Usuario de MOD-AUTH",
+              "example": "| ID US | Actor | Como [Actor] Quiero... | Para poder... | Requisito Relacionado |\n| --- | --- | --- | --- | --- |\n| **`US-AUTH-01`** | Finquero | Crear una cuenta indicando mi nombre, correo y contraseña. | Poder acceder a la plataforma y empezar mi proceso de publicación de fincas. | `CR-AUTH-01` |\n| **`US-AUTH-02`** | Finquero / Cliente | Iniciar sesión en mi cuenta existente de forma segura. | Acceder a mi panel personal para gestionar reservas e inventario. | `CR-AUTH-02` |\n| **`US-AUTH-03`** | Usuario | Solicitar un enlace de recuperación si olvido mi contraseña. | Restablecer mi clave de forma autónoma sin perder el acceso a la cuenta. | `CR-AUTH-03` |\n| **`US-AUTH-04`** | Finquero | Subir mi documento RUT al sistema en la sección de Perfil. | Completar mi verificación KYC y habilitar mi cuenta para operar y cobrar. | `CR-015` |\n| **`US-AUTH-05`** | Turista | Navegar el catálogo público sin ver una pantalla de registro. | Explorar fincas sin fricción inicial, maximizando la conversión de reservas. | `CR-001` |\n| **`US-AUTH-06`** | Usuario | Que mi sesión no se cierre abruptamente mientras opero. | Tener una experiencia fluida con rotación silenciosa de tokens cada 15 min. | `CR-AUTH-04` |\n| **`US-AUTH-07`** | Usuario | Confirmar mi correo a través de un link enviado a mi bandeja. | Evitar que bots usen mi correo y asegurar la titularidad de la cuenta. | `CR-AUTH-05` |\n| **`US-AUTH-08`** | Usuario | Cerrar mi sesión en el dispositivo actual de forma segura. | Proteger mi cuenta si estoy usando un computador o celular compartido. | `CR-AUTH-06` |\n| **`US-AUTH-09`** | Usuario | Cambiar mi contraseña por una nueva desde mi perfil. | Prevenir accesos no autorizados si sospecho que mi clave fue comprometida. | `CR-AUTH-07` |",
+              "link_label": "historias de usuario estructuradas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Especificación Formal de Casos de Uso (Use Cases)",
+      "summary": "Modelar el comportamiento determinista de la máquina ante cada interacción, detallando el Camino Feliz (Main Success Scenario) y anticipando exhaustivamente los Flujos Excepcionales (Exception Flows) para blindar el software.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Modelado de Casos de Uso y Flujos Excepcionales",
+          "objective": "Especificar los 7 Casos de Uso del módulo con triggers, precondiciones, pasos y respuestas ante fallos.",
+          "input": "Historias de Usuario del Step 2 y reglas de seguridad de [[example_output_actor_and_role]].",
+          "raw_data_title": "7 Casos de Uso Formalizados",
+          "raw_data": "- UC-AUTH-01: Registro B2B (Manejo de email duplicado 409).\n- UC-AUTH-02: Login y Rate Limiting (Manejo de fuerza bruta 429, credenciales 401, email no verificado 403).\n- UC-AUTH-03: KYC RUT (Manejo de archivo no PDF 415).\n- UC-AUTH-04: Double Opt-In (Manejo de token expirado 400).\n- UC-AUTH-05: Logout Seguro (Revocación total en BD y destrucción de cookies).\n- UC-AUTH-06: Cambio de Contraseña (Invalidación forzada de todos los Refresh Tokens).\n- UC-AUTH-07: Silent Refresh (Rechazo ante token revocado 401).",
+          "exit_label": "COMPLETE → Casos de uso blindados con flujos de excepción (4.1)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Especificación Formal de Casos de Uso (UC)",
+              "objective": "Documentar la secuencia paso a paso de interacción y el manejo de fallos para los desarrolladores.",
+              "how_to": {
+                "steps": [
+                  "1. Definir para cada interacción el Actor, Trigger y Precondiciones.",
+                  "2. Redactar el Main Success Scenario enumerando los pasos entre Frontend, Backend y BD.",
+                  "3. Identificar proactivamente todos los puntos de falla y documentar los Exception Flows con código HTTP.",
+                  "4. Consolidar la matriz de casos de uso del módulo."
+                ],
+                "table_columns": "ID UC | Nombre del Caso de Uso | Actor Primario | Precondición | Flujo Principal (Main Success Scenario) | Flujos Excepcionales (Exception Flows)",
+                "table_rules": "Cada caso de uso debe incluir al menos un flujo excepcional con código de error HTTP estándar.",
+                "restrictions": [
+                  "No asumir que el usuario siempre ingresa datos correctos",
+                  "No dejar excepciones abiertas a la interpretación del programador"
+                ],
+                "done_when": "Los 7 Casos de Uso cuentan con camino feliz y excepciones exhaustivamente resueltas"
+              },
+              "example_title": "Especificación Formal de Casos de Uso (MOD-AUTH)",
+              "example": "| ID UC | Nombre del Caso de Uso | Actor Primario | Precondición | Flujo Principal (Main Success Scenario) | Flujos Excepcionales (Exception Flows) |\n| --- | --- | --- | --- | --- | --- |\n| **`UC-AUTH-01`** | Registro de Cuenta | Finquero / Turista | Usuario no registrado | Formulario enviado -> Validación de formato -> Hash Argon2id -> Token de verificación emitido -> Correo enviado. | 3a. Email duplicado -> HTTP 409 Conflict sin revelar estado de cuenta. |\n| **`UC-AUTH-02`** | Inicio de Sesión (Login) | Usuario Registrado | Cuenta con Double Opt-In | POST /login -> Chequeo Rate Limiting (Redis) -> Verificación Argon2id -> Generación JWT (15m) + Cookie HttpOnly. | 2a. >5 fallos -> HTTP 429 (bloqueo 15m).<br>3a. Credenciales malas -> HTTP 401.<br>4a. Email no verificado -> HTTP 403. |\n| **`UC-AUTH-03`** | Verificación KYC | Finquero | Sesión activa ROLE_HOST | Carga de RUT en PDF -> Validación de MIME type -> Almacenamiento seguro S3 -> Estado PENDING_VERIFICATION -> Aprobación Admin. | 2a. Archivo no PDF o ejecutable -> HTTP 415 Unsupported Media Type. |\n| **`UC-AUTH-04`** | Double Opt-In | Usuario Registrado | Enlace de email recibido | Click en enlace -> GET /verify-email?token=XYZ -> Verificación de vigencia -> Estado EMAIL_VERIFIED: true -> Redirección a Login. | 2a. Token expirado -> HTTP 400 Bad Request con opción de reenvío. |\n| **`UC-AUTH-05`** | Cierre de Sesión (Logout) | Usuario Autenticado | Sesión activa | POST /logout -> Revocación de RefreshToken en BD -> Destrucción de cookies HttpOnly (Max-Age=0) -> HTTP 200. | *(Sin excepciones; destrucción idempotente).* |\n| **`UC-AUTH-06`** | Cambio de Contraseña | Usuario Autenticado | Sesión activa | POST /change-password -> Comparación hash oldPass -> Hash newPass -> BD actualizada -> Invalidación de todos los RefreshTokens. | 2a. Clave antigua errada -> HTTP 401 y disparo de Rate Limit. |\n| **`UC-AUTH-07`** | Renovación de Sesión | Frontend SPA | AccessToken expirado | POST /refresh con cookie HttpOnly -> Validación de RefreshToken en BD -> Nuevo AccessToken emitido -> HTTP 200. | 2a. RefreshToken revocado o adulterado -> HTTP 401 y redirección a Login. |",
+              "link_label": "casos de uso blindados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Diagramas de Actividad y Ensamblaje del Archivo Modular",
+      "summary": "Modelar el diagrama de actividad lógica en sintaxis Mermaid, auditar la compuerta de calidad del módulo y consolidar el artefacto exportable en la carpeta de especificaciones modulares.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Ensamblaje Canónico y Activity Flow",
+          "objective": "Consolidar el documento oficial MOD-[COD].md y verificar los criterios de calidad modular antes de exportar.",
+          "input": "Resultados de Step 1, Step 2 y Step 3 consolidados.",
+          "raw_data_title": "Metadatos y Verificación de Compuerta Modular",
+          "raw_data": "Proyecto: Nos Fuimos de Finca | Fase: 3 — Ingeniería de Requisitos | Entregable: 7 de 9 | Módulo: MOD-AUTH.\nCriterios: Aislamiento funcional, Valor humano en US, Flujos excepcionales HTTP, Diagrama Mermaid, Mitigación OWASP.",
+          "exit_label": "PUBLISH → Deliverable Completo: 7. Especificación del Módulo MOD-AUTH",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Dictamen de Compuerta de Calidad Modular",
+              "objective": "Emitir el veredicto oficial PROCEED certificando la especificación atómica del módulo.",
+              "how_to": {
+                "steps": [
+                  "1. Compilar los metadatos institucionales del módulo.",
+                  "2. Ensamblar las 6 secciones normativas del documento modular.",
+                  "3. Modelar el diagrama de estados y actividades en Mermaid.",
+                  "4. Auditar el cumplimiento de los 5 criterios de la compuerta de calidad de Capa 2."
+                ],
+                "table_columns": "Criterio de Calidad de Especificación Modular | Estado | Evidencia",
+                "table_rules": "Todos los criterios deben resultar en APROBADO sin excepciones.",
+                "restrictions": [
+                  "No exportar la especificación si existen flujos de excepción ambiguos",
+                  "Asegurar que las directrices de seguridad se alineen con Spring Security y JWT"
+                ],
+                "done_when": "El módulo MOD-AUTH cumple el 100% de los criterios del Module Quality Gate Check"
+              },
+              "example_title": "Veredicto del Module Specification Quality Gate",
+              "example": "| Criterio de Calidad de Especificación Modular | Estado | Evidencia |\n| --- | --- | --- |\n| Aislamiento Funcional Completo | APROBADO | Requerimientos FR y NFR filtrados exclusivamente para el módulo analizado |\n| Historias de Usuario con Valor Humano | APROBADO | 9 US estructuradas bajo la fórmula 'Como/Quiero/Para' vinculadas a sus FRs |\n| Casos de Uso con Flujos Excepcionales | APROBADO | 7 UCs con caminos felices y manejo estricto de excepciones HTTP (401, 403, 409, 429) |\n| Diagrama de Actividad Orquestado | APROBADO | Flujos de estado y autenticación modelados en diagrama Mermaid formal |\n| Mitigación de Vulnerabilidades OWASP | APROBADO | Hashing Argon2id, tokens HttpOnly, rate limiting anti-fuerza bruta y RLS |",
+              "link_label": "módulo especificado y aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 7. Especificación del Módulo MOD-AUTH.md",
+    "markdown": "# 7. Especificación del Módulo: MOD-AUTH\n\n### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 3 — Ingeniería de Requisitos\n**Entregable:** 7 de 7 (Capa 2: Especificación Modular)\n**Módulo:** MOD-AUTH (Gestión de Identidad, Autenticación y Onboarding KYC)\n**Estado:** Aprobado\n\n### 2. Requerimientos Base\n#### 2.1 Requerimientos Funcionales (FR)\n- **[CR-AUTH-01]** El sistema debe permitir el registro de usuarios diferenciando dos roles principales: `ROLE_FINQUERO` y `ROLE_AGENCIA`.\n- **[CR-AUTH-02]** El sistema debe permitir el inicio de sesión (Login) utilizando correo electrónico y contraseña.\n- **[CR-AUTH-03]** El sistema debe proveer un mecanismo seguro de recuperación de contraseña (\"Olvidé mi contraseña\") vía correo electrónico con un enlace temporal.\n- **[CR-AUTH-04]** El sistema debe mantener la sesión viva mediante una rotación de tokens (Refresh Tokens) sin interrumpir la experiencia del usuario.\n- **[CR-AUTH-05]** El sistema debe exigir Verificación de Correo Electrónico (Doble Opt-In) mediante un enlace antes de permitir el primer inicio de sesión.\n- **[CR-AUTH-06]** El sistema debe permitir el cierre de sesión seguro (Logout) revocando los tokens activos en BD.\n- **[CR-AUTH-07]** El sistema debe permitir al usuario autenticado cambiar su contraseña desde el panel de configuración interno.\n- **[CR-015]** El Finquero debe poder cargar su RUT en formato PDF y someterse a una validación KYC manual para poder habilitar la publicación de fincas.\n- **[CR-003]** Turistas (Guests) no necesitan cuenta para navegar o reservar, pero el sistema les asignará un identificador de sesión anónimo.\n\n#### 2.2 Requerimientos No Funcionales Modulares (NFR)\n- **[NFR-AUTH-01]** Seguridad Criptográfica: Hashing de contraseñas obligatoriamente con el algoritmo `Argon2id`.\n- **[NFR-AUTH-02]** Prevención XSS: Los tokens JWT de acceso deben transmitirse e inyectarse EXCLUSIVAMENTE mediante Cookies `HttpOnly`, `Secure` y `SameSite=Strict`. Prohibido el uso de `localStorage`.\n- **[NFR-AUTH-03]** Prevención de Fuerza Bruta: El endpoint de Login debe implementar Rate Limiting (Máximo 5 intentos fallidos por IP o Correo en 15 minutos).\n- **[NFR-AUTH-04]** CSRF Protection: Todas las mutaciones de estado en el módulo de Auth deben requerir un token Anti-CSRF.\n\n### 3. Historias de Usuario (User Stories)\n| ID | Como [Actor] | Quiero [Acción] | Para [Valor] | FR Origen |\n| --- | --- | --- | --- | --- |\n| US-AUTH-01 | Finquero | Crear una cuenta indicando mi nombre, correo y contraseña. | Poder acceder a la plataforma y empezar mi proceso de publicación. | CR-AUTH-01 |\n| US-AUTH-02 | Agencia | Iniciar sesión en mi cuenta existente. | Acceder a mi Dashboard B2B para gestionar las reservas. | CR-AUTH-02 |\n| US-AUTH-03 | Agencia | Solicitar un enlace de recuperación si olvido mi contraseña. | Restablecer mi clave de forma autónoma sin perder el acceso. | CR-AUTH-03 |\n| US-AUTH-04 | Finquero | Subir mi documento RUT al sistema en la sección de Perfil. | Completar mi verificación KYC y habilitar mi cuenta para cobrar. | CR-015 |\n| US-AUTH-05 | Turista | Navegar la plataforma sin ver una pantalla de registro. | Explorar fincas sin fricción inicial, maximizando conversión. | CR-003 |\n| US-AUTH-06 | Usuario | Que mi sesión no se cierre abruptamente. | Tener una experiencia fluida sin digitar clave cada 2 horas. | CR-AUTH-04 |\n| US-AUTH-07 | Usuario | Confirmar mi correo a través de un link enviado a mi bandeja. | Evitar que bots usen mi correo y asegurar titularidad. | CR-AUTH-05 |\n| US-AUTH-08 | Usuario | Cerrar mi sesión en el dispositivo actual. | Proteger mi cuenta si estoy usando un computador compartido. | CR-AUTH-06 |\n| US-AUTH-09 | Usuario | Cambiar mi contraseña por una nueva desde mi perfil. | Prevenir accesos no autorizados si sospecho compromiso. | CR-AUTH-07 |\n\n### 4. Casos de Uso (Use Cases)\n\n#### UC-AUTH-01: Registro de Cuenta B2B\n- **Actor:** Finquero / Agencia\n- **Trigger:** El usuario envía el formulario de Registro.\n- **Main Success Scenario:**\n  1. Frontend envía POST `/api/auth/register`.\n  2. Backend verifica formato de email y fortaleza de contraseña.\n  3. Backend busca en BD si el correo ya existe (No existe).\n  4. Backend aplica Hash `Argon2id` al password y guarda registro (`EMAIL_VERIFIED: false`).\n  5. Backend genera Token de Verificación (Doble Opt-In) y pide a `MOD-NOT` enviar correo.\n  6. Retorna HTTP 201 Created.\n- **Exception Flows:**\n  - **3a. Colisión de Correo:** Si el correo ya existe, el Backend NO revela si la cuenta está activa. Retorna HTTP 409 Conflict (\"El correo ya se encuentra en uso\").\n\n#### UC-AUTH-02: Inicio de Sesión (Login) y Mitigación de Fuerza Bruta\n- **Actor:** Finquero / Agencia\n- **Trigger:** El usuario envía credenciales en el Login.\n- **Main Success Scenario:**\n  1. Frontend envía POST `/api/auth/login`.\n  2. Backend consulta Rate Limiter (Redis). OK (Intentos < 5).\n  3. Backend busca email y verifica hash `Argon2id`. OK.\n  4. Backend verifica que el usuario haya completado el Doble Opt-In (`EMAIL_VERIFIED == true`).\n  5. Backend resetea el contador de Rate Limit.\n  6. Backend genera un JWT `AccessToken` (15m) y `RefreshToken` (7d).\n  7. Retorna HTTP 200 OK con Cookies `HttpOnly`.\n- **Exception Flows:**\n  - **2a. Rate Limit Excedido:** Si falló 5 veces, aborta y retorna HTTP 429 Too Many Requests (\"Cuenta bloqueada por 15 min\").\n  - **3a. Credenciales Inválidas:** Incrementa contador en Redis y retorna HTTP 401 Unauthorized genérico sin detallar qué falló.\n  - **4a. Correo No Verificado:** Si `EMAIL_VERIFIED == false`, aborta y devuelve HTTP 403 Forbidden (\"Por favor verifique su correo primero\").\n\n#### UC-AUTH-03: Proceso de Verificación KYC\n- **Actor:** Finquero\n- **Trigger:** Finquero sube PDF del RUT.\n- **Main Success Scenario:**\n  1. Frontend envía archivo a `/api/kyc/upload` con token de sesión.\n  2. Backend verifica el MIME type (es PDF válido).\n  3. Backend almacena en S3 y actualiza estado a `PENDING_VERIFICATION`.\n  4. Admin aprueba KYC y estado pasa a `VERIFIED`.\n- **Exception Flows:**\n  - **2a. Archivo Malicioso:** MIME type detecta ejecutable, devuelve HTTP 415 Unsupported Media Type.\n\n#### UC-AUTH-04: Verificación de Correo (Double Opt-In)\n- **Actor:** Usuario\n- **Trigger:** Usuario hace click en el enlace de verificación del email.\n- **Main Success Scenario:**\n  1. Frontend envía GET `/api/auth/verify-email?token=XYZ`.\n  2. Backend verifica que el token exista y no haya expirado.\n  3. Backend actualiza BD a `EMAIL_VERIFIED: true`.\n  4. Retorna HTTP 200 OK y redirige al Login.\n- **Exception Flows:**\n  - **2a. Token Expirado:** Devuelve HTTP 400 Bad Request y ofrece botón \"Reenviar correo\".\n\n#### UC-AUTH-05: Cierre de Sesión Seguro (Logout)\n- **Actor:** Usuario Autenticado\n- **Trigger:** Usuario oprime \"Cerrar Sesión\".\n- **Main Success Scenario:**\n  1. Frontend envía POST `/api/auth/logout`.\n  2. Backend elimina el registro del `RefreshToken` en la Base de Datos (Revocación total).\n  3. Backend emite cabeceras instruyendo al navegador a destruir las cookies `HttpOnly` (`Set-Cookie: access_token=; Max-Age=0`).\n  4. Retorna HTTP 200 OK.\n\n#### UC-AUTH-06: Cambio de Contraseña Interno\n- **Actor:** Usuario Autenticado\n- **Trigger:** Usuario envía formulario en su perfil.\n- **Main Success Scenario:**\n  1. Frontend envía POST `/api/auth/change-password` con `oldPass` y `newPass`.\n  2. Backend compara `oldPass` con el hash en BD. Coinciden.\n  3. Backend aplica hash a `newPass` y actualiza la BD.\n  4. Backend INVALIDA todos los `RefreshToken` activos (cierra sesión en otros dispositivos por seguridad).\n  5. Retorna HTTP 200 OK.\n- **Exception Flows:**\n  - **2a. Clave Antigua Incorrecta:** Devuelve HTTP 401 Unauthorized y dispara contador de Rate Limit.\n\n#### UC-AUTH-07: Renovación de Sesión (Silent Refresh)\n- **Actor:** Frontend SPA\n- **Trigger:** El `AccessToken` de 15 min expira.\n- **Main Success Scenario:**\n  1. Frontend envía POST `/api/auth/refresh`. El navegador adjunta la cookie HttpOnly del `RefreshToken`.\n  2. Backend valida que el Refresh Token exista en BD y no esté revocado.\n  3. Backend emite nuevo `AccessToken` e invalida el viejo.\n  4. Retorna HTTP 200 OK.\n- **Exception Flows:**\n  - **2a. Refresh Token Revocado:** Si el token fue revocado (Ej. por Logout o Cambio de Clave), rechaza con HTTP 401 y el Frontend redirige al Login forzosamente.\n\n### 5. Diagrama de Actividad Lógica Global (Orquestación de Identidad)\n```mermaid\nstateDiagram-v2\n    direction TB\n    \n    state \"Flujo de Registro y Double Opt-In\" as RegFlow {\n        [*] --> POST_Register\n        POST_Register --> Correo_Enviado: Registro OK\n        Correo_Enviado --> Click_Enlace_Verificacion\n        Click_Enlace_Verificacion --> EMAIL_VERIFIED: Token Válido\n    }\n\n    state \"Flujo de Autenticación\" as AuthFlow {\n        [*] --> Verificar_RateLimit: POST /login\n        Verificar_RateLimit --> Bloqueo_IP: Intentos >= 5\n        Bloqueo_IP --> [*]: HTTP 429 Too Many Requests\n        \n        Verificar_RateLimit --> Verificar_Credenciales: Intentos OK\n        Verificar_Credenciales --> Error_Genérico: Hash Inválido\n        Error_Genérico --> [*]: HTTP 401\n        \n        Verificar_Credenciales --> Validar_Correo: Hash OK\n        Validar_Correo --> [*]: EMAIL_VERIFIED == false (HTTP 403)\n        \n        Validar_Correo --> Emitir_Tokens: EMAIL_VERIFIED == true\n        Emitir_Tokens --> [*]: HTTP 200 + HttpOnly Cookies\n    }\n    \n    state \"Seguridad y Ciclo de Vida de Sesión\" as Session_Security {\n        [*] --> Sesion_Activa\n        Sesion_Activa --> Refresh_Token: Access Expira (15m)\n        Refresh_Token --> Sesion_Activa: RT Válido\n        Refresh_Token --> Cierre_Forzado: RT Revocado\n        \n        Sesion_Activa --> Cambio_Password\n        Cambio_Password --> Invalidar_Todos_RT: Por seguridad\n        \n        Sesion_Activa --> Logout_Manual\n        Logout_Manual --> Destruir_Cookie_y_Revocar\n        \n        Destruir_Cookie_y_Revocar --> Cierre_Forzado\n        Invalidar_Todos_RT --> Cierre_Forzado\n        Cierre_Forzado --> [*]: Redirigir a Login\n    }\n```\n\n### 6. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No.\n- **Condición:** Proceed. La seguridad ha sido documentada a nivel bancario. Se han mitigado vulnerabilidades críticas como el secuestro de sesión (XSS), escalada de privilegios, enumeración de usuarios y fuerza bruta. El ciclo de vida de los tokens es inquebrantable.\n"
+  }
+}

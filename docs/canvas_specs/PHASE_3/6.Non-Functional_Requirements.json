@@ -1,0 +1,173 @@
+{
+  "phase": "Phase 3",
+  "deliverable_code": "D6",
+  "deliverable": "Non-Functional Requirements (Requisitos No Funcionales Globales — NFR)",
+  "purpose": "Este entregable establece los atributos de calidad, rendimiento, resiliencia y seguridad que rigen el comportamiento técnico del sistema. Traduce expectativas operativas en 9 Requisitos No Funcionales (NFR) cuantificables y auditables matemáticamente bajo las 7 categorías clásicas de arquitectura de software (ISO 25010), desterrando adjetivos vagos y asignando umbrales percentiles (p90, p95) con herramientas automatizadas de verificación.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[example_output_system_context_diagram]] | Dependencias de infraestructura, servicios externos (Wompi, WhatsApp) y fronteras de red (Fase 3, D1). |\n| [[example_output_actor_and_role]] | Reglas de gobierno, menor privilegio RBAC y políticas de seguridad (Fase 3, D2). |\n| [[example_output_requirements_elicitation]] | Requerimientos candidatos de usabilidad, rendimiento y seguridad bajo FURPS+ (Fase 3, D4). |\n| [[example_output_module_decomposition]] | Arquitectura modular de 6 componentes, soberanía de datos y flujos de integración (Fase 3, D5). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Extracción de Expectativas Base (Verify Entry)",
+      "summary": "Analizar las fuentes de entrada y los módulos funcionales para identificar las expectativas operativas de calidad y los puntos críticos de fricción arquitectónica del sistema.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Extracción y Tipificación de Expectativas de Calidad",
+          "objective": "Identificar los factores críticos de calidad de los actores y módulos traduciéndolos a expectativas técnicas preliminares.",
+          "input": "[[example_output_module_decomposition]] y [[example_output_requirements_elicitation]].",
+          "raw_data_title": "Expectativas de Calidad por Módulo",
+          "raw_data": "- MOD-PROP: Carga rápida de fotos en 3G/4G rural.\n- MOD-RSV: Latencia ultra-baja en checkout y resistencia a concurrencia masiva (overbooking).\n- MOD-PAY: Resiliencia ante caídas de pasarela externa Wompi.\n- MOD-AUTH: Protección de contraseñas y sesiones JWT.\n- MOD-NOT: Rastreabilidad de notificaciones transaccionales WhatsApp.\n- Global: Encriptación de datos PII bajo Ley 1581.",
+          "exit_label": "COMPLETE → Expectativas de calidad tipificadas para evaluación de categorías (2.1)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Inventario de Expectativas de Calidad",
+              "objective": "Consolidar la tabla de factores de calidad vinculando cada expectativa a su riesgo arquitectónico.",
+              "how_to": {
+                "steps": [
+                  "1. Revisar los módulos de D5 y los requerimientos FURPS+ de D4.",
+                  "2. Documentar el riesgo arquitectónico asociado a cada expectativa operativa.",
+                  "3. Formular un criterio de aceptación preliminar verificable."
+                ],
+                "table_columns": "Factor de Calidad | Módulo / Componente | Expectativa de Negocio | Riesgo Arquitectónico Asociado | Criterio de Aceptación Preliminar",
+                "table_rules": "No incluir adjetivos subjetivos sin asociarlos a un riesgo técnico cuantificable.",
+                "restrictions": [
+                  "Evitar promesas irrealistas de 100% de uptime que contradigan los SLAs de terceros",
+                  "Enfocar los factores en los módulos reales del sistema"
+                ],
+                "done_when": "Los 7 factores de calidad críticos están catalogados con su riesgo asociado"
+              },
+              "example_title": "Expectativas de Calidad y Riesgos Arquitectónicos",
+              "example": "| Factor de Calidad | Módulo / Componente | Expectativa de Negocio | Riesgo Arquitectónico Asociado | Criterio de Aceptación Preliminar |\n| --- | --- | --- | --- | --- |\n| **Tiempo de Carga Móvil** | `MOD-PROP` / Catálogo | El turista navega en redes móviles 3G/4G inestables. | Abandono de compra por lentitud en fotos de fincas. | LCP < 2.5s en percentil 90 con Lighthouse. |\n| **Latencia de Checkout** | `MOD-RSV` / Reservas | El checkout debe ser inmediato al presionar Pagar. | Bloqueo temporal retenido por lentitud de backend. | Response time de API p95 < 500ms. |\n| **Tolerancia a Fallos Pasarela** | `MOD-PAY` / Pagos | Caídas de Wompi no deben tumbar la plataforma. | Inconsistencia de reservas pagadas no confirmadas. | Reintentos con Exponential Backoff y circuit breaker. |\n| **Protección de Credenciales** | `MOD-AUTH` / Identidad | Cuentas de turistas y finqueros deben estar blindadas. | Filtración de contraseñas por ataques de fuerza bruta. | Hashing obligatorio con Argon2id y tokens JWT HttpOnly. |\n| **Concurrencia de Fechas** | `MOD-RSV` / Reservas | Múltiples turistas intentando apartar la misma finca. | Overbooking o bloqueo doble de inventario. | Soporte de 50 TPS a la misma finca con 0 deadlocks. |\n| **Trazabilidad de Notificaciones** | `MOD-NOT` / Mensajería | Confirmaciones de WhatsApp deben entregarse al finquero. | Desconocimiento de reservas por fallos silenciosos de red. | 100% de webhooks fallidos registrados en log JSON estructurado. |\n| **Protección de Datos PII** | Global / Base de Datos | Datos sensibles protegidos por Ley 1581 (Colombia). | Sanciones legales por exposición de teléfonos o correos. | Encriptación AES-256 en reposo para campos PII. |",
+              "link_label": "expectativas de calidad identificadas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Evaluación de las 7 Categorías ISO 25010 y Alcance",
+      "summary": "Filtrar las expectativas técnicas a través de las 7 categorías de arquitectura de software para asegurar una cobertura sistémica integral sin huecos de diseño.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Cobertura y Justificación de las 7 Categorías Arquitectónicas",
+          "objective": "Verificar que las 7 dimensiones de calidad estén plenamente cubiertas y justificadas en el sistema.",
+          "input": "Expectativas de calidad del Step 1 y mapa de módulos de D5.",
+          "raw_data_title": "7 Categorías de Arquitectura Evaluadas",
+          "raw_data": "1. Performance | 2. Availability | 3. Security | 4. Scalability | 5. Observability | 6. Compliance | 7. Maintainability.",
+          "exit_label": "COMPLETE → 7 categorías cubiertas para formalización cuantitativa (3.1)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Matriz de Cobertura de Categorías ISO 25010",
+              "objective": "Documentar el estado y la justificación de aplicación de cada categoría arquitectónica.",
+              "how_to": {
+                "steps": [
+                  "1. Evaluar el impacto de cada una de las 7 categorías en los módulos de la plataforma.",
+                  "2. Justificar la relevancia arquitectónica de cada dimensión para el modelo de negocio.",
+                  "3. Verificar que ninguna categoría quede desatendida o marcada como no aplicable sin sustento."
+                ],
+                "table_columns": "Categoría | Estado | Justificación (Si aplica)",
+                "table_rules": "Todas las categorías deben registrar estado 'Cubierta'.",
+                "restrictions": [
+                  "No omitir categorías críticas como Observability o Compliance",
+                  "Alinear la justificación con las realidades operativas del producto"
+                ],
+                "done_when": "Las 7 categorías registran estado Cubierta con justificación contextual"
+              },
+              "example_title": "Matriz de Cobertura de Categorías de Arquitectura",
+              "example": "| Categoría | Estado | Justificación (Si aplica) |\n| --- | --- | --- |\n| **Performance** | Cubierta | Vital para la experiencia de Turistas en móvil y Agencias manejando datos en lote. |\n| **Availability** | Cubierta | Condicionada a SLAs de terceros (Wompi, Meta API) con arquitectura resiliente. |\n| **Security** | Cubierta | Crítico manejo de PII, sesiones JWT y principio de menor privilegio. |\n| **Scalability** | Cubierta | Soporte de picos transaccionales de temporada alta (Diciembre/Semana Santa). |\n| **Observability** | Cubierta | Rastreabilidad de webhooks asíncronos obligatoria para resolver disputas de pago. |\n| **Compliance** | Cubierta | Cumplimiento estricto de Ley 1581 (Habeas Data) en Colombia. |\n| **Maintainability** | Cubierta | Calidad de código garantizada por tests unitarios automatizados en CI/CD. |",
+              "link_label": "cobertura de categorías validada"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Cuantificación de Métricas, Umbrales y Verificación",
+      "summary": "Redactar formalmente los 9 Requisitos No Funcionales (NFR-001 a NFR-009) desterrando promedios y fijando umbrales percentiles rigurosos con herramientas de prueba automatizadas.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Formalización de la Lista Global de NFRs Cuantitativos",
+          "objective": "Estructurar la tabla canónica de NFRs con identificador, categoría, alcance, descripción y método de medición estricto.",
+          "input": "Categorías del Step 2 y convenciones técnicas de [[example_output_stack_decision]].",
+          "raw_data_title": "9 NFRs Cuantitativos Formalizados",
+          "raw_data": "- NFR-001 (Performance): MOD-PROP LCP < 2.5s p90 3G simulada (Lighthouse).\n- NFR-002 (Performance): MOD-RSV API response time < 500ms p95 (APM).\n- NFR-003 (Availability): MOD-PAY Chaos HTTP 500 Retry Exponential Backoff.\n- NFR-004 (Security): MOD-AUTH Hashing Argon2id verificado en CI.\n- NFR-005 (Security): MOD-AUTH JWT expira < 2h en cookie HttpOnly/Secure.\n- NFR-006 (Scalability): MOD-RSV 50 TPS a misma finca sin deadlocks (k6).\n- NFR-007 (Observability): MOD-NOT 100% webhooks fallidos en log JSON con payload.\n- NFR-008 (Compliance): Global Encriptación AES-256 en reposo para PII.\n- NFR-009 (Maintainability): MOD-RSV Code coverage unit test ≥ 80% en CI/CD.",
+          "exit_label": "COMPLETE → 9 NFRs cuantificados listos para auditoría de compuerta (4.1)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Lista Global de Requisitos No Funcionales (NFR)",
+              "objective": "Formalizar cada NFR con métrica exacta, percentil y herramienta objetiva de validación.",
+              "how_to": {
+                "steps": [
+                  "1. Asignar código unívoco secuencial NFR-XXX y asociarlo a su módulo o scope global.",
+                  "2. Redactar la descripción técnica clara del comportamiento esperado.",
+                  "3. Definir el método de medición estricto especificando la herramienta (k6, Lighthouse, APM, CI/CD)."
+                ],
+                "table_columns": "ID | Categoría | Scope (Módulo) | Descripción | Método de Medición Estricto",
+                "table_rules": "Prohibido el uso de promedios simples; usar percentiles (p90, p95) o valores deterministas.",
+                "restrictions": [
+                  "No redactar mediciones que requieran juicios humanos subjetivos",
+                  "Toda medición debe ser ejecutable de forma automatizada en staging o CI/CD"
+                ],
+                "done_when": "Los 9 NFRs cuentan con método de medición estricto y comprobable"
+              },
+              "example_title": "Lista Global de Requisitos No Funcionales (NFR)",
+              "example": "| ID | Categoría | Scope (Módulo) | Descripción | Método de Medición Estricto |\n| --- | --- | --- | --- | --- |\n| **`NFR-001`** | Performance | `MOD-PROP` | La carga inicial del catálogo (fotos webp y textos) debe renderizarse rápido en móviles. | Pruebas de Lighthouse: LCP (Largest Contentful Paint) < 2.5s en percentil 90 usando red 3G simulada. |\n| **`NFR-002`** | Performance | `MOD-RSV` | El endpoint de creación de reserva debe responder velozmente para evitar doble clicks. | Monitoreo APM: Response time de API < 500ms en percentil 95. |\n| **`NFR-003`** | Availability | `MOD-PAY` | Tolerancia a fallos de Wompi. Si la pasarela de pagos cae, la plataforma no debe fallar internamente. | Prueba Chaos Engineering: Al simular HTTP 500 de Wompi, el sistema debe aplicar Retry con Exponential Backoff sin afectar la DB. |\n| **`NFR-004`** | Security | `MOD-AUTH` | Protección de contraseñas de finqueros y agencias. | Análisis estático de código: Verificación estricta del uso exclusivo de la librería Argon2id. |\n| **`NFR-005`** | Security | `MOD-AUTH` | Protección de sesiones contra secuestros de sesión (XSS/CSRF). | Test de Integración: Validar que el token JWT expire en máximo 2 horas y obligatoriamente viaje en HttpOnly/Secure cookie. |\n| **`NFR-006`** | Scalability | `MOD-RSV` | Soporte de Overbooking (concurrencia masiva de reservas intentando apartar la misma fecha). | Load Test K6 en Staging: Disparar 50 Transacciones por Segundo (TPS) a la misma Finca; asegurar 0 deadlocks SQL y solo 1 reserva exitosa. |\n| **`NFR-007`** | Observability | `MOD-NOT` | Trazabilidad de fallos en envíos de WhatsApp. | Script automatizado de Logs: El 100% de Webhooks fallidos deben escribir un log estructurado JSON con severity=ERROR y el payload original. |\n| **`NFR-008`** | Compliance | Global | Protección de datos personales (Ley 1581 de Colombia). | Auditoría de esquema DB: Los campos PII (emails, celulares) en PostgreSQL deben usar encriptación AES-256 en reposo. |\n| **`NFR-009`** | Maintainability | `MOD-RSV` | Estándar de calidad del motor transaccional de reservas. | Pipeline CI/CD: El build fallará automáticamente si el Code Coverage (Unit Tests) del módulo es inferior al 80%. |",
+              "link_label": "NFRs formalizados y medibles"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final y Dictamen de Compuerta",
+      "summary": "Compilar la especificación unificada de NFRs, verificar el cumplimiento de la compuerta de calidad de Fase 3 y emitir el dictamen formal autorizando el cierre de la Capa 1 de Fundamentos Globales.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación Formal y Quality Gate de NFRs",
+          "objective": "Verificar la compuerta de calidad de NFRs y formalizar el cierre exitoso del Gate 1 de Fase 3.",
+          "input": "Resultados de Step 1, Step 2 y Step 3 consolidados.",
+          "raw_data_title": "Evaluación de Compuerta de Calidad NFR",
+          "raw_data": "Metadatos: Nos Fuimos de Finca, Fase 3, Entregable 6 de 9, Estado Aprobado.\nCriterios: Cobertura 100% de categorías, ausencia de subjetividad, asignación modular precisa, métodos de medición automatizables.",
+          "exit_label": "PUBLISH → Deliverable Completo: 6. Requerimientos No Funcionales (Cierre Capa 1)",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Dictamen de Compuerta de Calidad NFR",
+              "objective": "Emitir el veredicto oficial PROCEED cerrando la Capa 1 de Fundamentos Globales de Fase 3.",
+              "how_to": {
+                "steps": [
+                  "1. Auditar los 5 criterios normativos de calidad para requerimientos no funcionales.",
+                  "2. Validar que la tabla consolide los 9 NFRs sin campos incompletos.",
+                  "3. Emitir el dictamen oficial autorizando el avance hacia la Capa 2 (D7 - Module Specification)."
+                ],
+                "table_columns": "Criterio de Calidad de NFRs | Estado | Evidencia",
+                "table_rules": "Todos los criterios deben resultar en APROBADO sin excepciones.",
+                "restrictions": [
+                  "No emitir PROCEED si existen métricas sin umbral numérico exacto",
+                  "Garantizar que todos los NFRs estén coordinados con la arquitectura modular de D5"
+                ],
+                "done_when": "El documento cumple el 100% de los criterios del Quality Gate de NFRs"
+              },
+              "example_title": "Veredicto del Quality Gate de Requisitos No Funcionales",
+              "example": "| Criterio de Calidad de NFRs | Estado | Evidencia |\n| --- | --- | --- |\n| Cobertura Total de Categorías ISO | APROBADO | Las 7 categorías de arquitectura de software están completamente cubiertas |\n| Erradicación de Ambigüedades Subjetivas | APROBADO | Ningún requisito usa 'rápido', 'seguro' o 'promedios'; métricas con percentiles p90/p95 |\n| Asignación Modular Precisa | APROBADO | Cada NFR apunta a su módulo responsable (PROP, RSV, PAY, AUTH, NOT o Global) |\n| Métodos de Medición Automatizables | APROBADO | Pruebas definidas con herramientas verificables (Lighthouse, k6, CI/CD, Chaos) |\n| Alineación con Políticas de Negocio | APROBADO | Cumplimiento estricto de Ley 1581 de Habeas Data y directrices de seguridad D2 |",
+              "link_label": "NFRs aprobados formalmente"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 6. Requerimientos No Funcionales.md",
+    "markdown": "# 6. Requerimientos No Funcionales\n\n### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 3 — Ingeniería de Requisitos\n**Entregable:** 6 de 6\n**Estado:** Aprobado\n\n### 2. Cobertura de Categorías\n| Categoría | Estado | Justificación (Si aplica) |\n| --- | --- | --- |\n| Performance | Cubierta | Vital para la experiencia de Turistas en móvil y Agencias manejando datos en lote. |\n| Availability | Cubierta | Condicionada a SLAs de terceros (Wompi, Meta API). |\n| Security | Cubierta | Crítico manejo de PII y Tokens JWT. |\n| Scalability | Cubierta | Soporte de picos transaccionales de temporada alta (Diciembre/Semana Santa). |\n| Observability | Cubierta | Rastreabilidad de webhooks asíncronos obligatoria para resolver disputas de pago. |\n| Compliance | Cubierta | Cumplimiento estricto de Ley 1581 (Habeas Data) en Colombia. |\n| Maintainability | Cubierta | Calidad de código garantizada por tests unitarios automatizados. |\n\n### 3. Lista Global de NFRs\n| ID | Categoría | Scope (Módulo) | Descripción | Método de Medición Estricto |\n| --- | --- | --- | --- | --- |\n| NFR-001 | Performance | `MOD-PROP` | La carga inicial del catálogo (fotos webp y textos) debe renderizarse rápido en móviles. | Pruebas de Lighthouse: LCP (Largest Contentful Paint) < 2.5s en percentil 90 usando red 3G simulada. |\n| NFR-002 | Performance | `MOD-RSV` | El endpoint de creación de reserva debe responder velozmente para evitar doble clicks. | Monitoreo APM: Response time de API < 500ms en percentil 95. |\n| NFR-003 | Availability | `MOD-PAY` | Tolerancia a fallos de Wompi. Si la pasarela de pagos cae, la plataforma no debe fallar internamente. | Prueba Chaos Engineering: Al simular HTTP 500 de Wompi, el sistema debe aplicar Retry con Exponential Backoff sin afectar la DB. |\n| NFR-004 | Security | `MOD-AUTH` | Protección de contraseñas de finqueros y agencias. | Análisis estático de código: Verificación estricta del uso exclusivo de la librería Argon2id. |\n| NFR-005 | Security | `MOD-AUTH` | Protección de sesiones contra secuestros de sesión (XSS/CSRF). | Test de Integración: Validar que el token JWT expire en máximo 2 horas y obligatoriamente viaje en HttpOnly/Secure cookie. |\n| NFR-006 | Scalability | `MOD-RSV` | Soporte de Overbooking (concurrencia masiva de reservas intentando apartar la misma fecha). | Load Test K6 en Staging: Disparar 50 Transacciones por Segundo (TPS) a la misma Finca; asegurar 0 deadlocks SQL y solo 1 reserva exitosa. |\n| NFR-007 | Observability | `MOD-NOT` | Trazabilidad de fallos en envíos de WhatsApp. | Script automatizado de Logs: El 100% de Webhooks fallidos deben escribir un log estructurado JSON con severity=ERROR y el payload original. |\n| NFR-008 | Compliance | Global | Protección de datos personales (Ley 1581 de Colombia). | Auditoría de esquema DB: Los campos PII (emails, celulares) en PostgreSQL deben usar encriptación AES-256 en reposo. |\n| NFR-009 | Maintainability | `MOD-RSV` | Estándar de calidad del motor transaccional de reservas. | Pipeline CI/CD: El build fallará automáticamente si el Code Coverage (Unit Tests) del módulo es inferior al 80%. |\n\n### 4. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No.\n- **Condición:** Proceed. Se han formalizado 9 NFRs estrictos cubriendo las 7 categorías de arquitectura de software, apuntando directamente a los 7 módulos reales que rigen a \"Nos Fuimos de Finca\". Ninguna métrica utiliza \"promedios\" o adjetivos subjetivos, todas son algoritmos matemáticamente comprobables.\n"
+  }
+}

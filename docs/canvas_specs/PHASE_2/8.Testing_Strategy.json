@@ -1,0 +1,400 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D8",
+  "deliverable": "Testing Strategy (Estrategia de Pruebas)",
+  "purpose": "Este entregable define cómo se garantizará la calidad del software antes de tocar Producción. La ausencia de una estrategia de pruebas convierte a los clientes en 'beta-testers' involuntarios. La base de la pirámide son las pruebas unitarias que validan la lógica central, seguidas de integraciones y QA Manual.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_stack_decision]] | Determina si podemos usar frameworks de test (Ej. Jest/JUnit) o si dependemos de QA visual/funcional (P2-D3). |\n| [[example_output_non_negotiable_constraints]] | Determina qué Restricciones No Negociables (velocidad, costo, concurrencia) deben probarse sí o sí antes del lanzamiento (P2-D2). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Selección de la Pirámide de Pruebas",
+      "summary": "Elegir qué tipos de pruebas se ejecutarán combinando pruebas unitarias de backend, integración de contratos y QA manual de interfaz.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Evaluación de Capas de Código y Stack Tecnológico",
+          "objective": "Analizar la arquitectura técnica de P2-D3 para identificar qué componentes requieren pruebas automatizadas de código.",
+          "input": "[[example_output_stack_decision]] (D3).",
+          "raw_data_title": "Capas a Probar",
+          "raw_data": "Backend Java compilable (lógica pesada, locks, transacciones ACID). Frontend JS (interfaz B2C). PostgreSQL (persistencia).",
+          "exit_label": "CAPAS EVALUADAS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Análisis de Código Compilable y Dependencias de Prueba",
+              "objective": "Distinguir entre la lógica de negocio crítica del backend y la capa visual para focalizar el esfuerzo de testing.",
+              "how_to": {
+                "steps": [
+                  "Consultar el stack tecnológico consolidado en P2-D3.",
+                  "Identificar los puntos de fallo lógico complejos (algoritmos de overbooking, firmas criptográficas).",
+                  "Ponderar el costo-beneficio de automatizar el frontend vs el backend.",
+                  "Determinar la estrategia de priorización técnica."
+                ],
+                "table_columns": "Capa Técnica | Tipo de Lógica | Estrategia de Prueba Sugerida",
+                "table_rules": "Toda lógica transaccional o matemática compleja debe contar con pruebas unitarias.",
+                "restrictions": [
+                  "Prohibido omitir pruebas unitarias en algoritmos con impacto financiero."
+                ],
+                "done_when": "Capas de código y niveles de riesgo evaluados."
+              },
+              "example_title": "Priorización de Niveles de Prueba",
+              "example": "| Capa | Lógica Involucrada | Prioridad de Automatización |\n| --- | --- | --- |\n| Backend Java | Locks de reserva y verificación de webhook Wompi | Nivel 1 (Unitario) - Obligatorio |\n| Base de Datos | Persistencia relacional y constraints de integridad | Nivel 2 (Integración) - Obligatorio |\n| Frontend JS | Interfaz de usuario y formularios web | Nivel 3 (QA Manual) - Alta eficiencia |",
+              "link_label": "análisis técnico pasa a asignación de frameworks (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Asignación de Frameworks por Nivel de Prueba",
+          "objective": "Asignar las librerías y herramientas de test específicas para cada estrato de la pirámide.",
+          "input": "Priorización técnica (1.1) y estándares de desarrollo.",
+          "raw_data_title": "Frameworks Asignados",
+          "raw_data": "Nivel 1: JUnit 5. Nivel 2: SpringBootTest y Testcontainers. Nivel 3: QA Manual humano en Staging.",
+          "exit_label": "FRAMEWORKS ASIGNADOS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Mapeo de JUnit 5, SpringBootTest y QA Manual",
+              "objective": "Seleccionar formalmente los entornos de ejecución y justificar la inclusión o descarte de herramientas.",
+              "how_to": {
+                "steps": [
+                  "Asignar JUnit 5 para pruebas unitarias rápidas y aisladas en Java.",
+                  "Asignar SpringBootTest con Testcontainers para pruebas de integración con PostgreSQL real.",
+                  "Asignar QA manual en Staging para el frontend B2C evitando sobrecarga de Cypress.",
+                  "Documentar la justificación técnica de cada nivel."
+                ],
+                "table_columns": "Nivel de Prueba | Herramienta Asignada | Justificación Operativa",
+                "table_rules": "Evitar duplicar herramientas o introducir suites pesadas de E2E para equipos pequeños.",
+                "restrictions": [
+                  "No descartar pruebas de integración de base de datos si existen restricciones ACID."
+                ],
+                "done_when": "Herramientas de testing formalmente seleccionadas."
+              },
+              "example_title": "Frameworks Seleccionados por Nivel",
+              "example": "| Nivel | Herramienta | Justificación Operativa |\n| --- | --- | --- |\n| Unitarias | JUnit 5 | Validación matemática inmediata de locks y lógica en ms |\n| Integración | SpringBootTest / Testcontainers | Verificación real de persistencia y contratos HTTP |\n| E2E / Flujo | QA Manual en Staging | Ahorra semanas de mantenimiento de scripts E2E frágiles |",
+              "link_label": "frameworks pasan a formalización de la pirámide (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Consolidación de la Pirámide de Pruebas Ajustada",
+          "objective": "Consolidar la tabla oficial de la pirámide de pruebas con su aplicabilidad al stack.",
+          "input": "Herramientas y justificaciones de 1.1 y 1.2.",
+          "raw_data_title": "Pirámide Oficial",
+          "raw_data": "Tabla consolidada con Nivel 1 (Unitarias Java), Nivel 2 (Integración Spring/BD) y Nivel 3 (QA Manual Staging).",
+          "exit_label": "PIRÁMIDE DE PRUEBAS BLOQUEADA → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Formalización de la Pirámide Restaurada",
+              "objective": "Crear la tabla oficial de metodología de pruebas para el documento final.",
+              "how_to": {
+                "steps": [
+                  "Sintetizar la aplicabilidad de JUnit 5 para lógica de negocio.",
+                  "Sintetizar la aplicabilidad de SpringBootTest para comunicación backend-datos.",
+                  "Sintetizar el protocolo de QA manual en staging para experiencia de cliente.",
+                  "Comprobar el pass condition de efectividad sin código de test inútil."
+                ],
+                "table_columns": "Nivel | Herramienta / Capa | Aplicabilidad al Stack Java/JS",
+                "table_rules": "Cada nivel debe tener una justificación concreta vinculada al stack del proyecto.",
+                "restrictions": [
+                  "Prohibido inventar herramientas no soportadas por el stack decidido en D3."
+                ],
+                "done_when": "Tabla oficial de pirámide de pruebas formalizada."
+              },
+              "example_title": "Metodología de Pruebas (Step 1 Output)",
+              "example": "| Nivel | Herramienta / Capa | Aplicabilidad al Stack Java/JS |\n| --- | --- | --- |\n| Nivel 1 (Unitarias) | JUnit 5 (Java) | Justificación: Crítico. Obligatorio probar matemáticamente la lógica de overbooking y candados (locks) de base de datos antes de subir a Staging. |\n| Nivel 2 (Integración) | SpringBootTest / Testcontainers | Justificación: Validar que el servidor Java efectivamente lea la BD y que los endpoints REST devuelvan el JSON esperado al JS. |\n| Nivel 3 (E2E / QA Flow) | QA Manual Humano en Staging | Justificación: El equipo es pequeño. En lugar de gastar horas escribiendo Cypress para el Front B2C, se llenará manualmente el formulario JS para validar la experiencia final. |",
+              "link_label": "pirámide de pruebas pasa a definición de flujos core (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Definición de Casos Críticos de Negocio (Core Flows)",
+      "summary": "Identificar los flujos sin los cuales el negocio se detiene o pierde dinero, definiendo Happy Paths y Unhappy Paths con criterios de éxito objetivos.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Identificación de Happy Paths Transaccionales",
+          "objective": "Aislar los casos exitosos indispensables para la generación de ingresos y reservas.",
+          "input": "Casos de uso clave de P1-D9 (MVP) y arquitectura de servicios.",
+          "raw_data_title": "Happy Paths Críticos",
+          "raw_data": "TEST-01: Creación de reserva exitosa con disponibilidad. TEST-02: Recepción de webhook Wompi y cambio a estado Pagada.",
+          "exit_label": "HAPPY PATHS DELIMITADOS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Mapeo de Creación de Reserva y Webhook Financiero",
+              "objective": "Especificar las precondiciones, acciones y resultados esperados para los flujos de cobro y reserva.",
+              "how_to": {
+                "steps": [
+                  "Definir el flujo de solicitud de reserva con fechas libres.",
+                  "Definir el flujo de confirmación de pago vía webhook de Wompi.",
+                  "Establecer la respuesta HTTP esperada y el cambio de estado en la base de datos.",
+                  "Registrar el criterio de pase automatizado para cada flujo."
+                ],
+                "table_columns": "ID | Nombre del Flujo | Capa a Probar | Criterio de Éxito",
+                "table_rules": "Los criterios de éxito deben ser evaluables mediante aserciones computacionales.",
+                "restrictions": [
+                  "No dejar ambiguo el resultado de la transacción en la base de datos."
+                ],
+                "done_when": "Happy paths principales completamente documentados."
+              },
+              "example_title": "Happy Paths de Negocio",
+              "example": "| ID | Flujo | Capa | Criterio de Éxito |\n| --- | --- | --- | --- |\n| TEST-01 | Creación de Reserva | Java (Unitaria) | Lanza reserva exitosa con estado Pendiente y persiste fechas |\n| TEST-02 | Recepción Webhook Wompi | Java (Integración) | Firma válida actualiza estado a Pagada y emite evento de notificación |",
+              "link_label": "happy paths pasan a diseño de casos de fallo (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Identificación de Unhappy Paths y Concurrencia",
+          "objective": "Aislar los escenarios de error más dañinos (overbooking, firmas falsificadas, colisiones de red).",
+          "input": "Riesgos de fallo identificados en P0-D7 y RNNs de P2-D2.",
+          "raw_data_title": "Unhappy Paths y Concurrencia",
+          "raw_data": "TEST-03: Concurrencia simultánea (dos reservas al mismo ms para la misma finca). Manejo de firmas inválidas en Wompi.",
+          "exit_label": "UNHAPPY PATHS DELIMITADOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Mapeo de Colisiones de Overbooking y Criptografía Inválida",
+              "objective": "Definir los tests de resistencia ante colisiones concurrentes y ataques o fallos en payloads.",
+              "how_to": {
+                "steps": [
+                  "Modelar la colisión de dos solicitudes idénticas en el mismo milisegundo.",
+                  "Verificar el bloqueo pesimista o índice único en la base de datos.",
+                  "Definir la excepción HTTP correspondiente (ConflictException 409).",
+                  "Modelar el rechazo de firmas criptográficas no autorizadas en webhooks."
+                ],
+                "table_columns": "ID | Escenario de Error | Mecanismo de Defensa | Resultado Esperado",
+                "table_rules": "El sistema debe responder con fallo controlado y preservar la consistencia ACID.",
+                "restrictions": [
+                  "Prohibido permitir que un unhappy path resulte en estado inconsistente o 500 silencioso."
+                ],
+                "done_when": "Casos de fallo crítico y concurrencia definidos."
+              },
+              "example_title": "Casos Críticos de Concurrencia y Fallo",
+              "example": "| ID | Escenario de Error | Mecanismo | Resultado Esperado |\n| --- | --- | --- | --- |\n| TEST-03 | Concurrencia Simultánea | Lock de BD / Unique Index | 1 solicitud aprobada, 1 rechazada con error 409 sin cobro duplicado |\n| TEST-SEC | Webhook Wompi Inválido | Verificación de firma SHA256 | Rechazo inmediato (401/400) sin alterar BD |",
+              "link_label": "casos de error pasan a consolidación de matriz de flujos (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Matriz de Core Flows y Criterios de Éxito Automatizados",
+          "objective": "Consolidar los flujos esenciales en la matriz oficial de salida.",
+          "input": "Happy paths (2.1) y Unhappy paths (2.2).",
+          "raw_data_title": "Matriz Maestra de Core Flows",
+          "raw_data": "TEST-01 (Creación de Reserva), TEST-02 (Webhook Wompi), TEST-03 (Concurrencia Simultánea) con criterios automatizados.",
+          "exit_label": "MATRIZ DE CORE FLOWS BLOQUEADA → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Formalización de la Matriz de Casos Críticos",
+              "objective": "Construir la tabla oficial de casos críticos a testear con indicación de capa y criterio de éxito.",
+              "how_to": {
+                "steps": [
+                  "Registrar TEST-01 con su validación en capa Java Unitaria.",
+                  "Registrar TEST-02 con su validación en capa Java Integración.",
+                  "Registrar TEST-03 con su validación de concurrencia simultánea.",
+                  "Consolidar la tabla oficial de casos de negocio."
+                ],
+                "table_columns": "ID | Flujo | Capa a Probar | Criterio de Éxito Automatizado",
+                "table_rules": "Cada flujo debe incluir el resultado matemático o técnico verificable.",
+                "restrictions": [
+                  "No omitir la verificación de concurrencia simultánea."
+                ],
+                "done_when": "Matriz de casos críticos formalizada y validada."
+              },
+              "example_title": "Casos Críticos de Negocio (Step 2 Output)",
+              "example": "| ID | Flujo | Capa a Probar | Criterio de Éxito Automatizado |\n| --- | --- | --- | --- |\n| TEST-01 | Creación de Reserva | Java (Unitaria) | Si no hay disponibilidad, el método de reserva lanza un `ConflictException` (HTTP 409). |\n| TEST-02 | Recepción Webhook Wompi | Java (Integración) | Si la firma criptográfica es inválida, rechaza el request y no cambia el estado a \"Pagada\". |\n| TEST-03 | Concurrencia Simultánea | Java (Integración) | Al enviar 2 reservas para la misma finca al mismo ms, una pasa a \"Pendiente\" y la otra falla por restricción de BD (Unique Index / Lock). |",
+              "link_label": "core flows pasan a verificación de restricciones no negociables (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Verificación de Restricciones No Negociables (RNNs)",
+      "summary": "Establecer las herramientas y frecuencias de medición objetiva para garantizar que las métricas límite del D2 se cumplan en producción.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Extracción de Métricas Duras y Selección de Herramientas",
+          "objective": "Asociar a cada restricción cuantitativa de P2-D2 una herramienta de medición automatizada o benchmarking.",
+          "input": "[[example_output_non_negotiable_constraints]] (D2).",
+          "raw_data_title": "RNNs Cuantificadas",
+          "raw_data": "RNN-01: LCP < 2.5s y peso < 1.5MB (Lighthouse). RNN-02: P95 < 400ms bajo 50 req/s (k6/JMeter). RNN-03: Alerta WhatsApp < 10s.",
+          "exit_label": "MÉTRICAS Y HERRAMIENTAS ASOCIADAS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Asignación de Lighthouse, k6 y Mocks de Webhook",
+              "objective": "Definir los instrumentos técnicos para auditar performance web, carga en backend y latencia de mensajería.",
+              "how_to": {
+                "steps": [
+                  "Vincular RNN-01 de rendimiento frontend con Google Lighthouse CI.",
+                  "Vincular RNN-02 de latencia bajo carga con scripts k6 o Apache JMeter.",
+                  "Vincular RNN-03 de tiempo de entrega de alertas con pruebas de webhook mock.",
+                  "Documentar los comandos o suites requeridos."
+                ],
+                "table_columns": "ID RNN | Métrica Cuantificada | Herramienta de Auditoría | Umbral de Aprobación",
+                "table_rules": "Toda RNN debe medirse con herramientas especializadas sin estimaciones subjetivas.",
+                "restrictions": [
+                  "Prohibido sustituir benchmarks automatizados por percepciones humanas en rendimiento."
+                ],
+                "done_when": "Herramientas de auditoría vinculadas a cada RNN."
+              },
+              "example_title": "Instrumentación de Métricas No Negociables",
+              "example": "| ID RNN | Métrica | Herramienta | Umbral |\n| --- | --- | --- | --- |\n| RNN-01 | Rendimiento Web | Google Lighthouse | LCP < 2.5s, Bundle < 1.5MB |\n| RNN-02 | Latencia de API | k6 / JMeter | P95 < 400ms con 50 req/s |\n| RNN-03 | Entrega de Alerta | Script de prueba Webhook | Tiempo total < 10 segundos |",
+              "link_label": "instrumentación pasa a calendario de frecuencias (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Frecuencia de Medición y Umbrales de Aprobación",
+          "objective": "Determinar en qué punto del ciclo de vida se dispara cada prueba de restricciones.",
+          "input": "Herramientas asignadas (3.1) y pipelines CI/CD.",
+          "raw_data_title": "Frecuencia de Pruebas RNN",
+          "raw_data": "Lighthouse: Cada build frontend en CI. k6: Pre-lanzamiento en Staging. Webhook WhatsApp: En cada despliegue a Staging.",
+          "exit_label": "MATRIZ DE VERIFICACIÓN RNN BLOQUEADA → 4.1",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Formalización de la Matriz de Verificación RNN",
+              "objective": "Consolidar la tabla oficial de pruebas de restricciones no negociables para el entregable.",
+              "how_to": {
+                "steps": [
+                  "Especificar la periodicidad para la auditoría de Lighthouse (Cada Build Front).",
+                  "Especificar la periodicidad para tests de carga con k6 (Ocasional / Pre-lanzamiento).",
+                  "Especificar la periodicidad para alertas de mensajería (Cada despliegue a Staging).",
+                  "Consolidar la tabla oficial de verificación RNN."
+                ],
+                "table_columns": "ID RNN | Métrica a Probar | Herramienta | Frecuencia",
+                "table_rules": "Las frecuencias deben garantizar que ninguna regresión pase desapercibida a producción.",
+                "restrictions": [
+                  "No posponer pruebas de performance para después del lanzamiento."
+                ],
+                "done_when": "Matriz de verificación RNN completada y validada."
+              },
+              "example_title": "Pruebas de Restricciones No Negociables (Step 3 Output)",
+              "example": "| ID RNN | Métrica a Probar | Herramienta | Frecuencia |\n| --- | --- | --- | --- |\n| RNN-01 | LCP < 2.5s y Peso < 1.5MB JS | Google Lighthouse (CI) | Cada Build Front |\n| RNN-02 | P95 < 400ms en Backend Java | k6 o JMeter (Test de Carga) | Ocasional (Pre-lanzamiento) |\n| RNN-03 | Entrega de Alerta WhatsApp < 10s | Webhook Mock Test | En cada despliegue a Staging |",
+              "link_label": "verificación RNN pasa a ensamblaje del documento final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar la guía oficial de aseguramiento de calidad integrando pirámide, flujos core, verificación RNN y compuerta de fase.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Metadatos y Pirámide de Pruebas",
+          "objective": "Ensamblar la ficha técnica y la metodología de pirámide restaurada en formato oficial.",
+          "input": "Metadatos del proyecto y pirámide de Step 1.",
+          "raw_data_title": "Metadatos y Pirámide",
+          "raw_data": "Proyecto: Nos Fuimos de Finca, Fase 2, D8, Estado Aprobado. Pirámide restaurada para Java, SpringBoot y QA Manual.",
+          "exit_label": "METADATOS Y PIRÁMIDE INTEGRADOS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Compilación de Secciones 1 y 2 en Formato Oficial",
+              "objective": "Redactar las secciones 1 y 2 del documento final asegurando conformidad con el estándar.",
+              "how_to": {
+                "steps": [
+                  "Completar metadatos (Proyecto, Fase, Entregable, Estado).",
+                  "Adjuntar la tabla de Metodología de Pruebas (Pirámide Restaurada).",
+                  "Verificar que las justificaciones reflejen las ventajas técnicas del stack.",
+                  "Asegurar exactitud de formato Markdown."
+                ],
+                "table_columns": "Sección | Contenido Ensamblado | Estado",
+                "table_rules": "Respetar la numeración de secciones oficial.",
+                "restrictions": [
+                  "No omitir la fundamentación del descarte de suites pesadas de E2E automatizado."
+                ],
+                "done_when": "Secciones 1 y 2 compiladas correctamente."
+              },
+              "example_title": "Metadatos y Metodología Ensamblados",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 2 — Project Kickoff\n**Entregable:** 8 de 13\n**Estado:** Aprobado\n\n### 2. Metodología de Pruebas (Pirámide Restaurada)\n| Nivel | Herramienta / Capa | Aplicabilidad al Stack Java/JS |\n| --- | --- | --- |\n| Nivel 1 (Unitarias) | JUnit 5 (Java) | Justificación: Crítico. Obligatorio probar matemáticamente la lógica de overbooking y candados (locks) de base de datos antes de subir a Staging. |\n| Nivel 2 (Integración) | SpringBootTest / Testcontainers | Justificación: Validar que el servidor Java efectivamente lea la BD y que los endpoints REST devuelvan el JSON esperado al JS. |\n| Nivel 3 (E2E / QA Flow) | QA Manual Humano en Staging | Justificación: El equipo es pequeño. En lugar de gastar horas escribiendo Cypress para el Front B2C, se llenará manualmente el formulario JS para validar la experiencia final. |",
+              "link_label": "metodología base pasa a anexar casos core y RNNs (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Integración de Core Flows, RNNs y Compuerta de Fase",
+          "objective": "Incorporar las tablas de casos críticos, validación de restricciones y la compuerta de pase de fase.",
+          "input": "Tablas de Steps 2 y 3, y reglas de compuerta condicional.",
+          "raw_data_title": "Flujos, RNNs y Compuerta D8",
+          "raw_data": "Tablas integradas. Condición: Proceed. La base ingenieril defiende la lógica pesada con unit tests en Java.",
+          "exit_label": "FLUJOS, RNNS Y COMPUERTA INCORPORADAS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Ensamblaje de Tablas de Verificación y Condición de Avance",
+              "objective": "Integrar las secciones 3, 4 y 5 del documento y evaluar la compuerta condicional.",
+              "how_to": {
+                "steps": [
+                  "Insertar la tabla de Casos Críticos de Negocio (Core Flows).",
+                  "Insertar la tabla de Pruebas de Restricciones No Negociables (RNNs).",
+                  "Evaluar la compuerta condicional: ¿Pirámide completa, core flows definidos y RNNs instrumentadas?",
+                  "Redactar la declaración formal de avance (Proceed)."
+                ],
+                "table_columns": "Sección | Contenido Anexado | Veredicto",
+                "table_rules": "Si falta el unhappy path o no se mide una RNN, detener y exigir definición.",
+                "restrictions": [
+                  "Prohibido otorgar el pase si la lógica de pago o concurrencia carece de validación."
+                ],
+                "done_when": "Secciones de casos de negocio, RNNs y compuerta ensambladas."
+              },
+              "example_title": "Core Flows, RNNs y Compuerta",
+              "example": "### 3. Casos Críticos de Negocio (Core Flows) a Testear\n| ID | Flujo | Capa a Probar | Criterio de Éxito Automatizado |\n| --- | --- | --- | --- |\n| TEST-01 | Creación de Reserva | Java (Unitaria) | Si no hay disponibilidad, el método de reserva lanza un `ConflictException` (HTTP 409). |\n| TEST-02 | Recepción Webhook Wompi | Java (Integración) | Si la firma criptográfica es inválida, rechaza el request y no cambia el estado a \"Pagada\". |\n| TEST-03 | Concurrencia Simultánea | Java (Integración) | Al enviar 2 reservas para la misma finca al mismo ms, una pasa a \"Pendiente\" y la otra falla por restricción de BD (Unique Index / Lock). |\n\n### 4. Pruebas de Restricciones No Negociables (RNNs)\n| ID RNN | Métrica a Probar | Herramienta | Frecuencia |\n| --- | --- | --- | --- |\n| RNN-01 | LCP < 2.5s y Peso < 1.5MB JS | Google Lighthouse (CI) | Cada Build Front |\n| RNN-02 | P95 < 400ms en Backend Java | k6 o JMeter (Test de Carga) | Ocasional (Pre-lanzamiento) |\n| RNN-03 | Entrega de Alerta WhatsApp < 10s | Webhook Mock Test | En cada despliegue a Staging |\n\n### 5. Implicación de Compuerta de Fase\n- **Condición:** Proceed. Se recuperó la base ingenieril. La lógica pesada asíncrona se defenderá con pruebas unitarias en Java, limitando las pruebas manuales solo a interacciones visuales del usuario.",
+              "link_label": "documento completo pasa a validación final y publicación (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Validación de Integridad y Publicación Oficial",
+          "objective": "Verificar la exactitud del entregable contra el archivo de referencia y concretar la entrega oficial.",
+          "input": "Documento completo ensamblado y archivo de salida oficial.",
+          "raw_data_title": "Validación y Entrega D8",
+          "raw_data": "Verificado contra example_output_testing_strategy.md. Publicación oficial en docs/02-project-kickoff.",
+          "exit_label": "ENTREGABLE D8 PUBLICADO Y COMPLETADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Emisión Oficial del Documento D8",
+              "objective": "Emitir la Estrategia de Pruebas oficial del proyecto con registro formal en el control de progreso.",
+              "how_to": {
+                "steps": [
+                  "Comprobar exhaustivamente la coherencia de todas las secciones.",
+                  "Verificar el enlace al artefacto [[example_output_testing_strategy]].",
+                  "Validar que el estado del documento sea Aprobado.",
+                  "Registrar el hito en la bitácora de progreso."
+                ],
+                "table_columns": "Criterio de Cierre | Estado | Registro Oficial",
+                "table_rules": "El documento es el marco vinculante para la aprobación de Pull Requests y releases.",
+                "restrictions": [
+                  "No concluir sin validar que los casos críticos incluyan Happy y Unhappy Paths."
+                ],
+                "done_when": "Entregable D8 formalmente emitido y publicado."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_testing_strategy]]`.\n\nUbicación oficial: `docs/02-project-kickoff/08. Estrategia de Pruebas.md`.\nEstado: Aprobado por Compuerta de Fase.",
+              "link_label": "entrega completada - fin de flujo D8"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

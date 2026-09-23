@@ -1,0 +1,200 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D5",
+  "deliverable": "Architectural Style Selection",
+  "purpose": "Definir formalmente el estilo arquitectónico interno para cada una de las unidades modulares del sistema mediante un Architecture Decision Record (ADR-003), asignando Clean Architecture / Puertos y Adaptadores a los módulos Core de alta complejidad de negocio (Booking y Billing) y Layered/MVC ligero a los módulos Generic/Supporting (Identity, Catalog, Notifications), estableciendo las capas conceptuales sin invadir la estructura física de carpetas de Fase 6.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| System Decomposition Decision (P5-D4) | [[PHASE_5_ARCHITECTURAL_DESIGN/4.System Decomposition Decision/4.System Decomposition Decision.md]] | Provee las 5 unidades modulares desplegables sobre las que se asigna el estilo interno. |\n| Domain Model & ERD (P4-D6) | [[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]] | Permite medir la densidad de reglas de negocio, invariantes y estados de cada entidad. |\n| State Machine Diagrams (P4-D8) | [[PHASE_4_SYSTEM_MODELING/8.State_Machine_Diagrams/8.State_Machine_Diagrams.md]] | Identifica la complejidad de transiciones, bloqueos temporales y side effects en reservas. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Análisis de Complejidad Interna por Módulo (Internal Complexity Analysis)",
+      "summary": "Evaluar la densidad de lógica de negocio e invariantes de dominio en cada uno de los 5 Bounded Contexts.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Clasificación de Complejidad de Negocio por Bounded Context",
+          "objective": "Distinguir módulos con lógica de dominio densa frente a aquellos de naturaleza predominantemente CRUD.",
+          "input": "Entidades de D6, máquinas de estado de D8 y unidades modulares de D4.",
+          "raw_data_title": "Matriz de Complejidad de Dominio y Estilos Candidatos",
+          "raw_data": "| Módulo Modular (D4) | Densidad de Reglas de Negocio | Estilo Arquitectónico Asignado | Capas Conceptuales Definidas |\n|---|---|---|---|\n| `booking` | Muy Alta: Invariantes ACID, locks de fecha, ventanas de aprobación | Clean Architecture / Hexagonal | Domain (Entities, Rules), Application (Use Cases), Infrastructure (Postgres Adapter) |\n| `billing` | Alta: Cálculos de comisión, liquidación B2B, integración Wompi ACL | Clean Architecture / Hexagonal | Domain (Tarifas), Application (Payout Use Cases), Infrastructure (Wompi Gateway) |\n| `catalog` | Media-Baja: Búsqueda indexada, filtros y fichas técnicas | Layered / Feature-Driven | Presentation (Controllers/ISR), Service (Search), Data Access (Postgres Reader) |\n| `identity` | Baja: Delegado en Supabase GoTrue BaaS (AuthN estándar) | Layered / CRUD Ligero | Presentation (Hooks/Middlewares), Service (Profile sync), Data Access |\n| `notifications` | Baja: Despacho asíncrono de plantillas multicanal | Event-Driven / Worker Handler | Handlers reactivos suscritos a eventos de base de datos |",
+          "exit_label": "Complejidad Evaluada y Estilos Asignados por Módulo",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Criterios de Asignación Pragmática de Estilos",
+              "objective": "Evitar sobre-ingeniería en módulos sencillos y asegurar aislamiento en los críticos.",
+              "how_to": {
+                "steps": [
+                  "1. Identificar si el módulo contiene lógica de negocio crítica independiente del framework.",
+                  "2. Para `booking` y `billing`, exigir inversión de dependencias para proteger invariantes.",
+                  "3. Para `catalog` e `identity`, priorizar simplicidad y alta velocidad de desarrollo.",
+                  "4. Prohibir forzar Clean Architecture en todo el sistema de forma dogmática."
+                ],
+                "table_columns": [
+                  "Módulo",
+                  "Nivel Complejidad",
+                  "Estilo Recomendado",
+                  "Justificación"
+                ],
+                "table_rules": [
+                  "Módulos con dependencias externas volátiles (Wompi) deben usar Puertos y Adaptadores",
+                  "Módulos delegados a BaaS no requieren capas de dominio complejas",
+                  "Se permite la coexistencia de estilos híbridos justificados en el mismo monorepo"
+                ],
+                "restrictions": "Prohibido obligar a escribir interfaces y casos de uso en módulos CRUD directos.",
+                "done_when": "Los 5 módulos cuentan con su evaluación de complejidad y estilo asignado."
+              },
+              "example_title": "Asignación de Estilos D5",
+              "example": "```markdown\n| Módulo | Complejidad | Estilo Asignado |\n|---|---|---|\n| Booking | Alta | Clean Architecture (Domain / Application / Infrastructure) |\n| Billing | Alta | Hexagonal / ACL Adapter |\n| Catalog | Media | Layered / Feature-Driven |\n| Identity | Baja | Layered / CRUD |\n| Notifications | Baja | Event-Driven Worker |\n```",
+              "link_label": "Complejidad Analizada -> Redacción del ADR-003"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Redacción del ADR-003 de Estilo Arquitectónico (ADR Formulation)",
+      "summary": "Formalizar el registro inmutable de decisión de arquitectura con el enfoque híbrido pragmático.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Formalización de Estilos Híbridos (Clean Architecture vs Layered/MVC)",
+          "objective": "Estructurar el ADR-003 justificando la arquitectura interna de código.",
+          "input": "Análisis del Step 1 y requerimientos de mantenibilidad.",
+          "raw_data_title": "Estructura del ADR-003 de Estilos Arquitectónicos",
+          "raw_data": "| Campo ADR | Contenido Clave Formalizado |\n|---|---|\n| Título | ADR-003: Selección de Estilos Híbridos (Clean Architecture vs Layered) por Módulo |\n| Context | Monolito modular con dominios heterogéneos: reglas de pago complejas vs perfiles sencillos |\n| Options Considered | 1. Estilos Híbridos Pragmáticos por Módulo (Aprobada) <br> 2. Clean Architecture Global Dogmática <br> 3. MVC Tradicional Plano para todo el sistema |\n| Decision | Aplicar Clean Architecture (Puertos y Adaptadores) a Booking y Billing; Layered simple a Catalog e Identity |\n| Consequences (+) | Protección absoluta del negocio transaccional sin ralentizar el desarrollo de pantallas secundarias |\n| Consequences (-) | Exige que el equipo domine dos patrones de estructuración interna (mitigado con guías en Fase 6) |",
+          "exit_label": "ADR-003 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Redacción Canónica de la Decisión de Estilo Interno",
+              "objective": "Documentar formalmente el ADR-003.",
+              "how_to": {
+                "steps": [
+                  "1. Enunciar el Contexto vinculándolo a la descomposición de D4.",
+                  "2. Describir las tres opciones de uniformidad vs pragmatismo.",
+                  "3. Enunciar la Decisión detallando los módulos asignados a cada patrón.",
+                  "4. Especificar Consecuencias positivas y mitigación de la heterogeneidad."
+                ],
+                "table_columns": [
+                  "Sección ADR",
+                  "Contenido Técnico",
+                  "Comprobación"
+                ],
+                "table_rules": [
+                  "El ADR debe explicitar las capas conceptuales sin escribir rutas de directorios físicos",
+                  "Las entidades de dominio deben quedar desacopladas de librerías de Next.js en módulos Core",
+                  "El documento debe archivar el consenso de diseño del equipo"
+                ],
+                "restrictions": "Prohibido detallar rutas de carpetas físicas como /src/domain/ (eso pertenece a Fase 6 D1).",
+                "done_when": "ADR-003 redactado en sus 5 secciones estándar."
+              },
+              "example_title": "ADR-003: Estilo Interno",
+              "example": "```markdown\n# ADR-003: Estilos Híbridos por Módulo\n\n## Context\nDominios de distinta densidad de reglas dentro del Monolito Modular.\n\n## Decision\n- Booking / Billing: Clean Architecture.\n- Catalog / Identity / Notif: Layered / MVC.\n\n## Consequences\n- Positive: Invariantes protegidos, sin burocracia en CRUDs.\n- Negative: Dos curvas de aprendizaje internas.\n```",
+              "link_label": "ADR-003 Redactado -> Marco Conceptual de Capas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Marco Conceptual de Capas Arquitectónicas (Conceptual Layering)",
+      "summary": "Modelar las capas conceptuales Domain, Application e Infrastructure y el flujo de dependencias hacia el centro.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Delimitación de Capas Domain, Application, Infrastructure y Presentation",
+          "objective": "Visualizar la regla de dependencia de Clean Architecture que rige los módulos Core.",
+          "input": "ADR-003 y principios de inversión de dependencias.",
+          "raw_data_title": "Definición Conceptual de Capas Arquitectónicas",
+          "raw_data": "| Capa Conceptual | Responsabilidad Arquitectónica | Dependencias Permitidas | Elementos Contenidos |\n|---|---|---|---|\n| Domain Layer (Centro) | Entidades puras, reglas de negocio e invariantes | Ninguna (Agnóstico a frameworks y BD) | Entidades de Dominio, Value Objects, Excepciones de Negocio |\n| Application Layer | Orquestación de Casos de Uso y puertos abstractos | Depende exclusivamente de Domain | Use Cases, Interfaces de Repositorio (Puertos de Salida) |\n| Infrastructure Layer | Adaptadores de persistencia y servicios externos | Depende de Application (Inversión) | Repositorios Prisma/SQL, Clientes Wompi, Clientes S3 |\n| Presentation Layer | Handlers de interfaz, Server Actions y API Routes | Depende de Application | Server Actions, Controladores REST, Validadores Zod |",
+          "exit_label": "Capas Conceptuales y Regla de Dependencia Formalizadas",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Diagramación de la Regla de Dependencias en Mermaid",
+              "objective": "Representar concéntricamente el flujo de control y dependencias.",
+              "how_to": {
+                "steps": [
+                  "1. Ilustrar el núcleo de Dominio libre de dependencias externas.",
+                  "2. Envolver el Dominio en la capa de Aplicación (Casos de Uso).",
+                  "3. Situar Infraestructura y Presentación en la periferia.",
+                  "4. Marcar flechas apuntando siempre hacia el centro (Dependency Inversion Rule)."
+                ],
+                "table_columns": [
+                  "Capa",
+                  "Dirección Dependencia",
+                  "Puertos / Interfaces",
+                  "Regla de Oro"
+                ],
+                "table_rules": [
+                  "Las capas externas pueden depender de las internas, nunca al revés",
+                  "El dominio no debe importar nada de Next.js, React o PostgreSQL",
+                  "Las llamadas a base de datos se hacen a través de interfaces declaradas en Aplicación"
+                ],
+                "restrictions": "Prohibido permitir que el Dominio importe adaptadores de infraestructura.",
+                "done_when": "Diagrama Mermaid de capas y regla de dependencia validado."
+              },
+              "example_title": "Regla de Dependencias en Mermaid",
+              "example": "```mermaid\ngraph TD\n    Presentation[\"Presentation Layer (Next.js Actions / API Routes)\"] --> Application[\"Application Layer (Use Cases / Ports)\"]\n    Infrastructure[\"Infrastructure Layer (Supabase Adapters / Wompi ACL)\"] --> Application\n    Application --> Domain[\"Domain Layer (Entities / Invariants)\"]\n```",
+              "link_label": "Capas Validadas -> Ensamblaje D5"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de la Selección de Estilo y Traspaso Downstream (Assembly & Handoff)",
+      "summary": "Consolidar el entregable D5 y articular su impacto vinculante en la arquitectura de carpetas (Fase 6 D1) y clases (Fase 6 D5).",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación del Documento D5 e Implicaciones para Fase 6 D1 y D5",
+          "objective": "Publicar el entregable D5 como guía conceptual inmutable para la fase de construcción.",
+          "input": "ADR-003, análisis de complejidad y marco de capas.",
+          "raw_data_title": "Directivas de Consumo Downstream",
+          "raw_data": "| Entregable Receptor | Directiva Técnica Heredada de D5 | Impacto en Construcción |\n|---|---|---|\n| Fase 6 — D1 (Codebase & Folder Architecture) | Traducirá las capas conceptuales a directorios físicos reales | Creará carpetas `domain/`, `application/`, `infrastructure/` en módulos Core |\n| Fase 6 — D5 (Class & Entity Diagrams) | Modelará clases respetando puertos y adaptadores en Core | Diseñará interfaces abstractas para repositorios y pasarelas |\n| D10 (ADR Consolidation) | Indexará ADR-003 en el registro consolidado de arquitectura | Registra la justificación técnica formal ante auditorías |",
+          "exit_label": "Entregable D5 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento Maestro D5",
+              "objective": "Consolidar el entregable D5 en formato formal.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el archivo en sus 3 secciones canónicas: Metadata, ADR-003 y Consumidores.",
+                  "2. Verificar que no se invadan decisiones físicas de nombres de carpetas.",
+                  "3. Documentar las directivas para la Fase 6.",
+                  "4. Validar el cumplimiento total de traducción al español."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Contenido",
+                  "Normativa",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe evitar la prescripción de rutas físicas de código",
+                  "Garantizar coherencia absoluta con D4 y D2",
+                  "Verificar que las capas conceptuales queden claramente delimitadas"
+                ],
+                "restrictions": "No admitir ambigüedades respecto a la pureza del dominio en módulos Core.",
+                "done_when": "Documento D5 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Entregable D5",
+              "example": "```markdown\n# Deliverable 5 (D5): Architectural Style Selection\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n## 2. Architectural Decision Record (ADR-003)\n[ADR completo de estilos híbridos]\n\n## 3. Downstream Consumers (Fase 6 D1, D5 y D10)\n```",
+              "link_label": "Estilo Ensamblado -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Architectural Style Selection (D5)",
+    "markdown": "# Deliverable 5 (D5): Architectural Style Selection\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n---\n\n## 1. Architectural Decision Record (ADR-003)\n\n### ADR-003: Selección de Estilos Híbridos (Clean Architecture vs Layered) por Módulo\n\n#### Context\nTras decidir en el ADR-002 (`[[PHASE_5_ARCHITECTURAL_DESIGN/4.System_Decomposition_Decision/4.System_Decomposition_Decision.md]]`) que el sistema se estructurará como un Monolito Modular en Next.js, se debe establecer el patrón de diseño interno para organizar el código dentro de cada uno de los 5 Bounded Contexts identificados en D2. Según el Modelo de Dominio (`[[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]]`) y las Máquinas de Estado (`[[PHASE_4_SYSTEM_MODELING/8.State_Machine_Diagrams/8.State_Machine_Diagrams.md]]`), los módulos presentan niveles de complejidad funcional drásticamente dispares: mientras que el proceso de reserva y pago involucra reglas de negocio e invariantes críticas, la gestión de perfiles o catálogos opera principalmente como consultas CRUD.\n\n#### Options Considered\n1. **Estilos Híbridos Pragmáticos por Módulo (Seleccionada):** Aplicar **Clean Architecture (Puertos y Adaptadores)** a los módulos Core (`booking`, `billing`) para aislar totalmente las reglas de negocio de frameworks y bases de datos; y un estilo **Layered / Feature-Driven** ligero y directo para los módulos Supporting y Generic (`catalog`, `identity`, `notifications`).\n2. **Clean Architecture Global Uniforme (Descartada):** Forzar casos de uso, entidades abstractas e interfaces de repositorio en módulos de lectura simple como `catalog` o autenticación delegada en BaaS añade burocracia innecesaria de archivos y frena la velocidad del equipo.\n3. **MVC / Layered Plano Tradicional en Todo el Sistema (Descartada):** Acoplaría la lógica de negocio de cobros y bloqueos directamente a sentencias SQL y Server Actions de Next.js, imposibilitando la realización de pruebas unitarias puras sobre el proceso transaccional de reservas.\n\n#### Decision\nSe decide adoptar una **estrategia de estilos híbrida**:\n- **Módulos Core (`booking`, `billing`):** Se rigen estrictamente bajo **Clean Architecture / Hexagonal**. Capas conceptuales: `Domain` (Entidades, Invariantes y Reglas de Negocio puras), `Application` (Casos de Uso y Puertos de Salida) e `Infrastructure` (Adaptadores de Supabase y Wompi ACL).\n- **Módulos Generic y Supporting (`catalog`, `identity`, `notifications`):** Se rigen bajo un estilo **Layered / Feature-Driven**, estructurados en Presentación (Server Actions/Componentes), Servicios de Dominio livianos y Acceso a Datos directo mediante clientes tipados.\n\n*Nota de Alcance:* Esta decisión define las capas y responsabilidades conceptuales. La estructura física de carpetas y archivos será definida de forma vinculante y exclusiva en la **Fase 6 — D1 (Codebase & Folder Architecture)**.\n\n#### Consequences\n- **Positivas:**\n  - El motor transaccional de reservas y liquidaciones queda 100% blindado contra cambios de tecnología, librerías o pasarelas.\n  - Pruebas unitarias ultrarrápidas y sin dependencias de base de datos sobre los casos de uso críticos de reserva.\n  - Alta velocidad de desarrollo en las pantallas de catálogo y perfil al no incurrir en sobre-abstracciones innecesarias.\n- **Negativas / Riesgos:**\n  - Coexistencia de dos convenciones internas en el mismo monorepo (mitigada documentando plantillas de módulo claras en la Fase 6).\n\n---\n\n## 2. Marco Conceptual de Capas Arquitectónicas (Módulos Core)\n\n```mermaid\ngraph TD\n    subgraph Outer_Layers [Capas de Entrada y Salida (Periferia)]\n        Presentation[\"Presentation Layer: Server Actions & API Handlers\"]\n        Infrastructure[\"Infrastructure Layer: Supabase DB Adapters & Wompi ACL\"]\n    end\n    subgraph Middle_Layer [Capa de Casos de Uso]\n        Application[\"Application Layer: Use Cases & Output Ports (Interfaces)\"]\n    end\n    subgraph Core_Layer [Núcleo Puro de Negocio]\n        Domain[\"Domain Layer: Entities, Business Invariants & State Rules\"]\n    end\n\n    Presentation -->|Invoca| Application\n    Infrastructure -->|Implementa Puertos| Application\n    Application -->|Contiene y Protege| Domain\n```\n\n---\n\n## 3. Implicaciones para Entregables Downstream\n\n- **Hacia Fase 6 — D1 (Codebase & Folder Architecture):** Utilizará estas directivas conceptuales para diseñar la distribución física de directorios (ej. carpetas `domain/`, `application/`, `infrastructure/` en `modules/booking`).\n- **Hacia Fase 6 — D5 (Class & Entity Diagrams):** Modelará las entidades de dominio y casos de uso con puertos abstractos de repositorio en los módulos de reserva y liquidación.\n- **Hacia D10 (ADR Consolidation):** Se indexa el ADR-003 como la decisión de estilos internos del proyecto."
+  }
+}

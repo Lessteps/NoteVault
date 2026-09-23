@@ -1,0 +1,480 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D7",
+  "deliverable": "Viability Document (Documento de Viabilidad y Compuerta de Control)",
+  "purpose": "Este entregable consolida los hallazgos de mercado (D2), competencia (D3), tecnología (D4), regulación (D5) y capacidad (D6) para dictaminar si el modelo de negocio es viable antes de invertir tiempo y recursos en planeación detallada (MVP, Cronogramas). Funciona como una Compuerta de Control Interna (Internal Gate) con capacidad vinculante de detener (CANCEL) el proyecto.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_market_validation]] | Provee el modelo de ingresos, WTP y tamaño del mercado (P1-D2). |\n| [[example_output_technical_feasibility]] | Provee la base para estimar costos de infraestructura técnica y nube (P1-D4). |\n| [[example_output_legal_clearance]] | Confirma el estatus de cumplimiento y restricciones normativas (P1-D5). |\n| [[example_output_team_capability]] | Provee costos de herramientas, capacitaciones o brechas (P1-D6). |\n| [[example_output_stakeholder_map]] | Mapa base de actores de Fase 0 (P0-D6). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría Financiera y Modelo de Pricing",
+      "summary": "Confirmar fuentes de ingresos, estructura de costos fijos mensuales y gastos no recurrentes de setup.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Confirmar el modelo de pricing e ingreso por transacción o cliente",
+          "objective": "Extraer el valor conservador de monetización y disposición a pagar validado en P1-D2.",
+          "input": "Modelo de pricing y WTP de [[example_output_market_validation]] (P1-D2).",
+          "raw_data_title": "Ingresos y Monetización",
+          "raw_data": "Service fee: COP $5,000 por reserva completada (cobro al turista) o suscripción anual de COP $720,000 por finca ($60,000/mes).",
+          "exit_label": "MODELO DE PRICING CONFIRMADO → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Confirmación de modelo de ingresos y WTP",
+              "objective": "Registrar el ingreso unitario base adoptando el supuesto más conservador.",
+              "how_to": {
+                "steps": [
+                  "Consultar el WTP y modelo de monetización definidos en P1-D2.",
+                  "Identificar el valor nominal percibido por unidad de producto o suscripción.",
+                  "Si existen múltiples escenarios, seleccionar el supuesto más conservador.",
+                  "Documentar la fuente de evidencia de la tarifa unitaria."
+                ],
+                "table_columns": "Dimensión de Ingreso | Modalidad | Tarifa Unitaria Estimada | Fuente de Validación",
+                "table_rules": "Adoptar el valor unitario validado más prudente.",
+                "restrictions": [
+                  "No sobreestimar tarifas sin validación empírica previa.",
+                  "Diferenciar claramente comisiones transaccionales de suscripciones."
+                ],
+                "done_when": "Ingreso unitario por cliente o transacción formalmente registrado."
+              },
+              "example_title": "Modelo de Ingresos Unitarios",
+              "example": "| Métrica Financiera | Valor Estimado | Fuente |\n| --- | --- | --- |\n| Ingreso por reserva (service fee) | COP $5,000 / reserva | P1-D2 (modelo de pricing) |\n| Ingreso anual suscripción por finca | COP $720,000 / año | P1-D2 (WTP validado) |",
+              "link_label": "ingreso unitario va a costos fijos (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Extraer el costo operativo fijo mensual",
+          "objective": "Listar y sumar los costos operativos recurrentes de infraestructura y soporte.",
+          "input": "Costos de infraestructura y partners de [[example_output_technical_feasibility]] (P1-D4).",
+          "raw_data_title": "Costos Fijos Mensuales",
+          "raw_data": "Servidor web y base de datos (Render/DigitalOcean): COP $80,000/mes. API SMS (Twilio): COP $120,000/mes. Total fijo mensual: COP $200,000.",
+          "exit_label": "COSTOS FIJOS AUDITADOS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Estimación de costos operativos fijos mensuales",
+              "objective": "Cuantificar las erogaciones mensuales obligatorias independientes del volumen de uso.",
+              "how_to": {
+                "steps": [
+                  "Listar servicios de infraestructura en nube requeridos según P1-D4.",
+                  "Incorporar suscripciones de APIs y servicios recurrentes mínimos indispensables.",
+                  "Excluir costos variables directamente ligados al número de transacciones.",
+                  "Totalizar el costo fijo mensual operativo del sistema."
+                ],
+                "table_columns": "Concepto de Costo Fijo | Proveedor / Servicio | Costo Mensual Estimado | Justificación Técnica",
+                "table_rules": "Solo costos recurrentes fijos del entorno de producción.",
+                "restrictions": [
+                  "No incluir costos variables dependientes del volumen.",
+                  "No omitir costos mínimos de base de datos ni nombres de dominio."
+                ],
+                "done_when": "Presupuesto de costos fijos mensuales consolidado."
+              },
+              "example_title": "Costos Fijos Mensuales de Operación",
+              "example": "| Concepto Fijo | Detalle | Costo Mensual |\n| --- | --- | --- |\n| Servidor y Base de Datos | Render / DigitalOcean base | COP $80,000 / mes |\n| Servicios de Notificación | Plan base Twilio SMS | COP $120,000 / mes |\n| **Total Fijo Mensual** | **Operación recurrente mínima** | **COP $200,000 / mes** |",
+              "link_label": "costos fijos van a costos de setup (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Extraer los costos de setup únicos (no recurrentes)",
+          "objective": "Totalizar las inversiones iniciales requeridas antes del lanzamiento del MVP.",
+          "input": "Costos de resolución de brechas y consultorías de [[example_output_team_capability]] (P1-D6).",
+          "raw_data_title": "Costos de Setup",
+          "raw_data": "Consultor arquitectura BD (15h): COP $1,500,000. Abogado T&C SaaS: COP $2,500,000. Total setup inicial: COP $4,000,000.",
+          "exit_label": "AUDITORÍA FINANCIERA BASE CONSOLIDADA → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Cuantificación de costos de setup inicial",
+              "objective": "Identificar los gastos únicos de consultoría, asesoría legal y adecuación técnica inicial.",
+              "how_to": {
+                "steps": [
+                  "Revisar las tácticas de resolución que requieren presupuesto externo en P1-D6.",
+                  "Incluir los gastos de estructuración legal y redacción contractual de P1-D5.",
+                  "Excluir el tiempo propio de desarrollo de los fundadores si no representa caja inmediata.",
+                  "Consolidar el capital inicial total necesario para el setup."
+                ],
+                "table_columns": "Rubro de Setup | Destino / Proveedor | Costo Total Único | Fuente Documental",
+                "table_rules": "Una fila por inversión o consultoría no recurrente.",
+                "restrictions": [
+                  "No mezclar gastos de capital inicial con costos recurrentes de operación.",
+                  "Validar que existan cotizaciones o estimados fundamentados."
+                ],
+                "done_when": "Total de inversión no recurrente de setup determinado."
+              },
+              "example_title": "Costos de Setup Inicial",
+              "example": "| Métrica Financiera | Valor Estimado | Fuente |\n| --- | --- | --- |\n| Consultor arquitectura BD (15h) | COP $1,500,000 | P1-D6 (resolución brechas) |\n| Bufete legal T&C SaaS | COP $2,500,000 | P1-D5 / D6 (aprobación legal) |\n| **Total Costo de Setup Único** | **COP $4,000,000 total** | **Inversión no recurrente** |",
+              "link_label": "setup consolidado va a costos variables (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Economía Unitaria y Cálculo de Break-Even",
+      "summary": "Verificar margen de contribución positivo y calcular volumen necesario para equilibrio.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Calcular el costo variable por transacción",
+          "objective": "Desglosar el costo marginal en el que se incurre por cada unidad de servicio procesada.",
+          "input": "Métricas de consumo de API y base de datos de P1-D4.",
+          "raw_data_title": "Costos Variables Unitarios",
+          "raw_data": "SMS de confirmación por reserva: COP $100. Escritura y cómputo de base de datos: COP $50. Costo variable unitario total: COP $150.",
+          "exit_label": "COSTO VARIABLE DETERMINADO → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Determinación del costo variable unitario",
+              "objective": "Calcular el gasto incremental directo por cada reserva o transacción individual.",
+              "how_to": {
+                "steps": [
+                  "Listar los recursos de red, APIs de terceros y base de datos consumidos por transacción.",
+                  "Estimar el costo marginal por evento de reserva o usuario atendido.",
+                  "Incorporar comisiones transaccionales de pasarelas de pago si aplican.",
+                  "Sumar los componentes para fijar el costo variable unitario definitivo."
+                ],
+                "table_columns": "Componente Variable | Consumo por Unidad | Costo Unitario",
+                "table_rules": "Cálculo en moneda local por unidad transaccional.",
+                "restrictions": [
+                  "No omitir costos de microtransacciones de pasarelas ni SMS.",
+                  "Asegurar consistencia con las especificaciones de arquitectura de D4."
+                ],
+                "done_when": "Costo variable total por transacción calculado."
+              },
+              "example_title": "Desglose de Costo Variable Unitario",
+              "example": "| Componente Variable | Costo Unitario |\n| --- | --- |\n| SMS de confirmación (Twilio) | COP $100 |\n| Cómputo y persistencia DB | COP $50 |\n| **Costo Variable Total por Reserva** | **COP $150** |",
+              "link_label": "costo variable va a margen de contribución (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Calcular el margen de contribución unitario",
+          "objective": "Validar la regla de supervivencia financiera comprobando que el margen unitario sea estrictamente positivo.",
+          "input": "Ingreso por unidad del Step 1.1 y costo variable del Step 2.1.",
+          "raw_data_title": "Margen de Contribución",
+          "raw_data": "Ingreso COP $5,000 - Costo Variable COP $150 = Margen de Contribución COP $4,850 (97% de margen unitario). Positivo.",
+          "exit_label": "MARGEN POSITIVO VERIFICADO → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Cálculo y validación del margen de contribución",
+              "objective": "Aplicar la fórmula Ingreso − Costo Variable y comprobar supervivencia unitaria.",
+              "how_to": {
+                "steps": [
+                  "Restar el costo variable unitario del ingreso unitario percibido.",
+                  "Calcular el porcentaje de margen de contribución sobre el precio de venta.",
+                  "Verificar la regla estricta: si el margen es menor o igual a cero, dictaminar cancelación.",
+                  "Registrar el estatus positivo para habilitar la continuidad del análisis."
+                ],
+                "table_columns": "Concepto | Valor | Fórmula / Condición",
+                "table_rules": "Obligatorio margen > 0 para superar la compuerta.",
+                "restrictions": [
+                  "No continuar si el costo variable excede al ingreso unitario.",
+                  "Documentar cualquier subvención temporal de precios."
+                ],
+                "done_when": "Margen de contribución positivo calculado y certificado."
+              },
+              "example_title": "Economía Unitaria y Margen de Contribución",
+              "example": "| Métrica | Valor | Cálculo |\n| --- | --- | --- |\n| Ingreso por reserva | COP $5,000 | Modelo de pricing P1-D2 |\n| Costo Variable por reserva | COP $150 | SMS ($100) + DB ($50) |\n| **Margen de Contribución** | **COP $4,850** ✅ | $5,000 − $150 — Positivo (97%) |",
+              "link_label": "margen de contribución va a break-even operativo (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Calcular el break-even operativo mensual",
+          "objective": "Determinar el número mínimo de reservas o clientes mensuales para cubrir los costos fijos.",
+          "input": "Costos fijos mensuales del Step 1.2 y margen de contribución del Step 2.2.",
+          "raw_data_title": "Break-Even Operativo",
+          "raw_data": "Costo fijo COP $200,000 / Margen COP $4,850 = 42 reservas/mes requeridas. Con 25 fincas x 2 reservas/mes (50 reservas potenciales), es alcanzable.",
+          "exit_label": "BREAK-EVEN OPERATIVO ALCANZABLE → 2.4",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Cálculo del umbral de rentabilidad operativo",
+              "objective": "Dividir los costos fijos mensuales entre el margen de contribución y contrastar con el SOM de mercado.",
+              "how_to": {
+                "steps": [
+                  "Aplicar la fórmula: Costos Fijos Mensuales / Margen de Contribución Unitario.",
+                  "Redondear hacia arriba el número de unidades o transacciones necesarias.",
+                  "Contrastar la demanda requerida contra el SOM y validación de P1-D2.",
+                  "Verificar si la meta de volumen es alcanzable de manera realista sin sobredimensionar canales."
+                ],
+                "table_columns": "Tipo de Equilibrio | Unidades Requeridas | Base de Costo | Viabilidad Frente a SOM",
+                "table_rules": "Validar coherencia con la capacidad de mercado estimada.",
+                "restrictions": [
+                  "No asumir conversiones desproporcionadas respecto a P1-D2.",
+                  "Explicar el ratio de cobertura con fincas o usuarios activos."
+                ],
+                "done_when": "Volumen de Break-Even operativo calculado y validado contra el mercado."
+              },
+              "example_title": "Break-Even Operativo Mensual",
+              "example": "| Tipo | Unidades Requeridas | Horizonte / Justificación |\n| --- | --- | --- |\n| Break-Even Operativo (cubre fijos) | 42 reservas / mes | Alcanzable con 25 fincas activas (2 reservas/mes c/u vs 50 potenciales) |",
+              "link_label": "break-even operativo va a recuperación setup (2.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.4",
+          "title": "Calcular el break-even de recuperación de setup",
+          "objective": "Estimar el volumen total de transacciones y el horizonte temporal necesario para amortizar la inversión inicial.",
+          "input": "Costo total de setup del Step 1.3 y margen de contribución del Step 2.2.",
+          "raw_data_title": "Break-Even de Setup",
+          "raw_data": "Setup COP $4,000,000 / Margen COP $4,850 = 825 reservas totales. Con 42 reservas/mes operativas, recuperación en aprox. 20 meses.",
+          "exit_label": "ECONOMÍA UNITARIA Y BREAK-EVEN COMPLETADOS → 3.1",
+          "micro": [
+            {
+              "code": "2.4.1",
+              "title": "Estimación del horizonte de recuperación de setup",
+              "objective": "Determinar el número total de eventos para pagar la inversión previa al desarrollo.",
+              "how_to": {
+                "steps": [
+                  "Dividir el costo de setup único entre el margen de contribución unitario.",
+                  "Calcular el tiempo estimado en meses según la tasa esperada de transacciones.",
+                  "Evaluar si el período de amortización es aceptable para el perfil del proyecto.",
+                  "Registrar las conclusiones financieras en la matriz consolidada."
+                ],
+                "table_columns": "Métrica de Recuperación | Valor Calculado | Plazo Estimado | Evaluación de Viabilidad",
+                "table_rules": "Cálculo transparente basado en el margen neto unitario.",
+                "restrictions": [
+                  "No omitir costos de consultorías legales o técnicas iniciales.",
+                  "Verificar que el horizonte de repago no comprometa la solvencia del equipo."
+                ],
+                "done_when": "Horizonte de recuperación de setup calculado y calificado."
+              },
+              "example_title": "Break-Even de Inversión de Setup",
+              "example": "| Tipo | Unidades Requeridas | Horizonte Estimado |\n| --- | --- | --- |\n| Break-Even de Setup (recupera inversión) | 825 reservas totales | ~20 meses al ritmo de Break-Even Operativo base |",
+              "link_label": "break-even setup va a capacidad vs demanda (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Vulnerabilidades Operativas y Capacidad de Absorción",
+      "summary": "Evaluar la capacidad física del equipo ante la demanda de equilibrio y mapear nuevos actores.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Comparar la demanda en break-even contra la capacidad física actual del equipo",
+          "objective": "Verificar si el equipo actual puede absorber el volumen operativo diario sin contrataciones prematuras.",
+          "input": "Break-Even del Step 2.3 y capacidad operativa de [[example_output_team_capability]] (P1-D6).",
+          "raw_data_title": "Capacidad vs Demanda",
+          "raw_data": "Demanda: ~2 reservas/día (42/mes). Capacidad manual CEO: 10 gestiones WhatsApp/día. Sin brecha al Break-Even. Trigger contratación: >10 reservas/día (>220/mes).",
+          "exit_label": "CAPACIDAD OPERATIVA VERIFICADA → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Evaluación de capacidad operativa vs demanda",
+              "objective": "Traducir el volumen mensual a demanda diaria y contrastar contra horas disponibles de soporte.",
+              "how_to": {
+                "steps": [
+                  "Dividir el Break-Even mensual entre los días hábiles del mes (ej. 22 días).",
+                  "Calcular la carga de soporte o intermediación diaria requerida.",
+                  "Comparar con las horas o gestiones que el equipo fundador puede atender personalmente.",
+                  "Establecer el umbral cuantitativo que obligará a contratar personal de soporte."
+                ],
+                "table_columns": "Demanda en Break-Even | Capacidad Actual del Equipo | Brecha Operativa | Trigger de Automatización / Contratación",
+                "table_rules": "Definir un trigger numérico concreto de saturación.",
+                "restrictions": [
+                  "No subestimar el tiempo requerido para soporte al cliente manual.",
+                  "Asegurar que el equipo tenga ancho de banda para soporte y producto simultáneamente."
+                ],
+                "done_when": "Capacidad operativa evaluada y trigger de contratación definido."
+              },
+              "example_title": "Capacidad Operativa vs Demanda en Break-Even",
+              "example": "| Demanda en Break-Even | Capacidad Actual del Equipo | Brecha / Riesgo | Trigger de Automatización |\n| --- | --- | --- | --- |\n| ~2 reservas / día (42/mes) | ~10 gestiones / día (CEO) | Sin brecha al Break-Even | Al superar 220 reservas/mes (contratar 1 soporte) |\n| 30 Fincas (120 reservas/mes) | Capacidad para 100 fincas (1 dev/PM) | Sin brecha actual | >80 fincas registradas |",
+              "link_label": "capacidad va a mapeo de nuevos actores (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Identificar actores nuevos descubiertos durante la validación de Fase 1",
+          "objective": "Registrar partes interesadas surgidas en D1-D6 y anticipar soluciones por diseño a conflictos de interés.",
+          "input": "Mapa base de Fase 0 (P0-D6) e interacciones de campo de P1-D1 a P1-D6.",
+          "raw_data_title": "Nuevos Actores y Conflictos",
+          "raw_data": "Agencias de Turismo Local (Potential Blocker por comisión) y Wompi (Partner PCI). Conflicto: Finca vs Agencia. Solución: alcance v0.1.0 directo; agencias diferidas a vNext.",
+          "exit_label": "NUEVOS ACTORES Y CONFLICTOS RESUELTOS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Mapeo de nuevos actores y conflictos de interés",
+              "objective": "Documentar actores no previstos inicialmente y formular la respuesta arquitectónica o comercial.",
+              "how_to": {
+                "steps": [
+                  "Contrastar los actores de Fase 0 frente a las entidades interactuadas en Fase 1.",
+                  "Identificar intermediarios, pasarelas o competidores indirectos descubiertos.",
+                  "Analizar posibles tensiones comerciales o incentivos contrapuestos entre actores.",
+                  "Diseñar la resolución por delimitación de alcance o arquitectura de software."
+                ],
+                "table_columns": "Nuevo Actor Descubierto | Rol / Relación | Conflicto de Interés Identificado | Estrategia de Gestión / Resolución por Diseño",
+                "table_rules": "Solo registrar actores nuevos descubiertos en Fase 1.",
+                "restrictions": [
+                  "No repetir el listado completo de stakeholders de Fase 0.",
+                  "Asegurar que cada conflicto cuente con una decisión concreta de diseño."
+                ],
+                "done_when": "Tabla de nuevos actores y resolución de conflictos por diseño completada."
+              },
+              "example_title": "Actores Nuevos Descubiertos y Resolución de Conflictos",
+              "example": "| Nuevo Actor Descubierto | Rol / Relación | Interés Real | Estrategia de Gestión |\n| --- | --- | --- | --- |\n| Agencias Intermediarias Locales | Canal B2B y promotores | Proteger su comisión y velocidad | Alcance diferido a vNext; v0.1.0 prioriza canal directo |\n| Wompi / Pasarela de Pago | Partner tecnológico | Cumplimiento PCI y comisiones | Integración vía SDK tokenizado |\n\n**Conflicto de Interés:** Fincas vs Agencias (exclusividad vs autonomía).  \n**Resolución por Diseño:** Para el MVP v0.1.0 se prioriza la relación directa Finquero-Turista; panel para agencias diferido a vNext.",
+              "link_label": "actores nuevos van a vulnerabilidades financieras (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Identificar las vulnerabilidades financieras más críticas del modelo",
+          "objective": "Detectar los supuestos económicos más frágiles y establecer planes de contingencia inmediata.",
+          "input": "Supuestos de conversión y pricing de Steps 1 y 2.",
+          "raw_data_title": "Vulnerabilidades Financieras",
+          "raw_data": "Turista confía en pagar COP $5,000 online a plataforma desconocida (evidencia verbal baja). Mitigación: habilitar Efecty/Baloto y canal de referidos locales.",
+          "exit_label": "VULNERABILIDADES MITIGADAS → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Identificación y mitigación de vulnerabilidades financieras",
+              "objective": "Evaluar la solidez de las hipótesis que sostienen el Break-Even y definir acciones mitigadoras.",
+              "how_to": {
+                "steps": [
+                  "Seleccionar los supuestos de negocio con menor respaldo empírico hasta el momento.",
+                  "Evaluar el impacto de fracaso si el supuesto resulta ser completamente falso.",
+                  "Definir acciones de contingencia operativa y técnica para mitigar la fragilidad.",
+                  "Incorporar los hallazgos en la matriz de riesgos para la compuerta final."
+                ],
+                "table_columns": "Supuesto Financiero Crítico | Nivel de Evidencia | Impacto si Falso | Acción de Mitigación",
+                "table_rules": "Vincular supuestos clave con evidencia recopilada en campo.",
+                "restrictions": [
+                  "No ocultar fragilidades de adopción del modelo de monetización.",
+                  "Establecer mitigaciones prácticas ejecutables en el corto plazo."
+                ],
+                "done_when": "Matriz de vulnerabilidades financieras y mitigaciones documentada."
+              },
+              "example_title": "Matriz de Vulnerabilidades Financieras Críticas",
+              "example": "| Supuesto Financiero Crítico | Nivel de Evidencia | Impacto si Falso | Acción de Mitigación |\n| --- | --- | --- | --- |\n| Turista confía en pagar COP $5,000 online a plataforma desconocida | Bajo (verbal P1-D1) | 0% conversión → Break-Even inalcanzable | Habilitar pago offline (Efecty/Baloto) + canal inicial de referidos para generar confianza |",
+              "link_label": "vulnerabilidades van a evaluación de compuerta (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Evaluación Consolidada de Compuerta (Gate Verdict) y Ensamblaje",
+      "summary": "Evaluar los 5 pilares de viabilidad, emitir el veredicto formal vinculante y ensamblar el entregable.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Evaluar los 5 ejes de la compuerta de viabilidad",
+          "objective": "Calificar de manera integral los pilares Económico, Mercado, Técnico, Legal y Operativo.",
+          "input": "Outputs de Steps 1 al 3 y veredictos de D1 a D6.",
+          "raw_data_title": "Evaluación de 5 Ejes",
+          "raw_data": "Económico: Verde (Margen COP $4,850). Mercado: Amarillo (Break-Even alcanzable). Técnico: Amarillo (Spike offline pendiente). Legal: Amarillo (T&C SaaS pendiente). Operativo: Verde (capacidad suficiente).",
+          "exit_label": "5 EJES EVALUADOS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Evaluación semafórica de los 5 pilares de viabilidad",
+              "objective": "Asignar estado Verde, Amarillo o Rojo a cada dimensión clave del proyecto.",
+              "how_to": {
+                "steps": [
+                  "Evaluar Eje Económico: comprobar margen de contribución estrictamente positivo.",
+                  "Evaluar Eje de Mercado: contrastar Break-Even contra SOM y validación de D2.",
+                  "Evaluar Eje Técnico: revisar viabilidad arquitectónica de D4 y spikes requeridos.",
+                  "Evaluar Eje Legal: verificar cumplimiento normativo y ausencia de bloqueos de D5.",
+                  "Evaluar Eje Operativo: confirmar capacidad del equipo para la carga de D6."
+                ],
+                "table_columns": "Eje de Viabilidad | Calificación Semafórica | Justificación Operativa",
+                "table_rules": "Verde (OK), Amarillo (Condicionado/Mitigable), Rojo (Bloqueante fatal).",
+                "restrictions": [
+                  "Cualquier margen negativo o bloqueo legal insalvable es obligatoriamente Rojo.",
+                  "Mantener total alineación con los entregables previos D1 a D6."
+                ],
+                "done_when": "Tabla de semáforo de los 5 ejes completada con justificaciones."
+              },
+              "example_title": "Semáforo Consolidado de Viabilidad (5 Ejes)",
+              "example": "| Eje | Veredicto | Justificación |\n| --- | --- | --- |\n| Económico (Margen > 0) | 🟢 Verde | Margen COP $4,850 por reserva — positivo y sostenible |\n| Mercado (Break-Even alcanzable) | 🟡 Amarillo | 42 reservas/mes alcanzables ampliando canales |\n| Técnico (Con Pivote viable) | 🟡 Amarillo | Proceed con Reservas de P1-D4 (Spike offline pendiente) |\n| Legal (Sin bloqueo insalvable) | 🟡 Amarillo | Cleared con Reservas de P1-D5 (T&C SaaS pendientes) |\n| Operativo (Capacidad ≥ Demanda) | 🟢 Verde | 2 reservas/día < 10 gestiones/día del CEO — sin gap |",
+              "link_label": "evaluación de ejes va a veredicto de compuerta (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Aplicar la lógica de compuerta del Gate Verdict",
+          "objective": "Dictaminar formalmente PROCEED, PROCEED CON RESERVAS o CANCEL según la matriz de compuerta.",
+          "input": "Calificaciones de los 5 ejes del Step 4.1.",
+          "raw_data_title": "Dictamen de Compuerta",
+          "raw_data": "Veredicto: PROCEED CON RESERVAS. Ningún eje Rojo, tres ejes Amarillos con condiciones claras para D9 y D10.",
+          "exit_label": "VEREDICTO VINCULANTE EMITIDO → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Aplicación de la lógica formal de compuerta",
+              "objective": "Emitir la decisión ejecutiva vinculante sobre la continuidad del proyecto.",
+              "how_to": {
+                "steps": [
+                  "Aplicar la regla: si todos los ejes son Verdes -> emitir PROCEED.",
+                  "Si al menos un eje es Amarillo y ninguno es Rojo -> emitir PROCEED CON RESERVAS.",
+                  "Si al menos un eje es Rojo -> emitir CANCEL y suspender el proyecto de inmediato.",
+                  "Detallar las condiciones no negociables que deben cumplirse antes de construir el MVP."
+                ],
+                "table_columns": "Dictamen Final de Compuerta | Condiciones Obligatorias para D9/D10 | Autorización de Continuidad",
+                "table_rules": "El veredicto CANCEL es vinculante y detiene el proyecto.",
+                "restrictions": [
+                  "No autorizar PROCEED sin reservas si existen condiciones técnicas o legales pendientes.",
+                  "Redactar condiciones medibles y verificables."
+                ],
+                "done_when": "Gate Verdict vinculante dictaminado con sus condiciones asociadas."
+              },
+              "example_title": "Dictamen Formal de Gate Verdict",
+              "example": "**Gate Verdict Oficial:** **PROCEED CON RESERVAS** (o **PROCEED** según versión unificada).\n\n**Condiciones para avanzar a D9 y D10:**\n1. T&C redactados como SaaS y validados por abogado (plazo: antes de apertura pública).\n2. POC de arquitectura offline-first completado y validado (plazo: antes de Sprint 1).\n3. Canal de adquisición alternativo identificado para reducir ratio de divergencia.",
+              "link_label": "veredicto va a ensamblaje final (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Ensamblar el documento final con el Gate Verdict oficial",
+          "objective": "Integrar todas las secciones, certificar metadatos y registrar el documento exportable definitivo.",
+          "input": "Todas las tablas de Steps 1 al 4 y aprobadores designados.",
+          "raw_data_title": "Metadatos y Ensamblaje",
+          "raw_data": "Proyecto: Nos Fuimos de Finca. Fase 1, D7 de 13. Estado: Approved / Proceed con Reservas. Aprobadores: Julián / Laura.",
+          "exit_label": "ENTREGABLE DE VIABILIDAD ENSAMBLADO Y CERTIFICADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Consolidación, metadatos y ensamblaje de viabilidad",
+              "objective": "Generar el artefacto documental maestro estructurado listo para exportación.",
+              "how_to": {
+                "steps": [
+                  "Consolidar la cabecera de metadatos del documento: Proyecto, Fase 1, Entregable 7 de 13.",
+                  "Integrar las tablas de economía unitaria, nuevos actores, capacidad y Gate Verdict.",
+                  "Registrar la lista formal de aprobadores técnicos y de negocio.",
+                  "Exportar el documento al archivo final oficial en el repositorio."
+                ],
+                "table_columns": "Sección Documental | Estado de Integración | Verificación de Formato",
+                "table_rules": "Estructura idéntica al estándar oficial del entregable.",
+                "restrictions": [
+                  "No dejar campos vacíos en el dictamen final ni en metadatos.",
+                  "Garantizar la trazabilidad directa con los inputs de Fase 1."
+                ],
+                "done_when": "Documento de viabilidad completamente ensamblado y registrado."
+              },
+              "example_title": "Metadatos y Ensamblaje Final de Viabilidad",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 1 — Viabilidad Temprana (Early Viability)  \n**Entregable:** 7 de 13  \n**Estado:** Aprobado  \n\n### 5. Dictamen de Compuerta de Viabilidad (Gate Verdict)\n- **Mercado (D2):** Viable (Spread WTP > COP comprobado).\n- **Técnica (D4):** Factible (Arquitectura asíncrona validada por Spike).\n- **Legal (D5):** Compliant by Design.\n- **Capacidad (D6):** Ready with Conditions.\n- **Financiera (D7):** Margen de Contribución 83.3%, Break-Even alcanzable.\n- **Veredicto Final de Compuerta:** PROCEED.\n- **Aprobadores:** Julián (PM) / Laura (Tech Lead)",
+              "link_label": "cierre formal del entregable D7"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

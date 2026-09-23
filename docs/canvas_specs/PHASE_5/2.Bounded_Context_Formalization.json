@@ -1,0 +1,201 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D2",
+  "deliverable": "Bounded Context Formalization",
+  "purpose": "Aplicar los principios de Diseño Guiado por el Dominio (DDD) para segmentar el sistema en Bounded Contexts cohesivos a partir de las 15 entidades del ERD (D6), asignando propiedad unívoca a cada entidad, identificando Shared Kernels y Anti-Corruption Layers (ACL), y formalizando el Context Map integral para gobernar la decisión de descomposición del sistema (D4) y el diagrama de componentes C4 (D9).",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Domain Model & ERD (P4-D6) | [[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]] | Fuente primaria con el inventario de 15 entidades a agrupar en subdominios. |\n| Module Specification (P3-D7) | [[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification/7.Module_Specification.md]] | Delimita las fronteras funcionales y responsabilidades operativas de los actores. |\n| System Sequence Diagrams (P4-D7) | [[PHASE_4_SYSTEM_MODELING/7.System_Sequence_Diagrams/7.System_Sequence_Diagrams.md]] | Muestra las interacciones transaccionales entre módulos para deducir relaciones Upstream/Downstream. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Identificación de Subdominios (Subdomain Identification)",
+      "summary": "Agrupar las 15 entidades del ERD en subdominios cohesivos clasificándolos en Core, Supporting y Generic.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Agrupación de Entidades de D6 en Core, Supporting y Generic",
+          "objective": "Determinar qué subdominios constituyen la ventaja competitiva esencial del negocio y cuáles son soporte.",
+          "input": "Entidades persistentes de D6 y especificaciones de módulo de Fase 3.",
+          "raw_data_title": "Inventario de Subdominios y Clasificación Estratégica",
+          "raw_data": "| Subdominio | Clasificación DDD | Entidades Agrupadas | Justificación Estratégica |\n|---|---|---|---|\n| Booking Operations | Core Domain | `bookings`, `property_availability` | Corazón del negocio: gestión de reservas, ocupación y prevención de doble reserva |\n| Catalog Management | Core Domain | `properties`, `property_images`, `amenities`, `seasonal_prices` | Diferenciador clave: inventario de fincas verificadas y tarifas estacionales |\n| Billing & Financials | Supporting Domain | `payments`, `payouts`, `coupons` | Necesario pero no diferenciador: liquidación a anfitriones y cobros Wompi |\n| Identity & Profile | Generic Subdomain | `users`, `refresh_tokens` | Resuelto estándar por la industria: autenticación, sesiones JWT y roles |\n| Notification Hub | Generic Subdomain | `notifications` | Infraestructura de entrega multicanal: WhatsApp, Email, Push y Webhooks |",
+          "exit_label": "Subdominios Estratégicamente Clasificados",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Criterios de Clasificación DDD para Subdominios",
+              "objective": "Diferenciar la lógica diferenciadora de los servicios genéricos tercerizables.",
+              "how_to": {
+                "steps": [
+                  "1. Listar todas las entidades del modelo conceptual de datos de D6.",
+                  "2. Agrupar entidades con alta afinidad funcional en subdominios lógicos.",
+                  "3. Asignar 'Core' a subdominios que diferencian la propuesta de valor frente a competidores.",
+                  "4. Asignar 'Supporting' a soporte operativo y 'Generic' a componentes comunes (Auth/Alertas)."
+                ],
+                "table_columns": [
+                  "Subdominio",
+                  "Clasificación",
+                  "Entidades",
+                  "Impacto Competitivo"
+                ],
+                "table_rules": [
+                  "Los subdominios Core deben recibir el mayor esfuerzo de modelado riguroso",
+                  "Los subdominios Generic son candidatos prioritarios a usar servicios gestionados (SaaS)",
+                  "Toda entidad del ERD debe pertenecer a exactamente un subdominio"
+                ],
+                "restrictions": "Prohibido clasificar todo el sistema como Core sin discriminación de valor.",
+                "done_when": "Las 15 entidades del ERD asignadas a sus 5 subdominios correspondientes."
+              },
+              "example_title": "Subdominios Identificados D2",
+              "example": "```markdown\n## Subdominio: Booking Operations\n- Clasificación: Core Domain\n- Entidades: bookings, property_availability\n- Justificación: Razón de ser del negocio transaccional.\n\n## Subdominio: Identity & Profile\n- Clasificación: Generic Subdomain\n- Entidades: users, refresh_tokens\n- Justificación: Resuelto por Supabase Auth.\n```",
+              "link_label": "Subdominios Validados -> Mapeo de Bounded Contexts"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Fronteras de Contexto y Propiedad de Entidades (Bounded Context Mapping)",
+      "summary": "Establecer la regla estricta de propiedad única de entidades, formalizar responsabilidades y declarar Shared Kernels.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Mapeo de Fronteras Estrictas, Responsabilidades y Shared Kernels",
+          "objective": "Eliminar ambigüedades semánticas delimitando qué contexto muta cada entidad de base de datos.",
+          "input": "Subdominios clasificados del Step 1 y reglas RLS de D11.",
+          "raw_data_title": "Matriz de Propiedad de Bounded Contexts",
+          "raw_data": "| Bounded Context | Clasificación | Responsabilidad Central | Entidades que Posee | Excepciones (Shared Kernel / ACL) |\n|---|---|---|---|---|\n| Identity & Profile | Generic | Autenticación, perfiles y roles base | `users`, `refresh_tokens` | `users` actúa como Shared Kernel de solo lectura para otros contextos |\n| Catalog Management | Core | Curaduría, publicación y tarifas de fincas | `properties`, `property_images`, `amenities`, `seasonal_prices` | Expone catálogo público hacia Booking sin permitir mutaciones ajenas |\n| Booking Operations | Core | Ciclo de vida de reserva y control de disponibilidad | `bookings`, `property_availability` | Dueño absoluto de los locks de fecha; consume datos de Catalog vía upstream |\n| Billing & Financials | Supporting | Procesamiento de pasarela y desembolsos B2B | `payments`, `payouts`, `coupons` | Depende de Booking; consume Wompi API mediante Anti-Corruption Layer (ACL) |\n| Notification Hub | Generic | Despacho asíncrono multicanal | `notifications` | Consume eventos de Booking y Billing mediante desacoplamiento reactivo |",
+          "exit_label": "Fronteras de Contexto y Propiedad Estricta Formalizadas",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Resolución de Ambigüedades de Dominio y Shared Kernel",
+              "objective": "Garantizar que ninguna entidad quede con dueño compartido no regulado.",
+              "how_to": {
+                "steps": [
+                  "1. Para cada contexto, redactar una responsabilidad concisa de una línea.",
+                  "2. Asignar propiedad operativa exclusiva de escritura sobre sus entidades.",
+                  "3. Si un contexto necesita leer datos de otro (ej. `users.bank_account`), formalizar como Shared Kernel o ACL.",
+                  "4. Validar que no existan entidades huérfanas sin contexto asignado."
+                ],
+                "table_columns": [
+                  "Contexto",
+                  "Responsabilidad",
+                  "Entidades Propias",
+                  "Shared Kernel"
+                ],
+                "table_rules": [
+                  "Regla de oro: una entidad, un solo dueño con permiso de escritura",
+                  "Los Shared Kernels son de solo lectura para los contextos consumidores",
+                  "Toda integración con APIs externas de pago debe aislarse tras un ACL"
+                ],
+                "restrictions": "Prohibido permitir que dos Bounded Contexts ejecuten mutaciones directas sobre la misma tabla.",
+                "done_when": "Los 5 Bounded Contexts cuentan con responsabilidades y entidades asignadas unívocamente."
+              },
+              "example_title": "Especificación de Bounded Context",
+              "example": "```markdown\n### Bounded Context: Booking Operations\n- **Clasificación:** Core Domain\n- **Responsabilidad:** Administrar el ciclo de vida de la reserva y garantizar la consistencia atómica del inventario.\n- **Entidades Propias:** `bookings`, `property_availability`\n- **Shared Kernel:** Lee `users.id` y `properties.id` como referencias foráneas inmutables.\n```",
+              "link_label": "Fronteras Mapeadas -> Diagrama de Context Map"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Diagrama de Mapa de Contextos y Relaciones DDD (Context Map Diagram)",
+      "summary": "Trazar en Mermaid las relaciones operativas Upstream, Downstream, ACL y Shared Kernel entre contextos.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Diagramación Mermaid con Upstream, Downstream, ACL y Shared Kernel",
+          "objective": "Visualizar la topología de dependencias operacionales entre Bounded Contexts y sistemas externos.",
+          "input": "Bounded Contexts, Shared Kernels y APIs externas identificadas.",
+          "raw_data_title": "Matriz de Relaciones Operacionales entre Contextos",
+          "raw_data": "| Contexto Origen | Contexto Destino | Tipo de Relación DDD | Justificación de la Dependencia |\n|---|---|---|---|\n| Identity & Profile | Todos los Contextos | Shared Kernel (Read-Only) | Inyección global de sesión y rol de usuario vía JWT |\n| Catalog Management | Booking Operations | Upstream -> Downstream (Customer-Supplier) | Booking depende de los precios y condiciones publicados por Catalog |\n| Booking Operations | Billing & Financials | Upstream -> Downstream | Billing procesa cobros y desembolsos disparados por estados de Booking |\n| Billing & Financials | Wompi API (External) | Anti-Corruption Layer (ACL) | Aísla el modelo de dominio interno de las estructuras propietarias de la pasarela |\n| Booking & Billing | Notification Hub | Upstream -> Downstream (Event-Driven) | Notificaciones reacciona a eventos de reserva y cobro sin acoplamiento síncrono |",
+          "exit_label": "Context Map Visualmente Formalizado en Mermaid",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Construcción del Diagrama de Relaciones DDD en Mermaid",
+              "objective": "Diseñar el mapa de contexto con nomenclatura estandarizada.",
+              "how_to": {
+                "steps": [
+                  "1. Representar cada Bounded Context con nodo indicando su rol (Core, Supporting, Generic).",
+                  "2. Conectar dependencias indicando dirección de flujo con flechas etiquetadas.",
+                  "3. Etiquetar explícitamente `[Shared Kernel]`, `[Upstream/Downstream]` y `[ACL]`.",
+                  "4. Incluir los sistemas externos (Wompi, WhatsApp API) como actores periféricos."
+                ],
+                "table_columns": [
+                  "Relación",
+                  "Sintaxis Mermaid",
+                  "Significado DDD",
+                  "Validación"
+                ],
+                "table_rules": [
+                  "Ninguna flecha del diagrama debe carecer de etiqueta descriptiva de relación",
+                  "El downstream siempre es el contexto que depende del upstream",
+                  "Toda llamada a pasarela bancaria debe pasar obligatoriamente por un ACL"
+                ],
+                "restrictions": "No admitir dependencias circulares directas entre Bounded Contexts.",
+                "done_when": "Diagrama Mermaid del Context Map validado y sintácticamente correcto."
+              },
+              "example_title": "Context Map en Mermaid",
+              "example": "```mermaid\ngraph LR\n    Identity[\"Identity & Profile (Generic)\"] -.->|Shared Kernel: auth.uid| Booking[\"Booking Operations (Core)\"]\n    Catalog[\"Catalog Management (Core)\"] -->|Upstream / Downstream| Booking\n    Booking -->|Upstream / Downstream| Billing[\"Billing & Financials (Supporting)\"]\n    Billing -->|ACL| Wompi[\"Wompi API (External)\"]\n    Booking -.->|Event: booking.confirmed| Notifications[\"Notification Hub (Generic)\"]\n    Billing -.->|Event: payment.approved| Notifications\n```",
+              "link_label": "Context Map Diagramado -> Ensamblaje Formal D2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento de Contextos y Traspaso Downstream (Assembly & Handoff)",
+      "summary": "Consolidar el entregable D2 y articular su impacto directo en la decisión de descomposición del sistema (D4) y el C4 Container (D9).",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación del Documento D2 e Implicaciones para D4 (Monolito vs Microservicios)",
+          "objective": "Publicar el entregable D2 como frontera inmutable de modularización.",
+          "input": "Definiciones de contexto, mapa de contexto y reglas de integración.",
+          "raw_data_title": "Implicaciones Directas en Entregables Downstream",
+          "raw_data": "| Entregable Receptor | Directiva Heredada de D2 | Impacto Técnico Inmediato |\n|---|---|---|\n| D4 (System Decomposition) | Los 5 Bounded Contexts definen los límites de módulos internos | Recomienda Monolito Modular: 1 módulo por contexto en un solo repo |\n| D6 (Communication Patterns) | Relaciones Upstream/Downstream y eventos | Define llamadas in-process para Core y colas asíncronas para Notificaciones |\n| D9 (Component Diagram C4) | Nivel 2 C4 Containers | Cada Bounded Context se traduce en un contenedor o namespace lógico del C4 |",
+          "exit_label": "Entregable D2 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento Maestro de Bounded Contexts",
+              "objective": "Consolidar la segmentación formal de arquitectura DDD.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el archivo en sus 4 secciones canónicas: Metadata, Definiciones, Diagrama y Consumidores.",
+                  "2. Incluir el desglose de entidades y responsabilidades por contexto.",
+                  "3. Documentar las directivas para D4, D6 y D9.",
+                  "4. Validar el cumplimiento total de traducción al español."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Contenido",
+                  "Normativa",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe evitar decisiones prematuras de microservicios físicos",
+                  "Garantizar coherencia absoluta con los modelos de datos de D6",
+                  "Verificar que el Context Map respete la terminología formal de Evans"
+                ],
+                "restrictions": "No admitir ambigüedades en la pertenencia de las entidades.",
+                "done_when": "Documento D2 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Entregable D2",
+              "example": "```markdown\n# Deliverable 2 (D2): Bounded Context Formalization\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n## 2. Context Definitions (5 Bounded Contexts)\n[Desglose de entidades y reglas]\n\n## 3. Context Map Diagram (Mermaid)\n[Diagrama de relaciones]\n\n## 4. Downstream Consumers (D4, D6, D9)\n```",
+              "link_label": "Contextos Ensamblados -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Bounded Context Formalization (D2)",
+    "markdown": "# Deliverable 2 (D2): Bounded Context Formalization\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n---\n\n## 1. Context Definitions (Definición de Bounded Contexts)\n\n*Backlink a Fase 4:* Agrupa formalmente las 15 entidades diseñadas en el Modelo de Dominio y ERD (`[[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]]`) bajo los principios de Domain-Driven Design (DDD).\n\n### 1.1 Bounded Context: Identity & Profile\n- **Clasificación:** Generic Subdomain\n- **Responsabilidad:** Gestor maestro de autenticación (AuthN), perfiles, roles y datos financieros base.\n- **Entidades que posee:** `users`, `refresh_tokens`.\n- **Excepciones (Shared Kernel):** Los atributos básicos de `users` (`id`, `role`, `full_name`) actúan como Shared Kernel de solo lectura consumido por los demás contextos para verificación de autorizaciones.\n\n### 1.2 Bounded Context: Catalog Management\n- **Clasificación:** Core Domain\n- **Responsabilidad:** Administrar el inventario de fincas, ficha técnica, amenidades, curaduría KYC y reglas de tarifas estacionales.\n- **Entidades que posee:** `properties`, `property_images`, `property_amenities`, `property_rules`, `seasonal_prices`, `wishlists`.\n\n### 1.3 Bounded Context: Booking Operations\n- **Clasificación:** Core Domain\n- **Responsabilidad:** Administrar el ciclo de vida de las reservas, garantizar la consistencia atómica del inventario y gestionar los bloqueos de fechas.\n- **Entidades que posee:** `bookings`, `property_availability`, `reviews`.\n\n### 1.4 Bounded Context: Billing & Financials\n- **Clasificación:** Supporting Domain\n- **Responsabilidad:** Procesar cobros con la pasarela bancaria, aplicar cupones de descuento y liquidar desembolsos hacia anfitriones.\n- **Entidades que posee:** `payments`, `payouts`, `coupons`.\n- **Integración Externa:** Se comunica con la API de Wompi a través de un **Anti-Corruption Layer (ACL)**.\n\n### 1.5 Bounded Context: Notification Hub\n- **Clasificación:** Generic Subdomain\n- **Responsabilidad:** Despacho y entrega multicanal de alertas transaccionales (WhatsApp, Email, Push).\n- **Entidades que posee:** `notifications`.\n\n---\n\n## 2. Context Map Diagram (Relaciones DDD)\n\n```mermaid\ngraph LR\n    Identity[\"Identity & Profile (Generic)\"] -.->|Shared Kernel: auth.uid| Booking[\"Booking Operations (Core)\"]\n    Identity -.->|Shared Kernel: host bank data| Billing[\"Billing & Financials (Supporting)\"]\n    Catalog[\"Catalog Management (Core)\"] -->|Upstream / Downstream| Booking\n    Booking -->|Upstream / Downstream| Billing\n    Billing -->|Anti-Corruption Layer: ACL| Wompi[\"Wompi API (External Gateway)\"]\n    Booking -.->|Event: booking.confirmed| Notifications[\"Notification Hub (Generic)\"]\n    Billing -.->|Event: payment.approved| Notifications\n```\n\n---\n\n## 3. Implicaciones para Entregables Downstream\n\n- **Hacia D4 (System Decomposition Decision):** Los 5 contextos delimitados constituyen los candidatos a módulos independientes. Se favorece una arquitectura de **Monolito Modular** donde cada Bounded Context representa un paquete/directorio aislado con sus propios modelos y servicios dentro de la misma base de código.\n- **Hacia D6 (Communication Patterns):** La interacción entre Catalog, Booking y Billing se realiza mediante llamadas síncronas en memoria (*in-process method calls*), mientras que Notification Hub se desacopla mediante eventos asíncronos reactivos.\n- **Hacia D9 (Component Diagram C4):** Los 5 Bounded Contexts mapean 1:1 a los contenedores lógicos de Nivel 2 del modelo C4."
+  }
+}

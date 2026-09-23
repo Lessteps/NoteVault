@@ -1,0 +1,377 @@
+{
+  "phase": "Phase 0",
+  "deliverable_code": "D8",
+  "deliverable": "Go/No-Go Signal (Decision Record)",
+  "purpose": "This is the last mandatory deliverable of the Phase 0 gate. It is an executive and binary document. It acts as a tribunal: it reviews that the 7 previous documents exist, have no insurmountable blockers, and contain no conditional language that betrays a half-made decision. If it passes, the project is officially born and advances to Phase 1 (Early Viability).",
+  "inputs": "| Artifact | Use | Consumed in |\n| --- | --- | --- |\n| D1 to D7 from Phase 0 | All must exist in \"Approved\" status. | Step 1 |\n| [[example_output_impact_matrix]] | Continuity Signal (advisory) from D4. | Step 3 |\n| [[example_output_risk_register]] | Disqualifier verdicts (binding) from D7. | Step 3 |\n| [[example_output_stakeholder_map]] | Identity of the Sponsor / Project Authority (D6). | Step 4 |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Completeness Check (Document Audit)",
+      "summary": "Ensure no foundational pieces are missing before writing a single letter of the verdict.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Existence Verification",
+          "objective": "Confirm that D1 through D7 exist as assembled files.",
+          "input": "Phase 0 project workspace repository.",
+          "raw_data_title": "Phase 0 Workspace Artifacts",
+          "raw_data": "Deliverables D1 to D7 assembled in project folders.",
+          "exit_label": "EXISTENCE CONFIRMED → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Existence check of D1 through D7",
+              "objective": "Verify file existence for each deliverable D1 to D7.",
+              "how_to": {
+                "steps": [
+                  "Inspect the project workspace for assembled deliverable files D1 to D7.",
+                  "Verify file existence for each deliverable: Problem Statement, Problem Classification, Impact Estimate, Impact Matrix, Project Objectives, Stakeholder Map, and Risk Register.",
+                  "Confirm all 7 foundation files are present without gaps."
+                ],
+                "table_columns": "Deliverable Code | Deliverable Name | File Existence Check",
+                "table_rules": "One row per Phase 0 deliverable confirming file presence.",
+                "restrictions": [
+                  "All 7 prior deliverables must exist before proceeding.",
+                  "No missing documents allowed."
+                ],
+                "done_when": "All 7 files confirmed present."
+              },
+              "example_title": "Existence Check",
+              "example": "D1 through D7 exist as assembled files within the project repository folder:\n- D1 — Problem Statement: Present\n- D2 — Problem Classification: Present\n- D3 — Impact Estimate: Present\n- D4 — Impact Matrix: Present\n- D5 — Project Objectives: Present\n- D6 — Stakeholder Map: Present\n- D7 — Risk Register: Present",
+              "link_label": "files confirmed go to status check (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Status Verification",
+          "objective": "Confirm that all 7 prior deliverables are labeled Approved.",
+          "input": "Document headers of D1 to D7.",
+          "raw_data_title": "Document Metadata Headers",
+          "raw_data": "Status field across all 7 deliverables.",
+          "exit_label": "STATUS CONFIRMED → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Approved status audit",
+              "objective": "Audit metadata approval status for D1 through D7.",
+              "how_to": {
+                "steps": [
+                  "Review metadata status in each document header for D1 through D7.",
+                  "Verify that each document bears the official status 'Approved'.",
+                  "If any document is in 'Draft' or 'Pending', halt until formal approval."
+                ],
+                "table_columns": "Document | Status",
+                "table_rules": "One row per document stating its official approval status.",
+                "restrictions": [
+                  "All documents must be labeled Approved.",
+                  "Draft status prevents progression."
+                ],
+                "done_when": "100% of D1-D7 verified Approved."
+              },
+              "example_title": "Approval Status Audit",
+              "example": "| Document | Status |\n| :---: | :---: |\n| D1 — Problem Statement | Approved |\n| D2 — Problem Classification | Approved |\n| D3 — Impact Estimate | Approved |\n| D4 — Impact Matrix | Approved |\n| D5 — Project Objectives | Approved |\n| D6 — Stakeholder Map | Approved |\n| D7 — Risk Register | Approved |",
+              "link_label": "status verified goes to consistency check (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Cross-Consistency Verification",
+          "objective": "Confirm that every TBD actor from D6 has its corresponding Known Unknown in D7.",
+          "input": "D6 Stakeholder Map TBD roles and D7 Risk Register Known Unknowns.",
+          "raw_data_title": "Cross-Deliverable TBD Records",
+          "raw_data": "D6 declared 1 TBD role: 'Formal deposit voucher issuing institution'.",
+          "exit_label": "CONSISTENCY CONFIRMED → Step 2",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "TBD to Known Unknown cross-audit",
+              "objective": "Verify that zero TBD roles were lost between D6 and D7.",
+              "how_to": {
+                "steps": [
+                  "Extract all TBD roles documented in D6 Stakeholder Map.",
+                  "Cross-reference each TBD role against the Known Unknowns table in D7 Risk Register.",
+                  "Verify that every TBD role has a designated owner and action in D7.",
+                  "Confirm zero TBD items were lost between D6 and D7."
+                ],
+                "table_columns": "D6 TBD Role | D7 Known Unknown Log | Designated Owner | Consistency Verdict",
+                "table_rules": "One row per TBD role verifying cross-deliverable consistency.",
+                "restrictions": [
+                  "No TBD role can be omitted or dropped between D6 and D7."
+                ],
+                "done_when": "Consistency confirmed with zero orphaned TBD roles."
+              },
+              "example_title": "Cross-Consistency Verification",
+              "example": "- D6 declared 1 `TBD` role (\"Formal deposit voucher issuing institution\").\n- D7 logs it in its Known Unknowns table with owner (Laura Torres) and action (request quotes from current bank).\n- **Verdict:** `CONSISTENT` — zero TBD items were lost between D6 and D7.\n\n*Checklist Summary:* 100% logistical checklist verified, with TBD ↔ Known Unknowns consistency certified.",
+              "link_label": "audit passed goes to Step 2 (2.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Conditional Language Prohibition (Language Audit)",
+      "summary": "Guarantee that the verdict is grounded in already-resolved facts, not in future promises disguised as approval.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Conditional Language Sweep",
+          "objective": "Scan draft justification for speculative keywords (pending, assuming that, subject to, once).",
+          "input": "Initial draft justification for D8.",
+          "raw_data_title": "Draft Justification Text",
+          "raw_data": "\"The project may proceed, assuming that rural connectivity is not an issue and subject to the bank confirming the deposit voucher.\"",
+          "exit_label": "RED FLAGS FLAGGED → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Conditional language scan",
+              "objective": "Detect speculative red flags in draft justification.",
+              "how_to": {
+                "steps": [
+                  "Inspect the draft verdict justification for conditional trigger phrases.",
+                  "Search for speculative keywords: 'assuming that', 'subject to', 'pending', 'once'.",
+                  "Flag any sentence attempting to condition approval on future promises."
+                ],
+                "table_columns": "Draft Clause | Suspected Keyword | Semantic Risk | Flag Status",
+                "table_rules": "One row per scanned clause detecting conditional language.",
+                "restrictions": [
+                  "Conditional language is strictly prohibited in D8 justification."
+                ],
+                "done_when": "All conditional trigger phrases flagged."
+              },
+              "example_title": "Conditional Language Scan",
+              "example": "- Initial justification draft: *\"The project may proceed, assuming that rural connectivity is not an issue and subject to the bank confirming the deposit voucher.\"*\n- **Matches detected:** \"assuming that\" and \"subject to\" — 2 red flags.\n- **Risk:** Future promises disguised as approval; conditions must be resolved or logged in D7.",
+              "link_label": "red flags go to resolution rule (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Resolution Rule",
+          "objective": "Transfer genuine unresolved conditions to D7 and rewrite justification using settled facts only.",
+          "input": "Flagged red flags from Sub-step 2.1.",
+          "raw_data_title": "Settled Facts vs Open Items",
+          "raw_data": "- Settled: Zero fatal disqualifiers apply in D7. Problem activates Criterion C (D4).\n- Open items: Connectivity and banking receipt format documented in D7 Known Unknowns.",
+          "exit_label": "JUSTIFICATION CLEANED → Step 3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Condition transfer and factual rewriting",
+              "objective": "Rewrite justification grounded exclusively in settled facts free of conditionals.",
+              "how_to": {
+                "steps": [
+                  "Verify whether flagged conditions represent genuine open risks.",
+                  "Confirm that genuine open risks are logged in D7 Known Unknowns rather than conditioning D8 approval.",
+                  "Rewrite the justification using exclusively settled empirical facts from D1-D7.",
+                  "Ensure the text clearly reflects zero blocking conditions for Phase 1 start."
+                ],
+                "table_columns": "Condition | D7 Transfer Log | Cleaned Factual Justification | Audit Verdict",
+                "table_rules": "One row per condition documenting transfer and rewritten text.",
+                "restrictions": [
+                  "Do not write unresolved conditions in D8.",
+                  "Transfer to D7 Known Unknowns."
+                ],
+                "done_when": "Justification rewritten free of conditionals."
+              },
+              "example_title": "Condition Resolution and Rewriting",
+              "example": "- Both conditions are already logged as Known Unknowns in D7 (rural connectivity, deposit voucher issuing institution), with assigned owners and actions.\n- Rewrite the draft **free of conditionals**, relying solely on settled facts: all 4 fatal disqualifiers in D7 are `DOES NOT APPLY` (confirmed factual finding), and the 2 remaining uncertainties are explicitly scoped within D7 as Phase 1 work, rather than approval conditions in D8.\n- *Corrected Justification:* \"Analysis confirms that zero fatal disqualifiers apply (D7) and that the problem activates Criterion C for catastrophic failure (D4). Connectivity and banking voucher uncertainties are documented as Known Unknowns in D7 to be resolved in Phase 1, without blocking the commencement of exploration.\"",
+              "link_label": "clean justification goes to binary verdict (3.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Binary Verdict (The Final Call)",
+      "summary": "Explicitly dictate the project status, combining D4's advisory signal with D7's binding authority.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Decision Rule",
+          "objective": "Apply the 4 decision rules combining D7 (binding) and D4 (advisory) to issue GO or NO-GO.",
+          "input": "D4: 'Strategic Initiative' quadrant, 'PRIORITIZE' Continuity Signal. D7: All 4 fatal disqualifiers 'DOES NOT APPLY'.",
+          "raw_data_title": "D4 and D7 Inputs",
+          "raw_data": "- D4: Continuity Signal PRIORITIZE (Strategic Initiative).\n- D7: 4 lethal disqualifiers marked DOES NOT APPLY.",
+          "exit_label": "VERDICT ISSUED → Step 4",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Binary decision determination",
+              "objective": "Determine binary GO or NO-GO decision based on D7 binding rules and D4 advisory signal.",
+              "how_to": {
+                "steps": [
+                  "Evaluate Condition 1: Did any D7 disqualifier result in APPLIES without exception? (If YES -> NO-GO CANCELLED).",
+                  "Evaluate Condition 2: Did Disqualifier 4 (Trivial Existing Solution) result in APPLIES? (If YES -> NO-GO or purchase evaluation).",
+                  "Evaluate Condition 3: Is D7 free of lethal blockers and D4 signal favorable? (If YES -> GO PROCEED).",
+                  "Evaluate Condition 4: If D4 issued Money Pit alert but D7 is clean, evaluate Project Authority discretion.",
+                  "Issue definitive binary decision: GO or NO-GO with factual justification."
+                ],
+                "table_columns": "Decision Criterion | Artifact Source | Evaluated State | Verdict Impact",
+                "table_rules": "One row per decision condition detailing outcome.",
+                "restrictions": [
+                  "Decision must be binary: GO or NO-GO.",
+                  "D7 lethal disqualifiers are binding over D4 advisory signal."
+                ],
+                "done_when": "Binary decision dictated and justified."
+              },
+              "example_title": "Binary Verdict Evaluation",
+              "example": "1. Did any D7 disqualifier result in `APPLIES` without exception? **No** — all 4 are `DOES NOT APPLY`.\n2. Did the Trivial Existing Solution disqualifier result in `APPLIES`? **No.**\n3. Is D7 free of insurmountable blockers and D4 favorable? **Yes** — D7 clean, D4 set to `PRIORITIZE` (Strategic Initiative, Criterion C activated).\n4. The case of \"D4 Low Priority Alert without D7 blocker\" does not apply, because D4 issued no alert.\n\n### Verdict\n- **Decision:** `GO (PROCEED)`.\n- **Justification:** \"Analysis confirms that zero fatal disqualifiers apply (D7) and that the problem activates Criterion C for catastrophic failure with Strategic Initiative classification (D4). Connectivity and banking voucher uncertainties are documented as Known Unknowns in D7 to be resolved in Phase 1, without blocking the commencement of exploration.\"",
+              "link_label": "verdict goes to authorization (4.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Authorization and Signature",
+      "summary": "Convert the technical verdict into an act of nominal responsibility: someone with a proper name accepts the consequences of the decision.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Project Authority Identification",
+          "objective": "Extract the confirmed Sponsor from D6 Stakeholder Map.",
+          "input": "D6 Stakeholder Map Sponsor designation.",
+          "raw_data_title": "D6 Sponsor Record",
+          "raw_data": "Laura Torres (CEO and founder), Sponsor with fiscal authority.",
+          "exit_label": "AUTHORITY IDENTIFIED → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Project Authority extraction",
+              "objective": "Extract and verify Project Authority from D6.",
+              "how_to": {
+                "steps": [
+                  "Retrieve the confirmed Project Sponsor from D6 Stakeholder Map.",
+                  "Confirm that the identified individual holds fiscal authority for project expenditure.",
+                  "Designate the Project Authority for formal sign-off."
+                ],
+                "table_columns": "Stakeholder Profile | D6 Assigned Influence | Fiscal Authority | Project Authority Designation",
+                "table_rules": "One row designating the Project Authority.",
+                "restrictions": [
+                  "Must match Sponsor from D6."
+                ],
+                "done_when": "Project Authority identified."
+              },
+              "example_title": "Project Authority Identification",
+              "example": "| Stakeholder Profile | D6 Assigned Influence | Fiscal Authority | Project Authority Designation |\n| :--- | :---: | :---: | :---: |\n| Laura Torres (CEO and founder) | Sponsor | Complete | **Project Authority** |\n\n*Outcome:* D6 identifies Laura Torres (CEO and founder) as Sponsor.",
+              "link_label": "authority goes to confirmation statement (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Confirmation Statement",
+          "objective": "Draft and sign explicit acceptance of risk documented in D1-D7 with name and date.",
+          "input": "Identified Project Authority from Sub-step 4.1.",
+          "raw_data_title": "Signatory Authorization Details",
+          "raw_data": "Signatory: Laura Torres. Statement: Acceptance of documented risks to initiate Phase 1. Date: 2026-05-06.",
+          "exit_label": "AUTHORIZATION SIGNED → Step 5",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Signed confirmation registration",
+              "objective": "Record nominal confirmation statement and authorization signature.",
+              "how_to": {
+                "steps": [
+                  "Draft the formal confirmation statement: 'I accept responsibility and the risks documented across D1 through D7 to initiate Phase 1.'",
+                  "Record the signatory name, role, and formal approval date.",
+                  "Verify nominal accountability is established."
+                ],
+                "table_columns": "Signatory Name | Project Role | Confirmation Statement | Signature Date",
+                "table_rules": "One row recording signed authorization details.",
+                "restrictions": [
+                  "Explicit confirmation statement required.",
+                  "Date and nominal signatory mandatory."
+                ],
+                "done_when": "Signed authorization registered."
+              },
+              "example_title": "Signed Confirmation Statement",
+              "example": "- **Project Authority:** Laura Torres (CEO and founder, Sponsor).\n- **Confirmation Statement:** \"I accept the accountability and risks documented across D1 through D7 to initiate Phase 1.\"\n- **Date:** 2026-05-06.",
+              "link_label": "signed authorization goes to final assembly (5.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5",
+      "title": "Final Document Assembly",
+      "summary": "Format the project launch/cancellation record into the official deliverable.",
+      "substeps": [
+        {
+          "code": "5.1",
+          "title": "Metadata",
+          "objective": "Populate deliverable metadata header according to methodology standards.",
+          "input": "Project parameters: Nos Fuimos de Finca, Phase 0, Deliverable 8 of 9, Status Approved.",
+          "raw_data_title": "Project Metadata Parameters",
+          "raw_data": "Project: Nos Fuimos de Finca. Phase: 0 — Problem Recognition. Deliverable: 8 of 9. Status: Approved.",
+          "exit_label": "METADATA READY → 5.2",
+          "micro": [
+            {
+              "code": "5.1.1",
+              "title": "Metadata formatting",
+              "objective": "Assemble standardized metadata header block.",
+              "how_to": {
+                "steps": [
+                  "Populate Project Name, Phase, Deliverable number, and Status.",
+                  "Ensure metadata conforms to deliverable conventions."
+                ],
+                "table_columns": "Metadata Field | Project Value",
+                "table_rules": "One row per metadata field.",
+                "restrictions": [
+                  "Standard header fields only."
+                ],
+                "done_when": "Metadata block populated."
+              },
+              "example_title": "Metadata Block",
+              "example": "**Project:** Nos Fuimos de Finca  \n**Phase:** 0 — Problem Recognition  \n**Deliverable:** 8 of 9  \n**Status:** Approved",
+              "link_label": "metadata goes to verdict assembly (5.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "5.2",
+          "title": "Signature & Verdict Assembly",
+          "objective": "Insert the final Verdict in prominent text with the Sponsor's signature and validation panel.",
+          "input": "Outputs from Steps 1, 2, 3, and 4.",
+          "raw_data_title": "Complete Assembly Components",
+          "raw_data": "Validation panel, prominent GO (PROCEED) verdict with justification, and signed authorization register.",
+          "exit_label": "FINAL DELIVERABLE ASSEMBLED → publishes deliverable",
+          "micro": [
+            {
+              "code": "5.2.1",
+              "title": "Full assembly and verification",
+              "objective": "Verify verbatim transposition of validation panel, verdict, and authorization register.",
+              "how_to": {
+                "steps": [
+                  "Assemble Validation Panel with 4 checked verification items.",
+                  "Insert the prominent binary verdict # GO (PROCEED) with factual justification.",
+                  "Insert the signed Authorization Register with Project Authority and date.",
+                  "Verify complete document matches official template."
+                ],
+                "table_columns": "Document Section | Content Summary | Assembly Status",
+                "table_rules": "One row per document section.",
+                "restrictions": [
+                  "Verbatim transcribing from audited steps."
+                ],
+                "done_when": "Final deliverable assembled."
+              },
+              "example_title": "Assembly Verification",
+              "example": "| Section | Content Summary | Assembly Status |\n| :--- | :--- | :---: |\n| 1. Metadata | Project, Phase 0, Deliverable 8 of 9, Status Approved | `VERIFIED` |\n| 2. Validation Panel | 4 verified check items | `VERIFIED` |\n| 3. Final Verdict | GO (PROCEED) with factual justification | `VERIFIED` |\n| 4. Authorization Register | Laura Torres signed 2026-05-06 | `VERIFIED` |\n\n*Result:* Assembly complete with 100% fidelity to audited steps.",
+              "link_label": "publishes final deliverable"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 08. Go No-Go Signal.md",
+    "markdown": "# 8. Go/No-Go Signal (Decision Record)\n\n### 1. Document Metadata\n**Project:** Nos Fuimos de Finca\n**Phase:** 0 — Problem Recognition\n**Deliverable:** 8 of 9\n**Status:** Approved\n\n### 2. Validation Panel\n- [x] D1 to D7 completed and approved.\n- [x] TBD consistency (D6) ↔ Known Unknowns (D7) verified.\n- [x] Draft free of conditional language.\n- [x] D4 signal (advisory) and D7 verdicts (binding) explicitly cited.\n\n### 3. Final Verdict\n# GO (PROCEED)\n*Justification: The analysis confirms that no lethal disqualifier applies (D7) and that the problem activates Catastrophic Failure Criterion C with a Strategic Initiative classification (D4). Connectivity and banking receipt uncertainties are documented as Known Unknowns in D7, to be resolved in Phase 1, without blocking the start of exploration.*\n\n### 4. Authorization Register\n- **Project Authority (Sponsor, D6):** Laura Torres (CEO and founder).\n- **Confirmation Statement:** \"I accept responsibility and the risks documented in D1 to D7 to initiate Phase 1.\"\n- **Date:** 2026-05-06."
+  }
+}

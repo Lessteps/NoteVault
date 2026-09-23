@@ -1,0 +1,447 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D8",
+  "deliverable": "Risk Register Update (Actualización Incremental del Registro de Riesgos — Delta)",
+  "purpose": "Este entregable actualiza el Registro de Riesgos único y vivo del proyecto (creado en Fase 0, P0-D7), añadiendo una sección delta con los riesgos NUEVOS técnicos, de mercado, regulatorios y operativos descubiertos durante la investigación de viabilidad temprana (D2 a D7). No rehace ni duplica los 4 descalificadores de Fase 0.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_risk_register]] | Registro de Riesgos vivo de Fase 0 con los 4 descalificadores iniciales (P0-D7). |\n| [[example_output_market_validation]] | Riesgos de mercado, adopción y pricing descubiertos (P1-D2). |\n| [[example_output_technical_feasibility]] | Riesgos de arquitectura y concurrencia derivados del Spike (P1-D4). |\n| [[example_output_legal_clearance]] | Riesgos normativos y regulatorios identificados (P1-D5). |\n| [[example_output_team_capability]] | Riesgos de brechas técnicas y de ejecución (P1-D6). |\n| [[example_output_viability]] | Riesgos financieros y de capacidad operativa en Break-Even (P1-D7). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría de Nuevos Riesgos Emergentes (D2 a D7)",
+      "summary": "Extraer exclusivamente los riesgos nuevos surgidos de la investigación sin duplicar Fase 0.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Leer el registro P0-D7 para conocer los riesgos ya documentados",
+          "objective": "Verificar los descalificadores de Fase 0 para evitar duplicaciones innecesarias.",
+          "input": "Registro maestro de riesgos de Fase 0 ([[example_output_risk_register]]).",
+          "raw_data_title": "Riesgos Existentes P0-D7",
+          "raw_data": "Descalificador 2 (Fallo conectividad rural) y Descalificador 4 (Solución trivial existente) ya registrados en P0-D7.",
+          "exit_label": "RIESGOS BASE CONOCIDOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Revisión y exclusión de riesgos previos de Fase 0",
+              "objective": "Garantizar que este entregable reporte estrictamente el delta incremental.",
+              "how_to": {
+                "steps": [
+                  "Abrir y leer la tabla maestra de riesgos generada en P0-D7.",
+                  "Identificar los 4 descalificadores y riesgos operativos ya formulados.",
+                  "Marcar los temas cubiertos para prohibir su redefinición en este entregable.",
+                  "Registrar la frontera entre riesgos existentes y nuevas amenazas."
+                ],
+                "table_columns": "ID Riesgo Base | Nombre del Descalificador | Estado en Fase 0 | Tratamiento en Fase 1",
+                "table_rules": "No reescribir ni renombrar riesgos previos.",
+                "restrictions": [
+                  "Prohibido duplicar descalificadores de Fase 0.",
+                  "Mantener intacta la numeración original de riesgos."
+                ],
+                "done_when": "Inventario de riesgos base revisado y exclusión confirmada."
+              },
+              "example_title": "Riesgos Base de Fase 0 Excluidos de Duplicación",
+              "example": "| ID Base | Riesgo Existente P0-D7 | Estado |\n| --- | --- | --- |\n| R01 | Fallo crítico de conectividad rural | Mitigado en P0-D7 / Excluido de D8 |\n| R02 | Adopción de soluciones genéricas triviales | Controlado en P0-D7 / Excluido de D8 |",
+              "link_label": "exclusiones van a extracción delta (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Extraer riesgos nuevos de cada entregable de Fase 1 (D2 a D7)",
+          "objective": "Identificar amenazas emergentes en mercado, competencia, tecnología, regulación, equipo y finanzas.",
+          "input": "Entregables completados de P1-D2 a P1-D7.",
+          "raw_data_title": "Nuevos Riesgos Extraídos",
+          "raw_data": "Financiero: rechazo pagos online. Técnico: fallo persistencia Android gama baja / colisión asíncrona. Legal: exigencia RNT. Mercado: divergencia de canales.",
+          "exit_label": "RIESGOS EMERGENTES EXTRAÍDOS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Extracción y categorización de riesgos delta",
+              "objective": "Agrupar cada amenaza nueva por su disciplina de origen.",
+              "how_to": {
+                "steps": [
+                  "Revisar supuestos débiles de P1-D2 y P1-D3.",
+                  "Extraer vulnerabilidades técnicas y del Spike de P1-D4.",
+                  "Revisar restricciones normativas abiertas de P1-D5.",
+                  "Extraer brechas del equipo de P1-D6 y fragilidades de Break-Even de P1-D7.",
+                  "Asignar la categoría correspondiente a cada nuevo riesgo detectado."
+                ],
+                "table_columns": "ID Temporal | Riesgo Nuevo Emergente | Categoría | Entregable de Origen",
+                "table_rules": "Solo amenazas surgidas durante las investigaciones de Fase 1.",
+                "restrictions": [
+                  "No incluir riesgos que hayan sido resueltos en su totalidad.",
+                  "Vincular cada riesgo con su entregable de origen concreto."
+                ],
+                "done_when": "Listado de riesgos emergentes delta categorizado."
+              },
+              "example_title": "Inventario de Riesgos Emergentes de Fase 1",
+              "example": "| ID | Riesgo Nuevo Emergente (Solo Delta) | Categoría | Origen |\n| --- | --- | --- | --- |\n| R-F1-01 | Turistas rurales rechazan pago online → tasa de conversión 0% | Financiero | P1-D7 (Vulnerabilidad) |\n| R-F1-02 | Fallo de persistencia offline en dispositivos Android gama baja | Técnico | P1-D4 (Spike técnico) |\n| R-F1-03 | Auditoría imprevista de Fontur exigiendo RNT | Legal | P1-D5 (Pivot contractual) |\n| R-F1-04 | Agencia de Turismo Local bloquea acceso a su red | Competitivo/Operativo | P1-D7 (Actor nuevo) |\n| R-F1-05 | Ratio de divergencia 4.8x: canales insuficientes | Mercado | P1-D2 (Bottom-Up) |",
+              "link_label": "riesgos emergentes van a filtrado accionable (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Filtrar riesgos genéricos y descartar los no accionables",
+          "objective": "Depurar la lista eliminando lugares comunes para conservar solo amenazas críticas del modelo.",
+          "input": "Listado bruto de riesgos emergentes del Step 1.2.",
+          "raw_data_title": "Filtro de Relevancia",
+          "raw_data": "Descartados riesgos genéricos de renuncia o macroeconomía. Conservados 4-5 riesgos específicos del contexto del proyecto.",
+          "exit_label": "INVENTARIO DELTA DEPURADO Y ACCIONABLE → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Filtrado de riesgos contextuales y accionables",
+              "objective": "Asegurar que cada riesgo restante represente una amenaza directa sobre la que se pueda actuar.",
+              "how_to": {
+                "steps": [
+                  "Evaluar si el riesgo es específico al modelo de negocio y arquitectura del proyecto.",
+                  "Descartar riesgos genéricos de industria no controlables por el equipo.",
+                  "Verificar que existan palancas técnicas o de diseño para mitigar el riesgo.",
+                  "Consolidar la lista limpia de riesgos delta para cuantificación."
+                ],
+                "table_columns": "Riesgo Evaluado | Pertinencia Contextual | Accionabilidad | Decisión de Inclusión",
+                "table_rules": "Conservar únicamente amenazas accionables por el equipo.",
+                "restrictions": [
+                  "Eliminar frases vagas como 'puede haber fallos generales'.",
+                  "Exigir una formulación causa-efecto en cada riesgo aprobado."
+                ],
+                "done_when": "Lista de riesgos emergentes depurada y lista para matriz."
+              },
+              "example_title": "Filtro de Riesgos Accionables vs Genéricos",
+              "example": "| Riesgo Emergente | Criterio de Accionabilidad | Inclusión |\n| --- | --- | --- |\n| Colisión de inventario por reconexión asíncrona | Directamente mitigable por diseño UX y arquitectura | ✅ Aprobado |\n| Fincas no actualizan calendario por baja alfabetización | Mitigable con alertas WhatsApp Mobile-First | ✅ Aprobado |\n| Crisis macroeconómica nacional | Riesgo genérico no accionable | ❌ Descartado |",
+              "link_label": "lista depurada va a calificación de severidad (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Cuantificación Matricial (Severidad × Probabilidad)",
+      "summary": "Asignar valores matemáticos de impacto y ocurrencia para calcular el puntaje de exposición.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Asignar Severidad (1 a 5) a cada riesgo",
+          "objective": "Calcular la magnitud del daño que causaría la materialización de cada riesgo.",
+          "input": "Lista depurada de riesgos delta del Step 1.3.",
+          "raw_data_title": "Severidades Asignadas",
+          "raw_data": "Rechazo pagos: 5 (Catastrófico). Fallo offline: 4 (Alto). Auditoría RNT: 4-5 (Alto/Catastrófico). Agencia bloquea: 3 (Moderado). Divergencia canales: 4 (Alto).",
+          "exit_label": "SEVERIDADES ASIGNADAS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Calificación de severidad e impacto",
+              "objective": "Asignar valores del 1 al 5 según la escala estándar de severidad de la metodología.",
+              "how_to": {
+                "steps": [
+                  "Evaluar el impacto potencial en clientes, legalidad, ingresos o integridad técnica.",
+                  "Asignar 1 (Insignificante), 2 (Leve), 3 (Moderado), 4 (Alto) o 5 (Catastrófico).",
+                  "Documentar la justificación de la severidad asignada a cada riesgo.",
+                  "Mantener consistencia con los criterios de severidad usados en Fase 0."
+                ],
+                "table_columns": "ID Riesgo | Nombre del Riesgo | Nivel de Severidad (1-5) | Justificación del Impacto",
+                "table_rules": "Uso de escala estándar de 1 a 5.",
+                "restrictions": [
+                  "No subestimar riesgos regulatorios ni de pérdida total de clientes.",
+                  "Justificar técnicamente cualquier calificación de 4 o 5."
+                ],
+                "done_when": "Severidad numérica asignada a todos los riesgos delta."
+              },
+              "example_title": "Asignación de Severidad a Riesgos Delta",
+              "example": "| ID | Riesgo Emergente | Severidad (1-5) | Justificación |\n| --- | --- | --- | --- |\n| R-F1-01 | Rechazo total a pagos online por turistas | 5 | Pérdida total de monetización y quiebra del modelo |\n| R-F1-02 | Fallo offline en Android gama baja | 4 | Overbooking y pérdida de confianza de finqueros |\n| R-F1-03 | Sanción regulatoria por falta de RNT | 4 | Cierre de operaciones o multas de Fontur |",
+              "link_label": "severidades van a probabilidad de ocurrencia (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Asignar Probabilidad (1 a 5) a cada riesgo",
+          "objective": "Estimar la posibilidad de ocurrencia empírica del riesgo en los próximos 6 meses.",
+          "input": "Hallazgos de campo y evidencia de los entregables previos.",
+          "raw_data_title": "Probabilidades Asignadas",
+          "raw_data": "Rechazo pagos: 4 (Alta). Fallo offline: 3-4 (Media/Alta). Auditoría RNT: 2 (Baja). Bloqueo agencias: 3 (Media). Divergencia canales: 3 (Media).",
+          "exit_label": "PROBABILIDADES ASIGNADAS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Estimación de probabilidad temporal",
+              "objective": "Calcular la verosimilitud de ocurrencia en escala de 1 a 5.",
+              "how_to": {
+                "steps": [
+                  "Revisar el grado de validación empírica en D1, D2 y D4.",
+                  "Asignar 1 (Muy baja <10%), 2 (Baja 10-25%), 3 (Media 25-50%), 4 (Alta 50-75%), 5 (Muy alta >75%).",
+                  "Vincular la probabilidad con el comportamiento observado de usuarios o tecnologías.",
+                  "Registrar el valor para el cálculo del producto matricial."
+                ],
+                "table_columns": "ID Riesgo | Probabilidad (1-5) | Rango Porcentual | Evidencia de Soporte",
+                "table_rules": "Escala temporal enfocada en la ventana de lanzamiento del MVP.",
+                "restrictions": [
+                  "No asignar probabilidad baja a supuestos sin validación en campo.",
+                  "Considerar la precariedad de infraestructura en entornos rurales."
+                ],
+                "done_when": "Probabilidad asignada a cada riesgo de la matriz."
+              },
+              "example_title": "Asignación de Probabilidad de Ocurrencia",
+              "example": "| ID | Riesgo Emergente | Probabilidad (1-5) | Rango Estimado |\n| --- | --- | --- | --- |\n| R-F1-01 | Rechazo a pagos online | 4 | Alta (50% - 75%) |\n| R-F1-02 | Fallo de persistencia offline | 4 | Alta (50% - 75%) |\n| R-F1-03 | Sanción regulatoria RNT | 2 | Baja (10% - 25%) |",
+              "link_label": "probabilidad va a cálculo de exposición (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Calcular la Exposición (S × P) y clasificar el semáforo",
+          "objective": "Obtener el puntaje matemático de 1 a 25 y clasificar en Rojo, Amarillo o Verde.",
+          "input": "Severidades de 2.1 y Probabilidades de 2.2.",
+          "raw_data_title": "Matriz de Exposición",
+          "raw_data": "Rechazo pagos: 5x4 = 20 (Rojo). Colisión inventario: 4x4 = 16 (Rojo). Fallo offline: 4x3 = 12 (Amarillo). Brecha persistencia: 3x3 = 9 (Amarillo). RNT: 4x2 = 8 (Amarillo).",
+          "exit_label": "RIESGOS CUANTIFICADOS Y SEMAFORIZADOS → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Cálculo matricial de exposición y semáforo",
+              "objective": "Multiplicar Severidad por Probabilidad y agrupar por criticidad según umbrales.",
+              "how_to": {
+                "steps": [
+                  "Calcular Exposición = Severidad * Probabilidad para cada fila.",
+                  "Asignar Rojo si la Exposición es mayor o igual a 15 (amenaza crítica inmediata).",
+                  "Asignar Amarillo si la Exposición se ubica entre 8 y 14 (amenaza moderada).",
+                  "Asignar Verde si la Exposición es menor o igual a 7 (monitoreo pasivo).",
+                  "Ordenar la tabla descendentemente por puntaje de exposición."
+                ],
+                "table_columns": "ID | Riesgo | Severidad (S) | Probabilidad (P) | Exposición (S×P) | Semáforo",
+                "table_rules": "Rojo (≥15), Amarillo (8-14), Verde (1-7).",
+                "restrictions": [
+                  "No omitir el cálculo matemático explícito en ninguna fila.",
+                  "Mantener el rigor en los umbrales de corte de color."
+                ],
+                "done_when": "Tabla de exposición calculada y clasificada por semáforo."
+              },
+              "example_title": "Matriz de Exposición y Semáforo de Riesgos Delta",
+              "example": "| ID | Riesgo | Severidad | Probabilidad | Exposición (S×P) | Semáforo |\n| --- | --- | --- | --- | --- | --- |\n| R05 | Colisión de inventario por reconexión asíncrona | 4 | 4 | **16** | 🔴 Rojo |\n| R-F1-01 | Rechazo total a pagos online por turistas | 5 | 4 | **20** | 🔴 Rojo |\n| R06 | Fincas no actualizan calendario por baja alfabetización | 3 | 4 | **12** | 🟡 Amarillo |\n| R08 | Brecha de persistencia offline local | 3 | 3 | **9** | 🟡 Amarillo |\n| R07 | Sanción regulatoria por falta de RNT | 4 | 2 | **8** | 🟡 Amarillo |",
+              "link_label": "exposición cuantificada va a mitigaciones rojas (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Asignación de Mitigaciones y Dueños (Test de Muerte)",
+      "summary": "Diseñar acciones concretas de reducción de riesgo y asignar responsables nominales.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Para cada riesgo Rojo: definir mitigación inmediata obligatoria",
+          "objective": "Formular contramedidas específicas que reduzcan drásticamente la probabilidad o severidad crítica.",
+          "input": "Riesgos clasificados como Rojo (Exposición ≥ 15) del Step 2.3.",
+          "raw_data_title": "Mitigaciones para Riesgos Rojos",
+          "raw_data": "Rechazo pagos online: pasarelas offline (Efecty/Baloto) en MVP. Colisión asíncrona: mitigación UX poniendo reservas en 'Pendiente de Confirmación' manual.",
+          "exit_label": "MITIGACIONES ROJAS ESTABLECIDAS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Formulación de mitigaciones obligatorias para riesgos críticos",
+              "objective": "Establecer acciones técnicas o de diseño que desactiven el potencial destructivo del riesgo.",
+              "how_to": {
+                "steps": [
+                  "Filtrar todos los riesgos con semáforo Rojo.",
+                  "Formular una solución técnica, de proceso o de producto concreta.",
+                  "Identificar si la medida disminuye la Probabilidad de ocurrencia o la Severidad.",
+                  "Verificar que la mitigación reduzca el puntaje residual por debajo de 15."
+                ],
+                "table_columns": "ID Riesgo Crítico | Mitigación Táctica Obligatoria | Mecanismo de Reducción | Puntaje Residual Esperado",
+                "table_rules": "Prohibido avanzar con riesgos Rojos sin mitigación concreta.",
+                "restrictions": [
+                  "No redactar declaraciones de buenas intenciones sin mecanismo técnico.",
+                  "Asegurar que la mitigación sea viable con el stack tecnológico acordado."
+                ],
+                "done_when": "Mitigación ejecutable asignada a todos los riesgos Rojos."
+              },
+              "example_title": "Mitigaciones Obligatorias para Riesgos Críticos (Rojo)",
+              "example": "| ID | Riesgo Rojo | Mitigación Táctica Obligatoria | Mecanismo |\n| --- | --- | --- | --- |\n| R05 | Colisión de inventario por reconexión | Mitigación UX: Las reservas entran en estado 'Pendiente de Confirmación' hasta validación manual del dueño. | Reduce Severidad de 4 a 2 |\n| R-F1-01 | Rechazo a pagos online | Habilitar pasarelas offline (Efecty/Baloto) como opción de pago en MVP. | Reduce Probabilidad de 4 a 2 |",
+              "link_label": "mitigaciones rojas van a mitigaciones amarillas (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Para cada riesgo Amarillo: definir mitigación preventiva antes del lanzamiento",
+          "objective": "Establecer acciones preventivas y salvaguardas para riesgos de severidad intermedia.",
+          "input": "Riesgos clasificados como Amarillo del Step 2.3.",
+          "raw_data_title": "Mitigaciones para Riesgos Amarillos",
+          "raw_data": "Baja alfabetización: WhatsApp Cloud API + web Mobile-First ultra ligera. RNT: T&C como contrato civil. Brecha offline: RxDB/PouchDB + Spike guiado.",
+          "exit_label": "MITIGACIONES AMARILLAS ESTABLECIDAS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Definición de mitigaciones preventivas",
+              "objective": "Asignar medidas de contención para ejecutar en paralelo con el desarrollo del MVP.",
+              "how_to": {
+                "steps": [
+                  "Filtrar los riesgos con semáforo Amarillo.",
+                  "Definir la salvaguarda técnica, operativa o contractual adecuada.",
+                  "Fijar el hito temporal de ejecución (antes de Sprint 1, antes de lanzamiento o mes 1).",
+                  "Definir un indicador medible que demuestre la efectividad de la acción."
+                ],
+                "table_columns": "ID Riesgo Moderado | Mitigación Preventiva | Hito de Ejecución | Indicador de Efectividad",
+                "table_rules": "Cada mitigación debe contar con un hito temporal específico.",
+                "restrictions": [
+                  "No postergar mitigaciones de arquitectura más allá del Sprint 1.",
+                  "Definir indicadores verificables y no subjetivos."
+                ],
+                "done_when": "Mitigaciones preventivas asignadas a todos los riesgos Amarillos."
+              },
+              "example_title": "Mitigaciones Preventivas para Riesgos Amarillos",
+              "example": "| ID | Riesgo Amarillo | Mitigación Preventiva | Hito de Ejecución |\n| --- | --- | --- | --- |\n| R06 | Fincas no actualizan calendario | Notificaciones WhatsApp Cloud API + interfaz ultra ligera Mobile-First | Sprint 1 y 2 |\n| R07 | Sanción regulatoria RNT | T&C estructurados bajo modalidad de contrato civil temporal | Pre-lanzamiento |\n| R08 | Brecha persistencia offline | Adopción de librerías maduras (RxDB/PouchDB) + Spike guiado | Kickoff Fase 2 |",
+              "link_label": "mitigaciones amarillas van a dueños únicos (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Asignar un dueño único por riesgo (no el equipo)",
+          "objective": "Vincular a una persona individual responsable del monitoreo y ejecución de cada salvaguarda.",
+          "input": "Mitigaciones formuladas en 3.1 y 3.2.",
+          "raw_data_title": "Asignación de Dueños",
+          "raw_data": "R05: Laura (Tech Lead). R06: Julián (PM). R07: Julián (PM). R08: Laura (Tech Lead). R-F1-01: PM / CEO.",
+          "exit_label": "DUEÑOS ÚNICOS Y PLAZOS ASIGNADOS → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Asignación de dueño nominal y horizonte de ejecución",
+              "objective": "Garantizar rendición de cuentas nominal sin dilución de responsabilidades.",
+              "how_to": {
+                "steps": [
+                  "Asignar un único nombre y rol responsable por cada riesgo mitigado.",
+                  "Prohibir terminantemente asignar como responsable a 'el equipo' o 'todos'.",
+                  "Confirmar que el dueño designado cuente con capacidad real para liderar la mitigación.",
+                  "Consolidar la matriz completa de riesgos, puntajes, mitigaciones y dueños."
+                ],
+                "table_columns": "ID | Riesgo | Semáforo | Mitigación Táctica | Cuándo Ejecutar | Indicador de Éxito | Dueño Único",
+                "table_rules": "Obligatorio responsable uninominal con rol funcional.",
+                "restrictions": [
+                  "No admitir roles indeterminados.",
+                  "Vincular cada dueño con su ámbito de decisión en el proyecto."
+                ],
+                "done_when": "Responsable único asignado a todos los riesgos mitigados."
+              },
+              "example_title": "Matriz Consolidada de Riesgos con Dueños y Plazos",
+              "example": "| ID | Semáforo | Mitigación Táctica | Cuándo Ejecutar | Indicador de Mitigación | Dueño |\n| --- | --- | --- | --- | --- | --- |\n| R05 | 🔴 Rojo | Reservas entran en 'Pendiente de Confirmación' manual | Antes de Sprint 1 | Cero overbooking en producción | Laura (Tech Lead) |\n| R06 | 🟡 Amarillo | Notificaciones WhatsApp API + web Mobile-First | Sprint 1-2 | >80% respuesta en <2h | Julián (PM) |\n| R07 | 🟡 Amarillo | Contrato civil temporal en T&C | Antes de apertura | T&C blindados aprobados | Julián (PM) |\n| R08 | 🟡 Amarillo | RxDB / PouchDB + Spike guiado | Kickoff Fase 2 | POC validado pre-Sprint | Laura (Tech Lead) |",
+              "link_label": "matriz consolidada va a localización de archivo maestro (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Actualización del Archivo Único de Riesgos (Delta Append)",
+      "summary": "Incorporar la sección delta al archivo maestro de riesgos sin duplicarlo y verificar cierre.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Localizar el archivo maestro de riesgos de Fase 0",
+          "objective": "Verificar la existencia del documento maestro centralizado generado en P0-D7.",
+          "input": "Ruta documental `docs/00-reconocimiento-del-problema/07. Registro de Riesgos.md`.",
+          "raw_data_title": "Localización del Registro Maestro",
+          "raw_data": "Archivo maestro de riesgos existente y validado en la estructura del proyecto.",
+          "exit_label": "ARCHIVO MAESTRO LOCALIZADO → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Localización y verificación del registro maestro centralizado",
+              "objective": "Confirmar la ruta del archivo vivo de riesgos para evitar crear duplicados dispersos.",
+              "how_to": {
+                "steps": [
+                  "Ubicar el archivo de Registro de Riesgos creado en Fase 0.",
+                  "Comprobar que el archivo se encuentre estructurado y contenga los riesgos base.",
+                  "Asegurar el principio de fuente única de verdad: un solo documento para todo el proyecto.",
+                  "Preparar el punto de inserción al final del documento maestro."
+                ],
+                "table_columns": "Ruta del Archivo Maestro | Estatus de Verificación | Acción a Realizar",
+                "table_rules": "Garantizar no crear un archivo de riesgos separado para Fase 1.",
+                "restrictions": [
+                  "No duplicar el registro en carpetas desconectadas.",
+                  "Respetar el contenido preexistente del documento."
+                ],
+                "done_when": "Archivo maestro de riesgos ubicado y preparado para actualización append."
+              },
+              "example_title": "Verificación del Archivo Maestro Único",
+              "example": "| Parámetro | Valor |\n| --- | --- |\n| Ruta Centralizada | `docs/00-reconocimiento-del-problema/07. Registro de Riesgos.md` |\n| Modo de Actualización | Append al final del documento (sin sobreescribir Fase 0) |\n| Integridad | Verificada ✅ |",
+              "link_label": "verificación va a anexar sección delta (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Añadir la sección de actualización de Fase 1 al archivo maestro",
+          "objective": "Incorporar el bloque estructurado con metadatos, tabla delta y veredicto de supervivencia.",
+          "input": "Matriz consolidada de los Steps 1 al 3 y metadatos de Fase 1.",
+          "raw_data_title": "Sección Delta de Fase 1",
+          "raw_data": "Sección '## Actualización — Fase 1 (Early Viability)' con tabla delta, IDs R05-R08 y veredicto PROCEED.",
+          "exit_label": "SECCIÓN DELTA ANEXADA → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Incorporación estructurada de la sección delta",
+              "objective": "Anexar la sección de actualización manteniendo la coherencia tipográfica y estructural.",
+              "how_to": {
+                "steps": [
+                  "Redactar la cabecera: '## Actualización — Fase 1 (Early Viability)'.",
+                  "Registrar metadatos: Fase 1, Entregable 8 de 13, fecha de actualización y estado.",
+                  "Insertar la tabla de nuevos riesgos emergentes cuantificados y mitigados.",
+                  "Asegurar que los IDs de los riesgos delta (R05 en adelante) mantengan correlación estricta."
+                ],
+                "table_columns": "Bloque Documental | Contenido Incorporado | Validación de Formato",
+                "table_rules": "Estructura estandarizada con tabla de 9 columnas.",
+                "restrictions": [
+                  "No sobrescribir los descalificadores de Fase 0.",
+                  "Mantener consistencia en la nomenclatura de IDs."
+                ],
+                "done_when": "Sección delta de Fase 1 añadida correctamente al archivo maestro."
+              },
+              "example_title": "Estructura de la Sección Append de Fase 1",
+              "example": "## Actualización — Fase 1 (Early Viability)\n\n### 1. Metadatos de Actualización\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 1 — Viabilidad Temprana (Early Viability)  \n**Entregable:** 8 de 13  \n**Fecha de Actualización:** 2026-07-06  \n**Estado:** Aprobado  \n\n### 2. Matriz de Nuevos Riesgos Emergentes (Delta)\n| ID | Riesgo Emergente | Origen | Severidad (1-5) | Probabilidad (1-5) | Puntaje (1-25) | Nivel | Mitigación Táctica | Responsable |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| R05 | Colisión de inventario por reconexión asíncrona | P1-D4 | 4 | 4 | 16 | Rojo | Mitigación UX: Reservas entran en 'Pendiente de Confirmación' manual. | Laura (Tech Lead) |\n| R06 | Fincas no actualizan calendario | P1-D1 | 3 | 4 | 12 | Amarillo | Notificaciones WhatsApp API + web Mobile-First ultraligera. | Julián (PM) |\n| R07 | Sanción regulatoria por falta de RNT | P1-D5 | 4 | 2 | 8 | Amarillo | Términos y condiciones estructurados bajo contrato civil temporal. | Julián (PM) |\n| R08 | Brecha de persistencia offline local | P1-D6 | 3 | 3 | 9 | Amarillo | Librerías RxDB/PouchDB y Spike guiado en Fase 2. | Laura (Tech Lead) |",
+              "link_label": "sección delta va a auditoría de cierre (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Verificar que los riesgos Rojos tienen mitigación antes de cerrar",
+          "objective": "Certificar la ausencia de riesgos críticos huérfanos y emitir el dictamen formal de cierre de D8.",
+          "input": "Sección delta integrada en el documento maestro.",
+          "raw_data_title": "Cierre y Supervivencia",
+          "raw_data": "Riesgos Críticos No Mitigables: Ninguno. Todos los riesgos cuentan con mitigación y dueño. Veredicto: PROCEED. Estado: Approved.",
+          "exit_label": "REGISTRO DE RIESGOS ACTUALIZADO Y CERTIFICADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Auditoría de cierre y certificación de supervivencia",
+              "objective": "Verificar el cumplimiento de las compuertas condicionales y sellar la aprobación del entregable.",
+              "how_to": {
+                "steps": [
+                  "Realizar el control de compuerta: confirmar que ningún riesgo Rojo carezca de mitigación.",
+                  "Verificar que cada salvaguarda cuente con dueño uninominal asignado.",
+                  "Registrar la cláusula de supervivencia de Fase 1: cero riesgos críticos no mitigables.",
+                  "Emitir el veredicto formal de cierre: 'PROCEED (Actualización de riesgos aprobada)'."
+                ],
+                "table_columns": "Condición de Compuerta | Estado de Cumplimiento | Veredicto Final",
+                "table_rules": "Aprobación sujeta a mitigación exhaustiva de riesgos Rojos y Amarillos.",
+                "restrictions": [
+                  "No cerrar como Approved si persiste algún riesgo Rojo sin mitigar.",
+                  "Registrar formalmente el estado de cierre en el registro de avance."
+                ],
+                "done_when": "Veredicto de supervivencia emitido y entregable D8 formalmente aprobado."
+              },
+              "example_title": "Veredicto de Supervivencia y Cierre de D8",
+              "example": "### 3. Veredicto de Supervivencia de Fase 1\n- **Riesgos Críticos No Mitigables:** Ninguno. Todos los riesgos rojos y amarillos cuentan con mitigación de diseño o tecnológica.\n- **Veredicto:** PROCEED (Actualización de riesgos aprobada).\n\nEstado al cerrar este step: **Approved**. Todos los riesgos Rojos tienen mitigación documentada con dueño y plazo. La sección delta fue añadida al archivo maestro sin crear un documento separado.",
+              "link_label": "cierre formal del entregable D8"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

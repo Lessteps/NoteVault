@@ -1,0 +1,152 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D9",
+  "deliverable": "Component Diagram (C4 Model)",
+  "purpose": "Mapear visualmente la arquitectura completa del sistema utilizando el estándar industrial C4 Model (Nivel 1: System Context y Nivel 2: Container Diagram), integrando las decisiones de topología (D3), descomposición modular (D4) y patrones de comunicación con protocolos explícitos (D6), verificando consistencia absoluta antes del desarrollo.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Deployment Topology Decision (P5-D3) | [[PHASE_5_ARCHITECTURAL_DESIGN/3.Deployment Topology Decision/3.Deployment Topology Decision.md]] | Restringe qué Containers son físicamente válidos (ver Step 3). |\n| System Decomposition Decision (P5-D4) | [[PHASE_5_ARCHITECTURAL_DESIGN/4.System Decomposition Decision/4.System Decomposition Decision.md]] | Fuente primaria de las Unidades Desplegables a representar como Containers (ver Step 2). |\n| Communication Pattern Decision (P5-D6) | [[PHASE_5_ARCHITECTURAL_DESIGN/6.Communication Pattern Decision/6.Communication Pattern Decision.md]] | Fuente de los protocolos exactos a etiquetar en las flechas del diagrama (ver Step 2). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "C4 Nivel 1: System Context Diagram",
+      "summary": "Mapear el sistema como una sola caja negra, junto con los actores humanos y los sistemas externos de integración.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Modelado del Sistema Caja Negra, Actores y Sistemas Externos",
+          "objective": "Identificar el sistema núcleo, roles de usuario e integraciones externas obligatorias de Fase 4.",
+          "input": "Actores y sistemas externos identificados en Fase 3 y Fase 4 (Turista, Finquero, Wompi, WhatsApp, Supabase).",
+          "raw_data_title": "Catálogo de Elementos C4 Nivel 1",
+          "raw_data": "| Elemento C4 | Tipo C4 | Descripción / Responsabilidad | Protocolo / Canal |\n|---|---|---|---|\n| Turista | Person | Busca fincas de recreo, realiza solicitudes de reserva y efectúa pagos | HTTPS |\n| Finquero (Host) | Person | Publica propiedades, gestiona calendarios, aprueba reservas y cobra | HTTPS |\n| Nos Fuimos de Finca | System | Plataforma central (Marketplace B2C/B2B) de alquiler de fincas de recreo | Core Platform |\n| Wompi (Bancolombia) | System_Ext | Pasarela externa de pagos bancarios (Tarjetas de crédito, PSE) | REST / HTTPS |\n| WhatsApp Business API | System_Ext | Sistema externo de mensajería para notificaciones push a anfitriones | Webhooks / API |\n| Supabase Auth / Storage | System_Ext | Proveedor externo BaaS para Identidad (JWT) y CDN de fotos | REST / HTTPS |",
+          "exit_label": "Elementos y Límites de Contexto Identificados",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Especificación Mermaid C4Context",
+              "objective": "Generar el diagrama de contexto del sistema sin revelar estructura interna.",
+              "how_to": {
+                "steps": [
+                  "1. Declarar bloque C4Context con título formal.",
+                  "2. Definir usuarios humanos con Person(alias, nombre, descripción).",
+                  "3. Definir el sistema central con System(alias, nombre, descripción).",
+                  "4. Definir servicios de terceros con System_Ext(alias, nombre, descripción).",
+                  "5. Trazar relaciones unidireccionales y bidireccionales con Rel(origen, destino, etiqueta, tecnología)."
+                ],
+                "table_columns": [
+                  "Elemento",
+                  "Tipo C4",
+                  "Rol / Integración",
+                  "Tecnología de Red"
+                ],
+                "table_rules": [
+                  "Ningún sistema externo identificado en Fase 4 puede omitirse",
+                  "No mostrar detalles internos de implementación ni bases de datos en Nivel 1",
+                  "El diagrama debe ser legible tanto por stakeholders técnicos como de negocio"
+                ],
+                "restrictions": "Prohibido representar contenedores o bases de datos internas en el diagrama de Nivel 1.",
+                "done_when": "Diagrama Mermaid C4Context renderizado correctamente con todos los actores y servicios externos."
+              },
+              "example_title": "Diagrama Mermaid C4Context D9",
+              "example": "```mermaid\nC4Context\ntitle System Context Diagram - Nos Fuimos de Finca\n\nPerson(turista, \"Turista\", \"Busca fincas, realiza reservas y pagos.\")\nPerson(host, \"Finquero (Host)\", \"Publica fincas, aprueba reservas y recibe cobros.\")\n\nSystem(marketplace, \"Nos Fuimos de Finca\", \"Plataforma central (Marketplace B2C/B2B) para alquiler de fincas de recreo.\")\n\nSystem_Ext(wompi, \"Wompi (Bancolombia)\", \"Pasarela externa de pagos (Tarjetas, PSE).\")\nSystem_Ext(whatsapp, \"WhatsApp Business API\", \"Sistema de mensajería para notificaciones push.\")\nSystem_Ext(supabase_auth, \"Supabase Auth/Storage\", \"Proveedor externo de Identidad (JWT) y CDN de imágenes.\")\n\nRel(turista, marketplace, \"Busca y reserva fincas\", \"HTTPS\")\nRel(host, marketplace, \"Administra inventario y aprueba reservas\", \"HTTPS\")\n\nRel(marketplace, wompi, \"Inicia transacciones de cobro y dispersión\", \"API REST\")\nRel(marketplace, whatsapp, \"Envía notificaciones de reserva\", \"Webhooks / API\")\nRel(marketplace, supabase_auth, \"Autentica usuarios y lee/escribe fotos\", \"API REST\")\n```",
+              "link_label": "C4 Nivel 1 Completado -> Nivel 2 Contenedores"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "C4 Nivel 2: Container Diagram",
+      "summary": "Hacer zoom dentro del sistema para representar las unidades ejecutables físicas y sus protocolos exactos.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Desglose de Unidades Desplegables y Protocolos de Comunicación",
+          "objective": "Representar los contenedores reales respetando el Monolito Modular y la topología Serverless + BaaS.",
+          "input": "Unidades desplegables de D4 (Modular Monolith) y protocolos de red de D6 (HTTPS, WSS, Webhooks).",
+          "raw_data_title": "Matriz de Contenedores y Protocolos de Enlace",
+          "raw_data": "| Contenedor C4 | Tipo C4 | Tecnología / Runtime | Responsabilidad y Protocolos |\n|---|---|---|---|\n| Web & API Application | Container | Next.js (Vercel Serverless) | Monolito Modular. Sirve la UI (React) y ejecuta Server Actions/APIs (Booking, Billing, Catalog, Identity) |\n| Primary Database & Realtime | ContainerDb | Supabase (PostgreSQL + PgBouncer) | Almacena modelo relacional (15 entidades), provee pooling y eventos WebSockets |\n| Turista -> WebApp | Rel | HTTPS / REST | Navegación, búsqueda de catálogo, reserva y pagos |\n| Host -> WebApp | Rel | HTTPS / REST | Administración de propiedades y aprobación de reservas |\n| Host <- Database | Rel | WebSockets (WSS) | Recepción de notificaciones en tiempo real |\n| WebApp -> Database | Rel | HTTPS / SQL | Lectura y escritura transaccional mediante Prisma / PostgREST |\n| WebApp -> Wompi | Rel | HTTPS / REST | Creación de transacciones e inicio de cobro |\n| Wompi -> WebApp | Rel | Webhooks (HTTPS) | Notificación asíncrona de estado de pago |\n| Database -> WhatsApp | Rel | Webhooks (HTTPS) | Disparo directo desde BD (Database Webhooks pg_net) |",
+          "exit_label": "Contenedores y Protocolos Formalizados",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Especificación Mermaid C4Container",
+              "objective": "Generar el diagrama de contenedores con protocolos explícitos en cada flecha.",
+              "how_to": {
+                "steps": [
+                  "1. Declarar bloque C4Container con límite System_Boundary.",
+                  "2. Definir Container(webapp, ...) y ContainerDb(database, ...).",
+                  "3. Conectar usuarios a los contenedores correspondientes con sus protocolos.",
+                  "4. Conectar contenedores internos entre sí con protocolos explícitos (HTTPS / SQL).",
+                  "5. Conectar contenedores a servicios externos (Wompi, WhatsApp) mediante REST y Webhooks."
+                ],
+                "table_columns": [
+                  "Origen",
+                  "Destino",
+                  "Acción / Propósito",
+                  "Protocolo Técnico"
+                ],
+                "table_rules": [
+                  "Ninguna flecha puede carecer de etiqueta de protocolo de red",
+                  "No fragmentar el monolito modular en microservicios no contemplados en D4",
+                  "El protocolo de tiempo real debe mapear a WebSockets (WSS)"
+                ],
+                "restrictions": "Prohibido omitir tecnologías o protocolos de red en las relaciones entre contenedores.",
+                "done_when": "Diagrama Mermaid C4Container renderizado con límite de sistema y todas las flechas etiquetadas."
+              },
+              "example_title": "Diagrama Mermaid C4Container D9",
+              "example": "```mermaid\nC4Container\ntitle Container Diagram - Nos Fuimos de Finca (Modular Monolith)\n\nPerson(turista, \"Turista\", \"Busca fincas y reserva.\")\nPerson(host, \"Finquero (Host)\", \"Administra y aprueba.\")\n\nSystem_Boundary(c1, \"Marketplace (Nos Fuimos de Finca)\") {\n    Container(webapp, \"Web & API Application\", \"Next.js (Vercel Serverless)\", \"Monolito Modular. Sirve la UI (React) y ejecuta la lógica de negocio (Server Actions/APIs) para Booking, Billing, Catalog e Identity.\")\n    ContainerDb(database, \"Primary Database & Realtime\", \"Supabase (PostgreSQL + PgBouncer)\", \"Almacena el modelo relacional (15 entidades). Provee pooling y suscripciones a cambios (WebSockets).\")\n}\n\nSystem_Ext(wompi, \"Wompi\", \"Pasarela de Pagos\")\nSystem_Ext(whatsapp, \"WhatsApp API\", \"Notificaciones\")\n\nRel(turista, webapp, \"Navega, reserva y paga\", \"HTTPS / REST\")\nRel(host, webapp, \"Administra inventario\", \"HTTPS / REST\")\nRel(host, database, \"Recibe notificaciones en vivo\", \"WebSockets (WSS)\")\n\nRel(webapp, database, \"Lee y escribe datos transaccionales\", \"HTTPS / SQL\")\n\nRel(webapp, wompi, \"Inicia transacciones\", \"HTTPS / REST\")\nRel(wompi, webapp, \"Notifica estado de pago\", \"Webhooks (HTTPS)\")\n\nRel(database, whatsapp, \"Notifica a finquero (Database Trigger)\", \"Webhooks (HTTPS)\")\n```",
+              "link_label": "C4 Nivel 2 Completado -> Consistency Check"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Verificación de Consistencia Arquitectónica (Consistency Check)",
+      "summary": "Validar exhaustivamente que el C4 de Contenedores no contradiga las decisiones de topología y descomposición.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Auditoría Cruzada contra Topología (D3) y Descomposición (D4)",
+          "objective": "Garantizar que no existan contenedores inventados ni inconsistencias con el stack Serverless/BaaS.",
+          "input": "Diagrama C4 Nivel 2, Topología de D3, Descomposición de D4 y Protocolos de D6.",
+          "raw_data_title": "Matriz de Auditoría de Consistencia",
+          "raw_data": "| Criterio de Verificación | Entregable Referencia | Resultado | Detalle de Validación |\n|---|---|---|---|\n| Unidades Desplegables | D4 (System Decomposition) | [OK] Aprobado | Un único contenedor ejecutable (`webapp`), honrando estrictamente el Monolito Modular sin microservicios |\n| Topología e Infraestructura | D3 (Deployment Topology) | [OK] Aprobado | Contenedor de BD en Supabase con PgBouncer y protocolo WebSockets nativo |\n| Desacoplamiento de Notificaciones | D3 / D6 (Topology & Comm) | [OK] Aprobado | Webhook de WhatsApp sale de BD (`pg_net`) liberando timeouts de funciones Serverless |\n| Protocolos Explícitos | D6 (Communication Pattern) | [OK] Aprobado | 100% de las flechas y relaciones tienen protocolo explícito asignado (HTTPS, WSS, REST, SQL) |",
+          "exit_label": "Consistencia Arquitectónica Auditada y Certificada",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Certificación y Reporte de Consistencia",
+              "objective": "Emitir la verificación formal de consistencia entre los diagramas y los ADRs previos.",
+              "how_to": {
+                "steps": [
+                  "1. Contrastar el conteo de ejecutables contra el D4.",
+                  "2. Contrastar servicios gestionados y protocolos contra D3 y D6.",
+                  "3. Documentar los checks explícitos en el bloque de salida.",
+                  "4. Confirmar que no existen inconsistencias abiertas antes de consolidar el entregable."
+                ],
+                "table_columns": [
+                  "Check",
+                  "Entregable Padre",
+                  "Veredicto",
+                  "Justificación"
+                ],
+                "table_rules": [
+                  "Si se detecta cualquier discrepancia con D3 o D4, se debe corregir el diagrama antes de continuar",
+                  "No se admiten notas al pie de inconsistencias diferidas"
+                ],
+                "restrictions": "Prohibido aprobar diagramas que asuman infraestructura no contratada en D3.",
+                "done_when": "Reporte de verificación con veredictos [OK] en todos los puntos evaluados."
+              },
+              "example_title": "Reporte de Consistencia D9",
+              "example": "```markdown\n## Consistency Check\n- **Containers verificados contra D4 (Decomposition):** **[OK]**. Se muestra un solo contenedor ejecutable (`webapp`), honrando estrictamente la decisión de desarrollar un Monolito Modular.\n- **Containers verificados contra D3 (Topology):** **[OK]**. Los protocolos (`WebSockets`) y las capacidades del BaaS (Database Webhooks) encajan al 100% con la topología Supabase/Vercel aprobada previamente.\n```",
+              "link_label": "Consistencia Aprobada -> Entregable Final C4"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverable_output": "# Entregable 9 (D9): Component Diagram (C4 Model)\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n*Backlink a Fase 5:* Este diagrama consolida y rinde cuentas exactas de las decisiones previas de infraestructura (`[[PHASE_5_ARCHITECTURAL_DESIGN/3.Deployment_Topology_Decision/example_output_d3_deployment_topology.md]]`), partición de código (`[[PHASE_5_ARCHITECTURAL_DESIGN/4.System_Decomposition_Decision/example_output_d4_system_decomposition.md]]`), y protocolos de red (`[[PHASE_5_ARCHITECTURAL_DESIGN/6.Communication_Pattern_Decision/example_output_d6_communication_pattern.md]]`).\n\n---\n\n## 2. Level 1: System Context Diagram\n\nEl Nivel 1 muestra a \"Nos Fuimos de Finca\" como una caja negra (System), rodeada de los usuarios (Turista, Finquero) y las plataformas externas críticas identificadas en la Fase 4.\n\n```mermaid\nC4Context\ntitle System Context Diagram - Nos Fuimos de Finca\n\nPerson(turista, \"Turista\", \"Busca fincas, realiza reservas y pagos.\")\nPerson(host, \"Finquero (Host)\", \"Publica fincas, aprueba reservas y recibe cobros.\")\n\nSystem(marketplace, \"Nos Fuimos de Finca\", \"Plataforma central (Marketplace B2C/B2B) para alquiler de fincas de recreo.\")\n\nSystem_Ext(wompi, \"Wompi (Bancolombia)\", \"Pasarela externa de pagos (Tarjetas, PSE).\")\nSystem_Ext(whatsapp, \"WhatsApp Business API\", \"Sistema de mensajería para notificaciones push.\")\nSystem_Ext(supabase_auth, \"Supabase Auth/Storage\", \"Proveedor externo de Identidad (JWT) y CDN de imágenes.\")\n\nRel(turista, marketplace, \"Busca y reserva fincas\", \"HTTPS\")\nRel(host, marketplace, \"Administra inventario y aprueba reservas\", \"HTTPS\")\n\nRel(marketplace, wompi, \"Inicia transacciones de cobro y dispersión\", \"API REST\")\nRel(marketplace, whatsapp, \"Envía notificaciones de reserva\", \"Webhooks / API\")\nRel(marketplace, supabase_auth, \"Autentica usuarios y lee/escribe fotos\", \"API REST\")\n```\n\n---\n\n## 3. Level 2: Container Diagram\n\nEl Nivel 2 hace zoom dentro de la caja \"Marketplace\" y revela las unidades de software desplegables reales (Containers). Aquí aplicamos estrictamente nuestra decisión de **Monolito Modular** (1 solo ejecutable web) y etiquetamos cada flecha de red con el protocolo exacto.\n\n```mermaid\nC4Container\ntitle Container Diagram - Nos Fuimos de Finca (Modular Monolith)\n\nPerson(turista, \"Turista\", \"Busca fincas y reserva.\")\nPerson(host, \"Finquero (Host)\", \"Administra y aprueba.\")\n\nSystem_Boundary(c1, \"Marketplace (Nos Fuimos de Finca)\") {\n    Container(webapp, \"Web & API Application\", \"Next.js (Vercel Serverless)\", \"Monolito Modular. Sirve la UI (React) y ejecuta la lógica de negocio (Server Actions/APIs) para Booking, Billing, Catalog e Identity.\")\n    ContainerDb(database, \"Primary Database & Realtime\", \"Supabase (PostgreSQL + PgBouncer)\", \"Almacena el modelo relacional (15 entidades). Provee pooling y suscripciones a cambios (WebSockets).\")\n}\n\nSystem_Ext(wompi, \"Wompi\", \"Pasarela de Pagos\")\nSystem_Ext(whatsapp, \"WhatsApp API\", \"Notificaciones\")\n\nRel(turista, webapp, \"Navega, reserva y paga\", \"HTTPS / REST\")\nRel(host, webapp, \"Administra inventario\", \"HTTPS / REST\")\nRel(host, database, \"Recibe notificaciones en vivo\", \"WebSockets (WSS)\")\n\nRel(webapp, database, \"Lee y escribe datos transaccionales\", \"HTTPS / SQL\")\n\nRel(webapp, wompi, \"Inicia transacciones\", \"HTTPS / REST\")\nRel(wompi, webapp, \"Notifica estado de pago\", \"Webhooks (HTTPS)\")\n\nRel(database, whatsapp, \"Notifica a finquero (Database Trigger)\", \"Webhooks (HTTPS)\")\n```\n\n---\n\n## 4. Consistency Notes\n- **Verificación contra D4 (System Decomposition):** [OK]. Se muestra un solo contenedor ejecutable (`webapp`), honrando estrictamente la decisión de desarrollar un Monolito Modular y descartar microservicios.\n- **Verificación contra D3 (Deployment Topology) & D6 (Communication):** [OK]. Los protocolos (`WebSockets/WSS`) y las capacidades avanzadas de la base de datos (Database Webhooks / `pg_net` para llamar a WhatsApp) encajan al 100% con la topología Supabase (BaaS) aprobada. No hay tecnologías inventadas en este diagrama.\n\n---\n\n## 5. Downstream Consumers\nEste entregable es la fotografía oficial arquitectónica y es input obligatorio para:\n- **D11 (Phase 5 RTM Update & Brief):** Al mapear requerimientos contra el código real, utilizaremos estos \"Containers\" como destino.\n- **Phase 6 — D1 (Codebase & Folder Architecture):** La Fase 6 debe tomar el contenedor `webapp` y estructurarlo físicamente en un árbol de directorios de Next.js, respetando sus módulos internos.\n- **Phase 7 — D3 (Walking Skeleton Implementation):** El primer hito de código real deberá trazar con éxito la ruta: `[UI Turista] -> [Next.js webapp] -> [Supabase database]`, comprobando que la comunicación entre contenedores funciona en la nube antes de programar las reglas de negocio."
+}

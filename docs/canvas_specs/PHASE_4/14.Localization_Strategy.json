@@ -1,0 +1,201 @@
+{
+  "phase": "PHASE 4: SYSTEM MODELING",
+  "deliverable_code": "D14",
+  "deliverable": "Localization & i18n Strategy",
+  "purpose": "Establecer las reglas de negocio y estándares técnicos de localización (i18n y L10n) para soportar múltiples idiomas, monedas y husos horarios, imponiendo almacenamiento temporal absoluto en UTC con serialización ISO-8601, almacenamiento monetario exacto en enteros de unidad mínima (centavos) para erradicar errores de redondeo por flotantes, y trazando la frontera estricta entre textos estáticos de interfaz y contenido dinámico de usuario.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Market Validation (P1-D2) | [[PHASE_1_EARLY_VIABILITY/2.Market_Validation/2.Market_Validation.md]] | Define regiones objetivo prioritarias (Colombia `es-CO` y turismo extranjero `en-US`). |\n| Conceptual ERD (D6) | [[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]] | Identifica entidades con atributos temporales (`check_in`, `created_at`) y monetarios (`price`, `amount`). |\n| Wireframes (D3) | [[PHASE_4_SYSTEM_MODELING/3.Wireframes/3.Wireframes.md]] | Provee el inventario visual de textos estáticos, etiquetas, botones y mensajes a internacionalizar. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Zona Horaria y Serialización Temporal (UTC Enforcement)",
+      "summary": "Establecer la regla universal de almacenamiento en UTC y serialización ISO-8601, delegando la presentación local al cliente.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Clasificación de Columnas Temporales y Normalización UTC",
+          "objective": "Prevenir discrepancias de horario en reservas asegurando que todos los momentos absolutos se almacenen en UTC.",
+          "input": "Columnas temporales del ERD D6.",
+          "raw_data_title": "Inventario de Atributos Temporales y Reglas de Negocio",
+          "raw_data": "| Campo (Origen D6) | Naturaleza Temporal | Regla de Negocio | Formato de Intercambio (API) | Delegación Física |\n|---|---|---|---|---|\n| `created_at` / `updated_at` | Momento absoluto | Normalizar y guardar en UTC | ISO-8601 (`YYYY-MM-DDTHH:mm:ssZ`) | Fase 5 / Fase 6 |\n| `check_in_date` | Fecha y hora local de llegada | UTC normalizado a mediodía local | ISO-8601 con zona (`Z`) | Fase 5 / Fase 6 |\n| `check_out_date` | Fecha y hora local de salida | UTC normalizado a mediodía local | ISO-8601 con zona (`Z`) | Fase 5 / Fase 6 |\n| `duration_days` | Duración pura | Entero simple sin zona | Número entero positivo | Fase 5 / Fase 6 |",
+          "exit_label": "Regla Universal de UTC y Formatos ISO-8601 Aprobados",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Especificación de Almacenamiento UTC y Presentación en Frontend",
+              "objective": "Establecer las fronteras entre persistencia neutral y renderizado localizado.",
+              "how_to": {
+                "steps": [
+                  "1. Clasificar cada campo de fecha en: momento absoluto vs duración pura.",
+                  "2. Obligar a que toda inserción en base de datos convierta la hora a UTC (`Z`).",
+                  "3. Exigir formato ISO-8601 estricto en todos los payloads JSON de la API.",
+                  "4. Asignar la responsabilidad de formateo local (`Intl.DateTimeFormat`) exclusivamente al Frontend."
+                ],
+                "table_columns": [
+                  "Campo",
+                  "Tipo Temporal",
+                  "Regla de Negocio",
+                  "Responsabilidad Frontend"
+                ],
+                "table_rules": [
+                  "Todo momento en el tiempo debe persistirse en UTC sin excepción",
+                  "Las APIs jamás deben transportar fechas en formatos locales arbitrarios",
+                  "La zona horaria de fallback para usuarios sin geolocalización es America/Bogota (UTC-5)"
+                ],
+                "restrictions": "Prohibido almacenar horas en zonas locales o delegar el tipo de columna SQL físico a esta fase (se decide en P6-D2).",
+                "done_when": "Todos los campos temporales del ERD clasificados con su regla de normalización UTC."
+              },
+              "example_title": "Reglas de Zona Horaria D14",
+              "example": "```markdown\n**Reglas Temporales:**\n- Base de Datos: Almacenar en UTC exclusivamente.\n- API Payload: `\"check_in_date\": \"2026-12-24T15:00:00Z\"`\n- Frontend: Convertir a hora local mediante `Intl.DateTimeFormat(locale, { timeZone })`\n- Fallback Timezone: `America/Bogota` (UTC-5)\n```",
+              "link_label": "UTC Formalizado -> Almacenamiento Monetario"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Almacenamiento Monetario en Unidades Mínimas (Currency Storage)",
+      "summary": "Imponer el almacenamiento de dinero como enteros en la unidad mínima de la moneda para erradicar errores de redondeo en flotantes.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Prohibición de Flotantes y Representación Entera en Centavos",
+          "objective": "Garantizar integridad matemática absoluta en cobros, liquidaciones y transacciones contables.",
+          "input": "Campos con etiqueta monetaria del ERD D6.",
+          "raw_data_title": "Catálogo de Atributos Monetarios y Reglas de Almacenamiento",
+          "raw_data": "| Campo (Origen D6) | Moneda Base | Regla de Almacenamiento | Tipo Prohibido | Formateo Visual (Frontend) |\n|---|---|---|---|---|\n| `price_per_night` | COP | Entero en centavos (`10000000` = $100.000 COP) | FLOAT, DOUBLE, REAL | `Intl.NumberFormat('es-CO', { style: 'currency' })` |\n| `total_price` | COP | Entero en centavos exactos | FLOAT, DOUBLE, REAL | Renderiza `$100.000 COP` con separador de miles |\n| `commission_amount` | COP | Entero truncado a la unidad mínima | FLOAT, DOUBLE, REAL | Calculado matemáticamente sin decimales binarios |\n| `security_deposit` | COP | Entero en centavos | FLOAT, DOUBLE, REAL | Presentación en checkout y recibo |",
+          "exit_label": "Integridad Monetaria Entera Rigurosamente Blindada",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Veto a Tipos de Punto Flotante y Protocolo de Formateo",
+              "objective": "Asegurar que la aritmética financiera opere exclusivamente con enteros.",
+              "how_to": {
+                "steps": [
+                  "1. Identificar todas las columnas financieras en D6 (precios, comisiones, pagos).",
+                  "2. Definir que el valor transportado y persistido es un entero en centavos.",
+                  "3. Vetar explícitamente el uso de FLOAT, DOUBLE o tipos imprecisos en la arquitectura.",
+                  "4. Establecer que el símbolo `$`, los puntos y las comas solo existen en el renderizado UI."
+                ],
+                "table_columns": [
+                  "Atributo",
+                  "Unidad Mínima",
+                  "Ejemplo Valor Persistido",
+                  "Ejemplo Visual"
+                ],
+                "table_rules": [
+                  "Todo valor monetario debe almacenarse como entero en centavos",
+                  "El backend y la base de datos nunca transportan símbolos monetarios o separadores",
+                  "El formateo visual pertenece exclusivamente a la capa de presentación"
+                ],
+                "restrictions": "Prohibido el uso de FLOAT o DOUBLE para dinero en cualquier componente de backend o base de datos.",
+                "done_when": "Campos monetarios documentados con regla entera de unidad mínima y formateo delegado."
+              },
+              "example_title": "Reglas de Almacenamiento Monetario",
+              "example": "```markdown\n| Campo | Regla de Negocio | Valor Persistido | Renderizado UI |\n|---|---|---|---|\n| `price_per_night` | Entero en centavos | `35000000` | `$350.000 COP` |\n| `total_price` | Entero en centavos | `70000000` | `$700.000 COP` |\n```\n*Prohibición estricta:* FLOAT, DOUBLE, REAL en BD y API.",
+              "link_label": "Almacenamiento Monetario Validado -> Frontera de Traducción"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Frontera de Traducción e Internacionalización (Translation Boundaries)",
+      "summary": "Establecer la división entre textos estáticos de la interfaz (claves i18n desde el día 1) y contenido generado por usuarios.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Catálogo de Claves i18n Estáticas vs Contenido Dinámico de Usuario",
+          "objective": "Garantizar que la interfaz esté lista para múltiples idiomas sin incurrir en costos de traducción automática de contenido dinámico.",
+          "input": "Inventario de textos de Wireframes D3 y campos textuales de D6.",
+          "raw_data_title": "Delimitación de Fronteras de Traducción i18n",
+          "raw_data": "| Tipo de Texto | Origen / Ubicación | Estrategia de Localización | Ejemplo de Implementación |\n|---|---|---|---|\n| Textos de Interfaz (Estáticos) | Botones, Menús, Labels (D3) | Claves i18n mandatorias desde día 1 | `t('common.actions.search')` -> \"Buscar fincas\" |\n| Mensajes de Error y Validación | Notificaciones, Modales (D10) | Claves i18n parametrizadas | `t('errors.dates_unavailable')` |\n| Nombre y Descripción de Finca | Base de Datos (D6: `properties`) | Idioma original del autor (Sin traducción MVP) | Renderiza texto crudo escrito por el host |\n| Reseñas y Comentarios | Base de Datos (D6: `reviews`) | Idioma original del huésped | Renderiza texto crudo sin traducción automática |",
+          "exit_label": "Fronteras de Traducción Formalmente Establecidas",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Estructuración de Namespaces de Claves i18n",
+              "objective": "Organizar el catálogo de cadenas de texto estáticas por módulos y dominios semánticos.",
+              "how_to": {
+                "steps": [
+                  "1. Agrupar textos estáticos en namespaces: `common`, `auth`, `booking`, `errors`.",
+                  "2. Asignar claves jerárquicas en notación punto (`booking.checkout.pay_button`).",
+                  "3. Declarar que el contenido de usuario (UGC) no se traduce en la versión MVP.",
+                  "4. Configurar `es-CO` como idioma predeterminado y `en-US` como objetivo de expansión."
+                ],
+                "table_columns": [
+                  "Namespace",
+                  "Clave Propuesta",
+                  "Texto en es-CO",
+                  "Texto en en-US"
+                ],
+                "table_rules": [
+                  "Ningún texto visible de interfaz debe hardcodearse en componentes React/HTML",
+                  "El contenido dinámico generado por usuarios no debe pasar por APIs de traducción en el MVP",
+                  "El sistema debe cargar el archivo de idioma del cliente de forma reactiva"
+                ],
+                "restrictions": "Prohibido hardcodear cadenas de texto en español o inglés directamente en los componentes de UI.",
+                "done_when": "Namespaces estructurados y catálogo de claves inicial definido."
+              },
+              "example_title": "Estructura de Claves i18n",
+              "example": "```json\n// locales/es-CO/booking.json\n{\n  \"checkout\": {\n    \"title\": \"Confirma y paga tu reserva\",\n    \"pay_button\": \"Pagar con Wompi\",\n    \"dates_label\": \"Fechas seleccionadas:\"\n  }\n}\n// locales/en-US/booking.json\n{\n  \"checkout\": {\n    \"title\": \"Confirm and pay your booking\",\n    \"pay_button\": \"Pay with Wompi\",\n    \"dates_label\": \"Selected dates:\"\n  }\n}\n```",
+              "link_label": "Fronteras i18n Validadas -> Ensamblaje Estrategia D14"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de la Estrategia de Localización y Handoff (Assembly & Handoff)",
+      "summary": "Consolidar el entregable D14 con las especificaciones de husos horarios, moneda, traducción y directivas para fases posteriores.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Políticas de Localización y Directivas para Fase 5 y 6",
+          "objective": "Publicar el estándar formal de localización para su consumo en arquitectura y construcción.",
+          "input": "Políticas de UTC, reglas monetarias y catálogo i18n.",
+          "raw_data_title": "Directivas de Consumo Downstream",
+          "raw_data": "| Fase Receptora | Entregable Destino | Directiva Técnica Específica |\n|---|---|---|\n| Fase 5 (Architecture) | Physical Data Schema (P6-D2) | Asignar tipos `TIMESTAMPTZ` y `BIGINT` en PostgreSQL según directivas de D14 |\n| Fase 5 (API Gateway) | API Contracts (D9 Implementation) | Exigir ISO-8601 en parsers y cabecera `Accept-Language` |\n| Fase 6 (Frontend) | i18n Setup (next-intl / react-i18next) | Cargar diccionarios JSON organizados por namespaces desde el primer commit |",
+          "exit_label": "Entregable D14 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento D14 de Localización",
+              "objective": "Consolidar el estándar global de i18n y L10n.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el documento en sus 3 secciones mandatorias: Metadata, Reglas de Zona Horaria y Reglas Monetarias/Traducción.",
+                  "2. Especificar locales soportados (`es-CO` default, `en-US` secundario).",
+                  "3. Documentar las directivas para el diseño de base de datos en Fase 5 y 6.",
+                  "4. Validar el cumplimiento total de traducción al español en el documento."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Alcance",
+                  "Regla Central",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe evitar la asignación prematura de motores de BD físicos",
+                  "Garantizar consistencia absoluta con los atributos de D6 y D9",
+                  "Alinear los locales con los perfiles demográficos de Fase 1"
+                ],
+                "restrictions": "No tomar decisiones de implementación de librerías concretas antes de Fase 5.",
+                "done_when": "Documento D14 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Entregable D14",
+              "example": "```markdown\n# Deliverable 14 (D14): Estrategia de Localización e i18n\n\n## 1. Locale y Reglas de Zona Horaria\n- Locales: `es-CO` (Default), `en-US` (Futuro).\n- Almacenamiento: UTC universal, ISO-8601 en APIs.\n\n## 2. Almacenamiento Monetario\n- Representación: Entero en unidad mínima (centavos).\n- Veto estricto: FLOAT/DOUBLE.\n\n## 3. Fronteras de Traducción\n- UI Estática: Claves i18n mandatorias.\n- UGC Dinámico: Idioma original del autor en MVP.\n```",
+              "link_label": "Estrategia Ensamblada -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Localization & i18n Strategy (D14)",
+    "markdown": "# Deliverable 14 (D14): Estrategia de Localización e i18n\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Estado:** Aprobado\n\n---\n\n## 1. Locale y Reglas de Zona Horaria\n\n*Backlink a Fase 1 y 4:* Satisface los segmentos de mercado de `[[PHASE_1_EARLY_VIABILITY/2.Market_Validation/2.Market_Validation.md]]` y los atributos temporales del ERD `[[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]]`.\n\n- **Locales Soportados:**\n  - Default: `es-CO` (Español — Colombia).\n  - Secundario (Expansión): `en-US` (Inglés — Estados Unidos).\n  - Fallback del Sistema: `es-CO`.\n- **Regla de Almacenamiento Temporal (Backend y Base de Datos):**\n  - Toda marca temporal se normaliza y almacena en **UTC** sin excepción.\n  - Serialización en APIs: Estándar **ISO-8601** con sufijo explícito: `2026-12-24T15:00:00Z`.\n  - Conversión a hora local: Responsabilidad delegada exclusivamente al **Frontend** mediante la API `Intl.DateTimeFormat`.\n  - Huso horario de fallback: `America/Bogota` (UTC-5) para usuarios sin detección automática de zona.\n\n---\n\n## 2. Reglas de Almacenamiento Monetario (Currency Math)\n\n- **Regla Fundamental:** Todo valor monetario debe representarse y persistirse como un **número entero en la unidad mínima de la moneda** (centavos para COP y USD).\n  - Ejemplo: Un valor de `$350.000 COP` se almacena y transporta en la API como el entero `35000000`.\n- **Prohibición Arquitectónica Estricta:** Queda terminantemente prohibido el uso de tipos de datos en coma flotante (`FLOAT`, `DOUBLE`, `REAL`) en base de datos o lógica de servidor para campos monetarios, debido a los errores acumulativos de redondeo binario.\n- **Formateo Visual:** El formateo con signo `$`, puntos y comas se realiza en el Frontend mediante `Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' })`. Los endpoints nunca transportan datos formateados.\n\n---\n\n## 3. Fronteras de Traducción (i18n Boundaries)\n\n### 3.1 Textos Estáticos de Interfaz (UI Strings)\n- **Directiva:** Todo texto fijo de la aplicación (botones, títulos, etiquetas de formulario, placeholders y mensajes de validación) debe implementarse mediante **claves de internacionalización** (`t('common.actions.search')`) desde el primer commit en Fase 6.\n- **Namespaces Iniciales:**\n  - `common.json`: Acciones globales (`buscar`, `cancelar`, `guardar`).\n  - `auth.json`: Formularios de login y registro.\n  - `booking.json`: Flujo de checkout y estados de pago.\n  - `errors.json`: Textos de error mapeados a códigos HTTP de D9.\n\n### 3.2 Contenido Generado por Usuarios (UGC Dinámico)\n- **Directiva MVP:** El contenido dinámico ingresado por anfitriones y huéspedes (nombre de finca, descripción, reglas del lugar, reseñas) **permanece en el idioma original** en que fue redactado. La traducción automática de descripciones queda diferida como feature post-MVP.\n\n---\n\n## Implicaciones para Siguientes Entregables\n\n- **Hacia Fase 5 (Physical Data Modeling P6-D2):** Las reglas de este entregable guían la selección de tipos SQL específicos: `TIMESTAMPTZ` para marcas temporales y `BIGINT` para campos monetarios en PostgreSQL.\n- **Hacia Fase 6 (Frontend Implementation):** Se debe inicializar la infraestructura i18n (`react-i18next` o `next-intl`) configurada con fallback `es-CO` y namespaces modulares."
+  }
+}

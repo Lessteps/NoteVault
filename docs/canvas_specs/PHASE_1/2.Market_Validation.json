@@ -1,0 +1,653 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D2",
+  "deliverable": "Market Validation Document (Validación de Mercado)",
+  "purpose": "Este entregable es la prueba económica del proyecto. Convierte la estimación preliminar de daño (Fase 0, P0-D3) en números contrastados con datos de mercado, calcula el tamaño del mercado (TAM/SAM/SOM), valida la disposición a pagar (Willingness to Pay - WTP) frente al costo del problema (Cost of Problem - COP), y registra los supuestos críticos pendientes de validación.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_impact_estimate]] | Provee la cifra base estimada de costo/frecuencia del problema a contrastar con el mercado (P0-D3). |\n| [[example_output_user_profile]] | Provee la frecuencia del problema, el esfuerzo del workaround y el comportamiento observado (P1-D1). |\n| [[example_output_problem_statement]] | Define el grupo afectado para los filtros del mercado objetivo (P0-D1). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Contrastar Costo del Problema (COP) contra Datos de Mercado",
+      "summary": "Traducir el dolor a dinero (Cost of Problem) usando una fórmula base, contrastando la estimación preliminar de P0-D3 con datos reales o proxies validados del sector.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Extraer la cifra base de P0-D3",
+          "objective": "Extraer frecuencia anual, costo unitario y nivel de confianza de P0-D3.",
+          "input": "Tabla de estimación de impacto de [[example_output_impact_estimate]] (P0-D3).",
+          "raw_data_title": "Métricas Base P0-D3",
+          "raw_data": "P0-D3: 18 eventos críticos anuales, $1,400,000 COP costo unitario estimado. Pérdidas estimadas: ~$25,000,000 COP anuales.",
+          "exit_label": "BASE EXTRAÍDA → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Extracción de métricas de impacto P0-D3",
+              "objective": "Extraer formalmente frecuencia y costos unitarios de Fase 0.",
+              "how_to": {
+                "steps": [
+                  "Consultar la tabla de estimación de impacto de P0-D3.",
+                  "Extraer la frecuencia anual de ocurrencia del problema.",
+                  "Extraer el costo unitario por ocurrencia y el nivel de confianza declarado.",
+                  "Tabular los valores base para contrastación de mercado."
+                ],
+                "table_columns": "Métrica P0-D3 | Valor Declarado | Nivel de Confianza | Estado",
+                "table_rules": "Una fila por métrica base extraída de P0-D3.",
+                "restrictions": [
+                  "Citar valores exactos de P0-D3 sin modificaciones.",
+                  "Preservar el nivel de confianza original."
+                ],
+                "done_when": "Métricas base de P0-D3 tabuladas."
+              },
+              "example_title": "Extracción de Métricas P0-D3",
+              "example": "| Métrica P0-D3 | Valor Declarado | Nivel de Confianza | Estado |\n| :--- | :--- | :---: | :---: |\n| Frecuencia Anual | 18 eventos críticos/año | Medio | `EXTRAÍDO` |\n| Costo Unitario Promedio | $1,400,000 COP por evento | Medio | `EXTRAÍDO` |\n| Impacto Anual Estimado | ~$25,000,000 COP anuales | Medio | `EXTRAÍDO` |",
+              "link_label": "cifra base va a búsqueda de benchmarks (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Buscar benchmarks de mercado",
+          "objective": "Buscar tarifas promedio y pérdidas por cancelación en el sector para contrastar P0-D3.",
+          "input": "Datos del mercado vacacional rural en Colombia.",
+          "raw_data_title": "Benchmarks Sectoriales",
+          "raw_data": "Tarifas de finca en Antioquia: $800k-$1.5M/noche. Ticket promedio reserva: $1.2M COP. Pérdidas promedio por cruce no gestionado: $80,000–$120,000 COP.",
+          "exit_label": "BENCHMARKS OBTENIDOS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Investigación y contraste sectorial",
+              "objective": "Contrastar las variables de P0-D3 contra tarifas y costos operativos regionales.",
+              "how_to": {
+                "steps": [
+                  "Investigar tarifas de reserva promedio para fincas en la región objetivo.",
+                  "Revisar costos promedio de cancelación, devoluciones bancarias y reprocesos manuales.",
+                  "Comparar la estimación de P0-D3 contra los benchmarks sectoriales obtenidos.",
+                  "Determinar si la estimación original es conservadora, adecuada o sobreestimada."
+                ],
+                "table_columns": "Variable | Estimación P0-D3 | Benchmark de Mercado | Evaluación de Rango",
+                "table_rules": "Una fila por variable comparada con datos de mercado.",
+                "restrictions": [
+                  "Respaldar los benchmarks en fuentes del sector.",
+                  "Adoptar postura conservadora."
+                ],
+                "done_when": "Benchmarks documentados y evaluados."
+              },
+              "example_title": "Benchmarks de Mercado",
+              "example": "| Variable | Estimación P0-D3 | Benchmark de Mercado | Evaluación de Rango |\n| :--- | :--- | :--- | :---: |\n| Tarifa por noche | $800,000 COP | $800,000–$1,500,000 COP | `ALINEADO` |\n| Pérdida por cruce | $50,000 COP (base) | $80,000–$120,000 COP | `CONSERVADOR ✅` |\n| Ticket promedio | $1,200,000 COP | $1,200,000 COP (fin de semana) | `REALISTA` |",
+              "link_label": "benchmarks van a cálculo de COP (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Calcular Costo Anual del Problema (COP)",
+          "objective": "Calcular el COP Anual aplicando la fórmula: Frecuencia Anual × Pérdida Unitaria Validada.",
+          "input": "Frecuencia anual y costo unitario validado.",
+          "raw_data_title": "Parámetros de Cálculo COP",
+          "raw_data": "18 eventos críticos/año × $1,400,000 COP promedio de intermediación y oportunidad = $25,200,000 COP anuales.",
+          "exit_label": "COP ANUAL CALCULADO → 1.4",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Cálculo matemático del COP anual",
+              "objective": "Aplicar fórmula matemática de COP anual y documentar piso conservador.",
+              "how_to": {
+                "steps": [
+                  "Fijar la frecuencia anual validada (18 eventos críticos/año).",
+                  "Fijar la pérdida unitaria validada ($1,400,000 COP por colisión/sobrecosto).",
+                  "Multiplicar frecuencia anual por costo unitario validado.",
+                  "Verificar que la cifra final refleje el costo absorbido por la gestión manual."
+                ],
+                "table_columns": "Fórmula Aplicada | Frecuencia | Costo Unitario Validado | COP Anual Resultante",
+                "table_rules": "Una fila detallando la operación matemática del COP.",
+                "restrictions": [
+                  "Cálculo matemático estricto.",
+                  "Usar cifra de P0-D3 como piso si el benchmark es más alto."
+                ],
+                "done_when": "COP anual calculado y formalizado."
+              },
+              "example_title": "Cálculo del COP Anual",
+              "example": "- **Fórmula:** `COP Anual = 18 Eventos Críticos Anuales × $1,400,000 COP promedio`\n- **Resultado COP Anual:** **$25,200,000 COP** anuales de costo operativo absorbido por la gestión manual.\n- **Piso Conservador Piloto:** ~$9,000,000 COP anuales en pérdidas directas evitables por grupo piloto de fincas gestionadas.",
+              "link_label": "COP anual va a respaldo empírico (1.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.4",
+          "title": "Documentar conservadurismo y respaldo empírico",
+          "objective": "Verificar consistencia con casos reales de P1-D1 y confirmar evaluación conservadora.",
+          "input": "Cálculo de COP (1.3) y testimonios de P1-D1.",
+          "raw_data_title": "Respaldo Forense de P1-D1",
+          "raw_data": "Carlos M. reporta pérdidas acumuladas directas de $150,000 en un solo fin de semana. Demuestra que el cálculo anual es conservador.",
+          "exit_label": "COP VALIDADO FORENSEMENTE → Step 2",
+          "micro": [
+            {
+              "code": "1.4.1",
+              "title": "Evaluación de conservadurismo",
+              "objective": "Validar el COP contra casos empíricos observados en campo.",
+              "how_to": {
+                "steps": [
+                  "Revisar registros de campo del informante Carlos M. en P1-D1.",
+                  "Verificar si los incidentes reales superan o confirman la pérdida modelada.",
+                  "Emitir dictamen de conservadurismo (cifra protegida contra sobreestimación).",
+                  "Consolidar la tabla final del Costo del Problema (COP)."
+                ],
+                "table_columns": "Métrica | Valor | Fuente | Evaluación de Conservadurismo",
+                "table_rules": "Una fila por componente validando el respaldo empírico.",
+                "restrictions": [
+                  "Señalar explícitamente si existe riesgo de sobreestimación.",
+                  "No alterar datos forenses de P1-D1."
+                ],
+                "done_when": "Dictamen de conservadurismo aprobado."
+              },
+              "example_title": "Respaldo y Evaluación de COP",
+              "example": "| Métrica | Valor | Fuente |\n| --- | --- | --- |\n| Frecuencia Anual | 18 eventos críticos/año | P0-D3 + P1-D1 (observación) |\n| Costo Unitario Validado | $1,400,000 COP por evento | P0-D3 (piso conservador) |\n| **COP Anual Calculado** | **$25,200,000 COP** | 18 × $1,400,000 COP |\n| Benchmark Sectorial | $800k-$1.5M/noche | Tarifas de mercado en Antioquia |\n| Evaluación de Consistencia | Conservadora ✅ | Alineado con P0-D3; protege el margen del negocio |",
+              "link_label": "COP validado va a dimensionamiento TAM (2.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Dimensionar Mercado (TAM / SAM / SOM y Bottom-Up)",
+      "summary": "Medir el tamaño del mercado en dos direcciones (Top-Down institucional vs Bottom-Up granular) y calcular el ratio de divergencia.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Calcular TAM (Top-Down)",
+          "objective": "Identificar el universo total del mercado a partir de fuentes oficiales del sector.",
+          "input": "Base MinCIT / RNT (Censo turístico regional Colombia).",
+          "raw_data_title": "Universo Total Sectorial",
+          "raw_data": "10,000 fincas turísticas registradas en Colombia (base MinCIT / RNT regional).",
+          "exit_label": "TAM DEFINIDO → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Identificación de universo total TAM",
+              "objective": "Registrar el TAM con fuente y delimitación geográfica oficial.",
+              "how_to": {
+                "steps": [
+                  "Identificar la fuente oficial de registro de fincas turísticas en la región (MinCIT / RNT).",
+                  "Extraer el número total de unidades censadas.",
+                  "Definir el Total Addressable Market (TAM) formalmente.",
+                  "Citar la fuente de datos empleada."
+                ],
+                "table_columns": "Métrica de Mercado | Universo Total | Fuente Oficial | Cobertura Geográfica",
+                "table_rules": "Una fila registrando el cálculo del TAM.",
+                "restrictions": [
+                  "Usar fuentes públicas o gremiales comprobables.",
+                  "No inventar cifras sin referencia."
+                ],
+                "done_when": "TAM registrado con fuente institucional."
+              },
+              "example_title": "Definición del TAM",
+              "example": "| Métrica | Valor | Fuente / Derivación |\n| --- | --- | --- |\n| **TAM** | **10,000 Fincas** | Base MinCIT / RNT (Estimado regional Colombia) |",
+              "link_label": "TAM va a filtros del SAM (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Aplicar filtros del perfil para obtener SAM",
+          "objective": "Descontar del TAM las fincas que no cumplen el perfil de adopción tecnológica y conectividad.",
+          "input": "TAM (10,000 fincas) y restricciones de perfil P1-D1.",
+          "raw_data_title": "Filtros de Exclusión P1-D1",
+          "raw_data": "- Filtro 1: Hoteles / Cadenas con PMS corporativo (excluye 3,000 fincas).\n- Filtro 2: Fincas con conectividad total y Channel Managers (excluye 1,400 fincas). SAM resultante: 5,600 fincas.",
+          "exit_label": "SAM OBTENIDO → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Aplicación de filtros de arquetipo al SAM",
+              "objective": "Restar poblaciones no aptas según perfil de P1-D1 y calcular SAM.",
+              "how_to": {
+                "steps": [
+                  "Identificar exclusiones técnicas derivadas de P1-D1 (hoteles con PMS, fincas corporativas).",
+                  "Aplicar el descuento de propiedades con channel managers en la nube.",
+                  "Calcular la población restante: Serviceable Available Market (SAM).",
+                  "Documentar la justificación de cada filtro aplicado."
+                ],
+                "table_columns": "Filtro | Fuente | Justificación | Población Restante",
+                "table_rules": "Una fila por filtro aplicado restando del TAM.",
+                "restrictions": [
+                  "Los filtros deben originarse en los hallazgos de P1-D1.",
+                  "Documentar la justificación operativa de cada exclusión."
+                ],
+                "done_when": "Filtros aplicados y SAM consolidado."
+              },
+              "example_title": "Filtros y Cálculo del SAM",
+              "example": "| Filtro | Fuente | Justificación | Población Restante |\n| --- | --- | --- | --- |\n| Hoteles / Cadenas con PMS | P1-D1 | Usan PMS corporativos in-house | 7,000 |\n| Fincas con conectividad total y Channel Managers | P1-D1 | Ya resuelven sincronización en la nube | **5,600 Fincas (SAM)** |",
+              "link_label": "SAM va a cálculo del SOM (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Calcular SOM",
+          "objective": "Aplicar una tasa de captura conservadora al SAM para proyectar el mercado captable a 12-24 meses.",
+          "input": "SAM (5,600 fincas) y capacidad de adquisición inicial.",
+          "raw_data_title": "Tasa de Captura Año 1",
+          "raw_data": "Tasa de captura conservadora: 2% del SAM durante el Año 1 = 112 fincas.",
+          "exit_label": "SOM CALCULADO → 2.4",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Cálculo de penetración inicial SOM",
+              "objective": "Determinar el SOM a 12 meses con base en canales de adquisición reales.",
+              "how_to": {
+                "steps": [
+                  "Definir una tasa de captura realista para el primer año (2%–5%).",
+                  "Multiplicar el SAM por la tasa de captura elegida.",
+                  "Documentar la justificación del canal que soporta dicha captación.",
+                  "Registrar el Serviceable Obtainable Market (SOM) resultante."
+                ],
+                "table_columns": "Mercado | SAM Base | Tasa de Captura | SOM Resultante | Justificación de Canal",
+                "table_rules": "Una fila detallando la proyección del SOM.",
+                "restrictions": [
+                  "Tasa de captura debe ser conservadora (típicamente ≤ 5% año 1).",
+                  "Debe estar justificada por canales de acceso reales."
+                ],
+                "done_when": "SOM calculado y justificado."
+              },
+              "example_title": "Cálculo del SOM",
+              "example": "| Métrica | Valor | Fuente / Derivación |\n| --- | --- | --- |\n| **SOM** | **112 Fincas** | 2% inicial del SAM capturable durante el Año 1 |\n\n*Justificación:* Captura proyectada apalancada en la Landing Page pública de NFF, alianzas con fincas ancla y marketing digital directo.",
+              "link_label": "SOM va a estimación bottom-up (2.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.4",
+          "title": "Ejecutar estimación Bottom-Up granular",
+          "objective": "Medir el mercado sumando canales de acceso directo con tasas de conversión verificables.",
+          "input": "Canales de captación concretos disponibles hoy.",
+          "raw_data_title": "Canales Directos Bottom-Up",
+          "raw_data": "Base de datos de Fincas Aliadas Ancla: 300 fincas identificadas. Supuesto de conversión: 30% adopción = 90 fincas.",
+          "exit_label": "BOTTOM-UP ESTIMADO → 2.5",
+          "micro": [
+            {
+              "code": "2.4.1",
+              "title": "Cálculo ascendente Bottom-Up",
+              "objective": "Calcular la captación realista sumando canales directos concretos.",
+              "how_to": {
+                "steps": [
+                  "Identificar fuentes directas de contacto (fincas ancla, grupos sectoriales, directorios).",
+                  "Asignar la población alcanzable por cada canal.",
+                  "Aplicar un supuesto de conversión prudente a cada canal.",
+                  "Sumar los resultados para obtener la estimación Bottom-Up total."
+                ],
+                "table_columns": "Fuente de Población | Supuesto de Alcance | Supuesto de Conversión | Resultado",
+                "table_rules": "Una fila por canal de acceso directo evaluado.",
+                "restrictions": [
+                  "Usar canales y contactos verificables hoy.",
+                  "Tasas de conversión deben fundamentarse en benchmarks comerciales."
+                ],
+                "done_when": "Estimación Bottom-Up total calculada."
+              },
+              "example_title": "Estimación Bottom-Up",
+              "example": "| Fuente de Población | Supuesto de Alcance | Supuesto de Conversión | Resultado |\n| --- | --- | --- | --- |\n| BD de Fincas Aliadas Ancla | 300 Fincas | 30% Adopción directa | **90 Fincas** |",
+              "link_label": "bottom-up va a ratio de divergencia (2.5.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.5",
+          "title": "Calcular ratio de divergencia SOM / Bottom-Up",
+          "objective": "Calcular el ratio de divergencia para verificar la coherencia entre Top-Down y Bottom-Up.",
+          "input": "SOM (112 fincas) y Bottom-Up (90 fincas).",
+          "raw_data_title": "Valores de Comparación",
+          "raw_data": "SOM: 112 fincas. Bottom-Up: 90 fincas. Ratio = 112 / 90 = 1.24x.",
+          "exit_label": "RATIO CALCULADO → 2.6",
+          "micro": [
+            {
+              "code": "2.5.1",
+              "title": "Cálculo del ratio de divergencia",
+              "objective": "Dividir SOM entre Bottom-Up y evaluar el factor de divergencia.",
+              "how_to": {
+                "steps": [
+                  "Tomar el valor de SOM calculado (Top-Down).",
+                  "Tomar el valor total de la estimación Bottom-Up.",
+                  "Calcular el ratio: `Ratio = SOM / Bottom-Up`.",
+                  "Clasificar el ratio según los umbrales: ≤3x Realista, 3x-5x Alerta media, >5x Alerta alta."
+                ],
+                "table_columns": "Estimación Top-Down (SOM) | Estimación Bottom-Up | Ratio de Divergencia | Diagnóstico Preliminar",
+                "table_rules": "Una fila comparando ambas metodologías de dimensionamiento.",
+                "restrictions": [
+                  "Fórmula matemática estricta.",
+                  "Si ratio > 5x, se prohíbe dar por válido el SOM sin ajuste."
+                ],
+                "done_when": "Ratio de divergencia calculado y clasificado."
+              },
+              "example_title": "Ratio de Divergencia",
+              "example": "- **Estimación Top-Down (SOM):** 112 Fincas.\n- **Estimación Bottom-Up:** 90 Fincas.\n- **Ratio de Divergencia (`SOM / Bottom-Up`):** **1.24x**.\n- **Diagnóstico:** Ratio saludable (<5x y <3x). Las expectativas de mercado empatan con la capacidad real de adquisición inicial.",
+              "link_label": "ratio va a diagnóstico de mercado (2.6.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.6",
+          "title": "Diagnosticar y registrar coherencia",
+          "objective": "Emitir diagnóstico formal sobre el alineamiento de mercado y transferir supuestos si procede.",
+          "input": "Ratio de divergencia (1.24x).",
+          "raw_data_title": "Diagnóstico de Alineamiento",
+          "raw_data": "Ratio 1.24x indica alta coherencia. No requiere recorte de SOM ni alerta de sobreestimación.",
+          "exit_label": "DIMENSIONAMIENTO CERRADO → Step 3",
+          "micro": [
+            {
+              "code": "2.6.1",
+              "title": "Diagnóstico formal de dimensionamiento",
+              "objective": "Formalizar la conclusión del análisis de divergencia y confirmar viabilidad del SOM.",
+              "how_to": {
+                "steps": [
+                  "Evaluar el resultado del ratio frente a los canales de venta disponibles.",
+                  "Dictar si el mercado proyectado es alcanzable con el esfuerzo previsto.",
+                  "Si el ratio supera 3x, formular acción correctiva para Supuestos Críticos.",
+                  "Consolidar la tabla integrada de TAM / SAM / SOM y Divergencia."
+                ],
+                "table_columns": "Métrica | Valor | Evaluación | Implicación Operativa",
+                "table_rules": "Una fila resumiendo la conclusión del dimensionamiento.",
+                "restrictions": [
+                  "No omitir discrepancias si el ratio fuera desfavorable.",
+                  "Confirmar factibilidad comercial."
+                ],
+                "done_when": "Diagnóstico formal de dimensionamiento concluido."
+              },
+              "example_title": "Diagnóstico de Divergencia",
+              "example": "| Métrica | Valor | Evaluación | Implicación Operativa |\n| --- | :---: | :---: | :--- |\n| Ratio SOM / Bottom-Up | **1.24x** | **Saludable ✅** | Canales directos cubren el 80% del objetivo anual; no requiere ajuste de metas. |",
+              "link_label": "dimensionamiento va a análisis de WTP (3.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Recopilar Disposición a Pagar (WTP) y Racionalidad Económica",
+      "summary": "Fijar el Willingness to Pay (WTP) y verificar la regla de oro: WTP < COP.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Extraer gasto actual en sustitutos",
+          "objective": "Identificar cuánto gasta el usuario hoy en su workaround como techo del WTP real.",
+          "input": "Datos de gasto y tiempo observados en P1-D1.",
+          "raw_data_title": "Gasto en Sustitutos",
+          "raw_data": "Gasto actual en sustitutos: $20,000 COP/mes en cuadernos y materiales = $240,000 COP/año. Ineficiencia operativa absorbida: ~$9,000,000 COP/año.",
+          "exit_label": "SUSTITUTOS IDENTIFICADOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Evaluación de gasto en sustitutos",
+              "objective": "Calcular el gasto empírico actual en sustitutos como ancla de referencia.",
+              "how_to": {
+                "steps": [
+                  "Identificar los costos monetarios directos del workaround actual (cuadernos, llamadas, transporte).",
+                  "Anualizar el gasto recurrente en sustitutos.",
+                  "Documentar que ningún usuario pagará por software más de lo que ya gasta/pierde en el problema.",
+                  "Establecer la cota de referencia para el modelo de precios."
+                ],
+                "table_columns": "Concepto de Sustituto | Costo Mensual | Costo Anualizado | Fuente Empírica",
+                "table_rules": "Una fila por sustituto o gasto de workaround identificado.",
+                "restrictions": [
+                  "Solo incluir costos directos verificados.",
+                  "El gasto en sustitutos actúa como ancla de referencia psicológica."
+                ],
+                "done_when": "Gasto en sustitutos anualizado."
+              },
+              "example_title": "Gasto en Sustitutos",
+              "example": "| Concepto de Sustituto | Costo Mensual | Costo Anualizado | Fuente Empírica |\n| --- | --- | --- | --- |\n| Cuadernos y suministros manuales | $20,000 COP/mes | $240,000 COP/año | Observación P1-D1 |\n| Ineficiencia y tiempo perdido | ~$750,000 COP/mes | ~$9,000,000 COP/año | Métricas P0-D3 / P1-D1 |",
+              "link_label": "sustitutos van a WTP verbal (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Extraer WTP reportado en entrevistas",
+          "objective": "Registrar la respuesta textual de los usuarios sobre cuánto pagarían por eliminar el dolor.",
+          "input": "Entrevistas de campo de P1-D1 y modelo de negocio.",
+          "raw_data_title": "Sondeos de WTP",
+          "raw_data": "Finquero pagaría $30,000–$60,000 COP/mes por visibilidad destacada y cero sobreventas. Turista acepta 10% de service fee en pasarela.",
+          "exit_label": "WTP VERBAL REGISTRADO → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Registro de WTP declarado",
+              "objective": "Tabular las declaraciones de disposición a pagar de oferta y demanda.",
+              "how_to": {
+                "steps": [
+                  "Extraer las respuestas textuales sobre disposición a pagar de las entrevistas.",
+                  "Registrar la estructura de cobro propuesta (suscripción mensual o fee transaccional).",
+                  "Asignar fuente y nivel de incertidumbre (Medio para declaraciones verbales).",
+                  "Documentar la intención de pago por cada arquetipo."
+                ],
+                "table_columns": "Arquetipo | Modalidad de Cobro | Monto Declarado | Nivel de Incertidumbre",
+                "table_rules": "Una fila por arquetipo con su modelo de WTP reportado.",
+                "restrictions": [
+                  "Tratar el WTP verbal con nivel de incertidumbre Medio.",
+                  "Reflejar la estructura de cobro prevista para el negocio."
+                ],
+                "done_when": "Declaraciones de WTP registradas."
+              },
+              "example_title": "WTP Declarado por Arquetipo",
+              "example": "| Arquetipo | Modalidad de Cobro | Monto Declarado | Nivel de Incertidumbre |\n| --- | --- | --- | :---: |\n| Anfitrión Rural (Finquero) | Suscripción / Visibilidad destacada | $60,000 COP/mes | Medio |\n| Turista (Consumidor B2C) | Service fee por reserva en Wompi | 10% sobre ticket de reserva | Medio |",
+              "link_label": "WTP declarado va a anualización (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Anualizar el WTP y tomar valor conservador",
+          "objective": "Calcular el ingreso anualizado por usuario bajo criterios conservadores.",
+          "input": "WTP mensual ($60,000 COP/mes).",
+          "raw_data_title": "Anualización de Precios",
+          "raw_data": "$60,000 COP/mes × 12 meses = $720,000 COP anuales por finca.",
+          "exit_label": "WTP ANUALIZADO → 3.4",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Anualización y fijación conservadora de WTP",
+              "objective": "Calcular la cifra anualizada de WTP a contrastar contra el COP.",
+              "how_to": {
+                "steps": [
+                  "Multiplicar la tarifa mensual estimada por 12 meses.",
+                  "Verificar si la cifra anualizada es realista frente al flujo de caja del usuario.",
+                  "Fijar el WTP anualizado conservador por cliente/finca.",
+                  "Preparar la comparación económica frente al COP."
+                ],
+                "table_columns": "Esquema de Precios | Tarifa Base | Periodicidad | WTP Anualizado Conservador",
+                "table_rules": "Una fila con la anualización de la tarifa.",
+                "restrictions": [
+                  "Adopción de supuestos conservadores.",
+                  "Asegurar consistencia con el modelo de monetización."
+                ],
+                "done_when": "WTP anualizado formalizado."
+              },
+              "example_title": "Anualización del WTP",
+              "example": "- **Estructura:** Service Fee por transacción en pasarela Wompi (10% al turista) y/o suscripción mensual opcional para visibilidad destacada ($60,000 COP/mes).\n- **Estimación de WTP Anual:** **$720,000 COP anual** por finca ($60,000 × 12).",
+              "link_label": "WTP anualizado va a regla de racionalidad (3.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.4",
+          "title": "Validar regla de racionalidad: WTP < COP",
+          "objective": "Confirmar matemáticamente que el cliente paga significativamente menos de lo que le cuesta el problema.",
+          "input": "WTP Anual ($720,000 COP) vs Costo de Ineficiencia / COP Anual ($9,000,000 COP a $25,200,000 COP).",
+          "raw_data_title": "Comparativa de Racionalidad",
+          "raw_data": "$720,000 COP (WTP) vs $9,000,000 COP (Costo ineficiencia evitable). Ratio = 1:12.5 (el precio es solo el 8% del dolor).",
+          "exit_label": "RACIONALIDAD ECONÓMICA VALIDADA → Step 4",
+          "micro": [
+            {
+              "code": "3.4.1",
+              "title": "Verificación de la regla de oro WTP < COP",
+              "objective": "Validar que WTP < COP y calcular la proporción económica del precio.",
+              "how_to": {
+                "steps": [
+                  "Comparar formalmente: ¿Es WTP Anual < COP Anual?",
+                  "Calcular la proporción porcentual: `(WTP / COP) × 100`.",
+                  "Si WTP ≥ COP, emitir alerta de irracionalidad de precios.",
+                  "Si WTP < COP con proporción < 20%, certificar alta racionalidad económica."
+                ],
+                "table_columns": "WTP Anual | COP Anual / Ineficiencia | Condición WTP < COP | Proporción | Veredicto",
+                "table_rules": "Una fila certificando la racionalidad económica del modelo.",
+                "restrictions": [
+                  "La condición WTP < COP es obligatoria.",
+                  "Si no se cumple, el modelo debe corregirse antes de continuar."
+                ],
+                "done_when": "Racionalidad económica certificada favorablemente."
+              },
+              "example_title": "Validación WTP < COP",
+              "example": "| WTP Anual | COP Anual / Ineficiencia | Condición WTP < COP | Proporción | Veredicto |\n| :---: | :---: | :---: | :---: | :---: |\n| **$720,000 COP** | **$9,000,000 COP** | **`CUMPLE ✅`** | **8.0%** (1:12.5) | **Alta Racionalidad Económica** |\n\n*Conclusión:* El cliente paga menos del 10% de lo que pierde por ineficiencias de sobreventa. Incentivo de compra validado.",
+              "link_label": "racionalidad va a supuestos críticos (4.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Supuestos Críticos Pendientes de Validar y Ensamblaje",
+      "summary": "Consolidar la conclusión de viabilidad de mercado y registrar los supuestos críticos con baja/media confianza que exigen validación.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Emitir veredicto de viabilidad de mercado",
+          "objective": "Evaluar la compuerta de mercado: COP confirmado, WTP < COP, SAM suficiente y Ratio < 5x.",
+          "input": "Resultados de Steps 1, 2 y 3.",
+          "raw_data_title": "Condiciones de Compuerta",
+          "raw_data": "COP confirmado ($25.2M), WTP < COP cumplido (1:12.5), SAM viable (5,600 fincas), Ratio de divergencia 1.24x. Veredicto: Viable.",
+          "exit_label": "VEREDICTO EMITIDO → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Evaluación de compuerta de viabilidad",
+              "objective": "Emitir veredicto formal de mercado (Viable / Viable con Reservas / No Viable).",
+              "how_to": {
+                "steps": [
+                  "Verificar si el COP está respaldado por benchmarks del sector.",
+                  "Verificar si la regla WTP < COP se cumple con margen saludable.",
+                  "Verificar si el SAM y SOM son suficientes para el modelo de negocio.",
+                  "Verificar si el ratio de divergencia es manejable (≤ 3x o < 5x).",
+                  "Emitir el veredicto formal de viabilidad de mercado."
+                ],
+                "table_columns": "Criterio de Evaluación | Requisito de Aprobación | Estado Observado | Dictamen",
+                "table_rules": "Una fila por criterio de compuerta de mercado.",
+                "restrictions": [
+                  "No emitir Viable si la regla WTP < COP no se cumple.",
+                  "Explicitar reservas si existen supuestos de canal."
+                ],
+                "done_when": "Veredicto formal de mercado emitido."
+              },
+              "example_title": "Veredicto de Viabilidad de Mercado",
+              "example": "| Criterio de Evaluación | Requisito | Estado Observado | Dictamen |\n| :--- | :--- | :--- | :---: |\n| Costo del Problema (COP) | Respaldado por benchmarks | $25.2M COP anual ($1.4M/evento) | `APROBADO` |\n| Racionalidad de Precios | WTP < COP | $720k vs $9M (Relación 1:12.5) | `APROBADO` |\n| Tamaño de Mercado (SAM) | Suficiente para rentabilidad | 5,600 Fincas | `APROBADO` |\n| Divergencia de Captación | Ratio < 5x | 1.24x | `APROBADO` |\n\n*Veredicto Final:* **`VIABLE`**",
+              "link_label": "veredicto va a supuestos críticos (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Listar Supuestos Críticos con experimentos",
+          "objective": "Identificar supuestos de confianza Media/Baja y definir su experimento barato y métrica de éxito.",
+          "input": "Supuestos detectados en Steps 1 a 3.",
+          "raw_data_title": "Hipótesis a Validar",
+          "raw_data": "1) Turistas completan reservas con Wompi en landing (Confianza Media, Crítico). 2) Finqueros actualizan disponibilidad vía WhatsApp/plataforma (Confianza Media, Alto).",
+          "exit_label": "SUPUESTOS ESTRUCTURADOS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Matriz de supuestos críticos y experimentos",
+              "objective": "Estructurar tabla de supuestos críticos, impacto, experimento y umbral numérico de éxito.",
+              "how_to": {
+                "steps": [
+                  "Extraer todos los supuestos con confianza Media o Baja de los pasos anteriores.",
+                  "Calificar el impacto si el supuesto fuera falso (Crítico / Alto / Medio).",
+                  "Diseñar el experimento más barato disponible (Fake Door, Piloto asistido, Formulario).",
+                  "Fijar una métrica numérica de éxito para validar o refutar el supuesto."
+                ],
+                "table_columns": "Supuesto Crítico | Nivel de Confianza | Impacto si es Falso | Experimento de Validación Barato | Métrica de Éxito",
+                "table_rules": "Una fila por supuesto crítico registrado.",
+                "restrictions": [
+                  "Todo supuesto con confianza media/baja debe tener experimento y métrica.",
+                  "La métrica de éxito debe ser cuantitativa."
+                ],
+                "done_when": "Matriz de supuestos críticos completada."
+              },
+              "example_title": "Supuestos Críticos de Mercado",
+              "example": "| Supuesto Crítico | Nivel de Confianza | Impacto si es Falso | Experimento de Validación Barato | Métrica de Éxito |\n| --- | :---: | :---: | --- | :---: |\n| Los turistas completarán reservas y pagos directamente en la Landing Page con Wompi | Media | Crítico | Prueba de checkout con landing en vivo y pasarela sandbox | ≥70% de conversión en checkout iniciado |\n| Los finqueros actualizarán disponibilidad y confirmarán reservas vía plataforma/WhatsApp | Media | Alto | Piloto asistido con 10 fincas durante 2 semanas | ≥85% de confirmaciones a tiempo |",
+              "link_label": "supuestos van a recomendación D12 (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Registrar dirección recomendada para D12",
+          "objective": "Formular recomendación formal (Proceed / Pivot / Stop) hacia la compuerta final D12.",
+          "input": "Veredicto de viabilidad (4.1) y estado de supuestos (4.2).",
+          "raw_data_title": "Señal Advisory para D12",
+          "raw_data": "Recomendación: Proceed. Aprobadores: Julián (PM) y Laura (Tech Lead).",
+          "exit_label": "RECOMENDACIÓN FORMALIZADA → 4.4",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Dirección estratégica hacia D12",
+              "objective": "Documentar la señal recomendada para la decisión de continuidad.",
+              "how_to": {
+                "steps": [
+                  "Sintetizar la recomendación de mercado: Proceed, Proceed con Reservas, Pivot, o Stop.",
+                  "Aclarar que se trata de una señal técnica y de mercado previa a la compuerta final.",
+                  "Registrar los nombres y roles de los líderes que aprueban la recomendación."
+                ],
+                "table_columns": "Dimensión | Señal Emitida | Justificación Estratégica | Aprobadores",
+                "table_rules": "Una fila formalizando la dirección estratégica hacia D12.",
+                "restrictions": [
+                  "La señal es advisory; la autoridad final reside en D12.",
+                  "Debe ser consistente con el veredicto del Sub-paso 4.1."
+                ],
+                "done_when": "Dirección hacia D12 registrada con firmas técnicas."
+              },
+              "example_title": "Dirección Recomendada para D12",
+              "example": "- **Decisión:** Viable.\n- **Dirección Recomendada para D12:** **`Proceed`**.\n- **Aprobadores:** Julián (PM) / Laura (Tech Lead).",
+              "link_label": "recomendación va a ensamblaje final (4.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.4",
+          "title": "Ensamblar documento final",
+          "objective": "Consolidar las 8 secciones oficiales del entregable de Validación de Mercado.",
+          "input": "Tablas y análisis de Steps 1 al 4.",
+          "raw_data_title": "Estructura Final Ensamblada",
+          "raw_data": "8 secciones oficiales listas para publicación.",
+          "exit_label": "DOCUMENTO FINAL ENSAMBLADO → publica entregable",
+          "micro": [
+            {
+              "code": "4.4.1",
+              "title": "Ensamblaje y verificación de estructura final",
+              "objective": "Verificar la transcripción literal y completa de todas las secciones en el documento exportable.",
+              "how_to": {
+                "steps": [
+                  "Insertar metadatos oficiales: Proyecto, Fase 1, Entregable 2 de 13, Estado Aprobado.",
+                  "Transcribir las secciones de COP, TAM/SAM/SOM, Bottom-Up, Divergencia, WTP, Supuestos y Conclusión.",
+                  "Verificar que cada celda de las tablas contenga datos válidos y consistentes.",
+                  "Publicar el documento oficial 02. Validación de Mercado.md."
+                ],
+                "table_columns": "Sección Oficial | Contenido Resumido | Verificación de Transcripción",
+                "table_rules": "Una fila por sección oficial del documento exportable.",
+                "restrictions": [
+                  "Transcripción fiel de los pasos auditados.",
+                  "No omitir tablas de filtros ni matrices de supuestos."
+                ],
+                "done_when": "Documento final exportable ensamblado y certificado."
+              },
+              "example_title": "Verificación de Ensamblaje",
+              "example": "| Sección | Contenido | Verificación |\n| :--- | :--- | :---: |\n| 1. Metadatos | Proyecto, Fase 1, D2, Aprobado | `VERIFICADO` |\n| 2. Costo del Problema | COP Anual: $25.2M COP | `VERIFICADO` |\n| 3. TAM / SAM / SOM | TAM 10k, SAM 5.6k, SOM 112 | `VERIFICADO` |\n| 4. Bottom-Up | 90 Fincas (Fincas Aliadas Ancla) | `VERIFICADO` |\n| 5. Divergencia | Ratio 1.24x (<5x) | `VERIFICADO` |\n| 6. WTP y Racionalidad | WTP $720k/año < COP $9M (1:12.5) | `VERIFICADO` |\n| 7. Supuestos Críticos | 2 supuestos con experimentos | `VERIFICADO` |\n| 8. Conclusión | Viable → Proceed | `VERIFICADO` |\n\n*Resultado:* Ensamblaje 100% verificado contra las fuentes.",
+              "link_label": "publica entregable final"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 02. Market Validation.md",
+    "markdown": "# 2. Validación de Mercado\n\n### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 1 — Viabilidad Temprana (Early Viability)\n**Entregable:** 2 de 13\n**Estado:** Aprobado\n\n### 2. Costo del Problema (COP)\n- **Cifra Base P0-D3:** $6,300 USD (~$25,000,000 COP anuales) en sobrecostos de operación manual, soporte de emergencia y comisiones no concretadas para Nos Fuimos de Finca, representando un costo operativo medio de ~$9,000,000 COP anuales en pérdidas evitables por grupo piloto de fincas gestionadas.\n- **Fórmula de Contraste:** 18 Eventos Críticos Anuales × $1,400,000 COP promedio en costo de intermediación manual, compensación y oportunidad perdida.\n- **Inputs y Benchmarks de Mercado:** Tarifas promedio de fincas en Antioquia ($800k-$1.5M/noche); ticket promedio de reserva $1.2M COP.\n- **Resultado COP Anual:** $25,200,000 COP anuales de costo operativo absorbido por la gestión manual.\n- **Evaluación de Consistencia:** Alineado con P0-D3; demuestra que la automatización de reservas y pagos protege directamente el margen del negocio.\n\n### 3. TAM / SAM / SOM\n| Métrica | Valor | Fuente / Derivación |\n| --- | --- | --- |\n| TAM | 10,000 Fincas | Base MinCIT / RNT (Estimado regional Colombia) |\n| SAM | 5,600 Fincas | Fincas turísticas independientes sin PMS corporativo en Antioquia y Eje Cafetero |\n| SOM | 112 Fincas | 2% inicial del SAM capturable durante el Año 1 |\n\n**Filtros del SAM**\n| Filtro | Fuente | Justificación | Población Restante |\n| --- | --- | --- | --- |\n| Hoteles / Cadenas con PMS | P1-D1 | Usan PMS corporativos in-house | 7,000 |\n| Fincas con conectividad total y Channel Managers | P1-D1 | Ya resuelven sincronización en la nube | 5,600 |\n\n**Justificación del SOM**\n- Captura proyectada del 2% regional apalancada en la Landing Page pública de NFF, alianzas con fincas ancla y marketing digital directo.\n\n### 4. Estimación Ascendente (Bottom-Up)\n| Fuente de Población | Supuesto de Alcance | Supuesto de Conversión | Resultado |\n| --- | --- | --- | --- |\n| BD de Fincas Aliadas Ancla | 300 Fincas | 30% Adopción directa | 90 Fincas |\n\n### 5. Análisis de Divergencia\n- **Estimación Top-Down (SOM):** 112 Fincas.\n- **Estimación Bottom-Up:** 90 Fincas.\n- **Ratio de Divergencia (`SOM / Bottom-Up`):** 1.24x.\n- **Diagnóstico:** Ratio saludable (<5x). Las expectativas de mercado empatan con la capacidad real de adquisición inicial.\n\n### 6. Modelo de Ingresos y Disposición a Pagar (WTP)\n- **Fuente de Evidencia:** Entrevistas y sondeos de mercado.\n- **Estructura:** Service Fee por transacción en pasarela de pagos Wompi (10% al turista) y/o suscripción mensual opcional para visibilidad destacada ($60,000 COP/mes).\n- **Estimación de WTP Anual:** $720,000 COP anual por finca.\n- **Comparación (`WTP < COP`):** $720,000 COP (WTP) < $9,000,000 COP (Costo de ineficiencia). Relación 1:12.5; alta racionalidad económica.\n\n### 7. Supuestos Críticos Pendientes de Validar\n| Supuesto Crítico | Nivel de Confianza | Impacto si es Falso | Experimento de Validación Barato | Métrica de Éxito |\n| --- | --- | --- | --- | --- |\n| Los turistas completarán reservas y pagos directamente en la Landing Page con Wompi | Media | Crítico | Prueba de checkout con landing en vivo y pasarela sandbox | ≥70% de conversión en checkout iniciado |\n| Los finqueros actualizarán disponibilidad y confirmarán reservas vía plataforma/WhatsApp | Media | Alto | Piloto asistido con 10 fincas durante 2 semanas | ≥85% de confirmaciones a tiempo |\n\n### 8. Conclusión de Viabilidad de Mercado\n- **Decisión:** Viable.\n- **Dirección Recomendada para D12:** Proceed.\n- **Aprobador:** Julián (PM) / Laura (Tech Lead)"
+  }
+}

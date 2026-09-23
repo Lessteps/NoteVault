@@ -1,0 +1,528 @@
+{
+  "phase": "Phase 0",
+  "deliverable_code": "D9",
+  "deliverable": "Phase 0 Executive Brief",
+  "purpose": "This deliverable is an executive consolidation document that condenses the work of the 8 previous Phase 0 deliverables into a single presentation page for the Sponsor and decision-makers. Golden Rule (The Art of Writing Nothing New): No original or creative word may be drafted in the Brief. All its content must be an exact, textual extraction from previously approved deliverables D1 to D8. Changing a single word invalidates the approval signatures obtained on the original text.",
+  "inputs": "| Artifact | Use | Consumed in |\n| --- | --- | --- |\n| All Outputs from D1 to D8 | Sources for each and every text that will form this executive summary. | Steps 1 to 10 |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Entry Conditions Verification",
+      "summary": "Require that the project has executive approval before assembling the Brief.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Entry Conditions Check",
+          "objective": "Confirm that D8 exists and declares GO (PROCEED) signed by the Sponsor.",
+          "input": "Deliverable [[example_output_go_nogo]] (D8).",
+          "raw_data_title": "D8 Deliverable Artifact",
+          "raw_data": "Verdict: GO (PROCEED). Signatory: Laura Torres (CEO and founder, Sponsor). Date: 2026-05-06.",
+          "exit_label": "GATE CONFIRMED → Step 2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Executive approval verification",
+              "objective": "Verify the existence of D8 and its signed GO verdict.",
+              "how_to": {
+                "steps": [
+                  "Verify the existence of deliverable D8 (Go/No-Go Signal).",
+                  "Inspect Section 3 of D8 to confirm that the verdict is explicitly 'GO (PROCEED)'.",
+                  "Verify Section 4 of D8 to confirm the signature of Laura Torres (Sponsor identified in D6).",
+                  "Confirm project has green light to proceed with executive consolidation."
+                ],
+                "table_columns": "Entry Condition | Required State | Observed State | Gate Verdict",
+                "table_rules": "One row per verification condition checking D8 status.",
+                "restrictions": [
+                  "Brief cannot be assembled if D8 is missing, in Draft, or marked NO-GO.",
+                  "Sponsor signature is mandatory."
+                ],
+                "done_when": "Entry status confirmed as Approved / GO."
+              },
+              "example_title": "Entry Conditions Verification",
+              "example": "1. Verify the existence of deliverable D8 (Go/No-Go Signal).\n2. Confirm that the verdict is explicitly `GO (PROCEED)`, signed by Laura Torres (Sponsor, identified in D6).\n\n*Output:* **Entry Status:** Approved / GO.",
+              "link_label": "green light goes to problem extraction (2.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Problem Paragraph Extraction",
+      "summary": "Preserve the immutability of the original pain premise.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Problem Extraction",
+          "objective": "Extract textually, without altering a single word, the Problem Synthesis Paragraph from D1.",
+          "input": "[[example_output_problem_statement]] (D1).",
+          "raw_data_title": "D1 Problem Synthesis Section",
+          "raw_data": "Section 3 Problem Synthesis Paragraph in D1.",
+          "exit_label": "PROBLEM EXTRACTED → Step 3",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Literal problem paragraph extraction",
+              "objective": "Extract Section 3 of D1 verbatim without alteration.",
+              "how_to": {
+                "steps": [
+                  "Locate Section 3 'Problem Synthesis Paragraph' of D1 Problem Statement.",
+                  "Copy the entire paragraph verbatim without altering any words or punctuation.",
+                  "Confirm zero paraphrase or editorial summary was introduced."
+                ],
+                "table_columns": "Source Artifact | Section | Word Discrepancy Count | Extraction Status",
+                "table_rules": "One row recording literal extraction from D1.",
+                "restrictions": [
+                  "Verbatim transcription only.",
+                  "Zero changes to original text permitted."
+                ],
+                "done_when": "Problem paragraph extracted verbatim."
+              },
+              "example_title": "Extracted Problem Paragraph",
+              "example": "\"The operations team and reservation managers of Nos Fuimos de Finca, upon concurrently receiving and confirming reservation requests for a single rural property across multiple manual and dispersed communication channels, incur cross-approval and duplicate collection of deposit payments for identical dates. This booking collision forces last-minute cancellations, generating forced refunds with absorption of bank transfer surcharges, direct loss of brokerage commissions, and erosion of commercial trust among tourists and property owners.\"",
+              "link_label": "problem text goes to evidence selection (3.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Featured Evidence Selection",
+      "summary": "Strategically choose from D1 the 2 to 3 E-XX records that most powerfully demonstrate recurrence, causality, and cascade effect.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Selection Criterion",
+          "objective": "Select 1 record for recurrence, 1 for structural causality, and 1 for cascade effect.",
+          "input": "Records E-01 through E-04 anchored in D1.",
+          "raw_data_title": "D1 Anchored Records",
+          "raw_data": "E-01 (March 22 log), E-02 (transfer receipts), E-03 (refund voucher and complaint), E-04 (April 14 log).",
+          "exit_label": "RECORDS SELECTED → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Probative record selection",
+              "objective": "Select the 3 most probative E-XX records covering recurrence, causality, and cascade effect.",
+              "how_to": {
+                "steps": [
+                  "Review all E-XX records anchored in D1 Problem Statement.",
+                  "Select 1 record demonstrating recurrence across distinct dates/properties (E-04).",
+                  "Select 1 record demonstrating direct causal chain and concurrent blindness (E-01).",
+                  "Select 1 record demonstrating verifiable downstream financial damage (E-03).",
+                  "Confirm chosen set covers the 3 critical dimensions."
+                ],
+                "table_columns": "Probative Dimension | Selected Record | Demonstrated Fact",
+                "table_rules": "One row per probative dimension detailing record selection.",
+                "restrictions": [
+                  "Select existing E-XX records only.",
+                  "Must cover recurrence, causality, and cascade effect."
+                ],
+                "done_when": "3 probative records selected."
+              },
+              "example_title": "Probative Record Selection",
+              "example": "1. **Recurrence:** `E-04` selected — proves that the pattern repeated on a distinct property (\"La Esperanza\", April 18–20); not an isolated one-time incident.\n2. **Causality:** `E-01` selected — proves the precise mechanism of collision (two confirmation entries from two different coordinators without cross-reference, on identical property and dates).\n3. **Cascading Effect:** `E-03` selected — proves genuine verifiable financial damage (bank refund voucher showing deducted transfer fee, plus archived client complaint).",
+              "link_label": "selected records go to literal citation (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Literal Extraction",
+          "objective": "Cite the selected E-XX records exactly as anchored in D1 without summarizing or dramatizing.",
+          "input": "Selected records E-04, E-01, and E-03 from Sub-step 3.1.",
+          "raw_data_title": "Anchored Record Details",
+          "raw_data": "E-04: Apr 14 log. E-01: Mar 22 log. E-03: Bank refund voucher and complaint.",
+          "exit_label": "EVIDENCE CITED → Step 4",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Literal E-XX citation",
+              "objective": "Extract exact evidence citations for the 3 featured records.",
+              "how_to": {
+                "steps": [
+                  "Extract E-04 record phrasing from D1.",
+                  "Extract E-01 record phrasing from D1.",
+                  "Extract E-03 record phrasing from D1.",
+                  "Verify citations are faithful to original anchor text without dramatic elaboration."
+                ],
+                "table_columns": "Record Code | Dimension | Literal Citation from D1 | Fidelity Check",
+                "table_rules": "One row per featured record with its verbatim citation.",
+                "restrictions": [
+                  "No summarizing or dramatizing.",
+                  "Cite exact D1 anchored facts."
+                ],
+                "done_when": "All 3 citations compiled verbatim."
+              },
+              "example_title": "Literal Evidence Citations",
+              "example": "- **Recurrence (`E-04`):** Second collision documented in coordination log on April 14, for \"La Esperanza\" estate for April 18–20, displaying identical manual dual-confirmation pattern.\n- **Causality (`E-01`):** Coordination notebook dated March 22: two confirmation entries for \"El Recodo\" for April 1–3, in the handwriting of two different coordinators without cross-reference.\n- **Cascading Effect (`E-03`):** Bank refund voucher showing deducted transfer fee, plus archived complaint message from canceled client demanding compensation.",
+              "link_label": "evidence goes to classification extraction (4.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Classification and Remedy Extraction",
+      "summary": "Expose the architectural archetype and required technical focus, making explicit that it is a non-binding signal.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Archetype & Remedy Extraction",
+          "objective": "Extract Dominant Archetype, Secondary Classification, Theoretical Pattern, and non-binding disclaimer from D2.",
+          "input": "[[example_output_problem_classification]] (D2).",
+          "raw_data_title": "D2 Sections 3 and 4",
+          "raw_data": "Archetype: Information Asymmetry. Pattern: Single Source of Truth with concurrency control. Warning: Preliminary signal.",
+          "exit_label": "CLASSIFICATION EXTRACTED → Step 5",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Classification and pattern extraction",
+              "objective": "Extract architectural classification and remedy disclaimer verbatim from D2.",
+              "how_to": {
+                "steps": [
+                  "Extract Dominant Archetype and Secondary Classification from Section 3 of D2.",
+                  "Extract Suggested Theoretical Pattern and Technical Focus from Section 4 of D2.",
+                  "Extract non-binding warning disclaimer verbatim.",
+                  "Verify that the text clearly communicates preliminary status."
+                ],
+                "table_columns": "D2 Classification Element | Extracted Phrasing | Verbatim Fidelity",
+                "table_rules": "One row per classification element extracted from D2.",
+                "restrictions": [
+                  "Must include non-binding disclaimer.",
+                  "Verbatim extraction from D2."
+                ],
+                "done_when": "Classification and disclaimer extracted."
+              },
+              "example_title": "Architectural Classification Block",
+              "example": "- **Dominant Archetype:** Information Asymmetry. Secondary: Workflow Inefficiency (dependent).\n- **Suggested Theoretical Pattern:** Single Source of Truth with concurrency control.\n- **Technical Focus:** Single source of truth and instant inquiry mechanism regarding availability, with concurrency control.\n- **Disclaimer:** Preliminary signal, does not constitute architectural decision. Subject to confirmation in Phase 5.",
+              "link_label": "classification goes to impact extraction (5.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5",
+      "title": "Impact Estimate Extraction",
+      "summary": "Show the estimated magnitude of the problem and its real certainty.",
+      "substeps": [
+        {
+          "code": "5.1",
+          "title": "Impact Metrics Extraction",
+          "objective": "Extract Frequency, Unit Cost, Estimated Annual Impact, and Confidence Level from Section 2 of D3.",
+          "input": "[[example_output_impact_estimate]] (D3).",
+          "raw_data_title": "D3 Section 2 Content",
+          "raw_data": "Frequency: 12 events/year. Unit Cost: 800,000 COP. Annual: 9,600,000 COP. Confidence: Medium.",
+          "exit_label": "IMPACT EXTRACTED → Step 6",
+          "micro": [
+            {
+              "code": "5.1.1",
+              "title": "Economic impact extraction",
+              "objective": "Extract frequency, annual impact, and confidence level verbatim from D3.",
+              "how_to": {
+                "steps": [
+                  "Extract Estimated Frequency from Section 2 of D3.",
+                  "Extract Unit Cost and Estimated Annual Impact from Section 2 of D3.",
+                  "Extract Confidence Level and its justification verbatim from D3.",
+                  "Verify exact numerical alignment."
+                ],
+                "table_columns": "Metric Element | Value from D3 | Confidence Level | Extraction Check",
+                "table_rules": "One row per economic impact metric.",
+                "restrictions": [
+                  "Exact figures from D3.",
+                  "Must include confidence level justification."
+                ],
+                "done_when": "Impact metrics extracted verbatim."
+              },
+              "example_title": "Impact Estimate Summary",
+              "example": "- **Estimated Frequency:** 12 events / year (≈1 event/month), corrected against `E-01…E-04`.\n- **Unit Cost:** 800,000 COP per event.\n- **Estimated Annual Impact:** 9,600,000 COP per year.\n- **Confidence Level:** Medium (frequency projected from only 2 documented instances; cost mostly supported with one proxy component).",
+              "link_label": "impact goes to quadrant extraction (6.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "6",
+      "title": "Quadrant and Verdict Extraction",
+      "summary": "Show the strategic priority and its human confirmation.",
+      "substeps": [
+        {
+          "code": "6.1",
+          "title": "Matrix Prioritization Extraction",
+          "objective": "Extract Business Value, Complexity, Quadrant, Continuity Signal, and Human Confirmation from D4.",
+          "input": "[[example_output_impact_matrix]] (D4).",
+          "raw_data_title": "D4 Sections 2 to 4",
+          "raw_data": "Quadrant: Strategic Initiative. Continuity Signal: PRIORITIZE. Signatures: Carlos Ruiz, Laura Torres.",
+          "exit_label": "QUADRANT EXTRACTED → Step 7",
+          "micro": [
+            {
+              "code": "6.1.1",
+              "title": "Quadrant and signal extraction",
+              "objective": "Extract strategic priority quadrant and confirmation signatures verbatim from D4.",
+              "how_to": {
+                "steps": [
+                  "Extract Business Value and Technical Complexity classifications from D4.",
+                  "Extract Quadrant ('Strategic Initiative') and Continuity Signal ('PRIORITIZE') from D4.",
+                  "Extract Human Confirmation names, roles, and sign-off dates from Section 4 of D4.",
+                  "Verify complete alignment with D4 output."
+                ],
+                "table_columns": "Matrix Element | D4 Value | Signatory / Date | Status",
+                "table_rules": "One row per matrix prioritization element.",
+                "restrictions": [
+                  "Verbatim extraction from D4.",
+                  "Include human confirmation records."
+                ],
+                "done_when": "Quadrant and signal extracted."
+              },
+              "example_title": "Quadrant and Signal Summary",
+              "example": "- **Business Value:** HIGH (Criterion C — Catastrophic Failure).\n- **Technical Complexity:** MEDIUM.\n- **Quadrant:** Strategic Initiative.\n- **Continuity Signal:** PRIORITIZE.\n- **Human Confirmation:** Carlos Ruiz (Reviewer, no remarks) + Laura Torres (Sponsor, signed 2026-05-04).",
+              "link_label": "quadrant goes to OKR extraction (7.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "7",
+      "title": "Objectives, KRs, and Out-of-Scope Extraction",
+      "summary": "Declare the qualitative goals, measurable key results, and explicit project limits.",
+      "substeps": [
+        {
+          "code": "7.1",
+          "title": "OKR & Scope Extraction",
+          "objective": "Extract Objective, Key Results with firmness seals, and Out-of-Scope table from D5.",
+          "input": "[[example_output_project_objectives]] (D5).",
+          "raw_data_title": "D5 Sections 2 and 3",
+          "raw_data": "1 Objective, 2 KRs with seals, 2 Out-of-Scope exclusions.",
+          "exit_label": "OKRS EXTRACTED → Step 8",
+          "micro": [
+            {
+              "code": "7.1.1",
+              "title": "OKR and exclusions extraction",
+              "objective": "Extract Objective, sealed KRs, and out-of-scope exclusions verbatim from D5.",
+              "how_to": {
+                "steps": [
+                  "Extract General Objective (O) verbatim from Section 2 of D5.",
+                  "Extract KR1 and KR2 with their respective firmness seals verbatim from Section 2 of D5.",
+                  "Extract Out-of-Scope exclusions table from Section 3 of D5.",
+                  "Verify that no objective words or exclusion rationales were altered."
+                ],
+                "table_columns": "OKR Element | Content from D5 | Firmness Seal / Scope Exclusion",
+                "table_rules": "One row per OKR element and exclusion record.",
+                "restrictions": [
+                  "Verbatim extraction from D5.",
+                  "Firmness seals must be preserved."
+                ],
+                "done_when": "OKRs and out-of-scope items extracted."
+              },
+              "example_title": "OKR and Out-of-Scope Block",
+              "example": "- **Objective:** Reservation managers of Nos Fuimos de Finca can confirm availability and collect deposits with certainty even under high concurrent demand for a single rural estate, without incurring cross-approvals or duplicate payments.\n- **Key Results:**\n  - **KR1 (Type A, Medium seal):** Reduce double booking events from 12 to 0 per year within the first 3 months of stable operation.\n  - **KR2 (Type B, Firm):** Ensure 100% of availability inquiries among coordinators are resolved using shared, instantaneous information by the close of Phase 1.\n- **Out of Scope:** Dissatisfaction with cleanliness of rural properties (property quality maintenance management); delays in commission payouts to property owners (independent trigger, segregated to its own D1).",
+              "link_label": "OKRs go to stakeholder extraction (8.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "8",
+      "title": "Key Stakeholders Extraction",
+      "summary": "Expose the complete influence hierarchy: who blocks, who pays, who validates, and who uses.",
+      "substeps": [
+        {
+          "code": "8.1",
+          "title": "Stakeholder Table Extraction",
+          "objective": "Extract the full Influence table (Blocker, Sponsor, Validator, User) and Blocker Flags from D6.",
+          "input": "[[example_output_stakeholder_map]] (D6).",
+          "raw_data_title": "D6 Section 2 Stakeholder Table",
+          "raw_data": "4 ranked roles: Banking institution (Blocker), Laura Torres (Sponsor), RNT (Validator), Reservation Coordinator (User).",
+          "exit_label": "STAKEHOLDERS EXTRACTED → Step 9",
+          "micro": [
+            {
+              "code": "8.1.1",
+              "title": "Ranked stakeholder roster extraction",
+              "objective": "Extract 4-level stakeholder hierarchy and blocker flags verbatim from D6.",
+              "how_to": {
+                "steps": [
+                  "Extract the complete ranked stakeholder table from Section 2 of D6.",
+                  "Capture Influence, Who They Are, Blocker Flag (Y/N), and Primary Interest.",
+                  "Verify all 4 tiers (Blocker, Sponsor, Validator, User) are represented verbatim."
+                ],
+                "table_columns": "Influence | Who They Are | Blocker (Y/N) | Primary Interest",
+                "table_rules": "One row per stakeholder role extracted from D6.",
+                "restrictions": [
+                  "Exact table from D6.",
+                  "Preserve Blocker Flag values."
+                ],
+                "done_when": "Stakeholder table extracted verbatim."
+              },
+              "example_title": "Executive Stakeholder Table",
+              "example": "| Influence | Who They Are | Blocker (Y/N) | Primary Interest |\n| --- | --- | :---: | --- |\n| **Blocker** | Banking institution processing deposit transfers | YES | Reversal regulations and time cutoffs beyond agency control. |\n| **Sponsor** | Laura Torres (CEO and founder) | YES | Stopping the business from losing commissions and refunding cash. |\n| **Validator** | National Tourism Registry (RNT) | YES (medium term) | Ensuring business operations stay compliant with current tourism laws. |\n| **User** | Reservation Coordinator | YES | Verifying availability and collecting deposits without duplicating estates. |",
+              "link_label": "stakeholders go to risk extraction (9.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "9",
+      "title": "Risks and Known Unknowns Extraction",
+      "summary": "Convey the result of the survival test and what remains to be resolved.",
+      "substeps": [
+        {
+          "code": "9.1",
+          "title": "Disqualifiers & Unknowns Extraction",
+          "objective": "Extract the 4 disqualifier verdicts and Known Unknowns table with Carry-Forward implications from D7.",
+          "input": "[[example_output_risk_register]] (D7).",
+          "raw_data_title": "D7 Sections 2 and 3",
+          "raw_data": "4 disqualifiers with DOES NOT APPLY. 2 Known Unknowns (connectivity, bank receipt).",
+          "exit_label": "RISKS EXTRACTED → Step 10",
+          "micro": [
+            {
+              "code": "9.1.1",
+              "title": "Disqualifiers and carry-forwards extraction",
+              "objective": "Extract disqualifier outcomes and known unknowns verbatim from D7.",
+              "how_to": {
+                "steps": [
+                  "Extract verdicts for the 4 fatal disqualifiers from Section 2 of D7.",
+                  "Extract the Known Unknowns table with owners and Carry-Forward design implications from Section 3 of D7.",
+                  "Verify that all inherited Phase 1 design constraints are captured."
+                ],
+                "table_columns": "Risk Element | Source D7 Section | Extracted Content | Fidelity Status",
+                "table_rules": "One row per risk element extracted from D7.",
+                "restrictions": [
+                  "Verbatim extraction from D7.",
+                  "Carry-Forward design implications must be included."
+                ],
+                "done_when": "Disqualifiers and unknowns extracted verbatim."
+              },
+              "example_title": "Risks and Carry-Forwards Summary",
+              "example": "- **Disqualifiers:** All 4 (Management Problem, Physical/Infrastructure Blocker, Digital Literacy Blocker, Trivial Existing Solution) resulted in `DOES NOT APPLY`.\n- **Known Unknowns:**\n  - Mobile connectivity of rural estates — Owner: Carlos Ruiz; implies designing confirmation with retry queue / synchronization if intermittent coverage is confirmed.\n  - Formal deposit voucher issuing entity — Owner: Laura Torres; implies not committing to a specific receipt format until banking terms are confirmed.",
+              "link_label": "risks go to decision extraction (10.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "10",
+      "title": "Binary Decision and Authorization Extraction",
+      "summary": "Capture the executive authorization and the gate signature.",
+      "substeps": [
+        {
+          "code": "10.1",
+          "title": "Decision & Sign-Off Extraction",
+          "objective": "Extract the formal binary decision, justification, and Authorization Register from D8.",
+          "input": "[[example_output_go_nogo]] (D8).",
+          "raw_data_title": "D8 Sections 3 and 4",
+          "raw_data": "Decision: GO (PROCEED). Justification: Criterion C activated, D7 clean. Authorization: Laura Torres, 2026-05-06.",
+          "exit_label": "DECISION EXTRACTED → Step 11",
+          "micro": [
+            {
+              "code": "10.1.1",
+              "title": "Decision and signature extraction",
+              "objective": "Extract binary verdict, justification, and sponsor signature verbatim from D8.",
+              "how_to": {
+                "steps": [
+                  "Extract the formal binary decision and justification verbatim from Section 3 of D8.",
+                  "Extract the Authorization Record (signatory name, role, date) verbatim from Section 4 of D8.",
+                  "Confirm zero alterations were made to the executive approval text."
+                ],
+                "table_columns": "Authorization Element | D8 Source Value | Fidelity Check",
+                "table_rules": "One row per authorization field extracted from D8.",
+                "restrictions": [
+                  "Verbatim extraction from D8.",
+                  "Sponsor name and date mandatory."
+                ],
+                "done_when": "Decision and authorization extracted verbatim."
+              },
+              "example_title": "Gate Decision and Authorization Block",
+              "example": "- **Binary Decision:** GO (Proceed to Phase 1).\n- **Justification:** Analysis confirms that zero fatal disqualifiers apply (D7) and that the problem activates Criterion C for catastrophic failure with Strategic Initiative classification (D4). Connectivity and banking voucher uncertainties are documented as Known Unknowns in D7 to be resolved in Phase 1.\n- **Authorization:** Laura Torres (CEO and founder) — 2026-05-06.",
+              "link_label": "authorization goes to assembly and audit (11.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "11",
+      "title": "Assembly and Final Verification",
+      "summary": "Assemble the Brief, verifying total textual fidelity.",
+      "substeps": [
+        {
+          "code": "11.1",
+          "title": "Ordered Dump",
+          "objective": "Insert the 10 standardized sections without adding introductory phrases or creative text.",
+          "input": "Outputs from extraction Steps 2 through 10.",
+          "raw_data_title": "Consolidated Extraction Blocks",
+          "raw_data": "10 standardized sections ready for final layout.",
+          "exit_label": "DUMP COMPLETED → 11.2",
+          "micro": [
+            {
+              "code": "11.1.1",
+              "title": "Ordered dump execution",
+              "objective": "Assemble the 10 standardized sections in official order.",
+              "how_to": {
+                "steps": [
+                  "Sequence the 10 standardized sections in exact official order.",
+                  "Insert extracted blocks without adding transitional phrases, commentary, or embellishments.",
+                  "Verify complete section coverage from Metadata to Gate Authorization."
+                ],
+                "table_columns": "Section Number | Section Name | Source Deliverable | Insertion Status",
+                "table_rules": "One row per section in the assembled Brief.",
+                "restrictions": [
+                  "No creative writing or filler text allowed.",
+                  "Follow standardized section order."
+                ],
+                "done_when": "All 10 sections sequenced in official layout."
+              },
+              "example_title": "Ordered Dump Structure",
+              "example": "| Section | Section Name | Source Deliverable | Status |\n| :---: | :--- | :---: | :---: |\n| 1 | Document Metadata | Workspace | `INSERTED` |\n| 2 | Problem Statement | D1 | `INSERTED` |\n| 3 | Featured Evidence | D1 | `INSERTED` |\n| 4 | Architectural Classification | D2 | `INSERTED` |\n| 5 | Impact Estimate | D3 | `INSERTED` |\n| 6 | Impact Assessment and Quadrant | D4 | `INSERTED` |\n| 7 | Project Objectives (OKRs) & Out of Scope | D5 | `INSERTED` |\n| 8 | Key Stakeholder Map | D6 | `INSERTED` |\n| 9 | Risks and Known Unknowns | D7 | `INSERTED` |\n| 10 | Gate Decision and Authorization | D8 | `INSERTED` |",
+              "link_label": "assembled brief goes to immutability audit (11.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "11.2",
+          "title": "Immutability Audit",
+          "objective": "Compare each phrase in the Brief against its source in D1-D8, word by word.",
+          "input": "Assembled Brief document from Sub-step 11.1.",
+          "raw_data_title": "Assembled Document vs Source Artifacts",
+          "raw_data": "Full text of 09. Phase 0 Executive Brief.md compared word-for-word against D1 through D8.",
+          "exit_label": "BRIEF STERILIZED AND APPROVED → publishes deliverable",
+          "micro": [
+            {
+              "code": "11.2.1",
+              "title": "Word-for-word immutability audit",
+              "objective": "Verify 100% word-for-word textual fidelity against D1 through D8.",
+              "how_to": {
+                "steps": [
+                  "Compare each sentence in the Brief against its source in D1 through D8.",
+                  "Verify that zero words, figures, names, or punctuation were altered.",
+                  "If any discrepancy is found, revert immediately to exact source text.",
+                  "Issue official Immutability Audit certificate."
+                ],
+                "table_columns": "Section Audited | Source Document | Word Discrepancy Count | Audit Result",
+                "table_rules": "One row per section auditing word-for-word immutability.",
+                "restrictions": [
+                  "Zero word discrepancies allowed.",
+                  "Golden Rule: the art of writing nothing new."
+                ],
+                "done_when": "Immutability audit certifies 0 discrepancies."
+              },
+              "example_title": "Immutability Audit Verification",
+              "example": "1. Integrate extracts into the 10 standardized Brief sections.\n2. Perform Immutability Audit: compare every phrase in the Brief against its source across D1–D8, word for word. Zero discrepancies detected.\n\n*Audit Finding:* Word discrepancy count = 0. All texts match original approved deliverables with 100% fidelity.",
+              "link_label": "publishes final deliverable"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 09. Phase 0 Executive Brief.md",
+    "markdown": "# 9. Phase 0 Executive Brief\n\n### 1. Document Metadata\n**Project:** Nos Fuimos de Finca\n**Phase:** 0 — Problem Recognition\n**Deliverable:** 9 of 9\n**Status:** Approved\n\n### 2. Problem Statement\nThe operational team and reservation managers of Nos Fuimos de Finca, upon concurrently receiving and confirming reservation requests for the same rural property through multiple manual and dispersed communication channels, incur in cross-approval and duplicate advance payment collection for the same dates. This reservation collision forces last-minute cancellations, generating refunds with absorption of banking transfer surcharges, direct loss of intermediary commissions, and deterioration of commercial trust with tourists and property owners.\n\n### 3. Featured Evidence\n- **Recurrence (`E-04`):** Second documented collision in the coordination notebook on April 14, for property \"La Esperanza\" for Apr 18–20, with the same pattern of double manual confirmation.\n- **Causality (`E-01`):** Coordination notebook, March 22: two confirmation entries for \"El Recodo\" for Apr 1–3, in the handwriting of two different coordinators with no cross-reference.\n- **Cascade effect (`E-03`):** Bank refund receipt with deducted commission, plus archived complaint from the cancelled client.\n\n### 4. Architectural Classification\n- **Dominant Archetype:** Information Asymmetry. Secondary: Workflow Inefficiency (dependent).\n- **Suggested Theoretical Pattern:** Single Source of Truth with concurrency control. *Preliminary signal, does not constitute an architectural decision; subject to confirmation in Phase 5.*\n\n### 5. Impact Estimate\n- **Estimated Annual Impact:** 9,600,000 COP per year (12 events/year at 800,000 COP per event).\n- **Confidence Level:** Medium (frequency projected from 2 documented instances; cost mostly supported with one proxy component).\n\n### 6. Impact Assessment and Quadrant\n- **Quadrant:** Strategic Initiative.\n- **Continuity Signal:** PRIORITIZE.\n- **Human Confirmation:** Carlos Ruiz (Reviewer, no observations) + Laura Torres (Sponsor, signed 2026-05-04).\n\n### 7. Project Objectives (OKRs) and Out of Scope\n- **Objective (O):** Reservation managers at Nos Fuimos de Finca can confirm availability and collect advances with certainty even under high concurrent demand for the same property, without incurring cross-approvals or duplicate charges.\n- **Key Results (KRs):**\n  - **KR1 (Type A, Medium seal):** Reduce overbooking events from 12 to 0 per year within the first 3 months of stable operation.\n  - **KR2 (Type B, Firm):** Ensure that 100% of availability queries between coordinators are resolved with shared, instantaneous information by the end of Phase 1.\n- **Out of Scope:** Dissatisfaction with property cleanliness; delays in commission payments to property owners.\n\n### 8. Key Stakeholder Map\n| Influence | Who They Are | Blocker (Y/N) | Primary Interest |\n| --- | --- | :---: | --- |\n| **Blocker** | Banking entity that processes advance payments | YES | Transfer reversal rules over which the agency has no control. |\n| **Sponsor** | Laura Torres (CEO and founder) | YES | That the business stops losing commissions and refunding money. |\n| **Validator** | National Tourism Registry (RNT) | YES (medium term) | That the operation remains within the current legal framework. |\n| **User** | Reservation Coordinator | YES | Confirming and collecting reservations without double-booking a property. |\n\n### 9. Risks and Known Unknowns (Carry-Forwards)\n- **Disqualifiers:** All 4 (Management, Physical/Infrastructure, Literacy, Trivial Existing Solution) resulted in DOES NOT APPLY.\n- **Known Unknowns:** Mobile connectivity of properties (owner: Carlos Ruiz); entity issuing the formal advance payment receipt (owner: Laura Torres).\n\n### 10. Gate Decision and Authorization\n- **Verdict:** GO (Proceed to Phase 1 — Early Viability).\n- **Justification:** The analysis confirms that no lethal disqualifier applies (D7) and that the problem activates Catastrophic Failure Criterion C with a Strategic Initiative classification (D4). Connectivity and banking receipt uncertainties are documented as Known Unknowns in D7, to be resolved in Phase 1.\n- **Authorization:** Laura Torres (CEO and founder) — 2026-05-06."
+  }
+}

@@ -1,0 +1,367 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D12",
+  "deliverable": "Risk Register Update (Actualización del Registro de Riesgos — Delta)",
+  "purpose": "Este entregable actualiza el registro único y centralizado de riesgos del proyecto. En la Fase 2, tras tomar decisiones arquitectónicas de stack, repositorio, entornos y testing, surgen riesgos técnicos y de ingeniería (puntos únicos de fallo, dependencias de infraestructura, cuellos de botella de QA). Este entregable documenta exclusivamente estos nuevos riesgos como una sección delta en el archivo maestro de riesgos.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_risk_register_update]] | Registro de riesgos vivo del proyecto (secciones de Fase 0 y Fase 1, P1-D8). |\n| [[example_output_stack_decision]] | Arquitectura y tecnologías elegidas, con sus puntos únicos de fallo asociados (P2-D3). |\n| [[example_output_repository_structure]] | Estructura de repositorio y gestión de secretos (P2-D4). |\n| [[example_output_testing_strategy]] | Estrategia de pruebas y cobertura de calidad (P2-D8). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Extracción de Puntos Únicos de Fallo (SPOF)",
+      "summary": "Analizar la arquitectura técnica y dependencias cloud para exponer con rigor ingenieril las vulnerabilidades y puntos únicos de fallo del stack.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Auditoría de Vulnerabilidades de Stack e Infraestructura",
+          "objective": "Examinar cada capa de software (Backend Java, BD PostgreSQL, Hosting) para identificar fallos potenciales catastróficos.",
+          "input": "[[example_output_stack_decision]] (D3) y mapa de entornos de P2-D6.",
+          "raw_data_title": "Vulnerabilidades de Stack",
+          "raw_data": "Riesgo de colisión en reservas concurrentes por falta de locks. Riesgo de caída de servidores gestionados en la nube (outage PaaS/DB).",
+          "exit_label": "VULNERABILIDADES AUDITADAS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Identificación de Fallos Críticos en Lógica, Persistencia y Hosting",
+              "objective": "Cuestionar la resiliencia del sistema ante caídas de proveedores o saturación transaccional.",
+              "how_to": {
+                "steps": [
+                  "Revisar la capa de backend Java y el mecanismo de reserva de fechas.",
+                  "Evaluar qué ocurre si dos solicitudes concurrentes intentan apartar la misma finca al mismo ms.",
+                  "Evaluar la dependencia del hosting cloud (PaaS/PostgreSQL) y su disponibilidad.",
+                  "Documentar los riesgos técnicos emergentes."
+                ],
+                "table_columns": "Componente Evaluado | Modo de Fallo Potencial | Severidad Técnica",
+                "table_rules": "Asumir que todo servicio externo o base de datos puede fallar bajo condiciones de estrés.",
+                "restrictions": [
+                  "Prohibido asumir disponibilidad del 100% en infraestructura sin planes de contingencia."
+                ],
+                "done_when": "Puntos de fallo técnico del stack identificados."
+              },
+              "example_title": "Modos de Fallo Potencial en Infraestructura",
+              "example": "| Componente | Modo de Fallo Potencial | Severidad |\n| --- | --- | --- |\n| Base de Datos PostgreSQL | Concurrencia de reservas genera overbooking por carrera transaccional | Crítica |\n| Servidor Cloud PaaS | Caída imprevista del proveedor de hosting o límite de recursos | Alta |",
+              "link_label": "análisis de fallos pasa a catálogo de riesgos de infraestructura (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Catálogo de Riesgos Técnicos de Infraestructura",
+          "objective": "Consolidar la lista preliminar de riesgos de arquitectura derivados directamente de las decisiones de diseño.",
+          "input": "Modos de fallo de 1.1 y restricciones no negociables.",
+          "raw_data_title": "Riesgos Técnicos Emergentes",
+          "raw_data": "R-05: Colisión transaccional (overbooking). R-06: Outage de servicio gestionado en la nube.",
+          "exit_label": "RIESGOS TÉCNICOS CATALOGADOS → 2.1",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Mapeo de SPOFs en Base de Datos y Servicios Cloud",
+              "objective": "Registrar en tabla oficial las consecuencias arquitectónicas de cada punto único de fallo identificado.",
+              "how_to": {
+                "steps": [
+                  "Detallar la consecuencia de sobreventa o bloqueo de base de datos.",
+                  "Detallar el impacto de interrupción temporal de servicio para usuarios finales.",
+                  "Consolidar la tabla de nuevos riesgos de infraestructura.",
+                  "Verificar el cumplimiento del pass condition de honestidad técnica."
+                ],
+                "table_columns": "Componente / Decisión | Riesgo Técnico Emergente | Impacto Arquitectónico Potencial",
+                "table_rules": "Cada riesgo debe estar vinculado a una decisión técnica concreta de Fase 2.",
+                "restrictions": [
+                  "No omitir la concurrencia simultánea como riesgo crítico de persistencia."
+                ],
+                "done_when": "Lista oficial de riesgos técnicos de infraestructura formalizada."
+              },
+              "example_title": "Riesgos Técnicos Emergentes (Step 1 Output)",
+              "example": "| Componente / Decisión | Riesgo Técnico Emergente | Impacto Arquitectónico Potencial |\n| --- | --- | --- |\n| Base de Datos (D3) | Colisión Transaccional (Overbooking) | Dos reservas simultáneas para la misma fecha provocan overbooking y pérdida de confianza |\n| Infraestructura (D6) | Outage de Servicio Gestionado | Caída del hosting Java o PostgreSQL interrumpe el servicio comercial B2C |",
+              "link_label": "riesgos de infraestructura pasan a riesgos de proceso y seguridad (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Análisis de Riesgos Operativos, de Seguridad y Proceso",
+      "summary": "Evaluar los riesgos de factor humano, exposición de secretos en repositorios y degradación de rendimiento en redes lentas.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Evaluación de Riesgos de Seguridad y Gestión de Secretos",
+          "objective": "Identificar los riesgos asociados a la fuga accidental de credenciales financieras y de mensajería.",
+          "input": "Estructura de repositorio de P2-D4 y reglas de aislamiento de P2-D6.",
+          "raw_data_title": "Riesgos de Seguridad",
+          "raw_data": "R-07: Fuga accidental de llaves secretas de Wompi o Meta WABA por mal uso de Git o variables de entorno.",
+          "exit_label": "RIESGOS DE SEGURIDAD DELIMITADOS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Análisis de Fuga de Credenciales y Control de Versiones",
+              "objective": "Modelar el impacto financiero y reputacional de la filtración de tokens en repositorios de código.",
+              "how_to": {
+                "steps": [
+                  "Analizar los puntos de configuración donde intervienen llaves privadas (Wompi, Meta).",
+                  "Modelar el riesgo de comitear archivos .env o credenciales hardcodeadas.",
+                  "Establecer la consecuencia técnica y financiera de un compromiso de llaves.",
+                  "Documentar el riesgo operativo de seguridad."
+                ],
+                "table_columns": "Vector de Riesgo | Causa Humana / Operativa | Impacto de Seguridad",
+                "table_rules": "Toda credencial privada debe considerarse vector potencial de secuestro de infraestructura.",
+                "restrictions": [
+                  "Prohibido minimizar el riesgo de exposición de credenciales financieras."
+                ],
+                "done_when": "Riesgos de seguridad de credenciales y repositorio analizados."
+              },
+              "example_title": "Riesgo de Seguridad en Repositorio",
+              "example": "| Vector de Riesgo | Causa Operativa | Impacto |\n| --- | --- | --- |\n| Seguridad (D4) | Fuga Accidental de Credenciales en Git | Compromiso de cuentas de pasarela de pago o robo de identidad en WhatsApp |",
+              "link_label": "riesgos de seguridad pasan a evaluación de rendimiento y testing (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Evaluación de Riesgos de Rendimiento y Calidad",
+          "objective": "Identificar el riesgo de degradación de velocidad web en redes móviles 3G rurales según la RNN-01.",
+          "input": "Restricciones No Negociables de P2-D2 y estrategia de testing de P2-D8.",
+          "raw_data_title": "Riesgos de Rendimiento",
+          "raw_data": "R-08: Degradación por LCP en redes rurales 3G si el bundle JS crece sin control superando 1.5MB.",
+          "exit_label": "RIESGOS DE RENDIMIENTO DELIMITADOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Análisis de Degradación LCP y Cuellos de Botella de QA",
+              "objective": "Modelar la pérdida de conversión por tiempos de carga excesivos en entornos móviles.",
+              "how_to": {
+                "steps": [
+                  "Examinar el límite de LCP < 2.5s y bundle < 1.5MB fijado en P2-D2.",
+                  "Identificar el riesgo de agregar librerías pesadas en Vite sin optimización.",
+                  "Evaluar la consecuencia en usuarios turistas con mala conectividad móvil.",
+                  "Documentar el riesgo de rendimiento en la matriz."
+                ],
+                "table_columns": "Dimensión | Factor de Riesgo | Impacto en Negocio",
+                "table_rules": "La velocidad del frontend en redes rurales es crítica para la conversión.",
+                "restrictions": [
+                  "No omitir el impacto del peso del bundle en la experiencia de usuario."
+                ],
+                "done_when": "Riesgos de rendimiento y calidad delimitados."
+              },
+              "example_title": "Riesgo de Rendimiento en Redes Rurales",
+              "example": "| Dimensión | Factor de Riesgo | Impacto |\n| --- | --- | --- |\n| Rendimiento (D2) | Bundle JS excede 1.5MB y satura conexiones 3G | LCP > 2.5s genera abandono masivo de turistas rurales |",
+              "link_label": "riesgos de rendimiento pasan a consolidación preliminar (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Consolidación de Riesgos Operativos Crudos",
+          "objective": "Integrar los riesgos de seguridad y proceso en la tabla preliminar de salida del Step 2.",
+          "input": "Riesgos de seguridad (2.1) y rendimiento (2.2).",
+          "raw_data_title": "Riesgos de Proceso y Seguridad",
+          "raw_data": "Tabla consolidada con Fuga de Credenciales (Seguridad D4) y Degradación LCP (Rendimiento D2).",
+          "exit_label": "RIESGOS OPERATIVOS BLOQUEADOS → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Matriz Preliminar de Vulnerabilidades de Proceso",
+              "objective": "Construir la tabla oficial de riesgos operativos y de proceso para el documento maestro.",
+              "how_to": {
+                "steps": [
+                  "Sintetizar el riesgo de fuga de credenciales en control de versiones.",
+                  "Sintetizar el riesgo de degradación de velocidad web por peso de bundle.",
+                  "Consolidar la tabla preliminar de riesgos operativos.",
+                  "Comprobar el pass condition de catalogación completa."
+                ],
+                "table_columns": "Proceso / Capa | Riesgo Operativo o de Seguridad | Consecuencia en el Flujo",
+                "table_rules": "Cada riesgo debe señalar su consecuencia tangible en la entrega de valor.",
+                "restrictions": [
+                  "No dejar riesgos sin consecuencias operativas explícitas."
+                ],
+                "done_when": "Matriz preliminar de vulnerabilidades de proceso formalizada."
+              },
+              "example_title": "Riesgos Operativos y de Proceso (Step 2 Output)",
+              "example": "| Proceso / Capa | Riesgo Operativo o de Seguridad | Consecuencia en el Flujo |\n| --- | --- | --- |\n| Seguridad (D4) | Fuga Accidental de Credenciales | Exposición de secretos financieros en Git permite fraude o secuestro de WABA |\n| Rendimiento (D2) | Degradación por LCP en Redes Rurales | El bundle excede el presupuesto y falla en redes 3G lentas afectando reservas |",
+              "link_label": "riesgos operativos pasan a matriz delta y mitigaciones (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Consolidación de Matriz de Riesgos Delta y Planes de Mitigación",
+      "summary": "Ponderar probabilidad e impacto de cada riesgo nuevo de Fase 2 y diseñar planes de mitigación técnicos con dueños asignados.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Ponderación de Probabilidad, Impacto y Mitigaciones Duras",
+          "objective": "Asignar severidad cuantitativa y redactar planes de mitigación técnicos ejecutables.",
+          "input": "Riesgos catalogados de Steps 1 y 2.",
+          "raw_data_title": "Ponderación y Mitigaciones",
+          "raw_data": "R-05 (Overbooking): Alta/Crítico. Mitigación: Optimistic Locks JPA + soft-locks. R-06 (Outage): Media/Alto. Mitigación: PaaS SLA 99.5% + backups.",
+          "exit_label": "PONDERACIÓN Y MITIGACIONES DEFINIDAS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Diseño de Defensas Técnicas para Overbooking y Secretos",
+              "objective": "Especificar las soluciones de código e infraestructura para neutralizar los riesgos técnicos.",
+              "how_to": {
+                "steps": [
+                  "Diseñar mitigación para R-05 con @Version en JPA, control de soft-locks y HTTP 409 Conflict.",
+                  "Diseñar mitigación para R-06 con PaaS de alta disponibilidad y backups continuos.",
+                  "Diseñar mitigación para R-07 con inyección vía .env y pre-commit hooks de escaneo de secretos.",
+                  "Diseñar mitigación para R-08 con límites de bundle en Vite y comprobación en CI."
+                ],
+                "table_columns": "ID Riesgo | Probabilidad | Impacto | Estrategia de Mitigación Técnica",
+                "table_rules": "Las mitigaciones deben ser técnicas, específicas y accionables, no meros deseos.",
+                "restrictions": [
+                  "Prohibido proponer mitigaciones genéricas como 'tener cuidado' o 'revisar bien'."
+                ],
+                "done_when": "Estrategias de mitigación técnica detalladas para todos los riesgos."
+              },
+              "example_title": "Estrategias de Mitigación Técnica",
+              "example": "| ID | Probabilidad | Impacto | Mitigación Técnica |\n| --- | --- | --- | --- |\n| R-05 | Alta | Crítico | Implementar Optimistic Locks con control de versión (@Version) en JPA/PostgreSQL y Soft-Locks temporales con TTL |\n| R-07 | Baja | Crítico | Inyección de credenciales estrictamente por variables de entorno (.env) y escaneo con pre-commit hooks |",
+              "link_label": "mitigaciones pasan a asignación de dueños y matriz delta (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Asignación de Dueños de Riesgo y Matriz Delta Final",
+          "objective": "Asignar un rol responsable único a cada riesgo y formalizar la matriz delta oficial R-05 a R-08.",
+          "input": "Mitigaciones técnicas (3.1) y roles operativos de P2-D11.",
+          "raw_data_title": "Matriz Delta Consolidada",
+          "raw_data": "R-05 (Tech Lead), R-06 (DevOps / Lead), R-07 (Tech Lead), R-08 (Frontend Dev). Matriz completa de 4 nuevos riesgos.",
+          "exit_label": "MATRIZ DELTA BLOQUEADA → 4.1",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Formalización de la Matriz Delta de Riesgos (R-05 a R-08)",
+              "objective": "Construir la tabla definitiva de actualización de riesgos de Fase 2 para el archivo maestro.",
+              "how_to": {
+                "steps": [
+                  "Verificar que la numeración inicie en R-05 continuando con la secuencia de Fase 0/1.",
+                  "Asignar cada riesgo a su dueño formal (Tech Lead, DevOps, Frontend Dev).",
+                  "Consolidar la tabla completa de 7 columnas.",
+                  "Comprobar el pass condition de asignación de antídoto técnico a cada riesgo."
+                ],
+                "table_columns": "ID | Tipo de Riesgo | Riesgo Técnico / SPOF | Probabilidad | Impacto | Estrategia de Mitigación | Dueño del Riesgo",
+                "table_rules": "Cada riesgo debe contar con un titular unívoco.",
+                "restrictions": [
+                  "No dejar riesgos con propiedad compartida o difusa."
+                ],
+                "done_when": "Matriz delta de riesgos R-05 a R-08 completamente formalizada."
+              },
+              "example_title": "Nuevos Riesgos en Kickoff Técnico (Step 3 Output)",
+              "example": "| ID | Tipo de Riesgo | Riesgo Técnico / SPOF | Probabilidad | Impacto | Estrategia de Mitigación | Dueño del Riesgo |\n| --- | --- | --- | --- | --- | --- | --- |\n| **R-05** | Base de Datos (D3) | **Colisión Transaccional (Overbooking):** Peticiones POST concurrentes intentan reservar la misma finca en fechas solapadas. | Alta | Crítico | Implementar Optimistic Locks con control de versión (`@Version`) en JPA/PostgreSQL, retornando HTTP 409 Conflict ante colisiones y gestionando Soft-Locks temporales con TTL para garantizar P95 < 400ms (RNN-02). | Tech Lead |\n| **R-06** | Infraestructura (D6) | **Outage de Servicio Gestionado:** Caída del hosting donde residen el servicio Java o PostgreSQL. | Media | Alto | Utilizar PaaS con SLA > 99.5% y backups automatizados continuos de base de datos. | DevOps / Lead |\n| **R-07** | Seguridad (D4) | **Fuga de Credenciales:** Exposición involuntaria de llaves secretas de pasarela de pago o WhatsApp. | Baja | Crítico | Inyección de credenciales estrictamente por variables de entorno y validación automática con pre-commit hooks. | Tech Lead |\n| **R-08** | Rendimiento (D2) | **Degradación por LCP en Redes Rurales:** El bundle JS excede el presupuesto y falla en redes 3G. | Media | Alto | Budget de bundle < 1.5MB en Vite y bloqueo de PRs en CI si se supera el umbral. | Frontend Dev |",
+              "link_label": "matriz delta pasa a actualización del archivo único maestro (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Actualización del Archivo Único de Riesgos (Delta Append)",
+      "summary": "Compilar y anexar la sección delta de Fase 2 al archivo maestro de riesgos sin duplicar contenido.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Metadatos y Sección Delta de Fase 2",
+          "objective": "Ensamblar la ficha técnica de actualización y la tabla de riesgos delta en formato estricto Markdown.",
+          "input": "Matriz delta consolidada de Step 3 y metadatos del proyecto.",
+          "raw_data_title": "Metadatos y Sección Delta",
+          "raw_data": "Fase 2, Entregable 12 de 13, Fecha de actualización, Estado Aprobado. Tabla R-05 a R-08 lista para anexar.",
+          "exit_label": "METADATOS Y SECCIÓN DELTA ENSAMBLADOS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Compilación de Metadatos y Tabla Delta en Formato Oficial",
+              "objective": "Redactar las secciones 1 y 2 de la actualización asegurando concordancia cronológica y de versión.",
+              "how_to": {
+                "steps": [
+                  "Completar los metadatos de la actualización (Fase 2, D12, Estado).",
+                  "Adjuntar la tabla completa de Nuevos Riesgos Identificados en Kickoff Técnico (Delta).",
+                  "Verificar que la redacción respete las referencias a D2, D3, D4 y D6.",
+                  "Asegurar exactitud de formato Markdown."
+                ],
+                "table_columns": "Sección | Contenido Compilado | Estado de Verificación",
+                "table_rules": "La sección debe respetar el formato de anexo sin sobrescribir Fases 0 y 1.",
+                "restrictions": [
+                  "Prohibido crear un nuevo archivo de riesgos separado del registro maestro único."
+                ],
+                "done_when": "Metadatos y tabla delta completamente compilados."
+              },
+              "example_title": "Compilación de Metadatos y Sección Delta",
+              "example": "## Actualización — Fase 2 (Project Kickoff)\n\n### 1. Metadatos de la Actualización\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 2 — Project Kickoff\n**Entregable:** 12 de 13\n**Fecha de Actualización:** 2026-07-07\n**Estado:** Aprobado\n\n### 2. Nuevos Riesgos Identificados en Kickoff Técnico (Delta)\nAl definir la arquitectura de software (Java 21 / Vite JS / PostgreSQL / Wompi), se incorporan los siguientes riesgos de ingeniería al registro maestro:\n\n| ID | Tipo de Riesgo | Riesgo Técnico / SPOF | Probabilidad | Impacto | Estrategia de Mitigación | Dueño del Riesgo |\n| --- | --- | --- | --- | --- | --- | --- |\n| **R-05** | Base de Datos (D3) | **Colisión Transaccional (Overbooking):** Peticiones POST concurrentes intentan reservar la misma finca en fechas solapadas. | Alta | Crítico | Implementar Optimistic Locks con control de versión (`@Version`) en JPA/PostgreSQL, retornando HTTP 409 Conflict ante colisiones y gestionando Soft-Locks temporales con TTL para garantizar P95 < 400ms (RNN-02). | Tech Lead |\n| **R-06** | Infraestructura (D6) | **Outage de Servicio Gestionado:** Caída del hosting donde residen el servicio Java o PostgreSQL. | Media | Alto | Utilizar PaaS con SLA > 99.5% y backups automatizados continuos de base de datos. | DevOps / Lead |\n| **R-07** | Seguridad (D4) | **Fuga de Credenciales:** Exposición involuntaria de llaves secretas de pasarela de pago o WhatsApp. | Baja | Crítico | Inyección de credenciales estrictamente por variables de entorno y validación automática con pre-commit hooks. | Tech Lead |\n| **R-08** | Rendimiento (D2) | **Degradación por LCP en Redes Rurales:** El bundle JS excede el presupuesto y falla en redes 3G. | Media | Alto | Budget de bundle < 1.5MB en Vite y bloqueo de PRs en CI si se supera el umbral. | Frontend Dev |",
+              "link_label": "sección delta pasa a anexar compuerta de fase (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Integración de Compuerta de Fase y Anexado Maestro",
+          "objective": "Incorporar la compuerta condicional de avance y validar que la sección delta cierre satisfactoriamente.",
+          "input": "Metadatos, tabla delta y reglas de compuerta condicional.",
+          "raw_data_title": "Compuerta D12",
+          "raw_data": "Condición: Proceed. El equipo asume la programación de defensas transaccionales y de seguridad antes de Fase 3.",
+          "exit_label": "COMPUERTA INCORPORADA → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Evaluación de Compuerta Condicional y Confirmación de Registro",
+              "objective": "Completar la sección 3 del documento y verificar que todos los riesgos cuentan con mitigaciones viables.",
+              "how_to": {
+                "steps": [
+                  "Redactar la declaración formal de avance de compuerta (Proceed).",
+                  "Evaluar que los 4 nuevos riesgos cuenten con planes ejecutables y dueños designados.",
+                  "Verificar que la sección delta esté lista para incorporarse al registro único.",
+                  "Asegurar la consistencia con las compuertas de fases previas."
+                ],
+                "table_columns": "Elemento de Compuerta | Veredicto | Justificación Técnica",
+                "table_rules": "Si algún riesgo técnico crítico carece de mitigación, detener y exigir plan.",
+                "restrictions": [
+                  "Prohibido avanzar a Fase 3 sin defensas para concurrencia o fuga de secretos."
+                ],
+                "done_when": "Compuerta de fase formalizada y sección delta validada."
+              },
+              "example_title": "Compuerta de Fase Delta",
+              "example": "### 3. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No\n- **Condición:** Proceed. El equipo de ingeniería asume la responsabilidad de programar las defensas transaccionales y de seguridad a nivel de arquitectura antes de iniciar la Fase 3.",
+              "link_label": "sección completa pasa a publicación y actualización oficial (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Validación de Integridad y Publicación Oficial",
+          "objective": "Verificar la exactitud del documento frente al artefacto de referencia y oficializar su entrega.",
+          "input": "Documento delta completo ensamblado y archivo de salida oficial.",
+          "raw_data_title": "Validación y Entrega D12",
+          "raw_data": "Verificado contra example_output_risk_register_update.md. Publicación oficial en registro maestro del proyecto.",
+          "exit_label": "ENTREGABLE D12 PUBLICADO Y COMPLETADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Emisión Oficial del Documento D12",
+              "objective": "Emitir la actualización oficial de riesgos de Fase 2 con registro formal en el control de progreso.",
+              "how_to": {
+                "steps": [
+                  "Comprobar exhaustivamente la coherencia de todas las secciones del delta.",
+                  "Verificar el enlace al artefacto [[example_output_risk_register_update]].",
+                  "Confirmar que el estado del documento sea Aprobado.",
+                  "Registrar el hito en la bitácora de progreso."
+                ],
+                "table_columns": "Criterio de Cierre | Estado | Registro Oficial",
+                "table_rules": "El documento es la referencia vinculante para la gestión preventiva de riesgos de ingeniería.",
+                "restrictions": [
+                  "No dar por cerrado sin corroborar la trazabilidad con los entregables D2, D3, D4 y D6."
+                ],
+                "done_when": "Entregable D12 formalmente emitido y publicado."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_risk_register_update]]`.\n\nUbicación oficial: Anexo a `docs/00-reconocimiento-del-problema/07. Registro de Riesgos.md`.\nEstado: Aprobado por Compuerta de Fase.",
+              "link_label": "entrega completada - fin de flujo D12"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

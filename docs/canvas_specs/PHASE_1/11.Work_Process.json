@@ -1,0 +1,445 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D11",
+  "deliverable": "Work Process Document (Documento de Proceso de Trabajo)",
+  "purpose": "Este entregable define el marco metodológico de trabajo ágil de alto nivel (Kanban vs Scrum), la cadencia de sincronización y las métricas de flujo iniciales (DORA) para ejecutar el plan de trabajo sin ceremonias innecesarias.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_team_capability]] | Define el tamaño y composición del equipo ejecutor (P1-D6). |\n| [[example_output_mvp_definition]] | Define el alcance del experimento y nivel de incertidumbre en el delivery (P1-D9). |\n| [[example_output_initial_plan]] | Define los hitos y cronograma general de trabajo (P1-D10). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Selección y Justificación del Modelo Metodológico",
+      "summary": "Auditar actores, elegir Kanban vs Scrum según tamaño del equipo y fijar límites de WIP.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Auditoría de actores internos y externos",
+          "objective": "Mapear la participación del equipo core y de terceros para definir canales de interacción.",
+          "input": "Matriz de roles de [[example_output_team_capability]] (P1-D6) e hitos de [[example_output_initial_plan]] (P1-D10).",
+          "raw_data_title": "Mapa de Actores",
+          "raw_data": "Core: Julián (Negocio & Ventas) y Laura (Tecnología No-Code & Marketing). Externos: soporte Wompi (asíncrono SLA 24-48h) y asesor legal.",
+          "exit_label": "ACTORES AUDITADOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Mapeo de actores y modelos de interacción",
+              "objective": "Diferenciar la comunicación directa del equipo core de las dependencias asincrónicas de terceros.",
+              "how_to": {
+                "steps": [
+                  "Consultar el perfil de responsabilidades definido en P1-D6.",
+                  "Identificar los miembros del equipo con dedicación directa a la ejecución.",
+                  "Mapear los interlocutores externos (pasarelas, abogados, agencias).",
+                  "Definir el modelo de contacto predeterminado para cada grupo."
+                ],
+                "table_columns": "Actor / Grupo | Rol en el Proyecto | Canal Predeterminado | Tipo de SLA",
+                "table_rules": "Distinción estricta entre equipo interno y proveedores.",
+                "restrictions": [
+                  "No asumir respuestas inmediatas de actores externos.",
+                  "Evitar canales de comunicación dispersos."
+                ],
+                "done_when": "Mapa de actores internos y externos formalmente registrado."
+              },
+              "example_title": "Mapa de Actores y Canales de Interacción",
+              "example": "### Mapa de Actores\n- **Equipo Core:** Julián (Negocio & Ventas), Laura (Tecnología No-Code & Marketing). Comunicación sincrónica diaria por demanda.\n- **Externos:** Soporte Técnico Wompi (Asincrónico impredecible, 24-48h SLA), Asesor Legal (Por demanda asincrónica).",
+              "link_label": "mapa de actores va a selección metodológica (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Selección del marco metodológico (Kanban Light)",
+          "objective": "Elegir rigurosamente el marco de trabajo adaptado a la dimensión real del equipo (2 personas).",
+          "input": "Tamaño del equipo de P1-D6 y ciclo de 3-4 semanas de P1-D10.",
+          "raw_data_title": "Marco Metodológico",
+          "raw_data": "Seleccionado: Kanban Flujo Continuo con límite de WIP (máx 2-3 tareas activas). Scrum descartado por sobrecarga de ceremonias para 2 personas.",
+          "exit_label": "MARCO METODOLÓGICO SELECCIONADO → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Selección y justificación de metodología vs tamaño de equipo",
+              "objective": "Adoptar Kanban o Scrum con argumentos cuantitativos de costo administrativo.",
+              "how_to": {
+                "steps": [
+                  "Evaluar el tamaño del equipo ejecutor: 1-2 personas justifica Kanban.",
+                  "Calcular el desperdicio porcentual de ceremonias Scrum en equipos ultra reducidos.",
+                  "Documentar formalmente el descarte de Waterfall y Scrum.",
+                  "Fijar el principio rector de flujo continuo sobre lotes fijos."
+                ],
+                "table_columns": "Metodología Evaluada | Decisión (Adoptada / Descartada) | Justificación Matemática / Operativa",
+                "table_rules": "Coherencia estricta con la capacidad instalada del equipo.",
+                "restrictions": [
+                  "Prohibido imponer ceremonias pesadas sin equipo dedicado.",
+                  "Justificar con métricas la eliminación de burocracia."
+                ],
+                "done_when": "Modelo metodológico seleccionado y justificado."
+              },
+              "example_title": "Selección y Justificación Metodológica",
+              "example": "- **Modelo Seleccionado:** Kanban con Flujo Continuo y límite de WIP (Work in Progress: máx 2-3 tareas activas).\n- **Justificación según Tamaño del Equipo (P1-D6):** Dado que el equipo core está conformado por 1 desarrollador principal y 1 product manager / tester, Scrum introduce sobrecarga innecesaria. Kanban permite iteraciones rápidas guiadas por prioridades claras.\n- **Razones de Descarte:** Scrum descartado por ceremonias redundantes; Waterfall descartado por alta incertidumbre en campo.",
+              "link_label": "marco metodológico va a políticas asincrónicas (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Definición de políticas operativas asincrónicas",
+          "objective": "Establecer la regla de 'Asincrónico por Defecto' y el Límite de Trabajo en Proceso (WIP Limit).",
+          "input": "Modelo Kanban seleccionado en Step 1.2.",
+          "raw_data_title": "Políticas Asincrónicas",
+          "raw_data": "WIP Limit: Máximo 2 tareas In Progress por persona. Comunicación asincrónica por defecto; sincrónica solo ante bloqueos críticos.",
+          "exit_label": "POLÍTICAS ASINCRÓNICAS Y WIP ESTABLECIDOS → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Establecimiento de principios asincrónicos y WIP limits",
+              "objective": "Proteger el tiempo de concentración profunda fijando límites numéricos al multitasking.",
+              "how_to": {
+                "steps": [
+                  "Fijar el límite de WIP: máximo 2 tareas en estado 'In Progress' por miembro.",
+                  "Establecer la directriz: asincrónico por defecto para preservar bloques de desarrollo.",
+                  "Definir el protocolo de escalamiento cuando una tarea quede bloqueada.",
+                  "Registrar las reglas operativas en el documento de proceso."
+                ],
+                "table_columns": "Política Operativa | Regla Mandatoria | Impacto en Concentración",
+                "table_rules": "WIP Limit <= 2 por persona obligatorio.",
+                "restrictions": [
+                  "No permitir apertura de nuevas tareas si se alcanzó el límite de WIP.",
+                  "Evitar reuniones síncronas sin bloqueo explícito documentado."
+                ],
+                "done_when": "Límites de WIP y políticas asincrónicas formalizadas."
+              },
+              "example_title": "Políticas Operativas y Límites de WIP",
+              "example": "### Reglas del Marco Metodológico\n- **Metodología:** Kanban Flujo Continuo.\n- **WIP Limit:** Máximo 2 tareas `In Progress` por responsable al mismo tiempo.\n- **Comunicación:** Asincrónica por defecto; sincronización solo para resolución de bloqueos que detengan el flujo.",
+              "link_label": "políticas asincrónicas van a stack de herramientas (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Selección del Stack de Herramientas y Políticas de Comunicación",
+      "summary": "Elegir herramientas livianas, estandarizar tableros Kanban y prohibir canales dispersos.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Selección del tool stack liviano",
+          "objective": "Definir un ecosistema minimalista de software de gestión para máxima agilidad.",
+          "input": "Políticas de Step 1 y herramientas evaluadas.",
+          "raw_data_title": "Tool Stack Seleccionado",
+          "raw_data": "Task Tracker: Linear (tickets >15 min). Documentación: Obsidian + Git Repo. Chat: Slack con hilos.",
+          "exit_label": "TOOL STACK LIVIANO SELECCIONADO → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Definición de herramientas operativas mínimas",
+              "objective": "Asignar una herramienta oficial y única para cada necesidad operativa del proyecto.",
+              "how_to": {
+                "steps": [
+                  "Seleccionar una herramienta única para gestión de tareas (Linear o GitHub Projects).",
+                  "Seleccionar un repositorio centralizado para documentación estructurada (Obsidian/Git).",
+                  "Seleccionar una plataforma de mensajería organizada por canales e hilos (Slack).",
+                  "Documentar la justificación de velocidad y trazabilidad de cada herramienta."
+                ],
+                "table_columns": "Categoría Operativa | Herramienta Oficial | Criterio de Selección",
+                "table_rules": "Una sola herramienta oficial por categoría.",
+                "restrictions": [
+                  "No dispersar actividades en múltiples aplicaciones redundantes.",
+                  "Exigir sincronización con el repositorio de código."
+                ],
+                "done_when": "Stack oficial de herramientas seleccionado y parametrizado."
+              },
+              "example_title": "Stack de Herramientas Oficiales",
+              "example": "| Categoría | Herramienta Elegida | Justificación |\n| --- | --- | --- |\n| Task Tracker | Linear | Gestión rápida con atajos de teclado y sincronización con GitHub |\n| Documentación | Obsidian + Git Repo | Repositorio centralizado Markdown como única fuente de verdad |\n| Chat de Equipo | Slack | Canales temáticos y discusiones en hilos vinculados a tickets |",
+              "link_label": "tool stack va a prohibiciones de canales (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Establecimiento de prohibiciones de comunicación",
+          "objective": "Impedir la toma de decisiones en canales informales para garantizar trazabilidad y foco.",
+          "input": "Tool stack seleccionado en Step 2.1.",
+          "raw_data_title": "Canales Prohibidos",
+          "raw_data": "Prohibido: WhatsApp para decisiones técnicas/producto; Google Docs para arquitectura; notas personales dispersas.",
+          "exit_label": "PROHIBICIONES DE CANAL BLINDADAS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Fijación de canales autorizados y prohibiciones",
+              "objective": "Sancionar el uso de medios inadecuados para preservar la memoria arquitectónica del sistema.",
+              "how_to": {
+                "steps": [
+                  "Identificar canales informales susceptibles de causar pérdida de acuerdos (WhatsApp, llamadas).",
+                  "Declarar explícitamente prohibido cerrar acuerdos técnicos en dichos canales.",
+                  "Fijar la regla: si una decisión no está en Linear o Git, no existe formalmente.",
+                  "Consolidar la tabla de canales autorizados y prohibiciones de uso."
+                ],
+                "table_columns": "Herramienta Autorizada | Regla Obligatoria de Uso | Canales Estrictamente Prohibidos",
+                "table_rules": "Prohibiciones mandatorias de observancia general.",
+                "restrictions": [
+                  "No tolerar dispersión de especificaciones en chats personales.",
+                  "Obligar a transferir acuerdos informales al repositorio oficial."
+                ],
+                "done_when": "Tabla de reglas de uso y canales prohibidos establecida."
+              },
+              "example_title": "Políticas de Uso y Prohibiciones de Comunicación",
+              "example": "| Categoría | Herramienta Elegida | Regla de Uso Obligatoria | Canales Prohibidos |\n| --- | --- | --- | --- |\n| **Task Tracker** | Linear | Toda actividad > 15 min debe registrarse como Ticket. WIP Limit = 2. | Prohibido gestionar tareas en notas personales o chat. |\n| **Documentación** | Obsidian + Git Repo | Repositorio único de especificaciones y entregables. | Prohibido usar Google Docs para documentos de arquitectura o negocio. |\n| **Comunicación Chat** | Slack | Discusión de tareas mediante hilos (threads) vinculados al ticket de Linear. | Prohibido usar WhatsApp para tomar decisiones de producto. |",
+              "link_label": "prohibiciones van a estructura de tableros (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Estructuración de tableros Kanban",
+          "objective": "Estandarizar las columnas del flujo de trabajo y los criterios de transición de tickets.",
+          "input": "WIP limits de Step 1 y herramientas de Step 2.1.",
+          "raw_data_title": "Columnas del Tablero",
+          "raw_data": "Columnas estándar: Backlog -> Ready for Dev -> In Progress (WIP 2) -> Verification/DoD -> Done.",
+          "exit_label": "TABLERO KANBAN ESTANDARIZADO → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Estandarización de columnas y flujo de tickets",
+              "objective": "Configurar las fases del ciclo de vida de una tarea desde su concepción hasta su despliegue.",
+              "how_to": {
+                "steps": [
+                  "Definir la secuencia fija de estados del tablero: Backlog, Ready, In Progress, Verification, Done.",
+                  "Aplicar el WIP Limit restrictivo en la columna 'In Progress'.",
+                  "Establecer qué comprobación es requerida en 'Verification/DoD' antes de mover a 'Done'.",
+                  "Documentar la anatomía del tablero para alineación de todo el equipo."
+                ],
+                "table_columns": "Columna del Tablero | Propósito Operativo | Límite de WIP | Criterio de Salida",
+                "table_rules": "Estados unificados para desarrollo y producto.",
+                "restrictions": [
+                  "No crear columnas intermedias innecesarias que oculten cuellos de botella.",
+                  "Respetar el criterio de Definition of Done para el cierre."
+                ],
+                "done_when": "Estructura estándar de tablero Kanban documentada y validada."
+              },
+              "example_title": "Estructura Estándar de Tablero Kanban",
+              "example": "| Columna | Propósito | Regla de Tránsito |\n| --- | --- | --- |\n| **Backlog** | Ideas e iniciativas priorizadas | Priorizado por impacto |\n| **Ready for Dev** | Tareas con especificación y dependencias resueltas | Listo para ser tomado |\n| **In Progress** | Tareas activas en desarrollo | WIP Limit estricto: 2 por persona |\n| **Verification / DoD** | Pruebas y verificación de criterios de aceptación | Requiere revisión cruzada |\n| **Done** | Tarea completada y desplegada | Cerrada definitivamente |",
+              "link_label": "tablero Kanban va a diseño de rituales (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Diseño de Rituales de Sincronización y Métricas (DORA Baselines)",
+      "summary": "Definir cadencia de reuniones mínimas con entregable tangible y fijar métricas DORA.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Diseño de cadencia de rituales sincrónicos",
+          "objective": "Programar reuniones cortas y productivas manteniendo la sobrecarga horaria en menos de 2.5 horas semanales.",
+          "input": "Hitos de P1-D10 y políticas de Step 1.",
+          "raw_data_title": "Cadencia de Reuniones",
+          "raw_data": "Daily Sync (L, M, V - 15 min asíncrono/síncrono). Planning semanal (Lunes 45 min). Weekly Review/Retro (Viernes 30 min). Triage quincenal (30 min).",
+          "exit_label": "CADENCIA DE RITUALES DISEÑADA → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Programación de reuniones mínimas con duración acotada",
+              "objective": "Fijar horarios, frecuencias y topes de tiempo estrictos para cada ceremonia de equipo.",
+              "how_to": {
+                "steps": [
+                  "Fijar el Standup con frecuencia de 3 veces por semana o diario asíncrono (15 min máx).",
+                  "Programar la sesión de planificación al inicio de semana (30-45 min máx).",
+                  "Programar la demostración o retrospectiva al final de la semana (20-30 min máx).",
+                  "Calcular el tiempo total semanal para garantizar que represente menos del 6% de la jornada."
+                ],
+                "table_columns": "Ritual / Ceremonia | Frecuencia | Duración Máxima | Participantes Requeridos",
+                "table_rules": "Tope máximo semanal de reuniones: 2.5 horas acumuladas.",
+                "restrictions": [
+                  "Prohibido extender reuniones más allá del tiempo fijado.",
+                  "Cancelar reuniones de las que no se requiera resolución de bloqueos."
+                ],
+                "done_when": "Calendario de rituales mínimos programado con límites de tiempo."
+              },
+              "example_title": "Cadencia de Rituales Sincrónicos y Asíncronos",
+              "example": "### Cadencia de Rituales\n- **Daily Sync (Lunes, Miércoles, Viernes - 15 min):** Revisión de bloqueos y tickets `In Progress`.\n- **Sprint Planning (Lunes - 45 min):** Selección de tickets de `Backlog` a `Ready` según el Hito de P1-D10.\n- **Weekly Review & Retro (Viernes - 30 min):** Verificación de DoD de Hito semanal y retrospectiva.\n- **Sobrecarga Semanal Total:** 2.25 horas / semana (< 6% del tiempo disponible).",
+              "link_label": "cadencia va a entregables obligatorios por ritual (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Definición de entregables obligatorios por ritual",
+          "objective": "Asignar un artefacto o cambio verificable en el tablero a cada reunión para justificar su existencia.",
+          "input": "Cadencia de rituales de Step 3.1.",
+          "raw_data_title": "Outputs por Ritual",
+          "raw_data": "Daily: lista de desbloqueos en Slack. Planning: tablero Linear actualizado. Review: summary de avance en Obsidian y demo grabada.",
+          "exit_label": "ENTREGABLES POR RITUAL ASIGNADOS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Asignación de output verificable por ceremonia",
+              "objective": "Vincular cada reunión a un resultado tangible para aplicar la regla: 'sin output no hay reunión'.",
+              "how_to": {
+                "steps": [
+                  "Identificar el artefacto resultante de cada sesión sincrónica.",
+                  "Designar al responsable de publicar o actualizar el artefacto al término de la reunión.",
+                  "Establecer la regla: si un ritual no genera output medible durante 2 ciclos, se rediseña o elimina.",
+                  "Incorporar los outputs en la tabla maestra de rituales."
+                ],
+                "table_columns": "Ritual | Frecuencia | Duración Máxima | Participantes | Entregable Tangible (Output)",
+                "table_rules": "Cada reunión debe tener un output tangible comprobable.",
+                "restrictions": [
+                  "No admitir reuniones con propósitos genéricos de 'conversar'.",
+                  "Exigir evidencia documental o en tablero de cada sesión."
+                ],
+                "done_when": "Outputs verificables asociados formalmente a cada ritual."
+              },
+              "example_title": "Rituales y Ceremonias Ágiles con Output Tangible",
+              "example": "| Ritual / Reunión | Frecuencia | Duración Máxima | Participantes | Entregable Tangible (Output) |\n| --- | --- | --- | --- | --- |\n| **Standup Asíncrono / Sync** | L-M-V | 15 min | PM y Tech Lead | Tablero Kanban actualizado y bloqueos reportados |\n| **Planificación Semanal** | Semanal (Lunes) | 45 min | PM y Tech Lead | Board de Linear con tickets priorizados en Ready |\n| **Revisión de Flujo y Demo** | Semanal (Viernes) | 30 min | PM y Tech Lead | Incremento verificado y notas de avance en Obsidian |",
+              "link_label": "entregables por ritual van a métricas DORA (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Establecimiento de métricas de entrega y flujo (DORA Baselines)",
+          "objective": "Fijar objetivos iniciales cuantificables de velocidad, estabilidad y tiempo de ciclo.",
+          "input": "Hitos de P1-D10 y stack de herramientas de Step 2.",
+          "raw_data_title": "Métricas DORA",
+          "raw_data": "Frecuencia Despliegue: 1 vez/semana -> continua a Staging. Lead Time: 48h -> <12h. MTTR: 2h -> <30 min. Fallo Cambios: <15% -> <5%. Cycle Time: <48h.",
+          "exit_label": "MÉTRICAS DORA Y FLUJO ESTABLECIDAS → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Definición de metas DORA y ciclo temporal",
+              "objective": "Establecer la línea base y las metas técnicas de ingeniería para Fase 2.",
+              "how_to": {
+                "steps": [
+                  "Fijar metas para los 4 indicadores DORA: Frecuencia de Despliegue, Lead Time, MTTR y Change Failure Rate.",
+                  "Añadir la meta Lean de Cycle Time (tiempo de resolución de tickets < 48 horas).",
+                  "Determinar la fuente automatizada de medición (GitHub Actions, Vercel, logs de servidor).",
+                  "Consolidar la tabla de métricas de entrega de ingeniería."
+                ],
+                "table_columns": "Métrica DORA | Línea Base Inicial | Meta de Fase 2 | Fuente de Medición",
+                "table_rules": "Métricas objetivas medibles por herramientas de CI/CD.",
+                "restrictions": [
+                  "No fijar metas utópicas desconectadas del nivel de madurez del equipo.",
+                  "Garantizar que existan fuentes reales de medición."
+                ],
+                "done_when": "Tabla de métricas DORA iniciales consolidada y validada."
+              },
+              "example_title": "Línea Base de Métricas de Entrega (DORA Baselines)",
+              "example": "| Métrica DORA | Línea Base Inicial | Meta de Fase 2 | Fuente de Medición |\n| --- | --- | --- | --- |\n| **Frecuencia de Despliegue** | 1 vez por semana | Despliegue continuo a Staging tras cada PR | GitHub Actions / Vercel |\n| **Lead Time for Changes** | 48 horas | <12 horas desde commit hasta staging | Pipeline CI/CD |\n| **Tiempo de Recuperación (MTTR)** | 2 horas | <30 minutos vía rollback automático | Monitoreo y logs de servidor |\n| **Tasa de Fallo en Cambios** | <15% | <5% de reversiones en despliegues | Registro de incidencias |",
+              "link_label": "métricas DORA van a consolidación final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar el acuerdo metodológico, validar eficiencia de reuniones y certificar aprobación.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación estructurada del proceso de trabajo",
+          "objective": "Integrar selección metodológica, políticas, tool stack, rituales y métricas DORA en el documento oficial.",
+          "input": "Resultados de Steps 1 al 3.",
+          "raw_data_title": "Consolidación Documental",
+          "raw_data": "Ensamblaje de las 5 secciones estándar: Metadatos, Modelo Metodológico, Rituales Ágiles, Métricas DORA y Compuerta de Fase.",
+          "exit_label": "DOCUMENTO CONSOLIDADO → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Integración de directrices, herramientas y métricas",
+              "objective": "Formatear el artefacto oficial siguiendo la plantilla estandarizada de la metodología.",
+              "how_to": {
+                "steps": [
+                  "Organizar el contenido bajo la estructura de 5 apartados oficiales.",
+                  "Revisar la consistencia de tablas y viñetas explicativas.",
+                  "Verificar los enlaces hacia los artefactos precedentes (P1-D6, P1-D9, P1-D10).",
+                  "Preparar la versión consolidada para auditoría de sobrecarga horaria."
+                ],
+                "table_columns": "Sección Documental | Formato Aplicado | Estado de Integración",
+                "table_rules": "Uso estricto de la plantilla oficial de Fase 1.",
+                "restrictions": [
+                  "No omitir justificaciones del descarte metodológico.",
+                  "Mantener exactitud en las cifras de métricas DORA."
+                ],
+                "done_when": "Documento de Proceso de Trabajo integrado en su totalidad."
+              },
+              "example_title": "Estructura Consolidada del Proceso de Trabajo",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 1 — Viabilidad Temprana (Early Viability)  \n**Entregable:** 11 de 13  \n**Estado:** Aprobado  \n\n### 2. Selección y Justificación del Modelo Metodológico  \n### 3. Rituales y Ceremonias Ágiles  \n### 4. Línea Base de Métricas de Entrega (DORA Baselines)  \n### 5. Implicación de Compuerta de Fase",
+              "link_label": "consolidación va a validación de sobrecarga (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Validación de eficiencia operativa",
+          "objective": "Verificar cuantitativamente que el tiempo dedicado a reuniones no exceda el 6% de la capacidad disponible.",
+          "input": "Duración de rituales de Step 3.1.",
+          "raw_data_title": "Verificación de Sobrecarga",
+          "raw_data": "Tiempo total en reuniones: 2.25 horas/semana por persona (5.6% de 40h semanales). Cumple la restricción (<6%).",
+          "exit_label": "SOBRECARGA OPERATIVA VERIFICADA → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Verificación de sobrecarga de reuniones (<6%)",
+              "objective": "Comprobar que el marco metodológico maximice las horas disponibles para ejecución real.",
+              "how_to": {
+                "steps": [
+                  "Sumar la duración de todas las reuniones semanales programadas.",
+                  "Dividir entre la jornada laboral base (40 horas semanales).",
+                  "Comprobar que el porcentaje resultante sea menor o igual al 6% (máximo 2.4 horas).",
+                  "Registrar el cálculo de eficiencia operativa en los metadatos de validación."
+                ],
+                "table_columns": "Métrica de Eficiencia | Criterio de Control | Valor Calculado | Evaluación",
+                "table_rules": "Tope máximo de sobrecarga: 6% del tiempo disponible.",
+                "restrictions": [
+                  "Si la sobrecarga excede 6%, reducir la duración de las reuniones inmediatamente.",
+                  "Garantizar que la regla se respete durante la ejecución."
+                ],
+                "done_when": "Eficiencia operativa verificada dentro del límite permitido."
+              },
+              "example_title": "Verificación de Eficiencia Operativa de Reuniones",
+              "example": "| Métrica | Criterio | Valor Obtenido | Estatus |\n| --- | --- | --- | --- |\n| Sobrecarga Semanal de Reuniones | <= 2.4 h/semana (6%) | 2.25 h/semana (5.6%) | Conforme ✅ |\n| Foco en Ejecución Real | >= 94% tiempo disponible | 94.4% tiempo disponible | Conforme ✅ |",
+              "link_label": "eficiencia va a metadatos finales y firma (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Metadatos y firma de aprobación",
+          "objective": "Certificar la aprobación formal del modelo de proceso y registrar las firmas de liderazgo.",
+          "input": "Documento consolidado y verificado.",
+          "raw_data_title": "Aprobación y Cierre D11",
+          "raw_data": "Proyecto: Nos Fuimos de Finca. Fase 1, D11 de 13. Estado: Approved. Veredicto: Proceed. Aprobadores: Julián (PM) / Laura (Tech Lead).",
+          "exit_label": "PROCESO DE TRABAJO FORMALMENTE APROBADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Registro de metadatos y sellado formal de proceso",
+              "objective": "Formalizar el acuerdo de trabajo ágil como norma de conducta obligatoria del equipo.",
+              "how_to": {
+                "steps": [
+                  "Completar la cabecera estándar de metadatos con el estado 'Approved'.",
+                  "Registrar el veredicto formal de la compuerta de proceso 'Proceed'.",
+                  "Consolidar la firma conjunta de PM y Tech Lead.",
+                  "Publicar el entregable y actualizar el archivo de progreso del proyecto."
+                ],
+                "table_columns": "Campo de Metadatos | Valor Registrado | Observación",
+                "table_rules": "Aprobación formal consensuada.",
+                "restrictions": [
+                  "No omitir el veredicto de compuerta.",
+                  "Asegurar la adopción efectiva del marco de trabajo."
+                ],
+                "done_when": "Metadatos formalizados y entregable D11 aprobado."
+              },
+              "example_title": "Certificación Final del Entregable D11",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 1 — Viabilidad Temprana (Early Viability)  \n**Entregable:** 11 de 13  \n**Estado:** Aprobado  \n\n### 5. Implicación de Compuerta de Fase\n- **Veredicto:** Proceed. Marco metodológico ligero y adaptado al tamaño del equipo.\n- **Aprobadores:** Julián (PM) / Laura (Tech Lead)",
+              "link_label": "cierre formal del entregable D11"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,368 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D11",
+  "deliverable": "Communication & Escalation Protocols (Protocolos de Comunicación y Escalamiento)",
+  "purpose": "Este entregable define las reglas de gobernanza del proyecto: cómo se toman y registran las decisiones, cómo se escalan los bloqueos técnicos y cuál es la cadencia de sincronización del equipo. Erradica la amnesia corporativa y el caos de las decisiones sin registro.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_initial_plan]] | La cadencia del plan inicial (P1-D10) dicta la frecuencia de rituales y sincronizaciones. |\n| [[example_output_work_process]] | El modelo metodológico del D11 de Fase 1 dicta los canales y acuerdos de flujo. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría de Actores y Canales (Verify Entry)",
+      "summary": "Identificar los miembros del equipo operativo y fijar los canales oficiales de comunicación separando el intercambio efímero de la memoria documental permanente.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Identificación de Actores y Roles del Equipo",
+          "objective": "Extraer los roles operativos clave (PM, Tech Lead, Developers) para delimitar las líneas de reporte y consulta.",
+          "input": "Actores operativos de [[example_output_team_capability]] (P1-D6).",
+          "raw_data_title": "Equipo Operativo",
+          "raw_data": "Equipo fundador: Julián (PM / Producto) y Laura (CTO / Tech Lead). Roles definidos para decisiones de arquitectura y negocio.",
+          "exit_label": "ACTORES Y ROLES DELIMITADOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Mapeo de Roles de PM, Tech Lead y Canales Primarios",
+              "objective": "Asignar la titularidad de decisiones de producto a Julián y de tecnología/arquitectura a Laura.",
+              "how_to": {
+                "steps": [
+                  "Consultar el mapeo de responsabilidades de P1-D6.",
+                  "Asignar la gestión de prioridades y negocio al rol de PM.",
+                  "Asignar la gobernanza técnica y arquitectura al rol de Tech Lead.",
+                  "Registrar los roles en la matriz de gobernanza."
+                ],
+                "table_columns": "Rol Operativo | Titular Asignado | Ámbito de Autoridad",
+                "table_rules": "Toda decisión debe contar con un único responsable final para evitar parálisis.",
+                "restrictions": [
+                  "Prohibido dejar áreas de decisión en ambigüedad o sin responsable directo."
+                ],
+                "done_when": "Roles de gobernanza y autoridades formalizados."
+              },
+              "example_title": "Roles Operativos del Equipo",
+              "example": "| Rol | Titular | Ámbito de Autoridad |\n| --- | --- | --- |\n| PM / Producto | Julián | Priorización de backlog, alcance de sprints y validación comercial |\n| Tech Lead / CTO | Laura | Arquitectura, aprobación de PRs, estándares y decisiones de infraestructura |",
+              "link_label": "roles pasan a asignación de canales oficiales (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Asignación de Canales Oficiales y Regla de Canal Único",
+          "objective": "Establecer las herramientas oficiales de chat rápido y registro documental permanente.",
+          "input": "Herramientas de trabajo seleccionadas en P2-D10.",
+          "raw_data_title": "Canales Oficiales",
+          "raw_data": "Sincronización rápida: WhatsApp (grupo oficial del proyecto). Documentación inmutable: GitHub (Markdown en /docs).",
+          "exit_label": "CANALES OFICIALES BLOQUEADOS → 2.1",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Segregación de Comunicación Efímera vs Registro Inmutable",
+              "objective": "Fijar las directrices de canal y redactar las prohibiciones explícitas contra la pérdida de contexto.",
+              "how_to": {
+                "steps": [
+                  "Designar el grupo oficial de WhatsApp para mensajes rápidos y bloqueos inmediatos.",
+                  "Designar el repositorio GitHub (/docs) como única fuente inmutable de verdad documental.",
+                  "Dictar la prohibición estricta: ninguna decisión técnica vive solo en el chat.",
+                  "Consolidar la tabla de canales oficiales y prohibiciones."
+                ],
+                "table_columns": "Canal / Propósito | Herramienta Oficial | Regla de Uso | Prohibiciones",
+                "table_rules": "Cualquier acuerdo tomado en chat debe trasladarse a ticket o documento formal.",
+                "restrictions": [
+                  "Prohibido mezclar temas del proyecto en chats personales individuales."
+                ],
+                "done_when": "Canales oficiales delimitados con reglas de uso y prohibiciones."
+              },
+              "example_title": "Canales Oficiales de Comunicación (Step 1 Output)",
+              "example": "| Canal / Propósito | Herramienta Oficial | Regla de Uso | Prohibiciones |\n| --- | --- | --- | --- |\n| **Sincronización Rápida** | WhatsApp (Grupo Oficial) | Comunicación asíncrona ágil y avisos de bloqueo | Prohibido discutir arquitectura sin volcarlo a documento |\n| **Documentación / Repositorio** | GitHub / Notion | Registro inmutable de requerimientos y decisiones | Prohibido tomar decisiones solo verbalmente |",
+              "link_label": "canales de comunicación pasan a protocolo de ADRs (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Protocolo de Decisiones Técnicas (ADRs)",
+      "summary": "Establecer la metodología de Architecture Decision Records para preservar la memoria histórica de elecciones arquitectónicas irreversibles.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Disparadores y Ubicación de Registros de Arquitectura",
+          "objective": "Definir cuándo es mandatorio redactar un ADR y en qué ruta del repositorio debe alojarse.",
+          "input": "Estructura del repositorio de P2-D4 y reglas de gobernanza.",
+          "raw_data_title": "Disparadores y Ubicación de ADRs",
+          "raw_data": "Disparador: Cualquier cambio en Stack (D3), Arquitectura (Fase 5) o RNNs (D2). Directorio: /docs/adrs/ADR-NNN-titulo-kebab.md.",
+          "exit_label": "DISPARADORES Y UBICACIÓN DE ADRS FIJADOS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Fijación de Directorio y Criterios de Escritura de ADRs",
+              "objective": "Establecer las condiciones obligatorias que detonan la creación de un nuevo registro arquitectónico.",
+              "how_to": {
+                "steps": [
+                  "Fijar el directorio formal /docs/adrs/ en el monorepo.",
+                  "Definir la convención de nombres de archivo (ADR-NNN-titulo.md).",
+                  "Determinar los disparadores: impacto en stack, costo, persistencia o seguridad.",
+                  "Documentar los criterios en la normativa del equipo."
+                ],
+                "table_columns": "Elemento de ADR | Especificación Obligatoria | Condición de Gatillo",
+                "table_rules": "Toda modificación que altere una restricción no negociable exige un ADR previo.",
+                "restrictions": [
+                  "Prohibido realizar cambios de infraestructura significativos sin aprobación de su ADR."
+                ],
+                "done_when": "Directorio y disparadores de ADR formalmente definidos."
+              },
+              "example_title": "Disparadores y Convención de ADRs",
+              "example": "| Elemento | Especificación | Disparador |\n| --- | --- | --- |\n| Ruta Física | `/docs/adrs/ADR-NNN-titulo-kebab.md` | Monorepo oficial |\n| Gatillo Mandatorio | Modificaciones al Stack (D3), Arquitectura o RNNs (D2) | Previo a implementar el cambio en código |",
+              "link_label": "disparadores pasan a plantilla y ciclo de vida de ADRs (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Plantilla Estándar y Estados de Ciclo de Vida",
+          "objective": "Definir la estructura canónica y los estados permitidos de los registros de decisión arquitectónica.",
+          "input": "Estándares de documentación y plantillas de la industria (Michael Nygard).",
+          "raw_data_title": "Plantilla y Estados de ADR",
+          "raw_data": "Formato: Título, Estado (Propuesto/Aprobado/Rechazado/Superado), Contexto, Decisión, Consecuencias. Obligatorio.",
+          "exit_label": "PROTOCOLO ADR COMPLETO Y BLOQUEADO → 3.1",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Formalización de la Estructura Canónica de ADRs",
+              "objective": "Crear la especificación formal del protocolo ADR para el documento final.",
+              "how_to": {
+                "steps": [
+                  "Detallar las 5 secciones obligatorias de la plantilla canónica.",
+                  "Definir el flujo de estados (Propuesto -> Aprobado / Rechazado).",
+                  "Consolidar la sección oficial de Protocolo de Decisiones Técnicas.",
+                  "Asegurar el cumplimiento del pass condition de memoria inmutable."
+                ],
+                "table_columns": "Sección del ADR | Propósito del Campo | Obligatoriedad",
+                "table_rules": "El campo Consecuencias debe incluir tanto beneficios como desventajas técnicas asumidas.",
+                "restrictions": [
+                  "No omitir el impacto negativo o deudas técnicas asumidas en la decisión."
+                ],
+                "done_when": "Estructura canónica y estados de ADR formalizados."
+              },
+              "example_title": "Protocolo de Decisiones Técnicas (Step 2 Output)",
+              "example": "### 2. Protocolo de Decisiones Técnicas (ADR)\n- **Cuándo crear:** Ante cualquier decisión que impacte el Stack (D3), la Arquitectura (Fase 5), o los NFRs (D2).\n- **Directorio:** `/docs/adrs/ADR-NNN-titulo-kebab.md`\n- **Formato mínimo:** Título, Estado (Propuesto/Aprobado/Rechazado), Contexto, Decisión, Consecuencias.",
+              "link_label": "protocolo ADR pasa a ruta de escalamiento y rituales (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Ruta de Escalamiento y Rituales",
+      "summary": "Establecer la matriz de tiempos de atasco y escalamiento progresivo, junto con la cadencia de sincronizaciones ágiles.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Definición de Niveles y Tiempos de Escalamiento",
+          "objective": "Fijar los umbrales de tiempo máximos antes de que un desarrollador deba elevar un problema técnico.",
+          "input": "Acuerdos operativos y roles del equipo (Step 1).",
+          "raw_data_title": "Niveles de Escalamiento",
+          "raw_data": "Nivel 1: < 2h (resolver solo). Nivel 2: 2h-4h (escalar a Tech Lead). Nivel 3: > 4h (reportar en Daily). Nivel 4: > 1 día (reunión emergencia PM+Tech Lead).",
+          "exit_label": "NIVELES DE ESCALAMIENTO DELIMITADOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Matriz de Niveles, SLAs de Atasco y Responsables",
+              "objective": "Construir la tabla progresiva de escalamiento con acciones concretas y responsables por nivel.",
+              "how_to": {
+                "steps": [
+                  "Establecer Nivel 1 (< 2h) para investigación individual autónoma.",
+                  "Establecer Nivel 2 (2h-4h) para consulta directa al Tech Lead.",
+                  "Establecer Nivel 3 (> 4h) para declaración formal de impedimento en tablero.",
+                  "Establecer Nivel 4 (> 1 día) para sesión de emergencia y decisión de pivot.",
+                  "Consolidar la tabla oficial de escalamiento."
+                ],
+                "table_columns": "Nivel | Tiempo Bloqueado | Acción Requerida | Responsable",
+                "table_rules": "Nadie debe permanecer más de 2 horas atascado en silencio sin avisar.",
+                "restrictions": [
+                  "Prohibido ocultar bloqueos técnicos durante más de una jornada laboral."
+                ],
+                "done_when": "Matriz de escalamiento con tiempos y responsables formalizada."
+              },
+              "example_title": "Ruta de Escalamiento de Bloqueos (Step 3 Output)",
+              "example": "| Nivel | Tiempo Bloqueado | Acción | Responsable |\n| --- | --- | --- | --- |\n| 1 | < 2 horas | Resolver solo (Docs, IA, Stack Overflow). Documentar conclusión en el ticket. | Developer |\n| 2 | 2h - 4h | Mensaje directo a Laura (Tech Lead) vía WhatsApp. | Developer → Laura |\n| 3 | > 4h | Reportar en Daily Sync. Crear ticket de Impedimento en Trello. | Laura |\n| 4 | > 1 día | Reunión de emergencia PM (Julián) + Tech Lead. Decisión de pivot o wait. | Julián + Laura |",
+              "link_label": "escalamiento pasa a diseño de rituales de sincronización (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Diseño de la Cadencia de Rituales Ágiles",
+          "objective": "Estructurar las ceremonias periódicas de coordinación evitando reuniones innecesarias.",
+          "input": "Ritmo de iteración de P1-D10 y procesos de trabajo de P1-D11.",
+          "raw_data_title": "Cadencia de Rituales",
+          "raw_data": "Daily Sync: Martes y Jueves (15 min). Sprint Planning: Lunes quincenal (1 hora). Retrospective: Viernes quincenal (30 min).",
+          "exit_label": "RITUALES ÁGILES PROGRAMADOS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Programación de Daily Sync, Planning y Retrospectiva",
+              "objective": "Fijar la frecuencia, duración máxima y formato de cada ritual del equipo.",
+              "how_to": {
+                "steps": [
+                  "Programar Daily Sync bisemanal (Martes y Jueves, 15 min) para revisar bloqueos y avances.",
+                  "Programar Sprint Planning quincenal (Lunes, 1h) para priorizar y estimar.",
+                  "Programar Retrospectiva quincenal (Viernes, 30 min) para mejora continua del proceso.",
+                  "Documentar las 3 preguntas clave del daily y formato de cada ritual."
+                ],
+                "table_columns": "Ritual | Frecuencia | Duración Máxima | Formato / Entregable",
+                "table_rules": "Las reuniones deben ser estrictamente acotadas en tiempo y enfocadas en entregables.",
+                "restrictions": [
+                  "Prohibido extender reuniones de sync más allá de los 15 minutos asignados."
+                ],
+                "done_when": "Cadencia de rituales ágiles completamente programada."
+              },
+              "example_title": "Cadencia de Rituales Ágiles",
+              "example": "| Ritual | Frecuencia | Duración | Formato |\n| --- | --- | --- | --- |\n| Daily Sync | Martes y Jueves | 15 minutos | ¿Qué hice? ¿Qué haré? ¿Estoy bloqueado? |\n| Sprint Planning | Lunes (quincenal) | 1 hora | Revisión de backlog + estimación + priorización |\n| Retrospective | Viernes (quincenal) | 30 minutos | ¿Qué salió bien? ¿Qué mejorar? ¿Qué probar? |",
+              "link_label": "rituales pasan a consolidación de gobernanza (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Consolidación de Protocolos de Gobernanza",
+          "objective": "Integrar la matriz de escalamiento y los rituales en la directriz unificada de sincronización.",
+          "input": "Escalamiento (3.1) y rituales ágiles (3.2).",
+          "raw_data_title": "Gobernanza Unificada",
+          "raw_data": "Protocolo completo de escalamiento por niveles y cadencia quincenal sincronizada.",
+          "exit_label": "GOBERNANZA COMPLETA BLOQUEADA → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Formalización del Acuerdo de Escalamiento y Rituales",
+              "objective": "Validar la coherencia global entre los tiempos de respuesta y los ciclos del proyecto.",
+              "how_to": {
+                "steps": [
+                  "Verificar que los SLAs de escalamiento garanticen resolución antes del cierre de sprint.",
+                  "Comprobar que los rituales cuenten con agendas y entregables claros.",
+                  "Consolidar las tablas para su inclusión en el documento final.",
+                  "Comprobar el pass condition de certidumbre en desbloqueos y sincronización."
+                ],
+                "table_columns": "Componente de Gobernanza | Estado de Validación | Impacto Operativo",
+                "table_rules": "El equipo debe operar con previsibilidad y canales de socorro técnico claros.",
+                "restrictions": [
+                  "No dejar huecos en la cadena de escalamiento para días no laborables o emergencias."
+                ],
+                "done_when": "Gobernanza operativa completamente validada."
+              },
+              "example_title": "Resumen de Gobernanza de Sincronización",
+              "example": "El equipo operará con una cadencia bisemanal de standup y quincenal de planning/retro, respaldada por un escalamiento progresivo de 4 niveles con SLA máximo de 1 día hábil antes de reunión ejecutiva.",
+              "link_label": "gobernanza pasa a ensamblaje final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar las normas oficiales de gobernanza, protocolo de ADRs, escalamiento y rituales en el documento maestro del proyecto.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Metadatos y Protocolo ADR",
+          "objective": "Ensamblar la ficha técnica y la sección de registro de decisiones arquitectónicas en formato oficial.",
+          "input": "Metadatos del proyecto y directriz de ADRs de Step 2.",
+          "raw_data_title": "Metadatos y Protocolo ADR",
+          "raw_data": "Proyecto: Nos Fuimos de Finca, Fase 2, D11, Estado Aprobado. Protocolo de decisiones ADR formalizado.",
+          "exit_label": "METADATOS Y ADR INTEGRADOS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Compilación de Secciones 1 y 2 en Formato Oficial",
+              "objective": "Redactar las secciones 1 y 2 del documento oficial con estricto apego al formato Markdown.",
+              "how_to": {
+                "steps": [
+                  "Llenar los metadatos oficiales del proyecto.",
+                  "Adjuntar la sección de Protocolo de Decisiones Técnicas (ADR).",
+                  "Verificar que se especifiquen disparadores, directorio y formato mínimo.",
+                  "Asegurar exactitud sintáctica y coherencia."
+                ],
+                "table_columns": "Sección | Contenido Compilado | Estado",
+                "table_rules": "Respetar la numeración de secciones oficial.",
+                "restrictions": [
+                  "No omitir los campos obligatorios de la plantilla canónica de ADR."
+                ],
+                "done_when": "Secciones 1 y 2 compiladas correctamente."
+              },
+              "example_title": "Compilación de Metadatos y ADRs",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 2 — Project Kickoff\n**Entregable:** 11 de 13\n**Estado:** Aprobado\n\n### 2. Protocolo de Decisiones Técnicas (ADR)\n- **Cuándo crear:** Ante cualquier decisión que impacte el Stack (D3), la Arquitectura (Fase 5), o los NFRs (D2).\n- **Directorio:** `/docs/adrs/ADR-NNN-titulo-kebab.md`\n- **Formato mínimo:** Título, Estado (Propuesto/Aprobado/Rechazado), Contexto, Decisión, Consecuencias.",
+              "link_label": "secciones base pasan a anexar escalamiento, rituales y compuerta (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Integración de Escalamiento, Rituales y Compuerta",
+          "objective": "Incorporar las tablas de escalamiento de bloqueos, cadencia de rituales y evaluar la compuerta de fase.",
+          "input": "Tablas de Step 3 y reglas de compuerta condicional.",
+          "raw_data_title": "Escalamiento, Rituales y Compuerta D11",
+          "raw_data": "Tablas integradas. Condición: Proceed. Protocolos de decisión y escalamiento definidos con tiempos máximos y responsables.",
+          "exit_label": "ESCALAMIENTO, RITUALES Y COMPUERTA INCORPORADAS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Ensamblaje de Secciones 3, 4 y 5 con Declaración de Avance",
+              "objective": "Completar las secciones 3, 4 y 5 del entregable formalizando la gobernanza del equipo.",
+              "how_to": {
+                "steps": [
+                  "Insertar la tabla de Ruta de Escalación de Bloqueos.",
+                  "Insertar la tabla de Cadencia de Rituales.",
+                  "Evaluar la compuerta: ¿ADR con directorio, escalamiento con tiempos y rituales coherentes con D10?",
+                  "Redactar la declaración formal de avance (Proceed)."
+                ],
+                "table_columns": "Sección | Contenido Anexado | Veredicto",
+                "table_rules": "Si faltan tiempos límites de escalamiento, detener y exigir definición.",
+                "restrictions": [
+                  "Prohibido otorgar pase sin SLAs claros de desbloqueo."
+                ],
+                "done_when": "Secciones de escalamiento, rituales y compuerta de fase ensambladas."
+              },
+              "example_title": "Escalamiento, Rituales y Compuerta",
+              "example": "### 3. Ruta de Escalación de Bloqueos\n| Nivel | Tiempo Bloqueado | Acción | Responsable |\n| --- | --- | --- | --- |\n| 1 | < 2 horas | Resolver solo (Docs, IA, Stack Overflow). Documentar conclusión en el ticket. | Developer |\n| 2 | 2h - 4h | Mensaje directo a Laura (Tech Lead) vía WhatsApp. | Developer → Laura |\n| 3 | > 4h | Reportar en Daily Sync. Crear ticket de Impedimento en Trello. | Laura |\n| 4 | > 1 día | Reunión de emergencia PM (Julián) + Tech Lead. Decisión de pivot o wait. | Julián + Laura |\n\n### 4. Cadencia de Rituales\n| Ritual | Frecuencia | Duración | Formato |\n| --- | --- | --- | --- |\n| Daily Sync | Martes y Jueves | 15 minutos | ¿Qué hice? ¿Qué haré? ¿Estoy bloqueado? |\n| Sprint Planning | Lunes (quincenal) | 1 hora | Revisión de backlog + estimación + priorización |\n| Retrospective | Viernes (quincenal) | 30 minutos | ¿Qué salió bien? ¿Qué mejorar? ¿Qué probar? |\n\n### 5. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No.\n- **Condición:** Proceed. Los protocolos de decisión y escalación están definidos con tiempos máximos y responsables.",
+              "link_label": "documento completo pasa a validación final y publicación (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Validación de Integridad y Publicación Oficial",
+          "objective": "Verificar la exactitud del documento frente al artefacto de referencia y formalizar su publicación.",
+          "input": "Documento completo ensamblado y archivo de salida oficial.",
+          "raw_data_title": "Validación y Entrega D11",
+          "raw_data": "Verificado contra example_output_communication_protocols.md. Publicación oficial en docs/02-project-kickoff.",
+          "exit_label": "ENTREGABLE D11 PUBLICADO Y COMPLETADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Emisión Oficial del Documento D11",
+              "objective": "Publicar el marco oficial de comunicación y escalamiento para la operativa del equipo.",
+              "how_to": {
+                "steps": [
+                  "Comprobar la concordancia completa de todas las tablas y protocolos.",
+                  "Verificar el enlace al artefacto [[example_output_communication_protocols]].",
+                  "Validar que el estado del documento sea Aprobado.",
+                  "Registrar el hito en el control de progreso del proyecto."
+                ],
+                "table_columns": "Criterio de Cierre | Estado | Registro Oficial",
+                "table_rules": "El documento es el marco vinculante para la resolución de conflictos y coordinación diaria.",
+                "restrictions": [
+                  "No concluir sin validar que los tiempos de escalamiento sean realistas y medibles."
+                ],
+                "done_when": "Entregable D11 formalmente emitido y publicado."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_communication_protocols]]`.\n\nUbicación oficial: `docs/02-project-kickoff/11. Protocolos de Comunicacion.md`.\nEstado: Aprobado por Compuerta de Fase.",
+              "link_label": "entrega completada - fin de flujo D11"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

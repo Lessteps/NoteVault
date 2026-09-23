@@ -1,0 +1,202 @@
+{
+  "phase": "PHASE 4: SYSTEM MODELING",
+  "deliverable_code": "D10",
+  "deliverable": "Notification & Event Matrix",
+  "purpose": "Mapear eventos del sistema proactivos y transaccionales hacia canales de comunicación (Email, SMS/WhatsApp, Notificaciones Push y Webhooks de sistema), definiendo el UX writing con inyección de variables 1:1 desde el ERD (D6) y especificando esquemas JSON estrictos para integraciones desatendidas.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Sequence Diagrams (D7) | [[PHASE_4_SYSTEM_MODELING/7.System_Sequence_Diagrams/7.System_Sequence_Diagrams.md]] | Identifica cuándo se deben emitir eventos de notificación asíncrona hacia usuarios o servicios externos. |\n| State Machine Diagrams (D8) | [[PHASE_4_SYSTEM_MODELING/8.State_Machine_Diagrams/8.State_Machine_Diagrams.md]] | Determina las transiciones críticas de ciclo de vida (ej. PENDING_PAYMENT -> CONFIRMED) que disparan alertas. |\n| Conceptual ERD (D6) | [[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]] | Provee los nombres exactos de atributos de base de datos disponibles para interpolación dinámica en el copy. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Identificación de Eventos Transaccionales (Event Identification)",
+      "summary": "Filtrar transiciones del ciclo de vida y secuencias para aislar eventos de alto impacto en dinero, planes o seguridad.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Filtrado y Selección de Eventos Críticos de Negocio",
+          "objective": "Distinguir eventos transaccionales de alto valor frente a eventos internos que constituyen ruido operativo.",
+          "input": "Transiciones de D8 y puntos de emisión asíncrona de D7.",
+          "raw_data_title": "Inventario de Eventos Filtrados por Impacto",
+          "raw_data": "| Evento del Sistema | Origen Técnico | Tipo de Impacto | Criterio de Selección |\n|---|---|---|---|\n| BOOKING_APPROVAL_REQUEST | D8: PENDING_APPROVAL | Transaccional / Urgente | Requiere acción del finquero antes de ventana de 90 min |\n| BOOKING_CONFIRMED | D8: CONFIRMED | Financiero / Compromiso | Pago completado; genera itinerario y recibo legal |\n| BOOKING_CANCELLED_URGENT | D8: CANCELLED (<24h) | Operativo / Crítico | Cancelación imprevista que afecta check-in inmediato |\n| BOOKING_EXPIRED | D8: CANCELLED (Timeout) | Informativo / Reversión | Desbloquea fechas y notifica expiración al turista |\n| BOOKING_COMPLETED | D8: COMPLETED | Financiero / Reseña | Cierre de estadía; habilita desembolso y solicita calificación |",
+          "exit_label": "Eventos de Alto Valor Rigurosamente Aislados",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Criterios de Depuración Antiruido para Notificaciones",
+              "objective": "Aplicar filtros de negocio para evitar fatiga de alertas al usuario.",
+              "how_to": {
+                "steps": [
+                  "1. Evaluar si el evento involucra dinero, seguridad o fechas límite del usuario.",
+                  "2. Descartar eventos puramente de auditoría técnica interna.",
+                  "3. Asignar un identificador de evento en mayúsculas sostenidas (`BOOKING_CONFIRMED`).",
+                  "4. Validar trazabilidad directa con una transición de D8 o secuencia de D7."
+                ],
+                "table_columns": [
+                  "Evento",
+                  "Condición Disparadora",
+                  "Impacto Usuario",
+                  "Decisión"
+                ],
+                "table_rules": [
+                  "Solo eventos con impacto financiero, logístico o de seguridad califican",
+                  "No notificar cambios de estado que no demanden acción o confirmación del usuario",
+                  "Los identificadores de evento deben coincidir con la nomenclatura técnica del backend"
+                ],
+                "restrictions": "Prohibido generar notificaciones para transiciones de base de datos triviales o intermedias.",
+                "done_when": "Lista de eventos transaccionales depurada y aprobada."
+              },
+              "example_title": "Eventos Transaccionales Seleccionados",
+              "example": "```markdown\n| Evento | Origen (D7/D8) | Tipo |\n|---|---|---|\n| BOOKING_APPROVAL_REQUEST | D8: PENDING_APPROVAL | Urgente (Ventana 90m) |\n| BOOKING_CONFIRMED | D8: CONFIRMED | Financiero |\n| BOOKING_CANCELLED_URGENT | D8: CANCELLED | Crítico (<24h) |\n| BOOKING_COMPLETED | D8: COMPLETED | Financiero |\n```",
+              "link_label": "Eventos Depurados -> Mapeo de Canales y Destinatarios"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Mapeo de Canales y Destinatarios (Channel & Recipient Mapping)",
+      "summary": "Asignar cada evento al destinatario correcto y al canal tecnológico idóneo según urgencia, costo y persistencia.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Asignación de Canales por Latencia, Costo y Urgencia",
+          "objective": "Distribuir alertas entre Email, WhatsApp/SMS, Notificaciones Push y Webhooks minimizando costos operativos.",
+          "input": "Eventos del Step 1, roles de usuario de D1 y restricciones NFR de Fase 3.",
+          "raw_data_title": "Matriz de Asignación Canal-Destinatario-Urgencia",
+          "raw_data": "| Evento | Destinatario | Canal Óptimo | Justificación de Canal | Urgencia |\n|---|---|---|---|---|\n| BOOKING_APPROVAL_REQUEST | Finquero (Host) | WhatsApp HSM | Canal conversacional con mayor tasa de apertura en Colombia | < 90 min |\n| BOOKING_CONFIRMED | Turista | Email + Push | Email para recibo descargable; Push para feedback visual inmediato | Inmediata |\n| BOOKING_CANCELLED_URGENT | Finquero y Turista | SMS + Llamada | Notificación intrusiva para eventos imprevistos de última hora | < 24 hrs |\n| BOOKING_EXPIRED | Turista | Push | Canal gratuito no intrusivo; no amerita costo de SMS | Baja |\n| BOOKING_CONFIRMED | Sistema Contable | Webhook | Integración B2B automatizada sin intervención humana | Asíncrona |",
+          "exit_label": "Matriz de Canales y Roles Formalizada",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Clasificación de Canales y Racionalidad de Costos",
+              "objective": "Aplicar reglas de enrutamiento basadas en latencia y límites presupuestarios.",
+              "how_to": {
+                "steps": [
+                  "1. Reservar SMS/Llamada exclusivamente para urgencias operativas < 24 horas.",
+                  "2. Usar Email para confirmaciones transaccionales y soporte fiscal/legal.",
+                  "3. Usar Push para actualizaciones de estado en apps móviles y navegadores.",
+                  "4. Usar Webhooks con payloads estrictos para consumo entre sistemas.",
+                  "5. Registrar el costo unitario proyectado de SMS en la matriz de riesgos operativos."
+                ],
+                "table_columns": [
+                  "Canal",
+                  "Costo Mensaje",
+                  "Tasa Apertura",
+                  "Uso Recomendado"
+                ],
+                "table_rules": [
+                  "Todo evento con ventana de atención menor a 24h debe usar canal inmediato",
+                  "Los comprobantes de pago deben viajar obligatoriamente por Email",
+                  "Las integraciones externas de sistema deben implementarse vía Webhook"
+                ],
+                "restrictions": "No abusar del SMS para notificaciones rutinarias debido a su costo económico acumulativo.",
+                "done_when": "Todos los eventos cuentan con destinatario, canal y justificación formal asignados."
+              },
+              "example_title": "Asignación de Canales por Urgencia",
+              "example": "```markdown\n| Evento | Canal | Rol Receptor | Urgencia |\n|---|---|---|---|\n| BOOKING_APPROVAL_REQUEST | WhatsApp API | Finquero | <90m |\n| BOOKING_CONFIRMED | Email | Turista | Inmediata |\n| BOOKING_CONFIRMED | Webhook | Sistema Contable | N/A |\n| BOOKING_CANCELLED_URGENT | SMS | Turista | <24h |\n```",
+              "link_label": "Canales Asignados -> Redacción UX Copy y Payloads"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Redacción UX Copy y Payloads Estrictos (UX Writing & Payloads)",
+      "summary": "Redactar el copy exacto con interpolación de variables de D6 y diseñar los esquemas JSON de Webhook.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Plantillas con Variables Inyectables de D6 y Esquemas Webhook",
+          "objective": "Entregar a desarrollo las plantillas textuales exactas y contratos JSON listos sin ambigüedades.",
+          "input": "Campos de datos del ERD D6 y lineamientos de tono de marca.",
+          "raw_data_title": "Plantillas UX Copy y Esquemas JSON de Notificación",
+          "raw_data": "| Evento | Canal | Asunto / Subject | Cuerpo de Plantilla / Payload JSON |\n|---|---|---|---|\n| BOOKING_APPROVAL_REQUEST | WhatsApp | N/A | `¡Hola [hosts.full_name]! Tienes una solicitud para [properties.title] del [bookings.check_in_date] al [bookings.check_out_date]. Responde SÍ para aprobar o NO para rechazar (expira en 90 min).` |\n| BOOKING_CONFIRMED | Email | Confirmación de Reserva #[bookings.id] | `Hola [users.full_name], tu reserva en [properties.title] ha sido confirmada con éxito. Monto pagado: $[payments.amount]. Revisa tu itinerario adjunto.` |\n| BOOKING_CONFIRMED | Webhook | N/A | `{\n  \"event\": \"booking.confirmed\",\n  \"booking_id\": \"texto\",\n  \"total_price\": \"número\",\n  \"timestamp\": \"fecha\"\n}` |",
+          "exit_label": "Plantillas y Payloads Completamente Estandarizados",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Estructuración de Copy Transaccional y Payloads Tipados",
+              "objective": "Formular textos claros e inequívocos y objetos JSON que cumplan el contrato de integración.",
+              "how_to": {
+                "steps": [
+                  "1. Utilizar corchetes para inyectar variables de base de datos exactas: `[tabla.campo]`.",
+                  "2. Redactar mensajes directos con llamada a la acción (CTA) clara y sin adornos comerciales.",
+                  "3. Para Webhooks, especificar estructura JSON estricta con cabecera de evento y datos de contexto.",
+                  "4. Verificar que todas las variables existen formalmente en el ERD D6."
+                ],
+                "table_columns": [
+                  "Evento",
+                  "Tipo Copy",
+                  "Variables Inyectadas",
+                  "Validación D6"
+                ],
+                "table_rules": [
+                  "Las variables de plantilla deben corresponder 1:1 con atributos de D6",
+                  "El tono debe ser neutro, informativo y de alta precisión",
+                  "Los Webhooks deben incluir ID de transacción y timestamp ISO-8601"
+                ],
+                "restrictions": "Prohibido dejar al criterio del programador la redacción del texto de las notificaciones.",
+                "done_when": "Plantillas redactadas al 100% y contratos JSON formalizados."
+              },
+              "example_title": "Ejemplo de UX Copy y Webhook Payload",
+              "example": "```markdown\n## Evento: BOOKING_CONFIRMED\n**Canal:** Email\n**Asunto:** Tu reserva #[bookings.id] en [properties.title] está confirmada\n**Cuerpo:**\nHola [users.full_name],\nConfirmamos el pago exitoso de $[payments.amount] COP para tu estadía del [bookings.check_in_date] al [bookings.check_out_date].\n\n```json\n// Payload Webhook: booking.confirmed\n{\n  \"event\": \"booking.confirmed\",\n  \"booking_id\": \"b89a2b12-9c3f-4e5a-8b1a\",\n  \"property_id\": \"finca-las-palmas\",\n  \"total_price\": 1200000,\n  \"created_at\": \"2026-10-15T14:30:00Z\"\n}\n```",
+              "link_label": "Copy y Payloads Validados -> Ensamblaje Matriz D10"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de la Matriz de Notificaciones y Trazabilidad (Assembly & Risk Link)",
+      "summary": "Consolidar el entregable D10 con la matriz integral de eventos, destinatarios, canales, copies y vinculación a riesgos.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de la Matriz e Implicaciones para D11 y Riesgo Operativo",
+          "objective": "Publicar el entregable D10 integrando todas las combinaciones y documentando el impacto en seguridad y costos.",
+          "input": "Eventos depurados, canales mapeados y copies transaccionales.",
+          "raw_data_title": "Resumen Integral de Notificaciones del Sistema",
+          "raw_data": "| Código Evento | Destinatarios | Canales | Integración Downstream |\n|---|---|---|---|\n| BOOKING_APPROVAL_REQUEST | Host | WhatsApp HSM | D11 (API WhatsApp Webhook Auth) |\n| BOOKING_CONFIRMED | Turista, Contabilidad | Email, Push, Webhook | D11 (Protección de Webhook con firma HMAC) |\n| BOOKING_CANCELLED_URGENT | Turista, Host | SMS, Push | Risk Register (Costo de ráfagas SMS) |\n| BOOKING_EXPIRED | Turista | Push | MOD-CALENDAR (Liberación de soft-lock) |",
+          "exit_label": "Entregable D10 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento Maestro de Notificaciones",
+              "objective": "Consolidar el entregable D10 como especificación vinculante de comunicaciones.",
+              "how_to": {
+                "steps": [
+                  "1. Construir la tabla maestra con las 5 columnas: Evento, Destinatario, Canal, Estrategia y Copy.",
+                  "2. Documentar requerimientos de seguridad para webhooks de salida (firmas HMAC).",
+                  "3. Enlazar costos operativos con el Risk Register de Fase 1.",
+                  "4. Validar el cumplimiento estricto del idioma español en todos los textos."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Evento",
+                  "Canal",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "La matriz debe cubrir al menos los 4 canales de comunicación",
+                  "Todo mensaje debe tener asignada una plantilla o payload específico",
+                  "Verificar coherencia de nombres de atributos con D6"
+                ],
+                "restrictions": "No omitir el impacto económico en eventos de alta frecuencia sobre canales de pago (SMS).",
+                "done_when": "Documento D10 completamente ensamblado y validado."
+              },
+              "example_title": "Estructura de la Matriz D10",
+              "example": "```markdown\n| Evento | Destinatario | Canal | Estrategia | Copy / Payload |\n|:---|:---|:---|:---|:---|\n| BOOKING_APPROVAL_REQUEST | Host | WhatsApp | Async Worker | ¡Hola [hosts.full_name]! Tienes una reserva... |\n| BOOKING_CONFIRMED | Turista | Email | Async Worker | Hola [users.full_name], reserva confirmada... |\n| BOOKING_CONFIRMED | Contabilidad | Webhook | Event Sink | JSON: { event: \"booking.confirmed\", ... } |\n```",
+              "link_label": "Matriz Ensamblada -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Notification & Event Matrix (D10)",
+    "markdown": "# Deliverable 10 (D10): Matriz de Notificaciones y Eventos\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Módulo:** MOD-BOOKING / MOD-NOTIFICATION\n**Estado:** Aprobado\n\n---\n\n## Matriz Completa de Notificaciones y Eventos\n\n*Backlink a Fase 3:* Los eventos disparadores provienen de los Casos de Uso y secuencias técnicas (`[[PHASE_4_SYSTEM_MODELING/7.System_Sequence_Diagrams/7.System_Sequence_Diagrams.md]]`), y las restricciones de canal respetan los NFRs de la Fase 3 (`[[PHASE_3_REQUIREMENTS_ENGINEERING/6.Non-Functional_Requirements]]`).\n\n| Evento | Destinatario | Canal | Estrategia de Disparo | Asunto / Título / UX Copy |\n|:---|:---|:---|:---|:---|\n| **`BOOKING_APPROVAL_REQUEST`** | Finquero (Host) | WhatsApp API | Async Worker (MOD-QUEUE) | **Plantilla WA:** `¡Hola [hosts.full_name]! Tienes una solicitud de reserva para [properties.title] del [bookings.check_in_date] al [bookings.check_out_date]. Responde SÍ para aceptar o NO para rechazar (tienes 90 minutos antes de cancelación automática).` |\n| **`BOOKING_CONFIRMED`** | Turista (Guest) | Email + Push | Async Worker | **Email Subject:** `¡Reserva Confirmada! Tu viaje a [properties.title] está listo.`<br>**Email Body:** `Hola [users.full_name], confirmamos el cobro exitoso de $[payments.amount] COP. Tu código de reserva es [bookings.id]. Adjuntamos recibo de pago y guía de llegada.` |\n| **`BOOKING_CONFIRMED`** | Sistema Contable | Webhook (HTTPS POST) | Async Event Sink | **Webhook Payload:**<br>`{\n  \"event\": \"booking.confirmed\",\n  \"booking_id\": \"[bookings.id]\",\n  \"property_id\": \"[properties.id]\",\n  \"total_price\": [payments.amount],\n  \"currency\": \"COP\",\n  \"timestamp\": \"[bookings.created_at]\"\n}` |\n| **`BOOKING_CANCELLED_URGENT`** | Finquero y Turista | SMS | Inmediato (High Priority Queue) | **SMS Copy:** `Nos Fuimos de Finca Alerta: La reserva #[bookings.id] para hoy ha sido cancelada. Ingresa a la app para soporte inmediato o reembolso.` |\n| **`BOOKING_EXPIRED`** | Turista | Notificación Push | Async Worker | **Push Title:** `Solicitud de reserva expirada`<br>**Push Body:** `El anfitrión no respondió a tiempo la solicitud para [properties.title]. Tu dinero no fue cobrado. Explora otras fincas disponibles.` |\n\n---\n\n## Implicaciones para Siguientes Entregables\n\n- **Hacia D11 (Authorization Matrix):** El endpoint receptor del Webhook de WhatsApp y el despacho de Webhooks a sistemas contables requieren firma HMAC-SHA256 para validación de origen.\n- **Hacia el Risk Register (Fase 1 / Fase 4):** El uso de SMS para cancelaciones urgentes se categoriza con cuota mensual preventiva para evitar desbordes presupuestarios por spam o errores de sincronización.\n- **Hacia Fase 6 (Arquitectura Física):** Los eventos asíncronos (`BOOKING_CONFIRMED`, `BOOKING_APPROVAL_REQUEST`) se implementarán utilizando un Message Broker (Redis/RabbitMQ) para desacoplar el servidor HTTP del envío de correos y mensajes de WhatsApp."
+  }
+}

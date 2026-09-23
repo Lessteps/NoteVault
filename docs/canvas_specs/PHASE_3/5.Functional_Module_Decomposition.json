@@ -1,0 +1,305 @@
+{
+  "phase": "Phase 3",
+  "deliverable_code": "D5",
+  "deliverable": "Functional Module Decomposition (Descomposición Funcional en Módulos)",
+  "purpose": "Este entregable define la arquitectura funcional del software mediante la descomposición rigurosa del sistema en 6 módulos autónomos, altamente cohesivos y débilmente acoplados, fundamentados en Bounded Contexts y Agregados de Domain-Driven Design (DDD). Cada módulo gobierna la soberanía de sus datos, delimita sus operaciones expuestas y gestiona sus dependencias inter-modulares mediante un Grafo Acíclico Dirigido (DAG) sustentado en eventos desacoplados.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[example_output_system_context_diagram]] | Fronteras exteriores del sistema C4 Nivel 1 y sistemas externos integrados (Fase 3, D1). |\n| [[example_output_actor_and_role]] | Matriz de permisos RBAC, recursos protegidos y roles técnicos ROLE_* (Fase 3, D2). |\n| [[example_output_glossary]] | Agregados DDD, entidades, objetos de valor y lenguaje ubicuo formal (Fase 3, D3). |\n| [[example_output_requirements_elicitation]] | Registro maestro de 20 Requerimientos Candidatos (CR-001 a CR-020) y exclusiones (Fase 3, D4). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Particionamiento Modular, Criterios de Cohesión y Asignación de CRs (Verify Entry)",
+      "summary": "Analizar los agregados de dominio DDD, aplicar criterios rigurosos de cohesión funcional y balancear la granularidad modular para evitar tanto el antipatrón 'God Object' como la micro-fragmentación prematura.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Análisis de Agregados DDD y Delimitación Modular",
+          "objective": "Identificar los agregados nucleares de dominio y definir las fronteras de los 6 Bounded Contexts canónicos.",
+          "input": "[[example_output_glossary]] y [[example_output_system_context_diagram]].",
+          "raw_data_title": "Agregados y Bounded Contexts Identificados",
+          "raw_data": "- Finca / Catálogo -> Bounded Context de Catálogo y Publicación (MOD-CAT)\n- Calendario / Disponibilidad -> Bounded Context de Disponibilidad y Fechas (MOD-CAL)\n- Reserva / Checkout / Voucher -> Bounded Context de Reservas (MOD-RSV)\n- Pago / Transacción / Webhook -> Bounded Context Financiero (MOD-PAY)\n- Notificaciones WhatsApp -> Bounded Context de Mensajería (MOD-NOT)\n- Usuario / Autenticación / Auditoría -> Bounded Context de Identidad y Gobierno (MOD-IAM)",
+          "exit_label": "COMPLETE → 6 módulos funcionales delimitados con responsabilidad central única (1.2)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Delimitación Modular y Asignación Canónica",
+              "objective": "Establecer los 6 módulos canónicos con código MOD-[SUFIJO] y responsabilidad central.",
+              "how_to": {
+                "steps": [
+                  "1. Evaluar las raíces de agregación del dominio según las entidades de D3.",
+                  "2. Agrupar entidades con ciclo de vida existencial compartido en un mismo Bounded Context.",
+                  "3. Asignar código canónico MOD-[COD] en mayúsculas sostenidas y declarar la responsabilidad única."
+                ],
+                "table_columns": "Código Módulo | Nombre Canónico del Módulo | Responsabilidad Central | CRs In-Scope Asignados | Exclusiones Mapeadas (Won't Have) | Criterio de Cohesión Aplicado",
+                "table_rules": "Todos los códigos deben seguir el formato MOD-[TRES_LETRAS].",
+                "restrictions": [
+                  "No crear módulos god-object que mezclen reservas con pagos o catálogo con autenticación",
+                  "No fragmentar innecesariamente entidades subordinadas a un mismo agregado"
+                ],
+                "done_when": "Los 6 módulos están formalmente delimitados y tipados con sus criterios de cohesión"
+              },
+              "example_title": "Registro Maestro de Módulos Funcionales",
+              "example": "| Código Módulo | Nombre Canónico del Módulo | Responsabilidad Central | CRs In-Scope Asignados | Exclusiones Mapeadas (Won't Have) | Criterio de Cohesión Aplicado |\n| --- | --- | --- | --- | --- | --- |\n| **`MOD-CAT`** | Catálogo y Publicación de Fincas | Búsqueda pública, visualización de fichas y moderación de propiedades. | `CR-001`, `CR-006`, `CR-015` | *(Ninguna)* | Cohesión Funcional (Agregado Finca y Catálogo) |\n| **`MOD-CAL`** | Gestión de Disponibilidad y Calendario | Control soberano de fechas, bloqueos manuales y slots de reserva. | `CR-009`, `CR-012`, `CR-013` | `CR-014` (Reservas externas en efectivo) | Cohesión Transaccional (Máquina de estados de fechas) |\n| **`MOD-RSV`** | Core Transaccional de Reservas | Orquestación de checkout, creación de reservas y emisión de vouchers. | `CR-002`, `CR-005`, `CR-010`, `CR-011` | `CR-007` (Reembolsos automáticos 1-clic) | Cohesión de Flujo y Negocio (Ciclo de reserva) |\n| **`MOD-PAY`** | Procesamiento y Conciliación de Pagos | Recaudo vía pasarela, procesamiento de webhooks y auditoría financiera. | `CR-003`, `CR-016`, `CR-017` | `CR-020` (Facturación electrónica DIAN) | Cohesión Operativa y Aislamiento PCI-DSS |\n| **`MOD-NOT`** | Mensajería y Notificaciones Transaccionales | Despacho automatizado de alertas operativas (WhatsApp HSM y correo). | `CR-008` | *(Ninguna)* | Cohesión de Integración Externa Asíncrona |\n| **`MOD-IAM`** | Gestión de Identidad, Cuentas y Auditoría | Autenticación, control RBAC, bitácora forense y moderación de usuarios. | `CR-004`, `CR-018`, `CR-019` | *(Ninguna)* | Cohesión de Seguridad Transversal y Gobierno |",
+              "link_label": "módulos delimitados"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Asignación Exhaustiva de CRs y Segregación de Exclusiones",
+          "objective": "Mapear el 100% de los Requerimientos Candidatos de D4 a su módulo responsable y aislar los descartes.",
+          "input": "Registro de Requerimientos Candidatos (CR-001 a CR-020) de [[example_output_requirements_elicitation]].",
+          "raw_data_title": "Asignación de Requerimientos In-Scope y Exclusiones",
+          "raw_data": "- MOD-CAT: CR-001, CR-006, CR-015.\n- MOD-CAL: CR-009, CR-012, CR-013 (Excl: CR-014).\n- MOD-RSV: CR-002, CR-005, CR-010, CR-011 (Excl: CR-007).\n- MOD-PAY: CR-003, CR-016, CR-017 (Excl: CR-020).\n- MOD-NOT: CR-008.\n- MOD-IAM: CR-004, CR-018, CR-019.",
+          "exit_label": "COMPLETE → 100% de CRs asignados y exclusiones confinadas en sus módulos (2.1)",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Asignación Exhaustiva de CRs por Módulo",
+              "objective": "Garantizar cobertura total de requerimientos y vincular formalmente las exclusiones de alcance.",
+              "how_to": {
+                "steps": [
+                  "1. Distribuir los 17 requerimientos In-Scope en los módulos correspondientes.",
+                  "2. Confinar los 3 requerimientos Won't Have en sus módulos de impacto para blindar fronteras.",
+                  "3. Verificar que ningún requerimiento quede huérfano ni duplicado en múltiples módulos primarios."
+                ],
+                "table_columns": "Código Módulo | Nombre Canónico del Módulo | Responsabilidad Central | CRs In-Scope Asignados | Exclusiones Mapeadas (Won't Have) | Criterio de Cohesión Aplicado",
+                "table_rules": "Todo CR debe aparecer exactamente una vez en la columna de In-Scope o Exclusiones.",
+                "restrictions": [
+                  "No asignar requerimientos sin justificación funcional directa",
+                  "Mantener confinadas las exclusiones pactadas en D2 y D4"
+                ],
+                "done_when": "Los 20 requerimientos de D4 están asignados y balanceados en los 6 módulos"
+              },
+              "example_title": "Módulos Funcionales con CRs Asignados y Exclusiones",
+              "example": "| Código Módulo | Nombre Canónico del Módulo | Responsabilidad Central | CRs In-Scope Asignados | Exclusiones Mapeadas (Won't Have) | Criterio de Cohesión Aplicado |\n| --- | --- | --- | --- | --- | --- |\n| **`MOD-CAT`** | Catálogo y Publicación de Fincas | Búsqueda pública, visualización de fichas y moderación de propiedades. | `CR-001`, `CR-006`, `CR-015` | *(Ninguna)* | Cohesión Funcional (Agregado Finca y Catálogo) |\n| **`MOD-CAL`** | Gestión de Disponibilidad y Calendario | Control soberano de fechas, bloqueos manuales y slots de reserva. | `CR-009`, `CR-012`, `CR-013` | `CR-014` (Reservas externas en efectivo) | Cohesión Transaccional (Máquina de estados de fechas) |\n| **`MOD-RSV`** | Core Transaccional de Reservas | Orquestación de checkout, creación de reservas y emisión de vouchers. | `CR-002`, `CR-005`, `CR-010`, `CR-011` | `CR-007` (Reembolsos automáticos 1-clic) | Cohesión de Flujo y Negocio (Ciclo de reserva) |\n| **`MOD-PAY`** | Procesamiento y Conciliación de Pagos | Recaudo vía pasarela, procesamiento de webhooks y auditoría financiera. | `CR-003`, `CR-016`, `CR-017` | `CR-020` (Facturación electrónica DIAN) | Cohesión Operativa y Aislamiento PCI-DSS |\n| **`MOD-NOT`** | Mensajería y Notificaciones Transaccionales | Despacho automatizado de alertas operativas (WhatsApp HSM y correo). | `CR-008` | *(Ninguna)* | Cohesión de Integración Externa Asíncrona |\n| **`MOD-IAM`** | Gestión de Identidad, Cuentas y Auditoría | Autenticación, control RBAC, bitácora forense y moderación de usuarios. | `CR-004`, `CR-018`, `CR-019` | *(Ninguna)* | Cohesión de Seguridad Transversal y Gobierno |",
+              "link_label": "CRs asignados a módulos"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Especificación Anatómica y Fichas de Módulos Funcionales",
+      "summary": "Construir las fichas de especificación técnica bajo el contrato normativo de 8 dimensiones para cada uno de los 6 módulos, auditando la soberanía estricta de datos (Data Ownership) y el aislamiento de servicios de terceros.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Construcción de Fichas Anatómicas de 8 Dimensiones",
+          "objective": "Definir las entidades propias, operaciones expuestas, consumidas, eventos e integraciones por módulo.",
+          "input": "Registro de módulos de Step 1, convenciones técnicas de [[example_output_stack_decision]] y glosario D3.",
+          "raw_data_title": "8 Dimensiones Normativas por Módulo",
+          "raw_data": "1. Código y Nombre | 2. Responsabilidad Central | 3. Entidades Propias | 4. Operaciones Expuestas\n5. Operaciones Consumidas | 6. Eventos Emitidos/Consumidos | 7. Integración Externa | 8. Requerimientos Asignados",
+          "exit_label": "COMPLETE → Fichas anatómicas completas estructuradas en matriz consolidada (2.2)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Fichas Anatómicas de Módulos Funcionales",
+              "objective": "Formalizar la matriz de anatomía modular delimitando responsabilidades e interfaces técnicas.",
+              "how_to": {
+                "steps": [
+                  "1. Documentar para cada módulo las entidades sobre las cuales posee soberanía de escritura.",
+                  "2. Especificar las firmas de operaciones expuestas en su API pública.",
+                  "3. Catalogar los eventos de dominio que emite y escucha para coordinar procesos de negocio."
+                ],
+                "table_columns": "Módulo | Nombre Canónico | Responsabilidad Central | Entidades Propias (Data Ownership) | Operaciones Expuestas (API / Servicios) | Operaciones Consumidas (Dependencias) | Eventos Emitidos / Consumidos | Integración Externa",
+                "table_rules": "Ningún módulo puede escribir en tablas o entidades ajenas a su soberanía.",
+                "restrictions": [
+                  "Prohibir el acceso directo a bases de datos de otros módulos",
+                  "Toda comunicación inter-modular debe realizarse mediante APIs o eventos formales"
+                ],
+                "done_when": "La matriz de anatomía modular documenta las 8 dimensiones de los 6 módulos"
+              },
+              "example_title": "Matriz Consolidada de Anatomía Modular",
+              "example": "| Módulo | Nombre Canónico | Responsabilidad Central | Entidades Propias (Data Ownership) | Operaciones Expuestas (API / Servicios) | Operaciones Consumidas (Dependencias) | Eventos Emitidos / Consumidos | Integración Externa |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| **`MOD-CAT`** | Catálogo y Publicación de Fincas | Búsqueda pública, fichas y moderación de propiedades. | `Finca`, `Foto`, `Amenidad`, `TarifaBase` | `buscarFincas()`, `obtenerFicha()`, `aprobarFinca()` | `MOD-CAL.consultarDisponibilidad()`, `MOD-IAM.validarToken()` | Emite: `PropertyCreatedEvent` | Ninguna (Datos internos) |\n| **`MOD-CAL`** | Gestión de Disponibilidad y Calendario | Máquina de estados de fechas, bloqueos manuales y temporales. | `CalendarioFinca`, `BloqueoFecha`, `SlotDisponibilidad` | `bloquearFechasManual()`, `reservarSlotTemporal()`, `liberarSlot()` | `MOD-CAT.validarFincaActiva()` | Escucha: `BookingConfirmedEvent`, `LockExpiredEvent` | Ninguna (Lógica de inventario) |\n| **`MOD-RSV`** | Core Transaccional de Reservas | Flujo de reserva, emisión de vouchers y privacidad de datos. | `Reserva`, `DetalleHuesped`, `VoucherDigital` | `iniciarCheckout()`, `confirmarReserva()`, `consultarReserva()` | `MOD-CAL.reservarSlot()`, `MOD-PAY.crearIntencionPago()`, `MOD-IAM.validarRol()` | Emite: `BookingConfirmedEvent` | Ninguna (Datos transaccionales) |\n| **`MOD-PAY`** | Procesamiento y Conciliación de Pagos | Recaudo seguro, webhooks idempotentes y conciliación contable. | `TransaccionPago`, `WebhookLog`, `IntencionCobro` | `crearSesionPago()`, `procesarWebhookWompi()`, `listarTransacciones()` | `MOD-RSV.notificarPagoAprobado()` | Emite: `PaymentApprovedEvent`, `PaymentRejectedEvent` | **Wompi API** (Checkout & Webhooks) |\n| **`MOD-NOT`** | Mensajería y Notificaciones Transaccionales | Despacho de alertas automatizadas a turistas y finqueros. | `PlantillaMensaje`, `DespachoLog` | `enviarMensajeConfirmacion()`, `reintentarNotificacion()` | Ninguna síncrona (Reacciona a eventos) | Escucha: `BookingConfirmedEvent` | **WhatsApp Cloud API** & SMTP |\n| **`MOD-IAM`** | Gestión de Identidad, Cuentas y Auditoría | Autenticación, control RBAC, auditoría forense y gobernanza. | `Usuario`, `Perfil`, `BitacoraEvento` | `autenticarUsuario()`, `validarPermisoRBAC()`, `registrarAuditLog()` | Ninguna (Módulo raíz de seguridad) | Escucha: `SecurityViolationEvent` | Ninguna (Spring Security local) |",
+              "link_label": "fichas anatómicas construidas"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Auditoría de Soberanía de Datos y Aislamiento Externo",
+          "objective": "Verificar el principio de Data Ownership estricto y el confinamiento de APIs de terceros (Wompi, WhatsApp).",
+          "input": "Matriz de anatomía modular de Subpaso 2.1 y diagrama de contexto C4 Nivel 1 de [[example_output_system_context_diagram]].",
+          "raw_data_title": "Verificación de Fronteras de Datos y Servicios Externos",
+          "raw_data": "- Wompi API: Confinada exclusivamente en MOD-PAY (aislamiento financiero PCI-DSS).\n- WhatsApp Cloud API: Confinada exclusivamente en MOD-NOT (aislamiento de comunicaciones).\n- Soberanía de Datos: Ninguna entidad es escrita por más de un módulo.",
+          "exit_label": "COMPLETE → Soberanía de datos y servicios externos aislados arquitectónicamente (3.1)",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Auditoría de Soberanía de Datos y Servicios Externos",
+              "objective": "Validar que las dependencias externas no contaminen los módulos de dominio del sistema.",
+              "how_to": {
+                "steps": [
+                  "1. Auditar que ninguna entidad de base de datos sea mutada por dos módulos distintos.",
+                  "2. Verificar que los SDKs y contratos externos residan en módulos de integración especializados.",
+                  "3. Confirmar que los módulos de negocio operen mediante abstracciones desacopladas."
+                ],
+                "table_columns": "Módulo | Nombre Canónico | Responsabilidad Central | Entidades Propias (Data Ownership) | Operaciones Expuestas (API / Servicios) | Operaciones Consumidas (Dependencias) | Eventos Emitidos / Consumidos | Integración Externa",
+                "table_rules": "Cada servicio externo debe pertenecer exactamente a un único módulo encapsulador.",
+                "restrictions": [
+                  "No dispersar llamadas a Wompi en reservas o catálogo",
+                  "No invocar WhatsApp fuera del módulo MOD-NOT"
+                ],
+                "done_when": "Se confirma el 100% de aislamiento en datos e integraciones de terceros"
+              },
+              "example_title": "Anatomía Modular con Soberanía y Aislamiento Validados",
+              "example": "| Módulo | Nombre Canónico | Responsabilidad Central | Entidades Propias (Data Ownership) | Operaciones Expuestas (API / Servicios) | Operaciones Consumidas (Dependencias) | Eventos Emitidos / Consumidos | Integración Externa |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| **`MOD-CAT`** | Catálogo y Publicación de Fincas | Búsqueda pública, fichas y moderación de propiedades. | `Finca`, `Foto`, `Amenidad`, `TarifaBase` | `buscarFincas()`, `obtenerFicha()`, `aprobarFinca()` | `MOD-CAL.consultarDisponibilidad()`, `MOD-IAM.validarToken()` | Emite: `PropertyCreatedEvent` | Ninguna (Datos internos) |\n| **`MOD-CAL`** | Gestión de Disponibilidad y Calendario | Máquina de estados de fechas, bloqueos manuales y temporales. | `CalendarioFinca`, `BloqueoFecha`, `SlotDisponibilidad` | `bloquearFechasManual()`, `reservarSlotTemporal()`, `liberarSlot()` | `MOD-CAT.validarFincaActiva()` | Escucha: `BookingConfirmedEvent`, `LockExpiredEvent` | Ninguna (Lógica de inventario) |\n| **`MOD-RSV`** | Core Transaccional de Reservas | Flujo de reserva, emisión de vouchers y privacidad de datos. | `Reserva`, `DetalleHuesped`, `VoucherDigital` | `iniciarCheckout()`, `confirmarReserva()`, `consultarReserva()` | `MOD-CAL.reservarSlot()`, `MOD-PAY.crearIntencionPago()`, `MOD-IAM.validarRol()` | Emite: `BookingConfirmedEvent` | Ninguna (Datos transaccionales) |\n| **`MOD-PAY`** | Procesamiento y Conciliación de Pagos | Recaudo seguro, webhooks idempotentes y conciliación contable. | `TransaccionPago`, `WebhookLog`, `IntencionCobro` | `crearSesionPago()`, `procesarWebhookWompi()`, `listarTransacciones()` | `MOD-RSV.notificarPagoAprobado()` | Emite: `PaymentApprovedEvent`, `PaymentRejectedEvent` | **Wompi API** (Checkout & Webhooks) |\n| **`MOD-NOT`** | Mensajería y Notificaciones Transaccionales | Despacho de alertas automatizadas a turistas y finqueros. | `PlantillaMensaje`, `DespachoLog` | `enviarMensajeConfirmacion()`, `reintentarNotificacion()` | Ninguna síncrona (Reacciona a eventos) | Escucha: `BookingConfirmedEvent` | **WhatsApp Cloud API** & SMTP |\n| **`MOD-IAM`** | Gestión de Identidad, Cuentas y Auditoría | Autenticación, control RBAC, auditoría forense y gobernanza. | `Usuario`, `Perfil`, `BitacoraEvento` | `autenticarUsuario()`, `validarPermisoRBAC()`, `registrarAuditLog()` | Ninguna (Módulo raíz de seguridad) | Escucha: `SecurityViolationEvent` | Ninguna (Spring Security local) |",
+              "link_label": "soberanía y aislamiento verificados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Matriz de Dependencias, Flujos de Datos y Grafo Acíclico (DAG)",
+      "summary": "Estructurar la matriz de interacciones inter-modulares discriminando comunicaciones síncronas de eventos asíncronos y modelar el Grafo Acíclico Dirigido (Mermaid DAG), erradicando cualquier ciclo de dependencia.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Mecanismos de Comunicación y Matriz de Dependencias",
+          "objective": "Catalogar cada invocación inter-modular tipificando si es llamada síncrona o evento asíncrono con su dato intercambiado.",
+          "input": "Operaciones expuestas y consumidas de la matriz de anatomía del Step 2.",
+          "raw_data_title": "10 Interacciones Inter-Modulares Catalogadas",
+          "raw_data": "- Síncronas (6): MOD-CAT->MOD-CAL, MOD-CAT->MOD-IAM, MOD-CAL->MOD-CAT, MOD-RSV->MOD-CAL, MOD-RSV->MOD-PAY, MOD-RSV->MOD-IAM.\n- Asíncronas (3): MOD-PAY->MOD-RSV (PaymentApproved), MOD-NOT->MOD-RSV (BookingConfirmed), MOD-CAL->MOD-RSV (BookingConfirmed).\n- Raíz: MOD-IAM no depende de ningún módulo funcional.",
+          "exit_label": "COMPLETE → Matriz de dependencias inter-modulares consolidada (3.2)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Matriz de Dependencias Inter-Modulares",
+              "objective": "Documentar las dependencias con mecanismo de transporte, dato transferido y justificación técnica.",
+              "how_to": {
+                "steps": [
+                  "1. Identificar para cada módulo origen los módulos destino de los cuales requiere información.",
+                  "2. Clasificar el mecanismo en Llamada Síncrona o Evento Asíncrono de Dominio.",
+                  "3. Documentar el contrato de datos o nombre del evento y justificar la necesidad arquitectónica."
+                ],
+                "table_columns": "Módulo Origen | Depende de (Módulo Destino) | Tipo de Comunicación | Dato / Evento Intercambiado | Justificación de la Dependencia",
+                "table_rules": "Toda interacción asíncrona debe basarse en un evento de dominio estandarizado.",
+                "restrictions": [
+                  "No generar dependencias síncronas innecesarias para procesos secundarios como notificaciones",
+                  "Asegurar que MOD-IAM permanezca libre de dependencias hacia el negocio"
+                ],
+                "done_when": "Las 10 dependencias inter-modulares están completamente especificadas"
+              },
+              "example_title": "Matriz de Dependencias y Mecanismos de Comunicación",
+              "example": "| Módulo Origen | Depende de (Módulo Destino) | Tipo de Comunicación | Dato / Evento Intercambiado | Justificación de la Dependencia |\n| --- | --- | --- | --- | --- |\n| **`MOD-CAT`** | `MOD-CAL` | Síncrona (Llamada) | `fincaId`, `rangoFechas` | Consultar disponibilidad para filtrar fincas en catálogo. |\n| **`MOD-CAT`** | `MOD-IAM` | Síncrona (Llamada) | `adminId`, `tokenSesion` | Validar permisos de `ROLE_ADMIN` para aprobar fincas. |\n| **`MOD-CAL`** | `MOD-CAT` | Síncrona (Llamada) | `fincaId` | Validar que la finca exista y esté activa antes de bloquear fechas. |\n| **`MOD-RSV`** | `MOD-CAL` | Síncrona (Llamada) | `fincaId`, `fechas`, `ttl=15min` | Solicitar el bloqueo temporal atómico al iniciar checkout. |\n| **`MOD-RSV`** | `MOD-PAY` | Síncrona (Llamada) | `montoCOP`, `reservaId` | Generar la sesión de pago en pasarela al confirmar checkout. |\n| **`MOD-RSV`** | `MOD-IAM` | Síncrona (Llamada) | `usuarioId`, `rol` | Vincular la reserva al `ROLE_CUSTOMER` autenticado. |\n| **`MOD-PAY`** | `MOD-RSV` | Asíncrona (Evento) | `PaymentApprovedEvent` | Notificar a reservas que el webhook confirmó el recaudo. |\n| **`MOD-NOT`** | `MOD-RSV` | Asíncrona (Evento) | `BookingConfirmedEvent` | Escuchar la confirmación de reserva para enviar WhatsApp al finquero. |\n| **`MOD-CAL`** | `MOD-RSV` | Asíncrona (Evento) | `BookingConfirmedEvent` | Escuchar la confirmación para convertir bloqueo temporal en definitivo. |\n| **`MOD-IAM`** | *(Ninguno)* | — | — | Módulo raíz de seguridad y gobierno (no depende de módulos de negocio). |",
+              "link_label": "matriz de dependencias completada"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Diagrama Mermaid DAG y Protocolo Anti-Circular",
+          "objective": "Modelar el Grafo Acíclico Dirigido en sintaxis Mermaid y auditar matemáticamente la ausencia de ciclos.",
+          "input": "Matriz de dependencias de Subpaso 3.1.",
+          "raw_data_title": "Grafo de Dependencias Mermaid DAG",
+          "raw_data": "Grafo dirigido donde las llamadas van en sentido topológico estricto y las confirmaciones retornan como eventos asíncronos desacoplados, impidiendo bucles recursivos entre módulos.",
+          "exit_label": "COMPLETE → Grafo acíclico verificado sin dependencias circulares (4.1)",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Grafo Acíclico Dirigido (Mermaid DAG)",
+              "objective": "Verificar la propiedad acíclica de la arquitectura mediante orden topológico estricto.",
+              "how_to": {
+                "steps": [
+                  "1. Construir el diagrama de grafo en formato Mermaid discriminando flujos síncronos y reactivos.",
+                  "2. Ejecutar la prueba matemática de orden topológico para validar ausencia de ciclos (DAG check).",
+                  "3. Documentar la resolución de dependencias bidireccionales mediante arquitectura orientada a eventos."
+                ],
+                "table_columns": "Módulo Origen | Depende de (Módulo Destino) | Tipo de Comunicación | Dato / Evento Intercambiado | Justificación de la Dependencia",
+                "table_rules": "El grafo debe ser estrictamente acíclico (DAG válido).",
+                "restrictions": [
+                  "Prohibido ciclos de dependencia síncrona directa (ej. A llama a B y B llama a A de forma bloqueante)",
+                  "Todo retorno transaccional debe resolverse mediante Event-Driven Architecture (EDA)"
+                ],
+                "done_when": "El diagrama DAG pasa la validación de orden topológico sin ciclos detectados"
+              },
+              "example_title": "Diagrama y Matriz de Dependencias Acíclicas (Mermaid DAG)",
+              "example": "| Módulo Origen | Depende de (Módulo Destino) | Tipo de Comunicación | Dato / Evento Intercambiado | Justificación de la Dependencia |\n| --- | --- | --- | --- | --- |\n| **`MOD-CAT`** | `MOD-CAL` | Síncrona (Llamada) | `fincaId`, `rangoFechas` | Consultar disponibilidad para filtrar fincas en catálogo. |\n| **`MOD-CAT`** | `MOD-IAM` | Síncrona (Llamada) | `adminId`, `tokenSesion` | Validar permisos de `ROLE_ADMIN` para aprobar fincas. |\n| **`MOD-CAL`** | `MOD-CAT` | Síncrona (Llamada) | `fincaId` | Validar que la finca exista y esté activa antes de bloquear fechas. |\n| **`MOD-RSV`** | `MOD-CAL` | Síncrona (Llamada) | `fincaId`, `fechas`, `ttl=15min` | Solicitar el bloqueo temporal atómico al iniciar checkout. |\n| **`MOD-RSV`** | `MOD-PAY` | Síncrona (Llamada) | `montoCOP`, `reservaId` | Generar la sesión de pago en pasarela al confirmar checkout. |\n| **`MOD-RSV`** | `MOD-IAM` | Síncrona (Llamada) | `usuarioId`, `rol` | Vincular la reserva al `ROLE_CUSTOMER` autenticado. |\n| **`MOD-PAY`** | `MOD-RSV` | Asíncrona (Evento) | `PaymentApprovedEvent` | Notificar a reservas que el webhook confirmó el recaudo. |\n| **`MOD-NOT`** | `MOD-RSV` | Asíncrona (Evento) | `BookingConfirmedEvent` | Escuchar la confirmación de reserva para enviar WhatsApp al finquero. |\n| **`MOD-CAL`** | `MOD-RSV` | Asíncrona (Evento) | `BookingConfirmedEvent` | Escuchar la confirmación para convertir bloqueo temporal en definitivo. |\n| **`MOD-IAM`** | *(Ninguno)* | — | — | Módulo raíz de seguridad y gobierno (no depende de módulos de negocio). |",
+              "link_label": "grafo acíclico verificado"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje, Mapeo Exhaustivo y Dictamen de Compuerta (Gate Check)",
+      "summary": "Construir la Matriz de Mapeo Exhaustivo de Requerimientos a Módulos (Requirement-to-Module Matrix - RTM), verificar la compuerta de calidad modular y ensamblar el entregable maestro unificado.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Mapeo Exhaustivo de Requerimientos a Módulos (RTM)",
+          "objective": "Construir la matriz RTM asignando cada uno de los 20 CRs a su módulo primario y componente técnico específico.",
+          "input": "Resultados de Step 1, Step 2 y Step 3 consolidados.",
+          "raw_data_title": "Matriz RTM de 20 Requerimientos Candidatos",
+          "raw_data": "CR-001..CR-020 mapeados con actor, redacción canónica, FURPS+, MoSCoW, módulo primario y componente técnico responsable.",
+          "exit_label": "COMPLETE → Matriz de trazabilidad RTM completa y auditada (4.2)",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Matriz de Mapeo Exhaustivo Requerimientos a Módulos",
+              "objective": "Vincular formalmente cada requerimiento con el componente de software encargado de su ejecución.",
+              "how_to": {
+                "steps": [
+                  "1. Listar los 20 Requerimientos Candidatos heredados de D4.",
+                  "2. Asignar el módulo primario responsable de la implementación de cada CR.",
+                  "3. Especificar el nombre del componente o servicio técnico que materializa la capacidad."
+                ],
+                "table_columns": "ID CR | Actor | Redacción Canónica del Requerimiento | Categoría FURPS+ | Prioridad MoSCoW | Módulo Primario Asignado | Componente Responsable",
+                "table_rules": "No dejar ningún CR sin componente responsable asignado.",
+                "restrictions": [
+                  "Asegurar consistencia con las prioridades MoSCoW de D4",
+                  "Reflejar explícitamente los componentes de exclusión de alcance"
+                ],
+                "done_when": "Los 20 requerimientos cuentan con componente y módulo primario documentado"
+              },
+              "example_title": "Matriz de Mapeo Exhaustivo (Requirement-to-Module Matrix)",
+              "example": "| ID CR | Actor | Redacción Canónica del Requerimiento | Categoría FURPS+ | Prioridad MoSCoW | Módulo Primario Asignado | Componente Responsable |\n| --- | --- | --- | --- | --- | --- | --- |\n| **`CR-001`** | **Turista** | Búsqueda y filtrado del Catálogo público de Fincas por destino, fechas y capacidad. | Funcionalidad | Must Have | **`MOD-CAT`** | Buscador y Listado de Catálogo |\n| **`CR-002`** | **Turista** | Bloqueo Temporal atómico de 15 min sobre fechas de Finca en checkout. | Funcionalidad | Must Have | **`MOD-RSV`** | Orquestador de Checkout (Lock Engine) |\n| **`CR-003`** | **Turista** | Procesamiento de Transacción de Pago vía Wompi API y emisión de Voucher Digital. | Funcionalidad | Must Have | **`MOD-PAY`** | Gateway Handler & Payment Processor |\n| **`CR-004`** | **Turista** | Registro e inicio de sesión con JWT para consultar historial de reservas. | Funcionalidad | Must Have | **`MOD-IAM`** | Auth Controller & Token Service |\n| **`CR-005`** | **Turista** | Wizard de checkout paso a paso con resumen tarifario desglosado. | Usabilidad | Must Have | **`MOD-RSV`** | Checkout Wizard UI & Validation Engine |\n| **`CR-006`** | **Turista** | Carga de Catálogo y fotografías en menos de 2.5s sobre redes móviles 4G. | Rendimiento | Should Have | **`MOD-CAT`** | CDN Media Cache & Query Optimizer |\n| **`CR-007`** | **Turista** | Reembolso automático unilateral con un clic en la app. | Funcionalidad | Won't Have | **`MOD-RSV`** *(Exclusión)* | Descartado (Cancelaciones vía soporte) |\n| **`CR-008`** | **Finquero** | Notificación transaccional automática vía WhatsApp Cloud API tras confirmación. | Funcionalidad | Must Have | **`MOD-NOT`** | WhatsApp HSM Dispatcher Service |\n| **`CR-009`** | **Finquero** | Bloqueo y desbloqueo de fechas en calendario de Finca para mantenimiento. | Funcionalidad | Must Have | **`MOD-CAL`** | Calendar Grid & Availability Manager |\n| **`CR-010`** | **Finquero** | Ocultamiento de credenciales bancarias y datos de pago frente al anfitrión. | Seguridad | Must Have | **`MOD-RSV`** | Guest Privacy Shield & Voucher Filter |\n| **`CR-011`** | **Finquero** | Ocultamiento de cuentas bancarias y tarifas de liquidación frente al Turista. | Seguridad | Must Have | **`MOD-RSV`** | Financial Privacy Filter (PCI-DSS) |\n| **`CR-012`** | **Finquero** | Visualización móvil del estado mensual de ocupación de su Finca. | Usabilidad | Must Have | **`MOD-CAL`** | Mobile Calendar Dashboard View |\n| **`CR-013`** | **Finquero** | Interfaz táctil de calendario con áreas de toque mínimas de 48x48px. | Usabilidad | Should Have | **`MOD-CAL`** | Touch Calendar Grid Component |\n| **`CR-014`** | **Finquero** | Registro de reservas externas en efectivo sin comisión en la web. | Funcionalidad | Won't Have | **`MOD-CAL`** *(Exclusión)* | Descartado (Viola modelo de negocio D2) |\n| **`CR-015`** | **Administrador NFF** | Consola de back-office para auditar, aprobar o rechazar Fincas. | Funcionalidad | Must Have | **`MOD-CAT`** | Admin Property Moderation Console |\n| **`CR-016`** | **Administrador NFF** | Consulta de listado consolidado de Transacciones de Pago con filtros. | Funcionalidad | Must Have | **`MOD-PAY`** | Transaction Ledger & Reconciliation View |\n| **`CR-017`** | **Administrador NFF** | Procesamiento asíncrono e idempotente de Webhooks de Wompi API. | Confiabilidad | Must Have | **`MOD-PAY`** | Webhook Receiver & Idempotency Filter |\n| **`CR-018`** | **Administrador NFF** | Bitácora estructurada inmutable de auditoría (audit log) para eventos clave. | Seguridad | Must Have | **`MOD-IAM`** | Security Audit Logger & Event Store |\n| **`CR-019`** | **Administrador NFF** | Suspensión temporal de fincas o perfiles que infrinjan políticas de servicio. | Funcionalidad | Should Have | **`MOD-IAM`** | User & Property Governance Console |\n| **`CR-020`** | **Administrador NFF** | Emisión automatizada de facturas electrónicas avaladas por la DIAN. | Funcionalidad | Won't Have | **`MOD-PAY`** *(Exclusión)* | Descartado (Diferido a vNext por DIAN) |",
+              "link_label": "matriz RTM construida"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Module Quality Gate Check y Ensamblaje Maestro",
+          "objective": "Evaluar los 5 criterios de la compuerta de calidad modular y certificar el avance hacia Requisitos No Funcionales (D6).",
+          "input": "Matriz RTM de Subpaso 4.1 y verificaciones arquitectónicas.",
+          "raw_data_title": "Evaluación de Compuerta de Calidad Modular",
+          "raw_data": "Metadatos: Nos Fuimos de Finca, Fase 3, Entregable 5 de 9, Estado Aprobado.\nCriterios: Cobertura 100%, Responsabilidad Única, Grafo Acíclico (DAG), Aislamiento Externo, Módulo Raíz Aislado.",
+          "exit_label": "PUBLISH → Deliverable Completo: 5. Descomposición Modular Funcional",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Dictamen de Compuerta de Calidad Modular",
+              "objective": "Emitir el veredicto oficial PROCEED autorizando el cierre formal de D5.",
+              "how_to": {
+                "steps": [
+                  "1. Auditar los 5 criterios normativos de calidad modular.",
+                  "2. Verificar la completitud de las 6 fichas anatómicas y la matriz RTM.",
+                  "3. Consolidar el documento final para su aprobación arquitectónica."
+                ],
+                "table_columns": "Criterio de Calidad Modular | Estado | Evidencia",
+                "table_rules": "Todos los criterios deben resultar en APROBADO sin excepciones.",
+                "restrictions": [
+                  "No emitir veredicto favorable si existen dependencias circulares no resueltas",
+                  "No autorizar si hay módulos god-object con múltiples responsabilidades inconexas"
+                ],
+                "done_when": "El documento cumple el 100% de los criterios del Module Quality Gate Check"
+              },
+              "example_title": "Veredicto del Module Quality Gate Check",
+              "example": "| Criterio de Calidad Modular | Estado | Evidencia |\n| --- | --- | --- |\n| Cobertura Total de Requerimientos | APROBADO | 100% de los 20 CRs de D4 asignados a un módulo primario responsable |\n| Principio de Responsabilidad Única | APROBADO | 6 módulos especializados con agregados DDD delimitados y sin god objects |\n| Grafo Acíclico Dirigido (Anti-Circular) | APROBADO | Dependencias circulares resueltas mediante eventos desacoplados (EDA) |\n| Aislamiento de Servicios Externos | APROBADO | Wompi API confinada en MOD-PAY y WhatsApp Cloud API en MOD-NOT |\n| Módulo Raíz de Seguridad Aislado | APROBADO | MOD-IAM no depende de ningún módulo funcional de negocio |",
+              "link_label": "descomposición modular aprobada"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 5. Descomposición Modular Funcional.md",
+    "markdown": "# 5. Descomposición Modular Funcional\n\n### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 3 — Ingeniería de Requisitos\n**Entregable:** 5 de 9\n**Estado:** Aprobado\n\n---\n\n### 2. Registro Maestro de Módulos Funcionales (Module Registry)\n\n| Código | Nombre Canónico | Responsabilidad Principal | Entidades Gobernadas | Roles D2 Autorizados | Integraciones Externas |\n| --- | --- | --- | --- | --- | --- |\n| **`MOD-CAT`** | Catálogo y Publicación de Fincas | Búsqueda pública, visualización de fichas y moderación de propiedades | `Finca`, `Catálogo`, `Foto / Galería`, `Amenidad` | `ROLE_GUEST`, `ROLE_CUSTOMER`, `ROLE_HOST`, `ROLE_ADMIN` | Ninguna |\n| **`MOD-CAL`** | Gestión de Disponibilidad y Calendario | Máquina de estados de fechas, bloqueos manuales y retención de soft-lock | `Calendario`, `Bloqueo Temporal`, `Bloqueo Manual`, `Rango de Fechas` | `ROLE_GUEST`, `ROLE_CUSTOMER`, `ROLE_HOST`, `ROLE_ADMIN` | Ninguna |\n| **`MOD-RSV`** | Core Transaccional de Reservas | Flujo de checkout en ≤3 pasos, emisión de vouchers y privacidad bidireccional | `Reserva Confirmada`, `Voucher Digital`, `Huésped` | `ROLE_CUSTOMER`, `ROLE_HOST`, `ROLE_ADMIN` | Ninguna |\n| **`MOD-PAY`** | Procesamiento y Conciliación de Pagos | Recaudo vía pasarela, webhooks idempotentes y conciliación contable | `Transacción de Pago`, `Registro de Conciliación`, `Log Webhook` | `ROLE_CUSTOMER`, `ROLE_ADMIN` | **Wompi API** |\n| **`MOD-NOT`** | Mensajería y Notificaciones Transaccionales | Despacho automatizado de alertas operativas HSM a WhatsApp y Email | `Notificación Transaccional`, `Plantilla HSM` | `ROLE_HOST`, `ROLE_CUSTOMER` | **WhatsApp Cloud API**, **SMTP/Email** |\n| **`MOD-IAM`** | Gestión de Identidad, Cuentas y Auditoría | Autenticación, control RBAC, bitácora inmutable y suspensión de perfiles | `Cuenta de Usuario`, `Credencial`, `Registro de Auditoría` | `ROLE_GUEST`, `ROLE_CUSTOMER`, `ROLE_HOST`, `ROLE_ADMIN` | Ninguna |\n\n---\n\n### 3. Fichas de Especificación Anatómica de Módulos\n\n#### MOD-CAT: Catálogo y Publicación de Fincas\n- **Responsabilidad:** Gestionar la visualización pública del inventario de fincas, la galería de fotografías y el flujo de moderación y aprobación de predios por el equipo de operaciones.\n- **Entidades Gobernadas (Data Ownership):** `Finca` (`property`), `Catálogo` (`property_catalog`), `Foto / Galería` (`property_media`), `Amenidad` (`amenity`).\n- **Actores y Roles:** `Turista` (`ROLE_GUEST` / `ROLE_CUSTOMER`), `Propietario / Finquero` (`ROLE_HOST`), `Administrador NFF` (`ROLE_ADMIN`).\n- **Requerimientos Asignados:**\n  - *In-Scope (Activos):* `CR-001` (Búsqueda pública sin login), `CR-006` (Rendimiento de carga < 2s), `CR-015` (Moderación y aprobación de fincas).\n  - *Out-of-Scope (vNext):* `CR-014` (Comisiones B2B y administración multi-finca diferidas).\n- **Capacidades Operativas Expuestas:** `buscarFincasPublicas()`, `obtenerDetalleFinca()`, `aprobarFinca()`, `pausarFinca()`.\n- **Integraciones Externas:** Ninguna (Almacenamiento y CDN optimizado de activos multimedia estáticos).\n\n#### MOD-CAL: Gestión de Disponibilidad y Calendario\n- **Responsabilidad:** Administrar la máquina de estados de las fechas de cada finca (Libre, Bloqueada por Uso Personal, Retenida por Checkout, Ocupada por Reserva Confirmada), garantizando la soberanía del anfitrión y la prevención de sobreventas (*overbooking*).\n- **Entidades Gobernadas (Data Ownership):** `Calendario` (`calendar_schedule`), `Bloqueo Temporal` (`soft_lock`), `Bloqueo Manual` (`manual_block`), `Rango de Fechas` (`date_range`).\n- **Actores y Roles:** `Turista` (`ROLE_GUEST` / `ROLE_CUSTOMER`), `Propietario / Finquero` (`ROLE_HOST`), `Administrador NFF` (`ROLE_ADMIN`).\n- **Requerimientos Asignados:**\n  - *In-Scope (Activos):* `CR-002` (Bloqueo temporal atómico de 15 min en checkout), `CR-009` (Bloqueo manual soberano de fechas), `CR-013` (Interfaz táctil móvil rural ≥ 48x48px).\n  - *Out-of-Scope (vNext):* *(Exclusión D9)* Sincronización iCal bidireccional externa con Airbnb/Booking.\n- **Capacidades Operativas Expuestas:** `consultarDisponibilidad()`, `crearBloqueoTemporal()`, `liberarBloqueoTemporal()`, `registrarBloqueoManual()`, `consolidarBloqueoDefinitivo()`.\n- **Integraciones Externas:** Ninguna (Control transaccional interno en base de datos PostgreSQL).\n\n#### MOD-RSV: Core Transaccional de Reservas\n- **Responsabilidad:** Orquestar el ciclo transaccional de compra y formalización de reservas, encapsular los datos de checkout en un máximo de 3 pasos, generar el Voucher Digital oficial y blindar la privacidad bidireccional entre turista y anfitrión.\n- **Entidades Gobernadas (Data Ownership):** `Reserva Confirmada` (`booking`), `Voucher Digital` (`digital_voucher`), `Huésped` (`guest_detail`), `Resumen Liquidación Reserva` (`booking_summary`).\n- **Actores y Roles:** `Turista` (`ROLE_CUSTOMER`), `Propietario / Finquero` (`ROLE_HOST`), `Administrador NFF` (`ROLE_ADMIN`).\n- **Requerimientos Asignados:**\n  - *In-Scope (Activos):* `CR-003` (Emisión automática de Voucher Digital post-pago), `CR-005` (Checkout móvil en ≤ 3 pasos), `CR-010` (Ocultar datos bancarios del anfitrión en el voucher), `CR-011` (Ocultar tarjetas del turista al anfitrión).\n  - *Out-of-Scope (vNext):* `CR-007` (Reembolsos automáticos instantáneos unilaterales descartados por D2).\n- **Capacidades Operativas Expuestas:** `iniciarCheckout()`, `confirmarReserva()`, `obtenerVoucherDigital()`, `consultarReservasFinca()`.\n- **Integraciones Externas:** Ninguna directa (Orquesta con `MOD-PAY` para cobro y `MOD-NOT` para notificaciones).\n\n#### MOD-PAY: Procesamiento y Conciliación de Pagos\n- **Responsabilidad:** Delegar el procesamiento seguro de pagos a la pasarela Wompi API, recibir y procesar Webhooks transaccionales de forma idempotente con reintentos automáticos, y proporcionar la vista de auditoría para conciliación contable.\n- **Entidades Gobernadas (Data Ownership):** `Transacción de Pago` (`payment_transaction`), `Registro de Conciliación` (`payment_settlement_entry`), `Evento Webhook Recibido` (`webhook_log`).\n- **Actores y Roles:** `Turista` (`ROLE_CUSTOMER`), `Administrador NFF` (`ROLE_ADMIN`).\n- **Requerimientos Asignados:**\n  - *In-Scope (Activos):* `CR-016` (Consulta consolidada de transacciones para conciliación), `CR-017` (Idempotencia y tolerancia a fallos en Webhooks).\n  - *Out-of-Scope (vNext):* `CR-020` (Facturación electrónica masiva DIAN diferida a `vNext`).\n- **Capacidades Operativas Expuestas:** `generarSesionPago()`, `procesarWebhookPago()`, `consultarTransaccionesConciliacion()`.\n- **Integraciones Externas:** **Wompi API** (Checkout tokenizado, medios de pago PSE/Nequi/Tarjetas y Webhooks transaccionales).\n\n#### MOD-NOT: Mensajería y Notificaciones Transaccionales\n- **Responsabilidad:** Despachar alertas operativas unidireccionales y automatizadas ante eventos críticos (notificaciones HSM a celular vía WhatsApp Cloud API para anfitriones y correos de confirmación con voucher para turistas).\n- **Entidades Gobernadas (Data Ownership):** `Notificación Transaccional` (`notification_log`), `Plantilla HSM` (`message_template`).\n- **Actores y Roles:** `Sistema` (Emisor reactivo), `Propietario / Finquero` (`ROLE_HOST`), `Turista` (`ROLE_CUSTOMER`).\n- **Requerimientos Asignados:**\n  - *In-Scope (Activos):* `CR-008` (Notificación HSM vía WhatsApp Cloud API al finquero).\n  - *Out-of-Scope (vNext):* *(Exclusión D9)* Chatbots conversacionales interactivos de soporte.\n- **Capacidades Operativas Expuestas:** `despacharWhatsAppHSM()`, `despacharCorreoConfirmacion()`.\n- **Integraciones Externas:** **WhatsApp Cloud API (Meta)** (Plantillas HSM a celular) y **Servicio de Correo Transaccional (SMTP/API)**.\n\n#### MOD-IAM: Gestión de Identidad, Cuentas y Auditoría\n- **Responsabilidad:** Administrar el registro, autenticación simplificada con celular para finqueros y correo para turistas, control de acceso RBAC, suspensión preventiva de cuentas/fincas y almacenamiento inmutable de la bitácora de auditoría.\n- **Entidades Gobernadas (Data Ownership):** `Cuenta de Usuario` (`user_account`), `Credencial / Sesión` (`user_credential`), `Registro de Auditoría Inmutable` (`audit_log`).\n- **Actores y Roles:** `Turista` (`ROLE_GUEST` / `ROLE_CUSTOMER`), `Propietario / Finquero` (`ROLE_HOST`), `Administrador NFF` (`ROLE_ADMIN`).\n- **Requerimientos Asignados:**\n  - *In-Scope (Activos):* `CR-004` (Registro/Login Turista), `CR-012` (Auth simplificada celular Finquero), `CR-018` (Bitácora inmutable de auditoría), `CR-019` (Suspensión bajo Habeas Data y RBAC).\n  - *Out-of-Scope (vNext):* *(Exclusión D9)* Login social biométrico avanzado.\n- **Capacidades Operativas Expuestas:** `registrarTurista()`, `autenticarFinquero()`, `registrarEventoAuditoria()`, `suspenderCuenta()`.\n- **Integraciones Externas:** Ninguna (Spring Security con tokens criptográficos de sesión).\n\n---\n\n### 4. Mapeo Exhaustivo de Requerimientos a Módulos (Requirement-to-Module Matrix)\n\n| ID CR | Actor | Redacción Canónica del Requerimiento | Categoría FURPS+ | Prioridad MoSCoW | Módulo Asignado | Estado de Alcance |\n| --- | --- | --- | --- | --- | --- | --- |\n| **`CR-001`** | **Turista** | El sistema DEBE permitir al **Turista** consultar y filtrar el **Catálogo** de **Fincas** activas por destino y fechas sin requerir autenticación previa (`ROLE_GUEST`). | Funcional | `Must Have` | **`MOD-CAT`** | **In-Scope (Activo)** |\n| **`CR-002`** | **Turista** | El sistema DEBE generar un **Bloqueo Temporal** atómico de 15 minutos sobre la **Finca** al iniciar el checkout para prevenir sobreventas durante el pago en **Wompi API**. | Funcional | `Must Have` | **`MOD-CAL`** | **In-Scope (Activo)** |\n| **`CR-003`** | **Turista** | El sistema DEBE procesar la **Transacción de Pago** vía **Wompi API** y emitir automáticamente el **Voucher Digital** con datos de acceso tras confirmarse la **Reserva Confirmada**. | Funcional | `Must Have` | **`MOD-RSV`** | **In-Scope (Activo)** |\n| **`CR-004`** | **Turista** | El sistema DEBE permitir al **Turista** registrarse e iniciar sesión con correo y contraseña (`ROLE_CUSTOMER`), así como restablecer su clave mediante un enlace seguro. | Funcional | `Must Have` | **`MOD-IAM`** | **In-Scope (Activo)** |\n| **`CR-005`** | **Turista** | El sistema DEBE estructurar el flujo de checkout en un máximo de tres pasos secuenciales desde dispositivos móviles con validación visual inmediata. | Usabilidad | `Must Have` | **`MOD-RSV`** | **In-Scope (Activo)** |\n| **`CR-006`** | **Turista** | El sistema DEBE cargar la vista de **Catálogo** y las fotografías de la **Finca** en un tiempo menor a 2.0 segundos bajo redes móviles estándar (3G/4G). | Rendimiento | `Must Have` | **`MOD-CAT`** | **In-Scope (Activo)** |\n| **`CR-007`** | **Turista** | El sistema DEBE permitir al **Turista** solicitar reembolsos automáticos instantáneos con reversión bancaria total mediante un botón en la app. | Funcional | `Won't Have` | **`MOD-RSV`** | **Out-of-Scope (vNext)** |\n| **`CR-008`** | **Propietario / Finquero** | El sistema DEBE despachar una notificación transaccional HSM vía **WhatsApp Cloud API** al **Propietario / Finquero** al registrarse una **Reserva Confirmada** en su **Finca**. | Funcional | `Must Have` | **`MOD-NOT`** | **In-Scope (Activo)** |\n| **`CR-009`** | **Propietario / Finquero** | El sistema DEBE permitir al **Propietario / Finquero** registrar bloqueos de fechas por uso personal en el calendario de su **Finca** asignada. | Funcional | `Must Have` | **`MOD-CAL`** | **In-Scope (Activo)** |\n| **`CR-010`** | **Propietario / Finquero** | El sistema DEBE restringir la visibilidad del **Turista** para que el **Voucher Digital** solo exponga datos de check-in, ocultando las cuentas bancarias del **Propietario / Finquero**. | Restricción | `Must Have` | **`MOD-RSV`** | **In-Scope (Activo)** |\n| **`CR-011`** | **Propietario / Finquero** | El sistema DEBE restringir la visibilidad del **Propietario / Finquero** para que solo consulte nombres de huéspedes y fechas, ocultando datos de tarjetas o medios de pago del **Turista**. | Restricción | `Must Have` | **`MOD-RSV`** | **In-Scope (Activo)** |\n| **`CR-012`** | **Propietario / Finquero** | El sistema DEBE permitir al **Propietario / Finquero** iniciar sesión en su panel anfitrión (`ROLE_HOST`) mediante su número celular y credencial autenticada. | Funcional | `Must Have` | **`MOD-IAM`** | **In-Scope (Activo)** |\n| **`CR-013`** | **Propietario / Finquero** | El sistema DEBE proporcionar una interfaz táctil simplificada con áreas de toque mínimas de 48x48px para la gestión de disponibilidad en pantallas móviles. | Usabilidad | `Must Have` | **`MOD-CAL`** | **In-Scope (Activo)** |\n| **`CR-014`** | **Propietario / Finquero** | El sistema DEBE permitir al **Propietario / Finquero** registrar y comisionar fincas de terceros bajo un esquema de agencia B2B. | Funcional | `Won't Have` | **`MOD-CAT`** | **Out-of-Scope (vNext)** |\n| **`CR-015`** | **Administrador NFF** | El sistema DEBE proporcionar al **Administrador NFF** una interfaz de moderación para verificar y aprobar las **Fincas** antes de su publicación en el **Catálogo**. | Funcional | `Must Have` | **`MOD-CAT`** | **In-Scope (Activo)** |\n| **`CR-016`** | **Administrador NFF** | El sistema DEBE permitir al **Administrador NFF** consultar el registro consolidado de **Transacciones de Pago** con identificador único de **Wompi API** para conciliación financiera. | Funcional | `Must Have` | **`MOD-PAY`** | **In-Scope (Activo)** |\n| **`CR-017`** | **Administrador NFF** | El sistema DEBE procesar los Webhooks de **Wompi API** con lógica de idempotencia y reintentos exponenciales automáticos ante fallos de conexión. | Confiabilidad | `Must Have` | **`MOD-PAY`** | **In-Scope (Activo)** |\n| **`CR-018`** | **Administrador NFF** | El sistema DEBE registrar una bitácora estructurada inmutable de eventos de auditoría sobre cambios de estado en **Reservas** y **Transacciones de Pago**. | Soporte | `Must Have` | **`MOD-IAM`** | **In-Scope (Activo)** |\n| **`CR-019`** | **Administrador NFF** | El sistema DEBE permitir al **Administrador NFF** suspender o dar de baja **Fincas** o cuentas de usuarios que incumplan las políticas de la plataforma bajo el marco de Habeas Data. | Restricción | `Must Have` | **`MOD-IAM`** | **In-Scope (Activo)** |\n| **`CR-020`** | **Administrador NFF** | El sistema DEBE emitir facturas electrónicas XML automatizadas conectadas al web service de la DIAN por cada **Reserva Confirmada**. | Funcional | `Won't Have` | **`MOD-PAY`** | **Out-of-Scope (vNext)** |\n\n---\n\n### 5. Matriz y Diagrama de Dependencias Inter-Modulares (Anti-Circular DAG)\n\n#### Matriz de Dependencias y Mecanismos de Comunicación\n| Módulo Origen | Depende de (Módulo Destino) | Tipo de Comunicación | Dato / Evento Intercambiado | Justificación de la Dependencia |\n| --- | --- | --- | --- | --- |\n| **`MOD-CAT`** | `MOD-CAL` | Síncrona (Llamada) | `fincaId`, `rangoFechas` | Consultar disponibilidad en tiempo real para el filtrado del catálogo. |\n| **`MOD-CAT`** | `MOD-IAM` | Síncrona (Llamada) | `adminId`, `tokenSesion` | Validar permisos de `ROLE_ADMIN` antes de publicar o pausar fincas. |\n| **`MOD-CAL`** | `MOD-CAT` | Síncrona (Llamada) | `fincaId` | Validar existencia y estado activo de la finca antes de registrar bloqueos. |\n| **`MOD-RSV`** | `MOD-CAL` | Síncrona (Llamada) | `fincaId`, `fechas`, `ttl=15min` | Solicitar el bloqueo temporal atómico (Soft-Lock) al iniciar el checkout. |\n| **`MOD-RSV`** | `MOD-PAY` | Síncrona (Llamada) | `montoCOP`, `reservaId` | Generar la sesión de pago tokenizada en Wompi. |\n| **`MOD-RSV`** | `MOD-IAM` | Síncrona (Llamada) | `usuarioId`, `rol` | Vincular la reserva al `ROLE_CUSTOMER` autenticado en checkout. |\n| **`MOD-PAY`** | `MOD-RSV` | Asíncrona (Evento) | `PaymentApprovedEvent` | Notificar a reservas que Wompi aprobó la transacción para confirmar la compra. |\n| **`MOD-NOT`** | `MOD-RSV` | Asíncrona (Evento) | `BookingConfirmedEvent` | Escuchar la confirmación de reserva para despachar WhatsApp HSM y correo. |\n| **`MOD-CAL`** | `MOD-RSV` | Asíncrona (Evento) | `BookingConfirmedEvent` | Escuchar la confirmación de reserva para consolidar el bloqueo definitivo en calendario. |\n| **`MOD-IAM`** | *(Ninguno)* | — | — | Módulo raíz de seguridad y gobierno (no depende de módulos de negocio). |\n\n#### Diagrama de Dependencias Acíclico (Mermaid DAG)\n\n```mermaid\nflowchart TD\n    subgraph CapaSeguridad[\"Capa Base de Identidad y Seguridad\"]\n        IAM[\"MOD-IAM\\n(Identidad, Cuentas y Auditoría)\"]\n    end\n\n    subgraph CapaDominio[\"Capa de Dominio y Catálogo\"]\n        CAT[\"MOD-CAT\\n(Catálogo de Fincas)\"]\n        CAL[\"MOD-CAL\\n(Disponibilidad y Calendario)\"]\n    end\n\n    subgraph CapaTransaccional[\"Capa Transaccional y Cobros\"]\n        RSV[\"MOD-RSV\\n(Core de Reservas)\"]\n        PAY[\"MOD-PAY\\n(Pagos Wompi)\"]\n    end\n\n    subgraph CapaNotificaciones[\"Capa de Comunicación Externa\"]\n        NOT[\"MOD-NOT\\n(Mensajería WhatsApp / Email)\"]\n    end\n\n    %% Invocaciones Síncronas Directas\n    CAT -->|1. Consulta Disponibilidad| CAL\n    CAT -.->|Valida Sesión Admin| IAM\n    RSV -->|2. Solicita Soft-Lock 15m| CAL\n    RSV -->|3. Inicializa Cobro| PAY\n    RSV -.->|Valida Identidad Turista| IAM\n\n    %% Eventos Asíncronos Desacoplados\n    PAY ==>|PaymentApprovedEvent| RSV\n    RSV ==>|BookingConfirmedEvent| NOT\n    RSV ==>|BookingConfirmedEvent| CAL\n\n    %% Servicios Externos Aislados\n    PAY --- Wompi[\"[Ext] Wompi API\"]\n    NOT --- WhatsApp[\"[Ext] WhatsApp Cloud API\"]\n    NOT --- SMTP[\"[Ext] Correo Transaccional\"]\n```\n\n---\n\n### 6. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No.\n- **Condición:** Proceed. Se formalizó la descomposición en 6 módulos cohesivos con Data Ownership estricto, cobertura del 100% de los 20 Requerimientos Candidatos (17 activos y 3 exclusiones documentadas), aislamiento de servicios externos (Wompi y WhatsApp) y demostración de arquitectura acíclica mediante desacople por eventos de dominio.\n"
+  }
+}

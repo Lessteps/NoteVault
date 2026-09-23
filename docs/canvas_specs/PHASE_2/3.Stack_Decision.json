@@ -1,0 +1,445 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D3",
+  "deliverable": "Stack Decision (Decisión de Stack Tecnológico)",
+  "purpose": "Este entregable define el ecosistema tecnológico completo del proyecto. Su regla de oro es erradicar el Resume Driven Development (elegir tecnologías de moda sin justificación técnica). Cada decisión debe justificarse rígidamente contra las Restricciones No Negociables (D2) y las capacidades actuales del equipo (Fase 1 - D6).",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_non_negotiable_constraints]] | Proveen los límites numéricos que descartarán tecnologías costosas o lentas (P2-D2). |\n| [[example_output_team_capability]] | Dictamina qué tecnologías domina el equipo hoy sin curva de aprendizaje (P1-D6). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría de Restricciones y Filtro de Capacidad",
+      "summary": "Extraer los filtros absolutos de costo, performance y habilidades del equipo para acotar opciones.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Filtro de restricciones no negociables (P2-D2)",
+          "objective": "Extraer los techos de latencia, presupuesto y concurrencia fijados en el entregable P2-D2.",
+          "input": "Matriz de restricciones de [[example_output_non_negotiable_constraints]] (P2-D2).",
+          "raw_data_title": "Límites RNN Extraídos",
+          "raw_data": "RNN-01: LCP < 2.5s en 3G, bundle < 1.5MB. RNN-02: Transacciones ACID, P95 < 400ms. RNN-04: Cero datos de tarjetas, TLS 1.3.",
+          "exit_label": "FILTROS RNN IDENTIFICADOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Extracción de techos de OPEX y rendimiento",
+              "objective": "Aislar las métricas duras que descalificarán automáticamente opciones lentas o caras.",
+              "how_to": {
+                "steps": [
+                  "Consultar la matriz de RNN en P2-D2.",
+                  "Extraer los límites de tiempo de carga y peso de bundle para frontend.",
+                  "Extraer los requerimientos de transaccionalidad ACID y latencia para backend.",
+                  "Registrar los filtros numéricos en la tabla de criterios de entrada."
+                ],
+                "table_columns": "Filtro RNN Activo | Métrica Umbral Obligatoria | Capa Afectada",
+                "table_rules": "Extracción estricta de umbrales numéricos de P2-D2.",
+                "restrictions": [
+                  "No omitir restricciones de presupuesto ni de rendimiento.",
+                  "Asegurar que cada filtro condicione la selección de herramientas."
+                ],
+                "done_when": "Filtros de restricciones no negociables formalmente identificados."
+              },
+              "example_title": "Filtros Activos de Restricciones No Negociables",
+              "example": "| Filtro RNN Activo | Condición Obligatoria extraída de P2-D2 |\n| --- | --- |\n| Rendimiento Frontend | LCP < 2.5s en red móvil 3G y tamaño de bundle < 1.5MB |\n| Concurrencia y Datos | Aislamiento transaccional ACID y P95 < 400ms bajo 50 req/s |\n| Seguridad Financiera | Cero datos de tarjetas en DB propia; integración vía SDK Wompi |",
+              "link_label": "filtros RNN van a mapeo de habilidades (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Filtro de capacidad y competencias del equipo (P1-D6)",
+          "objective": "Identificar el conjunto de lenguajes, frameworks y bases de datos dominados hoy por el equipo.",
+          "input": "Evaluación de competencias de [[example_output_team_capability]] (P1-D6).",
+          "raw_data_title": "Capacidades del Equipo",
+          "raw_data": "Equipo domina: JavaScript/TypeScript, React, Java (Spring Boot), PostgreSQL, Tailwind CSS, Docker y APIs REST.",
+          "exit_label": "COMPETENCIAS DEL EQUIPO MAPEADAS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Mapeo de tecnologías dominadas actualmente",
+              "objective": "Reconocer las disciplinas técnicas operativas para erradicar el aprendizaje sobre la marcha.",
+              "how_to": {
+                "steps": [
+                  "Revisar la matriz de capacidades de P1-D6.",
+                  "Listar las tecnologías marcadas como 'Domina' o 'Familiar con librería'.",
+                  "Excluir herramientas que requieran curvas de aprendizaje superiores a 1 semana.",
+                  "Consolidar el catálogo de tecnologías viables para el equipo."
+                ],
+                "table_columns": "Disciplina | Tecnología Dominada | Nivel de Madurez del Equipo",
+                "table_rules": "Solo tecnologías probadas en producción por el equipo.",
+                "restrictions": [
+                  "Prohibido proponer lenguajes desconocidos sin justificación de spike previo.",
+                  "Mantener foco en la velocidad de entrega del MVP."
+                ],
+                "done_when": "Catálogo de competencias técnicas del equipo validado."
+              },
+              "example_title": "Capacidades Técnicas Dominadas por el Equipo",
+              "example": "| Disciplina | Tecnología Dominada | Nivel de Madurez |\n| --- | --- | --- |\n| Frontend | React + Tailwind CSS / JavaScript | Dominado (Product Designer / Dev) |\n| Backend API | Java (Spring Boot) + Hibernate | Dominado (Tech Lead) |\n| Persistencia | PostgreSQL 16 relacional | Dominado (Tech Lead) |\n| Infraestructura | Docker + Plataformas PaaS | Familiar / Dominado |",
+              "link_label": "capacidades van a lista negra inicial (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Definición de lista negra tecnológica inicial",
+          "objective": "Cruzar restricciones y habilidades para vetar de entrada tecnologías incompatibles.",
+          "input": "Filtros RNN de 1.1 y competencias de 1.2.",
+          "raw_data_title": "Lista Negra Inicial",
+          "raw_data": "Descartados: Angular / Next.js SSR pesado (complejidad excesiva), NoSQL MongoDB (sin ACID estricto), Kubernetes puro (sobrecarga operativa).",
+          "exit_label": "LISTA NEGRA INICIAL FIJADA → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Descalificación de tecnologías fuera de rango",
+              "objective": "Eliminar opciones que representen sobrecostos, sobre-ingeniería o riesgos de concurrencia.",
+              "how_to": {
+                "steps": [
+                  "Contrastar candidatos populares frente a los filtros de entrada.",
+                  "Vetar tecnologías que incumplan los requisitos de consistencia ACID inmediata.",
+                  "Vetar frameworks que generen bundles excesivamente pesados para redes 3G.",
+                  "Registrar la lista de tecnologías descartadas de antemano."
+                ],
+                "table_columns": "Tecnología Descartada | Motivo de Inclusión en Lista Negra | Filtro Incumplido",
+                "table_rules": "Descarte preventivo fundamentado en hechos objetivos.",
+                "restrictions": [
+                  "No incluir tecnologías en la lista negra por preferencias subjetivas.",
+                  "Asegurar que el descarte proteja los plazos y el presupuesto."
+                ],
+                "done_when": "Lista negra de tecnologías no viables formalmente establecida."
+              },
+              "example_title": "Lista Negra Preventiva de Tecnologías",
+              "example": "| Tecnología | Motivo de Descarte Preventivo |\n| --- | --- |\n| MongoDB / NoSQL | Consistencia eventual no tolera control atómico de reservas simultáneas |\n| Angular / Next.js SSR pesado | Complejidad innecesaria y sobrecarga de configuración para el MVP |\n| Kubernetes / AWS EC2 | Sobrecarga de DevOps y costos que pulverizan el Break-Even |",
+              "link_label": "lista negra va a división por capas (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Evaluación Matemática de Candidatos por Capa",
+      "summary": "Dividir el sistema en capas y aplicar un test binario (Sí/No) para elegir al ganador indiscutible.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Descomposición del sistema en capas arquitectónicas",
+          "objective": "Estructurar la solución en Frontend Web, Backend API, Base de Datos, Pagos, Mensajería y DevOps.",
+          "input": "Requerimientos funcionales de P1-D9 y arquitectura de Fase 1.",
+          "raw_data_title": "Capas del Sistema",
+          "raw_data": "6 capas definidas: Frontend Web, Backend API, Base de Datos, Pasarela de Pagos, Mensajería/Alertas y DevOps/Infra.",
+          "exit_label": "CAPAS ARQUITECTÓNICAS DEFINIDAS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Identificación de capas críticas de software",
+              "objective": "Segmentar el sistema en módulos independientes para evaluar tecnologías especializadas.",
+              "how_to": {
+                "steps": [
+                  "Identificar las capas indispensables para soportar el core loop de reservas.",
+                  "Separar la interfaz de usuario de la lógica transaccional de negocio.",
+                  "Definir las capas de integración externa (pagos y notificaciones transaccionales).",
+                  "Consolidar el esquema de capas para la evaluación de candidatos."
+                ],
+                "table_columns": "Capa Arquitectónica | Misión en el Sistema | Requerimiento Central",
+                "table_rules": "Descomposición modular limpia y desacoplada.",
+                "restrictions": [
+                  "No mezclar capas de presentación con persistencia de datos.",
+                  "Asegurar independencia de despliegue entre componentes."
+                ],
+                "done_when": "Estructura de capas arquitectónicas formalizada."
+              },
+              "example_title": "Capas Arquitectónicas del Sistema",
+              "example": "1. Frontend Web (Catálogo responsivo y checkout)\n2. Backend API (Máquina de estados y reservas)\n3. Base de Datos (Persistencia ACID y locking)\n4. Pasarela de Pagos (Cobro local y tokenización)\n5. Mensajería / Alertas (Notificaciones en tiempo real)\n6. DevOps / Infraestructura (Contenedores y hosting PaaS)",
+              "link_label": "capas van a evaluación binaria (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Evaluación binaria de candidatos por capa",
+          "objective": "Someter al menos 2 candidatos por capa al test binario de NFR y dominio del equipo.",
+          "input": "Capas de 2.1 y pool de candidatos tecnológicos.",
+          "raw_data_title": "Matriz de Evaluación Binaria",
+          "raw_data": "Frontend: React+Tailwind (Sí/Sí) vs Next.js SSR (No/No). Backend: Spring Boot (Sí/Sí) vs Node.js (No/No). DB: PostgreSQL (Sí/Sí) vs MongoDB (No/No). Pagos: Wompi (Sí/Sí) vs Stripe (No/No).",
+          "exit_label": "TEST BINARIO COMPLETADO → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Test binario de cumplimiento de RNN y curvas",
+              "objective": "Evaluar objetivamente cada opción descartando aquellas que requieran 'depende'.",
+              "how_to": {
+                "steps": [
+                  "Proponer al menos 2 candidatos lógicos para cada capa técnica.",
+                  "Aplicar el criterio: ¿Cumple las Restricciones No Negociables de costo y performance? (Sí/No).",
+                  "Aplicar el criterio: ¿El equipo lo domina sin curva de aprendizaje prolongada? (Sí/No).",
+                  "Registrar los resultados binarios en la matriz comparativa."
+                ],
+                "table_columns": "Capa | Candidato | ¿Cumple RNN crítico? | ¿El equipo lo domina? | Resultado",
+                "table_rules": "Evaluación estrictamente binaria (Sí / No).",
+                "restrictions": [
+                  "Prohibido asignar 'Parcial' o 'Depende'.",
+                  "Cualquier opción con un 'No' queda automáticamente descalificada."
+                ],
+                "done_when": "Matriz de selección binaria completada para todas las capas."
+              },
+              "example_title": "Matriz de Selección Binaria de Candidatos",
+              "example": "| Capa | Candidato | ¿Cumple RNN crítico? | ¿Equipo lo domina? | Resultado |\n| --- | --- | --- | --- | --- |\n| Frontend Web | React + Tailwind (Vite) | Sí (Bundle < 1.5MB) | Sí | **Ganador** |\n| Frontend Web | Next.js SSR / Angular | No (Overhead bundle) | No | Descartado |\n| Backend API | Java Spring Boot 3.x | Sí (ACID, P95 < 400ms) | Sí | **Ganador** |\n| Backend API | Node.js Express puro | No (Locks transaccionales) | No | Descartado |\n| Base de Datos | PostgreSQL 16 | Sí (Aislamiento Serializable) | Sí | **Ganador** |\n| Base de Datos | MongoDB / DynamoDB | No (Consistencia eventual) | No | Descartado |\n| Pasarela Pagos | Wompi API (Local) | Sí (PSE/Nequi/Cero PAN) | Sí | **Ganador** |\n| Pasarela Pagos | Stripe Puro | No (Fricción pagos Colombia) | No | Descartado |",
+              "link_label": "evaluación binaria va a selección de ganadores (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Selección del candidato ganador por capa",
+          "objective": "Consolidar el stack oficial confirmando que cada tecnología ganadora tenga 'Sí' en ambas columnas.",
+          "input": "Matriz de selección binaria de Step 2.2.",
+          "raw_data_title": "Stack Oficial Ganador",
+          "raw_data": "Frontend: React + Tailwind CSS (Vite). Backend: Java Spring Boot 3.x. DB: PostgreSQL 16. Pagos: Wompi API. Alertas: WhatsApp Cloud API. Infra: Docker en Render/Railway.",
+          "exit_label": "STACK GANADOR INDISCUTIBLE SELECCIONADO → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Declaración indiscutible de ganadores",
+              "objective": "Oficializar el conjunto de herramientas que constituirá la arquitectura del sistema.",
+              "how_to": {
+                "steps": [
+                  "Filtrar los candidatos con doble 'Sí' en cada una de las capas evaluadas.",
+                  "Verificar que el conjunto de tecnologías seleccionadas sea compatible entre sí.",
+                  "Confirmar que no existan cuellos de botella de integración entre frontend y backend.",
+                  "Declarar formalmente el stack oficial de desarrollo para Fase 2."
+                ],
+                "table_columns": "Capa Arquitectónica | Tecnología Ganadora Oficial | Cumplimiento Dual Certificado",
+                "table_rules": "Una sola tecnología ganadora por capa.",
+                "restrictions": [
+                  "No admitir dobles ganadores en la misma capa.",
+                  "Asegurar que todas las capas tengan tecnología asignada."
+                ],
+                "done_when": "Stack oficial consolidado con ganadores indiscutibles."
+              },
+              "example_title": "Stack Tecnológico Ganador Oficial",
+              "example": "- **Frontend Web:** React + Tailwind CSS / JavaScript (Vite)\n- **Backend API:** Java 21 (Spring Boot 3.x)\n- **Base de Datos:** PostgreSQL 16 (Relacional)\n- **Pasarela de Pagos:** Wompi API\n- **Mensajería / Alertas:** WhatsApp Cloud API\n- **DevOps / Infraestructura:** Docker + Git (Render / Railway)",
+              "link_label": "ganadores van a justificación arquitectónica (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Declaración de ADR (Architecture Decision Record)",
+      "summary": "Inmortalizar el porqué de cada ganador y redactar ADRs de rechazo lapidarios para alternativas famosas.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Justificación arquitectónica del ganador oficial",
+          "objective": "Vincular técnicamente cada tecnología ganadora con las Restricciones No Negociables que satisface.",
+          "input": "Ganadores oficiales de Step 2.3 y RNN de P2-D2.",
+          "raw_data_title": "Justificación de Ganadores",
+          "raw_data": "React+Tailwind cumple RNN-01 (bundle ligero <1.5MB). Spring Boot cumple RNN-02 (ACID y concurrencia). PostgreSQL cumple integridad de reservas. Wompi cumple RNN-04 (cero datos de tarjeta).",
+          "exit_label": "JUSTIFICACIONES TÉCNICAS REDACTADAS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Redacción de fundamentos técnicos por capa",
+              "objective": "Explicar las ventajas técnicas concretas que justifican la elección de cada herramienta.",
+              "how_to": {
+                "steps": [
+                  "Redactar una justificación precisa para cada tecnología elegida.",
+                  "Referenciar explícitamente el ID de la RNN que respalda la decisión.",
+                  "Explicar cómo la herramienta minimiza los riesgos identificados en Fase 1.",
+                  "Incorporar los argumentos en la columna de justificación del ADR."
+                ],
+                "table_columns": "Capa | Tecnología Elegida | Justificación Técnica RNN / Skill",
+                "table_rules": "Vincular directamente con una RNN o competencia validada.",
+                "restrictions": [
+                  "No apelar a modas de la industria o preferencias estéticas.",
+                  "Garantizar que la justificación sea técnicamente comprobable."
+                ],
+                "done_when": "Justificación técnica documentada para cada tecnología ganadora."
+              },
+              "example_title": "Justificación Técnica de Ganadores Oficiales",
+              "example": "| Capa | Tecnología Elegida | Justificación RNN / Decisión de Equipo |\n| --- | --- | --- |\n| Frontend Web | React + Tailwind (Vite) | Cumple RNN-01. Modularidad reactiva para catálogo con filtros y calendario. Purge de Tailwind asegura bundle < 1.5MB. |\n| Backend API | Java 21 (Spring Boot 3.x) | Cumple RNN-02 (Concurrencia). Soporte transaccional ACID, Spring Data JPA con locks y POJOs fuertemente tipados. |\n| Base de Datos | PostgreSQL 16 | Integridad referencial estricta, aislamiento transaccional y locks de fila para inventario de fechas. |",
+              "link_label": "justificación va a ADRs de rechazo lapidarios (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Redacción de ADR de rechazo lapidario",
+          "objective": "Escribir un argumento de una sola oración fundamentado en NFRs que vete definitivamente las opciones populares descartadas.",
+          "input": "Candidatos descartados de Step 2.2.",
+          "raw_data_title": "ADRs de Rechazo",
+          "raw_data": "Next.js: Complejidad excesiva y costo innecesario para MVP. Node.js: Menos nativo para locks transaccionales complejos. MongoDB: Rechazado por consistencia eventual. Stripe: Fricción en pagos locales COP.",
+          "exit_label": "ADRS DE RECHAZO REDACTADOS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Formulación de razones objetivas de descarte",
+              "objective": "Inmortalizar el 'Por Qué No' para evitar debates cíclicos futuros sobre tecnologías alternativas.",
+              "how_to": {
+                "steps": [
+                  "Identificar las opciones populares que los ingenieros suelen sugerir (Next.js, Node.js, MongoDB, AWS).",
+                  "Redactar una frase lapidaria de rechazo basada en un NFR incumplido o riesgo económico.",
+                  "Explicar con precisión técnica la falla fatal que causó su exclusión.",
+                  "Integrar los ADRs de rechazo en la tabla maestra."
+                ],
+                "table_columns": "Capa | Opción Descartada Famosa | ADR de Rechazo Lapidario (Motivo Objetivo)",
+                "table_rules": "Frase concisa, incontrovertible y referenciada a una limitante real.",
+                "restrictions": [
+                  "Prohibido descartar tecnologías sin justificación técnica o económica.",
+                  "Mantener un tono asertivo que cierre discusiones estériles."
+                ],
+                "done_when": "ADR de rechazo redactado para todas las alternativas relevantes."
+              },
+              "example_title": "ADR de Rechazo para Alternativas Famosas",
+              "example": "| Capa | ADR de Rechazo (Por qué NO otra cosa) |\n| --- | --- |\n| Frontend | **Angular / Next.js SSR pesado:** Rechazados. Complejidad excesiva para la etapa de MVP y mayor costo de mantenimiento. |\n| Backend | **Node.js puro:** Menos nativo para modelar candados transaccionales complejos y consistencia estricta en concurrencia. |\n| Base de Datos | **MongoDB / NoSQL:** Rechazado. Un flujo transaccional de reservas no tolera consistencia eventual; requiere ACID estricto. |\n| Pasarela Pagos | **Pasarelas internacionales (Stripe puro):** Fricción para pagos locales en pesos colombianos (COP). |",
+              "link_label": "ADRs de rechazo van a blindaje anti-debate (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Verificación de blindaje anti-debate futuro",
+          "objective": "Asegurar que cualquier intento de cambiar de stack durante Fase 2 deba ser rechazado citando este entregable.",
+          "input": "Tabla consolidada de ganadores y ADRs de rechazo de 3.1 y 3.2.",
+          "raw_data_title": "Blindaje Arquitectónico",
+          "raw_data": "Decisiones selladas. El equipo queda formalmente atado al stack oficial. Escribir código en frameworks no autorizados constituye falta metodológica.",
+          "exit_label": "BLINDAJE ARQUITECTÓNICO CERTIFICADO → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Sellado de defensas arquitectónicas contra churn",
+              "objective": "Proteger el foco del equipo prohibiendo migraciones tecnológicas durante el ciclo de vida del MVP.",
+              "how_to": {
+                "steps": [
+                  "Verificar que cada alternativa descartada cuente con una defensa incontrovertible.",
+                  "Establecer la regla: el stack no se reevalúa hasta concluir el ciclo piloto de Fase 1 y 2.",
+                  "Asegurar el respaldo conjunto del Product Manager y del Tech Lead.",
+                  "Consolidar la tabla completa de ADR para su ensamblaje final."
+                ],
+                "table_columns": "Capa | Tecnología Oficial | Alternativa Principal Rechazada | Blindaje Ratificado",
+                "table_rules": "Acuerdo inmutable durante el ciclo del MVP.",
+                "restrictions": [
+                  "No permitir cambios de stack basados en modas posteriores.",
+                  "Exigir observancia estricta en la configuración de repositorios."
+                ],
+                "done_when": "Blindaje de decisiones arquitectónicas formalmente ratificado."
+              },
+              "example_title": "Ratificación de Blindaje Arquitectónico",
+              "example": "| Capa | Tecnología Oficial | Alternativa Rechazada | Estatus de Blindaje |\n| --- | --- | --- | --- |\n| Frontend | React + Tailwind (Vite) | Next.js / Angular | Ratificado e inmutable ✅ |\n| Backend | Java Spring Boot 3.x | Node.js Express | Ratificado e inmutable ✅ |\n| Base de Datos | PostgreSQL 16 | MongoDB NoSQL | Ratificado e inmutable ✅ |\n| Pasarela | Wompi API | Stripe | Ratificado e inmutable ✅ |",
+              "link_label": "blindaje va a compilación final de la biblia técnica (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar la Biblia de Tecnología del proyecto, auditar compuerta de fase y exportar formalmente.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación estructurada de la tabla maestra ADR",
+          "objective": "Integrar capas, tecnología ganadora, justificación RNN y ADRs de rechazo en la tabla oficial.",
+          "input": "Resultados de Steps 1 al 3.",
+          "raw_data_title": "Consolidación Documental",
+          "raw_data": "Estructuración de las 3 secciones oficiales: Metadatos, Stack Tecnológico Oficial (ADR) con 6 capas e Implicación de Compuerta de Fase.",
+          "exit_label": "DOCUMENTO DE STACK CONSOLIDADO → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Unificación de ganadores, justificaciones y descartes",
+              "objective": "Formatear el documento maestro de decisiones tecnológicas siguiendo la plantilla estandarizada.",
+              "how_to": {
+                "steps": [
+                  "Integrar las 6 capas del sistema en la tabla canónica de 4 columnas.",
+                  "Revisar la tipografía y redacción técnica en español formal.",
+                  "Verificar los metadatos oficiales del entregable.",
+                  "Preparar la versión consolidada para la auditoría de compuerta."
+                ],
+                "table_columns": "Capa | Tecnología Elegida | Justificación RNN / Decisión de Equipo | ADR de Rechazo (Por qué NO otra cosa)",
+                "table_rules": "Uso de la tabla canónica de 4 columnas oficiales.",
+                "restrictions": [
+                  "No omitir ninguna de las 6 capas arquitectónicas.",
+                  "Mantener la precisión en las versiones de las librerías y frameworks."
+                ],
+                "done_when": "Documento de Decisión de Stack consolidado en su totalidad."
+              },
+              "example_title": "Tabla Maestra del Stack Tecnológico Oficial (ADR)",
+              "example": "### 2. Stack Tecnológico Oficial (ADR)\n| Capa | Tecnología Elegida | Justificación RNN / Decisión de Equipo | ADR de Rechazo (Por qué NO otra cosa) |\n| --- | --- | --- | --- |\n| **Frontend Web** | React + Tailwind CSS / JavaScript (Vite) | Permite modularidad reactiva para catálogo con filtros y calendario. Purge de Tailwind asegura bundle <1.5MB. | **Angular / Next.js SSR pesado:** Rechazados. Complejidad excesiva para MVP y mayor costo de mantenimiento. |\n| **Backend API** | Java 21 (Spring Boot 3.x) | Cumple RNN-02 (Concurrencia). Soporte transaccional ACID, Spring Data JPA y POJOs fuertemente tipados. | **Node.js puro:** Menos nativo para modelar candados transaccionales complejos y consistencia estricta en concurrencia. |\n| **Base de Datos** | PostgreSQL 16 (Relacional) | Integridad referencial estricta, aislamiento transaccional y locks de fila para inventario. | **MongoDB / NoSQL:** Rechazado. Un flujo transaccional de reservas no tolera consistencia eventual; requiere ACID estricto. |\n| **Pasarela de Pagos** | Wompi API | Delegación 100% segura del checkout financiero con soporte local (PSE, Nequi) y Webhooks idempotentes. | **Pasarelas internacionales (Stripe puro):** Fricción para pagos locales en pesos colombianos (COP). |\n| **Mensajería / Alertas** | WhatsApp Cloud API | Canal ubicuo de comunicación inmediata para confirmaciones transaccionales a finqueros y turistas. | **SMS tradicionales / Push nativas:** Menor tasa de apertura y sobrecostos por mensaje. |\n| **DevOps / Infra** | Docker + Git (Render / Railway) | Contenerización estándar, portabilidad y despliegues reproducibles con costo inferior a $15 USD mensuales. | **AWS EC2 / Kubernetes puro:** Sobrecarga operativa innecesaria para el MVP. |",
+              "link_label": "consolidación va a auditoría de compuerta condicional (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Verificación de compuerta condicional y español",
+          "objective": "Comprobar que todas las tecnologías cumplan RNN y habilidades, y que el texto esté en español absoluto.",
+          "input": "Documento consolidado de Step 4.1.",
+          "raw_data_title": "Auditoría de Calidad",
+          "raw_data": "100% de tecnologías cumplen RNN de costo, performance y transaccionalidad. ADRs de rechazo presentes en todas las capas. Español formal verificado.",
+          "exit_label": "COMPUERTA CONDICIONAL DE STACK SUPERADA → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Control de calidad de reglas de selección",
+              "objective": "Verificar el cumplimiento riguroso de las reglas condicionales de la metodología.",
+              "how_to": {
+                "steps": [
+                  "Revisar que ningún ganador viole las Restricciones No Negociables de P2-D2.",
+                  "Comprobar que las tecnologías estén dentro de las competencias validadas en P1-D6.",
+                  "Verificar que cada perdedor relevante posea su respectivo ADR de rechazo lapidario.",
+                  "Registrar el veredicto conforme de compuerta en la sección 3."
+                ],
+                "table_columns": "Criterio de Compuerta | Condición Exigida | Estado Verificado",
+                "table_rules": "Validación obligatoria sin excepciones técnicas.",
+                "restrictions": [
+                  "Rechazar si falta justificación contra RNN en alguna capa.",
+                  "Asegurar que la compuerta habilite el diseño del repositorio en P2-D4."
+                ],
+                "done_when": "Compuerta condicional verificada y aprobada."
+              },
+              "example_title": "Verificación de Compuerta de Stack",
+              "example": "### 3. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No.\n- **Condición:** Proceed. El equipo cuenta con la directriz clara: se construirá una plataforma web transaccional moderna con Frontend en React + Tailwind y Backend fuertemente tipado en Java Spring Boot + PostgreSQL. Se autoriza la estructuración del repositorio (D4).",
+              "link_label": "control de calidad va a exportación oficial (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Registro de metadatos y sellado formal del stack",
+          "objective": "Sellar la biblia tecnológica en la Base de Conocimiento oficial y habilitar Repository Structure.",
+          "input": "Documento validado y sellado.",
+          "raw_data_title": "Cierre Formal P2-D3",
+          "raw_data": "Proyecto: Nos Fuimos de Finca. Fase 2, D3 de 13. Estado: Approved. Stack Tecnológico Oficial publicado formalmente.",
+          "exit_label": "DECISIÓN DE STACK FORMALMENTE APROBADA",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Publicación oficial de la biblia tecnológica",
+              "objective": "Certificar la culminación de la selección del stack y abrir paso a la arquitectura de repositorios.",
+              "how_to": {
+                "steps": [
+                  "Completar la cabecera estándar de metadatos con el estado oficial 'Approved'.",
+                  "Publicar el documento en `docs/02-project-kickoff/03. Decision de Stack.md`.",
+                  "Actualizar el archivo de progreso PROGRESS.md con las métricas del entregable.",
+                  "Habilitar el inicio del entregable P2-D4 (Repository Structure)."
+                ],
+                "table_columns": "Metadato Maestro | Valor Registrado | Significado Metodológico",
+                "table_rules": "Registro oficial de cierre de entregable.",
+                "restrictions": [
+                  "No modificar el stack sin repetir la evaluación de compuerta.",
+                  "Utilizar las herramientas seleccionadas como base para la estructura de carpetas de P2-D4."
+                ],
+                "done_when": "Metadatos registrados y entregable P2-D3 formalmente aprobado."
+              },
+              "example_title": "Certificación Final de Decisión de Stack",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 2 — Project Kickoff  \n**Entregable:** 3 de 13  \n**Estado:** Aprobado  \n\nEstado al cerrar este step: **Approved**. Stack tecnológico oficial fijado en 6 capas: React+Tailwind (Frontend), Spring Boot (Backend), PostgreSQL 16 (DB), Wompi (Pagos), WhatsApp Cloud API (Alertas) y Docker en PaaS (DevOps). ADRs de rechazo vinculantes registrados.",
+              "link_label": "cierre formal del entregable P2-D3"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

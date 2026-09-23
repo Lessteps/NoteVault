@@ -1,0 +1,408 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D4",
+  "deliverable": "Technical Feasibility Record (Registro de Factibilidad Técnica)",
+  "purpose": "Este entregable evalúa si la visión del producto y el foso estratégico se pueden sostener técnicamente en la vida real. Traduce los mandatos en componentes técnicos (Build/Buy/Partner), somete la mayor incertidumbre técnica a un Spike de laboratorio (prueba de estrés), y audita la accesibilidad de datos y dependencias externas.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_competitive_analysis]] | Define el foso defensivo (Moat) que DEBEMOS construir internamente (P1-D3). |\n| [[example_output_user_profile]] | Define el contexto técnico del usuario, latencias y restricciones de red (P1-D1). |\n| [[example_output_risk_register]] | Provee los descalificadores técnicos y de conectividad evaluados en Fase 0 (P0-D7). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Inventariar Capacidades y Estrategia de Aprovisionamiento",
+      "summary": "Traducir los mandatos de negocio en capacidades técnicas agnósticas y decidir qué se construye internamente (Build), qué se compra (Buy) y qué se delega a terceros (Partner).",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Identificar capacidades técnicas en lenguaje agnóstico",
+          "objective": "Traducir los mandatos del Moat y requerimientos del usuario en capacidades técnicas sin nombres comerciales ni marcas.",
+          "input": "Mandatos de P1-D3 (Moat), P1-D1 y P0-D7.",
+          "raw_data_title": "Mandatos de Negocio Traducidos",
+          "raw_data": "1) Cola de mensajería offline-first. 2) Pasarela B2B tokenizada. 3) Resolución de colisiones diferidas (consistencia eventual). 4) Notificaciones push/SMS.",
+          "exit_label": "CAPACIDADES IDENTIFICADAS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Inventario de capacidades agnósticas",
+              "objective": "Catalogar las capacidades técnicas requeridas sin comprometer tecnologías específicas.",
+              "how_to": {
+                "steps": [
+                  "Analizar los mandatos del Moat en P1-D3 y los dolores de P1-D1.",
+                  "Formular cada función en términos de capacidades técnicas agnósticas.",
+                  "Evitar mencionar frameworks, marcas comerciales o lenguajes específicos.",
+                  "Compilar la lista inicial de capacidades técnicas para el producto."
+                ],
+                "table_columns": "Mandato de Negocio | Capacidad Técnica Agnóstica | Justificación Funcional",
+                "table_rules": "Una fila por capacidad técnica derivada de los requerimientos.",
+                "restrictions": [
+                  "Prohibido usar nombres de marcas, frameworks o librerías específicas.",
+                  "Definición conceptual y funcional pura."
+                ],
+                "done_when": "Lista de capacidades agnósticas compilada."
+              },
+              "example_title": "Capacidades Técnicas Agnósticas",
+              "example": "1. **Cola de Mensajería Offline-First:** Almacenamiento local y despacho asíncrono ante conectividad intermitente.\n2. **Pasarela B2B Tokenizada:** Procesamiento de pagos con delegación de cumplimiento PCI.\n3. **Resolución de Colisiones Diferidas:** Mecanismo de serialización y consistencia eventual ante desconexión.\n4. **Notificaciones Push / SMS:** Canal de alertas transaccionales inmediatas para anfitriones.",
+              "link_label": "capacidades van a evaluación tridimensional (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Evaluar cada capacidad en 3 dimensiones",
+          "objective": "Responder para cada capacidad: ¿Existe en el mercado? ¿Es accesible financieramente? ¿Está probada a escala?",
+          "input": "Inventario de capacidades técnicas del Sub-paso 1.1.",
+          "raw_data_title": "Matriz de Evaluación Tridimensional",
+          "raw_data": "Cola offline y resolución de colisiones: No existen listas para nuestro contexto rural. Pasarela tokenizada y notificaciones: Existen, son accesibles y probadas.",
+          "exit_label": "EVALUACIÓN TRIDIMENSIONAL CONCLUIDA → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Evaluación tridimensional de capacidades",
+              "objective": "Evaluar existencia, accesibilidad y madurez a escala de cada capacidad.",
+              "how_to": {
+                "steps": [
+                  "Evaluar si la solución existe lista en el mercado para el nicho específico.",
+                  "Evaluar si es accesible económicamente para un equipo inicial sin capital masivo.",
+                  "Evaluar si está probada a escala bajo condiciones similares de operación.",
+                  "Registrar las 3 dimensiones en la matriz de análisis."
+                ],
+                "table_columns": "Capacidad Técnica | ¿Existe lista? | ¿Accesible? | ¿Probada a escala?",
+                "table_rules": "Una fila por capacidad evaluando las tres preguntas estándar.",
+                "restrictions": [
+                  "Respuestas fundamentadas en investigación objetiva.",
+                  "Considerar el contexto de red intermitente rural."
+                ],
+                "done_when": "Todas las capacidades evaluadas en las 3 dimensiones."
+              },
+              "example_title": "Evaluación Tridimensional",
+              "example": "| Capacidad Técnica | ¿Existe lista? | ¿Accesible? | ¿Probada a escala? |\n| --- | :---: | :---: | :---: |\n| Cola de Mensajería Offline-First | Y | Y | Y |\n| Pasarela B2B Tokenizada | Y | Y | Y |\n| Resolución de Colisiones Diferidas | Y | Y | Y |\n| Notificaciones Push/SMS | Y | Y | Y |",
+              "link_label": "evaluación va a regla de aprovisionamiento (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Aplicar la regla de aprovisionamiento",
+          "objective": "Asignar estrategia Build, Buy o Partner aplicando las reglas de diferenciación y riesgo legal.",
+          "input": "Evaluación del Sub-paso 1.2 y Moat de P1-D3.",
+          "raw_data_title": "Asignación de Estrategia",
+          "raw_data": "Cola offline: Build (Moat). Pasarela: Partner (PCI). Colisiones diferidas: Build (Consistencia). Notificaciones: Buy (Commodity).",
+          "exit_label": "ESTRATEGIA ASIGNADA → 1.4",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Asignación Build, Buy o Partner",
+              "objective": "Clasificar formalmente cada capacidad bajo la regla metodológica de abastecimiento.",
+              "how_to": {
+                "steps": [
+                  "Si la capacidad constituye el Moat estructural diferenciador -> asignar Build.",
+                  "Si es un servicio común disponible a bajo costo marginal -> asignar Buy.",
+                  "Si conlleva riesgo regulatorio o cumplimiento legal complejo -> asignar Partner.",
+                  "Documentar la justificación técnica de cada asignación."
+                ],
+                "table_columns": "Capacidad Clave | Estrategia (Build/Buy/Partner) | Justificación Metodológica",
+                "table_rules": "Una fila por capacidad detallando la decisión de abastecimiento.",
+                "restrictions": [
+                  "El Moat no puede comprarse ni delegarse.",
+                  "Las capacidades con riesgo legal deben ser Partner."
+                ],
+                "done_when": "Estrategia asignada a todas las capacidades con justificación."
+              },
+              "example_title": "Estrategia de Aprovisionamiento",
+              "example": "| Capacidad Clave | Estrategia | Justificación |\n| --- | :---: | --- |\n| Cola de Mensajería Offline-First | **Build** | Es el foso competitivo (Moat). |\n| Pasarela B2B Tokenizada | **Partner** | Exigencia de seguridad financiera (PCI). Delegación a Wompi. |\n| Resolución de Colisiones Diferidas | **Build** | Mecanismo central de consistencia eventual. |\n| Notificaciones SMS/Push | **Buy** | Commodity. API madura de bajo costo marginal. |",
+              "link_label": "estrategia va a selección para spike (1.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.4",
+          "title": "Identificar capacidad Build de mayor riesgo técnico",
+          "objective": "Aislar el componente de mayor incertidumbre que requiere validación empírica en laboratorio.",
+          "input": "Capacidades asignadas como Build en Sub-paso 1.3.",
+          "raw_data_title": "Capacidad Crítica para Spike",
+          "raw_data": "Resolución de colisiones y cola offline bajo concurrencia extrema en red inestable. Candidato obligatorio para el Spike.",
+          "exit_label": "CANDIDATO DE SPIKE SELECCIONADO → Step 2",
+          "micro": [
+            {
+              "code": "1.4.1",
+              "title": "Selección de capacidad crítica para Spike",
+              "objective": "Designar la capacidad de mayor riesgo técnico para someterla a prueba de estrés.",
+              "how_to": {
+                "steps": [
+                  "Revisar todas las capacidades marcadas como Build.",
+                  "Evaluar cuál de ellas puede causar fallo catastrófico si colapsa en producción.",
+                  "Designar formalmente la capacidad que será sometida al Technical Spike en Step 2.",
+                  "Definir el vector de riesgo técnico a evaluar."
+                ],
+                "table_columns": "Capacidad Build | Vector de Riesgo | Severidad del Fallo | Selección para Spike",
+                "table_rules": "Una fila por capacidad Build evaluando su potencial de colapso.",
+                "restrictions": [
+                  "Seleccionar la capacidad de mayor incertidumbre real, no un flujo trivial.",
+                  "Obligatoriamente una capacidad Build."
+                ],
+                "done_when": "Capacidad para Spike seleccionada formalmente."
+              },
+              "example_title": "Capacidad Seleccionada para Spike",
+              "example": "**Capacidad candidata para Spike (Step 2):** Resolución de Colisiones Diferidas y Cola Offline — mayor riesgo técnico bajo condición de concurrencia y reconexión masiva simultánea desde redes rurales 4G.",
+              "link_label": "candidato va a diseño del spike (2.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Ejecutar Technical Spike sobre la Incertidumbre Crítica",
+      "summary": "Aislar la capacidad Build de mayor riesgo, formular una hipótesis de ruptura y ejecutar una prueba de estrés para medir los límites reales del sistema.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Aislar la capacidad Build de mayor riesgo",
+          "objective": "Fijar el contexto operativo extremo en el que el componente puede colapsar.",
+          "input": "Capacidad seleccionada en Sub-paso 1.4.",
+          "raw_data_title": "Contexto Extremo del Spike",
+          "raw_data": "Múltiples agencias reconectan a internet 4G y lanzan reservas represadas al mismo milisegundo sobre el mismo inventario.",
+          "exit_label": "ESCENARIO EXTREMO AISLADO → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Aislamiento del escenario límite de estrés",
+              "objective": "Definir las condiciones reales extremas bajo las cuales se evaluará el componente.",
+              "how_to": {
+                "steps": [
+                  "Describir el escenario del mundo real que somete a máxima tensión el sistema.",
+                  "Definir las variables críticas (número de usuarios, latencia, concurrencia de milisegundos).",
+                  "Evitar condiciones sintéticas irrelevantes y centrarse en el dolor operativo.",
+                  "Establecer las precondiciones del experimento."
+                ],
+                "table_columns": "Parámetro de Estrés | Condición Normal | Condición Extrema del Spike | Justificación de Campo",
+                "table_rules": "Una fila por parámetro crítico del escenario límite.",
+                "restrictions": [
+                  "El escenario debe replicar el detonante de fallo de P0-D1.",
+                  "Condiciones realistas pero extremas."
+                ],
+                "done_when": "Escenario límite de estrés documentado."
+              },
+              "example_title": "Escenario Límite del Spike",
+              "example": "- **Capacidad bajo prueba:** Resolución de colisiones diferidas y sincronización.\n- **Condición extrema:** Múltiples agencias y turistas reconectan simultáneamente en 4G e intentan asegurar la misma propiedad para el mismo fin de semana festivo en el mismo milisegundo.",
+              "link_label": "escenario va a hipótesis de ruptura (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Formular la Hipótesis de Ruptura",
+          "objective": "Escribir la hipótesis falseable: Si [condición extrema], entonces [fallo técnico], porque [mecanismo].",
+          "input": "Escenario límite del Sub-paso 2.1.",
+          "raw_data_title": "Hipótesis Falseable",
+          "raw_data": "Overbooking catastrófico si múltiples agencias reconectan a internet 4G y lanzan reservas represadas al mismo milisegundo sin lock optimista en la BD.",
+          "exit_label": "HIPÓTESIS FORMULADA → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Formulación de hipótesis falseable de ruptura",
+              "objective": "Redactar la hipótesis de fallo técnico de forma medible mediante código.",
+              "how_to": {
+                "steps": [
+                  "Aplicar el formato estructurado: Si [condición], entonces [fallo], porque [mecanismo].",
+                  "Asegurar que el fallo técnico esperado sea cuantificable (ej. reservas duplicadas).",
+                  "Explicitar el mecanismo arquitectónico sospechoso de vulnerabilidad.",
+                  "Verificar que la hipótesis pueda ser probada con un script desechable."
+                ],
+                "table_columns": "Estructura de la Hipótesis | Enunciado Técnico | Criterio de Falsación",
+                "table_rules": "Una fila detallando la formulación de la hipótesis de ruptura.",
+                "restrictions": [
+                  "La hipótesis debe ser comprobable con datos empíricos.",
+                  "No redactar hipótesis abstractas o subjetivas."
+                ],
+                "done_when": "Hipótesis de ruptura formalizada."
+              },
+              "example_title": "Hipótesis de Ruptura",
+              "example": "**Hipótesis a Probar:** Overbooking catastrófico si múltiples agencias reconectan a internet 4G y lanzan reservas represadas al mismo milisegundo, provocando colisión silenciosa en la base de datos si no se cuenta con transacciones optimistas serializables.",
+              "link_label": "hipótesis va a ejecución del script (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Diseñar y ejecutar script de prueba de estrés (Spike)",
+          "objective": "Construir script mínimo de laboratorio, disparar concurrencia masiva y medir comportamiento del sistema.",
+          "input": "Hipótesis de ruptura del Sub-paso 2.2.",
+          "raw_data_title": "Setup de Prueba y Script Desechable",
+          "raw_data": "Script Python disparando 50 hilos concurrentes asíncronos contra endpoints con lock optimista en la base de datos.",
+          "exit_label": "SCRIPT EJECUTADO → 2.4",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Ejecución de script desechable de estrés",
+              "objective": "Ejecutar la prueba de estrés y medir tiempos de respuesta y bloqueos de base de datos.",
+              "how_to": {
+                "steps": [
+                  "Diseñar un script de prueba mínimo (Python o herramienta de benchmarking).",
+                  "Configurar la carga de hilos concurrentes simulando solicitudes simultáneas.",
+                  "Disparar las peticiones concurrentes contra el mecanismo bajo prueba.",
+                  "Registrar los códigos de respuesta HTTP, excepciones y registros en base de datos."
+                ],
+                "table_columns": "Parámetro del Test | Configuración | Métrica de Salida | Comportamiento Observado",
+                "table_rules": "Una fila por parámetro de prueba documentando la ejecución.",
+                "restrictions": [
+                  "Uso de scripts desechables de laboratorio.",
+                  "Registrar mediciones directas sin suposiciones teóricas."
+                ],
+                "done_when": "Prueba de estrés ejecutada y métricas recolectadas."
+              },
+              "example_title": "Diseño de Prueba del Spike",
+              "example": "- **Diseño de Prueba (Script Desechable):** Script Python de estrés disparando 50 hilos concurrentes asíncronos contra un lock optimista en la base de datos.\n- **Duración:** 30 segundos de ráfaga continua.\n- **Métricas:** Respuestas HTTP 200 vs 409 Conflict, integridad de claves únicas de fecha.",
+              "link_label": "ejecución va a auditoría forense (2.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.4",
+          "title": "Documentar resultados forenses y límites del sistema",
+          "objective": "Analizar los resultados empíricos, confirmar o refutar la hipótesis y diagnosticar implicaciones de UX.",
+          "input": "Métricas y logs del Sub-paso 2.3.",
+          "raw_data_title": "Auditoría Forense del Spike",
+          "raw_data": "El backend bloquea el 98% (Devuelve HTTP 409 Conflict). Problema detectado: fallo de UX, el usuario creía haber vendido offline y recibe el rechazo horas después.",
+          "exit_label": "LÍMITES DOCUMENTADOS → Step 3",
+          "micro": [
+            {
+              "code": "2.4.1",
+              "title": "Auditoría forense de resultados del Spike",
+              "objective": "Dictaminar el resultado del Spike y documentar la limitación descubierta.",
+              "how_to": {
+                "steps": [
+                  "Analizar la proporción de bloqueos exitosos frente a duplicaciones.",
+                  "Confirmar o refutar la hipótesis inicial con base en los datos empíricos.",
+                  "Identificar el tipo de fallo: si es puramente de infraestructura o de experiencia de usuario.",
+                  "Documentar el umbral y límite operacional seguro del sistema."
+                ],
+                "table_columns": "Aspecto Forense | Hallazgo Empírico | Veredicto de Hipótesis | Implicación Arquitectónica",
+                "table_rules": "Una fila resumiendo los hallazgos forenses del Spike.",
+                "restrictions": [
+                  "Registrar los hechos técnicos con total transparencia.",
+                  "Resaltar si el problema migra de la base de datos a la experiencia de usuario."
+                ],
+                "done_when": "Reporte forense del Spike concluido."
+              },
+              "example_title": "Auditoría Forense y Resultados",
+              "example": "- **Auditoría Forense / Resultados:** El backend bloquea el 98% de colisiones (devuelve HTTP 409 Conflict). La base de datos no se corrompe.\n- **Problema de UX Revelado:** El fallo no es de concurrencia en la base de datos sino de experiencia: la agencia creía que vendió el paquete cuando estaba offline y recibe el rechazo horas después al reconectar.\n- **Conclusión de Hipótesis:** Confirmada la necesidad de rediseño del flujo de confirmación.",
+              "link_label": "resultados van a datos de terceros y mitigación (3.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Accesibilidad de Datos de Terceros (Condicional) y Mitigaciones UX",
+      "summary": "Auditar si el sistema depende de APIs o datos externos de terceros, y diseñar mitigaciones de arquitectura o UX para las limitaciones encontradas.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Evaluar dependencias de APIs o datos externos",
+          "objective": "Auditar existencia, gobernanza, costos, límites de tasa y permisos legales de fuentes externas.",
+          "input": "Capacidades Partner del Step 1 e integraciones externas.",
+          "raw_data_title": "Auditoría de APIs Externas",
+          "raw_data": "WhatsApp Business API (Meta) accesible vía Cloud API/Webhook con plan estándar. Wompi (pagos) certificada PCI-DSS accesible. Base de datos interna de fincas: propia.",
+          "exit_label": "DEPENDENCIAS EXTERNAS AUDITADAS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Auditoría de accesibilidad de datos de terceros",
+              "objective": "Evaluar y documentar la matriz de fuentes externas y APIs de integración.",
+              "how_to": {
+                "steps": [
+                  "Verificar si el sistema depende de APIs externas o scraping.",
+                  "Si no depende de fuentes externas, marcar explícitamente como 'N/A — Sin dependencias de datos externos'.",
+                  "Si depende de APIs, evaluar existencia, términos de servicio, costos, rate limits y legalidad.",
+                  "Consolidar la matriz de accesibilidad de terceros."
+                ],
+                "table_columns": "Requisito de Información | Fuente / Dueño | Mecanismo de Acceso | Veredicto",
+                "table_rules": "Una fila por API externa o fuente de datos auditada.",
+                "restrictions": [
+                  "Documentar o marcar explícitamente como N/A.",
+                  "Verificar permisos legales y viabilidad comercial de las APIs."
+                ],
+                "done_when": "Matriz de fuentes externas consolidada."
+              },
+              "example_title": "Matriz de Fuentes Externas",
+              "example": "- **Estado:** Aplica parcialmente (integración liviana con WhatsApp Business API / Webhooks y pasarela Wompi).\n\n| Requisito de Información | Fuente / Dueño | Mecanismo de Acceso | Veredicto |\n| --- | --- | --- | --- |\n| Notificaciones de Mensajería | WhatsApp Business API (Meta) | Cloud API / Webhook | Accesible con plan estándar |\n| Procesamiento de Pagos | Wompi API | REST API / Webhooks | Aprobada (PCI-DSS) |\n| Estado de Fincas / Registro | Operación interna propia | Base de datos interna | Accesible directo (N/A dependencias gubernamentales) |",
+              "link_label": "APIs van a mitigaciones UX (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Diseñar mitigaciones de arquitectura o UX",
+          "objective": "Diseñar un cambio de patrón de interacción o arquitectura para absorber la limitación del Spike.",
+          "input": "Resultados del Spike (Step 2) y latencias de P1-D1.",
+          "raw_data_title": "Mitigación del Fallo Asíncrono",
+          "raw_data": "Cambio de patrón: el sistema no confirma reservas síncronas. Todas entran en estado 'Pendiente de Confirmación' hasta que el propietario valida la disponibilidad manualmente.",
+          "exit_label": "MITIGACIONES DISEÑADAS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Diseño de mitigación operativa y de UX",
+              "objective": "Formular la solución de UX o arquitectura que neutraliza el riesgo descubierto en el Spike.",
+              "how_to": {
+                "steps": [
+                  "Tomar el fallo de UX identificado en el Spike (rechazo tardío tras venta offline).",
+                  "Diseñar un cambio en el flujo de interacción que elimine la falsa expectativa de confirmación síncrona.",
+                  "Definir el estado intermedio ('Pendiente de Confirmación') y el mecanismo de validación del anfitrión.",
+                  "Documentar el riesgo residual y cómo la UX lo absorbe de forma controlada."
+                ],
+                "table_columns": "Riesgo Residual Detectado | Impacto en Usuario | Mitigación Operativa o UX Diseñada",
+                "table_rules": "Una fila por riesgo residual formulando su mitigación concreta.",
+                "restrictions": [
+                  "La mitigación debe resolver el dolor del usuario sin requerir infraestructura inalcanzable.",
+                  "Evitar falsas promesas síncronas en entornos de red inestable."
+                ],
+                "done_when": "Mitigación operativa y de UX documentada."
+              },
+              "example_title": "Riesgos Residuales y Mitigaciones UX",
+              "example": "**Riesgo 1: Colisión de Inventario Asíncrono.**\n- **Impacto:** Falsa confirmación de venta en agencias o anfitriones que operan temporalmente offline.\n- **Mitigación Operativa o UX:** Cambio de patrón de interacción: el sistema no confirma reservas síncronas automáticamente. Todas entran en estado \"Pendiente de Confirmación\" con Soft-Lock temporal hasta que el propietario valida la disponibilidad en su app/WhatsApp.",
+              "link_label": "mitigaciones van a conclusión de factibilidad (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Emitir veredicto de factibilidad técnica y ensamblaje",
+          "objective": "Emitir el veredicto final de factibilidad (Proceed / Pivot Required / Stop) y definir condiciones para Fase 2.",
+          "input": "Resultados de Steps 1, 2 y 3.",
+          "raw_data_title": "Conclusión de Factibilidad",
+          "raw_data": "Veredicto: Proceed (Con Mitigación Operacional). Condición para Fase 2: stack con soporte para colas ligeras, WebSockets/polling y arquitectura Offline-First.",
+          "exit_label": "DOCUMENTO FINAL ENSAMBLADO → publica entregable",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Conclusión de factibilidad y directrices de Stack",
+              "objective": "Emitir el veredicto de factibilidad y consolidar las recomendaciones para Stack Decision (Fase 2).",
+              "how_to": {
+                "steps": [
+                  "Evaluar si las mitigaciones de UX y arquitectura hacen viable la construcción técnica.",
+                  "Emitir el veredicto formal de factibilidad: Proceed (con mitigación operacional).",
+                  "Redactar las condiciones técnicas que alimentarán el entregable Stack Decision de Fase 2.",
+                  "Ensamblar el documento final en español formal con metadatos y secciones completas."
+                ],
+                "table_columns": "Dimensión de Factibilidad | Dictamen | Recomendación para Fase 2",
+                "table_rules": "Una fila formalizando la conclusión técnica.",
+                "restrictions": [
+                  "Las recomendaciones deben alimentar directamente Fase 2 (Stack Decision).",
+                  "Documento final 100% trazable."
+                ],
+                "done_when": "Documento final exportable ensamblado y certificado."
+              },
+              "example_title": "Conclusión de Factibilidad",
+              "example": "### 6. Conclusión de Factibilidad\n- **Veredicto Final:** **`Proceed (Con Mitigación Operacional)`**.\n- **Justificación:** El problema de concurrencia en offline se mitiga mediante diseño de UX asíncrono, garantizando viabilidad técnica sin infraestructura compleja.\n- **Condición para Fase 2 (Stack Decision):** Recomendar stack con soporte robusto para colas ligeras, WebSockets/polling y arquitectura Offline-First.",
+              "link_label": "publica entregable final"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 04. Technical Feasibility.md",
+    "markdown": "# 4. Registro de Factibilidad Técnica\n\n### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 1 — Viabilidad Temprana (Early Viability)\n**Entregable:** 4 de 13\n**Estado:** Aprobado\n\n### 2. Matriz de Capacidades Técnicas\n| Capacidad Clave | ¿Existe? | ¿Accesible? | ¿Probado a Escala? | Build / Buy / Partner | Spike-Validado (Y/N) | Justificación |\n| --- | --- | --- | --- | --- | --- | --- |\n| Cola de Mensajería Offline-First | Y | Y | Y | Build | Y | Es el foso competitivo (Moat). |\n| Pasarela B2B Tokenizada | Y | Y | Y | Partner | N/A | Exigencia de seguridad financiera (PCI). |\n| Resolución de Colisiones Diferidas | Y | Y | Y | Build | Y | Mecanismo central de consistencia eventual. |\n\n### 3. Reporte de Technical Spike\n- **Hipótesis a Probar:** Overbooking catastrófico si múltiples agencias reconectan a internet 4G y lanzan reservas represadas al mismo milisegundo.\n- **Diseño de Prueba (Script Desechable):** Script Python de estrés disparando 50 hilos concurrentes asíncronos contra un lock optimista en la BD.\n- **Auditoría Forense / Resultados:** El backend bloquea el 98% (Devuelve HTTP 409 Conflict). El problema es de Experiencia de Usuario: la agencia creía que vendió el paquete cuando estaba offline y recibe el rechazo horas después.\n\n### 4. Accesibilidad de Datos de Terceros (Solo si aplica)\n- **Estado:** Aplica parcialmente (integración liviana con WhatsApp Business API / Webhooks).\n- **Matriz de Fuentes Externas:**\n| Requisito de Información | Fuente / Dueño | Mecanismo de Acceso | Veredicto |\n| --- | --- | --- | --- |\n| Notificaciones de Mensajería | WhatsApp Business API (Meta) | Cloud API / Webhook | Accesible con plan estándar |\n| Estado de Fincas / Registro | Operación interna propia | Base de datos interna | Accesible directo (N/A dependencias gubernamentales) |\n\n### 5. Riesgos Residuales y Mitigaciones UX\n**Riesgo 1:** Colisión de Inventario Asíncrono.\n- **Impacto:** Falsa confirmación de venta en agencias locales que operan temporalmente offline.\n- **Mitigación Operativa o UX:** Cambio de patrón de interacción: el sistema no confirma reservas síncronas. Todas entran en estado \"Pendiente de Confirmación\" hasta que el propietario valida la disponibilidad manualmente en su app/bot.\n\n### 6. Conclusión de Factibilidad\n- **Veredicto Final:** Proceed (Con Mitigación Operacional).\n- **Justificación:** El problema de concurrencia en offline se mitiga mediante diseño de UX asíncrono, garantizando viabilidad técnica sin infraestructura compleja.\n- **Condición para Fase 2 (Stack Decision):** Recomendar stack con soporte robusto para colas ligeras, WebSockets/polling y arquitectura Offline-First."
+  }
+}

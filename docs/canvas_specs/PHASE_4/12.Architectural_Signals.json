@@ -1,0 +1,201 @@
+{
+  "phase": "PHASE 4: SYSTEM MODELING",
+  "deliverable_code": "D12",
+  "deliverable": "Architectural Signals Synthesis",
+  "purpose": "Sintetizar y auditar todos los modelos desarrollados en la Fase 4 para extraer señales arquitectónicas tempranas en la capa de red (comunicaciones en tiempo real, WebSockets vs SSE) y en la capa de datos (ratios asimétricos de lectura/escritura, caché en memoria, CDN y almacenamiento binario), identificando bloqueadores estructurales previos al diseño de arquitectura en Fase 5.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Sequence Diagrams (D7) | [[PHASE_4_SYSTEM_MODELING/7.System_Sequence_Diagrams/7.System_Sequence_Diagrams.md]] | Provee mapas de latencia, interacción de capas y llamadas síncronas/asíncronas. |\n| Conceptual ERD (D6) | [[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]] | Revela volumetrías proyectadas, agregados y peso transaccional de las entidades. |\n| Notification Matrix (D10) | [[PHASE_4_SYSTEM_MODELING/10.Notification_Matrix/10.Notification_Matrix.md]] | Identifica requerimientos de entrega en tiempo real y flujo de eventos proactivos. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Señales de Capa de Red y Comunicaciones (Network Layer Signals)",
+      "summary": "Auditar las interacciones de secuencias y notificaciones para detectar necesidades de comunicación Stateful y push en tiempo real.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Auditoría de Sincronía y Detección de Necesidades Real-Time",
+          "objective": "Identificar flujos que exigen latencias sub-segundo o conexiones persistentes bidireccionales evitando polling ineficiente.",
+          "input": "Diagramas de secuencia D7 y eventos de notificación D10.",
+          "raw_data_title": "Inventario de Señales de Comunicación en Red",
+          "raw_data": "| Signal ID | Flujo Afectado | Tipo de Comunicación | Señal Detectada | Justificación Técnica |\n|---|---|---|---|---|\n| NS-01 | Alerta de Nueva Reserva en Dashboard | Servidor -> Host | Stateful / Push (Supabase Realtime) | El finquero debe ver la solicitud al instante sin recargar la pantalla |\n| NS-02 | Verificación de Disponibilidad en Calendario | Turista -> API | Stateless / Optimizado | Consulta recurrente; requiere respuestas ultrarrápidas (<200ms) |\n| NS-03 | Webhook de Notificación Wompi | Pasarela -> API | Stateless / Asíncrono | Evento transaccional puntual firmado criptográficamente |",
+          "exit_label": "Señales de Red Rigurosamente Documentadas",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Clasificación de Protocolos de Comunicación y Latencia",
+              "objective": "Determinar si el flujo amerita WebSocket, Server-Sent Events (SSE) o REST HTTP estándar.",
+              "how_to": {
+                "steps": [
+                  "1. Identificar si el usuario requiere recibir actualizaciones espontáneas del servidor.",
+                  "2. Evaluar el costo de tráfico de red de implementar polling periódico.",
+                  "3. Asignar un identificador de señal de red único (`NS-01`).",
+                  "4. Proponer la estrategia de mitigación o adopción tecnológica para Fase 5."
+                ],
+                "table_columns": [
+                  "Signal ID",
+                  "Flujo",
+                  "Patrón Detectado",
+                  "Recomendación Fase 5"
+                ],
+                "table_rules": [
+                  "Todo flujo con exigencia push debe marcarse como señal Stateful",
+                  "Alertar contra polling continuo si la frecuencia de cambio es impredecible",
+                  "Aprovechar mecanismos integrados de plataforma como PostgreSQL LISTEN/NOTIFY"
+                ],
+                "restrictions": "No tomar decisiones finales de infraestructura antes de Fase 5; solo registrar señales y advertencias.",
+                "done_when": "Todas las interacciones críticas de D7 clasificadas por modelo de sincronía."
+              },
+              "example_title": "Registro de Señal de Red NS-01",
+              "example": "```markdown\n| Signal ID | Descripción | Módulo | Implicación Fase 5 |\n|---|---|---|---|\n| NS-01 | Notificación instantánea en dashboard de Host | MOD-NOT | Supabase Realtime (PostgreSQL LISTEN/NOTIFY) para evitar servidor WebSocket custom |\n```",
+              "link_label": "Señales de Red Validadas -> Señales de Capa de Datos"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Señales de Persistencia y Volumetría de Datos (Data Layer Signals)",
+      "summary": "Analizar la proporción lectura/escritura y el manejo de medios binarios pesados en las entidades del ERD.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Análisis de Ratios Read/Write y Cuellos de Botella de BD",
+          "objective": "Detectar tablas sometidas a consultas masivas y requerimientos de almacenamiento de objetos no relacionales.",
+          "input": "Entidades y atributos del ERD D6 y patrones de consumo del D9.",
+          "raw_data_title": "Matriz de Asimetría de Datos y Volumetría",
+          "raw_data": "| Signal ID | Entidad de Datos | Ratio R/W Estimado | Señal Arquitectónica | Justificación y Estrategia |\n|---|---|---|---|---|\n| DS-01 | `properties` (Catálogo público) | ~100:1 (Read-Heavy) | Requiere Capa de Caché en Memoria | Miles de consultas de búsqueda vs escasas mutaciones de publicación |\n| DS-02 | `property_images` (Fotografías 4K) | Pesado binario | CDN + Object Storage Obligatorio | Almacenar binarios en PostgreSQL degrada drásticamente el rendimiento |\n| DS-03 | `audit_logs` / `event_history` | Write-Heavy continuo | Candidato a Append-Only / Particionamiento | Escrituras de alta frecuencia sin transacciones relacionales complejas |",
+          "exit_label": "Señales de Persistencia Formalmente Diagnosticadas",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Diagnóstico de Cuellos de Botella en la Capa de Datos",
+              "objective": "Establecer las directivas de desacoplamiento de almacenamiento y aceleración en memoria.",
+              "how_to": {
+                "steps": [
+                  "1. Evaluar el ratio lectura/escritura de las entidades principales.",
+                  "2. Marcar entidades de catálogo público (>50:1) como candidatas a Redis/CDN.",
+                  "3. Identificar campos binarios o multimedia pesada y descartar su guardado en base de datos relacional.",
+                  "4. Asignar códigos de señal de datos (`DS-01`, `DS-02`)."
+                ],
+                "table_columns": [
+                  "Signal ID",
+                  "Entidad",
+                  "Problema Potencial",
+                  "Solución Recomendada"
+                ],
+                "table_rules": [
+                  "Bases de datos relacionales no deben almacenar imágenes directamente",
+                  "El catálogo público debe contar con estrategia de invalidación de caché",
+                  "Proteger la base de datos transaccional aislando cargas de lectura intensiva"
+                ],
+                "restrictions": "Prohibido diseñar APIs que lean directamente imágenes desde la base de datos SQL.",
+                "done_when": "Entidades críticas evaluadas por patrón de tráfico y necesidades de almacenamiento."
+              },
+              "example_title": "Señales de Datos DS-01 y DS-02",
+              "example": "```markdown\n| Signal ID | Descripción | Entidad | Implicación Fase 5 |\n|---|---|---|---|\n| DS-01 | Ratio R/W de 100:1 en catálogo | properties | Capa de caché Redis o CDN edge para /properties |\n| DS-02 | Fotos 4K de fincas | property_images | Almacenamiento en S3/Cloud Storage + Cloudflare CDN |\n```",
+              "link_label": "Señales de Datos Validadas -> Bloqueadores Estructurales"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Conflictos Estructurales y Bloqueadores (Pre-Architecture Blockers)",
+      "summary": "Cruzar las señales de red y datos contra los lineamientos del proyecto para dictaminar restricciones insoslayables en Fase 5.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Detección de Bloqueos Arquitectónicos y Restricciones Previas",
+          "objective": "Identificar condiciones técnicas que descartan arquitecturas ingenuas y obligan a componentes especializados.",
+          "input": "Señales NS-01 a DS-02 y restricciones no negociables de Fase 2.",
+          "raw_data_title": "Matriz de Bloqueadores Pre-Arquitectura",
+          "raw_data": "| Blocker ID | Señales Cruzadas | Conflicto Estructural | Decisión Forzada para Fase 5 |\n|---|---|---|---|\n| BLK-01 | DS-02 + NFR Rendimiento (<2s) | Servir imágenes desde el servidor web satura ancho de banda | Bloquea almacenamiento local; obliga a Object Storage + CDN perimetral |\n| BLK-02 | NS-01 + NFR Disponibilidad (99.9%) | Implementar servidor de WebSockets custom eleva complejidad operativa | Recomienda backend serverless con Supabase Realtime gestionado |\n| BLK-03 | DS-01 + Transacciones ACID | Bloqueos de tabla por búsquedas concurrentes en `bookings` | Obliga a separar pool de conexiones o usar réplicas de solo lectura |",
+          "exit_label": "Veredicto de Bloqueadores Técnicos Emitido",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Formalización de Restricciones y Veredicto Arquitectónico",
+              "objective": "Establecer la frontera entre lo permisible y lo técnicamente inviable para la arquitectura.",
+              "how_to": {
+                "steps": [
+                  "1. Cruzar las señales con los requisitos no funcionales (NFRs).",
+                  "2. Declarar qué decisiones de implementación quedan vetadas por inviabilidad.",
+                  "3. Enunciar directivas claras para el Arquitecto de Software en Fase 5.",
+                  "4. Emitir el veredicto formal de viabilidad arquitectónica."
+                ],
+                "table_columns": [
+                  "Blocker ID",
+                  "Conflicto",
+                  "Opciones Descartadas",
+                  "Directiva"
+                ],
+                "table_rules": [
+                  "Un blocker no decide la arquitectura completa, solo acota el espacio de solución",
+                  "Toda restricción debe estar respaldada por datos cuantitativos de las fases previas",
+                  "Si no se detectan bloqueadores, registrar explícitamente 'sin restricciones detectadas'"
+                ],
+                "restrictions": "No inventar bloqueadores artificiales sin respaldo en requerimientos funcionales o técnicos.",
+                "done_when": "Bloqueadores formalizados con opciones descartadas y recomendaciones claras."
+              },
+              "example_title": "Declaración de Blocker BLK-01",
+              "example": "```markdown\n### Blocker BLK-01: Prohibición de Servir Estáticos Multimedia desde Servidor de App\n- **Conflicto:** Subida masiva de fotos 4K degradaría CPU y ancho de banda del API.\n- **Opciones Vetadas:** `fs.writeFile` en disco local del servidor.\n- **Directiva Fase 5:** Uso mandatorio de AWS S3 / Cloudflare R2 con URLs prefirmadas.\n```",
+              "link_label": "Bloqueadores Validados -> Ensamblaje Síntesis D12"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de la Síntesis Arquitectónica y Traspaso a Fase 5 (Assembly & Handoff)",
+      "summary": "Consolidar el entregable D12 como el puente formal entre el modelado funcional de Fase 4 y el diseño arquitectónico de Fase 5.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Señales, Mitigaciones e Implicaciones para Fase 5",
+          "objective": "Publicar el entregable D12 como guía ejecutiva y de diseño para la fase de arquitectura.",
+          "input": "Señales de red, señales de datos y matriz de bloqueadores completadas.",
+          "raw_data_title": "Resumen Ejecutivo de Traspaso a Fase 5",
+          "raw_data": "| Dimensión | Total Señales | Nivel de Riesgo | Impacto Principal en Fase 5 |\n|---|---|---|---|\n| Capa de Red | 1 señal (NS-01) | Medio | Supabase Realtime para notificaciones en vivo en dashboard |\n| Capa de Datos | 2 señales (DS-01, DS-02) | Alto | Redis Caching en catálogo y Object Storage externo para media |\n| Bloqueadores | 2 bloqueadores (BLK-01, BLK-02) | Crítico | Obliga a arquitectura desacoplada para estáticos y subida prefirmada |",
+          "exit_label": "Entregable D12 Consolidado y Listo para Fase 5",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Informe de Señales Arquitectónicas",
+              "objective": "Consolidar el entregable D12 en formato estandarizado.",
+              "how_to": {
+                "steps": [
+                  "1. Compilar el reporte en sus tres secciones canónicas: Metadata, Señales y Bloqueadores.",
+                  "2. Verificar que cada señal se encuentre trazada con su módulo de origen.",
+                  "3. Incluir las directivas de consumo downstream para Fase 5.",
+                  "4. Validar el cumplimiento total de idioma español y terminología técnica precisa."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Contenido",
+                  "Validación",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe servir como base directa para la elección del estilo arquitectónico",
+                  "Toda recomendación técnica debe estar alineada con el stack definido en Fase 2",
+                  "Garantizar que no existan contradicciones entre D12 y los NFRs"
+                ],
+                "restrictions": "No adelantar especificaciones de código o configuración propietaria antes de Fase 5.",
+                "done_when": "Documento D12 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Informe D12",
+              "example": "```markdown\n# Deliverable 12 (D12): Síntesis de Señales Arquitectónicas\n\n## 1. Señales Extraídas (Red y Datos)\n- NS-01: Real-Time Push Dashboard (Supabase Realtime)\n- DS-01: Read-Heavy Ratio 100:1 (Redis Cache)\n- DS-02: Media Pesada (Cloudflare R2 / S3)\n\n## 2. Pre-Architecture Blockers\n- BLK-01: Descarte de servidor monolítico para streaming multimedia.\n```",
+              "link_label": "Síntesis Ensamblada -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Architectural Signals Synthesis (D12)",
+    "markdown": "# Deliverable 12 (D12): Síntesis de Señales Arquitectónicas\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Estado:** Aprobado\n\n---\n\n## 1. Señales Extraídas (Red y Datos)\n\n*Backlink a Fase 3 y 4:* Estas señales surgen de auditar los modelos de interacción de `[[PHASE_4_SYSTEM_MODELING/7.System_Sequence_Diagrams/7.System_Sequence_Diagrams.md]]`, los contratos de datos de `[[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]]` y los NFRs de la Fase 3.\n\n### 1.1 Señales de Capa de Red (Comunicaciones)\n| Signal ID | Descripción | Módulo Origen | Implicación para Fase 5 |\n|---|---|---|---|\n| **NS-01** | **Real-Time Push:** El Dashboard del Finquero debe recibir alertas inmediatas de nuevas reservas sin recargar la página. | `MOD-NOT` (D10) | Adoptar **Supabase Realtime (PostgreSQL LISTEN/NOTIFY)** sobre la tabla `bookings`. Elimina la complejidad de mantener servidores custom de WebSockets. |\n| **NS-02** | **Baja Latencia en Búsqueda:** La consulta de filtros y disponibilidad en el catálogo exige latencias menores a 300ms. | `MOD-PROPERTIES` (D9) | Modelar índices compuestos en base de datos y optimizar payloads de respuesta en Fase 5. |\n\n### 1.2 Señales de Capa de Datos (Persistencia y Almacenamiento)\n| Signal ID | Descripción | Entidad Origen (D6) | Implicación para Fase 5 |\n|---|---|---|---|\n| **DS-01** | **Asimetría Read-Heavy (100:1):** El catálogo público de fincas recibe un volumen masivo de lecturas frente a bajas escrituras. | `properties` (D6) | Implementar una capa de almacenamiento en caché en memoria (**Redis**) o Edge Caching (Cloudflare) para desacoplar PostgreSQL de las consultas de catálogo. |\n| **DS-02** | **Almacenamiento de Binarios Pesados:** Cada finca incluye entre 10 y 25 fotos de alta resolución (hasta 5 MB c/u). | `property_images` (D6) | **Veto a la base de datos relacional:** Las fotos se almacenarán en **Object Storage (Supabase Storage / AWS S3)** servido a través de CDN, manejando cargas mediante URLs prefirmadas. |\n\n---\n\n## 2. Bloqueadores Pre-Arquitectura (Pre-Architecture Blockers)\n\n| Blocker ID | Señal Cruzada | Conflicto Estructural Detectado | Recomendación Obligatoria para Fase 5 |\n|---|---|---|---|\n| **BLK-01** | DS-02 + NFR Rendimiento (<2s) | Servir imágenes directamente desde el servidor web satura la CPU y agota el pool de conexiones HTTP. | **Veto al servidor de app para medios:** Obligatorio utilizar Object Storage con distribución global vía CDN. |\n| **BLK-02** | NS-01 + Mantenibilidad | Desplegar un cluster de WebSockets dedicado incrementa desproporcionadamente la carga operativa del equipo. | Utilizar la infraestructura pub/sub gestionada de Supabase Realtime, manteniendo el backend stateless. |\n\n---\n\n## Implicaciones para Siguientes Entregables\n\n- **Hacia Fase 5 (Architectural Design):** D12 proporciona los insumos directos para decidir el estilo arquitectónico (Monolito Modular con servicios auxiliares gestionados) y dimensionar la infraestructura de nube.\n- **Hacia Fase 6 (Technical Design):** Las señales dictan la necesidad de diseñar el esquema de caché de Redis y el flujo de subida de imágenes mediante URLs firmadas directas a Object Storage."
+  }
+}

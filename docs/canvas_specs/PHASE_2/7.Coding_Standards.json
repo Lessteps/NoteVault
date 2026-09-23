@@ -1,0 +1,367 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D7",
+  "deliverable": "Coding Standards (Estándares de Codificación / Nomenclatura)",
+  "purpose": "Este entregable asegura que el código parezca escrito por una sola entidad unificada, no por varias personas distintas con manías diferentes. En proyectos de software, esto se traduce a nomenclaturas estrictas, reglas claras por capa y linters automatizados.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_stack_decision]] | Determina a qué lenguajes (ej. Java, JS, SQL) hay que aplicarles reglas (P2-D3). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría de Herramientas y Lenguajes",
+      "summary": "Identificar todas las capas de software, lenguajes y herramientas manipuladas directamente por el equipo para delimitar el alcance de las reglas.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Inventario de Lenguajes y Capas del Stack",
+          "objective": "Extraer del stack D3 las capas técnicas que requieren estandarización obligatoria.",
+          "input": "[[example_output_stack_decision]] (D3).",
+          "raw_data_title": "Capas Técnicas del Proyecto",
+          "raw_data": "Backend: Java Spring Boot. Frontend: JavaScript/TypeScript. Base de datos: PostgreSQL (SQL). Interfaz de red: API REST.",
+          "exit_label": "CAPAS DEL STACK IDENTIFICADAS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Identificación de Capas de Software y Tecnologías Base",
+              "objective": "Catalogar cada lenguaje y componente para asignar el tipo de análisis estático adecuado.",
+              "how_to": {
+                "steps": [
+                  "Consultar el catálogo de tecnologías de P2-D3.",
+                  "Identificar los lenguajes de programación activos (Java, JS).",
+                  "Identificar el motor de base de datos relacional (PostgreSQL).",
+                  "Identificar el protocolo de contratos entre capas (API REST JSON)."
+                ],
+                "table_columns": "Capa Técnica | Lenguaje / Formato | Necesidad de Estandarización",
+                "table_rules": "Toda capa donde los desarrolladores escriban código o esquemas debe ser regulada.",
+                "restrictions": [
+                  "No omitir la capa de base de datos ni los contratos de red."
+                ],
+                "done_when": "Inventario completo de capas técnicas a regular."
+              },
+              "example_title": "Inventario de Capas Técnicas a Regular",
+              "example": "| Capa Técnica | Lenguaje / Formato | Necesidad de Estandarización |\n| --- | --- | --- |\n| Backend | Java (Spring Boot) | Alta (Convención Google Java Style) |\n| Frontend | JavaScript / HTML / CSS | Alta (Linter y Formateador) |\n| Base de Datos | SQL (PostgreSQL) | Alta (Nombres de tablas y columnas) |\n| Red / API | JSON / HTTP REST | Alta (Estandarización de rutas) |",
+              "link_label": "inventario técnico pasa a selección de linters (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Selección de Herramientas de Análisis Estático",
+          "objective": "Asignar a cada tecnología su correspondiente herramienta de análisis estático y formateo.",
+          "input": "Inventario de capas técnicas (1.1).",
+          "raw_data_title": "Herramientas de Análisis Estático",
+          "raw_data": "Java: Checkstyle. JavaScript: ESLint + Prettier. SQL: Nomenclatura estricta snake_case. REST: Convenciones OpenAPI.",
+          "exit_label": "HERRAMIENTAS DE LINTER SELECCIONADAS → 2.1",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Mapeo de Linters y Formateadores Oficiales",
+              "objective": "Definir las herramientas de software que auditarán automáticamente el código fuente.",
+              "how_to": {
+                "steps": [
+                  "Seleccionar Checkstyle para verificación de estilo Java.",
+                  "Seleccionar ESLint y Prettier para linting y formateo automático de JS.",
+                  "Fijar guías de estilo reconocidas en la industria.",
+                  "Consolidar la tabla oficial de herramientas por capa."
+                ],
+                "table_columns": "Capa de Software | Herramienta/Linter | Estándar de Referencia",
+                "table_rules": "Priorizar linters integrables tanto en local (pre-commit) como en CI/CD.",
+                "restrictions": [
+                  "Prohibido dejar capas de código sin herramientas de análisis estático asociadas."
+                ],
+                "done_when": "Herramientas de análisis estático y formateo seleccionadas."
+              },
+              "example_title": "Herramientas de Análisis Estático por Capa",
+              "example": "| Capa de Software | Herramienta/Linter | Estándar |\n| --- | --- | --- |\n| Backend Java | Checkstyle | Google Java Style Guide |\n| Frontend JS | ESLint + Prettier | Configuración recomendada estándar |\n| Base de Datos | Nomenclatura SQL | Estándar relacional snake_case |",
+              "link_label": "herramientas asignadas pasan a asignación de nomenclaturas (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Asignación de Convenciones de Nomenclatura (Naming Conventions)",
+      "summary": "Estandarizar cómo se nombran clases, variables, métodos, tablas de base de datos y endpoints para asegurar consistencia.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Estándares de Nomenclatura para Backend y Frontend",
+          "objective": "Definir las reglas de casing para el código fuente Java y JavaScript.",
+          "input": "Herramientas seleccionadas en Step 1 y requerimientos de desarrollo.",
+          "raw_data_title": "Reglas de Código Fuente",
+          "raw_data": "Java: Clases PascalCase, variables y métodos camelCase, constantes UPPER_SNAKE_CASE. JS: camelCase variables, PascalCase componentes.",
+          "exit_label": "REGLAS DE BACKEND Y FRONTEND DEFINIDAS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Definición de Convenciones de Clases, Variables y Componentes",
+              "objective": "Establecer la tabla de mayúsculas, minúsculas y sufijos por tipo de artefacto de software.",
+              "how_to": {
+                "steps": [
+                  "Dictar la regla PascalCase para nombres de clases Java y componentes UI.",
+                  "Dictar la regla camelCase para métodos, atributos y funciones auxiliares.",
+                  "Dictar la regla UPPER_SNAKE_CASE para variables constantes y enums.",
+                  "Redactar ejemplos correctos e incorrectos para guiar a los desarrolladores."
+                ],
+                "table_columns": "Tipo de Artefacto | Convención (Case) | Ejemplo Correcto | Ejemplo Incorrecto",
+                "table_rules": "Ningún archivo o identificador debe desviarse de la convención oficial.",
+                "restrictions": [
+                  "Prohibido mezclar kebab-case o snake_case en identificadores de Java/JS."
+                ],
+                "done_when": "Convenciones de código fuente backend y frontend completamente formalizadas."
+              },
+              "example_title": "Convenciones de Casing para Código",
+              "example": "| Artefacto | Convención | Correcto | Incorrecto |\n| --- | --- | --- | --- |\n| Clases Java / Entidades | PascalCase | `ReservaService`, `FincaEntity` | `reserva_service`, `fincaservice` |\n| Variables y Métodos | camelCase | `calcularMontoTotal()`, `idReserva` | `CalcularMonto()`, `id_reserva` |\n| Componentes UI | PascalCase | `BuscadorFincas.jsx`, `ModalReserva.jsx` | `buscador_fincas.jsx`, `modal.jsx` |",
+              "link_label": "reglas de código pasan a estándares de DB y REST (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Estándares de Base de Datos SQL y Endpoints REST",
+          "objective": "Estandarizar la persistencia relacional y el diseño de URIs de la API REST.",
+          "input": "Base de datos PostgreSQL y arquitectura de endpoints.",
+          "raw_data_title": "Reglas de Datos y API",
+          "raw_data": "SQL: Tablas y columnas snake_case plural. REST: Endpoints plurales en minúsculas, sin verbos, retorno JSON.",
+          "exit_label": "REGLAS DE DB Y API REST DEFINIDAS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Estandarización de Tablas, Columnas y Rutas de API",
+              "objective": "Fijar las directrices de persistencia e interconexión para evitar conflictos entre capas.",
+              "how_to": {
+                "steps": [
+                  "Definir tablas en plural y snake_case (ej. `reservas`, `usuarios`).",
+                  "Definir columnas en snake_case consistente con claves primarias (`id`) y foráneas (`finca_id`).",
+                  "Definir endpoints REST con sustantivos en plural y versionado (ej. `/api/v1/reservas`).",
+                  "Garantizar que no existan verbos en las rutas HTTP."
+                ],
+                "table_columns": "Elemento de Persistencia / API | Convención Obligatoria | Ejemplo Válido",
+                "table_rules": "Prevenir incompatibilidades de dialecto SQL con ORMs como Hibernate.",
+                "restrictions": [
+                  "Prohibido usar nombres singulares o en camelCase para tablas SQL."
+                ],
+                "done_when": "Convenciones de base de datos y endpoints REST completamente fijadas."
+              },
+              "example_title": "Convenciones de Base de Datos y API REST",
+              "example": "| Elemento | Convención | Ejemplo Válido |\n| --- | --- | --- |\n| Tablas SQL | `snake_case` plural | `reservas`, `fincas`, `pagos` |\n| Columnas SQL | `snake_case` con prefijo/sufijo de clave | `id`, `finca_id`, `monto_total` |\n| Rutas API REST | Sustantivos plurales en minúsculas | `POST /api/v1/reservas`, `GET /api/v1/fincas` |",
+              "link_label": "reglas de DB y REST pasan a matriz consolidada (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Consolidación de la Matriz de Nomenclatura por Capa",
+          "objective": "Integrar todas las convenciones en la matriz maestra de estándares por capa de software.",
+          "input": "Reglas de código (2.1) y datos/API (2.2).",
+          "raw_data_title": "Matriz Maestra de Nomenclatura",
+          "raw_data": "Tabla consolidada con Backend Java (Checkstyle), Frontend JS (ESLint), Base de Datos SQL (snake_case) y API REST.",
+          "exit_label": "MATRIZ DE ESTÁNDARES POR CAPA BLOQUEADA → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Formalización de Reglas Obligatorias por Capa",
+              "objective": "Construir la tabla oficial de estándares por capa de software para el documento maestro.",
+              "how_to": {
+                "steps": [
+                  "Sintetizar la regla obligatoria para Backend Java (Checkstyle / camelCase / PascalCase).",
+                  "Sintetizar la regla para Frontend JS (ESLint / Prettier sin warnings).",
+                  "Sintetizar la regla para Base de Datos SQL (snake_case plural).",
+                  "Sintetizar la regla para API REST (sustantivos plurales y JSON estandarizado)."
+                ],
+                "table_columns": "Entorno / Capa | Herramienta | Regla Obligatoria",
+                "table_rules": "Cada capa del software debe contar con su regla cardinal documentada.",
+                "restrictions": [
+                  "No dejar ninguna tecnología del stack D3 sin su correspondiente regla."
+                ],
+                "done_when": "Matriz maestra de estándares por capa formalizada."
+              },
+              "example_title": "Estándares por Capa de Software (Step 2 Output)",
+              "example": "| Entorno / Capa | Herramienta | Regla Obligatoria |\n| --- | --- | --- |\n| Backend Java | Checkstyle | Cumplimiento del estándar de Google Java Style Guide. Variables en `camelCase`, Clases en `PascalCase`. |\n| Frontend JS | ESLint + Prettier | No se aceptarán warnings ni variables no utilizadas. Formato uniforme automático. |\n| Base de Datos SQL | Nomenclatura Estricta | Tablas y columnas en `snake_case` plural (ej. `reservas`, `id_finca`). Previene problemas con Hibernate/JPA. |\n| API REST | Diseño de Endpoints | Sustantivos plurales, sin verbos. Ej: `POST /api/v1/reservas`. Retorno siempre JSON estandarizado. |",
+              "link_label": "matriz de estándares pasa a mecanismos de enforcing (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Automatización de Reglas (Linters) y Enforcing Mecánico",
+      "summary": "Configurar las herramientas de bloqueo mecánico para que las reglas de calidad se verifiquen automáticamente sin depender de la memoria humana.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Configuración de Pre-commit Hooks (Husky)",
+          "objective": "Establecer la barrera local que impida la creación de commits con código defectuoso.",
+          "input": "Linters de Step 1 y convenciones de Step 2.",
+          "raw_data_title": "Enforcing Local",
+          "raw_data": "Pre-commit hooks con Husky: ejecuta formateo Prettier, validación ESLint y comprobación Checkstyle antes de git commit.",
+          "exit_label": "ENFORCING LOCAL CONFIGURADO → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Bloqueo Local de Commits No Conformantes",
+              "objective": "Configurar la ejecución de linters antes de permitir cualquier confirmación en el repositorio.",
+              "how_to": {
+                "steps": [
+                  "Instalar y configurar Husky en el entorno de desarrollo.",
+                  "Vincular el script pre-commit con la ejecución de ESLint y formateadores.",
+                  "Configurar el script para abortar el commit si se detectan errores.",
+                  "Asegurar que ningún desarrollador pueda evadir el formateo en local."
+                ],
+                "table_columns": "Mecanismo Local | Script Ejecutado | Acción de Bloqueo",
+                "table_rules": "El hook debe fallar de inmediato si existen infracciones de estilo.",
+                "restrictions": [
+                  "Prohibido deshabilitar pre-commit hooks en commits de características."
+                ],
+                "done_when": "Mecanismo de enforcing local completamente definido."
+              },
+              "example_title": "Configuración de Pre-commit Hooks",
+              "example": "| Mecanismo | Script de Verificación | Acción de Bloqueo |\n| --- | --- | --- |\n| Pre-commit Hooks (Husky) | `npm run lint && npm run format:check` | Aborta el commit si hay errores de sintaxis o variables no usadas |",
+              "link_label": "enforcing local pasa a enforcing en CI (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Validación Automatizada en Pipeline CI (GitHub Actions)",
+          "objective": "Establecer el peaje ineludible en la nube que rechace Pull Requests si fallan las comprobaciones de estilo.",
+          "input": "Pipelines CI y políticas de protección de ramas de P2-D5.",
+          "raw_data_title": "Enforcing en Integración Continua",
+          "raw_data": "GitHub Actions corre mvn checkstyle:check y eslint. Falla = rechazo automático del PR impidiendo el merge a main.",
+          "exit_label": "ENFORCING AUTOMATIZADO BLOQUEADO → 4.1",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Compuerta Mecánica de Integración y Merge",
+              "objective": "Consolidar la tabla de mecanismos de enforcing y sus respectivas acciones de bloqueo.",
+              "how_to": {
+                "steps": [
+                  "Definir el paso de CI para Checkstyle en el backend Java.",
+                  "Definir el paso de CI para ESLint en el frontend JS.",
+                  "Establecer que cualquier falla en el pipeline marque el PR como fallido.",
+                  "Consolidar la tabla oficial de enforcing."
+                ],
+                "table_columns": "Mecanismo | Acción de Bloqueo",
+                "table_rules": "El pipeline de CI es la última línea de defensa antes de la rama principal.",
+                "restrictions": [
+                  "Prohibido permitir merges con checks de linter en rojo."
+                ],
+                "done_when": "Matriz de enforcing automatizado documentada y aprobada."
+              },
+              "example_title": "Mecanismos de Enforcing (Step 3 Output)",
+              "example": "| Mecanismo | Acción de Bloqueo |\n| --- | --- |\n| Pre-commit Hooks (Husky) | Evita que el dev haga commit de código JS mal formateado o código Java que no compile. |\n| CI Pipeline (GitHub Actions) | Corre `mvn checkstyle:check` o `eslint`. Si falla, rechaza automáticamente el Pull Request impidiendo el merge a `main`. |",
+              "link_label": "mecanismos de enforcing pasan a ensamblaje final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar la guía oficial de estándares de codificación, nomenclatura y mecanismos de enforcing en el artefacto de entrega.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Metadatos y Estándares por Capa",
+          "objective": "Ensamblar la ficha técnica y la tabla de estándares de software en el documento oficial.",
+          "input": "Metadatos del proyecto y matriz de estándares de Step 2.",
+          "raw_data_title": "Metadatos y Estándares",
+          "raw_data": "Proyecto: Nos Fuimos de Finca, Fase 2, D7, Estado Aprobado. Estándares por capa para Backend, Frontend, SQL y REST.",
+          "exit_label": "METADATOS Y ESTÁNDARES INTEGRADOS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Compilación de Secciones 1 y 2 en Formato Oficial",
+              "objective": "Redactar las secciones 1 y 2 del entregable con estricto apego al formato Markdown.",
+              "how_to": {
+                "steps": [
+                  "Llenar los metadatos (Proyecto, Fase, Entregable, Estado).",
+                  "Adjuntar la tabla de Estándares por Capa de Software.",
+                  "Verificar que cada capa cuente con su herramienta y regla obligatoria.",
+                  "Asegurar exactitud y consistencia terminológica."
+                ],
+                "table_columns": "Sección | Contenido Compilado | Estado de Verificación",
+                "table_rules": "Respetar la numeración de secciones oficial.",
+                "restrictions": [
+                  "No omitir detalles de convenciones de mayúsculas ni guías de estilo."
+                ],
+                "done_when": "Secciones 1 y 2 completamente compiladas."
+              },
+              "example_title": "Compilación de Metadatos y Estándares",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 2 — Project Kickoff\n**Entregable:** 7 de 13\n**Estado:** Aprobado\n\n### 2. Estándares por Capa de Software\n| Entorno / Capa | Herramienta | Regla Obligatoria |\n| --- | --- | --- |\n| Backend Java | Checkstyle | Cumplimiento del estándar de Google Java Style Guide (o similar). Variables en `camelCase`, Clases en `PascalCase`. |\n| Frontend JS | ESLint + Prettier | No se aceptarán warnings ni variables no utilizadas. |\n| Base de Datos SQL | Nomenclatura Estricta | Tablas y columnas en `snake_case` plural (ej. `reservas`, `id_finca`). Esto previene problemas con dialectos en Java (Hibernate/JPA). |\n| API REST | Diseño de Endpoints | Sustantivos plurales, sin verbos. Ej: `POST /api/v1/reservas`. Retorno siempre JSON estandarizado. |",
+              "link_label": "secciones base pasan a anexar enforcing y compuerta (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Integración de Enforcing y Compuerta de Fase",
+          "objective": "Incorporar la tabla de mecanismos de enforcing y evaluar la compuerta condicional de fase.",
+          "input": "Mecanismos de enforcing (Step 3) y reglas de compuerta condicional.",
+          "raw_data_title": "Enforcing y Compuerta D7",
+          "raw_data": "Tabla de enforcing anexada. Condición: Proceed. El estilo está unificado y protegido mecánicamente.",
+          "exit_label": "ENFORCING Y COMPUERTA INCORPORADAS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Ensamblaje de Mecanismos de Bloqueo y Condición de Pase",
+              "objective": "Completar las secciones 3 y 4 integrando los peajes mecánicos y la declaración de avance.",
+              "how_to": {
+                "steps": [
+                  "Insertar la tabla de Automatización y Forzado de Reglas (Enforcing).",
+                  "Evaluar la compuerta: ¿Están todas las convenciones cubiertas y con enforcing mecánico?",
+                  "Redactar la declaración formal de avance (Proceed).",
+                  "Validar la ausencia de ambigüedades operativas."
+                ],
+                "table_columns": "Sección | Contenido Anexado | Veredicto",
+                "table_rules": "Si las reglas dependen puramente de revisión humana, detener y exigir linter.",
+                "restrictions": [
+                  "Prohibido dar el pase sin herramientas mecánicas de forzado declaradas."
+                ],
+                "done_when": "Secciones de enforcing y compuerta ensambladas."
+              },
+              "example_title": "Enforcing y Compuerta de Fase",
+              "example": "### 3. Automatización y Forzado de Reglas (Enforcing)\n| Mecanismo | Acción de Bloqueo |\n| --- | --- |\n| Pre-commit Hooks (Husky) | Evita que el dev haga commit de código JS mal formateado o código Java que no compile. |\n| CI Pipeline (GitHub Actions) | Corre `mvn checkstyle:check` o `eslint`. Si falla, rechaza automáticamente el Pull Request impidiendo el merge a `main`. |\n\n### 4. Implicación de Compuerta de Fase\n- **Condición:** Proceed. Con el retorno de código fuente real (Java/JS), los linters y formateadores automatizados asumen la carga del control de calidad visual, quitando peso a las revisiones de código de los fundadores.",
+              "link_label": "documento integrado pasa a validación final y publicación (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Validación de Integridad y Publicación Oficial",
+          "objective": "Verificar la exactitud del documento frente al artefacto de referencia y publicar oficialmente el D7.",
+          "input": "Documento ensamblado completo y archivo de salida oficial.",
+          "raw_data_title": "Validación y Publicación D7",
+          "raw_data": "Verificado contra example_output_coding_standards.md. Listo para integración en docs/02-project-kickoff.",
+          "exit_label": "ENTREGABLE D7 PUBLICADO Y COMPLETADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Emisión Oficial del Documento D7",
+              "objective": "Cerrar formalmente el entregable D7 emitiendo la guía oficial de estándares de código.",
+              "how_to": {
+                "steps": [
+                  "Verificar la coherencia completa entre metadatos, estándares y enforcing.",
+                  "Comprobar el enlace al artefacto [[example_output_coding_standards]].",
+                  "Confirmar la aprobación de la compuerta de fase.",
+                  "Registrar el hito en la bitácora de progreso."
+                ],
+                "table_columns": "Criterio de Cierre | Estado | Registro Oficial",
+                "table_rules": "El entregable es la ley de estilo vinculante para todo commit en el repositorio.",
+                "restrictions": [
+                  "No concluir sin validar la exactitud de los ejemplos de código y rutas."
+                ],
+                "done_when": "Entregable D7 validado, emitido y registrado oficialmente."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_coding_standards]]`.\n\nUbicación oficial: `docs/02-project-kickoff/07. Estandares de Codificacion.md`.\nEstado: Aprobado por Compuerta de Fase.",
+              "link_label": "entrega completada - fin de flujo D7"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,201 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D1",
+  "deliverable": "Quality Attributes Map",
+  "purpose": "Traducir los Requerimientos No Funcionales (NFRs) heredados de la Fase 3 y las señales de riesgo de la Fase 4 (D12) en escenarios arquitectónicos concretos y auditables según el estándar SEI (Source, Stimulus, Environment, Artifact, Response, Measure), priorizándolos mediante un Utility Tree en función de su valor de negocio e impacto arquitectónico para guiar las decisiones macro (ADRs).",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Non-Functional Requirements (P3-D6) | [[PHASE_3_REQUIREMENTS_ENGINEERING/6.Non-Functional_Requirements/6.Non-Functional_Requirements.md]] | Fuente primaria de restricciones no funcionales de negocio (latencia, disponibilidad, seguridad). |\n| Architectural Signals Synthesis (P4-D12) | [[PHASE_4_SYSTEM_MODELING/12.Architectural_Signals/12.Architectural_Signals.md]] | Identifica señales de riesgo de infraestructura (asimetría R/W 100:1, push en tiempo real, fotos 4K). |\n| Module Specification (P3-D7) | [[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification/7.Module_Specification.md]] | Provee los límites funcionales y SLA esperados por módulo crítico. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Extracción de Atributos de Calidad (Attribute Extraction)",
+      "summary": "Cruzar las restricciones de Fase 3 y las señales de D12 para seleccionar y justificar los atributos de calidad críticos del sistema.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Trazabilidad de Atributos NFR y Señales de Riesgo D12",
+          "objective": "Aislar los atributos no funcionales prioritarios respaldados estrictamente por fuentes documentales verificables.",
+          "input": "NFRs de Fase 3 y señales NS-01, DS-01, DS-02 de Fase 4 D12.",
+          "raw_data_title": "Inventario de Atributos de Calidad Extraídos",
+          "raw_data": "| Atributo de Calidad | Fuente NFR (Fase 3) | Fuente D12 (Fase 4) | Justificación Sistémica |\n|---|---|---|---|\n| Latency / Performance | NFR-PERF-01: Respuesta <2.0s | DS-01: Proporción R/W 100:1 en catálogo | Consultas concurrentes masivas al catálogo público de fincas |\n| Media / Scalability | NFR-PERF-02: Carga de fotos optimizada | DS-02 / BLK-01: Bloqueo de streaming local | Entrega de 10 a 25 fotos de alta resolución por propiedad |\n| Security / Data Isolation | NFR-SEC-01: Aislamiento estricto de datos | D11: Reglas RLS obligatorias en tablas | Mitigación absoluta de ataques IDOR entre finqueros y turistas |\n| Availability / Real-Time | NFR-REL-01: Disponibilidad 99.9% | NS-01: Alertas instantáneas en dashboard | Recepción de reservas por WhatsApp y WebSockets sin caída de servicio |",
+          "exit_label": "Atributos de Calidad Críticos Aislados y Trazados",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Depuración y Vinculación Documental de Atributos",
+              "objective": "Garantizar que todo atributo arquitectónico tenga origen explícito.",
+              "how_to": {
+                "steps": [
+                  "1. Auditar los NFRs aprobados de Fase 3.",
+                  "2. Cruzar con las señales de riesgo de D12 (red, datos, bloqueadores).",
+                  "3. Descartar atributos genéricos que no condicionen decisiones arquitectónicas.",
+                  "4. Asignar el nombre canónico del atributo (Performance, Security, Availability, Scalability)."
+                ],
+                "table_columns": [
+                  "Atributo",
+                  "Cita NFR",
+                  "Cita D12",
+                  "Impacto"
+                ],
+                "table_rules": [
+                  "Todo atributo debe tener cita textual de NFR o señal D12",
+                  "No se admiten atributos sin justificación de riesgo operativo",
+                  "Limitar la selección a los 3-5 atributos más restrictivos para el sistema"
+                ],
+                "restrictions": "Prohibido inventar atributos no respaldados en requerimientos previos.",
+                "done_when": "Lista de atributos esenciales seleccionada con referencias verificadas."
+              },
+              "example_title": "Atributos Extraídos D1",
+              "example": "```markdown\n## Atributo: Performance / Latency\n- Fuente NFR: NFR-PERF-01 (Tiempos de respuesta <2s)\n- Fuente D12: DS-01 (Ratio R/W 100:1 en catálogo)\n\n## Atributo: Security / Isolation\n- Fuente NFR: NFR-SEC-01 (Protección de datos multi-tenant)\n- Fuente D12: D11 (RLS con modificadores OWN/ALL)\n```",
+              "link_label": "Atributos Extraídos -> Generación de Escenarios SEI"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Generación de Escenarios SEI (Scenario Generation)",
+      "summary": "Convertir cada atributo en un escenario verificable y auditable de 6 partes bajo el estándar SEI.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Formalización de Source, Stimulus, Environment, Artifact, Response y Measure",
+          "objective": "Redactar especificaciones matemáticas de comportamiento del sistema ante condiciones de estrés.",
+          "input": "Atributos priorizados del Step 1 y cargas pico identificadas.",
+          "raw_data_title": "Escenarios SEI Formulados",
+          "raw_data": "| Escenario | Atributo | Source / Stimulus | Environment | Artifact | Response | Measure Exacta |\n|---|---|---|---|---|---|---|\n| Escenario 1 | Performance | Turista consulta catálogo `/` | Tráfico pico de fin de semana | Sistema Web / Caché | Retorna catálogo sin consultar BD relacional | TTFB < 200ms en percentil 95 (p95) |\n| Escenario 2 | Scalability | 100 usuarios abren fotos 4K simultáneamente | Conexión 4G móvil promedio | CDN / Storage | Sirve imágenes optimizadas WebP | Tiempo total de renderizado < 1.5s |\n| Escenario 3 | Security | Usuario malicioso envía GET a reserva ajena | Tráfico autenticado normal | API Gateway / RLS | Bloquea lectura y registra intento en audit log | 0 fugas de datos (HTTP 403 o 404 estricto) |\n| Escenario 4 | Performance | Concurrencia de reservas sobre misma finca | Horario de alta demanda | Engine Transaccional | Aplica soft-lock de 15 minutos en BD | 0 reservas duplicadas (100% ACID) |\n| Escenario 5 | Availability | Nueva reserva confirmada | Dashboard de anfitrión abierto | Supabase Realtime | Notifica evento push en pantalla | Notificación recibida en < 500ms |",
+          "exit_label": "Escenarios SEI Formalizados con Métricas Exactas",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Redacción de la Estructura Canónica de 6 Partes",
+              "objective": "Construir escenarios sin ambigüedad sujetos a pruebas de carga.",
+              "how_to": {
+                "steps": [
+                  "1. Definir Source (emisor) y Stimulus (acción detonante).",
+                  "2. Contextualizar Environment (condiciones operativas, picos de carga).",
+                  "3. Identificar Artifact (componente de software impactado).",
+                  "4. Especificar Response (acción esperada del sistema).",
+                  "5. Fijar Measure cuantitativa y verificable (ms, percentil, tasa de error)."
+                ],
+                "table_columns": [
+                  "Parte",
+                  "Descripción",
+                  "Regla de Redacción"
+                ],
+                "table_rules": [
+                  "Toda Measure debe contener unidades matemáticas explícitas (ms, %, p95)",
+                  "El Environment debe reflejar las señales de carga de D12",
+                  "No redactar requerimientos vagos como 'rápido' o 'seguro'"
+                ],
+                "restrictions": "Cualquier escenario sin Measure numérica o verificable queda automáticamente rechazado.",
+                "done_when": "Los 5 escenarios cuentan con sus 6 componentes canónicos completos."
+              },
+              "example_title": "Escenario SEI: Performance de Catálogo",
+              "example": "```markdown\n#### Escenario 1: Performance (Caché de Catálogo)\n- **Source:** Turista anónimo (Browser / Móvil).\n- **Stimulus:** Accede a la URL principal `/properties`.\n- **Environment:** Tráfico pico de fin de semana (1.000 req/min).\n- **Artifact:** Capa de visualización y Edge Cache.\n- **Response:** Entrega catálogo desde caché perimetral sin tocar PostgreSQL.\n- **Measure:** TTFB < 200ms en el 95% de las solicitudes.\n```",
+              "link_label": "Escenarios SEI Validados -> Priorización en Utility Tree"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Priorización en Utility Tree (Utility Tree & Ranking)",
+      "summary": "Evaluar los escenarios en los ejes independientes de Valor de Negocio e Impacto Arquitectónico para ordenar su atención.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Matriz de Priorización Alto/Medio/Bajo y Orden de Riesgo",
+          "objective": "Determinar los escenarios críticos (Alto/Alto) que gobernarán las decisiones estructurales D3 a D6.",
+          "input": "Escenarios SEI del Step 2 y evaluación de riesgo operacional.",
+          "raw_data_title": "Utility Tree Matriz de Priorización",
+          "raw_data": "| Escenario | Atributo Clave | Valor de Negocio (Business Value) | Impacto Arquitectónico (Arch Impact) | Clasificación | Rank Prioritario |\n|---|---|---|---|---|---|\n| Escenario 1: Caché ISR de Catálogo | Performance | Alto | Alto | (H, H) | Rank 1 |\n| Escenario 3: Data Isolation con RLS | Security | Alto | Alto | (H, H) | Rank 2 |\n| Escenario 5: Notificación Push Real-Time | Availability | Alto | Alto | (H, H) | Rank 3 |\n| Escenario 4: Concurrencia de Soft-Locks | Performance | Alto | Medio | (H, M) | Rank 4 |\n| Escenario 2: Entrega de Media HD en CDN | Scalability | Medio | Medio | (M, M) | Rank 5 |",
+          "exit_label": "Utility Tree Jerarquizado y Escenarios Críticos Identificados",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Clasificación de Escenarios y Resolución de Empates",
+              "objective": "Jerarquizar las restricciones según criticidad de negocio y complejidad técnica.",
+              "how_to": {
+                "steps": [
+                  "1. Calificar Business Value como Alto, Medio o Bajo.",
+                  "2. Calificar Architectural Impact como Alto, Medio o Bajo.",
+                  "3. Agrupar escenarios (H,H) como prioritarios para decisiones de topología y estilo.",
+                  "4. En caso de empate, priorizar aquellos con dependencias externas síncronas."
+                ],
+                "table_columns": [
+                  "Escenario",
+                  "Business Value",
+                  "Arch Impact",
+                  "Criterio de Desempate"
+                ],
+                "table_rules": [
+                  "Los escenarios (H, H) deben ser atendidos obligatoriamente en D3, D4 y D5",
+                  "Los escenarios de menor impacto no deben sobrecomplicar la arquitectura inicial",
+                  "El ranking debe reflejar riesgo financiero y de experiencia de usuario"
+                ],
+                "restrictions": "No clasificar todos los escenarios como Alto/Alto sin discernimiento de impacto real.",
+                "done_when": "Utility Tree completado con ranking unívoco del 1 al 5."
+              },
+              "example_title": "Utility Tree D1",
+              "example": "```markdown\n| Escenario | Atributo | Business Value | Arch Impact | Rank |\n|---|---|---|---|---|\n| Escenario 1 (Catálogo) | Performance | Alto | Alto | 1 |\n| Escenario 3 (RLS) | Security | Alto | Alto | 2 |\n| Escenario 5 (Push) | Availability | Alto | Alto | 3 |\n| Escenario 4 (Locks) | Performance | Alto | Medio | 4 |\n| Escenario 2 (Media) | Scalability | Medio | Medio | 5 |\n```",
+              "link_label": "Utility Tree Validado -> Ensamblaje Mapa de Atributos"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Mapa de Atributos y Directivas Downstream (Assembly & Directives)",
+      "summary": "Consolidar el entregable D1 integrando el Utility Tree, escenarios SEI y directivas vinculantes para los ADRs de Fase 5.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación del Documento D1 e Implicaciones para Decisiones ADR",
+          "objective": "Publicar el mapa de atributos de calidad como guía ineludible para el diseño de arquitectura.",
+          "input": "Utility Tree, escenarios SEI y análisis de impacto.",
+          "raw_data_title": "Implicaciones Directas en Entregables Downstream",
+          "raw_data": "| Entregable Consumidor | Escenario Directriz | Decisión Arquitectónica Condicionada |\n|---|---|---|\n| D3 (Deployment Topology) | Escenario 1 y 2 | Obliga a desplegar Edge CDN y Object Storage para absorber tráfico de lectura y medios |\n| D4 (System Decomposition) | Escenario 4 y 3 | Favorece Monolito Modular con base de datos unificada para garantizar transacciones ACID sin 2PC |\n| D5 (Architectural Style) | Escenario 1 y 5 | Combina arquitectura Serverless/JAMstack para catálogo con eventos Realtime para notificaciones |\n| D6 (Communication Patterns) | Escenario 5 | Justifica el uso de WebSockets / SSE sobre PostgreSQL LISTEN/NOTIFY para alertas instantáneas |",
+          "exit_label": "Entregable D1 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Mapa de Atributos de Calidad",
+              "objective": "Consolidar el entregable D1 como especificación rectora de arquitectura.",
+              "how_to": {
+                "steps": [
+                  "1. Compilar el documento en sus secciones canónicas: Metadata, Utility Tree y Escenarios SEI.",
+                  "2. Documentar las directivas para los entregables D3 a D6.",
+                  "3. Verificar que no exista contradicción con las decisiones de Fase 2.",
+                  "4. Validar el cumplimiento total de traducción al español."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Contenido",
+                  "Normativa",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El mapa de atributos debe servir como justificación técnica de cada ADR",
+                  "Ninguna decisión arquitectónica puede violar las métricas de los escenarios SEI",
+                  "Preservar trazabilidad hacia NFRs de Fase 3 y señales de Fase 4"
+                ],
+                "restrictions": "No admitir directivas técnicas que no resuelvan un escenario del Utility Tree.",
+                "done_when": "Documento D1 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Entregable D1",
+              "example": "```markdown\n# Deliverable 1 (D1): Quality Attributes Map\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n## 2. Utility Tree\n[Tabla priorizada de escenarios]\n\n## 3. Concrete Scenarios (SEI Standard)\n[5 escenarios de 6 partes]\n```",
+              "link_label": "Mapa Ensamblado -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Quality Attributes Map (D1)",
+    "markdown": "# Deliverable 1 (D1): Quality Attributes Map\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n---\n\n## 1. Utility Tree (Priorización de Escenarios)\n\n*Backlink a Fase 3 y 4:* Formaliza los requerimientos de `[[PHASE_3_REQUIREMENTS_ENGINEERING/6.Non-Functional_Requirements/6.Non-Functional_Requirements.md]]` cruzados con las señales de infraestructura de `[[PHASE_4_SYSTEM_MODELING/12.Architectural_Signals/12.Architectural_Signals.md]]`.\n\n| Escenario | Atributo Clave | Valor de Negocio | Impacto Arquitectónico | Rank Prioritario |\n|:---|:---|:---|:---|:---|\n| **Escenario 1: Caché ISR de Catálogo** | Performance | **Alto** | **Alto** | **Rank 1** |\n| **Escenario 3: Data Isolation con RLS** | Security | **Alto** | **Alto** | **Rank 2** |\n| **Escenario 5: Notificación Push Real-Time** | Availability | **Alto** | **Alto** | **Rank 3** |\n| **Escenario 4: Concurrencia de Soft-Locks** | Performance | **Alto** | **Medio** | **Rank 4** |\n| **Escenario 2: Entrega de Media HD en CDN** | Scalability | **Medio** | **Medio** | **Rank 5** |\n\n---\n\n## 2. Escenarios Concretos de Arquitectura (Estándar SEI de 6 Partes)\n\n#### Escenario 1: Performance (Caché de Catálogo)\n- **Source:** Turista anónimo (Browser / Móvil).\n- **Stimulus:** Accede a la URL principal `/properties` para consultar fincas disponibles.\n- **Environment:** Tráfico pico de fin de semana (1.000 solicitudes concurrentes por minuto).\n- **Artifact:** Edge CDN / Capa de Caché en Memoria.\n- **Response:** El sistema sirve la vista pre-renderizada desde el edge sin consultar la base de datos PostgreSQL.\n- **Measure:** Tiempo al primer byte (TTFB) < 200ms en el 95% de las solicitudes (p95).\n\n#### Escenario 2: Scalability (Entrega de Fotografías HD)\n- **Source:** Huésped explorando la galería de una finca.\n- **Stimulus:** Carga simultánea de 20 imágenes de alta resolución (4K/WebP).\n- **Environment:** Red móvil 4G estándar en Colombia (latencia ~80ms).\n- **Artifact:** Object Storage (Cloudflare R2 / S3) + CDN global.\n- **Response:** Transfiere imágenes redimensionadas y optimizadas desde el punto de presencia más cercano.\n- **Measure:** Carga visual completa de la galería en menos de 1.5 segundos.\n\n#### Escenario 3: Security (Aislamiento de Datos Multi-inquilino)\n- **Source:** Usuario autenticado con rol Turista.\n- **Stimulus:** Intenta consultar o mutar una reserva ajena vía `GET /api/v1/bookings/:id` manipulando el UUID.\n- **Environment:** Operación regular en producción con miles de usuarios activos.\n- **Artifact:** Base de datos relacional con Row-Level Security (RLS) habilitado.\n- **Response:** La política RLS filtra la consulta en el motor de base de datos (`guest_id = auth.uid()`).\n- **Measure:** 0% de filtración de datos ajenos (retorna HTTP 404 o 403 de forma estricta).\n\n#### Escenario 4: Performance / Consistency (Prevención de Doble Reserva)\n- **Source:** Dos turistas seleccionando simultáneamente las mismas fechas para una finca.\n- **Stimulus:** Ambos hacen clic en \"Pagar\" con milisegundos de diferencia.\n- **Environment:** Cierre de fin de semana con alta concurrencia transaccional.\n- **Artifact:** Motor transaccional de reservas (MOD-BOOKING).\n- **Response:** Aplica un soft-lock atómico inmediato al primer pagador y rechaza al segundo con HTTP 409 Conflict.\n- **Measure:** 0 colisiones de doble reserva; consistencia ACID absoluta del 100%.\n\n#### Escenario 5: Availability (Alertas en Vivo para Anfitriones)\n- **Source:** Sistema transaccional tras confirmación exitosa de pago de un huésped.\n- **Stimulus:** Emisión del evento `booking.confirmed`.\n- **Environment:** Dashboard web del anfitrión abierto en navegador en segundo plano.\n- **Artifact:** Canal de subscripción Supabase Realtime (PostgreSQL LISTEN/NOTIFY).\n- **Response:** Despacha actualización push reactiva al navegador del anfitrión sin necesidad de recargar la página.\n- **Measure:** Alerta renderizada en la pantalla del finquero en menos de 500ms tras el evento.\n\n---\n\n## Implicaciones para Decisiones Arquitectónicas (ADRs)\n\n- **Hacia D3 (Deployment Topology):** Los Escenarios 1 y 2 justifican de forma vinculante la contratación de una CDN perimetral y almacenamiento de objetos externo.\n- **Hacia D4 (System Decomposition):** El Escenario 4 aconseja una arquitectura de Monolito Modular sobre una base de datos ACID unificada, evitando la sobrecomplejidad de transacciones distribuidas (Sagas/2PC).\n- **Hacia D6 (Communication Patterns):** El Escenario 5 dicta la adopción de WebSockets/SSE gestionados para el canal en tiempo real."
+  }
+}

@@ -117,8 +117,18 @@ def _escape_segment(text: str) -> str:
 _RULE_LINE_RE = re.compile(r"^ {0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*$")
 
 
-def prepare_markdown(markdown: str) -> str:
-    """Rewrite syntax Qt's importer does not know into syntax it does."""
+def prepare_markdown(markdown: str, embed_notes: bool = False) -> str:
+    """Rewrite syntax Qt's importer does not know into syntax it does.
+
+    ``embed_notes`` makes a ``![[Nota]]`` note transclusion travel as an
+    embed image (like ``![[foto.png]]``) instead of being downgraded to a
+    ``[[Nota]]`` link. It then survives the Editor's re-serialisation intact,
+    so a note that only carries note transclusions is no longer forced into
+    Markdown mode — it can open in the rich Editor, where tables render as a
+    real grid. The transclusion shows as a placeholder there (Qt cannot inline
+    another note's body while editing), but the ``![[Nota]]`` text is preserved
+    on save. The read-only view expands transclusions before this runs, so it
+    is unaffected and keeps ``embed_notes`` off."""
     lines, fence = [], False
     for line in (markdown or "").split("\n"):
         if _FENCE_RE.match(line):
@@ -135,11 +145,17 @@ def prepare_markdown(markdown: str) -> str:
         lines.append(line if fence else _escape_unknown_tags(line))
     markdown = "\n".join(lines)
 
-    text = _EMBED_RE.sub(
-        lambda m: (f"![{m.group(2) or PLACEHOLDER}]"
-                   f"(<{EMBED_SCHEME}{m.group(1).strip()}>)"),
-        markdown or "",
-    )
+    def _embed_to_img_or_link(m: re.Match) -> str:
+        target = m.group(1).strip()
+        from .attachments import IMAGE_EXTS, VIDEO_EXTS, AUDIO_EXTS, PDF_EXTS
+        suffix = Path(target).suffix.lower()
+        is_media = suffix in IMAGE_EXTS | VIDEO_EXTS | AUDIO_EXTS | PDF_EXTS or (suffix and suffix not in (".md", ".canvas", ".txt"))
+        if is_media or embed_notes:
+            return f"![{m.group(2) or PLACEHOLDER}](<{EMBED_SCHEME}{target}>)"
+        label = (m.group(2) or target).strip()
+        return f"[[{target}|{label}]]" if m.group(2) else f"[[{target}]]"
+
+    text = _EMBED_RE.sub(_embed_to_img_or_link, markdown or "")
     text = _EMPTY_ALT_RE.sub(f"![{PLACEHOLDER}](", text)
     return _EMPTY_TASK_RE.sub(lambda m: f"{m.group(1)} {PLACEHOLDER}", text)
 
@@ -148,7 +164,7 @@ _WIKILINK_RE = re.compile(r"(?<!!)\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\
 _TASK_LINE_RE = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+\[)([ xX])(\])")
 
 
-_TRANSCLUDE_RE = re.compile(r"!\[\[([^\]|#]+?)(?:#([^\]|]*))?\]\]")
+_TRANSCLUDE_RE = re.compile(r"!\[\[([^\]|#]+?)(?:#([^\]|]*))?(?:\|([^\]]*))?\]\]")
 
 
 def expand_transclusions(markdown: str, resolve_fn, depth: int = 0,
@@ -172,7 +188,7 @@ def expand_transclusions(markdown: str, resolve_fn, depth: int = 0,
 
         body = resolve_fn(ref)
         if body is None:
-            return m.group(0)   # keep original if not found
+            return m.group(0)
 
         if heading:
             # Extract only the section under that heading
@@ -512,9 +528,11 @@ _STRUCTURE = {
 
 
 def roundtrip_markdown(markdown: str) -> str:
-    """What the Editor would write back after opening this markdown."""
+    """What the Editor would write back after opening this markdown. Note
+    transclusions travel as embeds (``embed_notes=True``), matching how the
+    rich Editor loads a note, so the check and the Editor agree."""
     doc = QTextDocument()
-    doc.setMarkdown(prepare_markdown(markdown))
+    doc.setMarkdown(prepare_markdown(markdown, embed_notes=True))
     return document_to_markdown(doc)
 
 
@@ -648,3 +666,68 @@ def new_table(rows: int, cols: int) -> str:
     header = [f"Columna {c + 1}" for c in range(cols)]
     body = [[""] * cols for _ in range(max(1, rows - 1))]
     return format_table([header] + body, ["none"] * cols)
+
+
+# ── Pasting tables ──────────────────────────────────────────────────────────
+
+def _tsv_to_table(text: str) -> str:
+    """Tab-separated rows (what spreadsheets and rendered tables put on the
+    clipboard as plain text) → a markdown pipe table; '' when it isn't TSV."""
+    rows = [r for r in (text or "").replace("\r\n", "\n").split("\n") if r.strip()]
+    if len(rows) < 2 or not all("\t" in r for r in rows):
+        return ""
+    cells = [[c.strip().replace("|", r"\|") for c in r.split("\t")] for r in rows]
+    width = max(len(r) for r in cells)
+    cells = [r + [""] * (width - len(r)) for r in cells]
+    lines = ["| " + " | ".join(cells[0]) + " |",
+             "|" + "|".join(" --- " for _ in range(width)) + "|"]
+    lines += ["| " + " | ".join(r) + " |" for r in cells[1:]]
+    return "\n".join(lines)
+
+
+def _strip_visual_formats(doc: QTextDocument):
+    """Drop font sizes, families and colours copied along with HTML so the
+    serialiser writes plain markdown (bold/italic/code survive) instead of
+    ``<span style=...>`` wrappers around every pasted cell."""
+    names = ("FontPointSize", "FontPixelSize", "FontSizeAdjustment",
+             "FontFamilies", "FontFamily", "FontStyleHint",
+             "ForegroundBrush", "BackgroundBrush")
+    props = [getattr(P, n) for n in names if hasattr(P, n)]
+    cursor = QTextCursor(doc)
+    cursor.beginEditBlock()
+    block = doc.begin()
+    while block.isValid():
+        it = block.begin()
+        while not it.atEnd():
+            frag = it.fragment()
+            if frag.isValid():
+                fmt = frag.charFormat()
+                for prop in props:
+                    fmt.clearProperty(prop)
+                c = QTextCursor(doc)
+                c.setPosition(frag.position())
+                c.setPosition(frag.position() + frag.length(), QTextCursor.KeepAnchor)
+                c.setCharFormat(fmt)
+            it += 1
+        block = block.next()
+    cursor.endEditBlock()
+
+
+def clipboard_markdown(html: str, text: str) -> str:
+    """Markdown for pasted clipboard content.
+
+    A table copied from a rendered note, a browser or a spreadsheet arrives as
+    HTML (plus a flattened plain-text copy). Pasting the plain text into a
+    markdown card ran every cell together into one paragraph; this rebuilds
+    it as a pipe table instead. Tab-separated plain text is converted too.
+    Anything that is not a table is returned as the plain text, unchanged.
+    """
+    if html and re.search(r"<table", html, re.I):
+        doc = QTextDocument()
+        doc.setHtml(html)
+        _strip_visual_formats(doc)
+        md = document_to_markdown(doc).strip()
+        if md and "|" in md:
+            return md
+    tsv = _tsv_to_table(text)
+    return tsv or (text or "")

@@ -1,0 +1,177 @@
+{
+  "phase": "Phase 4",
+  "deliverable_code": "D5",
+  "deliverable": "High-Fidelity Mockups & Prototypes (Mockups de Alta Fidelidad y Prototipos)",
+  "purpose": "Este entregable culmina el Track A (Frontend / UX) de la Fase 4 al transformar los wireframes estructurales (D3) en especificaciones de alta fidelidad visual hiper-realistas mediante la aplicación rigurosa de los tokens del Design System (D4). Erradica por completo el 'Lorem Ipsum' inyectando datos comerciales reales del mercado vacacional colombiano, detalla los estados interactivos y micro-animaciones físicas (hover, loading, error states) y genera la guía definitiva de handoff para desarrolladores.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[PHASE_4_SYSTEM_MODELING/3.Wireframes]] | Estructuras espaciales, layouts responsivos y checklists atómicos de pantallas (Fase 4, D3). |\n| [[PHASE_4_SYSTEM_MODELING/4.Design_System_UI_Kit]] | Tokens de diseño, paleta Deep Forest, tipografías Epilogue/Be Vietnam Pro y a11y (Fase 4, D4). |\n| [[PHASE_4_SYSTEM_MODELING/1.Content_Strategy_Information_Architecture]] | Taxonomía de rutas, navegación jerárquica y vistas de soporte (Fase 4, D1). |\n| [[PROJECT_IDENTITY]] | Identidad de marca, valores comerciales y tono de comunicación rural-editorial (Fase 2, D1). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Aplicación de Tokens de Identidad Visual (Brand Styling)",
+      "summary": "Vestir la estructura espacial de los wireframes aplicando sistemáticamente los tokens de diseño (colores HSL/Hex, tipografías Epilogue y Be Vietnam Pro, superficies cálidas y elevaciones tonales).",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Transformación de Wireframes con Tokens de Diseño",
+          "objective": "Asignar a cada elemento gráfico su token visual correspondiente sustituyendo la escala de grises de los esqueletos.",
+          "input": "Wireframes de [[PHASE_4_SYSTEM_MODELING/3.Wireframes]] y tokens de [[PHASE_4_SYSTEM_MODELING/4.Design_System_UI_Kit]].",
+          "raw_data_title": "Tokens Aplicados en Home Page y Property Page",
+          "raw_data": "- Fondo: Surface cálido (#F9FAF6) para cero fatiga visual.\n- Titulares: Epilogue Bold (48px / 32px) en color blanco (hero) u On-Surface (#1A1C1A).\n- Botón Primario: Deep Forest (#1B3022) con texto blanco Be Vietnam Pro.\n- Precios: Clay Terracotta (#BC6C25) en Epilogue 700 bold.\n- Tarjetas: Fondo blanco puro (#FFFFFF) con sombra difusa al 15% de opacidad.",
+          "exit_label": "COMPLETE → Tokens de marca aplicados en las pantallas del sistema (2.1)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Matriz de Transformación Visual con Tokens",
+              "objective": "Especificar la conversión de elementos de esqueleto a componentes de alta fidelidad.",
+              "how_to": {
+                "steps": [
+                  "1. Reemplazar los fondos genéricos grises por el token Surface cálido (#F9FAF6).",
+                  "2. Aplicar la jerarquía tipográfica Epilogue para titulares y Be Vietnam Pro para textos continuos.",
+                  "3. Asignar los tokens de color primario (Deep Forest) y secundario (Clay Terracotta) a los CTAs.",
+                  "4. Incorporar la capa de oscurecimiento (Overlay 40%) en las imágenes hero."
+                ],
+                "table_columns": "Pantalla Objetivo | Elemento UI del Wireframe | Token de Diseño Aplicado | Valor Técnico Resultante | Efecto Visual / Justificación UX",
+                "table_rules": "Cero uso de estilos en línea ad-hoc; todo debe derivar de los tokens de D4.",
+                "restrictions": [
+                  "Prohibido alterar la estructura jerárquica ya aprobada en los wireframes",
+                  "Garantizar que todos los textos mantengan su contraste auditado"
+                ],
+                "done_when": "Los elementos principales de las pantallas tienen asignados sus tokens visuales oficiales"
+              },
+              "example_title": "Matriz de Transformación Visual con Tokens",
+              "example": "| Pantalla Objetivo | Elemento UI del Wireframe | Token de Diseño Aplicado | Valor Técnico Resultante | Efecto Visual / Justificación UX |\n| :--- | :--- | :--- | :--- | :--- |\n| **Home Page B2C** | Fondo General | `Surface (#F9FAF6)` | Blanco humo cálido | Elimina fatiga visual y evoca entorno rústico natural. |\n| **Home Page B2C** | Hero H1 Title | `Epilogue Bold (48px)` | Blanco `#FFFFFF` sobre overlay | Máximo impacto editorial con legibilidad garantizada. |\n| **Home Page B2C** | Hero Image | `Overlay Layer` | Negro al 40% de opacidad | Contraste superior a 4.5:1 exigido por WCAG AA. |\n| **Home Page B2C** | SearchBar Button | `Deep Forest (#1B3022)` | Botón píldora con texto blanco | Alto contraste y punto focal primario de conversión. |\n| **Property Page** | Property Title | `Epilogue SemiBold (32px)` | `On-Surface (#1A1C1A)` | Jerarquía visual clara para el nombre del inmueble. |\n| **Property Page** | Price Tag | `Clay Terracotta (#BC6C25)` | Tipografía `Epilogue 700` | Acento comercial cálido que resalta la tarifa por noche. |\n| **Property Page** | Cards de Similares | `Elevation Tonal` | Sombra difusa al 15% Deep Forest | Sensación de tactilidad física sin sombras duras. |",
+              "link_label": "tokens aplicados a wireframes"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Inyección de Datos Reales (Cero Lorem Ipsum)",
+      "summary": "Eliminar de raíz el texto simulado (Lorem Ipsum) e inyectar contenidos hiper-realistas del mercado vacacional de fincas en Colombia (nombres verosímiles, tarifas en COP, ubicaciones y comodidades reales).",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Reemplazo por Datos Reales del Mercado Colombiano",
+          "objective": "Poblar las interfaces con información verosímil para validar el balance de layout y la longitud real de textos.",
+          "input": "Catálogo de dominio de Fase 3 (D3) y fichas de producto.",
+          "raw_data_title": "Datos Reales Inyectados en la Interfaz",
+          "raw_data": "- Título: 'Hacienda El Paraíso Cafetero' (Quimbaya, Quindío).\n- Tarifa: '$850.000 COP / noche' en Epilogue Terracotta.\n- Amenidades: 'Piscina Privada', 'Pet Friendly', 'Zona BBQ', 'WiFi Fibra'.\n- Capacidad: 'Hasta 16 Huéspedes (4 Habitaciones)'.\n- Checkout: 'Subtotal: $1.700.000 COP (2 Noches) + Tarifa Servicio: $120.000 COP'.",
+          "exit_label": "COMPLETE → Datos reales colombianos inyectados sin textos ficticios (3.1)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Matriz de Inyección de Datos Reales de Negocio",
+              "objective": "Catalogar las cadenas de texto reales que sustituyen los marcadores de posición.",
+              "how_to": {
+                "steps": [
+                  "1. Identificar todos los marcadores de posición de texto y números en las pantallas.",
+                  "2. Formular nombres de fincas, descripciones y amenidades verosímiles del contexto colombiano.",
+                  "3. Aplicar el formato monetario estándar colombiano con separadores de miles y sufijo COP.",
+                  "4. Comprobar que los textos no rompan el layout ni generen desbordamientos no deseados."
+                ],
+                "table_columns": "Pantalla | Componente UI | Texto / Placeholder Wireframe | Dato Real Inyectado (Contexto Colombiano) | Formato y Moneda Aplicada",
+                "table_rules": "Prohibido el uso de la palabra 'Lorem' o cadenas de texto genéricas.",
+                "restrictions": [
+                  "No utilizar precios en monedas extranjeras no soportadas en el MVP",
+                  "Mantener coherencia cultural y geográfica con las regiones turísticas colombianas"
+                ],
+                "done_when": "El 100% de los componentes visuales muestran datos reales de negocio"
+              },
+              "example_title": "Matriz de Inyección de Datos Reales de Negocio",
+              "example": "| Pantalla | Componente UI | Texto / Placeholder Wireframe | Dato Real Inyectado (Contexto Colombiano) | Formato y Moneda Aplicada |\n| :--- | :--- | :--- | :--- | :--- |\n| **Property Page** | Property Title | `[Lorem Ipsum Finca Title]` | \"Hacienda El Paraíso Cafetero\" | Nombre geográfico verosímil del Eje Cafetero. |\n| **Property Page** | Price Tag | `$XXX / night` | \"$850.000 COP / noche\" | Formato monetario con separador de miles colombiano. |\n| **Property Page** | Location Tag | `[Location, City]` | \"Quimbaya, Quindío (A 15 min de Panaca)\" | Ubicación contextualizada con puntos de referencia reales. |\n| **Property Page** | Amenity Chips | `[Amenity 1, 2, 3]` | \"Piscina Privada\", \"Pet Friendly\", \"Zona BBQ\", \"WiFi Fibra\" | Comodidades reales verificadas en fichas de anfitriones. |\n| **Property Page** | Capacidad Máxima | `[X Guests]` | \"Hasta 16 Huéspedes (4 Habitaciones)\" | Capacidad familiar típica del alquiler rural vacacional. |\n| **Checkout Page** | Resumen Tarifa | `Total: $YYY` | \"Subtotal: $1.700.000 COP (2 Noches) + Tarifa Servicio: $120.000 COP\" | Desglose tarifario transparente sin cargos ocultos. |",
+              "link_label": "datos reales inyectados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Casos de Borde y Estados Interactivos",
+      "summary": "Modelar la física interactiva del sistema: especificar el comportamiento de los estados Hover, Focus, Active, Loading con Glassmorphism y la visualización de los caminos tristes (errores de validación y expiraciones).",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Modelado Visual de Hover, Loading y Validation Errors",
+          "objective": "Especificar las micro-interacciones y la respuesta visual ante acciones del usuario y fallos del sistema.",
+          "input": "Reglas de interacción de [[PHASE_4_SYSTEM_MODELING/4.Design_System_UI_Kit]] y caminos tristes de D2.",
+          "raw_data_title": "Micro-interacciones y Estados de Excepción",
+          "raw_data": "- Hover Card: Escala 101% con sombra profundizada al 25% de opacidad.\n- Terms Error: Checkbox parpadea en rojo #BA1A1A con sacudida horizontal de 4px.\n- Search Loading: Overlay glassmorphism al 80% con backdrop-blur 8px y spinner.\n- Button Press: Escala 98% con oscurecimiento del 5% del fondo.\n- Lock Expiring: Temporizador cambia a amarillo ámbar #D97706 al restar < 3 min.",
+          "exit_label": "COMPLETE → Estados interactivos y casos de borde modelados (4.1)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Catálogo de Micro-interacciones y Estados Transitorios",
+              "objective": "Consolidar las especificaciones de comportamiento físico y alertas visuales para desarrollo.",
+              "how_to": {
+                "steps": [
+                  "1. Definir la transformación geométrica y cromática para el estado Hover en desktop.",
+                  "2. Diseñar la pantalla de carga con desenfoque de fondo para operaciones asíncronas.",
+                  "3. Especificar el tratamiento visual para errores de formulario sin depender solo del color.",
+                  "4. Documentar los estados de advertencia para procesos con temporizador (Soft-Lock)."
+                ],
+                "table_columns": "Componente / Pantalla | Estado Interactivo | Micro-animación / Transformación Visual | Token de Color y Estilo | Código de Estado Asignado",
+                "table_rules": "Todos los estados interactivos deben incluir especificación de tiempo de transición.",
+                "restrictions": [
+                  "No emplear animaciones bruscas o mareantes; mantener transiciones entre 150ms y 300ms",
+                  "Asegurar que los errores sean claramente distinguibles para usuarios daltónicos"
+                ],
+                "done_when": "Los estados interactivos y de error cuentan con especificación visual completa"
+              },
+              "example_title": "Catálogo de Micro-interacciones y Estados Transitorios",
+              "example": "| Componente / Pantalla | Estado Interactivo | Micro-animación / Transformación Visual | Token de Color y Estilo | Código de Estado Asignado |\n| :--- | :--- | :--- | :--- | :--- |\n| **Property Card** | `Hover (Desktop)` | Escala al 101% (Scale 1.01) con transición suave de 200ms. | Sombra ambiental aumenta de 15% a 25% de opacidad Deep Forest. | `STATE_HOVER_ACTIVE` |\n| **Terms Checkbox** | `Validation Error` | Borde parpadea en rojo y tiembla horizontalmente (Shake 4px). | Borde y texto de ayuda en Rojo Alerta `#BA1A1A` (WCAG > 4.5:1). | `STATE_ERROR_UNCHECKED` |\n| **Search Modal** | `Loading / Filter` | Glassmorphism con fondo blanco al 80% y `backdrop-blur: 8px`. | Spinner animado en color Deep Forest `#1B3022` en el centro. | `STATE_ASYNC_LOADING` |\n| **Primary Button** | `Active / Press` | Escala al 98% (Scale 0.98) simulando hundimiento táctil físico. | Fondo se oscurece un 5% para retroalimentación instantánea. | `STATE_CLICK_FEEDBACK` |\n| **Lock Countdown** | `Warning State` | Temporizador pasa a ámbar cuando restan menos de 3 minutos. | Texto y borde en Amarillo Alerta `#D97706`. | `STATE_LOCK_EXPIRING` |",
+              "link_label": "estados interactivos modelados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Especificaciones para Dev Handoff y Cierre de Track A",
+      "summary": "Consolidar las especificaciones técnicas de entrega para desarrollo frontend (Dev Handoff), verificar el cumplimiento de los estándares de UI y emitir el cierre formal del Track A (Frontend/UX).",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Handoff a Desarrolladores y Quality Gate",
+          "objective": "Auditar la compuerta de calidad visual y autorizar la transición al Track B (Diseño Técnico y Datos: D6 a D9).",
+          "input": "Resultados de Step 1, Step 2 y Step 3 consolidados.",
+          "raw_data_title": "Evaluación de Compuerta de Mockups (Cierre Track A)",
+          "raw_data": "Proyecto: Nos Fuimos de Finca | Fase: 4 — Modelado del Sistema | Entregable: 5 de 15 | Alcance: Global.\nCriterios: Fidelidad 100% de tokens D4, erradicación de Lorem Ipsum, estados de interacción completos, adaptabilidad responsiva, cierre formal de Track A.",
+          "exit_label": "PUBLISH → Deliverable Completo: 5. High-Fidelity Mockups (Track A Closed)",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Dictamen de Compuerta de Mockups de Alta Fidelidad",
+              "objective": "Emitir el veredicto oficial PROCEED cerrando exitosamente el Track A de diseño de experiencia.",
+              "how_to": {
+                "steps": [
+                  "1. Auditar la adherencia estricta a los tokens del Design System de D4.",
+                  "2. Comprobar la ausencia total de texto simulado en todas las especificaciones de pantalla.",
+                  "3. Validar que los componentes cuenten con especificaciones de handoff listas para Tailwind CSS.",
+                  "4. Emitir el dictamen formal PROCEED autorizando el inicio de D6 (Domain Model & Conceptual ERD)."
+                ],
+                "table_columns": "Criterio de Calidad de Mockups de Alta Fidelidad | Estado | Evidencia",
+                "table_rules": "Todos los criterios deben resultar en APROBADO sin excepciones.",
+                "restrictions": [
+                  "No emitir veredicto favorable si persisten pantallas con textos genéricos o colores ad-hoc",
+                  "Garantizar que el handoff sirva de guía directa para la maquetación en React"
+                ],
+                "done_when": "El entregable aprueba el 100% de los criterios del Mockups Quality Gate y cierra Track A"
+              },
+              "example_title": "Veredicto del High-Fidelity Mockups Quality Gate",
+              "example": "| Criterio de Calidad de Mockups de Alta Fidelidad | Estado | Evidencia |\n| --- | --- | --- |\n| Fidelidad de Tokens de Diseño (D4) | APROBADO | 100% de colores, tipografías y sombras provienen de la especificación de D4 |\n| Erradicación Total de Lorem Ipsum | APROBADO | Cero textos falsos; datos reales colombianos (COP, Eje Cafetero, Quimbaya) |\n| Estados de Interacción Completos | APROBADO | Estados Hover, Focus, Active, Error y Loading formalizados con micro-interacciones |\n| Adaptabilidad Responsiva Verificada | APROBADO | Renders especificados para resoluciones Desktop (1440px) y Mobile (390px) |\n| Cierre Exitoso de Track A (Frontend/UX) | APROBADO | Transición autorizada hacia Track B (Diseño Técnico y Datos: D6 a D9) |",
+              "link_label": "mockups aprobados y Track A cerrado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 5. High-Fidelity Mockups & Dev Handoff.md",
+    "markdown": "# Entregable 5 (D5): High-Fidelity Mockups\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Alcance:** Global\n**Estado:** Aprobado\n\n---\n\n### 1. Renders Finales (Pantallas Clave)\n\n**Pantalla 01: Home Page (Marketplace)**\n- *Screenshot: `[Mockup_Home_Desktop.png]`*\n- *Screenshot: `[Mockup_Home_Mobile.png]`*\n\n**Pantalla 02: Detalles de Propiedad (Property Page)**\n- *Screenshot: `[Mockup_Property_Desktop.png]`*\n- *Screenshot: `[Mockup_Property_Mobile.png]`*\n\n---\n\n### 2. Especificaciones Visuales Aplicadas (Dev Handoff)\n\n**Pantalla: Home Page B2C**\n- **Hero Image:** Aplicado Overlay (40% negro) para contraste.\n- **Hero H1 Title (\"Encuentra tu refugio\"):** Aplicado token tipográfico `Epilogue` (Display-lg 48px), color Blanco `#ffffff`.\n- **Search Bar (Buscador Global):** Aplicada forma de píldora (Pill) con esquinas 100% redondeadas. Fondo `#ffffff`, borde interno invisible, botón primario en `Deep Forest (#1B3022)` con texto `Be Vietnam Pro`.\n- **Fondo General de la Grilla (Grid Background):** Aplicado token `Surface (#f9faf6)` para ambiente orgánico y nula fatiga visual.\n\n**Pantalla: Property Page (Módulo MOD-PROP)**\n- **Property Title:** Inyección de dato real (\"Hacienda El Paraíso Cafetero\"). Tipografía `Epilogue` en color oscuro `On-Surface (#1a1c1a)`.\n- **Etiqueta de Precio:** Inyección de dato real (\"$850.000 COP\"). Tipografía `Epilogue`, color de acento `Clay Terracotta (#BC6C25)`.\n- **Descripción Larga:** Tipografía `Be Vietnam Pro` (Body-md 16px) asegurando legibilidad máxima.\n- **Property Cards (Tarjetas Similares):** Fondo `#ffffff`, esquinas redondeadas `0.5rem (8px)`, sombra base ambiental de 15% opacidad color `Deep Forest`.\n\n---\n\n### 3. Estados Interactivos y Micro-interacciones\n\n**Hover States (Navegación Desktop)**\n- **Property Cards:** Al pasar el ratón, la tarjeta crece un 1% (escala 1.01) y la sombra ambiental (Tonal Layering) pasa de 15% a 25% de opacidad para dar retroalimentación física sin parecer que \"flota\" artificialmente.\n- **Botones Primarios (Deep Forest):** Se aclara u oscurece sutilmente la luminosidad del botón (Filter Brightness).\n\n**Edge Cases & Errores (Checkout MOD-PAY)**\n- **Validación Fallida (Términos Legales):** Si el usuario omite el checkbox, el contenedor estalla con un borde rojo sólido (`#ba1a1a` Error Token), y un texto de ayuda inferior en `Be Vietnam Pro` rojo alerta aparece inmediatamente bajo la caja.\n- **Modales Activos (Ej. Date Picker):** El fondo del portal se difumina (Glassmorphism) para aislar la acción, manteniendo los colores vivos de las fincas parcialmente visibles de fondo.\n"
+  }
+}

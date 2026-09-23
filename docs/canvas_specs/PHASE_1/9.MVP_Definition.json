@@ -1,0 +1,479 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D9",
+  "deliverable": "MVP Definition (Definición del Producto Mínimo Viable y Criterios de Éxito)",
+  "purpose": "Este entregable define la versión más ágil y económica posible del producto, concebida como un vehículo de experimentación para validar los supuestos críticos identificados en P1-D2. Delimita estrictamente lo que está dentro y fuera de alcance (Scope Boundaries), e incorpora los Criterios de Éxito del MVP (KRs de adopción y release específicos) para medir el impacto sin duplicar los OKRs macro de negocio de Fase 0 (P0-D5).",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_market_validation]] | Provee los supuestos críticos pendientes de validar y los experimentos requeridos (P1-D2). |\n| [[example_output_technical_feasibility]] | Define los riesgos técnicos que el MVP no debe intentar sobre-arquitecturar prematuramente (P1-D4). |\n| [[example_output_viability]] | Provee las métricas de Break-Even y el modelo de monetización (P1-D7). |\n| [[example_output_project_objectives]] | Objetivos macro de negocio de Fase 0 (P0-D5), usados como referencia superior. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Enmarcado de Experimentos y Selección de Factor de Forma",
+      "summary": "Extraer hipótesis críticas, elegir factor de forma más económico y documentar el mandato del MVP.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Extraer los supuestos críticos de P1-D2 que deben validarse",
+          "objective": "Identificar los supuestos de negocio con confianza Media o Baja que requieren validación empírica.",
+          "input": "Tabla de Supuestos Críticos de [[example_output_market_validation]] (P1-D2).",
+          "raw_data_title": "Supuestos Críticos Extraídos",
+          "raw_data": "Supuesto 1: Finquero/turista paga service fee de COP $5,000 (Media). Supuesto 2: Fincas responden consultas WhatsApp en <2h (Baja).",
+          "exit_label": "SUPUESTOS IDENTIFICADOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Extracción de supuestos críticos de mercado",
+              "objective": "Aislar las hipótesis fundamentales que el MVP debe probar empíricamente.",
+              "how_to": {
+                "steps": [
+                  "Consultar la matriz de supuestos de P1-D2.",
+                  "Filtrar únicamente los ítems con nivel de confianza Medio o Bajo.",
+                  "Diferenciar las hipótesis de validación inmediata frente a objetivos macro.",
+                  "Registrar los supuestos que delimitarán el alcance del experimento."
+                ],
+                "table_columns": "ID Supuesto | Hipótesis Crítica | Nivel de Confianza Actual | Experimento Requerido",
+                "table_rules": "Solo supuestos que requieran validación de campo.",
+                "restrictions": [
+                  "No incluir supuestos ya comprobados con alta confianza.",
+                  "Evitar metas comerciales que no dependan del producto temprano."
+                ],
+                "done_when": "Lista de supuestos críticos prioritarios consolidada."
+              },
+              "example_title": "Supuestos Críticos Priorizados para el MVP",
+              "example": "| Supuesto a Probar | Confianza Inicial | Experimento Requerido |\n| --- | --- | --- |\n| Disposición a pagar service fee (COP $5,000) | Media | Fake Door / Checkout transaccional |\n| Tiempo de respuesta de fincas en <2 horas | Baja | Operación Concierge / Canal WhatsApp |",
+              "link_label": "supuestos van a factor de forma (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Asignar el factor de forma más liviano",
+          "objective": "Seleccionar el tipo de MVP más ágil para validar las hipótesis con el menor costo.",
+          "input": "Supuestos priorizados del Step 1.1.",
+          "raw_data_title": "Factor de Forma Evaluado",
+          "raw_data": "Evaluación: Fake Door para intención de pago, Concierge para soporte, Web App SPA Mobile-First para catálogo y reservas.",
+          "exit_label": "FACTOR DE FORMA ASIGNADO → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Selección del factor de forma mínimo viable",
+              "objective": "Determinar si el experimento se implementa como Fake Door, Concierge, Wizard of Oz o Single Feature.",
+              "how_to": {
+                "steps": [
+                  "Evaluar opciones: Concierge (manual), Wizard of Oz (híbrido), Single Feature (software acotado) o Fake Door.",
+                  "Elegir la modalidad que minimice horas de codificación sin sacrificar fidelidad.",
+                  "Asegurar que el usuario experimente la propuesta de valor sin fricción artificial.",
+                  "Documentar la justificación de la arquitectura elegida para el experimento."
+                ],
+                "table_columns": "Componente Clave | Factor de Forma Seleccionado | Justificación de Mínimo Esfuerzo",
+                "table_rules": "Priorizar siempre la alternativa más liviana viable.",
+                "restrictions": [
+                  "No elegir arquitecturas complejas cuando un flujo simple baste.",
+                  "Garantizar que el factor de forma mida comportamiento real."
+                ],
+                "done_when": "Factor de forma asignado a cada componente del experimento."
+              },
+              "example_title": "Selección de Factores de Forma para el MVP",
+              "example": "| Componente Clave | Factor de Forma Seleccionado |\n| --- | --- |\n| Landing Page y Catálogo B2C | Web App SPA responsiva (Mobile-First) |\n| Sistema Transaccional de Reservas | API REST modular con máquina de estados y control de concurrencia |\n| Pasarela de Pagos Integrada | Checkout transaccional con liquidación directa y Webhooks |\n| Notificaciones Transaccionales | Alertas automatizadas de estado de reserva vía WhatsApp Cloud API |",
+              "link_label": "factor de forma va a selección de herramientas (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Seleccionar las herramientas existentes (No-Code, mensajería, stack liviano)",
+          "objective": "Fijar el conjunto de tecnologías y plataformas probadas para construir el MVP en tiempo récord.",
+          "input": "Factores de forma del Step 1.2 y capacidades del equipo de P1-D6.",
+          "raw_data_title": "Stack Tecnológico del MVP",
+          "raw_data": "Frontend: React + Tailwind CSS. Backend: Java Spring Boot 3.x + PostgreSQL 16. Pagos: Wompi API. Alertas: WhatsApp Cloud API.",
+          "exit_label": "HERRAMIENTAS SELECCIONADAS → 1.4",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Selección de herramientas y stack del MVP",
+              "objective": "Definir tecnologías estándar y maduras que aceleren la implementación sin crear deuda técnica insostenible.",
+              "how_to": {
+                "steps": [
+                  "Revisar el stack técnico dominado según la evaluación de P1-D6.",
+                  "Seleccionar frameworks y servicios con integración directa comprobada.",
+                  "Evitar herramientas propietarias o librerías sin soporte comunitario.",
+                  "Consolidar la tabla técnica oficial del producto mínimo viable."
+                ],
+                "table_columns": "Capa / Servicio | Tecnología Seleccionada | Justificación de Velocidad y Estabilidad",
+                "table_rules": "Alineación estricta con las decisiones de viabilidad técnica de D4.",
+                "restrictions": [
+                  "No introducir tecnologías desconocidas que requieran curvas prolongadas.",
+                  "Limitar integraciones de backend a lo estrictamente necesario."
+                ],
+                "done_when": "Stack de herramientas para el MVP formalmente registrado."
+              },
+              "example_title": "Stack Tecnológico Oficial del MVP",
+              "example": "| Componente | Stack Tecnológico Oficial |\n| --- | --- |\n| Catálogo B2C | React + Tailwind CSS / JavaScript |\n| Motor Reservas | Java (Spring Boot 3.x) + PostgreSQL 16 |\n| Pasarela Pagos | Wompi API (PSE, Nequi, Tarjetas) |\n| Alertas | WhatsApp Cloud API + Correo Transaccional |",
+              "link_label": "herramientas van a mandato formal (1.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.4",
+          "title": "Documentar el mandato del MVP",
+          "objective": "Sintetizar en una declaración formal qué se construye, con qué fin y en qué plazo máximo.",
+          "input": "Supuestos, factores de forma y herramientas de Steps 1.1 a 1.3.",
+          "raw_data_title": "Mandato del MVP",
+          "raw_data": "Mandato: Construir Web App Mobile-First con motor transaccional de reservas y checkout Wompi para validar adopción de fincas y turistas en 4 semanas.",
+          "exit_label": "MANDATO DE MVP FORMULADO → 2.1",
+          "micro": [
+            {
+              "code": "1.4.1",
+              "title": "Redacción del mandato formal del MVP",
+              "objective": "Articular la directriz ejecutiva que blindará al equipo contra adiciones fuera de alcance.",
+              "how_to": {
+                "steps": [
+                  "Redactar el objetivo del MVP en una sola frase rectora.",
+                  "Indicar el plazo máximo de desarrollo y prueba en semanas.",
+                  "Explicitar qué aprendizaje concreto valida el éxito de la iniciativa.",
+                  "Obtener confirmación del Product Manager y Tech Lead."
+                ],
+                "table_columns": "Elemento del Mandato | Declaración Oficial",
+                "table_rules": "Texto breve, asertivo y de estricta observancia.",
+                "restrictions": [
+                  "No incluir ambigüedades respecto al plazo o entregable central.",
+                  "Mantener foco absoluto en validar las hipótesis clave."
+                ],
+                "done_when": "Mandato del MVP documentado y aprobado."
+              },
+              "example_title": "Mandato Oficial del MVP",
+              "example": "**Mandato del MVP:** Desarrollar una Web App SPA Mobile-First con catálogo y motor de reservas transaccionales atómicas, integrada con Wompi y alertas WhatsApp, para validar en 4 semanas que ≥10 fincas gestionan reservas directas con 0 incidentes de overbooking.",
+              "link_label": "mandato va a delimitación in-scope (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Delimitación Estricta de Alcance (In-Scope vs Out-of-Scope)",
+      "summary": "Blindar el MVP definiendo componentes esenciales e imponiendo prohibiciones explícitas.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Listar los componentes In-Scope (lo único que se construye)",
+          "objective": "Definir las pantallas, flujos e integraciones que componen el núcleo indispensable del MVP.",
+          "input": "Mandato del MVP de Step 1.4 y requerimientos funcionales.",
+          "raw_data_title": "Componentes In-Scope",
+          "raw_data": "In-Scope: Landing Page con catálogo, vista detallada de finca con fotos y tarifas, motor de reserva con Soft-Lock atómico, checkout Wompi, alertas WhatsApp, panel básico de disponibilidad.",
+          "exit_label": "COMPONENTES IN-SCOPE FIJADOS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Especificación de componentes esenciales In-Scope",
+              "objective": "Describir cada funcionalidad autorizada asociándola al supuesto de validación respectivo.",
+              "how_to": {
+                "steps": [
+                  "Listar únicamente las funcionalidades indispensables para completar el core loop.",
+                  "Vincular cada funcionalidad con un supuesto crítico o requerimiento legal/técnico.",
+                  "Redactar descripciones precisas del comportamiento de cada componente.",
+                  "Verificar que no se cuele ninguna funcionalidad cosmética o secundaria."
+                ],
+                "table_columns": "Componente Esencial | Descripción Operativa | Supuesto o Requerimiento Asociado",
+                "table_rules": "Cada componente debe validar directamente un supuesto.",
+                "restrictions": [
+                  "No incluir pantallas o flujos no esenciales.",
+                  "Mantener la arquitectura orientada al mínimo esfuerzo viable."
+                ],
+                "done_when": "Listado de componentes In-Scope cerrado y justificado."
+              },
+              "example_title": "Delimitación de Alcance: In-Scope",
+              "example": "- **In-Scope (Funcionalidades Esenciales):**\n  - Landing Page oficial de Nos Fuimos de Finca con catálogo de propiedades y filtros por fechas/capacidad.\n  - Vista detallada de propiedad con fotos, tarifas, descripción y calendario interactivo de disponibilidad.\n  - Motor de reservas con bloqueo atómico temporal (Soft-Lock) durante el checkout.\n  - Pasarela de pagos integrada vía Wompi con confirmación automática de reservas post-pago.\n  - Alertas automáticas vía WhatsApp/Email para finqueros y turistas.\n  - Panel de control para que el finquero gestione disponibilidad y consulte reservas.",
+              "link_label": "in-scope va a prohibiciones out-of-scope (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Listar explícitamente los componentes Out-of-Scope con su justificación",
+          "objective": "Establecer las prohibiciones explícitas de desarrollo para blindar el cronograma contra desvíos.",
+          "input": "Funcionalidades descartadas y riesgos de sobre-ingeniería de P1-D4 y P1-D7.",
+          "raw_data_title": "Prohibiciones Out-of-Scope",
+          "raw_data": "Prohibido: Apps móviles nativas iOS/Android, panel para agencias B2B, bot interactivo WhatsApp, motores IA de recomendación, sincronización iCal bidireccional, facturación masiva propia.",
+          "exit_label": "PROHIBICIONES OUT-OF-SCOPE BLINDADAS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Definición de prohibiciones explícitas Out-of-Scope",
+              "objective": "Enumerar las características prohibidas con su justificación técnica o de negocio.",
+              "how_to": {
+                "steps": [
+                  "Identificar funcionalidades típicas que los desarrolladores podrían intentar codificar.",
+                  "Declarar formalmente prohibida la construcción de cada una en esta fase.",
+                  "Justificar por qué la ausencia de cada característica no invalida el experimento.",
+                  "Indicar si la característica se difiere a versiones futuras (vNext) o se descarta."
+                ],
+                "table_columns": "Componente Prohibido | Destino (vNext / Descarte) | Justificación de Exclusión",
+                "table_rules": "Prohibiciones explícitas, mandatorias e inapelables.",
+                "restrictions": [
+                  "No omitir justificación de exclusión.",
+                  "Asegurar que el equipo comprenda que codificar lo prohibido constituye infracción de alcance."
+                ],
+                "done_when": "Lista de prohibiciones Out-of-Scope documentada con justificaciones."
+              },
+              "example_title": "Delimitación de Alcance: Out-of-Scope (Prohibiciones)",
+              "example": "- **Out-of-Scope (Prohibiciones Explícitas en el MVP):**\n  - Aplicaciones móviles nativas (iOS / Android) — se garantiza experiencia web responsiva Mobile-First.\n  - Panel multi-finca y roles dedicados para Agencias Intermediarias B2B (Diferido a vNext).\n  - Bot conversacional interactivo de WhatsApp (Diferido a vNext; WhatsApp opera como canal unidireccional de alertas).\n  - Motores de recomendación con Inteligencia Artificial o analítica predictiva.\n  - Sincronización iCal bidireccional compleja con Airbnb/Booking.\n  - Facturación electrónica masiva integrada en base de datos propia.",
+              "link_label": "out-of-scope va a verificación de cobertura (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Verificar que el In-Scope cubre todos los supuestos del mandato",
+          "objective": "Comprobar matricialmente que no existan supuestos huérfanos ni funcionalidades superfluas.",
+          "input": "Supuestos de Step 1 y listas de In-Scope y Out-of-Scope.",
+          "raw_data_title": "Matriz de Cobertura",
+          "raw_data": "Supuesto pago -> Checkout Wompi. Supuesto tiempo respuesta -> Alertas WhatsApp. Supuesto adopción -> Panel finquero. 100% cubierto sin redundancias.",
+          "exit_label": "COBERTURA DE SUPUESTOS VERIFICADA → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Verificación de cobertura de supuestos vs alcance",
+              "objective": "Cruzar cada supuesto crítico con el componente que lo valida para certificar suficiencia.",
+              "how_to": {
+                "steps": [
+                  "Mapear cada supuesto de P1-D2 contra los componentes In-Scope.",
+                  "Verificar que cada supuesto cuente con al menos un mecanismo de validación.",
+                  "Confirmar que ningún ítem Out-of-Scope sea indispensable para probar algún supuesto.",
+                  "Sellar la coherencia matricial entre hipótesis y desarrollo técnico."
+                ],
+                "table_columns": "Supuesto Crítico | Componente In-Scope de Validación | Cobertura Certificada",
+                "table_rules": "Validación 1 a 1 de todos los supuestos.",
+                "restrictions": [
+                  "No permitir supuestos huérfanos sin mecanismo de validación.",
+                  "No permitir componentes In-Scope sin correlación con supuestos."
+                ],
+                "done_when": "Matriz de cobertura validada y firmada."
+              },
+              "example_title": "Matriz de Cobertura de Supuestos Críticos",
+              "example": "| Supuesto Crítico | Componente In-Scope que lo Valida | Estado |\n| --- | --- | --- |\n| Disposición a pagar service fee | Checkout Wompi + confirmación automática | Validado por diseño ✅ |\n| Tiempo de respuesta de fincas | Alertas WhatsApp transaccionales + panel ágil | Validado por diseño ✅ |\n| Prevención de colisiones | Motor de reservas con Soft-Lock atómico | Validado por diseño ✅ |",
+              "link_label": "cobertura va a formulación de KRs (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Criterios de Éxito del MVP (KRs de Lanzamiento y Adopción)",
+      "summary": "Redactar KRs cuantitativos medibles de comportamiento y fijar criterios de salida vinculantes.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Redactar 1 a 3 KRs con la fórmula estándar",
+          "objective": "Definir resultados clave cuantitativos usando la estructura Verbo + Métrica + Umbral + Horizonte.",
+          "input": "Métricas de validación de P1-D2 y objetivos de Break-Even de P1-D7.",
+          "raw_data_title": "KRs Formulados",
+          "raw_data": "KR1 Adopción: Lograr que >=10 fincas gestionen el 100% de reservas en 4 semanas. KR2 Calidad: 0 incidentes de overbooking (100% atómicas). KR3 Conversión: >=30 reservas pagadas en el primer mes.",
+          "exit_label": "KRS CUANTITATIVOS FORMULADOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Formulación de KRs cuantitativos de lanzamiento",
+              "objective": "Redactar resultados orientados a adopción y comportamiento real, no a meras tareas de desarrollo.",
+              "how_to": {
+                "steps": [
+                  "Aplicar estrictamente la fórmula: Verbo + Métrica + Umbral Numérico + Horizonte Temporal.",
+                  "Asegurar que la métrica mida conducta observable del usuario final o desempeño del sistema.",
+                  "Prohibir la inclusión de tareas de ingeniería como KRs (ej. 'terminar backend').",
+                  "Limitar la cantidad a un máximo de 3 KRs de alto impacto."
+                ],
+                "table_columns": "Tipo de KR | Resultado Clave Cuantitativo (KR) | Umbral de Éxito | Métrica Fuente",
+                "table_rules": "Entre 1 y 3 KRs cuantitativos estrictamente.",
+                "restrictions": [
+                  "Prohibido formular KRs de actividades o tareas internas.",
+                  "Exigir umbrales numéricos concretos sin adjetivos subjetivos."
+                ],
+                "done_when": "1 a 3 KRs de lanzamiento redactados según la fórmula estándar."
+              },
+              "example_title": "Criterios de Éxito del MVP (KRs de Lanzamiento)",
+              "example": "| Tipo de KR | Resultado Clave Cuantitativo (KR) | Umbral de Éxito | Métrica Fuente |\n| --- | --- | --- | --- |\n| **Adopción / Uso** | Lograr que ≥10 fincas piloto gestionen el 100% de sus reservas vía plataforma | ≥10 fincas activas en 4 semanas | P1-D2 |\n| **Calidad / Fricción** | Mantener 0 incidentes de overbooking o colisión de reservas en transacciones procesadas | 0% colisiones (100% transacciones atómicas) | P0-D5 / P1-D7 |\n| **Conversión / Tracción** | Procesar al menos 30 reservas confirmadas exitosamente a través de la pasarela Wompi | ≥30 reservas pagadas en el primer mes | P1-D7 |",
+              "link_label": "krs van a verificación de independencia (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Verificar que los KRs sean independientes entre sí y no se solapen",
+          "objective": "Garantizar que los KRs cubran dimensiones complementarias (adopción, calidad, conversión) sin redundancia.",
+          "input": "KRs redactados en Step 3.1.",
+          "raw_data_title": "Análisis de Independencia",
+          "raw_data": "KR1 mide adopción de anfitriones, KR2 mide calidad técnica y concurrencia, KR3 mide conversión financiera de turistas. Ortogonales.",
+          "exit_label": "INDEPENDENCIA DE KRS CONFIRMADA → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Verificación de independencia y dimensiones de KRs",
+              "objective": "Confirmar la ortogonalidad de las métricas seleccionadas para evitar sesgos de medición.",
+              "how_to": {
+                "steps": [
+                  "Comprobar que cada KR mida una dimensión distinta del negocio o producto.",
+                  "Verificar que el cumplimiento de uno no implique automáticamente el de los demás.",
+                  "Eliminar métricas secundarias si coinciden con la variable de otro resultado clave.",
+                  "Asegurar que los KRs provean un diagnóstico integral del experimento."
+                ],
+                "table_columns": "KR | Dimensión Evaluada | Criterio de Ortogonalidad | Dictamen",
+                "table_rules": "Una dimensión distinta por cada KR seleccionado.",
+                "restrictions": [
+                  "No usar dos KRs que midan variaciones de la misma variable.",
+                  "Garantizar coherencia con los supuestos de negocio."
+                ],
+                "done_when": "Independencia conceptual y cuantitativa de los KRs verificada."
+              },
+              "example_title": "Verificación de Independencia de KRs",
+              "example": "| KR | Dimensión Evaluada | Evaluación |\n| --- | --- | --- |\n| KR1 (Adopción) | Retención y uso de la herramienta por finqueros | Independiente ✅ |\n| KR2 (Calidad) | Concurrencia y solidez transaccional del backend | Independiente ✅ |\n| KR3 (Conversión) | Monetización y disposición a pagar de turistas | Independiente ✅ |",
+              "link_label": "independencia va a exit criteria (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Definir los Exit Criteria (criterios de salida vinculantes)",
+          "objective": "Establecer la ruta de acción mandataria si los KRs se cumplen (Proceed) o si fallan (Pivot / Stop).",
+          "input": "Umbrales numéricos de los KRs de Step 3.1.",
+          "raw_data_title": "Criterios de Salida",
+          "raw_data": "Si pasa: Proceed a Fase 2 (Kickoff de Ingeniería y Tooling). Si falla: Pivot en flujo de checkout o canales de adquisición.",
+          "exit_label": "CRITERIOS DE SALIDA FIJADOS → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Definición de criterios de salida (Proceed / Pivot / Stop)",
+              "objective": "Convertir las métricas de éxito en directrices ejecutivas automáticas sin margen para ambigüedades.",
+              "how_to": {
+                "steps": [
+                  "Definir el umbral numérico exacto que activa la decisión 'Proceed a Fase 2'.",
+                  "Definir las alternativas de 'Pivot' si se obtienen resultados sub-umbrales mitigables.",
+                  "Definir la condición de parada 'Stop' si las hipótesis fundamentales quedan refutadas.",
+                  "Obtener el compromiso formal del equipo respecto al cumplimiento de los criterios."
+                ],
+                "table_columns": "Resultado del Experimento | Decisión Vinculante | Acción Operativa Inmediata",
+                "table_rules": "Criterios de salida explícitos e irrevocables.",
+                "restrictions": [
+                  "No admitir interpretaciones subjetivas post-lanzamiento.",
+                  "Vincular la compuerta directamente con el avance a Fase 2."
+                ],
+                "done_when": "Criterios de salida documentados y acordados."
+              },
+              "example_title": "Criterios de Salida (Exit Criteria)",
+              "example": "### 5. Criterios de Salida (Exit Criteria)\n- **Acción si Pasa (≥ Umbral de Éxito):** Proceed a Fase 2 (Project Kickoff y Arquitectura Técnica Final).\n- **Acción si Falla (< Umbral de Éxito):** Pivot en el flujo de checkout o en las estrategias de adquisición de tráfico.\n- **Aprobadores:** Julián (PM) / Laura (Tech Lead)",
+              "link_label": "exit criteria van a auditoría de coherencia (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Verificar coherencia entre mandato, alcance y KRs, y generar el artefacto oficial.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Verificar coherencia entre Mandato, Alcance y KRs",
+          "objective": "Realizar una auditoría cruzada asegurando que todo KR se mida con componentes In-Scope autorizados.",
+          "input": "Tablas y directrices de Steps 1 al 3.",
+          "raw_data_title": "Auditoría de Coherencia",
+          "raw_data": "Comprobado: ningún componente In-Scope es prescindible para los KRs; ninguna feature Out-of-Scope hace falta para medirlos.",
+          "exit_label": "COHERENCIA INTEGRAL CONFIRMADA → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Auditoría de coherencia integral",
+              "objective": "Verificar que la definición del MVP funcione como un sistema cerrado y armónico.",
+              "how_to": {
+                "steps": [
+                  "Revisar que cada KR posea la instrumentación técnica necesaria dentro de In-Scope.",
+                  "Confirmar que los componentes Out-of-Scope no dejen huecos que impidan probar el core loop.",
+                  "Validar la compatibilidad entre el factor de forma elegido y los plazos estipulados.",
+                  "Certificar que la propuesta cumple con la directriz de máximo aprendizaje con mínimo esfuerzo."
+                ],
+                "table_columns": "Dimensión de Auditoría | Hallazgo de Coherencia | Estado de Conformidad",
+                "table_rules": "Aprobación sujeta a consistencia del 100%.",
+                "restrictions": [
+                  "No permitir contradicciones entre alcance y métricas.",
+                  "Alinear los términos con los estándares de la metodología."
+                ],
+                "done_when": "Auditoría de coherencia superada sin observaciones."
+              },
+              "example_title": "Auditoría de Coherencia Mandato - Alcance - KRs",
+              "example": "| Dimensión | Condición Auditada | Estatus |\n| --- | --- | --- |\n| Mandato vs Alcance | Todo componente In-Scope responde al experimento del Mandato | Conforme ✅ |\n| Alcance vs KRs | Los KRs se miden exclusivamente con features In-Scope | Conforme ✅ |\n| Out-of-Scope vs KRs | Ninguna prohibición bloquea la medición de los KRs | Conforme ✅ |",
+              "link_label": "coherencia va a ensamblaje formal (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Ensamblar las 4 secciones del documento formal",
+          "objective": "Integrar metadatos, mandato, delimitación de alcance, criterios de éxito y criterios de salida.",
+          "input": "Contenidos validados de Steps 1 al 4.1.",
+          "raw_data_title": "Ensamblaje del Documento",
+          "raw_data": "Estructuración del archivo oficial con las 5 secciones estándar para su publicación en el repositorio.",
+          "exit_label": "DOCUMENTO ESTRUCTURADO Y COMPILADO → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Integración estructural del documento de MVP",
+              "objective": "Compilar el entregable final cumpliendo la plantilla oficial y los estándares tipográficos.",
+              "how_to": {
+                "steps": [
+                  "Formatear las tablas de Mandato, Factor de Forma y Stack Tecnológico.",
+                  "Consolidar las viñetas estructuradas de In-Scope y Out-of-Scope.",
+                  "Incorporar la matriz de Criterios de Éxito (KRs) y Criterios de Salida.",
+                  "Verificar la correcta inclusión de enlaces a los artefactos precedentes."
+                ],
+                "table_columns": "Sección Documental | Formato Aplicado | Estado de Integración",
+                "table_rules": "Uso estricto de la plantilla oficial de la metodología.",
+                "restrictions": [
+                  "No omitir justificaciones en el Out-of-Scope.",
+                  "Preservar la precisión de las tablas de KRs."
+                ],
+                "done_when": "Documento integrado en su formato definitivo de exportación."
+              },
+              "example_title": "Estructura de Ensamblaje del Entregable",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 1 — Viabilidad Temprana (Early Viability)  \n**Entregable:** 9 de 13  \n**Estado:** Aprobado  \n\n### 2. Mandato del MVP y Factor de Forma  \n### 3. Delimitación Estricta de Alcance  \n### 4. Criterios de Éxito del MVP (KRs de Lanzamiento)  \n### 5. Criterios de Salida (Exit Criteria)",
+              "link_label": "integración va a metadatos y firma (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Aplicar metadatos y registrar estado",
+          "objective": "Sellar el documento con los metadatos definitivos y certificar la aprobación oficial del MVP.",
+          "input": "Documento integrado y firmas de aprobación.",
+          "raw_data_title": "Cierre y Aprobación",
+          "raw_data": "Proyecto: Nos Fuimos de Finca. Fase 1, D9 de 13. Estado: Approved. Aprobadores: Julián (PM) / Laura (Tech Lead).",
+          "exit_label": "DEFINICIÓN DE MVP FORMALMENTE APROBADA",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Registro de metadatos y firma de aprobación",
+              "objective": "Certificar el estado de aprobación formal y autorizar la planificación detallada en D10.",
+              "how_to": {
+                "steps": [
+                  "Completar la cabecera estándar de metadatos del proyecto y fase.",
+                  "Asignar estado 'Approved' al constatar la coherencia total.",
+                  "Registrar nominalmente a los aprobadores técnicos y de producto.",
+                  "Publicar el entregable en la ruta oficial y actualizar el registro de avance."
+                ],
+                "table_columns": "Campo de Certificación | Valor Final Registrado",
+                "table_rules": "Registro formal de cierre de entregable.",
+                "restrictions": [
+                  "No cerrar como Approved si persisten inconsistencias de alcance.",
+                  "Asegurar trazabilidad con los planes subsiguientes."
+                ],
+                "done_when": "Metadatos aplicados y aprobación formal registrada."
+              },
+              "example_title": "Certificación Final de Aprobación",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 1 — Viabilidad Temprana (Early Viability)  \n**Entregable:** 9 de 13  \n**Estado:** Aprobado  \n\nEstado al cerrar este step: **Approved**. Mandato definido, alcance delimitado con prohibiciones estrictas, KRs cuantitativos con Exit Criteria vinculantes. Autorizado paso a planificación detallada.",
+              "link_label": "cierre formal del entregable D9"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

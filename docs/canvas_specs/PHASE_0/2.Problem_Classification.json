@@ -1,0 +1,568 @@
+{
+  "phase": "Phase 0",
+  "deliverable_code": "D2",
+  "deliverable": "Problem Classification",
+  "purpose": "This deliverable confirms that the problem is recurring (not an isolated event) and frames it within one of the 4 standard software engineering archetypes. It defines WHAT type of engineering applies — without yet committing to ANY architectural decision. If we cannot classify the problem, we will build the wrong solution (e.g., using Artificial Intelligence for a problem that is actually fixed with a centralized database with concurrency control).",
+  "inputs": "| Artifact | Use | Consumed in |\n| --- | --- | --- |\n| [[example_output_problem_statement]] (D1) | Problem Anatomy Table (Actor, Condition, Consequence, Downstream Effect) and its `E-XX` evidence records anchored in D1 Sub-step 2.2.3. | Step 1 (1.1, 1.2) |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Recurrence Confirmation and Dominant Archetype Scan",
+      "summary": "Confirm that booking collisions at *Nos Fuimos de Finca* have occurred more than once, and frame the problem within one of the 4 standard archetypes through structured elimination.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Recurrence Confirmation",
+          "objective": "Prevent classifying and building software for an isolated incident.",
+          "input": "- Problem Anatomy Table and records `E-01` through `E-04` from [[example_output_problem_statement]] (D1).",
+          "raw_data_title": "Raw Extracted Data",
+          "raw_data": "- **Condition:** Concurrent intake and confirmation of booking requests for a single rural property across multiple manual and dispersed communication channels.\n- **Consequence:** Cross-approval and duplicate collection of deposit payments for a single property on identical date ranges (overselling / double booking).\n- **Evidence records:** `E-01` (notebook log, El Recodo estate, April 1–3), `E-02` (duplicate receipts), `E-03` (refund voucher + complaint), `E-04` (second collision, La Esperanza estate, April 18–20).",
+          "exit_label": "RECURRENT (2 instances) → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Independent instance count",
+              "objective": "Count how many E-XX records from D1 document a distinct occurrence of the same trigger.",
+              "how_to": {
+                "steps": [
+                  "Extract all evidence records E-XX anchored in D1 Sub-step 2.2.3.",
+                  "Compare the date, location/estate, and facts of each record to distinguish separate events from multiple proofs of the same event.",
+                  "Group records documenting the same event into a single instance.",
+                  "Mark each genuinely distinct occurrence as an independent instance."
+                ],
+                "table_columns": "Record | Event Date | Independent Instance?",
+                "table_rules": "One row per evidence record or record cluster. In the third column, state whether it constitutes a distinct instance or duplicates an existing one.",
+                "restrictions": [
+                  "Different proofs of the same date/estate count as one instance (e.g., E-01, E-02, E-03 represent one collision).",
+                  "Only distinct dates and operational contexts qualify as new instances (E-04).",
+                  "No new facts outside D1 records."
+                ],
+                "done_when": "Every E-XX record evaluated and total independent instances counted."
+              },
+              "example_title": "Instance Table",
+              "example": "| Record | Event Date | Independent Instance? |\n| :---: | :--- | :---: |\n| `E-01`/`E-02`/`E-03` | April 1–3, \"El Recodo\" estate | Counts as **a single** instance (evidence of the same event). |\n| `E-04` | April 18–20, \"La Esperanza\" estate | **Yes** — distinct property, distinct date, same causal pattern. |",
+              "link_label": "instance count goes to verdict (1.1.2)"
+            },
+            {
+              "code": "1.1.2",
+              "title": "Recurrence verdict",
+              "objective": "Apply the recurrence stopping rule (minimum 2 independent instances).",
+              "how_to": {
+                "steps": [
+                  "Sum the count of verified independent instances from 1.1.1.",
+                  "Test count >= 2 threshold: if count < 2, issue NOT RECURRING and stop methodology.",
+                  "If count >= 2, issue RECURRENT and authorize Sub-step 1.2."
+                ],
+                "table_columns": "Metric | Value | Threshold | Verdict",
+                "table_rules": "One row for the recurrence evaluation.",
+                "restrictions": [
+                  "Minimum threshold is 2 independent instances.",
+                  "Single incidents must be logged to Problem Pattern Log and halted."
+                ],
+                "done_when": "Binary verdict RECURRENT issued."
+              },
+              "example_title": "Recurrence Verdict",
+              "example": "| Metric | Value | Threshold | Verdict |\n| :--- | :---: | :---: | :---: |\n| Independent instances | 2 (El Recodo + La Esperanza) | $\\ge 2$ | `RECURRENT` |\n\n*Recurrence Finding:* Threshold satisfied. Problem is an operational recurrence, authorizing structured archetype scanning.",
+              "link_label": "RECURRENT → scan archetypes (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Structured Scan of the 4 Archetypes",
+          "objective": "Evaluate the problem against each archetype using a single disqualifying question, preventing the analyst from choosing 'the one that sounds best'.",
+          "input": "- Purified Condition and Consequence from D1.\n- Recurrence confirmation from 1.1.",
+          "raw_data_title": "Disqualifying Questions Catalog",
+          "raw_data": "1. **Algorithmic Complexity:** Does data volume or combination count exceed mental calculation capability of an expert human?\n2. **Integration Disconnect:** Do two or more already operational computing systems exist that fail to exchange data with one another?\n3. **Information Asymmetry:** Does someone make a decision without seeing information that another person holds at that exact same moment?\n4. **Workflow Inefficiency:** Is information visible in principle, but moving it from step to step requires slow manual steps?",
+          "exit_label": "DOMINANT CONFIRMED → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Disqualifying question applied per archetype",
+              "objective": "Subject the problem to the four disqualifying questions in order.",
+              "how_to": {
+                "steps": [
+                  "Evaluate Algorithmic Complexity: check if estate and date combinations exceed human mental calculation.",
+                  "Evaluate Integration Disconnect: check if two or more operating software systems fail to exchange data.",
+                  "Evaluate Information Asymmetry: check if a coordinator confirms a booking without seeing parallel actions by another coordinator.",
+                  "Evaluate Workflow Inefficiency: check if information is visible but manual steps cause delays.",
+                  "Assign DISCARDED, STRONG CANDIDATE, or WEAK CANDIDATE to each."
+                ],
+                "table_columns": "Archetype | Disqualifying Question | Answer against D1 | Verdict",
+                "table_rules": "One row per archetype in fixed order (Algorithmic Complexity, Integration Disconnect, Information Asymmetry, Workflow Inefficiency).",
+                "restrictions": [
+                  "Evaluate root cause, not surface delay.",
+                  "Zero pre-existing software means Integration Disconnect is automatically DISCARDED.",
+                  "Answer must cite D1 facts verbatim."
+                ],
+                "done_when": "All 4 archetypes have explicit answers and verdicts."
+              },
+              "example_title": "Structured Elimination Table",
+              "example": "| Archetype | Disqualifying Question | Answer against D1 | Verdict |\n| :--- | :--- | :--- | :---: |\n| **Algorithmic Complexity** | Does data volume or combination count exceed the mental calculation capability of an expert human? | No: there are few estates and few dates per season; a human can calculate availability if they hold complete information in time. | `DISCARDED` |\n| **Integration Disconnect** | Do two or more already operational computing systems exist that fail to exchange data with one another? | No: there are no pre-existing systems; records are manual (notebooks, phone calls). There is nothing to integrate. | `DISCARDED` |\n| **Information Asymmetry** | Does someone make a decision without seeing information that another person holds at that exact same moment? | **Yes**: a coordinator confirms a booking without seeing that another coordinator is already confirming the same estate and dates at that identical instant. | `STRONG CANDIDATE` |\n| **Workflow Inefficiency** | Is information visible in principle, but moving it from step to step requires slow manual steps? | Partially: the process is slow and manual, but slowness is not the cause of collisions — the cause is that neither coordinator sees the other's action in real time. | `WEAK CANDIDATE (derivative)` |",
+              "link_label": "elimination table goes to selection (1.2.2)"
+            },
+            {
+              "code": "1.2.2",
+              "title": "Dominant archetype selection",
+              "objective": "Declare the root dominant archetype that drives the failure.",
+              "how_to": {
+                "steps": [
+                  "Compare the candidates from 1.2.1.",
+                  "Identify the archetype that receives YES at root causal level (Information Asymmetry).",
+                  "Identify whether any other YES is an accompanying symptom (Workflow Inefficiency).",
+                  "Formulate justification explaining why solving slowness alone does not eliminate collisions."
+                ],
+                "table_columns": "Selection Field | Declared Value | Justification",
+                "table_rules": "One row for the dominant archetype declaration and justification.",
+                "restrictions": [
+                  "Exactly one primary dominant archetype must be declared.",
+                  "Do not name technology or frameworks."
+                ],
+                "done_when": "Dominant archetype declared with causal justification."
+              },
+              "example_title": "Dominant Archetype Declaration",
+              "example": "| Selection Field | Declared Value | Justification |\n| :--- | :--- | :--- |\n| **Dominant Archetype** | **Information Asymmetry** | Direct root cause: collisions occur precisely because one coordinator's confirmation is invisible to the other at the moment of decision. Workflow Inefficiency is an accompanying symptom, not the cause: even if manual notes were recorded faster, collisions would persist as long as mutual blindness between coordinators remains. |",
+              "link_label": "dominant archetype goes to audit (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Counter-Evidence Audit and Secondary Classification",
+          "objective": "Honestly acknowledge when the problem has a secondary front, without losing the primary architectural focus.",
+          "input": "- Dominant Archetype: Information Asymmetry (from 1.2).\n- Record `E-01` regarding late note reconciliation.",
+          "raw_data_title": "Secondary Symptom Evidence",
+          "raw_data": "Record `E-01` shows that confirmations took hours to be detected (\"we reconcile notes at the end of the day\"), indicating a genuine component of *Workflow Inefficiency*: reconciliation is slow in addition to being blind.",
+          "exit_label": "SECONDARY AUDITED → 1.4",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Counter-evidence search",
+              "objective": "Identify documented pain points that exhibit traits of a second archetype.",
+              "how_to": {
+                "steps": [
+                  "Review field evidence (E-01..E-04) for operational friction outside pure mutual blindness.",
+                  "Detect late end-of-day reconciliation in E-01.",
+                  "Classify the candidate secondary archetype suggested by this evidence."
+                ],
+                "table_columns": "Evidence Record | Observed Operational Friction | Suggested Secondary Archetype",
+                "table_rules": "One row per friction point identified.",
+                "restrictions": [
+                  "Counter-evidence must cite real E-XX records.",
+                  "Do not invent unrecorded complaints."
+                ],
+                "done_when": "Secondary archetype candidate identified from evidence."
+              },
+              "example_title": "Counter-Evidence Identification",
+              "example": "| Evidence Record | Observed Operational Friction | Suggested Secondary Archetype |\n| :---: | :--- | :--- |\n| `E-01` | End-of-day reconciliation: coordinators discover double bookings hours after phone calls because notebook entries are manual and unshared. | **Workflow Inefficiency** |",
+              "link_label": "evidence goes to dependency test (1.3.2)"
+            },
+            {
+              "code": "1.3.2",
+              "title": "Dependency test",
+              "objective": "Determine whether the secondary archetype is dependent on the primary or an independent problem requiring segregation.",
+              "how_to": {
+                "steps": [
+                  "Formulate the dependency test question: 'If we resolve Information Asymmetry, does the secondary symptom disappear on its own?'.",
+                  "Analyze whether real-time shared availability eliminates end-of-day notebook reconciliation.",
+                  "If YES, assign DEPENDENT SECONDARY TYPE (declared, preserved under primary focus).",
+                  "If NO, segregate to separate D1 per Single Scope rule."
+                ],
+                "table_columns": "Candidate Secondary Archetype | Evidence | Dependent on Primary? | Destination",
+                "table_rules": "One row for the secondary classification test.",
+                "restrictions": [
+                  "If dependent, it does not alter primary focus.",
+                  "If independent, it must be segregated to a separate project."
+                ],
+                "done_when": "Destination formally assigned (Declared dependent vs Segregated)."
+              },
+              "example_title": "Secondary Classification Table",
+              "example": "| Candidate Secondary Archetype | Evidence | Dependent on Primary? | Destination |\n| :--- | :--- | :---: | :--- |\n| **Workflow Inefficiency** | `E-01` (late note reconciliation) | `YES` | Declared as dependent secondary; resolves automatically when Information Asymmetry is eliminated. Does not alter core architectural focus. |",
+              "link_label": "classification goes to gate (1.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.4",
+          "title": "Consolidation and Handoff toward Step 2",
+          "objective": "Confirm all quality gate criteria for Step 1 before handoff.",
+          "input": "- Recurrence verification from 1.1.\n- Archetype scan from 1.2.\n- Secondary classification from 1.3.",
+          "raw_data_title": "Gate Check Evidence",
+          "raw_data": "Recurrence: 2 instances (PASS). Dominant: Information Asymmetry (PASS). 3 Discarded: Algorithmic, Integration, Workflow (PASS). Secondary: Workflow Inefficiency dependent (PASS).",
+          "exit_label": "APPROVED → Step 2",
+          "micro": [
+            {
+              "code": "1.4.1",
+              "title": "Gate checklist",
+              "objective": "Perform binary verification of the 4 Step 1 compliance criteria.",
+              "how_to": {
+                "steps": [
+                  "Check Criterion 1: Recurrence confirmed with >=2 independent E-XX instances.",
+                  "Check Criterion 2: Dominant archetype selected with disqualifying question answered.",
+                  "Check Criterion 3: Remaining 3 archetypes discarded using their respective questions.",
+                  "Check Criterion 4: Secondary classification resolved (declared or discarded)."
+                ],
+                "table_columns": "Criterion | Verification | Result",
+                "table_rules": "One row per gate criterion. All must be YES.",
+                "restrictions": [
+                  "Any NO blocks handoff to Step 2."
+                ],
+                "done_when": "4 × YES confirmed."
+              },
+              "example_title": "Step 1 Gate Checklist",
+              "example": "| # | Criterion | Verification | Result |\n| :---: | :--- | :--- | :---: |\n| 1 | Recurrence confirmed ($\\ge 2$ independent `E-XX` instances) | `E-01/02/03` (El Recodo) + `E-04` (La Esperanza) | `YES` |\n| 2 | Dominant archetype selected with disqualifying question answered | Information Asymmetry answered YES against D1 | `YES` |\n| 3 | Remaining 3 discarded using their respective questions | Algorithmic, Integration, Workflow evaluated | `YES` |\n| 4 | Secondary classification resolved (declared or discarded) | Workflow Inefficiency declared as dependent secondary | `YES` |",
+              "link_label": "checklist goes to verdict (1.4.2)"
+            },
+            {
+              "code": "1.4.2",
+              "title": "Verdict",
+              "objective": "Issue formal approval verdict for Step 1 handoff.",
+              "how_to": {
+                "steps": [
+                  "Verify that 1.4.1 checklist has 4 × YES.",
+                  "Record dominant archetype and secondary archetype.",
+                  "Issue APPROVED verdict and handoff to Step 2."
+                ],
+                "table_columns": "Gate Dimension | Outcome | Status",
+                "table_rules": "One row for the handoff decision.",
+                "restrictions": [
+                  "Handoff authorizes Step 2."
+                ],
+                "done_when": "APPROVED verdict issued."
+              },
+              "example_title": "Step 1 Handoff Verdict",
+              "example": "| Gate Dimension | Outcome | Status |\n| :--- | :--- | :---: |\n| Dominant Archetype | **Information Asymmetry** | Confirmed |\n| Secondary Archetype | **Workflow Inefficiency** (dependent) | Declared |\n| **Step 1 Gate Verdict** | **Handoff to Step 2 Authorized** | **`APPROVED`** |",
+              "link_label": "APPROVED → Step 2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Preliminary Architectural Signal (Non-Binding Structural Remedy)",
+      "summary": "Assign the generic theoretical pattern that remedies Information Asymmetry, without committing to any concrete architectural decisions.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Archetype → Theoretical Pattern Mapping",
+          "objective": "Assign the corresponding generic remedy without naming commercial technology.",
+          "input": "- Dominant Archetype: Information Asymmetry (from Step 1).",
+          "raw_data_title": "Theoretical Pattern Catalog",
+          "raw_data": "Fixed mapping from master: Information Asymmetry $\\rightarrow$ Single Source of Truth with concurrency control.",
+          "exit_label": "PATTERN ASSIGNED → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Fixed mapping table consultation",
+              "objective": "Look up the standard theoretical design pattern for the confirmed archetype.",
+              "how_to": {
+                "steps": [
+                  "Access the master archetype-to-pattern correspondence table.",
+                  "Locate Information Asymmetry row.",
+                  "Extract the generic theoretical remedy: 'Single Source of Truth with concurrency control'."
+                ],
+                "table_columns": "Archetype | Generic Theoretical Pattern | Mapping Status",
+                "table_rules": "One row for the selected archetype.",
+                "restrictions": [
+                  "Pattern must be theoretical and generic.",
+                  "Zero brand names or commercial tools."
+                ],
+                "done_when": "Theoretical pattern assigned."
+              },
+              "example_title": "Assigned Theoretical Pattern",
+              "example": "| Archetype | Generic Theoretical Pattern | Mapping Status |\n| :--- | :--- | :---: |\n| **Information Asymmetry** | **Single Source of Truth with concurrency control** | `ASSIGNED` |",
+              "link_label": "pattern goes to technical focus (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Technical Focus Drafting",
+          "objective": "Translate the theoretical pattern into a concrete priority instruction for engineering.",
+          "input": "- Generic Pattern: Single Source of Truth with concurrency control.",
+          "raw_data_title": "Pattern Core Principle",
+          "raw_data": "Prevent two concurrent reservations on the same estate and dates from coexisting without one blocking the other.",
+          "exit_label": "FOCUS DRAFTED → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Translation to engineering priority",
+              "objective": "Draft 1 concrete instruction for the engineering team derived directly from the pattern.",
+              "how_to": {
+                "steps": [
+                  "Identify the core transactional requirement (concurrency control on unique inventory).",
+                  "Draft the engineering guideline focusing on mutual exclusion rather than speed.",
+                  "Verify the text instructs WHAT engineering property must exist without naming frameworks."
+                ],
+                "table_columns": "Instruction Type | Drafted Technical Focus | Engineering Priority",
+                "table_rules": "One row with the drafted technical guideline.",
+                "restrictions": [
+                  "Must not say 'make it faster'.",
+                  "Must emphasize concurrent decision ordering.",
+                  "Brand names prohibited."
+                ],
+                "done_when": "Concrete brand-free engineering instruction drafted."
+              },
+              "example_title": "Technical Focus Guideline",
+              "example": "| Instruction Type | Drafted Technical Focus | Engineering Priority |\n| :--- | :--- | :--- |\n| **Architecture Orientation** | \"The team must prioritize a single source of truth and instant inquiry mechanism regarding the availability of each rural property, with concurrency control preventing two confirmations from coexisting on the same resource and date.\" | Transactional integrity & mutual exclusion over UI speed. |",
+              "link_label": "draft goes to neutrality audit (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Tool Neutrality Audit",
+          "objective": "Verify that neither the pattern nor technical focus names a commercial product, framework, or vendor, and attach non-binding seal.",
+          "input": "- Theoretical Pattern from 2.1.\n- Technical Focus from 2.2.",
+          "raw_data_title": "Prohibited Brand Catalog",
+          "raw_data": "Scan list: React, PostgreSQL, Firebase, AWS, MySQL, Node, WhatsApp Business API, Google Cloud, Docker, etc.",
+          "exit_label": "AUDIT PASSED → 2.4",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Technology proper name sweep",
+              "objective": "Scan text word-for-word against commercial technology catalogs.",
+              "how_to": {
+                "steps": [
+                  "Compare pattern and technical focus words against product/vendor list.",
+                  "Verify 0 matches detected.",
+                  "Confirm terminology uses strictly computer science and architectural concepts."
+                ],
+                "table_columns": "Monitored Category | Matches Detected | Replacement Action | Verdict",
+                "table_rules": "One row per audit category.",
+                "restrictions": [
+                  "Zero commercial brands allowed.",
+                  "Any match must be purged immediately."
+                ],
+                "done_when": "Verdict CLEAN confirmed."
+              },
+              "example_title": "Brand Neutrality Scan",
+              "example": "| Monitored Category | Matches Detected | Replacement Action | Verdict |\n| :--- | :---: | :--- | :---: |\n| Commercial DBMS (PostgreSQL, Firebase, MySQL) | 0 | None needed | `CLEAN` |\n| Cloud Vendors (AWS, GCP, Azure) | 0 | None needed | `CLEAN` |\n| Frameworks & Libraries (React, Django, Node) | 0 | None needed | `CLEAN` |\n| Commercial Communication APIs (WhatsApp API) | 0 | None needed | `CLEAN` |",
+              "link_label": "clean text goes to seal (2.3.2)"
+            },
+            {
+              "code": "2.3.2",
+              "title": "Non-binding seal",
+              "objective": "Attach mandatory non-binding architectural disclaimer.",
+              "how_to": {
+                "steps": [
+                  "Retrieve the mandatory Phase 0 architectural warning.",
+                  "Affix disclaimer to the structural remedy section.",
+                  "Certify that formal commitment is deferred to Phase 5 ADRs."
+                ],
+                "table_columns": "Seal Type | Mandatory Warning Text | Binding Status",
+                "table_rules": "One row for the disclaimer seal.",
+                "restrictions": [
+                  "Disclaimer must explicitly name Phase 5 confirmation.",
+                  "Cannot be omitted."
+                ],
+                "done_when": "Disclaimer affixed."
+              },
+              "example_title": "Non-Binding Disclaimer Seal",
+              "example": "| Seal Type | Mandatory Warning Text | Binding Status |\n| :--- | :--- | :---: |\n| **Architectural Disclaimer** | *\"Preliminary signal, does not constitute an architectural decision. Subject to confirmation in Phase 5.\"* | `NON-BINDING` |",
+              "link_label": "seal goes to handoff (2.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.4",
+          "title": "Verdict and Handoff toward Step 3",
+          "objective": "Issue formal Step 2 approval verdict.",
+          "input": "- Verified Pattern, Technical Focus, and Disclaimer Seal.",
+          "raw_data_title": "Step 2 Synthesis",
+          "raw_data": "Pattern: Single Source of Truth with concurrency control. Clean: 0 brands. Seal: Non-binding confirmed.",
+          "exit_label": "APPROVED → Step 3",
+          "micro": [
+            {
+              "code": "2.4.1",
+              "title": "Step 2 handoff verdict",
+              "objective": "Validate that remedy is structural, clean, and sealed before entering final assembly.",
+              "how_to": {
+                "steps": [
+                  "Verify theoretical pattern is documented.",
+                  "Verify neutrality audit is CLEAN.",
+                  "Verify non-binding seal is present.",
+                  "Authorize Step 3 assembly."
+                ],
+                "table_columns": "Remedy Field | Value | Gate Status",
+                "table_rules": "One row for Step 2 completion.",
+                "restrictions": [
+                  "Step 3 requires confirmed non-binding remedy."
+                ],
+                "done_when": "APPROVED verdict issued."
+              },
+              "example_title": "Step 2 Gate Verdict",
+              "example": "| Remedy Field | Value | Gate Status |\n| :--- | :--- | :---: |\n| Generic Pattern | Single Source of Truth with concurrency control | Verified |\n| Technical Focus | Mutual exclusion on estate-date availability lookup | Verified |\n| Brand Neutrality | 0 proprietary names | `CLEAN` |\n| Binding Seal | Phase 5 confirmation disclaimer | `AFFIXED` |\n| **Step 2 Gate Verdict** | **Handoff to Step 3 Authorized** | **`APPROVED`** |",
+              "link_label": "APPROVED → Step 3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Final Document Assembly (Output Structure)",
+      "summary": "Consolidate the formal deliverable 02. Problem Classification.md for Nos Fuimos de Finca.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Metadata and Formal Structure",
+          "objective": "Establish control metadata and path convention.",
+          "input": "- Project: Nos Fuimos de Finca\n- Phase 0 Deliverable 2 of 9\n- Status: Approved",
+          "raw_data_title": "Metadata Parameters",
+          "raw_data": "Phase folder: `docs/00-problem-recognition/`\nDeliverable prefix: `02.`\nFilename: `Problem Classification.md`",
+          "exit_label": "METADATA ASSEMBLED → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Metadata assembly and path validation",
+              "objective": "Assemble mandatory control fields and validate discoverability path.",
+              "how_to": {
+                "steps": [
+                  "Assign Project, Phase, Deliverable, and Status values.",
+                  "Verify filename against convention: '02. Problem Classification.md'.",
+                  "Generate front matter metadata block."
+                ],
+                "table_columns": "Field | Assigned Value | Verification Status",
+                "table_rules": "One row per metadata field.",
+                "restrictions": [
+                  "Status is Approved only upon passing all gates."
+                ],
+                "done_when": "Metadata table complete."
+              },
+              "example_title": "Deliverable Metadata Block",
+              "example": "| Field | Assigned Value | Verification Status |\n| :--- | :--- | :---: |\n| **Project** | Nos Fuimos de Finca | `PASS` |\n| **Phase** | 0 — Problem Recognition | `PASS` |\n| **Deliverable** | 2 of 9 | `PASS` |\n| **Status** | Approved | `PASS` |\n| **File Path** | `docs/00-problem-recognition/02. Problem Classification.md` | `PASS` |",
+              "link_label": "metadata goes to classification mapping (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Classification Mapping",
+          "objective": "Transfer Dominant Archetype, why it applies, why others do not, and secondary classification without alteration.",
+          "input": "- Step 1 confirmed classification and justifications.",
+          "raw_data_title": "Step 1 Results",
+          "raw_data": "Dominant: Information Asymmetry. Discarded: Algorithmic, Integration, Workflow. Secondary: Workflow Inefficiency dependent.",
+          "exit_label": "CLASSIFICATION MAPPED → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Classification verbatim mapping",
+              "objective": "Transfer audited classification text verbatim into the deliverable section.",
+              "how_to": {
+                "steps": [
+                  "Copy Dominant Archetype and causal justification from Sub-step 1.2.",
+                  "Copy elimination rationale for remaining 3 archetypes.",
+                  "Copy secondary classification and dependency justification from Sub-step 1.3.",
+                  "Confirm word-for-word fidelity with Step 1."
+                ],
+                "table_columns": "Section Component | Mapped Text | Fidelity Verdict",
+                "table_rules": "One row per classification element.",
+                "restrictions": [
+                  "Rewriting or embellishing previously audited text is strictly prohibited."
+                ],
+                "done_when": "Verbatim transfer verified."
+              },
+              "example_title": "Architectural Classification Section",
+              "example": "| Section Component | Mapped Text | Fidelity Verdict |\n| :--- | :--- | :---: |\n| **Dominant Archetype** | **Information Asymmetry** | `FAITHFUL` |\n| **Why it applies** | One coordinator confirms a reservation without being able to see that another coordinator is simultaneously confirming the same property and dates. Collision arises from mutual blindness. | `FAITHFUL` |\n| **Why others do not apply** | Volume does not exceed human mental capacity (Algorithmic); no pre-existing computer systems exist (Integration); manual slowness is an accompanying symptom, not root cause (Workflow). | `FAITHFUL` |\n| **Secondary Classification** | **Workflow Inefficiency (Dependent Secondary Type)**: resolves automatically when Information Asymmetry is eliminated. | `FAITHFUL` |",
+              "link_label": "classification goes to remedy mapping (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Structural Remedy Mapping",
+          "objective": "Transfer generic theoretical pattern, technical focus, and disclaimer seal.",
+          "input": "- Step 2 validated remedy and disclaimer.",
+          "raw_data_title": "Step 2 Results",
+          "raw_data": "Pattern: Single Source of Truth with concurrency control. Focus: Concurrency control on booking inquiries. Warning: Non-binding.",
+          "exit_label": "REMEDY MAPPED → 3.4",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Structural remedy and disclaimer mapping",
+              "objective": "Transfer audited remedy components and disclaimer into the deliverable section.",
+              "how_to": {
+                "steps": [
+                  "Copy Generic Theoretical Pattern from Sub-step 2.1.",
+                  "Copy Technical Focus from Sub-step 2.2.",
+                  "Copy Non-binding warning from Sub-step 2.3.",
+                  "Verify all three elements are complete and unchanged."
+                ],
+                "table_columns": "Remedy Component | Content | Status",
+                "table_rules": "One row per remedy component.",
+                "restrictions": [
+                  "Must include mandatory Phase 5 warning."
+                ],
+                "done_when": "Remedy section assembled."
+              },
+              "example_title": "Structural Remedy Section",
+              "example": "| Remedy Component | Content | Status |\n| :--- | :--- | :---: |\n| **Generic Theoretical Pattern** | Single Source of Truth with concurrency control | `TRANSFERRED` |\n| **Technical Focus** | Prioritize a single-truth mechanism with instant availability lookup per property, with concurrency control preventing two confirmations on the same resource and date. | `TRANSFERRED` |\n| **Non-Binding Warning** | *Preliminary signal, does not constitute an architectural decision. Subject to confirmation in Phase 5.* | `AFFIXED` |",
+              "link_label": "remedy goes to quality gate (3.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.4",
+          "title": "Final Quality Gate Validation",
+          "objective": "Execute the 5 AI Question Rules quality criteria and certify document for publication.",
+          "input": "- Complete assembled deliverable components.",
+          "raw_data_title": "Deliverable Quality Criteria",
+          "raw_data": "1. Recurrence confirmed. 2. Exactly one dominant. 3. 3 Discarded. 4. Secondary resolved. 5. Remedy generic & non-binding.",
+          "exit_label": "PUBLISHABLE → Final Deliverable",
+          "micro": [
+            {
+              "code": "3.4.1",
+              "title": "Quality gate checklist",
+              "objective": "Perform strict binary check of the 5 AI Question Rules criteria.",
+              "how_to": {
+                "steps": [
+                  "Check Condition 1: Recurrence confirmed with >=2 independent E-XX records.",
+                  "Check Condition 2: EXACTLY ONE dominant archetype selected.",
+                  "Check Condition 3: Explicit justification for why the other 3 were discarded.",
+                  "Check Condition 4: Secondary archetype declared as dependent or segregated.",
+                  "Check Condition 5: Remedy is structural, brand-free, and carries non-binding seal."
+                ],
+                "table_columns": "# | Gate Criterion | Verification | Result",
+                "table_rules": "One row per quality gate criterion.",
+                "restrictions": [
+                  "Any failure blocks publication."
+                ],
+                "done_when": "5 × YES confirmed."
+              },
+              "example_title": "Final Gate Checklist",
+              "example": "| # | Gate Criterion | Verification | Result |\n| :---: | :--- | :--- | :---: |\n| 1 | Recurrence confirmed with $\\ge 2$ independent `E-XX` instances | `E-01/02/03` + `E-04` verified | `YES` |\n| 2 | Exactly one dominant archetype selected with question answered | Information Asymmetry, Sub-step 1.2 | `YES` |\n| 3 | Remaining 3 archetypes discarded with their respective questions | Algorithmic, Integration, Workflow discarded | `YES` |\n| 4 | Secondary classification resolved | Workflow Inefficiency declared as dependent | `YES` |\n| 5 | Remedy is structural, brand-free, and carries non-binding seal | Single Source of Truth + Phase 5 disclaimer | `YES` |",
+              "link_label": "checklist goes to publication verdict (3.4.2)"
+            },
+            {
+              "code": "3.4.2",
+              "title": "Publication verdict",
+              "objective": "Issue formal publication authorization verdict.",
+              "how_to": {
+                "steps": [
+                  "Verify all 5 gate criteria are YES.",
+                  "Authorize release of '02. Problem Classification.md'.",
+                  "Declare deliverable ready to guide Phase 0 D3 (Impact Estimate) and Phase 1 (Early Viability)."
+                ],
+                "table_columns": "Publication Field | Result | Authorization",
+                "table_rules": "One row for publication verdict.",
+                "restrictions": [
+                  "Enables downstream deliverables D3 through D9."
+                ],
+                "done_when": "PUBLISHABLE verdict issued."
+              },
+              "example_title": "Publication Verdict",
+              "example": "| Publication Field | Result | Authorization |\n| :--- | :---: | :---: |\n| Quality Gate Criteria Passed | 5 of 5 | `APPROVED` |\n| **Publication Verdict** | **`PUBLISHABLE`** | **Authorized** |\n\n*Handoff:* Ready to guide Phase 0 Deliverable 3 (Impact Estimate) and Phase 1 Technical Feasibility.",
+              "link_label": "publishes official deliverable"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 02. Problem Classification.md",
+    "markdown": "# 2. Problem Classification\n\n### 1. Document Metadata\n\n**Project:** Nos Fuimos de Finca  \n**Phase:** 0 — Problem Recognition  \n**Deliverable:** 2 of 9  \n**Status:** Approved  \n\n### 2. Recurrence Confirmation\n\n- **Independent documented instances:** 2 — `E-01/E-02/E-03` (collision at property \"El Recodo\", Apr 1–3) and `E-04` (collision at property \"La Esperanza\", Apr 18–20).\n- **Verdict:** RECURRING.\n\n### 3. Architectural Classification\n\n- **Dominant Archetype:** **Information Asymmetry**.\n- **Why it applies:** One coordinator confirms a reservation without being able to see that another coordinator is simultaneously confirming the same property and the same dates. The collision arises from that mutual blindness, not from process slowness.\n- **Why the others do NOT apply:** It does not exceed one person's mental calculation capacity (Algorithmic Complexity); there are no pre-existing computer systems to integrate (Integration Disconnect); the slowness of the manual workflow is an accompanying symptom, not the root cause of the collision (Workflow Inefficiency).\n- **Secondary Classification:** Workflow Inefficiency, declared as **Dependent Secondary Type**: it disappears on its own by resolving the Information Asymmetry, because manual cross-checking at the end of day is no longer needed if visibility is instantaneous and shared.\n\n### 4. Suggested Structural Remedy (Non-Binding)\n\n- **Generic Theoretical Pattern:** Single Source of Truth with concurrency control.\n- **Technical Focus (For Engineering):** Prioritize a single-truth mechanism with instant availability lookup per property, with concurrency control that prevents two confirmations from coexisting on the same resource and date.\n- **Warning:** Preliminary signal, does not constitute an architectural decision. Subject to confirmation in Phase 5."
+  }
+}

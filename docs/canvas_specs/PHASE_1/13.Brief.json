@@ -1,0 +1,336 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D13",
+  "deliverable": "Phase 1 Brief (Resumen Ejecutivo de Viabilidad Temprana — Brief de Fase 1)",
+  "purpose": "Este es el documento final de cierre de la Fase 1. Es un resumen ejecutivo puramente extractivo (sin texto creativo ni reinterpretación) que compila las decisiones clave de mercado, competencia, factibilidad técnica, viabilidad económica, riesgos, mandato del MVP y gobernanza (D1 a D12), sirviendo como punto de partida y compendio oficial para el equipo de ingeniería de la Fase 2 (Project Kickoff). Incluye además un Anexo Opcional de Resumen Visual (Lean Canvas).",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_user_profile]] | Perfil de usuario y contexto operativo (P1-D1). |\n| [[example_output_market_validation]] | Conclusión de mercado, dimensionamiento y WTP (P1-D2). |\n| [[example_output_competitive_analysis]] | Posicionamiento y Foso Defensivo (Moat) (P1-D3). |\n| [[example_output_technical_feasibility]] | Factibilidad técnica y arquitectura mitigada (P1-D4). |\n| [[example_output_legal_clearance]] | Cumplimiento regulatorio y design constraints (P1-D5). |\n| [[example_output_team_capability]] | Capacidad y brechas técnicas del equipo (P1-D6). |\n| [[example_output_viability]] | Economía unitaria, margen y Break-Even (P1-D7). |\n| [[example_output_risk_register_update]] | Riesgos principales emergentes y mitigaciones (P1-D8). |\n| [[example_output_mvp_definition]] | Mandato, alcance y criterios de éxito del MVP (P1-D9). |\n| [[example_output_initial_plan]] | Cronograma e hitos de ejecución (P1-D10). |\n| [[example_output_work_process]] | Metodología de trabajo y métricas DORA (P1-D11). |\n| [[example_output_go_nogo_decision]] | Decisión oficial y condicionantes de Gate 1 (P1-D12). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría de Aprobación de Entregables (Verify Entry)",
+      "summary": "Confirmar que los 12 entregables previos estén formalmente aprobados y con trazabilidad intacta.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Auditoría de estado Approved en P1-D1 a P1-D12",
+          "objective": "Inspeccionar los metadatos de los 12 entregables previos para asegurar que todos posean estado Approved.",
+          "input": "Entregables completados de P1-D1 a P1-D12.",
+          "raw_data_title": "Auditoría de Estados",
+          "raw_data": "12 entregables de Fase 1 revisados. 100% de los documentos en estado Approved. Sin secciones pendientes.",
+          "exit_label": "ENTREGABLES PREVIOS APROBADOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Verificación de estado de aprobación de entregables previos",
+              "objective": "Asegurar que ningún entregable se encuentre en borrador o con cambios pendientes de firma.",
+              "how_to": {
+                "steps": [
+                  "Revisar secuencialmente la cabecera de metadatos de D1 a D12.",
+                  "Comprobar que el campo 'Estado' registre unánimemente 'Approved' o 'Aprobado'.",
+                  "Verificar que existan los archivos físicos correspondientes en el repositorio.",
+                  "Registrar la lista de conformidad de entrada en el registro de auditoría."
+                ],
+                "table_columns": "Entregable de Fase 1 | Estatus Documental | Veredicto de Compuerta | Conformidad",
+                "table_rules": "Todos los documentos deben estar en estado Approved sin excepción.",
+                "restrictions": [
+                  "No compilar el Brief si falta algún entregable previo.",
+                  "Exigir trazabilidad completa con los archivos de salida generados."
+                ],
+                "done_when": "12 entregables verificados en estado Approved."
+              },
+              "example_title": "Lista de Verificación de Entradas Aprobadas",
+              "example": "### Estado de Documentos de Origen\n- **P1-D1 a P1-D11:** 100% Estado `Approved`.\n- **P1-D12 (Decisión Go/No-Go):** Estado `Approved` (Veredicto: GO / CONDITIONAL GO).",
+              "link_label": "aprobaciones van a verificación de salida Gate 1 (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Verificación de autorización de salida (Gate 1)",
+          "objective": "Confirmar que la decisión tomada en P1-D12 sea GO o CONDITIONAL GO, habilitando el cierre formal.",
+          "input": "Veredicto y acta de [[example_output_go_nogo_decision]] (P1-D12).",
+          "raw_data_title": "Veredicto de Gate 1",
+          "raw_data": "Veredicto P1-D12: GO (o CONDITIONAL GO). Firmas de PM y Tech Lead registradas. Avance a Fase 2 formalmente autorizado.",
+          "exit_label": "AUTORIZACIÓN DE GATE 1 CONFIRMADA → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Confirmación de veredicto Go / Conditional Go",
+              "objective": "Validar que la compuerta de cierre haya emitido una autorización de avance formal y documentada.",
+              "how_to": {
+                "steps": [
+                  "Consultar la sección de Decisión Oficial de Compuerta en P1-D12.",
+                  "Verificar que el veredicto sea explícitamente GO o CONDITIONAL GO.",
+                  "Constatar que existan firmas de sign-off del Project Authority y Tech Lead.",
+                  "Registrar la autorización de salida que habilita la publicación del Brief."
+                ],
+                "table_columns": "Entregable Gate 1 | Veredicto Oficial | Firmantes Formales | Estado de Habilitación",
+                "table_rules": "Avance solo autorizado si no existen dictámenes No-Go.",
+                "restrictions": [
+                  "Si el veredicto es NO-GO, prohibido generar el Brief de avance.",
+                  "Verificar que las condicionantes de paso estén identificadas."
+                ],
+                "done_when": "Veredicto GO / CONDITIONAL GO formalmente certificado."
+              },
+              "example_title": "Certificación de Salida de Gate 1",
+              "example": "| Parámetro | Valor Verificado |\n| --- | --- |\n| Entregable de Compuerta | P1-D12 Decisión Go / No-Go / Pivot |\n| Veredicto de Salida | GO (Avance Autorizado a Fase 2) |\n| Firmantes Oficiales | Julián (PM) / Laura (Tech Lead) |\n| Habilitación del Brief | Autorizada ✅ |",
+              "link_label": "veredicto de Gate 1 va a mapeo de fuentes (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Indexación de fuentes de datos por sección",
+          "objective": "Mapear la procedencia exacta de cada dato clave para los 8 bloques estructurales del Brief.",
+          "input": "Entregables verificados D1 a D12.",
+          "raw_data_title": "Mapeo de Fuentes",
+          "raw_data": "Mapeo: D1 (Usuario/Problema), D2 (Mercado/WTP), D3 (Moat), D4-D6 (Factibilidad/Equipo), D7 (Finanzas), D8 (Riesgos), D9 (MVP), D10-D11 (Plan/Proceso), D12 (Gate 1).",
+          "exit_label": "FUENTES DOCUMENTALES INDEXADAS → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Mapeo de trazabilidad documental por bloque del Brief",
+              "objective": "Fijar el índice de referencias que garantizará el principio de extracción pura sin invención.",
+              "how_to": {
+                "steps": [
+                  "Asociar cada sección del Brief con su documento de origen correspondiente.",
+                  "Definir las variables clave que deben extraerse de cada entregable.",
+                  "Asegurar que ningún bloque estructural quede sin fuente primaria verificada.",
+                  "Consolidar la tabla de indexación de fuentes del Brief."
+                ],
+                "table_columns": "Sección del Brief | Entregable de Origen | Variable Clave Extraída",
+                "table_rules": "Trazabilidad documental obligatoria del 100%.",
+                "restrictions": [
+                  "No extraer información de fuentes no pertenecientes a Fase 1.",
+                  "Mantener la correspondencia estricta de variables."
+                ],
+                "done_when": "Tabla de indexación y trazabilidad de fuentes consolidada."
+              },
+              "example_title": "Mapeo de Fuentes de Datos para el Brief",
+              "example": "| Sección del Brief | Entregable de Origen | Variable Clave Extraída |\n| --- | --- | --- |\n| 1. Problema & Perfil | P1-D1 User Profile | Dolor validado, frecuencia, segmento meta |\n| 2. Mercado & WTP | P1-D2 Market Validation | Disposición de pago ($720k anual), SOM |\n| 3. Foso Competitivo | P1-D3 Competitive Analysis | Foso defensivo (efectos de red), diferenciación |\n| 4. Factibilidad Técnica | P1-D4 Technical Feasibility | Arquitectura transaccional asíncrona |\n| 5. Legal & Regulatorio | P1-D5 Legal Clearance | Habeas Data, pasarela PCI (Wompi) |\n| 6. Equipo & Brechas | P1-D6 Team Capability | Stack cubierto, librerías estándar |\n| 7. Viabilidad Financiera | P1-D7 Financial Viability | Margen 83.3%, Break-Even (30 fincas) |\n| 8. Mandato MVP & KRs | P1-D9 MVP Definition | Catálogo + reservas Wompi, 3 KRs |\n| 9. Hoja de Ruta | P1-D10 & D11 | Cronograma 8 semanas, Kanban |\n| 10. Decisión Gate 1 | P1-D12 Go/No-Go | Veredicto GO y mandatos vinculantes |",
+              "link_label": "fuentes indexadas van a extracción literal (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Extracción Literal y Cero Creación (Pure Extraction)",
+      "summary": "Extraer textualmente los bloques esenciales de cada entregable previo sin agregar supuestos nuevos.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Extracción literaria fidedigna sin reinterpretación",
+          "objective": "Copiar los datos y métricas exactas aprobadas en Fase 1 sin alterar cifras ni inventar conceptos.",
+          "input": "Indexación de fuentes del Step 1.3.",
+          "raw_data_title": "Datos Extraídos Literalmente",
+          "raw_data": "SOM: 112 fincas. COP problema: $25.2M. WTP: $720k/año. Margen: 83.3% ($600k). Break-Even: 30 fincas. KRs: 10 fincas 100%, 0 incidentes, 30 reservas Wompi.",
+          "exit_label": "DATOS EXTRAÍDOS CON FIDELIDAD TEXTUAL → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Extracción textual de datos clave de D1 a D12",
+              "objective": "Recopilar de forma fiel las cifras, definiciones y acuerdos establecidos en la fase.",
+              "how_to": {
+                "steps": [
+                  "Copiar textualmente los valores numéricos y conclusiones de cada entregable.",
+                  "Prohibir la adición de adjetivos, supuestos no validados o promesas creativas.",
+                  "Mantener intacta la terminología técnica acordada en D4 y D9.",
+                  "Consolidar la base de datos extractiva del resumen ejecutivo."
+                ],
+                "table_columns": "Variable Extraída | Valor Literal Aprobado | Entregable Base",
+                "table_rules": "Cero invención: reproducción exacta de los contenidos preexistentes.",
+                "restrictions": [
+                  "No modificar cifras de mercado, costos ni métricas.",
+                  "Eliminar cualquier propuesta que no esté respaldada en D1-D12."
+                ],
+                "done_when": "Extracción literal de datos completada sin discrepancias."
+              },
+              "example_title": "Extracción Literaria de Métricas y Acuerdos Clave",
+              "example": "### Datos Consolidados del Brief Ejecutivo\n- **Problema Validado (P1-D1):** Ausencia de plataforma automatizada para gestionar reservas y pagos; dependencia de WhatsApp y métodos manuales.\n- **Propuesta de Valor (P1-D2):** Catálogo visual con disponibilidad en tiempo real y checkout seguro con pasarela integrada.\n- **Diferenciación Competitiva (P1-D3):** Plataforma vertical especializada en fincas de recreo con checkout local ágil (PSE/Nequi).\n- **Solución MVP (P1-D4 & P1-D9):** Web App responsiva (React + Tailwind) + Backend REST (Spring Boot + PostgreSQL) + Wompi + WhatsApp.\n- **Unit Economics & Break-Even (P1-D7):** Margen unitario $600,000 COP (83.3%). Break-Even en 30 fincas activas.\n- **Veredicto Final & Mandatos (P1-D12):** GO. Arquitectura transaccional desacoplada y delegación total en Wompi.",
+              "link_label": "extracción literal va a estructuración ejecutiva (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Estructuración del Brief en bloques ejecutivos",
+          "objective": "Organizar la información consolidada en una síntesis ejecutiva coherente y de lectura rápida.",
+          "input": "Datos literales extraídos en Step 2.1.",
+          "raw_data_title": "Estructura del Brief",
+          "raw_data": "Brief estructurado en 9 apartados ejecutivos: Metadatos, Problema/Usuario, Mercado, Competencia/Moat, Factibilidad, Finanzas, Mandato MVP, Plan y Decisión Gate 1.",
+          "exit_label": "BLOQUES EJECUTIVOS CONSOLIDADOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Consolidación temática de resumen de viabilidad",
+              "objective": "Agrupar los hallazgos en secciones ejecutivas que proporcionen una visión 360 del proyecto.",
+              "how_to": {
+                "steps": [
+                  "Distribuir los contenidos en las 9 secciones estándar de la metodología.",
+                  "Redactar viñetas concisas y directas que faciliten la lectura a inversionistas o ingenieros.",
+                  "Asegurar que cada sección contenga únicamente los puntos decisorios esenciales.",
+                  "Verificar el orden lógico desde la definición del problema hasta la decisión de Gate 1."
+                ],
+                "table_columns": "Bloque Ejecutivo | Contenido Consolidado | Enfoque de Lectura",
+                "table_rules": "Síntesis orientada a la toma de decisiones y arranque de ingeniería.",
+                "restrictions": [
+                  "No extender explicaciones innecesarias que ya constan en los entregables base.",
+                  "Mantener alta densidad informativa en cada párrafo."
+                ],
+                "done_when": "Contenidos estructurados en los 9 bloques ejecutivos estándar."
+              },
+              "example_title": "Bloques Temáticos del Resumen Ejecutivo",
+              "example": "1. Resumen Ejecutivo del Problema y Usuarios (De D1)\n2. Conclusión de Mercado y Modelo de Negocio (De D2)\n3. Posición Competitiva y Foso Defensivo (De D3)\n4. Factibilidad Técnica y Restricciones (De D4, D5 y D6)\n5. Viabilidad Financiera y Economía Unitaria (De D7)\n6. Mandato y Criterios de Éxito del MVP (De D9)\n7. Hoja de Ruta y Metodología (De D10 y D11)\n8. Decisión Oficial de Compuerta (Gate 1 — De D12)",
+              "link_label": "estructuración va a verificación cruzada (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Verificación cruzada de consistencia cero-error",
+          "objective": "Asegurar que las cifras financieras, plazos del MVP y restricciones sean estrictamente idénticas a los entregables base.",
+          "input": "Bloques estructurados de Step 2.2 y entregables de origen.",
+          "raw_data_title": "Verificación Cruzada",
+          "raw_data": "Comprobadas cifras de WTP ($720k), Break-Even (30 fincas), KRs de MVP y restricciones de Wompi. 0 discrepancias detectadas.",
+          "exit_label": "CONSISTENCIA CERO-ERROR CERTIFICADA → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Auditoría de concordancia numérica y conceptual",
+              "objective": "Realizar una doble verificación comparando cada línea del Brief contra el documento fuente.",
+              "how_to": {
+                "steps": [
+                  "Contrastar las cifras de ingresos y costos del Brief contra P1-D7.",
+                  "Contrastar los componentes In-Scope y KRs contra P1-D9.",
+                  "Contrastar el cronograma y modelo metodológico contra P1-D10 y P1-D11.",
+                  "Certificar que la tasa de divergencia informativa sea exactamente cero."
+                ],
+                "table_columns": "Campo Auditado | Valor en Brief | Valor en Fuente Base | Discrepancia",
+                "table_rules": "Tolerancia cero a discrepancias numéricas o de alcance.",
+                "restrictions": [
+                  "Corregir de inmediato cualquier dato que difiera del entregable aprobado.",
+                  "No introducir redondeos que alteren la interpretación económica."
+                ],
+                "done_when": "Consistencia cruzada verificada al 100% con los documentos de origen."
+              },
+              "example_title": "Auditoría Cruzada de Concordancia Numérica",
+              "example": "| Métrica Auditada | Valor en Brief | Valor en Entregable Base | Estatus |\n| --- | --- | --- | --- |\n| SOM Inicial | 112 fincas | 112 fincas (P1-D2) | Idéntico ✅ |\n| Margen de Contribución | $600,000 COP (83.3%) | $600,000 COP (P1-D7) | Idéntico ✅ |\n| Break-Even | 30 fincas | 30 fincas (P1-D7) | Idéntico ✅ |\n| Duración Cronograma | 8 semanas (4 hitos) | 8 semanas (P1-D10) | Idéntico ✅ |",
+              "link_label": "consistencia va a construcción del Lean Canvas (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Ensamblaje del Documento y Anexo Visual (Lean Canvas)",
+      "summary": "Construir el anexo Lean Canvas de 9 bloques, verificar fidelidad y registrar aprobación oficial.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Construcción del Lean Canvas sintético de 9 bloques",
+          "objective": "Sintetizar los 9 bloques del Lean Canvas a partir de las decisiones tomadas en D1 a D12.",
+          "input": "Datos consolidados del Step 2.",
+          "raw_data_title": "Lean Canvas",
+          "raw_data": "9 bloques sintetizados: 1. Problema, 2. Segmento, 3. Propuesta de Valor, 4. Solución, 5. Canales, 6. Flujo Ingresos, 7. Estructura Costos, 8. Métricas Clave, 9. Ventaja Injusta.",
+          "exit_label": "LEAN CANVAS SINTETIZADO → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Síntesis de los 9 bloques del Lean Canvas",
+              "objective": "Proveer una representación visual ultracompacta del modelo de negocio validado en Fase 1.",
+              "how_to": {
+                "steps": [
+                  "Completar los 9 bloques: Problema (D1), Segmentos (D1), Propuesta de Valor (D5/D3), Solución (D9), Canales (D2), Ingresos (D2/D7), Costos (D4/D7), Métricas (D9) y Ventaja Injusta (D3).",
+                  "Vincular cada bloque con su entregable de origen para mantener la trazabilidad.",
+                  "Garantizar que el Lean Canvas funcione como un resumen visual no bloqueante.",
+                  "Formatear la tabla sintética de 9 bloques."
+                ],
+                "table_columns": "Bloque Lean Canvas | Contenido Extraído | Entregable de Origen",
+                "table_rules": "Síntesis pura de los 9 bloques canónicos de Lean Canvas.",
+                "restrictions": [
+                  "No inventar propuestas de valor no formuladas en Fase 0 o 1.",
+                  "Respetar las limitaciones de alcance acordadas en el MVP."
+                ],
+                "done_when": "Anexo visual Lean Canvas de 9 bloques completado y trazable."
+              },
+              "example_title": "Anexo Visual: Lean Canvas de 9 Bloques",
+              "example": "| Bloque | Contenido Extraído | Origen |\n| --- | --- | --- |\n| **1. Problema** | Ausencia de plataforma automatizada para reservas y pagos; riesgo de inconsistencias por WhatsApp. | P0-D1 |\n| **2. Segmento** | Turistas buscando fincas de recreo y Propietarios de fincas rurales (Finqueros). | P1-D1 |\n| **3. Propuesta Única** | Landing moderna con catálogo, disponibilidad en tiempo real y checkout seguro integrado. | P0-D5 / P1-D3 |\n| **4. Solución (MVP)** | Web App con Landing Page, catálogo interactivo, pasarela Wompi y panel de disponibilidad. | P1-D9 |\n| **5. Canales** | Tráfico directo web, marketing digital y alianzas directas con fincas turísticas. | P1-D2 |\n| **6. Ingresos** | Service fee por reserva transaccionada (Wompi) y suscripción mensual destacada. | P1-D2 / P1-D7 |\n| **7. Costos** | Infraestructura cloud (Render/Railway), base de datos PostgreSQL, APIs mensajería y dominio. | P1-D4 / P1-D7 |\n| **8. Métricas Clave** | Meta 30 fincas activas (Break-Even), 0 incidentes de overbooking, ≥30 reservas pagadas. | P1-D9 |\n| **9. Ventaja Injusta** | Especialización en el mercado rural local con pagos inmediatos y checkout ágil. | P1-D3 |",
+              "link_label": "Lean Canvas va a chequeo de fidelidad (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Chequeo final de fidelidad al mandato y compuerta",
+          "objective": "Confirmar que la portada del Brief incluya de forma prominente la decisión GO y sus mandatos vinculantes.",
+          "input": "Brief consolidado y Lean Canvas de Steps 2 y 3.1.",
+          "raw_data_title": "Chequeo de Fidelidad",
+          "raw_data": "Decisión GO y mandatos de arquitectura offline-first y delegación en Wompi incluidos en portada. Coherencia 100% verificada.",
+          "exit_label": "FIDELIDAD Y COMPUERTA VERIFICADAS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Verificación de inclusión de mandatos y veredicto",
+              "objective": "Asegurar que el Brief no diluya los condicionamientos vinculantes emitidos en Gate 1.",
+              "how_to": {
+                "steps": [
+                  "Comprobar que el veredicto oficial de D12 encabece la sección de cierre del documento.",
+                  "Verificar la inclusión íntegra de las condicionantes técnicas y de alcance.",
+                  "Asegurar que las advertencias de revocación (Halt & Re-Audit) queden explícitas.",
+                  "Certificar que el documento prepare inequívocamente al equipo para el kickoff de Fase 2."
+                ],
+                "table_columns": "Elemento de Compuerta | Presencia en el Brief | Exactitud Textual",
+                "table_rules": "Inclusión mandatoria del veredicto y condicionantes de Gate 1.",
+                "restrictions": [
+                  "No suprimir mandatos vinculantes de la versión ejecutiva.",
+                  "Mantener la integridad de los acuerdos de gobernanza."
+                ],
+                "done_when": "Fidelidad al mandato de compuerta verificada y certificada."
+              },
+              "example_title": "Verificación de Inclusión de Mandatos de Gate 1",
+              "example": "### 9. Decisión Oficial de Compuerta (Gate 1 — De D12)\n- **Veredicto:** GO (Avance total a Fase 2 — Project Kickoff).\n- **Condicionantes para Fase 2:** Desarrollar Landing Page transaccional con React/Tailwind y Backend Spring Boot. Respetar la arquitectura desacoplada y delegación total en Wompi.\n- **Firmas:** Julián (PM) / Laura (Tech Lead)",
+              "link_label": "chequeo de fidelidad va a metadatos maestros y cierre (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Metadatos y exportación maestra",
+          "objective": "Asignar metadatos finales, registrar el cierre definitivo de Fase 1 y habilitar el pase a Fase 2.",
+          "input": "Documento integrado, verificado y firmado.",
+          "raw_data_title": "Cierre Definitivo Fase 1",
+          "raw_data": "Proyecto: Nos Fuimos de Finca. Fase 1, D13 de 13. Estado: Approved. Fase 1 (Early Viability) completada al 100%. Siguiente: Fase 2 (Project Kickoff).",
+          "exit_label": "FASE 1 COMPLETADA Y RESUMEN EJECUTIVO ARCHIVADO",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Registro de metadatos y sellado formal de cierre de Fase 1",
+              "objective": "Emitir la certificación final que clausura la Fase 1 y entrega el compendio maestro a ingeniería.",
+              "how_to": {
+                "steps": [
+                  "Completar la cabecera estándar de metadatos con el estado 'Approved'.",
+                  "Declarar formalmente el estado de fase: 'Phase 1 Completed'.",
+                  "Indicar el hito siguiente del proyecto: 'Fase 2 — Project Kickoff'.",
+                  "Publicar el documento en `docs/01-viabilidad-temprana/13. Resumen Ejecutivo Fase 1.md` y actualizar PROGRESS.md."
+                ],
+                "table_columns": "Metadato Maestro | Valor Final Registrado | Significado Metodológico",
+                "table_rules": "Cierre formal definitivo de la Fase 1.",
+                "restrictions": [
+                  "No cerrar si persisten dudas sobre la viabilidad o alcance.",
+                  "Garantizar que el artefacto esté listo para consumo en Fase 2."
+                ],
+                "done_when": "Metadatos formalizados y Fase 1 oficialmente cerrada."
+              },
+              "example_title": "Certificación Final y Cierre de Fase 1",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 1 — Viabilidad Temprana (Early Viability)  \n**Entregable:** 13 de 13  \n**Estado:** Aprobado  \n\n```yaml\nMetadata:\n  Deliverable: P1-D13 Brief Ejecutivo de Fase 1 (Early Viability)\n  Status: Approved\n  Phase_Status: Phase 1 Completed\n  Next_Phase: Phase 2 - MVP Execution & Building\n  Decision: GO\n  Lean_Canvas_Embedded: True\n```",
+              "link_label": "cierre formal del entregable D13 y de la Fase 1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,368 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D4",
+  "deliverable": "Repository Structure (Estructura de Repositorio)",
+  "purpose": "Este entregable define cómo se organizarán los archivos, carpetas y servicios del proyecto en el sistema de control de versiones. Una mala estructura de repositorio (ej. Monorepo vs Multi-repo mal elegido) genera conflictos de 'merge' constantes, pipelines de CI/CD infernales y fricción en la colaboración.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_project_identity]] | Otorga el Codename técnico del proyecto (P2-D1). |\n| [[example_output_stack_decision]] | Dicta las capas que existirán físicamente (ej. Frontend, Integraciones No-Code) (P2-D3). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Elección de Topología (Monorepo vs Multi-repo)",
+      "summary": "Decidir si todo el código o configuración vivirá en un solo repositorio maestro o si cada capa tendrá su propio repositorio aislado.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Evaluación del Stack Tecnológico y Selección de Topología",
+          "objective": "Evaluar el stack del D3 y el tamaño del equipo para determinar la topología de versionado adecuada.",
+          "input": "[[example_output_stack_decision]] (D3).",
+          "raw_data_title": "Criterios de Stack y Equipo",
+          "raw_data": "Stack definido: Frontend JS, Java Backend (Spring Boot), PostgreSQL, Wompi. Equipo pequeño (1-3 devs), despliegues sincronizados.",
+          "exit_label": "TOPOLOGÍA SELECCIONADA → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Evaluación de Criterios Arquitectónicos y Topología",
+              "objective": "Ponderar la complejidad del stack y el número de desarrolladores para elegir entre Monorepo o Multi-repo.",
+              "how_to": {
+                "steps": [
+                  "Evaluar el stack elegido en el D3 (pesado vs ligero, monolito vs microservicios).",
+                  "Verificar el tamaño del equipo de desarrollo (1-3 devs favorece Monorepo).",
+                  "Analizar requerimientos de independencia de despliegue y pipelines CI/CD.",
+                  "Seleccionar formalmente Monorepo o Multi-repo según los criterios."
+                ],
+                "table_columns": "Criterio de Decisión | Situación del Proyecto | Topología Recomendada",
+                "table_rules": "Para equipos pequeños y MVPs, Monorepo es la regla salvo NFR de aislamiento extremo.",
+                "restrictions": [
+                  "No seleccionar Multi-repo sin equipos independientes masivos que lo justifiquen.",
+                  "Asegurar coherencia con las tecnologías definidas en D3."
+                ],
+                "done_when": "Topología de repositorio seleccionada con justificación preliminar."
+              },
+              "example_title": "Evaluación de Topología de Repositorio",
+              "example": "| Criterio Evaluado | Situación en Nos Fuimos de Finca | Recomendación |\n| --- | --- | --- |\n| Complejidad de Stack | Java Backend + Frontend JS + PostgreSQL | Monorepo |\n| Tamaño de Equipo | 1 a 2 desarrolladores (CTO/Dev) | Monorepo |\n| Frecuencia de Release | Despliegues sincronizados de UI y API | Monorepo Polyglot |",
+              "link_label": "topología seleccionada va a matriz de justificación (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Documentación de Justificación y Ventajas Técnicas",
+          "objective": "Documentar la justificación técnica y formalizar la topología bloqueada.",
+          "input": "Topología seleccionada en 1.1 y restricciones de arquitectura.",
+          "raw_data_title": "Justificación Técnica de Topología",
+          "raw_data": "Monorepo unifica documentación, backend y frontend en un solo historial de git evitando desincronización de versiones de API.",
+          "exit_label": "TOPOLOGÍA BLOQUEADA → 2.1",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Formalización de la Matriz de Topología Bloqueada",
+              "objective": "Registrar la decisión final de topología con sus ventajas concretas y el impacto en el flujo de trabajo.",
+              "how_to": {
+                "steps": [
+                  "Redactar la justificación arquitectónica detallada.",
+                  "Detallar las ventajas operativas para el equipo y el pipeline.",
+                  "Completar la tabla oficial de topología bloqueada.",
+                  "Verificar que el pass condition de clonación de repositorio se cumpla."
+                ],
+                "table_columns": "Topología Elegida | Justificación Arquitectónica",
+                "table_rules": "Debe dejar claro si git clone se ejecuta una sola vez para todo el sistema.",
+                "restrictions": [
+                  "Prohibido dejar ambigüedad en el alcance del repositorio único."
+                ],
+                "done_when": "Matriz de topología bloqueada completada y aprobada."
+              },
+              "example_title": "Topología Bloqueada (Step 1 Output)",
+              "example": "| Topología Elegida | Justificación Arquitectónica |\n| --- | --- |\n| Monorepo | Alojar el Backend en Java y el Frontend en JavaScript en el mismo repositorio permite sincronizar los releases, mantener la documentación centralizada en docs/ y evitar fricciones de versionado para el equipo (un solo desarrollador / CTO). |",
+              "link_label": "topología bloqueada pasa a estructuración de carpetas (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Diseño del Árbol de Carpetas (Folder Tree)",
+      "summary": "Definir exactamente dónde se guardan los documentos, los scripts de despliegue y cada capa del stack.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Definición del Directorio Raíz y Carpetas Mandatorias",
+          "objective": "Establecer la carpeta raíz con el codename del proyecto y las carpetas estructurales obligatorias.",
+          "input": "[[example_output_project_identity]] (Codename) y Topología (Step 1).",
+          "raw_data_title": "Estructura Raíz",
+          "raw_data": "Raíz: nosfuimosdefinca-monorepo. Carpetas obligatorias: /docs para requerimientos y .github/workflows para automatización.",
+          "exit_label": "RAÍZ Y CARPETAS MANDATORIAS DEFINIDAS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Estructuración de Raíz, Docs y Pipelines",
+              "objective": "Asignar el nombre del directorio raíz y garantizar carpetas de gobernanza documental y CI/CD.",
+              "how_to": {
+                "steps": [
+                  "Tomar el codename técnico de P2-D1 para la raíz del repositorio.",
+                  "Crear obligatoriamente la carpeta /docs para especificaciones y metodología.",
+                  "Configurar la carpeta de pipelines (.github/workflows o equivalente).",
+                  "Registrar el archivo README.md como punto de entrada del repositorio."
+                ],
+                "table_columns": "Directorio Mandatorio | Propósito Estructural | Contenido Esperado",
+                "table_rules": "Toda estructura debe tener /docs y punto de entrada README.md.",
+                "restrictions": [
+                  "No inventar nombres de raíz que no provengan del Codename técnico de D1."
+                ],
+                "done_when": "Estructura raíz y carpetas de gobernanza fijadas."
+              },
+              "example_title": "Directorios Mandatorios de Gobernanza",
+              "example": "| Directorio Mandatorio | Propósito Estructural | Contenido Esperado |\n| --- | --- | --- |\n| /docs | Bóveda documental | Framework de Fases (F1, F2, F3) y Requerimientos |\n| /.github/workflows | Automatización CI/CD | Pipelines de compilación Java y linter JS |\n| /README.md | Onboarding | Guía de configuración local y enlaces a entornos |",
+              "link_label": "directorios base pasan a distribución de capas (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Aislamiento de Capas de Código y Servicios",
+          "objective": "Definir las carpetas específicas para Backend, Frontend y recursos estáticos según el Stack D3.",
+          "input": "Capas de stack de [[example_output_stack_decision]] (D3).",
+          "raw_data_title": "Capas de Código",
+          "raw_data": "Backend: Java (Spring Boot) con src/main/java y pom.xml. Frontend: JavaScript B2C con src/ y package.json.",
+          "exit_label": "CAPAS DE CÓDIGO DISTRIBUIDAS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Mapeo de Carpetas Backend, Frontend y Assets",
+              "objective": "Asignar a cada tecnología de D3 una carpeta aislada con su propia herramienta de construcción.",
+              "how_to": {
+                "steps": [
+                  "Crear carpeta /backend para los servicios API y controladores.",
+                  "Crear carpeta /frontend para la interfaz de usuario web.",
+                  "Aislar archivos de configuración (pom.xml, package.json) en sus respectivas carpetas.",
+                  "Verificar que cada capa posea su propio ciclo de vida y empaquetado."
+                ],
+                "table_columns": "Capa del Stack | Directorio Asignado | Herramienta de Build / Configuración",
+                "table_rules": "Cada tecnología de D3 debe tener su propio espacio de trabajo sin mezcla de dependencias.",
+                "restrictions": [
+                  "Prohibido mezclar dependencias de frontend y backend en un único package.json raíz."
+                ],
+                "done_when": "Carpetas de capas técnicas completamente distribuidas."
+              },
+              "example_title": "Distribución de Capas Técnicas",
+              "example": "| Capa del Stack | Directorio Asignado | Build / Configuración |\n| --- | --- | --- |\n| Backend API | /backend | Maven (pom.xml) o Gradle (build.gradle) |\n| Frontend Web | /frontend | Node / Vite (package.json) |\n| Configuración CI | /.github/workflows | GitHub Actions YAML |",
+              "link_label": "distribución técnica pasa a generación de árbol ASCII (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Documentación del Propósito de Carpetas en Formato ASCII",
+          "objective": "Generar el diagrama visual ASCII del árbol de carpetas con comentarios descriptivos.",
+          "input": "Estructura raíz y capas de código (2.1 y 2.2).",
+          "raw_data_title": "Árbol Consolidado",
+          "raw_data": "Árbol ASCII con nosfuimosdefinca-monorepo, docs, backend, frontend y .github con comentarios por línea.",
+          "exit_label": "ÁRBOL ASCII OFICIAL COMPLETO → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Generación del Árbol ASCII Oficial Comentado",
+              "objective": "Diagramar el árbol de directorios jerárquico en texto con comentarios explicativos por nodo.",
+              "how_to": {
+                "steps": [
+                  "Dibujar la jerarquía de carpetas usando caracteres ASCII (├──, └──, │).",
+                  "Añadir un comentario alineado (# [propósito]) para cada carpeta relevante.",
+                  "Verificar que el árbol refleje fielmente todas las decisiones de D1 y D3.",
+                  "Validar que ningún miembro del equipo tenga dudas sobre dónde ubicar cada archivo."
+                ],
+                "table_columns": "Ruta de Carpeta | Nivel de Jerarquía | Propósito Explicativo",
+                "table_rules": "El árbol debe ser un bloque de texto formateado y autoexplicativo.",
+                "restrictions": [
+                  "No omitir subcarpetas críticas como src/ o directorios de recursos."
+                ],
+                "done_when": "Árbol ASCII generado y comentado sin ambigüedades."
+              },
+              "example_title": "Árbol Visual de Directorios (Step 2 Output)",
+              "example": "```text\nnosfuimosdefinca-monorepo/\n├── docs/                    # Requerimientos, framework de fases (F1, F2, F3)\n├── backend/                 # Código fuente Java (API REST)\n│   ├── src/main/java        # Lógica de dominio, Controladores, Servicios\n│   ├── src/main/resources   # application.yml, scripts SQL\n│   └── pom.xml / build.gradle\n├── frontend/                # Cliente B2C Web en JavaScript\n│   ├── src/                 # Lógica JS, HTML, CSS\n│   └── package.json         # Dependencias (Vite, etc.)\n└── .github/workflows/       # Pipelines de CI/CD (Build Java, Lints JS)\n```",
+              "link_label": "árbol ASCII pasa a definición de reglas de aislamiento (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Reglas de Aislamiento y Dependencia Cruzada",
+      "summary": "Dictar las leyes de importación, protección de credenciales y acoplamiento para evitar contaminación arquitectónica.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Definición de Leyes de Importación y Fronteras de Código",
+          "objective": "Establecer las restricciones de importación entre carpetas para preservar la modularidad del Monorepo.",
+          "input": "Árbol de carpetas (Step 2).",
+          "raw_data_title": "Riesgos de Acoplamiento",
+          "raw_data": "Riesgo: Frontend intentando acceder directamente a archivos o base de datos de backend. Frontera: comunicación exclusiva por API REST.",
+          "exit_label": "LEYES DE IMPORTACIÓN ESTABLECIDAS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Establecimiento de Prohibición de Importaciones Cruzadas",
+              "objective": "Fijar barreras estrictas para que ninguna capa invoque internamente módulos de otra capa sin contrato de red.",
+              "how_to": {
+                "steps": [
+                  "Identificar los puntos de contacto posibles entre frontend y backend.",
+                  "Redactar la regla prohibitiva de importación directa entre carpetas de capas.",
+                  "Definir los canales exclusivos de comunicación (HTTP/REST, JSON).",
+                  "Establecer el impacto arquitectónico de vulnerar la regla."
+                ],
+                "table_columns": "Frontera de Capa | Regla Prohibitiva | Canal de Comunicación Autorizado",
+                "table_rules": "El cliente jamás debe importar código interno ni librerías de infraestructura backend.",
+                "restrictions": [
+                  "Prohibido el acoplamiento directo entre frontend y modelos de base de datos."
+                ],
+                "done_when": "Fronteras de importación y protocolos de comunicación delimitados."
+              },
+              "example_title": "Fronteras de Importación y Reglas de Comunicación",
+              "example": "| Frontera de Capa | Regla Prohibitiva | Canal Autorizado |\n| --- | --- | --- |\n| Frontend -> Backend | Prohibido require/import relativo a archivos fuera de /frontend | Llamadas HTTP a endpoints REST de /backend |\n| Frontend -> DB | Prohibido conexión directa a PostgreSQL desde código cliente | Peticiones mediadas por controladores Spring Boot |",
+              "link_label": "fronteras de código pasan a gestión de secretos y consecuencias (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Protección de Secretos y Acoplamiento entre Servicios",
+          "objective": "Dictar las normas de seguridad para manejo de API keys, credenciales y consecuencias técnicas de infracción.",
+          "input": "Riesgos de seguridad de servicios externos (Wompi, Meta WABA, DB).",
+          "raw_data_title": "Manejo de Secretos",
+          "raw_data": "Variables de entorno (.env / application.yml), prohibido credenciales hardcodeadas, gitignore estricto.",
+          "exit_label": "MATRIZ DE LEYES DE AISLAMIENTO COMPLETA → 4.1",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Matriz de Reglas de Aislamiento y Consecuencias Técnicas",
+              "objective": "Consolidar las reglas de oro de aislamiento con su correspondiente impacto técnico en caso de incumplimiento.",
+              "how_to": {
+                "steps": [
+                  "Analizar riesgos de fuga de credenciales en repositorios de código.",
+                  "Estipular el uso mandatorio de variables de entorno para secretos y claves privadas.",
+                  "Formular la consecuencia técnica severa para cada incumplimiento.",
+                  "Consolidar la tabla de reglas de aislamiento oficial."
+                ],
+                "table_columns": "Regla de Aislamiento | Impacto de Romper la Regla",
+                "table_rules": "Cada regla debe vincularse a un riesgo concreto de seguridad o estabilidad.",
+                "restrictions": [
+                  "No admitir excepciones en el almacenamiento de credenciales en git."
+                ],
+                "done_when": "Matriz de reglas de aislamiento y consecuencias técnicas formalizada."
+              },
+              "example_title": "Leyes de Aislamiento y Consecuencias (Step 3 Output)",
+              "example": "| Regla de Aislamiento | Impacto de Romper la Regla |\n| --- | --- |\n| **Separación de Responsabilidades:** El Frontend JS JAMÁS debe comunicarse directamente a la Base de Datos. | Violación de Seguridad. Inyección SQL directa desde el navegador del cliente. |\n| **Gestión de Secretos:** Prohibido comitear llaves de Wompi o Meta WABA al código fuente (Backend o Frontend). Todo va por Variables de Entorno (.env). | Secuestro de infraestructura y pérdida de dinero B2B. |",
+              "link_label": "leyes de aislamiento pasan a ensamblaje final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Generar el manual de estructura oficial que se adjuntará al README.md y servirá de guía para el setup del proyecto.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Metadatos y Árbol de Carpetas Oficial",
+          "objective": "Ensamblar la ficha técnica del entregable y el árbol de carpetas validado con el Codename.",
+          "input": "Metadatos de proyecto y árbol ASCII de Steps 1 y 2.",
+          "raw_data_title": "Metadatos y Árbol Oficial",
+          "raw_data": "Proyecto: Nos Fuimos de Finca, Fase 2, D4, Estado Aprobado. Raíz: nosfuimosdefinca-monorepo.",
+          "exit_label": "METADATOS Y ÁRBOL INTEGRADOS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Integración de Metadatos y Codename en la Raíz",
+              "objective": "Compilar las secciones 1, 2 y 3 del entregable oficial asegurando alineación de nomenclatura.",
+              "how_to": {
+                "steps": [
+                  "Redactar la sección de metadatos (Proyecto, Fase, Entregable, Estado).",
+                  "Incorporar la topología de repositorio y su justificación arquitectónica.",
+                  "Insertar el bloque de código del árbol ASCII oficial.",
+                  "Verificar concordancia con el Codename técnico de P2-D1."
+                ],
+                "table_columns": "Sección del Documento | Contenido Integrado | Fuente de Datos",
+                "table_rules": "El nombre de la raíz debe coincidir exactamente con el Codename aprobado en D1.",
+                "restrictions": [
+                  "No alterar la numeración de secciones del formato de salida."
+                ],
+                "done_when": "Secciones de metadatos, topología y árbol oficial compiladas."
+              },
+              "example_title": "Compilación Inicial de Metadatos y Estructura",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 2 — Project Kickoff\n**Entregable:** 4 de 13\n**Estado:** Aprobado\n\n### 2. Topología de Repositorio\n- **Tipo:** Monorepo de Código (Polyglot).\n- **Justificación:** Alojar el Backend en Java y el Frontend en JavaScript en el mismo repositorio permite sincronizar los releases, mantener la documentación centralizada en `docs/` y evitar fricciones de versionado para el equipo (un solo desarrollador / CTO).\n\n### 3. Árbol de Carpetas Oficial\n```text\nnosfuimosdefinca-monorepo/\n├── docs/                    # Requerimientos, framework de fases (F1, F2, F3)\n├── backend/                 # Código fuente Java (API REST)\n│   ├── src/main/java        # Lógica de dominio, Controladores, Servicios\n│   ├── src/main/resources   # application.yml, scripts SQL\n│   └── pom.xml / build.gradle\n├── frontend/                # Cliente B2C Web en JavaScript\n│   ├── src/                 # Lógica JS, HTML, CSS\n│   └── package.json         # Dependencias (Vite, etc.)\n└── .github/workflows/       # Pipelines de CI/CD (Build Java, Lints JS)\n```",
+              "link_label": "estructura base pasa a anexar reglas y compuertas (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Integración de Reglas de Aislamiento y Compuertas de Fase",
+          "objective": "Incorporar las leyes de acoplamiento y determinar la condición de avance de la compuerta de fase.",
+          "input": "Matriz de aislamiento (Step 3) y criterios de compuerta condicional.",
+          "raw_data_title": "Compuerta de Fase D4",
+          "raw_data": "Condición: Proceed. El árbol y las reglas garantizan aislamiento y orden para iniciar ramas y configuración en D5.",
+          "exit_label": "REGLAS Y COMPUERTA INCORPORADAS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Ensamblaje de Matriz de Leyes y Condiciones de Avance",
+              "objective": "Anexar la tabla de reglas de aislamiento y evaluar el cumplimiento de la compuerta de fase.",
+              "how_to": {
+                "steps": [
+                  "Adjuntar la tabla de reglas de aislamiento y consecuencias técnicas.",
+                  "Evaluar la compuerta: ¿El árbol responde al Stack de D3 y protege secretos?",
+                  "Redactar la declaración formal de avance (Proceed / Stop).",
+                  "Confirmar que la condición de pase habilite el trabajo del siguiente entregable."
+                ],
+                "table_columns": "Componente Final | Estado de Validación | Impacto en Siguiente Fase",
+                "table_rules": "Si hay carpetas discordantes con D3, la compuerta debe detener el avance.",
+                "restrictions": [
+                  "No dar pase libre si existen secretos expuestos o capas huérfanas en el árbol."
+                ],
+                "done_when": "Reglas y compuerta de fase formalizadas en el documento."
+              },
+              "example_title": "Reglas de Aislamiento y Compuerta de Fase",
+              "example": "### 4. Reglas de Aislamiento\n| Regla de Aislamiento | Impacto de Romper la Regla |\n| --- | --- |\n| **Separación de Responsabilidades:** El Frontend JS JAMÁS debe comunicarse directamente a la Base de Datos. | Violación de Seguridad. Inyección SQL directa desde el navegador del cliente. |\n| **Gestión de Secretos:** Prohibido comitear llaves de Wompi o Meta WABA al código fuente (Backend o Frontend). Todo va por Variables de Entorno (`.env`). | Secuestro de infraestructura y pérdida de dinero B2B. |\n\n### 5. Implicación de Compuerta de Fase\n- **Condición:** Proceed. La estructura de carpetas asegura que el código fuente de las dos tecnologías base (Java y JS) vivan en sus propios entornos de construcción, orquestados por el mismo repositorio.",
+              "link_label": "documento integrado pasa a exportación final (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Validación de Integridad y Exportación Final",
+          "objective": "Verificar la coherencia completa del documento final y validar contra el entregable de referencia.",
+          "input": "Documento ensamblado completo y plantilla de salida.",
+          "raw_data_title": "Validación y Entrega",
+          "raw_data": "Documento verificado contra example_output_repository_structure.md, listo para publicación en repo.",
+          "exit_label": "ENTREGABLE D4 PUBLICADO Y COMPLETADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Publicación Oficial del Documento D4",
+              "objective": "Emitir el documento maestro final de Estructura de Repositorio listo para control de versiones.",
+              "how_to": {
+                "steps": [
+                  "Revisar la concordancia entre todas las secciones del documento ensamblado.",
+                  "Validar que no existan contradicciones con D1, D2 ni D3.",
+                  "Confirmar que el archivo de salida cumpla estrictamente el formato Markdown.",
+                  "Registrar la entrega formal en el índice del proyecto."
+                ],
+                "table_columns": "Criterio de Validación | Estado | Observación",
+                "table_rules": "El entregable final debe ser un artefacto autónomo y de referencia obligatoria.",
+                "restrictions": [
+                  "No dar por cerrado sin corroborar la existencia del archivo de salida correspondiente."
+                ],
+                "done_when": "Entregable D4 completamente validado y publicado."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_repository_structure]]`.\n\nUbicación oficial: `docs/02-project-kickoff/04. Estructura de Repositorio.md`.\nEstado: Aprobado por Compuerta de Fase.",
+              "link_label": "entrega completada - fin de flujo D4"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

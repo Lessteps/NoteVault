@@ -1,0 +1,21 @@
+# name: Pasos (columna)
+layout: column
+direction: down
+defaults:
+  card_width: 260
+nodes:
+  - id: s1
+    title: "Paso 1"
+    body: "Primer paso."
+    role: root
+  - id: s2
+    title: "Paso 2"
+    body: "Segundo paso."
+  - id: s3
+    title: "Paso 3"
+    body: "Tercer paso."
+edges:
+  - from: s1
+    to: s2
+  - from: s2
+    to: s3

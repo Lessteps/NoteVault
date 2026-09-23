@@ -1,0 +1,374 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D5",
+  "deliverable": "Legal and Regulatory Clearance Record (Registro de Despeje Legal y Regulatorio)",
+  "purpose": "Este entregable evalúa las obligaciones legales y regulatorias aplicables al proyecto mediante una lista de verificación estructurada (autoevaluación), traduciendo los requerimientos normativos en restricciones concretas de diseño de software (Design Constraints), sin exigir dictámenes de abogados externos para no bloquear el flujo.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_user_profile]] | Define el país y jurisdicción donde operan físicamente los usuarios (P1-D1). |\n| [[example_output_technical_feasibility]] | Define los datos y capacidades que el sistema procesa o almacena (P1-D4). |\n| [[example_output_competitive_analysis]] | Identifica las licencias o requerimientos del sector que utiliza la competencia (P1-D3). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Contexto Operativo y Alcance Jurisdiccional",
+      "summary": "Delimitar la jurisdicción física y el sector industrial para evitar aplicar leyes extranjeras o inaplicables.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Identificar país y región operativa principal",
+          "objective": "Registrar el país y demarcación territorial de operación comercial del producto.",
+          "input": "Datos de ubicación y usuarios de [[example_output_user_profile]] (P1-D1).",
+          "raw_data_title": "Jurisdicción Operativa",
+          "raw_data": "País: Colombia. Regiones de lanzamiento: Antioquia, Eje Cafetero y Cundinamarca.",
+          "exit_label": "JURISDICCIÓN DELIMITADA → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Delimitación territorial y jurisdiccional",
+              "objective": "Fijar el marco geográfico y las autoridades legales aplicables al lanzamiento.",
+              "how_to": {
+                "steps": [
+                  "Identificar el país donde operarán físicamente los usuarios y anfitriones.",
+                  "Delimitar las regiones y departamentos donde se desplegará el piloto comercial.",
+                  "Confirmar que la legislación a evaluar corresponda a dicha demarcación territorial.",
+                  "Registrar la jurisdicción principal en la ficha de contexto."
+                ],
+                "table_columns": "Dimensión Jurisdiccional | Ámbito Territorial | Marco Jurídico Aplicable",
+                "table_rules": "Una fila por ámbito jurisdiccional de operación.",
+                "restrictions": [
+                  "Evaluar la jurisdicción de operación real, no la sede de constitución societaria.",
+                  "Evitar marcos regulatorios inaplicables."
+                ],
+                "done_when": "Jurisdicción principal delimitada y registrada."
+              },
+              "example_title": "Delimitación Jurisdiccional",
+              "example": "| Dimensión | Valor | Autoridad / Regulación |\n| --- | --- | --- |\n| Jurisdicción de operación | Colombia (Antioquia, Eje Cafetero, Cundinamarca) | Gobierno Nacional de Colombia |",
+              "link_label": "jurisdicción va a sector regulado (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Identificar sector regulado y autoridad competente",
+          "objective": "Determinar si el negocio pertenece a un sector con regulación especial e identificar sus autoridades.",
+          "input": "Modelo de negocio y actividad de intermediación turística.",
+          "raw_data_title": "Sector y Autoridades",
+          "raw_data": "Sector: Turismo y Alojamiento Rural. Autoridades: Ministerio de Comercio, Industria y Turismo (MinCIT) y Fontur. Ley 300 de 1996 y Ley 2068 de 2020.",
+          "exit_label": "SECTOR REGULADO IDENTIFICADO → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Identificación sectorial y de autoridades",
+              "objective": "Clasificar la actividad industrial y mapear sus organismos reguladores.",
+              "how_to": {
+                "steps": [
+                  "Revisar la actividad económica del producto frente a las clasificaciones gubernamentales.",
+                  "Identificar si aplica regulación sectorial especial (Turismo, Salud, Fintech, etc.).",
+                  "Determinar las entidades de inspección, vigilancia y control correspondientes.",
+                  "Documentar las leyes sectoriales marco aplicables."
+                ],
+                "table_columns": "Sector Industrial | Autoridad Reguladora | Ley / Normativa Marco | Nivel de Regulación",
+                "table_rules": "Una fila detallando la clasificación sectorial y sus autoridades.",
+                "restrictions": [
+                  "Mapear autoridades con competencia sancionatoria real.",
+                  "Documentar el marco sectorial específico."
+                ],
+                "done_when": "Sector y autoridades reguladoras mapeadas."
+              },
+              "example_title": "Sector y Autoridades Regulatorias",
+              "example": "| Dimensión | Valor | Autoridad / Regulación |\n| --- | --- | --- |\n| Sector regulado | Turismo y Alojamiento Rural | MinCIT / Fontur |\n| Marco legal sectorial | Ley 300 de 1996 / Ley 2068 de 2020 | Congreso de Colombia / MinCIT |",
+              "link_label": "sector va a clasificación de datos (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Identificar datos personales, financieros o credenciales procesados",
+          "objective": "Listar todos los tipos de datos que el sistema almacena, transmite o procesa.",
+          "input": "Capacidades técnicas de [[example_output_technical_feasibility]] (P1-D4).",
+          "raw_data_title": "Flujos de Datos del Sistema",
+          "raw_data": "- Identidad: Nombre, teléfono, cédula y correo del anfitrión y turista.\n- Financieros: Monto de reserva, identificador de transacción y voucher Wompi (sin PAN/CVV directo).\n- Operativos: Disponibilidad, fechas e historial de reservas.",
+          "exit_label": "DATOS CLASIFICADOS → Step 2",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Inventario y clasificación de datos procesados",
+              "objective": "Catalogar la información procesada por categoría de riesgo de privacidad y cumplimiento.",
+              "how_to": {
+                "steps": [
+                  "Extraer de P1-D4 todas las entidades de datos que el software gestionará.",
+                  "Clasificar cada dato en: Datos de Identidad, Datos Financieros o Datos Operativos.",
+                  "Verificar si el sistema almacena directamente credenciales bancarias o números de tarjeta.",
+                  "Mapear la entidad de supervisión de privacidad para cada categoría."
+                ],
+                "table_columns": "Tipo de Dato | Atributos Específicos | ¿Almacenado Localmente? | Autoridad de Control",
+                "table_rules": "Una fila por categoría de datos procesados.",
+                "restrictions": [
+                  "Identificar claramente si se tocan datos sensibles o financieros.",
+                  "Asegurar consistencia con las decisiones de aprovisionamiento de P1-D4."
+                ],
+                "done_when": "Inventario de datos procesados formalizado."
+              },
+              "example_title": "Inventario de Datos Procesados",
+              "example": "| Dimensión | Valor | Autoridad / Regulación |\n| --- | --- | --- |\n| Datos de Identidad | Nombre, teléfono, cédula, correo (finquero y turista) | SIC (Habeas Data) |\n| Datos Financieros | Monto de reserva, ID transacción (sin tarjeta directa) | SFC / PCI-DSS |\n| Datos de Comportamiento | Historial de reservas y disponibilidad | SIC |",
+              "link_label": "datos van a autoevaluación normativa (2.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Lista de Chequeo de Obligaciones Normativas (Autoevaluación)",
+      "summary": "Evaluar las obligaciones aplicables según la naturaleza del software y convertirlas en restricciones técnicas de ingeniería.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Evaluar obligaciones de Privacidad de Datos (Habeas Data)",
+          "objective": "Determinar el régimen de privacidad aplicable y traducirlo en directrices de desarrollo.",
+          "input": "Datos de identidad clasificados en Sub-paso 1.3.",
+          "raw_data_title": "Obligación de Protección de Datos",
+          "raw_data": "Ley 1581 de 2012 (Habeas Data). Obligación: consentimiento previo y expreso, política accesible, derecho a supresión.",
+          "exit_label": "PRIVACIDAD EVALUADA → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Autoevaluación de protección de datos personales",
+              "objective": "Evaluar cumplimiento de Habeas Data y formular órdenes de programación de consentimiento.",
+              "how_to": {
+                "steps": [
+                  "Identificar la ley de privacidad local aplicable (Ley 1581 de 2012 en Colombia).",
+                  "Determinar las obligaciones específicas de captura, almacenamiento y revocatoria.",
+                  "Formular la restricción técnica de diseño (Design Constraint) como orden de desarrollo.",
+                  "Asignar estado de cumplimiento por diseño."
+                ],
+                "table_columns": "Ley Aplicable | Obligación Específica | Restricción de Diseño de Software | Estado",
+                "table_rules": "Una fila por obligación de privacidad evaluando su traducción técnica.",
+                "restrictions": [
+                  "El consentimiento no puede ser tácito ni pre-marcado.",
+                  "Las directrices deben traducirse en requisitos de programación verificables."
+                ],
+                "done_when": "Design Constraints de privacidad redactadas."
+              },
+              "example_title": "Restricciones de Privacidad",
+              "example": "| Regulación / Ley | Organismo | Obligación | Design Constraint (Orden de Programación) | Estado |\n| --- | --- | --- | --- | --- |\n| Ley 1581/2012 (Habeas Data) | SIC | Consentimiento expreso previo al almacenamiento | Checkbox T&C desmarcado por defecto; backend rechaza registro sin aceptación activa | Compliant by Design |\n| Ley 1581/2012 | SIC | Derecho de supresión de datos | API endpoint para solicitar eliminación de cuenta y todos sus datos | Cumplido por Diseño |",
+              "link_label": "privacidad va a pagos y PCI-DSS (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Evaluar obligaciones de Procesamiento de Pagos (PCI-DSS)",
+          "objective": "Garantizar cumplimiento PCI-DSS mediante delegación total de datos de pago a pasarela certificada.",
+          "input": "Flujos financieros de P1-D4 y pasarela Wompi.",
+          "raw_data_title": "Régimen de Procesamiento de Pagos",
+          "raw_data": "Estándar PCI-DSS. Servidores propios nunca tocan PAN ni CVV. Delegación total a pasarela Wompi (Partner certificado).",
+          "exit_label": "PAGOS EVALUADOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Evaluación de cumplimiento PCI-DSS",
+              "objective": "Verificar la arquitectura de tokenización y certificar la exención de custodia de tarjetas.",
+              "how_to": {
+                "steps": [
+                  "Revisar el flujo transaccional de pagos con tarjeta de crédito/débito.",
+                  "Confirmar que los números de tarjeta nunca transitan ni se almacenan en servidores propios.",
+                  "Formular la restricción de arquitectura: procesamiento exclusivo vía SDK / iframe / checkout seguro de pasarela.",
+                  "Certificar el estado como 'Cumplido por Diseño / Mitigado por Partner'."
+                ],
+                "table_columns": "Tipo de Transacción | ¿El sistema toca datos de tarjeta? | Estándar Aplicable | Design Constraint",
+                "table_rules": "Una fila evaluando la delegación transaccional y cumplimiento PCI.",
+                "restrictions": [
+                  "Prohibición estricta de almacenar o procesar números de tarjeta (PAN) en servidores propios.",
+                  "Delegación total a pasarelas certificadas."
+                ],
+                "done_when": "Cumplimiento PCI-DSS asegurado por diseño."
+              },
+              "example_title": "Procesamiento de Pagos y PCI-DSS",
+              "example": "| Tipo | ¿El sistema toca datos de tarjeta? | Estado PCI | Design Constraint |\n| --- | --- | --- | --- |\n| Pagos electrónicos | No — delegado a Wompi | Mitigado por Partner | Ningún servidor propio toca datos de tarjetas (PAN); delegación 100% a Wompi. Iframe/checkout seguro para todos los pagos. |",
+              "link_label": "pagos van a regulación sectorial (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Evaluar regulación sectorial específica",
+          "objective": "Evaluar la exigencia del Registro Nacional de Turismo (RNT) y definir el pivote contractual adecuado.",
+          "input": "Ley 300 de 1996 y Ley 2068 de 2020.",
+          "raw_data_title": "Regulación RNT",
+          "raw_data": "Operar como agencia turística formal exige RNT para cada propiedad. El 80% de fincas carece de RNT. Solución: pivote a SaaS de gestión bajo arrendamiento civil temporal.",
+          "exit_label": "REGULACIÓN SECTORIAL RESUELTA → 2.4",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Evaluación de licencias sectoriales y pivote legal",
+              "objective": "Determinar si la normativa sectorial bloquea el producto o si se resuelve con un pivote contractual.",
+              "how_to": {
+                "steps": [
+                  "Analizar los requisitos de operación como agencia de viajes o plataforma de alojamiento.",
+                  "Evaluar el impacto de la exigencia del RNT sobre el universo de fincas disponibles.",
+                  "Formular el pivote legal: clasificar la plataforma como 'Software SaaS de Gestión' y los contratos como 'arrendamiento civil temporal directo'.",
+                  "Documentar la directriz de redacción de Términos y Condiciones."
+                ],
+                "table_columns": "Requisito / Licencia | Autoridad | ¿Aplica directamente? | Restricción o Pivote Legal",
+                "table_rules": "Una fila detallando la evaluación de licencias sectoriales.",
+                "restrictions": [
+                  "No violar normativas sectoriales obligatorias.",
+                  "Explicitar en T&C la naturaleza tecnológica de la plataforma."
+                ],
+                "done_when": "Pivote contractual y regulatorio documentado."
+              },
+              "example_title": "Regulación Sectorial y Pivote Legal",
+              "example": "| Requisito / Licencia | Obligatorio | Autoridad | ¿Aplica directamente? | Restricción o Pivote |\n| --- | --- | --- | --- | --- |\n| Registro Nacional de Turismo (RNT) | Sí (para operar como OTA) | Fontur | No aplica con Pivote SaaS | Plataforma permite registrar RNT opcional o clasificar el contrato como arrendamiento civil temporal directo finquero–turista. T&C declaran naturaleza SaaS. |",
+              "link_label": "regulación va a matriz de design constraints (2.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.4",
+          "title": "Convertir cada obligación en una Design Constraint de programación",
+          "objective": "Consolidar la tabla maestra de restricciones de ingeniería accionables para el equipo de desarrollo.",
+          "input": "Análisis de privacidad (2.1), pagos (2.2) y regulación sectorial (2.3).",
+          "raw_data_title": "Consolidado de Design Constraints",
+          "raw_data": "1) Checkbox de T&C con registro de timestamp. 2) Cero almacenamiento de tarjetas con pasarela Wompi. 3) Campo RNT opcional con cláusula civil en T&C.",
+          "exit_label": "MATRIZ DE RESTRICCIONES CONSOLIDADA → Step 3",
+          "micro": [
+            {
+              "code": "2.4.1",
+              "title": "Consolidación de Design Constraints de software",
+              "objective": "Integrar todas las restricciones normativas en especificaciones de programación concretas.",
+              "how_to": {
+                "steps": [
+                  "Recopilar las restricciones derivadas de los pasos 2.1, 2.2 y 2.3.",
+                  "Redactar cada una como una orden de ingeniería precisa y no como un comentario legal.",
+                  "Asignar estado de cumplimiento: Cumplido por Diseño / Pendiente de implementación.",
+                  "Consolidar la matriz para su incorporación en el documento final."
+                ],
+                "table_columns": "Área Normativa | Obligación / Ley Aplicable | ¿Aplica? | Restricción de Diseño de Software (Design Constraint) | Estado",
+                "table_rules": "Una fila por área normativa consolidando su orden de diseño.",
+                "restrictions": [
+                  "Redacción funcional accionable para programadores.",
+                  "Ninguna obligación puede quedar sin restricción técnica asociada."
+                ],
+                "done_when": "Matriz maestra de Design Constraints consolidada."
+              },
+              "example_title": "Lista de Chequeo y Restricciones de Software",
+              "example": "| Área Normativa | Obligación / Ley Aplicable | ¿Aplica? (Sí/No) | Restricción de Diseño de Software (Design Constraint) | Estado de Cumplimiento |\n| --- | --- | --- | --- | --- |\n| **Protección de Datos** | Ley 1581 de 2012 (Habeas Data) | Sí | Backend registra timestamp de consentimiento explícito de T&C; checkbox obligatorio en UI. | Cumplido por Diseño |\n| **Pagos y Transacciones** | PCI-DSS (Seguridad Financiera) | Sí | Ningún servidor propio toca datos de tarjetas (PAN); delegación 100% a Wompi/Stripe. | Cumplido por Diseño |\n| **Regulación Sectorial** | Normativa RNT (Ley 2068 de 2020) | Sí | Plataforma permite a la finca registrar su RNT o clasificar el contrato como arrendamiento civil temporal. | Cumplido por Diseño |",
+              "link_label": "restricciones van a auditoría de bloqueos (3.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Auditoría de Bloqueos Críticos y Veredicto",
+      "summary": "Determinar si existe alguna prohibición legal insalvable que impida operar el modelo o si todas las obligaciones son absorbibles por diseño.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Verificar si existe algún bloqueo legal insalvable",
+          "objective": "Verificar si alguna restricción cumple las 3 condiciones de bloqueo insalvable para el proyecto.",
+          "input": "Matriz de restricciones de Sub-paso 2.4.",
+          "raw_data_title": "Auditoría de Bloqueos",
+          "raw_data": "Bloqueos críticos insalvables: Ninguno. Todos los riesgos legales identificados tienen pivote de diseño o mitigación contractual viable.",
+          "exit_label": "BLOQUEOS DESCARTADOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Auditoría de bloqueos insalvables",
+              "objective": "Evaluar si existen prohibiciones penales, regulatorias o comerciales insalvables.",
+              "how_to": {
+                "steps": [
+                  "Verificar si alguna norma prohíbe taxativamente el modelo sin alternativa.",
+                  "Evaluar si el costo de cumplimiento legal excede el presupuesto del proyecto.",
+                  "Confirmar que los pivotes legales propuestos (SaaS + Wompi) neutralizan las infracciones.",
+                  "Emitir dictamen de ausencia de bloqueos insalvables."
+                ],
+                "table_columns": "Riesgo Evaluado | Condición de Bloqueo | ¿Existe Pivote Viable? | Estado de Bloqueo",
+                "table_rules": "Una fila por riesgo evaluando si califica como bloqueo insalvable.",
+                "restrictions": [
+                  "Si un bloqueo no tiene pivote, el veredicto debe ser Stop.",
+                  "Evaluación estricta de viabilidad."
+                ],
+                "done_when": "Ausencia de bloqueos insalvables certificada."
+              },
+              "example_title": "Auditoría de Bloqueos",
+              "example": "- **Bloqueos Críticos Insalvables:** Ninguno.\n- **Evaluación:** La intermediación turística sin RNT se neutraliza mediante el pivote legal SaaS (contrato de arrendamiento civil temporal directo). El riesgo de datos de tarjeta se elimina por delegación a pasarela Wompi.",
+              "link_label": "bloqueos van a tabla de riesgos residuales (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Formular mitigación contractual o de diseño para riesgos residuales",
+          "objective": "Estructurar la tabla de riesgos regulatorios, normas relacionadas, impacto y mitigaciones contractuales.",
+          "input": "Riesgos identificados y mitigaciones de Sub-paso 3.1.",
+          "raw_data_title": "Riesgo Residual de Liquidación",
+          "raw_data": "Riesgo: Responsabilidad solidaria por fraude o cancelación (Estatuto del Consumidor, Ley 1480). Mitigación: Retención de liquidación hasta 24h tras check-in exitoso.",
+          "exit_label": "MITIGACIONES FORMALIZADAS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Matriz de riesgos regulatorios y mitigaciones",
+              "objective": "Estructurar los riesgos residuales con su impacto, norma y mitigación técnica/contractual.",
+              "how_to": {
+                "steps": [
+                  "Identificar los riesgos legales residuales derivados de la operación diaria (fraude, devoluciones, cancelaciones).",
+                  "Vincular cada riesgo con su norma legal relacionada (Ley 1480 del Consumidor).",
+                  "Definir la mitigación técnica o contractual precisa (retención temporal de liquidación post check-in).",
+                  "Registrar el impacto potencial en la operación comercial."
+                ],
+                "table_columns": "Riesgo Potencial | Norma Relacionada | Impacto | Mitigación Técnica o Contractual",
+                "table_rules": "Una fila por riesgo regulatorio residual evaluado.",
+                "restrictions": [
+                  "Toda mitigación debe ser ejecutable por software o cláusula contractual.",
+                  "Proteger la sostenibilidad financiera del proyecto."
+                ],
+                "done_when": "Matriz de riesgos regulatorios y mitigaciones consolidada."
+              },
+              "example_title": "Riesgos Regulatorios y Mitigaciones",
+              "example": "| Riesgo Potencial | Norma Relacionada | Impacto | Mitigación Técnica o Contractual |\n| --- | --- | --- | --- |\n| Responsabilidad Solidaria por Fraude o Cancelación | Estatuto del Consumidor (Ley 1480) | Sanción / Reclamos | El sistema retiene la liquidación hasta 24h tras el check-in exitoso en la finca. |",
+              "link_label": "mitigaciones van a veredicto final (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Emitir veredicto regulatorio y ensamblar documento final",
+          "objective": "Emitir el veredicto final (Compliant by Design) y consolidar las 5 secciones oficiales del entregable.",
+          "input": "Resultados de los Steps 1 al 3 y aprobadores técnicos.",
+          "raw_data_title": "Veredicto y Condiciones para Fase 2",
+          "raw_data": "Veredicto: Compliant by Design. Condición para Fase 2: cifrado HTTPS, almacenamiento de logs de consentimiento y delegación total a Wompi SDK. Aprobador: Julián (PM) / Laura (Tech Lead).",
+          "exit_label": "DOCUMENTO FINAL ENSAMBLADO → publica entregable",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Veredicto de despeje y ensamblaje final",
+              "objective": "Consolidar el veredicto de cumplimiento normativo y exportar el documento 05. Despeje Legal y Regulatorio.md.",
+              "how_to": {
+                "steps": [
+                  "Emitir el veredicto de despeje legal: Compliant by Design.",
+                  "Formular las directrices no funcionales (NFRs) que hereda la Fase 2.",
+                  "Integrar metadatos, contexto jurisdiccional, lista de chequeo, riesgos y veredicto en el layout oficial.",
+                  "Verificar la trazabilidad completa y emitir el documento final exportable."
+                ],
+                "table_columns": "Sección del Entregable | Contenido Principal | Verificación de Transcripción",
+                "table_rules": "Una fila por sección oficial del documento final.",
+                "restrictions": [
+                  "Transcripción fiel de todas las matrices.",
+                  "Las condiciones para Fase 2 deben incluir NFRs de seguridad."
+                ],
+                "done_when": "Documento final exportable ensamblado y certificado."
+              },
+              "example_title": "Veredicto de Cumplimiento y Ensamblaje",
+              "example": "### 5. Veredicto de Cumplimiento\n- **Veredicto:** **`Compliant by Design`**.\n- **Condición para Fase 2 (NFRs):** Obligatorio cifrado HTTPS, almacenamiento seguro de logs de consentimiento y delegación total de pagos a SDK de pasarela.\n- **Aprobador:** Julián (PM) / Laura (Tech Lead)\n\n*Resultado de Ensamblaje:* 5 secciones oficiales integradas con 100% de coherencia.",
+              "link_label": "publica entregable final"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 05. Legal and Regulatory Clearance.md",
+    "markdown": "# 5. Despeje Legal y Regulatorio\n\n### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 1 — Viabilidad Temprana (Early Viability)\n**Entregable:** 5 de 13\n**Estado:** Aprobado\n\n### 2. Contexto Jurisdiccional\n- **País / Jurisdicción:** Colombia\n- **Sector Regulado:** Turismo y Alojamiento Rural (MinCIT / Fontur)\n- **Tipos de Datos Procesados:** Datos de contacto personales y transacciones financieras tokenizadas\n\n### 3. Lista de Chequeo y Restricciones de Diseño de Software\n| Área Normativa | Obligación / Ley Aplicable | ¿Aplica? (Sí/No) | Restricción de Diseño de Software (Design Constraint) | Estado de Cumplimiento |\n| --- | --- | --- | --- | --- |\n| **Protección de Datos** | Ley 1581 de 2012 (Habeas Data) | Sí | Backend registra timestamp de consentimiento explícito de T&C; checkbox obligatorio en UI. | Cumplido por Diseño |\n| **Pagos y Transacciones** | PCI-DSS (Seguridad Financiera) | Sí | Ningún servidor propio toca datos de tarjetas (PAN); delegación 100% a Wompi/Stripe. | Cumplido por Diseño |\n| **Regulación Sectorial** | Normativa RNT (Ley 2068 de 2020) | Sí | Plataforma permite a la finca registrar su RNT o clasificar el contrato como arrendamiento civil temporal. | Cumplido por Diseño |\n\n### 4. Riesgos Regulatorios y Mitigaciones\n| Riesgo Potencial | Norma Relacionada | Impacto | Mitigación Técnica o Contractual |\n| --- | --- | --- | --- |\n| Responsabilidad Solidaria por Fraude o Cancelación | Estatuto del Consumidor (Ley 1480) | Sanción / Reclamos | El sistema retiene la liquidación hasta 24h tras el check-in exitoso en la finca. |\n\n### 5. Veredicto de Cumplimiento\n- **Veredicto:** Compliant by Design.\n- **Condición para Fase 2 (NFRs):** Obligatorio cifrado HTTPS, almacenamiento seguro de logs de consentimiento y delegación total de pagos a SDK de pasarela.\n- **Aprobador:** Julián (PM) / Laura (Tech Lead)"
+  }
+}

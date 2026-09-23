@@ -1,0 +1,202 @@
+{
+  "phase": "PHASE 4: SYSTEM MODELING",
+  "deliverable_code": "D15",
+  "deliverable": "Phase 4 RTM Update & Brief",
+  "purpose": "Actualizar horizontalmente la Matriz de Trazabilidad de Requerimientos (RTM) heredada de Fase 3 incorporando los artefactos de diseño y modelado generados en Fase 4 (Wireframes D3, Mockups D5, Diagramas de Secuencia D7 y Endpoints de API D9), ejecutando el análisis de brechas (Gap Analysis) y formalizando el cierre estricto del Phase Gate para dar paso a la Fase 5 (Arquitectura).",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Phase 3 RTM (P3-D10) | [[PHASE_3_REQUIREMENTS_ENGINEERING/10.Requirements_Traceability_Matrix/10.Requirements_Traceability_Matrix.md]] | Provee la matriz base con todos los Requerimientos Funcionales (FR) e Historias de Usuario (US). |\n| Wireframes & Mockups (D3/D5) | [[PHASE_4_SYSTEM_MODELING/3.Wireframes/3.Wireframes.md]] y [[PHASE_4_SYSTEM_MODELING/5.High_Fidelity_Mockups/5.High_Fidelity_Mockups.md]] | Confirma que cada requerimiento funcional cuenta con una pantalla de interfaz mapeada. |\n| Sequence Diagrams (D7) | [[PHASE_4_SYSTEM_MODELING/7.System_Sequence_Diagrams/7.System_Sequence_Diagrams.md]] | Confirma que cada interacción transaccional crítica cuenta con un flujo técnico de secuencia. |\n| API Conceptual Design (D9) | [[PHASE_4_SYSTEM_MODELING/9.API_Conceptual_Design/9.API_Conceptual_Design.md]] | Confirma que cada pantalla y flujo transaccional cuenta con contratos de endpoints RESTful. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Extensión Horizontal de la RTM (Horizontal RTM Extension)",
+      "summary": "Agregar a la matriz de Fase 3 las columnas de diseño de Fase 4 (Pantalla UI, Diagrama de Secuencia y Endpoint de API).",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Incorporación de Columnas de Fase 4 (Wireframes, Secuencias y Endpoints)",
+          "objective": "Trazar cada requerimiento funcional contra sus artefactos de modelado técnico y visual correspondientes.",
+          "input": "RTM de Fase 3 y catálogo de entregables D1 a D14 de Fase 4.",
+          "raw_data_title": "Matriz de Trazabilidad Extendida (Fase 3 -> Fase 4)",
+          "raw_data": "| FR-ID | Requerimiento / Historia de Usuario | D3/D5 Pantalla / Wireframe | D7 Diagrama de Secuencia | D9 Endpoint de API | Estado de Trazabilidad |\n|---|---|---|---|---|---|\n| FR-001 | Búsqueda y filtrado de fincas por departamento | `/properties` (Catálogo) | Flujo Búsqueda (Público) | `GET /api/v1/properties` | Mapeado al 100% |\n| FR-002 | Visualización de ficha técnica y disponibilidad | `/properties/:id` | Flujo Disponibilidad | `GET /api/v1/properties/:id` | Mapeado al 100% |\n| FR-003 | Creación transaccional de reserva y pago | `/checkout/:id` | `MOD-BOOKING` (Wompi + DB) | `POST /api/v1/bookings` | Mapeado al 100% |\n| FR-004 | Cancelación de reserva con política | `/trips` (Detalle Reserva) | Flujo Cancelación | `PATCH /api/v1/bookings/:id/cancel` | Mapeado al 100% |\n| FR-005 | Panel de control y métricas del anfitrión | `/host/dashboard` | Flujo Métricas Anfitrión | `GET /api/v1/host/properties` | Mapeado al 100% |\n| FR-006 | Registro y autenticación de usuarios | `/auth/login`, `/auth/register` | Flujo Auth OAuth + JWT | `POST /api/v1/auth/login` | Mapeado al 100% |",
+          "exit_label": "RTM Extendida Horizontalmente sin Celdas Nulas",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Mapeo Celda a Celda y Vinculación de Artefactos",
+              "objective": "Verificar que ningún requerimiento de Fase 3 quede sin representación visual o técnica.",
+              "how_to": {
+                "steps": [
+                  "1. Cargar las filas originales de requerimientos de la RTM de Fase 3.",
+                  "2. Crear las columnas: `D3/D5 Wireframe`, `D7 Sequence` y `D9 API Endpoint`.",
+                  "3. Mapear cada requerimiento a su ruta UI, secuencia Mermaid y contrato REST.",
+                  "4. Dejar vacía cualquier celda que no cuente con artefacto explícito para auditoría posterior."
+                ],
+                "table_columns": [
+                  "FR-ID",
+                  "Requerimiento",
+                  "Artefacto UI",
+                  "Artefacto Backend",
+                  "Comprobación"
+                ],
+                "table_rules": [
+                  "No modificar las filas ni códigos FR originales de Fase 3",
+                  "Toda celda debe contener una referencia verificable a un entregable real",
+                  "Prohibido rellenar con supuestos o aproximaciones no documentadas"
+                ],
+                "restrictions": "Nunca omitir filas de requerimientos heredados de Fase 3.",
+                "done_when": "Todas las filas de Fase 3 cuentan con sus 3 columnas de Fase 4 asociadas."
+              },
+              "example_title": "Extensión de Trazabilidad RTM",
+              "example": "```markdown\n| FR-ID | User Story | Wireframe | Sequence | API Endpoint | Status |\n|---|---|---|---|---|---|\n| FR-001 | Buscar fincas | `/properties` | Búsqueda | `GET /properties` | ✅ Mapped |\n| FR-002 | Reservar finca | `/checkout/:id` | Booking Flow | `POST /bookings` | ✅ Mapped |\n```",
+              "link_label": "RTM Extendida -> Análisis de Brechas y Sign-Off"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Análisis de Brechas y Sign-Off (Gap Analysis & Phase Gate)",
+      "summary": "Auditar la RTM extendida en busca de celdas vacías y emitir el veredicto formal de cierre de fase.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Verificación de Brechas Cero y Aprobación del Phase Gate",
+          "objective": "Ejecutar la compuerta de calidad de Fase 4 verificando que no existan GAPs huérfanos.",
+          "input": "RTM extendida del Step 1 y directivas de gobierno de proyectos.",
+          "raw_data_title": "Auditoría de Brechas (Gap Analysis)",
+          "raw_data": "| Tipo de Verificación | Requerimientos Auditados | GAPs Detectados | Estado de la Compuerta |\n|---|---|---|---|\n| Cobertura de Interfaz (Wireframes / Mockups) | 100% de FRs evaluados | 0 GAPs | APROBADO (Toda función tiene pantalla) |\n| Cobertura Dinámica (Diagramas de Secuencia) | 100% de flujos transaccionales | 0 GAPs | APROBADO (Toda transacción tiene secuencia) |\n| Cobertura de Integración (Contratos API) | 100% de endpoints requeridos | 0 GAPs | APROBADO (Todo dato tiene endpoint REST) |\n| Veredicto Global del Phase Gate | Todos los criterios satisfechos | 0 GAPs Totales | FASE 4 FORMALMENTE CERRADA |",
+          "exit_label": "Dictamen de Cierre Favorable y Brechas Cero Certificadas",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Auditoría de Integridad y Protocolo de Phase Gate",
+              "objective": "Asegurar que el sistema esté 100% modelado antes de iniciar arquitectura en Fase 5.",
+              "how_to": {
+                "steps": [
+                  "1. Escanear la matriz en búsqueda de valores nulos o celdas sin mapear.",
+                  "2. Si se detecta un GAP, bloquear el avance y generar ticket de remediación.",
+                  "3. Si el total de GAPs es cero, certificar la integridad de modelado del sistema.",
+                  "4. Emitir el dictamen formal de cierre: 'Fase 4 CIERRA'."
+                ],
+                "table_columns": [
+                  "Criterio Gate",
+                  "Hallazgos",
+                  "Impacto Arquitectura",
+                  "Dictamen"
+                ],
+                "table_rules": [
+                  "Fase 4 no puede cerrar si existe un solo GAP abierto en la RTM",
+                  "El dictamen debe documentar explícitamente el cumplimiento de los 15 entregables",
+                  "Cero tolerancia a requerimientos sin contrato de API asignado"
+                ],
+                "restrictions": "Prohibido otorgar sign-off condicional con brechas críticas pendientes.",
+                "done_when": "Auditoría completada con 0 brechas y dictamen favorable emitido."
+              },
+              "example_title": "Dictamen de Phase Gate D15",
+              "example": "```markdown\n### Dictamen de Cierre de Phase Gate:\n- **GAPs Detectados:** 0\n- **Cobertura de Requerimientos:** 100% (FR-001 a FR-015 mapeados)\n- **Estado Formal:** Fase 4 CIERRA EXITOSAMENTE\n- **Autorización:** Habilitado el inicio inmediato de Fase 5 (Architectural Design)\n```",
+              "link_label": "Cierre Certificado -> Brief Ejecutivo y Handoff"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Brief Ejecutivo y Traspaso a Fase 5 (Execution Brief & Handoff)",
+      "summary": "Sintetizar los logros, entregables producidos e hitos técnicos de la Fase 4 para la transferencia a arquitectura.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Consolidación del Dictamen de Cierre y Traspaso de Requerimientos Modelados",
+          "objective": "Articular la entrega formal del paquete de modelado de sistema al equipo de arquitectura.",
+          "input": "Resumen ejecutivo de los 15 entregables completados de Fase 4.",
+          "raw_data_title": "Inventario de Artefactos Transferidos a Fase 5",
+          "raw_data": "| Track de Modelado | Entregables Consolidados | Artefacto Clave de Transferencia |\n|---|---|---|\n| Track A: Frontend / UX | D1 a D5 completados | Sitemap, Flujos, Wireframes, UI Kit y Mockups de alta fidelidad |\n| Track B: Backend / Data | D6 a D9 completados | Modelo de Dominio ERD 3NF, Secuencias con bloques alt, Máquinas de Estado y Catálogo API |\n| Track C: Seguridad y Soporte | D10 a D15 completados | Matriz de Notificaciones, RBAC/RLS, Señales Arquitectónicas, WCAG AA e i18n |",
+          "exit_label": "Paquete de Handoff a Fase 5 Completado y Transferido",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Formulación del Brief Ejecutivo de Fase 4",
+              "objective": "Documentar el estado de preparación técnica para la toma de decisiones arquitectónicas.",
+              "how_to": {
+                "steps": [
+                  "1. Resumir la cobertura de los 3 tracks de Fase 4 (UX, Backend, Seguridad).",
+                  "2. Destacar las señales arquitectónicas clave transferidas a Fase 5 (Redis, Realtime, S3).",
+                  "3. Enlazar la RTM extendida como artefacto vivo del proyecto.",
+                  "4. Firmar el acta de cierre formal de la Fase 4."
+                ],
+                "table_columns": [
+                  "Componente",
+                  "Entregables",
+                  "Estado de Madurez",
+                  "Receptor"
+                ],
+                "table_rules": [
+                  "El brief debe servir como acta de entrega ante stakeholders técnicos",
+                  "Garantizar que todos los backlinks apunten a los entregables oficiales",
+                  "La RTM extendida debe quedar versionada para la Fase 5"
+                ],
+                "restrictions": "No admitir entregables en borrador al momento de la firma del brief.",
+                "done_when": "Brief ejecutivo completado y aprobado."
+              },
+              "example_title": "Brief de Cierre Fase 4",
+              "example": "```markdown\n## Resumen Ejecutivo de Fase 4:\n- 15 entregables completados y validados.\n- Track A (UX) y Track B (Técnico) sincronizados 1:1.\n- Seguridad perimetral (JWT) y granular (RLS) formalizadas.\n- Señales de red y datos listas para diseño de arquitectura en Fase 5.\n```",
+              "link_label": "Brief Aprobado -> Ensamblaje Documento Maestro D15"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Maestro RTM y Cierre de Fase (Assembly & Final RTM)",
+      "summary": "Compilar el entregable final D15 con la RTM extendida completa, el reporte de auditoría y la firma formal de cierre.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Publicación del Documento D15 y Cierre Integral de Fase 4",
+          "objective": "Consolidar el entregable D15 como hito contractual y documental de la metodología.",
+          "input": "RTM horizontal completa, dictamen de compuerta y brief ejecutivo.",
+          "raw_data_title": "Estructura del Entregable D15 Final",
+          "raw_data": "| Sección | Contenido Específico | Estado de Validación |\n|---|---|---|\n| Metadata Header | Proyecto, Fase 4, Estado Aprobado | Verificado |\n| Traceability Matrix Update | Tabla cruzada FR-ID -> Wireframe -> Secuencia -> Endpoint | 0 GAPs verificados |\n| Phase 4 Execution Brief | Resumen de gobernanza, señales clave y sign-off formal | Aprobado unánimemente |",
+          "exit_label": "Fase 4 Completamente Culminada al 100%",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento Maestro D15",
+              "objective": "Emitir la versión definitiva de D15 en el repositorio de documentación.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el archivo en sus 3 secciones canónicas.",
+                  "2. Incorporar la matriz completa de trazabilidad.",
+                  "3. Incluir las firmas técnicas de aprobación.",
+                  "4. Validar el 100% de cumplimiento en formato y redacción en español."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Verificación",
+                  "Normativa",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe archivar el cierre definitivo de la Fase 4",
+                  "Debe dar luz verde formal a las actividades de la Fase 5",
+                  "Preservar la trazabilidad bidireccional desde Fase 0"
+                ],
+                "restrictions": "No cerrar la fase si existe alguna inconsistencia entre modelos.",
+                "done_when": "Documento D15 publicado y verificado contra compuertas condicionales."
+              },
+              "example_title": "Estructura del Documento D15",
+              "example": "```markdown\n# Deliverable 15 (D15): Phase 4 RTM Update & Brief\n\n## 1. Traceability Matrix Update (Fase 3 -> Fase 4)\n[Tabla RTM completa]\n\n## 2. Phase 4 Execution Brief & Sign-Off\n- Veredicto: Fase 4 CIERRA.\n- Autorizado el inicio de Fase 5.\n```",
+              "link_label": "Documento Maestro Ensamblado -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Phase 4 RTM Update & Brief (D15)",
+    "markdown": "# Deliverable 15 (D15): Phase 4 RTM Update & Brief\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Estado:** Aprobado\n\n---\n\n## 1. Actualización de la Matriz de Trazabilidad de Requerimientos (RTM)\n\n*Backlink a Fase 3:* Extiende la matriz original de `[[PHASE_3_REQUIREMENTS_ENGINEERING/10.Requirements_Traceability_Matrix/10.Requirements_Traceability_Matrix.md]]` incorporando los artefactos visuales, de interacción y de datos concebidos en la Fase 4.\n\n| FR-ID | Requerimiento Funcional | D3/D5 Wireframe / Mockup | D7 Diagrama de Secuencia | D9 API Endpoint | Estado de Trazabilidad |\n|:---|:---|:---|:---|:---|:---|\n| **FR-001** | Búsqueda y filtrado de fincas por departamento y precio | `/properties` (Catálogo público) | Flujo Búsqueda (Público) | `GET /api/v1/properties` | ✅ Mapeado al 100% |\n| **FR-002** | Consulta de detalle, fotografías y disponibilidad de finca | `/properties/:id` | Flujo Disponibilidad | `GET /api/v1/properties/:id` | ✅ Mapeado al 100% |\n| **FR-003** | Creación transaccional de reserva y procesamiento de pago | `/checkout/:id` | `MOD-BOOKING` (Wompi + DB) | `POST /api/v1/bookings` | ✅ Mapeado al 100% |\n| **FR-004** | Cancelación de reserva con política de reembolso | `/trips` (Detalle de Reserva) | Flujo Cancelación | `PATCH /api/v1/bookings/:id/cancel` | ✅ Mapeado al 100% |\n| **FR-005** | Dashboard de anfitrión y métricas de ocupación | `/host/dashboard` | Flujo Métricas Anfitrión | `GET /api/v1/host/properties` | ✅ Mapeado al 100% |\n| **FR-006** | Autenticación, registro y gestión de sesión segura | `/auth/login`, `/auth/register` | Flujo OAuth + JWT | `POST /api/v1/auth/login` | ✅ Mapeado al 100% |\n| **FR-007** | Aprobación y rechazo B2B de reservas vía WhatsApp | Chat WhatsApp HSM | Flujo WA Webhook | `POST /api/v1/webhooks/whatsapp` | ✅ Mapeado al 100% |\n| **FR-008** | Publicación y curaduría de fincas con fotos | `/host/properties/new` | Flujo Publicación Finca | `POST /api/v1/properties` | ✅ Mapeado al 100% |\n\n---\n\n## 2. Análisis de Brechas (Gap Analysis) y Dictamen de Phase Gate\n\n- **Total de Requerimientos Auditados:** 8 Requerimientos Funcionales (100% de la Fase 3).\n- **Celdas Vacías / GAPs Identificados:** 0 (Cero brechas).\n- **Cobertura Visual (Track A):** 100% de los requerimientos cuentan con pantalla o componente en D3/D5.\n- **Cobertura Técnica (Track B):** 100% de los flujos transaccionales tienen secuencia en D7 y contratos REST en D9.\n- **Cobertura de Seguridad y Soporte (Track C):** 100% de las rutas tienen reglas RBAC/RLS en D11 y directivas de accesibilidad en D13.\n\n### **Dictamen Formal de Cierre:**\n> **FASE 4: SYSTEM MODELING QUEDA FORMALMENTE CERRADA Y APROBADA.**  \n> Se autoriza el paso inmediato y sin restricciones a la **Fase 5: Architectural Design**.\n\n---\n\n## 3. Síntesis de Transferencia a Fase 5 (Handoff Brief)\n\n1. **Estilo Arquitectónico:** Guiado por las señales de D12 hacia un **Monolito Modular con servicios auxiliares gestionados** (Supabase Auth/Realtime y Pasarela Wompi).\n2. **Persistencia y Almacenamiento:** Directiva estricta de **PostgreSQL con RLS nativo (D11)**, caché Redis para catálogo público (D12) y almacenamiento de imágenes en Object Storage con CDN perimetral (BLK-01).\n3. **Internacionalización y Datos:** Normalización universal a **UTC en ISO-8601** y almacenamiento monetario como **enteros en centavos** sin punto flotante (D14)."
+  }
+}

@@ -1,0 +1,175 @@
+{
+  "phase": "Phase 4",
+  "deliverable_code": "D3",
+  "deliverable": "Wireframes (Page-Centric Framework) (Wireframes y Especificación de Pantallas)",
+  "purpose": "Este entregable traslada la arquitectura de información y los flujos de usuario al plano espacial de pantallas físicas concretas. Actúa como el Director de Arte para el equipo de diseño UI/UX en Figma, entregando para cada página del sistema un blueprint exhaustivo fundamentado en Atomic Design (átomos, moléculas, organismos), heurísticas cognitivas de usabilidad (Ley de Fitts, carga mental reducida) y accesibilidad estricta WCAG AA con estados transitorios y caminos tristes.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[PHASE_4_SYSTEM_MODELING/1.Content_Strategy_Information_Architecture]] | Inventario total de páginas, sitemap jerárquico y vistas auxiliares (Fase 4, D1). |\n| [[PHASE_4_SYSTEM_MODELING/2.User_Flows_Task_Flows]] | Flujos de usuario, mapeo topológico y pasos cronológicos de interacción (Fase 4, D2). |\n| [[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification.md]] | Casos de uso atómicos, validaciones de campo y directrices de UI por módulo (Fase 3, D7). |\n| [[PHASE_3_REQUIREMENTS_ENGINEERING/6.Non-Functional_Requirements]] | Restricciones de rendimiento visual LCP < 2.5s y accesibilidad táctil (Fase 3, D6). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Inventario Topológico y Mapeo de Módulos (Master Index)",
+      "summary": "Establecer el inventario cartográfico de páginas físicas del sistema, determinando con precisión qué módulos de backend (`MOD-X`) convergen e inyectan componentes en cada pantalla.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Mapeo de Pantallas Físicas e Inyecciones Modulares",
+          "objective": "Catalogar las URLs de la aplicación identificando su ecosistema y los módulos de código responsables.",
+          "input": "Sitemap de [[PHASE_4_SYSTEM_MODELING/1.Content_Strategy_Information_Architecture]] y módulos de Fase 3.",
+          "raw_data_title": "Inventario de Pantallas y Módulos Convergentes",
+          "raw_data": "- / (Home): MOD-SRCH, MOD-PROP.\n- /search: MOD-SRCH.\n- /finca/[slug]: MOD-PROP, MOD-CAL.\n- /checkout/[id]: MOD-RSV, MOD-PAY.\n- /checkout/success: MOD-RSV.\n- /login: MOD-AUTH.\n- /onboarding: MOD-AUTH.\n- /dashboard: MOD-DASH, MOD-NOT.\n- /dashboard/calendario: MOD-CAL.",
+          "exit_label": "COMPLETE → Pantallas físicas inventariadas con módulos asignados (2.1)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Inventario Cartográfico de Pantallas e Inyección Modular",
+              "objective": "Estructurar la tabla maestra de páginas vinculando cada pantalla a su módulo funcional.",
+              "how_to": {
+                "steps": [
+                  "1. Listar las rutas URL físicas del Sitemap de D1.",
+                  "2. Identificar qué módulos de código inyectan lógica en cada interfaz.",
+                  "3. Declarar la responsabilidad funcional dominante de la pantalla."
+                ],
+                "table_columns": "ID Pantalla | Ruta Física (URL) | Ecosistema | Módulos Inyectados | Responsabilidad Funcional Dominante",
+                "table_rules": "Toda ruta debe coincidir exactamente con la arquitectura de información de D1.",
+                "restrictions": [
+                  "No diseñar páginas desconectadas de los módulos de la Fase 3",
+                  "Identificar si la vista pertenece al Marketplace B2C o al Portal B2B"
+                ],
+                "done_when": "Las 9 pantallas principales cuentan con su mapeo modular exhaustivo"
+              },
+              "example_title": "Inventario Maestro de Páginas e Inyección Modular",
+              "example": "| ID Pantalla | Ruta Física (URL) | Ecosistema | Módulos Inyectados | Responsabilidad Funcional Dominante |\n| :--- | :--- | :--- | :--- | :--- |\n| **`PAGE-01`** | `/` (Home) | B2C Marketplace | `MOD-SRCH`, `MOD-PROP` | Búsqueda pública, hero banner, categorías y fincas destacadas. |\n| **`PAGE-02`** | `/search` | B2C Marketplace | `MOD-SRCH` | Resultados de búsqueda interactiva con filtros y scroll infinito. |\n| **`PAGE-03`** | `/finca/[slug]` | B2C Marketplace | `MOD-PROP`, `MOD-CAL` | Perfil detallado, galería HD, tarifas y widget de calendario. |\n| **`PAGE-04`** | `/checkout/[id]` | B2C Transaccional | `MOD-RSV`, `MOD-PAY` | Wizard de reserva paso a paso con desglose y pasarela Wompi. |\n| **`PAGE-05`** | `/checkout/success` | B2C Transaccional | `MOD-RSV` | Pantalla de confirmación, emisión y descarga de voucher digital. |\n| **`PAGE-06`** | `/login` | B2B Portal / Shared | `MOD-AUTH` | Acceso con credenciales, rate limiting y enlace a recuperación. |\n| **`PAGE-07`** | `/onboarding` | B2B Portal | `MOD-AUTH` | Wizard de verificación KYC con subida de RUT en PDF. |\n| **`PAGE-08`** | `/dashboard` | B2B Portal | `MOD-DASH`, `MOD-NOT` | Hub de control con métricas, gráficos y centro de notificaciones. |\n| **`PAGE-09`** | `/dashboard/calendario` | B2B Portal | `MOD-CAL` | Matriz táctil de gestión de fechas, bloqueos manuales y reservas. |",
+              "link_label": "pantallas cartografiadas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Análisis Cognitivo y Patrón UX (Cognitive Load & Layout Rules)",
+      "summary": "Analizar la carga mental del usuario al ingresar a la pantalla y seleccionar el patrón de diseño UX óptimo (Split-Screen, Wizard, Sticky Sidebar) para minimizar la fricción cognitiva.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Selección de Patrones UX y Leyes de Interacción",
+          "objective": "Diagnosticar las necesidades psicológicas del usuario y prescribir la disposición espacial en desktop y móvil.",
+          "input": "Inventario de pantallas del Step 1 y requerimientos de usabilidad FURPS+ de Fase 3.",
+          "raw_data_title": "Diagnósticos Cognitivos y Patrones de Interfaz",
+          "raw_data": "- /login: Split-screen (50% formulario de foco / 50% branding relajante en desktop; 100% centrado en móvil).\n- /finca/[slug]: Sticky Summary (galería asimétrica superior y tarjeta de reserva flotante fija).\n- /checkout/[id]: Progressive Wizard (paso a paso lineal con contador de lock de 15m visible).\n- /dashboard: Card-based Dashboard (KPIs superiores, gráfica central y lista de reservas).",
+          "exit_label": "COMPLETE → Patrones UX y layouts prescritos para cada pantalla (3.1)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Análisis Cognitivo y Prescripción de Patrones UX",
+              "objective": "Documentar la justificación psicológica y espacial del layout seleccionado.",
+              "how_to": {
+                "steps": [
+                  "1. Diagnosticar la carga cognitiva y el nivel de concentración requerido en la vista.",
+                  "2. Seleccionar el patrón de diseño (Split-Screen, Wizard, Grid, Master-Detail).",
+                  "3. Definir la adaptación responsiva entre pantallas grandes (1440px) y móviles (390px)."
+                ],
+                "table_columns": "Ruta UI | Diagnóstico Cognitivo | Patrón UX Seleccionado | Justificación de Arquitectura de Interfaz",
+                "table_rules": "El patrón debe resolver directamente el dolor o necesidad del actor.",
+                "restrictions": [
+                  "Evitar sobrecargar pantallas transaccionales con elementos decorativos innecesarios",
+                  "Asegurar que los formularios mantengan el foco visual en el centro"
+                ],
+                "done_when": "Los patrones de interfaz quedan definidos con justificación cognitiva rigurosa"
+              },
+              "example_title": "Diagnósticos Cognitivos y Patrones UX Prescritos",
+              "example": "| Ruta UI | Diagnóstico Cognitivo | Patrón UX Seleccionado | Justificación de Arquitectura de Interfaz |\n| :--- | :--- | :--- | :--- |\n| **`/login`** | Usuario busca entrar rápido a trabajar; alta frustración ante errores repetitivos. | **Split-Screen** | 50% izq formulario de alta concentración; 50% der branding relajante. En mobile 100% centrado. |\n| **`/finca/[slug]`** | Exploración sensorial de imágenes y cotización rápida sin perder contexto. | **Sticky Summary + Grid** | Galería asimétrica superior y tarjeta de reserva fija (Sticky Sidebar) en desktop; bottom bar en móvil. |\n| **`/checkout/[id]`** | Ansiedad por cobros sorpresa o pérdida de fechas retenidas. | **Progressive Wizard** | Proceso en 3 pasos lineales con indicador de progreso y temporizador de lock visible. |\n| **`/dashboard`** | Supervisión ejecutiva de ingresos y alertas urgentes de huéspedes. | **Card-Based Dashboard** | KPIs numéricos superiores, gráfico central de ingresos y tabla de actividades recientes. |",
+              "link_label": "patrones UX seleccionados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Inventario de UI Atómico (Atomic Design & States)",
+      "summary": "Desglosar los componentes visuales de la pantalla en Átomos, Moléculas y Organismos, especificando las variantes de estado obligatorias (Default, Focus, Error, Disabled, Loading).",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Desglose de Átomos, Moléculas, Organismos y Variantes de Estado",
+          "objective": "Construir la biblioteca de componentes atómicos requerida en Figma para ensamblar la pantalla.",
+          "input": "Patrones UX del Step 2 y directrices de UI Kit de [[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification.md]].",
+          "raw_data_title": "Componentes Atómicos de la Pantalla de Login",
+          "raw_data": "- Átomos: AuthInput (Default, Focus, Error, Disabled), PrimaryButton (Default, Hover, Disabled, Loading), PasswordToggleIcon (Visible, Hidden).\n- Moléculas: AuthFormField (Label + AuthInput + ErrorText), PasswordToggleField (Label + AuthInput + Icon).\n- Organismos: LoginFormBlock (Formulario completo con submit y forgot password), BrandPromoPanel (Foto HD y testimonial).",
+          "exit_label": "COMPLETE → Inventario atómico completo con variantes de estado (4.1)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Inventario de Componentes de Atomic Design",
+              "objective": "Catalogar los bloques constructivos de interfaz y sus variantes visuales.",
+              "how_to": {
+                "steps": [
+                  "1. Identificar los Átomos indivisibles (inputs, botones, etiquetas, iconos).",
+                  "2. Agrupar átomos en Moléculas funcionales con validaciones.",
+                  "3. Ensamblar moléculas en Organismos complejos que materialicen el caso de uso.",
+                  "4. Especificar las variantes de estado reactivas para cada elemento."
+                ],
+                "table_columns": "Nivel Atómico | Nombre del Componente | Variantes de Estado Obligatorias | Módulo de Origen",
+                "table_rules": "Todo componente interactivo debe contar con al menos 4 estados visuales.",
+                "restrictions": [
+                  "No omitir el estado Loading con spinner para acciones asíncronas",
+                  "Garantizar consistencia con las librerías de diseño del frontend"
+                ],
+                "done_when": "El inventario atómico cubre el 100% de los componentes de la pantalla"
+              },
+              "example_title": "Inventario Atómico de Componentes y Variantes",
+              "example": "| Nivel Atómico | Nombre del Componente | Variantes de Estado Obligatorias | Módulo de Origen |\n| :--- | :--- | :--- | :--- |\n| **Átomo** | `AuthInput` | `Default`, `Focus` (Borde azul), `Error` (Borde rojo `#D92D20`), `Disabled` | `MOD-AUTH` |\n| **Átomo** | `PrimaryButton` | `Default`, `Hover`, `Active`, `Disabled` (Gris `#E5E7EB`), `Loading` (Spinner) | `MOD-AUTH` |\n| **Átomo** | `PasswordToggleIcon` | `Visible` (Ojo abierto), `Hidden` (Ojo tachado) | `MOD-AUTH` |\n| **Molécula** | `AuthFormField` | Compone: `Label` + `AuthInput` + `HelperText/ErrorText` | `MOD-AUTH` |\n| **Molécula** | `PasswordToggleField` | Compone: `Label` + `AuthInput` + `PasswordToggleIcon` | `MOD-AUTH` |\n| **Organismo** | `LoginFormBlock` | Compone: Título + Email Field + Password Field + Forgot Link + Submit Button | `MOD-AUTH` |\n| **Organismo** | `BrandPromoPanel` | Compone: Fotografía de finca en alta resolución + Testimonial de finquero aliado | `MOD-PROP` |",
+              "link_label": "inventario atómico estructurado"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Accesibilidad, Heurísticas y Designer Checklist (Figma Artboards)",
+      "summary": "Establecer las reglas de accesibilidad WCAG AA (contraste de color, touch targets mínimos de 48px) y estructurar el checklist de verificación de pantallas base, transitorias y caminos tristes para Figma.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Reglas a11y WCAG y Checklist de Estados de Pantalla",
+          "objective": "Prescribir las normas de accesibilidad y emitir el checklist de entrega para los diseñadores de producto.",
+          "input": "Componentes atómicos del Step 3 y normativas WCAG 2.1 AA.",
+          "raw_data_title": "Heurísticas de Accesibilidad y Checklist de Artboards",
+          "raw_data": "- Ley de Fitts: Botón móvil full-width 48px de alto en zona del pulgar.\n- Contraste WCAG: Textos de error #D92D20 con contraste > 4.5:1 y sacudida visual.\n- Teclado: Autofocus en primer campo, salto con Tab y submit con Enter.\n- Checklist Figma: Happy path desktop/mobile, Loading state con spinner, Client error con borde rojo, Server error con toast rate limit.",
+          "exit_label": "PUBLISH → Deliverable Completo: 3. Wireframes (Page-Centric Framework)",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Heurísticas de Accesibilidad y Designer Checklist",
+              "objective": "Consolidar las reglas de accesibilidad y validar la compuerta de calidad de wireframes.",
+              "how_to": {
+                "steps": [
+                  "1. Fijar las dimensiones táctiles mínimas para dispositivos móviles (Touch targets ≥ 48x48px).",
+                  "2. Validar que las combinaciones cromáticas de error cumplan el ratio de contraste WCAG AA > 4.5:1.",
+                  "3. Estructurar el checklist de mesas de trabajo divididas en Happy Path, Loading y Unhappy Paths.",
+                  "4. Auditar los criterios de la compuerta antes de autorizar la entrega al equipo de diseño."
+                ],
+                "table_columns": "Criterio de Calidad de Wireframing | Estado | Evidencia",
+                "table_rules": "Todos los criterios de calidad y accesibilidad deben resultar en APROBADO.",
+                "restrictions": [
+                  "Prohibido entregar wireframes sin haber dibujado los estados de error y carga",
+                  "Asegurar que el blueprint sirva como contrato directo entre diseño y código"
+                ],
+                "done_when": "El checklist de diseño está completo y aprueba los estándares de calidad"
+              },
+              "example_title": "Veredicto del Wireframing Quality Gate",
+              "example": "| Criterio de Calidad de Wireframing | Estado | Evidencia |\n| --- | --- | --- |\n| Cobertura de la Ley de Fitts | APROBADO | Botones móviles full-width con touch targets mínimos de 48x48px en zona del pulgar |\n| Contraste Accesibilidad WCAG AA | APROBADO | Textos de error con contraste > 4.5:1 sobre fondo blanco y micro-animación de sacudida |\n| Flujo de Teclado y Foco Lógico | APROBADO | Autofocus inicial en email, salto secuencial con Tab y activación de submit con Enter |\n| Estados Transitorios y de Carga | APROBADO | Botón con spinner de carga y skeleton screens definidos para estados asíncronos |\n| Manejo Exhaustivo de Caminos Tristes | APROBADO | Pantallas diseñadas para error de validación cliente y bloqueo por Rate Limit en servidor |",
+              "link_label": "wireframe blueprint aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 3. Wireframe Blueprint The Login Page.md",
+    "markdown": "# Ejemplo de Blueprint de Página: The Login Page\n\n**Objetivo Didáctico:** Enseñar a la IA cómo consolidar Patrones UX, Inventario Atómico, Accesibilidad y Listas de Tareas para una sola **PANTALLA** (URL), sirviendo de guía estricta para el humano que dibuja en Figma.\n\n---\n\n# Wireframe Specifications: `/login` (Acceso B2B)\n\n**Ruta UI:** `/login`\n**Módulos Funcionales Inyectados:** `MOD-AUTH` (Autenticación).\n\n---\n\n## 1. Análisis Cognitivo y Patrón UX Recomendado\n\n- **Diagnóstico:** El usuario quiere ingresar a su herramienta de trabajo rápido. Múltiples errores (Rate Limit) causarán frustración.\n- **Patrón Principal:** `Split-Screen (Pantalla Dividida)`. En Desktop, usa el 50% izquierdo para el formulario (fondo blanco, alta concentración) y el 50% derecho para una imagen promocional de la marca (relajación cognitiva). En Mobile, el formulario ocupa el 100%.\n\n---\n\n## 2. Inventario de UI (Atomic Design)\n\nDiseñador, asegúrate de tener estos *Master Components* en Figma antes de armar la página `/login`:\n\n### A. Átomos\n- `AuthInput` **(Obligatorio por MOD-AUTH)**: Campo de texto. *Variantes: `Default`, `Focus`, `Error` (Borde rojo).*\n- `PrimaryButton`: Botón principal. *Variantes: `Default`, `Hover`, `Disabled` (Gris), `Loading` (Spinner).*\n\n### B. Moléculas\n- `AuthFormField`: Une (`Label` + `AuthInput` + `HelperText/ErrorText`).\n- `PasswordToggleField`: Une (`AuthInput` + Icono de \"Ojo\" clickeable).\n\n### C. Organismos\n- `LoginFormBlock` **(Obligatorio por MOD-AUTH)**: Une (Título + `AuthFormField` para Email + `PasswordToggleField` + Botón \"Olvidé mi clave\" + `PrimaryButton`).\n\n---\n\n## 3. Heurísticas Espaciales y Accesibilidad (Layout Rules)\n\n1. **Ley de Fitts (Thumb Zone):**\n   - En versión Mobile (390px), el `PrimaryButton` debe tener un ancho del 100% (Full width) y una altura mínima de `48px` (Touch target estándar de iOS).\n2. **Accesibilidad (a11y) y Prevención de Errores:**\n   - Si el usuario se equivoca de clave, la Molécula `AuthFormField` debe pintar su `ErrorText` en rojo fuerte (Ej. `#D92D20`), garantizando un contraste WCAG > `4.5:1` sobre el fondo blanco. Además, el Input debe temblar ligeramente (Micro-animación).\n3. **Flujo de Teclado:**\n   - El Focus debe iniciar automáticamente en el campo \"Email\". El botón de \"Ingresar\" debe activarse al oprimir `Enter`.\n\n---\n\n## 4. The Designer Checklist (Tareas para Figma)\n\nDiseñador, marca con `[x]` cuando hayas dibujado estas mesas de trabajo (`Artboards`) para la ruta `/login`:\n\n### ✅ Pantallas Base (Happy Path)\n- `[ ]` **Desktop (1440px):** Layout Split-Screen.\n- `[ ]` **Mobile (390px):** Layout en 1 columna, centrado verticalmente.\n\n### ✅ Estados Transitorios (Mutaciones Asíncronas)\n- `[ ]` **Loading State (Obligatorio por MOD-AUTH):** El usuario oprimió \"Ingresar\". Dibuja el `PrimaryButton` deshabilitado y mostrando un icono de Spinner de carga.\n\n### ✅ Excepciones y Muros (Unhappy Paths)\n- `[ ]` **Validation Error (Client-Side):** Pantalla donde el Input de Email tiene un borde rojo con el texto \"Formato de correo inválido\".\n- `[ ]` **Auth Error Rate Limit (Obligatorio por MOD-AUTH):** Pantalla con un componente flotante (Toast) en la parte superior derecha que diga \"Credenciales incorrectas. Te quedan 4 intentos\".\n"
+  }
+}

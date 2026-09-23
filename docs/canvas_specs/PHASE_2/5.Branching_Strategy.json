@@ -1,0 +1,335 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D5",
+  "deliverable": "Branching Strategy (Estrategia de Ramas Git)",
+  "purpose": "Este entregable define cómo el equipo va a colaborar sobre los archivos físicos (o flujos No-Code) sin sobrescribir el trabajo del otro. Una estrategia de ramas equivocada (Ej. usar GitFlow clásico en un proyecto de 2 personas) genera burocracia absurda ('Merge Hell').",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_stack_decision]] | Determina si hay código que compilar o si solo hay manifiestos estáticos (P2-D3). |\n| [[example_output_team_capability]] | Define cuántas personas trabajan concurrentemente (P1-D6). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Selección de Estrategia por Volumen y Stack",
+      "summary": "Elegir entre Trunk-Based Development o GitFlow según el tamaño del equipo y la naturaleza compilable del stack.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Evaluación de Tamaño de Equipo y Tipo de Stack",
+          "objective": "Analizar la cantidad de desarrolladores concurrentes y los requisitos de compilación de código.",
+          "input": "[[example_output_stack_decision]] (D3) y [[example_output_team_capability]] (D6).",
+          "raw_data_title": "Parámetros de Equipo y Stack",
+          "raw_data": "Equipo de 1 a 2 desarrolladores. Stack compilable con Java Spring Boot y bundle JS; requiere evitar ramas de larga duración.",
+          "exit_label": "PARÁMETROS EVALUADOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Análisis de Frecuencia de Release y Overhead de Ramas",
+              "objective": "Ponderar el costo operativo de ramas múltiples frente a la necesidad de estabilidad de integración.",
+              "how_to": {
+                "steps": [
+                  "Consultar el número de contribuidores concurrentes en P1-D6.",
+                  "Evaluar si el stack de P2-D3 posee procesos de compilación y CI obligatorios.",
+                  "Comparar la sobrecarga de GitFlow clásico contra la agilidad de Trunk-Based.",
+                  "Determinar el umbral de complejidad aceptable para el flujo de trabajo."
+                ],
+                "table_columns": "Modelo Evaluado | Sobrecarga de Coordinación | Adecuación al Equipo",
+                "table_rules": "Equipos <= 3 personas deben priorizar agilidad y evitar sobre-ingeniería de ramas.",
+                "restrictions": [
+                  "Prohibido imponer GitFlow estricto a equipos pequeños sin justificación regulatoria."
+                ],
+                "done_when": "Comparativa de modelos completada con conclusión clara."
+              },
+              "example_title": "Comparativa de Estrategias de Versionado",
+              "example": "| Modelo Evaluado | Sobrecarga de Coordinación | Adecuación al Equipo |\n| --- | --- | --- |\n| GitFlow Clásico | Alta (múltiples ramas release/develop/feature) | Inadecuado (Merge hell para 2 personas) |\n| Trunk-Based Ligero | Mínima (ramas de feature efímeras directas a main) | Óptimo para releases continuos sincronizados |",
+              "link_label": "análisis de flujo pasa a selección formal (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Selección y Justificación de Estrategia Base",
+          "objective": "Formalizar la elección del modelo de ramas y fundamentar el descarte de modelos pesados.",
+          "input": "Conclusión comparativa de 1.1 y restricciones de despliegue.",
+          "raw_data_title": "Estrategia Base Seleccionada",
+          "raw_data": "Trunk-Based Development Ligero con ramas efímeras. Descarta GitFlow por burocracia innecesaria.",
+          "exit_label": "ESTRATEGIA BASE FORMALIZADA → 2.1",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Formalización del Modelo Trunk-Based Ligero",
+              "objective": "Documentar la justificación técnica de la estrategia base en la matriz de salida.",
+              "how_to": {
+                "steps": [
+                  "Redactar la justificación técnica en función de la compilación Java y linter JS.",
+                  "Explicar por qué el push directo puro es riesgoso pero GitFlow es excesivo.",
+                  "Consolidar la tabla de estrategia seleccionada.",
+                  "Asegurar el cumplimiento del pass condition de flujo ágil."
+                ],
+                "table_columns": "Estrategia Seleccionada | Justificación según Equipo/Stack",
+                "table_rules": "La justificación debe vincular directamente el tamaño del equipo con la velocidad de entrega.",
+                "restrictions": [
+                  "No dejar ambigüedad en el ciclo de vida de las ramas de características."
+                ],
+                "done_when": "Estrategia base seleccionada y justificada oficialmente."
+              },
+              "example_title": "Estrategia Base Seleccionada (Step 1 Output)",
+              "example": "| Estrategia Seleccionada | Justificación según Equipo/Stack |\n| --- | --- |\n| Trunk-Based Development Ligero (Ramas Efímeras) | Al ser un MVP de código fuente puro (Java + JS), el commit directo a main es peligroso porque puede romper el build (Java Compilation) y tirar Staging. Se requieren ramas efímeras de características (feat/...) que pasen por integración continua antes de fusionarse. |",
+              "link_label": "estrategia seleccionada pasa a definición de convenciones de commit (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Nomenclatura Estricta (Conventional Commits)",
+      "summary": "Imponer un estándar estricto de mensajes de commit para asegurar trazabilidad humana y generación automatizada de changelogs.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Adopción de Estándar Angular y Scopes de Monorepo",
+          "objective": "Definir la estructura sintáctica de los mensajes de commit y los ámbitos por carpeta del repositorio.",
+          "input": "Árbol de carpetas de [[example_output_repository_structure]] (P2-D4) y estándar Conventional Commits.",
+          "raw_data_title": "Reglas Sintácticas",
+          "raw_data": "Formato: tipo(scope): descripción corta en imperativo. Scopes: backend, frontend, docs, ci.",
+          "exit_label": "SINTAXIS Y SCOPES DEFINIDOS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Definición de Prefijos y Scopes de Capas",
+              "objective": "Establecer las reglas de composición gramatical y asociación a carpetas del proyecto.",
+              "how_to": {
+                "steps": [
+                  "Adoptar la convención Angular de Conventional Commits.",
+                  "Mapear los scopes a las carpetas del monorepo (/backend, /frontend, /docs).",
+                  "Definir el estilo imperativo y longitud máxima de la primera línea.",
+                  "Documentar ejemplos de mensajes válidos e inválidos."
+                ],
+                "table_columns": "Elemento de Commit | Regla Sintáctica | Ejemplo de Aplicación",
+                "table_rules": "Todo commit debe indicar tipo y scope cuando afecte a un componente específico.",
+                "restrictions": [
+                  "Prohibido mensajes genéricos como 'fix', 'wip' o 'cambios varios'."
+                ],
+                "done_when": "Reglas sintácticas y catálogo de scopes completamente formalizados."
+              },
+              "example_title": "Reglas de Sintaxis y Scopes",
+              "example": "| Elemento | Regla Sintáctica | Ejemplo |\n| --- | --- | --- |\n| Tipo | Minúsculas sin espacios | feat, fix, docs, chore |\n| Scope | Entre paréntesis, nombre de módulo | (backend), (frontend), (docs) |\n| Mensaje | Verbo imperativo, sin punto final | agrega servicio de lock pesimista |",
+              "link_label": "sintaxis pasa a catálogo de tipos de commit (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Catálogo de Tipos de Commit Permitidos",
+          "objective": "Especificar la lista exhaustiva de tipos de commit permitidos en el repositorio.",
+          "input": "Necesidades de versionado de código, documentación y tareas de mantenimiento.",
+          "raw_data_title": "Catálogo de Tipos",
+          "raw_data": "feat: nueva funcionalidad, fix: corrección de errores, docs: documentación, chore: dependencias/builds.",
+          "exit_label": "CATÁLOGO DE COMMITS BLOQUEADO → 3.1",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Matriz de Tipos de Commit, Uso y Ejemplos",
+              "objective": "Crear la tabla oficial de tipos de commit con su caso de uso y un ejemplo representativo del proyecto.",
+              "how_to": {
+                "steps": [
+                  "Definir el tipo feat: para nuevas funcionalidades de backend o frontend.",
+                  "Definir el tipo fix: para reparación de bugs.",
+                  "Definir el tipo docs: para actualizaciones de metodología o entregables.",
+                  "Definir el tipo chore: para dependencias de build (POM, package.json).",
+                  "Consolidar la tabla de convenciones de commit."
+                ],
+                "table_columns": "Tipo de Commit | Cuándo se usa | Ejemplo",
+                "table_rules": "Cada tipo debe incluir un ejemplo real alineado al stack Nos Fuimos de Finca.",
+                "restrictions": [
+                  "No inventar tipos exóticos que no formen parte del estándar de la industria."
+                ],
+                "done_when": "Catálogo de tipos de commit completo y documentado."
+              },
+              "example_title": "Convención de Commits (Step 2 Output)",
+              "example": "| Tipo | Uso | Ejemplo |\n| --- | --- | --- |\n| `feat:` | Nuevo requerimiento del Backend Java o Frontend JS. | `feat(backend): agrega servicio de lock pesimista` |\n| `fix:` | Corrección de bug. | `fix(frontend): repara overflow del modal B2C` |\n| `docs:` | Actualización del framework de fases. | `docs(p3): inicia historia de usuario 1` |\n| `chore:` | Actualización de dependencias o builds (POM / package.json). | `chore(backend): actualiza spring-boot a 3.x` |",
+              "link_label": "catálogo de commits pasa a políticas de protección de ramas (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Políticas de Protección de Main (Pull Requests)",
+      "summary": "Establecer las salvaguardas mecánicas para impedir que cambios defectuosos o sin verificar contaminen la rama principal.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Evaluación de Riesgo de Integración en Main",
+          "objective": "Identificar los puntos críticos de fallo que ameritan validación automática previa al merge.",
+          "input": "Estrategia Trunk-Based y requerimientos de CI/CD.",
+          "raw_data_title": "Riesgos en Main",
+          "raw_data": "Riesgo crítico: Fallo de compilación Java, pruebas unitarias rotas o linter fallido en JS tumbando staging.",
+          "exit_label": "RIESGOS DE INTEGRACIÓN EVALUADOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Definición de Bloqueos y Pipelines de Integración Continua",
+              "objective": "Vincular el éxito del pipeline de integración como condición previa obligatoria para el merge en main.",
+              "how_to": {
+                "steps": [
+                  "Identificar las comprobaciones automáticas mínimas (Java build, JS lint).",
+                  "Determinar si la rama main tolera push directo o exige Pull Request.",
+                  "Establecer la regla de pipeline en verde como compuerta de fusión.",
+                  "Asegurar que la protección evite regresiones en ambientes desplegados."
+                ],
+                "table_columns": "Comprobación Obligatoria | Herramienta Ejecutora | Criterio de Bloqueo",
+                "table_rules": "Toda integración a main debe garantizar compilación limpia en CI.",
+                "restrictions": [
+                  "Prohibido permitir bypass del pipeline automatizado en main."
+                ],
+                "done_when": "Requisitos de compuerta automática formalizados."
+              },
+              "example_title": "Comprobaciones Obligatorias de Integración",
+              "example": "| Comprobación Obligatoria | Herramienta Ejecutora | Criterio de Bloqueo |\n| --- | --- | --- |\n| Compilación Backend | Maven Clean Test | Bloquea PR si hay errores de compilación o test fallidos |\n| Linter & Build Frontend | Vite Build / ESLint | Bloquea PR si hay sintaxis inválida o bundle roto |",
+              "link_label": "comprobaciones automáticas pasan a formalización de protección (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Configuración de Reglas de PR y Aprobaciones",
+          "objective": "Definir las políticas de revisión humana y permisos de fusión en la rama principal.",
+          "input": "Capacidad del equipo y compuertas automáticas (3.1).",
+          "raw_data_title": "Reglas de Aprobación",
+          "raw_data": "Main protegida. Requiere PR, pipeline en verde y 1 aprobación visual de otro founder/dev.",
+          "exit_label": "REGLAS DE PROTECCIÓN BLOQUEADAS → 4.1",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Formalización de Políticas de Protección de Rama Main",
+              "objective": "Crear la tabla oficial de protección de ramas con los requerimientos de PR y revisiones.",
+              "how_to": {
+                "steps": [
+                  "Fijar el estado de protección para la rama main.",
+                  "Definir el número de approvals humanos requeridos (1 para equipo fundador).",
+                  "Estipular la obligación de pasar las pruebas automatizadas.",
+                  "Consolidar la tabla oficial de protección de ramas."
+                ],
+                "table_columns": "Rama | Regla Crítica | Reviews Necesarios",
+                "table_rules": "Proteger main sin crear cuellos de botella desproporcionados.",
+                "restrictions": [
+                  "No exigir múltiples approvals si el equipo solo cuenta con 1 o 2 miembros."
+                ],
+                "done_when": "Políticas de protección de rama main documentadas y listas."
+              },
+              "example_title": "Reglas de Protección de Ramas (Step 3 Output)",
+              "example": "| Rama | Regla Crítica | Reviews Necesarios |\n| --- | --- | --- |\n| `main` | Protegida. Solo se avanza mediante Pull Request. Requiere que el Pipeline de Github Actions pase en Verde (Java Build + JS Lints). | 1 (Aprobación visual de otro founder si no hay más devs). |",
+              "link_label": "protección de ramas pasa a ensamblaje final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Generar la normativa oficial de control de versiones y colaboración en equipo.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Metadatos y Modelo de Flujo",
+          "objective": "Ensamblar la ficha técnica y la sección de estrategia de flujo con su justificación técnica.",
+          "input": "Metadatos de proyecto y estrategia seleccionada (Step 1).",
+          "raw_data_title": "Metadatos y Modelo",
+          "raw_data": "Proyecto: Nos Fuimos de Finca, Fase 2, D5, Estado Aprobado. Modelo: Trunk-Based Development Ligero.",
+          "exit_label": "METADATOS Y MODELO INTEGRADOS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Integración de Modelo Git Flow y Justificación",
+              "objective": "Compilar las secciones 1 y 2 del documento oficial en formato estricto Markdown.",
+              "how_to": {
+                "steps": [
+                  "Completar la sección 1 con los metadatos oficiales del proyecto.",
+                  "Redactar la sección 2 con el modelo de ramas elegido y su justificación.",
+                  "Verificar que la terminología coincida con el stack y la capacidad del equipo.",
+                  "Asegurar orden y claridad en la presentación."
+                ],
+                "table_columns": "Sección | Contenido Compilado | Estado de Verificación",
+                "table_rules": "Respetar la numeración y estructura de la plantilla de salida.",
+                "restrictions": [
+                  "No omitir la justificación del descarte de ramas de larga duración."
+                ],
+                "done_when": "Secciones 1 y 2 compiladas con exactitud."
+              },
+              "example_title": "Compilación de Metadatos y Modelo de Ramas",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 2 — Project Kickoff\n**Entregable:** 5 de 13\n**Estado:** Aprobado\n\n### 2. Estrategia de Flujo (Git Flow)\n- **Modelo Elegido:** Trunk-Based Development Ligero (Ramas Efímeras).\n- **Justificación:** Al ser un MVP de código fuente puro (Java + JS), el commit directo a `main` es peligroso porque puede romper el build (Java Compilation) y tirar Staging. Se requieren ramas efímeras de características (`feat/...`) que pasen por integración continua antes de fusionarse.",
+              "link_label": "metadatos pasan a integración de tablas de gobernanza (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Integración de Commits, Protección y Compuerta de Fase",
+          "objective": "Incorporar las tablas de convención de commits, reglas de protección y la implicación de compuerta.",
+          "input": "Tablas de Steps 2 y 3, y condición de compuerta condicional.",
+          "raw_data_title": "Gobernanza y Compuerta D5",
+          "raw_data": "Tablas de commits y protección integradas. Condición: Proceed. Equipo capacitado en flujo de ramas.",
+          "exit_label": "GOBERNANZA Y COMPUERTA INTEGRADAS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Ensamblaje de Tablas y Evaluación de Compuerta",
+              "objective": "Integrar las secciones 3, 4 y 5 completando las reglas de colaboración y la condición de avance.",
+              "how_to": {
+                "steps": [
+                  "Insertar la tabla de tipos de Conventional Commits.",
+                  "Insertar la tabla de políticas de protección de ramas.",
+                  "Evaluar la compuerta condicional: ¿La estrategia es proporcional al equipo y tiene commits definidos?",
+                  "Redactar la declaración formal de avance (Proceed)."
+                ],
+                "table_columns": "Sección | Contenido Anexado | Veredicto de Compuerta",
+                "table_rules": "Si la estrategia crea sobrecarga injustificada, la compuerta debe detener el avance.",
+                "restrictions": [
+                  "No omitir el criterio de compuerta de fase en el documento final."
+                ],
+                "done_when": "Secciones de gobernanza y compuerta ensambladas."
+              },
+              "example_title": "Tablas de Commits, Protección y Compuerta",
+              "example": "### 3. Convención de Commits (Conventional Commits)\n| Tipo | Uso | Ejemplo |\n| --- | --- | --- |\n| `feat:` | Nuevo requerimiento del Backend Java o Frontend JS. | `feat(backend): agrega servicio de lock pesimista` |\n| `fix:` | Corrección de bug. | `fix(frontend): repara overflow del modal B2C` |\n| `docs:` | Actualización del framework de fases. | `docs(p3): inicia historia de usuario 1` |\n| `chore:` | Actualización de dependencias o builds (POM / package.json). | `chore(backend): actualiza spring-boot a 3.x` |\n\n### 4. Reglas de Protección\n| Rama | Regla Crítica | Reviews Necesarios |\n| --- | --- | --- |\n| `main` | Protegida. Solo se avanza mediante Pull Request. Requiere que el Pipeline de Github Actions pase en Verde (Java Build + JS Lints). | 1 (Aprobación visual de otro founder si no hay más devs). |\n\n### 5. Implicación de Compuerta de Fase\n- **Condición:** Proceed. Se restableció la burocracia mínima de protección de código, necesaria para lenguajes compilados y evitar caídas en producción.",
+              "link_label": "tablas ensambladas pasan a validación final y publicación (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Validación de Integridad y Publicación Oficial",
+          "objective": "Realizar la validación cruzada final y emitir el documento oficial de Estrategia de Ramas.",
+          "input": "Documento completo ensamblado y entregable de referencia.",
+          "raw_data_title": "Validación y Publicación",
+          "raw_data": "Verificado contra example_output_branching_strategy.md. Listo para adjuntar a guías de contribución.",
+          "exit_label": "ENTREGABLE D5 PUBLICADO Y COMPLETADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Emisión Oficial del Documento D5",
+              "objective": "Cerrar formalmente el entregable D5 dejándolo disponible en el directorio de documentación del proyecto.",
+              "how_to": {
+                "steps": [
+                  "Comprobar consistencia global con D3 y D4.",
+                  "Verificar formato Markdown y enlaces del artefacto.",
+                  "Confirmar la aprobación de la compuerta de fase.",
+                  "Registrar el entregable como concluido."
+                ],
+                "table_columns": "Criterio de Cierre | Estado | Registro",
+                "table_rules": "El entregable debe ser la guía oficial de contribución Git del equipo.",
+                "restrictions": [
+                  "No concluir sin validar la concordancia con la carpeta docs/ del monorepo."
+                ],
+                "done_when": "Documento D5 validado, emitido y registrado."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_branching_strategy]]`.\n\nUbicación oficial: `docs/02-project-kickoff/05. Estrategia de Ramas.md`.\nEstado: Aprobado por Compuerta de Fase.",
+              "link_label": "entrega completada - fin de flujo D5"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,200 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D3",
+  "deliverable": "Deployment Topology Decision",
+  "purpose": "Definir formalmente la infraestructura física y en la nube donde operará el sistema mediante un Architecture Decision Record (ADR-001), evaluando opciones entre Serverless/Edge, Orquestación de Contenedores y PaaS frente a las métricas de Performance y Disponibilidad de D1, y visualizando el recorrido de red desde el usuario hasta la base de datos privada.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Quality Attributes Map (P5-D1) | [[PHASE_5_ARCHITECTURAL_DESIGN/1.Quality Attributes Map/1.Quality Attributes Map.md]] | Fuente primaria de métricas cuantitativas (TTFB < 200ms, p95) y escenarios de carga. |\n| Architectural Signals Synthesis (P4-D12) | [[PHASE_4_SYSTEM_MODELING/12.Architectural_Signals/12.Architectural_Signals.md]] | Provee directivas de infraestructura: CDN perimetral, Redis Cache y Supabase Realtime. |\n| Bounded Context Formalization (P5-D2) | [[PHASE_5_ARCHITECTURAL_DESIGN/2.Bounded Context Formalization/2.Bounded Context Formalization.md]] | Determina el número de dominios funcionales a alojar de forma unificada o desacoplada. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Análisis de Necesidades de Infraestructura (Infrastructure Needs)",
+      "summary": "Evaluar las métricas de latencia y disponibilidad de D1 para seleccionar los candidatos de despliegue ideales.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Evaluación de Cargas Pico y Comparativa Serverless vs Containers",
+          "objective": "Comparar opciones de infraestructura frente a picos estacionales de tráfico y restricciones presupuestarias.",
+          "input": "Escenario 1 y 2 de D1, y bloqueadores BLK-01/BLK-02 de D12.",
+          "raw_data_title": "Matriz Comparativa de Topologías Candidatas",
+          "raw_data": "| Criterio Arquitectónico | Opción A: Serverless Edge (Vercel + Supabase) | Opción B: Container Orchestration (AWS ECS/K8s) | Opción C: Monolito VM Tradicional (EC2) |\n|---|---|---|---|\n| Latencia Global (TTFB < 200ms) | Excelente: Edge Caching e ISR nativo | Buena: Requiere configurar CloudFront manual | Pobre: Sujeto a latencia de origen único |\n| Costo Operativo Inicial | Mínimo: Facturación por uso, cero运维 | Alto: Costos fijos de cluster y DevOps dedicado | Medio: Mantenimiento continuo de parches de SO |\n| Manejo de Cargas Pico | Elástico automático en segundos | Elástico pero con retardo de warm-up en nodos | Inelástico: Requiere sobredimensionamiento estático |\n| Soporte Realtime / WebSockets | Gestionado (Supabase Realtime LISTEN/NOTIFY) | Requiere cluster Redis PubSub dedicado | Complejo: Conexiones persistentes saturan memoria |",
+          "exit_label": "Topología Serverless/BaaS Seleccionada como Óptima",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Evaluación de Restricciones Operativas y SLA",
+              "objective": "Verificar la compatibilidad de las opciones frente a los atributos de calidad.",
+              "how_to": {
+                "steps": [
+                  "1. Extraer las métricas de rendimiento y disponibilidad de D1.",
+                  "2. Evaluar el costo de mantenimiento de infraestructura frente al tamaño del equipo.",
+                  "3. Descartar opciones con sobrecarga de gestión no justificada (Kubernetes).",
+                  "4. Seleccionar la combinación de plataformas con mejor relación costo/beneficio."
+                ],
+                "table_columns": [
+                  "Topología",
+                  "Ventajas Clave",
+                  "Riesgos / Tradeoffs",
+                  "Veredicto"
+                ],
+                "table_rules": [
+                  "La topología debe garantizar cumplimiento de las métricas de D1",
+                  "Equipos pequeños deben priorizar plataformas PaaS/BaaS sobre infraestructura autogestionada",
+                  "El catálogo público debe beneficiarse de almacenamiento perimetral (Edge CDN)"
+                ],
+                "restrictions": "Prohibido adoptar Kubernetes en fase inicial sin justificación de escala extrema.",
+                "done_when": "Análisis comparativo completado con selección justificada de arquitectura de despliegue."
+              },
+              "example_title": "Evaluación de Infraestructura D3",
+              "example": "```markdown\n## Análisis de Necesidades:\n- Métrica D1: TTFB < 200ms en catálogo (95% p95).\n- Selección: Vercel Serverless (Next.js) + Supabase Cloud (PostgreSQL managed).\n- Descarte: AWS ECS/EKS por sobrecarga de mantenimiento operativo innecesario en MVP.\n```",
+              "link_label": "Infraestructura Evaluada -> Redacción del ADR-001"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Redacción del ADR-001 de Topología (ADR Formulation)",
+      "summary": "Formalizar la decisión de arquitectura bajo el formato estricto Context, Options, Decision y Consequences.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Formalización de Context, Options, Decision y Consequences",
+          "objective": "Documentar la decisión técnica inmutable con transparencia total sobre vendor lock-in y ventajas.",
+          "input": "Análisis comparativo del Step 1 y requerimientos de gobernanza.",
+          "raw_data_title": "Estructura del ADR-001 de Topología",
+          "raw_data": "| Campo ADR | Contenido Clave Formalizado |\n|---|---|\n| Título | ADR-001: Adopción de Topología Serverless PaaS (Vercel) y BaaS (Supabase Cloud) |\n| Context | Picos masivos de búsqueda en fines de semana, exigencia de TTFB < 200ms y equipo de desarrollo ágil |\n| Options Considered | 1. Vercel + Supabase BaaS (Aprobada) <br> 2. Contenedores Docker en AWS ECS/Fargate <br> 3. Monolito en VPS (DigitalOcean/EC2) |\n| Decision | Desplegar Frontend y API Routes en la red perimetral de Vercel; persistencia y Realtime en Supabase Cloud |\n| Consequences (+) | Cero administración de servidores, escalado automático, despliegues atómicos y CDN global integrada |\n| Consequences (-) | Dependencia moderada del ecosistema Vercel/Supabase (Vendor Lock-in mitiable por PostgreSQL estándar) |",
+          "exit_label": "ADR-001 Formalmente Aprobado y Registrado",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Redacción Canónica del Registro de Decisión Arquitectónica",
+              "objective": "Estructurar el documento ADR según los estándares de Michael Nygard.",
+              "how_to": {
+                "steps": [
+                  "1. Enunciar el Contexto citando explícitamente los escenarios de D1.",
+                  "2. Listar las Opciones Consideradas con sus pros y contras técnicos.",
+                  "3. Declarar la Decisión de manera inequívoca y afirmativa.",
+                  "4. Especificar Consecuencias positivas y negativas (riesgos conocidos y vendor lock-in)."
+                ],
+                "table_columns": [
+                  "Sección ADR",
+                  "Requisito de Calidad",
+                  "Comprobación"
+                ],
+                "table_rules": [
+                  "El ADR es inmutable; cambios futuros requieren un ADR que lo derogue (supersedes)",
+                  "No ocultar desventajas o costos derivados de la decisión",
+                  "Las consecuencias negativas deben incluir estrategia de mitigación"
+                ],
+                "restrictions": "Prohibido omitir la declaración de vendor lock-in cuando se adopten soluciones BaaS.",
+                "done_when": "ADR-001 completo y redactado en formato formal."
+              },
+              "example_title": "ADR-001: Topología de Despliegue",
+              "example": "```markdown\n# ADR-001: Topología Serverless PaaS/BaaS\n\n## Context\nNecesidad de cumplir SLA de catálogo y notificaciones en tiempo real.\n\n## Decision\nAdoptar Vercel (Edge/Serverless) + Supabase (PostgreSQL/Realtime).\n\n## Consequences\n- Positive: Alta elasticidad, cero gestión de parches.\n- Negative: Costo variable por invocación y dependencia de proveedor.\n```",
+              "link_label": "ADR-001 Redactado -> Diagrama de Topología de Red"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Diagrama de Topología Física y Red (Topology Diagram)",
+      "summary": "Trazar en Mermaid el flujo completo del tráfico desde los clientes hasta el almacenamiento privado y base de datos.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Diagramación Mermaid de Flujo Perimetral, Edge, Compute y DB Subnet",
+          "objective": "Visualizar las zonas de red seguras, puntos de caché y conexiones de datos.",
+          "input": "Decisión del ADR-001 y políticas perimetrales de seguridad.",
+          "raw_data_title": "Componentes de la Topología de Red",
+          "raw_data": "| Capa de Infraestructura | Entorno / Servicio | Función Específica | Nivel de Seguridad |\n|---|---|---|---|\n| Cliente Final | Navegador / App Móvil | Origen de tráfico de turistas y finqueros | Internet Pública |\n| Red Perimetral (Edge) | Vercel Edge CDN | Servir assets estáticos y páginas pre-renderizadas (ISR) | HTTPS / TLS 1.3 con Cloudflare DDoS |\n| Capa de Cómputo | Vercel Serverless (us-east-1) | Ejecución de Next.js Server Actions y endpoints API | Aislado en micro-VMs efímeras |\n| Capa de Persistencia | Supabase Managed Cloud | Base de datos PostgreSQL con RLS y Connection Pooler | VPC Privada / Acceso seguro vía SSL |\n| Almacenamiento de Objetos | Supabase Storage / S3 | Depósito de fotos 4K y contratos | URLs firmadas con CDN perimetral |",
+          "exit_label": "Diagrama de Topología Física y de Red Completado",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Modelado Visual de Infraestructura y Fronteras de Red",
+              "objective": "Construir el diagrama Mermaid de flujo físico de peticiones.",
+              "how_to": {
+                "steps": [
+                  "1. Dibujar el ingreso de usuarios a través de la red perimetral de Edge CDN.",
+                  "2. Ilustrar la bifurcación entre contenido estático (caché) y llamadas dinámicas a Serverless.",
+                  "3. Representar la base de datos en su zona protegida conectada mediante pooler seguro.",
+                  "4. Incorporar los servicios externos (Pasarela Wompi, WhatsApp API) en la periferia."
+                ],
+                "table_columns": [
+                  "Nodo",
+                  "Plataforma",
+                  "Aislamiento",
+                  "Protocolo"
+                ],
+                "table_rules": [
+                  "La base de datos nunca debe aparecer expuesta directamente sin capa de cómputo o pooler",
+                  "Todo tráfico entre capas debe utilizar conexiones encriptadas TLS/SSL",
+                  "Los diagramas deben reflejar la geolocalización de las regiones de nube"
+                ],
+                "restrictions": "No dibujar diagramas lógicos de software; este diagrama debe representar infraestructura física de red.",
+                "done_when": "Diagrama de topología validado y sin errores sintácticos."
+              },
+              "example_title": "Topología de Red en Mermaid",
+              "example": "```mermaid\ngraph LR\n    subgraph Public_Internet [Internet Pública]\n        User[\"Turista / Host (Navegador/Móvil)\"]\n    end\n    subgraph Vercel_Platform [Vercel Global Platform]\n        Edge[\"Vercel Edge Network / CDN\"]\n        Compute[\"Vercel Serverless Functions (Next.js)\"]\n    end\n    subgraph Supabase_Cloud [Supabase Cloud Infrastructure]\n        Pooler[\"Supavisor Connection Pooler\"]\n        DB[(\"PostgreSQL 16 (RLS Enabled)\")]\n        Realtime[\"Realtime Engine (Elixir / WebSockets)\"]\n        Storage[\"Object Storage (S3 Compatible)\"]\n    end\n    User -->|HTTPS / TLS 1.3| Edge\n    Edge -->|Cache Miss| Compute\n    Compute -->|Encrypted Pool| Pooler\n    Pooler --> DB\n    Compute -->|S3 API| Storage\n    User -.->|WSS| Realtime\n```",
+              "link_label": "Diagrama de Red Validado -> Ensamblaje D3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de la Topología y Consumidores Downstream (Assembly & Handoff)",
+      "summary": "Consolidar el entregable D3 y articular sus directivas para D4 (Descomposición del Sistema) y D8 (CI/CD).",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación del Documento D3 e Implicaciones para D4 (Descomposición) y D8 (CI/CD)",
+          "objective": "Publicar el entregable D3 como base inmutable de infraestructura.",
+          "input": "ADR-001, análisis de necesidades y diagrama de topología.",
+          "raw_data_title": "Directivas de Consumo Downstream",
+          "raw_data": "| Entregable Consumidor | Directiva Técnica Heredada de D3 | Impacto Operativo |\n|---|---|---|\n| D4 (System Decomposition) | La topología Vercel/Supabase soporta de forma óptima un Monolito Modular | Evita fragmentar el sistema en microservicios independientes innecesarios |\n| D8 (CI/CD Strategy) | Despliegues gestionados por Git Push en Vercel y migraciones en Supabase | Pipeline ultra ágil con entornos de Preview automáticos por Pull Request |\n| D9 (Component Diagram C4) | Los contenedores deben respetar la separación Edge / Serverless / Managed DB | El diagrama C4 Container Nivel 2 reflejará exactamente estos límites físicos |",
+          "exit_label": "Entregable D3 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento Maestro D3",
+              "objective": "Consolidar el entregable D3 en formato formal para la arquitectura del proyecto.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el archivo en sus 4 secciones canónicas: Metadata, ADR-001, Diagrama y Consumidores.",
+                  "2. Verificar que el ADR contenga las 5 partes mandatorias.",
+                  "3. Incluir las implicaciones para D4, D8 y D9.",
+                  "4. Validar el cumplimiento total de traducción al español."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Contenido",
+                  "Normativa",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe archivar formalmente la decisión de infraestructura",
+                  "Asegurar coherencia absoluta con el stack técnico decidido en Fase 2",
+                  "Verificar que el diagrama de red esté completamente etiquetado"
+                ],
+                "restrictions": "No admitir ambigüedades en la asignación de responsabilidades de nube.",
+                "done_when": "Documento D3 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Entregable D3",
+              "example": "```markdown\n# Deliverable 3 (D3): Deployment Topology Decision\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n## 2. Architectural Decision Record (ADR-001)\n[ADR completo de topología]\n\n## 3. Network / Deployment Diagram\n[Diagrama Mermaid]\n\n## 4. Downstream Consumers (D4, D8, D9)\n```",
+              "link_label": "Topología Ensamblada -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Deployment Topology Decision (D3)",
+    "markdown": "# Deliverable 3 (D3): Deployment Topology Decision\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n---\n\n## 1. Architectural Decision Record (ADR-001)\n\n### ADR-001: Adopción de Topología Serverless PaaS (Vercel) y BaaS (Supabase Cloud)\n\n#### Context\nEl marketplace \"Nos Fuimos de Finca\" experimenta una alta concentración de tráfico durante fines de semana y temporadas vacacionales, con una proporción asimétrica de lectura/escritura (100:1, señal DS-01). El mapa de atributos de calidad (`[[PHASE_5_ARCHITECTURAL_DESIGN/1.Quality Attributes Map/1.Quality Attributes Map.md]]`) exige un tiempo al primer byte (TTFB) < 200ms en catálogo y renderizado de imágenes de alta resolución en < 1.5s, todo ello operado por un equipo de desarrollo ágil y sin un departamento de DevOps dedicado.\n\n#### Options Considered\n1. **Vercel Serverless PaaS + Supabase Managed BaaS (Seleccionada):** Despliegue en el edge con renderizado incremental (ISR), funciones serverless efímeras y base de datos PostgreSQL gestionada con pooler de conexiones y Realtime nativo.\n2. **Contenedores Docker Orquestados en AWS ECS / Kubernetes (Descartada):** Ofrece control granular pero impone una sobrecarga operativa y de costos fijos desproporcionada para el estadio actual del producto.\n3. **Monolito Desplegado en Máquina Virtual Única (Descartada):** Económico inicialmente pero genera un punto único de falla (SPOF) y no escala ante ráfagas repentinas de búsqueda.\n\n#### Decision\nSe decide adoptar una **topología híbrida Serverless PaaS / BaaS**, utilizando **Vercel** para la capa de presentación, middleware y API routes, y **Supabase Cloud** para la persistencia transaccional (PostgreSQL), autenticación (Supabase Auth), almacenamiento de medios (Storage S3-compatible) y eventos en vivo (Supabase Realtime).\n\n#### Consequences\n- **Positivas:**\n  - Escalabilidad elástica instantánea ante picos de demanda turística.\n  - Latencias sub-200ms en catálogo mediante Edge Caching e ISR automático.\n  - Cero tiempo dedicado al mantenimiento de parches de sistema operativo o clusters de base de datos.\n  - Despliegues atómicos y entornos efímeros de preview por cada Pull Request.\n- **Negativas / Riesgos:**\n  - Dependencia de proveedor (Vendor Lock-in) de Vercel y Supabase, mitigada por el hecho de que Next.js puede ejecutarse en Node.js estándar y Supabase opera sobre PostgreSQL abierto.\n  - Latencia de arranque en frío (Cold Start) en funciones serverless poco utilizadas (mitigada manteniendo las rutas críticas en Node.js runtime optimizado y en Vercel Edge).\n\n---\n\n## 2. Diagrama de Topología Física y Red\n\n```mermaid\ngraph LR\n    subgraph Public_Internet [Internet Pública]\n        User[\"Turista / Host (Navegador / App Móvil)\"]\n    end\n    subgraph Vercel_Platform [Vercel Global Edge Network]\n        Edge[\"Vercel Edge CDN (Caché & Middleware)\"]\n        Compute[\"Serverless Compute (Next.js App Router)\"]\n    end\n    subgraph Supabase_Cloud [Supabase Cloud (AWS us-east-1)]\n        Pooler[\"Supavisor Connection Pooler\"]\n        DB[(\"PostgreSQL 16 Engine (RLS Enabled)\")]\n        Realtime[\"Realtime Service (WebSockets)\"]\n        Storage[\"Object Storage (S3 / CDN)\"]\n    end\n    subgraph External_Services [Servicios Externos]\n        Wompi[\"Pasarela Wompi\"]\n        Meta[\"WhatsApp Business API\"]\n    end\n\n    User -->|HTTPS / TLS 1.3| Edge\n    Edge -->|Cache Hit: <200ms| User\n    Edge -->|Dynamic Request| Compute\n    Compute -->|Encrypted Pool: Port 6543| Pooler\n    Pooler --> DB\n    Compute -->|S3 REST API| Storage\n    Compute -->|Webhook / API| Wompi\n    Compute -->|REST API| Meta\n    User -.->|WSS (Push Alerts)| Realtime\n    Realtime -.->|LISTEN/NOTIFY| DB\n```\n\n---\n\n## 3. Implicaciones para Entregables Downstream\n\n- **Hacia D4 (System Decomposition Decision):** La topología Serverless adoptada condiciona la arquitectura hacia un **Monolito Modular** en un único repositorio Next.js, evitando la fragmentación física en múltiples repositorios o microservicios que elevarían la complejidad de despliegue.\n- **Hacia D8 (CI/CD Strategy):** El pipeline se simplifica al integrarse de forma nativa con GitHub y Vercel Git Integration, con migraciones automatizadas de Supabase CLI en staging y producción.\n- **Hacia D9 (Component Diagram C4):** El diagrama C4 Container (Nivel 2) respetará estrictamente estos límites de red y protocolos de conexión."
+  }
+}

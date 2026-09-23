@@ -1,0 +1,272 @@
+{
+  "phase": "Phase 3",
+  "deliverable_code": "D3",
+  "deliverable": "Domain Glossary (Glosario de Dominio — Lenguaje Ubicuo)",
+  "purpose": "Este entregable establece el Lenguaje Ubicuo (Ubiquitous Language) del dominio bajo los principios de Domain-Driven Design (DDD). Define de forma unívoca, rigurosa y sin ambigüedades cada término de negocio, su significado canónico, límites semánticos ('Lo que NO es'), nombre técnico en código y lista taxativa de sinónimos prohibidos, asegurando coherencia conceptual absoluta entre stakeholders, especificaciones y código fuente.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[example_output_system_context_diagram]] | Actores humanos autorizados, sistemas externos integrados y contratos de datos C4 Nivel 1 (Fase 3, D1). |\n| [[example_output_actor_and_role]] | Capacidades permitidas, fronteras negativas, recursos MVP y roles técnicos (Fase 3, D2). |\n| [[example_output_mvp_definition]] | Límites de alcance funcional, módulos transaccionales y términos de negocio base (Fase 1, D9). |\n| [[example_output_stack_decision]] | Convenciones tecnológicas de backend, frontend y bases de datos relacionales (Fase 2, D3). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría y Extracción de Términos Semilla (Verify Entry)",
+      "summary": "Escanear exhaustivamente los artefactos previos aprobados para extraer todos los sustantivos y conceptos clave del negocio, clasificándolos en categorías preliminares con trazabilidad documental.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Extracción y Clasificación de Términos Crudos",
+          "objective": "Extraer los términos crudos de los inputs y clasificarlos en entidades, actores, sistemas y plataforma.",
+          "input": "[[example_output_system_context_diagram]], [[example_output_actor_and_role]] y [[example_output_mvp_definition]].",
+          "raw_data_title": "Términos Crudos Identificados en las Fuentes",
+          "raw_data": "- finca / propiedad / casa / cabaña\n- catálogo / inventario\n- disponibilidad / bloqueo de calendario\n- reserva / pre-reserva / hold\n- transacción de pago / cobro\n- voucher digital / recibo\n- turista / huésped / cliente\n- propietario / finquero / dueño\n- administrador nff\n- Wompi API / WhatsApp Cloud API / Nos Fuimos de Finca",
+          "exit_label": "COMPLETE → Términos crudos clasificados con justificación de inclusión (1.2)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Inventario de Términos Crudos y Trazabilidad",
+              "objective": "Construir la matriz de términos candidatos semilla vinculando cada vocablo a su fuente documental original.",
+              "how_to": {
+                "steps": [
+                  "1. Rastrear los sustantivos y conceptos clave en D1, D2 y P1-D9.",
+                  "2. Agruparlos preliminarmente en Entidades, Actores, Sistemas e Infraestructura.",
+                  "3. Asignar la justificación de inclusión como término semilla para el análisis semántico."
+                ],
+                "table_columns": "Término Crudo Extraído | Clasificación Inicial | Fuente Documental (Trazabilidad) | Justificación de Inclusión como Candidato Semilla",
+                "table_rules": "Todo término extraído debe contar con backlink documental verificable sin invenciones.",
+                "restrictions": [
+                  "No formalizar términos en este paso sin antes someterlos a desambiguación",
+                  "No omitir términos conflictivos o con múltiples variantes coloquiales"
+                ],
+                "done_when": "El 100% de los conceptos nucleares de las fuentes han sido inventariados con su fuente de origen"
+              },
+              "example_title": "Matriz de Términos Semilla Extraídos",
+              "example": "| Término Crudo Extraído | Clasificación Inicial | Fuente Documental (Trazabilidad) | Justificación de Inclusión como Candidato Semilla |\n| --- | --- | --- | --- |\n| **finca / propiedad / casa** | Entidad de Dominio | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 4) | Inmueble rural central sobre el cual gira toda la oferta del negocio. Requiere desambiguación. |\n| **catálogo** | Entidad de Dominio | [[example_output_actor_and_role]] (Sec. 4)<br>[[example_output_mvp_definition]] (In-Scope) | Módulo público que indexa y expone las fincas disponibles para búsqueda interactiva. |\n| **disponibilidad / bloqueo** | Entidad de Dominio | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 4) | Mecanismo de control de inventario de fechas (bloqueo manual y bloqueo temporal en checkout). |\n| **reserva / pre-reserva** | Entidad de Dominio | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 4) | Transacción central de estadía vacacional. Requiere desambiguación homonímica en Step 2. |\n| **transacción de pago** | Entidad de Dominio | [[example_output_system_context_diagram]] (Sec. 3)<br>[[example_output_actor_and_role]] (Sec. 4) | Registro transaccional monetario en COP generado por la pasarela de pagos Wompi. |\n| **voucher digital / recibo** | Entidad de Dominio | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 2) | Documento digital de confirmación emitido al turista con el código de reserva. |\n| **turista / huésped / cliente** | Actor y Rol | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 2) | Consumidor final B2C que realiza la reserva y el pago. Requiere unificación de término. |\n| **propietario / finquero** | Actor y Rol | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 2) | Anfitrión u operador rural responsable de la finca física. Requiere unificación de término. |\n| **administrador nff** | Actor y Rol | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 2) | Operador de back-office responsable de moderación, conciliación y soporte de incidencias. |\n| **Wompi API** | Sistema e Integración | [[example_output_system_context_diagram]] (Sec. 3) | Pasarela de pagos externa encargada del procesamiento financiero tokenizado en COP. |\n| **WhatsApp Cloud API** | Sistema e Integración | [[example_output_system_context_diagram]] (Sec. 3) | Servicio en la nube de Meta encargado del despacho automatizado de notificaciones HSM. |\n| **Nos Fuimos de Finca** | Plataforma Central | [[example_output_system_context_diagram]] (Sec. 4) | Sistema web central (caja negra) que orquesta el catálogo, checkout y reservas. |",
+              "link_label": "términos semilla extraídos"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Selección de Candidatos Semilla y Detección de Conflictos",
+          "objective": "Identificar los conflictos semánticos, sinonimias coloquiales y homonimias que deben resolverse en el Step 2.",
+          "input": "Matriz de términos crudos del Subpaso 1.1.",
+          "raw_data_title": "Conflictos y Ambigüedades Semánticas Detectadas",
+          "raw_data": "- Sinonimias: 'finca' vs 'propiedad' vs 'casa'; 'turista' vs 'huésped' vs 'cliente'; 'finquero' vs 'propietario'.\n- Homonimias: 'reserva' como bloqueo transitorio (checkout) vs 'reserva' como estadía confirmada y pagada.",
+          "exit_label": "COMPLETE → Conflictos semánticos listos para depuración y desambiguación (2.1)",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Focalización de Conflictos Semánticos",
+              "objective": "Aislar las inconsistencias de vocabulario entre áreas de negocio, técnicas y usuarios.",
+              "how_to": {
+                "steps": [
+                  "1. Detectar términos que refieren al mismo concepto con nombres distintos (sinonimia).",
+                  "2. Detectar términos que representan conceptos diferentes bajo la misma etiqueta (homonimia).",
+                  "3. Formular la lista de candidatos que requieren acuerdo canónico obligatorio."
+                ],
+                "table_columns": "Término Crudo Extraído | Clasificación Inicial | Fuente Documental (Trazabilidad) | Justificación de Inclusión como Candidato Semilla",
+                "table_rules": "Señalizar explícitamente qué términos requieren desambiguación profunda.",
+                "restrictions": [
+                  "No postergar la resolución de ambigüedades a etapas posteriores de diseño",
+                  "Garantizar que todo conflicto detectado pase al Step 2"
+                ],
+                "done_when": "Se tienen plenamente delimitados los puntos de fricción conceptual del vocabulario"
+              },
+              "example_title": "Términos Semilla con Conflictos Semánticos Delimitados",
+              "example": "| Término Crudo Extraído | Clasificación Inicial | Fuente Documental (Trazabilidad) | Justificación de Inclusión como Candidato Semilla |\n| --- | --- | --- | --- |\n| **finca / propiedad / casa** | Entidad de Dominio | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 4) | Inmueble rural central sobre el cual gira toda la oferta del negocio. Requiere desambiguación. |\n| **catálogo** | Entidad de Dominio | [[example_output_actor_and_role]] (Sec. 4)<br>[[example_output_mvp_definition]] (In-Scope) | Módulo público que indexa y expone las fincas disponibles para búsqueda interactiva. |\n| **disponibilidad / bloqueo** | Entidad de Dominio | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 4) | Mecanismo de control de inventario de fechas (bloqueo manual y bloqueo temporal en checkout). |\n| **reserva / pre-reserva** | Entidad de Dominio | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 4) | Transacción central de estadía vacacional. Requiere desambiguación homonímica en Step 2. |\n| **transacción de pago** | Entidad de Dominio | [[example_output_system_context_diagram]] (Sec. 3)<br>[[example_output_actor_and_role]] (Sec. 4) | Registro transaccional monetario en COP generado por la pasarela de pagos Wompi. |\n| **voucher digital / recibo** | Entidad de Dominio | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 2) | Documento digital de confirmación emitido al turista con el código de reserva. |\n| **turista / huésped / cliente** | Actor y Rol | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 2) | Consumidor final B2C que realiza la reserva y el pago. Requiere unificación de término. |\n| **propietario / finquero** | Actor y Rol | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 2) | Anfitrión u operador rural responsable de la finca física. Requiere unificación de término. |\n| **administrador nff** | Actor y Rol | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_actor_and_role]] (Sec. 2) | Operador de back-office responsable de moderación, conciliación y soporte de incidencias. |\n| **Wompi API** | Sistema e Integración | [[example_output_system_context_diagram]] (Sec. 3) | Pasarela de pagos externa encargada del procesamiento financiero tokenizado en COP. |\n| **WhatsApp Cloud API** | Sistema e Integración | [[example_output_system_context_diagram]] (Sec. 3) | Servicio en la nube de Meta encargado del despacho automatizado de notificaciones HSM. |\n| **Nos Fuimos de Finca** | Plataforma Central | [[example_output_system_context_diagram]] (Sec. 4) | Sistema web central (caja negra) que orquesta el catálogo, checkout y reservas. |",
+              "link_label": "conflictos semánticos delimitados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Análisis, Desambiguación y Depuración Semántica",
+      "summary": "Resolver sistemáticamente las sinonimias y homonimias del dominio, pactando un único término oficial acordado y estableciendo la lista de términos estrictamente prohibidos.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Identificación y Resolución de Sinonimias (Múltiples palabras para un concepto)",
+          "objective": "Elegir un único vocablo representativo para cada concepto de negocio eliminando variantes informales.",
+          "input": "Candidatos semilla del Step 1 y análisis cultural del mercado colombiano de fincas.",
+          "raw_data_title": "Acuerdos Semánticos de Sinonimia",
+          "raw_data": "- Finca: Término cultural canónico preferido sobre propiedad, villa o cabaña.\n- Turista: Distingue al comprador frente a huéspedes secundarios.\n- Propietario / Finquero: Reconoce la doble faceta jurídica y rural del anfitrión.",
+          "exit_label": "COMPLETE → Sinonimias resueltas con prohibición de términos coloquiales (2.2)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Resolución de Sinonimias y Términos Prohibidos",
+              "objective": "Consolidar los términos oficiales y declarar la lista negra de sinónimos proscritos.",
+              "how_to": {
+                "steps": [
+                  "1. Comparar los sinónimos encontrados contra el contexto del mercado y producto.",
+                  "2. Seleccionar el término oficial más preciso y representativo.",
+                  "3. Catalogar el resto de términos como Sinónimos Prohibidos en código y documentación."
+                ],
+                "table_columns": "Término Candidato (Step 1) | Concepto de Negocio | Término Oficial Acordado | Justificación Semántica de Elección | Sinónimos Estrictamente Prohibidos",
+                "table_rules": "Cada fila debe contar con al menos dos sinónimos prohibidos expresamente.",
+                "restrictions": [
+                  "No permitir el uso alternado de sinónimos en ningún artefacto de software",
+                  "No seleccionar términos en inglés para conceptos de negocio locales colombianos"
+                ],
+                "done_when": "Todos los conceptos con multiplicidad de nombres tienen su término oficial fijado"
+              },
+              "example_title": "Matriz de Depuración Semántica y Sinonimias Resueltas",
+              "example": "| Término Candidato (Step 1) | Concepto de Negocio | Término Oficial Acordado | Justificación Semántica de Elección | Sinónimos Estrictamente Prohibidos |\n| --- | --- | --- | --- | --- |\n| `finca / propiedad / casa` | Inmueble rural ofertado | **Finca** | Identidad de marca y término cultural directo del mercado vacacional en Colombia. | Casa de Campo, Propiedad, Terreno, Villa, Cabaña, Alojamiento |\n| `turista / huésped / cliente` | Usuario comprador B2C | **Turista** | Deslinda con precisión al consumidor final frente a los anfitriones y operadores. | Huésped, Cliente, Viajero, Usuario Genérico, Pasajero |\n| `propietario / finquero` | Anfitrión y operador rural | **Propietario / Finquero** | Representa al encargado operativo de la disponibilidad física de la finca. | Dueño, Host, Casero, Administrador de Finca, Arrendador |\n| `catálogo / inventario` | Agrupación pública de fincas | **Catálogo** | Representación indexada de todas las fincas publicadas y verificadas. | Inventario, Lista de casas, Portafolio, Feed de propiedades |\n| `reserva (checkout)` | Bloqueo transitorio en pasarela | **Bloqueo Temporal (Soft-Lock)** | Aislamiento atómico de fechas por 15 minutos mientras concluye el pago bancario. | Pre-reserva, Apartado, Retención provisional, Hold |\n| `reserva (confirmada)` | Estadía pagada y en firme | **Reserva Confirmada** | Estado final persistido tras la confirmación exitosa del Webhook de Wompi. | Booking cerrado, Alquiler pagado, Compra final, Lead cerrado |\n| `transacción de pago` | Registro financiero en COP | **Transacción de Pago** | Certificación monetaria emitida por la pasarela de pagos Wompi. | Cobro, Voucher bancario, Recibo de pago |\n| `voucher digital / recibo` | Comprobante de estadía | **Voucher Digital** | Documento oficial con código único de reserva y guía de acceso a la finca. | Tiquete, Recibo, Ticket, Boleta, Factura |\n| `administrador nff` | Operador de back-office | **Administrador NFF** | Rol de administración central, moderación de fincas y conciliación. | Superuser, Gestor, Gerente de Finca |\n| `Wompi API` | Pasarela de pagos externa | **Wompi API** | Servicio SaaS de procesamiento de pagos en COP (Bancolombia/PSE/Tarjetas). | Pasarela bancaria, Datafono virtual |\n| `WhatsApp Cloud API` | Mensajería cloud externa | **WhatsApp Cloud API** | Servicio en la nube de Meta para notificaciones transaccionales HSM. | Meta API, Bot de WhatsApp, Chatbot |",
+              "link_label": "sinonimias resueltas"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Identificación y Resolución de Homonimias (Una palabra para múltiples conceptos)",
+          "objective": "Deslindar vocablos sobrecargados asignando nombres técnicos especializados e inequívocos.",
+          "input": "Detección de sobrecarga en el concepto 'Reserva' (bloqueo en checkout vs estadía en firme).",
+          "raw_data_title": "Diferenciación Conceptual de Homonimia",
+          "raw_data": "- Reserva transitoria en checkout -> 'Bloqueo Temporal (Soft-Lock)' (Value Object de 15 min).\n- Reserva confirmada tras pago -> 'Reserva Confirmada' (Entidad definitiva con contrato pagado).",
+          "exit_label": "COMPLETE → Homonimias desambiguadas para modelado formal DDD (3.1)",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Desambiguación de Conceptos Homónimos",
+              "objective": "Separar estados y ciclos de vida de entidades para evitar ambigüedades en flujos de compra.",
+              "how_to": {
+                "steps": [
+                  "1. Analizar el ciclo de vida del término sobrecargado.",
+                  "2. Dividir el concepto en términos independientes según el momento temporal y contractual.",
+                  "3. Asignar definiciones mutuamente excluyentes a cada variante resultante."
+                ],
+                "table_columns": "Término Candidato (Step 1) | Concepto de Negocio | Término Oficial Acordado | Justificación Semántica de Elección | Sinónimos Estrictamente Prohibidos",
+                "table_rules": "Prohibir el uso del término genérico desprovisto de su calificador canónico.",
+                "restrictions": [
+                  "No admitir 'reserva' a secas en flujos donde la diferencia de estado sea crítica",
+                  "Garantizar que el sistema diferencie a nivel de base de datos ambos conceptos"
+                ],
+                "done_when": "Las homonimias críticas de reserva y pago quedan formalmente bifurcadas y blindadas"
+              },
+              "example_title": "Matriz de Desambiguación Homonímica Completa",
+              "example": "| Término Candidato (Step 1) | Concepto de Negocio | Término Oficial Acordado | Justificación Semántica de Elección | Sinónimos Estrictamente Prohibidos |\n| --- | --- | --- | --- | --- |\n| `finca / propiedad / casa` | Inmueble rural ofertado | **Finca** | Identidad de marca y término cultural directo del mercado vacacional en Colombia. | Casa de Campo, Propiedad, Terreno, Villa, Cabaña, Alojamiento |\n| `turista / huésped / cliente` | Usuario comprador B2C | **Turista** | Deslinda con precisión al consumidor final frente a los anfitriones y operadores. | Huésped, Cliente, Viajero, Usuario Genérico, Pasajero |\n| `propietario / finquero` | Anfitrión y operador rural | **Propietario / Finquero** | Representa al encargado operativo de la disponibilidad física de la finca. | Dueño, Host, Casero, Administrador de Finca, Arrendador |\n| `catálogo / inventario` | Agrupación pública de fincas | **Catálogo** | Representación indexada de todas las fincas publicadas y verificadas. | Inventario, Lista de casas, Portafolio, Feed de propiedades |\n| `reserva (checkout)` | Bloqueo transitorio en pasarela | **Bloqueo Temporal (Soft-Lock)** | Aislamiento atómico de fechas por 15 minutos mientras concluye el pago bancario. | Pre-reserva, Apartado, Retención provisional, Hold |\n| `reserva (confirmada)` | Estadía pagada y en firme | **Reserva Confirmada** | Estado final persistido tras la confirmación exitosa del Webhook de Wompi. | Booking cerrado, Alquiler pagado, Compra final, Lead cerrado |\n| `transacción de pago` | Registro financiero en COP | **Transacción de Pago** | Certificación monetaria emitida por la pasarela de pagos Wompi. | Cobro, Voucher bancario, Recibo de pago |\n| `voucher digital / recibo` | Comprobante de estadía | **Voucher Digital** | Documento oficial con código único de reserva y guía de acceso a la finca. | Tiquete, Recibo, Ticket, Boleta, Factura |\n| `administrador nff` | Operador de back-office | **Administrador NFF** | Rol de administración central, moderación de fincas y conciliación. | Superuser, Gestor, Gerente de Finca |\n| `Wompi API` | Pasarela de pagos externa | **Wompi API** | Servicio SaaS de procesamiento de pagos en COP (Bancolombia/PSE/Tarjetas). | Pasarela bancaria, Datafono virtual |\n| `WhatsApp Cloud API` | Mensajería cloud externa | **WhatsApp Cloud API** | Servicio en la nube de Meta para notificaciones transaccionales HSM. | Meta API, Bot de WhatsApp, Chatbot |",
+              "link_label": "homonimias desambiguadas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Formalización de los 7 Campos del Lenguaje Ubicuo (DDD)",
+      "summary": "Estructurar la ficha canónica completa de cada término oficial en los 7 campos estandarizados de Domain-Driven Design: Término Oficial, Tipo DDD, Definición Canónica, Ejemplo de Uso, Lo que NO es, Nombre en Código y Sinónimos Prohibidos.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Definición Canónica y Tipado DDD (Entidad, Value Object, Actor, Sistema)",
+          "objective": "Clasificar cada término según patrones DDD y construir su definición canónica rigurosa.",
+          "input": "Términos oficiales acordados en Step 2 y arquitectura técnica de Stack Decision (P2-D3).",
+          "raw_data_title": "Tipado DDD de Términos Oficiales",
+          "raw_data": "- Finca: Entidad con identidad propia.\n- Catálogo: Entidad/Agregado de búsqueda.\n- Bloqueo Temporal: Objeto de Valor inmutable por 15 min.\n- Reserva Confirmada: Entidad central del negocio.\n- Transacción de Pago: Entidad financiera ligada a Wompi.\n- Voucher Digital: Objeto de Valor con datos de estadía.",
+          "exit_label": "COMPLETE → Tipos DDD y definiciones canónicas estructuradas (3.2)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Tipificación DDD y Redacción Canónica",
+              "objective": "Asignar la taxonomía DDD exacta y redactar la definición sin ambigüedad conceptual.",
+              "how_to": {
+                "steps": [
+                  "1. Clasificar el término en Entidad, Objeto de Valor, Actor o Sistema Externo.",
+                  "2. Redactar una definición concisa centrada en la responsabilidad de negocio del concepto.",
+                  "3. Validar que la definición utilice vocabulario canónico del propio glosario."
+                ],
+                "table_columns": "Término Oficial | Tipo DDD | Definición Canónica | Ejemplo de Uso | Lo que NO es | Nombre en Código | Sinónimos Prohibidos",
+                "table_rules": "Toda definición debe ser afirmativa y autosuficiente.",
+                "restrictions": [
+                  "No confundir Entidades (con identidad propia mutable) con Objetos de Valor (inmutables sin ID)",
+                  "No utilizar definiciones circulares"
+                ],
+                "done_when": "Los 11 términos oficiales cuentan con Tipo DDD y definición canónica aprobada"
+              },
+              "example_title": "Definiciones Canónicas y Clasificación DDD",
+              "example": "| Término Oficial | Tipo DDD | Definición Canónica | Ejemplo de Uso | Lo que NO es | Nombre en Código | Sinónimos Prohibidos |\n| --- | --- | --- | --- | --- | --- | --- |\n| **Finca** | Entidad | Inmueble rural registrado y verificado disponible para alquiler vacacional por noches completas. | *\"El turista visualiza las fotos y características de la Finca en el catálogo.\"* | No es un hotel urbano, habitación compartida ni terreno sin edificación. | `property` / `Property` | Casa de Campo, Propiedad, Terreno, Villa, Cabaña, Alojamiento |\n| **Catálogo** | Entidad | Agrupación indexada de todas las fincas publicadas y activas para consulta pública. | *\"El sistema filtra el Catálogo según destino y rango de fechas.\"* | No es una base de datos desordenada ni un listado de fincas inactivas. | `catalog` / `PropertyCatalog` | Inventario, Lista de Casas, Portafolio, Feed |\n| **Bloqueo Temporal** | Objeto de Valor | Reserva atómica transitoria de 15 minutos que retiene fechas mientras se concluye el pago en pasarela. | *\"Se genera un Bloqueo Temporal al presionar el botón Pagar con Wompi.\"* | No es una reserva confirmada ni un compromiso de pago vinculante. | `temporary_lock` / `TemporaryLock` | Pre-reserva, Apartado, Retención provisional, Hold |\n| **Reserva Confirmada** | Entidad | Contrato transaccional definitivo de estadía originado tras la confirmación exitosa de pago en Wompi. | *\"Al recibir el webhook de pago, el sistema transiciona a Reserva Confirmada.\"* | No es una solicitud pendiente ni un intento de compra fallido. | `booking` / `Booking` | Booking cerrado, Alquiler pagado, Compra final, Lead |\n| **Transacción de Pago** | Entidad | Registro financiero emitido por Wompi que certifica el cobro del monto de la reserva en COP. | *\"La Transacción de Pago contiene la referencia única de Wompi y el estado APPROVED.\"* | No es una factura tributaria DIAN ni un recibo de caja manual. | `payment_transaction` / `PaymentTransaction` | Cobro, Voucher bancario, Recibo de pago |\n| **Voucher Digital** | Objeto de Valor | Documento electrónico emitido al turista con el código unívoco de reserva e instrucciones de llegada. | *\"El turista descarga su Voucher Digital tras la confirmación de la reserva.\"* | No es un tiquete de transporte ni un contrato legal físico. | `digital_voucher` / `DigitalVoucher` | Tiquete, Recibo, Ticket, Boleta, Factura |\n| **Turista** | Actor Primario | Usuario final B2C que explora el catálogo, cotiza y adquiere reservas en la plataforma web. | *\"El Turista ingresa sus datos personales en el checkout.\"* | No es una agencia intermediaria ni un operador administrativo. | `tourist_user` / `TouristUser` | Huésped, Cliente, Viajero, Usuario Genérico |\n| **Propietario / Finquero** | Actor Primario | Anfitrión rural responsable de la administración de disponibilidad física de sus fincas asignadas. | *\"El Propietario / Finquero bloquea fechas de fin de año en su calendario.\"* | No es el administrador técnico de la plataforma ni un empleado de soporte. | `farm_owner` / `FarmOwner` | Dueño, Host, Casero, Administrador de Finca |\n| **Administrador NFF** | Actor Secundario | Operador de back-office responsable de moderar publicaciones, conciliar pagos y atender soporte. | *\"El Administrador NFF aprueba la publicación de una nueva finca.\"* | No es el dueño legal de los inmuebles ni un agente bancario externo. | `nff_admin` / `NffAdmin` | Superuser, Gestor, Gerente de Finca |\n| **Wompi API** | Sistema Externo | Pasarela de pagos encargada del procesamiento seguro de cobros en COP (PSE, tarjetas, Nequi). | *\"El sistema envía la intención de cobro hacia la Wompi API.\"* | No es una cuenta bancaria propia ni un módulo contable interno. | `wompi_gateway` / `WompiGateway` | Pasarela bancaria, Datafono virtual |\n| **WhatsApp Cloud API** | Sistema Externo | Servicio en la nube de Meta utilizado para el despacho automatizado de notificaciones HSM. | *\"El sistema dispara un mensaje HSM vía WhatsApp Cloud API al finquero.\"* | No es un bot de chat libre ni una cuenta personal de WhatsApp. | `whatsapp_cloud_api` / `WhatsAppService` | Meta API, Bot de WhatsApp, Chatbot |",
+              "link_label": "definiciones DDD formalizadas"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Límites Semánticos, Ejemplos de Uso y Convenciones en Código",
+          "objective": "Fijar 'Lo que NO es' (deslinde negativo), redactar ejemplos prácticos de uso y estandarizar el naming técnico.",
+          "input": "Convenciones Spring Boot / TypeScript de Stack Decision (P2-D3) y exclusiones de Step 2.",
+          "raw_data_title": "Límites Negativos y Naming en Código",
+          "raw_data": "- Finca: No es hotel ni terreno baldío -> `property` / `Property`\n- Catálogo: No es listado sin filtrar -> `catalog` / `PropertyCatalog`\n- Bloqueo Temporal: No es reserva firme -> `temporary_lock` / `TemporaryLock`\n- Reserva Confirmada: No es cotización -> `booking` / `Booking`\n- Turista: No es intermediario -> `tourist_user` / `TouristUser`",
+          "exit_label": "COMPLETE → 7 campos completados para todos los términos de dominio (3.3)",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Fijación de Límites Semánticos y Nombres Técnicos",
+              "objective": "Completar la delimitación negativa, casos prácticos y variables técnicas para desarrollo.",
+              "how_to": {
+                "steps": [
+                  "1. Redactar una frase contextual real de uso en el software para cada término.",
+                  "2. Especificar explícitamente 'Lo que NO es' para evitar desbordes de alcance.",
+                  "3. Declarar el identificador técnico en snake_case / PascalCase para backend y base de datos."
+                ],
+                "table_columns": "Término Oficial | Tipo DDD | Definición Canónica | Ejemplo de Uso | Lo que NO es | Nombre en Código | Sinónimos Prohibidos",
+                "table_rules": "El campo 'Nombre en Código' debe incluir la variable en snake_case y clase en PascalCase.",
+                "restrictions": [
+                  "No dejar vacío el campo 'Lo que NO es'",
+                  "Asegurar nombres técnicos en inglés idiomático estándar"
+                ],
+                "done_when": "La tabla formalizada de 7 campos está completa para el 100% de los términos de dominio"
+              },
+              "example_title": "Tabla Canónica Formalizada de los 7 Campos del Lenguaje Ubicuo",
+              "example": "| Término Oficial | Tipo DDD | Definición Canónica | Ejemplo de Uso | Lo que NO es | Nombre en Código | Sinónimos Prohibidos |\n| --- | --- | --- | --- | --- | --- | --- |\n| **Finca** | Entidad | Inmueble rural registrado y verificado disponible para alquiler vacacional por noches completas. | *\"El turista visualiza las fotos y características de la Finca en el catálogo.\"* | No es un hotel urbano, habitación compartida ni terreno sin edificación. | `property` / `Property` | Casa de Campo, Propiedad, Terreno, Villa, Cabaña, Alojamiento |\n| **Catálogo** | Entidad | Agrupación indexada de todas las fincas publicadas y activas para consulta pública. | *\"El sistema filtra el Catálogo según destino y rango de fechas.\"* | No es una base de datos desordenada ni un listado de fincas inactivas. | `catalog` / `PropertyCatalog` | Inventario, Lista de Casas, Portafolio, Feed |\n| **Bloqueo Temporal** | Objeto de Valor | Reserva atómica transitoria de 15 minutos que retiene fechas mientras se concluye el pago en pasarela. | *\"Se genera un Bloqueo Temporal al presionar el botón Pagar con Wompi.\"* | No es una reserva confirmada ni un compromiso de pago vinculante. | `temporary_lock` / `TemporaryLock` | Pre-reserva, Apartado, Retención provisional, Hold |\n| **Reserva Confirmada** | Entidad | Contrato transaccional definitivo de estadía originado tras la confirmación exitosa de pago en Wompi. | *\"Al recibir el webhook de pago, el sistema transiciona a Reserva Confirmada.\"* | No es una solicitud pendiente ni un intento de compra fallido. | `booking` / `Booking` | Booking cerrado, Alquiler pagado, Compra final, Lead |\n| **Transacción de Pago** | Entidad | Registro financiero emitido por Wompi que certifica el cobro del monto de la reserva en COP. | *\"La Transacción de Pago contiene la referencia única de Wompi y el estado APPROVED.\"* | No es una factura tributaria DIAN ni un recibo de caja manual. | `payment_transaction` / `PaymentTransaction` | Cobro, Voucher bancario, Recibo de pago |\n| **Voucher Digital** | Objeto de Valor | Documento electrónico emitido al turista con el código unívoco de reserva e instrucciones de llegada. | *\"El turista descarga su Voucher Digital tras la confirmación de la reserva.\"* | No es un tiquete de transporte ni un contrato legal físico. | `digital_voucher` / `DigitalVoucher` | Tiquete, Recibo, Ticket, Boleta, Factura |\n| **Turista** | Actor Primario | Usuario final B2C que explora el catálogo, cotiza y adquiere reservas en la plataforma web. | *\"El Turista ingresa sus datos personales en el checkout.\"* | No es una agencia intermediaria ni un operador administrativo. | `tourist_user` / `TouristUser` | Huésped, Cliente, Viajero, Usuario Genérico |\n| **Propietario / Finquero** | Actor Primario | Anfitrión rural responsable de la administración de disponibilidad física de sus fincas asignadas. | *\"El Propietario / Finquero bloquea fechas de fin de año en su calendario.\"* | No es el administrador técnico de la plataforma ni un empleado de soporte. | `farm_owner` / `FarmOwner` | Dueño, Host, Casero, Administrador de Finca |\n| **Administrador NFF** | Actor Secundario | Operador de back-office responsable de moderar publicaciones, conciliar pagos y atender soporte. | *\"El Administrador NFF aprueba la publicación de una nueva finca.\"* | No es el dueño legal de los inmuebles ni un agente bancario externo. | `nff_admin` / `NffAdmin` | Superuser, Gestor, Gerente de Finca |\n| **Wompi API** | Sistema Externo | Pasarela de pagos encargada del procesamiento seguro de cobros en COP (PSE, tarjetas, Nequi). | *\"El sistema envía la intención de cobro hacia la Wompi API.\"* | No es una cuenta bancaria propia ni un módulo contable interno. | `wompi_gateway` / `WompiGateway` | Pasarela bancaria, Datafono virtual |\n| **WhatsApp Cloud API** | Sistema Externo | Servicio en la nube de Meta utilizado para el despacho automatizado de notificaciones HSM. | *\"El sistema dispara un mensaje HSM vía WhatsApp Cloud API al finquero.\"* | No es un bot de chat libre ni una cuenta personal de WhatsApp. | `whatsapp_cloud_api` / `WhatsAppService` | Meta API, Bot de WhatsApp, Chatbot |",
+              "link_label": "tabla de 7 campos completada"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar y estructurar formalmente el Glosario de Dominio en el documento unificado y validar los criterios de calidad semántica antes de su aprobación.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación Formal y Semantic Quality Gate",
+          "objective": "Verificar la compuerta de calidad semántica y consolidar el artefacto exportable de Lenguaje Ubicuo.",
+          "input": "Resultados de Step 1, Step 2 y Step 3 consolidados.",
+          "raw_data_title": "Metadatos y Verificación de Compuerta",
+          "raw_data": "Proyecto: Nos Fuimos de Finca | Fase: 3 — Ingeniería de Requisitos | Entregable: 3 de 9 | Estado: Aprobado.\nCriterios: Cobertura total, Erradicación de ambigüedades, Convenciones de código y Taxonomía DDD.",
+          "exit_label": "PUBLISH → Deliverable Completo: 3. Glosario de Dominio (Lenguaje Ubicuo)",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Semantic Quality Gate y Aprobación Canónica",
+              "objective": "Auditar que el glosario cumple con los 4 pilares de consistencia semántica antes de avanzar a D4.",
+              "how_to": {
+                "steps": [
+                  "1. Verificar que no exista ningún concepto huérfano sin definición.",
+                  "2. Validar que la tabla contenga los 7 campos normativos completos.",
+                  "3. Emitir el veredicto formal de la compuerta de fase autorizando la transición a D4."
+                ],
+                "table_columns": "Criterio de Calidad Semántica | Estado | Evidencia",
+                "table_rules": "Todos los criterios deben resultar en APROBADO sin excepciones.",
+                "restrictions": [
+                  "No aprobar el documento si existen celdas vacías en la tabla de 7 campos",
+                  "No tolerar sinónimos ambiguos sin catalogar"
+                ],
+                "done_when": "El documento cumple el 100% de los criterios del Semantic Quality Gate"
+              },
+              "example_title": "Veredicto del Semantic Quality Gate",
+              "example": "| Criterio de Calidad Semántica | Estado | Evidencia |\n| --- | --- | --- |\n| Cobertura Total de Actores y Sistemas | APROBADO | El 100% de actores de D1/D2 y sistemas externos están formalizados en el glosario |\n| Erradicación de Ambigüedades | APROBADO | Se resolvieron todas las sinonimias y homonimias identificadas con lista de términos prohibidos |\n| Alineación Técnica de Código | APROBADO | Identificadores en código compatibles con Spring Boot, JPA y PostgreSQL |\n| Clasificación DDD Rigurosa | APROBADO | Entidades, Objetos de Valor y Sistemas Externos deslindados formalmente |",
+              "link_label": "glosario aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 3. Glosario de Dominio.md",
+    "markdown": "# 3. Glosario de Dominio (Lenguaje Ubicuo)\n\n### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 3 — Ingeniería de Requisitos\n**Entregable:** 3 de 9\n**Estado:** Aprobado\n\n---\n\n### 2. Glosario de Términos Oficiales (Lenguaje Ubicuo)\n\n| Término Oficial            | Tipo DDD         | Definición Canónica                                                                                    | Ejemplo de Uso                                                                         | Lo que NO es                                                               | Nombre en Código                             | Sinónimos Prohibidos                                          |\n| -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------- |\n| **Finca**                  | Entidad          | Inmueble rural registrado y verificado disponible para alquiler vacacional por noches completas.       | *\"El turista visualiza las fotos y características de la Finca en el catálogo.\"*       | No es un hotel urbano, habitación compartida ni terreno sin edificación.   | `property` / `Property`                      | Casa de Campo, Propiedad, Terreno, Villa, Cabaña, Alojamiento |\n| **Catálogo**               | Entidad          | Agrupación indexada de todas las fincas publicadas y activas para consulta pública.                    | *\"El sistema filtra el Catálogo según destino y rango de fechas.\"*                     | No es una base de datos desordenada ni un listado de fincas inactivas.     | `catalog` / `PropertyCatalog`                | Inventario, Lista de Casas, Portafolio, Feed                  |\n| **Bloqueo Temporal**       | Objeto de Valor  | Reserva atómica transitoria de 15 minutos que retiene fechas mientras se concluye el pago en pasarela. | *\"Se genera un Bloqueo Temporal al presionar el botón Pagar con Wompi.\"*               | No es una reserva confirmada ni un compromiso de pago vinculante.          | `temporary_lock` / `TemporaryLock`           | Pre-reserva, Apartado, Retención provisional, Hold            |\n| **Reserva Confirmada**     | Entidad          | Contrato transaccional definitivo de estadía originado tras la confirmación exitosa de pago en Wompi.  | *\"Al recibir el webhook de pago, el sistema transiciona a Reserva Confirmada.\"*        | No es una solicitud pendiente ni un intento de compra fallido.             | `booking` / `Booking`                        | Booking cerrado, Alquiler pagado, Compra final, Lead          |\n| **Transacción de Pago**    | Entidad          | Registro financiero emitido por Wompi que certifica el cobro del monto de la reserva en COP.           | *\"La Transacción de Pago contiene la referencia única de Wompi y el estado APPROVED.\"* | No es una factura tributaria DIAN ni un recibo de caja manual.             | `payment_transaction` / `PaymentTransaction` | Cobro, Voucher bancario, Recibo de pago                       |\n| **Voucher Digital**        | Objeto de Valor  | Documento electrónico emitido al turista con el código unívoco de reserva e instrucciones de llegada.  | *\"El turista descarga su Voucher Digital tras la confirmación de la reserva.\"*         | No es un tiquete de transporte ni un contrato legal físico.                | `digital_voucher` / `DigitalVoucher`         | Tiquete, Recibo, Ticket, Boleta, Factura                      |\n| **Turista**                | Actor Primario   | Usuario final B2C que explora el catálogo, cotiza y adquiere reservas en la plataforma web.            | *\"El Turista ingresa sus datos personales en el checkout.\"*                            | No es una agencia intermediaria ni un operador administrativo.             | `tourist_user` / `TouristUser`               | Huésped, Cliente, Viajero, Usuario Genérico                   |\n| **Propietario / Finquero** | Actor Primario   | Anfitrión rural responsable de la administración de disponibilidad física de sus fincas asignadas.     | *\"El Propietario / Finquero bloquea fechas de fin de año en su calendario.\"*           | No es el administrador técnico de la plataforma ni un empleado de soporte. | `farm_owner` / `FarmOwner`                   | Dueño, Host, Casero, Administrador de Finca                   |\n| **Administrador NFF**      | Actor Secundario | Operador de back-office responsable de moderar publicaciones, conciliar pagos y atender soporte.       | *\"El Administrador NFF aprueba la publicación de una nueva finca.\"*                    | No es el dueño legal de los inmuebles ni un agente bancario externo.       | `nff_admin` / `NffAdmin`                     | Superuser, Gestor, Gerente de Finca                           |\n| **Wompi API**              | Sistema Externo  | Pasarela de pagos encargada del procesamiento seguro de cobros en COP (PSE, tarjetas, Nequi).          | *\"El sistema envía la intención de cobro hacia la Wompi API.\"*                         | No es una cuenta bancaria propia ni un módulo contable interno.            | `wompi_gateway` / `WompiGateway`             | Pasarela bancaria, Datafono virtual                           |\n| **WhatsApp Cloud API**     | Sistema Externo  | Servicio en la nube de Meta utilizado para el despacho automatizado de notificaciones HSM.             | *\"El sistema dispara un mensaje HSM vía WhatsApp Cloud API al finquero.\"*              | No es un bot de chat libre ni una cuenta personal de WhatsApp.             | `whatsapp_cloud_api` / `WhatsAppService`     | Meta API, Bot de WhatsApp, Chatbot                            |\n\n---\n\n### 3. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No.\n- **Condición:** Proceed. Lenguaje ubicuo acordado, formalizado bajo los 7 campos de DDD y blindado contra ambigüedades semánticas. La totalidad de actores de D2 y sistemas de D1 cuentan con nombres y tipos técnicos normalizados para guiar los requerimientos funcionales y la arquitectura de software.\n"
+  }
+}

@@ -21,13 +21,14 @@ from PySide6.QtWidgets import (
     QTabBar, QStackedWidget, QScrollArea, QMessageBox, QInputDialog,
     QSizePolicy, QLayout, QMenu, QFileDialog, QApplication, QDialog,
 )
-from PySide6.QtCore import Qt, Signal, QTimer, QObject, QRunnable, QThreadPool, QUrl
+from PySide6.QtCore import Qt, Signal, QTimer, QObject, QRunnable, QThreadPool, QUrl, QMimeData, QPoint
 from PySide6.QtGui import (
     QTextCursor, QTextCharFormat, QFont, QTextListFormat, QTextBlockFormat,
-    QKeySequence, QShortcut, QDesktopServices,
+    QKeySequence, QShortcut, QDesktopServices, QDrag, QPainter, QColor, QPen,
 )
 
 from ....config import AppConfig
+from ... import theme
 from ....core.vault_manager import VaultManager
 from ....core.notes_service import NotesService
 from ....core import markdown_utils, attachments
@@ -114,7 +115,7 @@ class _OpenNote:
         self.path = Path(path)
         self.frontmatter = frontmatter
         self.body = body
-        self.kind = kind           # "note" or "code"
+        self.kind = kind           # "note", "code", or "canvas"
         self.dirty = False
         self.pinned = False
         self._checked_body = None
@@ -133,8 +134,47 @@ class _OpenNote:
         return self.kind == "code"
 
     @property
+    def is_canvas(self) -> bool:
+        return self.kind == "canvas"
+
+    @property
     def title(self) -> str:
         return self.path.name if self.is_code else self.path.stem
+
+
+class _DraggableTabBar(QTabBar):
+    def __init__(self, editor, parent=None):
+        super().__init__(parent)
+        self.editor = editor
+        self._drag_start_pos = None
+        self._drag_tab_idx = -1
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_start_pos = event.position().toPoint()
+            self._drag_tab_idx = self.tabAt(self._drag_start_pos)
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if (event.buttons() & Qt.LeftButton) and self._drag_start_pos and self._drag_tab_idx >= 0:
+            dist = (event.position().toPoint() - self._drag_start_pos).manhattanLength()
+            if dist > QApplication.startDragDistance():
+                if not self.rect().contains(event.position().toPoint()):
+                    self._start_drag()
+                    return
+        super().mouseMoveEvent(event)
+
+    def _start_drag(self):
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData("application/x-notevault-tab", b"tab")
+        drag.setMimeData(mime)
+        from .split_notes import SplitNotes
+        SplitNotes._drag_source = (self.editor, self._drag_tab_idx)
+        drag.exec(Qt.MoveAction)
+        SplitNotes._drag_source = None
+        self._drag_start_pos = None
+        self._drag_tab_idx = -1
 
 
 class MarkdownEditor(QWidget):
@@ -145,6 +185,9 @@ class MarkdownEditor(QWidget):
     assistant_toggled   = Signal()
     reveal_requested    = Signal(Path)
     context_action_requested = Signal(str, str, dict)
+    split_requested     = Signal()          # user asked to split this pane (horizontal)
+    split_down_requested = Signal()         # user asked to split down (vertical)
+    became_empty        = Signal()          # last tab closed (for pane closing)
 
     def __init__(self, vault: VaultManager, service: NotesService, parent=None):
         super().__init__(parent)
@@ -177,8 +220,16 @@ class MarkdownEditor(QWidget):
         root.setSpacing(0)
 
         root.addWidget(self._build_tab_row())
-        root.addWidget(self._build_toolbar())
+        self._toolbar_bar = self._build_toolbar()
+        # Wrap the format bar so a narrow pane scrolls it horizontally instead
+        # of being forced wide by the full button row (responsive split panes).
+        self._toolbar_host = self._wrap_hscroll(self._toolbar_bar, 38)
+        root.addWidget(self._toolbar_host)
         root.addWidget(self._build_workspace_bar())
+
+        # Let the whole editor shrink in a split; the toolbars scroll and the
+        # bars clip instead of setting a wide floor.
+        self.setMinimumWidth(120)
 
         self._stack = QStackedWidget()
 
@@ -187,7 +238,7 @@ class MarkdownEditor(QWidget):
         # proportional UI face, like Obsidian's live view.
         self._rich.setStyleSheet(
             f"QTextEdit{{background:{BG_PAGE};border:none;color:{TEXT};"
-            "font-family:'Segoe UI Variable Text','Segoe UI',sans-serif;"
+            f"font-family:{theme.NOTE_FONT_FAMILY};"
             "font-size:15px;padding:22px 26px;}"
         )
         self._rich.textChanged.connect(self._on_text_changed)
@@ -199,7 +250,7 @@ class MarkdownEditor(QWidget):
         self._raw = NoteSourceEdit()
         self._raw.setStyleSheet(
             f"QTextEdit{{background:{BG_PAGE};border:none;color:{TEXT};"
-            "font-family:'Cascadia Mono',Consolas,monospace;font-size:13px;"
+            f"font-family:{theme.NOTE_FONT_FAMILY};font-size:14px;"
             "padding:22px 26px;}"
         )
         self._raw.textChanged.connect(self._on_text_changed)
@@ -210,7 +261,7 @@ class MarkdownEditor(QWidget):
         self._read = NoteTextBrowser()
         self._read.setStyleSheet(
             f"QTextBrowser{{background:{BG_PAGE};border:none;color:{TEXT};"
-            "font-family:'Segoe UI Variable Text','Segoe UI',sans-serif;"
+            f"font-family:{theme.NOTE_FONT_FAMILY};"
             "font-size:15px;padding:22px 26px;}"
         )
         self._read.media_activated.connect(self._open_media)
@@ -218,10 +269,24 @@ class MarkdownEditor(QWidget):
         self._read.note_link_activated.connect(self._open_wikilink)
         self._stack.addWidget(self._read)      # 2
 
+        from .canvas import CanvasView
+        self._canvas = CanvasView(self.vault, self.service)
+        self._canvas.open_note_requested.connect(self.open_note_requested.emit)
+        self._canvas.open_note_in_new_tab_requested.connect(self.open_note_new_tab)
+        self._stack.addWidget(self._canvas)    # 3
+
         root.addWidget(self._stack, stretch=1)
 
+        self._current_backlinks_count = 0
         self._mentions = _MentionsFooter(self.service)
+        self._mentions.setSizePolicy(
+            QSizePolicy.Ignored, self._mentions.sizePolicy().verticalPolicy())
         self._mentions.open_requested.connect(self._open_from_mention)
+        self._mentions.open_in_new_tab_requested.connect(
+            lambda p, ln: self.open_note(p, ln, new_tab=True)
+        )
+        self._mentions.link_requested.connect(self._on_link_mention_requested)
+        self._mentions.backlinks_count_changed.connect(self._on_backlinks_count_changed)
         root.addWidget(self._mentions)
         QTimer.singleShot(400, self._mentions.warm_up)
 
@@ -250,20 +315,27 @@ class MarkdownEditor(QWidget):
 
     def _build_tab_row(self) -> QWidget:
         row = QFrame()
+        row.setObjectName("tabRow")
         row.setAttribute(Qt.WA_StyledBackground, True)
         row.setStyleSheet(
-            f"QFrame{{background:{BG_BAR};border:none;border-bottom:1px solid {BORDER};}}"
+            f"QFrame#tabRow{{background:{BG_BAR};border-top:2px solid {ACCENT};border-bottom:1px solid {BORDER};}}"
         )
+        self._tab_row = row
+        # Let the row shrink in a narrow split pane; its right-side buttons clip
+        # instead of setting a wide floor, and the tab bar keeps its scroll arrows.
+        row.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         lay = QHBoxLayout(row)
         lay.setContentsMargins(0, 0, 8, 0)
         lay.setSpacing(6)
 
-        self._tabs = QTabBar()
+        self._tabs = _DraggableTabBar(self)
         self._tabs.setExpanding(False)
         self._tabs.setTabsClosable(True)
         self._tabs.setMovable(True)
         self._tabs.setUsesScrollButtons(True)
         self._tabs.setDrawBase(False)
+        self._tabs.setMinimumWidth(0)
+        self._tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._tabs.setContextMenuPolicy(Qt.CustomContextMenu)
         self._tabs.setStyleSheet(
             "QTabBar{background:transparent;border:none;}"
@@ -278,6 +350,30 @@ class MarkdownEditor(QWidget):
         self._tabs.tabMoved.connect(self._on_tab_moved)
         self._tabs.customContextMenuRequested.connect(self._tab_menu)
         lay.addWidget(self._tabs, stretch=1)
+
+        self._split_btn = QPushButton("◨")
+        self._split_btn.setCursor(Qt.PointingHandCursor)
+        self._split_btn.setFixedHeight(26)
+        self._split_btn.setToolTip("Dividir el editor a la derecha (Ctrl+\\)")
+        self._split_btn.setStyleSheet(
+            f"QPushButton{{background:transparent;border:1px solid {BORDER};"
+            f"border-radius:6px;color:{TEXT_DIM};font-size:14px;padding:0 8px;}}"
+            f"QPushButton:hover{{color:{TEXT};border-color:#505060;}}"
+        )
+        self._split_btn.clicked.connect(self.split_requested.emit)
+        lay.addWidget(self._split_btn)
+
+        self._split_v_btn = QPushButton("⬓")
+        self._split_v_btn.setCursor(Qt.PointingHandCursor)
+        self._split_v_btn.setFixedHeight(26)
+        self._split_v_btn.setToolTip("Dividir el editor abajo (Ctrl+Shift+\\)")
+        self._split_v_btn.setStyleSheet(
+            f"QPushButton{{background:transparent;border:1px solid {BORDER};"
+            f"border-radius:6px;color:{TEXT_DIM};font-size:14px;padding:0 8px;}}"
+            f"QPushButton:hover{{color:{TEXT};border-color:#505060;}}"
+        )
+        self._split_v_btn.clicked.connect(self.split_down_requested.emit)
+        lay.addWidget(self._split_v_btn)
 
         self._assistant_btn = QPushButton("✦  Asistente")
         self._assistant_btn.setCheckable(True)
@@ -294,6 +390,25 @@ class MarkdownEditor(QWidget):
         self._assistant_btn.clicked.connect(self.assistant_toggled.emit)
         lay.addWidget(self._assistant_btn)
         return row
+
+    def _wrap_hscroll(self, inner: QWidget, height: int) -> QScrollArea:
+        """Put a toolbar in a horizontal scroll area so a narrow pane can show
+        a scrollbar and reach every button instead of forcing the pane wide."""
+        sa = QScrollArea()
+        sa.setWidget(inner)
+        sa.setWidgetResizable(True)
+        sa.setFixedHeight(height)
+        sa.setFrameShape(QScrollArea.NoFrame)
+        sa.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        sa.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        sa.setMinimumWidth(0)
+        sa.setStyleSheet(
+            "QScrollArea{background:transparent;border:none;}"
+            "QScrollBar:horizontal{height:6px;background:transparent;}"
+            f"QScrollBar::handle:horizontal{{background:{BORDER};border-radius:3px;min-width:24px;}}"
+            "QScrollBar::add-line:horizontal,QScrollBar::sub-line:horizontal{width:0;}"
+        )
+        return sa
 
     def _build_toolbar(self) -> QWidget:
         bar = QFrame()
@@ -377,6 +492,7 @@ class MarkdownEditor(QWidget):
     def _build_workspace_bar(self) -> QWidget:
         self._ws_frame = QFrame()
         self._ws_frame.setAttribute(Qt.WA_StyledBackground, True)
+        self._ws_frame.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self._ws_frame.setFixedHeight(34)
         self._ws_frame.setStyleSheet(
             f"QFrame{{background:{BG_BAR};border:none;border-bottom:1px solid {BORDER};}}"
@@ -695,32 +811,39 @@ class MarkdownEditor(QWidget):
 
     # ── Tabs / open files ─────────────────────────────────────────────────
 
-    def open_note(self, path: Path, line: int = 0):
+    def open_note_new_tab(self, path: Path, line: int = 0):
+        self.open_note(path, line, new_tab=True)
+
+    def open_note(self, path: Path, line: int = 0, new_tab: bool = False):
         path = Path(path)
-        for i, note in enumerate(self._open):
-            if note.path == path:
-                self._tabs.setCurrentIndex(i)
-                if line:
-                    self._goto_line(line)
-                self._focus_view()
-                return
+        if not new_tab:
+            for i, note in enumerate(self._open):
+                if note.path == path:
+                    self._tabs.setCurrentIndex(i)
+                    if line and not note.is_canvas:
+                        self._goto_line(line)
+                    self._focus_view()
+                    return
         fs = attachments.fs_path(path)
         if not fs.exists():
             QMessageBox.warning(self, "No encontrada",
                                 f"El archivo ya no existe:\n{path}")
             return
-        try:
-            text = fs.read_text(encoding="utf-8", errors="replace")
-        except OSError as e:
-            QMessageBox.warning(self, "No se pudo abrir", f"{path}\n\n{e}")
-            return
 
         kind = kind_for(path) or "note"
-        if kind == "code":
-            fm, body = "", text
+        if kind == "canvas":
+            note = _OpenNote(path, "", "", "canvas")
         else:
-            fm, body = _split_frontmatter(text)
-        note = _OpenNote(path, fm, body, kind)
+            try:
+                text = fs.read_text(encoding="utf-8", errors="replace")
+            except OSError as e:
+                QMessageBox.warning(self, "No se pudo abrir", f"{path}\n\n{e}")
+                return
+            if kind == "code":
+                fm, body = "", text
+            else:
+                fm, body = _split_frontmatter(text)
+            note = _OpenNote(path, fm, body, kind)
 
         # New tabs go after the pinned ones so pins stay on the left.
         index = len(self._open)
@@ -751,7 +874,10 @@ class MarkdownEditor(QWidget):
             return
         if index == self._current:
             self._capture_current()
-        if self._open[index].dirty:
+        closing = self._open[index]
+        if closing.is_canvas:
+            self.flush_canvas()
+        elif closing.dirty:
             self._save(index)
         self._open.pop(index)
         # Keep _current pointing at the same note while the bar re-indexes.
@@ -764,6 +890,7 @@ class MarkdownEditor(QWidget):
             self._current = -1
             self._show_placeholder(True)
             self.active_note_changed.emit(None)
+            self.became_empty.emit()
 
     def _on_tab_changed(self, index: int):
         if self._reordering:
@@ -846,6 +973,9 @@ class MarkdownEditor(QWidget):
             return
         note = self._open[index]
         menu = QMenu(self)
+        menu.addAction("Dividir a la derecha", lambda: self.split_requested.emit())
+        menu.addAction("Dividir abajo", lambda: self.split_down_requested.emit())
+        menu.addSeparator()
         menu.addAction("Desfijar pestaña" if note.pinned else "Fijar pestaña",
                        lambda: self.set_pinned(index, not note.pinned))
         menu.addSeparator()
@@ -872,6 +1002,49 @@ class MarkdownEditor(QWidget):
                 continue
             self.close_tab(self._open.index(note))
 
+    def set_pane_active(self, active: bool):
+        border_top = f"2px solid {ACCENT}" if active else "2px solid transparent"
+        if hasattr(self, "_tab_row") and self._tab_row:
+            self._tab_row.setStyleSheet(
+                f"QFrame#tabRow{{background:{BG_BAR};border-top:{border_top};border-bottom:1px solid {BORDER};}}"
+            )
+
+    def detach_note(self, index: int):
+        """Remove and return _OpenNote without losing state or re-serializing."""
+        if not (0 <= index < len(self._open)):
+            return None
+        if index == self._current:
+            self._capture_current()
+        note = self._open.pop(index)
+        self._tabs.removeTab(index)
+        if index < self._current:
+            self._current -= 1
+        elif index == self._current:
+            self._current = -1
+        if not self._open:
+            self._current = -1
+            self._show_placeholder(True)
+            self.active_note_changed.emit(None)
+            self.became_empty.emit()
+        else:
+            self._current = max(0, min(self._current, len(self._open) - 1))
+            self._tabs.setCurrentIndex(self._current)
+            self._load_into_view(self._open[self._current])
+        return note
+
+    def attach_note(self, note: _OpenNote):
+        """Attach an in-memory _OpenNote object from another pane."""
+        index = len(self._open)
+        self._open.append(note)
+        self._tabs.blockSignals(True)
+        self._tabs.addTab("")
+        self._tabs.blockSignals(False)
+        self._refresh_tab(index)
+        self._tabs.setCurrentIndex(index)
+        self._show_placeholder(False)
+        self._load_into_view(note)
+        self.active_note_changed.emit(note.path)
+
     def current_note(self):
         if 0 <= self._current < len(self._open):
             return self._open[self._current]
@@ -880,6 +1053,11 @@ class MarkdownEditor(QWidget):
     def current_path(self):
         note = self.current_note()
         return note.path if note else None
+
+    def current_canvas(self):
+        """The CanvasView when the current tab is a canvas, else None."""
+        note = self.current_note()
+        return self._canvas if note is not None and note.is_canvas else None
 
     def current_title(self) -> str:
         p = self.current_path()
@@ -920,6 +1098,18 @@ class MarkdownEditor(QWidget):
         return self._active if self.current_note() is not None else self._mode
 
     def _load_into_view(self, note: _OpenNote):
+        self._current_backlinks_count = 0
+        if note.is_canvas:
+            self._toolbar_host.setVisible(False)
+            self._ws_frame.setVisible(False)
+            self._mentions.setVisible(False)
+            self._status.setText("")
+            self._stack.setCurrentIndex(3)
+            self._canvas.load(note.path)
+            self.active_note_changed.emit(note.path)
+            return
+
+        self._toolbar_host.setVisible(True)
         mode, problem = self._mode_for(note)
         self._active = mode
         for view in (self._rich, self._raw, self._read):
@@ -935,7 +1125,7 @@ class MarkdownEditor(QWidget):
                 body = expand_transclusions(note.body, self._resolve_transclude)
                 self._read.load_markdown(prepare_for_reading(body))
             else:
-                self._rich.load_markdown(prepare_markdown(note.body))
+                self._rich.load_markdown(prepare_markdown(note.body, embed_notes=True))
         finally:
             self._loading = False
         self._stack.setCurrentIndex(mode)
@@ -971,10 +1161,66 @@ class MarkdownEditor(QWidget):
         if path is not None and note is not None and note.path == path:
             self._mentions.load(path)
 
+    def refresh_mentions(self):
+        """Reload mentions for the currently active note."""
+        note = self.current_note()
+        if note is not None and not note.is_code and not note.is_canvas:
+            self._mentions.load(note.path)
+
+    def _on_backlinks_count_changed(self, count: int):
+        self._current_backlinks_count = int(count)
+        note = self.current_note()
+        if note is not None and not note.is_canvas and not note.is_code:
+            self._update_status(note)
+
+    def on_note_moved(self, old_path: Path, new_path: Path):
+        """Update any open tab pointing to old_path and debounce mentions refresh."""
+        old_path, new_path = Path(old_path), Path(new_path)
+        for i, n in enumerate(self._open):
+            if n.path == old_path:
+                n.path = new_path
+                self._refresh_tab(i)
+        self._mentions_refresh.start()
+
+    def on_note_deleted(self, path: Path):
+        """Close any open tab for path and debounce mentions refresh."""
+        path = Path(path)
+        for i, n in enumerate(list(self._open)):
+            if n.path == path:
+                self.close_tab(i)
+        self._mentions_refresh.start()
+
+    def on_note_created(self, path: Path):
+        """Debounce mentions refresh when a new note is created."""
+        self._mentions_refresh.start()
+
+    def _on_link_mention_requested(self, note_path: Path, line_no: int, target_title: str):
+        """Convert unlinked mention to wikilink, refresh open tabs and mentions."""
+        ok = self.service.linkify_mention(note_path, line_no, target_title)
+        if ok:
+            for i, note in enumerate(self._open):
+                if note.path == note_path:
+                    try:
+                        text = note_path.read_text(encoding="utf-8", errors="replace")
+                        note.frontmatter, note.body = _split_frontmatter(text)
+                        if self._current == i:
+                            self._load_into_view(note)
+                    except Exception:
+                        pass
+            self.refresh_mentions()
+
+    def flush_canvas(self):
+        """Flush any pending canvas save (call before closing the app)."""
+        if hasattr(self, "_canvas"):
+            try:
+                self._canvas.flush()
+            except Exception:
+                pass
+
     def _capture_current(self):
         """Pull whatever the visible editor holds back into the model."""
         note = self.current_note()
-        if note is None or self._loading:
+        if note is None or self._loading or note.is_canvas:
             return
         mode = self._view_mode()
         if mode == MODE_RAW:
@@ -1029,12 +1275,15 @@ class MarkdownEditor(QWidget):
             self._status.setText(f"{rel}   ·   código · {lines} líneas{tail}")
             return
         words = markdown_utils.count_words(note.body)
+        bl_info = f"   ·   {self._current_backlinks_count} backlinks"
         self._status.setText(
-            f"{rel}   ·   {words} palabras · {len(note.body)} caracteres"
+            f"{rel}   ·   {words} palabras · {len(note.body)} caracteres{bl_info}"
             f"   ·   Ctrl+P comandos{tail}")
 
     def _show_placeholder(self, show: bool):
         if show:
+            if hasattr(self, "_toolbar_host"):
+                self._toolbar_host.setVisible(True)
             if hasattr(self, "_ws_frame"):
                 self._ws_frame.setVisible(False)
             self._loading = True
@@ -1554,7 +1803,8 @@ class MarkdownEditor(QWidget):
         ]
 
     def open_palette(self):
-        palette = CommandPalette(self._commands(), self)
+        from .command_palette import global_commands
+        palette = CommandPalette(global_commands() + self._commands(), self)
         # The caret is remembered, so a table command still knows which cell
         # it is in after the palette steals focus.
         cursor = self._editor().textCursor()
@@ -1803,6 +2053,8 @@ class MarkdownEditor(QWidget):
         self.vault = vault
         self.service = service
         self._mentions.service = service
+        if hasattr(self, "_canvas"):
+            self._canvas.set_context(vault, service)
         # Re-point workspace detection at the new vault; otherwise the study
         # toolbar keeps reading profiles from the previous vault's .notevault.
         self._workspace_manager = WorkspaceManager(vault.vault_root)
@@ -1947,6 +2199,90 @@ class _IndexWarmup(QRunnable):
             pass
 
 
+class _MentionBtn(QPushButton):
+    """Button for a mention row supporting left click and middle click."""
+    middle_clicked = Signal()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            self.middle_clicked.emit()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+
+class _CollapsibleMentionsSection(QWidget):
+    """Collapsible section for Linked or Unlinked mentions."""
+
+    def __init__(self, title: str, parent=None):
+        super().__init__(parent)
+        self._expanded = True
+        self.setStyleSheet("background:transparent;")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        # Header
+        header = QWidget()
+        header.setFixedHeight(24)
+        header.setStyleSheet("background:transparent;")
+        hlay = QHBoxLayout(header)
+        hlay.setContentsMargins(0, 0, 0, 0)
+        hlay.setSpacing(6)
+
+        self._toggle_btn = QPushButton("▾")
+        self._toggle_btn.setFixedSize(16, 16)
+        self._toggle_btn.setCursor(Qt.PointingHandCursor)
+        self._toggle_btn.setStyleSheet(
+            f"QPushButton{{background:transparent;border:none;color:{TEXT_FAINT};font-size:10px;}}"
+            f"QPushButton:hover{{color:{TEXT};}}"
+        )
+        self._toggle_btn.clicked.connect(self.toggle_expanded)
+        hlay.addWidget(self._toggle_btn)
+
+        self._title_lbl = QLabel(title)
+        self._title_lbl.setStyleSheet(
+            f"color:{TEXT};font-size:11px;font-weight:600;background:transparent;border:none;"
+        )
+        hlay.addWidget(self._title_lbl)
+
+        self._badge = QLabel("0")
+        self._badge.setStyleSheet(
+            f"color:{TEXT_FAINT};font-size:10px;background:#2b2b36;padding:1px 6px;"
+            "border-radius:8px;border:none;"
+        )
+        hlay.addWidget(self._badge)
+        hlay.addStretch()
+        layout.addWidget(header)
+
+        # Content container
+        self._content_widget = QWidget()
+        self._content_widget.setStyleSheet("background:transparent;")
+        self._content_layout = QVBoxLayout(self._content_widget)
+        self._content_layout.setContentsMargins(16, 2, 0, 4)
+        self._content_layout.setSpacing(3)
+        layout.addWidget(self._content_widget)
+
+    def toggle_expanded(self):
+        self._expanded = not self._expanded
+        self._toggle_btn.setText("▾" if self._expanded else "▸")
+        self._content_widget.setVisible(self._expanded)
+
+    def clear(self):
+        self._badge.setText("0")
+        while self._content_layout.count():
+            item = self._content_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+    def add_widget(self, w: QWidget):
+        self._content_layout.addWidget(w)
+
+    def set_count(self, count: int):
+        self._badge.setText(str(count))
+
+
 class _MentionsFooter(QFrame):
     """Linked / unlinked mentions, pinned under every open note.
 
@@ -1954,11 +2290,15 @@ class _MentionsFooter(QFrame):
     result that arrives after the user moved to another note is discarded.
     """
 
-    open_requested = Signal(Path, int)   # (note path, line number of the match)
+    open_requested = Signal(Path, int)           # (note path, line number of the match)
+    open_in_new_tab_requested = Signal(Path, int) # (note path, line number) via middle-click
+    link_requested = Signal(Path, int, str)       # (note path, line number, target title)
+    backlinks_count_changed = Signal(int)
 
     def __init__(self, service: NotesService, parent=None):
         super().__init__(parent)
         self.service = service
+        self._current_path = None
         self._expanded = True
         self._generation = 0
         self._pending = None
@@ -1974,7 +2314,7 @@ class _MentionsFooter(QFrame):
             f"QFrame{{background:{BG_CARD};border:none;"
             f"border-top:1px solid {BORDER};}}"
         )
-        self.setMinimumHeight(160)
+        self.setMinimumHeight(140)
         self.setMaximumHeight(230)
 
         outer = QVBoxLayout(self)
@@ -1982,7 +2322,7 @@ class _MentionsFooter(QFrame):
         outer.setSpacing(0)
 
         head = QWidget()
-        head.setFixedHeight(30)
+        head.setFixedHeight(28)
         head.setStyleSheet("background:transparent;")
         h = QHBoxLayout(head)
         h.setContentsMargins(16, 0, 12, 0)
@@ -1999,7 +2339,7 @@ class _MentionsFooter(QFrame):
         self._toggle.clicked.connect(self._toggle_expanded)
         h.addWidget(self._toggle)
 
-        self._title = QLabel("Menciones enlazadas")
+        self._title = QLabel("Backlinks & Menciones")
         self._title.setStyleSheet(
             f"color:{TEXT};font-size:12px;font-weight:600;"
             "background:transparent;border:none;"
@@ -2023,9 +2363,17 @@ class _MentionsFooter(QFrame):
         body = QWidget()
         body.setStyleSheet(f"background:{BG_CARD};")
         self._body = QVBoxLayout(body)
-        self._body.setContentsMargins(16, 0, 16, 12)
-        self._body.setSpacing(4)
+        self._body.setContentsMargins(16, 0, 16, 8)
+        self._body.setSpacing(6)
         self._body.setSizeConstraint(QLayout.SetMinimumSize)
+
+        self._sec_linked = _CollapsibleMentionsSection("Menciones enlazadas")
+        self._body.addWidget(self._sec_linked)
+
+        self._sec_unlinked = _CollapsibleMentionsSection("Menciones sin enlazar")
+        self._body.addWidget(self._sec_unlinked)
+        self._body.addStretch()
+
         self._scroll.setWidget(body)
         outer.addWidget(self._scroll, stretch=1)
 
@@ -2033,70 +2381,68 @@ class _MentionsFooter(QFrame):
         self._expanded = not self._expanded
         self._toggle.setText("▾" if self._expanded else "▸")
         self._scroll.setVisible(self._expanded)
-        self.setMinimumHeight(160 if self._expanded else 30)
-        self.setMaximumHeight(230 if self._expanded else 30)
-        if self._expanded and self._pending is not None:
-            path, self._pending = self._pending, None
-            self.load(path)
+        self.setMinimumHeight(140 if self._expanded else 28)
+        self.setMaximumHeight(230 if self._expanded else 28)
 
     def clear(self):
         self._generation += 1
         self._clear_rows()
         self._count.setText("0")
+        self.backlinks_count_changed.emit(0)
 
     def _clear_rows(self):
-        while self._body.count():
-            item = self._body.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        self._sec_linked.clear()
+        self._sec_unlinked.clear()
 
     def warm_up(self):
         """Read the vault once at start-up, off the UI thread."""
         self._pool.start(_IndexWarmup(self.service))
 
     def load(self, path: Path):
+        self._current_path = Path(path)
         self._generation += 1
-        if not self._expanded:
-            # Collapsed: nothing would be shown, so nothing is scanned.
-            self._pending = Path(path)
-            return
         self._clear_rows()
         self._count.setText("…")
-        self._body.addWidget(self._muted(
-            "Buscando menciones en la vault…" if self.service.index.ready
-            else "Leyendo la vault por primera vez…"))
+        msg = ("Buscando menciones en la vault…" if self.service.index.ready
+               else "Leyendo la vault por primera vez…")
+        self._sec_linked.add_widget(self._muted(msg))
         self._pool.start(
             _MentionsJob(self.service, Path(path), self._generation, self._signals)
         )
+
+    def _target_title(self) -> str:
+        if getattr(self, "_current_path", None) is not None:
+            return self._current_path.stem
+        return ""
 
     def _show_results(self, generation: int, linked, unlinked):
         if generation != self._generation:
             return
         self._clear_rows()
         self._count.setText(str(len(linked)))
-        self._add_section(linked, "No hay backlinks todavía.")
+        self.backlinks_count_changed.emit(len(linked))
 
-        self._body.addSpacing(8)
-        sub = QLabel(f"Menciones sin enlazar  ·  {len(unlinked)}")
-        sub.setStyleSheet(
-            f"color:{TEXT};font-size:12px;font-weight:600;"
-            "background:transparent;border:none;"
-        )
-        self._body.addWidget(sub)
-        self._add_section(unlinked, "Sin menciones sueltas.")
-        self._body.addStretch()
+        # Linked mentions
+        self._sec_linked.set_count(len(linked))
+        if not linked:
+            self._sec_linked.add_widget(self._muted("No hay backlinks todavía."))
+        else:
+            for m in linked[:MAX_MENTION_ROWS]:
+                self._sec_linked.add_widget(self._row(m))
+            extra = len(linked) - MAX_MENTION_ROWS
+            if extra > 0:
+                self._sec_linked.add_widget(self._muted(f"… y {extra} más."))
 
-    def _add_section(self, mentions: list, empty: str):
-        if not mentions:
-            self._body.addWidget(self._muted(empty))
-            return
-        # A title like "backend" is mentioned thousands of times; building a
-        # widget for each froze the window for seconds.
-        for m in mentions[:MAX_MENTION_ROWS]:
-            self._body.addWidget(self._row(m))
-        extra = len(mentions) - MAX_MENTION_ROWS
-        if extra > 0:
-            self._body.addWidget(self._muted(f"… y {extra} más."))
+        # Unlinked mentions
+        self._sec_unlinked.set_count(len(unlinked))
+        if not unlinked:
+            self._sec_unlinked.add_widget(self._muted("Sin menciones sueltas."))
+        else:
+            for m in unlinked[:MAX_MENTION_ROWS]:
+                self._sec_unlinked.add_widget(self._row(m))
+            extra = len(unlinked) - MAX_MENTION_ROWS
+            if extra > 0:
+                self._sec_unlinked.add_widget(self._muted(f"… y {extra} más."))
 
     def _muted(self, text: str) -> QLabel:
         lbl = QLabel(text)
@@ -2116,21 +2462,50 @@ class _MentionsFooter(QFrame):
         return re.sub(r"\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]", _repl, line or "")
 
     def _row(self, mention) -> QWidget:
-        btn = QPushButton()
-        btn.setCursor(Qt.PointingHandCursor)
-        btn.setMinimumHeight(34)
-        btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         clean_line = self._clean_mention_line(mention.line)
+        btn = _MentionBtn()
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setMinimumHeight(28)
+        btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         btn.setText(f"{mention.title}   ·   {clean_line}")
-        btn.setToolTip(f"{mention.path}  (línea {mention.line_no})")
+        btn.setToolTip(f"{mention.path}  (línea {mention.line_no})\nClic: abrir\nClic central: abrir en nueva pestaña")
         color = ACCENT if mention.linked else TEXT_DIM
         btn.setStyleSheet(
             "QPushButton{background:transparent;border:none;text-align:left;"
-            f"color:{color};font-size:12px;padding:4px 6px;border-radius:5px;}}"
+            f"color:{color};font-size:12px;padding:3px 6px;border-radius:4px;}}"
             "QPushButton:hover{background:#2e2e38;}"
         )
         btn.clicked.connect(
             lambda _=False, p=mention.path, ln=mention.line_no:
                 self.open_requested.emit(Path(p), int(ln or 0))
         )
-        return btn
+        btn.middle_clicked.connect(
+            lambda p=mention.path, ln=mention.line_no:
+                self.open_in_new_tab_requested.emit(Path(p), int(ln or 0))
+        )
+        if mention.linked:
+            return btn
+
+        row_w = QWidget()
+        row_w.setStyleSheet("background:transparent;")
+        rlay = QHBoxLayout(row_w)
+        rlay.setContentsMargins(0, 0, 0, 0)
+        rlay.setSpacing(6)
+        rlay.addWidget(btn, stretch=1)
+
+        link_btn = QPushButton("Enlazar")
+        target_t = self._target_title()
+        link_btn.setToolTip(f"Convertir en [[{target_t}]]")
+        link_btn.setCursor(Qt.PointingHandCursor)
+        link_btn.setFixedHeight(22)
+        link_btn.setStyleSheet(
+            f"QPushButton{{background:#2b2b36;color:{ACCENT};border:1px solid #3e3e50;"
+            "border-radius:4px;padding:1px 8px;font-size:11px;font-weight:600;}"
+            f"QPushButton:hover{{background:{ACCENT};color:#ffffff;border-color:{ACCENT};}}"
+        )
+        link_btn.clicked.connect(
+            lambda _=False, p=mention.path, ln=mention.line_no, t=target_t:
+                self.link_requested.emit(Path(p), int(ln or 0), t)
+        )
+        rlay.addWidget(link_btn)
+        return row_w

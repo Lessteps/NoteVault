@@ -1,0 +1,151 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D11",
+  "deliverable": "Phase 5 RTM Update & Brief",
+  "purpose": "Actualizar horizontalmente la Matriz de Trazabilidad de Requerimientos (RTM) extendiéndola con los Contenedores Arquitectónicos definidos en el C4 Model (D9), ejecutar el análisis de cobertura garantizando cero GAPs, y formalizar el dictamen ejecutivo de cierre de la Fase 5 autorizando la transición a la Fase 6 (Development).",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Component Diagram (C4 Model) (P5-D9) | [[PHASE_5_ARCHITECTURAL_DESIGN/9.Component Diagram/9.Component Diagram.md]] | Fuente primaria de los Containers a los que se mapea cada Functional Requirement y UI Screen (ver Step 2). |\n| Phase 4 RTM Update (P4-D15) | [[PHASE_4_SYSTEM_MODELING/15.Phase 4 RTM Update/15.Phase 4 RTM Update.md]] | Matriz base sobre la que se extiende la columna de Architectural Container (ver Step 1). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Extensión Horizontal de la RTM (RTM Extension)",
+      "summary": "Tomar la matriz RTM de Fase 4 e incorporar horizontalmente la columna de Contenedores Arquitectónicos de Fase 5.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Adición de la Columna Arquitectónica a la Matriz Viva",
+          "objective": "Preservar la trazabilidad completa desde los FRs y wireframes hasta los contenedores físicos de ejecución.",
+          "input": "Matriz de Trazabilidad de Fase 4 (D15) con mapeo de pantallas, flujos y endpoints.",
+          "raw_data_title": "Estructura de la Matriz RTM Expandida a Fase 5",
+          "raw_data": "| FR-ID | User Story | D3/D5 Wireframe | D7 Sequence | D9 API Endpoint | D9 Architectural Container (Fase 5) |\n|---|---|---|---|---|---|\n| FR-001 | Buscar fincas por ubicación | `/search` | Guest→API→DB | `GET /properties?location=X` | *Pendiente de Asignación (Step 2)* |\n| FR-002 | Reservar una finca | `/property/{id}` | Guest→API→Wompi→DB | `POST /bookings` | *Pendiente de Asignación (Step 2)* |\n| FR-003 | Cancelar una reserva | `/guest/bookings` | Guest→API→DB | `PATCH /bookings/{id}` | *Pendiente de Asignación (Step 2)* |\n| FR-004 | Dashboard de Anfitrión | `/host/dashboard` | Host→API→DB | `GET /host/stats` | *Pendiente de Asignación (Step 2)* |\n| FR-005 | Registro de usuario | `/auth/register` | Guest→API→DB | `POST /auth/register` | *Pendiente de Asignación (Step 2)* |\n| FR-006 | Login de usuario | `/auth/login` | Guest→API→DB→JWT | `POST /auth/login` | *Pendiente de Asignación (Step 2)* |\n| FR-007 | Publicar una finca (Host) | `/host/properties/new` | Host→API→S3→DB | `POST /properties` | *Pendiente de Asignación (Step 2)* |",
+          "exit_label": "Matriz Base Expandida Horizontalmente",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Incorporación de Metadatos de Infraestructura C4",
+              "objective": "Asegurar que cada fila cuente con un casillero para su contenedor de despliegue.",
+              "how_to": {
+                "steps": [
+                  "1. Importar las columnas de Fase 3 y Fase 4 sin eliminar datos previos.",
+                  "2. Insertar la nueva columna 'D9 Architectural Container'.",
+                  "3. Verificar que no se alteren los IDs ni secuencias de requerimientos.",
+                  "4. Dejar el estado en evaluación para la verificación del Step 2."
+                ],
+                "table_columns": [
+                  "FR ID",
+                  "Requisito Negocio",
+                  "Columna Fase 4",
+                  "Nueva Columna Fase 5"
+                ],
+                "table_rules": [
+                  "La RTM se expande horizontalmente y nunca se sobrescribe de cero",
+                  "Ninguna fila de requerimiento funcional puede desaparecer",
+                  "La trazabilidad debe ser continua y navegable"
+                ],
+                "restrictions": "Prohibido reiniciar la matriz o eliminar referencias a pantallas y secuencias.",
+                "done_when": "Estructura tabular extendida con la nueva dimensión arquitectónica."
+              },
+              "example_title": "Matriz Extendida D11",
+              "example": "```markdown\n## RTM Extendida (columna agregada)\n\n| FR-ID | User Story | D3/D5 Wireframe | D7 Sequence | D9 API Endpoint | D9 Architectural Container (Fase 5) |\n|---|---|---|---|---|---|\n| FR-001 | Buscar fincas por ubicación | `/search` | Guest→API→DB | `GET /properties?location=X` | *Pendiente (Step 2)* |\n| FR-002 | Reservar una finca | `/property/{id}` | Guest→API→Stripe→DB | `POST /bookings` | *Pendiente (Step 2)* |\n| FR-003 | Cancelar una reserva | `/guest/bookings` | Guest→API→DB | `PATCH /bookings/{id}` | *Pendiente (Step 2)* |\n| FR-004 | Dashboard de Anfitrión | `/host/dashboard` | Host→API→DB | `GET /host/stats` | *Pendiente (Step 2)* |\n| FR-005 | Registro de usuario | `/auth/register` | Guest→API→DB | `POST /auth/register` | *Pendiente (Step 2)* |\n| FR-006 | Login de usuario | `/auth/login` | Guest→API→DB→JWT | `POST /auth/login` | *Pendiente (Step 2)* |\n| FR-007 | Publicar una finca (Host) | `/host/properties/new` | Host→API→S3→DB | `POST /properties` | *Pendiente (Step 2)* |\n```",
+              "link_label": "Matriz Extendida -> Mapeo y Gap Analysis"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Mapeo y Análisis de Brechas (Mapping & Gap Analysis)",
+      "summary": "Asignar cada requerimiento al contenedor correspondiente y comprobar la ausencia de requerimientos huérfanos.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Asignación de Contenedores y Validación de Cobertura Total",
+          "objective": "Verificar que el 100% de los requerimientos y pantallas cuenten con un contenedor de ejecución asignado.",
+          "input": "Matriz extendida del Step 1 y contenedores del C4 Container Diagram (D9).",
+          "raw_data_title": "Matriz de Trazabilidad Actualizada y Validación de GAPs",
+          "raw_data": "| FR-ID | User Story | D3/D5 Wireframe | D7 Sequence | D9 API Endpoint | D9 Architectural Container (Fase 5) | Estado |\n|---|---|---|---|---|---|---|\n| FR-001 | Buscar fincas por ubicación | `/search` | Guest→API→DB | `GET /properties?location=X` | Web Application (Next.js) | ✅ OK |\n| FR-002 | Reservar una finca | `/property/{id}` | Guest→API→Wompi→DB | `POST /bookings` | Web Application (Next.js) | ✅ OK |\n| FR-003 | Cancelar una reserva | `/guest/bookings` | Guest→API→DB | `PATCH /bookings/{id}` | Web Application (Next.js) | ✅ OK |\n| FR-004 | Dashboard de Anfitrión | `/host/dashboard` | Host→API→DB | `GET /host/stats` | Web Application + Supabase Realtime | ✅ OK |\n| FR-005 | Registro de usuario | `/auth/register` | Guest→API→DB | `POST /auth/register` | Web Application + Supabase Auth | ✅ OK |\n| FR-006 | Login de usuario | `/auth/login` | Guest→API→DB→JWT | `POST /auth/login` | Web Application + Supabase Auth | ✅ OK |\n| FR-007 | Publicar finca (Host) | `/host/properties/new` | Host→API→S3→DB | `POST /properties` | Web Application + Supabase Storage | ✅ OK |",
+          "exit_label": "Mapeo Completado con Cero GAPs",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Certificación de Cobertura sin Requerimientos Huérfanos",
+              "objective": "Garantizar que no existan requerimientos sin contenedor ejecutable asignado.",
+              "how_to": {
+                "steps": [
+                  "1. Asociar cada endpoint y pantalla al contenedor Next.js WebApp.",
+                  "2. Asociar los servicios de persistencia e identidad al backend Supabase BaaS.",
+                  "3. Evaluar la presencia de GAPs o requerimientos sin soporte arquitectónico.",
+                  "4. Certificar que el conteo de GAPs es estrictamente cero."
+                ],
+                "table_columns": [
+                  "FR ID",
+                  "Contenedor Ejecutable",
+                  "Servicio BaaS",
+                  "Veredicto GAP"
+                ],
+                "table_rules": [
+                  "Un solo GAP abierto bloquea el avance hacia el cierre de fase",
+                  "Todo requerimiento debe tener responsable de ejecución físico",
+                  "No se permite postergar la resolución de inconsistencias"
+                ],
+                "restrictions": "Prohibido avanzar a la redacción del Brief si existe algún GAP sin resolver.",
+                "done_when": "Reporte de Gap Analysis con exactamente 0 (cero) requerimientos huérfanos."
+              },
+              "example_title": "Traceability Matrix Completa D11",
+              "example": "```markdown\n## Traceability Matrix Update (Phase 3 → 4 → 5)\n\n| FR-ID | User Story | D3/D5 Wireframe | D7 Sequence | D9 API Endpoint | D9 Architectural Container (Fase 5) | Estado |\n|---|---|---|---|---|---|---|\n| FR-001 | Buscar fincas por ubicación | `/search` | Guest→API→DB | `GET /properties?location=X` | Web Application (Next.js) | ✅ OK |\n| FR-002 | Reservar una finca | `/property/{id}` | Guest→API→Wompi→DB | `POST /bookings` | Web Application (Next.js) | ✅ OK |\n| FR-003 | Cancelar una reserva | `/guest/bookings` | Guest→API→DB | `PATCH /bookings/{id}` | Web Application (Next.js) | ✅ OK |\n| FR-004 | Dashboard de Anfitrión | `/host/dashboard` | Host→API→DB | `GET /host/stats` | Web Application + Supabase Realtime | ✅ OK |\n| FR-005 | Registro de usuario | `/auth/register` | Guest→API→DB | `POST /auth/register` | Web Application + Supabase Auth | ✅ OK |\n| FR-006 | Login de usuario | `/auth/login` | Guest→API→DB→JWT | `POST /auth/login` | Web Application + Supabase Auth | ✅ OK |\n| FR-007 | Publicar finca (Host) | `/host/properties/new` | Host→API→S3→DB | `POST /properties` | Web Application + Supabase Storage| ✅ OK |\n\n**GAPs Detectados:** 0 (Cero).\n```",
+              "link_label": "Cero GAPs Verificados -> Briefing Ejecutivo"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Briefing Ejecutivo y Cierre de Fase (Phase 5 Briefing & Sign-off)",
+      "summary": "Emitir el informe oficial de cierre que sintetiza la arquitectura y autoriza el inicio de la Fase 6.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Redacción del Dictamen Formal de Cierre y Autorización",
+          "objective": "Formalizar el gate de salida de la Fase 5 y la habilitación oficial para el equipo de desarrollo.",
+          "input": "Cero GAPs del Step 2 y consolidación de los 10 entregables previos de la Fase 5.",
+          "raw_data_title": "Resumen Ejecutivo de la Fase 5",
+          "raw_data": "| Dimensión Arquitectónica | Decisión Vinculante Aprobada | Beneficio Operativo |\n|---|---|---|\n| Topología de Despliegue | Serverless PaaS (Vercel) + BaaS (Supabase) | Cero mantenimiento de infraestructura y Time-to-Market inmediato |\n| Descomposición del Sistema | Monolito Modular con 5 Bounded Contexts | Un solo repositorio y pipeline de CI/CD sin complejidad de red microservicios |\n| Estilos Arquitectónicos | Híbrido: Clean Architecture (Booking/Billing) + MVC (Catalog) | Máxima robustez transaccional en flujos financieros con agilidad en UI |\n| Protocolos de Enlace | HTTPS / REST, Server Actions y WebSockets (WSS) | Tipado estricto end-to-end con notificaciones reactivas push en tiempo real |\n| Gobernanza de Requerimientos | RTM con 100% de cobertura y 0 GAPs | Certeza de que cada funcionalidad requerida tiene un contenedor de ejecución |",
+          "exit_label": "Fase 5 Formalmente Cerrada y Autorizada",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Firma Ejecutiva de Autorización para Fase 6",
+              "objective": "Emitir la declaración formal de pase de fase que habilita a los desarrolladores.",
+              "how_to": {
+                "steps": [
+                  "1. Resumir la transformación de modelos abstractos a infraestructura física concreta.",
+                  "2. Confirmar la ausencia de brechas en la matriz RTM.",
+                  "3. Declarar el dictamen final de aprobación.",
+                  "4. Establecer las conexiones obligatorias con la Fase 6."
+                ],
+                "table_columns": [
+                  "Párrafo",
+                  "Contenido Temático",
+                  "Criterio de Validación",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El informe debe autorizar formalmente el inicio de la Fase 6",
+                  "Debe confirmar explícitamente cero GAPs en la RTM",
+                  "Debe citar la infraestructura Serverless/BaaS y el Monolito Modular"
+                ],
+                "restrictions": "Prohibido declarar el cierre si persisten dudas sobre la viabilidad técnica.",
+                "done_when": "Briefing de ejecución redactado con dictamen formal de aprobación."
+              },
+              "example_title": "Phase 5 Execution Brief D11",
+              "example": "```markdown\n## Phase 5 Execution Brief\n\nDurante la Fase 5 (Architectural Design), se transformó el modelado lógico de la aplicación en una topología física e infraestructura técnica concreta. Tras evaluar los NFRs (velocidad de carga < 1.5s y notificaciones en tiempo real B2B), se descartó el uso de Kubernetes o IaaS pesado, eligiendo una topología basada en Vercel (PaaS) y Supabase (BaaS). A nivel de base de código, se rechazaron los microservicios a favor de un **Monolito Modular** estructurado internamente de forma híbrida: usando *Clean Architecture* para aislar y blindar las pasarelas de pago y la máquina de estados de reservas, y arquitectura en capas simple para el catálogo.\n\nEl cruce final en la Matriz de Trazabilidad (RTM) confirma que **todos** los requerimientos y endpoints modelados en la Fase 4 (D15) encajan perfectamente dentro del Contenedor Web principal de la Fase 5. No se identificaron GAPs arquitectónicos. Los protocolos transversales (Auth JWT seguro, IAM, Caching ISR y CI/CD Trunk-Based) están consolidados y listos para implementarse en código.\n\n**Dictamen Final:** La Fase 5 (Architectural Design) está formalmente CERRADA. El proyecto \"Nos Fuimos de Finca\" está **AUTORIZADO** para iniciar la **Fase 6: Development / Implementation**.\n```",
+              "link_label": "Brief Aprobado -> Entregable Final RTM D11"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverable_output": "# Entregable 11 (D11): Phase 5 RTM Update & Brief\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Approved\n\n*Backlink a Fase 4:* Este documento actualiza la Matriz de Trazabilidad original cerrada en el entregable `[[PHASE_4_SYSTEM_MODELING/15.Phase_4_RTM_Update/example_output_d15_rtm.md]]`, expandiéndola con la arquitectura definida en esta fase.\n\n---\n\n## 2. Traceability Matrix Update (Phase 3 → 4 → 5)\n\nLa siguiente matriz asegura que cada requerimiento de negocio exigido (FR) tenga un contenedor arquitectónico (servidor o función) que se haga cargo de él. Como definimos un Monolito Modular en el **D4**, todos recaen en el mismo gran componente de Next.js.\n\n| FR-ID | User Story | D3/D5 Wireframe | D7 Sequence | D9 API Endpoint | D9 Architectural Container (Fase 5) | Estado |\n|---|---|---|---|---|---|---|\n| FR-001 | Buscar fincas por ubicación | `/search` | Guest→API→DB | `GET /properties?location=X` | Web Application (Next.js) | ✅ OK |\n| FR-002 | Reservar una finca | `/property/{id}` | Guest→API→Wompi→DB | `POST /bookings` | Web Application (Next.js) | ✅ OK |\n| FR-003 | Cancelar una reserva | `/guest/bookings` | Guest→API→DB | `PATCH /bookings/{id}` | Web Application (Next.js) | ✅ OK |\n| FR-004 | Dashboard de Anfitrión | `/host/dashboard` | Host→API→DB | `GET /host/stats` | Web Application + Supabase Realtime | ✅ OK |\n| FR-005 | Registro de usuario | `/auth/register` | Guest→API→DB | `POST /auth/register` | Web Application + Supabase Auth | ✅ OK |\n| FR-006 | Login de usuario | `/auth/login` | Guest→API→DB→JWT | `POST /auth/login` | Web Application + Supabase Auth | ✅ OK |\n| FR-007 | Publicar finca (Host) | `/host/properties/new` | Host→API→S3→DB | `POST /properties` | Web Application + Supabase Storage| ✅ OK |\n\n**GAPs Detectados:** 0 (Cero). Ningún requerimiento quedó huérfano.\n\n---\n\n## 3. Phase 5 Execution Brief\n\nDurante la Fase 5 (*Architectural Design*), se transformó el modelado lógico de la aplicación en una topología física e infraestructura técnica concreta. Tras evaluar los NFRs (velocidad de carga < 1.5s y notificaciones en tiempo real B2B), se descartó el uso de orquestación pesada (Kubernetes/IaaS), eligiendo una topología basada en Vercel (PaaS) y Supabase (BaaS). A nivel de base de código, se rechazaron firmemente los microservicios a favor de un **Monolito Modular**, estructurado internamente de forma híbrida: usando *Clean Architecture* para aislar y blindar las transacciones financieras y la máquina de estados de reservas, y arquitectura en capas (*Layered MVC*) para flexibilizar la lectura del catálogo.\n\nEl cruce final en la Matriz de Trazabilidad (RTM) de arriba confirma que **todos** los requerimientos y endpoints modelados en la Fase 4 encajan perfectamente dentro del Contenedor Web principal delineado en el Modelo C4 (D9). No se identificaron GAPs arquitectónicos. Los protocolos transversales (Auth JWT seguro, limitación de APIs, Caching mediante ISR y un pipeline de CI/CD Trunk-Based) están documentados, consolidados (D10) y listos para materializarse en código.\n\n> **Dictamen Final:** La Fase 5 (Architectural Design) está formalmente CERRADA. El proyecto \"Nos Fuimos de Finca\" está **AUTORIZADO** para iniciar la **Fase 6: Development / Implementation**.\n\n---\n\n## 4. Downstream Consumers\nEste entregable es la llave final y es input obligatorio para:\n- **Phase 6 — D0 (Execution Order):** Usa esta autorización de cierre como el \"Gate\" oficial para permitir que los desarrolladores abran sus IDEs y empiecen a escribir el primer `npm init`.\n- **Phase 7 — D1 (AI Task Breakdown & Sprint Planning):** Usará este mapeo FR → Container como base matemática para crear los tickets en Jira o Github Projects."
+}

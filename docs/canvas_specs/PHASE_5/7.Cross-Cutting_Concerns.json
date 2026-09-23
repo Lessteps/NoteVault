@@ -1,0 +1,201 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D7",
+  "deliverable": "Cross-Cutting Concerns",
+  "purpose": "Formalizar las estrategias transversales que impactan a todos los módulos del sistema de manera global: Gestión de Identidad y Seguridad (IAM con tokens JWT en cookies HttpOnly, CORS unificado y Rate-Limiting por IP), Observabilidad y Manejo Uniforme de Errores (Structured Logging en JSON, captura de excepciones en Sentry y contratos consistentes con traceId), y Estrategia de Caché Multinivel con invalidación precisa on-demand.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Authorization and Security (P4-D11) | [[PHASE_4_SYSTEM_MODELING/11.Authorization_and_Security/11.Authorization_and_Security.md]] | Provee las políticas de tokens JWT, roles, RLS y lista blanca de exenciones. |\n| System Decomposition Decision (P5-D4) | [[PHASE_5_ARCHITECTURAL_DESIGN/4.System Decomposition Decision/4.System Decomposition Decision.md]] | Establece que la política CORS opera sobre un único origen propio de producción (Monolito). |\n| Quality Attributes Map (P5-D1) | [[PHASE_5_ARCHITECTURAL_DESIGN/1.Quality Attributes Map/1.Quality Attributes Map.md]] | Dicta las métricas de rendimiento (Escenario 1 y 2) que exigen capas de caché e invalidación. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Estrategia de IAM y Seguridad Perimetral (IAM & Security Strategy)",
+      "summary": "Establecer la gestión de tokens, almacenamiento en cookies HttpOnly, directivas CORS y rate-limiting de protección.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Ciclo de Vida de Tokens, Almacenamiento Seguro, CORS y Rate-Limiting",
+          "objective": "Blindar el perímetro del sistema contra ataques XSS, CSRF, DDoS y robo de credenciales.",
+          "input": "Matriz de seguridad D11 y arquitectura monolítica D4.",
+          "raw_data_title": "Políticas Globales de IAM y Seguridad",
+          "raw_data": "| Parámetro de Seguridad | Especificación Técnica | Justificación Arquitectónica |\n|---|---|---|\n| Access Token (JWT) | Duración de 1 hora (3600s), firmado por Supabase GoTrue | Minimiza la ventana de exposición ante robo temporal de sesión |\n| Refresh Token | Rotación automática con revocación de familia de tokens | Invalida sesiones duplicadas o robadas automáticamente |\n| Almacenamiento en Cliente | Cookies `HttpOnly`, `Secure`, `SameSite=Lax` | Impide acceso por scripts maliciosos (Neutraliza ataques XSS) |\n| Política de CORS | Restringido exclusivamente al dominio oficial del proyecto y localhost en dev | Previene solicitudes maliciosas desde orígenes no autorizados |\n| Rate-Limiting por IP | Máximo 100 req/min general; 5 req/min en `/auth/*` (Upstash/Redis) | Protege endpoints contra ataques de fuerza bruta y denegación de servicio |",
+          "exit_label": "Políticas de IAM y Seguridad Perimetral Formalizadas",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Configuración de Tokens, Cookies y Filtros Perimetrales",
+              "objective": "Especificar las directivas funcionales para los middlewares de backend.",
+              "how_to": {
+                "steps": [
+                  "1. Fijar expiración de tokens de acceso y estrategia de rotación de refresh tokens.",
+                  "2. Prohibir almacenar tokens JWT en LocalStorage por vulnerabilidad a ataques XSS.",
+                  "3. Configurar cabeceras CORS en Next.js para admitir solo el origen autorizado.",
+                  "4. Establecer umbrales de limitación de tasa (HTTP 429 Too Many Requests)."
+                ],
+                "table_columns": [
+                  "Aspecto",
+                  "Mecanismo",
+                  "Riesgo Mitigado",
+                  "Comprobación"
+                ],
+                "table_rules": [
+                  "Los tokens de sesión jamás deben guardarse en LocalStorage",
+                  "Toda petición no autorizada en CORS debe ser bloqueada en el Edge",
+                  "Los endpoints de login deben tener rate-limiting estricto"
+                ],
+                "restrictions": "Prohibido el uso de comodines `Access-Control-Allow-Origin: *` en producción.",
+                "done_when": "Políticas de IAM, CORS y Rate-Limiting completamente documentadas."
+              },
+              "example_title": "Configuración de IAM D7",
+              "example": "```markdown\n## IAM & Seguridad:\n- Access Token: JWT 1 hora.\n- Almacenamiento: Cookies HttpOnly, Secure, SameSite=Lax.\n- CORS: Dominio de producción y subdominios propios exclusivamente.\n- Rate-Limiting: 100 req/min global, 5 req/min en login (Retorna HTTP 429).\n```",
+              "link_label": "IAM Validado -> Observabilidad y Manejo de Errores"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Observabilidad y Manejo Uniforme de Errores (Observability & Errors)",
+      "summary": "Estandarizar el registro de logs estructurados en JSON, monitoreo de excepciones con Sentry y contratos de error.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Structured Logging JSON, Monitoreo Sentry y Formato Uniforme de Error",
+          "objective": "Garantizar trazabilidad de incidentes sin filtrar información sensible o contraseñas en logs.",
+          "input": "Estándar de errores de D9 y requerimientos de auditoría.",
+          "raw_data_title": "Políticas de Observabilidad y Errores",
+          "raw_data": "| Componente | Herramienta / Estándar | Especificación Técnica |\n|---|---|---|\n| Structured Logging | Pino / Winston en formato JSON | Campos obligatorios: `timestamp`, `level`, `traceId`, `module`, `userId`, `message` |\n| Máscara de Datos Sensibles | Sanitizador de logs automático | Censura passwords, números de tarjeta, tokens y teléfonos en los logs |\n| Monitoreo de Excepciones | Sentry (SDK para Next.js) | Captura automática de crashes y errores 500 no controlados con stack trace |\n| Formato de Error de API | Envelope JSON Estandarizado | `{ \"error\": { \"code\": 409, \"type\": \"...\", \"message\": \"...\", \"traceId\": \"uuid\" } }` |",
+          "exit_label": "Estándar de Logs y Manejo de Errores Formalizado",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Diseño del Esquema de Log y Envelope de Error",
+              "objective": "Asegurar que cada fallo técnico en producción sea correlacionable con un identificador único.",
+              "how_to": {
+                "steps": [
+                  "1. Diseñar el esquema de logging en formato JSON para consumo en Datadog/Vercel Logs.",
+                  "2. Inyectar un `traceId` único en cada petición HTTP para correlacionar logs y errores de cliente.",
+                  "3. Integrar Sentry para alertar inmediatamente al equipo ante excepciones no capturadas.",
+                  "4. Estandarizar el objeto de error retornado por todos los endpoints del backend."
+                ],
+                "table_columns": [
+                  "Elemento",
+                  "Estructura JSON",
+                  "Propósito",
+                  "Validación"
+                ],
+                "table_rules": [
+                  "Los logs en producción deben ser estrictamente JSON de una sola línea",
+                  "Prohibido loguear datos personales o tokens de autenticación",
+                  "Todo error 500 devuelto al cliente debe incluir un traceId para soporte"
+                ],
+                "restrictions": "Nunca devolver stack traces completos o nombres de tablas de base de datos al cliente.",
+                "done_when": "Esquemas de log y formato de respuesta de error documentados y validados."
+              },
+              "example_title": "Formato de Error y Log D7",
+              "example": "```json\n// Structured Log\n{\n  \"timestamp\": \"2026-10-15T14:30:00Z\",\n  \"level\": \"ERROR\",\n  \"traceId\": \"c73a-4b92-91e8\",\n  \"module\": \"booking\",\n  \"message\": \"Fallo de cobro en Wompi\"\n}\n\n// API Error Response\n{\n  \"error\": {\n    \"code\": 402,\n    \"type\": \"PAYMENT_DECLINED\",\n    \"message\": \"Tu tarjeta fue rechazada por la pasarela.\",\n    \"traceId\": \"c73a-4b92-91e8\"\n  }\n}\n```",
+              "link_label": "Observabilidad Validada -> Estrategia de Caching"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Estrategia de Caching y Rendimiento (Caching & Performance)",
+      "summary": "Definir las capas de almacenamiento en caché perimetral y en memoria, junto con sus protocolos de invalidación on-demand.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Configuración de Edge CDN, Redis/Memory Cache e Invalidación On-Demand",
+          "objective": "Cumplir la meta de TTFB < 200ms en catálogo y optimizar el consumo de base de datos relacional.",
+          "input": "Escenario 1 y 2 de D1, y señal de asimetría R/W (100:1) de D12.",
+          "raw_data_title": "Matriz de Capas de Caché e Invalidación",
+          "raw_data": "| Capa de Caché | Tecnología / Servicio | Qué Cachea | TTL Base | Mecanismo de Invalidación |\n|---|---|---|---|---|\n| Edge CDN (HTML/JSON) | Vercel Edge Cache | Páginas públicas del catálogo de fincas | 60 segundos (stale-while-revalidate) | On-Demand via `revalidatePath('/properties')` cuando un host actualiza su finca |\n| Multimedia (Imágenes 4K) | Cloudflare CDN / Supabase Storage | Fotos de propiedades optimizadas en WebP | 1 año (31536000s) | Por versión inmutable de archivo (`foto_v2.webp`) |\n| Base de Datos / Consultas | Upstash Redis (In-Memory) | Contadores de disponibilidad y filtros frecuentes | 5 minutos | Invalidación activa ante confirmación de reserva (`booking.confirmed`) |",
+          "exit_label": "Estrategia de Caching e Invalidación Rigurosamente Diseñada",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Diseño de Políticas de Caché y Purga On-Demand",
+              "objective": "Garantizar frescura de datos en reservas sin penalizar la velocidad de exploración.",
+              "how_to": {
+                "steps": [
+                  "1. Configurar Edge Caching en Vercel para servir vistas de catálogo de forma instantánea.",
+                  "2. Diseñar el disparador de purga de caché cuando un host modifica fotos, precios o reglas.",
+                  "3. Asignar encabezados `Cache-Control: public, max-age=31536000, immutable` a fotografías.",
+                  "4. Prohibir el almacenamiento en caché de respuestas privadas de checkout o perfil de usuario."
+                ],
+                "table_columns": [
+                  "Recurso",
+                  "Capa",
+                  "TTL",
+                  "Regla de Invalidación"
+                ],
+                "table_rules": [
+                  "Las pantallas de pago y reservas nunca deben cachearse en la CDN",
+                  "Toda actualización de propiedad debe purgar el caché del catálogo inmediatamente",
+                  "Las imágenes deben ser inmutables por nombre para aprovechar el caché de navegador"
+                ],
+                "restrictions": "Prohibido almacenar en caché respuestas que contengan datos personales o tokens de sesión.",
+                "done_when": "Capas de caché y eventos de invalidación completamente definidos."
+              },
+              "example_title": "Matriz de Caching D7",
+              "example": "```markdown\n| Capa | Servicio | Recurso | TTL | Invalidación |\n|---|---|---|---|---|\n| Edge CDN | Vercel | Catálogo fincas | 60s (SWR) | `revalidatePath('/properties')` |\n| Media CDN | Cloudflare | Fotos fincas | 1 año | Nombres versionados inmutables |\n| In-Memory | Redis | Disponibilidad | 5 min | Evento de nueva reserva |\n```",
+              "link_label": "Caching Validado -> Ensamblaje D7"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de Aspectos Transversales y Handoff (Assembly & Handoff)",
+      "summary": "Consolidar el entregable D7 y articular sus directivas para middlewares en Fase 6 D4 y pipelines en D8.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación del Documento D7 e Implicaciones para Fase 6 D4 y D8",
+          "objective": "Publicar el entregable D7 como especificación de observabilidad, seguridad y caché.",
+          "input": "Estrategias de IAM, observabilidad, errores y caching completadas.",
+          "raw_data_title": "Directivas de Consumo Downstream",
+          "raw_data": "| Entregable Receptor | Directiva Técnica Heredada de D7 | Impacto en la Implementación |\n|---|---|---|\n| Fase 6 — D4 (Security Implementation & Middleware) | Implementará los middlewares Next.js para verificación de cookies HttpOnly y CORS | Código fuente de protección de rutas y rate-limiting |\n| Fase 6 — D10 (Async Workers & Job Scheduling) | Utilizará los webhooks y eventos para purgar caché de Redis y Edge | Tareas de invalidación en segundo plano |\n| D8 (CI/CD Strategy) | Integrará Sentry DSN y verificaciones de variables de entorno en pipelines | Validaciones automáticas de observabilidad antes de despliegue |",
+          "exit_label": "Entregable D7 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento Maestro D7",
+              "objective": "Consolidar el entregable D7 en formato formal.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el archivo en sus 4 secciones canónicas: Metadata, IAM, Observabilidad y Caching.",
+                  "2. Verificar que se cubran las directivas para los 3 pilares transversales.",
+                  "3. Documentar las directivas para Fase 6 y D8.",
+                  "4. Validar el cumplimiento total de traducción al español."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Contenido",
+                  "Normativa",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe servir como checklist de implementación para los middlewares de Fase 6",
+                  "Asegurar coherencia absoluta con los NFRs y la matriz de seguridad D11",
+                  "Verificar que las estrategias de invalidación sean realizables técnicamente"
+                ],
+                "restrictions": "No admitir políticas de seguridad ambiguas o configuraciones de logging en texto plano.",
+                "done_when": "Documento D7 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Entregable D7",
+              "example": "```markdown\n# Deliverable 7 (D7): Cross-Cutting Concerns\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n## 2. IAM & Security Strategy\n- Cookies HttpOnly, CORS restringido y Rate-Limiting.\n\n## 3. Observability & Global Error Handling\n- Structured Logging JSON, Sentry y traceId unificado.\n\n## 4. Caching & Performance Strategy\n- Vercel Edge ISR, Redis y CDN de imágenes.\n```",
+              "link_label": "Aspectos Transversales Ensamblados -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Cross-Cutting Concerns (D7)",
+    "markdown": "# Deliverable 7 (D7): Cross-Cutting Concerns\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n---\n\n## 1. Estrategia Global de IAM y Seguridad Perimetral\n\n*Backlink a Fase 4:* Formaliza la implementación técnica de las políticas de autenticación y autorización establecidas en `[[PHASE_4_SYSTEM_MODELING/11.Authorization_and_Security/11.Authorization_and_Security.md]]`.\n\n- **Ciclo de Vida de Sesión y Tokens:**\n  - **Access Token:** JWT firmado asimétricamente por Supabase GoTrue, con una vigencia estricta de 1 hora (3600 segundos).\n  - **Refresh Token:** Rotación automática en cada uso con revocación inmediata de la familia de tokens en caso de detección de reúso fraudulento.\n  - **Almacenamiento Seguro:** Queda taxativamente prohibido el almacenamiento de JWT en `localStorage` o `sessionStorage`. Los tokens se transmiten y persisten exclusivamente mediante **Cookies `HttpOnly`, `Secure` y `SameSite=Lax`**, neutralizando de raíz ataques de robo de sesión vía XSS.\n- **Política de CORS:** Restringida estrictamente al dominio oficial de producción del marketplace (`https://nosfuimosdefinca.com`) y a `localhost:3000` en entornos de desarrollo local. Las peticiones desde cualquier otro origen son bloqueadas en el Edge.\n- **Rate-Limiting Perimetral:** Implementado en el Edge Middleware (con Upstash Redis):\n  - Rutas Generales de API: Máximo **100 solicitudes por minuto** por dirección IP.\n  - Rutas de Autenticación y Checkout (`/api/v1/auth/*`, `POST /api/v1/bookings`): Máximo **5 solicitudes por minuto** por dirección IP. Las infracciones devuelven `HTTP 429 Too Many Requests`.\n\n---\n\n## 2. Observabilidad, Logging y Manejo Uniforme de Errores\n\n- **Structured Logging (Logs JSON):** Todos los registros del servidor se emiten en formato JSON estructurado de una sola línea, permitiendo agregación y búsqueda en tiempo real. Campos obligatorios:\n  ```json\n  {\n    \"timestamp\": \"2026-10-15T14:30:00Z\",\n    \"level\": \"INFO | WARN | ERROR\",\n    \"traceId\": \"c73a-4b92-91e8-6e54\",\n    \"module\": \"booking\",\n    \"userId\": \"usr_8921\",\n    \"message\": \"Reserva creada exitosamente\",\n    \"context\": { \"booking_id\": \"b89a\", \"total_price\": 1200000 }\n  }\n  ```\n  *Enmascaramiento:* Todo dato sensible (contraseñas, números de tarjeta, tokens y teléfonos) se filtra y censura automáticamente antes de emitir el log.\n- **Captura de Excepciones (APM):** Integración con **Sentry** para captura automática de excepciones no controladas y errores `500`, correlacionando el reporte con el `traceId` y la versión de Git.\n- **Envelope Estándar de Errores de API:**\n  ```json\n  {\n    \"error\": {\n      \"code\": 409,\n      \"type\": \"DATES_UNAVAILABLE\",\n      \"message\": \"Las fechas seleccionadas ya han sido reservadas por otro usuario.\",\n      \"traceId\": \"c73a-4b92-91e8-6e54\"\n    }\n  }\n  ```\n\n---\n\n## 3. Estrategia de Caching y Rendimiento (Invalidación On-Demand)\n\n| Capa de Caché | Tecnología | Recurso Almacenado | TTL | Estrategia de Invalidación |\n|---|---|---|---|---|\n| **Edge CDN** | Vercel Edge Cache | Páginas y datos del catálogo público (`/properties`) | 60 seg (Stale-While-Revalidate) | **On-Demand:** Se invoca `revalidatePath('/properties')` cuando un host actualiza tarifas o información. |\n| **Media CDN** | Cloudflare / Supabase Storage | Fotografías de fincas (WebP optimizado) | 1 año (Inmutable) | **Versionado por Hash:** La edición de una foto genera una URL con hash nuevo (`finca_v2.webp`). |\n| **In-Memory** | Upstash Redis | Disponibilidad de fechas y cupones | 5 minutos | **Purga Activa:** El evento `booking.confirmed` purga la clave de disponibilidad de esa finca. |\n\n---\n\n## 4. Implicaciones para Entregables Downstream\n\n- **Hacia Fase 6 — D4 (Security Implementation & Middleware):** Estas directivas dictan la implementación de `src/middleware.ts` en Next.js para validación de cookies, CORS y rate-limiting.\n- **Hacia D8 (CI/CD Strategy):** El pipeline de despliegue validará la inyección de `SENTRY_DSN` y variables secretas antes de autorizar el pase a producción."
+  }
+}

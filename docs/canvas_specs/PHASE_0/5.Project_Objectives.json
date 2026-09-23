@@ -1,0 +1,408 @@
+{
+  "phase": "Phase 0",
+  "deliverable_code": "D5",
+  "deliverable": "Project Objectives (OKRs)",
+  "purpose": "This deliverable translates the problem documented in D1 and the estimated metrics from D3 into a measurable and inspiring goal, and shields the scope by explicitly documenting what will NOT be built. It defines how we will know we have succeeded at the end of the project, leaving no room for technical ambiguity or unauthorized promises.",
+  "inputs": "| Artifact | Use | Consumed in |\n| --- | --- | --- |\n| [[example_output_problem_statement]] | The pain to cure and the satellite complaints not included in scope (P0-D1). | Step 1, Step 3 |\n| [[example_output_impact_estimate]] | The estimated metrics (baseline) to improve, and their Confidence Level (P0-D3). | Step 2 |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Main Objective Drafting",
+      "summary": "Define the supreme qualitative goal: a surgical description of a world where the D1 failure no longer exists — not a description of the system to be built.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Fit into the General Objective Formula",
+          "objective": "Avoid a vague or dreamy objective by forcing a verifiable structure.",
+          "input": "Affected Actor, Condition, and Consequence from D1.",
+          "raw_data_title": "Purified D1 Variables",
+          "raw_data": "- **Affected Actor:** Operations team and reservation managers.\n- **Condition:** High concurrent demand across manual/dispersed channels.\n- **Consequence:** Cross-approval and duplicate collections (overselling / double booking).",
+          "exit_label": "FORMULA APPLIED → v1 goes to subject audit (1.2)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Fixed formula application",
+              "objective": "Apply the structural formula: [Affected Group] can [do what failure prevented] [under prior failure conditions] [without suffering consequence].",
+              "how_to": {
+                "steps": [
+                  "Extract the 4 purified variables from D1 (Affected Actor, Condition, Consequence, Downstream Effect).",
+                  "Slot the variables into the formula: '[Affected Group] can [do what failure prevented] [under prior failure conditions] [without suffering consequence]'.",
+                  "Verify that the sentence reads clearly and describes the desired operational outcome."
+                ],
+                "table_columns": "Formula Component | Extracted D1 Variable | Objective Clause",
+                "table_rules": "One row per formula slot detailing the D1 source and drafted phrasing.",
+                "restrictions": [
+                  "Must use the fixed 4-part formula.",
+                  "No technological mechanisms or solution terms allowed.",
+                  "Follow D1 facts strictly."
+                ],
+                "done_when": "All 4 formula slots filled into Draft Objective v1."
+              },
+              "example_title": "Formula Application",
+              "example": "- **Affected Group:** Operations team and reservation managers of Nos Fuimos de Finca.\n- **What the failure prevented them from doing:** Confirm availability and collect deposit payments with certainty.\n- **Conditions where it previously failed:** High concurrent demand for a single property.\n- **Consequence not to suffer:** Cross-approval and duplicate collections (overselling / double booking).\n- **Draft Objective v1:** \"Reservation managers of Nos Fuimos de Finca can confirm availability and collect deposits with certainty even under high concurrent demand for a single rural estate, without incurring cross-approvals or duplicate payments.\"",
+              "link_label": "draft v1 goes to elimination rule (1.1.2)"
+            },
+            {
+              "code": "1.1.2",
+              "title": "Elimination Rule",
+              "objective": "Verify the objective promises to eliminate the primary symptom, never to merely 'improve' or 'reduce' it.",
+              "how_to": {
+                "steps": [
+                  "Inspect Draft Objective v1 for comparative or mitigation verbs ('reduce', 'improve', 'faster', 'mitigate').",
+                  "Verify the phrasing promises absolute cessation of the symptom ('without incurring', 'eliminate').",
+                  "If mitigation verbs are found, rewrite to promise total eradication of the failure condition."
+                ],
+                "table_columns": "Draft Clause | Verb / Phrasing | Verifiable Promise | Elimination Audit",
+                "table_rules": "One row evaluating the symptom promise against the absolute elimination rule.",
+                "restrictions": [
+                  "Promising speed ('faster') or reduction ('lesser') is prohibited.",
+                  "Must commit to eliminating the failure."
+                ],
+                "done_when": "Elimination check confirmed with zero mitigation verbs."
+              },
+              "example_title": "Elimination Audit",
+              "example": "| Draft Clause | Verb / Phrasing | Verifiable Promise | Elimination Audit |\n| :--- | :--- | :--- | :---: |\n| \"...without incurring cross-approvals or duplicate payments.\" | \"without incurring\" | Total eradication of overselling symptom | **`PASS`** |\n\n*Audit Result:* The text uses \"without incurring\" instead of \"with lesser frequency\" or \"faster\". Absolute elimination verified.",
+              "link_label": "v1 audited goes to subject audit (1.2)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Grammatical Subject Audit",
+          "objective": "Ensure the sentence subject is the Affected Group, never the technology.",
+          "input": "Draft Objective v1 from Sub-step 1.1.",
+          "raw_data_title": "Draft Objective v1 Text",
+          "raw_data": "\"Reservation managers of Nos Fuimos de Finca can confirm availability and collect deposits with certainty even under high concurrent demand for a single rural estate, without incurring cross-approvals or duplicate payments.\"",
+          "exit_label": "HUMAN SUBJECT VERIFIED → Objective v2 goes to Step 2",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Subject identification",
+              "objective": "Identify the grammatical subject and confirm it is a human group, not a system.",
+              "how_to": {
+                "steps": [
+                  "Locate the grammatical subject performing the primary action in the sentence.",
+                  "Test whether the subject is a human actor/group or a technological noun ('the system', 'the platform', 'the app', 'the tool').",
+                  "If technology is the subject, rewrite the sentence with D1's Affected Group as the active subject.",
+                  "Confirm the human subject can execute the action."
+                ],
+                "table_columns": "Draft Text | Grammatical Subject | Subject Nature | Verdict",
+                "table_rules": "One row evaluating grammatical subject identity.",
+                "restrictions": [
+                  "Technology as grammatical subject is strictly prohibited.",
+                  "Subject must match Affected Actor from D1."
+                ],
+                "done_when": "Grammatical subject confirmed as human actor."
+              },
+              "example_title": "Grammatical Subject Identification",
+              "example": "| Draft Text | Grammatical Subject | Subject Nature | Verdict |\n| :--- | :--- | :--- | :---: |\n| \"Reservation managers of Nos Fuimos de Finca can confirm...\" | Reservation managers of Nos Fuimos de Finca | Human Actor (Affected Group) | **`CORRECT`** |\n\n*Outcome:* Active subject is human; zero technological artifacts used as grammatical subject.",
+              "link_label": "qualitative objective goes to Step 2 (2.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Key Results Definition",
+      "summary": "Establish quantitative metrics that determine success, explicitly marking their firmness level based on D3 confidence.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "KR Type Selection",
+          "objective": "Select KR Type A (Improvement: From X to Y) or Type B (Capability: Target threshold) based on D3 baseline availability.",
+          "input": "Objective (Step 1) + D3 Estimated Impact (12 events/year, 9,600,000 COP/year) + D1 Condition/Trigger.",
+          "raw_data_title": "Baseline Metrics and Context",
+          "raw_data": "- Double booking events: 12 events/year (documented baseline in D3).\n- Shared visibility among coordinators: 0% today (manual dispersed channels in D1, no prior numerical baseline).",
+          "exit_label": "KR TYPES ASSIGNED → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "KR Type Assignment",
+              "objective": "Assign Type A or Type B to candidate KRs according to baseline presence.",
+              "how_to": {
+                "steps": [
+                  "Review candidate metrics against D3 baseline data.",
+                  "If D3 reports a clear numeric baseline, format as Type A: Verb + Metric + From X to Y + Deadline.",
+                  "If the problem is total absence without a historical numerical baseline, format as Type B: Verb + Metric + Target threshold + Deadline.",
+                  "Verify that each KR specifies a concrete verb, measurable metric, target, and timeframe."
+                ],
+                "table_columns": "Candidate KR | Metric | Baseline Status | Assigned KR Type | Draft Formula",
+                "table_rules": "One row per candidate KR with its type classification.",
+                "restrictions": [
+                  "Type A requires historical starting number X.",
+                  "Type B requires qualitative capability target threshold without false past baseline."
+                ],
+                "done_when": "All candidate KRs classified into Type A or Type B."
+              },
+              "example_title": "KR Type Selection",
+              "example": "- **KR1 (Type A):** D3 reports a clear numerical baseline (12 events/year) $\\rightarrow$ Type A.\n  - *Verb:* Reduce. *Metric:* Double booking events. *From/To:* From 12 to 0 per year. *Timeframe:* First 3 months of stable operation.\n- **KR2 (Type B):** No prior numerical baseline exists for \"shared visibility among coordinators\" (today 0% by definition, manual dispersed channels) $\\rightarrow$ Type B.\n  - *Verb:* Ensure. *Metric:* Availability inquiries resolved using shared real-time information among coordinators. *Threshold:* 100%. *Timeframe:* By close of Phase 1.",
+              "link_label": "draft KRs go to firmness sealing (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Firmness Seal Based on D3 Confidence Level",
+          "objective": "Seal each KR according to D3's authentic confidence rating to prevent ungrounded contractual commitments.",
+          "input": "Draft KRs from 2.1 + D3 Confidence Level (Medium, based on 2 documented instances).",
+          "raw_data_title": "D3 Confidence Assessment",
+          "raw_data": "D3 Confidence Level: Medium (frequency annualized from 2 isolated records, not audited full-year accounting ledger).",
+          "exit_label": "SEALS APPLIED → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Applied sealing rule",
+              "objective": "Apply the firmness seal rule: High -> Firm, Medium -> Firm with confirmation note, Low -> Type B + PROVISIONAL.",
+              "how_to": {
+                "steps": [
+                  "Retrieve D3 Confidence Level for the supporting metric of each KR.",
+                  "If Confidence is High, assign Firm KR without additional note.",
+                  "If Confidence is Medium, assign Firm KR with mandatory note: 'Baseline subject to magnitude confirmation in Phase 1; the direction of improvement and qualitative threshold are maintained.'",
+                  "If Confidence is Low, draft in Type B format and label 'PROVISIONAL — Recalculate in Phase 1'.",
+                  "Attach explicit seal to KR definition."
+                ],
+                "table_columns": "KR | Supporting Metric | D3 Confidence | Applied Seal | Mandatory Seal Text",
+                "table_rules": "One row per KR evaluating confidence and assigning the binding seal.",
+                "restrictions": [
+                  "Never assign unconditional firm seal to Medium or Low confidence baselines.",
+                  "Must follow exact seal formulas."
+                ],
+                "done_when": "All KRs assigned appropriate firmness seals."
+              },
+              "example_title": "Firmness Seal Application",
+              "example": "| KR | Metric | D3 Confidence | Applied Seal | Mandatory Note |\n| :--- | :--- | :---: | :---: | :--- |\n| **KR1** | Double booking events (from 12 to 0) | **Medium** | `Medium Seal` | *Baseline subject to magnitude confirmation in Phase 1; direction of improvement (eliminating double bookings) and qualitative threshold (0 events) remain firm.* |\n| **KR2** | Shared real-time visibility (100%) | *Qualitative (D1)* | `Firm / Unsealed` | Threshold independent of historical incident frequency. |",
+              "link_label": "sealed KRs go to quantity check (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Quantity Limit",
+          "objective": "Enforce the strict limit of maximum 3 KRs to preserve strategic focus.",
+          "input": "List of sealed KRs from Sub-step 2.2.",
+          "raw_data_title": "Active KR Count",
+          "raw_data": "Candidate KRs: KR1 (Reduce double bookings), KR2 (100% shared visibility). Total count: 2.",
+          "exit_label": "KR QUANTITY VALIDATED → Step 3",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Quantity ceiling check",
+              "objective": "Verify total number of KRs does not exceed 3.",
+              "how_to": {
+                "steps": [
+                  "Count total defined KRs.",
+                  "Check condition: count <= 3.",
+                  "If count > 3, prioritize top 3 highest business impact KRs and relegate remainder to operational monitoring or drop.",
+                  "Issue formal approval of KR set."
+                ],
+                "table_columns": "Total KRs Defined | Maximum Allowed | Constraint Status | Decision",
+                "table_rules": "One row checking total KR count against maximum limit.",
+                "restrictions": [
+                  "Strict ceiling: maximum 3 KRs allowed."
+                ],
+                "done_when": "KR count confirmed <= 3."
+              },
+              "example_title": "Quantity Limit Check",
+              "example": "| Total KRs Defined | Maximum Allowed | Constraint Status | Decision |\n| :---: | :---: | :---: | :---: |\n| 2 | 3 | **`PASS`** | Approved without pruning. |\n\n*Final Draft KRs:*\n- **KR1 (Type A, Medium seal):** Reduce double booking events from 12 to 0 per year within the first 3 months of stable operation. *(Baseline subject to magnitude confirmation in Phase 1).*\n- **KR2 (Type B, unsealed):** Ensure 100% of availability inquiries among coordinators are resolved using shared, instantaneous information by the close of Phase 1.",
+              "link_label": "sealed KRs go to solution language audit (3.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Solution Language Audit and Out of Scope",
+      "summary": "Purge solution language from the Objective and KRs, and explicitly document discarded complaints to prevent implicit promises.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Substitution Test",
+          "objective": "Detect and eliminate product or technology words (App, Web, Database, Algorithm, AI, Platform) from Objective and KRs.",
+          "input": "Objective (Step 1) and KRs (Step 2).",
+          "raw_data_title": "Audited Objective & KR Statements",
+          "raw_data": "- Objective: Reservation managers can confirm availability... without duplicate payments.\n- KR1: Reduce double bookings from 12 to 0...\n- KR2: Ensure 100% of inquiries resolved with shared, instantaneous information...",
+          "exit_label": "LANGUAGE PURGED → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Substitution test execution",
+              "objective": "Test each statement by removing suspected tech terms to ensure focus on human outcomes.",
+              "how_to": {
+                "steps": [
+                  "Scan Objective and KRs for suspicious tech or implementation terms (App, Web, Database, Algorithm, AI, Platform, Software).",
+                  "For each candidate term, execute the Substitution Test: remove the word and examine whether sentence retains human outcome meaning.",
+                  "If the sentence loses essential meaning or references a technical architecture, replace with the human capability or outcome.",
+                  "Issue CLEAN verdict for every statement."
+                ],
+                "table_columns": "Audited Text | Suspected Tech Term | Substitution Test | Verdict",
+                "table_rules": "One row per audited statement.",
+                "restrictions": [
+                  "Solution/product words are strictly prohibited in Objectives and KRs.",
+                  "Focus exclusively on human outcomes."
+                ],
+                "done_when": "All statements verified CLEAN."
+              },
+              "example_title": "Substitution Test",
+              "example": "| Audited Text | Suspected Tech Term | Substitution Test | Verdict |\n| :--- | :--- | :--- | :---: |\n| Objective (O) | None | — | `CLEAN` |\n| KR1 | None | — | `CLEAN` |\n| KR2 | \"shared and instantaneous visibility\" — verified not to imply a specific product | Delete and re-read: \"ensure that 100% of inquiries are resolved with ________ among coordinators\" — remains a human capability outcome, not a vendor/product name. | `CLEAN` |",
+              "link_label": "clean statements go to exclusions (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Documentation of Exclusions (Out of Scope)",
+          "objective": "Formally document discarded requests and satellite complaints with specific exclusion rationales.",
+          "input": "D1 Sub-step 2.1.3 discarded complaints (cleanliness, commission delays).",
+          "raw_data_title": "Discarded Complaint Records from D1",
+          "raw_data": "- Complaint: Property cleanliness and physical maintenance.\n- Complaint: Commission payment delays to property owners.",
+          "exit_label": "OUT OF SCOPE SEALED → Step 4",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Out-of-scope logging",
+              "objective": "Document each discarded complaint and cite its concrete reason for exclusion.",
+              "how_to": {
+                "steps": [
+                  "Retrieve all satellite complaints discarded during D1 delimitation.",
+                  "For each discarded item, determine the precise reason for exclusion (e.g. independent trigger, separate management domain).",
+                  "Populate the Out-of-Scope table with discarded request and exclusion rationale.",
+                  "Verify no discarded item is left ambiguous."
+                ],
+                "table_columns": "Discarded Request or Complaint | Exclusion Rationale",
+                "table_rules": "One row per discarded complaint explaining why it is excluded from this project.",
+                "restrictions": [
+                  "Every satellite complaint from D1 must be explicitly accounted for.",
+                  "Exclusions must be rooted in single-trigger boundary rules."
+                ],
+                "done_when": "All discarded items documented with rationales."
+              },
+              "example_title": "Out-of-Scope Exclusions",
+              "example": "| Discarded Request or Complaint | Exclusion Rationale |\n| :--- | :--- |\n| Dissatisfaction with cleanliness or physical state of estates | Discarded in D1 (Substep 2.1.3): belongs to on-site quality maintenance management, not reservation coordination. |\n| Delays in commission payouts to property owners | Segregated in D1 into its own D1: holds an independent trigger (settlement accounting cycle), does not derive from double bookings. |",
+              "link_label": "exclusions go to traceability matrix (4.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "OKR Traceability Matrix",
+      "summary": "Verify that each KR is firmly anchored to authentic data from D3 or D1, preventing invented objectives (Scope Creep).",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Lineage Verification",
+          "objective": "Verify lineage and supporting evidence for each KR against D3 and D1 data.",
+          "input": "KRs from Step 2, D3 Estimated Impact, D1 Condition/Trigger.",
+          "raw_data_title": "Source Evidence for KRs",
+          "raw_data": "- KR1: Double bookings reduction. Source: D3 frequency baseline of 12 events/year.\n- KR2: Shared real-time visibility. Source: D1 Condition/Trigger (manual dispersed communication channels).",
+          "exit_label": "TRACEABILITY CONFIRMED → Step 5",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Traceability mapping and gate check",
+              "objective": "Map each KR to its supporting evidence and verify zero scope creep.",
+              "how_to": {
+                "steps": [
+                  "For each KR, identify the exact supporting data point in D3 or qualitative trigger in D1.",
+                  "Deduce whether the metric directly stems from the documented evidence or represents an ungrounded addition.",
+                  "Compile the Traceability Matrix recording KR, Grounding Data, Type (A/B), and Firmness Seal.",
+                  "Confirm zero ungrounded objectives exist."
+                ],
+                "table_columns": "KR | Grounding Data (D3 or D1) | Type (A/B) | Firmness Seal",
+                "table_rules": "One row per KR detailing lineage back to D3/D1.",
+                "restrictions": [
+                  "Every KR must trace back to D3 metric or D1 trigger.",
+                  "Invented objectives (Scope Creep) are prohibited."
+                ],
+                "done_when": "Complete traceability matrix assembled with all KRs validated."
+              },
+              "example_title": "OKR Traceability Matrix",
+              "example": "| KR | Grounding Data (D3 or D1) | Type (A/B) | Firmness Seal |\n| --- | --- | --- | :---: |\n| **KR1** (Reduce double bookings from 12 to 0) | D3: Estimated frequency of 12 events/year | Type A | Medium (baseline to confirm in Phase 1) |\n| **KR2** (100% of inquiries with shared visibility) | D1: Condition/Trigger — manual, dispersed channels | Type B | Firm |\n\n*Gate Validation:* Both KRs exhibit direct traceability back to D3 or D1. Zero ungrounded objectives (*Scope Creep*) infiltrated the deliverable.",
+              "link_label": "traceability verified goes to final assembly (5.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "5",
+      "title": "Final Document Assembly",
+      "summary": "Format the OKRs, Out-of-Scope table, and Traceability Matrix into the official exportable deliverable.",
+      "substeps": [
+        {
+          "code": "5.1",
+          "title": "Document Metadata",
+          "objective": "Populate deliverable metadata header according to methodology standards.",
+          "input": "Project parameters: Nos Fuimos de Finca, Phase 0, Deliverable 5 of 9, Status Approved.",
+          "raw_data_title": "Project Parameters",
+          "raw_data": "Project: Nos Fuimos de Finca. Phase: 0 — Problem Recognition. Deliverable: 5 of 9. Status: Approved.",
+          "exit_label": "METADATA READY → 5.2",
+          "micro": [
+            {
+              "code": "5.1.1",
+              "title": "Metadata formatting",
+              "objective": "Assemble standardized metadata block for deliverable 05.",
+              "how_to": {
+                "steps": [
+                  "Record Project name, Phase, Deliverable number, and approval status.",
+                  "Verify compliance with standard deliverable header conventions.",
+                  "Prepare metadata header block for document publication."
+                ],
+                "table_columns": "Metadata Field | Project Value",
+                "table_rules": "One row per metadata field.",
+                "restrictions": [
+                  "Standard header fields only."
+                ],
+                "done_when": "Metadata block populated."
+              },
+              "example_title": "Metadata Block",
+              "example": "**Project:** Nos Fuimos de Finca  \n**Phase:** 0 — Problem Recognition  \n**Deliverable:** 5 of 9  \n**Status:** Approved",
+              "link_label": "metadata goes to verbatim transposition (5.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "5.2",
+          "title": "Verbatim Transposition",
+          "objective": "Assemble Objective, KRs, Out of Scope, and Traceability Matrix verbatim without reformulating audited text.",
+          "input": "Audited outputs from Steps 1, 2, 3, and 4.",
+          "raw_data_title": "Audited Component Blocks",
+          "raw_data": "- Objective (Step 1)\n- KRs with seals (Step 2)\n- Out of Scope table (Step 3)\n- Traceability Matrix (Step 4)",
+          "exit_label": "FINAL DELIVERABLE ASSEMBLED → publishes deliverable",
+          "micro": [
+            {
+              "code": "5.2.1",
+              "title": "Full assembly verification",
+              "objective": "Verify verbatim transposition of all 4 sections into the final exportable document.",
+              "how_to": {
+                "steps": [
+                  "Copy the audited Objective from Step 1 verbatim.",
+                  "Copy the sealed KRs from Step 2 verbatim.",
+                  "Copy the Out-of-Scope table from Step 3 verbatim.",
+                  "Copy the OKR Traceability Matrix from Step 4 verbatim.",
+                  "Verify that no word, number, or condition was altered during transcription."
+                ],
+                "table_columns": "Section | Source Step | Content Check | Transposition Status",
+                "table_rules": "One row per assembled section verifying verbatim integrity.",
+                "restrictions": [
+                  "Verbatim transposition only; no rewriting or reformulation permitted."
+                ],
+                "done_when": "All 4 sections assembled and verified verbatim."
+              },
+              "example_title": "Assembly Verification",
+              "example": "| Section | Source Step | Content Check | Transposition Status |\n| :--- | :---: | :--- | :---: |\n| 1. Metadata | Step 5.1 | Project: Nos Fuimos de Finca, Phase 0, D5 | `VERIFIED` |\n| 2. Project OKR | Step 1 & 2 | 1 Objective + 2 sealed KRs | `VERIFIED` |\n| 3. Out of Scope | Step 3 | 2 excluded complaints with rationales | `VERIFIED` |\n| 4. Traceability Matrix | Step 4 | 2 KRs traced to D3/D1 | `VERIFIED` |\n\n*Result:* Transposition complete with 100% fidelity to audited steps.",
+              "link_label": "publishes final deliverable"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 05. Project Objectives.md",
+    "markdown": "# 5. Project Objectives (OKRs)\n\n### 1. Document Metadata\n**Project:** Nos Fuimos de Finca\n**Phase:** 0 — Problem Recognition\n**Deliverable:** 5 of 9\n**Status:** Approved\n\n### 2. Project OKR\n**Objective (O):**\n- Reservation managers at Nos Fuimos de Finca can confirm availability and collect advances with certainty even under high concurrent demand for the same property, without incurring cross-approvals or duplicate charges.\n\n**Key Results (KRs):**\n- **KR1:** Reduce overbooking events from 12 to 0 per year within the first 3 months of stable operation. *(Type A — Medium: baseline subject to magnitude confirmation in Phase 1).*\n- **KR2:** Ensure that 100% of availability queries between coordinators are resolved with shared, instantaneous information by the end of Phase 1. *(Type B — Firm).*\n\n### 3. Out of Scope\n| Discarded Request or Complaint | Reason for Exclusion |\n| --- | --- |\n| Dissatisfaction with the cleanliness or physical condition of properties | Belongs to property quality management, not to reservation coordination (discarded in D1). |\n| Delays in commission payments to property owners | Independent trigger (settlement cycle); segregated into its own D1. |\n\n### 4. OKR Traceability Matrix\n| KR | Supporting Data (D3 or D1) | Type (A/B) | Firmness Seal |\n| --- | --- | --- | :---: |\n| **KR1** | D3: Estimated frequency of 12 events/year | Type A | Medium |\n| **KR2** | D1: Condition/Trigger — manual and dispersed channels | Type B | Firm |"
+  }
+}

@@ -1,0 +1,423 @@
+{
+  "phase": "Phase 0",
+  "deliverable_code": "D6",
+  "deliverable": "Stakeholder Map",
+  "purpose": "This deliverable identifies the real humans who will decide the success, use, and payment of the software — including those nobody mentions in interviews because they operate behind the scenes. Without primary users who suffer the pain, there is no adoption; without a Sponsor who pays, there is no project; without mapping who can veto it, the project dies late and expensively.",
+  "inputs": "| Artifact | Use | Consumed in |\n| --- | --- | --- |\n| [[example_output_problem_statement]] | Affected Actor (Who empirically suffers the problem) from D1. | Step 1 |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Primary User Identification",
+      "summary": "Confirm who will touch the software every day with their hands — not the CEO, but whoever is in the trenches of the problem documented in D1.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Actor Extraction",
+          "objective": "Literally extract the Affected Actor from D1.",
+          "input": "Affected Actor from [[example_output_problem_statement]].",
+          "raw_data_title": "D1 Affected Actor",
+          "raw_data": "\"Operations team and reservation managers of Nos Fuimos de Finca\"",
+          "exit_label": "ACTOR EXTRACTED → trench test (1.2)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Literal extraction",
+              "objective": "Extract the exact phrasing identifying who empirically suffers the daily breakdown.",
+              "how_to": {
+                "steps": [
+                  "Locate the Affected Actor defined in D1 Problem Statement.",
+                  "Extract the exact phrasing identifying who empirically suffers the daily breakdown.",
+                  "Verify that the actor represents specific operational people rather than an abstract company name."
+                ],
+                "table_columns": "D1 Artifact Source | Affected Actor Literal | Verification Status",
+                "table_rules": "One row documenting literal actor extraction from D1.",
+                "restrictions": [
+                  "Cite verbatim from D1.",
+                  "Do not substitute abstract organizational entities for concrete humans."
+                ],
+                "done_when": "Affected Actor extracted verbatim from D1."
+              },
+              "example_title": "Actor Extraction",
+              "example": "| D1 Artifact Source | Affected Actor Literal | Verification Status |\n| :--- | :--- | :---: |\n| [[example_output_problem_statement]] | Operations team and reservation managers of Nos Fuimos de Finca | `VERIFIED` |\n\n*Finding:* D1 explicitly identifies the operations team and reservation managers, not 'Nos Fuimos de Finca' as an abstract entity.",
+              "link_label": "extracted actor goes to trench test (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Trench Test",
+          "objective": "Determine whether this actor executes the daily hands-on operational tasks or delegates them.",
+          "input": "Extracted actor from Sub-step 1.1.",
+          "raw_data_title": "Operational Roles in Trenches",
+          "raw_data": "Reservation managers handling customer inquiries and bank deposits across WhatsApp and phone.",
+          "exit_label": "TRENCH TEST PASSED → role naming (1.3)",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Operational button-clicker verification",
+              "objective": "Apply the Trench Test question: 'Will this person be the one who clicks the buttons to solve the daily problem?'",
+              "how_to": {
+                "steps": [
+                  "Formulate the Trench Test question: 'Will this individual be the one who clicks the buttons to solve the daily problem?'",
+                  "Assess daily operational duties versus managerial/delegated duties.",
+                  "If the extracted actor delegates daily tasks to subordinates, shift focus to the actual hands-on operator.",
+                  "Confirm that the evaluated role executes the immediate operational actions."
+                ],
+                "table_columns": "Candidate Role | Trench Question | Operational Reality | Trench Test Verdict",
+                "table_rules": "One row recording Trench Test evaluation.",
+                "restrictions": [
+                  "Never assign the CEO or executive sponsor as Primary User unless they personally execute the operation daily."
+                ],
+                "done_when": "Trench test answered YES with hands-on role identified."
+              },
+              "example_title": "Trench Test Evaluation",
+              "example": "| Candidate Role | Trench Question | Operational Reality | Trench Test Verdict |\n| :--- | :--- | :--- | :---: |\n| Reservation managers / operations team | Will this individual be clicking buttons to confirm availability and collect deposits? | Booking coordinators verify availability and receive bank receipts daily; they execute tasks directly. | **`PASS`** |",
+              "link_label": "verified actor goes to role naming (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Concrete Role Naming",
+          "objective": "Designate the standardized operational job title for the primary user.",
+          "input": "Verified actor from Sub-step 1.2.",
+          "raw_data_title": "Operational Job Title",
+          "raw_data": "Reservation Coordinator of Nos Fuimos de Finca.",
+          "exit_label": "PRIMARY USER DESIGNATED → Step 2",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Final role assignment",
+              "objective": "Assign the formal project role 'Primary User' with precise operational boundaries.",
+              "how_to": {
+                "steps": [
+                  "Define the standardized job title for the primary hands-on user.",
+                  "Assign the formal project role 'Primary User'.",
+                  "Document the specific role in the stakeholder roster."
+                ],
+                "table_columns": "Project Role | Who They Are | Operational Domain",
+                "table_rules": "One row defining the Primary User role.",
+                "restrictions": [
+                  "Role name must be specific and operational."
+                ],
+                "done_when": "Primary User formalized."
+              },
+              "example_title": "Primary User Definition",
+              "example": "| Project Role | Who They Are | Operational Domain |\n| --- | --- | --- |\n| **Primary User** | Reservation Coordinator of Nos Fuimos de Finca | Daily availability verification, booking intake, deposit receipt handling |",
+              "link_label": "primary user goes to Step 2 (2.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Silent Controllers and Influence Hierarchy",
+      "summary": "Map not just who is obvious, but who controls money, data, or deployment permission without interview mention, and rank everyone by real veto power.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Silent Controllers Search",
+          "objective": "Find the invisible actors no interviewee mentioned but that the problem domain requires.",
+          "input": "Primary User (Step 1) + business domain context (rural property rentals, deposit transfers).",
+          "raw_data_title": "Domain Tracking Answers",
+          "raw_data": "- Money handler: Commercial banks processing deposit transfers and enforcing reversal rules.\n- Regulation: National Tourism Registry (RNT) regulates rural lodging in Colombia.\n- Production deployment: Internal operational decision, no external veto.",
+          "exit_label": "CANDIDATES UNCOVERED → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Tracking questions",
+              "objective": "Execute tracking questions on money, regulation, and production deployment.",
+              "how_to": {
+                "steps": [
+                  "Ask question 1: 'Who handles the data or money this solution will touch?'",
+                  "Ask question 2: 'What legal or sector regulation applies to this type of operation?'",
+                  "Ask question 3: 'Who approves the production deployment?'",
+                  "List all uncovered entities as silent controller candidates."
+                ],
+                "table_columns": "Tracking Question | Operational Reality / Domain Answer | Silent Controller Candidate",
+                "table_rules": "One row per tracking question documenting candidate stakeholders.",
+                "restrictions": [
+                  "Minimum 1 tracking question must be answered.",
+                  "Probe financial and regulatory domains even if not mentioned in problem interviews."
+                ],
+                "done_when": "All tracking questions probed and candidates compiled."
+              },
+              "example_title": "Tracking Questions for Silent Controllers",
+              "example": "| Tracking Question | Answer | Silent Controller Candidate |\n| :--- | :--- | :--- |\n| Who handles the money this solution touches? | Deposits are transferred through commercial banks; banks establish processing cutoffs and reversal regulations. | Banking institution processing deposit transfers |\n| What legal or sector regulations apply to this operation? | Rural tourism rentals in Colombia mandate formal registration with the National Tourism Registry (RNT). | National Tourism Registry (RNT) |\n| Who approves production rollout? | No external technical entity; internal operational decision. | None additional |",
+              "link_label": "candidate roster goes to hierarchy (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Influence Hierarchy Assignment",
+          "objective": "Assign each candidate exactly one type of influence in fixed exclusive order: Blocker > Sponsor > Validator > User.",
+          "input": "Candidate roster from Sub-step 2.1 + Primary User (Step 1).",
+          "raw_data_title": "Stakeholder Candidates",
+          "raw_data": "Candidates: Banking institution, Laura Torres (CEO and founder), National Tourism Registry (RNT), Reservation Coordinator.",
+          "exit_label": "INFLUENCE RANKED → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Fixed exclusive order mapping",
+              "objective": "Map candidate stakeholders against the 4 hierarchical influence categories.",
+              "how_to": {
+                "steps": [
+                  "Review the fixed influence hierarchy: Blocker > Sponsor > Validator > User.",
+                  "Assign each candidate to their candidate role categories.",
+                  "Document candidate classification options."
+                ],
+                "table_columns": "Candidate | Potential Role(s) | Primary Capability",
+                "table_rules": "One row per candidate outlining role possibilities.",
+                "restrictions": [
+                  "Must follow the 4 standard categories."
+                ],
+                "done_when": "Candidates mapped against influence categories."
+              },
+              "example_title": "Influence Role Mapping",
+              "example": "| Candidate | Potential Role(s) | Primary Capability |\n| :--- | :--- | :--- |\n| Banking institution | Validator or Blocker | Processes deposits, enforces reversal regulations |\n| Laura Torres (CEO and founder) | User or Sponsor | Pays for project, oversees agency operations |\n| National Tourism Registry (RNT) | Validator | Regulates legal framework for tourism accommodation |\n| Reservation Coordinator | User | Executes daily reservations and calendar checks |",
+              "link_label": "mapping goes to exclusivity rule (2.2.2)"
+            },
+            {
+              "code": "2.2.2",
+              "title": "Exclusivity rule application",
+              "objective": "Resolve multi-role conflicts by assigning the role with greater political/financial weight.",
+              "how_to": {
+                "steps": [
+                  "Apply the exclusivity rule: if a stakeholder qualifies for multiple roles, assign the role with highest hierarchical weight.",
+                  "Hierarchy rank: Blocker (highest) > Sponsor > Validator > User (lowest).",
+                  "Assign exactly one final Influence type per stakeholder.",
+                  "Verify no stakeholder holds multiple influence designations."
+                ],
+                "table_columns": "Candidate | Potential Role(s) | Conflict Resolution / Rationale | Assigned Influence",
+                "table_rules": "One row per stakeholder detailing exclusivity resolution.",
+                "restrictions": [
+                  "Each stakeholder must have exactly ONE influence type.",
+                  "Higher political/financial weight takes precedence."
+                ],
+                "done_when": "Single exclusive influence assigned to each candidate."
+              },
+              "example_title": "Exclusivity Rule Application",
+              "example": "| Candidate | Potential Role(s) | Conflict Resolution / Rationale | Assigned Influence |\n| :--- | :--- | :--- | :---: |\n| Banking institution (deposits and reversals) | Validator vs Blocker | Capability to disrupt entire refund flow elevates to veto level. | **Blocker** |\n| Laura Torres (CEO and founder) | User vs Sponsor | Occasional system user, but funds project — financial authority prevails. | **Sponsor** |\n| National Tourism Registry (RNT) | Validator | Validates business legality; does not fund or technically veto software. | **Validator** |\n| Reservation Coordinator | User | User executing daily operational tasks (Step 1). | **User** |",
+              "link_label": "ranked roster goes to blocker flag (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Independent Blocker Flag",
+          "objective": "Capture operational veto power even in actors of low hierarchical weight.",
+          "input": "Ranked stakeholders from Sub-step 2.2.",
+          "raw_data_title": "Stakeholders with Assigned Influence",
+          "raw_data": "Blocker: Banking institution. Sponsor: Laura Torres. Validator: RNT. User: Reservation Coordinator.",
+          "exit_label": "BLOCKER FLAGS AUDITED → Step 3",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Blocker flag evaluation",
+              "objective": "Apply the flag question: 'If this person refuses to cooperate, does the project die?'",
+              "how_to": {
+                "steps": [
+                  "For every stakeholder, ask the independent veto question: 'If this person/entity refuses to cooperate, does the project die?'",
+                  "Evaluate operational boycott or procedural refusal risk.",
+                  "Assign Blocker Flag: YES or NO (with timeframe if conditional).",
+                  "Confirm that operational users or external regulators can hold Blocker Flag YES regardless of their influence category."
+                ],
+                "table_columns": "Candidate | Influence | Does project terminate if they refuse to cooperate? | Blocker Flag",
+                "table_rules": "One row per stakeholder checking independent veto power.",
+                "restrictions": [
+                  "Blocker Flag is independent of Influence category.",
+                  "Be realistic about user boycott and financial withdrawal."
+                ],
+                "done_when": "Blocker flag assigned to all stakeholders."
+              },
+              "example_title": "Independent Blocker Flag Audit",
+              "example": "| Candidate | Influence | Does project terminate if they refuse to cooperate? | Blocker Flag |\n| :--- | :---: | :--- | :---: |\n| Banking institution | Blocker | Yes, by definition of its role. | `YES` |\n| Laura Torres | Sponsor | Yes, without budget no project exists. | `YES` |\n| RNT | Validator | Not immediately, but without valid registration rural property operations become illegal mid-term. | `YES (medium term)` |\n| Reservation Coordinator | User | If coordinators refuse to adopt the tool and revert to paper notebooks, the project fails from lack of adoption. | `YES` |",
+              "link_label": "stakeholder table goes to TBD check (3.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Completeness and To-Be-Determined (TBD)",
+      "summary": "Honestly document roles known to exist but whose specific person or organization is not yet known, instead of faking a perfect map.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "TBD Role Identification",
+          "objective": "Identify necessary roles required by the domain that lack a specific designated entity.",
+          "input": "Influence Table from Step 2.",
+          "raw_data_title": "Domain Requirements for Evidence Handling",
+          "raw_data": "The domain mandates a verifiable voucher or digital confirmation mechanism for deposits to demonstrate precedence in disputes — yet Nos Fuimos de Finca has not decided which bank or provider will formalize these valid receipts.",
+          "exit_label": "TBD IDENTIFIED → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "TBD role identification",
+              "objective": "Identify domain roles lacking a concrete designated entity.",
+              "how_to": {
+                "steps": [
+                  "Inspect domain workflows for essential capabilities where specific vendors or institutions are not yet designated.",
+                  "Identify missing entities without faking certainty.",
+                  "Mark unassigned necessary roles as 'To Be Determined' (TBD)."
+                ],
+                "table_columns": "Domain Capability Required | Known Role | Assigned Entity | TBD Status",
+                "table_rules": "One row per required domain capability evaluating assignment status.",
+                "restrictions": [
+                  "Do not invent vendor names or fake certainty.",
+                  "Roles without assigned entities must be labeled TBD."
+                ],
+                "done_when": "All unknown entities labeled TBD."
+              },
+              "example_title": "TBD Role Identification",
+              "example": "| Domain Capability Required | Known Role | Assigned Entity | TBD Status |\n| :--- | :--- | :--- | :---: |\n| Verifiable digital confirmation for deposit priority | Formal deposit voucher issuing institution | Unselected / under review | **`TBD`** |",
+              "link_label": "TBD roles go to risk register handoff (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Mandatory Link to Risk Register",
+          "objective": "Forward every TBD actor as an explicit entry to D7 (Risk Register) as a Known Unknown.",
+          "input": "Identified TBD roles from Sub-step 3.1.",
+          "raw_data_title": "TBD Role Transfer Details",
+          "raw_data": "Role: Formal deposit voucher issuing institution. Resolution owner: Laura Torres (Sponsor). Action: Request proposals from current agency bank.",
+          "exit_label": "RISK LINKED → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Transfer to D7 as Known Unknown",
+              "objective": "Link each TBD role to D7 with concrete mitigation action and designated owner.",
+              "how_to": {
+                "steps": [
+                  "Take each TBD role and formulate a Known Unknown risk entry.",
+                  "Assign an explicit mitigation action and owner.",
+                  "Prepare transfer record to D7 Risk Register."
+                ],
+                "table_columns": "Known Role, Unknown Entity | Risk Type | Handed off to D7 (Action & Owner)",
+                "table_rules": "One row per TBD role with its D7 transfer specification.",
+                "restrictions": [
+                  "Every TBD role must have an assigned owner and link to D7."
+                ],
+                "done_when": "TBD role formally transferred to D7."
+              },
+              "example_title": "Link to Risk Register (D7)",
+              "example": "| Known Role, Unknown Entity | Risk Type | Handed off to D7 (Action & Owner) |\n| :--- | :---: | :--- |\n| Formal deposit voucher issuing institution | Known Unknown | Logged in D7: Request proposals from current agency bank. Owner: Laura Torres (Sponsor). |",
+              "link_label": "risk transfer goes to completeness verdict (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Completeness Verdict",
+          "objective": "Verify that the map honestly records pending validations rather than feigning artificial certainty.",
+          "input": "Full stakeholder roster with TBD audit.",
+          "raw_data_title": "Audit of Complete Roster",
+          "raw_data": "4 defined stakeholders + 1 explicit TBD role.",
+          "exit_label": "MAP INTEGRITY VERIFIED → Step 4",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Completeness finding",
+              "objective": "Audit stakeholder map completeness and validate legitimate uncertainty recording.",
+              "how_to": {
+                "steps": [
+                  "Assess the stakeholder map for false completeness or hidden omissions.",
+                  "Verify that at least 1 Primary User, 1 Sponsor, and necessary controllers are identified.",
+                  "Confirm that acknowledged uncertainties are documented as TBD.",
+                  "Issue formal completeness finding."
+                ],
+                "table_columns": "Audit Item | Evaluation Standard | Observation | Audit Verdict",
+                "table_rules": "One row per audit checkpoint.",
+                "restrictions": [
+                  "A map with zero TBDs must be re-checked for suspicious overconfidence."
+                ],
+                "done_when": "Map completeness verified."
+              },
+              "example_title": "Completeness Finding",
+              "example": "| Audit Item | Evaluation Standard | Observation | Audit Verdict |\n| :--- | :--- | :--- | :---: |\n| Primary User present | Must match D1 Affected Actor | Reservation Coordinator verified | `PASS` |\n| Sponsor defined | Budget authority identified | Laura Torres (CEO) designated | `PASS` |\n| Silent controllers checked | Financial & legal channels probed | Bank and RNT mapped | `PASS` |\n| Transparent uncertainty | TBD roles linked to D7 | 1 TBD role logged with owner | `PASS` |\n\n*Completeness Finding:* The map is not arbitrarily 'complete': it holds 1 explicit TBD role, which accurately demonstrates thorough analysis of underlying infrastructure without feigning false certainty.",
+              "link_label": "verified map goes to final assembly (4.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Final Document Assembly",
+      "summary": "Format the complete Stakeholder Map into the official exportable deliverable.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Metadata",
+          "objective": "Populate deliverable metadata header according to methodology standards.",
+          "input": "Project parameters: Nos Fuimos de Finca, Phase 0, Deliverable 6 of 9, Status Approved.",
+          "raw_data_title": "Project Metadata Parameters",
+          "raw_data": "Project: Nos Fuimos de Finca. Phase: 0 — Problem Recognition. Deliverable: 6 of 9. Status: Approved.",
+          "exit_label": "METADATA READY → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Metadata formatting",
+              "objective": "Assemble standardized metadata header block.",
+              "how_to": {
+                "steps": [
+                  "Record Project, Phase, Deliverable number, and Status.",
+                  "Ensure alignment with deliverable metadata standards."
+                ],
+                "table_columns": "Metadata Field | Project Value",
+                "table_rules": "One row per metadata field.",
+                "restrictions": [
+                  "Standard header fields only."
+                ],
+                "done_when": "Metadata block populated."
+              },
+              "example_title": "Metadata Block",
+              "example": "**Project:** Nos Fuimos de Finca  \n**Phase:** 0 — Problem Recognition  \n**Deliverable:** 6 of 9  \n**Status:** Approved",
+              "link_label": "metadata goes to mapping assembly (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Mapping Table",
+          "objective": "Assemble the Stakeholder Map table and TBD Risks table into the official deliverable.",
+          "input": "Outputs from Steps 1, 2, and 3.",
+          "raw_data_title": "Final Stakeholder Map Content",
+          "raw_data": "4 ranked roles (Blocker, Sponsor, Validator, User) with interests/pains and 1 TBD role linked to D7.",
+          "exit_label": "FINAL DELIVERABLE ASSEMBLED → publishes deliverable",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Full table assembly and verification",
+              "objective": "Verify verbatim transposition of stakeholder map and TBD risks tables.",
+              "how_to": {
+                "steps": [
+                  "Assemble the Stakeholder Map table containing Influence, Profile/Role, Blocker (Y/N), Interest / Pain, and TBD.",
+                  "Assemble the TBD Risks table with D7 transfer links.",
+                  "Verify verbatim transcription without alteration."
+                ],
+                "table_columns": "Section | Included Elements | Assembly Status",
+                "table_rules": "One row per section in final document.",
+                "restrictions": [
+                  "Verbatim transcribing from audited steps."
+                ],
+                "done_when": "Final document assembled."
+              },
+              "example_title": "Assembly Verification",
+              "example": "| Section | Included Elements | Assembly Status |\n| :--- | :--- | :---: |\n| 1. Metadata | Project, Phase 0, Deliverable 6 of 9, Status Approved | `VERIFIED` |\n| 2. Stakeholder Map | 4 ranked roles (Blocker, Sponsor, Validator, User) | `VERIFIED` |\n| 3. TBD Risks | 1 role with D7 link and resolution owner | `VERIFIED` |\n\n*Result:* Assembly complete with 100% fidelity to audited steps.",
+              "link_label": "publishes final deliverable"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 06. Stakeholder Map.md",
+    "markdown": "# 6. Stakeholder Map\n\n### 1. Document Metadata\n**Project:** Nos Fuimos de Finca\n**Phase:** 0 — Problem Recognition\n**Deliverable:** 6 of 9\n**Status:** Approved\n\n### 2. Stakeholder Map\n| Influence | Who They Are (Profile/Role) | Blocker (Y/N) | Interest / Pain | TBD |\n| --- | --- | :---: | --- | :---: |\n| **Blocker** | Banking entity that processes advance payments | YES | Transfer reversal rules and timelines, over which the agency has no control. | No |\n| **Sponsor** | Laura Torres (CEO and founder) | YES | That the business stops losing commissions and refunding money due to overbooking. | No |\n| **Validator** | National Tourism Registry (RNT) | YES (medium term) | That the rural rental operation remains within the current legal framework. | No |\n| **User** | Reservation Coordinator | YES | Confirming and collecting reservations without the risk of double-booking a property already committed. | No |\n\n### 3. To-Be-Determined (TBD) Risks — Link to D7\n| Known Role, Unknown Entity | Transfer to D7 (Known Unknown) |\n| --- | --- |\n| Entity issuing the formal advance payment receipt | Registered in D7; resolution owner: Laura Torres (Sponsor). |"
+  }
+}

@@ -1,0 +1,177 @@
+{
+  "phase": "Phase 4",
+  "deliverable_code": "D4",
+  "deliverable": "Design System & UI Kit (Sistema de Diseño y Kit de Componentes)",
+  "purpose": "Este entregable consolida la infraestructura visual, el sistema de tokens de diseño y la biblioteca de componentes atómicos reutilizables para toda la plataforma Nos Fuimos de Finca. Dicta las reglas normativas de accesibilidad (WCAG 2.1 AA, contraste matemático superior a 4.5:1, touch targets de 48px), define la identidad cromática y tipográfica rural-editorial, y construye el inventario atómico de componentes interactivos con sus estados transitorios para desarrollo en Tailwind CSS y Figma.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[PHASE_4_SYSTEM_MODELING/3.Wireframes]] | Blueprints de páginas físicas, componentes atómicos requeridos y reglas espaciales (Fase 4, D3). |\n| [[PHASE_4_SYSTEM_MODELING/1.Content_Strategy_Information_Architecture]] | Taxonomía de rutas frontend, necesidades UX y asimetría de roles B2C/B2B (Fase 4, D1). |\n| [[PHASE_3_REQUIREMENTS_ENGINEERING/6.Non-Functional_Requirements]] | SLAs de rendimiento LCP < 2.5s y estándares globales de calidad (Fase 3, D6). |\n| [[PROJECT_IDENTITY]] | Directrices de identidad de marca: ecoturismo rústico, confianza y modernidad (Fase 2, D1). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Global Usability & Accessibility Rules (WCAG 2.1 AA)",
+      "summary": "Establecer los estándares obligatorios de accesibilidad, ratios matemáticos de contraste de color y ergonomía táctil móvil bajo la norma internacional WCAG 2.1 Nivel AA.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Reglas Globales de Accesibilidad, Contraste y Zonas Táctiles",
+          "objective": "Definir los umbrales no negociables de contraste visual y dimensiones mínimas de interacción táctil.",
+          "input": "Directrices de accesibilidad de [[PHASE_4_SYSTEM_MODELING/3.Wireframes]] y normativas WCAG.",
+          "raw_data_title": "Parámetros de Accesibilidad Obligatorios",
+          "raw_data": "- WCAG Target: Nivel AA.\n- Contraste Texto Normal: Ratio ≥ 4.5:1 sobre cualquier fondo.\n- Contraste Texto Grande: Ratio ≥ 3.0:1 en titulares.\n- Touch Target Móvil: Mínimo 48x48px (Ley de Fitts).\n- Hero Image Overlay: Capa negra al 40% de opacidad obligatoria.\n- Focus Ring: Anillo de 2px de alto contraste para navegación con teclado.",
+          "exit_label": "COMPLETE → Umbrales de accesibilidad y ergonomía formalizados (2.1)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Matriz de Reglas Globales de Accesibilidad",
+              "objective": "Estructurar la tabla normativa de reglas de usabilidad y accesibilidad para diseño y desarrollo.",
+              "how_to": {
+                "steps": [
+                  "1. Fijar el nivel de conformidad WCAG exigido por el modelo de negocio.",
+                  "2. Calcular los ratios mínimos de contraste cromático para textos y elementos gráficos.",
+                  "3. Estandarizar la altura y anchura mínima de botones y controles móviles (Touch Targets).",
+                  "4. Establecer las salvaguardas de contraste sobre fotografías de catálogo."
+                ],
+                "table_columns": "Regla de Accesibilidad / Usabilidad | Valor Objetivo / Umbral Técnico | Justificación de Arquitectura Frontend",
+                "table_rules": "Todos los elementos interactivos deben cumplir el mínimo de 48x48px en móvil.",
+                "restrictions": [
+                  "Prohibido utilizar combinaciones de color con contraste inferior a 4.5:1",
+                  "No diseñar textos sobre imágenes sin capa de oscurecimiento (overlay)"
+                ],
+                "done_when": "Los 6 parámetros de accesibilidad están cuantificados y formalizados"
+              },
+              "example_title": "Matriz de Reglas Globales de Accesibilidad",
+              "example": "| Regla de Accesibilidad / Usabilidad | Valor Objetivo / Umbral Técnico | Justificación de Arquitectura Frontend |\n| :--- | :--- | :--- |\n| **Estándar WCAG** | Nivel AA (WCAG 2.1) | Cumplimiento regulatorio obligatorio para plataformas de comercio electrónico. |\n| **Contraste de Texto Normal** | Ratio ≥ 4.5:1 | Garantiza legibilidad para textos menores a 18px sobre cualquier fondo. |\n| **Contraste de Texto Grande** | Ratio ≥ 3.0:1 | Aplicable a titulares H1/H2 y elementos decorativos con peso tipográfico bold. |\n| **Tap Target Mínimo (Móvil)** | 48 x 48 px | Ley de Fitts: ergonomía táctil en smartphones rurales en campo. |\n| **Hero Image Overlay** | Capa oscura al 40% de opacidad | Asegura contraste superior a 4.5:1 de textos blancos sobre fotografías cambiantes. |\n| **Navegación por Teclado** | Focus Ring visible (2px `#1B3022`) | Soporte de accesibilidad para usuarios que navegan exclusivamente con Tab / Enter. |",
+              "link_label": "reglas de accesibilidad fijadas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Design Tokens (Visual Foundation: Typography, Palette & Spacing)",
+      "summary": "Formular los tokens de diseño matemáticos: paleta de colores con validación de contraste, tipografía editorial rústica, grilla espacial base 8px y radios de curvatura.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Tokens de Diseño Matemático y Validación Cromática",
+          "objective": "Definir los valores hexadecimales, rem y escalas matemáticas de los fundamentos visuales de la marca.",
+          "input": "Reglas de accesibilidad del Step 1 e identidad de marca de [[PROJECT_IDENTITY]].",
+          "raw_data_title": "Valores de Tokens de Diseño",
+          "raw_data": "- Deep Forest (#1B3022): Primario, ratio 11.2:1.\n- Clay Terracotta (#BC6C25): Secundario, ratio 4.8:1.\n- Sage (#2C3120): Terciario, ratio 7.9:1.\n- Neutral BG (#F9FAF6): Fondo cálido.\n- Error (#BA1A1A): Alerta, ratio 5.6:1.\n- Tipografías: Epilogue (Titulares) y Be Vietnam Pro (Cuerpo).\n- Spacing Base: 8px (xs 4, sm 8, md 16, lg 24, xl 32px).\n- Border Radius: md (12px / 0.75rem).",
+          "exit_label": "COMPLETE → Tokens de diseño validados matemáticamente para desarrollo (3.1)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Catálogo Maestro de Tokens de Diseño",
+              "objective": "Consolidar la tabla de tokens visuales con sus valores técnicos y verificación matemática de contraste.",
+              "how_to": {
+                "steps": [
+                  "1. Asignar nombres canónicos en kebab-case a cada token de diseño para variables CSS y Tailwind.",
+                  "2. Documentar los códigos de color hexadecimal y verificar el ratio de contraste contra blanco puro.",
+                  "3. Definir la jerarquía tipográfica discriminando fuentes display de fuentes de texto continuo.",
+                  "4. Fijar la escala de márgenes y paddings en múltiplos estrictos de 8px."
+                ],
+                "table_columns": "Categoría de Token | Nombre del Token | Valor Hex / Rem | Uso en la Plataforma | Ratio Contraste WCAG",
+                "table_rules": "Todos los colores de texto deben superar el ratio de 4.5:1 demostrado matemáticamente.",
+                "restrictions": [
+                  "No utilizar colores genéricos sin justificación en la identidad de marca",
+                  "Evitar espaciados arbitrarios que rompan el ritmo vertical de 8px"
+                ],
+                "done_when": "El catálogo de tokens visuales cubre color, tipografía, espaciado y radios"
+              },
+              "example_title": "Catálogo Maestro de Tokens de Diseño",
+              "example": "| Categoría de Token | Nombre del Token | Valor Hex / Rem | Uso en la Plataforma | Ratio Contraste WCAG |\n| :--- | :--- | :--- | :--- | :--- |\n| **Color Primario** | `color-deep-forest` | `#1B3022` | Barra de navegación, botones primarios, títulos display. | 11.2:1 sobre `#FFFFFF` (PASS) |\n| **Color Secundario** | `color-clay-terracotta` | `#BC6C25` | Acentos cálidos, etiquetas de precio, badges destacados. | 4.8:1 sobre `#FFFFFF` (PASS) |\n| **Color Terciario** | `color-sage` | `#2C3120` | Bordes de inputs, estados hover sutiles, textos secundarios. | 7.9:1 sobre `#FFFFFF` (PASS) |\n| **Fondo / Surface** | `color-neutral-bg` | `#F9FAF6` | Fondo global de la app para reducir fatiga visual en pantallas. | Base neutra |\n| **Superficie Tarjetas** | `color-surface-white` | `#FFFFFF` | Contenedores de fincas, tarjetas de reservas y modales. | Base pura |\n| **Color de Alerta** | `color-error` | `#BA1A1A` | Bordes de validación errónea, toasts de fallo, banners de aviso. | 5.6:1 sobre `#FFFFFF` (PASS) |\n| **Tipografía Titulares** | `font-display` | `Epilogue, serif` | Titulares editoriales con sensación rústica y contemporánea. | Jerarquía visual |\n| **Tipografía Cuerpo** | `font-body` | `Be Vietnam Pro, sans` | Textos de párrafo, inputs y etiquetas de alta legibilidad móvil. | Ergonomía de lectura |\n| **Espaciado Base** | `spacing-base` | `8px (0.5rem)` | Multiplicadores: xs (4px), sm (8px), md (16px), lg (24px), xl (32px). | Consistencia matemática |",
+              "link_label": "tokens de diseño formalizados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Atomic Component Specifications (Atoms, Molecules, Organisms)",
+      "summary": "Especificar la arquitectura constructiva de los componentes de interfaz bajo Atomic Design, detallando propiedades visuales, tokens aplicados y variantes de estado obligatorias.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Especificación Atómica de Componentes Reutilizables",
+          "objective": "Catalogar los átomos, moléculas y organismos del sistema definiendo sus estados reactivos.",
+          "input": "Tokens del Step 2 y necesidades de interfaz de [[PHASE_4_SYSTEM_MODELING/3.Wireframes]].",
+          "raw_data_title": "Biblioteca de Componentes Atómicos",
+          "raw_data": "- Átomos: PrimaryButton (12px radio, min 48px, variantes Default/Hover/Active/Disabled/Loading), InputField (8px radio, padding 16px, variantes Default/Focus/Error), PriceTag (Epilogue 700 bold), FilterChip (píldora 32px).\n- Moléculas: PropertyCard (imagen 16:9 + título + precio con elevación en hover), SearchBarPill (píldora de búsqueda con inputs y botón).\n- Organismos: GlobalHeader (barra de navegación responsiva con variantes B2C y B2B).",
+          "exit_label": "COMPLETE → Componentes atómicos especificados con variantes de estado (4.1)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Especificación de la Biblioteca de Componentes Atómicos",
+              "objective": "Construir la matriz técnica de componentes para el kit de Figma y la librería de React.",
+              "how_to": {
+                "steps": [
+                  "1. Modelar los Átomos elementales con sus dimensiones, bordes y paddings exactos.",
+                  "2. Ensamblar las Moléculas funcionales combinando átomos con separación armónica.",
+                  "3. Construir los Organismos transversales que definen la estructura de las páginas.",
+                  "4. Explicitar las variantes interactivas de cada componente (Hover, Focus, Loading, Error)."
+                ],
+                "table_columns": "Nivel Atómico | Componente | Atributos Visuales y Tokens Aplicados | Variantes de Estado / Composición",
+                "table_rules": "Cada componente interactivo debe documentar obligatoriamente su estado Loading y Disabled.",
+                "restrictions": [
+                  "No omitir la variante de error para campos de formulario",
+                  "Asegurar que todas las medidas se deriven de los tokens del Step 2"
+                ],
+                "done_when": "Los 7 componentes nucleares están completamente descritos a nivel atómico"
+              },
+              "example_title": "Especificación de la Biblioteca de Componentes Atómicos",
+              "example": "| Nivel Atómico | Componente | Atributos Visuales y Tokens Aplicados | Variantes de Estado / Composición |\n| :--- | :--- | :--- | :--- |\n| **Átomo** | `PrimaryButton` | BG `#1B3022`, Texto `#FFFFFF`, Radio `12px` (`0.75rem`), Altura min `48px`. | `Default`, `Hover` (Scale 1.02), `Active`, `Disabled` (`#E5E7EB`), `Loading` (Spinner). |\n| **Átomo** | `InputField` | BG `#F9FAF6`, Borde 1px `#2C3120`, Radio `8px`, Padding `16px`. | `Default`, `Focus` (Borde 2px `#1B3022`), `Error` (Borde `#BA1A1A`), `Disabled`. |\n| **Átomo** | `PriceTag` | Tipografía `Epilogue`, Color `#BC6C25`, Peso `700 Bold`. | `Standard`, `Discounted`, `NightlyRate`. |\n| **Átomo** | `FilterChip` | Radio píldora `32px`, Padding `8px 16px`, Borde 1px. | `Unselected` (BG `#F9FAF6`), `Selected` (BG `#1B3022`, Texto `#FFFFFF`). |\n| **Molécula** | `PropertyCard` | Ratio imagen 16:9 + Título `Epilogue` + `PriceTag` + Esquinas `12px` + Sombra suave. | `Default`, `Hover` (Elevación +1%, sombra profunda), `Reserved`. |\n| **Molécula** | `SearchBarPill` | Forma de píldora que agrupa inputs de fecha y huéspedes con botón de búsqueda. | `Collapsed` (Mobile Sticky), `Expanded` (Modal full-screen). |\n| **Organismo** | `GlobalHeader` | Barra superior con logo vectorial, buscador integrado y menú de usuario. | `GuestView` (Botón Login B2B), `HostView` (Avatar + Dashboard Link). |",
+              "link_label": "biblioteca atómica construida"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Interactive Rules, Tonal Layering & Quality Gate",
+      "summary": "Definir las capas tonales de profundidad, reglas de elevación sin sombras duras, comportamiento de overlays con desenfoque (Glassmorphism) y emitir el dictamen formal de la compuerta de calidad.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Capas Tonales, Elevación y Quality Gate del Design System",
+          "objective": "Prescribir las normas de física visual e interactiva y certificar el cumplimiento de los estándares de UI.",
+          "input": "Especificaciones atómicas del Step 3 y directrices de elevación.",
+          "raw_data_title": "Reglas de Física Visual y Verificación de Calidad",
+          "raw_data": "- Elevación: Cero elementos flotantes duros; sombras ambientales difusas al 15% del color primario.\n- Micro-interacción: Escala +1% y profundización de sombra en hover de tarjetas.\n- Overlays: Glassmorphism translúcido con backdrop-blur para preservar contexto fotográfico.\n- Criterios: Contraste WCAG AA 100%, grilla base 8px, componentes atómicos, elevación tonal, touch targets 48px.",
+          "exit_label": "PUBLISH → Deliverable Completo: 4. Design System & UI Kit",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Dictamen de Compuerta de Calidad del Design System",
+              "objective": "Auditar los criterios normativos y autorizar el uso oficial del UI Kit en mockups de alta fidelidad.",
+              "how_to": {
+                "steps": [
+                  "1. Verificar el cumplimiento estricto del ratio de contraste en todos los pares cromáticos.",
+                  "2. Comprobar la adherencia a la grilla matemática base 8px en espaciados y dimensiones.",
+                  "3. Documentar las directrices de profundidad y micro-animaciones físicas.",
+                  "4. Emitir el veredicto oficial PROCEED autorizando la transición a D5 (High-Fidelity Mockups)."
+                ],
+                "table_columns": "Criterio de Calidad de Design System | Estado | Evidencia",
+                "table_rules": "Todos los criterios de calidad visual y accesibilidad deben resultar en APROBADO.",
+                "restrictions": [
+                  "No emitir veredicto favorable si existen componentes con textos de bajo contraste",
+                  "Asegurar que el UI Kit sirva de referencia vinculante para desarrollo frontend"
+                ],
+                "done_when": "El Design System cumple el 100% de los estándares normativos de calidad"
+              },
+              "example_title": "Veredicto del Design System Quality Gate",
+              "example": "| Criterio de Calidad de Design System | Estado | Evidencia |\n| --- | --- | --- |\n| Contraste Matemático WCAG 2.1 AA | APROBADO | Paleta cromática auditada: Primario 11.2:1, Secundario 4.8:1, Error 5.6:1 (todos > 4.5:1) |\n| Grilla Matemática Base 8px | APROBADO | Spacing tokens (4, 8, 16, 24, 32px) y border radius armonizados (8px y 12px) |\n| Componentes Atómicos Reutilizables | APROBADO | Biblioteca completa de átomos, moléculas y organismos derivada de los Wireframes D3 |\n| Elevación Tonal y Glassmorphism | APROBADO | Sombras suaves al 15% de opacidad y overlays translúcidos con desenfoque de fondo |\n| Touch Targets de Alta Ergonomía | APROBADO | 100% de elementos interactivos móviles cumplen la regla mínima de 48x48px |",
+              "link_label": "design system validado y aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 4. Design System & UI Kit.md",
+    "markdown": "# Entregable 4 (D4): Design System & UI Kit\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Alcance:** Global\n**Estado:** Aprobado\n\n---\n\n### 1. Fundamentos Visuales (Tokens de Diseño)\n\n**Tipografía (Brand: Rural Sanctuary)**\n- Tipografía de Títulos (Display/Headlines): `Epilogue` (Sensación geométrica, editorial y rústica).\n- Tipografía de Cuerpo (Body/Labels): `Be Vietnam Pro` (Legibilidad alta, amigable y contemporánea).\n- Escala: `Display-lg (48px)`, `Headline-lg (32px)`, `Body-lg (18px)`, `Label-md (12px)`.\n\n**Paleta de Colores (Rural Sanctuary)**\n- Primario (Deep Forest): `#1B3022` (Navegación, botones primarios).\n- Secundario (Clay Terracotta): `#BC6C25` (Acentos, etiquetas de precio).\n- Terciario (Sage): `#2c3120` (Interacciones secundarias).\n- Fondo/Superficie (Neutral): `#f9faf6` (Blanco humo cálido para reducir fatiga visual).\n- Superficie Interactiva (Tarjetas): `#ffffff` (Blanco puro con sombra difusa).\n- Error: `#ba1a1a` (Rojo alerta).\n\n**Cuadrícula y Espaciado (Grid & Spacing)**\n- Base Matemática: `8px`.\n- Layout: Híbrido (Contenedor máximo de 1280px en Desktop, fluido en Mobile).\n- Ritmo Vertical: `stack-sm (8px)`, `stack-md (16px)`, `stack-lg (32px)`.\n- Border Radius (Global): Formas redondeadas `md (0.75rem / 12px)` para suavizar el aspecto clínico.\n\n---\n\n### 2. Biblioteca de Componentes (Diseño Atómico)\n\n#### Átomos (Atoms)\n**Botón Primario (Primary Button)**\n- Fondo (BG): `Deep Forest (#1B3022)`.\n- Texto: Blanco `#ffffff`, Tipografía: `Be Vietnam Pro (Label-lg)`.\n- Border Radius: `0.75rem` (12px) o Forma de Píldora (Pill).\n\n**Campo de Entrada de Texto (Input Field)**\n- Fondo: `#f9faf6`.\n- Borde: 1px sólido `Sage (#2c3120)`.\n- Estado Focus: Borde grueso en `Deep Forest`.\n- Border Radius: `0.5rem` (8px).\n\n**Etiqueta de Precio (Price Tag)**\n- Tipografía: `Epilogue`.\n- Color: `Clay Terracotta (#BC6C25)`.\n\n#### Moléculas (Molecules)\n**Tarjeta de Propiedad (Property Card)**\n- Contiene: Imagen (Ratio 16:9) + Título (Epilogue) + Price Tag (Terracotta).\n- Fondo: Blanco `#ffffff`.\n- Esquinas: Redondeadas `0.5rem`.\n\n#### Organismos (Organisms)\n**Barra de Búsqueda Global (Search Bar Pill)**\n- Contenedor: Forma de píldora (Pill shape) destacada en el tope de la pantalla.\n- Contiene: Inputs (Ubicación, Fechas, Huéspedes) + Botón Primario de Búsqueda de alto contraste.\n\n---\n\n### 3. Reglas de Interactividad, Profundidad y Accesibilidad\n\n- **Elevación (Tonal Layering):** Cero elementos \"flotantes\". Las superficies se elevan mediante sombras ambientales muy suaves (15% de opacidad del color primario).\n- **Interacción Táctil (Hover):** Al pasar el cursor sobre un `Property Card`, la escala aumenta un 1% y la sombra se profundiza para brindar respuesta física.\n- **Overlays (Modales y Fechas):** Utilizan desenfoque (Glassmorphism) para mantener visible la fotografía de la finca de fondo.\n- **Contraste WCAG:** El fondo `Deep Forest` contrastado con texto blanco supera holgadamente el mínimo de 4.5:1 exigido por WCAG AA.\n"
+  }
+}

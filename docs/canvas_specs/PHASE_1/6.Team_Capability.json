@@ -1,0 +1,446 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D6",
+  "deliverable": "Team Capability Assessment (Evaluación de Capacidad y Brechas Técnicas)",
+  "purpose": "Este entregable realiza una autoevaluación honesta de brechas de conocimiento técnico y de dominio: compara lo que el proyecto exige técnicamente (según la Factibilidad Técnica de P1-D4 y las restricciones de P1-D5) contra lo que el desarrollador o equipo domina actualmente, eliminando el optimismo ciego.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_technical_feasibility]] | Define las capacidades técnicas y de arquitectura exigidas por el sistema (P1-D4). |\n| [[example_output_legal_clearance]] | Define las restricciones normativas y de seguridad requeridas (P1-D5). |\n| [[example_output_competitive_analysis]] | Define el conocimiento del dominio/industria necesario para sostener el Moat (P1-D3). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Inventario de Exigencias del Proyecto vs Dominio Actual",
+      "summary": "Contrastar las tecnologías y disciplinas requeridas por el proyecto frente a las competencias dominadas hoy.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Extraer requerimientos técnicos de P1-D4 y P1-D5",
+          "objective": "Listar cada tecnología, capacidad o habilidad exigida explícitamente por el proyecto.",
+          "input": "Capacidades técnicas (Build/Buy/Partner) de [[example_output_technical_feasibility]] y restricciones de diseño de [[example_output_legal_clearance]].",
+          "raw_data_title": "Exigencias Técnicas Extraídas",
+          "raw_data": "D4: BD con transacciones ACID, arquitectura offline-first, API pagos. D5: iframe PCI, endpoint ARCO, T&C SaaS.",
+          "exit_label": "EXIGENCIAS EXTRAÍDAS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Extracción de exigencias técnicas críticas",
+              "objective": "Consolidar el listado exhaustivo de competencias y tecnologías requeridas.",
+              "how_to": {
+                "steps": [
+                  "Revisar las decisiones Build/Buy/Partner y los hallazgos del Spike en P1-D4.",
+                  "Revisar los Design Constraints normativos y de seguridad fijados en P1-D5.",
+                  "Extraer únicamente tecnologías y disciplinas exigidas explícitamente por este proyecto.",
+                  "Registrar el origen documental de cada requerimiento identificado."
+                ],
+                "table_columns": "Origen | Exigencia Técnica | Área Tecnológica / Normativa",
+                "table_rules": "Una fila por competencia o tecnología requerida.",
+                "restrictions": [
+                  "No incluir tecnologías genéricas o no exigidas explícitamente.",
+                  "Mantener la trazabilidad con los entregables D4 y D5."
+                ],
+                "done_when": "Listado de exigencias del proyecto consolidado con su origen."
+              },
+              "example_title": "Exigencias Técnicas del Proyecto",
+              "example": "| Origen | Exigencia Técnica |\n| --- | --- |\n| D4 (Spike) | BD con transacciones ACID + bloqueos optimistas |\n| D4 (Build) | Arquitectura offline-first (sincronización eventual) |\n| D4 (Partner) | Integración con API de Wompi (pagos) |\n| D5 (Legal) | Iframe PCI + endpoint ARCO (supresión de datos) |\n| D3 (Diseño) | UX/UI para usuarios con baja alfabetización digital |\n| D5 (Legal) | Redacción de T&C como SaaS (pivote legal) |",
+              "link_label": "exigencias van a mapeo de dominio (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Mapear cada exigencia contra el nivel de dominio actual del equipo",
+          "objective": "Declarar con honestidad estricta el nivel de competencia actual del equipo para cada exigencia.",
+          "input": "Listado de exigencias del Step 1.1 y autoevaluación del equipo.",
+          "raw_data_title": "Niveles de Competencia Declarados",
+          "raw_data": "Tech Lead: ACID (Brecha), Offline-first (Brecha), Wompi (Familiar), PCI/ARCO (Familiar). Designer: UX rural (Domina). CEO: T&C SaaS (Brecha).",
+          "exit_label": "NIVELES ASIGNADOS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Evaluación de nivel de dominio por exigencia",
+              "objective": "Asignar Domina, Familiar o Brecha con base en experiencia previa en producción.",
+              "how_to": {
+                "steps": [
+                  "Consultar al miembro del equipo más calificado en cada disciplina o reto.",
+                  "Asignar 'Domina' solo si ha implementado la tecnología en producción exitosamente.",
+                  "Asignar 'Familiar' si ha experimentado con documentación o proyectos guiados.",
+                  "Asignar 'Brecha' si no posee experiencia previa o solo conocimiento superficial."
+                ],
+                "table_columns": "Exigencia Técnica | Miembro del Equipo | Nivel Actual | Justificación",
+                "table_rules": "Prohibido marcar 'Domina' por tutoriales sin despliegue real en producción.",
+                "restrictions": [
+                  "Eliminar optimismo ciego; calificar con honestidad radical.",
+                  "Asignar a la persona específica responsable de la disciplina."
+                ],
+                "done_when": "Nivel de dominio asignado a cada exigencia técnica."
+              },
+              "example_title": "Mapeo de Dominio del Equipo",
+              "example": "| Exigencia Técnica | Miembro del Equipo | Nivel Actual |\n| --- | --- | --- |\n| BD con transacciones ACID | Tech Lead | **Brecha** |\n| Arquitectura offline-first | Tech Lead | **Brecha** |\n| Integración API Wompi | Tech Lead | Familiar |\n| Iframe PCI + endpoint ARCO | Tech Lead | Familiar |\n| UX/UI baja alfabetización | Product Designer | **Domina** |\n| T&C como SaaS | CEO | **Brecha** |",
+              "link_label": "niveles van a clasificación de severidad (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Clasificar cada brecha por severidad",
+          "objective": "Determinar el impacto crítico de cada brecha detectada sobre el producto y el negocio.",
+          "input": "Mapeo de dominio del Step 1.2.",
+          "raw_data_title": "Severidad de Brechas",
+          "raw_data": "Brechas en ACID, Offline-first, PCI/ARCO y T&C SaaS calificadas como Alta. Wompi calificada como Media. UX sin brecha.",
+          "exit_label": "INVENTARIO Y BRECHAS CLASIFICADAS → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Clasificación de impacto y severidad",
+              "objective": "Categorizar cada brecha como Alta, Media o Baja según su capacidad de bloquear el proyecto.",
+              "how_to": {
+                "steps": [
+                  "Identificar todas las filas con nivel 'Brecha' o 'Familiar' crítico.",
+                  "Asignar 'Alta' si un fallo paraliza el sistema en producción o incumple la ley.",
+                  "Asignar 'Media' si genera retraso significativo pero admite solución alternativa temporal.",
+                  "Asignar 'Baja' si genera deuda técnica menor sin afectar el núcleo del producto."
+                ],
+                "table_columns": "Origen | Exigencia Técnica | Miembro del Equipo | Nivel Actual | Severidad si Brecha",
+                "table_rules": "Toda brecha legal o de arquitectura central debe ser clasificada como Alta.",
+                "restrictions": [
+                  "No degradar la severidad de brechas críticas para aparentar menor riesgo.",
+                  "Vincular cada severidad con su justificación operativa."
+                ],
+                "done_when": "Tabla comparativa consolidada con severidad asignada a cada brecha."
+              },
+              "example_title": "Inventario de Exigencias vs Dominio y Severidad",
+              "example": "| Origen | Exigencia Técnica | Miembro del Equipo | Nivel Actual | Severidad si Brecha |\n| --- | --- | --- | --- | --- |\n| D4 (Spike) | BD con transacciones ACID + bloqueos optimistas | Tech Lead | **Brecha** | Alta |\n| D4 (Build) | Arquitectura offline-first (sincronización eventual) | Tech Lead | **Brecha** | Alta |\n| D4 (Partner) | Integración con API de Wompi (pagos) | Tech Lead | Familiar | Media |\n| D5 (Legal) | Iframe PCI + endpoint ARCO (supresión de datos) | Tech Lead | Familiar | Alta |\n| D3 (Diseño) | UX/UI para usuarios con baja alfabetización digital | Product Designer | **Domina** | — |\n| D5 (Legal) | Redacción de T&C como SaaS (pivote legal) | CEO | **Brecha** | Alta |",
+              "link_label": "inventario clasificado va a táctica para brechas altas (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Matriz de Brechas y Plan de Resolución",
+      "summary": "Asignar una estrategia concreta de resolución a cada brecha detectada.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Asignar táctica concreta a brechas de severidad Alta",
+          "objective": "Definir tácticas medibles y viables para las brechas críticas que bloquean el núcleo.",
+          "input": "Inventario con severidades de [[example_step_1_team_capability]].",
+          "raw_data_title": "Tácticas para Brechas Altas",
+          "raw_data": "ACID: PostgreSQL + SQLAlchemy + Consultor 15h. Offline: Spike guiado PouchDB/CouchDB. PCI/ARCO: Wompi docs + abogado. T&C: bufete externo.",
+          "exit_label": "TÁCTICAS ALTAS DEFINIDAS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Definición de táctica para brechas críticas",
+              "objective": "Establecer estrategias sin improvisación para componentes centrales y regulatorios.",
+              "how_to": {
+                "steps": [
+                  "Seleccionar cada brecha clasificada con severidad Alta.",
+                  "Evaluar tácticas en orden: librería probada, consultoría externa puntual, spike guiado o delegación.",
+                  "Prohibir terminantemente el aprendizaje sobre la marcha sin método en áreas críticas.",
+                  "Registrar la táctica específica y herramientas asociadas."
+                ],
+                "table_columns": "Exigencia Crítica | Severidad | Táctica de Resolución Elegida",
+                "table_rules": "Cada brecha Alta debe contar con una táctica específica documentada.",
+                "restrictions": [
+                  "No dejar brechas críticas bajo el supuesto de aprender sobre la marcha.",
+                  "Verificar que la táctica sea viable técnicamente."
+                ],
+                "done_when": "Táctica de resolución fijada para cada brecha de severidad Alta."
+              },
+              "example_title": "Tácticas para Brechas Críticas",
+              "example": "| Exigencia Técnica | Severidad | Táctica de Resolución |\n| --- | --- | --- |\n| BD con ACID + bloqueos optimistas | Alta | Librería: PostgreSQL + SQLAlchemy SERIALIZABLE + Consultor externo 15h |\n| Arquitectura offline-first | Alta | Spike guiado: POC con PouchDB + CouchDB antes de Sprint 1 |\n| Iframe PCI + endpoint ARCO | Alta | Documentación Wompi + revisión legal del endpoint con abogado |\n| T&C como SaaS (pivote legal) | Alta | Consultor externo: bufete especializado en turismo (estimado COP $2,500,000) |",
+              "link_label": "tácticas altas van a tácticas medias (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Asignar táctica de bajo costo a brechas de severidad Media",
+          "objective": "Resolver brechas medias mediante documentación oficial, tutoriales avanzados o prototipos simples.",
+          "input": "Brechas de severidad Media del Step 1.",
+          "raw_data_title": "Tácticas para Brechas Medias",
+          "raw_data": "Integración API Wompi: revisión de documentación oficial de Wompi y pruebas en sandbox.",
+          "exit_label": "TÁCTICAS MEDIAS DEFINIDAS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Definición de táctica para brechas medias",
+              "objective": "Asignar planes ágiles de autoformación y prototipado sin sobrecosto.",
+              "how_to": {
+                "steps": [
+                  "Filtrar brechas clasificadas con severidad Media.",
+                  "Asignar tácticas ágiles: documentación oficial, sandbox de pruebas o spike interno.",
+                  "Estimar el esfuerzo de autoformación para incluirlo en el cronograma.",
+                  "Documentar los recursos necesarios para la resolución."
+                ],
+                "table_columns": "Exigencia Media | Severidad | Táctica de Bajo Costo",
+                "table_rules": "Priorizar fuentes primarias y sandboxes de proveedores.",
+                "restrictions": [
+                  "No sobredimensionar la solución para brechas que no bloquean el producto.",
+                  "Asegurar acceso a sandboxes y documentación oficial."
+                ],
+                "done_when": "Tácticas de bajo costo asignadas a todas las brechas medias."
+              },
+              "example_title": "Tácticas para Brechas Medias",
+              "example": "| Exigencia Técnica | Severidad | Táctica de Bajo Costo |\n| --- | --- | --- |\n| Integración API Wompi | Media | Documentación oficial Wompi + sandbox de pruebas |",
+              "link_label": "tácticas medias van a estimación y responsables (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Estimar tiempo de resolución y asignar responsable único",
+          "objective": "Consolidar tiempos hábiles de resolución y asignar un responsable individual por cada brecha.",
+          "input": "Tácticas definidas en 2.1 y 2.2.",
+          "raw_data_title": "Tiempos y Responsables Asignados",
+          "raw_data": "ACID: 3 días (Tech Lead). Offline: 5 días (Tech Lead). Wompi: 1 día (Tech Lead). PCI/ARCO: 2 días (Tech Lead + Abogado). T&C: 5 días (CEO).",
+          "exit_label": "PLAN DE RESOLUCIÓN CONSOLIDADO → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Estimación de tiempos y asignación de responsable único",
+              "objective": "Asignar días hábiles y una persona individual a cargo de cada plan de resolución.",
+              "how_to": {
+                "steps": [
+                  "Calcular los días hábiles requeridos para ejecutar cada táctica de resolución.",
+                  "Asignar un responsable único con nombre y rol concreto para cada fila.",
+                  "Verificar que los tiempos sumados no sobrecarguen la disponibilidad del responsable.",
+                  "Integrar la información en la matriz consolidada de resolución."
+                ],
+                "table_columns": "Exigencia Técnica | Nivel Actual | Severidad | Táctica de Resolución | Tiempo Estimado | Responsable",
+                "table_rules": "Prohibido asignar responsabilidades difusas como 'el equipo'.",
+                "restrictions": [
+                  "Los tiempos deben ser realistas considerando la curva de aprendizaje.",
+                  "Mantener consistencia con el cronograma preliminar."
+                ],
+                "done_when": "Matriz de resolución completa con tiempos y responsables únicos."
+              },
+              "example_title": "Matriz de Brechas y Plan de Resolución",
+              "example": "| Exigencia Técnica | Nivel Actual | Severidad | Táctica de Resolución | Tiempo Estimado | Responsable |\n| --- | --- | --- | --- | --- | --- |\n| BD con ACID + bloqueos optimistas | Brecha | Alta | Librería: PostgreSQL + SQLAlchemy SERIALIZABLE + Consultor externo 15h | 3 días hábiles | Tech Lead |\n| Arquitectura offline-first | Brecha | Alta | Spike guiado: POC con PouchDB + CouchDB antes de Sprint 1 | 5 días hábiles | Tech Lead |\n| Integración API Wompi | Familiar | Media | Documentación oficial Wompi + sandbox de pruebas | 1 día hábil | Tech Lead |\n| Iframe PCI + endpoint ARCO | Familiar | Alta | Documentación Wompi + revisión legal del endpoint con abogado | 2 días hábiles | Tech Lead + Abogado |\n| T&C como SaaS (pivote legal) | Brecha | Alta | Consultor externo: bufete especializado en turismo (estimado COP $2,500,000) | 5 días hábiles | CEO |",
+              "link_label": "plan de resolución va a evaluación de brechas altas (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Veredicto de Preparación del Equipo",
+      "summary": "Evaluar la viabilidad global de ejecución y emitir el dictamen formal de preparación.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Evaluar si alguna brecha de severidad Alta no tiene plan de resolución viable",
+          "objective": "Verificar que ninguna brecha crítica carezca de táctica, presupuesto o plazo realista.",
+          "input": "Matriz de brechas y planes de resolución de [[example_step_2_team_capability]].",
+          "raw_data_title": "Evaluación de Brechas Críticas",
+          "raw_data": "Todas las brechas Altas cuentan con tácticas viables dentro de presupuesto (COP $2.5M) y plazo (<4 semanas).",
+          "exit_label": "BRECHAS CRÍTICAS EVALUADAS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Control de viabilidad de brechas de severidad Alta",
+              "objective": "Descartar bloqueantes insalvables antes de autorizar el paso a planificación.",
+              "how_to": {
+                "steps": [
+                  "Revisar cada brecha de severidad Alta del Step 2.",
+                  "Verificar si el costo de consultores externos encaja en el presupuesto disponible.",
+                  "Comprobar si el tiempo de resolución finaliza antes de iniciar el Sprint 1.",
+                  "Confirmar que el responsable asignado posee disponibilidad real comprobada."
+                ],
+                "table_columns": "Brecha Crítica | Táctica Asignada | Presupuesto Disponible | Plazo Compatible | Bloqueante Detectado",
+                "table_rules": "Cualquier brecha Alta sin plan viable clasifica como riesgo bloqueante.",
+                "restrictions": [
+                  "No autorizar planes que excedan el horizonte del MVP (>4 semanas).",
+                  "Exigir confirmación presupuestal para consultorías externas."
+                ],
+                "done_when": "Viabilidad confirmada para todas las brechas de severidad Alta."
+              },
+              "example_title": "Control de Viabilidad de Brechas Altas",
+              "example": "| Brecha Crítica | Táctica | Presupuesto | Plazo | Bloqueante |\n| --- | --- | --- | --- | --- |\n| BD ACID | Librería + Consultor | COP $1.2M disp. | 3 días pre-Sprint | No |\n| Offline-first | Spike PouchDB | N/A (interno) | 5 días pre-Sprint | No |\n| PCI/ARCO | Wompi + Abogado | Cubierto | 2 días pre-Sprint | No |\n| T&C SaaS | Bufete externo | COP $2.5M disp. | 5 días pre-Sprint | No |",
+              "link_label": "control crítico va a evaluación por áreas (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Evaluar el estado global por área funcional",
+          "objective": "Emitir una calificación de preparación por disciplina (Técnica, Legal-Contractual, Diseño UX).",
+          "input": "Matriz de resolución y evaluación de brechas del Step 3.1.",
+          "raw_data_title": "Estados por Área Funcional",
+          "raw_data": "Técnica: Ready with Gaps (8 días resolución). Legal: Ready with Gaps (bufete y $2.5M). Diseño: Ready (sin brechas).",
+          "exit_label": "ÁREAS EVALUADAS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Calificación de preparación por área funcional",
+              "objective": "Agrupar el nivel de madurez operativa por disciplina del proyecto.",
+              "how_to": {
+                "steps": [
+                  "Agrupar las brechas en áreas: Técnica, Legal-Contractual y Diseño UX.",
+                  "Asignar 'Ready' si el equipo domina el área sin dependencias críticas.",
+                  "Asignar 'Ready with Gaps' si existen brechas pero con planes viables en plazo y costo.",
+                  "Asignar 'At Risk' si persisten brechas críticas sin plan viable de resolución."
+                ],
+                "table_columns": "Área Funcional | Estado | Justificación",
+                "table_rules": "Una fila por área funcional principal evaluada.",
+                "restrictions": [
+                  "No declarar 'Ready' áreas con brechas técnicas abiertas.",
+                  "Explicar con precisión el tiempo y recursos de resolución."
+                ],
+                "done_when": "Tabla de estado por área funcional completada."
+              },
+              "example_title": "Estado de Preparación por Área Funcional",
+              "example": "| Área Funcional | Estado | Justificación |\n| --- | --- | --- |\n| Técnica (BD + Offline) | Ready with Gaps | Brechas tienen tácticas concretas (PostgreSQL + Spike guiado). Tiempo total: 8 días hábiles antes del Sprint 1. |\n| Legal-Contractual (T&C SaaS) | Ready with Gaps | Bufete externo identificado. Presupuesto COP $2,500,000 disponible. Tiempo: 5 días hábiles. |\n| Diseño UX Análogo | Ready | Diseñador con experiencia en apps agrícolas. Sin brechas. |",
+              "link_label": "estado por áreas va a veredicto global (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Emitir el veredicto global de preparación",
+          "objective": "Establecer la compuerta formal de pase: Prepared, Proceed with Caution o Stop.",
+          "input": "Calificaciones por área funcional del Step 3.2.",
+          "raw_data_title": "Dictamen de Preparación",
+          "raw_data": "Veredicto: Prepared con condición de resolver brechas Altas antes del Sprint 1 (~8 días hábiles).",
+          "exit_label": "VEREDICTO EMITIDO → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Emisión del veredicto formal de preparación",
+              "objective": "Definir si el equipo está habilitado para iniciar la fase de implementación y sus condiciones.",
+              "how_to": {
+                "steps": [
+                  "Revisar el estado de todas las áreas funcionales.",
+                  "Emitir 'Prepared' si todas las áreas están en Ready o Ready with Gaps con planes viables.",
+                  "Emitir 'Proceed with Caution' si hay áreas At Risk pero con contingencia documentada.",
+                  "Emitir 'Stop' si persisten áreas At Risk sin alternativa viable.",
+                  "Redactar las condiciones obligatorias que deben cumplirse antes de iniciar el desarrollo."
+                ],
+                "table_columns": "Veredicto Global | Condición Obligatoria | Tiempo Total de Resolución Pre-Sprint",
+                "table_rules": "Condición explícita requerida para cualquier resultado que no sea Ready pleno.",
+                "restrictions": [
+                  "No omitir las condiciones necesarias para mantener la viabilidad.",
+                  "Vincular el tiempo pre-Sprint al cronograma general."
+                ],
+                "done_when": "Veredicto global emitido y registrado formalmente."
+              },
+              "example_title": "Veredicto Global de Preparación",
+              "example": "**Veredicto de Preparación:** **Prepared** (con condición: resolver brechas Altas antes de Sprint 1).\n\nLas brechas críticas tienen planes de resolución viables dentro del presupuesto y horizonte del MVP. El tiempo total de resolución (~8 días hábiles) encaja en el cronograma pre-Sprint antes de comenzar desarrollo.",
+              "link_label": "veredicto va a consolidación final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Consolidar la matriz maestra, dependencias para D10 y metadatos del entregable.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidar la tabla maestra de capacidades y brechas",
+          "objective": "Integrar inventario, severidad, táctica, tiempo estimado y responsable en la tabla final.",
+          "input": "Inventario de Step 1, planes de Step 2 y veredicto de Step 3.",
+          "raw_data_title": "Matriz Consolidada",
+          "raw_data": "Tabla unificada de exigencias, brechas, severidades, tácticas y responsables para el documento final.",
+          "exit_label": "TABLA MAESTRA CONSOLIDADA → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Integración y validación de la matriz maestra",
+              "objective": "Generar la tabla exhaustiva verificando que ninguna brecha Alta carezca de responsable o tiempo.",
+              "how_to": {
+                "steps": [
+                  "Combinar las tablas de los Steps 1, 2 y 3 en una sola estructura unificada.",
+                  "Verificar que cada fila contenga disciplina, origen, nivel actual, severidad, táctica, tiempo y responsable.",
+                  "Confirmar la coherencia de todos los campos con los entregables previos (D3, D4, D5).",
+                  "Formatear la tabla final según la estructura requerida para exportación."
+                ],
+                "table_columns": "Disciplina / Reto | Origen | Nivel Exigido | Nivel Actual | Severidad de Brecha | Táctica de Resolución",
+                "table_rules": "Validar que todas las filas tengan táctica concreta asignada.",
+                "restrictions": [
+                  "Ninguna brecha Alta puede carecer de táctica o responsable.",
+                  "Mantener consistencia terminológica en toda la tabla."
+                ],
+                "done_when": "Tabla maestra de capacidades y brechas integrada y validada."
+              },
+              "example_title": "Matriz Maestra de Exigencias y Brechas Técnicas",
+              "example": "| Disciplina / Reto | Origen | Nivel Exigido | Nivel Actual | Severidad de Brecha | Táctica de Resolución |\n| --- | --- | --- | --- | --- | --- |\n| Arquitectura Offline-First y Persistencia Local | P1-D4 | Alto | Brecha Parcial | Alta | Usar librerías maduras (RxDB / PouchDB / IndexedDB) y ejecutar Spike guiado en Fase 2. |\n| Integración de WhatsApp Business API | P1-D4 | Medio | Dominado | Baja | SDK oficial de Meta con Webhooks en Node.js/TypeScript. |\n| Diseño UX Mobile-First Ultra Ligero | P1-D1 / D3 | Alto | Dominado | Baja | TailwindCSS optimizado y componentes accesibles livianos. |\n| Normatividad de Términos y Consentimiento | P1-D5 | Medio | Brecha Parcial | Media | Adoptar plantilla estándar de Habeas Data para plataformas SaaS intermediarias. |",
+              "link_label": "matriz maestra va a dependencias D10 (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Transferir los tiempos de resolución al registro de dependencias del D10",
+          "objective": "Listar explícitamente los ítems que deben completarse antes de iniciar el Sprint 1 de desarrollo.",
+          "input": "Tiempos estimados y tácticas del Step 2 y Step 4.1.",
+          "raw_data_title": "Pre-condiciones para Sprint 1",
+          "raw_data": "1) POC offline-first PouchDB (5 días). 2) T&C SaaS bufete (5 días). 3) Revisión esquema BD consultor (3 días).",
+          "exit_label": "DEPENDENCIAS TRANSFERIBLES LISTAS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Extracción y documentación de pre-condiciones pre-Sprint",
+              "objective": "Formular el listado de prerequisitos técnicos que alimentarán directamente el cronograma del D10.",
+              "how_to": {
+                "steps": [
+                  "Filtrar las tareas de resolución que deben completarse antes de codificar en Sprint 1.",
+                  "Registrar cada precondición con responsable individual y duración estimada en días hábiles.",
+                  "Formatear las dependencias para su consumo directo por el entregable D10 (Initial Plan).",
+                  "Documentar los riesgos de cronograma asociados a retrasos en estas actividades."
+                ],
+                "table_columns": "Riesgo de Capacidad | Impacto en el Cronograma | Acción Preventiva",
+                "table_rules": "Vincular cada riesgo con su impacto medible en días o semanas de retraso.",
+                "restrictions": [
+                  "No omitir precondiciones que condicionen la viabilidad técnica.",
+                  "No subestimar los tiempos de consultoría externa."
+                ],
+                "done_when": "Listado de precondiciones y riesgos de cronograma listo para transferir a D10."
+              },
+              "example_title": "Pre-condiciones y Riesgos de Ejecución Derivados",
+              "example": "| Riesgo de Capacidad | Impacto en el Cronograma | Acción Preventiva |\n| --- | --- | --- |\n| Retraso en sincronización de datos offline | +1 semana de desarrollo | Validar la librería de persistencia en los primeros 3 días de kickoff de arquitectura (Fase 2). |\n\n**Pre-condiciones para Sprint 1 (transferir a D10):**\n1. POC offline-first con PouchDB/CouchDB validado — Tech Lead — 5 días hábiles.\n2. T&C redactados como SaaS — CEO + abogado externo — 5 días hábiles.\n3. Revisión de esquema BD por consultor externo — Tech Lead — 3 días hábiles.",
+              "link_label": "dependencias van a metadatos finales (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Aplicar metadatos y registrar estado",
+          "objective": "Completar la cabecera estándar de metadatos y certificar el estado de aprobación del entregable.",
+          "input": "Documento integrado y veredicto de Step 3.3.",
+          "raw_data_title": "Metadatos y Estado Final",
+          "raw_data": "Proyecto: Nos Fuimos de Finca. Fase 1, D6 de 13. Estado: Approved (Condicionado). Aprobadores: Julián / Laura.",
+          "exit_label": "ENTREGABLE ENSAMBLADO Y REGISTRADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Cierre de metadatos y registro formal",
+              "objective": "Asignar metadatos definitivos y registrar el estado de aprobación formal del documento.",
+              "how_to": {
+                "steps": [
+                  "Completar la sección de metadatos: Proyecto, Fase 1, Entregable 6 de 13.",
+                  "Asignar estado 'Approved' si el veredicto es Prepared o Proceed with Caution con mitigaciones.",
+                  "Asignar estado 'Draft' si alguna brecha crítica carece de plan de resolución.",
+                  "Registrar la condición para Fase 2 y los nombres de los aprobadores formales."
+                ],
+                "table_columns": "Campo de Metadatos | Valor Registrado",
+                "table_rules": "Metadatos estandarizados de la metodología.",
+                "restrictions": [
+                  "No aprobar documentos con brechas Altas sin plan definido.",
+                  "Preservar la vinculación con el archivo de salida final."
+                ],
+                "done_when": "Metadatos completos y estado formal certificado en el documento final."
+              },
+              "example_title": "Metadatos y Cierre Formal",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 1 — Viabilidad Temprana (Early Viability)  \n**Entregable:** 6 de 13  \n**Estado:** Aprobado (Condicionado)  \n\n### 4. Veredicto de Preparación\n- **Veredicto:** Ready with Conditions.\n- **Condición para Fase 2 (Tooling & Standards):** Seleccionar frameworks con amplio ecosistema y documentación probada; evitar crear motores de sincronización propietarios desde cero.\n- **Aprobador:** Julián (PM / Desarrollador) / Laura (Tech Lead)",
+              "link_label": "cierre formal del entregable D6"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

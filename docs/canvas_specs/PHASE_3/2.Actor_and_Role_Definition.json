@@ -1,0 +1,306 @@
+{
+  "phase": "Phase 3",
+  "deliverable_code": "D2",
+  "deliverable": "Actor and Role Definition (Definición de Actores y Roles)",
+  "purpose": "Este entregable traduce los actores identificados en el Diagrama de Contexto (D1) y el alcance acotado en el MVP (D9) en un modelo estricto de autorización y gobierno de acceso. Define qué puede hacer cada usuario, qué tiene expresamente prohibido hacer (fronteras negativas) y mapea cada actor humano a un rol técnico estandarizado (ROLE_*) vinculado a una matriz de permisos RBAC para asegurar el sistema desde el inicio del diseño de software.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[example_output_system_context_diagram]] | Catálogo de actores humanos autorizados y sus contratos de datos (Fase 3, D1). |\n| [[example_output_mvp_definition]] | Delimitación de alcance funcional In-Scope vs. exclusiones diferidas a vNext (Fase 1, D9). |\n| [[example_output_project_identity]] | Definición de límites de producto y perfiles operativos (Fase 2, D1). |\n| [[example_output_stack_decision]] | Estándares de seguridad stateless JWT y convenciones Spring Security (Fase 2, D3). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría y Validación de Actores Base (Verify Entry)",
+      "summary": "Auditar y validar que los actores humanos a los que les asignaremos roles y permisos provengan estrictamente de los entregables aprobados previamente (D1 y MVP), evitando la creación arbitraria de usuarios fantasma.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Filtrado de Actores y Compuerta de Trazabilidad (Actor Audit Gate)",
+          "objective": "Verificar la procedencia de cada actor contra D1 y MVP para rechazar perfiles no autorizados o diferidos.",
+          "input": "[[example_output_system_context_diagram]] y [[example_output_mvp_definition]].",
+          "raw_data_title": "Actores Candidatos Extraídos de Inputs",
+          "raw_data": "- Turista (Context Diagram D1 Sec. 2)\n- Propietario / Finquero (Context Diagram D1 Sec. 2)\n- Administrador NFF (Context Diagram D1 Sec. 2)\n- Auditor Financiero Externo (Mencionado en Kickoff pero diferido a vNext)",
+          "exit_label": "COMPLETE → Actores auditados con veredicto CONFIRMADO (1.2)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Auditoría Documental de Procedencia",
+              "objective": "Auditar cada perfil contra D1 y MVP asignando veredicto formal de inclusión o diferimiento.",
+              "how_to": {
+                "steps": [
+                  "1. Extraer los actores humanos declarados en el Diagrama de Contexto (D1).",
+                  "2. Cruzar cada actor contra la lista de módulos In-Scope de la Definición de MVP (P1-D9).",
+                  "3. Clasificar cada perfil en CONFIRMADO o EXCLUIDO/DIFERIDO justificando la decisión."
+                ],
+                "table_columns": "Actor | Tipo C4 | Evidencia Documental (Trazabilidad) | Contexto Operativo en el Sistema | Veredicto",
+                "table_rules": "Todo actor debe tener trazabilidad bidireccional a D1 y D9. Ningún actor fantasma puede ser confirmado.",
+                "restrictions": [
+                  "No inventar roles que no existan en D1",
+                  "Perfiles no interactivos o diferidos a vNext deben quedar catalogados como EXCLUIDO"
+                ],
+                "done_when": "El 100% de los actores analizados cuentan con veredicto justificado y backlink documental"
+              },
+              "example_title": "Tabla de Actores Auditados",
+              "example": "| Actor | Tipo C4 | Evidencia Documental (Trazabilidad) | Contexto Operativo en el Sistema | Veredicto |\n| --- | --- | --- | --- | --- |\n| **Turista** | Actor Primario | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_mvp_definition]] (Sec. 2) | Navega el catálogo web público, cotiza estadías, bloquea fechas temporalmente y completa el pago de reservas de fincas. | **CONFIRMADO** |\n| **Propietario / Finquero** | Actor Primario | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_mvp_definition]] (Sec. 2) | Administra su inventario rural asignado, actualiza precios base, bloquea fechas fuera de servicio y consulta huéspedes que reservaron su finca. | **CONFIRMADO** |\n| **Administrador NFF** | Actor Secundario | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_mvp_definition]] (Sec. 2) | Opera la consola interna de back-office, modera o aprueba fincas registradas, monitorea transacciones de pago y gestiona incidencias de soporte. | **CONFIRMADO** |\n| **Auditor Financiero** | Externo | N/A (Mencionó en Kickoff pero diferido) | Sin acceso directo al software en fase MVP. Recibe reportes contables consolidados vía exportación manual de CSV. | **EXCLUIDO / DIFERIDO (vNext)** |",
+              "link_label": "actores auditados"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Mapeo de Contexto Operativo y Rol en el Negocio",
+          "objective": "Ratificar clasificación C4 y describir el contexto operativo de cada actor confirmado en la plataforma.",
+          "input": "Actores confirmados del Subpaso 1.1 y límites operativos de [[example_output_project_identity]].",
+          "raw_data_title": "Contexto de Operación por Actor Confirmado",
+          "raw_data": "- Turista: Explora catálogo, reserva atómicamente, paga vía pasarela y recibe voucher digital.\n- Finquero: Administra disponibilidad física de finca, define precios y consulta huéspedes asignados.\n- Administrador NFF: Opera consola de back-office, aprueba fincas, audita pagos y atiende incidencias.",
+          "exit_label": "COMPLETE → Actores base ratificados para asignación de capacidades (2.1)",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Mapeo Operativo Canónico",
+              "objective": "Sintetizar la responsabilidad operativa y el flujo diario de cada actor confirmado.",
+              "how_to": {
+                "steps": [
+                  "1. Revisar las interacciones de entrada/salida de cada actor en D1.",
+                  "2. Redactar una descripción de uso diario sin tecnicismos que sintetice su función en la plataforma.",
+                  "3. Integrar la síntesis en la columna de contexto operativo de la tabla de actores."
+                ],
+                "table_columns": "Actor | Tipo C4 | Evidencia Documental (Trazabilidad) | Contexto Operativo en el Sistema | Veredicto",
+                "table_rules": "La descripción debe reflejar exactamente el alcance de la versión actual.",
+                "restrictions": [
+                  "No incluir funcionalidades fuera de alcance del MVP",
+                  "Mantener distinción clara entre roles primarios y secundarios"
+                ],
+                "done_when": "Todos los actores confirmados tienen definido su contexto operativo con precisión"
+              },
+              "example_title": "Contexto Operativo Integrado de Actores Base",
+              "example": "| Actor | Tipo C4 | Evidencia Documental (Trazabilidad) | Contexto Operativo en el Sistema | Veredicto |\n| --- | --- | --- | --- | --- |\n| **Turista** | Actor Primario | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_mvp_definition]] (Sec. 2) | Navega el catálogo web público, cotiza estadías, bloquea fechas temporalmente y completa el pago de reservas de fincas. | **CONFIRMADO** |\n| **Propietario / Finquero** | Actor Primario | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_mvp_definition]] (Sec. 2) | Administra su inventario rural asignado, actualiza precios base, bloquea fechas fuera de servicio y consulta huéspedes que reservaron su finca. | **CONFIRMADO** |\n| **Administrador NFF** | Actor Secundario | [[example_output_system_context_diagram]] (Sec. 2)<br>[[example_output_mvp_definition]] (Sec. 2) | Opera la consola interna de back-office, modera o aprueba fincas registradas, monitorea transacciones de pago y gestiona incidencias de soporte. | **CONFIRMADO** |\n| **Auditor Financiero** | Externo | N/A (Mencionó en Kickoff pero diferido) | Sin acceso directo al software en fase MVP. Recibe reportes contables consolidados vía exportación manual de CSV. | **EXCLUIDO / DIFERIDO (vNext)** |",
+              "link_label": "contexto operativo ratificado"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Catálogo de Capacidades y Exclusiones de Uso (Fronteras Negativas)",
+      "summary": "Definir con precisión qué puede hacer cada actor en la aplicación y, de forma indispensable, qué tiene expresamente prohibido hacer (fronteras negativas) para acotar el alcance y prevenir riesgos de seguridad.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Declaración de Capacidades Permitidas (Multi-ítem)",
+          "objective": "Listar de forma estructurada y justificada las capacidades nucleares autorizadas para cada actor en el MVP.",
+          "input": "Actores confirmados del Step 1 y módulos transaccionales de [[example_output_mvp_definition]].",
+          "raw_data_title": "Capacidades Funcionales In-Scope",
+          "raw_data": "- Turista: Búsqueda catálogo, reserva temporal soft-lock, descarga voucher digital.\n- Finquero: Bloqueo de calendario, ajuste tarifario base, consulta reservas de fincas propias.\n- Admin: Gobernanza catálogo fincas, auditoría pagos pasarela, gestión usuarios.",
+          "exit_label": "COMPLETE → Capacidades autorizadas catalogadas (2.2)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Catálogo de Capacidades Permitidas",
+              "objective": "Catalogar las capacidades autorizadas con su justificación operativa para cada perfil.",
+              "how_to": {
+                "steps": [
+                  "1. Listar para cada actor las 3 capacidades nucleares que requiere para operar en el MVP.",
+                  "2. Justificar operativamente por qué cada capacidad es imprescindible para el actor.",
+                  "3. Dar formato multi-ítem numerado con negritas en el nombre de la acción."
+                ],
+                "table_columns": "Actor | Descripción y Contexto | Capacidades Permitidas (In-Scope) | Exclusiones y Prohibiciones (Out-of-Scope)",
+                "table_rules": "Cada capacidad debe incluir nombre y justificación operativa sin ambigüedades.",
+                "restrictions": [
+                  "No incluir acciones que pertenezcan a versiones futuras (vNext)",
+                  "No omitir justificaciones"
+                ],
+                "done_when": "Todos los actores cuentan con sus capacidades permitidas catalogadas y justificadas"
+              },
+              "example_title": "Capacidades Permitidas por Actor",
+              "example": "| Actor | Descripción y Contexto | Capacidades Permitidas (In-Scope) | Exclusiones y Prohibiciones (Out-of-Scope) |\n| --- | --- | --- | --- |\n| **Turista** | Usuario final B2C que explora y reserva estadías vacacionales en la plataforma web. | 1. **Búsqueda en catálogo:** Filtrado por fechas, capacidad y destino.<br>2. **Bloqueo temporal (Soft-Lock):** Reserva atómica durante checkout.<br>3. **Voucher digital:** Descarga de comprobante de compra. | 1. **Cancelación automática:** Sin reembolso directo sin soporte.<br>2. **Edición de inventario:** Prohibido alterar precios o disponibilidad.<br>3. **Datos de terceros:** Prohibido ver reservas de otros usuarios. |\n| **Propietario / Finquero** | Anfitrión rural que gestiona la disponibilidad física de sus fincas en el sistema. | 1. **Bloqueo de calendario:** Inhabilitar fechas de forma manual.<br>2. **Ajuste tarifario base:** Modificar precios por noche de su finca.<br>3. **Consulta de reservas:** Ver huéspedes y fechas asignadas. | 1. **Fincas ajenas:** Prohibido ver tarifas o reservas de competidores.<br>2. **Comisión NFF:** Prohibido alterar el porcentaje de servicio.<br>3. **Cobro externo:** Prohibido desviar pagos fuera de Wompi. |\n| **Administrador NFF** | Equipo operador de back-office que supervisa la operación de la plataforma. | 1. **Gobernanza de catálogo:** Aprobar o rechazar fincas registradas.<br>2. **Auditoría de pagos:** Consultar logs transaccionales de pasarela.<br>3. **Gestión de usuarios:** Desactivar cuentas infractoras. | 1. **Reservar como cliente:** Prohibido auto-asignarse estadías con rol admin.<br>2. **Acceso a credenciales bancarias:** Prohibido manipular llaves privadas.<br>3. **Bypass de reglas de negocio:** Prohibido saltarse el escrow de pagos. |",
+              "link_label": "capacidades permitidas"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Declaración Estricta de Exclusiones y Prohibiciones (Multi-ítem)",
+          "objective": "Declarar taxativamente las prohibiciones y fronteras negativas para cada actor, blindando la seguridad y alcance.",
+          "input": "Exclusiones explícitas de [[example_output_mvp_definition]] y políticas de [[example_output_project_identity]].",
+          "raw_data_title": "Fronteras Negativas y Prohibiciones",
+          "raw_data": "- Turista: Cancelación automática sin soporte, edición de tarifas/inventario, acceso a reservas ajenas.\n- Finquero: Ver tarifas o reservas de competidores, alterar comisión NFF, desviar pagos fuera de Wompi.\n- Admin: Auto-asignarse reservas con rol admin, manipular credenciales bancarias privadas, omitir escrow.",
+          "exit_label": "COMPLETE → Fronteras negativas blindadas para diseño RBAC (3.1)",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Fronteras Negativas y Restricciones Taxativas",
+              "objective": "Establecer la lista taxativa de prohibiciones justificadas por perfil.",
+              "how_to": {
+                "steps": [
+                  "1. Identificar para cada actor al menos 3 acciones expresamente denegadas por seguridad o alcance.",
+                  "2. Justificar el motivo de cada prohibición (evitar Scope Creep o mitigar vulnerabilidades).",
+                  "3. Consolidar la tabla comparativa final de actores."
+                ],
+                "table_columns": "Actor | Descripción y Contexto | Capacidades Permitidas (In-Scope) | Exclusiones y Prohibiciones (Out-of-Scope)",
+                "table_rules": "Ningún actor puede tener el campo de exclusiones vacío o con texto genérico.",
+                "restrictions": [
+                  "Prohibido usar frases vagas como 'no puede hacer nada más'",
+                  "Cada exclusión debe ser taxativa y verificable mediante pruebas de software"
+                ],
+                "done_when": "El 100% de los actores tienen sus fronteras negativas declaradas y justificadas"
+              },
+              "example_title": "Catálogo Completo de Actores, Capacidades y Exclusiones",
+              "example": "| Actor | Descripción y Contexto | Capacidades Permitidas (In-Scope) | Exclusiones y Prohibiciones (Out-of-Scope) |\n| --- | --- | --- | --- |\n| **Turista** | Usuario final B2C que explora y reserva estadías vacacionales en la plataforma web. | 1. **Búsqueda en catálogo:** Filtrado por fechas, capacidad y destino.<br>2. **Bloqueo temporal (Soft-Lock):** Reserva atómica durante checkout.<br>3. **Voucher digital:** Descarga de comprobante de compra. | 1. **Cancelación automática:** Sin reembolso directo sin soporte.<br>2. **Edición de inventario:** Prohibido alterar precios o disponibilidad.<br>3. **Datos de terceros:** Prohibido ver reservas de otros usuarios. |\n| **Propietario / Finquero** | Anfitrión rural que gestiona la disponibilidad física de sus fincas en el sistema. | 1. **Bloqueo de calendario:** Inhabilitar fechas de forma manual.<br>2. **Ajuste tarifario base:** Modificar precios por noche de su finca.<br>3. **Consulta de reservas:** Ver huéspedes y fechas asignadas. | 1. **Fincas ajenas:** Prohibido ver tarifas o reservas de competidores.<br>2. **Comisión NFF:** Prohibido alterar el porcentaje de servicio.<br>3. **Cobro externo:** Prohibido desviar pagos fuera de Wompi. |\n| **Administrador NFF** | Equipo operador de back-office que supervisa la operación de la plataforma. | 1. **Gobernanza de catálogo:** Aprobar o rechazar fincas registradas.<br>2. **Auditoría de pagos:** Consultar logs transaccionales de pasarela.<br>3. **Gestión de usuarios:** Desactivar cuentas infractoras. | 1. **Reservar como cliente:** Prohibido auto-asignarse estadías con rol admin.<br>2. **Acceso a credenciales bancarias:** Prohibido manipular llaves privadas.<br>3. **Bypass de reglas de negocio:** Prohibido saltarse el escrow de pagos. |",
+              "link_label": "fronteras negativas fijadas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Definición de Roles Técnicos y Matriz de Permisos (RBAC)",
+      "summary": "Mapear cada actor a roles técnicos estandarizados en Spring Security (ROLE_*) y construir la matriz RBAC que otorga permisos CRUD bajo el principio de menor privilegio.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Reglas de Derivación y Nomenclatura de Roles Técnicos",
+          "objective": "Establecer la nomenclatura canónica en UPPER_SNAKE_CASE con prefijo ROLE_* según estándar Spring Security.",
+          "input": "[[example_output_stack_decision]] sobre Spring Security JWT y actores confirmados de Step 1.",
+          "raw_data_title": "Roles Técnicos Canónicos y Estados de Sesión",
+          "raw_data": "- ROLE_GUEST: Turista anónimo no autenticado.\n- ROLE_CUSTOMER: Turista autenticado con JWT.\n- ROLE_HOST: Propietario / finquero autenticado.\n- ROLE_ADMIN: Operador interno back-office autenticado.",
+          "exit_label": "COMPLETE → Roles técnicos tipados con Spring Security (3.2)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Definición Canónica de Roles Técnicos",
+              "objective": "Mapear estados de sesión y actores a identificadores ROLE_* universales.",
+              "how_to": {
+                "steps": [
+                  "1. Analizar el estado de sesión de cada actor (anónimo vs. autenticado).",
+                  "2. Asignar identificadores canónicos con prefijo obligatorio ROLE_*.",
+                  "3. Documentar las capacidades de seguridad específicas asociadas a cada rol."
+                ],
+                "table_columns": "Rol (Nombre Técnico) | Actor(es) y Estado Asociado | Descripción de Capacidades de Seguridad",
+                "table_rules": "Todos los roles deben llevar prefijo ROLE_ en mayúsculas sostenidas.",
+                "restrictions": [
+                  "No crear roles redundantes si un rol existente cubre la responsabilidad",
+                  "No utilizar nombres en minúsculas ni sin prefijo ROLE_"
+                ],
+                "done_when": "Los 4 roles canónicos del sistema están formalmente tipados y descritos"
+              },
+              "example_title": "Catálogo de Roles Técnicos",
+              "example": "| Rol (Nombre Técnico) | Actor(es) y Estado Asociado | Descripción de Capacidades de Seguridad |\n| --- | --- | --- |\n| `ROLE_GUEST` | Turista no autenticado (Navegación pública previa al registro) | Acceso de solo lectura al catálogo público de fincas, disponibilidad y cálculo estimado de tarifas. Sin acceso a datos privados ni operaciones de reserva persistentes. |\n| `ROLE_CUSTOMER` | Turista autenticado (Sesión iniciada mediante JWT) | Capacidad de crear y consultar sus propias reservas, iniciar procesos de pago en checkout y descargar sus vouchers. Prohibido ver o modificar datos de reservas de otros usuarios. |\n| `ROLE_HOST` | Propietario / Finquero autenticado | Capacidad de administrar el inventario, bloquear fechas de disponibilidad y consultar reservas asociadas a las fincas de su propiedad. Prohibido el acceso a fincas de terceros. |\n| `ROLE_ADMIN` | Administrador interno NFF autenticado | Acceso transversal de supervisión, moderación de fincas, auditoría de pagos, resolución de disputas y gestión de cuentas. Prohibida la suplantación para operaciones de compra. |",
+              "link_label": "roles técnicos definidos"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Extracción y Clasificación de Recursos de Información del MVP",
+          "objective": "Identificar los 5 recursos de datos nucleares del MVP sobre los que se ejercerá control de acceso granular.",
+          "input": "Módulos transaccionales de [[example_output_mvp_definition]].",
+          "raw_data_title": "Recursos de Datos Protegidos en el MVP",
+          "raw_data": "1. Finca / Catálogo (Módulo 1)\n2. Bloqueo / Calendario (Módulo 2)\n3. Reserva / Checkout (Módulo 3)\n4. Pago / Webhook (Módulo 4)\n5. Usuario / Perfil (Módulo 5)",
+          "exit_label": "COMPLETE → Recursos clasificados para cruce RBAC (3.3)",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Inventario de Recursos de Información",
+              "objective": "Clasificar los recursos nucleares de datos justificando la necesidad de protección de cada uno.",
+              "how_to": {
+                "steps": [
+                  "1. Extraer los recursos nucleares de datos a partir de los módulos transaccionales de P1-D9.",
+                  "2. Definir qué información sensible contiene cada recurso.",
+                  "3. Justificar el motivo de seguridad por el cual requiere autorización diferenciada."
+                ],
+                "table_columns": "Recurso de Información | Módulo MVP de Origen (P1-D9) | Qué Información Representa | Motivo por el que Requiere Control de Acceso",
+                "table_rules": "Cada recurso debe vincularse a su módulo de origen de P1-D9.",
+                "restrictions": [
+                  "No incluir recursos que correspondan a módulos excluidos de la versión MVP",
+                  "Definir con precisión la información representada"
+                ],
+                "done_when": "Los 5 recursos del MVP están plenamente identificados y justificados"
+              },
+              "example_title": "Recursos de Información Protegidos del MVP",
+              "example": "| Recurso de Información | Módulo MVP de Origen (P1-D9) | Qué Información Representa | Motivo por el que Requiere Control de Acceso |\n| --- | --- | --- | --- |\n| **Finca / Catálogo** | Módulo 1 — Catálogo y Búsqueda | Datos de fincas, imágenes, comodidades, capacidad y tarifas base. | Debe ser público para lectura general, pero su edición debe restringirse exclusivamente al propietario verificado o a administradores. |\n| **Bloqueo / Calendario** | Módulo 2 — Gestión de Disponibilidad | Fechas ocupadas, fechas bloqueadas por mantenimiento y ventanas de reserva. | Los turistas solo pueden leer fechas para reservar; los propietarios administran su calendario propio; nadie puede alterar inventario ajeno. |\n| **Reserva / Checkout** | Módulo 3 — Reservas y Checkout | Registros de reserva, huéspedes, códigos de transacción y estado (HOLD, PAID). | Contiene datos personales y transaccionales sensibles; un turista solo puede ver sus propias reservas y el propietario solo las de su propiedad. |\n| **Pago / Webhook** | Módulo 4 — Pagos e Integración Wompi | Comprobantes de pago, logs de transacción de pasarela y estados de liquidación. | Información crítica auditada. Acceso restringido al gateway (webhook firmado), turista (comprobante propio) y administradores NFF. |\n| **Usuario / Perfil** | Módulo 5 — Autenticación y Usuarios | Credenciales, nombres, teléfonos, roles técnicos y estado de cuenta. | Datos privados amparados por política de privacidad. Cada usuario solo edita su perfil; administración supervisa estados globales. |",
+              "link_label": "recursos clasificados"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Procedimiento Sistemático de Construcción de la Matriz RBAC",
+          "objective": "Construir la matriz cruzada de recursos vs. roles asignando permisos CRUD precisos bajo menor privilegio.",
+          "input": "Recursos de Subpaso 3.2, roles de Subpaso 3.1 y exclusiones de Step 2.",
+          "raw_data_title": "Cruce Recursos vs Roles Técnicos",
+          "raw_data": "Filas: Catálogo, Disponibilidad, Reservas, Pagos, Perfiles.\nColumnas: ROLE_GUEST, ROLE_CUSTOMER, ROLE_HOST, ROLE_ADMIN.\nOperaciones CRUD: Create (C), Read (R), Update (U), Delete (D), Acceso Denegado (—).",
+          "exit_label": "COMPLETE → Matriz RBAC terminada para validación y ensamble (4.1)",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Matriz de Permisos Base (RBAC)",
+              "objective": "Asignar permisos CRUD exactos en cada intersección aplicando menor privilegio.",
+              "how_to": {
+                "steps": [
+                  "1. Cruzar los recursos en filas contra los roles en columnas.",
+                  "2. Evaluar celda por celda qué operación CRUD corresponde aplicando el menor privilegio.",
+                  "3. Colocar guión de acceso denegado (—) en todas las celdas no autorizadas.",
+                  "4. Redactar en la columna final la justificación arquitectónica del control de acceso."
+                ],
+                "table_columns": "Recurso / Entidad | ROLE_GUEST | ROLE_CUSTOMER | ROLE_HOST | ROLE_ADMIN | Justificación de Control de Acceso",
+                "table_rules": "No dejar celdas vacías. Usar — para permisos denegados. Incluir justificación por fila.",
+                "restrictions": [
+                  "Denegar por defecto cualquier permiso que no esté sustentado en el alcance",
+                  "Asegurar que las exclusiones de Step 2 estén reflejadas como denegaciones"
+                ],
+                "done_when": "La matriz RBAC cubre el 100% de cruces recurso-rol con menor privilegio verificado"
+              },
+              "example_title": "Matriz de Permisos Base (RBAC)",
+              "example": "| Recurso / Entidad | `ROLE_GUEST` | `ROLE_CUSTOMER` | `ROLE_HOST` | `ROLE_ADMIN` | Justificación de Control de Acceso |\n| --- | --- | --- | --- | --- | --- |\n| **Catálogo Fincas** | `R` (Público) | `R` (Público) | `C, R, U` (Propias) | `R, U, D` (Global) | Invitados y clientes consultan fincas activas; el anfitrión publica y edita sus propias fincas; admin modera y aprueba. |\n| **Disponibilidad** | `R` (Público) | `R` (Público) | `C, R, U` (Propias) | `R, U` (Global) | Las fechas disponibles son visibles públicamente; el anfitrión gestiona bloqueos de su finca; admin supervisa incidencias. |\n| **Reservas** | `—` | `C, R` (Propias) | `R` (Sus fincas) | `R, U` (Global) | El invitado no reserva sin login; el cliente crea y ve solo sus reservas; el anfitrión consulta quién reservará su finca; admin audita. |\n| **Transacciones / Pagos** | `—` | `C, R` (Propios) | `R` (Comisión propia) | `R` (Global audit) | Las transacciones están estrictamente aisladas al pagador, receptor verificado y a la auditoría administrativa. |\n| **Perfiles de Usuario** | `C` (Registro) | `R, U` (Propio) | `R, U` (Propio) | `R, U` (Global) | El visitante solo puede registrarse; clientes y anfitriones editan su perfil propio; admin puede suspender cuentas infractoras. |",
+              "link_label": "matriz RBAC construida"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar y estructurar formalmente toda la información validada en el entregable maestro unificado y auditar el cumplimiento del Security Quality Gate.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación Formal y Compuerta de Calidad de Seguridad",
+          "objective": "Ensamblar el entregable unificado y validar las reglas de compuerta antes de la exportación.",
+          "input": "Resultados consolidados de Step 1, Step 2 y Step 3.",
+          "raw_data_title": "Secciones y Metadatos Unificados",
+          "raw_data": "Metadatos: Proyecto Nos Fuimos de Finca, Fase 3, Entregable 2 de 9, Estado Aprobado.\nSecciones: 1. Metadatos, 2. Catálogo Actores y Exclusiones, 3. Roles Técnicos, 4. Matriz RBAC, 5. Implicación Compuerta.",
+          "exit_label": "PUBLISH → Deliverable Completo: 2. Definición de Actores y Roles",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Security Quality Gate y Ensamblaje Canónico",
+              "objective": "Verificar la compuerta de seguridad y validar la integridad del artefacto final.",
+              "how_to": {
+                "steps": [
+                  "1. Compilar los metadatos institucionales del proyecto.",
+                  "2. Ensamblar las 4 secciones normativas del entregable.",
+                  "3. Ejecutar la compuerta de validación de seguridad confirmando integridad y consistencia."
+                ],
+                "table_columns": "Criterio de Calidad de Seguridad | Estado | Evidencia",
+                "table_rules": "Todos los criterios deben resultar en APROBADO para autorizar el avance hacia D3.",
+                "restrictions": [
+                  "No aprobar el documento si existen actores sin exclusiones taxativas",
+                  "No aprobar si la matriz RBAC contiene celdas ambiguas"
+                ],
+                "done_when": "El entregable maestro cumple el 100% de los criterios del Security Quality Gate"
+              },
+              "example_title": "Veredicto del Security Quality Gate",
+              "example": "| Criterio de Calidad de Seguridad | Estado | Evidencia |\n| --- | --- | --- |\n| Trazabilidad de Actores vs D1 | APROBADO | El 100% de actores proviene de D1 sin actores fantasma |\n| Fronteras Negativas Explícitas | APROBADO | Todo actor cuenta con al menos 3 exclusiones justificadas |\n| Nomenclatura Canónica de Roles | APROBADO | Prefijo ROLE_* estandarizado para integración con Spring Security |\n| Menor Privilegio en RBAC | APROBADO | Permisos CRUD estrictos con denegaciones (—) en operaciones no autorizadas |",
+              "link_label": "entregable validado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 2. Definición de Actores y Roles.md",
+    "markdown": "# 2. Definición de Actores y Roles\n\n### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 3 — Ingeniería de Requisitos\n**Entregable:** 2 de 9\n**Estado:** Aprobado\n\n---\n\n### 2. Catálogo de Actores y Exclusiones de Uso\n\n| Actor | Descripción y Contexto | Capacidades Permitidas (In-Scope) | Exclusiones y Prohibiciones (Out-of-Scope) |\n| --- | --- | --- | --- |\n| **Turista** | Usuario final B2C que explora y reserva estadías vacacionales en la plataforma web. | 1. **Búsqueda en catálogo:** Filtrado por fechas, capacidad y destino.<br>2. **Bloqueo temporal (Soft-Lock):** Reserva atómica durante checkout.<br>3. **Voucher digital:** Descarga de comprobante de compra. | 1. **Cancelación automática:** Sin reembolso directo sin soporte.<br>2. **Edición de inventario:** Prohibido alterar precios o disponibilidad.<br>3. **Datos de terceros:** Prohibido ver reservas de otros usuarios. |\n| **Propietario / Finquero** | Anfitrión rural que gestiona la disponibilidad física de sus fincas en el sistema. | 1. **Bloqueo de calendario:** Inhabilitar fechas de forma manual.<br>2. **Ajuste tarifario base:** Modificar precios por noche de su finca.<br>3. **Consulta de reservas:** Ver huéspedes y fechas asignadas. | 1. **Fincas ajenas:** Prohibido ver tarifas o reservas de competidores.<br>2. **Comisión NFF:** Prohibido alterar el porcentaje de servicio.<br>3. **Cobro externo:** Prohibido desviar pagos fuera de Wompi. |\n| **Administrador NFF** | Equipo operador de back-office que gobierna el catálogo y la operación. | 1. **Moderación de fincas:** Aprobar, editar o pausar propiedades.<br>2. **Conciliación contable:** Cierre de liquidaciones y comisiones.<br>3. **Soporte de incidencias:** Mediación ante cancelaciones y reclamos. | 1. **Datos de tarjetas:** Prohibido manipular credenciales bancarias.<br>2. **Cambios sin auditoría:** Prohibido alterar reservas sin traza.<br>3. **Cobros directos:** Prohibido operar fuera de la pasarela Wompi. |\n\n---\n\n### 3. Catálogo de Roles Técnicos\n\n| Rol (Nombre Técnico) | Actor(es) Asociados | Descripción de Capacidades de Seguridad |\n| --- | --- | --- |\n| `ROLE_GUEST` | Turista (No autenticado) | Exploración pública del catálogo, filtrado de propiedades y consulta de calendarios sin credenciales. |\n| `ROLE_CUSTOMER` | Turista (Autenticado) | Inicio de checkout seguro con Wompi, creación de reservas propias y consulta/descarga de vouchers personales. |\n| `ROLE_HOST` | Propietario / Finquero | Gestión de disponibilidad (bloqueos manuales) y consulta de reservas asociadas a sus fincas asignadas. |\n| `ROLE_ADMIN` | Administrador NFF | Moderación global de catálogo, supervisión operativa de reservas, conciliación contable y gestión de incidencias. |\n\n---\n\n### 4. Matriz de Permisos Base (RBAC)\n\n| Recurso / Entidad | `ROLE_GUEST` | `ROLE_CUSTOMER` | `ROLE_HOST` | `ROLE_ADMIN` | Justificación de Control de Acceso |\n| --- | --- | --- | --- | --- | --- |\n| **Catálogo de Fincas** | R (Público) | R (Público) | R, U (Solo propias) | C, R, U, D (Global) | La búsqueda es abierta. El finquero solo edita sus fincas. El admin aprueba y modera el inventario global. |\n| **Disponibilidad / Calendario** | R (Público) | R (Público) | R, U (Bloqueos propios) | C, R, U, D (Global) | La consulta de fechas libres es pública. El finquero bloquea sus días. El admin resuelve contingencias. |\n| **Reservas** | — | C, R (Solo propias) | R, U (Solo de sus fincas) | C, R, U, D (Global) | El turista solo ve y crea sus reservas. El finquero ve quién se hospeda. El admin audita y gestiona soporte. |\n| **Transacciones / Pagos** | — | C (Iniciar Checkout) | R (Resumen liquidación) | R, U (Auditoría / Conciliar) | El pago se delega a Wompi. El finquero ve liquidaciones. El admin concilia cuentas sin tocar tarjetas. |\n| **Usuarios / Perfiles** | C (Registro) | R, U (Solo propio) | R, U (Solo propio) | R, U (Supervisión global) | Cada usuario gestiona su propia cuenta bajo Habeas Data. El admin solo supervisa estados de cuenta. |\n\n*(Leyenda: C = Crear, R = Leer / Consultar, U = Actualizar / Editar, D = Eliminar, — = Acceso Denegado)*\n\n---\n\n### 5. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No.\n- **Condición:** Proceed. Actores, roles técnicos y matriz de permisos RBAC formalmente delimitados, justificados y coherentes con las fronteras de seguridad del Diagrama de Contexto (D1) y el alcance de MVP.\n"
+  }
+}

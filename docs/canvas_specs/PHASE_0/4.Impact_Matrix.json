@@ -1,0 +1,440 @@
+{
+  "phase": "Phase 0",
+  "deliverable_code": "D4",
+  "deliverable": "Impact Matrix",
+  "purpose": "This deliverable crosses Business Value against Technical Complexity to provide a prioritization signal, not a cancellation verdict. Its objective is to prevent a team from investing 6 months in a problem that delivers little value or is too complex for the current budget.",
+  "inputs": "| Artifact | Use | Consumed in |\n| --- | --- | --- |\n| [[example_output_impact_estimate]] | Frequency and estimated Annual Impact (P0-D3), to be converted into Severity/Scale. | Step 1 |\n| [[example_output_problem_classification]] | Dominant Archetype and non-binding Remedy (P0-D2), to estimate engineering effort. | Step 2 |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Evaluate Business Value",
+      "summary": "Convert D3 Frequency and Annual Impact into a Business Value classification (High/Medium/Low) through explicit thresholds, not subjective impressions.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Conversion to Factual Severity",
+          "objective": "Translate Downstream Effect into one of 5 factual categories, prohibiting emotional descriptions.",
+          "input": "- D1 Derived Effect and D3 Estimated Annual Impact (9,600,000 COP/year).",
+          "raw_data_title": "Documented Impact Facts",
+          "raw_data": "Forced refunds with bank fee absorption, lost commissions, client grievance claims. Annualized loss: 9,600,000 COP/year.",
+          "exit_label": "SEVERITY CLASSIFIED → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Classification on fixed scale",
+              "objective": "Select the highest factual severity category sustained by D3 evidence.",
+              "how_to": {
+                "steps": [
+                  "Review the 5 fixed factual categories: Inconvenience < Time Lost < Task Blocked < Financial Loss < Safety Risk.",
+                  "Filter out emotional terms ('frustrating', 'annoying', 'chaotic') and probe the concrete damage.",
+                  "Match documented facts: forced refunds and lost commissions represent direct monetary loss.",
+                  "Assign Financial Loss as the verified severity category."
+                ],
+                "table_columns": "Severity Category | Category Definition | Evidence Match | Classified Status",
+                "table_rules": "One row showing the highest substantiated severity level.",
+                "restrictions": [
+                  "Emotional words are strictly prohibited.",
+                  "Choose the highest category evidence supports."
+                ],
+                "done_when": "Factual severity category classified."
+              },
+              "example_title": "Severity Classification",
+              "example": "| Severity Category | Category Definition | Evidence Match | Classified Status |\n| :--- | :--- | :--- | :---: |\n| **Financial Loss** | Direct monetary loss, absorbed transaction surcharges, and lost revenue | D3 documents 9,600,000 COP/year in refunds, bank fees, and lost commissions | **`CLASSIFIED`** |\n\n*Rule Check:* Prohibited emotional terms avoided; classification rests strictly on monetary records.",
+              "link_label": "severity goes to threshold tests (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Evaluation against the Three Threshold Criteria",
+          "objective": "Activate Business Value only if the problem crosses at least one of the three objective criteria (A, B, or C).",
+          "input": "- Severity: Financial Loss (from 1.1).\n- Frequency: 12 events/year (D3).",
+          "raw_data_title": "Threshold Criteria Catalog",
+          "raw_data": "Criterion A: Daily/weekly frequency + Task Blocked or worse.\nCriterion B: Multi-unit scale + Time Lost or worse.\nCriterion C: Financial Loss or Safety Risk regardless of frequency.",
+          "exit_label": "THRESHOLDS EVALUATED → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Criterion A (Chronic Failure)",
+              "objective": "Test problem against Criterion A threshold.",
+              "how_to": {
+                "steps": [
+                  "Check frequency requirement: daily or weekly occurrence.",
+                  "Check severity requirement: Task Blocked or worse.",
+                  "Compare case data: frequency is monthly (12/year), not daily/weekly.",
+                  "Mark Criterion A as NO."
+                ],
+                "table_columns": "Criterion | Condition | Met? | Supporting Evidence from D3",
+                "table_rules": "One row evaluating Criterion A.",
+                "restrictions": [
+                  "Requires daily/weekly operational frequency."
+                ],
+                "done_when": "Criterion A evaluated."
+              },
+              "example_title": "Criterion A Evaluation",
+              "example": "| Criterion | Condition | Met? | Supporting Evidence from D3 |\n| :--- | :--- | :---: | :--- |\n| **A — Chronic Failure** | Daily/Weekly frequency + Blocked Task or worse | `NO` | Frequency is monthly (12/year), not daily or weekly. |",
+              "link_label": "Criterion A result goes to B (1.2.2)"
+            },
+            {
+              "code": "1.2.2",
+              "title": "Criterion B (Death by a Thousand Cuts)",
+              "objective": "Test problem against Criterion B threshold.",
+              "how_to": {
+                "steps": [
+                  "Check scale requirement: operational spread across multiple units, properties, or shifts.",
+                  "Check severity requirement: Time Lost or worse.",
+                  "Compare case data: double bookings affect individual properties per event, not simultaneous fleet-wide operations.",
+                  "Mark Criterion B as NO."
+                ],
+                "table_columns": "Criterion | Condition | Met? | Supporting Evidence from D3",
+                "table_rules": "Rows showing Criterion A and B progress.",
+                "restrictions": [
+                  "Requires systemic multi-unit operational spread."
+                ],
+                "done_when": "Criterion B evaluated."
+              },
+              "example_title": "Criterion B Evaluation",
+              "example": "| Criterion | Condition | Met? | Supporting Evidence from D3 |\n| :--- | :--- | :---: | :--- |\n| **A — Chronic Failure** | Daily/Weekly frequency + Blocked Task or worse | `NO` | Frequency is monthly (12/year), not daily or weekly. |\n| **B — Death by a Thousand Cuts** | Multi-unit scale + Time Lost or worse | `NO` | Impacts individual properties per event, not operations across multiple business units simultaneously. |",
+              "link_label": "Criteria A & B go to C (1.2.3)"
+            },
+            {
+              "code": "1.2.3",
+              "title": "Criterion C (Catastrophic Failure)",
+              "objective": "Test problem against Criterion C threshold.",
+              "how_to": {
+                "steps": [
+                  "Check condition: Severity is Financial Loss or Safety Risk, regardless of frequency.",
+                  "Compare case data: verified severity is Financial Loss (9,600,000 COP/year).",
+                  "Mark Criterion C as YES.",
+                  "Issue consolidated Threshold Table."
+                ],
+                "table_columns": "Criterion | Condition | Met? | Supporting Evidence from D3",
+                "table_rules": "Complete table covering all 3 threshold criteria.",
+                "restrictions": [
+                  "Criterion C activates regardless of event frequency."
+                ],
+                "done_when": "Threshold Table complete with Criterion C activation."
+              },
+              "example_title": "Complete Threshold Table",
+              "example": "| Criterion | Condition | Met? | Supporting Evidence from D3 |\n| :--- | :--- | :---: | :--- |\n| **A — Chronic Failure** | Daily/Weekly frequency + Blocked Task or worse | `NO` | Frequency is monthly (12/year), not daily/weekly. |\n| **B — Death by a Thousand Cuts** | Multi-unit + Lost Time or worse | `NO` | Impacts individual properties per event, not operations across multiple business units simultaneously. |\n| **C — Catastrophic Failure** | Financial Loss or Security Risk, regardless of frequency | **`YES`** | Annual Impact of 9,600,000 COP in direct financial losses (refunds + lost commissions), documented in D3. |",
+              "link_label": "threshold table goes to derivation (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Business Value Derivation",
+          "objective": "Apply the derivation rule to declare High, Medium, or Low Business Value.",
+          "input": "- Threshold table from 1.2: Criterion C = YES.",
+          "raw_data_title": "Derivation Rules",
+          "raw_data": "Criterion C met -> HIGH. Only A/B met -> MEDIUM. None met -> LOW.",
+          "exit_label": "VALUE DERIVED → Step 2",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Business value derivation rule",
+              "objective": "Derive Business Value level based on active threshold criteria and verify confidence caveats.",
+              "how_to": {
+                "steps": [
+                  "Apply derivation rule: Criterion C is YES -> Business Value is HIGH.",
+                  "Check D3 Confidence Level: D3 is Medium, so low-certainty warning caveats do not trigger.",
+                  "Formulate Business Value declaration stating Criterion C activation."
+                ],
+                "table_columns": "Evaluation Axis | Active Criterion | Resulting Value | Confidence Status",
+                "table_rules": "One row declaring final Business Value.",
+                "restrictions": [
+                  "A catastrophic failure is High value regardless of low frequency.",
+                  "Do not lower value subjectively."
+                ],
+                "done_when": "Business Value HIGH declared."
+              },
+              "example_title": "Business Value Declaration",
+              "example": "| Evaluation Axis | Active Criterion | Resulting Value | Confidence Status |\n| :--- | :---: | :---: | :--- |\n| **Business Value** | **Criterion C** (Financial Loss) | **`HIGH`** | Solid: D3 confidence is Medium; no low-certainty override applies. |\n\n*Rule Confirmation:* Criterion C triggers HIGH value; monetary loss justifies high engineering prioritization.",
+              "link_label": "Business Value goes to Step 2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Evaluate Technical Complexity",
+      "summary": "Estimate engineering effort based on the non-binding signal from D2, without committing to architectural design.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Complexity Mapping by Archetype",
+          "objective": "Apply the indicative archetype-to-complexity correspondence.",
+          "input": "- Dominant Archetype: Information Asymmetry.\n- Theoretical Pattern: Single Source of Truth with concurrency control.",
+          "raw_data_title": "Indicative Complexity Guide",
+          "raw_data": "Information Asymmetry / Workflow: typically MEDIUM. Integration Disconnect: MEDIUM-HIGH. Algorithmic: HIGH.",
+          "exit_label": "COMPLEXITY MAPPED → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Indicative complexity mapping",
+              "objective": "Map Information Asymmetry to standard complexity baseline and check upward adjustment factors.",
+              "how_to": {
+                "steps": [
+                  "Look up Information Asymmetry in indicative guide: baseline is MEDIUM.",
+                  "Check upward adjustment conditions: multiple legacy integrations, hardware, frontier AI.",
+                  "Verify absence of upward adjustment factors in D2 Technical Focus.",
+                  "Assign MEDIUM technical complexity baseline."
+                ],
+                "table_columns": "Archetype | Standard Baseline | Adjustment Factors | Resulting Complexity",
+                "table_rules": "One row evaluating archetype technical complexity.",
+                "restrictions": [
+                  "Complexity mapping is an orientation, not a binding architectural decision.",
+                  "Upward adjustments require explicit evidence of hardware or complex APIs."
+                ],
+                "done_when": "Complexity baseline assigned."
+              },
+              "example_title": "Indicative Complexity Mapping",
+              "example": "| Archetype | Standard Baseline | Adjustment Factors | Resulting Complexity |\n| :--- | :---: | :--- | :---: |\n| **Information Asymmetry** | `MEDIUM` | None: D2 mentions zero hardware, legacy mainframe integrations, or frontier AI. | **`MEDIUM`** |\n\n*Rationale:* Concurrency control and consistency are addressed through well-known transactional database patterns.",
+              "link_label": "complexity baseline goes to justification (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Explicit Justification",
+          "objective": "Draft concrete justification linking complexity rating directly to D2's Technical Focus.",
+          "input": "- D2 Technical Focus text verbatim.",
+          "raw_data_title": "D2 Technical Focus Statement",
+          "raw_data": "Single source of truth and instant inquiry mechanism with concurrency control.",
+          "exit_label": "COMPLEXITY JUSTIFIED → Step 3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Technical focus alignment",
+              "objective": "Publish formal justification connecting MEDIUM complexity with standard transactional patterns.",
+              "how_to": {
+                "steps": [
+                  "Reference D2 Technical Focus verbatim.",
+                  "Explain why standard transactional mechanisms keep complexity at MEDIUM.",
+                  "Confirm that no frontier R&D is required."
+                ],
+                "table_columns": "Evaluation Axis | Complexity Level | Direct Justification",
+                "table_rules": "One row with explicit justification.",
+                "restrictions": [
+                  "Must cite D2 Technical Focus.",
+                  "Brand names prohibited."
+                ],
+                "done_when": "Complexity justification published."
+              },
+              "example_title": "Technical Complexity Justification",
+              "example": "| Evaluation Axis | Complexity Level | Direct Justification |\n| :--- | :---: | :--- |\n| **Technical Complexity** | **`MEDIUM`** | \"The technical focus demands concurrency control and real-time availability inquiry, resolvable through standard transactional patterns; it does not require frontier algorithms, legacy integrations, or hardware.\" |",
+              "link_label": "complexity goes to Step 3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Matrix Placement, Human Confirmation, and Continuity Signal",
+      "summary": "Intersect Value (HIGH) and Complexity (MEDIUM), obtain human confirmation of the verdict, and issue the continuity signal.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Cross and Quadrant",
+          "objective": "Intersect Business Value and Technical Complexity to declare matrix quadrant.",
+          "input": "- Business Value: HIGH (Step 1).\n- Technical Complexity: MEDIUM (Step 2).",
+          "raw_data_title": "Matrix Quadrant Definitions",
+          "raw_data": "High Value / Low Complexity: Quick Win. High Value / Medium-High Complexity: Strategic Initiative. Low Value / Low Complexity: Fill-in. Low Value / High Complexity: Money Pit.",
+          "exit_label": "QUADRANT PLACED → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Matrix intersection and quadrant declaration",
+              "objective": "Declare matrix quadrant from intersection of HIGH Value and MEDIUM Complexity.",
+              "how_to": {
+                "steps": [
+                  "Plot coordinates: X = Medium Complexity, Y = High Value.",
+                  "Locate intersection: Strategic Initiative quadrant.",
+                  "Formulate quadrant interpretation: worthwhile investment requiring structured architectural design in Phase 5."
+                ],
+                "table_columns": "Value Axis | Complexity Axis | Resulting Quadrant | Project Classification",
+                "table_rules": "One row showing quadrant determination.",
+                "restrictions": [
+                  "Strategic Initiative is not a casual quick win; demands dedicated design."
+                ],
+                "done_when": "Quadrant declared."
+              },
+              "example_title": "Matrix Intersection",
+              "example": "| Value Axis | Complexity Axis | Resulting Quadrant | Project Classification |\n| :---: | :---: | :---: | :--- |\n| **HIGH** | **MEDIUM** | **`Strategic Initiative`** | High-impact project; justifies dedicated architectural design (Phase 5) rather than a hasty afternoon patch. |",
+              "link_label": "quadrant goes to human audit (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Human Confirmation (Context Reviewer)",
+          "objective": "Audit sources and obtain Project Authority signature to prevent analyst bias.",
+          "input": "- Matrix intersection results.\n- Stakeholder roles from D6.",
+          "raw_data_title": "Audit Reviewers",
+          "raw_data": "Context Reviewer: Carlos Ruiz (Operations Coordinator). Project Authority: Laura Torres (Sponsor / Property Owner).",
+          "exit_label": "HUMAN AUDIT COMPLETE → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Reviewer audit",
+              "objective": "A second person with operational context verifies that all cells cite concrete evidence rather than subjective impressions.",
+              "how_to": {
+                "steps": [
+                  "Reviewer Carlos Ruiz inspects Value cell: verified against Criterion C and 9,600,000 COP figure in D3.",
+                  "Reviewer inspects Complexity cell: verified against literal D2 Technical Focus.",
+                  "Confirm zero unsourced personal impressions.",
+                  "Issue Reviewer Audit Finding: NO REMARKS / APPROVED."
+                ],
+                "table_columns": "Audited Section | Cited Source | Verification Outcome | Reviewer Status",
+                "table_rules": "Rows verifying source compliance for each matrix dimension.",
+                "restrictions": [
+                  "Reviewer must not be the author of the matrix.",
+                  "Every cell must cite an E-XX or master criterion."
+                ],
+                "done_when": "Reviewer audit approved."
+              },
+              "example_title": "Context Reviewer Audit",
+              "example": "| Audited Section | Cited Source | Verification Outcome | Reviewer Status |\n| :--- | :--- | :--- | :---: |\n| Business Value (HIGH) | Criterion C + D3 Annual Impact (9,600,000 COP) | Factually grounded in financial records | `VERIFIED` |\n| Technical Complexity (MEDIUM) | D2 Technical Focus statement | Grounded in standard concurrency patterns | `VERIFIED` |\n| **Reviewer Audit Verdict** | **Carlos Ruiz (Operations Coordinator)** | **Zero unsourced impressions detected** | **`APPROVED`** |",
+              "link_label": "reviewer audit goes to sign-off (3.2.2)"
+            },
+            {
+              "code": "3.2.2",
+              "title": "Project Authority signature",
+              "objective": "Obtain written acceptance sign-off from the Project Authority.",
+              "how_to": {
+                "steps": [
+                  "Present audited matrix to Project Authority Laura Torres (Sponsor / Owner).",
+                  "Record explicit sign-off statement accepting Criterion C and Strategic Initiative classification.",
+                  "Record authentic signature date (2026-05-04)."
+                ],
+                "table_columns": "Authority Role | Named Authority | Acceptance Sign-Off Statement | Date",
+                "table_rules": "One row for the formal sign-off.",
+                "restrictions": [
+                  "Authority must be identified in D6 Stakeholder Map.",
+                  "Date must be recorded."
+                ],
+                "done_when": "Project Authority sign-off recorded."
+              },
+              "example_title": "Project Authority Sign-Off",
+              "example": "| Authority Role | Named Authority | Acceptance Sign-Off Statement | Date |\n| :--- | :--- | :--- | :---: |\n| **Project Sponsor** | **Laura Torres** (Property Owner & Partner) | *\"I authorize proceeding based on Criterion C (Financial Loss) and the Strategic Initiative classification.\"* | 2026-05-04 |",
+              "link_label": "sign-off goes to continuity signal (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Continuity Signal (not cancellation)",
+          "objective": "Issue the formal continuity signal based on matrix quadrant.",
+          "input": "- Confirmed quadrant: Strategic Initiative.",
+          "raw_data_title": "Continuity Signal Policy",
+          "raw_data": "Money Pit -> Low Priority Alert to D7/D8. Quick Win / Strategic Initiative -> PRIORITIZE.",
+          "exit_label": "SIGNAL ISSUED → Step 4",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Continuity signal issuance",
+              "objective": "Issue formal PRIORITIZE signal and confirm non-activation of Low Priority Alert.",
+              "how_to": {
+                "steps": [
+                  "Verify quadrant is Strategic Initiative, not Money Pit.",
+                  "Confirm Low Priority Alert is NOT triggered.",
+                  "Issue continuity signal: PRIORITIZE.",
+                  "Forward signal to D5 (Objectives) and D7 (Risks) to maintain normal Phase 0 workflow."
+                ],
+                "table_columns": "Quadrant | Low Priority Alert Status | Continuity Signal | Downstream Destination",
+                "table_rules": "One row defining signal and downstream flow.",
+                "restrictions": [
+                  "D4 cannot issue cancellation; cancellation is exclusive to D7 and D8."
+                ],
+                "done_when": "Continuity signal issued."
+              },
+              "example_title": "Continuity Signal Issuance",
+              "example": "| Quadrant | Low Priority Alert Status | Continuity Signal | Downstream Destination |\n| :---: | :---: | :---: | :--- |\n| **Strategic Initiative** | **Not Activated** | **`PRIORITIZE`** | Carried forward to D5 (Project Objectives) and D7 (Risk Register) to maintain normal Phase 0 workflow. |\n\n*Policy Check:* Authority rule respected: D4 prioritizes; cancellation authority reserved for D7 and D8.",
+              "link_label": "signal goes to Step 4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Final Document Assembly (Output Structure)",
+      "summary": "Format the Impact Matrix with its visible evidence chain and human confirmation.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Metadata",
+          "objective": "Establish deliverable control metadata and discoverability path.",
+          "input": "- Project: Nos Fuimos de Finca\n- Phase 0 Deliverable 4 of 9\n- Status: Approved",
+          "raw_data_title": "Metadata Parameters",
+          "raw_data": "Folder: docs/00-problem-recognition/\nPrefix: 04.\nFilename: Impact Matrix.md",
+          "exit_label": "METADATA ASSEMBLED → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Metadata assembly and path validation",
+              "objective": "Assemble front matter metadata block and validate file path.",
+              "how_to": {
+                "steps": [
+                  "Assign Project, Phase, Deliverable, and Status values.",
+                  "Verify destination path: 'docs/00-problem-recognition/04. Impact Matrix.md'.",
+                  "Generate deliverable front matter."
+                ],
+                "table_columns": "Field | Assigned Value | Verification Status",
+                "table_rules": "One row per metadata field.",
+                "restrictions": [
+                  "Status Approved upon passing Steps 1–3."
+                ],
+                "done_when": "Metadata section complete."
+              },
+              "example_title": "Deliverable Metadata",
+              "example": "| Field | Assigned Value | Verification Status |\n| :--- | :--- | :---: |\n| **Project** | Nos Fuimos de Finca | `PASS` |\n| **Phase** | 0 — Problem Recognition | `PASS` |\n| **Deliverable** | 4 of 9 | `PASS` |\n| **Status** | Approved | `PASS` |\n| **File Path** | `docs/00-problem-recognition/04. Impact Matrix.md` | `PASS` |",
+              "link_label": "metadata goes to final mapping (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Literal Dump",
+          "objective": "Assemble classifications, quadrant, continuity signal, and human confirmation, and execute publication gate.",
+          "input": "- Validated outputs from Steps 1 to 3.",
+          "raw_data_title": "Matrix Summary Record",
+          "raw_data": "Value: HIGH (Crit C). Complexity: MEDIUM (D2 Focus). Quadrant: Strategic Initiative. Signal: PRIORITIZE. Reviewer: Carlos Ruiz. Sponsor: Laura Torres.",
+          "exit_label": "PUBLISHABLE → Final Deliverable",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Consolidated impact matrix mapping and publication gate",
+              "objective": "Verify 5 AI Question Rules conditions and authorize formal publication.",
+              "how_to": {
+                "steps": [
+                  "Verify Condition 1: Business Value derived from threshold criterion C citing D3.",
+                  "Verify Condition 2: Complexity justified citing D2 Technical Focus.",
+                  "Verify Condition 3: Context Reviewer audited evidence sources.",
+                  "Verify Condition 4: Project Authority signed acceptance.",
+                  "Verify Condition 5: Continuity signal documented (Money Pit alert not triggered).",
+                  "Issue PUBLISHABLE verdict."
+                ],
+                "table_columns": "# | Gate Criterion | Verification | Result",
+                "table_rules": "One row per quality gate criterion.",
+                "restrictions": [
+                  "All criteria must be satisfied to release deliverable."
+                ],
+                "done_when": "PUBLISHABLE verdict issued."
+              },
+              "example_title": "Final Quality Gate & Publication Verdict",
+              "example": "| # | Gate Criterion | Verification | Result |\n| :---: | :--- | :--- | :---: |\n| 1 | Business Value derived from Threshold Criteria citing D3 | Criterion C (Financial Loss, 9,600,000 COP) | `YES` |\n| 2 | Technical Complexity justified citing D2 Technical Focus | Concurrency control with standard patterns | `YES` |\n| 3 | Context Reviewer audited that cells cite authentic sources | Carlos Ruiz audited sources (no remarks) | `YES` |\n| 4 | Project Authority signed acceptance of verdict | Laura Torres signed 2026-05-04 | `YES` |\n| 5 | Continuity Signal documented without unauthorized cancellation | PRIORITIZE issued; authority rule respected | `YES` |\n\n*Verdict:* **`PUBLISHABLE`** — Formal release authorized.",
+              "link_label": "publishes official deliverable"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 04. Impact Matrix.md",
+    "markdown": "# 4. Impact Matrix\n\n### 1. Document Metadata\n**Project:** Nos Fuimos de Finca  \n**Phase:** 0 — Problem Recognition  \n**Deliverable:** 4 of 9  \n**Status:** Approved  \n\n### 2. Variable Evaluation\n- **Business Value (High/Medium/Low):** HIGH — *Activated threshold criterion: C (Catastrophic Failure) — Evidence: Annual Impact of 9,600,000 COP/year (D3).*\n- **Technical Complexity (High/Medium/Low):** MEDIUM — *Justification: concurrency control with standard transactional patterns, without integrations or hardware (D2 Technical Focus).*\n\n### 3. Matrix Placement\n- **Quadrant:** Strategic Initiative.\n- **Continuity Signal:** PRIORITIZE (no Low Priority Alert activated).\n\n### 4. Human Confirmation\n- **Context Reviewer:** Carlos Ruiz (Operations Coordinator) — No observations.\n- **Project Authority:** Laura Torres (Sponsor) — Acceptance signature, 2026-05-04."
+  }
+}

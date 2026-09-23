@@ -1,0 +1,445 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D12",
+  "deliverable": "Go/No-Go/Pivot Decision Record (Decisión Oficial de Compuerta de Fase 1 — Gate 1)",
+  "purpose": "Este entregable es el tribunal formal de cierre de la Fase 1 (Gate 1). Audita los veredictos y evidencias de los 11 entregables previos (Mercado, Competencia, Factibilidad, Legal, Capacidad, Viabilidad, Riesgos Delta, MVP, Plan y Proceso) y emite un veredicto vinculante de supervivencia: GO, CONDITIONAL GO / PIVOT, o NO-GO (CANCEL).",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| D1 a D11 — Todos los entregables de Fase 1 | Fuente de auditoría de completitud y veredictos de compuerta. |\n| [[example_output_viability]] | (P1-D7) Veredicto de Viabilidad y Economía Unitaria. |\n| [[example_output_technical_feasibility]] | (P1-D4) Veredicto de Factibilidad Técnica y Spike. |\n| [[example_output_risk_register_update]] | (P1-D8) Actualización Delta del Registro de Riesgos. |\n| [[example_output_mvp_definition]] | (P1-D9) Mandato y Criterios de Éxito del MVP. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría Consolidada de Entregables (D1 a D11)",
+      "summary": "Verificar existencia, aprobación formal y veredictos de compuerta de los 11 entregables previos.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Auditoría de compuertas P1-D1 a P1-D11",
+          "objective": "Recopilar los estados y veredictos de los 11 entregables previos de la Fase 1.",
+          "input": "Entregables completados de P1-D1 a P1-D11.",
+          "raw_data_title": "Auditoría de Entregables",
+          "raw_data": "11 entregables auditados. Todos en estado Approved. Veredictos base registrados desde User Profile hasta Work Process.",
+          "exit_label": "ENTREGABLES RECOPILADOS Y AUDITADOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Recopilación exhaustiva de estados de entregables",
+              "objective": "Confirmar que no existan documentos pendientes de aprobación antes de cerrar la compuerta.",
+              "how_to": {
+                "steps": [
+                  "Revisar secuencialmente los artefactos D1 al D11 en el repositorio.",
+                  "Verificar que cada entregable cuente con estado formal 'Approved'.",
+                  "Extraer el veredicto base emitido en cada documento.",
+                  "Consolidar la tabla inicial de auditoría de Fase 1."
+                ],
+                "table_columns": "Código | Entregable | Estado Documental | Veredicto Base | Evidencia Principal",
+                "table_rules": "Auditoría exhaustiva de los 11 entregables sin omisiones.",
+                "restrictions": [
+                  "No avanzar si algún entregable permanece en estado Draft.",
+                  "Comprobar la concordancia con los artefactos de salida reales."
+                ],
+                "done_when": "11 entregables auditados con su estado y veredicto base registrado."
+              },
+              "example_title": "Auditoría Consolidada de Entregables de Fase 1",
+              "example": "| Entregable | Nombre | Estado | Veredicto Base | Notas de Auditoría |\n| --- | --- | --- | --- | --- |\n| **D1** | User Profile | Aprobado | Válido | Perfil de administradores rurales sin 4G validado en campo |\n| **D2** | Market Validation | Aprobado | Viable | COP $9M vs WTP $720k anual; 112 fincas SOM inicial |\n| **D3** | Competitive Analysis | Aprobado | Diferenciado | Moat en efectos de red bilaterales con agencias locales |\n| **D4** | Technical Feasibility | Aprobado | Proceed (Mitigado) | Spike superado con arquitectura asíncrona |\n| **D5** | Legal & Regulatory | Aprobado | Compliant by Design | Habeas Data, PCI en pasarela externa y contratos civiles |\n| **D6** | Team Capability | Aprobado | Ready with Conditions | Brechas técnicas mitigadas con librerías estándar y spikes |\n| **D7** | Viability Document | Aprobado | Proceed (Gate Superado) | Margen de contribución 83.3%, Break-Even con 30 fincas |\n| **D8** | Risk Register Update | Aprobado | Mitigado (Delta) | 4 nuevos riesgos incorporados con mitigaciones y dueños |\n| **D9** | MVP Definition | Aprobado | Acotado | Bot de WhatsApp + web liviana para agencias; 3 KRs |\n| **D10** | Initial Plan | Aprobado | Agendado | Ciclo de 8 semanas estructurado en 4 hitos |\n| **D11** | Work Process | Aprobado | Definido | Metodología Kanban con rituales asíncronos y métricas DORA |",
+              "link_label": "auditoría va a clasificación de veredictos (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Clasificación de veredictos individuales",
+          "objective": "Categorizar los resultados de los 11 entregables en Proceed, Proceed with Conditions o Stop.",
+          "input": "Tabla consolidada de auditoría del Step 1.1.",
+          "raw_data_title": "Clasificación de Veredictos",
+          "raw_data": "Proceed: 9 entregables. Proceed with Conditions: 2 entregables (D4 Técnica, D8 Riesgos). Stop / Pivot: 0 entregables.",
+          "exit_label": "VEREDICTOS CATEGORIZADOS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Categorización de veredictos de compuerta",
+              "objective": "Estandarizar las decisiones individuales bajo la taxonomía ternaria de compuerta.",
+              "how_to": {
+                "steps": [
+                  "Clasificar cada entregable como 'Proceed', 'Proceed with Conditions' o 'Stop/Pivot'.",
+                  "Identificar si algún entregable crítico (D4, D5, D7) impuso condicionamientos.",
+                  "Cuantificar el total de entregables por categoría.",
+                  "Preparar la base numérica para el cálculo algorítmico del veredicto final."
+                ],
+                "table_columns": "Categoría de Veredicto | Cantidad de Entregables | Entregables Asociados",
+                "table_rules": "Clasificación mutuamente excluyente y exhaustiva.",
+                "restrictions": [
+                  "No reclasificar como Proceed limpio aquellos que tengan condiciones abiertas.",
+                  "Mantener total transparencia en el conteo."
+                ],
+                "done_when": "Conteo oficial de veredictos individuales completado."
+              },
+              "example_title": "Distribución de Veredictos Individuales",
+              "example": "### Conteo de Veredictos\n- **Proceed:** 9 entregables.\n- **Proceed with Conditions:** 2 entregables (P1-D4 Técnica, P1-D8 Riesgos).\n- **Stop / Pivot:** 0 entregables.",
+              "link_label": "clasificación va a aislamiento de red flags (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Identificación de red flags y condiciones críticas",
+          "objective": "Aislar las restricciones técnicas, operativas y legales que condicionan el paso a Fase 2.",
+          "input": "Entregables clasificados con condiciones en Step 1.2.",
+          "raw_data_title": "Condiciones Críticas",
+          "raw_data": "D4: arquitectura asíncrona offline-first sin motor propio en tiempo real. D8: pasarela Wompi verificada con transacción de prueba antes de pauta.",
+          "exit_label": "RESTRICCIONES Y RED FLAGS AISLADOS → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Aislamiento de restricciones y condiciones vinculantes",
+              "objective": "Extraer los requerimientos no negociables que deben trasladarse obligatoriamente a Fase 2.",
+              "how_to": {
+                "steps": [
+                  "Filtrar las notas de auditoría de los entregables con condicionamientos.",
+                  "Redactar las condiciones técnicas derivadas del Spike de factibilidad (P1-D4).",
+                  "Redactar las condiciones operativas y comerciales derivadas del registro de riesgos (P1-D8).",
+                  "Consolidar la lista de mandatos de cumplimiento obligatorio."
+                ],
+                "table_columns": "Entregable Origen | Condición Vinculante | Justificación de Riesgo Mitigado",
+                "table_rules": "Mandatos explícitos y verificables para ingeniería y producto.",
+                "restrictions": [
+                  "No omitir restricciones que eviten sobrecostos o fallos en campo.",
+                  "Garantizar que las condiciones sean ejecutables en el kickoff de Fase 2."
+                ],
+                "done_when": "Listado de condiciones críticas y mandatos consolidado."
+              },
+              "example_title": "Condiciones Críticas Vinculantes Heredadas",
+              "example": "| Origen | Condición Crítica Requerida |\n| --- | --- |\n| **P1-D4 (Técnica)** | Debe ser asincrónico No-Code / ligero (WhatsApp API). Prohibido desarrollar motor propio. |\n| **P1-D8 (Riesgos)** | Cobros con link directo Wompi verificado con transacción real de prueba antes de pauta. |",
+              "link_label": "red flags van a evaluación de compuerta booleana (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Cálculo de Decisión Final y Condiciones de Paso",
+      "summary": "Aplicar la lógica matemática de compuerta y formular el veredicto oficial con mandatos.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Evaluación de reglas de agregación de decisiones",
+          "objective": "Aplicar la función de decisión booleana para calcular el veredicto formal de Gate 1.",
+          "input": "Conteo de veredictos del Step 1.2.",
+          "raw_data_title": "Reglas Booleanas de Compuerta",
+          "raw_data": "Regla: Si Stop > 0 -> NO-GO. Si Stop == 0 y Conditions > 0 -> CONDITIONAL GO. Si Stop == 0 y Conditions == 0 -> GO. Resultado: GO / CONDITIONAL GO.",
+          "exit_label": "VEREDICTO ALGORTÍMICO COMPUTADO → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Aplicación algorítmica de compuerta booleana",
+              "objective": "Determinar matemáticamente si el proyecto avanza, se condiciona o se cancela.",
+              "how_to": {
+                "steps": [
+                  "Verificar si existe algún entregable con veredicto Stop: si es así, emitir NO-GO inmediato.",
+                  "Verificar si no hay Stops pero existen condicionamientos: emitir CONDITIONAL GO.",
+                  "Verificar si todos los entregables tienen luz verde plena: emitir GO incondicional.",
+                  "Registrar el resultado algorítmico formal en el acta."
+                ],
+                "table_columns": "Condición Lógica | Expresión Booleana | Resultado Aplicado",
+                "table_rules": "Lógica determinista vinculante sin excepciones discrecionales.",
+                "restrictions": [
+                  "Prohibido otorgar GO incondicional si existen riesgos o Spikes no resueltos.",
+                  "Respetar el mandato de cancelación si existe inviabilidad insalvable."
+                ],
+                "done_when": "Veredicto formal calculado y validado según las reglas de agregación."
+              },
+              "example_title": "Cálculo Algorítmico del Veredicto de Gate 1",
+              "example": "### Reglas de Agregación de Decisiones\n- Si `Count(Stop) > 0` → **STOP / PIVOT MANDATORIO**.\n- Si `Count(Stop) == 0` AND `Count(Conditions) > 0` → **CONDITIONAL GO**.\n- Si `Count(Stop) == 0` AND `Count(Conditions) == 0` → **UNCONDITIONAL GO**.\n\n**Resultado:** Cero stops, condiciones acotadas → **GO / CONDITIONAL GO** (Avance Autorizado).",
+              "link_label": "cálculo booleano va a mandatos vinculantes (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Sustanciación de mandatos de condición",
+          "objective": "Formular los mandatos vinculantes de observancia obligatoria durante el kickoff de Fase 2.",
+          "input": "Condiciones identificadas en Step 1.3.",
+          "raw_data_title": "Mandatos Vinculantes",
+          "raw_data": "Mandato 1: Mantener arquitectura desacoplada offline-first. Mandato 2: Cero scope creep de apps móviles nativas. Mandato 3: Delegación total en Wompi sin persistir tarjetas.",
+          "exit_label": "MANDATOS VINCULANTES REDACTADOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Formulación de mandatos vinculantes para Fase 2",
+              "objective": "Redactar las condiciones no negociables que gobernarán el diseño de arquitectura y especificación.",
+              "how_to": {
+                "steps": [
+                  "Redactar mandatos claros, asertivos y delimitados.",
+                  "Vincular cada mandato con su restricción de alcance o salvaguarda de seguridad.",
+                  "Establecer la sanción por incumplimiento: revocación inmediata del avance.",
+                  "Integrar las cláusulas en la sección de condicionantes de Fase 2."
+                ],
+                "table_columns": "Número de Mandato | Texto del Mandato Vinculante | Área de Aplicación",
+                "table_rules": "Condiciones mandatorias de cumplimiento estricto.",
+                "restrictions": [
+                  "No redactar cláusulas ambiguas o subjetivas.",
+                  "Asegurar que cada mandato responda a un riesgo auditado."
+                ],
+                "done_when": "Mandatos vinculantes completamente redactados y numerados."
+              },
+              "example_title": "Mandatos Vinculantes para Fase 2 (Kickoff)",
+              "example": "### 4. Condicionantes Obligatorias para Fase 2 (Kickoff)\n1. Mantener la arquitectura desacoplada y basada en colas ligeras para respetar la condición Offline-First en zonas rurales.\n2. No permitir scope creep de aplicaciones móviles nativas o sistemas de login complejos durante la especificación de Fase 2 y 3.\n3. Asegurar la delegación total de transacciones financieras en la pasarela de pagos (Wompi) sin persistir datos bancarios en servidores propios.",
+              "link_label": "mandatos van a resolución oficial (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Formulación de la resolución final",
+          "objective": "Declarar formalmente el veredicto oficial de Gate 1 acompañado de su justificación ejecutiva.",
+          "input": "Veredicto algorítmico de 2.1 y mandatos de 2.2.",
+          "raw_data_title": "Resolución Oficial Gate 1",
+          "raw_data": "Veredicto: GO (Avance Autorizado a Fase 2 — Kickoff del Proyecto). Justificación: evidencia empírica de mercado, viabilidad económica positiva y riesgos mitigados.",
+          "exit_label": "RESOLUCIÓN OFICIAL FORMULADA → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Declaración formal del veredicto oficial de compuerta",
+              "objective": "Emitir la decisión institucional de paso respaldada por la evidencia acumulada.",
+              "how_to": {
+                "steps": [
+                  "Declarar explícitamente el veredicto en mayúsculas: GO (o CONDITIONAL GO).",
+                  "Redactar la justificación ejecutiva resumiendo el balance de mercado, tecnología y finanzas.",
+                  "Confirmar la habilitación del presupuesto y recursos para el Kickoff de Ingeniería.",
+                  "Incorporar la resolución al cuerpo principal del entregable."
+                ],
+                "table_columns": "Campo de Resolución | Declaración Formal",
+                "table_rules": "Resolución ejecutiva concluyente.",
+                "restrictions": [
+                  "No omitir la justificación ejecutiva fundamentada.",
+                  "Alinear la decisión con los criterios de éxito de Fase 1."
+                ],
+                "done_when": "Resolución final formalmente declarada con justificación ejecutiva."
+              },
+              "example_title": "Decisión Oficial de Compuerta (Gate 1)",
+              "example": "### 3. Decisión Oficial de Compuerta (Gate 1)\n- **Veredicto:** GO (Avance Autorizado a Fase 2 — Kickoff del Proyecto).\n- **Justificación Ejecutiva:** La Fase 1 ha demostrado con números y evidencia empírica que el mercado rural existe, que la disposición a pagar supera con creces el costo del problema, que las limitaciones técnicas se resuelven por diseño asíncrono y que los riesgos están completamente acotados.",
+              "link_label": "resolución oficial va a asignación de custodios (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Asignación de Firmas y Responsabilidad de Gobernanza",
+      "summary": "Asignar custodios nominales a los mandatos, fijar criterio de revocación y recoger firmas.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Asignación directa de custodia de mandatos",
+          "objective": "Designar a los responsables titulares encargados de vigilar el cumplimiento de las condiciones en Fase 2.",
+          "input": "Mandatos de Step 2.2 y roles de [[example_output_team_capability]] (P1-D6).",
+          "raw_data_title": "Custodios Asignados",
+          "raw_data": "Mandato Offline-first / No-Code: Laura (CTO / Tech Lead). Mandato Validación Pasarela / Pagos: Julián (CEO / Business Lead).",
+          "exit_label": "CUSTODIOS ASIGNADOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Designación de custodios titulares por mandato",
+              "objective": "Asegurar que cada salvaguarda cuente con un defensor nominal con capacidad de veto.",
+              "how_to": {
+                "steps": [
+                  "Asignar la custodia de los mandatos técnicos al Tech Lead.",
+                  "Asignar la custodia de los mandatos comerciales y financieros al Project Authority.",
+                  "Otorgar facultad formal a los custodios para paralizar el desarrollo ante violaciones.",
+                  "Documentar las asignaciones en la sección de gobernanza."
+                ],
+                "table_columns": "Mandato Vinculante | Custodio Titular Designado | Rol en el Proyecto | Facultad de Veto",
+                "table_rules": "Custodia uninominal obligatoria por cada mandato.",
+                "restrictions": [
+                  "No asignar custodias colectivas sin responsabilidad individual.",
+                  "Garantizar que el custodio tenga autoridad sobre el área técnica o de negocio."
+                ],
+                "done_when": "Custodios titulares formalmente asignados a todos los mandatos."
+              },
+              "example_title": "Custodia de Mandatos Condicionales",
+              "example": "### Custodia de Mandatos Condicionales\n- **Mandato 1 (Arquitectura Offline-First / Desacoplada):** Custodio Titular: Laura (CTO / Tech Lead).\n- **Mandato 2 (Delimitación de Alcance MVP / Sin Apps Nativas):** Custodio Titular: Laura (CTO / Tech Lead).\n- **Mandato 3 (Delegación Wompi / Seguridad Financiera):** Custodio Titular: Julián (CEO / Business Lead).",
+              "link_label": "custodios van a criterio de revocación (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Establecimiento del criterio de revocación",
+          "objective": "Definir la regla de aborto inmediato si durante Fase 2 se viola alguna de las condiciones pactadas.",
+          "input": "Mandatos y custodias de Step 3.1.",
+          "raw_data_title": "Criterio de Revocación",
+          "raw_data": "Regla: Si durante la ejecución de Fase 2 se viola alguno de los mandatos, el proyecto entra inmediatamente en estado 'HALT & RE-AUDIT' paralizando el presupuesto.",
+          "exit_label": "CRITERIO DE REVOCACIÓN BLINDADO → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Definición de regla de aborto y revocación",
+              "objective": "Fijar el protocolo automático de detención si se infringe el alcance o la arquitectura acordada.",
+              "how_to": {
+                "steps": [
+                  "Establecer la causal de revocación: cualquier transgresión de los mandatos vinculantes.",
+                  "Definir el estado resultante: 'HALT & RE-AUDIT' con congelamiento de despliegues.",
+                  "Fijar el mecanismo de reactivación: requiere nueva sesión extraordinaria de compuerta.",
+                  "Registrar la cláusula de salvaguarda en el acta oficial."
+                ],
+                "table_columns": "Causal de Infracción | Consecuencia Operativa Inmediata | Procedimiento de Reactivación",
+                "table_rules": "Revocación automática sin tolerancia a desvíos de alcance.",
+                "restrictions": [
+                  "No admitir excepciones informales que rompan las condiciones del Gate.",
+                  "Exigir notificación inmediata a los aprobadores ante cualquier conato de desvío."
+                ],
+                "done_when": "Criterio de revocación y protocolo de detención documentado."
+              },
+              "example_title": "Criterio de Revocación y Regla de Aborto",
+              "example": "### Protocolo de Revocación (Halt & Re-Audit)\nSi durante el diseño de arquitectura o especificación de Fase 2 se detecta un intento de construir features Out-of-Scope o de vulnerar el desacoplamiento offline-first, cualquier custodio tiene la potestad y deber de activar el estado **HALT & RE-AUDIT**, suspendiendo las actividades hasta subsanar la desviación.",
+              "link_label": "criterio de revocación va a firmas de sign-off (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Registro formal de firmas (Sign-off)",
+          "objective": "Consolidar el compromiso formal de los líderes mediante firmas con nombres, roles y fecha.",
+          "input": "Resolución, mandatos y custodias de Steps 2 y 3.",
+          "raw_data_title": "Firmas de Autorización",
+          "raw_data": "Project Authority: Julián (PM), Decisión: Aprobado, Fecha: 2026-07-06. Tech Lead: Laura (Tech Lead), Decisión: Aprobado, Fecha: 2026-07-06.",
+          "exit_label": "FIRMAS REGISTRADAS Y CERTIFICADAS → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Protocolo formal de sign-off y gobernanza",
+              "objective": "Vincular legal y metodológicamente a los líderes del proyecto con la decisión de paso.",
+              "how_to": {
+                "steps": [
+                  "Registrar el rol de Project Authority / Negocio con nombre propio.",
+                  "Registrar el rol de Tech Lead / Arquitectura con nombre propio.",
+                  "Hacer constar la decisión explícita de aprobación de ambos líderes.",
+                  "Registrar la fecha formal de sign-off que marca el cierre de la Fase 1."
+                ],
+                "table_columns": "Rol de Liderazgo | Nombre del Firmante | Decisión Emitida | Fecha Formal",
+                "table_rules": "Firmas uninominales obligatorias de ambos líderes.",
+                "restrictions": [
+                  "No cerrar el Gate sin la firma explícita del Tech Lead y del PM.",
+                  "Asegurar consistencia con las fechas de los cronogramas."
+                ],
+                "done_when": "Firmas formales registradas en la tabla de gobernanza."
+              },
+              "example_title": "Firmas de Autorización de Gate 1",
+              "example": "### 5. Firmas de Autorización\n| Rol | Nombre | Decisión | Fecha |\n| --- | --- | --- | --- |\n| **Project Authority / PM** | Julián (PM) | Aprobado | 2026-07-06 |\n| **Tech Lead** | Laura (Tech Lead) | Aprobado | 2026-07-06 |",
+              "link_label": "firmas van a ensamblaje formal del acta (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar el acta formal de Gate 1, verificar lista de chequeo de cierre y exportar.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación estructurada del acta de Gate 1",
+          "objective": "Integrar metadatos, tabla de auditoría, decisión oficial, condicionantes y firmas.",
+          "input": "Resultados de Steps 1 al 3.",
+          "raw_data_title": "Consolidación Documental",
+          "raw_data": "Estructuración del acta oficial de Gate 1 en sus 5 secciones estándar para archivo maestro.",
+          "exit_label": "ACTA DE GATE 1 CONSOLIDADA → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Integración de auditoría, decisión, mandatos y firmas",
+              "objective": "Formatear el documento maestro que certifica el cumplimiento íntegro de la Fase 1.",
+              "how_to": {
+                "steps": [
+                  "Organizar las 5 secciones estándar del entregable oficial.",
+                  "Comprobar el formateo riguroso de la tabla de auditoría de 11 entregables.",
+                  "Insertar los bloques de mandatos vinculantes y tabla de firmas.",
+                  "Verificar los enlaces hacia los artefactos de salida de Fase 1."
+                ],
+                "table_columns": "Sección del Acta | Estado de Compilación | Verificación Estructural",
+                "table_rules": "Uso estricto de la plantilla oficial de Gate 1.",
+                "restrictions": [
+                  "No omitir ninguna sección ni columna de la auditoría.",
+                  "Mantener la fidelidad con los acuerdos alcanzados."
+                ],
+                "done_when": "Acta de Gate 1 completamente integrada y lista para chequeo."
+              },
+              "example_title": "Estructura Consolidada del Acta de Gate 1",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 1 — Viabilidad Temprana (Early Viability)  \n**Entregable:** 12 de 13  \n**Estado:** Aprobado  \n\n### 2. Tabla Consolidada de Auditoría de Entregables (D1 a D11)  \n### 3. Decisión Oficial de Compuerta (Gate 1)  \n### 4. Condicionantes Obligatorias para Fase 2 (Kickoff)  \n### 5. Firmas de Autorización",
+              "link_label": "consolidación va a lista de chequeo de cierre (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Lista de chequeo de cierre de Fase 1",
+          "objective": "Confirmar que no exista ningún entregable sin veredicto expreso y certificar completitud.",
+          "input": "Acta consolidada de Step 4.1.",
+          "raw_data_title": "Chequeo de Completitud",
+          "raw_data": "11/11 entregables verificados con enlaces válidos. 0 entregables en Draft. 100% veredictos conformes.",
+          "exit_label": "COMPLETITUD DE FASE 1 CERTIFICADA → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Verificación de completitud del 100% de entregables",
+              "objective": "Realizar el control de calidad final sobre los 11 entregables previos antes de archivar la fase.",
+              "how_to": {
+                "steps": [
+                  "Verificar que cada uno de los 11 entregables cuente con archivo de salida generado.",
+                  "Comprobar que todas las rutas de enlace documental estén intactas.",
+                  "Confirmar que los 3 mandatos vinculantes tengan asignado su respectivo custodio.",
+                  "Registrar el dictamen de completitud en la lista de chequeo final."
+                ],
+                "table_columns": "Elemento de Control | Condición Exigida | Estado Verificado",
+                "table_rules": "Completitud obligatoria del 100% para habilitar la firma.",
+                "restrictions": [
+                  "No certificar si falta algún documento o veredicto.",
+                  "Asegurar que las condiciones de cierre sean inalterables."
+                ],
+                "done_when": "Lista de chequeo superada con 100% de conformidad."
+              },
+              "example_title": "Lista de Chequeo de Cierre de Fase 1",
+              "example": "| Criterio de Control | Requerimiento | Estatus |\n| --- | --- | --- |\n| Completitud Documental | 11/11 entregables en Approved | Conforme ✅ |\n| Trazabilidad de Veredictos | Veredictos de D4, D5, D7 y D8 reflejados | Conforme ✅ |\n| Custodia de Mandatos | Custodios uninominales con veto | Conforme ✅ |\n| Firmas de Gobernanza | PM y Tech Lead registradas | Conforme ✅ |",
+              "link_label": "chequeo va a metadatos finales y exportación (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Metadatos y exportación de resolución",
+          "objective": "Asignar metadatos definitivos, sellar el estado Approved y autorizar el avance oficial a Fase 2.",
+          "input": "Acta verificada y firmas de liderazgo.",
+          "raw_data_title": "Cierre Formal Gate 1",
+          "raw_data": "Proyecto: Nos Fuimos de Finca. Fase 1, D12 de 13. Estado: Approved. Decisión Final: GO. Fase 1 formalmente clausurada.",
+          "exit_label": "DECISIÓN GATE 1 OFICIALMENTE PUBLICADA",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Registro de metadatos y sellado formal de Gate 1",
+              "objective": "Certificar la culminación exitosa de la etapa de evaluación de viabilidad y abrir paso a ingeniería.",
+              "how_to": {
+                "steps": [
+                  "Completar la cabecera de metadatos del documento oficial.",
+                  "Asignar estado 'Approved' al acta de decisión.",
+                  "Publicar el entregable en `docs/01-viabilidad-temprana/12. Decision Go-NoGo.md`.",
+                  "Actualizar el archivo de progreso certificando la superación de Gate 1."
+                ],
+                "table_columns": "Parámetro de Resolución | Valor Final | Validez Jurídica / Técnica",
+                "table_rules": "Acta de cierre vinculante para todo el proyecto.",
+                "restrictions": [
+                  "No alterar el contenido tras el sign-off.",
+                  "Preservar el registro como insumo directo del Brief de Fase 1 (D13)."
+                ],
+                "done_when": "Metadatos formalizados y acta de Gate 1 oficialmente archivada."
+              },
+              "example_title": "Certificación Oficial de Cierre de Gate 1",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 1 — Viabilidad Temprana (Early Viability)  \n**Entregable:** 12 de 13  \n**Estado:** Aprobado  \n\nEstado al cerrar este step: **Approved**. Gate 1 superado exitosamente con veredicto GO condicionado a los mandatos de arquitectura offline-first y seguridad de pagos. Autorizado el paso a Fase 2.",
+              "link_label": "cierre formal del entregable D12"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

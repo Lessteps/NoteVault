@@ -1,0 +1,201 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D8",
+  "deliverable": "CI/CD & Environments Strategy",
+  "purpose": "Formalizar la estrategia de control de versiones y entrega continua de software, adoptando Trunk-Based Development con ramas de ciclo corto y entornos de despliegue aislados (Local, Preview Ephemeral, Staging y Producción), definiendo el pipeline automatizado de integración continua (Typecheck, Lint, Tests y Build) y despliegue continuo Serverless en Vercel con migraciones declarativas en Supabase CLI.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Deployment Topology Decision (P5-D3) | [[PHASE_5_ARCHITECTURAL_DESIGN/3.Deployment Topology Decision/3.Deployment Topology Decision.md]] | Fuente primaria de infraestructura (Vercel Serverless + Supabase Cloud) para el CD. |\n| System Decomposition Decision (P5-D4) | [[PHASE_5_ARCHITECTURAL_DESIGN/4.System Decomposition Decision/4.System Decomposition Decision.md]] | Determina que el pipeline construye y despliega una única unidad atómica (Monolito Modular). |\n| Communication Pattern Decision (P5-D6) | [[PHASE_5_ARCHITECTURAL_DESIGN/6.Communication Pattern Decision/6.Communication Pattern Decision.md]] | Dicta la necesidad de validación estricta de tipos TypeScript (Server Actions) en el pipeline de CI. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Estrategia de Ramas y Entornos (Branching & Environments)",
+      "summary": "Establecer Trunk-Based Development con ramas efímeras y definir los cuatro tiers de entornos operativos.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Adopción de Trunk-Based Development y Tiers de Entornos",
+          "objective": "Erradicar el infierno de merges de GitFlow y proveer ambientes limpios de prueba.",
+          "input": "Equipo de 1-3 desarrolladores y requerimientos de alta cadencia de entrega.",
+          "raw_data_title": "Matriz de Entornos y Reglas de Ramificación",
+          "raw_data": "| Entorno | Rama / Trigger de Git | Infraestructura | Propósito Operativo |\n|---|---|---|---|\n| Local Development | Rama de trabajo local (`feature/*`) | Next.js Dev Server + Supabase Docker local | Desarrollo activo, pruebas unitarias y migración local |\n| Preview (Efímero) | Pull Request abierto contra `main` | Entorno Serverless efímero de Vercel | Revisión visual de UI, pruebas E2E y aprobación QA |\n| Staging | Push / Merge directo a `main` | Vercel Staging + Base de datos Supabase Staging | Pruebas de integración pre-producción con datos semilla |\n| Producción | Tag de Release o promoción manual | Vercel Production + Cluster Supabase Prod | Operación en vivo real para turistas y finqueros |",
+          "exit_label": "Estrategia de Ramas y Matriz de Entornos Formalizada",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Configuración de Reglas de Protección de Ramas y Promoción",
+              "objective": "Asegurar que la rama principal `main` sea siempre desplegable.",
+              "how_to": {
+                "steps": [
+                  "1. Designar `main` como rama troncal protegida sin commits directos.",
+                  "2. Configurar ramas de vida corta `feat/nombre` que se fusionan en menos de 48 horas.",
+                  "3. Exigir que todo PR genere automáticamente un entorno de Preview en Vercel.",
+                  "4. Establecer promoción automática a Staging y gate manual para Producción."
+                ],
+                "table_columns": [
+                  "Rama",
+                  "Duración Máxima",
+                  "Entorno Destino",
+                  "Criterio de Merge"
+                ],
+                "table_rules": [
+                  "Trunk-Based Development es mandatorio para maximizar velocidad de iteración",
+                  "Ninguna rama feature debe permanecer abierta más de 3 días",
+                  "La rama main debe estar en estado de producción permanente"
+                ],
+                "restrictions": "Prohibido el uso de ramas de release de larga duración tipo GitFlow tradicional.",
+                "done_when": "Estrategia de ramas y reglas de promoción a entornos completamente documentadas."
+              },
+              "example_title": "Reglas de Entornos D8",
+              "example": "```markdown\n## Branching Strategy:\n- Modelo: Trunk-Based Development (`main` como tronco inmutable).\n- Flujo: `feature/xyz` -> Pull Request -> Preview Deploy -> Merge a `main` -> Staging -> Prod.\n- Ambientes: Local (Docker), Preview (Vercel PR), Staging, Production.\n```",
+              "link_label": "Ramas y Entornos Validados -> Pipeline CI/CD"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Definición del Pipeline CI/CD (Pipeline Specification)",
+      "summary": "Estructurar las etapas secuenciales automáticas de Continuous Integration y Continuous Deployment.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Muro de Validaciones CI y Despliegue Continuo Serverless en Vercel",
+          "objective": "Impedir que código con errores de sintaxis, tipado o regresiones llegue a los servidores.",
+          "input": "Herramientas de testing de Fase 2 y topología Serverless de D3.",
+          "raw_data_title": "Etapas Secuenciales del Pipeline CI/CD",
+          "raw_data": "| Etapa del Pipeline | Herramienta Ejecutora | Comando / Acción | Criterio de Aprobación |\n|---|---|---|---|\n| 1. Type Checking | TypeScript Compiler | `tsc --noEmit` | 0 errores de tipado estricto entre módulos |\n| 2. Linting & Style | ESLint + Prettier | `npm run lint` | 0 violaciones de reglas de código y fronteras |\n| 3. Unit & Integration Tests | Vitest / Jest | `npm run test` | 100% de tests unitarios de Booking/Billing aprobados |\n| 4. Database Dry-Run | Supabase CLI | `supabase db push --dry-run` | Migraciones SQL aplicables sin conflictos de schema |\n| 5. Serverless Build & CD | Vercel Git Integration | `vercel build` | Artefacto compilado desplegado atómicamente |",
+          "exit_label": "Pipeline CI/CD Detallado y Validado",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Diseño del Muro de Calidad y Despliegue Automatizado",
+              "objective": "Especificar las compuertas obligatorias de compilación y entrega.",
+              "how_to": {
+                "steps": [
+                  "1. Ordenar validaciones de menor a mayor costo de cómputo (Tipado -> Lint -> Tests -> Build).",
+                  "2. Configurar el fallo prematuro (*fail-fast*): si el tipado falla, abortar el resto del pipeline.",
+                  "3. Integrar migraciones de base de datos automatizadas con Supabase CLI.",
+                  "4. Asegurar que los despliegues de Vercel utilicen Instant Rollbacks ante incidentes."
+                ],
+                "table_columns": [
+                  "Orden",
+                  "Fase",
+                  "Acción de Protección",
+                  "Tiempo Límite"
+                ],
+                "table_rules": [
+                  "Cualquier fallo en CI debe bloquear inmediatamente el botón de merge en GitHub",
+                  "Las migraciones de base de datos deben aplicarse antes de activar el nuevo código",
+                  "El tiempo total de ejecución del pipeline de CI no debe exceder 5 minutos"
+                ],
+                "restrictions": "Prohibido hacer despliegues manuales mediante comandos directos desde máquinas locales.",
+                "done_when": "Especificación del pipeline con todas sus fases y criterios de corte completada."
+              },
+              "example_title": "Etapas de CI/CD D8",
+              "example": "```yaml\n# Pipeline CI/CD Secuencial\nname: CI Pipeline\non: [pull_request, push]\njobs:\n  validate:\n    steps:\n      - run: npm run typecheck\n      - run: npm run lint\n      - run: npm test\n      - run: supabase db test\n```",
+              "link_label": "Pipeline Diseñado -> Herramientas de Automatización e IaC"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Automatización, Herramientas e IaC (Tooling & Infrastructure as Code)",
+      "summary": "Seleccionar el stack tecnológico de DevOps y definir la gestión declarativa de base de datos.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "GitHub Actions, Vercel Git Integration y Supabase CLI Migrations",
+          "objective": "Consolidar las herramientas que materializarán el pipeline sin incurrir en costos de mantenimiento.",
+          "input": "Pipeline del Step 2 y servicios de nube de D3.",
+          "raw_data_title": "Stack Tecnológico de Automatización DevOps",
+          "raw_data": "| Función DevOps | Herramienta Seleccionada | Justificación Técnica |\n|---|---|---|\n| Orquestador de CI | GitHub Actions | Integración nativa con el repositorio, runners rápidos en nube y costo cero inicial |\n| Motor de Continuous Deployment | Vercel Git Integration | Despliegue atómico instantáneo con soporte para Edge Middleware e ISR |\n| Infrastructure as Code (Database) | Supabase CLI (SQL Declarativo) | Control de versiones de tablas, RLS, triggers y funciones en `/supabase/migrations/` |\n| Gestión de Secretos de Entorno | GitHub Secrets & Vercel Project Env | Inyección segura de credenciales por tier (Local vs Staging vs Prod) |",
+          "exit_label": "Stack de Tooling DevOps Formalmente Aprobado",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Definición de Infraestructura como Código y Secretos",
+              "objective": "Garantizar reproducibilidad total del esquema de datos y variables sensibles.",
+              "how_to": {
+                "steps": [
+                  "1. Configurar GitHub Actions para correr los checks de CI en cada Pull Request.",
+                  "2. Conectar Vercel con el repositorio para despliegue automatizado por push.",
+                  "3. Establecer que toda modificación a la base de datos se haga mediante archivos SQL migratorios.",
+                  "4. Prohibir almacenar claves de API o contraseñas en el código fuente versionado."
+                ],
+                "table_columns": [
+                  "Área",
+                  "Herramienta",
+                  "Ubicación en Repo",
+                  "Seguridad"
+                ],
+                "table_rules": [
+                  "Las migraciones de base de datos deben ser idempotentes y ordenadas cronológicamente",
+                  "Las variables secretas de producción solo residen en el panel cifrado de Vercel/GitHub",
+                  "Los desarrolladores locales deben usar un archivo .env.local no versionado"
+                ],
+                "restrictions": "Prohibido modificar tablas o funciones directamente en el dashboard web de Supabase en producción.",
+                "done_when": "Herramientas de automatización e IaC documentadas con políticas de secretos."
+              },
+              "example_title": "Tooling y Migraciones D8",
+              "example": "```markdown\n## Tooling DevOps:\n- CI Runner: GitHub Actions (ubuntu-latest).\n- CD Engine: Vercel Native Deployer.\n- IaC Database: Supabase CLI (`supabase/migrations/*.sql`).\n- Secretos: Vercel Project Variables segregadas por Environment (Preview vs Prod).\n```",
+              "link_label": "Tooling Validado -> Ensamblaje D8"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de la Estrategia DevOps y Handoff (Assembly & Handoff)",
+      "summary": "Consolidar el entregable D8 y articular su impacto directo en secretos (Fase 6 D3) y scaffolding del proyecto (Fase 7 D2).",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación del Documento D8 e Implicaciones para Fase 6 D3 y Fase 7 D2",
+          "objective": "Publicar el entregable D8 como norma obligatoria de desarrollo y despliegue.",
+          "input": "Estrategia de ramas, pipeline CI/CD y stack de tooling.",
+          "raw_data_title": "Directivas de Consumo Downstream",
+          "raw_data": "| Entregable Receptor | Directiva Técnica Heredada de D8 | Impacto en el Proyecto |\n|---|---|---|\n| Fase 6 — D3 (Environment Secrets) | Estructura las variables de entorno segregadas por los 4 tiers definidos en D8 | Configuración de plantillas `.env.example` para cada ambiente |\n| Fase 7 — D2 (Project Scaffolding) | Inicializará los workflows de GitHub Actions y configuración de Vercel | Archivos `.github/workflows/ci.yml` y `vercel.json` creados en el repo |\n| D10 (ADR Consolidation) | Registra la decisión de Trunk-Based y GitHub Actions en el índice | Respaldo formal de gobernanza DevOps |",
+          "exit_label": "Entregable D8 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento Maestro D8",
+              "objective": "Consolidar el entregable D8 en formato formal para la arquitectura.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el archivo en sus 3 secciones canónicas: Metadata, DevOps & Delivery Pipeline y Consumidores.",
+                  "2. Verificar que se detallen las etapas de CI ajustadas a Next.js y Supabase.",
+                  "3. Documentar las implicaciones para Fase 6 y Fase 7.",
+                  "4. Validar el cumplimiento total de traducción al español."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Contenido",
+                  "Normativa",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe archivar formalmente las reglas de branch y despliegue",
+                  "Asegurar coherencia absoluta con la topología D3 y descomposición D4",
+                  "Verificar que las políticas de migración de base de datos sean rigurosas"
+                ],
+                "restrictions": "No admitir ambigüedades respecto a qué evento detona la promoción a producción.",
+                "done_when": "Documento D8 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Entregable D8",
+              "example": "```markdown\n# Deliverable 8 (D8): CI/CD & Environments Strategy\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n## 2. DevOps & Delivery Pipeline\n- Trunk-Based Development, 4 Entornos y GitHub Actions.\n\n## 3. Downstream Consumers (Fase 6 D3, Fase 7 D2 y D10)\n```",
+              "link_label": "Estrategia DevOps Ensamblada -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — CI/CD & Environments Strategy (D8)",
+    "markdown": "# Deliverable 8 (D8): Estrategia de CI/CD y Ambientes\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n---\n\n## 1. DevOps y Pipeline de Entrega Continua\n\n*Backlink a Fase 5:* Materializa el ciclo de vida del código para la infraestructura Serverless adoptada en el ADR-001 (`[[PHASE_5_ARCHITECTURAL_DESIGN/3.Deployment Topology Decision/3.Deployment Topology Decision.md]]`) y la base de código unificada del Monolito Modular (`[[PHASE_5_ARCHITECTURAL_DESIGN/4.System Decomposition Decision/4.System Decomposition Decision.md]]`).\n\n### 1.1 Estrategia de Ramas (Branching)\n- **Modelo Adoptado:** **Trunk-Based Development**. Existe una única rama central inmutable: `main`.\n- **Ciclo de Ramas:** Los ingenieros crean ramas de ciclo corto (`feat/nombre-feature` o `fix/bug`) que se fusionan a `main` en menos de 48 horas mediante Pull Requests evaluados.\n- **Prohibición de GitFlow:** Quedan vetadas las ramas de release de larga duración para evitar bloqueos y conflictos masivos de merge (*merge hell*).\n\n### 1.2 Tiers de Entornos Operativos\n| Entorno | Disparador de Git | Infraestructura | Rol en el Ciclo de Vida |\n|---|---|---|---|\n| **Local Development** | Rama local | Localhost + Supabase Docker CLI | Entorno de desarrollo local, pruebas unitarias y creación de migraciones. |\n| **Preview (Efímero)** | Pull Request abierto | Vercel Preview Deployments | Instancia aislada y efímera generada por cada PR para revisión visual de UI y testing. |\n| **Staging** | Merge a `main` | Vercel Staging + Supabase Staging DB | Entorno pre-productivo con datos semilla anonimizados para pruebas de integración finales. |\n| **Producción** | Gate manual / Tag | Vercel Production + Supabase Cloud Prod | Entorno en vivo de alta disponibilidad para turistas y anfitriones. |\n\n---\n\n## 2. Definición del Pipeline Automatizado (CI/CD)\n\n```mermaid\ngraph LR\n    subgraph Continuous_Integration [CI: GitHub Actions Runner]\n        Typecheck[\"1. Type Checking (`tsc --noEmit`)\"]\n        Lint[\"2. Linting & Style (`eslint`)\"]\n        Tests[\"3. Unit & Integration Tests (`vitest`)\"]\n        DB_Dry[\"4. Supabase DB Validation (`db test`)\"]\n    end\n    subgraph Continuous_Deployment [CD: Vercel Native Deployer]\n        Build[\"5. Build Serverless (`next build`)\"]\n        Deploy[\"6. Atomic Deployment (Edge CDN)\"]\n    end\n\n    Typecheck --> Lint\n    Lint --> Tests\n    Tests --> DB_Dry\n    DB_Dry -->|Pasa Todos los Checks| Build\n    Build --> Deploy\n```\n\n- **Compuertas de Calidad (Fail-Fast):** Si el tipado estricto o un solo test falla, el pipeline se aborta inmediatamente y el PR queda bloqueado contra la rama `main`.\n- **Despliegues Atómicos:** Vercel despliega el código compilado sin tiempo de inactividad (*zero-downtime*) y soporta reversión instantánea (*Instant Rollback*) en menos de 10 segundos.\n- **Infraestructura como Código para Base de Datos:** Todas las tablas, políticas RLS y funciones se versionan en `/supabase/migrations/*.sql` y se aplican automáticamente mediante Supabase CLI en staging y producción.\n\n---\n\n## 3. Implicaciones para Entregables Downstream\n\n- **Hacia Fase 6 — D3 (Configuration & Environment Secrets):** Estructura la segregación de variables de entorno (`.env.local`, `.env.staging`, `.env.production`) requeridas para Next.js y Supabase.\n- **Hacia Fase 7 — D2 (Project Scaffolding & Setup):** Inicializará los archivos de configuración `.github/workflows/ci.yml`, `vercel.json` y los hooks de pre-commit (`husky` / `lint-staged`).\n- **Hacia D10 (ADR Consolidation):** Registra formalmente el acuerdo de Trunk-Based Development y GitHub Actions en el compendio arquitectónico."
+  }
+}

@@ -1,6 +1,8 @@
 # ── Build artifacts ──────────────────────────────────────────────
 build/
 dist/
+# WEB module engine (python tools/build_web_runtime.py)
+/web_runtime/
 *.spec.bak
 # Compiled thin launcher (rebuilt with: python -m PyInstaller ...)
 SDD_Studio.exe

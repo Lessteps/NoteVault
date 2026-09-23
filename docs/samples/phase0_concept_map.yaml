@@ -1,0 +1,32 @@
+# Golden sample for the concept-map generator (see PLAN_CONCEPT_MAP_GENERATOR.md).
+# Build with:  python -m notevault_app.core.canvas_builder \
+#                  docs/samples/phase0_concept_map.yaml out.canvas
+title: "Phase 0 — Problem Recognition"
+layout: radial
+defaults:
+  card_width: 240
+nodes:
+  - id: root
+    title: "Problem Statement"
+    body: "Phase 0 - D1: define the operational failure, qualitative and causal."
+    role: root
+    color: "6"
+  - id: who
+    title: "Affected Group"
+    body: "Who directly suffers the failure in their real operational context."
+    color: "4"
+  - id: when
+    title: "Condition / Trigger"
+    body: "The real-world event or process breakdown that triggers the failure."
+    color: "2"
+  - id: what
+    title: "Observable Consequence"
+    body: "The immediate, auditable result produced after the trigger."
+    color: "3"
+  - id: cost
+    title: "Downstream Effect"
+    body: "The final collateral damage: financial, operational, time or reputational."
+    color: "1"
+edges:
+  - from: root
+    to: [who, when, what, cost]

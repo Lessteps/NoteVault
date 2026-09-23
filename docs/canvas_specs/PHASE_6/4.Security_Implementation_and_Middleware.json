@@ -1,0 +1,152 @@
+{
+  "phase": "PHASE 6: TECHNICAL DESIGN",
+  "deliverable_code": "D4",
+  "deliverable": "Security Implementation & Middleware",
+  "purpose": "Definir formalmente la implementación de seguridad a nivel de middleware perimetral en Next.js (Edge), especificando el algoritmo de hashing (bcrypt con saltRounds=10 en Supabase GoTrue), el cifrado en reposo (AES-256 en disco + RLS en Postgres), el ciclo de vida y claims del token JWT con transporte estricto en Cookies HttpOnly/Secure/SameSite=Lax (erradicando localStorage contra XSS), y la lógica completa de AuthGuard (401) y RoleGuard (403) con revocación activa de sesiones.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Authorization & Security Matrix (P4-D11) | [[PHASE_4_SYSTEM_MODELING/11.Authorization and Security/11.Authorization and Security.md]] | Fuente primaria de roles (tourist, host, admin), permisos por ruta y NFRs de seguridad. |\n| Non-Functional Requirements (P3-D6) | [[PHASE_3_REQUIREMENTS_ENGINEERING/6.Non-Functional Requirements/6.Non-Functional Requirements.md]] | Define requisitos de protección de datos personales y ausencia de cifrado simétrico en código. |\n| Stack Decision (P2-D3) | [[PHASE_2_PROJECT_KICKOFF/3.Stack Decision/3.Stack Decision.md]] | Determina el framework Next.js App Router con SSR exigiendo Cookies HttpOnly. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Especificación de Contraseñas y Cifrado (Password & Encryption Specs)",
+      "summary": "Establecer los algoritmos criptográficos para hashing de contraseñas y delimitar el cifrado de datos en reposo.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Definición de Hashing Criptográfico y Protección de PII",
+          "objective": "Garantizar protección contra ataques offline de contraseñas y definir la salvaguarda de PII sensible.",
+          "input": "NFRs de seguridad de Fase 3 (D6) y entidades con datos sensibles de Fase 4 (D11).",
+          "raw_data_title": "Matriz de Parámetros Criptográficos y Protección de Datos",
+          "raw_data": "| Dimensión de Seguridad | Tecnología / Algoritmo | Parámetro de Coste | Ámbito de Protección |\n|---|---|---|---|\n| Hashing de Contraseñas | `bcrypt` (Supabase GoTrue) | `saltRounds=10` | Tablas de autenticación; resistencia contra ataques de fuerza bruta offline |\n| Cifrado de PII en Reposo | AES-256 (Infraestructura Cloud) | Nativo de volumen EBS/PostgreSQL | Protección física del disco en AWS/Supabase Cloud |\n| Protección Lógica de PII | Row Level Security (RLS) | Políticas por usuario | `document_number`, `bank_account_number`, `phone_number` |\n| Cifrado a Nivel de Aplicación | No Aplica | N/A | Exclusión deliberada: evita sobrecoste de latencia y gestión compleja de KMS |",
+          "exit_label": "Directrices Criptográficas Formalizadas",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Formalización de Parámetros Criptográficos",
+              "objective": "Documentar la especificación de hashing y justificar la ausencia de cifrado manual en código.",
+              "how_to": {
+                "steps": [
+                  "1. Fijar bcrypt con factor de coste 10 como estándar no negociable.",
+                  "2. Declarar la delegación del hashing al motor Supabase GoTrue.",
+                  "3. Documentar la protección física mediante AES-256 en disco.",
+                  "4. Establecer RLS como mecanismo de blindaje lógico para números de documento y cuentas."
+                ],
+                "table_columns": [
+                  "Aspecto",
+                  "Algoritmo",
+                  "Factor de Coste",
+                  "Justificación"
+                ],
+                "table_rules": [
+                  "Prohibido usar algoritmos rápidos como MD5 o SHA-256 para contraseñas de usuarios",
+                  "Debe aclararse explícitamente que no se utilizará cifrado simétrico en código de aplicación",
+                  "El acceso a PII sensible debe delegarse a políticas RLS en base de datos"
+                ],
+                "restrictions": "Prohibido almacenar contraseñas en texto claro o con hashes simples sin salt.",
+                "done_when": "Especificación de cifrado documentada con parámetros técnicos completos."
+              },
+              "example_title": "Especificación de Cifrado D4",
+              "example": "```markdown\n## Especificación de Cifrado\n- **Algoritmo de Hashing de Contraseñas:** `bcrypt` (saltRounds=10, manejado nativamente por Supabase Auth).\n- **Cifrado de PII en Reposo a nivel aplicación:** No aplica.\n- **Seguridad en Reposo a nivel infraestructura:** AES-256 (Garantizado por el proveedor Cloud Supabase/AWS).\n- **Campos PII Afectados:** `document_number`, `bank_account_number`, `phone_number` protegidos por RLS.\n```",
+              "link_label": "Criptografía Formalizada -> Ciclo de Vida de Token"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Ciclo de Vida de Token y Sesión (Token & Session Lifecycle)",
+      "summary": "Definir los claims del JWT, tiempos de expiración y el almacenamiento en Cookies HttpOnly para erradicar XSS.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Estructura de Claims JWT y Transporte Seguro en Cookies",
+          "objective": "Asegurar que los tokens contengan claims mínimos sin PII y viajen blindados en cookies de servidor.",
+          "input": "Matriz de Autorización de Fase 4 (D11) y arquitectura SSR de Next.js.",
+          "raw_data_title": "Matriz de Configuración del JWT y Banderas de Transporte",
+          "raw_data": "| Parámetro de Sesión | Especificación Técnica | Valor / Configuración | Propósito de Seguridad |\n|---|---|---|---|\n| Algoritmo de Firma | `HS256` (HMAC-SHA256) | Firma con `JWT_SECRET` | Verificación criptográfica rápida y confiable |\n| Duración AccessToken | Vida Corta | 1 Hora | Minimiza ventana de exposición si el token se intercepta |\n| Duración RefreshToken | Sesión Prolongada | 7 Días | Balance de UX sin obligar a re-login continuo |\n| Mecanismo de Almacenamiento | Cookies del Navegador | `sb-[project]-auth-token` | Erradica vulnerabilidad XSS al no usar `localStorage` |\n| Banderas de Seguridad | `HttpOnly`, `Secure`, `SameSite=Lax` | Cookies estrictas | Inaccesible a JavaScript; solo viaja en HTTPS |\n| Contenido del Payload JWT | `sub`, `email`, `custom_role`, `exp` | Claims ligeros | Cero PII bancario o sensible en el token decodificable |",
+          "exit_label": "Contrato de Tokens y Sesión Formalizado",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Especificación de Formato JWT y Banderas de Transporte",
+              "objective": "Redactar el payload JSON canónico y fijar las directrices de transporte en cookies.",
+              "how_to": {
+                "steps": [
+                  "1. Definir payload con campos aud, exp, sub, email y custom_role.",
+                  "2. Establecer expiración de 1 hora para AccessToken y 7 días para RefreshToken.",
+                  "3. Prohibir expresamente el uso de localStorage para guardar tokens de sesión.",
+                  "4. Configurar banderas HttpOnly, Secure y SameSite=Lax en la cookie de sesión."
+                ],
+                "table_columns": [
+                  "Claim / Bandera",
+                  "Tipo",
+                  "Valor Ejemplo",
+                  "Regla de Seguridad"
+                ],
+                "table_rules": [
+                  "Ningún token puede almacenar números de documento, cuentas bancarias ni contraseñas",
+                  "El transporte en frontend debe realizarse mediante Cookies HttpOnly obligatoriamente",
+                  "La bandera Secure debe estar activa para rechazar conexiones HTTP no cifradas"
+                ],
+                "restrictions": "Prohibido almacenar tokens de sesión en Web Storage (localStorage/sessionStorage).",
+                "done_when": "Payload JWT documentado junto con las banderas de transporte en cookies."
+              },
+              "example_title": "Payload y Ciclo de Vida D4",
+              "example": "```json\n{\n  \"aud\": \"authenticated\",\n  \"exp\": 1735690500,\n  \"sub\": \"b8a9f...uuid...\",\n  \"email\": \"turista@example.com\",\n  \"user_metadata\": {\n    \"custom_role\": \"tourist\"\n  },\n  \"role\": \"authenticated\"\n}\n```",
+              "link_label": "Tokens Especificados -> Lógica de Middleware"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Lógica de Middleware y Revocación (Middleware Logic Flow)",
+      "summary": "Codificar el pseudocódigo del Edge Middleware implementando AuthGuard (401), RoleGuard (403) y revocación activa.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Arquitectura de AuthGuard, RoleGuard y Validación Activa",
+          "objective": "Blindar las rutas del servidor con inspección activa en cada request antes de tocar la base de datos.",
+          "input": "Matriz de roles de Fase 4 (D11), Cookies de Step 2 y endpoints de webhooks.",
+          "raw_data_title": "Matriz de Decisiones y Respuestas del Middleware",
+          "raw_data": "| Componente Middleware | Condición de Evaluación | Respuesta / Código HTTP | Acción Operativa |\n|---|---|---|---|\n| AuthGuard (Cookie Ausente) | No existe token en cookie | HTTP 401 (API) o HTTP 302 (Web) | Redirección a `/login` o bloqueo API |\n| AuthGuard (Revocación Activa) | `supabase.auth.getUser()` falla en BD | HTTP 401 Unauthorized | Invalida sesión si hubo logout en otro equipo |\n| RoleGuard (Host no autorizado) | Ruta `/host/*` y rol !== 'host'/'admin' | HTTP 403 Forbidden | Bloquea a turistas que intenten acceder al panel host |\n| RoleGuard (Admin no autorizado) | Ruta `/admin/*` y rol !== 'admin' | HTTP 403 Forbidden | Bloquea acceso a administración central |\n| Webhook Guard (Wompi) | Firma SHA-256 no coincide con secret | HTTP 403 Forbidden | Previene inyección de pagos falsificados |",
+          "exit_label": "Pseudocódigo de Middleware Edge Formalizado",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Codificación del Pseudocódigo de Seguridad Edge",
+              "objective": "Escribir la secuencia lógica detallada para `middleware.ts` distinguiendo 401 y 403.",
+              "how_to": {
+                "steps": [
+                  "1. Interceptar peticiones en el Edge antes de procesar páginas o APIs.",
+                  "2. Extraer cookie de sesión y ejecutar validación activa contra Supabase.",
+                  "3. Responder HTTP 401 o redirigir a login si la autenticación falla.",
+                  "4. Evaluar permisos por rol en RoleGuard y responder HTTP 403 si el rol no coincide.",
+                  "5. Validar firma HMAC de webhooks externos antes de autorizar ejecución."
+                ],
+                "table_columns": [
+                  "Paso",
+                  "Guardián",
+                  "Evaluación",
+                  "Código de Retorno"
+                ],
+                "table_rules": [
+                  "El middleware debe diferenciar claramente entre 401 (no autenticado) y 403 (no autorizado)",
+                  "La validación debe ser activa para permitir revocación inmediata de sesiones",
+                  "Los webhooks externos deben verificar firma criptográfica y omitir guardián de cookies"
+                ],
+                "restrictions": "Prohibido responder 401 cuando el usuario está autenticado pero carece de permisos de rol.",
+                "done_when": "Pseudocódigo completo de AuthGuard y RoleGuard documentado y validado."
+              },
+              "example_title": "Pseudocódigo Middleware D4",
+              "example": "```text\n1. Interceptar Request en Edge.\n2. Extraer cookie `sb-[project]-auth-token`.\n3. Validar sesión: await supabase.auth.getUser()\n4. IF sesión inválida: RETURN 401 Unauthorized (o 302 -> /login).\n5. IF ruta inicia con `/host/` AND rol !== 'host' AND rol !== 'admin':\n   RETURN 403 Forbidden.\n6. RETURN next().\n```",
+              "link_label": "Middleware Codificado -> Entregable D4"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverable_output": "# Deliverable 4 (D4): Security Implementation & Middleware\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 6 — Technical Design\n**Estado:** Approved\n\n*Backlink a Fase 4:* Este entregable implementa físicamente los permisos y barreras teóricas definidas en la matriz de autorización `[[PHASE_4_SYSTEM_MODELING/11.Authorization_and_Security/example_output_d11_authorization_matrix.md]]`.\n\n---\n\n## 2. Especificación de Criptografía y Token\n\n### 2.1 Cifrado y Hashing\n- **Hashing de Contraseñas:** Se utilizará **bcrypt** con factor de coste `saltRounds=10`. Esto es manejado de forma nativa por el motor de identidad del BaaS (Supabase GoTrue), ofreciendo resistencia comprobada contra ataques de fuerza bruta offline.\n- **Cifrado de PII en Reposo (Encryption at Rest):** No se desarrollará cifrado simétrico adicional a nivel de código de aplicación (ej. cifrar manualmente con llaves AWS KMS antes del `INSERT`). Nos apoyaremos en el cifrado AES-256 a nivel de volumen de disco físico que provee la infraestructura (AWS/Supabase) y protegeremos el acceso lógico a la PII (`bank_account_number`, `document_number`) utilizando PostgreSQL Row Level Security (RLS) en el diseño de base de datos (Fase 6 D2).\n\n### 2.2 Ciclo de Vida del Token (Session Lifecycle)\n- **Proveedor:** JWT generado asimétricamente por Supabase Auth, firmado mediante `HS256`.\n- **Estrategia de Almacenamiento Frontend:** Dado el framework Next.js con soporte Server-Side Rendering (SSR), el token se transmitirá exclusivamente mediante **Cookies** con los flags `HttpOnly=true`, `Secure=true` y `SameSite=Lax`. **Está terminantemente prohibido almacenar tokens en `localStorage`**, eliminando así la superficie de ataque para inyecciones de scripts (XSS).\n- **Tiempos de Expiración:**\n  - `AccessToken` (Vida corta): 1 hora.\n  - `RefreshToken` (Sesión prolongada): 7 días.\n\n---\n\n## 3. Pseudocódigo / Lógica de Middleware (Next.js Edge)\n\nEl archivo central de seguridad (Next.js `middleware.ts`) se ejecutará en la capa *Edge* antes de que cualquier request toque la base de datos o el frontend renderizado. Contiene dos barreras:\n\n### 3.1 Estrategia de Revocación y AuthGuard (Identidad)\nValidación *Activa*. No nos confiaremos de la lectura en memoria del JWT. Usaremos la librería `supabase/ssr` para verificar contra la BBDD si la sesión sigue activa, permitiendo la revocación instantánea (ej. si el usuario cambia la contraseña en otro equipo).\n\n```text\n1. INICIO: Request interceptado en el Edge de Vercel/Next.js.\n2. Extraer cookie `sb-[project]-auth-token`.\n3. Validar sesión: await supabase.auth.getUser()\n4. IF sesión es INVÁLIDA (No hay token, expirado o revocado activamente):\n     5. IF ruta es `/api/*` (Llamada REST interna):\n          6. RETURN HTTP 401 Unauthorized.\n     7. IF ruta es protegida web (`/host/*`, `/guest/*`, `/admin/*`):\n          8. RETURN HTTP 302 Redirection -> `/login`.\n9. ELSE (Identidad confirmada):\n     10. Extraer `user.user_metadata.custom_role` (tourist | host | admin).\n     11. Pasar el control a RoleGuard.\n```\n\n### 3.2 RoleGuard (Autorización)\nEvalúa los permisos según la Matriz de la Fase 4 D11.\n\n```text\n12. INICIO ROLEGUARD.\n13. Determinar el contexto de la ruta solicitada.\n14. IF ruta inicia con `/host/`:\n      15. IF rol_del_usuario !== 'host' AND !== 'admin':\n          16. RETURN HTTP 403 Forbidden. (No tiene permiso de propietario)\n17. IF ruta inicia con `/admin/`:\n      18. IF rol_del_usuario !== 'admin':\n          19. RETURN HTTP 403 Forbidden.\n20. IF ruta es Webhook Externo (ej. `/api/wompi-webhook`):\n      21. (Bypass de AuthGuard regular)\n      22. Validar firma SHA-256 contra el body con `WOMPI_WEBHOOK_SECRET` de D3.\n      23. IF firma NO COINCIDE:\n          24. RETURN HTTP 403 Forbidden.\n25. RETURN next() (Permitir el paso al Server Action o la página).\n```\n\n---\n\n## 4. Downstream Consumers\nEste entregable blinda al sistema contra intrusiones antes del inicio de código:\n- **Phase 6 — D7 (API Contracts):** OpenApi.yml utilizará el requerimiento de Cookie de Sesión como el esquema de seguridad global estándar.\n- **Phase 7 — D7 (Security & Middleware Implementation):** Será el manual directo de codificación del desarrollador encargado de escribir el archivo maestro `middleware.ts` del repositorio Next.js."
+}

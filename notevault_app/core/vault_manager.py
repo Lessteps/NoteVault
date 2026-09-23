@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Optional
 
 from . import vault_format
+from .attachments import ATTACHMENTS_DIR
 
 
 class Note:
@@ -136,7 +137,12 @@ MAX_SCAN_NOTES = 4000
 
 
 def is_ignored_dir(path: Path) -> bool:
-    return path.name in IGNORED_DIRS or path.name.startswith(".")
+    # `attachments/` holds media (and copies of notes moved into a note's own
+    # attachments); it is never a note/canvas container, so it must never be
+    # walked by the index — otherwise those copies show up as phantom notes and
+    # duplicate backlinks.
+    return (path.name in IGNORED_DIRS or path.name.startswith(".")
+            or path.name == ATTACHMENTS_DIR)
 
 
 # Name of the optional, user-editable file (inside the data folder) that lists
@@ -245,7 +251,6 @@ class VaultManager:
         self.vault_root = vault_root
         self.vault_root.mkdir(parents=True, exist_ok=True)
         migrate_vault(self.vault_root)
-        self._backlink_index: dict[str, list[Path]] = {}
         self._excluded_top: set[str] = set()
         self._excluded_stamp = None
         self._refresh_excluded()
@@ -303,6 +308,35 @@ class VaultManager:
         """Every note path in the vault, sorted. Walks directories but reads
         no file, which is what the text index needs to spot new notes."""
         return sorted(self._walk_note_paths(limit))
+
+    def canvas_paths(self, limit: int = MAX_SCAN_NOTES) -> list[Path]:
+        """Every .canvas path in the vault, sorted."""
+        self._refresh_excluded()
+        out = []
+        stack = [self.vault_root]
+        while stack:
+            folder = stack.pop()
+            try:
+                entries = list(folder.iterdir())
+            except (OSError, ValueError):
+                continue
+            for entry in entries:
+                try:
+                    if entry.is_dir():
+                        if is_ignored_dir(entry) or self._is_excluded_top(entry):
+                            continue
+                        if entry.parent == self.vault_root and is_reserved(entry, self.vault_root):
+                            continue
+                        stack.append(entry)
+                    elif entry.suffix.lower() == ".canvas":
+                        if is_reserved(entry, self.vault_root):
+                            continue
+                        out.append(entry)
+                        if len(out) >= limit:
+                            return sorted(out)
+                except (OSError, ValueError):
+                    continue
+        return sorted(out)
 
     def all_notes(self, limit: int = MAX_SCAN_NOTES) -> list:
         return [Note(p, self.vault_root) for p in self.note_paths(limit)]
@@ -431,54 +465,70 @@ class VaultManager:
 
     # ── Backlinks ────────────────────────────────────────────────────────
 
-    def rebuild_backlinks(self):
-        self._backlink_index = {}
-        for note in self.all_notes():
-            for link in note.wikilinks:
-                clean = link.split("#")[0].strip().lower()
-                stem = Path(clean).stem.lower()
-                name = Path(clean).name.lower()
-                for key in {clean, stem, name}:
-                    if key:
-                        self._backlink_index.setdefault(key, []).append(note.path)
-
     def get_backlinks(self, note: Note) -> list[Note]:
-        self.rebuild_backlinks()
-        keys = {note.title.lower(), note.path.name.lower()}
-        try:
-            rel = note.path.relative_to(self.vault_root).as_posix().lower()
-            keys.add(rel)
-            keys.add(Path(rel).with_suffix("").as_posix().lower())
-        except Exception:
-            pass
-        matched_paths = set()
-        for k in keys:
-            for p in self._backlink_index.get(k, []):
-                if p != note.path:
-                    matched_paths.add(p)
-        return [Note(p, self.vault_root) for p in matched_paths]
+        """Notes that link to *note* via a ``[[wikilink]]``.
+
+        Delegates to :meth:`NotesService.mentions` so there is a single,
+        index-backed backlink implementation — one that matches by file name,
+        vault path, frontmatter ``title`` and ``aliases``, and treats spaces and
+        underscores as interchangeable, exactly like Obsidian. The old private
+        ``_backlink_index`` re-read every note from disk on each call and missed
+        all of those cases.
+        """
+        from .notes_service import NotesService
+        linked, _ = NotesService(self).mentions(note)
+        seen, out = set(), []
+        for m in linked:
+            if m.path not in seen and m.path != note.path:
+                seen.add(m.path)
+                out.append(Note(m.path, self.vault_root))
+        return out
 
     # ── Resolve wikilink ─────────────────────────────────────────────────
 
     def resolve_link(self, link_text: str) -> Optional[Note]:
-        """Find a note by title (case-insensitive, partial match ok)."""
-        clean = link_text.split("#")[0].split("|")[0].strip()
-        target = clean.lower()
-        target_stem = Path(clean).stem.lower()
-        target_name = Path(clean).name.lower()
+        """Resolve a ``[[wikilink]]`` target to a note the way Obsidian does.
 
+        Priority: an exact vault path, then an exact match against any note's
+        file name, frontmatter ``title`` or ``alias`` (with space/underscore
+        equivalence). A partial title match is used only as a last resort and
+        only when it is unambiguous, so ``[[Plan]]`` never silently opens
+        ``Planning_Doc`` when a note actually named ``Plan`` exists.
+        """
+        clean = link_text.split("#")[0].split("|")[0].strip()
+        if not clean:
+            return None
+
+        # Exact vault path first: [[folder/Note.md]] and [[folder/Note]].
         rel_candidate = self.vault_root / clean
         if rel_candidate.is_file():
             return Note(rel_candidate, self.vault_root)
         if rel_candidate.with_suffix(".md").is_file():
             return Note(rel_candidate.with_suffix(".md"), self.vault_root)
 
-        for note in self.all_notes():
-            if note.title.lower() in (target, target_stem) or note.path.name.lower() in (target, target_name):
+        from .notes_service import link_identifiers, _norm
+        from .vault_index import VaultIndex
+
+        target = clean.lower()
+        target_forms = {target, _norm(target),
+                        Path(target).name.lower(), _norm(Path(target).name.lower()),
+                        Path(target).stem.lower(), _norm(Path(target).stem.lower())}
+        target_forms.discard("")
+
+        entries = VaultIndex.for_vault(self).notes()
+
+        for entry in entries:
+            note = Note(entry.path, self.vault_root)
+            ids, _needles = link_identifiers(note, self.vault_root, entry.text)
+            if target_forms & ids:
                 return note
-        for note in self.all_notes():
-            if target_stem and target_stem in note.title.lower():
-                return note
+
+        # Unambiguous partial file-name match as a last resort.
+        stem = Path(clean).stem.lower()
+        if stem:
+            matches = [e for e in entries if stem in e.path.stem.lower()]
+            if len(matches) == 1:
+                return Note(matches[0].path, self.vault_root)
         return None
 
     # ── Search ───────────────────────────────────────────────────────────

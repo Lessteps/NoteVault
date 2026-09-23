@@ -551,6 +551,42 @@ Lista de rutas relativas a la raíz de la vault, con `/` como separador:
 ["1.PERSONAL/3.Exercise/Ejercicio.md"]
 ```
 
+## Web
+
+El navegador integrado (módulo WEB, solo escritorio) guarda en `.notevault/web/`
+lo que debe viajar con la vault. Las cookies, las sesiones iniciadas y la caché
+**no** van aquí: viven en el perfil local `~/.notevault/web_profile` de cada equipo.
+
+### `.notevault/web/marcadores.json`
+
+```json
+[{"id": "a1b2c3d4e5f6", "title": "Qt docs", "url": "https://doc.qt.io", "created": "2026-09-23T10:00"}]
+```
+
+`folder` es opcional. El cliente móvil conserva el archivo sin tocarlo.
+
+### `.notevault/web/restricciones.json`
+
+```json
+{"enabled": true, "mode": "blocklist",
+ "blocked_domains": ["tiktok.com"], "blocked_patterns": ["youtube.com/shorts"],
+ "allowed_domains": [], "daily_limits": {"youtube.com": 30}, "confirm_to_relax": false}
+```
+
+- `mode`: `blocklist` (todo permitido salvo lo bloqueado) o `allowlist` (modo enfoque: solo `allowed_domains`).
+- Un dominio cubre sus subdominios (`youtube.com` bloquea `m.youtube.com`).
+- `blocked_patterns` son fragmentos de la URL, en minúsculas.
+- `daily_limits`: minutos por día y dominio; se mide con `uso/`.
+- `confirm_to_relax`: si es `true`, aflojar cualquier regla pide escribir «quiero desbloquear».
+
+### `.notevault/web/historial/AAAA/MM/AAAA-MM-DD.json`
+
+Lista de visitas del día: `{"time": "HH:MM:SS", "url": ..., "title": ...}`, máximo 2000.
+
+### `.notevault/web/uso/AAAA/MM/AAAA-MM-DD.json`
+
+Segundos de uso por host ese día, con claves ordenadas: `{"youtube.com": 1260}`.
+
 ## Adjuntos
 
 Una imagen o un video que se pega o arrastra dentro de una nota se **copia** a

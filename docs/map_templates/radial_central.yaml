@@ -1,0 +1,21 @@
+# name: Radial (idea central)
+layout: radial
+defaults:
+  card_width: 240
+nodes:
+  - id: root
+    title: "Idea central"
+    body: "Describe el concepto principal."
+    role: root
+    color: "6"
+  - id: a
+    title: "Concepto 1"
+  - id: b
+    title: "Concepto 2"
+  - id: c
+    title: "Concepto 3"
+  - id: d
+    title: "Concepto 4"
+edges:
+  - from: root
+    to: [a, b, c, d]

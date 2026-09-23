@@ -1,0 +1,409 @@
+{
+  "phase": "Phase 1",
+  "deliverable_code": "D1",
+  "deliverable": "User Profile (Perfil de Usuario)",
+  "purpose": "Este primer entregable de la Fase 1 (Early Viability) funciona como un escáner del comportamiento humano y del mercado real. Su objetivo principal es modelar arquetipos de usuarios basados en contacto y observación directa comprobables con los afectados, erradicando los 'User Personas' ficticios basados en suposiciones no validadas.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_problem_statement]] | Define al \"Grupo Afectado\" (P0-D1). |\n| [[example_output_impact_estimate]] | Provee las métricas y frecuencia estimada del problema (P0-D3). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Contacto Directo y Observación Cruda",
+      "summary": "Extraer el comportamiento real del usuario in-situ prevaleciendo la observación directa sobre la entrevista verbal.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Confirmar pertenencia al grupo afectado",
+          "objective": "Verificar que cada informante pertenece al Grupo Afectado declarado en P0-D1.",
+          "input": "Grupo Afectado de [[example_output_problem_statement]] (P0-D1).",
+          "raw_data_title": "Grupo Afectado P0-D1",
+          "raw_data": "Grupo Afectado P0-D1: Anfitriones rurales informales y turistas vacacionales concurrentes.",
+          "exit_label": "PERTENENCIA VERIFICADA → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Verificación de grupo afectado",
+              "objective": "Confirmar si cada informante pertenece al grupo empíricamente afectado o descartarlo.",
+              "how_to": {
+                "steps": [
+                  "Consultar la definición del Grupo Afectado establecida en P0-D1.",
+                  "Comprobar el perfil y rol operativo real del informante candidato.",
+                  "Si no pertenece al grupo afectado, descartar al informante y registrar el motivo.",
+                  "Si pertenece, registrar la concordancia formal y autorizar la observación."
+                ],
+                "table_columns": "Informante | Rol Operativo Real | Grupo P0-D1 Correspondiente | Verificación",
+                "table_rules": "Una fila por informante candidato evaluando su pertenencia.",
+                "restrictions": [
+                  "Solo continuar con informantes que pertenezcan al grupo afectado de P0-D1.",
+                  "Descartar sujetos que no sufran el dolor de forma directa."
+                ],
+                "done_when": "Todos los informantes evaluados y pertenencia validada."
+              },
+              "example_title": "Verificación de Pertenencia",
+              "example": "Carlos M. es propietario de finca turística rural → Coincide con Grupo Afectado P0-D1: Anfitriones rurales informales. ✅\nMariana G. es viajera vacacional frecuente → Coincide con Demanda B2C en P0-D1. ✅",
+              "link_label": "informantes validados van a flujo actual (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Pedir descripción del flujo actual",
+          "objective": "Solicitar al informante que describa cómo ejecuta hoy la tarea central sin mencionar soluciones futuras.",
+          "input": "Informantes validados del Sub-paso 1.1.",
+          "raw_data_title": "Relato Verbal del Informante",
+          "raw_data": "Informante reporta verbalmente: 'responder una consulta me toma 5 minutos'.",
+          "exit_label": "RELATO VERBAL REGISTRADO → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Registro de descripción verbal",
+              "objective": "Registrar textualmente las acciones y tiempos que el informante reporta de forma verbal.",
+              "how_to": {
+                "steps": [
+                  "Pedir al informante que narre paso a paso su procedimiento actual.",
+                  "Prohibir estrictamente sugerir tecnologías, herramientas o soluciones a futuro.",
+                  "Anotar literalmente los pasos reportados y los tiempos que el usuario cree tardar.",
+                  "Marcar los datos como declaraciones verbales preliminares."
+                ],
+                "table_columns": "Informante | Tarea Declarada | Procedimiento Verbal | Tiempo Reportado",
+                "table_rules": "Una fila por informante con sus afirmaciones verbales.",
+                "restrictions": [
+                  "No inducir respuestas ni mencionar soluciones.",
+                  "Registrar la voz del usuario sin corregirla."
+                ],
+                "done_when": "Descripción verbal registrada sin sesgo de solución."
+              },
+              "example_title": "Descripción Verbal",
+              "example": "- **Carlos M. (Anfitrión):** Dice: \"responder una consulta me toma 5 minutos\".\n- **Mariana G. (Turista):** Dice: \"escribo por WhatsApp a varias fincas y espero que me confirmen tarifa y disponibilidad\".",
+              "link_label": "declaraciones van a observación in-situ (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Observar físicamente o mediante task-walkthrough",
+          "objective": "Observar y cronometrar la ejecución real del flujo en el entorno natural del informante.",
+          "input": "Procedimiento verbal del Sub-paso 1.2 y entorno del usuario.",
+          "raw_data_title": "Datos de Observación In-Situ",
+          "raw_data": "Carlos M. abre 3 chats de WhatsApp, consulta un cuaderno de espiral y tarda 40 minutos en confirmar una fecha.",
+          "exit_label": "OBSERVACIÓN CRONOMETRADA → 1.4",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Cronometraje y registro observable",
+              "objective": "Medir tiempos reales y registrar herramientas, interrupciones y fricciones.",
+              "how_to": {
+                "steps": [
+                  "Acompañar al informante en su entorno operativo real durante la ejecución de la tarea.",
+                  "Cronometrar el tiempo exacto transcurrido de principio a fin.",
+                  "Registrar cada herramienta física o digital empleada (cuaderno, chats, llamadas).",
+                  "Anotar interrupciones, bloqueos y fricciones operativas comprobadas."
+                ],
+                "table_columns": "Informante | Tarea Ejecutada | Herramientas Utilizadas | Tiempo Cronometrado | Fricciones",
+                "table_rules": "Una fila por sesión de observación in-situ o walkthrough.",
+                "restrictions": [
+                  "Observación en entorno real, nunca simulaciones artificiales.",
+                  "Anotar solo hechos empíricamente observables."
+                ],
+                "done_when": "Flujo observado y cronometrado forensemente."
+              },
+              "example_title": "Observación In-Situ",
+              "example": "- **Observación Carlos M.:** Abre 3 chats de WhatsApp diferentes, busca un cuaderno físico de espiral, coteja transferencias bancarias y tarda 40 minutos en confirmar una sola fecha de disponibilidad.\n- **Task Walkthrough Mariana G.:** Mensajería manual en WhatsApp + transferencia bancaria a cuenta particular; espera de 3+ horas con incertidumbre en disponibilidad y temor a colisión de pago.",
+              "link_label": "tiempos observados van a discrepancia (1.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.4",
+          "title": "Resolver discrepancia observación vs. verbal",
+          "objective": "Fijar como dato válido el dato observado frente a las discrepancias del relato verbal.",
+          "input": "Datos verbales (1.2) vs datos observados (1.3).",
+          "raw_data_title": "Diferencial de Tiempos",
+          "raw_data": "Verbal: 5 minutos. Observado: 40 minutos. Delta: 35 minutos de subestimación del dolor.",
+          "exit_label": "DATOS CRUDOS VALIDADOS → Step 2",
+          "micro": [
+            {
+              "code": "1.4.1",
+              "title": "Resolución forense de discrepancia",
+              "objective": "Comparar lo verbal con lo observado y declarar el dato empírico como verdad operativa.",
+              "how_to": {
+                "steps": [
+                  "Comparar el tiempo/esfuerzo verbal reportado frente al cronometrado.",
+                  "Si existe discrepancia, registrar ambos valores en la tabla de síntesis.",
+                  "Aplicar la regla metodológica: fijar como dato válido el observado in-situ.",
+                  "Documentar la discrepancia como evidencia empírica de subestimación del dolor."
+                ],
+                "table_columns": "Informante | Acción / Mecanismo Observado | Tiempo / Resultado Observado | Discrepancia vs. Verbal | Fuente",
+                "table_rules": "Una fila por informante sintetizando el contraste forense.",
+                "restrictions": [
+                  "El dato observado prevalece siempre sobre el testimonio verbal.",
+                  "Registrar explícitamente el delta de discrepancia."
+                ],
+                "done_when": "Tabla de datos crudos validados consolidada."
+              },
+              "example_title": "Resolución de Discrepancia",
+              "example": "| Informante | Acción / Mecanismo Observado | Tiempo / Resultado Observado | Discrepancia vs. Verbal | Fuente |\n| --- | --- | --- | --- | --- |\n| **Carlos M. (Anfitrión Rural)** | Cuaderno físico + 3 chats de WhatsApp dispersos | 40 minutos por cotización y registro de disponibilidad | Verbal: 5 min → Real: 40 min | Observación in-situ |\n| **Mariana G. (Turista B2C)** | Mensajería manual en WhatsApp + transferencia a cuenta particular | 3+ horas de espera, incertidumbre en disponibilidad y temor a colisión de pago | Sin discrepancia relevante | Task Walkthrough |",
+              "link_label": "datos crudos van a matriz de perfil (2.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Poblar el Perfil y Verificar Representatividad",
+      "summary": "Estructurar los datos obtenidos en un formato consumible por ingeniería y asegurar representatividad estadística.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Llenar la matriz de perfil",
+          "objective": "Completar Rol, Comodidad Técnica, Frecuencia del Problema y Solución Alternativa (Workaround).",
+          "input": "Datos crudos validados de Step 1.",
+          "raw_data_title": "Variables Operativas del Perfil",
+          "raw_data": "Anfitrión: Propietario, WhatsApp/Android, semanal, cuaderno físico. Turista: Viajero, Web/Móvil/e-commerce, 3-6 veces/año, búsqueda dispersa.",
+          "exit_label": "MATRIZ POBLADA → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Población de variables de perfil",
+              "objective": "Estructurar las 4 columnas operativas base para cada arquetipo.",
+              "how_to": {
+                "steps": [
+                  "Definir el Arquetipo y Rol y Antigüedad exacta del usuario.",
+                  "Registrar la Comodidad Técnica con base en herramientas digitales reales usadas hoy.",
+                  "Determinar la Frecuencia del Problema con que enfrenta el detonante de P0-D1.",
+                  "Documentar en detalle la Solución Alternativa Actual (Workaround) compensatoria."
+                ],
+                "table_columns": "Arquetipo | Rol | Comodidad Técnica | Frecuencia del Problema | Solución Alternativa (Workaround)",
+                "table_rules": "Una fila por arquetipo estructurando sus variables operativas.",
+                "restrictions": [
+                  "Comodidad técnica debe reflejar uso real, no herramientas teóricas.",
+                  "El workaround debe ser concreto y exhaustivo."
+                ],
+                "done_when": "Variables de perfil pobladas para los arquetipos."
+              },
+              "example_title": "Matriz Operativa de Perfil",
+              "example": "| Arquetipo | Rol | Comodidad Técnica | Frecuencia del Problema | Solución Alternativa (Workaround) |\n| --- | --- | --- | --- | --- |\n| **Anfitrión Rural** | Propietario de Finca Turística | Smartphone básico / WhatsApp | 2+ cruces críticos de disponibilidad por fin de semana | Cuaderno físico + chats dispersos de WhatsApp |\n| **Consumidor B2C** | Turista Vacacional Frecuente | Web / Móvil / Apps de e-commerce | 1 frustración de reserva por búsqueda de finca | Mensajería manual en WhatsApp + transferencia bancaria directa |",
+              "link_label": "matriz va a asignación de incertidumbre (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Asignar Fuente y Nivel de Incertidumbre",
+          "objective": "Calificar la fuente empírica y el nivel de incertidumbre (Bajo/Medio/Alto) por cada dato.",
+          "input": "Matriz operativa de Sub-paso 2.1 y registros de observación.",
+          "raw_data_title": "Fuentes y Niveles de Certeza",
+          "raw_data": "Anfitrión: Observación in-situ (Incertidumbre Baja). Turista: Task Walkthrough (Incertidumbre Baja).",
+          "exit_label": "INCERTIDUMBRE AUDITADA → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Auditoría de fuente e incertidumbre",
+              "objective": "Asignar calificación de incertidumbre y asegurar que no haya datos verbales no verificados.",
+              "how_to": {
+                "steps": [
+                  "Identificar la Fuente para cada celda: Observación in-situ, Task Walkthrough, Entrevista verbal, o Ambas.",
+                  "Asignar Nivel de Incertidumbre: Bajo (empírico observado), Medio (corroborado), Alto (verbal no verificado).",
+                  "Verificar la regla: ningún dato con incertidumbre Alta puede aparecer como hallazgo principal sin advertencia.",
+                  "Consolidar la tabla completa con fuente e incertidumbre."
+                ],
+                "table_columns": "Arquetipo | Rol | Comodidad Técnica | Frecuencia | Workaround | Fuente | Incertidumbre",
+                "table_rules": "Una fila por arquetipo con su nivel de incertidumbre evaluado.",
+                "restrictions": [
+                  "Prohibido elevar datos con incertidumbre Alta a hallazgos principales sin advertencia.",
+                  "La fuente debe corresponder con el registro real del Step 1."
+                ],
+                "done_when": "Niveles de incertidumbre asignados y auditados."
+              },
+              "example_title": "Tabla con Fuente e Incertidumbre",
+              "example": "| Arquetipo | Rol | Comodidad Técnica | Frecuencia del Problema | Solución Alternativa (Workaround) | Fuente | Incertidumbre |\n| --- | --- | --- | --- | --- | --- | :---: |\n| **Anfitrión Rural** | Propietario de Finca Turística | Smartphone básico / WhatsApp | 2+ cruces críticos de disponibilidad por fin de semana | Cuaderno físico + chats dispersos de WhatsApp | Observación in-situ | Bajo |\n| **Consumidor B2C** | Turista Vacacional Frecuente | Web / Móvil / Apps de e-commerce | 1 frustración de reserva por búsqueda de finca | Mensajería manual en WhatsApp + transferencia bancaria directa | Task Walkthrough | Bajo |",
+              "link_label": "perfiles validados van a cruce con P0-D3 (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Cruzar el perfil con las métricas de Fase 0",
+          "objective": "Comparar la frecuencia observada y el workaround con las métricas de P0-D3 e instancias de P0-D2.",
+          "input": "Frecuencia observada (2.1) vs Estimaciones P0-D3 (12-24 eventos/año).",
+          "raw_data_title": "Métricas P0-D3 vs Observación",
+          "raw_data": "Observado: 2 cruces/fin de semana en temporada alta. P0-D3: 12 eventos anuales promedio (18-24 en picos). Coherencia confirmada.",
+          "exit_label": "COHERENCIA VERIFICADA → 2.4",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Cruce analítico con Fase 0",
+              "objective": "Verificar consistencia macro entre el perfil observado y la hipótesis de Fase 0.",
+              "how_to": {
+                "steps": [
+                  "Extraer la frecuencia anual estimada en P0-D3 (Impact Estimate).",
+                  "Comparar la periodicidad observada in-situ contra la proyección de P0-D3.",
+                  "Contrastar el workaround registrado con los registros de evidencia E-XX de P0-D1/D2.",
+                  "Dictar veredicto de coherencia macro o documentar el delta analítico."
+                ],
+                "table_columns": "Variable | Observación Fase 1 | Estimación P0-D3 | Coherencia Macro",
+                "table_rules": "Una fila por variable cruzada entre Fase 1 y Fase 0.",
+                "restrictions": [
+                  "Documentar cualquier discrepancia o delta de magnitud.",
+                  "Mantener consistencia con el alcance delimitado en P0."
+                ],
+                "done_when": "Cruce macro completado con veredicto favorable."
+              },
+              "example_title": "Cruce con Métricas P0-D3",
+              "example": "| Variable | Observación Fase 1 | Estimación P0-D3 | Coherencia Macro |\n| :--- | :--- | :--- | :---: |\n| Frecuencia | 2 cruces críticos por fin de semana | 12 eventos/año base (18-24 en alta demanda) | **`COHERENTE ✅`** |\n| Workaround | Cuaderno físico y WhatsApp disperso | Canales manuales asíncronos (E-01…E-04) | **`COHERENTE ✅`** |\n\n*Conclusión:* La observación empírica corrobora la hipótesis de daño de Fase 0.",
+              "link_label": "cruce macro va a diagnóstico de representatividad (2.4.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.4",
+          "title": "Diagnosticar riesgo de outlier y representatividad",
+          "objective": "Evaluar si el perfil corresponde al segmento central del mercado o a un caso atípico.",
+          "input": "Cruce macro del Sub-paso 2.3 y perfiles observados.",
+          "raw_data_title": "Evaluación de Representatividad",
+          "raw_data": "Riesgo de outlier bajo; muestra cubre oferta y demanda centrales. Implicación: SAM debe excluir fincas con PMS corporativo.",
+          "exit_label": "REPRESENTATIVIDAD APROBADA → Step 3",
+          "micro": [
+            {
+              "code": "2.4.1",
+              "title": "Diagnóstico de riesgo de outlier",
+              "objective": "Emitir la Nota de Representatividad y definir implicaciones para el dimensionamiento.",
+              "how_to": {
+                "steps": [
+                  "Evaluar si los informantes representan al segmento masivo o son casos extremos (outliers).",
+                  "Asignar calificación de Riesgo de Outlier: Bajo, Medio o Alto con justificación.",
+                  "Si el riesgo es Alto, exigir informantes adicionales antes de continuar.",
+                  "Redactar la Nota de Representatividad con evidencia, limitación e implicación para Fase 1."
+                ],
+                "table_columns": "Dimensión de Representatividad | Evaluación | Implicación de Mercado",
+                "table_rules": "Una fila por dimensión de representatividad estadística.",
+                "restrictions": [
+                  "No asumir representatividad sin evaluar riesgo de sesgo.",
+                  "Explicitar exclusiones para el dimensionamiento de mercado."
+                ],
+                "done_when": "Nota de representatividad redactada con riesgo evaluado."
+              },
+              "example_title": "Nota de Representatividad",
+              "example": "**Nota de Representatividad:**\n- **Coherencia con P0-D3:** Frecuencia observada (2 cruces/fin de semana) ≈ Estimación P0-D3 (18-24 cruces críticos/año). ✅\n- **Riesgo de Outlier:** Bajo — ambos arquetipos representan los dos lados centrales del mercado (oferta y demanda).\n- **Implicación para D2 (Market Validation):** Los filtros del SAM deben excluir fincas con PMS corporativo ya adoptado (~20% del TAM).",
+              "link_label": "representatividad va a auditoría final (3.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Auditoría y Ensamblaje del Documento Final",
+      "summary": "Consolidar el documento final en español con trazabilidad humana y técnica.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Registrar firmas de investigador y revisor",
+          "objective": "Registrar formalmente la autoría y la revisión independiente del levantamiento.",
+          "input": "Investigador y revisor técnico del proyecto.",
+          "raw_data_title": "Firmas del Equipo",
+          "raw_data": "Investigador: Julián (PM), 2026-07-06/07. Revisor: Laura (Tech Lead), 2026-07-08.",
+          "exit_label": "FIRMAS REGISTRADAS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Registro de firmas y auditoría independiente",
+              "objective": "Formalizar la tabla de registro de entrevista y revisión técnica.",
+              "how_to": {
+                "steps": [
+                  "Anotar el nombre, rol y fecha de levantamiento del investigador principal.",
+                  "Anotar el nombre, rol y fecha de revisión del revisor técnico independiente.",
+                  "Verificar que el revisor certifique que ningún dato de incertidumbre Alta carece de advertencia.",
+                  "Verificar coherencia entre fuentes declaradas y datos tabulados."
+                ],
+                "table_columns": "Campo | Informante 1 (Anfitrión Rural) | Informante 2 (Turista B2C)",
+                "table_rules": "Una fila por campo de auditoría y levantamiento.",
+                "restrictions": [
+                  "El revisor debe ser un integrante independiente del levantador.",
+                  "Ambas firmas son obligatorias para el estado Aprobado."
+                ],
+                "done_when": "Registro de entrevista y observación completado con 2 firmas."
+              },
+              "example_title": "Registro de Entrevista y Observación",
+              "example": "| Campo | Informante 1 (Anfitrión Rural) | Informante 2 (Turista B2C) |\n| --- | --- | --- |\n| Sujeto Entrevistado / Observado | Carlos M. (Dueño y administrador de Finca El Paraíso) | Mariana G. (Viajera vacacional frecuente, Bogotá) |\n| Fecha de Levantamiento | 2026-07-06 | 2026-07-07 |\n| Responsable de Levantamiento | Julián (PM) | Julián (PM) |\n| Revisor Independiente | Laura (Tech Lead) | Laura (Tech Lead) |\n| Fecha de Revisión | 2026-07-08 | 2026-07-08 |",
+              "link_label": "firmas van a ensamblaje de perfiles (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Ensamblar perfiles validados forensemente",
+          "objective": "Integrar tablas de caracterización, dolores empíricos y citas crudas para ambos perfiles.",
+          "input": "Perfiles estructurados, dolores identificados y citas textuales de campo.",
+          "raw_data_title": "Bloques de Perfil Detallados",
+          "raw_data": "Perfil 1 Anfitrión (FIN-01 a FIN-07) y Perfil 2 Turista (TUR-01 a TUR-07).",
+          "exit_label": "PERFILES ENSAMBLADOS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Ensamblaje de perfiles detallados",
+              "objective": "Estructurar las secciones operativas, dolores y citas textuales de cada perfil.",
+              "how_to": {
+                "steps": [
+                  "Insertar la Tabla de Caracterización Operativa para el Perfil 1 (Anfitrión Rural).",
+                  "Insertar los 6 dolores y frustraciones empíricos y las citas crudas FIN-01 a FIN-07.",
+                  "Insertar la Tabla de Caracterización Operativa para el Perfil 2 (Turista B2C).",
+                  "Insertar los 6 dolores y frustraciones empíricos y las citas crudas TUR-01 a TUR-07.",
+                  "Verificar transcripción literal sin inventar citas ni atributos."
+                ],
+                "table_columns": "Sección de Perfil | Componente | Cantidad de Citas / Ítems | Estado",
+                "table_rules": "Una fila por componente del perfil validado.",
+                "restrictions": [
+                  "Transcripción literal de citas crudas de los usuarios.",
+                  "No omitir dolores comprobados en campo."
+                ],
+                "done_when": "Ambos perfiles ensamblados con caracterización, dolores y citas."
+              },
+              "example_title": "Ensamblaje de Perfiles",
+              "example": "#### 3.1. Perfil 1 — Propietario / Finquero (Anfitrión Rural)\n- **Caracterización:** Posición: Propietario; Comodidad: Android/WhatsApp; Frecuencia: Semanal; Workaround: Cuaderno + chats.\n- **Dolores:** Sobrecarga WhatsApp, Riesgo overbooking, Conectividad rural, Privacidad bancaria, Autenticación simple, Deslinde de datos del huésped.\n- **Citas Crudas:** FIN-01 a FIN-07 registradas.\n\n#### 3.2. Perfil 2 — Turista (Viajero Vacacional B2C)\n- **Caracterización:** Arquetipo: Consumidor final B2C; Comodidad: Web/móvil/e-commerce; Frecuencia: 3-6 veces/año; Workaround: Búsqueda dispersa.\n- **Dolores:** Falta catálogo instantáneo, Miedo colisión checkout, Ausencia voucher formal, Historial reservas, Usabilidad móvil, Cancelación unilateral.\n- **Citas Crudas:** TUR-01 a TUR-07 registradas.",
+              "link_label": "perfiles van a metadatos y conclusiones (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Metadatos y conclusiones de diseño",
+          "objective": "Aplicar metadatos oficiales y consolidar las 4 implicaciones de diseño del MVP.",
+          "input": "Outputs de Sub-pasos 3.1, 3.2 y conclusiones metodológicas.",
+          "raw_data_title": "Implicaciones de Diseño MVP",
+          "raw_data": "1) Navegación abierta vs checkout autenticado. 2) Reserva instantánea con Soft-Lock (15 min). 3) Canal rural desatendido (WhatsApp Cloud API). 4) Privacidad bidireccional.",
+          "exit_label": "DOCUMENTO FINAL ENSAMBLADO → publica entregable",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Consolidación de metadatos e implicaciones",
+              "objective": "Integrar metadatos y las 4 directrices de diseño para el MVP en el documento exportable.",
+              "how_to": {
+                "steps": [
+                  "Aplicar el encabezado de metadatos: Proyecto, Fase 1, Entregable 1 de 13, Estado Aprobado.",
+                  "Insertar la Nota de Representatividad y Conclusiones de Fase 1 con las 4 directrices arquitectónicas.",
+                  "Verificar que el documento final cumpla el 100% de la estructura oficial.",
+                  "Emitir el entregable consolidado listo para exportación."
+                ],
+                "table_columns": "Sección del Entregable | Contenido | Verificación de Calidad",
+                "table_rules": "Una fila por sección oficial del entregable final.",
+                "restrictions": [
+                  "Cumplir la estructura de salida oficial.",
+                  "Las 4 implicaciones de diseño deben ser explícitas."
+                ],
+                "done_when": "Documento final exportable ensamblado y certificado."
+              },
+              "example_title": "Implicaciones de Diseño MVP",
+              "example": "### 4. Nota de Representatividad y Conclusiones de Fase 1\n- **Evidencia Empírica:** Muestra N=2 arquetipos primarios (Finquero rural y Turista B2C). Concordancia con métricas P0-D3.\n- **Limitación:** Riesgo de outlier bajo.\n- **Implicación de Diseño para el MVP y Modelo de Reserva Instantánea:**\n  1. **Navegación Abierta vs. Checkout Autenticado:** Catálogo abierto (ROLE_GUEST), checkout formaliza cuenta (ROLE_CUSTOMER).\n  2. **Modelo de Reserva Instantánea con Soft-Lock (15 min):** Descarte de aprobación manual; bloqueo atómico temporal de 15 minutos en pasarela Wompi.\n  3. **Canal Rural Desatendido (WhatsApp Cloud API):** Alertas unidireccionales por WhatsApp y panel web liviano para bloqueo preventivo.\n  4. **Privacidad y Seguridad Bidireccional:** Transacciones encapsuladas en Wompi API, protegiendo cuentas del anfitrión y datos del turista.",
+              "link_label": "publica entregable final"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 01. User Profile.md",
+    "markdown": "# 1. Perfil de Usuario\n\n### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 1 — Viabilidad Temprana (Early Viability)\n**Entregable:** 1 de 13\n**Estado:** Aprobado\n\n---\n\n### 2. Registro de Entrevista y Observación\n| Campo | Informante 1 (Anfitrión Rural) | Informante 2 (Turista B2C) |\n| --- | --- | --- |\n| Sujeto Entrevistado / Observado | Carlos M. (Dueño y administrador de Finca El Paraíso) | Mariana G. (Viajera vacacional frecuente, Bogotá) |\n| Fecha de Levantamiento | 2026-07-06 | 2026-07-07 |\n| Responsable de Levantamiento | Julián (PM) | Julián (PM) |\n| Revisor Independiente | Laura (Tech Lead) | Laura (Tech Lead) |\n| Fecha de Revisión | 2026-07-08 | 2026-07-08 |\n\n---\n\n### 3. Perfiles de Usuario Validados Forensemente\n\n#### 3.1. Perfil 1 — Propietario / Finquero (Anfitrión Rural)\n\n##### A. Tabla de Caracterización Operativa\n| Categoría | Campo | Valor Validado | Fuente | Nivel de Incertidumbre |\n|---|---|---|---|---|\n| **Rol y Contexto** | Posición Exacta | Propietario y Administrador de Finca Turística | Entrevista / Observación in-situ | Bajo |\n| **Comodidad Técnica** | Dispositivos y Canales | Smartphone Android estándar, uso continuo de WhatsApp, conectividad rural intermitente (3G/4G básica), nulo uso de computadores | Observación directa | Bajo |\n| **Frecuencia del Dolor** | Periodicidad del Problema | Semanal (fines de semana y temporadas altas vacacionales) | Observación / Métricas P0-D3 | Bajo |\n| **Solución Alternativa Actual** | Workaround | Anotaciones en cuadernos de papel, revisión manual de chats de WhatsApp, cotejo manual de transferencias bancarias | Observación in-situ | Bajo |\n\n##### B. Dolores y Frustraciones Identificados (Evidencia Empírica)\n1. **Sobrecarga y Fricción en WhatsApp:** Pérdida de tiempo respondiendo múltiples chats repetitivos para cotizar fechas que ya están ocupadas o negociar precios manuales.\n2. **Riesgo de Colisión de Fechas (Overbooking):** Alto riesgo de sobrevender fechas o comprometer días que la familia del finquero planeaba usar por falta de un calendario unificado y sincronizado.\n3. **Dependencia de Dispositivo Móvil y Conectividad Rural:** Incapacidad de operar sistemas complejos que exijan computadores de escritorio, interfaces pesadas o conexiones de alta velocidad en la finca.\n4. **Privacidad Financiera y Seguridad de Datos:** Incomodidad e inseguridad ante la exigencia de compartir números de cuentas bancarias personales con clientes desconocidos por chat.\n5. **Autenticación Compleja:** Rechazo a procesos de login con contraseñas extensas o verificaciones complejas; necesidad de acceso simple y directo mediante su número celular.\n6. **Deslinde de Responsabilidad Financiera del Huésped:** Preocupación por tener que manipular o ver datos de pago de los turistas, prefiriendo recibir únicamente la lista de huéspedes confirmados para la logística de check-in.\n\n##### C. Registro de Declaraciones Textuales Crudas (Voz del Finquero)\n- **Cita FIN-01 (Canal móvil y avisos en tiempo real):** *\"Yo no manejo computador en la finca; necesito que al celular me llegue un mensaje de WhatsApp en cuanto entre una reserva pagada con los datos de cuántos vienen.\"*\n- **Cita FIN-02 (Soberanía de calendario):** *\"Necesito poder marcar en el calendario los días que mi familia va a la finca para que la página no los venda.\"*\n- **Cita FIN-03 (Privacidad de datos bancarios del finquero):** *\"Necesito saber el nombre del cliente y los acompañantes para recibirlos, pero no quiero que ellos tengan mis datos bancarios personales.\"*\n- **Cita FIN-04 (Intermediación ajena / Candidata a exclusión):** *\"Me gustaría poder registrar también las fincas de mis vecinos y cobrar una comisión por administrárselas.\"*\n- **Cita FIN-05 (Autenticación y acceso ágil):** *\"Quiero entrar a mi panel de anfitrión con mi número de celular y una clave sencilla sin complicaciones técnicas ni pasos engorrosos.\"*\n- **Cita FIN-06 (Usabilidad y ergonomía en campo):** *\"El panel de fechas debe tener botones grandes y claros que pueda usar con una sola mano en el celular bajo el sol y con señal débil.\"*\n- **Cita FIN-07 (Protección de datos del turista):** *\"Yo solo necesito la lista de huéspedes para coordinar el ingreso; no debo tener acceso a tarjetas de crédito ni datos financieros del turista.\"*\n\n---\n\n#### 3.2. Perfil 2 — Turista (Viajero Vacacional B2C)\n\n##### A. Tabla de Caracterización Operativa\n| Categoría | Campo | Valor Validado | Fuente | Nivel de Incertidumbre |\n|---|---|---|---|---|\n| **Rol y Contexto** | Arquetipo de Usuario | Turista / Viajero familiar o en grupo (Consumidor final B2C) | Entrevista estructurada y Task Walkthrough | Bajo |\n| **Comodidad Técnica** | Dispositivos y Canales | Smartphone y navegador web móvil/desktop, usuario habitual de apps de comercio electrónico y pasarelas de pago digitales | Observación directa | Bajo |\n| **Frecuencia del Dolor** | Periodicidad del Problema | Cada vez que planea un viaje o descanso de fin de semana (3 a 6 veces al año) | Entrevista | Bajo |\n| **Solución Alternativa Actual** | Workaround | Búsqueda dispersa en redes sociales, envío de mensajes a múltiples números de WhatsApp, espera de cotizaciones manuales | Observación de tarea | Bajo |\n\n##### B. Dolores y Frustraciones Identificados (Evidencia Empírica)\n1. **Falta de Catálogo con Disponibilidad Inmediata:** Frustración por tener que escribir por chat y esperar horas a que respondan si una finca tiene fechas libres y cuál es su tarifa real.\n2. **Incertidumbre Transaccional y Miedo a Colisiones en Checkout:** Temor a transferir dinero o pagar en línea y enterarse después de que otro usuario pagó las mismas fechas; exigencia de que el sistema retenga las fechas al menos 15 minutos mientras completa el pago.\n3. **Ausencia de Comprobante Formal de Acceso (Voucher Digital):** Inseguridad por no recibir un voucher digital oficial con dirección exacta, geolocalización y teléfono del encargado inmediatamente después de pagar.\n4. **Registro e Historial de Reservas:** Necesidad de contar con una cuenta personal simple vinculada a su correo para consultar reservas activas, descargar vouchers y recuperar acceso si olvida su clave.\n5. **Usabilidad y Rendimiento en Dispositivos Móviles:** Exigencia de un flujo de compra rápido (máximo 3 pasos) y un catálogo optimizado cuyas fotos carguen en menos de 2 segundos sin consumir excesivo plan de datos.\n6. **Expectativa de Cancelación Unilateral:** Deseo de contar con un mecanismo de reembolso automático e instantáneo si cambia de planes de viaje (solicitud en conflicto con las políticas de estabilidad de anfitriones).\n\n##### C. Registro de Declaraciones Textuales Crudas (Voz del Turista)\n- **Cita TUR-01 (Exploración pública sin fricción):** *\"Quiero entrar a la web y ver las fincas disponibles con sus fotos, tarifas y fechas libres sin tener que pedir que me atiendan por chat ni crear cuenta para solo mirar.\"*\n- **Cita TUR-02 (Protección contra colisiones y Soft-Lock en checkout):** *\"Me da rabia pagar por transferencia y que luego me digan que otro cliente ya había separado esas mismas fechas; cuando esté pagando en la pasarela, esas fechas deben estar aseguradas para mí por al menos 15 minutos.\"*\n- **Cita TUR-03 (Pago integrado y voucher formal):** *\"Quiero pagar seguro por PSE o tarjeta y que el sistema me entregue de inmediato el comprobante digital con la confirmación, dirección y el teléfono del encargado.\"*\n- **Cita TUR-04 (Reembolso automático / Candidata a exclusión):** *\"Si por algún motivo no puedo viajar, quisiera poder cancelar con un botón y que la página me devuelva la plata de una vez.\"*\n- **Cita TUR-05 (Autenticación y gestión de reservas):** *\"Quiero registrarme e iniciar sesión fácilmente con mi correo para guardar mis reservas pasadas, ver mis comprobantes y recuperar mi contraseña si la olvido.\"*\n- **Cita TUR-06 (Usabilidad y flujo ágil de checkout):** *\"El proceso de reserva y checkout debe ser claro, en máximo 3 pasos desde el celular, sin formularios interminables ni botones confusos.\"*\n- **Cita TUR-07 (Rendimiento y velocidad de carga móvil):** *\"La página de catálogo y las fotos de las fincas deben cargar en menos de 2 segundos en mi celular sin trabarse ni gastarme todos los datos.\"*\n\n---\n\n### 4. Nota de Representatividad y Conclusiones de Fase 1\n- **Evidencia Empírica:** Muestra de contacto directo N=2 arquetipos primarios (Finquero rural y Turista B2C). Los hallazgos concuerdan con la métrica macro de [[example_output_impact_estimate]] (18 colisiones críticas de disponibilidad/año y 40 reclamos por desorganización en WhatsApp).\n- **Limitación:** Riesgo de sesgo o outlier bajo. Ambos perfiles representan fielmente la dinámica de oferta y demanda vacacional en Colombia.\n- **Implicación de Diseño para el MVP y Modelo de Reserva Instantánea:**\n  1. **Navegación Abierta vs. Checkout Autenticado:** La exploración del catálogo debe operar sin registro previo (`ROLE_GUEST`), pero el inicio de checkout y confirmación de compra formaliza la cuenta del usuario (`ROLE_CUSTOMER`) para gobernanza y emisión de comprobantes.\n  2. **Modelo de Reserva Instantánea con Soft-Lock (15 min):** Se descarta el modelo obsoleto de aprobación manual asíncrona (antiguo timeout de 90/120 min), el cual generaba 65% de abandono y colisiones en WhatsApp. El MVP formaliza **Reserva Instantánea confirmada post-pago Wompi con bloqueo temporal atómico de 15 minutos**, protegiendo la disponibilidad durante la pasarela.\n  3. **Canal Rural Desatendido (WhatsApp Cloud API):** La experiencia del anfitrión rural se apoya en WhatsApp como canal unidireccional de alertas inmediatas, complementado por un panel web móvil ultraliviano para el bloqueo preventivo de fechas de uso familiar.\n  4. **Privacidad y Seguridad Bidireccional:** El sistema encapsula las transacciones monetarias en Wompi API, protegiendo las cuentas bancarias del anfitrión frente al turista y salvaguardando los datos de tarjeta y privacidad del viajero frente al anfitrión."
+  }
+}

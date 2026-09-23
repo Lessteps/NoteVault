@@ -38,6 +38,18 @@ class _DraggableTree(QTreeWidget):
 
     # sidebar sets this after construction
     drop_handler = None  # callable(list[Path], dest_folder|None) | None
+    middle_clicked = Signal(Path)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            item = self.itemAt(event.position().toPoint())
+            if item is not None:
+                data = item.data(0, Qt.UserRole) or {}
+                if data.get("type") == "note" and data.get("path"):
+                    self.middle_clicked.emit(Path(data["path"]))
+                    event.accept()
+                    return
+        super().mousePressEvent(event)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -187,10 +199,14 @@ class _ToolButton(QPushButton):
 
 class NotesSidebar(QWidget):
     note_selected          = Signal(Path)
+    note_selected_new_tab  = Signal(Path)
     note_selected_at_line  = Signal(Path, int)
     vault_switch_requested = Signal(Path)
     bookmarks_changed      = Signal()
     note_moved             = Signal(Path, Path)   # (old_path, new_path)
+    note_created           = Signal(Path)
+    note_deleted           = Signal(Path)
+    generate_map_requested = Signal()             # open the concept-map generator
 
     def __init__(self, vault: VaultManager, service: NotesService, parent=None):
         super().__init__(parent)
@@ -281,6 +297,10 @@ class NotesSidebar(QWidget):
         self._btn_new_folder.clicked.connect(self.new_folder)
         lay.addWidget(self._btn_new_folder)
 
+        self._btn_map = _ToolButton("🗺", "Generar mapa conceptual")
+        self._btn_map.clicked.connect(self.generate_map_requested.emit)
+        lay.addWidget(self._btn_map)
+
         self._btn_study = _ToolButton("🎓", "Crear espacios de estudio (Matemáticas, Inglés, Programación)")
         self._btn_study.clicked.connect(self.open_study_folders)
         lay.addWidget(self._btn_study)
@@ -319,6 +339,7 @@ class NotesSidebar(QWidget):
 
         self._tree = _DraggableTree()
         self._tree.drop_handler = self._on_tree_drop
+        self._tree.middle_clicked.connect(self.note_selected_new_tab.emit)
         self._tree.setHeaderHidden(True)
         self._tree.setIndentation(14)
         self._tree.setRootIsDecorated(True)
@@ -541,6 +562,7 @@ class NotesSidebar(QWidget):
             item.setData(0, Qt.UserRole, data)
         self.populate_tree(note.path)
         self.reveal(note.path)
+        self.note_created.emit(note.path)
         self.note_selected.emit(note.path)
 
     def new_canvas(self, folder: Path = None):
@@ -554,6 +576,7 @@ class NotesSidebar(QWidget):
             if p:
                 self.populate_tree(p)
                 self.reveal(p)
+                self.note_created.emit(p)
                 self.note_selected.emit(p)
 
     def new_folder(self):
@@ -900,6 +923,8 @@ class NotesSidebar(QWidget):
             self._active_path = new_path
         self.populate_tree(self._active_path)
         self.refresh_bookmarks()
+        if new_path != path:
+            self.note_moved.emit(path, new_path)
 
     def _delete(self, path: Path):
         answer = QMessageBox.question(
@@ -912,6 +937,7 @@ class NotesSidebar(QWidget):
         self.service.delete_path(path)
         self.populate_tree()
         self.refresh_bookmarks()
+        self.note_deleted.emit(path)
 
     # ── Search ────────────────────────────────────────────────────────────
 

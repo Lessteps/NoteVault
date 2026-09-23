@@ -179,6 +179,7 @@ class TestCanvasPolish(unittest.TestCase):
         note_item = NoteNodeItem(cnode, note_file, self.view.service)
         self.view._scene.addItem(note_item)
 
+        note_item._enter_edit()
         note_item._proxy.setFocus()
         note_item._editor.setFocus()
         ncur = note_item._editor.textCursor()
@@ -187,6 +188,81 @@ class TestCanvasPolish(unittest.TestCase):
 
         self.view.keyPressEvent(ev_bs)
         self.assertEqual(note_item._editor.toPlainText(), "Hello Worl")
+
+    def test_read_only_mode(self):
+        item = self.view.add_text_node(QPointF(0, 0), "Tarjeta")
+        self.assertFalse(self.view.is_read_only())
+        self.assertTrue(bool(item.flags() & QGraphicsObject.ItemIsMovable))
+
+        self.view.set_read_only(True)
+        self.assertTrue(self.view.is_read_only())
+        self.assertFalse(bool(item.flags() & QGraphicsObject.ItemIsMovable))
+
+        # Adding new node blocked in read-only
+        new_item = self.view.add_text_node(QPointF(50, 50), "Bloqueado")
+        self.assertIsNone(new_item)
+
+        self.view.set_read_only(False)
+        self.assertFalse(self.view.is_read_only())
+        self.assertTrue(bool(item.flags() & QGraphicsObject.ItemIsMovable))
+
+    def test_undo_redo_stack(self):
+        self.assertEqual(len(self.view._doc.nodes), 0)
+        item = self.view.add_text_node(QPointF(0, 0), "Paso 1")
+        self.assertEqual(len(self.view._doc.nodes), 1)
+
+        self.view.undo()
+        self.assertEqual(len(self.view._doc.nodes), 0)
+
+        self.view.redo()
+        self.assertEqual(len(self.view._doc.nodes), 1)
+
+    def test_bottom_toolbar_and_nav_rail(self):
+        # There is now a single Excalidraw-style bottom toolbar: the old right
+        # navigation rail is gone and its zoom/undo/redo controls live in the
+        # same bar as the create tools.
+        from notevault_app.ui.components.notes.canvas.view import _ToolButton
+        self.assertIsNotNone(self.view._toolbar)
+        self.assertIsNone(getattr(self.view, "_nav_rail", None))
+
+        glyphs = [c._icon.text()
+                  for c in self.view._toolbar.findChildren(_ToolButton)]
+        # Create tools.
+        for g in ("📄", "📝", "🖼", "🌐", "🔲"):
+            self.assertIn(g, glyphs)
+        # View / history controls, now in the same toolbar.
+        for g in ("＋", "−", "↶", "↷"):
+            self.assertIn(g, glyphs)
+
+    def test_create_group_from_selection(self):
+        t1 = self.view.add_text_node(QPointF(100, 100), "A")
+        t2 = self.view.add_text_node(QPointF(300, 200), "B")
+        t1.setSelected(True)
+        t2.setSelected(True)
+
+        grp = self.view.create_group_from_selection()
+        self.assertIsNotNone(grp)
+        self.assertEqual(grp.node.type, "group")
+        self.assertLessEqual(grp.pos().x(), 100)
+        self.assertLessEqual(grp.pos().y(), 100)
+        self.assertGreaterEqual(grp.pos().x() + grp.node.width, 300)
+        self.assertGreaterEqual(grp.pos().y() + grp.node.height, 200)
+
+    def test_snap_to_objects_and_alignment_guides(self):
+        t1 = self.view.add_text_node(QPointF(100, 100), "Fijo")
+        t2 = self.view.add_text_node(QPointF(500, 500), "Movible")
+
+        # Nudge t2 x near t1 x (100) within 6px threshold
+        snapped = t2._snapped_to_objects(QPointF(103, 500))
+        self.assertEqual(snapped.x(), 100.0)
+        self.assertGreater(len(self.view._align_guides), 0)
+
+        from PySide6.QtWidgets import QGraphicsSceneMouseEvent
+        from PySide6.QtCore import QEvent
+        ev = QGraphicsSceneMouseEvent(QEvent.GraphicsSceneMouseRelease)
+        ev.setButton(Qt.LeftButton)
+        t2.mouseReleaseEvent(ev)
+        self.assertEqual(len(self.view._align_guides), 0)
 
 
 if __name__ == "__main__":

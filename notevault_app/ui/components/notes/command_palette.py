@@ -35,6 +35,26 @@ class Command:
     id: str = ""            # stable id for hotkey overrides; defaults to title
 
 
+# Providers of commands that exist everywhere, not only inside a note (the
+# WEB module is opened from here). MainWindow registers them at start-up.
+_GLOBAL_PROVIDERS: list = []
+
+
+def register_global_commands(provider: Callable[[], list]):
+    if provider not in _GLOBAL_PROVIDERS:
+        _GLOBAL_PROVIDERS.append(provider)
+
+
+def global_commands() -> list:
+    out = []
+    for provider in _GLOBAL_PROVIDERS:
+        try:
+            out.extend(provider())
+        except Exception:
+            pass
+    return out
+
+
 def _fold(text: str) -> str:
     """Lowercase without accents, so "tabla" finds "Tablá" and "anadir"
     finds "Añadir"."""
@@ -72,7 +92,7 @@ class CommandPalette(QDialog):
         lay.setSpacing(6)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Escribe un comando…  (tabla, checklist, imagen, fila…)")
+        self._input.setPlaceholderText("Escribe un comando…  (web, tabla, checklist, imagen…)")
         self._input.setStyleSheet(
             f"QLineEdit{{background:#1a1a1e;border:1px solid {BORDER};border-radius:7px;"
             f"color:{TEXT};font-family:'Segoe UI Variable Text','Segoe UI';"

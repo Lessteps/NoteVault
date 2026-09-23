@@ -1,0 +1,367 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D10",
+  "deliverable": "Tooling (Herramientas del Equipo)",
+  "purpose": "Este entregable declara las herramientas perimetrales del proyecto. Mientras el D3 eligió el 'Stack de Producción', el Tooling define el 'Stack de Trabajo' (dónde planeamos los tickets, qué IDEs usamos, dónde diseñamos y cómo gestionamos las bases de datos). Esto previene la fragmentación y asegura un onboarding estandarizado.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_stack_decision]] | Determina qué lenguajes y servicios demandan herramientas de soporte específicas (P2-D3). |\n| [[example_output_non_negotiable_constraints]] | Límite presupuestal que impide pagar licencias de software innecesarias (P2-D2). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Selección de Herramientas de Diseño (UI/UX) y Entorno de Trabajo (IDEs)",
+      "summary": "Elegir la herramienta oficial de diseño de interfaces y los IDEs estándar para el desarrollo de backend y frontend.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Selección de Herramienta de Diseño UI/UX",
+          "objective": "Designar la única fuente de verdad gráfica y de wireframes para evitar dispersión entre herramientas.",
+          "input": "Capacidades de diseño del equipo y requerimientos del frontend web.",
+          "raw_data_title": "Herramienta de Diseño",
+          "raw_data": "Figma seleccionado. Tier gratuito suficiente para centralizar wireframes, componentes UI, paletas de colores y activos visuales.",
+          "exit_label": "HERRAMIENTA DE DISEÑO BLOQUEADA → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Fijación de Figma como Fuente de Verdad Visual",
+              "objective": "Formalizar la elección de Figma y establecer la prohibición de crear activos fuera del espacio oficial.",
+              "how_to": {
+                "steps": [
+                  "Evaluar las competencias del equipo en herramientas de diseño (P1-D6).",
+                  "Verificar que Figma cubra diseño responsivo y exportación SVG/CSS para JS.",
+                  "Dictar la prohibición formal de usar herramientas no autorizadas (Photoshop, Canva).",
+                  "Consolidar la justificación técnica en la matriz de diseño."
+                ],
+                "table_columns": "Categoría | Herramienta Oficial | Razón Técnica",
+                "table_rules": "Todos los activos visuales deben residir en un único workspace oficial.",
+                "restrictions": [
+                  "Prohibido contratar planes pagos de diseño si el tier gratuito cubre las necesidades del MVP."
+                ],
+                "done_when": "Herramienta de diseño UI/UX oficialmente designada y justificada."
+              },
+              "example_title": "Selección de Herramienta de Diseño",
+              "example": "| Categoría | Herramienta Oficial | Razón |\n| --- | --- | --- |\n| Diseño UI | Figma | Única fuente de verdad visual para el diseño de interfaces web en JS. Tier gratuito suficiente para centralizar SVGs y paletas. |",
+              "link_label": "diseño UI pasa a selección de IDEs de desarrollo (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Selección de Entornos Integrados de Desarrollo (IDEs)",
+          "objective": "Estandarizar los entornos de edición y depuración para backend Java y frontend JavaScript.",
+          "input": "Stack tecnológico de P2-D3 (Java Spring Boot y JS/Vite).",
+          "raw_data_title": "IDEs de Desarrollo",
+          "raw_data": "Backend: IntelliJ IDEA / Eclipse (estándar Java, depuración profunda). Frontend: VS Code (ligero, soporte Vite y plugins ESLint).",
+          "exit_label": "IDES DE TRABAJO SELECCIONADOS → 2.1",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Mapeo de IntelliJ IDEA y VS Code para Backend y Frontend",
+              "objective": "Asignar a cada tecnología el IDE más eficiente y documentar sus extensiones mandatorias.",
+              "how_to": {
+                "steps": [
+                  "Asignar IntelliJ IDEA / Eclipse para el backend Java gracias a sus herramientas de profiling y Maven.",
+                  "Asignar VS Code para el frontend JavaScript por su ecosistema de extensiones Vite y Prettier.",
+                  "Verificar que ambos editores admitan integración con Git y linters configurados en D7.",
+                  "Registrar la justificación técnica en la matriz."
+                ],
+                "table_columns": "Capa de Código | IDE Oficial | Justificación Técnica",
+                "table_rules": "Los IDEs deben ser estándar en la industria para minimizar fricciones de configuración.",
+                "restrictions": [
+                  "No forzar un único IDE si las tecnologías requieren herramientas especializadas distintas."
+                ],
+                "done_when": "IDEs oficiales seleccionados y documentados."
+              },
+              "example_title": "IDEs Oficiales por Capa",
+              "example": "| Capa | IDE Oficial | Justificación |\n| --- | --- | --- |\n| Backend Java | IntelliJ IDEA / Eclipse | Entornos oficiales y estándar de la industria para desarrollo en Java. Excelente debugging. |\n| Frontend JS | VS Code | Ligero, soporte absoluto para JavaScript y extensiones de Vite/ESLint. |",
+              "link_label": "IDEs de desarrollo pasan a gestión de proyectos y datos (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Selección de Herramientas de Gestión de Proyecto, Versiones y Datos",
+      "summary": "Definir las plataformas para el seguimiento ágil de tareas, el control de versiones colaborativo y la administración de bases de datos.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Selección de Plataforma de Gestión de Proyecto (PM)",
+          "objective": "Designar el tablero oficial para planificar sprints y gestionar el ciclo de vida de los tickets.",
+          "input": "Capacidad del equipo y metodología ágil definida en P1-D11.",
+          "raw_data_title": "Plataforma de PM",
+          "raw_data": "Jira / Trello seleccionados. Permite llevar el backlog formalizado bajo Agile y trazar el progreso sin perder requerimientos.",
+          "exit_label": "GESTIÓN ÁGIL ASIGNADA → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Asignación de Jira/Trello para Backlog Ágil",
+              "objective": "Formalizar la plataforma de gestión de tickets y erradicar la asignación de requerimientos por canales informales.",
+              "how_to": {
+                "steps": [
+                  "Evaluar la complejidad operativa del equipo (2 desarrolladores/fundadores).",
+                  "Seleccionar Jira o Trello para seguimiento visual de tareas.",
+                  "Dictar la regla estricta: requerimiento no registrado en el tablero no existe.",
+                  "Registrar la justificación operativa en la matriz oficial."
+                ],
+                "table_columns": "Categoría | Herramienta Seleccionada | Justificación de Selección",
+                "table_rules": "La herramienta debe ser accesible para todos los integrantes sin barreras de entrada.",
+                "restrictions": [
+                  "Prohibido gestionar requerimientos o bugs mediante mensajes de WhatsApp o chat informal."
+                ],
+                "done_when": "Herramienta de gestión de proyecto formalmente asignada."
+              },
+              "example_title": "Plataforma de Gestión Ágil",
+              "example": "| Categoría | Herramienta | Justificación |\n| --- | --- | --- |\n| Gestión de Proyecto | Jira / Trello | Para llevar el backlog formalizado bajo metodologías Agile y trazar el progreso de desarrollo. |",
+              "link_label": "gestión de tickets pasa a control de versiones y datos (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Selección de Control de Versiones y Cliente de Datos",
+          "objective": "Fijar el servicio de repositorio Git y el software de inspección de bases de datos PostgreSQL.",
+          "input": "Topología de monorepo de P2-D4 y base de datos de P2-D3.",
+          "raw_data_title": "Control de Versiones y Datos",
+          "raw_data": "Git + GitHub (repositorio central y CI/CD). pgAdmin / DBeaver (cliente de inspección y alteración de esquemas SQL).",
+          "exit_label": "VERSIONES Y DATOS ASIGNADOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Asignación de Git/GitHub y pgAdmin/DBeaver",
+              "objective": "Especificar las herramientas de versionado y gestión de persistencia relacional.",
+              "how_to": {
+                "steps": [
+                  "Vincular Git y GitHub como bóveda central de código y ejecutor de GitHub Actions.",
+                  "Vincular pgAdmin o DBeaver para interacción directa con PostgreSQL local y remoto.",
+                  "Verificar que las herramientas sean compatibles con los sistemas operativos del equipo.",
+                  "Consolidar las justificaciones en la matriz de herramientas."
+                ],
+                "table_columns": "Área Técnica | Herramienta Elegida | Propósito Operativo",
+                "table_rules": "Todo acceso a base de datos debe realizarse a través de clientes seguros que respeten variables de entorno.",
+                "restrictions": [
+                  "Prohibido usar herramientas obsoletas sin soporte de TLS o túneles SSH para acceso a bases de datos."
+                ],
+                "done_when": "Herramientas de control de versiones y clientes de bases de datos seleccionados."
+              },
+              "example_title": "Control de Versiones y Gestión de Datos",
+              "example": "| Área | Herramienta | Propósito |\n| --- | --- | --- |\n| Control de Versiones | Git + GitHub | Repositorio central del código fuente y pipelines de integración (CI/CD). |\n| Cliente de Base de Datos | pgAdmin / DBeaver | Necesario para inspeccionar y alterar esquemas en PostgreSQL local y remoto. |",
+              "link_label": "herramientas técnicas pasan a consolidación del stack diario (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Consolidación del Stack Oficial de Trabajo Diario",
+          "objective": "Integrar todas las herramientas en la tabla oficial del stack de desarrollo y gestión.",
+          "input": "Herramientas de diseño, IDEs, PM, Git y Base de Datos (1.1 a 2.2).",
+          "raw_data_title": "Matriz Consolidada de Tooling",
+          "raw_data": "Tabla con 6 categorías: IDE Backend, IDE Frontend, Cliente DB, Gestión de Proyecto, Diseño UI, Control de Versiones.",
+          "exit_label": "STACK DE TRABAJO BLOQUEADO → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Formalización de la Matriz de Herramientas de Trabajo",
+              "objective": "Construir la tabla oficial del Stack de Trabajo Diario para el documento final.",
+              "how_to": {
+                "steps": [
+                  "Organizar las 6 categorías clave de tooling.",
+                  "Verificar que cada herramienta cuente con una justificación concisa y clara.",
+                  "Comprobar que ninguna herramienta viole el límite presupuestal de P2-D2.",
+                  "Consolidar la tabla oficial en el artefacto."
+                ],
+                "table_columns": "Categoría | Herramienta Elegida | Justificación",
+                "table_rules": "El catálogo de herramientas debe ser integral y cerrado para el equipo.",
+                "restrictions": [
+                  "No dejar categorías críticas como versionado o diseño sin definición."
+                ],
+                "done_when": "Tabla oficial del stack de trabajo diario formalizada."
+              },
+              "example_title": "Stack Oficial de Trabajo (Step 2 Output)",
+              "example": "| Categoría | Herramienta Elegida | Justificación |\n| --- | --- | --- |\n| IDE Backend | IntelliJ IDEA / Eclipse | Entornos oficiales y estándar de la industria para desarrollo en Java. Excelente debugging. |\n| IDE Frontend | VS Code | Ligero, soporte absoluto para JavaScript y extensiones de Vite/ESLint. |\n| Cliente de Base de Datos | pgAdmin / DBeaver | Necesario para inspeccionar y alterar esquemas en PostgreSQL local y remoto. |\n| Gestión de Proyecto | Jira / Trello | Para llevar el backlog formalizado bajo metodologías Agile y trazar el progreso de desarrollo. |\n| Diseño UI | Figma | Única fuente de verdad visual para el diseño de interfaces web en JS. |\n| Control de Versiones | Git + GitHub | Repositorio central del código fuente y pipelines de integración (CI/CD). |",
+              "link_label": "stack de trabajo pasa a estandarización de entorno local (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Estandarización del Entorno de Ejecución Local",
+      "summary": "Establecer los requisitos de software mandatorios en las máquinas de los desarrolladores para garantizar paridad de desarrollo.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Requisitos de Runtimes y SDKs Locales",
+          "objective": "Especificar las versiones exactas de Java JDK y Node.js requeridas para compilar y ejecutar el software.",
+          "input": "Decisiones de stack de P2-D3 y monorepo de P2-D4.",
+          "raw_data_title": "SDKs y Runtimes Mandatorios",
+          "raw_data": "Java JDK 17 o superior (para backend Spring Boot). Node.js LTS y npm/yarn (para servidor Vite de Frontend).",
+          "exit_label": "RUNTIMES LOCALES DEFINIDOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Especificación de Java JDK 17 y Node.js/npm",
+              "objective": "Fijar las versiones mínimas de los compiladores y gestores de paquetes en los equipos de desarrollo.",
+              "how_to": {
+                "steps": [
+                  "Fijar Java JDK versión 17 LTS o superior para soporte de Spring Boot moderno.",
+                  "Fijar Node.js en su versión LTS activa junto con npm o yarn.",
+                  "Verificar que las versiones sean uniformes entre todos los desarrolladores.",
+                  "Redactar las directrices de instalación en la guía del equipo."
+                ],
+                "table_columns": "Runtime / SDK | Versión Requerida | Propósito Local",
+                "table_rules": "Todos los desarrolladores deben utilizar la misma versión mayor para evitar discrepancias de build.",
+                "restrictions": [
+                  "Prohibido usar versiones obsoletas de Java o Node fuera de soporte LTS."
+                ],
+                "done_when": "Runtimes y SDKs mandatorios formalizados."
+              },
+              "example_title": "Runtimes y SDKs Obligatorios",
+              "example": "| Runtime / SDK | Versión Requerida | Propósito |\n| --- | --- | --- |\n| Java JDK | 17 LTS o superior | Compilación y ejecución del backend Spring Boot |\n| Node.js / npm | LTS Activo | Empaquetado y dev server de Vite para Frontend JS |",
+              "link_label": "SDKs pasan a virtualización y contenedores locales (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Virtualización y Contenedores Locales",
+          "objective": "Definir el uso de Docker para aprovisionar instancias de base de datos idénticas a producción en local.",
+          "input": "Configuración de bases de datos de P2-D6.",
+          "raw_data_title": "Contenedores Locales",
+          "raw_data": "Docker recomendado para levantar PostgreSQL local sin ensuciar el sistema operativo anfitrión.",
+          "exit_label": "ENTORNO LOCAL BLOQUEADO → 4.1",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Configuración de Docker para PostgreSQL Local",
+              "objective": "Formalizar las recomendaciones de contenedorización para aislamiento de dependencias locales.",
+              "how_to": {
+                "steps": [
+                  "Establecer Docker Desktop o Docker Engine como herramienta de virtualización recomendada.",
+                  "Proveer la configuración de contenedor PostgreSQL (versión, puertos y variables de entorno).",
+                  "Redactar los requisitos de la sección de Entorno de Ejecución Local.",
+                  "Comprobar el pass condition de onboarding rápido y sin colisiones."
+                ],
+                "table_columns": "Herramienta | Tipo de Uso | Ventaja Operativa",
+                "table_rules": "El entorno local debe ser reproducible mediante scripts o contenedores.",
+                "restrictions": [
+                  "No requerir contenedores pesados para herramientas que pueden correr nativamente de forma ligera."
+                ],
+                "done_when": "Directrices de contenedorización y entorno local completadas."
+              },
+              "example_title": "Entorno de Ejecución Local (Step 3 Output)",
+              "example": "Todos los desarrolladores deben tener instalado:\n- **Java JDK (17 o superior):** Para compilar el backend.\n- **Node.js y npm/yarn:** Para empaquetar y levantar el servidor de desarrollo del Frontend (Vite).\n- **Docker (Opcional pero recomendado):** Para levantar un contenedor de PostgreSQL idéntico al de producción sin ensuciar la máquina local.",
+              "link_label": "entorno local pasa a ensamblaje del documento final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar el directorio oficial de herramientas y entorno local en el documento maestro del proyecto.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Metadatos y Stack Oficial de Trabajo",
+          "objective": "Ensamblar la ficha técnica y la matriz de herramientas en el documento oficial.",
+          "input": "Metadatos del proyecto y matriz consolidada de Step 2.",
+          "raw_data_title": "Metadatos y Stack de Trabajo",
+          "raw_data": "Proyecto: Nos Fuimos de Finca, Fase 2, D10, Estado Aprobado. Stack oficial con 6 categorías de software.",
+          "exit_label": "METADATOS Y STACK INTEGRADOS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Compilación de Secciones 1 y 2 en Formato Oficial",
+              "objective": "Redactar las secciones 1 y 2 del entregable con estricto apego a la plantilla de salida.",
+              "how_to": {
+                "steps": [
+                  "Llenar metadatos (Proyecto, Fase, Entregable, Estado).",
+                  "Adjuntar la tabla del Stack Oficial de Trabajo (Desarrollo y Gestión).",
+                  "Verificar que cada categoría tenga su justificación.",
+                  "Asegurar consistencia sintáctica y formato Markdown limpio."
+                ],
+                "table_columns": "Sección | Contenido Compilado | Estado",
+                "table_rules": "Cumplir con el formato estándar Markdown.",
+                "restrictions": [
+                  "No omitir ninguna de las 6 herramientas consolidadas."
+                ],
+                "done_when": "Secciones 1 y 2 compiladas correctamente."
+              },
+              "example_title": "Compilación de Metadatos y Stack",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 2 — Project Kickoff\n**Entregable:** 10 de 13\n**Estado:** Aprobado\n\n### 2. Stack Oficial de Trabajo (Desarrollo y Gestión)\n| Categoría | Herramienta Elegida | Justificación |\n| --- | --- | --- |\n| IDE Backend | IntelliJ IDEA / Eclipse | Entornos oficiales y estándar de la industria para desarrollo en Java. Excelente debugging. |\n| IDE Frontend | VS Code | Ligero, soporte absoluto para JavaScript y extensiones de Vite/ESLint. |\n| Cliente de Base de Datos | pgAdmin / DBeaver | Necesario para inspeccionar y alterar esquemas en PostgreSQL local y remoto. |\n| Gestión de Proyecto | Jira / Trello | Para llevar el backlog formalizado bajo metodologías Agile y trazar el progreso de desarrollo. |\n| Diseño UI | Figma | Única fuente de verdad visual para el diseño de interfaces web en JS. |\n| Control de Versiones | Git + GitHub | Repositorio central del código fuente y pipelines de integración (CI/CD). |",
+              "link_label": "stack de trabajo pasa a anexar entorno local y compuerta (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Integración de Entorno Local y Compuerta de Fase",
+          "objective": "Incorporar las especificaciones de ejecución local y evaluar el cumplimiento de la compuerta de fase.",
+          "input": "Especificaciones de entorno local (Step 3) y reglas de compuerta condicional.",
+          "raw_data_title": "Entorno Local y Compuerta D10",
+          "raw_data": "Entorno local integrado. Condición: Proceed. El equipo asume un ecosistema estándar y prohíbe herramientas no autorizadas.",
+          "exit_label": "ENTORNO LOCAL Y COMPUERTA INCORPORADAS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Incorporación de Requisitos Locales y Declaración de Pase",
+              "objective": "Completar las secciones 3 y 4 del entregable formalizando los requisitos locales y la compuerta.",
+              "how_to": {
+                "steps": [
+                  "Insertar la sección de Entorno de Ejecución Local (JDK, Node, Docker).",
+                  "Evaluar la compuerta condicional: ¿Herramientas sin gasto no planificado y familiares al equipo?",
+                  "Redactar la declaración formal de avance (Proceed).",
+                  "Verificar que la compuerta bloquee herramientas experimentales no autorizadas."
+                ],
+                "table_columns": "Sección | Contenido Anexado | Veredicto",
+                "table_rules": "Si se detecta gasto no planificado o herramientas exóticas, detener el avance.",
+                "restrictions": [
+                  "Prohibido otorgar pase con herramientas que superen el límite de OPEX de D2."
+                ],
+                "done_when": "Secciones de entorno local y compuerta de fase ensambladas."
+              },
+              "example_title": "Entorno Local y Compuerta de Fase",
+              "example": "### 3. Entorno de Ejecución Local\nTodos los desarrolladores deben tener instalado:\n- **Java JDK (17 o superior):** Para compilar el backend.\n- **Node.js y npm/yarn:** Para empaquetar y levantar el servidor de desarrollo del Frontend (Vite).\n- **Docker (Opcional pero recomendado):** Para levantar un contenedor de PostgreSQL idéntico al de producción sin ensuciar la máquina local.\n\n### 4. Implicación de Compuerta de Fase\n- **Condición:** Proceed. El equipo de ingeniería asume el uso de un ecosistema de desarrollo estándar para web apps. Queda prohibida la introducción de herramientas pesadas o experimentales sin previa autorización.",
+              "link_label": "documento completo pasa a validación final y publicación (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Validación de Integridad y Publicación Oficial",
+          "objective": "Verificar la exactitud del documento frente al artefacto de referencia y oficializar su publicación.",
+          "input": "Documento completo ensamblado y archivo de salida oficial.",
+          "raw_data_title": "Validación y Entrega D10",
+          "raw_data": "Verificado contra example_output_tooling.md. Publicación oficial en docs/02-project-kickoff.",
+          "exit_label": "ENTREGABLE D10 PUBLICADO Y COMPLETADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Emisión Oficial del Documento D10",
+              "objective": "Emitir el manual oficial de Tooling del equipo con registro formal en el control de progreso.",
+              "how_to": {
+                "steps": [
+                  "Comprobar la concordancia completa de todas las secciones.",
+                  "Verificar el enlace al artefacto [[example_output_tooling]].",
+                  "Validar que el estado del documento sea Aprobado.",
+                  "Registrar el hito en la bitácora de progreso."
+                ],
+                "table_columns": "Criterio de Cierre | Estado | Registro Oficial",
+                "table_rules": "El documento es la referencia vinculante para el setup de cualquier desarrollador que ingrese.",
+                "restrictions": [
+                  "No concluir sin verificar que el stack perimetral esté completamente cubierto."
+                ],
+                "done_when": "Entregable D10 formalmente emitido y publicado."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_tooling]]`.\n\nUbicación oficial: `docs/02-project-kickoff/10. Tooling.md`.\nEstado: Aprobado por Compuerta de Fase.",
+              "link_label": "entrega completada - fin de flujo D10"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+# name: Jerarquía (árbol)
+layout: tree
+direction: down
+defaults:
+  card_width: 220
+nodes:
+  - id: root
+    title: "Tema raíz"
+    role: root
+    color: "6"
+  - id: a
+    title: "Rama A"
+  - id: b
+    title: "Rama B"
+  - id: a1
+    title: "Sub A1"
+  - id: a2
+    title: "Sub A2"
+  - id: b1
+    title: "Sub B1"
+edges:
+  - from: root
+    to: [a, b]
+  - from: a
+    to: [a1, a2]
+  - from: b
+    to: [b1]

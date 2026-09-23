@@ -1,0 +1,151 @@
+{
+  "phase": "PHASE 6: TECHNICAL DESIGN",
+  "deliverable_code": "D6",
+  "deliverable": "Data Access & Repositories",
+  "purpose": "Definir los contratos de persistencia y acceso a datos para el módulo Booking Engine mediante el patrón Repositorio tipado en TypeScript para Supabase JS (PostgreSQL), especificando operaciones CRUD, consultas complejas con inner joins y cruces temporales para prevenir sobreposición de reservas, y Data Transfer Objects (DTOs) que blindan contra vulnerabilidades de asignación masiva (Mass Assignment).",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Class & Entity Diagrams (P6-D5) | [[PHASE_6_TECHNICAL_DESIGN/5.Class & Entity Diagrams/5.Class & Entity Diagrams.md]] | Fuente de entidades agregadas (Booking, Review, Wishlist) a persistir. |\n| Physical Data Modeling (P6-D2) | [[PHASE_6_TECHNICAL_DESIGN/2.Physical Data Modeling/2.Physical Data Modeling.md]] | Fuente de nombres exactos de tablas, columnas y tipos en PostgreSQL. |\n| Module Specification (P3-D7) | [[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module Specification/7.Module Specification.md]] | Fuente de reglas de negocio de disponibilidad y liquidación de reservas. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Definición de Interfaces de Repositorio (Repository Interface Definition)",
+      "summary": "Abstraer el acceso a Supabase detrás de interfaces tipadas para cada Aggregate Root del módulo.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Abstracción de Persistencia para Aggregate Roots",
+          "objective": "Desacoplar la lógica de dominio de la base de datos definiendo interfaces limpias con paginación estándar.",
+          "input": "Aggregate Roots de Fase 6 (D5) y convención estándar de paginación.",
+          "raw_data_title": "Matriz de Repositorios y Firmas CRUD",
+          "raw_data": "| Interfaz de Repositorio | Aggregate Root | Operaciones Tipadas | Convención de Paginación |\n|---|---|---|---|\n| `IBookingRepository` | `Booking` | `create, findById, findAll, update, delete` | `{ page: number, limit: number, sortBy?: string, order?: 'asc' \\| 'desc' }` |\n| `IReviewRepository` | `Review` | `create, findById, findAll, update, delete` | `{ page: number, limit: number, sortBy?: string, order?: 'asc' \\| 'desc' }` |\n| `IWishlistRepository` | `Wishlist` | `create, findAll, delete` | Paginación estándar de favoritos por usuario |",
+          "exit_label": "Interfaces de Repositorio Formalizadas",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Formalización de Interfaces de Persistencia",
+              "objective": "Documentar las firmas TypeScript de los repositorios retornando promesas de entidades ricas.",
+              "how_to": {
+                "steps": [
+                  "1. Crear interfaz IBookingRepository con métodos CRUD.",
+                  "2. Retornar promesas de la clase rica Booking en vez de registros de base de datos planos.",
+                  "3. Estandarizar la signatura de paginación `{page, limit, sortBy, order}`.",
+                  "4. Definir IReviewRepository e IWishlistRepository."
+                ],
+                "table_columns": [
+                  "Interfaz",
+                  "Método",
+                  "Retorno",
+                  "Propósito"
+                ],
+                "table_rules": [
+                  "Solo los Aggregate Roots reciben interfaz de repositorio propia",
+                  "Todos los métodos de listado múltiple deben soportar paginación obligatoria",
+                  "Las operaciones deben retornar instancias del dominio y no JSONs crudos"
+                ],
+                "restrictions": "Prohibido crear repositorios para entidades hijas dependientes.",
+                "done_when": "Interfaces de repositorio compiladas con tipado estricto."
+              },
+              "example_title": "Interfaces de Repositorio D6",
+              "example": "```typescript\nexport interface IBookingRepository {\n  create(data: CreateBookingDTO): Promise<Booking>;\n  findById(id: string): Promise<Booking | null>;\n  findAll(params: { page: number; limit: number; sortBy?: string; order?: 'asc' | 'desc' }): Promise<Booking[]>;\n  update(id: string, data: UpdateBookingDTO): Promise<Booking>;\n  delete(id: string): Promise<void>;\n}\n```",
+              "link_label": "Interfaces Definidas -> Consultas Complejas"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Especificación de Consultas Complejas (Complex Query Specification)",
+      "summary": "Diseñar en sintaxis literal de Supabase JS las consultas de negocio no-CRUD con joins y cruces de fechas.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Consultas Avanzadas y Joins en Supabase JS",
+          "objective": "Especificar las queries de prevención de solapamiento de fechas y agregaciones del dashboard.",
+          "input": "Reglas de disponibilidad de Fase 3 y columnas físicas de PostgreSQL de Fase 6 (D2).",
+          "raw_data_title": "Matriz de Consultas Complejas de Negocio",
+          "raw_data": "| Consulta Compleja | Propósito de Negocio | Sintaxis / Operador Supabase JS | Justificación Técnica |\n|---|---|---|---|\n| `findOverlappingBookings` | Prevención de doble reserva | `.or('and(check_in.lte...,check_out.gte...)')` | Bloquea colisiones de fechas antes de crear reserva |\n| `findBookingsByHost` | Dashboard de Finquero (Mis Huéspedes) | `.select('*, properties!inner(host_id)')` | Inner join invertido filtrando por dueño de finca |\n| `findBookingsByGuest` | Panel del Turista (Mis Viajes) | `.select('*').eq('guest_id', id).order('check_in')` | Recuperación cronológica de reservas históricas |",
+          "exit_label": "Consultas Complejas Codificadas en Supabase JS",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Codificación de Queries Avanzadas",
+              "objective": "Escribir la sintaxis literal en TypeScript utilizando el SDK de Supabase v2.",
+              "how_to": {
+                "steps": [
+                  "1. Codificar findOverlappingBookings usando operadores lógicos lte y gte.",
+                  "2. Implementar inner join invertido properties!inner para filtrar por hostId.",
+                  "3. Implementar ordenamiento cronológico para listado de reservas del turista.",
+                  "4. Mapear cada resultado a la entidad de dominio con mapToBookingEntity."
+                ],
+                "table_columns": [
+                  "Query",
+                  "Método Supabase",
+                  "Filtro SQL",
+                  "Garantía de Negocio"
+                ],
+                "table_rules": [
+                  "Toda query compleja debe referenciar únicamente columnas existentes en D2",
+                  "Las fechas deben formatearse en ISO strings universales",
+                  "Los joins deben explicitarse mediante la notación de relaciones de Supabase"
+                ],
+                "restrictions": "Prohibido inventar columnas no declaradas en el DDL físico.",
+                "done_when": "Código literal de Supabase JS redactado y probado para cada flujo."
+              },
+              "example_title": "Consultas Supabase JS D6",
+              "example": "```typescript\nasync findOverlappingBookings(propertyId: string, checkIn: Date, checkOut: Date): Promise<Booking[]> {\n  const { data, error } = await supabase\n    .from('bookings')\n    .select('*')\n    .eq('property_id', propertyId)\n    .in('status', ['PENDING', 'APPROVED'])\n    .or(`and(check_in.lte.${checkOut.toISOString()},check_out.gte.${checkIn.toISOString()})`);\n  if (error) throw error;\n  return data.map(mapToBookingEntity);\n}\n```",
+              "link_label": "Queries Codificadas -> Mapeo de DTOs"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Mapeo de DTOs y Protección Mass Assignment (DTO Mapping)",
+      "summary": "Definir los DTOs de entrada excluyendo estrictamente precios y estados manipulables por el cliente.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Definición de Payloads Seguros de Entrada",
+          "objective": "Blindar la aplicación contra inyección de precios calculados o mutaciones no autorizadas de estado.",
+          "input": "Métodos de repositorio de los Steps 1 y 2, y requerimientos de validación.",
+          "raw_data_title": "Catálogo de DTOs y Reglas de Bloqueo de Campos",
+          "raw_data": "| DTO de Entrada | Campos Permitidos del Cliente | Campos Excluidos / Bloqueados | Razón de Seguridad |\n|---|---|---|---|\n| `CreateBookingDTO` | `propertyId, checkIn, checkOut, guestCount, couponCode` | `id, status, totalPrice, basePriceAmount` | Evita manipulación de precios o estados por el cliente |\n| `UpdateBookingDTO` | `status?: 'APPROVED' \\| 'CANCELLED', cancellationReason` | Campos de fechas, precios o propiedades | Las reservas solo admiten cambios de estado de ciclo de vida |\n| `CreateReviewDTO` | `propertyId, rating (1-5), comment` | `id, guestId` | El `guestId` se inyecta desde el JWT en el backend |\n| `CreateWishlistDTO` | `propertyId` | `id, userId` | El `userId` se inyecta desde la sesión del usuario |",
+          "exit_label": "DTOs Seguros Formalizados",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Especificación de DTOs Tipados y Consolidación",
+              "objective": "Documentar las interfaces TypeScript de los DTOs con anotaciones de validación.",
+              "how_to": {
+                "steps": [
+                  "1. Declarar CreateBookingDTO con campos mínimos requeridos.",
+                  "2. Bloquear explícitamente totalPrice, status e id en la creación.",
+                  "3. Restringir UpdateBookingDTO exclusivamente a transiciones de estado semánticas.",
+                  "4. Inyectar guestId y userId desde el contexto del servidor (JWT)."
+                ],
+                "table_columns": [
+                  "DTO",
+                  "Campo",
+                  "Tipo",
+                  "Restricción de Validación"
+                ],
+                "table_rules": [
+                  "Ningún DTO de creación de reserva puede aceptar totalPrice del cliente",
+                  "El guestId no se recibe del frontend en reviews; se extrae del JWT",
+                  "Las fechas deben validarse como futuras y checkOut mayor que checkIn"
+                ],
+                "restrictions": "Prohibido permitir que el cliente envíe el rol o el identificador de usuario en el payload.",
+                "done_when": "DTOs de entrada documentados y protegidos contra Mass Assignment."
+              },
+              "example_title": "Definición de DTOs D6",
+              "example": "```typescript\nexport interface CreateBookingDTO {\n  propertyId: string;\n  checkIn: string;\n  checkOut: string;\n  guestCount: number;\n  couponCode?: string;\n  // ⛔ BLOQUEADO: status, totalPrice e id NO se aceptan\n}\n```",
+              "link_label": "DTOs Mapeados -> Entregable D6"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverable_output": "# Deliverable 6 (D6): Data Access & Repositories\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 6 — Technical Design\n**Módulo:** MOD-Booking\n**Estado:** Approved\n\n*Backlink a Fase 6, D5:* Este entregable define las interfaces de comunicación con la base de datos (PostgreSQL vía Supabase JS) para persistir las entidades protegidas diseñadas en el `[[PHASE_6_TECHNICAL_DESIGN/modules/MOD-Booking/5.Class_Diagrams.md]]`.\n\n---\n\n## 2. Interfaces de Repositorio y Queries Complejas (Supabase JS)\n\nAplicando Domain-Driven Design, hemos creado repositorios únicamente para las *Aggregate Roots* (`Booking`, `Review`, `Wishlist`).\n\n### 2.1 IBookingRepository\n```typescript\nimport { Booking } from '../domain/Booking';\nimport { CreateBookingDTO, UpdateBookingDTO } from './dtos';\n\nexport interface IBookingRepository {\n  // Operaciones CRUD Estándar\n  create(data: CreateBookingDTO): Promise<Booking>;\n  findById(id: string): Promise<Booking | null>;\n  update(id: string, data: UpdateBookingDTO): Promise<Booking>;\n  delete(id: string): Promise<void>; // (Solo aplicable pre-pago por seguridad financiera)\n  \n  // NFR: Listado Genérico con Paginación\n  findAll(params: { page: number; limit: number; sortBy?: string; order?: 'asc' | 'desc' }): Promise<Booking[]>;\n  \n  // --- CONSULTAS COMPLEJAS (Supabase JS) ---\n\n  // 1. Prevención de Doble Reserva (Validación antes de Crear)\n  async findOverlappingBookings(propertyId: string, checkIn: Date, checkOut: Date): Promise<Booking[]> {\n    const { data, error } = await supabase\n      .from('bookings')\n      .select('*')\n      .eq('property_id', propertyId)\n      .in('status', ['PENDING', 'APPROVED'])\n      // Lógica de cruce temporal en Postgres:\n      .or(`and(check_in.lte.${checkOut.toISOString()},check_out.gte.${checkIn.toISOString()})`);\n    \n    if (error) throw error;\n    return data.map(mapToBookingEntity);\n  }\n\n  // 2. Dashboard del Finquero (Mis Huéspedes) - Inner Join Invertido\n  async findBookingsByHost(hostId: string, params: PaginationParams): Promise<Booking[]> {\n    const { data, error } = await supabase\n      .from('bookings')\n      // Relación implicita configurada en BD: properties!inner\n      .select('*, properties!inner(host_id)')\n      .eq('properties.host_id', hostId)\n      .order(params.sortBy || 'created_at', { ascending: params.order === 'asc' })\n      .range(params.page * params.limit, (params.page + 1) * params.limit - 1);\n      \n    if (error) throw error;\n    return data.map(mapToBookingEntity);\n  }\n\n  // 3. Mis Viajes (Dashboard del Turista)\n  async findBookingsByGuest(guestId: string): Promise<Booking[]> {\n    const { data, error } = await supabase\n      .from('bookings')\n      .select('*')\n      .eq('guest_id', guestId)\n      .order('check_in', { ascending: false });\n      \n    if (error) throw error;\n    return data.map(mapToBookingEntity);\n  }\n}\n```\n\n### 2.2 IReviewRepository & IWishlistRepository\n```typescript\nexport interface IReviewRepository {\n  create(data: CreateReviewDTO): Promise<Review>;\n  findById(id: string): Promise<Review | null>;\n  findAll(params: { page: number; limit: number; sortBy?: string; order?: 'asc' | 'desc' }): Promise<Review[]>;\n  update(id: string, data: UpdateReviewDTO): Promise<Review>;\n  delete(id: string): Promise<void>;\n}\n\nexport interface IWishlistRepository {\n  create(data: CreateWishlistDTO): Promise<Wishlist>;\n  findAll(params: { page: number; limit: number; sortBy?: string; order?: 'asc' | 'desc' }): Promise<Wishlist[]>;\n  delete(id: string): Promise<void>;\n}\n```\n\n---\n\n## 3. Definiciones de DTO (Data Transfer Objects)\n\n> [!WARNING]\n> La seguridad de Mass Assignment reside aquí. Ningún DTO expone los atributos financieros (`totalPrice`, `taxesAmount`) de la base de datos hacia el cliente. El backend debe recalcularlos asíncronamente en base al catálogo maestro en el momento de crear la reserva.\n\n```typescript\n// ==========================================\n// BOOKING DTOs\n// ==========================================\n\nexport interface CreateBookingDTO {\n  propertyId: string; // UUID válido, requerido (Llave hacia Catálogo)\n  checkIn: string; // Fecha ISO YYYY-MM-DD, requerida, debe ser mayor o igual a HOY\n  checkOut: string; // Fecha ISO YYYY-MM-DD, requerida, debe ser mayor a checkIn\n  guestCount: number; // Entero positivo >= 1\n  couponCode?: string; // Opcional. String alfanumérico.\n  \n  // ⛔ BLOQUEADO: 'status', 'totalPrice', 'basePriceAmount' y 'id' NO se aceptan.\n}\n\nexport interface UpdateBookingDTO {\n  // Las modificaciones a una reserva son acciones de estado, no escrituras libres.\n  status?: 'APPROVED' | 'CANCELLED'; \n  cancellationReason?: string;\n}\n\n// ==========================================\n// REVIEW DTOs\n// ==========================================\n\nexport interface CreateReviewDTO {\n  propertyId: string; // UUID válido\n  rating: number; // Entero obligatorio, restringido al rango 1 - 5\n  comment?: string; // Texto, máximo 1000 caracteres\n  \n  // ⛔ BLOQUEADO: 'guestId' NO se acepta del cliente. El backend lo inyectará extrayéndolo del JWT por seguridad.\n}\n\n// ==========================================\n// WISHLIST DTOs\n// ==========================================\n\nexport interface CreateWishlistDTO {\n  propertyId: string; // UUID válido\n  \n  // ⛔ BLOQUEADO: 'userId' lo inyecta el AuthGuard a partir de la cookie de sesión.\n}\n```\n\n---\n\n## 4. Downstream Consumers\n- **Phase 6 — D7 (API Contracts):** Este documento entregará la estructura JSON exacta que se plasmará en Swagger/OpenAPI (Los DTOs definen los `Request Bodies`).\n- **Phase 7 — D5 (Backend API Implementation):** Los desarrolladores usarán estas interfaces y las consultas literales de Supabase JS para escribir el código fuente del proyecto Next.js (`src/modules/booking/infrastructure/SupabaseBookingRepository.ts`)."
+}

@@ -23,9 +23,20 @@ def run():
             if p.exists():
                 QCoreApplication.addLibraryPath(str(p))
 
+    # QtWebEngine (the WEB module, loaded on demand) requires this before the
+    # QApplication exists; it is harmless when WEB is never opened.
+    QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+
+    if any(a.startswith("--web-selftest") for a in sys.argv):
+        from .ui.components.web.selftest import run_selftest
+        sys.exit(run_selftest(sys.argv))
+
     app = QApplication(sys.argv)
     app.setApplicationName("NoteVault")
     app.setOrganizationName("NoteVault")
+
+    # Load friendly fonts before theme installation
+    theme.load_fonts()
 
     # Must run before the first widget is created: it routes every widget
     # stylesheet through the active palette.

@@ -1,0 +1,445 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D1",
+  "deliverable": "Project Identity (Identidad del Proyecto)",
+  "purpose": "Este primer entregable de la Fase 2 (Project Kickoff) tiene como objetivo asentar oficialmente las bases fundacionales del proyecto. Su meta principal es bautizar el proyecto técnicamente y delimitar su alcance (Scope), protegiendo al equipo de ingeniería de construir funcionalidades fantasma que no resuelven el problema central aprobado en la Fase 1.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_mvp_definition]] | Define el formato del MVP aprobado y la hipótesis (P1-D9). |\n| [[example_output_go_nogo_decision]] | Provee la confirmación de mandato para continuar o detenerse (P1-D12). |\n| [[example_output_brief]] | Resume la propuesta de valor y las capacidades excluidas (P1-D13). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría de Mandato (Verify Entry)",
+      "summary": "Confirmar la autorización ejecutiva de Gate 1, extraer condiciones restrictivas y deducir implicaciones técnicas.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Evaluación del mandato oficial y condiciones",
+          "objective": "Extraer literalmente el estado final del mandato y sus condiciones restrictivas desde P1-D12.",
+          "input": "Acta de decisión de [[example_output_go_nogo_decision]] (P1-D12).",
+          "raw_data_title": "Mandato Oficial Gate 1",
+          "raw_data": "Mandato: GO / CONDITIONAL GO. Condiciones: desarrollo desacoplado offline-first, delegación en pasarela Wompi y cero scope creep de apps móviles.",
+          "exit_label": "MANDATO Y CONDICIONES AUDITADOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Auditoría de estado y restricciones de Gate 1",
+              "objective": "Verificar la existencia de autorización ejecutiva formal antes de gastar horas de ingeniería.",
+              "how_to": {
+                "steps": [
+                  "Consultar el acta formal de Gate 1 en P1-D12.",
+                  "Extraer el veredicto oficial emitido por los líderes de negocio y tecnología.",
+                  "Identificar las condiciones restrictivas que condicionan el desarrollo del software.",
+                  "Registrar el mandato en la tabla de evaluación forense."
+                ],
+                "table_columns": "Dimensión de Entrada | Estado Extraído | Documento Fuente",
+                "table_rules": "Extracción literal de la decisión oficial sin reinterpretaciones.",
+                "restrictions": [
+                  "Prohibido inicializar repositorios si el mandato es No-Go.",
+                  "Identificar todas las restricciones técnicas explícitas."
+                ],
+                "done_when": "Mandato oficial y restricciones extraídos y documentados."
+              },
+              "example_title": "Auditoría del Mandato Oficial de Fase 1",
+              "example": "| Mandato Oficial | Condiciones del Mandato |\n| --- | --- |\n| GO (o Conditional Go) | MVP desacoplado, arquitectura offline-first, pasarela de pago Wompi y cero scope creep |",
+              "link_label": "mandato va a hipótesis central de valor (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Extracción de hipótesis central de valor",
+          "objective": "Aislar la promesa central de negocio que el software debe validar empíricamente.",
+          "input": "Resumen ejecutivo de [[example_output_brief]] (P1-D13).",
+          "raw_data_title": "Hipótesis Central de Valor",
+          "raw_data": "Hipótesis: La automatización de reservas y cobros mediante Landing Page, catálogo y checkout Wompi elimina errores y la dependencia manual de WhatsApp.",
+          "exit_label": "HIPÓTESIS DE VALOR EXTRAÍDA → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Extracción y formulación de la hipótesis de valor",
+              "objective": "Declarar la hipótesis rectora cuya validación justifica la existencia del producto.",
+              "how_to": {
+                "steps": [
+                  "Localizar la hipótesis central en el Brief de Fase 1 (P1-D13).",
+                  "Redactar la declaración en términos de causa y efecto verificable.",
+                  "Asegurar que la hipótesis vincule la solución técnica con el dolor del usuario.",
+                  "Incorporar la hipótesis en la tabla forense de mandato."
+                ],
+                "table_columns": "Hipótesis Central | Mecanismo Técnico | Resultado Esperado",
+                "table_rules": "Alineación estricta con los supuestos validados en Fase 1.",
+                "restrictions": [
+                  "No formular hipótesis abstractas desconectadas del código.",
+                  "Preservar el foco en resolver el dolor central del usuario."
+                ],
+                "done_when": "Hipótesis central de valor redactada y vinculada al mandato."
+              },
+              "example_title": "Hipótesis Central de Valor",
+              "example": "**Hipótesis Central de Valor:** La automatización del proceso de reservas y cobros mediante una Landing Page con catálogo interactivo, pasarela de pagos integrada (Wompi) y motor transaccional centralizado elimina la dependencia de métodos manuales en WhatsApp, suprimiendo la probabilidad de errores o cruces y optimizando el control operativo.",
+              "link_label": "hipótesis va a implicaciones arquitectónicas (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Determinación de implicaciones arquitectónicas",
+          "objective": "Traducir las directivas del mandato en directrices técnicas mandatorias para el diseño de sistemas.",
+          "input": "Mandato de 1.1 e hipótesis de 1.2.",
+          "raw_data_title": "Implicaciones Técnicas",
+          "raw_data": "Implicación: Desarrollo Fullstack desacoplado. Frontend SPA responsivo (React + Tailwind CSS) y Backend API REST (Spring Boot 3.x + PostgreSQL 16).",
+          "exit_label": "IMPLICACIONES ARQUITECTÓNICAS DEFINIDAS → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Traducción de directivas a directrices arquitectónicas",
+              "objective": "Definir las restricciones globales que regirán la selección del stack y la modularidad del código.",
+              "how_to": {
+                "steps": [
+                  "Analizar cómo las restricciones de mandato impactan las capas de software.",
+                  "Determinar si se exige desarrollo Fullstack desacoplado o integraciones ligeras.",
+                  "Fijar la directriz sobre bases de datos y procesamiento de transacciones.",
+                  "Consolidar la tabla de auditoría forense del mandato."
+                ],
+                "table_columns": "Mandato Oficial | Condiciones del Mandato | Hipótesis Central de Valor | Implicación Arquitectónica",
+                "table_rules": "Traducción directa de negocio a directriz técnica.",
+                "restrictions": [
+                  "Prohibido violar las directrices fijadas en el acta de Gate 1.",
+                  "Mantener consistencia entre el stack y el horizonte del MVP."
+                ],
+                "done_when": "Tabla de auditoría de mandato consolidada con implicaciones arquitectónicas."
+              },
+              "example_title": "Evaluación Forense del Mandato y Arquitectura",
+              "example": "| Mandato Oficial | Condiciones del Mandato | Hipótesis Central de Valor | Implicación Arquitectónica |\n| --- | --- | --- | --- |\n| GO | MVP desacoplado, sin scope creep | Automatización de catálogo y reservas elimina errores de WhatsApp | Frontend React + Tailwind CSS y Backend Spring Boot 3.x + PostgreSQL 16 con checkout Wompi |",
+              "link_label": "implicaciones van a nombre comercial (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Identidad Nominal Comercial y Técnica",
+      "summary": "Asignar nombre comercial, codename técnico bajo estándar POSIX y versión inicial SemVer.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Definición del nombre comercial",
+          "objective": "Establecer la denominación pública oficial del producto con formato capitalizado.",
+          "input": "Propuesta de valor y marca aprobada en Fase 1.",
+          "raw_data_title": "Nombre Comercial",
+          "raw_data": "Nombre Comercial: Nos Fuimos de Finca.",
+          "exit_label": "NOMBRE COMERCIAL FIJADO → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Fijación del nombre público del producto",
+              "objective": "Declarar la identidad comercial que identificará el producto ante clientes y mercado.",
+              "how_to": {
+                "steps": [
+                  "Consultar el nombre aprobado por los stakeholders en los entregables de Fase 1.",
+                  "Verificar la ortografía y formato capitalizado de la marca.",
+                  "Asegurar que represente claramente la propuesta de valor del negocio.",
+                  "Registrar la denominación en la convención de nomenclatura."
+                ],
+                "table_columns": "Tipo de Identidad | Denominación Oficial | Regla Tipográfica",
+                "table_rules": "Nombre comercial capitalizado con espacios estándar.",
+                "restrictions": [
+                  "No alterar el nombre de marca pactado en Fase 0 y 1.",
+                  "Garantizar coherencia en todos los entregables subsiguientes."
+                ],
+                "done_when": "Nombre comercial formalmente registrado."
+              },
+              "example_title": "Definición de Nombre Comercial",
+              "example": "| Tipo | Definición | Regla Aplicada |\n| --- | --- | --- |\n| Nombre Comercial | Nos Fuimos de Finca | Capitalizado con espacios |",
+              "link_label": "nombre comercial va a codename POSIX (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Definición del codename técnico POSIX",
+          "objective": "Asignar el identificador técnico en kebab-case para repositorios, microservicios y variables de entorno.",
+          "input": "Nombre comercial de 2.1 y reglas POSIX.",
+          "raw_data_title": "Codename Técnico",
+          "raw_data": "Codename Técnico: nff-platform (kebab-case, minúsculas, sin espacios, máximo 3 palabras).",
+          "exit_label": "CODENAME TÉCNICO POSIX BLOQUEADO → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Asignación de codename kebab-case bajo estándar POSIX",
+              "objective": "Garantizar una nomenclatura técnica segura y universal para CI/CD, Git y bases de datos.",
+              "how_to": {
+                "steps": [
+                  "Aplicar reglas POSIX: máximo 3 palabras, solo minúsculas y caracteres alfanuméricos.",
+                  "Separar términos exclusivamente mediante guiones medios (kebab-case).",
+                  "Verificar que no existan espacios, caracteres especiales ni acentos.",
+                  "Aprobar el slug que identificará el repositorio y los prefijos de configuración."
+                ],
+                "table_columns": "Parámetro Técnico | Valor Asignado | Validación POSIX",
+                "table_rules": "Estricto kebab-case sin mayúsculas ni caracteres no ASCII.",
+                "restrictions": [
+                  "Prohibido usar espacios, camelCase o guiones bajos en el codename principal.",
+                  "Mantener brevedad para facilitar su uso como prefijo de variables de entorno."
+                ],
+                "done_when": "Codename técnico POSIX validado y bloqueado."
+              },
+              "example_title": "Codename Técnico POSIX",
+              "example": "| Tipo | Definición | Regla Aplicada |\n| --- | --- | --- |\n| Codename Técnico | `nff-platform` | POSIX, sin espacios, minúsculas, kebab-case |",
+              "link_label": "codename va a versión inicial SemVer (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Establecimiento de versión inicial SemVer",
+          "objective": "Definir el número de versión semántica de arranque reflejando el carácter exploratorio del MVP.",
+          "input": "Mandato del MVP de Step 1.",
+          "raw_data_title": "Versión Inicial",
+          "raw_data": "Versión Inicial: v0.1.0-alpha (Semantic Versioning para MVP en desarrollo pre-producción).",
+          "exit_label": "CONVENCIÓN NOMINAL Y VERSIÓN BLOQUEADAS → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Fijación de versión inicial de arranque",
+              "objective": "Aplicar Semantic Versioning (SemVer) justificando el número de inicio según la madurez del código.",
+              "how_to": {
+                "steps": [
+                  "Aplicar el estándar SemVer: Major.Minor.Patch con etiqueta de prerelease.",
+                  "Asignar v0.1.0-alpha para reflejar la condición de desarrollo de MVP inicial.",
+                  "Justificar por qué no se usa v1.0.0 en esta fase temprana.",
+                  "Consolidar la tabla de convención de nomenclatura del proyecto."
+                ],
+                "table_columns": "Tipo | Definición | Regla Aplicada",
+                "table_rules": "Uso de estándar SemVer oficial.",
+                "restrictions": [
+                  "No usar v1.0.0 antes de la validación completa en campo.",
+                  "Mantener la versión sincronizada con package.json y pom.xml."
+                ],
+                "done_when": "Versión inicial SemVer formalmente fijada."
+              },
+              "example_title": "Convención de Nomenclatura Bloqueada",
+              "example": "| Tipo | Definición | Regla Aplicada |\n| --- | --- | --- |\n| Nombre Comercial | Nos Fuimos de Finca | Capitalizado |\n| Codename Técnico | `nff-platform` | POSIX, sin espacios, minúsculas, kebab-case |\n| Versión de Arranque | v0.1.0-alpha | MVP exploratorio según SemVer |",
+              "link_label": "nomenclatura va a delimitación in-scope (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Delimitación Estricta de Alcance (Scope & Out-of-Scope)",
+      "summary": "Fijar capacidades mandatorias In-Scope e imponer prohibiciones explícitas Out-of-Scope.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Extracción y justificación de capacidades In-Scope",
+          "objective": "Listar las 3 a 5 capacidades fundamentales que el sistema debe implementar obligatoriamente para v0.1.0.",
+          "input": "Componentes esenciales de [[example_output_mvp_definition]] (P1-D9).",
+          "raw_data_title": "In-Scope Mandatorio",
+          "raw_data": "In-Scope: 1) Landing Page y Catálogo B2C, 2) Motor Transaccional de Reservas, 3) Pasarela Checkout Wompi, 4) Notificaciones WhatsApp/Email, 5) Panel de Disponibilidad.",
+          "exit_label": "CAPACIDADES IN-SCOPE FIJADAS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Especificación mandatoria de capacidades In-Scope",
+              "objective": "Definir los componentes críticos de software que componen la entrega sin adornos superfluos.",
+              "how_to": {
+                "steps": [
+                  "Consultar el In-Scope aprobado en P1-D9.",
+                  "Describir cada capacidad funcional requerida con su tecnología base.",
+                  "Justificar la necesidad de cada componente respecto a la hipótesis de valor.",
+                  "Integrar la lista de capacidades mandatorias de arranque."
+                ],
+                "table_columns": "Capacidad Requerida (In-Scope) | Implementación Técnica | Justificación de Negocio",
+                "table_rules": "Máximo 5 capacidades fundamentales para el MVP.",
+                "restrictions": [
+                  "No incluir funciones secundarias no validadas en Fase 1.",
+                  "Asegurar que cada ítem contribuya directamente al core loop."
+                ],
+                "done_when": "Capacidades In-Scope listadas y justificadas."
+              },
+              "example_title": "Capacidades Mandatorias In-Scope (v0.1.0)",
+              "example": "**In-Scope (Mandatorio para v0.1.0):**\n- **Landing Page y Catálogo B2C:** Frontend React + Tailwind CSS responsivo con búsqueda, filtrado por fechas/capacidad y detalle de fincas.\n- **Motor Transaccional de Reservas:** API REST Spring Boot para orquestación de estados de reserva y bloqueo atómico en PostgreSQL.\n- **Pasarela de Pagos Integrada:** Checkout transaccional con Wompi (PSE, Nequi, Tarjetas) y confirmación automática vía Webhooks.\n- **Notificaciones Transaccionales:** Despacho automatizado de alertas vía WhatsApp Cloud API y correo electrónico a finqueros y turistas.\n- **Panel de Disponibilidad:** Panel web ágil para que los finqueros gestionen fechas y el equipo NFF supervise operaciones.",
+              "link_label": "in-scope va a prohibiciones out-of-scope (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Definición y justificación de exclusiones Out-of-Scope",
+          "objective": "Enumerar las funcionalidades prohibidas en v0.1.0 con el motivo técnico y económico de exclusión.",
+          "input": "Prohibiciones explícitas de [[example_output_mvp_definition]] (P1-D9).",
+          "raw_data_title": "Out-of-Scope Prohibido",
+          "raw_data": "Out-of-Scope: Apps móviles nativas, panel multi-finca para agencias B2B, bot conversacional IA, sincronización iCal compleja, facturación masiva propia.",
+          "exit_label": "PROHIBICIONES OUT-OF-SCOPE BLINDADAS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Formulación explícita de prohibiciones Out-of-Scope",
+              "objective": "Blindar el presupuesto y cronograma prohibiendo el desarrollo prematuro de funciones complejas.",
+              "how_to": {
+                "steps": [
+                  "Identificar las características que típicamente generan scope creep en la industria.",
+                  "Declarar su prohibición explícita para la versión v0.1.0.",
+                  "Justificar técnicamente por qué construirlas en este momento implicaría desperdicio.",
+                  "Documentar si quedan diferidas a vNext o descartadas definitivamente."
+                ],
+                "table_columns": "Funcionalidad Prohibida (Out-of-Scope) | Motivo de Exclusión Técnica | Destino",
+                "table_rules": "Prohibiciones categóricas vinculantes para todo el equipo.",
+                "restrictions": [
+                  "No omitir justificaciones técnicas o de negocio.",
+                  "Garantizar que cualquier ticket con estas features sea rechazado de plano."
+                ],
+                "done_when": "Lista de exclusiones Out-of-Scope blindada y justificada."
+              },
+              "example_title": "Funcionalidades Prohibidas Out-of-Scope (v0.1.0)",
+              "example": "**Out-of-Scope (Estrictamente Prohibido para v0.1.0):**\n- Apps móviles nativas iOS / Android (se prioriza Web App responsiva Mobile-First).\n- Panel multi-finca y gestión de comisiones para Agencias Intermediarias B2B (Diferido a vNext).\n- Bot conversacional interactivo en WhatsApp (Diferido a vNext; WhatsApp opera como canal unidireccional de notificaciones).\n- Motores de recomendación con Inteligencia Artificial o analítica predictiva.\n- Sincronización iCal bidireccional multicanal compleja.\n- Facturación electrónica masiva en base de datos propia.",
+              "link_label": "out-of-scope va a verificación anti scope-creep (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Verificación de blindaje anti scope-creep",
+          "objective": "Certificar que las fronteras de alcance otorguen a cualquier miembro la facultad de rechazar tareas no autorizadas.",
+          "input": "Tablas de In-Scope y Out-of-Scope de 3.1 y 3.2.",
+          "raw_data_title": "Blindaje de Alcance",
+          "raw_data": "Fronteras de alcance cerradas. Cualquier ticket que intente incluir apps nativas o IA será rechazado citando P2-D1.",
+          "exit_label": "BLINDAJE DE ALCANCE CERTIFICADO → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Auditoría cruzada de coherencia de alcance vs mandato",
+              "objective": "Asegurar que la totalidad de las exclusiones respalde el mandato de agilidad y presupuesto de Fase 1.",
+              "how_to": {
+                "steps": [
+                  "Cruzar cada elemento Out-of-Scope contra las condiciones de Gate 1.",
+                  "Comprobar que ninguna exclusión impida probar la hipótesis central de valor.",
+                  "Fijar la regla: 'Si está Out-of-Scope, el ticket se cierra como Won't Do'.",
+                  "Registrar el dictamen de blindaje de alcance en la bitácora."
+                ],
+                "table_columns": "Dimensión de Alcance | Verificación de Coherencia | Estatus de Blindaje",
+                "table_rules": "Validación de coherencia al 100%.",
+                "restrictions": [
+                  "No dejar zonas grises sobre funcionalidades permitidas.",
+                  "Capacitar al equipo en la aplicación estricta del Out-of-Scope."
+                ],
+                "done_when": "Blindaje de alcance formalmente verificado y sellado."
+              },
+              "example_title": "Verificación de Blindaje Anti Scope-Creep",
+              "example": "| Criterio de Control | Condición Exigida | Estado |\n| --- | --- | --- |\n| In-Scope acotado | Máximo 5 capacidades centrales | Conforme (5 componentes) ✅ |\n| Out-of-Scope explícito | Prohibición explícita de apps nativas e IA | Conforme ✅ |\n| Facultad de rechazo | tickets fuera de alcance se cierran 'Won't Do' | Activada ✅ |",
+              "link_label": "blindaje va a consolidación de secciones (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar el acta de nacimiento técnica del proyecto, auditar formato y exportar formalmente.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación estructurada de secciones",
+          "objective": "Integrar metadatos, identidad nominal, hipótesis de valor y delimitación de alcance en el formato maestro.",
+          "input": "Outputs de Steps 1 al 3.",
+          "raw_data_title": "Consolidación Documental",
+          "raw_data": "Estructuración del documento oficial en sus 4 secciones canónicas en español absoluto.",
+          "exit_label": "DOCUMENTO CONSOLIDADO → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Compilación de metadatos, identidad y alcance",
+              "objective": "Armar el artefacto oficial siguiendo la plantilla estructurada de la metodología.",
+              "how_to": {
+                "steps": [
+                  "Organizar las 4 secciones estándar del entregable.",
+                  "Insertar metadatos completos: Proyecto, Fase 2, Entregable 1 de 13, Estado.",
+                  "Formatear las viñetas de In-Scope y Out-of-Scope con sus respectivas justificaciones.",
+                  "Revisar la tipografía y redacción técnica en español formal."
+                ],
+                "table_columns": "Sección del Documento | Contenido Compilado | Estado de Integración",
+                "table_rules": "Estructura estandarizada oficial de Fase 2.",
+                "restrictions": [
+                  "No omitir justificaciones en el Out-of-Scope.",
+                  "Garantizar exactitud en el Codename técnico."
+                ],
+                "done_when": "Documento consolidado en su formato definitivo de exportación."
+              },
+              "example_title": "Estructura Consolidada de Identidad del Proyecto",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 2 — Project Kickoff  \n**Entregable:** 1 de 13  \n**Estado:** Aprobado  \n\n### 2. Identidad Nominal y Mandato  \n### 3. Hipótesis Central de Valor  \n### 4. Delimitación de Alcance (Scope Bounds)",
+              "link_label": "consolidación va a control de calidad y español (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Verificación de compuerta y coherencia",
+          "objective": "Ejecutar la lista de verificación confirmando reglas POSIX, SemVer y español absoluto.",
+          "input": "Documento consolidado de 4.1.",
+          "raw_data_title": "Control de Calidad",
+          "raw_data": "Codename nff-platform cumple POSIX. SemVer v0.1.0-alpha conforme. Español absoluto en 100% de títulos y tablas.",
+          "exit_label": "CONTROL DE CALIDAD SUPERADO → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Control de calidad de nomenclatura y español absoluto",
+              "objective": "Verificar el cumplimiento riguroso de las compuertas condicionales del entregable.",
+              "how_to": {
+                "steps": [
+                  "Confirmar que el codename sea POSIX estricto (sin mayúsculas ni espacios).",
+                  "Verificar que la versión de arranque respete SemVer.",
+                  "Comprobar que todos los encabezados y metadatos estén traducidos a español absoluto.",
+                  "Registrar el resultado conforme en la lista de chequeo."
+                ],
+                "table_columns": "Regla de Control | Requerimiento de Validación | Estado",
+                "table_rules": "Cumplimiento obligatorio del 100% de reglas de formato.",
+                "restrictions": [
+                  "Rechazar si el codename incluye caracteres inválidos.",
+                  "No admitir encabezados en inglés no permitidos."
+                ],
+                "done_when": "Lista de verificación de formato superada con éxito."
+              },
+              "example_title": "Lista de Verificación de Calidad",
+              "example": "| Regla de Control | Condición | Estatus |\n| --- | --- | --- |\n| Nomenclatura POSIX | Kebab-case, minúsculas, <= 3 palabras | Conforme (`nff-platform`) ✅ |\n| Semantic Versioning | Major.Minor.Patch con etiqueta | Conforme (`v0.1.0-alpha`) ✅ |\n| Idioma Español | Encabezados y metadatos 100% español | Conforme ✅ |\n| Coherencia de Mandato | Alineado con acta de Gate 1 (P1-D12) | Conforme ✅ |",
+              "link_label": "control de calidad va a exportación y firma (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Registro de metadatos y exportación formal",
+          "objective": "Sellar el acta de nacimiento técnica y publicarla en la Base de Conocimiento oficial.",
+          "input": "Documento validado y sellado.",
+          "raw_data_title": "Exportación y Cierre P2-D1",
+          "raw_data": "Proyecto: Nos Fuimos de Finca. Fase 2, D1 de 13. Estado: Approved. Acta de nacimiento técnica oficialmente publicada.",
+          "exit_label": "IDENTIDAD DEL PROYECTO FORMALMENTE APROBADA",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Sellado formal del entregable de Identidad del Proyecto",
+              "objective": "Certificar la culminación del primer paso de Kickoff y autorizar el avance a Restricciones No Negociables.",
+              "how_to": {
+                "steps": [
+                  "Completar la cabecera estándar de metadatos con el estado oficial 'Approved'.",
+                  "Publicar el documento en `docs/02-project-kickoff/01. Identidad del Proyecto.md`.",
+                  "Actualizar el archivo de progreso PROGRESS.md con las métricas del entregable.",
+                  "Habilitar el inicio del entregable P2-D2 (Non-Negotiable Constraints)."
+                ],
+                "table_columns": "Parámetro de Registro | Valor Registrado | Significado Metodológico",
+                "table_rules": "Registro formal de cierre del entregable fundacional.",
+                "restrictions": [
+                  "No modificar el contenido una vez publicado.",
+                  "Preservar la identidad como directriz inmutable de la Fase 2."
+                ],
+                "done_when": "Metadatos registrados y entregable P2-D1 formalmente aprobado."
+              },
+              "example_title": "Certificación Final de Identidad del Proyecto",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca  \n**Fase:** 2 — Project Kickoff  \n**Entregable:** 1 de 13  \n**Estado:** Aprobado  \n\nEstado al cerrar este step: **Approved**. Proyecto bautizado técnicamente como `nff-platform` (v0.1.0-alpha). Alcance blindado con 5 capacidades In-Scope y 6 prohibiciones Out-of-Scope mandatorias.",
+              "link_label": "cierre formal del entregable P2-D1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

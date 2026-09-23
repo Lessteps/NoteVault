@@ -18,6 +18,22 @@ from PySide6.QtWidgets import QWidget
 DARK = "dark"
 LIGHT = "light"
 
+NOTE_FONT_NAME = "Lexend"
+NOTE_FONT_FAMILY = "Lexend, 'Segoe UI Variable Text', 'Segoe UI', sans-serif"
+CODE_FONT_FAMILY = "'Cascadia Mono', Consolas, monospace"
+
+
+def load_fonts():
+    """Load bundled friendly typography into Qt's application font database."""
+    import sys
+    from pathlib import Path
+    from PySide6.QtGui import QFontDatabase
+    base = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).resolve().parent.parent.parent
+    font_path = base / "assets" / "fonts" / "Lexend-Variable.ttf"
+    if font_path.exists():
+        QFontDatabase.addApplicationFont(str(font_path))
+
+
 RAW_CSS_PROPERTY = "_nvRawCss"
 
 _current = DARK

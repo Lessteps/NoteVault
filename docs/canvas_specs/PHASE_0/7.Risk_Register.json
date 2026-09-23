@@ -1,0 +1,275 @@
+{
+  "phase": "Phase 0",
+  "deliverable_code": "D7",
+  "deliverable": "Risk Register (Disqualifiers)",
+  "purpose": "This deliverable functions as a survival test. Its objective is to attempt to 'kill' the project by demonstrating early whether the problem cannot be solved with software (it is a purely human, physical, hardware problem, or already trivially solved by existing tools). It is also the place where everything we still don't know is professionally documented, instead of faking certainty. If it survives, it will proceed to Phase 1.",
+  "inputs": "| Artifact | Use | Consumed in |\n| --- | --- | --- |\n| [[example_output_problem_statement]] | Primary User Profile and Problem (D1). | Step 1 |\n| [[example_output_stakeholder_map]] | `TBD` roles to be converted into Known Unknowns (D6). | Step 3 |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Lethal Disqualifier Test",
+      "summary": "Actively seek valid excuses NOT to write custom software, with a 3-state verdict that avoids the false binary 'do it / don't do it.'",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Evaluation of the 4 Project Killers",
+          "objective": "Evaluate Management, Physical, Literacy, and Trivial Existing Solution disqualifiers with a 3-state verdict.",
+          "input": "Primary User Profile (D6) and Problem (D1).",
+          "raw_data_title": "Primary User & Operational Context",
+          "raw_data": "- Primary User: Reservation Coordinator operating phone calls, text messages, and notebook logs.\n- Problem: Concurrency collision during simultaneous booking confirmations across manual channels.",
+          "exit_label": "DISQUALIFIERS EVALUATED → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Evaluation of the 4 Project Killers",
+              "objective": "Apply 3-state verdict (APPLIES, DOES NOT APPLY, APPLIES WITH LIMITED EXCEPTION) to each lethal risk.",
+              "how_to": {
+                "steps": [
+                  "Evaluate Disqualifier 1: Management Problem (could operational directive solve it without custom software?).",
+                  "Evaluate Disqualifier 2: Physical/Hardware Blocker (lack of connectivity, power, devices).",
+                  "Evaluate Disqualifier 3: Digital Literacy Blocker (target user incapable of using digital tools).",
+                  "Evaluate Disqualifier 4: Trivial Existing Solution (free/commercial tool already solves 80% of pain).",
+                  "Assign 3-state verdict to each: APPLIES, DOES NOT APPLY, or APPLIES WITH LIMITED EXCEPTION.",
+                  "Record empirical justification citing D1/D6 evidence."
+                ],
+                "table_columns": "Disqualifier | Verdict | Justification",
+                "table_rules": "One row per disqualifier with its 3-state verdict and factual justification.",
+                "restrictions": [
+                  "Cite concrete D1/D6 evidence.",
+                  "Do not invent risks unsupported by facts.",
+                  "If APPLIES without exception, project must CANCEL."
+                ],
+                "done_when": "All 4 project killers evaluated with 3-state verdicts."
+              },
+              "example_title": "Fatal Disqualifiers Evaluation",
+              "example": "| Disqualifier | Verdict | Justification |\n| :--- | :---: | :--- |\n| **1. Management Problem** | `DOES NOT APPLY` | D1 documents a structural concurrency failure (two coordinators confirm in parallel without mutual visibility), verified as an actionable process failure in the D1 Depth Test (Substep 2.3) — not a mere lack of administrative policy. A managerial directive (\"communicate before confirming\") does not eliminate failure if communication channels remain asynchronous. |\n| **2. Physical / Infrastructure Blocker** | `DOES NOT APPLY` | Coordinators already operate via phone calls and text messages without D1 documenting signal outages or lack of hardware devices. Zero `E-XX` evidence of connectivity blockers exists. |\n| **3. Digital Literacy Blocker** | `DOES NOT APPLY` | Coordinators already operate smartphones and messaging platforms for daily work, proving baseline competency with digital devices. |\n| **4. Trivial Existing Solution** | `DOES NOT APPLY` | Phone calls, text messages, and manual notebook logs are precisely the channels generating mutual blindness (Information Asymmetry, D2); none provides shared real-time visibility into property availability. They do not resolve 80% of the pain; they cause it. |",
+              "link_label": "verdicts go to legal shield (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Legal Shield of the Limited Exception",
+          "objective": "Convert partial exceptions into explicit MVP exclusion clauses and flag unverified domain assumptions.",
+          "input": "Step 1.1 verdicts and domain context.",
+          "raw_data_title": "Exception & Domain Analysis",
+          "raw_data": "Zero disqualifiers received APPLIES WITH LIMITED EXCEPTION with solid D1 evidence. Known assumption: rural estates in Santander/Antioquia may have intermittent coverage, unconfirmed in D1.",
+          "exit_label": "LEGAL SHIELD AUDITED → Step 2",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Legal armor and assumption tagging",
+              "objective": "Draft MVP exclusion clause for exceptions or flag assumptions for Known Unknowns transfer.",
+              "how_to": {
+                "steps": [
+                  "Identify any disqualifier with APPLIES WITH LIMITED EXCEPTION verdict.",
+                  "Draft explicit MVP exclusion clause specifying who or what is excluded from initial scope.",
+                  "If no disqualifier has exception but domain assumptions exist, label them [UNVERIFIED ASSUMPTION] and forward to Step 3.",
+                  "Verify legal protection of the team against out-of-scope complaints."
+                ],
+                "table_columns": "Disqualifier | Exception Type | Legal Shield Clause / Flag | Disposition",
+                "table_rules": "One row documenting exception wording or assumption flagging.",
+                "restrictions": [
+                  "No vague clauses.",
+                  "Unverified domain assumptions must be flagged explicitly."
+                ],
+                "done_when": "Exclusion clauses drafted or assumptions flagged for Step 3."
+              },
+              "example_title": "Legal Armor and Domain Assumptions",
+              "example": "No disqualifier received an `APPLIES WITH LIMITED EXCEPTION` verdict with solid evidence from D1. However, an unverified domain assumption is documented: it is known that certain rural estates in Santander and Antioquia can have intermittent cellular connectivity, although D1 does not confirm this for this specific case. It is flagged `[UNVERIFIED ASSUMPTION]` and transferred as a Known Unknown to Step 3, rather than ignored or treated as verified fact.\n\n| Fatal Risk Type | Verdict | Justification |\n| --- | :---: | --- |\n| Management Problem | DOES NOT APPLY | Actionable process failure confirmed in D1, not missing management directive. |\n| Physical / Infrastructure Blocker | DOES NOT APPLY (with unverified assumption to validate) | Zero evidence of blocker; potential intermittent rural connectivity unconfirmed. |\n| Digital Literacy Blocker | DOES NOT APPLY | Coordinators already operate digital devices daily. |\n| Trivial Existing Solution | DOES NOT APPLY | Current manual channels are the cause, not the cure. |",
+              "link_label": "disqualifier audit goes to Step 2 (2.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Structural Mitigation (Survival)",
+      "summary": "Design how any risk that partially threatens the project will be architecturally circumvented.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Structural Mitigation Assessment",
+          "objective": "Define mandatory constraints for limited exceptions or confirm clean survival without premature constraints.",
+          "input": "Verdicts from Step 1.",
+          "raw_data_title": "Step 1 Verdict Outcomes",
+          "raw_data": "All 4 fatal disqualifiers resulted in DOES NOT APPLY. No APPLIES WITH LIMITED EXCEPTION risks exist.",
+          "exit_label": "MITIGATION EVALUATED → Step 3",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Structural mitigation review",
+              "objective": "Determine architectural constraints or affirm unconstrained architectural passage.",
+              "how_to": {
+                "steps": [
+                  "Review verdicts from Step 1.",
+                  "If any risk APPLIES WITH LIMITED EXCEPTION, define the binding architectural or process restriction.",
+                  "If all 4 disqualifiers DO NOT APPLY, confirm zero premature architectural constraints.",
+                  "Forward open questions/assumptions intact to Step 3 Known Unknowns."
+                ],
+                "table_columns": "Disqualifier Status | Survival Decision | Inherited Architectural Constraint",
+                "table_rules": "One row documenting survival decision and design constraints.",
+                "restrictions": [
+                  "Do not invent premature mitigations for unconfirmed risks."
+                ],
+                "done_when": "Structural mitigations evaluated and confirmed."
+              },
+              "example_title": "Structural Mitigation Review",
+              "example": "- Because all 4 fatal disqualifiers resulted in `DOES NOT APPLY`, there are no `APPLIES WITH LIMITED EXCEPTION` risks requiring structural mitigation in this Step.\n- The sole open item is the unverified assumption regarding rural connectivity, which is **not mitigated prematurely here with architectural constraints** — it is transferred as a Known Unknown to Step 3, because it is not yet a confirmed risk, but rather an open operational question.\n\n*Output:* No new structural mitigations introduced in this Step. The connectivity assumption transfers intact to Step 3.",
+              "link_label": "clean survival goes to known unknowns (3.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Known Unknowns and Phase 1 Carry-Forwards",
+      "summary": "Professionally document what is still unknown, instead of stopping the project for weeks or lying by saying there are no risks.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Known Unknowns Registration",
+          "objective": "Convert each information gap and inherited TBD into an actionable task with 4 mandatory fields.",
+          "input": "Unverified connectivity assumption (Step 1) + TBD role 'Formal deposit voucher issuing institution' from D6.",
+          "raw_data_title": "Open Information Gaps",
+          "raw_data": "- Mobile signal coverage at active rural estates.\n- Banking entity to formalize deposit confirmation vouchers.",
+          "exit_label": "UNKNOWNS REGISTERED → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Logging Known Unknowns",
+              "objective": "Register unknowns with the 4 mandatory fields: unknown, missing evidence, action, and owner.",
+              "how_to": {
+                "steps": [
+                  "Compile unresolved domain questions, including TBD roles inherited from D6 Stakeholder Map.",
+                  "For each unknown, fill the 4 mandatory fields: the unknown, missing evidence, action to take, and responsible person.",
+                  "Verify each unknown is assigned to a concrete named human owner."
+                ],
+                "table_columns": "Unknown | Missing Evidence | Action | Owner",
+                "table_rules": "One row per unknown with all 4 mandatory fields completed.",
+                "restrictions": [
+                  "Must include all 4 fields.",
+                  "Every unknown must have a named owner."
+                ],
+                "done_when": "All known unknowns registered with complete fields."
+              },
+              "example_title": "Known Unknowns Registration",
+              "example": "| Unknown | Missing Evidence | Action | Owner |\n| :--- | :--- | :--- | :--- |\n| Do the agency's rural estates have reliable mobile connectivity? | Zero `E-XX` records measure mobile signal coverage at active properties. | Survey the 8–10 active estates regarding available mobile coverage. | Carlos Ruiz (Operations Coordinator) |\n| What banking entity will formalize the deposit confirmation voucher? | TBD inherited from D6 (Stakeholder Map). | Request quotes/mechanisms from the agency's current bank for verifiable confirmation receipts. | Laura Torres (Sponsor) |",
+              "link_label": "unknowns go to design implications (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Carry-Forward Implication",
+          "objective": "Dictate how each unknown restricts or directs software design in Phase 1.",
+          "input": "Registered unknowns from Sub-step 3.1.",
+          "raw_data_title": "Design Boundaries for Phase 1",
+          "raw_data": "- Intermittent coverage requires sync/retry mechanisms.\n- Unconfirmed receipt format requires modular payment confirmation workflows.",
+          "exit_label": "DESIGN IMPLICATIONS DEFINED → Step 4",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Carry-Forward Design Implications",
+              "objective": "Formulate 1 concrete Carry-Forward Implication statement per unknown.",
+              "how_to": {
+                "steps": [
+                  "Review each registered unknown from 3.1.",
+                  "Analyze how the open question restricts or influences software design in Phase 1.",
+                  "Draft 1 concise Carry-Forward Implication statement per unknown.",
+                  "Ensure architectural implications prevent premature technical lock-in."
+                ],
+                "table_columns": "Unknown | Design Implication (Carry-Forward)",
+                "table_rules": "One row per unknown stating Phase 1 design restriction.",
+                "restrictions": [
+                  "Must state concrete Phase 1 impact.",
+                  "Prevent premature technical commitments."
+                ],
+                "done_when": "Design implications formulated for all unknowns."
+              },
+              "example_title": "Carry-Forward Design Implications",
+              "example": "| Unknown | Design Implication (Carry-Forward) |\n| :--- | :--- |\n| Mobile connectivity of rural estates | If intermittent coverage is confirmed at any estate, Phase 1 must design a retry queue or synchronization mechanism, rather than assuming uninterrupted connectivity. |\n| Deposit voucher issuing entity | Forces Phase 1 to refrain from committing to a specific receipt format until banking terms are confirmed, preventing rework in payment confirmation workflows. |",
+              "link_label": "carry-forwards go to final assembly (4.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Final Document Assembly",
+      "summary": "Format the complete Risk Register into the official exportable deliverable.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Metadata",
+          "objective": "Populate deliverable metadata header according to methodology standards.",
+          "input": "Project parameters: Nos Fuimos de Finca, Phase 0, Deliverable 7 of 9, Status Approved.",
+          "raw_data_title": "Project Metadata Parameters",
+          "raw_data": "Project: Nos Fuimos de Finca. Phase: 0 — Problem Recognition. Deliverable: 7 of 9. Status: Approved.",
+          "exit_label": "METADATA READY → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Metadata formatting",
+              "objective": "Assemble standardized metadata header block.",
+              "how_to": {
+                "steps": [
+                  "Record Project, Phase, Deliverable number, and Status.",
+                  "Verify standard header metadata format."
+                ],
+                "table_columns": "Metadata Field | Project Value",
+                "table_rules": "One row per metadata field.",
+                "restrictions": [
+                  "Standard header fields only."
+                ],
+                "done_when": "Metadata block populated."
+              },
+              "example_title": "Metadata Block",
+              "example": "**Project:** Nos Fuimos de Finca  \n**Phase:** 0 — Problem Recognition  \n**Deliverable:** 7 of 9  \n**Status:** Approved",
+              "link_label": "metadata goes to direct mapping (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Direct Mapping",
+          "objective": "Assemble the Lethal Disqualifier matrix and Known Unknowns table into the official deliverable.",
+          "input": "Outputs from Steps 1, 2, and 3.",
+          "raw_data_title": "Audited Deliverable Tables",
+          "raw_data": "4 disqualifiers with DOES NOT APPLY verdicts and 2 Known Unknowns with Phase 1 design implications.",
+          "exit_label": "FINAL DELIVERABLE ASSEMBLED → publishes deliverable",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Direct mapping and verification",
+              "objective": "Verify verbatim transcription of disqualifiers and known unknowns.",
+              "how_to": {
+                "steps": [
+                  "Assemble the Lethal Disqualifier Evaluation table from Step 1.",
+                  "Assemble the Known Unknowns and Phase 1 Carry-Forwards table from Step 3.",
+                  "Verify verbatim transposition without reformulating audited text."
+                ],
+                "table_columns": "Section | Source Step | Element Count | Assembly Status",
+                "table_rules": "One row per section in final document.",
+                "restrictions": [
+                  "Verbatim transcribing from audited steps."
+                ],
+                "done_when": "Final document assembled."
+              },
+              "example_title": "Assembly Verification",
+              "example": "| Section | Source Step | Element Count | Assembly Status |\n| :--- | :---: | :---: | :---: |\n| 1. Metadata | Step 4.1 | 4 fields | `VERIFIED` |\n| 2. Lethal Disqualifier Evaluation | Step 1 | 4 project killers evaluated | `VERIFIED` |\n| 3. Known Unknowns & Carry-Forwards | Step 3 | 2 unknowns with design implications | `VERIFIED` |\n\n*Result:* Assembly complete with 100% fidelity to audited steps.",
+              "link_label": "publishes final deliverable"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 07. Risk Register.md",
+    "markdown": "# 7. Risk Register (Disqualifiers)\n\n### 1. Document Metadata\n**Project:** Nos Fuimos de Finca\n**Phase:** 0 — Problem Recognition\n**Deliverable:** 7 of 9\n**Status:** Approved\n\n### 2. Lethal Disqualifier Evaluation\n| Type of Lethal Risk | Verdict | Justification / Exclusion Clause |\n| --- | :---: | --- |\n| **Purely Management/Human Problem** | DOES NOT APPLY | Structural process failure confirmed by D1 Depth Test; an administrative directive does not eliminate blind concurrency. |\n| **Physical / Infrastructure Blocker** | DOES NOT APPLY | No `E-XX` evidence of connectivity failures; assumption of rural coverage transferred as Known Unknown (section 3). |\n| **Digital Literacy Blocker** | DOES NOT APPLY | Coordinators already operate mobile devices daily for their work. |\n| **Trivial Existing Solution** | DOES NOT APPLY | Current manual channels (calls, messages, notes) are the cause of mutual blindness, not an available cure. |\n\n### 3. Known Unknowns and Phase 1 Carry-Forwards\n| Unknown | Missing Evidence | Action | Owner | Design Implication (Carry-Forward) |\n| --- | --- | --- | --- | --- |\n| Do the properties have reliable mobile connectivity? | No `E-XX` record of signal/coverage. | Survey active properties on mobile coverage. | Carlos Ruiz (Operations Coordinator) | If coverage is intermittent, Phase 1 designs confirmation with retry/sync queue. |\n| Which entity will issue the formal advance payment receipt? | TBD inherited from D6. | Get a quote from the current bank for a receipt with probative validity. | Laura Torres (Sponsor) | Phase 1 does not commit to a receipt format until the quote is obtained. |"
+  }
+}

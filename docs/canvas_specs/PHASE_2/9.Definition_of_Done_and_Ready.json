@@ -1,0 +1,400 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D9",
+  "deliverable": "Definition of Done & Definition of Ready (DoD y DoR)",
+  "purpose": "Este entregable establece las compuertas binarias (checklists estrictos) que regulan el flujo de trabajo. El DoR protege al developer de trabajar en tickets ambiguos. El DoD protege al proyecto de fusionar código sin calidad.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_testing_strategy]] | El DoD hereda las reglas de tests del D8. |\n| [[example_output_coding_standards]] | El DoD hereda las reglas de calidad del código del D7. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría de Condiciones Base (Verify Entry)",
+      "summary": "Extraer las reglas automáticas de testing y calidad de código de D7 y D8 para alimentar objetivamente la Definition of Done.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Extracción de Reglas Automáticas de Testing (D8)",
+          "objective": "Aislar las condiciones de pruebas unitarias, de integración y cobertura requeridas para certificar calidad.",
+          "input": "[[example_output_testing_strategy]] (D8).",
+          "raw_data_title": "Reglas Heredadas de Testing",
+          "raw_data": "Pruebas unitarias JUnit/Jest pasando, pruebas de integración sin errores, cobertura de ramas >= 70% sin excepciones.",
+          "exit_label": "REGLAS DE TESTING EXTRAÍDAS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Mapeo de Pruebas Unitarias, Integración y Cobertura",
+              "objective": "Extraer los umbrales numéricos de aprobación y las suites de test automatizadas del D8.",
+              "how_to": {
+                "steps": [
+                  "Consultar la pirámide de pruebas aprobada en P2-D8.",
+                  "Extraer la exigencia de CI en verde para tests unitarios y de integración.",
+                  "Extraer el umbral mínimo de cobertura de código (>= 70%).",
+                  "Documentar las condiciones como materias primas para el DoD."
+                ],
+                "table_columns": "Dimensión de Testing | Condición Obligatoria de D8 | Herramienta Ejecutora",
+                "table_rules": "Toda regla extraída de D8 debe ser directamente verificable por el pipeline de CI.",
+                "restrictions": [
+                  "No relajar los umbrales de cobertura ni omitir pruebas de integración."
+                ],
+                "done_when": "Condiciones base de testing completamente identificadas."
+              },
+              "example_title": "Condiciones Base de Testing Heredadas",
+              "example": "| Dimensión | Condición Obligatoria | Herramienta |\n| --- | --- | --- |\n| Tests Unitarios | 100% de tests unitarios pasando sin fallos | JUnit 5 / Jest |\n| Cobertura | Cobertura de ramas >= 70% | Jest --coverage / JaCoCo |\n| Integración | Verificación de persistencia y endpoints REST | SpringBootTest / Postman |",
+              "link_label": "reglas de testing pasan a extracción de estándares de código (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Extracción de Reglas de Código y Formateo (D7)",
+          "objective": "Aislar los requisitos de análisis estático, linter y formateo que condicionarán la fusión de ramas.",
+          "input": "[[example_output_coding_standards]] (D7).",
+          "raw_data_title": "Reglas Heredadas de Código",
+          "raw_data": "ESLint / Checkstyle sin errores (0 warnings tolerados), formateo Prettier aplicado, sin conflictos con main.",
+          "exit_label": "CONDICIONES BASE AUDITADAS → 2.1",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Mapeo de Linters, Formateo y Ausencia de Errores",
+              "objective": "Extraer los criterios mecánicos de calidad de código del D7 para su integración en el DoD.",
+              "how_to": {
+                "steps": [
+                  "Consultar la matriz de estándares por capa de P2-D7.",
+                  "Identificar los linters de bloqueo (ESLint, Checkstyle).",
+                  "Fijar la regla de cero warnings tratados como errores.",
+                  "Consolidar la lista de reglas base de código."
+                ],
+                "table_columns": "Capa de Código | Estándar Obligatorio de D7 | Mecanismo de Bloqueo",
+                "table_rules": "Ningún commit con discrepancias de formateo o advertencias puede considerarse completado.",
+                "restrictions": [
+                  "Prohibido permitir exclusiones ad-hoc de reglas de estilo."
+                ],
+                "done_when": "Reglas base de calidad de código extraídas y documentadas."
+              },
+              "example_title": "Condiciones Base de Código Heredadas",
+              "example": "| Capa | Estándar de D7 | Mecanismo |\n| --- | --- | --- |\n| Frontend | ESLint sin errores, Prettier aplicado | Pre-commit y CI |\n| Backend | Checkstyle Google Style sin warnings | Maven checkstyle:check |\n| Git | Sin conflictos de merge contra main | GitHub PR check |",
+              "link_label": "condiciones base pasan a diseño de Definition of Ready (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Definition of Ready (DoR) — Compuerta de Entrada",
+      "summary": "Establecer la lista de verificación ineludible que protege a los desarrolladores de comenzar a trabajar sobre requerimientos ambiguos.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Definición de Claridad de Problema y Dependencias Técnicas",
+          "objective": "Garantizar que cada ticket describa el problema de negocio y sus dependencias técnicas antes de iniciar desarrollo.",
+          "input": "Flujos operativos del MVP y metodología de refinamiento.",
+          "raw_data_title": "Requisitos de Entrada del Ticket",
+          "raw_data": "Descripción del problema en <= 3 oraciones, wireframes adjuntos si involucra UI, dependencias técnicas explícitas.",
+          "exit_label": "CLARIDAD Y DEPENDENCIAS DEFINIDAS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Fijación de Formato de Problema, UI y Dependencias",
+              "objective": "Definir los campos obligatorios que debe contener un ticket para superar la compuerta de entrada.",
+              "how_to": {
+                "steps": [
+                  "Exigir descripción concisa del problema (máximo 3 oraciones, no de la solución).",
+                  "Exigir mockup o wireframe para cualquier tarea que modifique la interfaz de usuario.",
+                  "Exigir declaración explícita de endpoints y tablas de base de datos afectadas.",
+                  "Establecer el rechazo inmediato de tickets que carezcan de estos elementos."
+                ],
+                "table_columns": "Campo del Ticket | Regla de Contenido | Impacto de Omisión",
+                "table_rules": "El desarrollador tiene derecho a rechazar cualquier ticket sin especificación clara.",
+                "restrictions": [
+                  "Prohibido aceptar requerimientos con soluciones técnicas preconcebidas pero sin problema de negocio claro."
+                ],
+                "done_when": "Requisitos estructurales de entrada fijados en el DoR."
+              },
+              "example_title": "Criterios Estructurales del Ticket (DoR)",
+              "example": "| Campo Obligatorio | Regla de Validación | Impacto |\n| --- | --- | --- |\n| Descripción de Problema | <= 3 oraciones explicando el dolor del usuario | Evita soluciones desenfocadas |\n| Referencia Visual | Wireframe o link Figma si toca UI | Evita rediseños en fase de pull request |\n| Dependencias Técnicas | Lista de APIs y tablas impactadas | Evita bloqueos a mitad de desarrollo |",
+              "link_label": "criterios estructurales pasan a criterios de aceptación y estimación (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Criterios de Aceptación y Estimación de Esfuerzo",
+          "objective": "Imponer el formato Gherkin y la estimación cuantitativa para que una tarea sea ejecutable.",
+          "input": "Prácticas de especificación por comportamiento (BDD) y planificación.",
+          "raw_data_title": "Criterios y Estimación",
+          "raw_data": "Criterios en formato Gherkin (Given / When / Then), estimación de esfuerzo en Story Points u horas asignada.",
+          "exit_label": "CRITERIOS Y ESTIMACIÓN DEFINIDOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Adopción de Formato Gherkin y Ponderación de Esfuerzo",
+              "objective": "Normalizar cómo se expresan los casos de prueba de aceptación y el dimensionamiento de esfuerzo.",
+              "how_to": {
+                "steps": [
+                  "Adoptar la sintaxis Gherkin (Given / When / Then) para los criterios de aceptación.",
+                  "Requerir estimación formal en Story Points o tiempo antes de incluir el ticket en el sprint.",
+                  "Verificar que el ticket sea atómico e independiente de otros en el mismo sprint.",
+                  "Comprobar que los criterios sean verificables de forma binaria."
+                ],
+                "table_columns": "Requisito de Refinamiento | Formato Obligatorio | Criterio de Pase",
+                "table_rules": "No iniciar ninguna tarea que carezca de criterios Gherkin claros.",
+                "restrictions": [
+                  "No permitir tareas con criterios vagos como 'que funcione bien'."
+                ],
+                "done_when": "Criterios Gherkin y metodología de estimación incorporados al DoR."
+              },
+              "example_title": "Formato de Criterios de Aceptación (Gherkin)",
+              "example": "| Requisito | Formato | Ejemplo |\n| --- | --- | --- |\n| Criterios de Aceptación | Given / When / Then | Dado que el usuario selecciona fechas ocupadas, cuando presiona Reservar, entonces ve un error 409 |\n| Estimación de Esfuerzo | Story Points (1, 2, 3, 5, 8) | Asignado y consensuado en refinamiento |",
+              "link_label": "criterios Gherkin pasan a checklist oficial de DoR (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Consolidación del Checklist Oficial del DoR",
+          "objective": "Consolidar el checklist oficial de Definition of Ready que actúa como compuerta de entrada al sprint.",
+          "input": "Criterios estructurales (2.1) y de aceptación (2.2).",
+          "raw_data_title": "Checklist Oficial de DoR",
+          "raw_data": "Checklist de 5 puntos: descripción <= 3 oraciones, Gherkin, wireframe adjunto, dependencias explicitadas, estimación asignada.",
+          "exit_label": "CHECKLIST DOR BLOQUEADO → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Formalización de la Compuerta de Entrada al Sprint",
+              "objective": "Crear la lista oficial de verificación de entrada para el documento maestro.",
+              "how_to": {
+                "steps": [
+                  "Redactar los 5 criterios del checklist con formato interactivo de markdown (- [ ]).",
+                  "Establecer la regla de que el ticket requiere el 100% de checks para comenzar.",
+                  "Consolidar la sección oficial de Definition of Ready.",
+                  "Verificar el cumplimiento del pass condition de protección contra ambigüedad."
+                ],
+                "table_columns": "Ítem de Verificación | Condición de Aprobación | Responsable de Cumplimiento",
+                "table_rules": "Un ticket puede comenzar si y solo si cumple TODOS los criterios.",
+                "restrictions": [
+                  "Prohibido saltar la compuerta de DoR por presión de tiempo."
+                ],
+                "done_when": "Checklist oficial de Definition of Ready formalizado."
+              },
+              "example_title": "Definition of Ready Oficial (Step 2 Output)",
+              "example": "### 2. Definition of Ready (DoR) — Compuerta de Entrada al Sprint\nUn ticket puede comenzar desarrollo si y solo si cumple TODOS los siguientes criterios:\n- [ ] Descripción del problema en ≤ 3 oraciones (no de la solución técnica).\n- [ ] Criterios de aceptación en formato Gherkin (Given / When / Then).\n- [ ] Si involucra UI: wireframe o referencia visual adjunta.\n- [ ] Dependencias técnicas explicitadas (qué endpoints, qué tablas de BD).\n- [ ] Estimación de esfuerzo asignada (Story Points o horas).",
+              "link_label": "checklist DoR pasa a definición de Definition of Done (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Definition of Done (DoD) — Compuerta de Salida",
+      "summary": "Establecer la compuerta estricta de salida que combina validaciones automáticas de CI y revisión humana para autorizar el merge a main.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Definición de Criterios Automáticos de CI/CD",
+          "objective": "Configurar las comprobaciones mecánicas no negociables que el pipeline de GitHub Actions debe certificar.",
+          "input": "Condiciones base extraídas en Step 1 y configuración de CI de D5.",
+          "raw_data_title": "Criterios Automáticos de Salida",
+          "raw_data": "CI verde (Unit + Integration), cobertura >= 70%, ESLint/Checkstyle sin errores, Prettier aplicado, sin conflictos con main.",
+          "exit_label": "CRITERIOS AUTOMÁTICOS DEFINIDOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Mapeo de CI Verde, Cobertura y Linters en GitHub Actions",
+              "objective": "Fijar la lista de checks mecánicos que impiden físicamente el botón de merge si alguno falla.",
+              "how_to": {
+                "steps": [
+                  "Exigir pipeline de CI en estado verde para tests unitarios y de integración.",
+                  "Exigir reporte de cobertura de ramas >= 70%.",
+                  "Exigir análisis estático con 0 errores y 0 warnings tratados como errores.",
+                  "Exigir ausencia total de diferencias de formato Prettier y conflictos con main."
+                ],
+                "table_columns": "Criterio Automático | Herramienta de Enforcing | Umbral Inviolable",
+                "table_rules": "El merge debe estar bloqueado a nivel de repositorio si cualquier check automático falla.",
+                "restrictions": [
+                  "Prohibido forzar merge (bypass) ante fallos en la suite de pruebas."
+                ],
+                "done_when": "Criterios automáticos de Definition of Done formalizados."
+              },
+              "example_title": "Criterios Automáticos del DoD",
+              "example": "| Criterio Automático | Herramienta | Umbral Inviolable |\n| --- | --- | --- |\n| Tests Unitarios e Integración | GitHub Actions | 100% Passing (CI Verde) |\n| Cobertura de Código | Jest / JaCoCo | >= 70% ramas |\n| Linter y Formato | ESLint / Checkstyle / Prettier | 0 errores / 0 warnings |\n| Integración Git | GitHub Merge Engine | 0 conflictos con main |",
+              "link_label": "criterios automáticos pasan a criterios manuales de revisión (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Definición de Criterios Manuales de Revisión Humana",
+          "objective": "Establecer las comprobaciones cualitativas que un revisor humano debe validar antes de dar su aprobación.",
+          "input": "Políticas de revisión de código de D5 y criterios de aceptación del ticket.",
+          "raw_data_title": "Criterios Manuales de Salida",
+          "raw_data": "Mínimo 1 aprobación de par/founder, todos los criterios Gherkin validados en Staging, diff limpio sin logs ni TODOs huérfanos.",
+          "exit_label": "CRITERIOS MANUALES DEFINIDOS → 3.3",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Mapeo de Aprobaciones de Revisores y Limpieza de Código",
+              "objective": "Definir las responsabilidades del revisor humano en cuanto a calidad de diff y verificación funcional.",
+              "how_to": {
+                "steps": [
+                  "Exigir mínimo 1 aprobación formal en GitHub PR de otro miembro del equipo.",
+                  "Exigir verificación manual de los criterios Gherkin en el entorno Staging.",
+                  "Exigir que el diff no contenga console.log, código comentado ni TODOs sin ticket.",
+                  "Documentar los criterios manuales en el checklist del DoD."
+                ],
+                "table_columns": "Criterio Manual | Responsable | Validación Requerida",
+                "table_rules": "El revisor es corresponsable de cualquier defecto que llegue a producción.",
+                "restrictions": [
+                  "Prohibido auto-aprobarse Pull Requests en ramas de producción."
+                ],
+                "done_when": "Criterios manuales de revisión humana formalizados."
+              },
+              "example_title": "Criterios Manuales de Revisión (DoD)",
+              "example": "| Criterio Manual | Responsable | Validación Requerida |\n| --- | --- | --- |\n| Aprobación de Par | Laura (CTO) o Julián (PM) | Revisión de arquitectura y legibilidad en PR |\n| Verificación Funcional | QA / Revisor | Comprobación de criterios Gherkin en Staging |\n| Higiene de Diff | Revisor de Código | Cero console.log, cero código muerto o comentado |",
+              "link_label": "criterios manuales pasan a consolidación oficial del DoD (3.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title": "Consolidación del Checklist Oficial del DoD",
+          "objective": "Integrar los criterios automáticos y manuales en la compuerta binaria oficial de salida.",
+          "input": "Criterios automáticos (3.1) y criterios manuales (3.2).",
+          "raw_data_title": "Checklist Oficial de DoD",
+          "raw_data": "Checklist segregado en Criterios Automáticos (CI) y Criterios Manuales (Revisor) con formato Markdown.",
+          "exit_label": "CHECKLIST DOD BLOQUEADO → 4.1",
+          "micro": [
+            {
+              "code": "3.3.1",
+              "title": "Formalización de la Compuerta de Salida al Merge",
+              "objective": "Consolidar el checklist completo de Definition of Done para el artefacto de entrega.",
+              "how_to": {
+                "steps": [
+                  "Compilar la sección de Criterios Automáticos (Verificados por CI).",
+                  "Compilar la sección de Criterios Manuales (Verificados por Revisor).",
+                  "Establecer la regla de que el 100% de ítems deben cumplirse para autorizar la fusión.",
+                  "Verificar el pass condition de blindaje contra código mediocre."
+                ],
+                "table_columns": "Tipo de Criterio | Cantidad de Ítems | Barrera de Contención",
+                "table_rules": "Un Pull Request puede fusionarse si y solo si cumple TODOS los criterios.",
+                "restrictions": [
+                  "No fusionar ningún PR con ítems pendientes en el checklist."
+                ],
+                "done_when": "Definition of Done completamente formalizada y validada."
+              },
+              "example_title": "Definition of Done Oficial (Step 3 Output)",
+              "example": "### 3. Definition of Done (DoD) — Compuerta de Salida al Merge\nUn Pull Request puede fusionarse si y solo si cumple TODOS los siguientes criterios:\n\n**Criterios Automáticos (Verificados por CI — GitHub Actions):**\n- [ ] CI verde (Tests Unitarios + Tests de Integración pasan).\n- [ ] Cobertura de ramas ≥ 70% (Jest --coverage).\n- [ ] ESLint sin errores (0 warnings tratados como errores).\n- [ ] Prettier aplicado (sin diferencias de formato).\n- [ ] Sin conflictos de merge contra `main`.\n\n**Criterios Manuales (Verificados por Revisor Humano):**\n- [ ] Mínimo 1 aprobación de Julián (PM/Product) o Laura (CTO/Tech).\n- [ ] Todos los criterios de aceptación del ticket verificados manualmente.\n- [ ] Sin `console.log`, código comentado, ni TODOs sin ticket asociado en el diff.",
+              "link_label": "checklist DoD pasa a ensamblaje del documento final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar el contrato de trabajo oficial del equipo integrando metadatos, DoR, DoD y la compuerta de fase.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Metadatos y Compuerta DoR",
+          "objective": "Ensamblar la ficha técnica y la sección de Definition of Ready en formato oficial.",
+          "input": "Metadatos del proyecto y checklist DoR de Step 2.",
+          "raw_data_title": "Metadatos y DoR",
+          "raw_data": "Proyecto: Nos Fuimos de Finca, Fase 2, D9, Estado Aprobado. Checklist de entrada al sprint.",
+          "exit_label": "METADATOS Y DOR INTEGRADOS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Compilación de Secciones 1 y 2 en Formato Oficial",
+              "objective": "Redactar las secciones 1 y 2 del documento maestro garantizando alineación terminológica.",
+              "how_to": {
+                "steps": [
+                  "Completar los metadatos oficiales del proyecto.",
+                  "Adjuntar la sección de Definition of Ready con sus 5 criterios interactivos.",
+                  "Verificar que no existan discrepancias con los flujos de sprint.",
+                  "Asegurar exactitud de sintaxis Markdown."
+                ],
+                "table_columns": "Sección | Contenido Compilado | Estado",
+                "table_rules": "Respetar fielmente la estructura dictaminada en la plantilla de salida.",
+                "restrictions": [
+                  "No omitir el criterio Gherkin ni las dependencias técnicas del DoR."
+                ],
+                "done_when": "Secciones 1 y 2 compiladas correctamente."
+              },
+              "example_title": "Compilación de Metadatos y DoR",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 2 — Project Kickoff\n**Entregable:** 9 de 13\n**Estado:** Aprobado\n\n### 2. Definition of Ready (DoR) — Compuerta de Entrada al Sprint\nUn ticket puede comenzar desarrollo si y solo si cumple TODOS los siguientes criterios:\n- [ ] Descripción del problema en ≤ 3 oraciones (no de la solución técnica).\n- [ ] Criterios de aceptación en formato Gherkin (Given / When / Then).\n- [ ] Si involucra UI: wireframe o referencia visual adjunta.\n- [ ] Dependencias técnicas explicitadas (qué endpoints, qué tablas de BD).\n- [ ] Estimación de esfuerzo asignada (Story Points o horas).",
+              "link_label": "DoR integrado pasa a anexar DoD y compuerta (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Integración de DoD y Compuerta de Fase",
+          "objective": "Incorporar la sección de Definition of Done y evaluar el cumplimiento de la compuerta de fase.",
+          "input": "Checklist DoD de Step 3 y reglas de compuerta condicional.",
+          "raw_data_title": "DoD y Compuerta D9",
+          "raw_data": "Checklist DoD anexado. Condición: Proceed. El DoR y el DoD están trazados directamente a los estándares de D7 y D8.",
+          "exit_label": "DOD Y COMPUERTA INCORPORADAS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Ensamblaje de Sección 3 y Declaración de Avance",
+              "objective": "Completar las secciones 3 y 4 del entregable formalizando los criterios de salida y el avance.",
+              "how_to": {
+                "steps": [
+                  "Insertar la sección completa de Definition of Done (automáticos y manuales).",
+                  "Evaluar la compuerta: ¿DoR claro, DoD trazable a D7/D8 y con revisión humana?",
+                  "Redactar la declaración formal de avance (Proceed).",
+                  "Confirmar que el contrato de calidad sea inquebrantable."
+                ],
+                "table_columns": "Sección | Contenido Anexado | Veredicto",
+                "table_rules": "Si el DoD carece de revisión humana o checks de CI, detener y exigir corrección.",
+                "restrictions": [
+                  "Prohibido otorgar pase sin criterios automáticos trazables a D7 y D8."
+                ],
+                "done_when": "Secciones de DoD y compuerta de fase ensambladas."
+              },
+              "example_title": "DoD y Compuerta de Fase",
+              "example": "### 3. Definition of Done (DoD) — Compuerta de Salida al Merge\nUn Pull Request puede fusionarse si y solo si cumple TODOS los siguientes criterios:\n\n**Criterios Automáticos (Verificados por CI — GitHub Actions):**\n- [ ] CI verde (Tests Unitarios + Tests de Integración pasan).\n- [ ] Cobertura de ramas ≥ 70% (Jest --coverage).\n- [ ] ESLint sin errores (0 warnings tratados como errores).\n- [ ] Prettier aplicado (sin diferencias de formato).\n- [ ] Sin conflictos de merge contra `main`.\n\n**Criterios Manuales (Verificados por Revisor Humano):**\n- [ ] Mínimo 1 aprobación de Julián (PM/Product) o Laura (CTO/Tech).\n- [ ] Todos los criterios de aceptación del ticket verificados manualmente.\n- [ ] Sin `console.log`, código comentado, ni TODOs sin ticket asociado en el diff.\n\n### 4. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No.\n- **Condición:** Proceed. El DoR y el DoD están trazados directamente a los estándares del D7 y D8.",
+              "link_label": "documento completo pasa a validación final y publicación (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Validación de Integridad y Publicación Oficial",
+          "objective": "Comprobar la completitud del documento frente al artefacto de referencia y concretar la entrega oficial.",
+          "input": "Documento completo ensamblado y archivo de salida oficial.",
+          "raw_data_title": "Validación y Entrega D9",
+          "raw_data": "Verificado contra example_output_dor_dod.md. Publicación oficial en docs/02-project-kickoff.",
+          "exit_label": "ENTREGABLE D9 PUBLICADO Y COMPLETADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Emisión Oficial del Documento D9",
+              "objective": "Publicar oficialmente el documento de Definition of Done & Ready para la operativa de desarrollo.",
+              "how_to": {
+                "steps": [
+                  "Comprobar exhaustivamente la coherencia de todas las secciones.",
+                  "Verificar el enlace al artefacto [[example_output_dor_dod]].",
+                  "Validar que el estado del documento sea Aprobado.",
+                  "Registrar el hito en la bitácora de progreso."
+                ],
+                "table_columns": "Criterio de Cierre | Estado | Registro Oficial",
+                "table_rules": "El documento es el contrato vinculante que rige los sprints y las revisiones de código.",
+                "restrictions": [
+                  "No concluir sin validar la exactitud de los checklists interactivos."
+                ],
+                "done_when": "Entregable D9 formalmente emitido y publicado."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_dor_dod]]`.\n\nUbicación oficial: `docs/02-project-kickoff/09. Definicion de Done y Ready.md`.\nEstado: Aprobado por Compuerta de Fase.",
+              "link_label": "entrega completada - fin de flujo D9"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

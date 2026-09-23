@@ -1,0 +1,201 @@
+{
+  "phase": "PHASE 4: SYSTEM MODELING",
+  "deliverable_code": "D9",
+  "deliverable": "API Conceptual Design",
+  "purpose": "Formalizar los contratos conceptuales de interfaz (Endpoints, Verbos HTTP, Request/Response Payloads, Estructura Estándar de Errores y Paginación) que conectan las vistas e interacciones de usuario (D2/D5) con las entidades de datos (D6) y secuencias técnicas (D7), utilizando categorías conceptuales de datos sin acoplamiento a motores físicos.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| User Flows (D2) | [[PHASE_4_SYSTEM_MODELING/2.User_Flows_Task_Flows/2.User_Flows_Task_Flows.md]] | Identifica cada pantalla y acción de usuario que requiere interactuar con el servidor. |\n| Sequence Diagrams (D7) | [[PHASE_4_SYSTEM_MODELING/7.System_Sequence_Diagrams/7.System_Sequence_Diagrams.md]] | Determina el momento cronológico exacto de las llamadas API y los códigos de error HTTP a capturar. |\n| Conceptual ERD (D6) | [[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/6.Domain_Model_and_ERD.md]] | Provee los nombres exactos de atributos y sus categorías conceptuales (texto, número, fecha, booleano, lista). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Definición de Arquitectura REST y Rutas (REST Architecture & Paths)",
+      "summary": "Traducir las acciones de usuario de D2 en un catálogo de rutas RESTful en plural utilizando los verbos HTTP canónicos.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Mapeo de Acciones D2 a Recursos y Rutas RESTful",
+          "objective": "Declarar los endpoints orientados a recursos para cada módulo sin usar verbos en la URI.",
+          "input": "Acciones de usuario de D2 y entidades del ERD D6.",
+          "raw_data_title": "Catálogo Inicial de Endpoints por Módulo (MOD-BOOKING)",
+          "raw_data": "| Método HTTP | Ruta RESTful | Acción de Usuario Origen (D2) | Descripción del Recurso |\n|---|---|---|---|\n| GET | /api/v1/properties | Explorar catálogo de fincas | Retorna listado filtrable y paginado de inmuebles |\n| GET | /api/v1/properties/{id} | Ver detalle de una finca | Retorna ficha técnica completa y disponibilidad |\n| POST | /api/v1/bookings | Confirmar y pagar reserva | Inicia checkout transaccional y cobra vía pasarela |\n| GET | /api/v1/users/me/bookings | Ver historial de reservas | Retorna listado de reservas del usuario en sesión |\n| PATCH | /api/v1/bookings/{id}/cancel | Cancelar reserva | Solicita cancelación y ejecuta política de reembolso |",
+          "exit_label": "Catálogo de Rutas RESTful Formalizado",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Definición de Verbos e Idempotencia en Rutas",
+              "objective": "Asignar el verbo HTTP correcto (GET, POST, PATCH, DELETE) según la naturaleza de la operación.",
+              "how_to": {
+                "steps": [
+                  "1. Nombrar las rutas siempre en sustantivos plurales (`/properties`, `/bookings`).",
+                  "2. Usar GET para consultas seguras e idempotentes.",
+                  "3. Usar POST exclusivamente para creación de recursos subordinados.",
+                  "4. Usar PATCH para actualizaciones parciales y transiciones de estado específicas.",
+                  "5. Prefijar todas las rutas con versionamiento explícito `/api/v1`."
+                ],
+                "table_columns": [
+                  "Verbo",
+                  "Semántica",
+                  "Idempotente",
+                  "Ejemplo de Ruta"
+                ],
+                "table_rules": [
+                  "Prohibido incluir verbos de acción en las URIs (ej. no usar /create-booking)",
+                  "Las rutas deben estructurarse jerárquicamente reflejando agregados de dominio",
+                  "Toda ruta debe incluir versión de API"
+                ],
+                "restrictions": "Nunca usar GET para mutaciones de datos ni verbos en las URIs salvo patrones RPC justificados.",
+                "done_when": "Todas las acciones de usuario cuentan con su endpoint REST canónico asignado."
+              },
+              "example_title": "Catálogo de Endpoints REST",
+              "example": "```markdown\n| Método | Ruta | Acción de Usuario Origen (D2) |\n|---|---|---|\n| GET | /api/v1/properties | Ver catálogo de fincas |\n| GET | /api/v1/properties/{id} | Ver detalle de finca |\n| POST | /api/v1/bookings | Crear y pagar reserva |\n| PATCH | /api/v1/bookings/{id}/cancel | Cancelar reserva |\n```",
+              "link_label": "Rutas REST Definidas -> Contratos de Payloads"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Contratos de Request y Response (Payloads & Wrappers)",
+      "summary": "Definir las estructuras JSON de entrada y salida utilizando categorías conceptuales de datos y el wrapper estándar data.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Definición de Payloads con Categorías Conceptuales y Wrapper",
+          "objective": "Especificar los contratos de datos evitando tipos físicos de base de datos y envolviendo respuestas en clave data.",
+          "input": "Nombres de atributos y reglas de obligatoriedad del ERD D6.",
+          "raw_data_title": "Contratos de Payloads para POST /api/v1/bookings",
+          "raw_data": "| Campo | Ubicación | Categoría Conceptual | Requerido | Justificación de Negocio |\n|---|---|---|---|---|\n| property_id | Request Body | texto | Sí | Identificador de la finca a reservar |\n| check_in_date | Request Body | fecha (ISO-8601) | Sí | Fecha inicial de ocupación |\n| check_out_date | Request Body | fecha (ISO-8601) | Sí | Fecha final de desocupación |\n| guest_count | Request Body | número (entero) | Sí | Cantidad de personas para cálculo de aforo |\n| payment_token | Request Body | texto | Sí | Token temporal de tarjeta generado por Wompi |\n| data.booking_id | Response Body | texto | Sí | ID único generado de la reserva |\n| data.status | Response Body | texto | Sí | Estado inicial (`PENDING_APPROVAL`) |\n| data.total_price | Response Body | número | Sí | Monto final cobrado en centavos |",
+          "exit_label": "Payloads de Entrada y Salida Estandarizados",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Estructuración de Request y Response Wrappers JSON",
+              "objective": "Redactar los esquemas JSON de petición y respuesta garantizando encapsulamiento en wrapper data.",
+              "how_to": {
+                "steps": [
+                  "1. Listar los campos de entrada marcando obligatoriedad `(requerido)` u `(opcional)`.",
+                  "2. Usar exclusivamente categorías conceptuales: `texto`, `número`, `fecha`, `booleano`, `lista`.",
+                  "3. Envolver toda respuesta exitosa en el objeto raíz `{ \"data\": { ... } }`.",
+                  "4. Validar correspondencia exacta con los campos conceptuales del ERD D6."
+                ],
+                "table_columns": [
+                  "Tipo Payload",
+                  "Esquema JSON",
+                  "Wrapper Utilizado",
+                  "Validación"
+                ],
+                "table_rules": [
+                  "Prohibido usar tipos físicos de motor (UUID, VARCHAR, DECIMAL, BIGINT)",
+                  "Toda respuesta 200/201 debe contener la clave raíz 'data'",
+                  "Los nombres de campos deben seguir convención snake_case coherente con D6"
+                ],
+                "restrictions": "No inventar campos que no figuren en el ERD o que no tengan justificación funcional directa.",
+                "done_when": "Esquemas JSON de Request y Response completados con wrapper data y categorías conceptuales."
+              },
+              "example_title": "Contrato Request/Response de Reserva",
+              "example": "```json\n// Request Body — POST /api/v1/bookings\n{\n  \"property_id\": \"texto (requerido)\",\n  \"check_in_date\": \"fecha (requerido)\",\n  \"check_out_date\": \"fecha (requerido)\",\n  \"guest_count\": \"número (requerido)\",\n  \"payment_token\": \"texto (requerido)\"\n}\n\n// Response Body — 201 Created\n{\n  \"data\": {\n    \"id\": \"texto\",\n    \"property_id\": \"texto\",\n    \"status\": \"texto\",\n    \"total_price\": \"número\",\n    \"created_at\": \"fecha\"\n  }\n}\n```",
+              "link_label": "Payloads Validados -> Estándar de Errores y Paginación"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Estándar de Errores JSON y Paginación (Errors & Pagination)",
+      "summary": "Estandarizar las respuestas de error a partir de los bloques alt de D7 y definir parámetros de consulta para listados.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Estandarización de Sad Paths y Parámetros de Consulta",
+          "objective": "Definir el objeto JSON de error unificado y los query params de paginación y ordenamiento.",
+          "input": "Bloques alt de secuencias D7 y especificaciones de NFR de Fase 3.",
+          "raw_data_title": "Matriz de Errores y Query Parameters",
+          "raw_data": "| Código HTTP | Clave de Error | Mensaje Estándar | Parámetros Query Aplicables |\n|---|---|---|---|\n| 400 Bad Request | VALIDATION_ERROR | Parámetros de entrada inválidos o faltantes | N/A |\n| 401 Unauthorized | AUTH_REQUIRED | Token de sesión no provisto o expirado | N/A |\n| 402 Payment Required | PAYMENT_DECLINED | La transacción fue rechazada por la pasarela | N/A |\n| 409 Conflict | DATES_UNAVAILABLE | Las fechas solicitadas ya se encuentran reservadas | N/A |\n| 200 OK (Listados) | SUCCESS | Paginación requerida para colecciones | `?page=1&limit=20&sort=price_asc` |",
+          "exit_label": "Estándar de Errores y Paginación Validado",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Diseño del Envelope de Error y Convenciones de Paginación",
+              "objective": "Especificar la estructura `{ \"error\": { \"code\", \"message\", \"details\" } }` y parámetros de cursor/offset.",
+              "how_to": {
+                "steps": [
+                  "1. Formalizar el objeto de error estándar con código numérico, identificador y mensaje legible.",
+                  "2. En endpoints GET de colecciones, declarar query parameters obligatorios: `?page=1&limit=20`.",
+                  "3. Mapear cada código HTTP a los bloques alt identificados en D7.",
+                  "4. Incluir metadatos de paginación en respuestas de listado dentro del objeto raíz `{ \"data\": [...], \"pagination\": { ... } }`."
+                ],
+                "table_columns": [
+                  "Elemento",
+                  "Estructura JSON / URI",
+                  "Regla de Aplicación"
+                ],
+                "table_rules": [
+                  "Los errores nunca deben devolver texto plano o HTML",
+                  "Todo endpoint GET de catálogo debe limitar el tamaño máximo de página a 50 elementos",
+                  "Los códigos HTTP deben coincidir exactamente con los diagramas de secuencia D7"
+                ],
+                "restrictions": "Prohibido devolver arrays planos en endpoints de listado sin envoltorio y sin paginación.",
+                "done_when": "Estructura JSON de error unificada y parámetros de consulta formalizados."
+              },
+              "example_title": "Estructura JSON de Error y Paginación",
+              "example": "```json\n// Estructura Estándar de Error\n{\n  \"error\": {\n    \"code\": 409,\n    \"type\": \"DATES_UNAVAILABLE\",\n    \"message\": \"Las fechas seleccionadas ya no están disponibles.\"\n  }\n}\n\n// Paginación en GET /api/v1/properties\n// Query: ?page=1&limit=20&department=Antioquia\n{\n  \"data\": [ ... ],\n  \"pagination\": {\n    \"current_page\": 1,\n    \"per_page\": 20,\n    \"total_items\": 85,\n    \"total_pages\": 5\n  }\n}\n```",
+              "link_label": "Errores y Paginación Validados -> Ensamblaje Catálogo D9"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Catálogo de API y Trazabilidad (Assembly & Downstream Impact)",
+      "summary": "Compilar la especificación conceptual completa de la API con trazabilidad hacia la Matriz de Autorización (D11) y Fase 6.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Estructuración del Contrato API e Implicaciones para Seguridad (D11) y Fase 6",
+          "objective": "Ensamblar el catálogo completo de endpoints y articular el impacto en seguridad y modelado físico.",
+          "input": "Endpoints, Payloads, Errores y Requerimientos no funcionales de Fase 3.",
+          "raw_data_title": "Inventario de Contratos e Impacto Downstream",
+          "raw_data": "| Endpoint | Rol Autorizado (D11) | Scope de Acceso | Consumidor Downstream Principal |\n|---|---|---|---|\n| GET /api/v1/properties | PUBLIC | ALL | Frontend (Catálogo y Búsqueda) |\n| POST /api/v1/bookings | TOURIST, AGENCY | OWN | D11 (Seguridad), Pasarela Wompi, Fase 6 (Modelado Físico) |\n| GET /api/v1/users/me/bookings | TOURIST, HOST | OWN | D11 (Aislamiento Multi-inquilino) |\n| PATCH /api/v1/properties/{id}/review | ADMIN | ALL | D11 (Módulo de Gobernanza y Aprobación) |",
+          "exit_label": "Entregable D9 Formalmente Ensamblado y Validado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Contrato Conceptual de API",
+              "objective": "Consolidar el entregable D9 como base definitiva para la implementación técnica.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el documento maestro con metadata, catálogo de endpoints por módulo y ejemplos de payloads.",
+                  "2. Mapear cada endpoint con su rol autorizado requerido para el entregable D11.",
+                  "3. Documentar directivas de transición para el modelado físico de Fase 6 (P6-D2).",
+                  "4. Validar el 100% de cumplimiento en idioma español y convenciones REST."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Contenido",
+                  "Trazabilidad",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El catálogo debe satisfacer todos los flujos de D2 y pantallas de D5",
+                  "Los contratos de payload deben servir como base inmutable para el diseño OpenAPI en Fase 6",
+                  "Validar que ninguna ruta quede sin definición de rol o de errores"
+                ],
+                "restrictions": "No incluir detalles de implementación específicos de un framework web concreto.",
+                "done_when": "Documento D9 ensamblado y verificado contra todas las compuertas condicionales."
+              },
+              "example_title": "Especificación de Endpoint en D9",
+              "example": "```markdown\n### POST /api/v1/bookings — Crear Reserva\n**Origen (D2):** Clic en 'Pagar' en Pantalla de Checkout\n**Autenticación:** Bearer JWT (Roles: TOURIST, AGENCY)\n\n**Request Body:**\n{\n  \"property_id\": \"texto (requerido)\",\n  \"check_in_date\": \"fecha (requerido)\",\n  \"check_out_date\": \"fecha (requerido)\",\n  \"guest_count\": \"número (requerido)\",\n  \"payment_token\": \"texto (requerido)\"\n}\n\n**Response Body (201 Created):**\n{\n  \"data\": {\n    \"id\": \"texto\",\n    \"status\": \"texto\",\n    \"total_price\": \"número\"\n  }\n}\n\n**Errores:**\n| Código | Tipo | Mensaje |\n|---|---|---|\n| 402 | PAYMENT_DECLINED | Tarjeta rechazada |\n| 409 | DATES_UNAVAILABLE | Fechas ocupadas |\n```",
+              "link_label": "Catálogo API Ensamblado -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — API Conceptual Design (D9)",
+    "markdown": "# Deliverable 9 (D9): API Conceptual Design — MOD-BOOKING\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Módulo:** MOD-BOOKING\n**Estado:** Aprobado\n\n---\n\n## 1. Catálogo Conceptual de Endpoints\n\n*Backlink a Fase 3:* El diseño de estos endpoints satisface los contratos de datos requeridos por los Casos de Uso (`[[PHASE_3_REQUIREMENTS_ENGINEERING/3.Use_Case_Diagram.md]]`) y las secuencias de `[[PHASE_4_SYSTEM_MODELING/7.System_Sequence_Diagrams/7.System_Sequence_Diagrams.md]]`.\n\n### `POST /api/v1/bookings` — Crear Reserva y Cobrar\n*Inicia el flujo transaccional de reserva y procesa la transacción bancaria a través de la pasarela de pagos.*\n\n- **Origen (D2):** Acción del Turista al hacer clic en \"Pagar\" en la Pantalla de Checkout.\n- **Autenticación requerida:** `Bearer JWT (Roles: TOURIST, AGENCY_USER)`.\n\n**Cuerpo de Solicitud (Request Body):**\n```json\n{\n  \"property_id\": \"texto (requerido)\",\n  \"check_in_date\": \"fecha ISO-8601 (requerido)\",\n  \"check_out_date\": \"fecha ISO-8601 (requerido)\",\n  \"guest_count\": \"número (requerido)\",\n  \"payment_token\": \"texto (requerido)\"\n}\n```\n\n**Cuerpo de Respuesta Exitosa (Response Body — 201 Created):**\n```json\n{\n  \"data\": {\n    \"booking_id\": \"texto\",\n    \"property_id\": \"texto\",\n    \"user_id\": \"texto\",\n    \"status\": \"texto (CONFIRMED)\",\n    \"total_price\": \"número (centavos)\",\n    \"check_in_date\": \"fecha\",\n    \"check_out_date\": \"fecha\",\n    \"created_at\": \"fecha\"\n  }\n}\n```\n\n**Matriz de Errores Estandarizados (Sad Paths):**\n| Código HTTP | Tipo de Error | Mensaje para el Cliente | Acción UI (Frontend) |\n|---|---|---|---|\n| 400 Bad Request | VALIDATION_ERROR | Fechas inválidas o check_out anterior a check_in | Resaltar campos en rojo |\n| 401 Unauthorized | AUTH_REQUIRED | Sesión expirada o no iniciada | Redirigir a login modal |\n| 402 Payment Required | PAYMENT_DECLINED | Tu tarjeta fue rechazada por fondos insuficientes | Toast Rojo de pago fallido |\n| 409 Conflict | DATES_UNAVAILABLE | Las fechas seleccionadas ya han sido reservadas | Toast Amarillo de conflicto |\n| 500 Internal Error | SERVER_ERROR | Error inesperado procesando la reserva | Modal de error del sistema |\n\n---\n\n### `GET /api/v1/properties` — Catálogo Paginado de Inmuebles\n*Consulta el inventario de fincas disponibles con soporte de filtros y ordenamiento.*\n\n- **Query Parameters:** `?page=1&limit=20&department=Antioquia&max_price=1000000`\n- **Response Body (200 OK):**\n```json\n{\n  \"data\": [\n    {\n      \"id\": \"texto\",\n      \"title\": \"texto\",\n      \"department\": \"texto\",\n      \"city\": \"texto\",\n      \"price_per_night\": \"número\",\n      \"capacity\": \"número\",\n      \"rating\": \"número\"\n    }\n  ],\n  \"pagination\": {\n    \"current_page\": 1,\n    \"per_page\": 20,\n    \"total_items\": 42,\n    \"total_pages\": 3\n  }\n}\n```\n\n---\n\n## Implicaciones para Siguientes Entregables\n\n- **Hacia D10 (Notification Matrix):** El evento exitoso de `POST /api/v1/bookings` dispara el envío de confirmación de reserva y recibo de cobro.\n- **Hacia D11 (Authorization Matrix):** Define los endpoints exactos que deben incluirse en la matriz OWN/ALL según roles (`TOURIST`, `HOST`, `ADMIN`).\n- **Hacia Fase 6 (P6-D2 Physical Data Modeling):** Las categorías conceptuales (`texto`, `número`) se traducirán a tipos SQL nativos (`UUID`, `VARCHAR(255)`, `BIGINT`, `TIMESTAMPTZ`)."
+  }
+}

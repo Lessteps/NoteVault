@@ -70,6 +70,11 @@ LAYOUT = {
     "study_goal":        f"{DATA_DIR}/estudio/metas/{{id}}.json",
     "study_projects_dir": f"{DATA_DIR}/estudio/proyectos",
     "study_project":     f"{DATA_DIR}/estudio/proyectos/{{id}}.json",
+    "web_dir":           f"{DATA_DIR}/web",
+    "web_bookmarks":     f"{DATA_DIR}/web/marcadores.json",
+    "web_restrictions":  f"{DATA_DIR}/web/restricciones.json",
+    "web_history_day":   f"{DATA_DIR}/web/historial/{{year}}/{{month:02d}}/{{date}}.json",
+    "web_usage_day":     f"{DATA_DIR}/web/uso/{{year}}/{{month:02d}}/{{date}}.json",
 }
 
 # 0 = Monday, matching datetime.date.weekday().

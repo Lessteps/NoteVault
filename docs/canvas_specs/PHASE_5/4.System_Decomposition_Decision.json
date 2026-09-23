@@ -1,0 +1,200 @@
+{
+  "phase": "PHASE 5: ARCHITECTURAL DESIGN",
+  "deliverable_code": "D4",
+  "deliverable": "System Decomposition Decision",
+  "purpose": "Formalizar mediante un Architecture Decision Record (ADR-002) la estructura de empaquetamiento y unidades desplegables del sistema, evaluando Monolito Tradicional, Microservicios Distribuidos y Monolito Modular (Modular Monolith) sobre Serverless frente al tamaño del equipo (1-3 ingenieros), Time-to-Market y la topología de D3, asignando cada Bounded Context de D2 a un módulo interno aislado dentro de un monorepo.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Bounded Context Formalization (P5-D2) | [[PHASE_5_ARCHITECTURAL_DESIGN/2.Bounded Context Formalization/2.Bounded Context Formalization.md]] | Provee los 5 Bounded Contexts candidatos a ser mapeados a unidades desplegables. |\n| Deployment Topology Decision (P5-D3) | [[PHASE_5_ARCHITECTURAL_DESIGN/3.Deployment Topology Decision/3.Deployment Topology Decision.md]] | Condiciona la descomposición al modelo Serverless/Edge de Vercel y base de datos unificada en Supabase. |\n| Quality Attributes Map (P5-D1) | [[PHASE_5_ARCHITECTURAL_DESIGN/1.Quality Attributes Map/1.Quality Attributes Map.md]] | Exige consistencia transaccional atómica en reservas (Escenario 4) sin sobrecarga de transacciones distribuidas. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Mapeo de Contextos a Unidades Desplegables (Map Contexts to Units)",
+      "summary": "Analizar los 5 Bounded Contexts frente a la capacidad del equipo y la infraestructura para definir la frontera de despliegue.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Evaluación de Monolito Modular vs Microservicios frente a Equipo y Topología",
+          "objective": "Determinar si los contextos deben vivir en servicios independientes de red o en módulos internos de un solo artefacto.",
+          "input": "Bounded Contexts de D2, topología de D3 y perfil del equipo de desarrollo.",
+          "raw_data_title": "Mapeo de Bounded Contexts a Unidades de Despliegue",
+          "raw_data": "| Bounded Context (D2) | Clasificación | Unidad Desplegable Asignada | Tipo de Aislamiento |\n|---|---|---|---|\n| Identity & Profile | Generic Subdomain | Módulo interno `modules/identity` | Aislamiento a nivel de paquete en Monorepo |\n| Catalog Management | Core Domain | Módulo interno `modules/catalog` | Frontera lógica estricta con API exportada |\n| Booking Operations | Core Domain | Módulo interno `modules/booking` | Lógica de negocio encapsulada con llamadas in-process |\n| Billing & Financials | Supporting Domain | Módulo interno `modules/billing` | Desacoplamiento de pasarela vía ACL interno |\n| Notification Hub | Generic Subdomain | Módulo interno `modules/notifications` | Worker desacoplado reactivamente vía Supabase Realtime |",
+          "exit_label": "Mapeo Unívoco de Contextos a Módulos Completado",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Evaluación del Overhead Organizacional y Operativo",
+              "objective": "Verificar la viabilidad operativa de la descomposición.",
+              "how_to": {
+                "steps": [
+                  "1. Evaluar el número de ingenieros dedicados al mantenimiento del sistema.",
+                  "2. Descartar Microservicios por la complejidad añadida de 5 pipelines de CI/CD independientes.",
+                  "3. Adoptar el patrón Modular Monolith como equilibrio óptimo entre orden y agilidad.",
+                  "4. Establecer barreras de importación estricta entre carpetas mediante linters (ESLint boundaries)."
+                ],
+                "table_columns": [
+                  "Patrón",
+                  "Complejidad Red",
+                  "Velocidad MVP",
+                  "Dictamen"
+                ],
+                "table_rules": [
+                  "No adoptar microservicios si el equipo es menor a 3 desarrolladores full-stack",
+                  "La consistencia ACID de reservas debe resolverse en una sola base de datos relacional",
+                  "El monolito debe ser modular, prohibiendo espagueti de dependencias cruzadas"
+                ],
+                "restrictions": "Prohibido fragmentar en microservicios independientes sin justificación de escala de equipos.",
+                "done_when": "Todos los Bounded Contexts mapeados a módulos internos dentro del mismo codebase."
+              },
+              "example_title": "Mapeo de Unidades D4",
+              "example": "```markdown\n| Bounded Context | Unidad Desplegable |\n|---|---|\n| Identity | Módulo interno Next.js (`src/modules/identity`) |\n| Catalog | Módulo interno Next.js (`src/modules/catalog`) |\n| Booking | Módulo interno Next.js (`src/modules/booking`) |\n| Billing | Módulo interno Next.js (`src/modules/billing`) |\n| Notifications | Módulo interno Next.js (`src/modules/notifications`) |\n```",
+              "link_label": "Mapeo Completado -> Redacción del ADR-002"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Redacción del ADR-002 de Descomposición (ADR Formulation)",
+      "summary": "Formalizar el registro de decisión de arquitectura justificando la elección de Monolito Modular.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Formalización de Context, Options, Decision y Consequences (Monolito Modular)",
+          "objective": "Documentar formalmente el ADR-002 con sus trade-offs y salvaguardas de gobernanza.",
+          "input": "Mapeo del Step 1 y directivas de agilidad de negocio.",
+          "raw_data_title": "Estructura del ADR-002 de Descomposición",
+          "raw_data": "| Campo ADR | Contenido Clave Formalizado |\n|---|---|\n| Título | ADR-002: Adopción del Patrón Modular Monolith sobre Arquitectura Serverless |\n| Context | 5 Bounded Contexts, equipo ágil pequeño, necesidad de transacciones ACID en reservas y despliegue en Vercel |\n| Options Considered | 1. Modular Monolith en Monorepo Next.js (Aprobada) <br> 2. Microservicios Distribuidos en Contenedores <br> 3. Monolito Tradicional sin fronteras lógicas |\n| Decision | Construir un Monolito Modular donde cada Bounded Context reside en un directorio aislado con barreras de importación |\n| Consequences (+) | Simplicidad de despliegue (1 pipeline), llamadas de función in-process (<1ms), consistencia ACID nativa |\n| Consequences (-) | Riesgo de acoplamiento progresivo si los desarrolladores puentean fronteras (mitigado con reglas ESLint estrictas) |",
+          "exit_label": "ADR-002 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Redacción del Registro Inmutable de Descomposición",
+              "objective": "Cumplir los requisitos de gobernanza del C4 y ADRs.",
+              "how_to": {
+                "steps": [
+                  "1. Contextualizar el ADR citando el número de Bounded Contexts y restricciones de equipo.",
+                  "2. Describir las tres opciones evaluadas destacando costos operativos.",
+                  "3. Enunciar la Decisión de Modular Monolith con claridad.",
+                  "4. Establecer consecuencias positivas y directivas de disciplina para mitigar acoplamiento."
+                ],
+                "table_columns": [
+                  "Elemento ADR",
+                  "Detalle Técnico",
+                  "Comprobación"
+                ],
+                "table_rules": [
+                  "El ADR debe explicitar las reglas para prevenir que el monolito degenere en 'Big Ball of Mud'",
+                  "Las transacciones entre Booking y Billing deben ser locales y atómicas",
+                  "El documento debe archivar el consenso unánime de arquitectura"
+                ],
+                "restrictions": "No admitir ambigüedades respecto a si los servicios se comunican por red o en memoria.",
+                "done_when": "ADR-002 completamente redactado en las 5 secciones estándar."
+              },
+              "example_title": "ADR-002: Monolito Modular",
+              "example": "```markdown\n# ADR-002: Adopción de Modular Monolith\n\n## Context\n5 Bounded Contexts, equipo de 1-3 ingenieros, despliegue unificado en Vercel.\n\n## Decision\nImplementar un Monolito Modular con límites de módulo estrictos en un solo monorepo.\n\n## Consequences\n- Positive: Transacciones ACID simples, 1 solo pipeline de CI/CD.\n- Negative: Exige disciplina de importación para evitar acoplamiento.\n```",
+              "link_label": "ADR-002 Redactado -> Estructura de Unidades Desplegables"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Estructura de Unidades Desplegables y Paquetes (Deployment Units Structure)",
+      "summary": "Modelar la estructura de directorios y el aislamiento de módulos dentro del monorepo Next.js.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Diagramación y Delimitación de Módulos Internos en Monorepo Next.js",
+          "objective": "Visualizar la arquitectura de carpetas y las barreras de comunicación entre paquetes.",
+          "input": "ADR-002 y lineamientos de código limpio.",
+          "raw_data_title": "Estructura de Paquetes del Monolito Modular",
+          "raw_data": "| Módulo Interno | Directorio de Código | Responsabilidad Exportada | Acceso Permitido |\n|---|---|---|---|\n| `identity` | `src/modules/identity/` | Servicios de sesión y validación de roles | Público para todos los módulos |\n| `catalog` | `src/modules/catalog/` | Búsqueda y ficha técnica de fincas | Consumido por Booking vía interfaz pública |\n| `booking` | `src/modules/booking/` | Lógica de checkout y reserva | Aislado; expone eventos hacia Billing y Notificaciones |\n| `billing` | `src/modules/billing/` | Adaptador ACL para pasarela Wompi | Invocado exclusivamente por Booking |\n| `notifications` | `src/modules/notifications/` | Handlers asíncronos de WhatsApp/Email | Suscriptor reactivo de eventos |",
+          "exit_label": "Estructura de Módulos y Barreras de Código Definidas",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Diseño de la Topología de Módulos en Mermaid",
+              "objective": "Ilustrar la composición del Monolito Modular desplegado en Vercel.",
+              "how_to": {
+                "steps": [
+                  "1. Representar el artefacto único de despliegue (Next.js Application).",
+                  "2. Desglosar los 5 módulos internos con sus puertos de entrada públicos (`index.ts`).",
+                  "3. Ilustrar la base de datos relacional compartida con esquemas lógicos separados.",
+                  "4. Indicar que las llamadas inter-módulo son llamadas en memoria de alta velocidad."
+                ],
+                "table_columns": [
+                  "Módulo",
+                  "Interfaz Pública",
+                  "Dependencias",
+                  "Comunicación"
+                ],
+                "table_rules": [
+                  "Ningún módulo debe acceder a las tablas internas de otro sin pasar por su servicio público",
+                  "La comunicación inter-módulo es síncrona en memoria salvo eventos diferidos",
+                  "El artefacto compilado se despliega como una sola unidad atómica en Vercel"
+                ],
+                "restrictions": "Prohibido permitir importaciones circulares entre módulos (`booking` -> `catalog` -> `booking`).",
+                "done_when": "Diagrama Mermaid de descomposición modular completado y validado."
+              },
+              "example_title": "Arquitectura Modular Monolith en Mermaid",
+              "example": "```mermaid\ngraph TD\n    subgraph Deployable_Unit [Unidad Única de Despliegue: Next.js App en Vercel]\n        AppRouter[\"Next.js App Router (UI & API Routes)\"]\n        subgraph Modules [Módulos Aislados en Código]\n            ModIdentity[\"Identity Module\"]\n            ModCatalog[\"Catalog Module\"]\n            ModBooking[\"Booking Module\"]\n            ModBilling[\"Billing Module (ACL)\"]\n            ModNotif[\"Notification Module\"]\n        end\n        AppRouter --> ModIdentity\n        AppRouter --> ModCatalog\n        AppRouter --> ModBooking\n        ModBooking -->|In-Process Call| ModCatalog\n        ModBooking -->|In-Process Call| ModBilling\n        ModBooking -.->|Emit Event| ModNotif\n    end\n    subgraph Data_Layer [Supabase PostgreSQL]\n        DB[(\"PostgreSQL 16 Engine\")]\n    end\n    Modules -->|Connection Pool| DB\n```",
+              "link_label": "Estructura Modular Validada -> Ensamblaje D4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de la Decisión y Consumidores Downstream (Assembly & Handoff)",
+      "summary": "Consolidar el entregable D4 y articular su impacto directo en el estilo arquitectónico (D5) y patrones de comunicación (D6).",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación del Documento D4 e Implicaciones para D5 y D6",
+          "objective": "Publicar el entregable D4 como marco de descomposición vinculante.",
+          "input": "ADR-002, mapeo de unidades y topología modular.",
+          "raw_data_title": "Directivas de Consumo Downstream",
+          "raw_data": "| Entregable Receptor | Directiva Heredada de D4 | Impacto en el Diseño |\n|---|---|---|\n| D5 (Architectural Style Selection) | El estilo debe aplicarse de forma homogénea a los módulos internos | Permite adoptar Hexagonal/Ports & Adapters en módulos Core y MVC simple en Generic |\n| D6 (Communication Patterns) | La descomposición descarta la necesidad de protocolos de red Server-Server | Elimina gRPC o HTTP inter-servicio; la comunicación es in-process method invocation |\n| D9 (Component Diagram C4) | El diagrama C4 Container Nivel 2 modelará los módulos como contenedores lógicos | Representación limpia sin dispersión física |",
+          "exit_label": "Entregable D4 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento Maestro D4",
+              "objective": "Consolidar el entregable D4 en formato formal para la arquitectura.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el archivo en sus 3 secciones canónicas: Metadata, ADR-002 y Diagrama Modular.",
+                  "2. Verificar que se justifique explícitamente el descarte de microservicios.",
+                  "3. Documentar las directivas para D5, D6 y D9.",
+                  "4. Validar el cumplimiento total de traducción al español."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Contenido",
+                  "Normativa",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe archivar la justificación económica y técnica del Monolito Modular",
+                  "Asegurar coherencia absoluta con D2 y D3",
+                  "Verificar que las salvaguardas anti-acoplamiento queden explícitas"
+                ],
+                "restrictions": "No admitir ambigüedades respecto a la modularidad interna del código.",
+                "done_when": "Documento D4 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Entregable D4",
+              "example": "```markdown\n# Deliverable 4 (D4): System Decomposition Decision\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n## 2. Architectural Decision Record (ADR-002)\n[ADR completo de Modular Monolith]\n\n## 3. Modular Monolith Architecture Diagram\n[Diagrama Mermaid]\n```",
+              "link_label": "Descomposición Ensamblada -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — System Decomposition Decision (D4)",
+    "markdown": "# Deliverable 4 (D4): System Decomposition Decision\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 5 — Architectural Design\n**Estado:** Aprobado\n\n---\n\n## 1. Architectural Decision Record (ADR-002)\n\n### ADR-002: Adopción del Patrón \"Modular Monolith\" sobre Arquitectura Serverless\n\n#### Context\nEl sistema ha sido lógicamente dividido en 5 Bounded Contexts (`[[PHASE_5_ARCHITECTURAL_DESIGN/2.Bounded Context Formalization/2.Bounded Context Formalization.md]]`). El equipo de ingeniería actual es pequeño (1 a 3 desarrolladores full-stack) y el proyecto exige un time-to-market agresivo. Además, la topología física elegida en el ADR-001 (`[[PHASE_5_ARCHITECTURAL_DESIGN/3.Deployment Topology Decision/3.Deployment Topology Decision.md]]`) opera sobre Vercel Serverless y Supabase, entorno optimizado para el despliegue atómico de un solo monorepo Next.js con una base de datos relacional PostgreSQL compartida y transacciones ACID nativas.\n\n#### Options Considered\n1. **Monolito Modular (Modular Monolith) en Monorepo Next.js (Seleccionada):** Una sola unidad de despliegue que contiene fronteras lógicas estrictas entre los 5 Bounded Contexts (`src/modules/*`), con comunicación entre módulos mediante llamadas de función en memoria (*in-process method calls*) y eventos reactivos.\n2. **Microservicios Físicos Distribuidos (Descartada):** Dividir los 5 contextos en 5 repositorios, 5 servicios independientes y bases de datos separadas. Descartada taxativamente debido a la sobrecarga operacional, la lentitud de red inter-servicio y la imposibilidad de ejecutar transacciones atómicas simples en el proceso de reserva y pago sin recurrir a patrones complejos como Sagas o 2-Phase Commit (2PC).\n3. **Monolito Tradicional no Estructurado (Descartada):** Código mezclado sin separación de dominios; rechazada por el alto riesgo de deuda técnica y degeneración en un monolito inmanejable (*Big Ball of Mud*).\n\n#### Decision\nSe decide implementar un **Monolito Modular (Modular Monolith)**. Todo el código del backend y frontend residirá en un único repositorio Next.js organizado en paquetes desacoplados por Bounded Context. Cada módulo expondrá una interfaz pública estricta (`public API / index.ts`), quedando prohibido el acceso a estructuras internas o modelos privados de otros módulos.\n\n#### Consequences\n- **Positivas:**\n  - **Despliegue Simple:** Un solo pipeline de CI/CD y despliegues atómicos sin riesgo de incompatibilidad de versiones entre microservicios.\n  - **Rendimiento Máximo:** Las llamadas inter-módulo (ej. Booking consultando disponibilidad en Catalog) se ejecutan en memoria con latencias menores a 1 milisegundo.\n  - **Consistencia Transaccional:** La creación de reservas, pagos y bloqueos de calendario se realiza en una sola transacción ACID de PostgreSQL.\n- **Negativas / Riesgos:**\n  - Riesgo de erosión de límites arquitectónicos si los desarrolladores puentean las interfaces públicas para importar código privado (mitigado mediante reglas estrictas de linting con `@nx/enforce-module-boundaries` o ESLint).\n\n---\n\n## 2. Diagrama de Arquitectura Modular Monolith\n\n```mermaid\ngraph TD\n    subgraph Deployable_Unit [Unidad Única de Despliegue: Next.js App en Vercel]\n        AppRouter[\"Next.js App Router (UI Pages & API Routes)\"]\n        subgraph Modules [Módulos Aislados en Código Monorepo]\n            ModIdentity[\"Identity Module (`/modules/identity`)\"]\n            ModCatalog[\"Catalog Module (`/modules/catalog`)\"]\n            ModBooking[\"Booking Module (`/modules/booking`)\"]\n            ModBilling[\"Billing Module (`/modules/billing`)\"]\n            ModNotif[\"Notification Module (`/modules/notifications`)\"]\n        end\n        AppRouter --> ModIdentity\n        AppRouter --> ModCatalog\n        AppRouter --> ModBooking\n        ModBooking -->|In-Process Call: <1ms| ModCatalog\n        ModBooking -->|In-Process Call: <1ms| ModBilling\n        ModBooking -.->|Async Event: booking.confirmed| ModNotif\n        ModBilling -.->|Async Event: payment.approved| ModNotif\n    end\n    subgraph Data_Layer [Supabase Managed PostgreSQL]\n        DB[(\"PostgreSQL 16 Database (Shared Instance / RLS Enforced)\")]\n    end\n    Modules -->|Encrypted Connection Pool| DB\n```\n\n---\n\n## 3. Implicaciones para Entregables Downstream\n\n- **Hacia D5 (Architectural Style Selection):** La decisión de Monolito Modular permite aplicar estilos por módulo: Clean Architecture / Ports & Adapters para los módulos Core (`booking`, `catalog`) y un enfoque directo MVC/CRUD ligero para módulos Generic (`identity`).\n- **Hacia D6 (Communication Patterns):** Descarta la necesidad de protocolos de red RPC complejos (gRPC) entre servicios del servidor; la comunicación interna es invocación de métodos locales y eventos en memoria.\n- **Hacia D9 (Component Diagram C4):** El diagrama C4 Container (Nivel 2) modelará el backend como un único contenedor Next.js con sus módulos internos claramente delimitados."
+  }
+}

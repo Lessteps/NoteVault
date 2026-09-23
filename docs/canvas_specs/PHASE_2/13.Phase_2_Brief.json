@@ -1,0 +1,402 @@
+{
+  "phase": "Phase 2",
+  "deliverable_code": "D13",
+  "deliverable": "Phase 2 Brief (Resumen Ejecutivo de la Fase 2 — Brief de Kickoff)",
+  "purpose": "Este es el documento final de cierre de la Fase 2. Actúa como el compendio integral y la fuente única de verdad para el equipo de ingeniería antes de iniciar la Fase 3 (Requirements Engineering). Sintetiza las decisiones tomadas en los 12 entregables previos sin requerir que un desarrollador deba leer individualmente los 12 documentos base.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_project_identity]] | Identidad del proyecto, codename y alcance in/out (P2-D1). |\n| [[example_output_non_negotiable_constraints]] | Restricciones no negociables de calidad, costo y SLAs (P2-D2). |\n| [[example_output_stack_decision]] | Stack tecnológico oficial y decisiones ADR base (P2-D3). |\n| [[example_output_repository_structure]] | Topología de repositorio y estructura física de carpetas (P2-D4). |\n| [[example_output_branching_strategy]] | Estrategia de ramas Git y convención de commits (P2-D5). |\n| [[example_output_environment_definitions]] | Mapa de entornos (dev, staging, prod) y secretos (P2-D6). |\n| [[example_output_coding_standards]] | Estándares de codificación, linter y formateo (P2-D7). |\n| [[example_output_testing_strategy]] | Pirámide de pruebas, flujos críticos y verificación RNN (P2-D8). |\n| [[example_output_dor_dod]] | Definition of Ready y Definition of Done (P2-D9). |\n| [[example_output_tooling]] | Pila de herramientas de desarrollo y dependencias oficiales (P2-D10). |\n| [[example_output_communication_protocols]] | Canales de comunicación, protocolo ADR y escalamiento (P2-D11). |\n| [[example_output_risk_register_update]] | Riesgos técnicos de ingeniería y puntos únicos de fallo (P2-D12). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Extracción del Core de Arquitectura y Configuración (D1 a D6)",
+      "summary": "Extraer las definiciones fundamentales que estructuran el código, la infraestructura, las restricciones no negociables y los entornos de despliegue.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Consolidación de Identidad, Alcance y Restricciones (D1 y D2)",
+          "objective": "Extraer el Codename técnico, mandato central, fronteras de alcance y las restricciones numéricas innegociables.",
+          "input": "[[example_output_project_identity]] (D1) y [[example_output_non_negotiable_constraints]] (D2).",
+          "raw_data_title": "Identidad y Límites",
+          "raw_data": "Codename: nff-platform. In-scope: React + Tailwind frontend, Java 21 Spring Boot backend, PostgreSQL 16, Wompi y WABA. Out-scope: Apps nativas, IA. RNN-01 a RNN-04 numéricas.",
+          "exit_label": "IDENTIDAD Y LÍMITES EXTRAÍDOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Extracción de Codename, In/Out Scope y RNNs Numéricas",
+              "objective": "Sintetizar la identidad técnica y los límites duros de rendimiento, concurrencia y seguridad.",
+              "how_to": {
+                "steps": [
+                  "Consultar el Codename oficial nff-platform y el mandato central de D1.",
+                  "Extraer las capacidades In-Scope y exclusiones Out-of-Scope.",
+                  "Extraer las restricciones RNN-01 (LCP < 2.5s), RNN-02 (P95 < 400ms), RNN-03 (Sin login) y RNN-04 (TLS 1.3/Cero tarjetas).",
+                  "Documentar en la ficha de resumen arquitectónico."
+                ],
+                "table_columns": "Dominio | Parámetro Clave | Valor Oficial Extraído",
+                "table_rules": "Copia literal sin alterar los umbrales numéricos de D1 y D2.",
+                "restrictions": [
+                  "Prohibido redefinir o modificar el alcance fuera de lo acordado en D1 y D2."
+                ],
+                "done_when": "Identidad, alcance y RNNs numéricas completamente extraídas."
+              },
+              "example_title": "Identidad y Restricciones Numéricas",
+              "example": "| Parámetro | Valor Extraído de D1 y D2 |\n| --- | --- |\n| Codename Técnico | `nff-platform` |\n| Alcance Core | React frontend, Spring Boot backend, PostgreSQL, Wompi, WABA |\n| RNN-01 (Rendimiento) | LCP < 2.5s en 3G Fast, Bundle < 1.5MB |\n| RNN-02 (Concurrencia) | Latencia P95 < 400ms bajo 50 req/s con control ACID |",
+              "link_label": "identidad y límites pasan a extracción de stack y repositorios (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Consolidación de Stack, Repositorio y Entornos (D3 a D6)",
+          "objective": "Extraer las tecnologías oficiales, la topología monorepo, la estrategia Trunk-Based y el mapa de ambientes.",
+          "input": "Entregables D3 (Stack), D4 (Repositorio), D5 (Ramas) y D6 (Entornos).",
+          "raw_data_title": "Stack, Repo y Ambientes",
+          "raw_data": "Stack: Java 21, React, PostgreSQL 16, Wompi, WABA. Monorepo con /backend, /frontend, /docs. Trunk-Based ligero. Entornos: Local, Staging, Prod.",
+          "exit_label": "STACK, REPO Y AMBIENTES EXTRAÍDOS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Extracción de Tecnologías, Monorepo, Ramas y Ambientes",
+              "objective": "Sintetizar la arquitectura física y las políticas de despliegue del proyecto.",
+              "how_to": {
+                "steps": [
+                  "Extraer la matriz de tecnologías oficiales de P2-D3.",
+                  "Extraer la topología monorepo y reglas de aislamiento de P2-D4.",
+                  "Extraer la estrategia Trunk-Based y Conventional Commits de P2-D5.",
+                  "Extraer el mapa de entornos Local, Staging y Producción de P2-D6."
+                ],
+                "table_columns": "Capa Técnica | Definición Oficial | Entregable Fuente",
+                "table_rules": "Asegurar congruencia absoluta entre las herramientas de D3 y las carpetas de D4.",
+                "restrictions": [
+                  "No omitir las versiones mayores oficiales de las tecnologías ganadoras."
+                ],
+                "done_when": "Stack, repositorio, ramas y entornos consolidados."
+              },
+              "example_title": "Infraestructura Técnica Consolidada",
+              "example": "| Capa | Decisión Oficial | Fuente |\n| --- | --- | --- |\n| Stack Oficial | Java 21 (Spring Boot 3.x), React + Vite, PostgreSQL 16 | P2-D3 |\n| Repositorio | Monorepo modular (`backend/`, `frontend/`, `docs/`) | P2-D4 |\n| Ramas Git | Trunk-Based ligero con Conventional Commits | P2-D5 |\n| Entornos | Local (Docker), Staging (PaaS test), Producción (VPC) | P2-D6 |",
+              "link_label": "infraestructura pasa a formalización del bloque base (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Matriz Base de Arquitectura y Configuración",
+          "objective": "Consolidar el resumen ejecutivo de arquitectura y configuración para el Step 1.",
+          "input": "Resúmenes de 1.1 y 1.2.",
+          "raw_data_title": "Bloque Base Consolidado",
+          "raw_data": "Tabla ejecutiva consolidada de arquitectura cubriendo D1 a D6 sin omisiones.",
+          "exit_label": "BLOQUE DE ARQUITECTURA BLOQUEADO → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Formalización del Bloque Base de Arquitectura (Step 1 Output)",
+              "objective": "Construir la tabla oficial del bloque base de arquitectura para el documento final.",
+              "how_to": {
+                "steps": [
+                  "Integrar las 5 dimensiones clave (Identidad, Límites, Stack, Repo/Ramas, Entornos).",
+                  "Redactar síntesis concisa y precisa de cada bloque.",
+                  "Consolidar la tabla oficial de salida del Step 1.",
+                  "Comprobar el pass condition de cimientos técnicos consolidados."
+                ],
+                "table_columns": "Dominio | Resumen Ejecutivo Extraído",
+                "table_rules": "El bloque debe reflejar fielmente los acuerdos previos sin introducir variaciones.",
+                "restrictions": [
+                  "Prohibido agregar tecnologías o dependencias no aprobadas en D1 a D6."
+                ],
+                "done_when": "Bloque base de arquitectura formalizado."
+              },
+              "example_title": "Bloque Base de Arquitectura (Step 1 Output)",
+              "example": "| Dominio | Resumen Ejecutivo Extraído |\n| --- | --- |\n| Identidad y Alcance (D1) | `nff-platform`. Plataforma web transaccional B2C con React + Spring Boot y WhatsApp Cloud API. Out-of-scope: apps nativas e IA. |\n| Restricciones No Negociables (D2) | LCP < 2.5s (RNN-01), P95 < 400ms bajo 50 req/s (RNN-02), Checkout directo sin login (RNN-03), Cero tarjetas en BD propia (RNN-04). |\n| Stack Oficial (D3) | Java 21 LTS (Spring Boot 3.x), React + Vite + Tailwind CSS, PostgreSQL 16, Wompi API. |\n| Repositorio y Ramas (D4, D5) | Monorepo modular con carpetas `backend/`, `frontend/`, `docs/`. Trunk-Based con Conventional Commits. |\n| Entornos (D6) | Local (Docker Compose), Staging (PaaS test/sandbox), Producción (SLA 99.5%, backups continuos). |",
+              "link_label": "bloque de arquitectura pasa a extracción del marco normativo (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Extracción del Marco Normativo y Operativo (D7 a D11)",
+      "summary": "Consolidar las reglas de calidad de código, la pirámide de pruebas, compuertas de DoD/DoR, tooling y protocolos de escalamiento.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Consolidación de Estándares, Testing y Compuertas (D7 a D9)",
+          "objective": "Extraer las reglas de linter, pirámide de pruebas y criterios de admisión y terminación de tareas.",
+          "input": "Entregables D7 (Estándares), D8 (Testing) y D9 (DoD/DoR).",
+          "raw_data_title": "Estándares, QA y Compuertas",
+          "raw_data": "Checkstyle/ESLint sin errores. Pirámide JUnit 5 + SpringBootTest + QA manual. DoR: Gherkin + wireframe. DoD: CI verde, cobertura >= 70%, 1 aprobación.",
+          "exit_label": "CALIDAD, QA Y COMPUERTAS EXTRAÍDOS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Extracción de Linters, Pirámide de Pruebas y DoR/DoD",
+              "objective": "Sintetizar las directrices técnicas de calidad y compuertas de sprint.",
+              "how_to": {
+                "steps": [
+                  "Extraer las reglas de estilo y linters obligatorios de P2-D7.",
+                  "Extraer la pirámide de pruebas y los Core Flows críticos de P2-D8.",
+                  "Extraer los criterios de entrada (DoR) y de salida (DoD) de P2-D9.",
+                  "Documentar en la ficha de marco normativo."
+                ],
+                "table_columns": "Área de Calidad | Regla Mandatoria | Fuente",
+                "table_rules": "Todos los criterios de calidad deben ser objetivos y verificables.",
+                "restrictions": [
+                  "No omitir el requisito de cobertura ni las pruebas de concurrencia."
+                ],
+                "done_when": "Criterios de calidad, testing y compuertas extraídos."
+              },
+              "example_title": "Directrices de Calidad y Compuertas",
+              "example": "| Área | Regla Mandatoria | Fuente |\n| --- | --- | --- |\n| Estándares de Código | Google Java Style / ESLint / Prettier sin warnings | P2-D7 |\n| Pruebas de Calidad | JUnit 5 para lógica pesada, SpringBootTest para integración | P2-D8 |\n| Compuertas DoR / DoD | DoR en Gherkin; DoD con CI verde, cobertura >= 70% y 1 aprobación | P2-D9 |",
+              "link_label": "calidad y QA pasan a tooling y gobernanza (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Consolidación de Tooling, Comunicación y Gobernanza (D10 y D11)",
+          "objective": "Extraer la pila de herramientas de desarrollo, canales oficiales y ruta de escalamiento de bloqueos.",
+          "input": "Entregables D10 (Tooling) y D11 (Comunicación y Escalamiento).",
+          "raw_data_title": "Tooling y Gobernanza",
+          "raw_data": "Tooling: IntelliJ/VS Code, Docker, Git. Comunicación: WhatsApp rápido, GitHub inmutable, ADRs en /docs/adrs/, escalamiento < 2h a 1 día.",
+          "exit_label": "TOOLING Y GOBERNANZA EXTRAÍDOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Extracción de Stack de Trabajo, ADRs y Escalamiento",
+              "objective": "Sintetizar el ecosistema de trabajo diario y los protocolos de toma de decisiones.",
+              "how_to": {
+                "steps": [
+                  "Extraer la lista de herramientas oficiales y versiones de P2-D10.",
+                  "Extraer el protocolo de Architecture Decision Records (/docs/adrs/) de P2-D11.",
+                  "Extraer la matriz de escalamiento de 4 niveles y rituales ágiles de P2-D11.",
+                  "Documentar en la tabla de gobernanza."
+                ],
+                "table_columns": "Componente | Especificación Oficial | Fuente",
+                "table_rules": "Los protocolos de comunicación deben priorizar el registro documental sobre el chat efímero.",
+                "restrictions": [
+                  "No relajar los tiempos máximos de escalamiento estipulados en D11."
+                ],
+                "done_when": "Tooling y acuerdos de gobernanza completamente extraídos."
+              },
+              "example_title": "Tooling y Gobernanza Extraídos",
+              "example": "| Componente | Especificación | Fuente |\n| --- | --- | --- |\n| Tooling Oficial | IntelliJ IDEA / VS Code, Maven, Node.js LTS, Docker, Git CLI | P2-D10 |\n| Protocolo ADR | Formato Nygard en `/docs/adrs/ADR-NNN-titulo.md` ante cambios de stack/NFR | P2-D11 |\n| Escalamiento y Rituales | SLA de atasco < 2h individual, > 4h Tech Lead; Daily bisemanal | P2-D11 |",
+              "link_label": "tooling y gobernanza pasan a consolidación del marco normativo (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Matriz Normativa y de Gobernanza Operativa",
+          "objective": "Consolidar el resumen ejecutivo del marco normativo y operativo para el Step 2.",
+          "input": "Resúmenes de 2.1 y 2.2.",
+          "raw_data_title": "Bloque Normativo Consolidado",
+          "raw_data": "Tabla ejecutiva consolidada cubriendo Estándares, Testing, DoD/DoR, Tooling y Comunicación.",
+          "exit_label": "BLOQUE NORMATIVO BLOQUEADO → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Formalización del Bloque Normativo (Step 2 Output)",
+              "objective": "Construir la tabla oficial del marco normativo para el documento maestro.",
+              "how_to": {
+                "steps": [
+                  "Integrar las 5 áreas normativas en una única matriz estructurada.",
+                  "Verificar que cada regla mandatoria sea autoexplicativa.",
+                  "Consolidar la tabla oficial de salida del Step 2.",
+                  "Comprobar el pass condition de reglas operativas condensadas sin ambigüedad."
+                ],
+                "table_columns": "Área | Regla Mandatoria Consolidada",
+                "table_rules": "El compendio normativo es vinculante para el desarrollo en Fase 3.",
+                "restrictions": [
+                  "No omitir ningún mecanismo de enforcing ni regla cardinal."
+                ],
+                "done_when": "Bloque normativo y de gobernanza formalizado."
+              },
+              "example_title": "Bloque Normativo y de Gobernanza (Step 2 Output)",
+              "example": "| Área | Regla Mandatoria Consolidada |\n| --- | --- |\n| Calidad y Estándares (D7) | `camelCase` en Java/JS, `snake_case` en SQL. ESLint + Checkstyle sin warnings en CI. |\n| Pruebas (D8) | Pirámide con tests unitarios JUnit 5 para concurrencia, SpringBootTest para integración y QA manual en Staging. |\n| DoR / DoD (D9) | DoR: Gherkin + dependencias explícitas. DoD: CI verde, cobertura >= 70% y 1 aprobación humana. |\n| Tooling (D10) | IntelliJ IDEA / VS Code, Docker Compose para PostgreSQL 16 local, Git + GitHub. |\n| Comunicación y Escalamiento (D11) | GitHub para código/docs; WhatsApp para avisos. ADRs en `/docs/adrs/`. Escalamiento a Tech Lead si el bloqueo supera 2 horas. |",
+              "link_label": "bloque normativo pasa a extracción de riesgos técnicos (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Extracción de Riesgos Técnicos y Mitigaciones (D12)",
+      "summary": "Visibilizar las amenazas técnicas críticas y puntos únicos de fallo introducidos en Fase 2 para que ningún desarrollador cometa errores prevenibles.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Filtrado de Riesgos Técnicos Críticos y SPOFs",
+          "objective": "Aislar los riesgos catalogados como Altos o Críticos del entregable P2-D12.",
+          "input": "[[example_output_risk_register_update]] (D12).",
+          "raw_data_title": "Riesgos Críticos Filtrados",
+          "raw_data": "R-05 (Overbooking por concurrencia), R-06 (Outage de base de datos/hosting), R-07 (Fuga de credenciales). Todos con mitigación obligatoria.",
+          "exit_label": "RIESGOS CRÍTICOS FILTRADOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Aislamiento de Riesgos R-05 a R-08 y Mitigaciones Mandatorias",
+              "objective": "Extraer las advertencias técnicas severas y sus correspondientes antídotos de ingeniería.",
+              "how_to": {
+                "steps": [
+                  "Consultar la matriz delta de riesgos de P2-D12.",
+                  "Filtrar R-05 (Colisión Transaccional) y su mitigación con Optimistic Locks y `@Version`.",
+                  "Filtrar R-06 (Caída de Base de Datos) y su mitigación con PaaS de alta disponibilidad.",
+                  "Filtrar R-07 (Fuga de Credenciales) y su mitigación con variables de entorno y pre-commit hooks.",
+                  "Documentar en la ficha de advertencias técnicas."
+                ],
+                "table_columns": "ID Riesgo | Riesgo Técnico / SPOF | Estrategia de Mitigación Mandatoria | Dueño",
+                "table_rules": "Cada riesgo técnico debe contar con una estrategia preventiva y un responsable unívoco.",
+                "restrictions": [
+                  "Prohibido omitir el riesgo de colisión transaccional de reservas."
+                ],
+                "done_when": "Riesgos técnicos críticos y mitigaciones completamente aislados."
+              },
+              "example_title": "Riesgos Técnicos Críticos y Mitigaciones",
+              "example": "| ID | Riesgo Técnico / SPOF | Mitigación Mandatoria | Dueño |\n| --- | --- | --- | --- |\n| R-05 | Colisión Transaccional (Overbooking) | Locks optimistas (@Version) en JPA/PostgreSQL y soft-locks con TTL | Tech Lead |\n| R-06 | Caída de Base de Datos Gestionada | Backups diarios automatizados y alta disponibilidad en PaaS | DevOps / Lead |\n| R-07 | Fuga accidental de llaves de API | Variables de entorno estrictas y escaneo con pre-commit hooks | Tech Lead |",
+              "link_label": "riesgos críticos pasan a formalización de la matriz de advertencias (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Consolidación de la Matriz de Advertencias Técnicas",
+          "objective": "Consolidar la tabla oficial de riesgos técnicos principales para el Step 3.",
+          "input": "Riesgos filtrados de 3.1.",
+          "raw_data_title": "Matriz de Advertencias Técnicas",
+          "raw_data": "Tabla consolidada con R-05, R-06 y R-07 lista para inclusión en el Brief ejecutivo.",
+          "exit_label": "ADVERTENCIAS TÉCNICAS BLOQUEADAS → 4.1",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Formalización de Riesgos Técnicos Principales (Step 3 Output)",
+              "objective": "Construir la tabla oficial de riesgos técnicos y puntos ciegos para el documento maestro.",
+              "how_to": {
+                "steps": [
+                  "Revisar que la formulación técnica sea clara para cualquier ingeniero que se sume.",
+                  "Confirmar que los planes de mitigación no requieran recursos inexistentes.",
+                  "Consolidar la tabla oficial de salida del Step 3.",
+                  "Comprobar el pass condition de puntos ciegos expuestos con claridad."
+                ],
+                "table_columns": "ID | Riesgo Técnico / SPOF | Estrategia de Mitigación | Dueño",
+                "table_rules": "La matriz debe alertar a los ingenieros de Fase 3 sobre las trampas de arquitectura.",
+                "restrictions": [
+                  "No dejar riesgos técnicos sin dueño de ejecución formal."
+                ],
+                "done_when": "Tabla oficial de riesgos técnicos principales formalizada."
+              },
+              "example_title": "Riesgos Técnicos Principales (Step 3 Output)",
+              "example": "| ID | Riesgo Técnico / SPOF | Estrategia de Mitigación | Dueño |\n| --- | --- | --- | --- |\n| **R-05** | Colisión Transaccional (Overbooking) | Locks optimistas con control de versión (`@Version`) en PostgreSQL/JPA y Soft-Locks temporales | Tech Lead |\n| **R-06** | Caída de Base de Datos Gestionada | Backups diarios automatizados y alta disponibilidad en PaaS | DevOps / Lead |\n| **R-07** | Fuga accidental de llaves de API | Variables de entorno estrictas y escaneo con pre-commit hooks | Tech Lead |",
+              "link_label": "advertencias técnicas pasan a ensamblaje del documento final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar el compendio oficial de Fase 2 integrando las 9 secciones estructurales y emitiendo el veredicto final de compuerta Gate 2.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Compilación de Identidad, RNNs, Stack y Entornos",
+          "objective": "Ensamblar las primeras 6 secciones del Brief Ejecutivo a partir de los datos consolidados en Step 1.",
+          "input": "Datos de arquitectura de Step 1 y metadatos del proyecto.",
+          "raw_data_title": "Secciones 1 a 6 del Brief",
+          "raw_data": "Metadatos, Identidad (D1), Restricciones (D2), Stack Oficial (D3), Repositorio y Ramas (D4, D5), Ambientes (D6).",
+          "exit_label": "SECCIONES 1 A 6 COMPILADAS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Ensamblaje de Secciones 1 a 6 del Brief Ejecutivo",
+              "objective": "Redactar el bloque estructural de arquitectura en formato estricto Markdown.",
+              "how_to": {
+                "steps": [
+                  "Completar la sección 1 de Metadatos del Documento.",
+                  "Redactar la sección 2 de Identidad y Alcance Técnico (Codename, Mandato, In/Out Scope).",
+                  "Redactar la sección 3 de Restricciones No Negociables (RNN-01 a RNN-04).",
+                  "Adjuntar la tabla de la sección 4 de Stack Tecnológico Oficial.",
+                  "Redactar las secciones 5 de Repositorio/Ramas y 6 de Ambientes y Entornos."
+                ],
+                "table_columns": "Sección | Contenido Compilado | Estado de Verificación",
+                "table_rules": "Respetar fielmente la numeración y estructura de la plantilla de salida.",
+                "restrictions": [
+                  "No omitir ninguna sección de arquitectura ni alterar la nomenclatura oficial."
+                ],
+                "done_when": "Secciones 1 a 6 completamente ensambladas y verificadas."
+              },
+              "example_title": "Compilación de Arquitectura y Configuración",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 2 — Project Kickoff\n**Entregable:** 13 de 13\n**Estado:** Aprobado\n\n### 2. Identidad y Alcance Técnico (De D1)\n- **Codename Técnico:** `nff-platform`\n- **Mandato Central:** Construir una plataforma web transaccional moderna compuesta por una Landing Page con catálogo de fincas, pasarela de pagos integrada (Wompi) y motor de reservas automatizado.\n- **In-Scope (Mandato Core):** Frontend React + Tailwind CSS, Backend Java Spring Boot 3.x, PostgreSQL 16, WhatsApp Cloud API y Wompi.\n- **Out-of-Scope (Prohibiciones):** Apps móviles nativas (iOS/Android), IA/machine learning, facturación masiva compleja.",
+              "link_label": "secciones 1 a 6 pasan a compilar gobernanza y compuerta (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Compilación de Gobernanza, Riesgos y Decisión de Compuerta",
+          "objective": "Ensamblar las secciones 7, 8 y 9 completando las reglas operativas, riesgos técnicos y el veredicto Gate 2.",
+          "input": "Marco normativo de Step 2, advertencias de Step 3 y reglas de compuerta condicional.",
+          "raw_data_title": "Secciones 7 a 9 y Gate 2",
+          "raw_data": "Estándares y Gobernanza (D7-D11), Riesgos Técnicos (D12) y Decisión Oficial Gate 2 (GO a Fase 3).",
+          "exit_label": "DOCUMENTO COMPLETO Y GATE 2 COMPILADOS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Ensamblaje de Secciones 7 a 9 y Veredicto Gate 2",
+              "objective": "Integrar las secciones finales y emitir la autorización formal de paso a Fase 3.",
+              "how_to": {
+                "steps": [
+                  "Redactar la sección 7 de Estándares, Calidad y Gobernanza (D7 a D11).",
+                  "Adjuntar la tabla de la sección 8 de Riesgos Técnicos Principales (D12).",
+                  "Emitir el veredicto de la sección 9: GO (Avance Autorizado a Fase 3 — Requirements Engineering).",
+                  "Firmar la compuerta por Julián (Project Authority) y Laura (Tech Lead)."
+                ],
+                "table_columns": "Sección | Contenido Anexado | Veredicto",
+                "table_rules": "El veredicto debe ser formal y vincular a las autoridades del proyecto.",
+                "restrictions": [
+                  "Prohibido emitir veredicto GO si persisten contradicciones entre entregables."
+                ],
+                "done_when": "Secciones 7, 8 y 9 completamente ensambladas y firmadas."
+              },
+              "example_title": "Compilación de Gobernanza, Riesgos y Gate 2",
+              "example": "### 7. Estándares, Calidad y Gobernanza (De D7, D8, D9, D10, D11)\n- **Estándares de Código (D7):** `camelCase` en Java/JS, `snake_case` en SQL PostgreSQL, reglas estrictas con ESLint y Checkstyle.\n- **Estrategia de Testing (D8):** Pirámide con base en pruebas unitarias JUnit 5 para lógica de concurrencia y pruebas de integración SpringBootTest en Staging.\n- **DoD / DoR (D9):** Un ticket requiere DoR claro para iniciar; un PR exige CI verde, cobertura ≥ 70% y mínimo 1 aprobación humana para fusionar.\n- **Tooling Oficial (D10):** IntelliJ IDEA / VS Code, Maven 3.9+, Node.js 20 LTS, Docker Desktop y Git CLI.\n- **Canales y Escalamiento (D11):** GitHub para código y documentación; canal de chat para alertas operativas. Escalamiento a Tech Lead si el bloqueo supera 2 horas.\n\n### 8. Riesgos Técnicos Principales (De D12)\n| ID | Riesgo Técnico / SPOF | Estrategia de Mitigación | Dueño |\n| --- | --- | --- | --- |\n| **R-05** | Colisión Transaccional (Overbooking) | Locks optimistas con control de versión (`@Version`) en PostgreSQL/JPA y Soft-Locks temporales | Tech Lead |\n| **R-06** | Caída de Base de Datos Gestionada | Backups diarios automatizados y alta disponibilidad en PaaS | DevOps / Lead |\n| **R-07** | Fuga accidental de llaves de API | Variables de entorno estrictas y escaneo con pre-commit hooks | Tech Lead |\n\n### 9. Decisión Oficial de Compuerta (Gate 2)\n- **Veredicto:** GO (Paso Autorizado a Fase 3 — Requirements Engineering).\n- **Firmas:** Julián (Project Authority) / Laura (Tech Lead).",
+              "link_label": "documento completo pasa a validación final y cierre de fase (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Validación de Integridad y Publicación Oficial",
+          "objective": "Verificar la exactitud del compendio contra el archivo de referencia y concretar el cierre de Fase 2.",
+          "input": "Documento completo ensamblado y archivo de salida oficial.",
+          "raw_data_title": "Validación y Cierre de Fase 2",
+          "raw_data": "Verificado contra example_output_phase2_brief.md. Publicación oficial en docs/02-project-kickoff. Fase 2 completada al 100%.",
+          "exit_label": "FASE 2 COMPLETADA Y AUTORIZADA",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Emisión Oficial del Documento D13 y Cierre de Fase 2",
+              "objective": "Publicar el Brief de Kickoff oficial y registrar el hito de finalización de Fase 2.",
+              "how_to": {
+                "steps": [
+                  "Comprobar exhaustivamente la coherencia de las 9 secciones del Brief.",
+                  "Verificar el enlace al artefacto [[example_output_phase2_brief]].",
+                  "Validar que el veredicto Gate 2 sea formalmente GO.",
+                  "Registrar el hito final de Fase 2 en la bitácora de progreso."
+                ],
+                "table_columns": "Criterio de Cierre | Estado | Registro Oficial",
+                "table_rules": "El documento es el contrato vinculante de arquitectura para toda la Fase 3.",
+                "restrictions": [
+                  "No dar por cerrado sin corroborar que los 13 entregables de Fase 2 estén completos y verificados."
+                ],
+                "done_when": "Entregable D13 emitido oficialmente y Fase 2 concluida al 100%."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_phase2_brief]]`.\n\nUbicación oficial: `docs/02-project-kickoff/13. Resumen Ejecutivo Fase 2.md`.\nEstado: Aprobado por Compuerta de Fase Gate 2 (GO a Fase 3).",
+              "link_label": "entrega completada - fin de fase 2"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "phase": "PHASE 6: TECHNICAL DESIGN",
+  "deliverable_code": "D7",
+  "deliverable": "API Contracts (OpenAPI-Swagger)",
+  "purpose": "Formalizar los contratos de interfaz de programación (API) para el módulo Booking Engine en formato OpenAPI 3.0 YAML auto-contenido, sincronizando los esquemas de petición con los DTOs de D6, las respuestas con las entidades de D5, el esquema de seguridad perimetral de Cookies HttpOnly de D4, y unificando el envelope de errores para consumo seguro desde el frontend en React Query.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| API Conceptual Design (P4-D9) | [[PHASE_4_SYSTEM_MODELING/9.API Conceptual Design/9.API Conceptual Design.md]] | Fuente de endpoints conceptuales a mapear en paths y verbos HTTP literales. |\n| Data Access & Repositories (P6-D6) | [[PHASE_6_TECHNICAL_DESIGN/6.Data Access & Repositories/6.Data Access & Repositories.md]] | Fuente de los DTOs exactos que definen el contrato de request bodies. |\n| Security Implementation & Middleware (P6-D4) | [[PHASE_6_TECHNICAL_DESIGN/4.Security Implementation & Middleware/4.Security Implementation & Middleware.md]] | Fuente del esquema de seguridad `cookieAuth` con cookie `sb-[project]-auth-token`. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Mapeo de Endpoints a Rutas OpenAPI (Endpoint to Path Mapping)",
+      "summary": "Traducir las operaciones conceptuales del módulo en rutas HTTP literales con parámetros y tags.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Estructuración de Rutas, Verbos HTTP y Parámetros",
+          "objective": "Mapear cada acción de reservas, reseñas y favoritos a su ruta OpenAPI formal con operationId único.",
+          "input": "Diseño conceptual de APIs de Fase 4 (D9) asignado a Booking Engine.",
+          "raw_data_title": "Matriz de Endpoints y Rutas OpenAPI",
+          "raw_data": "| Path OpenAPI | Verbo HTTP | Operación / operationId | Tag de Módulo | Parámetros Clave |\n|---|---|---|---|---|\n| `/api/bookings` | `POST` | `createBooking` | `Bookings` | Request body con DTO de reserva |\n| `/api/bookings` | `GET` | `listBookings` | `Bookings` | Query params: `page`, `limit` |\n| `/api/bookings/{id}/status` | `PATCH` | `updateBookingStatus` | `Bookings` | Path param: `id (UUID)`; body: status |\n| `/api/reviews` | `POST` | `createReview` | `Reviews` | Request body con rating y comentario |\n| `/api/reviews` | `GET` | `listReviews` | `Reviews` | Query param: `propertyId (UUID)`, `page`, `limit` |\n| `/api/wishlists` | `POST` | `addToWishlist` | `Wishlists` | Request body: `propertyId` |\n| `/api/wishlists/{propertyId}` | `DELETE` | `removeFromWishlist` | `Wishlists` | Path param: `propertyId (UUID)` |",
+          "exit_label": "Rutas y Verbos HTTP Formalizados",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Formalización de Rutas y Operaciones",
+              "objective": "Documentar la declaración YAML inicial de los paths y parámetros de consulta.",
+              "how_to": {
+                "steps": [
+                  "1. Asignar rutas consistentes `/api/bookings`, `/api/reviews`, `/api/wishlists`.",
+                  "2. Definir verbos POST, GET, PATCH y DELETE según semántica REST.",
+                  "3. Asignar operationIds únicos en camelCase para generadores de código.",
+                  "4. Tipar parámetros de consulta y de ruta con formato UUID y defaults."
+                ],
+                "table_columns": [
+                  "Ruta",
+                  "Método",
+                  "Tag",
+                  "operationId"
+                ],
+                "table_rules": [
+                  "Cada operación debe pertenecer a un tag consistente",
+                  "Los operationIds deben ser únicos en todo el documento",
+                  "Todos los parámetros de paginación deben incluir valores por defecto"
+                ],
+                "restrictions": "Prohibido reutilizar el mismo operationId en múltiples métodos.",
+                "done_when": "Bloque de paths documentado con operaciones completas."
+              },
+              "example_title": "Declaración de Paths D7",
+              "example": "```yaml\npaths:\n  /api/bookings:\n    post:\n      tags: [Bookings]\n      summary: Crear una nueva reserva (Turista)\n      operationId: createBooking\n    get:\n      tags: [Bookings]\n      summary: Listar reservas asociadas al usuario actual\n      operationId: listBookings\n```",
+              "link_label": "Paths Declarados -> Componentes y Seguridad"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Componentes y Sincronización de Seguridad (Components & Security Sync)",
+      "summary": "Definir esquemas de datos, envelope único de error y el esquema de seguridad de cookies.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Esquemas de Datos, Errores y Seguridad",
+          "objective": "Conectar los DTOs de entrada y las entidades con la especificación OpenAPI unificando respuestas de error.",
+          "input": "DTOs de Fase 6 (D6), entidades de Fase 6 (D5) y esquema de cookies de Fase 6 (D4).",
+          "raw_data_title": "Catálogo de Componentes Schemas y Seguridad",
+          "raw_data": "| Componente Schema | Tipo / Ubicación | Propósito / Campos Clave | Sincronización Técnica |\n|---|---|---|---|\n| `cookieAuth` | `securitySchemes` (Cookie) | `name: sb-project-auth-token` | Next.js Edge AuthGuard (Fase 6 D4) |\n| `CreateBookingRequest` | `schemas` (Request) | `propertyId, checkIn, checkOut, guestCount` | Mapeo de `CreateBookingDTO` de D6 |\n| `BookingResponse` | `schemas` (Response) | `id, propertyId, guestId, status, totalPrice` | Mapeo de entidad `Booking` de D5 |\n| `ErrorResponse` | `schemas` (Envelope Único) | `{ error: { code, message } }` | Contrato estándar unificado para 400/401/403 |",
+          "exit_label": "Componentes y Schemas Compilados",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Definición de Schemas Reutilizables",
+              "objective": "Declarar la sección components de OpenAPI con securitySchemes y schemas tipados.",
+              "how_to": {
+                "steps": [
+                  "1. Configurar securitySchemes de tipo apiKey en cookie para Supabase Auth.",
+                  "2. Definir CreateBookingRequest y UpdateBookingStatusRequest con required.",
+                  "3. Declarar BookingResponse y ReviewResponse.",
+                  "4. Establecer ErrorResponse único para todas las respuestas no-200."
+                ],
+                "table_columns": [
+                  "Componente",
+                  "Tipo",
+                  "Campos Requeridos",
+                  "Ref"
+                ],
+                "table_rules": [
+                  "Todas las respuestas de error deben usar obligatoriamente el schema ErrorResponse",
+                  "El securityScheme debe reflejar el nombre exacto de cookie sb-[project]-auth-token",
+                  "Los formatos de fecha deben explicitarse como date o date-time"
+                ],
+                "restrictions": "Prohibido crear esquemas de error diferentes para distintas operaciones.",
+                "done_when": "Sección components redactada con schemas completos y validados."
+              },
+              "example_title": "Componentes OpenAPI D7",
+              "example": "```yaml\ncomponents:\n  securitySchemes:\n    cookieAuth:\n      type: apiKey\n      in: cookie\n      name: sb-project-auth-token\n  schemas:\n    ErrorResponse:\n      type: object\n      properties:\n        error:\n          type: object\n          properties:\n            code: { type: string }\n            message: { type: string }\n```",
+              "link_label": "Componentes Definidos -> Ensamblaje YAML"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Ensamblaje del Documento OpenAPI YAML (YAML Specification Assembly)",
+      "summary": "Compilar el documento OpenAPI 3.0.3 auto-contenido con referencias `$ref` resueltas y seguridad aplicada.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Compilación y Validación del Archivo OpenAPI 3.0.3",
+          "objective": "Garantizar que el contrato YAML sea auto-contenido, ejecutable y consumible por generadores de código.",
+          "input": "Bloques de paths del Step 1 y components del Step 2.",
+          "raw_data_title": "Matriz de Integración del Contrato OpenAPI Final",
+          "raw_data": "| Sección OpenAPI | Contenido Técnico | Referencias Internas ($ref) | Validación de Integridad |\n|---|---|---|---|\n| Header & Info | `openapi: 3.0.3`, Título, Versión 1.0.0 | N/A | Sintaxis válida OpenAPI 3.0 |\n| Rutas Protegidas | 7 endpoints con `security: [{ cookieAuth: [] }]` | `$ref: '#/components/schemas/...'` | Cero endpoints protegidos sin security |\n| Respuestas de Error | Códigos 400, 401 y 403 en todas las operaciones | `$ref: '#/components/schemas/ErrorResponse'` | Cero esquemas de error ad-hoc |",
+          "exit_label": "Especificación OpenAPI YAML Completa y Validada",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Compilación del Contrato YAML y Consolidación",
+              "objective": "Producir el bloque YAML auto-contenido definitivo para el módulo Booking Engine.",
+              "how_to": {
+                "steps": [
+                  "1. Ensamblar metadatos del contrato con openapi: 3.0.3.",
+                  "2. Incrustar los 7 paths con sus requestBodies y responses referenciadas.",
+                  "3. Aplicar cookieAuth en todas las rutas protegidas.",
+                  "4. Validar que ninguna referencia $ref apunte a rutas inexistentes."
+                ],
+                "table_columns": [
+                  "Bloque",
+                  "Elemento",
+                  "Estado $ref",
+                  "Seguridad"
+                ],
+                "table_rules": [
+                  "El documento debe ser completamente auto-contenido sin dependencias externas",
+                  "Todas las respuestas 401 y 403 deben referenciar ErrorResponse",
+                  "El frontend debe poder generar clientes fuertemente tipados a partir del contrato"
+                ],
+                "restrictions": "Prohibido dejar referencias $ref huérfanas o rutas sin códigos de respuesta.",
+                "done_when": "Contrato OpenAPI YAML compilado y listo para ser consumido en React Query."
+              },
+              "example_title": "Contrato OpenAPI Ensamblado D7",
+              "example": "```yaml\nopenapi: 3.0.3\ninfo:\n  title: API — Módulo Booking Engine\n  version: 1.0.0\npaths:\n  /api/bookings:\n    post:\n      tags: [Bookings]\n      operationId: createBooking\n      security: [{ cookieAuth: [] }]\n      requestBody:\n        content:\n          application/json:\n            schema: { $ref: '#/components/schemas/CreateBookingRequest' }\n      responses:\n        '201':\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/BookingResponse' }\n```",
+              "link_label": "Contrato YAML Compilado -> Entregable D7"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverable_output": "# Deliverable 7 (D7): API Contracts (OpenAPI)\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 6 — Technical Design\n**Módulo:** MOD-Booking\n**Estado:** Approved\n\n*Backlink a Fase 4 y 6:* Este documento fusiona las operaciones conceptuales del `[[PHASE_4_SYSTEM_MODELING/9.API_Conceptual_Design.md]]` con los DTOs estrictos definidos en el `[[PHASE_6_TECHNICAL_DESIGN/modules/MOD-Booking/6.Data_Access.md]]` y el mecanismo de seguridad de `[[PHASE_6_TECHNICAL_DESIGN/4.Security_Implementation.md]]`. \n\n---\n\n## 2. Especificación OpenAPI YAML\n\n> [!TIP]\n> **Para el equipo Frontend:** Todos los endpoints requieren que la cookie `sb-[project]-auth-token` viaje en la petición. Next.js y el navegador manejan esto automáticamente (credentials: 'include'), no hace falta adjuntar un header `Authorization` manualmente.\n\n```yaml\nopenapi: 3.0.3\ninfo:\n  title: API — Módulo Booking Engine\n  version: 1.0.0\n  description: Contrato oficial para orquestar reservas, reseñas y favoritos.\n  \npaths:\n  /api/bookings:\n    post:\n      tags: [Bookings]\n      summary: Crear una nueva reserva (Turista)\n      operationId: createBooking\n      security: [{ cookieAuth: [] }]\n      requestBody:\n        content:\n          application/json:\n            schema: { $ref: '#/components/schemas/CreateBookingRequest' }\n      responses:\n        '201':\n          description: Reserva creada en estado PENDING.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/BookingResponse' }\n        '400':\n          description: Reglas de negocio violadas (ej. fechas cruzadas, capacidad excedida).\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ErrorResponse' }\n        '401':\n          description: Sesión inválida o faltante.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ErrorResponse' }\n    get:\n      tags: [Bookings]\n      summary: Listar reservas asociadas al usuario actual\n      operationId: listBookings\n      security: [{ cookieAuth: [] }]\n      parameters:\n        - name: page\n          in: query\n          schema: { type: integer, default: 0 }\n        - name: limit\n          in: query\n          schema: { type: integer, default: 20 }\n      responses:\n        '200':\n          description: Array de reservas (Histórico o Futuras).\n          content:\n            application/json:\n              schema:\n                type: array\n                items: { $ref: '#/components/schemas/BookingResponse' }\n        '401':\n          description: Sesión inválida.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ErrorResponse' }\n\n  /api/bookings/{id}/status:\n    patch:\n      tags: [Bookings]\n      summary: Actualizar estado de la reserva (Finquero aprueba/cancela)\n      operationId: updateBookingStatus\n      security: [{ cookieAuth: [] }]\n      parameters:\n        - name: id\n          in: path\n          required: true\n          schema: { type: string, format: uuid }\n      requestBody:\n        content:\n          application/json:\n            schema: { $ref: '#/components/schemas/UpdateBookingStatusRequest' }\n      responses:\n        '200':\n          description: Estado actualizado exitosamente.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/BookingResponse' }\n        '401':\n          description: Sesión inválida.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ErrorResponse' }\n        '403':\n          description: Prohibido. El usuario no es dueño de la propiedad ni administrador.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ErrorResponse' }\n\n  /api/reviews:\n    post:\n      tags: [Reviews]\n      summary: Crear una reseña para una propiedad\n      operationId: createReview\n      security: [{ cookieAuth: [] }]\n      requestBody:\n        content:\n          application/json:\n            schema: { $ref: '#/components/schemas/CreateReviewRequest' }\n      responses:\n        '201':\n          description: Reseña guardada.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ReviewResponse' }\n        '400':\n          description: Error de validación (ej. Rating fuera de rango 1-5).\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ErrorResponse' }\n        '401':\n          description: Sesión inválida.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ErrorResponse' }\n        '403':\n          description: Prohibido. El usuario no ha completado un viaje en esta finca.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ErrorResponse' }\n              \n  /api/wishlists:\n    post:\n      tags: [Wishlists]\n      summary: Agregar propiedad a favoritos\n      operationId: addToWishlist\n      security: [{ cookieAuth: [] }]\n      requestBody:\n        content:\n          application/json:\n            schema: { $ref: '#/components/schemas/CreateWishlistRequest' }\n      responses:\n        '201':\n          description: Agregado.\n        '401':\n          description: Sesión inválida.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ErrorResponse' }\n              \n  /api/wishlists/{propertyId}:\n    delete:\n      tags: [Wishlists]\n      summary: Remover propiedad de favoritos\n      operationId: removeFromWishlist\n      security: [{ cookieAuth: [] }]\n      parameters:\n        - name: propertyId\n          in: path\n          required: true\n          schema: { type: string, format: uuid }\n      responses:\n        '204':\n          description: Eliminado exitosamente (Sin contenido).\n        '401':\n          description: Sesión inválida.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ErrorResponse' }\n\ncomponents:\n  securitySchemes:\n    cookieAuth:\n      type: apiKey\n      in: cookie\n      name: sb-project-auth-token\n      description: Next.js SSR HttpOnly Cookie inyectada automáticamente.\n\n  schemas:\n    # --- REQUESTS ---\n    CreateBookingRequest:\n      type: object\n      required: [propertyId, checkIn, checkOut, guestCount]\n      properties:\n        propertyId: { type: string, format: uuid }\n        checkIn: { type: string, format: date, example: \"2026-12-24\" }\n        checkOut: { type: string, format: date, example: \"2026-12-31\" }\n        guestCount: { type: integer, minimum: 1, example: 4 }\n        couponCode: { type: string }\n\n    UpdateBookingStatusRequest:\n      type: object\n      required: [status]\n      properties:\n        status: { type: string, enum: [APPROVED, CANCELLED] }\n        cancellationReason: { type: string }\n\n    CreateReviewRequest:\n      type: object\n      required: [propertyId, rating]\n      properties:\n        propertyId: { type: string, format: uuid }\n        rating: { type: integer, minimum: 1, maximum: 5, example: 5 }\n        comment: { type: string, maxLength: 1000 }\n\n    CreateWishlistRequest:\n      type: object\n      required: [propertyId]\n      properties:\n        propertyId: { type: string, format: uuid }\n\n    # --- RESPONSES ---\n    BookingResponse:\n      type: object\n      properties:\n        id: { type: string, format: uuid }\n        propertyId: { type: string, format: uuid }\n        guestId: { type: string, format: uuid }\n        status: { type: string, enum: [PENDING, APPROVED, CANCELLED, COMPLETED] }\n        checkIn: { type: string, format: date-time }\n        checkOut: { type: string, format: date-time }\n        totalPrice: { type: integer, description: \"Costo total en centavos\" }\n\n    ReviewResponse:\n      type: object\n      properties:\n        id: { type: string, format: uuid }\n        propertyId: { type: string, format: uuid }\n        rating: { type: integer }\n        comment: { type: string }\n\n    # --- SHARED ENVELOPES ---\n    ErrorResponse:\n      type: object\n      properties:\n        error:\n          type: object\n          properties:\n            code: { type: string, example: \"VALIDATION_FAILED\" }\n            message: { type: string, example: \"Mensaje descriptivo del error.\" }\n```\n\n---\n\n## 3. Downstream Consumers\n- **Phase 7 — D5 (Backend API Implementation):** El desarrollador backend debe lograr que Next.js responda matemáticamente idéntico a este YAML (mismos códigos HTTP, mismas keys en el JSON).\n- **Phase 7 — D6 (Frontend UI):** El desarrollador frontend usará este YAML (o generadores como `orval` / `openapi-typescript`) para crear las queries de **React Query** (`useMutation`, `useQuery`), logrando que el frontend esté fuertemente tipado incluso antes de que el backend exista."
+}

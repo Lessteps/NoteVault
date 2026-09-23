@@ -1,0 +1,151 @@
+{
+  "phase": "PHASE 6: TECHNICAL DESIGN",
+  "deliverable_code": "D1",
+  "deliverable": "Codebase & Folder Architecture",
+  "purpose": "Definir la estructura física exacta de directorios y archivos a nivel raíz para los repositorios de frontend y backend, garantizando que el código fuente respete la decisión de Monolito Modular en Next.js con estilos arquitectónicos híbridos (Clean Architecture en módulos críticos y Layered MVC en módulos de lectura) adoptada en la Fase 5.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Architectural Style Decision (P5-D5) | [[PHASE_5_ARCHITECTURAL_DESIGN/5.Architectural Style Selection/5.Architectural Style Selection.md]] | Determina qué carpetas son obligatorias (Clean Architecture vs Layered MVC). |\n| System Decomposition Decision (P5-D4) | [[PHASE_5_ARCHITECTURAL_DESIGN/4.System Decomposition Decision/4.System Decomposition Decision.md]] | Determina la topología de base de código única (Monolito Modular). |\n| CI/CD & Environments Strategy (P5-D8) | [[PHASE_5_ARCHITECTURAL_DESIGN/8.CI-CD & Environments Strategy/8.CI-CD & Environments Strategy.md]] | Determina el despliegue serverless en Vercel y estructura de proyecto único. |\n| Functional Module Decomposition (P3-D5) | [[PHASE_3_REQUIREMENTS_ENGINEERING/5.Functional Module Decomposition/5.Functional Module Decomposition.md]] | Lista los módulos de negocio (booking, billing, catalog, iam, notifications) que deben reflejarse como carpetas. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Resolución del Estilo Arquitectónico (Architectural Style Resolution)",
+      "summary": "Convertir las decisiones de topología, estilo híbrido y Bounded Contexts en reglas físicas de estructuración.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Resolución de Estilo Híbrido y Topología de Repositorio",
+          "objective": "Establecer la convivencia de Frontend y Backend en Next.js y delimitar carpetas obligatorias.",
+          "input": "ADR-002 (Modular Monolith) y ADR-003 (Estilo Híbrido) de la Fase 5.",
+          "raw_data_title": "Matriz de Parámetros Estructurales y Reglas de Dependencia",
+          "raw_data": "| Parámetro Arquitectónico | Decisión Adoptada | Implicación Estructural | Regla de Dependencia |\n|---|---|---|---|\n| Topología de Repositorio | Single Codebase (Monolito Modular) | Un solo repositorio unificado Next.js para Frontend y Backend | Frontend consume módulos mediante Server Actions |\n| Estilo Módulos Críticos | Clean Architecture (`booking`, `billing`) | Subcarpetas `domain/`, `application/`, `infrastructure/` | `infrastructure` y `application` dependen de `domain` puro |\n| Estilo Módulos Ligeros | Layered MVC (`catalog`, `iam`, `notifications`) | Subcarpetas `controllers/`, `services/`, `models/` | Estilo directo para agilidad de lectura y renderizado |\n| Core Compartido | Código transversal técnico (`src/shared/`) | Tipos globales TypeScript, cliente Supabase, variables | Ningún módulo depende de detalles internos de otro |",
+          "exit_label": "Reglas Físicas de Estilo y Topología Formalizadas",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Formalización de Reglas de Dependencia y Estructura",
+              "objective": "Documentar las directrices de acoplamiento y organización de paquetes.",
+              "how_to": {
+                "steps": [
+                  "1. Extraer el estilo híbrido declarado en el ADR-003 de Fase 5.",
+                  "2. Confirmar que no habrá separación monorepo/polyrepo al ser Monolito Modular.",
+                  "3. Asignar subcarpetas Clean a los módulos transaccionales de dinero.",
+                  "4. Asignar subcarpetas MVC a los módulos de lectura y visualización."
+                ],
+                "table_columns": [
+                  "Criterio",
+                  "Selección Técnica",
+                  "Justificación",
+                  "Restricción de Importación"
+                ],
+                "table_rules": [
+                  "Prohibido importar infraestructura directamente desde capas de dominio en módulos Clean",
+                  "Frontend y Backend comparten un único package.json raíz",
+                  "Las dependencias entre módulos deben resolverse mediante interfaces públicas"
+                ],
+                "restrictions": "Prohibido crear repositorios separados para frontend y backend.",
+                "done_when": "Especificación de resolución de estilo documentada y aprobada."
+              },
+              "example_title": "Resolución de Estilo D1",
+              "example": "```markdown\n## Resolución de Estilo\n- **Estilo Arquitectónico:** Híbrido (Modular Monolith con Feature-Sliced Design en la raíz). Módulos críticos usan Clean Architecture; módulos de lectura usan MVC.\n- **Topología de Repositorio:** Single Codebase (1 Repositorio unificado para Frontend y Backend en Next.js).\n- **Carpetas Obligatorias (Backend Lógico):** `src/modules/` subdividido por Bounded Contexts.\n- **Carpetas Obligatorias (Frontend UI):** `src/app/` (App Router) y `src/components/`.\n```",
+              "link_label": "Resolución de Estilo Aprobada -> Estructura Backend"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Estructura del Backend y Módulos de Dominio (Backend Structure)",
+      "summary": "Diseñar la organización interna de los Bounded Contexts dentro del directorio `src/modules`.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Modelado del Core Backend y Módulos de Negocio",
+          "objective": "Aislar la lógica de negocio de cada contexto respetando el estilo arquitectónico asignado.",
+          "input": "Lista de módulos de negocio de Fase 3 (D5) y carpetas obligatorias del Step 1.",
+          "raw_data_title": "Distribución Modular del Backend en `src/modules`",
+          "raw_data": "| Módulo Backend | Estilo Aplicado | Responsabilidad / Bounded Context | Subestructura de Directorios |\n|---|---|---|---|\n| `booking/` | Clean Architecture | Gestión de reservas, máquina de estados y bloqueos de calendario | `domain/` (reglas puras), `application/` (use cases), `infrastructure/` (repositorios) |\n| `billing/` | Clean Architecture | Transacciones, cobros, dispersiones e integración con Wompi | `domain/` (pagos), `application/` (webhooks), `infrastructure/` (Wompi adapter) |\n| `catalog/` | Layered MVC | Lectura y filtrado de propiedades de recreo con ISR | `controllers/` (server actions), `services/` (caching), `models/` (interfaces) |\n| `iam/` | Layered MVC | Identidad, autenticación y roles de usuario | `services/` (Supabase Auth wrappers) |\n| `notifications/` | Layered MVC | Disparo de alertas push, mensajería WhatsApp y Realtime | `services/` (WhatsApp API client, Supabase Realtime) |",
+          "exit_label": "Estructura Modular Backend Formalizada",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Definición del Árbol de Directorios del Backend",
+              "objective": "Estructurar las carpetas del backend anotando inline la responsabilidad de cada subdirectorio.",
+              "how_to": {
+                "steps": [
+                  "1. Crear carpeta raíz `src/modules/` para contener los cinco Bounded Contexts.",
+                  "2. Dividir `booking` y `billing` en `domain`, `application` e `infrastructure`.",
+                  "3. Dividir `catalog`, `iam` y `notifications` en `controllers`, `services` y `models`.",
+                  "4. Establecer `src/shared/` para utilidades comunes y configuración de Supabase."
+                ],
+                "table_columns": [
+                  "Módulo",
+                  "Ruta Física",
+                  "Capa Arquitectónica",
+                  "Función"
+                ],
+                "table_rules": [
+                  "Cada carpeta debe contener un comentario inline explicando su propósito",
+                  "Ninguna lógica de reservas o pagos puede colocarse en capas de presentación",
+                  "Las utilidades transversales no deben acoplarse a módulos específicos"
+                ],
+                "restrictions": "Prohibido mezclar lógica de infraestructura dentro de las entidades de dominio puro.",
+                "done_when": "Árbol backend documentado con comentarios inline en cada rama."
+              },
+              "example_title": "Esquema Backend D1",
+              "example": "```text\nsrc/modules/\n├── booking/                 # [Clean Architecture] Core Transaccional\n│   ├── domain/              # Entidades (Booking, BookingStatus) y Reglas Puras\n│   ├── application/         # Casos de uso (CreateBookingUseCase)\n│   └── infrastructure/      # Server Actions, Repositorios Supabase\n├── billing/                 # [Clean Architecture] Core Financiero\n│   ├── domain/              # Entidades (Payment, Invoice)\n│   ├── application/         # Casos de uso (ProcessPaymentWebhook)\n│   └── infrastructure/      # Wompi Adapter, Supabase Repositories\n├── catalog/                 # [Layered MVC] Lectura de Fincas\n└── notifications/           # [Layered MVC] Mensajería\n```",
+              "link_label": "Backend Estructurado -> Estructura Frontend"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Estructura del Frontend y Enrutamiento (Frontend Structure)",
+      "summary": "Definir las rutas App Router, biblioteca de componentes UI y middleware de seguridad.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Modelado del Frontend y Enrutamiento App Router",
+          "objective": "Organizar el enrutamiento visual en Next.js App Router separando zonas públicas, privadas y APIs.",
+          "input": "Pantallas de UI de Fase 4 y decisión técnica de Next.js App Router.",
+          "raw_data_title": "Distribución de Rutas y Componentes Frontend",
+          "raw_data": "| Capa Frontend | Directorio Físico | Tecnología / Paradigma | Propósito y Contenido |\n|---|---|---|---|\n| App Router | `src/app/(public)/` | Next.js Server Components | Rutas abiertas para turistas: landing page, catálogo y búsqueda |\n| App Router | `src/app/(host)/` | Next.js Server Components + Auth Guard | Dashboard protegido de anfitrión para administración de fincas |\n| API Handlers | `src/app/api/` | Next.js Route Handlers | Webhooks externos para pasarela Wompi y endpoints REST |\n| Sistema UI | `src/components/ui/` | TailwindCSS / Radix UI | Componentes atómicos de diseño (botones, inputs, modales) |\n| Shared UI | `src/components/shared/` | React Components | Componentes reutilizables compuestos (navbar, footer, cards) |\n| Middleware | `src/middleware.ts` | Next.js Edge Middleware | Guardián perimetral de autenticación JWT y limitación de tasa |",
+          "exit_label": "Estructura Frontend y Árbol Completo Unificado",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Definición del Árbol de Directorios del Frontend y Consolidación",
+              "objective": "Consolidar el árbol ASCII integral unificado del repositorio completo.",
+              "how_to": {
+                "steps": [
+                  "1. Configurar grupos de rutas con paréntesis `(public)` y `(host)` para aislar layouts.",
+                  "2. Definir carpeta `src/components/ui/` para componentes del sistema de diseño.",
+                  "3. Ubicar `middleware.ts` en la raíz de `src/` para control perimetral.",
+                  "4. Integrar Frontend y Backend en un solo diagrama de árbol legible."
+                ],
+                "table_columns": [
+                  "Zona Frontend",
+                  "Ruta App Router",
+                  "Control de Acceso",
+                  "Archivos Clave"
+                ],
+                "table_rules": [
+                  "El frontend debe usar App Router de Next.js obligatoriamente",
+                  "Las rutas protegidas deben contar con layouts y middlewares dedicados",
+                  "Los componentes UI genéricos no deben contener lógica de negocio"
+                ],
+                "restrictions": "Prohibido mezclar rutas públicas y de host sin layout protector.",
+                "done_when": "Árbol ASCII completo del repositorio unificado compilado y documentado."
+              },
+              "example_title": "Esquema Frontend y Árbol Unificado D1",
+              "example": "```text\nnos-fuimos-de-finca/\n├── src/\n│   ├── app/                         # Frontend: Next.js App Router (Rutas Web y API Routes)\n│   │   ├── (public)/                # Grupo de rutas: Landing, Catálogo\n│   │   ├── (host)/                  # Grupo de rutas: Dashboard de Finquero\n│   │   └── api/                     # Endpoints REST expuestos explícitamente (Webhooks)\n│   ├── components/                  # Frontend: React Components\n│   │   ├── ui/                      # Sistema de diseño genérico (Botones, Inputs)\n│   │   └── shared/                  # Componentes reutilizables entre módulos\n│   └── middleware.ts                # Next.js Middleware (Auth Edge guards, Rate Limiting)\n```",
+              "link_label": "Frontend y Backend Integrados -> Entregable D1"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverable_output": "# Deliverable 1 (D1): Codebase & Folder Architecture\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 6 — Technical Design\n**Estado:** Approved\n\n*Backlink a Fase 5:* Este entregable obedece a las resoluciones arquitectónicas tomadas en `[[PHASE_5_ARCHITECTURAL_DESIGN/4.System_Decomposition_Decision/example_output_d4_system_decomposition.md|System Decomposition]]` (Modular Monolith) y `[[PHASE_5_ARCHITECTURAL_DESIGN/5.Architectural_Style_Selection/example_output_d5_architectural_style.md|Architectural Style]]` (Estilo Híbrido).\n\n---\n\n## 2. Estructura Unificada del Repositorio (Monolito Modular)\n\nDado que la topología elegida es Serverless en Vercel, **Frontend y Backend comparten exactamente la misma base de código** utilizando el framework Next.js. El patrón aplicado es *Feature-Sliced Design* a nivel raíz (`src/modules`), permitiendo que el Frontend (`src/app`) consuma lógicas encapsuladas por Bounded Contexts.\n\nSe observa el cumplimiento estricto del Modelo Híbrido: los dominios críticos (`booking`, `billing`) están protegidos con *Clean Architecture*, mientras los de lectura (`catalog`) utilizan un patrón más sencillo (*Layered MVC*).\n\n```text\nnos-fuimos-de-finca/\n├── src/\n│   ├── app/                         # Frontend: Next.js App Router (Rutas Web y API Routes)\n│   │   ├── (public)/                # Grupo de rutas: Landing, Catálogo\n│   │   ├── (host)/                  # Grupo de rutas: Dashboard de Finquero\n│   │   └── api/                     # Endpoints REST expuestos explícitamente (Webhooks)\n│   │\n│   ├── components/                  # Frontend: React Components\n│   │   ├── ui/                      # Sistema de diseño genérico (Botones, Inputs)\n│   │   └── shared/                  # Componentes reutilizables entre módulos\n│   │\n│   ├── modules/                     # Backend: Core del Monolito Modular\n│   │   ├── booking/                 # [Clean Architecture] Core Transaccional\n│   │   │   ├── domain/              # Entidades (Booking, BookingStatus) y Reglas Puras\n│   │   │   ├── application/         # Casos de uso (CreateBookingUseCase)\n│   │   │   └── infrastructure/      # Server Actions, Repositorios Supabase\n│   │   │\n│   │   ├── billing/                 # [Clean Architecture] Core Financiero\n│   │   │   ├── domain/              # Entidades (Payment, Invoice)\n│   │   │   ├── application/         # Casos de uso (ProcessPaymentWebhook)\n│   │   │   └── infrastructure/      # Wompi Adapter, Supabase Repositories\n│   │   │\n│   │   ├── catalog/                 # [Layered MVC] Lectura de Fincas\n│   │   │   ├── controllers/         # Server Actions para UI\n│   │   │   ├── services/            # Fetching de Supabase (ISR/Caching)\n│   │   │   └── models/              # Interfaces TS\n│   │   │\n│   │   ├── iam/                     # [Layered MVC] Identidad y Acceso\n│   │   │   └── services/            # Supabase Auth wrappers\n│   │   │\n│   │   └── notifications/           # [Layered MVC] Mensajería\n│   │   └── services/            # WhatsApp API, Push Realtime\n│   │\n│   ├── shared/                      # Código común técnico (no ligado a un módulo)\n│   │   ├── types/                   # Tipos globales de TypeScript\n│   │   ├── utils/                   # Helpers generales\n│   │   └── config/                  # Inicialización de Supabase client, env vars\n│   │\n│   └── middleware.ts                # Next.js Middleware (Auth Edge guards, Rate Limiting)\n│\n├── public/                          # Assets estáticos\n├── vercel.json                      # Configuración de IaC Serverless\n├── .env.local                       # Secrets (No versionado)\n└── package.json                     # Dependencias\n```\n\n---\n\n## 3. Downstream Consumers\nEste entregable es la hoja de ruta física para los desarrolladores y es input obligatorio para:\n- **Phase 7 — D2 (Project Scaffolding & Setup):** Los desarrolladores tomarán este árbol de carpetas exacto para crear los directorios con `mkdir` e inicializar el repositorio GitHub.\n- **Phase 6 — D3 (Configuration & Environment Secrets):** Mapeará las claves secretas necesarias que deben residir en el `.env.local` raíz de este proyecto unificado.\n- **Phase 6 — D9 (Frontend Component & State Architecture):** Profundizará en la gestión del estado global que habitará en el directorio `src/app/` y `src/components/`."
+}

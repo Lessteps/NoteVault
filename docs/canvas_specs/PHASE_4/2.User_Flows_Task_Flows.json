@@ -1,0 +1,176 @@
+{
+  "phase": "Phase 4",
+  "deliverable_code": "D2",
+  "deliverable": "User Flows & Task Flows (Modular) (Flujos de Usuario y Tareas Modulares)",
+  "purpose": "Este entregable traduce las Historias de Usuario y Casos de Uso de la Fase 3 en flujos de interacción visuales y operacionales para cada módulo del sistema. Discrimina con rigor heurístico las tareas atómicas lineales (Task Flows) de los flujos de decisión complejos con estados asíncronos y caminos tristes (User Flows), mapeando cada interacción sobre las rutas físicas del Sitemap (D1) y modelando diagramas Mermaid deterministas para Frontend y QA.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[PHASE_4_SYSTEM_MODELING/1.Content_Strategy_Information_Architecture]] | Sitemap jerárquico, taxonomía de rutas frontend y vistas auxiliares (Fase 4, D1). |\n| [[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification.md]] | Casos de uso con flujos principales y excepciones HTTP (Fase 3, D7). |\n| [[PHASE_3_REQUIREMENTS_ENGINEERING/2.Actor_and_Role_Definition]] | Actores y roles para modelado diferenciado B2C vs B2B (Fase 3, D2). |\n| [[PHASE_3_REQUIREMENTS_ENGINEERING/8.System_Requirements_Specification]] | Acuerdos de integración y resolución de conflictos inter-modulares (Fase 3, D8). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Flow Inventory (Inventario Heurístico)",
+      "summary": "Analizar los casos de uso de cada módulo para clasificarlos rigurosamente en User Flows (flujos de decisión no lineales con caminos tristes) o Task Flows (tareas operativas directas).",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Clasificación Heurística de Flujos de Usuario vs Tareas",
+          "objective": "Determinar la naturaleza y complejidad de interacción de cada capacidad funcional del módulo.",
+          "input": "[[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification.md]] y catálogo de casos de uso.",
+          "raw_data_title": "Casos de Uso Clasificados de MOD-RSV y MOD-PAY",
+          "raw_data": "- UC-RSV-01: Wizard de Checkout -> User Flow (Camino crítico con decisiones, TTL de 15m, errores de pasarela).\n- UC-RSV-02: Aprobar Reserva B2B -> Task Flow (Acción atómica de confirmación en lista).\n- UC-PAY-01: Checkout Wompi -> User Flow (Orquestación con loading antifraude y declive).\n- UC-PAY-02: Ver Historial de Pagos -> Task Flow (Consulta tabular sin asincronía).\n- UC-CAL-01: Bloqueo de Fechas -> Task Flow (Selección directa de rango en calendario).\n- UC-AUTH-03: Onboarding KYC -> User Flow (Subida de documento, validación MIME y espera).",
+          "exit_label": "COMPLETE → Flujos clasificados heurísticamente con actores identificados (2.1)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Inventario Heurístico de Flujos Modulares",
+              "objective": "Catalogar cada interacción asignando el tipo de flujo con base en su complejidad de estados.",
+              "how_to": {
+                "steps": [
+                  "1. Evaluar si la acción del usuario tiene ramificaciones lógicas o estados intermedios.",
+                  "2. Asignar 'User Flow' a flujos que incluyan validaciones complejas, caminos tristes o integración bancaria.",
+                  "3. Asignar 'Task Flow' a interacciones lineales de un solo paso o consultas simples.",
+                  "4. Identificar el actor responsable de la ejecución del flujo."
+                ],
+                "table_columns": "Caso de Uso Origen (Fase 3) | Módulo | Tipo de Flujo | Justificación Heurística UX | Actor Principal",
+                "table_rules": "No calificar como Task Flow ningún proceso que contemple declives bancarios o timeouts.",
+                "restrictions": [
+                  "Prohibido copiar requerimientos sin evaluar el impacto en la interfaz de usuario",
+                  "Garantizar que los roles B2C y B2B estén debidamente deslindados"
+                ],
+                "done_when": "Todos los casos de uso nucleares están clasificados en User Flow o Task Flow"
+              },
+              "example_title": "Inventario Heurístico de Flujos Modulares",
+              "example": "| Caso de Uso Origen (Fase 3) | Módulo | Tipo de Flujo | Justificación Heurística UX | Actor Principal |\n| :--- | :--- | :--- | :--- | :--- |\n| **`UC-RSV-01: Wizard de Checkout`** | `MOD-RSV` | **User Flow** | Camino crítico no lineal con decisiones, TTL de 15m, estados de error y pasarela. | Turista |\n| **`UC-RSV-02: Aprobar Reserva B2B`** | `MOD-RSV` | **Task Flow** | Acción atómica y directa en lista de reservas sin bifurcaciones complejas. | Finquero |\n| **`UC-PAY-01: Checkout Wompi`** | `MOD-PAY` | **User Flow** | Orquestación transaccional con estados intermedios (Loading, Declive, Éxito). | Turista |\n| **`UC-PAY-02: Ver Historial de Pagos`** | `MOD-PAY` | **Task Flow** | Consulta tabular directa de transacciones sin estados asíncronos. | Finquero / Admin |\n| **`UC-CAL-01: Bloqueo de Fechas`** | `MOD-CAL` | **Task Flow** | Selección de rango en cuadrícula táctil y confirmación inmediata en BD. | Finquero |\n| **`UC-AUTH-03: Onboarding KYC`** | `MOD-AUTH` | **User Flow** | Flujo multi-etapa con subida de RUT, validación de archivo y espera de aprobación. | Finquero |",
+              "link_label": "flujos clasificados heurísticamente"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Screen Mapping (Cruce Topológico)",
+      "summary": "Anclar cada paso del flujo de interacción a las rutas frontend físicas del Sitemap de D1, eliminando flujos etéreos y definiendo con exactitud las pantallas necesarias para diseño y desarrollo.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Mapeo Topológico a Rutas Frontend del Sitemap D1",
+          "objective": "Asociar cada interacción a su ruta real, componente de interfaz, acción del usuario y respuesta del sistema.",
+          "input": "Inventario del Step 1 y mapa de rutas de [[PHASE_4_SYSTEM_MODELING/1.Content_Strategy_Information_Architecture]].",
+          "raw_data_title": "Cruce Topológico del Checkout Crítico",
+          "raw_data": "1. Selección: /finca/[slug] (Widget MOD-CAL) -> 2. Formulario: /checkout/[id] (Wizard MOD-RSV) -> 3. Espera: /checkout/processing (Spinner antifraude) -> 4. Pasarela: Wompi API -> 5a. Éxito: /checkout/success (Voucher Card) -> 5b. Declive: /checkout/[id] (Modal Error) -> 5c. Timeout: /410 (Sesión Expirada).",
+          "exit_label": "COMPLETE → Pasos del flujo anclados a rutas físicas del sitemap (3.1)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Matriz de Cruce Topológico Pantalla a Pantalla",
+              "objective": "Especificar la secuencia física de pantallas para guiar a los diseñadores de mockups y desarrolladores web.",
+              "how_to": {
+                "steps": [
+                  "1. Desglosar el flujo en pasos cronológicos numerados.",
+                  "2. Vincular cada paso con la ruta física del Sitemap de D1.",
+                  "3. Declarar el componente de UI involucrado y la acción concreta del usuario.",
+                  "4. Especificar la respuesta síncrona o asíncrona del sistema en cada pantalla."
+                ],
+                "table_columns": "Paso del Flujo | Pantalla / Ruta Frontend (Nodo D1) | Componente UI Involucrado | Acción del Usuario | Respuesta del Sistema",
+                "table_rules": "Todas las rutas deben coincidir textualmente con el Sitemap de D1.",
+                "restrictions": [
+                  "No inventar rutas que no existan en la arquitectura de información",
+                  "Documentar explícitamente los caminos de retorno ante fallos de pago o expiración"
+                ],
+                "done_when": "La totalidad de pasos del flujo crítico están anclados a pantallas reales del sitemap"
+              },
+              "example_title": "Matriz de Cruce Topológico Pantalla a Pantalla",
+              "example": "| Paso del Flujo | Pantalla / Ruta Frontend (Nodo D1) | Componente UI Involucrado | Acción del Usuario | Respuesta del Sistema |\n| :--- | :--- | :--- | :--- | :--- |\n| **1. Selección de Fechas** | `/finca/[slug]` | Widget de Calendario (`MOD-CAL`) | Selecciona fechas libres y oprime 'Reservar'. | Valida disponibilidad y crea Soft-Lock atómico de 15 min. |\n| **2. Datos y Resumen** | `/checkout/[id]` | Wizard de Checkout Form | Digita nombre, correo y revisa desglose de tarifa. | Genera sesión de pago y habilita botón 'Pagar con Wompi'. |\n| **3. Espera Antifraude** | `/checkout/processing` | Loading Modal / Spinner Polling | Visualiza pantalla de espera transaccional. | Dispara POST hacia pasarela y previene doble cobro. |\n| **4. Pasarela Externa** | `Wompi Checkout` | Widget SaaS Wompi | Selecciona método (PSE/Tarjeta) y autoriza débito. | Procesa transacción bancaria y emite Webhook firmado. |\n| **5a. Camino Feliz (Éxito)** | `/checkout/success` | Voucher Card & Confirmación | Descarga comprobante digital con código de reserva. | Transiciona reserva a PAID y dispara WhatsApp al finquero. |\n| **5b. Camino Triste (Declive)** | `/checkout/[id]` | Modal Error: Fondos Insuficientes | Lee motivo del rechazo y presiona 'Reintentar'. | Restaura formulario preservando el tiempo restante del lock. |\n| **5c. Timeout Expirado** | `/410` | Pantalla Error: Sesión Expirada | Presiona botón 'Volver a la Finca'. | Libera el Soft-Lock en calendario y redirige a `/finca/[slug]`. |",
+              "link_label": "cruce topológico consolidado"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Visual Flow Modeling (Mermaid)",
+      "summary": "Modelar el diagrama de flujo visual determinista en sintaxis formal Mermaid, respetando las leyes de notación técnica (rectángulos para UI, rombos para IF/ELSE y óvalos para servicios backend).",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Modelado Visual de User Flows y Task Flows en Mermaid",
+          "objective": "Construir los diagramas de flujo completos integrando caminos felices, declives y timeouts.",
+          "input": "Cruce topológico del Step 2 y reglas de sintaxis Mermaid.",
+          "raw_data_title": "Estructura Lógica del Diagrama de Flujo",
+          "raw_data": "Start (/finca) -> LockCheck (¿Soft-lock ok?) -> CheckoutUI (/checkout/id) -> TimeCheck (¿<15 min?) -> Spinner (/checkout/processing) -> Wompi Gateway -> PayCheck (¿Pago aprobado?) -> Success (/checkout/success) o ModalError (Reintentar) o Timeout (/410).",
+          "exit_label": "COMPLETE → Diagramas visuales deterministas modelados con sintaxis técnica (4.1)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Diagramación Formal de Flujos con Decisiones y Excepciones",
+              "objective": "Estructurar la tabla de nodos lógicos y renderizar el diagrama de flujo en sintaxis Mermaid.",
+              "how_to": {
+                "steps": [
+                  "1. Asignar forma geométrica según la naturaleza del elemento (UI, decisión o backend).",
+                  "2. Trazar las bifurcaciones lógicas de éxito y caminos tristes con etiquetas explícitas en las flechas.",
+                  "3. Representar las transiciones asíncronas hacia servicios externos con líneas punteadas.",
+                  "4. Validar que no existan nodos ciegos o huérfanos sin ruta de escape para el usuario."
+                ],
+                "table_columns": "Nodo Diagrama | Tipo de Elemento | Representación en UI / Arquitectura | Condición / Decisión Evaluada",
+                "table_rules": "Todo nodo de decisión debe tener al menos dos salidas mutuamente excluyentes (Sí / No).",
+                "restrictions": [
+                  "Prohibido omitir el camino triste de declive de tarjeta de crédito",
+                  "Garantizar que el diagrama sea legible e interpretable por desarrolladores y QA"
+                ],
+                "done_when": "Los diagramas Mermaid modelan fielmente el flujo crítico y las tareas modulares"
+              },
+              "example_title": "Estructura de Nodos y Decisiones del Flujo Visual",
+              "example": "| Nodo Diagrama | Tipo de Elemento | Representación en UI / Arquitectura | Condición / Decisión Evaluada |\n| :--- | :--- | :--- | :--- |\n| `Start` | Pantalla Física | Perfil de Finca (`/finca/[slug]`) | Punto de entrada del turista. |\n| `LockCheck` | Decisión Lógica | ¿Soft-Lock Aprobado en backend? | Sí -> avanza al checkout; No -> alerta de fecha ocupada. |\n| `CheckoutUI` | Pantalla Física | Wizard de Checkout (`/checkout/[id]`) | Captura de datos personales y confirmación de monto. |\n| `TimeCheck` | Decisión Lógica | ¿Tardó más de 15 Minutos en pagar? | Sí -> deriva a `/410` (Expirado); No -> avanza a pasarela. |\n| `Spinner` | Pantalla Física | Transaccional antifraude (`/checkout/processing`) | Bloqueo de UI durante la comunicación bancaria. |\n| `Wompi` | Entidad Externa | Pasarela de Pago Wompi API | Procesamiento financiero tokenizado. |\n| `PayCheck` | Decisión Lógica | ¿Transacción Aprobada por el banco? | Sí -> pantalla éxito `/checkout/success`; No -> modal error en checkout. |\n| `Success` | Pantalla Física | Recibo y Voucher (`/checkout/success`) | Cierre transaccional exitoso de la reserva. |",
+              "link_label": "flujo visual modelado en Mermaid"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Cross-Module Flow Stitching & Gate Check",
+      "summary": "Verificar la costura inter-modular (Cross-Module Stitching) que conecta las pantallas de salida de un módulo con las entradas del siguiente, auditando la compuerta de calidad antes de avanzar a Wireframes.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Costura Inter-Modular y Quality Gate de Flujos",
+          "objective": "Validar la continuidad sin fricción entre módulos interactuantes y emitir el dictamen formal de calidad.",
+          "input": "Diagramas de flujo del Step 3 y matriz de dependencias de Fase 3 (D5/D8).",
+          "raw_data_title": "Auditoría de Costura Inter-Modular y Quality Gate",
+          "raw_data": "Metadatos: Nos Fuimos de Finca, Fase 4, Entregable 2 de 15, Módulo: MOD-RSV.\nCriterios: Discriminación heurística estricta, cobertura topológica 100%, caminos tristes modelados, costura inter-modular sin fisuras, sintaxis Mermaid técnica.",
+          "exit_label": "PUBLISH → Deliverable Completo: 2. User Flows & Task Flows (Modular)",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Dictamen de Compuerta de Flujos Modulares",
+              "objective": "Verificar los criterios de calidad de flujos y autorizar la transición formal hacia D3 (Wireframes).",
+              "how_to": {
+                "steps": [
+                  "1. Auditar la continuidad entre módulos (MOD-CAL entrega a MOD-RSV; MOD-RSV entrega a MOD-PAY y MOD-NOT).",
+                  "2. Verificar que ningún flujo termine de manera abrupta sin feedback al usuario.",
+                  "3. Evaluar los 5 criterios de calidad de la compuerta y emitir el veredicto oficial PROCEED."
+                ],
+                "table_columns": "Criterio de Calidad de Flujos Modulares | Estado | Evidencia",
+                "table_rules": "Todos los criterios deben resultar en APROBADO sin excepciones.",
+                "restrictions": [
+                  "No emitir veredicto favorable si existen caminos de error no especificados",
+                  "Asegurar que los flujos sirvan como blueprint directo para los wireframes de D3"
+                ],
+                "done_when": "El entregable modular de flujos aprueba el 100% de los criterios del Quality Gate"
+              },
+              "example_title": "Veredicto del User Flows Quality Gate",
+              "example": "| Criterio de Calidad de Flujos Modulares | Estado | Evidencia |\n| --- | --- | --- |\n| Discriminación Heurística Estricta | APROBADO | User Flows reservados para flujos con decisiones/excepciones; Task Flows para acciones atómicas |\n| Cobertura Topológica contra Sitemap D1 | APROBADO | 100% de los pasos navegan sobre rutas reales (`/finca`, `/checkout`, `/dashboard`, `/410`) |\n| Modelado Exhaustivo de Caminos Tristes | APROBADO | Excepciones de declive bancario, colisión de fechas y timeout de 15m formalmente resueltas |\n| Costura Inter-Modular (Stitching) | APROBADO | Puntos de contacto entre MOD-CAL, MOD-RSV, MOD-PAY y MOD-NOT perfectamente hilvanados |\n| Sintaxis Mermaid Técnica | APROBADO | Rectángulos para UI, rombos para IF/ELSE y óvalos para servicios backend asíncronos |",
+              "link_label": "flujos modulares aprobados formalmente"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 2. User Flows MOD-RSV.md",
+    "markdown": "# User Flows: MOD-RSV (Reservas)\n\n**Project:** Nos Fuimos de Finca\n**Phase:** 4 — System Modeling (D2)\n**Module:** MOD-RSV\n**Status:** Approved\n\n---\n\n## 1. Flow Inventory\n\n| Caso de Uso Origen (Fase 3) | Tipo de Flujo | Descripción UX | Actor Principal |\n| :--- | :--- | :--- | :--- |\n| **UC-RSV-01: Wizard de Checkout** | User Flow | Camino largo desde que elige fechas hasta que paga con Wompi o sufre un Timeout. | Turista |\n| **UC-RSV-02: Aprobar Reserva B2B** | Task Flow | Acción rápida del Finquero al aceptar un huésped en su panel. | Finquero |\n\n---\n\n## 2. Screen Mapping & Flow Modeling\n\n### 2.1. User Flow 1: El Camino Crítico del Checkout (Turista)\n**Trigger:** Turista selecciona fechas disponibles en el Widget del Perfil de Finca e inicia el checkout.\n**Pantallas (Nodos D1):** `/finca/[slug]` -> `/checkout/[id]` -> `/checkout/processing` -> `Wompi Gateway` -> `/checkout/success`.\n\n```mermaid\nflowchart TD\n    %% Nodos UI\n    Start(Perfil Finca:<br>Selecciona Fechas)\n    CheckoutUI[Pantalla Wizard Checkout<br>Ingresa Email y Subtotal]\n    Spinner[Pantalla Transaccional<br>/checkout/processing]\n    Wompi((Pasarela Externa<br>Wompi))\n    Success[Pantalla Éxito<br>Muestra Recibo]\n    Timeout[Pantalla Error 410<br>Tiempo Expirado]\n    \n    %% Decisiones\n    LockCheck{¿Soft-Lock<br>Aprobado?}\n    TimeCheck{¿Tardó más de<br>90 Minutos?}\n    PayCheck{¿Pago Wompi<br>Aprobado?}\n\n    %% Flujo\n    Start --> LockCheck\n    LockCheck -- No (Ocupado) --> Start\n    LockCheck -- Sí --> CheckoutUI\n    CheckoutUI --> TimeCheck\n    \n    TimeCheck -- Sí --> Timeout\n    Timeout --> Start\n    \n    TimeCheck -- No --> Spinner\n    Spinner --> Wompi\n    \n    Wompi --> PayCheck\n    PayCheck -- No (Rechazado) --> CheckoutUI\n    PayCheck -- Sí (Aprobado) --> Success\n```\n\n### 2.2. Task Flow 1: Aprobación B2B (Finquero)\n**Trigger:** El Finquero revisa su lista de reservas entrantes y decide aprobar a un grupo.\n**Pantallas (Nodos D1):** `/dashboard/reservas`.\n\n```mermaid\nflowchart TD\n    %% Nodos UI\n    Dashboard(Panel de Reservas B2B<br>/dashboard/reservas)\n    ModalConfirm[Modal de Confirmación<br>'¿Seguro que aprueba?']\n    ToastSuccess[Notificación Toast<br>Reserva Aprobada]\n    \n    %% Flujo Lineal (Task Flow)\n    Dashboard --> |Click 'Aprobar'| ModalConfirm\n    ModalConfirm --> |Click 'Confirmar'| ToastSuccess\n    ToastSuccess --> Dashboard\n```\n"
+  }
+}

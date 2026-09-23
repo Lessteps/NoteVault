@@ -1,0 +1,173 @@
+{
+  "phase": "Phase 3",
+  "deliverable_code": "D9",
+  "deliverable": "Phase 3 Brief (Resumen Ejecutivo de la Fase 3 — Brief de Requisitos)",
+  "purpose": "Este entregable constituye el documento formal de cierre de la Fase 3 (Gate 3 Closure). Actúa como el compendio ejecutivo y la fuente única de verdad para el equipo de desarrollo, modeladores y arquitectos antes de iniciar la Fase 4 (System Modeling). Sintetiza con fidelidad absoluta las decisiones adoptadas en los 8 entregables previos (Límites C4, Roles RBAC, Glosario DDD, Elicitación, Descomposición Modular, NFRs globales, Especificaciones Atómicas y Matriz RTM del SRS), autorizando formalmente la transición a las fases de diseño técnico.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[example_output_system_context_diagram]] | Límites del sistema C4 Nivel 1, actores externos y contratos de terceros (Fase 3, D1). |\n| [[example_output_actor_and_role]] | Roles técnicos, matriz de permisos RBAC y fronteras negativas (Fase 3, D2). |\n| [[example_output_glossary]] | Glosario de dominio y términos clave del Lenguaje Ubicuo (Fase 3, D3). |\n| [[example_output_requirements_elicitation]] | Resumen de requerimientos candidatos y priorización MoSCoW (Fase 3, D4). |\n| [[example_output_module_decomposition]] | Topología de módulos funcionales y dependencias acíclicas DAG (Fase 3, D5). |\n| [[example_output_non_functional]] | Requisitos no funcionales globales y umbrales cuantitativos de calidad (Fase 3, D6). |\n| [[example_output_srs]] | Libro Blanco del SRS maestro y Matriz de Trazabilidad RTM (Fase 3, D8). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Extracción de Fundamentos Globales y Límites (D1 a D3)",
+      "summary": "Extraer y sintetizar de forma ejecutiva las fronteras externas del software, los actores humanos con su matriz de permisos y el vocabulario canónico acordado bajo DDD.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Síntesis de Fronteras C4, RBAC y Lenguaje Ubicuo",
+          "objective": "Consolidar las bases globales del sistema a partir de los entregables D1, D2 y D3.",
+          "input": "[[example_output_system_context_diagram]], [[example_output_actor_and_role]] y [[example_output_glossary]].",
+          "raw_data_title": "Fundamentos Globales de Requisitos",
+          "raw_data": "- Fronteras C4: Plataforma web Nos Fuimos de Finca, 3 actores (Turista, Finquero, Admin NFF), 3 integraciones (Wompi, WhatsApp, PostgreSQL).\n- RBAC D2: ROLE_GUEST (público), ROLE_HOST (anfitrión inventario propio), ROLE_ADMIN (supervisión global).\n- Lenguaje Ubicuo D3: Finca, Bloqueo Temporal (15m), Reserva Confirmada, Overbooking (erradicado).",
+          "exit_label": "COMPLETE → Fundamentos globales consolidados para síntesis modular (2.1)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Compendio de Fundamentos Globales",
+              "objective": "Sintetizar las fronteras exteriores, perfiles autorizados y vocabulario del dominio.",
+              "how_to": {
+                "steps": [
+                  "1. Extraer los actores y sistemas externos del Diagrama de Contexto D1.",
+                  "2. Resumir la matriz de permisos y roles técnicos Spring Security de D2.",
+                  "3. Ratificar las definiciones nucleares de Lenguaje Ubicuo pactadas en D3."
+                ],
+                "table_columns": "Dominio Metodológico | Entregable Origen | Resumen Ejecutivo Extraído | Decisiones Clave Aprobadas",
+                "table_rules": "No introducir conceptos no definidos previamente en D1, D2 o D3.",
+                "restrictions": [
+                  "Mantener fidelidad textual absoluta con los entregables previos",
+                  "Evitar la reinvención de términos o roles"
+                ],
+                "done_when": "Los fundamentos globales del sistema quedan consolidados sin ambigüedades"
+              },
+              "example_title": "Compendio de Fundamentos Globales (D1 a D3)",
+              "example": "| Dominio Metodológico | Entregable Origen | Resumen Ejecutivo Extraído | Decisiones Clave Aprobadas |\n| --- | --- | --- | --- |\n| **Fronteras e Integraciones** | D1 — Context Diagram | Plataforma web transaccional con catálogo público, motor de reservas con máquina de estados y pasarela integrada. | 3 actores (Turista, Finquero, Admin NFF) y 3 sistemas externos (Wompi, WhatsApp, PostgreSQL). |\n| **Roles y Matriz RBAC** | D2 — Actor & Role Definition | Modelo de autorización bajo menor privilegio con roles técnicos Spring Security (`ROLE_*`). | `ROLE_GUEST` (público), `ROLE_HOST` (anfitrión), `ROLE_ADMIN` (operador). Prohibición de acceso cruzado. |\n| **Lenguaje Ubicuo** | D3 — Domain Glossary | Vocabulario canónico formalizado bajo Domain-Driven Design (DDD) con 7 campos normativos. | Finca (`Property`), Bloqueo Temporal (`Soft-Lock`), Reserva Confirmada (`Booking`), Overbooking (prohibido). |",
+              "link_label": "fundamentos globales sintetizados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Extracción de Arquitectura Modular y Calidad (D4 a D7)",
+      "summary": "Consolidar el desglose modular del sistema, los requerimientos priorizados y las restricciones de calidad no funcionales formalizadas en la Capa 2.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Síntesis de Requerimientos, Catálogo Modular y NFRs",
+          "objective": "Integrar el inventario modular y los estándares de calidad extraídos de D4, D5, D6 y D7.",
+          "input": "[[example_output_requirements_elicitation]], [[example_output_module_decomposition]], [[example_output_non_functional]] y módulos D7.",
+          "raw_data_title": "Síntesis de Arquitectura Modular y Calidad",
+          "raw_data": "- Requerimientos D4: 20 CRs clasificados bajo FURPS+ (14 Must, 3 Should, 3 Won't Have descartados).\n- Módulos D5/D7: 7 módulos autónomos (MOD-AUTH, MOD-PROP, MOD-CAL, MOD-RSV, MOD-PAY, MOD-NOT, MOD-DASH).\n- NFRs D6: Latencia p95 < 300ms, Uptime ≥ 99.5%, TLS 1.3, cobertura tests ≥ 80%.",
+          "exit_label": "COMPLETE → Arquitectura modular y calidad consolidadas (3.1)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Compendio de Arquitectura Modular y Calidad",
+              "objective": "Estructurar la síntesis de módulos, requerimientos priorizados y métricas cuantitativas.",
+              "how_to": {
+                "steps": [
+                  "1. Resumir la distribución de requerimientos y prioridades MoSCoW de D4.",
+                  "2. Catalogar los 7 módulos oficiales con su responsabilidad central única.",
+                  "3. Sintetizar los umbrales cuantitativos clave de rendimiento, disponibilidad y seguridad de D6."
+                ],
+                "table_columns": "Área Arquitectónica | Entregables Origen | Síntesis Consolidada | Criterios y Métricas Cuantitativas",
+                "table_rules": "Cada módulo debe estar respaldado por su archivo físico en modules/.",
+                "restrictions": [
+                  "No listar módulos hipotéticos que no existan en la especificación D7",
+                  "Preservar las métricas objetivas sin volver a calificativos subjetivos"
+                ],
+                "done_when": "La arquitectura modular y las restricciones de calidad quedan consolidadas"
+              },
+              "example_title": "Síntesis de Arquitectura Modular y Calidad (D4 a D7)",
+              "example": "| Área Arquitectónica | Entregables Origen | Síntesis Consolidada | Criterios y Métricas Cuantitativas |\n| --- | --- | --- | --- |\n| **Elicitación y Priorización** | D4 — Requirements Elicitation | 20 Requerimientos Candidatos formalizados con Lenguaje Ubicuo y clasificados en FURPS+. | 14 Must Have, 3 Should Have, 3 Won't Have descartados por alcance o seguridad. |\n| **Catálogo Modular** | D5 / D7 — Modular Specification | 7 módulos altamente cohesivos con soberanía de datos y Grafo Acíclico Dirigido (DAG). | `MOD-AUTH`, `MOD-PROP`, `MOD-CAL`, `MOD-RSV`, `MOD-PAY`, `MOD-NOT`, `MOD-DASH` formalizados. |\n| **Requisitos No Funcionales** | D6 — Global NFRs | 9 NFRs cuantitativos rigurosos cubriendo las 7 categorías de arquitectura de software. | Latencia P95 < 300ms, Uptime ≥ 99.5%, TLS 1.3, cero persistencia de datos de tarjeta, coverage ≥ 80%. |",
+              "link_label": "arquitectura modular sintetizada"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Verificación de Integridad RTM y Certificación SRS (D8)",
+      "summary": "Confirmar la ausencia de conflictos inter-modulares, certificar la completitud de la Matriz RTM y verificar la consistencia del contrato técnico del SRS maestro.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Certificación de Integración y Trazabilidad RTM",
+          "objective": "Auditar los resultados de integración inter-modular y la cobertura total de requerimientos de D8.",
+          "input": "[[example_output_srs]].",
+          "raw_data_title": "Métricas de Integración y Trazabilidad",
+          "raw_data": "- Conflictos Inter-Modulares: 0 conflictos no resueltos (sincronización TTL atómica).\n- Cobertura RTM: 100% de requerimientos funcionales vinculados a Casos de Uso y objetivos del MVP.\n- Soberanía de Datos: Verificada en cada módulo.\n- Integraciones Externas: Aisladas en MOD-PAY y MOD-NOT.",
+          "exit_label": "COMPLETE → Integración certificada para cierre de compuerta Gate 3 (4.1)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Certificación de Integración y Trazabilidad RTM",
+              "objective": "Construir la matriz de certificación garantizando coherencia lógica total del sistema.",
+              "how_to": {
+                "steps": [
+                  "1. Verificar la resolución de conflictos inter-modulares auditados en el SRS.",
+                  "2. Validar que la cobertura de la Matriz RTM sea del 100% sin requerimientos huérfanos.",
+                  "3. Documentar el impacto favorable de la integración para la siguiente fase de Modelado."
+                ],
+                "table_columns": "Dimensión de Integración | Resultado de la Auditoría | Evidencia Documental | Impacto en la Fase 4",
+                "table_rules": "Todos los rubros de integración deben figurar como verificados y conformes.",
+                "restrictions": [
+                  "No emitir certificación si persisten dudas sobre la titularidad de los datos",
+                  "Garantizar que la matriz RTM no tenga inconsistencias de trazabilidad"
+                ],
+                "done_when": "La integridad del sistema de requisitos queda formalmente certificada"
+              },
+              "example_title": "Certificación de Integración y Trazabilidad RTM",
+              "example": "| Dimensión de Integración | Resultado de la Auditoría | Evidencia Documental | Impacto en la Fase 4 |\n| --- | --- | --- | --- |\n| **Auditoría de Conflictos Inter-Modulares** | **0 Conflictos Detectados** | Timeouts sincronizados entre `MOD-CAL` (15m lock) y `MOD-PAY` (webhook Wompi). | Eliminación de condiciones de carrera y colisiones de estado. |\n| **Cobertura RTM de Requerimientos** | **100% Trazabilidad Certificada** | Todos los requerimientos funcionales mapeados a Casos de Uso y OKRs de MVP. | Cero funciones huérfanas y erradicación total de Gold Plating. |\n| **Soberanía Estricta de Datos** | **Verificada y Blindada** | Cada entidad pertenece exactamente a un único módulo responsable de su ciclo de vida. | Esquemas de base de datos desacoplados y limpios. |\n| **Aislamiento de Servicios Externos** | **Confinado** | SDKs de Wompi API y WhatsApp Cloud API encapsulados en `MOD-PAY` y `MOD-NOT`. | Resiliencia ante fallos o caídas de plataformas de terceros. |",
+              "link_label": "integración certificada"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final y Cierre de Compuerta (Gate 3)",
+      "summary": "Ensamblar el Brief Ejecutivo de Requisitos en sus 7 secciones canónicas, emitir el veredicto oficial de la compuerta Gate 3 y autorizar el paso formal a la Fase 4 (System Modeling).",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Dictamen de Compuerta Gate 3 y Sign-Off Maestro",
+          "objective": "Emitir el acta formal de cierre de Fase 3 y autorizar la transición al Modelado de Sistemas.",
+          "input": "Resultados consolidados de Step 1, Step 2 y Step 3.",
+          "raw_data_title": "Evaluación de Compuerta de Fase 3 (Gate 3)",
+          "raw_data": "Proyecto: Nos Fuimos de Finca | Fase: 3 — Ingeniería de Requisitos | Entregable: 9 de 9 (Gate 3) | Estado: Aprobado.\nCriterios: Cobertura total D1-D8, trazabilidad RTM 100%, grafo DAG acíclico, NFRs cuantificados, transición formal a Fase 4.",
+          "exit_label": "PUBLISH → Deliverable Completo: 9. Resumen Ejecutivo de Requisitos (Gate 3 Closed)",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Dictamen de Compuerta Gate 3 y Cierre de Fase",
+              "objective": "Emitir el veredicto oficial GO autorizando el avance a la Fase 4.",
+              "how_to": {
+                "steps": [
+                  "1. Auditar los 5 criterios de la compuerta de cierre de fase.",
+                  "2. Compilar el documento maestro en sus 7 secciones normativas.",
+                  "3. Emitir el dictamen formal GO con las firmas de autorización del proyecto."
+                ],
+                "table_columns": "Criterio de Cierre de Fase 3 (Gate 3) | Estado | Evidencia",
+                "table_rules": "Todos los criterios deben resultar en APROBADO para emitir el veredicto GO.",
+                "restrictions": [
+                  "No emitir veredicto GO si existe algún entregable previo incompleto",
+                  "Asegurar que el documento sirva como resumen ejecutivo autosuficiente"
+                ],
+                "done_when": "El Brief de Fase 3 recibe el dictamen oficial GO y cierra formalmente el Gate 3"
+              },
+              "example_title": "Veredicto del Gate 3 y Cierre de Fase 3",
+              "example": "| Criterio de Cierre de Fase 3 (Gate 3) | Estado | Evidencia |\n| --- | --- | --- |\n| Cobertura Total de Entregables (D1 a D8) | APROBADO | Los 8 entregables previos están formalizados, auditados y aprobados |\n| Trazabilidad Bidireccional de Requisitos | APROBADO | Matriz RTM certifica 100% de mapeo hacia casos de uso y objetivos del MVP |\n| Arquitectura Modular Libre de Ciclos (DAG) | APROBADO | Grafo acíclico dirigido validado con comunicación desacoplada por eventos |\n| Requisitos No Funcionales Cuantificados | APROBADO | 9 NFRs medibles en CI/CD y pruebas de carga sin adjetivos ambiguos |\n| Veredicto de Transición a Fase 4 | **GO** | Cierre formal de Gate 3; paso autorizado a Modelado de Sistemas (Fase 4) |",
+              "link_label": "Gate 3 cerrado exitosamente"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 9. Resumen Ejecutivo de Requisitos (Gate 3).md",
+    "markdown": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 3 — Ingeniería de Requisitos\n**Entregable:** 9 de 9 — Resumen Ejecutivo de Requisitos (Gate 3)\n**Estado:** Aprobado\n\n### 2. Fronteras del Sistema e Integraciones (De D1)\n- **Frontera del Sistema:** Plataforma web transaccional con Landing Page pública, catálogo de fincas, motor de reservas con máquina de estados y pasarela de pagos integrada para Nos Fuimos de Finca.\n- **Actores del Sistema:**\n  - *Turista (Primario B2C):* Consulta catálogo público, filtra por fechas/capacidad, verifica disponibilidad en tiempo real y realiza reservas con checkout Wompi.\n  - *Propietario / Finquero (Primario Operador):* Consulta estado de reservas, administra disponibilidad y recibe alertas transaccionales.\n  - *Administrador NFF (Secundario Back-office):* Supervisa reservas globales, liquidaciones, moderación de fincas y métricas de plataforma.\n- **Sistemas Externos Conectados:**\n  - *Wompi API:* Pasarela de pago delegada mediante checkout seguro tokenizado (HTTPS REST + Webhooks idempotentes).\n  - *WhatsApp Cloud API (Meta):* Notificaciones transaccionales y confirmaciones en tiempo real (Webhooks).\n  - *PostgreSQL 16:* Persistencia relacional con control transaccional ACID y locks de fila.\n\n### 3. Roles y Matriz de Acceso RBAC (De D2)\n| Rol Técnico | Actores Asociados | Capacidades Principales |\n| --- | --- | --- |\n| `ROLE_GUEST` | Turista | Búsqueda pública, solicitud de reserva y checkout con pasarela de pagos Wompi. |\n| `ROLE_HOST` | Propietario / Finquero | Visualización de reservas asignadas y gestión de disponibilidad de su propia finca. |\n| `ROLE_ADMIN` | Administrador NFF | CRUD de propiedades, anulación/conciliación de reservas, visualización de métricas y liquidaciones. |\n\n### 4. Lenguaje Ubicuo Oficial (De D3)\n- **Finca (`Property`):** Unidad de alojamiento rural listada en el catálogo. Prohibido usar \"Casa\" o \"Hacienda\".\n- **Bloqueo Temporal (`Soft-Lock`):** Retención provisional de fechas (TTL 15 min) mientras el usuario completa el pago en pasarela.\n- **Reserva Confirmada (`Booking`):** Estado final inmutable tras recepción exitosa del webhook de pago de Wompi.\n- **Overbooking:** Colisión de dos solicitudes para la misma finca en la misma fecha. Prohibido por diseño de software.\n\n### 5. Catálogo de Módulos Especificados (De D5 y D7)\n| Código | Nombre del Módulo | Responsabilidad Principal | Archivo de Especificación |\n| --- | --- | --- | --- |\n| `MOD-AUTH` | Identidad y Acceso | Autenticación y gestión de sesiones para finqueros y administradores NFF | `modules/MOD-AUTH.md` |\n| `MOD-PROP` | Catálogo de Propiedades | Gestión de fincas, fotos optimizadas, tarifas y fichas públicas | `modules/MOD-PROP.md` |\n| `MOD-CAL` | Calendario y Disponibilidad | State Machine de fechas, Soft-Locks y Hard-Locks | `modules/MOD-CAL.md` |\n| `MOD-RSV` | Orquestación de Reservas | Ciclo de vida de la reserva y checkout transaccional | `modules/MOD-RSV.md` |\n| `MOD-PAY` | Procesamiento de Pagos | Integración con Wompi API, webhooks e idempotencia | `modules/MOD-PAY.md` |\n| `MOD-NOT` | Hub de Notificaciones | Despacho de mensajes WhatsApp y correos con reintentos | `modules/MOD-NOT.md` |\n| `MOD-DASH` | Dashboard Operativo | Panel de control y métricas para finqueros y administradores NFF | `modules/MOD-DASH.md` |\n\n### 6. Requisitos No Funcionales Globales (De D6)\n- **Rendimiento (`NFR-01`):** Latencia P95 < 300ms en endpoints de búsqueda; LCP < 2.5s con bundle optimizado de React + Tailwind.\n- **Disponibilidad (`NFR-02`):** Uptime mensual ≥ 99.5% con monitoreo automatizado de salud (`/health`).\n- **Seguridad (`NFR-03`):** Cifrado TLS 1.3 en tránsito; cero persistencia de datos de tarjeta en base de datos propia.\n- **Integridad Transaccional (`NFR-04`):** Bloqueo transaccional estricto en PostgreSQL para garantizar 0% de overbooking.\n\n### 7. Certificación de Trazabilidad y Cierre de Compuerta (Gate 3)\n- **Auditoría de Conflictos Inter-Modulares:** `0 Conflictos Detectados`. Los timeouts de `MOD-CAL` y `MOD-PAY` están sincronizados.\n- **Cobertura RTM:** 100% de requerimientos funcionales mapeados a Historias de Usuario, Casos de Uso y Objetivos de Negocio del MVP.\n- **Veredicto de Compuerta (Gate 3):** GO (Paso formal autorizado a Fase 4 — System Modeling).\n- **Firmas:** Julián (Project Authority) / Laura (Lead Systems Analyst).\n"
+  }
+}

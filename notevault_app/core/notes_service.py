@@ -16,12 +16,132 @@ from .vault_manager import (
 from .vault_index import VaultIndex
 
 from .file_kinds import kind_for
+from .frontmatter_utils import FRONTMATTER_RE
 # Media copied into notes lives here; it is not a note and never listed.
 from .attachments import ATTACHMENTS_DIR
 
 BOOKMARKS_FILE = ".notevault-bookmarks.json"
 
 _DIGITS = re.compile(r"(\d+)")
+
+# Obsidian resolves a [[wikilink]] against a note's file name, its full path,
+# its frontmatter `title:` and each of its `aliases:` — and treats spaces and
+# underscores as interchangeable. These helpers reproduce that so a backlink is
+# found no matter which of those names the other note wrote.
+_ALIAS_KEYS = ("aliases", "alias")
+_WIKILINK_SCAN_RE = re.compile(r"\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
+
+
+def _norm(s: str) -> str:
+    """Fold underscores to spaces (Obsidian link equivalence)."""
+    return s.replace("_", " ")
+
+
+def _variants(s: str) -> set:
+    """Both the space and underscore spellings of a name, so a link written
+    either way is matched regardless of how the file itself is named."""
+    return {s, s.replace("_", " "), s.replace(" ", "_")}
+
+
+def _frontmatter_names(text: str) -> list[str]:
+    """Lowercase `title:` and `aliases:` from YAML frontmatter.
+
+    Handles both inline lists (``aliases: [a, b]``) and block lists::
+
+        aliases:
+          - Alias One
+          - Alias Two
+    """
+    m = FRONTMATTER_RE.match(text or "")
+    if not m:
+        return []
+    names: list[str] = []
+    lines = m.group(1).splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        i += 1
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, _, val = line.partition(":")
+        key = key.strip().lower()
+        val = val.strip()
+        if key == "title":
+            v = val.strip("\"'")
+            if v:
+                names.append(v)
+        elif key in _ALIAS_KEYS:
+            if val.startswith("[") and val.endswith("]"):
+                names += [x.strip().strip("\"'")
+                          for x in val[1:-1].split(",") if x.strip()]
+            elif val:
+                names.append(val.strip("\"'"))
+            else:                       # block list: consume the "- item" lines
+                while i < len(lines):
+                    item = lines[i].strip()
+                    if item.startswith("-"):
+                        names.append(item[1:].strip().strip("\"'"))
+                        i += 1
+                    elif not item or item.startswith(" "):
+                        i += 1
+                    else:
+                        break
+    return [n.lower() for n in names if n.strip()]
+
+
+def link_identifiers(note: Note, vault_root, raw_text: str = None):
+    """(target_ids, name_needles) for one note.
+
+    ``target_ids``   — normalized strings a ``[[wikilink]]`` target may equal
+                       (file name/stem, vault path with and without extension,
+                       frontmatter title and aliases; each also space/underscore
+                       normalized).
+    ``name_needles`` — distinctive lowercase strings to search for in body text,
+                       used both for the early-exit scan and for detecting
+                       unlinked (plain-text) mentions.
+    """
+    ids: set[str] = set()
+    needles: set[str] = set()
+    stem = note.path.stem.lower()
+    name = note.path.name.lower()
+    ids.update({stem, name, _norm(stem), _norm(name),
+                stem.replace(" ", "_"), name.replace(" ", "_")})
+    needles.update({stem, _norm(stem), stem.replace(" ", "_")})
+    try:
+        rel = note.path.relative_to(vault_root).as_posix().lower()
+        rel_ns = Path(rel).with_suffix("").as_posix().lower()
+        ids.update({rel, rel_ns, _norm(rel), _norm(rel_ns),
+                    rel.replace(" ", "_"), rel_ns.replace(" ", "_")})
+    except Exception:
+        pass
+    if raw_text is not None:
+        text = raw_text
+    else:
+        # A vault_manager.Note exposes .raw (disk-backed); an IndexedNote
+        # exposes .text (already cached in memory). Accept either.
+        text = getattr(note, "raw", None)
+        if text is None:
+            text = getattr(note, "text", "")
+    for nm in _frontmatter_names(text):
+        ids.update({nm, _norm(nm), nm.replace(" ", "_")})
+        needles.update({nm, _norm(nm), nm.replace(" ", "_")})
+    ids.discard("")
+    needles.discard("")
+    return ids, needles
+
+
+def wikilink_matches(line: str, target_ids: set) -> bool:
+    """True if any ``[[wikilink]]`` on the line points at ``target_ids``."""
+    for wm in _WIKILINK_SCAN_RE.finditer(line):
+        raw_target = wm.group(1).strip().lower()
+        if not raw_target:
+            continue
+        name = Path(raw_target).name.lower()
+        stem = Path(raw_target).stem.lower()
+        for cand in (raw_target, name, stem):
+            if cand in target_ids or _norm(cand) in target_ids:
+                return True
+    return False
 
 
 def numeric_key(name: str):
@@ -450,40 +570,106 @@ class NotesService:
             return ([], [])
 
         linked, unlinked = [], []
-        needle = title.lower()
-        target_ids = {needle, note.path.name.lower(), note.path.stem.lower()}
-        try:
-            rel = note.path.relative_to(self.vault.vault_root).as_posix().lower()
-            target_ids.add(rel)
-            target_ids.add(Path(rel).with_suffix("").as_posix().lower())
-        except Exception:
-            pass
+        target_ids, name_needles = link_identifiers(note, self.vault.vault_root)
+        if not name_needles:
+            return ([], [])
 
-        plain_re = re.compile(
-            r"(?<![\w\[])" + re.escape(title) + r"(?![\w\]])", re.IGNORECASE
-        )
+        # Plain-text (unlinked) detection: match each distinctive name as a whole
+        # word. Very short names (e.g. a "D1" alias) are skipped to avoid noise.
+        plain_res = [
+            re.compile(r"(?<![\w\[])" + re.escape(n) + r"(?![\w\]])", re.IGNORECASE)
+            for n in name_needles if len(n) >= 3
+        ]
 
         for other in self.index.notes():
             if other.path == note.path:
                 continue
-            if needle not in other.lower:
+            # Early exit: skip a note that mentions none of the target's names.
+            if not any(n in other.lower for n in name_needles):
                 continue
             for i, line in enumerate(other.text.splitlines(), start=1):
-                is_linked = False
-                for wm in re.finditer(r"\[\[([^\]|#]+?)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]", line):
-                    raw_target = wm.group(1).strip().lower()
-                    stem = Path(raw_target).stem.lower()
-                    name = Path(raw_target).name.lower()
-                    if raw_target in target_ids or name in target_ids or stem == needle:
-                        is_linked = True
-                        break
-                if is_linked:
+                if wikilink_matches(line, target_ids):
                     linked.append(Mention(other.path, other.title, i,
                                           line.strip()[:200], True))
-                elif plain_re.search(line):
+                elif any(rx.search(line) for rx in plain_res):
                     unlinked.append(Mention(other.path, other.title, i,
                                             line.strip()[:200], False))
         return (linked, unlinked)
+
+    def linkify_mention(self, note_path: Path, line_no: int, target_title: str) -> bool:
+        """Convert the first unlinked mention of target_title at/near line_no in note_path
+        into a [[target_title]] wikilink and persist it to disk and index."""
+        p = Path(note_path)
+        try:
+            text = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return False
+
+        lines = text.splitlines(keepends=True)
+        if not lines:
+            return False
+
+        title_clean = target_title.strip()
+        if not title_clean:
+            return False
+
+        title_esc = re.escape(title_clean)
+        pattern = r"(?<![\w\[])(" + title_esc + r")(?![\w\]])"
+        if "_" in title_clean or " " in title_clean:
+            alt = re.escape(title_clean.replace("_", " ") if "_" in title_clean else title_clean.replace(" ", "_"))
+            pattern = r"(?<![\w\[])(" + title_esc + r"|" + alt + r")(?![\w\]])"
+        rx = re.compile(pattern, re.IGNORECASE)
+
+        idx = line_no - 1
+        candidate_indices = []
+        if 0 <= idx < len(lines):
+            candidate_indices.append(idx)
+        for offset in range(1, 5):
+            if 0 <= idx - offset < len(lines):
+                candidate_indices.append(idx - offset)
+            if 0 <= idx + offset < len(lines):
+                candidate_indices.append(idx + offset)
+
+        replaced = False
+        for i in candidate_indices:
+            line = lines[i]
+            if rx.search(line):
+                def _replace_match(m):
+                    nonlocal replaced
+                    if not replaced:
+                        replaced = True
+                        return f"[[{title_clean}]]"
+                    return m.group(0)
+
+                new_line = rx.sub(_replace_match, line, count=1)
+                if replaced:
+                    lines[i] = new_line
+                    break
+
+        if not replaced:
+            for i, line in enumerate(lines):
+                if rx.search(line):
+                    def _replace_match(m):
+                        nonlocal replaced
+                        if not replaced:
+                            replaced = True
+                            return f"[[{title_clean}]]"
+                        return m.group(0)
+
+                    new_line = rx.sub(_replace_match, line, count=1)
+                    if replaced:
+                        lines[i] = new_line
+                        break
+
+        if replaced:
+            new_text = "".join(lines)
+            try:
+                p.write_text(new_text, encoding="utf-8")
+                self.note_written(p, new_text)
+                return True
+            except OSError:
+                return False
+        return False
 
     # ── Mutations ─────────────────────────────────────────────────────────
 

@@ -1,0 +1,174 @@
+{
+  "phase": "Phase 3",
+  "deliverable_code": "D8",
+  "deliverable": "System Requirements Specification & Integration (SRS y Trazabilidad RTM — Capa 3)",
+  "purpose": "Este entregable consolida el Libro Blanco Maestro de Especificación de Requisitos del Sistema (SRS) bajo el estándar ISO/IEC/IEEE 29148. Actúa como el contrato técnico único y vinculante para las fases posteriores de Modelado (Fase 4) y Diseño Arquitectónico (Fase 5), garantizando la sanidad modular, resolviendo conflictos de integración inter-modular y certificando la trazabilidad bidireccional de extremo a extremo mediante la Matriz RTM.",
+  "inputs": "| Artefacto de Entrada | Uso en este Entregable |\n| --- | --- |\n| [[example_output_system_context_diagram]] | Diagrama C4 Nivel 1, límites exteriores y contratos con servicios de terceros (Fase 3, D1). |\n| [[example_output_actor_and_role]] | Matriz de permisos RBAC y modelos de autorización por rol (Fase 3, D2). |\n| [[example_output_glossary]] | Lenguaje ubicuo oficial de 7 campos y definiciones DDD del dominio (Fase 3, D3). |\n| [[example_output_requirements_elicitation]] | Catálogo maestro de 20 Requerimientos Candidatos y exclusiones de alcance (Fase 3, D4). |\n| [[example_output_module_decomposition]] | Arquitectura modular de 6/7 componentes, anatomía y grafo DAG de dependencias (Fase 3, D5). |\n| [[example_output_non_functional]] | 9 Requisitos No Funcionales globales con métricas percentiles cuantitativas (Fase 3, D6). |\n| Paquetes Modulares en `modules/` | Especificaciones anatómicas completas con User Stories y Casos de Uso (Fase 3, D7). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Auditoría de Sanidad y Completitud Modular (Verify Entry)",
+      "summary": "Verificar rigurosamente que la totalidad de los módulos identificados en la descomposición arquitectónica (D5) cuenten con su especificación detallada (D7) completada con todas sus secciones normativas.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Checklist de Completitud Modular",
+          "objective": "Auditar la existencia física y la completitud estructural de las especificaciones de todos los módulos del sistema.",
+          "input": "[[example_output_module_decomposition]] y archivos en `modules/`.",
+          "raw_data_title": "Módulos Auditados en modules/",
+          "raw_data": "- MOD-AUTH: Completo (8 RF, 2 RNF, 9 US, 7 UC, Diagrama Mermaid).\n- MOD-PROP: Completo (5 RF, 1 RNF, 6 US, 4 UC, Diagrama Mermaid).\n- MOD-CAL: Completo (4 RF, 1 RNF, 5 US, 4 UC, Diagrama Mermaid).\n- MOD-RSV: Completo (6 RF, 2 RNF, 7 US, 5 UC, Diagrama Mermaid).\n- MOD-PAY: Completo (4 RF, 1 RNF, 5 US, 4 UC, Diagrama Mermaid).\n- MOD-NOT: Completo (3 RF, 1 RNF, 4 US, 3 UC, Diagrama Mermaid).\n- MOD-DASH: Completo (5 RF, 1 RNF, 5 US, 4 UC, Diagrama Mermaid).",
+          "exit_label": "COMPLETE → 100% de módulos auditados y completos para verificación de integración (2.1)",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Auditoría de Completitud Modular",
+              "objective": "Construir la matriz de verificación certificando que no existan módulos pendientes ni parciales.",
+              "how_to": {
+                "steps": [
+                  "1. Comparar la lista de módulos de D5 contra los archivos físicos existentes en modules/.",
+                  "2. Validar que cada archivo contenga RFs, RNFs, User Stories, Use Cases y Diagramas.",
+                  "3. Asignar el estado de verificación formal a cada componente."
+                ],
+                "table_columns": "Código Módulo | Nombre Canónico del Módulo | Archivo Físico en modules/ | Estado de Especificación | Componentes Auditados",
+                "table_rules": "Todos los módulos deben figurar con estado 'Completo y Validado'.",
+                "restrictions": [
+                  "No consolidar el SRS si existen módulos en borrador o sin casos de uso",
+                  "Garantizar que todos los archivos sigan la plantilla canónica"
+                ],
+                "done_when": "El 100% de los módulos de la arquitectura están completos y validados"
+              },
+              "example_title": "Checklist de Completitud Modular",
+              "example": "| Código Módulo | Nombre Canónico del Módulo | Archivo Físico en modules/ | Estado de Especificación | Componentes Auditados |\n| --- | --- | --- | --- | --- |\n| **`MOD-AUTH`** | Gestión de Identidad, Autenticación y KYC | `modules/MOD-AUTH.md` | **Completo y Validado** | 8 RFs, 2 RNFs, 9 USs, 7 UCs, Diagrama de Actividad Mermaid |\n| **`MOD-PROP`** | Catálogo y Publicación de Fincas | `modules/MOD-PROP.md` | **Completo y Validado** | 5 RFs, 1 RNF, 6 USs, 4 UCs, Diagrama de Actividad Mermaid |\n| **`MOD-CAL`** | Gestión de Disponibilidad y Calendario | `modules/MOD-CAL.md` | **Completo y Validado** | 4 RFs, 1 RNF, 5 USs, 4 UCs, Diagrama de Actividad Mermaid |\n| **`MOD-RSV`** | Core Transaccional de Reservas | `modules/MOD-RSV.md` | **Completo y Validado** | 6 RFs, 2 RNFs, 7 USs, 5 UCs, Diagrama de Actividad Mermaid |\n| **`MOD-PAY`** | Procesamiento y Conciliación de Pagos | `modules/MOD-PAY.md` | **Completo y Validado** | 4 RFs, 1 RNF, 5 USs, 4 UCs, Diagrama de Actividad Mermaid |\n| **`MOD-NOT`** | Mensajería y Notificaciones Transaccionales | `modules/MOD-NOT.md` | **Completo y Validado** | 3 RFs, 1 RNF, 4 USs, 3 UCs, Diagrama de Actividad Mermaid |\n| **`MOD-DASH`** | Consola de Back-Office y Auditoría | `modules/MOD-DASH.md` | **Completo y Validado** | 5 RFs, 1 RNF, 5 USs, 4 UCs, Diagrama de Actividad Mermaid |",
+              "link_label": "módulos verificados"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Chequeo y Resolución de Conflictos Inter-Modulares",
+      "summary": "Auditar las dependencias cruzadas entre módulos para garantizar que ningún módulo asuma estados, timeouts o contratos transaccionales que otro módulo no soporte, documentando los acuerdos de integración.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Matriz de Conflictos Inter-Modulares y Acuerdos de Integración",
+          "objective": "Detectar y resolver colisiones potenciales en timeouts, estados de reserva y eventos asíncronos.",
+          "input": "Casos de Uso de todos los módulos (D7) y matriz de dependencias de [[example_output_module_decomposition]].",
+          "raw_data_title": "5 Puntos de Fricción Inter-Modular Resueltos",
+          "raw_data": "1. Expiración de Soft-Lock (15m): MOD-CAL gobierna el TTL y emite LockExpiredEvent sincronizado.\n2. Retraso en Webhook de Wompi: Margen de gracia en MOD-CAL para no perder reservas pagadas.\n3. Notificaciones WhatsApp: Desacople asíncrono reactivo para no bloquear la compra del turista.\n4. Filtrado de disponibilidad en catálogo: MOD-CAT invoca síncronamente a MOD-CAL para evitar datos viejos.\n5. Moderación de fincas: MOD-PROP exige verificación KYC emitida por MOD-IAM antes de publicar.",
+          "exit_label": "COMPLETE → Conflictos inter-modulares resueltos formalmente en acuerdos técnicos (3.1)",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Resolución de Conflictos Inter-Modulares",
+              "objective": "Estructurar la matriz de integración certificando consistencia lógica entre módulos.",
+              "how_to": {
+                "steps": [
+                  "1. Cruzar las operaciones consumidor-proveedor de los módulos interactuantes.",
+                  "2. Evaluar condiciones de carrera, tiempos de expiración y asincronía en pasarela y eventos.",
+                  "3. Documentar la resolución oficial y el contrato vinculante de integración entre componentes."
+                ],
+                "table_columns": "Módulo Origen | Módulo Destino | Tensión Operativa Detectada | Colisión Lógica Potencial | Resolución Oficial y Contrato de Integración",
+                "table_rules": "Cada tensión identificada debe contar con resolución técnica explícita.",
+                "restrictions": [
+                  "No dejar dependencias ambiguas donde ambos módulos asuman soberanía del mismo dato",
+                  "Garantizar que los eventos reactivos manejen fallos sin corromper el estado"
+                ],
+                "done_when": "Los 5 acuerdos de integración están formalizados y libres de conflictos"
+              },
+              "example_title": "Matriz de Resolución de Conflictos Inter-Modulares",
+              "example": "| Módulo Origen | Módulo Destino | Tensión Operativa Detectada | Colisión Lógica Potencial | Resolución Oficial y Contrato de Integración |\n| --- | --- | --- | --- | --- |\n| **`MOD-RSV`** | **`MOD-CAL`** | Expiración de Soft-Lock en checkout (15 min). | Que la reserva expire pero el slot de calendario continúe bloqueado impidiendo otras compras. | **Sincronización Atómica de TTL**. `MOD-CAL` gobierna el temporizador; emite `LockExpiredEvent` tras 15m liberando el slot simultáneamente en reservas y catálogo. |\n| **`MOD-PAY`** | **`MOD-CAL`** | Retraso en confirmación de Webhook de Wompi. | Que el Webhook tarde 16 min y el bloqueo temporal se libere justo antes de confirmar el cobro. | **Margen de Gracia en Pasarela**. Si el Webhook llega con estado APPROVED y el lock recién expiró, se reasigna la fecha en firme si no fue tomada por otro usuario. |\n| **`MOD-RSV`** | **`MOD-NOT`** | Despacho de notificaciones de WhatsApp al finquero. | Que una caída temporal de la API de Meta bloquee la confirmación de compra del turista. | **Desacople Asíncrono Reactivo**. Reservas emite `BookingConfirmedEvent` y retorna HTTP 200 de inmediato; `MOD-NOT` escucha en segundo plano con reintentos. |\n| **`MOD-CAT`** | **`MOD-CAL`** | Filtrado de fincas disponibles en catálogo público. | Desfase de caché que muestre fincas como disponibles cuando acaban de ser reservadas. | **Invocación Síncrona a Motor de Fechas**. La búsqueda consulta directamente a `MOD-CAL` antes de renderizar la tarjeta en el frontend, garantizando consistencia. |\n| **`MOD-IAM`** | **`MOD-PROP`** | Moderación y publicación de fincas por administradores. | Propietario intentando publicar fincas sin haber completado la verificación KYC manual. | **Guarda de Seguridad RBAC**. Endpoint de publicación exige rol verificado `ROLE_HOST_VERIFIED` emitido por `MOD-IAM` tras visto bueno del RUT en S3. |",
+              "link_label": "conflictos inter-modulares resueltos"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Construcción de la Matriz de Trazabilidad de Requerimientos (RTM)",
+      "summary": "Construir la Matriz RTM de extremo a extremo, certificando que cada requerimiento funcional provenga de una necesidad de negocio aprobada (Fase 1 y D4) y cuente con al menos un Caso de Uso en D7 que lo materialice, erradicando el 'Gold Plating'.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Matriz de Trazabilidad Bidireccional de Requerimientos (RTM)",
+          "objective": "Vincular de forma bidireccional los objetivos estratégicos, requerimientos candidatos, módulos y casos de uso.",
+          "input": "[[example_output_mvp_definition]], [[example_output_requirements_elicitation]] y paquetes modulares de D7.",
+          "raw_data_title": "Cadena de Trazabilidad RTM",
+          "raw_data": "Objetivo Negocio P1 -> Raw Statement D4 -> Requerimiento Candidato CR -> Módulo D5 -> Requisito Funcional FR -> Historia Usuario US -> Caso de Uso UC.",
+          "exit_label": "COMPLETE → Matriz RTM consolidada con 100% de requerimientos trazados (4.1)",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Construcción de la Matriz RTM",
+              "objective": "Mapear cada requerimiento a su caso de uso y meta de negocio, validando ausencia de funciones huérfanas.",
+              "how_to": {
+                "steps": [
+                  "1. Listar los requerimientos funcionales y de calidad de los módulos de D7.",
+                  "2. Rastrear su procedencia en los CRs de D4 y los objetivos de MVP de Fase 1.",
+                  "3. Asociar el Caso de Uso formal de D7 que ejecuta y valida el requerimiento.",
+                  "4. Verificar que no exista ningún requerimiento sin caso de uso ni caso de uso sin requerimiento."
+                ],
+                "table_columns": "ID Requisito | Descripción Funcional | Origen (D4 / D6) | Módulo Responsable | Caso de Uso Vinculado | Objetivo de Negocio / Alcance MVP (P1)",
+                "table_rules": "Cada fila debe tener trazabilidad completa en ambas direcciones (hacia el negocio y hacia la técnica).",
+                "restrictions": [
+                  "Prohibido el 'Gold Plating': funciones en código que no respondan a requerimientos aprobados",
+                  "Asegurar coherencia entre los IDs de requerimientos de D4 y D7"
+                ],
+                "done_when": "La matriz RTM certifica trazabilidad bidireccional total para el 100% de capacidades"
+              },
+              "example_title": "Matriz de Trazabilidad de Requerimientos (RTM)",
+              "example": "| ID Requisito | Descripción Funcional | Origen (D4 / D6) | Módulo Responsable | Caso de Uso Vinculado | Objetivo de Negocio / Alcance MVP (P1) |\n| --- | --- | --- | --- | --- | --- |\n| **`FR-CAT-01`** | Búsqueda pública en catálogo por filtros. | `CR-001` (D4) | `MOD-PROP` | `UC-PROP-01` | Reducción de fricción de cotización vacacional. |\n| **`FR-RSV-01`** | Bloqueo temporal atómico de 15 min en checkout. | `CR-002` (D4) | `MOD-RSV` | `UC-RSV-01` | Erradicación total de sobreventas (Overbooking 0%). |\n| **`FR-PAY-01`** | Procesamiento seguro de pagos vía Wompi. | `CR-003` (D4) | `MOD-PAY` | `UC-PAY-01` | Cobro transparente tokenizado sin intermediarios informales. |\n| **`FR-AUTH-01`** | Registro e inicio de sesión con JWT HttpOnly. | `CR-004` (D4) | `MOD-AUTH` | `UC-AUTH-01` | Autenticación robusta y gobierno de identidades. |\n| **`FR-RSV-02`** | Wizard de checkout paso a paso con resumen. | `CR-005` (D4) | `MOD-RSV` | `UC-RSV-02` | Prevención de errores de usuario en compras móviles. |\n| **`NFR-001`** | Carga móvil de catálogo con LCP < 2.5s en 3G. | `CR-006` (D4) / `NFR-001` (D6) | `MOD-PROP` | `UC-PROP-01` | Usabilidad garantizada en zonas rurales de baja cobertura. |\n| **`FR-NOT-01`** | Notificación transaccional automática por WhatsApp. | `CR-008` (D4) | `MOD-NOT` | `UC-NOT-01` | Inclusión digital rural sin requerir computador al finquero. |\n| **`FR-CAL-01`** | Bloqueo manual de fechas en calendario por finquero. | `CR-009` (D4) | `MOD-CAL` | `UC-CAL-01` | Soberanía total del anfitrión sobre la finca física. |\n| **`FR-RSV-03`** | Privacidad de datos personales y bancarios. | `CR-010`, `CR-011` (D4) | `MOD-RSV` | `UC-RSV-03` | Cumplimiento estricto de Ley 1581 (Habeas Data) y PCI-DSS. |\n| **`FR-DASH-01`** | Consola de moderación y aprobación de fincas. | `CR-015` (D4) | `MOD-DASH` | `UC-DASH-01` | Prevención de fraudes y control de calidad de oferta. |\n| **`FR-PAY-02`** | Conciliación transaccional y bitácora de pagos. | `CR-016` (D4) | `MOD-PAY` | `UC-PAY-02` | Transparencia contable y resolución de disputas financieras. |\n| **`FR-PAY-03`** | Procesamiento asíncrono e idempotente de Webhooks. | `CR-017` (D4) / `NFR-003` (D6) | `MOD-PAY` | `UC-PAY-03` | Integridad transaccional ante fallos de red o caídas de pasarela. |\n| **`FR-AUTH-02`** | Auditoría forense inmutable de acciones de usuario. | `CR-018` (D4) | `MOD-AUTH` | `UC-AUTH-05` | Trazabilidad legal ante reclamaciones o disputas. |",
+              "link_label": "matriz RTM completada"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Libro Blanco Maestro (SRS ISO 29148)",
+      "summary": "Compilar formalmente el documento SRS unificado bajo el estándar ISO 29148, auditar los criterios de calidad de la compuerta de integración y autorizar la transición formal hacia la Fase 4 (System Modeling).",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "SRS Quality Gate Check y Sign-Off Maestro",
+          "objective": "Verificar la compuerta de calidad de la especificación de requisitos y emitir el cierre formal de la Fase 3.",
+          "input": "Resultados consolidados de Step 1, Step 2 y Step 3.",
+          "raw_data_title": "Evaluación de Compuerta SRS ISO 29148",
+          "raw_data": "Metadatos: Nos Fuimos de Finca, Fase 3, Entregable 8 de 9, Estado Aprobado.\nCriterios: Completitud modular 100%, coherencia inter-modular libre de conflictos, trazabilidad RTM 100%, sin gold plating, transición autorizada a Fase 4.",
+          "exit_label": "PUBLISH → Deliverable Completo: 8. System Requirements Specification (SRS Maestro)",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Dictamen de Compuerta SRS ISO 29148",
+              "objective": "Emitir el veredicto oficial PROCEED certificando el SRS como contrato vinculante para Fase 4.",
+              "how_to": {
+                "steps": [
+                  "1. Auditar los 5 criterios normativos del estándar ISO 29148.",
+                  "2. Validar que el SRS compile la arquitectura global, módulos, RTM y conflictos resueltos.",
+                  "3. Emitir el Sign-Off formal autorizando la transición a Modelado de Sistemas (Fase 4)."
+                ],
+                "table_columns": "Criterio de Calidad SRS ISO 29148 | Estado | Evidencia",
+                "table_rules": "Todos los criterios deben resultar en APROBADO sin excepciones.",
+                "restrictions": [
+                  "No emitir Sign-Off si existen conflictos inter-modulares sin resolver",
+                  "Garantizar que el documento sirva de contrato definitivo para desarrollo y testing"
+                ],
+                "done_when": "El SRS maestro cumple el 100% de los criterios normativos y recibe el Sign-Off oficial"
+              },
+              "example_title": "Veredicto del SRS Quality Gate (ISO 29148)",
+              "example": "| Criterio de Calidad SRS ISO 29148 | Estado | Evidencia |\n| --- | --- | --- |\n| Completitud Modular 100% | APROBADO | Los 7 módulos cuentan con su especificación D7 formalizada y validada |\n| Coherencia Inter-Modular Libre de Conflictos | APROBADO | 5 acuerdos de integración protocolizados erradicando colisiones de timeouts y locks |\n| Trazabilidad Bidireccional (RTM 100%) | APROBADO | Matriz RTM vincula el 100% de requerimientos con sus casos de uso y objetivos P1 |\n| Sin Ambigüedades ni Gold Plating | APROBADO | Cero funciones huérfanas sin sustento en el alcance aprobado de la Fase 1 |\n| Autorización Formal de Transición a Fase 4 | APROBADO | Dictamen PROCEED. SRS formalmente cerrado como contrato técnico de modelado |",
+              "link_label": "SRS formalizado y cerrado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 8. System Requirements Specification.md",
+    "markdown": "### 1. Metadatos del Documento\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 3 — Requirements Engineering\n**Entregable:** 8 de 8 (Capa 3 - Final)\n**Estado:** Aprobado\n**Fecha:** 2026-07-05\n**Versión:** 1.0\n\n---\n\n## 1. Executive Summary\nEste documento consolida la especificación formal de requerimientos para \"Nos Fuimos de Finca\", definiendo el alcance, los actores, y la descomposición modular del sistema para el MVP. Este SRS actúa como el contrato técnico único para la Fase 4 (Análisis).\n\n## 2. Global Architecture\n* **[[1.System_Context_Diagram_NF|System Context Diagram (D1)]]:** Define las fronteras del sistema, incluyendo a los actores (Turista, Finquero) y sistemas externos (Wompi, Supabase, Proveedor Notificaciones).\n* **[[2.Actor_and_Role_Definition_NF|Actor and Role Definition (D2)]]:** Establece la matriz RBAC para los roles `guest` y `finquero` a través de los módulos.\n* **[[3.Domain_Glossary_nf|Domain Glossary (D3)]]:** Define el lenguaje ubicuo del dominio (Ej. Soft-Lock, Hard-Lock, Checkout).\n* **[[6.Non-Functional_Requirements_NF|Global Non-Functional Requirements (D6)]]:** Define los atributos de calidad (Performance < 1.5s, Availability 99.5%, Security via RLS, etc.).\n\n## 3. Module Specifications\nEl sistema está compuesto por 7 módulos altamente cohesivos, derivados de la elicitación de requerimientos ([[4.Requirements_Elicitation|D4]] y [[5.Functional_Module_Decomposition_NF|D5]]). Cada módulo contiene sus FRs, Historias de Usuario, Casos de Uso y Diagramas de Actividad.\n\n1. **[[5.1.P3-MOD-AUTH|MOD-AUTH]]:** Autenticación y Onboarding KYC.\n2. **[[5.2.P3-MOD-PROP|MOD-PROP]]:** Gestión de Propiedades (Perfil de Finca).\n3. **[[5.3.P3-MOD-CAL|MOD-CAL]]:** Calendario y Disponibilidad (State Machine & TTL).\n4. **[[5.4.P3-MOD-RSV|MOD-RSV]]:** Gestión de Reservas (Checkout).\n5. **[[5.5.P3-MOD-PAY|MOD-PAY]]:** Pagos y Webhooks (Wompi Integration & Idempotencia).\n6. **[[5.6.P3-MOD-NOT|MOD-NOT]]:** Notificaciones (Event-driven alerts).\n7. **[[5.7.P3-MOD-DASH|MOD-DASH]]:** Dashboard del Finquero.\n\n## 4. System Integration\n* **[[8.Inter_Module_Conflicts_NF|Inter-Module Conflict Check (D8)]]:** Resuelve la propiedad de estados transaccionales (Ej. MOD-PAY controla a MOD-CAL; MOD-CAL ejecuta el Soft-Lock antes que MOD-RSV cree la Reserva).\n* **[[9.RTM_NF|Requirements Traceability Matrix (D9)]]:** Mapea el 100% de los 40 Requerimientos Funcionales hacia las sesiones originales y los Casos de Uso correspondientes.\n\n---\n**Sign-off:** El SRS queda formally closed. Transición a Fase 4 autorizada.\n"
+  }
+}

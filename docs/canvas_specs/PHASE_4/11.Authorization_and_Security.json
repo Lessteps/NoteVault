@@ -1,0 +1,202 @@
+{
+  "phase": "PHASE 4: SYSTEM MODELING",
+  "deliverable_code": "D11",
+  "deliverable": "Authorization & Security Matrix",
+  "purpose": "Mapear los roles del sistema hacia vistas UI y endpoints backend, estableciendo una política integral de control de acceso basada en roles (RBAC) y seguridad a nivel de filas (RLS con modificadores OWN/ALL), declarando el estándar de autenticación (JWT/OAuth) y la lista blanca de rutas exentas.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| User Flows (D2) | [[PHASE_4_SYSTEM_MODELING/2.User_Flows_Task_Flows/2.User_Flows_Task_Flows.md]] | Provee los actores y roles involucrados en los flujos (Turista, Finquero, Admin). |\n| Information Architecture / Sitemap (D1) | [[PHASE_4_SYSTEM_MODELING/1.Content_Strategy_Information_Architecture/1.Content_Strategy_Information_Architecture.md]] | Provee el inventario exhaustivo de vistas y rutas del Frontend a clasificar. |\n| API Conceptual Design (D9) | [[PHASE_4_SYSTEM_MODELING/9.API_Conceptual_Design/9.API_Conceptual_Design.md]] | Provee el catálogo integral de endpoints RESTful que deben ser protegidos en Backend. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Matriz de Acceso UI (Frontend Visibility & RBAC)",
+      "summary": "Cruzar las pantallas del Sitemap con los roles del sistema para definir reglas de visibilidad y protección de rutas en el cliente.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Clasificación de Pantallas por Nivel de Acceso y Rol",
+          "objective": "Aplicar el principio de menor privilegio a la navegación UI asegurando aislamiento estricto de rutas.",
+          "input": "Sitemap de D1 y definición de roles de Fase 3.",
+          "raw_data_title": "Matriz de Navegación y Visibilidad UI",
+          "raw_data": "| Vista UI | Ruta en Frontend | Nivel de Acceso | Rol Requerido | Comportamiento si no Autorizado |\n|---|---|---|---|---|\n| Catálogo de Fincas | `/properties` | Public | Cualquiera (Anónimo) | Acceso libre sin autenticación |\n| Detalle de Finca | `/properties/:id` | Public | Cualquiera | Acceso libre con botón CTA de reserva |\n| Checkout de Reserva | `/checkout/:id` | Protected | Turista, Finquero | Redirigir a login modal preservando state |\n| Mis Reservas | `/trips` | Protected | Turista | Redirigir a login; mostrar solo reservas propias |\n| Panel de Gestión | `/host/dashboard` | Protected | Finquero (Host) | Error 404 / Ocultar ruta a turistas |\n| Consola de Aprobación | `/admin/properties` | Protected | SuperAdmin | Error 404 estricto para usuarios no admin |",
+          "exit_label": "Reglas de Visibilidad UI Formalizadas",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Configuración de Middlewares de Navegación Frontend",
+              "objective": "Establecer la política de enrutamiento protegido en el cliente.",
+              "how_to": {
+                "steps": [
+                  "1. Clasificar cada vista como `Public` o `Protected`.",
+                  "2. Para vistas protegidas, declarar el rol obligatorio (Turista, Finquero, Admin).",
+                  "3. En vistas segregadas de administración, aplicar directiva de 'Ocultamiento' (404 virtual).",
+                  "4. Asegurar que los componentes de navegación (Sidebar, Navbar) no rendericen enlaces prohibidos."
+                ],
+                "table_columns": [
+                  "Ruta",
+                  "Nivel",
+                  "Rol",
+                  "Regla Middleware"
+                ],
+                "table_rules": [
+                  "Ningún rol debe tener acceso visual a vistas de gestión ajenas",
+                  "Las rutas anónimas no deben requerir token ni validación de estado",
+                  "El rechazo de rutas administrativas debe ser silencioso para evitar enumeración"
+                ],
+                "restrictions": "Prohibido mostrar dashboards administrativos o botones de edición a usuarios no autenticados.",
+                "done_when": "Todas las vistas del Sitemap cuentan con regla de acceso y comportamiento no autorizado."
+              },
+              "example_title": "Reglas de Acceso a Vistas UI",
+              "example": "```markdown\n| Vista | Ruta | Acceso | Rol Requerido |\n|---|---|---|---|\n| Home / Exploración | `/` | Public | — |\n| Mis Reservas | `/my-bookings` | Protected | Turista |\n| Panel de Finquero | `/host/properties` | Protected | Finquero |\n| Panel Maestro | `/admin/kyc` | Protected | SuperAdmin |\n```",
+              "link_label": "Acceso UI Validado -> Matriz de Acceso API y RLS"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Matriz de Acceso API y Row-Level Security (API & RLS Matrix)",
+      "summary": "Mapear cada endpoint de D9 con permisos RBAC y definir políticas RLS con modificadores OWN vs ALL para neutralizar ataques IDOR.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Mapeo de Endpoints a Roles con Modificadores OWN / ALL",
+          "objective": "Establecer la capa de protección de base de datos y autorización a nivel de fila.",
+          "input": "Catálogo unificado de endpoints de D9 y esquema de entidades de D6.",
+          "raw_data_title": "Matriz de Autorización API y Alcance RLS",
+          "raw_data": "| Endpoint REST | Método | Nivel | Rol Permitido | Alcance RLS | Regla de Filtrado en Base de Datos |\n|---|---|---|---|---|---|\n| `/api/v1/properties` | GET | Public | — | ALL | Solo filas con `status = 'PUBLISHED'` |\n| `/api/v1/bookings` | POST | Protected | Turista | OWN | Inyecta `user_id = auth.uid()` en la inserción |\n| `/api/v1/bookings/:id` | GET | Protected | Turista, Host | OWN | `auth.uid() = guest_id OR auth.uid() = host_id` |\n| `/api/v1/bookings/:id/cancel` | PATCH | Protected | Turista | OWN | Solo si `guest_id = auth.uid()` y status cancelable |\n| `/api/v1/properties/:id/review` | PATCH | Protected | Admin | ALL | Permite actualizar cualquier propiedad sin restricción |",
+          "exit_label": "Matriz API y Políticas RLS Rigurosamente Definidas",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Definición de Políticas RLS y Aislamiento de Filas",
+              "objective": "Especificar los filtros SQL obligatorios para prevenir accesos cruzados entre usuarios.",
+              "how_to": {
+                "steps": [
+                  "1. Clasificar el alcance como `OWN` si la operación debe restringirse a filas del autor.",
+                  "2. Clasificar el alcance como `ALL` exclusivamente para catálogos públicos o perfiles SuperAdmin.",
+                  "3. Exigir que todo endpoint de mutación valide pertenencia en la cláusula WHERE.",
+                  "4. Retornar 403 Forbidden o 404 Not Found si el recurso solicitado no pertenece al `auth.uid()`."
+                ],
+                "table_columns": [
+                  "Endpoint",
+                  "Método",
+                  "Rol",
+                  "Alcance",
+                  "Condición SQL"
+                ],
+                "table_rules": [
+                  "Toda mutación de usuario común debe tener alcance OWN estricto",
+                  "El alcance ALL queda restringido para consultas de lectura pública o roles Admin",
+                  "Las políticas RLS deben evaluarse a nivel de motor de datos en Fase 6"
+                ],
+                "restrictions": "Prohibido delegar la seguridad RLS únicamente al Frontend o permitir IDs mutables sin validación.",
+                "done_when": "El 100% de los endpoints de mutación cuentan con especificación OWN/ALL."
+              },
+              "example_title": "Matriz de Endpoints y RLS",
+              "example": "```markdown\n| Endpoint | Método | Acceso | Rol | Alcance |\n|---|---|---|---|---|\n| `/api/v1/properties` | GET | Public | — | ALL (Solo Published) |\n| `/api/v1/bookings` | POST | Protected | Turista | OWN |\n| `/api/v1/bookings/:id` | DELETE | Protected | Turista | OWN |\n| `/api/v1/admin/users` | GET | Protected | Admin | ALL |\n```",
+              "link_label": "Matriz API y RLS Validada -> Restricciones de Seguridad y Tokens"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Mecanismo AuthN, Lista Blanca y Exenciones (Constraints & Whitelist)",
+      "summary": "Formalizar el proveedor de identidad, ciclo de vida de tokens JWT y las rutas exentas de autenticación por firma.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Configuración de Tokens JWT, Firmas Webhook y Whitelist",
+          "objective": "Establecer la infraestructura criptográfica de sesión y delimitar las excepciones al middleware.",
+          "input": "Endpoints D9, Webhooks D10 y directivas NFR de seguridad.",
+          "raw_data_title": "Configuración de Identidad y Exenciones",
+          "raw_data": "| Parámetro / Ruta | Tipo | Valor / Mecanismo | Justificación Técnica |\n|---|---|---|---|\n| Proveedor de Identidad | AuthN | Supabase Auth (GoTrue) | Gestión federada de identidad y OAuth 2.0 |\n| Formato de Token | Token | JWT (JSON Web Token) | Cabecera `Authorization: Bearer <token>` |\n| Expiración Access Token | TTL | 3600 segundos (1 hora) | Minimiza ventana de exposición ante robo de token |\n| Refresh Token | Rotación | Habilitada con detección de reúso | Invalida sesiones comprometidas automáticamente |\n| `/api/v1/auth/login` | Whitelist | Exento de JWT | Endpoint público de entrada para obtención de credenciales |\n| `/api/v1/webhooks/wompi` | Whitelist | Exento de JWT (Firma HMAC) | Validado mediante cabecera `X-Event-Checksum-SHA256` |",
+          "exit_label": "Configuración AuthN y Lista Blanca Estandarizada",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Especificación de Lista Blanca de Exenciones y Firmas",
+              "objective": "Prevenir bloqueos accidentales en rutas críticas y asegurar webhooks con verificación criptográfica.",
+              "how_to": {
+                "steps": [
+                  "1. Declarar los parámetros de autenticación global (proveedor, TTL, algoritmo).",
+                  "2. Listar todas las rutas que se saltan el middleware de JWT.",
+                  "3. Para webhooks de terceros, especificar el mecanismo alternativo de autenticación (HMAC SHA-256).",
+                  "4. Validar que ninguna ruta administrativa quede en la lista blanca."
+                ],
+                "table_columns": [
+                  "Ruta",
+                  "Exención",
+                  "Mecanismo Alternativo",
+                  "Riesgo Mitigado"
+                ],
+                "table_rules": [
+                  "Solo rutas de autenticación inicial y webhooks de terceros pueden estar en la lista blanca",
+                  "Todo webhook de terceros debe validar firma criptográfica obligatoriamente",
+                  "Los tokens de acceso deben expirar en un máximo de 1 hora"
+                ],
+                "restrictions": "Nunca dejar endpoints de mutación interna en la lista blanca sin mecanismo de verificación.",
+                "done_when": "Mecanismo AuthN documentado y lista blanca de exenciones aprobada."
+              },
+              "example_title": "Lista Blanca de Rutas Exentas",
+              "example": "```markdown\n**Mecanismo AuthN:** Supabase JWT — Cabecera: `Authorization: Bearer <token>`\n\n### Lista Blanca de Exenciones:\n| Ruta | Motivo de Exención | Mecanismo de Seguridad |\n|---|---|---|\n| `/api/v1/auth/login` | Entrada al sistema | Rate Limiting por IP (5 req/min) |\n| `/api/v1/auth/register` | Registro de nuevos usuarios | Rate Limiting y Captcha |\n| `/api/v1/webhooks/wompi` | Notificación asíncrona de pasarela | Firma HMAC-SHA256 en header |\n```",
+              "link_label": "Lista Blanca Validada -> Ensamblaje Matriz D11"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje de la Matriz de Seguridad y Trazabilidad (Assembly & Architecture Link)",
+      "summary": "Consolidar el entregable D11 articulando su impacto en el diseño de middlewares en Fase 5 y políticas SQL en Fase 6.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Políticas de Seguridad e Impacto en Fase 5 y 6",
+          "objective": "Publicar el entregable D11 formalizando las directivas de seguridad para la arquitectura de software.",
+          "input": "Matriz UI, Matriz API RLS y Lista Blanca completadas.",
+          "raw_data_title": "Impacto Arquitectónico de las Políticas de Seguridad",
+          "raw_data": "| Componente de Seguridad | Entregable Destino | Directiva de Implementación |\n|---|---|---|\n| Middlewares de Ruta UI | Fase 5 (Frontend Architecture) | Guards de enrutamiento con react-router / Next.js middleware |\n| Middlewares de Auth API | Fase 5 (API Gateway / Backend) | Middleware Express/FastAPI que decodifica JWT e inyecta `req.user` |\n| Políticas RLS | Fase 6 (Physical Data Model P6-D2) | Sentencias `CREATE POLICY ... USING (auth.uid() = user_id)` en PostgreSQL |\n| Webhook Signature Checker | Fase 5 (Worker & Integraciones) | Middleware específico de cálculo HMAC antes de invocar handlers |",
+          "exit_label": "Entregable D11 Formalmente Aprobado y Consolidado",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Publicación del Documento D11 de Seguridad",
+              "objective": "Consolidar el documento maestro como guía inmutable de ciberseguridad.",
+              "how_to": {
+                "steps": [
+                  "1. Estructurar el documento en sus 3 secciones mandatorias: Metadata, UI Access Matrix y API Access Matrix.",
+                  "2. Integrar las tablas de roles, permisos, alcances OWN/ALL y lista blanca.",
+                  "3. Documentar las implicaciones para la arquitectura de Fase 5 y modelos físicos de Fase 6.",
+                  "4. Validar traducción al 100% al español y consistencia de identificadores."
+                ],
+                "table_columns": [
+                  "Sección",
+                  "Alcance",
+                  "Cumplimiento",
+                  "Estado"
+                ],
+                "table_rules": [
+                  "El documento debe cubrir tanto la seguridad perimetral como la seguridad en profundidad (RLS)",
+                  "Todas las directivas deben ser verificables mediante pruebas automatizadas en Fase 8",
+                  "Garantizar coherencia absoluta con los NFRs de Fase 3"
+                ],
+                "restrictions": "No admitir zonas grises donde el acceso no esté explícitamente concedido o denegado.",
+                "done_when": "Documento D11 completamente verificado y aprobado."
+              },
+              "example_title": "Estructura del Entregable D11",
+              "example": "```markdown\n# Deliverable 11 (D11): Matriz de Autorización y Seguridad\n\n## 1. Configuración Global de Seguridad (AuthN)\n- Proveedor: Supabase Auth (JWT)\n- TTL: 1 hora con rotación de Refresh Tokens\n\n## 2. Matriz de Acceso UI\n| Vista | Ruta | Acceso | Rol Requerido |\n\n## 3. Matriz de Acceso API y RLS\n| Endpoint | Método | Acceso | Rol | Alcance |\n```",
+              "link_label": "Matriz Ensamblada -> Deliverable Final Aprobado"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — Authorization & Security Matrix (D11)",
+    "markdown": "# Deliverable 11 (D11): Matriz de Autorización y Seguridad\n\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 4 — Modelado del Sistema\n**Estado:** Aprobado\n\n---\n\n## 1. Configuración Global de Seguridad (AuthN)\n\n*Backlink a Fase 3:* Estas políticas de seguridad (incluyendo JWT, Roles de Usuario y RLS) implementan las directivas obligatorias de los NFRs y los Actores identificados en `[[PHASE_3_REQUIREMENTS_ENGINEERING/2.Actor_and_Role_Definition]]`.\n\n- **Proveedor de Identidad:** Supabase Auth (GoTrue).\n- **Mecanismo:** JSON Web Tokens (JWT) firmados asimétricamente.\n- **Cabecera HTTP:** `Authorization: Bearer <supabase_jwt>`\n- **Access Token TTL:** 1 hora (3600 segundos).\n- **Refresh Token:** Rotación obligatoria en cada solicitud con revocación de tokens previos.\n\n### Lista Blanca de Exenciones (Rutas Públicas sin JWT)\n| Ruta | Motivo de Exención | Mecanismo de Seguridad Sustituto |\n|---|---|---|\n| `/api/v1/auth/login` | Autenticación inicial de usuario | Rate Limiting estricto (5 intentos por minuto por IP) |\n| `/api/v1/auth/register` | Registro de nuevas cuentas | Verificación de email con token único OTP |\n| `/api/v1/properties` | Catálogo público para SEO e indexación | Caché CDN y solo lectura de fincas publicadas |\n| `/api/v1/webhooks/wompi` | Notificación asíncrona de pasarela | Verificación criptográfica HMAC-SHA256 en header |\n\n---\n\n## 2. Matriz de Acceso UI (Frontend)\n\n| Vista UI | Ruta Frontend | Nivel de Acceso | Rol Requerido | Comportamiento si no Autorizado |\n|:---|:---|:---|:---|:---|\n| **Catálogo de Fincas** | `/properties` | Public | Cualquiera (Anónimo) | Acceso permitido sin restricciones |\n| **Detalle de Finca** | `/properties/:id` | Public | Cualquiera | Acceso permitido; botón 'Reservar' exige login |\n| **Checkout de Reserva** | `/checkout/:id` | Protected | Turista, Finquero | Redirigir a login modal preservando state de compra |\n| **Mis Reservas** | `/trips` | Protected | Turista | Redirigir a `/login`; muestra únicamente reservas propias |\n| **Panel de Finquero** | `/host/dashboard` | Protected | Finquero (Host) | Error 404 silencioso para evitar enumeración de rutas |\n| **Consola KYC Admin** | `/admin/properties` | Protected | SuperAdmin | Error 404 estricto para cualquier rol no administrativo |\n\n---\n\n## 3. Matriz de Acceso API y Row-Level Security (RLS)\n\n| Endpoint REST | Método | Nivel | Rol Permitido | Alcance RLS | Regla de Filtrado en Base de Datos |\n|:---|:---|:---|:---|:---|:---|\n| `/api/v1/properties` | GET | Public | — | ALL | `status = 'PUBLISHED'` |\n| `/api/v1/bookings` | POST | Protected | Turista | OWN | Inyección obligatoria de `guest_id = auth.uid()` |\n| `/api/v1/bookings/:id` | GET | Protected | Turista, Host | OWN | `auth.uid() = guest_id OR auth.uid() = host_id` |\n| `/api/v1/bookings/:id/cancel` | PATCH | Protected | Turista | OWN | `guest_id = auth.uid() AND status IN ('PENDING_APPROVAL', 'CONFIRMED')` |\n| `/api/v1/properties` | POST | Protected | Finquero | OWN | Inyección de `host_id = auth.uid()`, inicializa en `DRAFT` |\n| `/api/v1/properties/:id/review`| PATCH | Protected | SuperAdmin | ALL | Permite mutar `status` de cualquier registro a `PUBLISHED` o `REJECTED` |\n\n---\n\n## Implicaciones para Siguientes Entregables\n\n- **Hacia Fase 5 (Arquitectura de Software):** El backend debe implementar middlewares de autenticación JWT y autorización RBAC/RLS desacoplados de los controladores de negocio.\n- **Hacia Fase 6 (Modelado Físico P6-D2):** Todas las tablas críticas (`bookings`, `properties`, `payments`) deberán crearse en PostgreSQL con la directiva `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;` y sus políticas asociadas."
+  }
+}

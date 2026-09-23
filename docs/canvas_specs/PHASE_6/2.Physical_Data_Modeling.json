@@ -1,0 +1,151 @@
+{
+  "phase": "PHASE 6: TECHNICAL DESIGN",
+  "deliverable_code": "D2",
+  "deliverable": "Physical Data Modeling",
+  "purpose": "Traducir el Modelo de Dominio y ERD conceptual de la Fase 4 a código SQL DDL físico ejecutable para PostgreSQL (Supabase BaaS), definiendo tipos nativos de alta precisión (BIGINT para montos en centavos, TIMESTAMPTZ para auditoría, UUIDs nativos), políticas de integridad referencial (ON DELETE CASCADE vs RESTRICT) y una estrategia de indexación B-Tree selectiva alineada con los NFRs de rendimiento.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Domain Model & ERD (P4-D6) | [[PHASE_4_SYSTEM_MODELING/6.Domain Model and ERD/6.Domain Model and ERD.md]] | Fuente primaria de 15 entidades, atributos, relaciones y cardinalidades. |\n| Stack Decision (P2-D3) | [[PHASE_2_PROJECT_KICKOFF/3.Stack Decision/3.Stack Decision.md]] | Define el motor PostgreSQL 15 en Supabase como dialecto físico vinculante. |\n| Non-Functional Requirements (P3-D6) | [[PHASE_3_REQUIREERING_ENGINEERING/6.Non-Functional Requirements/6.Non-Functional Requirements.md]] | Define requisitos de performance (< 1.5s en catálogo y reservas) que justifican los índices. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Resolución del Motor y Mapeo Físico de Tipos (Type Mapping)",
+      "summary": "Seleccionar el dialecto PostgreSQL y mapear las etiquetas conceptuales a tipos de datos físicos nativos de alta fidelidad.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Mapeo Conceptual a Tipos Físicos de PostgreSQL",
+          "objective": "Establecer las directrices de precisión numérica, identificadores opacos y manejo de zonas horarias.",
+          "input": "Topología D3 (Supabase PostgreSQL) y atributos del ERD conceptual D6.",
+          "raw_data_title": "Matriz de Mapeo de Tipos Conceptual a Físico",
+          "raw_data": "| Etiqueta Conceptual (Fase 4) | Tipo Físico (PostgreSQL) | Justificación Técnica | Regla de Precisión |\n|---|---|---|---|\n| Identificadores (`id`, `*_id`) | `UUID` | Prevención de enumeración web-scraping y soporte nativo Supabase | `uuid_generate_v4()` |\n| `[MONETARIO]` | `BIGINT` | Almacenamiento en centavos para precisión matemática exacta en facturación | Cero errores de coma flotante |\n| `[AUDITORÍA]` / Fechas con hora | `TIMESTAMPTZ` | Timestamp with Time Zone universal para reservas y transacciones | Horario UTC consistente |\n| `[GEO]` | `NUMERIC(10, 7)` | Precisión centimétrica para geolocalización de fincas | Suficiente para Google Maps |\n| Textos cortos/largos | `TEXT` | Postgres maneja TEXT sin pérdida de rendimiento comparado con VARCHAR | Máxima flexibilidad |\n| Códigos ISO y Estados | `VARCHAR(3)` / `VARCHAR(50)` | Para `currency` (COP, USD) y `status` (PENDING, PAID, CONFIRMED) | Restricción por longitud |",
+          "exit_label": "Diccionario de Tipos Físicos Formalizado",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Formalización del Diccionario de Tipos Físicos",
+              "objective": "Documentar las reglas de mapeo de tipos primitivos para la base de datos.",
+              "how_to": {
+                "steps": [
+                  "1. Confirmar el motor PostgreSQL y activar extensión uuid-ossp.",
+                  "2. Mapear todas las entidades monetarias a enteros BIGINT en centavos.",
+                  "3. Fijar todas las columnas temporales en TIMESTAMPTZ con default now().",
+                  "4. Establecer NUMERIC(10,7) para coordenadas geoespaciales."
+                ],
+                "table_columns": [
+                  "Tipo Conceptual",
+                  "Tipo Postgres",
+                  "Restricción",
+                  "Uso"
+                ],
+                "table_rules": [
+                  "Prohibido usar tipos FLOAT o REAL para valores monetarios",
+                  "Toda llave primaria debe ser UUID v4 generado por base de datos",
+                  "Todas las fechas transaccionales deben almacenar zona horaria explícita"
+                ],
+                "restrictions": "Prohibido el uso de enteros autoincrementales en llaves primarias públicas.",
+                "done_when": "Tabla de mapeo de tipos físicos completada y justificada."
+              },
+              "example_title": "Mapeo de Tipos D2",
+              "example": "```markdown\n## Resolución de Motor\n- **Motor de Base de Datos:** PostgreSQL 15 (Supabase).\n- **Rama Aplicable:** SQL DDL.\n\n## Mapeo de Tipos Conceptual → Físico\n| Etiqueta Conceptual (Fase 4) | Tipo Físico (PostgreSQL) | Justificación |\n|---|---|---|\n| Identificadores (`id`, `*_id`) | `UUID` | Soporte nativo, esconde métricas de crecimiento y evita enumeración. |\n| `[MONETARIO]` | `BIGINT` | Almacenamiento en centavos para precisión matemática exacta en facturación. |\n| `[AUDITORÍA]` / Fechas con hora | `TIMESTAMPTZ` | Timestamp with Time Zone asegura que las reservas y pagos sean universales. |\n| `[GEO]` | `NUMERIC(10, 7)` | Precisión suficiente (centímetros) para geolocalización. |\n```",
+              "link_label": "Tipos Mapeados -> Generación DDL"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Esquema Físico Relacional SQL DDL (SQL DDL Draft)",
+      "summary": "Escribir los scripts CREATE TABLE para las 15 entidades con llaves foráneas y reglas de integridad.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Generación de Tablas DDL con Integridad Referencial",
+          "objective": "Garantizar la protección de transacciones financieras y la eliminación limpia de recursos dependientes.",
+          "input": "Mapeo de tipos del Step 1 y las 15 entidades del ERD de Fase 4.",
+          "raw_data_title": "Matriz de Tablas DDL y Cláusulas ON DELETE",
+          "raw_data": "| Tabla Físicamente Modelada | Entidad de Dominio | Clave Primaria | Clave Foránea Principal | Regla ON DELETE |\n|---|---|---|---|---|\n| `users` | Usuario (Turista/Host) | `id UUID` | N/A | N/A |\n| `properties` | Finca de Recreo | `id UUID` | `host_id -> users(id)` | `RESTRICT` (blindaje histórico) |\n| `property_images` | Galería de Fotos | `id UUID` | `property_id -> properties(id)` | `CASCADE` (composición pura) |\n| `property_amenities` | Comodidades de Finca | `id UUID` | `property_id -> properties(id)` | `CASCADE` (composición pura) |\n| `property_rules` | Reglas de Convivencia | `id UUID` | `property_id -> properties(id)` | `CASCADE` (composición pura) |\n| `property_availability` | Bloqueos de Calendario | `id UUID` | `property_id -> properties(id)` | `CASCADE` (composición pura) |\n| `seasonal_prices` | Precios por Temporada | `id UUID` | `property_id -> properties(id)` | `CASCADE` (composición pura) |\n| `wishlists` | Fincas Favoritas | `id UUID` | `user_id`, `property_id` | `CASCADE` |\n| `coupons` | Cupones de Descuento | `id UUID` | N/A | N/A |\n| `bookings` | Reservaciones | `id UUID` | `property_id`, `guest_id` | `RESTRICT` (blindaje financiero) |\n| `payments` | Transacciones Pasarela | `id UUID` | `booking_id -> bookings(id)` | `RESTRICT` (blindaje financiero) |\n| `payouts` | Dispersiones a Host | `id UUID` | `booking_id`, `host_id` | `RESTRICT` (blindaje financiero) |\n| `reviews` | Calificaciones | `id UUID` | `property_id`, `guest_id` | `CASCADE` |\n| `notifications` | Alertas Push / Email | `id UUID` | `user_id -> users(id)` | `CASCADE` |\n| `refresh_tokens` | Sesiones JWT | `id UUID` | `user_id -> users(id)` | `CASCADE` |",
+          "exit_label": "Esquema DDL de 15 Tablas Compilado",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Especificación de Scripts SQL DDL",
+              "objective": "Escribir las declaraciones CREATE TABLE exactas para las 15 tablas relacionales.",
+              "how_to": {
+                "steps": [
+                  "1. Habilitar extensión 'uuid-ossp'.",
+                  "2. Crear tablas maestras independientes (users, properties, coupons).",
+                  "3. Crear tablas dependientes con ON DELETE CASCADE para multimedia y reglas.",
+                  "4. Crear tablas financieras con ON DELETE RESTRICT para preservar auditoría."
+                ],
+                "table_columns": [
+                  "Tabla",
+                  "PK",
+                  "FKs",
+                  "Política de Borrado"
+                ],
+                "table_rules": [
+                  "Tablas financieras (bookings, payments, payouts) deben usar siempre ON DELETE RESTRICT",
+                  "Tablas de atributos de propiedad deben usar ON DELETE CASCADE",
+                  "Toda tabla debe incluir columnas created_at, updated_at y deleted_at (soft delete)"
+                ],
+                "restrictions": "Prohibido usar borrado en cascada sobre registros contables o reservas históricas.",
+                "done_when": "Script SQL completo de 15 tablas verificado y libre de errores de sintaxis."
+              },
+              "example_title": "Esquema DDL D2",
+              "example": "```sql\nCREATE TABLE properties (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    host_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,\n    name TEXT NOT NULL,\n    price_per_night BIGINT NOT NULL,\n    cleaning_fee BIGINT NOT NULL,\n    max_guests INT NOT NULL,\n    location_lat NUMERIC(10, 7) NOT NULL,\n    location_lng NUMERIC(10, 7) NOT NULL,\n    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n```",
+              "link_label": "DDL Generado -> Estrategia de Índices"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Estrategia de Indexación y Optimización (Indexing Strategy)",
+      "summary": "Diseñar índices B-Tree específicos y parciales para soportar los NFRs de velocidad sin degradar inserciones.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Diseño de Índices B-Tree y Parciales para NFRs",
+          "objective": "Acelerar las consultas críticas del catálogo público, reservas y dashboard de anfitriones.",
+          "input": "NFRs de velocidad (< 1.5s) y tablas generadas en el Step 2.",
+          "raw_data_title": "Catálogo de Índices Físicos y Justificación de Rendimiento",
+          "raw_data": "| Índice SQL | Tabla y Columnas | Tipo de Índice | Patrón de Consulta Acelerado (NFR) |\n|---|---|---|---|\n| `idx_properties_host_id` | `properties(host_id)` | B-Tree | Dashboard de Anfitrión: listar propiedades propias |\n| `idx_properties_is_active` | `properties(is_active)` | B-Tree | Catálogo Público: filtrado inmediato de fincas activas |\n| `idx_property_availability_dates` | `property_availability(start_date, end_date)` | B-Tree Compuesto | Motor de Disponibilidad: cruce de fechas en reserva |\n| `idx_seasonal_prices_dates` | `seasonal_prices(start_date, end_date)` | B-Tree Compuesto | Cálculo de Tarifa: cotización dinámica por temporada |\n| `idx_property_images_property_id` | `property_images(property_id)` | B-Tree | Renderizado UI: carga paralela de fotos de la ficha |\n| `idx_bookings_guest_id` | `bookings(guest_id)` | B-Tree | Panel del Turista: Mis Viajes y reservas activas |\n| `idx_bookings_property_id` | `bookings(property_id)` | B-Tree | Calendario de Ocupación: reservas asociadas a la finca |\n| `idx_notifications_user_unread` | `notifications(user_id) WHERE read_at IS NULL` | B-Tree Parcial | Campanita de Alertas: consulta liviana sin escanear leídas |",
+          "exit_label": "Estrategia de Índices Formalizada y Optimizada",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Implementación de Scripts de Indexación",
+              "objective": "Escribir las sentencias CREATE INDEX justificando cada impacto en lectura vs escritura.",
+              "how_to": {
+                "steps": [
+                  "1. Indexar todas las llaves foráneas frecuentes en cláusulas WHERE y JOIN.",
+                  "2. Crear índices compuestos para rangos de fechas de disponibilidad y precios.",
+                  "3. Implementar índice parcial condicional en notificaciones no leídas.",
+                  "4. Evitar crear índices redundantes en columnas que ya son UNIQUE."
+                ],
+                "table_columns": [
+                  "Nombre de Índice",
+                  "Tabla",
+                  "Columnas",
+                  "Condición Parcial"
+                ],
+                "table_rules": [
+                  "Cada índice debe justificar una consulta real de usuario",
+                  "Los índices parciales deben usarse para tablas de notificaciones activas",
+                  "No sobre-indexar columnas con baja cardinalidad a menos que filtren booleanos críticos"
+                ],
+                "restrictions": "Prohibido crear índices sobre columnas UNIQUE o Primary Keys ya indexadas.",
+                "done_when": "Sentencias de indexación redactadas con comentarios explicativos claros."
+              },
+              "example_title": "Scripts de Índices D2",
+              "example": "```sql\n-- Acelerar catálogo de Turistas\nCREATE INDEX idx_properties_is_active ON properties(is_active);\n\n-- Acelerar cruce de fechas de disponibilidad\nCREATE INDEX idx_property_availability_dates ON property_availability(start_date, end_date);\n\n-- Acelerar campanita de alertas con índice parcial\nCREATE INDEX idx_notifications_user_unread ON notifications(user_id) WHERE read_at IS NULL;\n```",
+              "link_label": "Índices Compilados -> Entregable D2"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverable_output": "# Deliverable 2 (D2): Physical Data Modeling\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 6 — Technical Design\n**Estado:** Approved\n\n*Backlink a Fase 4 y 5:* Este entregable aterriza las entidades teóricas del Dominio (`[[PHASE_4_SYSTEM_MODELING/6.Domain_Model_and_ERD/example_output_d6_erd.md]]`) a código SQL ejecutable para PostgreSQL, que es el dialecto del motor BaaS elegido en la Fase 5 (Supabase).\n\n---\n\n## 2. Scripts de Creación de Base de Datos (DDL)\n\n```sql\n-- Habilitar extensión UUID nativa de PostgreSQL\nCREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";\n\n-- 1. USERS\nCREATE TABLE users (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    email VARCHAR(255) NOT NULL UNIQUE,\n    password_hash TEXT NOT NULL,\n    role VARCHAR(50) NOT NULL,\n    full_name TEXT NOT NULL,\n    phone_number VARCHAR(50) NOT NULL,\n    document_number VARCHAR(100) UNIQUE,\n    avatar_url TEXT,\n    bank_name TEXT,\n    bank_account_number TEXT,\n    bank_account_type VARCHAR(50),\n    kyc_status VARCHAR(50) NOT NULL DEFAULT 'PENDING',\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 2. PROPERTIES\nCREATE TABLE properties (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    host_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,\n    name TEXT NOT NULL,\n    description TEXT NOT NULL,\n    price_per_night BIGINT NOT NULL,\n    cleaning_fee BIGINT NOT NULL,\n    max_guests INT NOT NULL,\n    bedrooms_count INT NOT NULL,\n    bathrooms_count INT NOT NULL,\n    beds_count INT NOT NULL,\n    location_lat NUMERIC(10, 7) NOT NULL,\n    location_lng NUMERIC(10, 7) NOT NULL,\n    location_address TEXT NOT NULL,\n    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',\n    is_active BOOLEAN NOT NULL DEFAULT true,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 3. PROPERTY_IMAGES\nCREATE TABLE property_images (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,\n    url_hd TEXT NOT NULL,\n    sort_order INT NOT NULL DEFAULT 0,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 4. PROPERTY_AMENITIES\nCREATE TABLE property_amenities (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,\n    amenity_key VARCHAR(100) NOT NULL,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 5. PROPERTY_RULES\nCREATE TABLE property_rules (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    property_id UUID NOT NULL UNIQUE REFERENCES properties(id) ON DELETE CASCADE,\n    check_in_time VARCHAR(50) NOT NULL,\n    check_out_time VARCHAR(50) NOT NULL,\n    allows_pets BOOLEAN NOT NULL DEFAULT false,\n    allows_parties BOOLEAN NOT NULL DEFAULT false,\n    additional_rules TEXT,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 6. PROPERTY_AVAILABILITY (Fechas bloqueadas)\nCREATE TABLE property_availability (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,\n    start_date DATE NOT NULL,\n    end_date DATE NOT NULL,\n    reason VARCHAR(255) NOT NULL,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 7. SEASONAL_PRICES\nCREATE TABLE seasonal_prices (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,\n    start_date DATE NOT NULL,\n    end_date DATE NOT NULL,\n    price_per_night BIGINT NOT NULL,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 8. WISHLISTS\nCREATE TABLE wishlists (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 9. COUPONS\nCREATE TABLE coupons (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    code VARCHAR(50) NOT NULL UNIQUE,\n    discount_percentage NUMERIC(5,2),\n    max_discount_amount BIGINT,\n    valid_from TIMESTAMPTZ NOT NULL,\n    valid_until TIMESTAMPTZ NOT NULL,\n    usage_limit INT,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 10. BOOKINGS\nCREATE TABLE bookings (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,\n    guest_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,\n    coupon_id UUID REFERENCES coupons(id) ON DELETE SET NULL,\n    check_in DATE NOT NULL,\n    check_out DATE NOT NULL,\n    guest_count INT NOT NULL,\n    agency_client_name TEXT,\n    base_price_amount BIGINT NOT NULL,\n    cleaning_fee_amount BIGINT NOT NULL,\n    platform_fee_amount BIGINT NOT NULL,\n    taxes_amount BIGINT NOT NULL,\n    total_price BIGINT NOT NULL,\n    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',\n    cancellation_reason TEXT,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 11. PAYMENTS\nCREATE TABLE payments (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE RESTRICT,\n    amount BIGINT NOT NULL,\n    currency VARCHAR(3) NOT NULL DEFAULT 'COP',\n    gateway_reference VARCHAR(255) UNIQUE,\n    payment_method VARCHAR(50),\n    transaction_date TIMESTAMPTZ NOT NULL DEFAULT now(),\n    receipt_url TEXT,\n    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 12. PAYOUTS\nCREATE TABLE payouts (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    booking_id UUID NOT NULL UNIQUE REFERENCES bookings(id) ON DELETE RESTRICT,\n    host_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,\n    amount BIGINT NOT NULL,\n    currency VARCHAR(3) NOT NULL DEFAULT 'COP',\n    bank_reference VARCHAR(255),\n    transaction_date TIMESTAMPTZ,\n    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 13. REVIEWS\nCREATE TABLE reviews (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,\n    guest_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),\n    comment TEXT,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 14. NOTIFICATIONS\nCREATE TABLE notifications (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n    type VARCHAR(50) NOT NULL,\n    title TEXT NOT NULL,\n    body TEXT NOT NULL,\n    read_at TIMESTAMPTZ,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n\n-- 15. REFRESH_TOKENS\nCREATE TABLE refresh_tokens (\n    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n    token_hash TEXT NOT NULL UNIQUE,\n    expires_at TIMESTAMPTZ NOT NULL,\n    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n    deleted_at TIMESTAMPTZ\n);\n```\n\n---\n\n## 3. Scripts de Indexación y Optimización\n\nEstos índices están diseñados específicamente para resolver los requerimientos no funcionales (NFRs) de carga rápida del sistema (Catálogo y Dashboard de reservas).\n\n```sql\n-- 1. Acelerar el dashboard del Finquero (Buscar todas MIS fincas)\nCREATE INDEX idx_properties_host_id ON properties(host_id);\n\n-- 2. Acelerar el catálogo de Turistas (Listar solo las fincas activas en el buscador)\nCREATE INDEX idx_properties_is_active ON properties(is_active);\n\n-- 3. Acelerar cruces matemáticos de fechas para los cálculos de disponibilidad y precios estacionales\nCREATE INDEX idx_property_availability_dates ON property_availability(start_date, end_date);\nCREATE INDEX idx_seasonal_prices_dates ON seasonal_prices(start_date, end_date);\n\n-- 4. Acelerar el montaje visual de fotos por finca en el UI\nCREATE INDEX idx_property_images_property_id ON property_images(property_id);\n\n-- 5. Acelerar el listado histórico de reservas para el Turista (MIS VIAJES) y el Finquero (MIS HUESPEDES)\nCREATE INDEX idx_bookings_guest_id ON bookings(guest_id);\nCREATE INDEX idx_bookings_property_id ON bookings(property_id);\n\n-- 6. Acelerar la campanita de notificaciones (Filtrado condicional parcial para ahorrar memoria en Postgres)\nCREATE INDEX idx_notifications_user_unread ON notifications(user_id) WHERE read_at IS NULL;\n```\n\n---\n\n## 4. Downstream Consumers\nEste entregable es la hoja de ruta para la creación física del proyecto:\n- **Fase 6 — D6 (Data Access & Repositories):** Usará los nombres de columna exactos y las sentencias SQL escritas aquí para los mappers y DTOs de código.\n- **Fase 7 — D4 (Database Migrations Implementation):** Tomará estos bloques de código, casi textualmente, y los insertará en el CLI de Supabase como la primera gran migración de la base de datos (`supabase migration new initial_schema`)."
+}

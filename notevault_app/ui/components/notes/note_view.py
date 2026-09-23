@@ -31,7 +31,10 @@ from ....core.qt_markdown import (
     split_row, sep_align, is_mono as _is_mono,
 )
 from ... import theme
-from .md_highlighter import MarkdownHighlighter
+from .md_highlighter import (
+    MarkdownHighlighter, _TASK_RE, _BULLET_RE, _QUOTE_RE, _TABLE_RE,
+    _TABLE_SEP_RE, IN_CODE,
+)
 
 Marker = QTextBlockFormat.MarkerType
 
@@ -689,6 +692,16 @@ class NoteSourceEdit(_WikilinkClicks, QTextEdit):
         self._current_block_number = -1
         self.cursorPositionChanged.connect(self._mark_current_line)
 
+    def _set_cursor_shape(self, shape):
+        """Update the viewport cursor only when it actually changes. Without
+        this method (it lives on ``_NoteSurface``, which the rich editor mixes
+        in but this one does not) every mouse-move raised inside
+        ``mouseMoveEvent``, so the ``super()`` call never ran and a click-drag
+        could not extend a selection — only Shift+arrows did."""
+        if shape != self._cursor_shape:
+            self._cursor_shape = shape
+            self.viewport().setCursor(shape)
+
     @property
     def is_code(self) -> bool:
         return self._is_code
@@ -702,6 +715,11 @@ class NoteSourceEdit(_WikilinkClicks, QTextEdit):
         # A script is not markdown: colouring its `#` lines as headings and
         # its `*` as emphasis would be worse than no colour at all.
         self._highlighter.enabled = not value
+        family = theme.CODE_FONT_FAMILY if value else theme.NOTE_FONT_FAMILY
+        self.setStyleSheet(
+            f"QTextEdit{{background:{PAGE_BG};border:none;color:#dcdde0;"
+            f"font-family:{family};font-size:14px;padding:22px 26px;}}"
+        )
         self._repaint_source()
 
     def retheme(self):
@@ -745,14 +763,200 @@ class NoteSourceEdit(_WikilinkClicks, QTextEdit):
                 if cb.isValid():
                     self._highlighter.rehighlightBlock(cb)
 
-    # keyboard ---------------------------------------------------------------
+    # painting ---------------------------------------------------------------
+
+    def paintEvent(self, event):
+        if not self._is_code and hasattr(self, "_highlighter") and self._highlighter.enabled:
+            self._paint_code_blocks(event)
+
+        super().paintEvent(event)
+
+        if not self._is_code and hasattr(self, "_highlighter") and self._highlighter.enabled:
+            self._paint_source_decorations(event)
+
+    def _paint_code_blocks(self, _event):
+        doc = self.document()
+        layout = doc.documentLayout()
+        vp = self.viewport()
+        dy = -self.verticalScrollBar().value()
+        top, bottom = -dy, -dy + vp.height()
+
+        painter = QPainter(vp)
+        bg = QColor(theme.tint(CODE_BLOCK_BG))
+        block = self.cursorForPosition(QPoint(0, 0)).block()
+        while block.isValid():
+            rect = layout.blockBoundingRect(block)
+            if rect.top() > bottom:
+                break
+            if rect.bottom() < top:
+                block = block.next()
+                continue
+            if block.userState() == IN_CODE:
+                painter.fillRect(QRectF(0, rect.top() + dy, vp.width(), rect.height()), bg)
+            block = block.next()
+        painter.end()
+
+    def _paint_source_decorations(self, _event):
+        doc = self.document()
+        layout = doc.documentLayout()
+        vp = self.viewport()
+        dx = -self.horizontalScrollBar().value()
+        dy = -self.verticalScrollBar().value()
+        top, bottom = -dy, -dy + vp.height()
+
+        painter = QPainter(vp)
+        painter.setRenderHint(QPainter.Antialiasing)
+        guide_pen = QPen(QColor(theme.tint(GUIDE_COLOR)), 1)
+        quote_pen = QPen(QColor(theme.tint(QUOTE_BAR)), 3)
+        table_pen = QPen(QColor(theme.tint(TABLE_BORDER)), 1)
+        bullet_brush = QColor(theme.tint("#a5b4fc"))
+
+        active_blk = self._highlighter.active_block
+        block = self.cursorForPosition(QPoint(0, 0)).block()
+        while block.isValid():
+            rect = layout.blockBoundingRect(block)
+            if rect.top() > bottom:
+                break
+            if rect.bottom() < top:
+                block = block.next()
+                continue
+
+            blk_num = block.blockNumber()
+            is_active = (blk_num == active_blk)
+            text = block.text()
+
+            # Quote left vertical bar
+            if _QUOTE_RE.match(text):
+                painter.setPen(quote_pen)
+                x = rect.left() + dx + 4
+                painter.drawLine(QPointF(x, rect.top() + dy), QPointF(x, rect.bottom() + dy))
+
+            # Task item
+            task = _TASK_RE.match(text)
+            if task:
+                indent_str = task.group(1)
+                indent_level = len(indent_str) // 4
+                if indent_level > 0:
+                    painter.setPen(guide_pen)
+                    for k in range(1, indent_level + 1):
+                        cur = QTextCursor(block)
+                        cur.setPosition(block.position() + k * 4)
+                        rx = self.cursorRect(cur).left()
+                        painter.drawLine(QPointF(rx, rect.top() + dy), QPointF(rx, rect.bottom() + dy))
+
+                # On inactive block, render crisp Obsidian-style checkbox inside concealed [ ] span
+                if not is_active:
+                    cur = QTextCursor(block)
+                    cur.setPosition(block.position() + task.start(4))
+                    r = self.cursorRect(cur)
+                    box = QRectF(r.left(), r.top() + (r.height() - BOX_SIZE) / 2,
+                                 BOX_SIZE, BOX_SIZE)
+                    done = task.group(5) in "xX"
+                    if done:
+                        painter.setBrush(QColor(theme.tint(BOX_DONE)))
+                        painter.setPen(Qt.NoPen)
+                        painter.drawRoundedRect(box, 3, 3)
+                        painter.setPen(QPen(QColor("#ffffff"), 2))
+                        painter.drawPolyline([
+                            QPointF(box.left() + 2.5, box.center().y()),
+                            QPointF(box.center().x() - 0.5, box.bottom() - 3.0),
+                            QPointF(box.right() - 2.5, box.top() + 3.0),
+                        ])
+                    else:
+                        painter.setBrush(Qt.NoBrush)
+                        painter.setPen(QPen(QColor(theme.tint(BOX_BORDER)), 1.4))
+                        painter.drawRoundedRect(box.adjusted(0.5, 0.5, -0.5, -0.5), 3, 3)
+
+            else:
+                bullet = _BULLET_RE.match(text)
+                if bullet:
+                    indent_str = bullet.group(1)
+                    indent_level = len(indent_str) // 4
+                    if indent_level > 0:
+                        painter.setPen(guide_pen)
+                        for k in range(1, indent_level + 1):
+                            cur = QTextCursor(block)
+                            cur.setPosition(block.position() + k * 4)
+                            rx = self.cursorRect(cur).left()
+                            painter.drawLine(QPointF(rx, rect.top() + dy), QPointF(rx, rect.bottom() + dy))
+
+                    b_char = bullet.group(2)
+                    if not is_active and b_char in "-*+":
+                        cur = QTextCursor(block)
+                        cur.setPosition(block.position() + bullet.start(2))
+                        r = self.cursorRect(cur)
+                        painter.setPen(Qt.NoPen)
+                        painter.setBrush(bullet_brush)
+                        painter.drawEllipse(QPointF(r.left() + 4, r.top() + r.height() / 2), 2.5, 2.5)
+
+            # Table grid: draw crisp cell borders behind a monospace table row.
+            # The concealed |---| alignment row is skipped (it has no height),
+            # so the header and first data row meet on one line.
+            if _TABLE_RE.match(text) and not (_TABLE_SEP_RE.match(text) and not is_active):
+                pipes = [i for i, ch in enumerate(text)
+                         if ch == "|" and (i == 0 or text[i - 1] != "\\")]
+                if len(pipes) >= 2:
+                    y_top = rect.top() + dy
+                    y_bot = rect.bottom() + dy
+                    xs = []
+                    for i in pipes:
+                        cur = QTextCursor(block)
+                        cur.setPosition(block.position() + i)
+                        xs.append(self.cursorRect(cur).left())
+                    painter.setPen(table_pen)
+                    painter.setBrush(Qt.NoBrush)
+                    for x in xs:
+                        painter.drawLine(QPointF(x, y_top), QPointF(x, y_bot))
+                    painter.drawLine(QPointF(xs[0], y_top), QPointF(xs[-1], y_top))
+                    painter.drawLine(QPointF(xs[0], y_bot), QPointF(xs[-1], y_bot))
+
+            block = block.next()
+        painter.end()
+
+    # mouse ------------------------------------------------------------------
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and not self._is_code                 and self._follow_wikilink(event):
-            return
+        if event.button() == Qt.LeftButton and not self._is_code:
+            pos = event.position().toPoint()
+            # 1. Click on inactive task checkbox toggles it
+            cursor = self.cursorForPosition(pos)
+            block = cursor.block()
+            if block.isValid() and block.blockNumber() != getattr(self._highlighter, "active_block", -1):
+                task = _TASK_RE.match(block.text())
+                if task:
+                    cur = QTextCursor(block)
+                    cur.setPosition(block.position() + task.start(4))
+                    r = self.cursorRect(cur)
+                    if QRectF(r.left() - 2, r.top(), BOX_SIZE + 6, r.height()).contains(pos):
+                        # Toggle task character ' ' <-> 'x'
+                        tc = QTextCursor(block)
+                        tc.setPosition(block.position() + task.start(5))
+                        tc.movePosition(QTextCursor.NextCharacter, QTextCursor.KeepAnchor, 1)
+                        is_checked = task.group(5) in "xX"
+                        tc.insertText(" " if is_checked else "x")
+                        return
+
+            if self._follow_wikilink(event):
+                return
+
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if not self._is_code:
+            pos = event.position().toPoint()
+            cursor = self.cursorForPosition(pos)
+            block = cursor.block()
+            if block.isValid() and block.blockNumber() != getattr(self._highlighter, "active_block", -1):
+                task = _TASK_RE.match(block.text())
+                if task:
+                    cur = QTextCursor(block)
+                    cur.setPosition(block.position() + task.start(4))
+                    r = self.cursorRect(cur)
+                    if QRectF(r.left() - 2, r.top(), BOX_SIZE + 6, r.height()).contains(pos):
+                        self._set_cursor_shape(Qt.PointingHandCursor)
+                        super().mouseMoveEvent(event)
+                        return
+
         if self._is_code or not self._wikilink_cursor(event):
             self._set_cursor_shape(Qt.IBeamCursor)
         super().mouseMoveEvent(event)

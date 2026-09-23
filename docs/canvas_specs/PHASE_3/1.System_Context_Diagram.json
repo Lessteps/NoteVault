@@ -1,0 +1,400 @@
+{
+  "phase": "Phase 3",
+  "deliverable_code": "D1",
+  "deliverable": "System Context Diagram (Diagrama de Contexto del Sistema)",
+  "purpose": "Este entregable define las fronteras exteriores del software: delimita qué personas o roles humanos interactúan directamente con la solución (Actores), qué plataformas o servicios de terceros la alimentan o reciben datos (Sistemas Externos), y qué información crítica fluye a través de cada frontera. Constituye la vista de más alto nivel (Diagrama C4 Nivel 1) antes de diseñar cualquier componente interno.",
+  "inputs": "| Artifact | Use |\n| --- | --- |\n| [[example_output_stakeholder_map]] | Identifica el universo de interesados, usuarios potenciales y patrocinadores del negocio (Fase 0/1). |\n| [[example_output_project_identity]] | Define el nombre comercial, codename técnico y límites iniciales de alcance In-Scope / Out-of-Scope (Fase 2). |\n| [[example_output_brief]] | Provee la hipótesis de valor, objetivos del producto y flujos centrales de negocio (Fase 1). |\n| [[example_output_mvp_definition]] | Establece la frontera de inclusión funcional estricta para la versión en construcción (Fase 1). |\n| [[example_output_stack_decision]] | Declara las plataformas SaaS, pasarelas y APIs externas oficialmente aprobadas (Fase 2). |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Delimitación de Scope y Actores Humanos (Verify Entry)",
+      "summary": "Determinar qué actores humanos interactúan directamente con el software y definir de forma estructurada los datos que intercambian con el sistema.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Filtrado Inicial de Actores por Compuerta de Alcance",
+          "objective": "Evaluar cada perfil del mapa de interesados para decidir su inclusión, exclusión o diferimiento a versiones futuras.",
+          "input": "[[example_output_stakeholder_map]], [[example_output_mvp_definition]] y [[example_output_project_identity]].",
+          "raw_data_title": "Perfiles Evaluados",
+          "raw_data": "Turista (Primary User 2), Finquero (Primary User 1), Administrador NFF (Back-office), Agencias B2B (Out-of-Scope vNext), Regulador/DIAN (Validator offline).",
+          "exit_label": "ACTORES HUMANOS FILTRADOS → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Evaluación de Interacción Directa con la Aplicación",
+              "objective": "Someter cada actor a la compuerta de interacción directa con pantallas o procesos de la versión v0.1.0.",
+              "how_to": {
+                "steps": [
+                  "Consultar los perfiles identificados en el Stakeholder Map de Fase 0/1.",
+                  "Verificar si el actor opera pantallas web o interfaces interactivas en el MVP.",
+                  "Asignar el veredicto INCLUIDO, EXCLUIDO o DIFERIDO (vNext) con su justificación.",
+                  "Asegurar la trazabilidad mediante referencias a los artefactos previos."
+                ],
+                "table_columns": "Actor Evaluado | Evidencia Documental | Interacción Directa | Veredicto",
+                "table_rules": "Solo se incluyen actores que operan directamente el software en tiempo de ejecución.",
+                "restrictions": [
+                  "Prohibido incluir stakeholders pasivos (inversionistas, reguladores offline) como actores del sistema."
+                ],
+                "done_when": "Todos los perfiles clasificados con veredicto justificado."
+              },
+              "example_title": "Filtrado de Actores por Alcance",
+              "example": "| Actor Evaluado | Evidencia Documental | Interacción Directa | Veredicto |\n| --- | --- | --- | --- |\n| Turista | Primary User 2 en P0-D6 y P1-D9 | Interactúa con catálogo, calendario y checkout web | **INCLUIDO** |\n| Finquero | Primary User 1 en P0-D6 y P1-D9 | Opera panel de disponibilidad y bloqueos de fechas | **INCLUIDO** |\n| Admin NFF | Back-office derivado de Sponsor en P0-D6 | Modera catálogo y gestiona liquidaciones | **INCLUIDO** |\n| Agencias B2B | Out-of-Scope en P1-D9 y P2-D1 | No tienen interfaz en MVP | **DIFERIDO (vNext)** |\n| Regulador / DIAN | Validator en P0-D6 | Cumplimiento legal offline, sin uso de app | **EXCLUIDO** |",
+              "link_label": "actores filtrados pasan a clasificación C4 (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Clasificación de Rol C4 (Primario vs Secundario)",
+          "objective": "Clasificar a los actores incluidos en Primarios (catalizadores de la transacción) o Secundarios (soporte y administración).",
+          "input": "Actores incluidos de 1.1 y flujos de negocio del producto.",
+          "raw_data_title": "Clasificación de Roles",
+          "raw_data": "Turista: Primario (inicia búsqueda y compra). Finquero: Primario (proveedor que gestiona inventario físico). Admin NFF: Secundario (soporte y moderación).",
+          "exit_label": "ROLES C4 CLASIFICADOS → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Justificación de Roles Primarios y Secundarios",
+              "objective": "Fundamentar la razón de negocio por la cual cada actor ostenta un rol primario o secundario.",
+              "how_to": {
+                "steps": [
+                  "Definir al Turista como actor primario por iniciar el flujo transaccional central.",
+                  "Definir al Finquero como actor primario por alimentar y gestionar la oferta de fincas.",
+                  "Definir al Administrador NFF como actor secundario por realizar labores de soporte y gobernanza.",
+                  "Documentar las justificaciones en la matriz de roles."
+                ],
+                "table_columns": "Actor | Rol C4 | Justificación Funcional y de Negocio",
+                "table_rules": "Los roles primarios deben ser los catalizadores directos del modelo de negocio.",
+                "restrictions": [
+                  "No clasificar como primarios a roles que solo realizan soporte o auditoría."
+                ],
+                "done_when": "Clasificación C4 justificada para el 100% de los actores incluidos."
+              },
+              "example_title": "Clasificación C4 de Actores",
+              "example": "| Actor | Rol C4 | Justificación Funcional y de Negocio |\n| --- | --- | --- |\n| Turista | Actor Primario | Inicia el flujo transaccional central de búsqueda, cotización y compra del servicio de alquiler vacacional. |\n| Finquero | Actor Primario | Proveedor del servicio que alimenta y gestiona el inventario de disponibilidad física de las fincas. |\n| Administrador NFF | Actor Secundario | Opera las funciones de soporte, moderación del catálogo y gobernanza operativa del sistema. |",
+              "link_label": "roles C4 pasan a diseño de contratos de datos (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Mapeo de Flujos de Entrada y Salida (Contratos de Datos)",
+          "objective": "Desglosar los datos de entrada que cada actor envía al sistema y las salidas que recibe con justificación operativa.",
+          "input": "Actores clasificados de 1.2 e interfaces del MVP.",
+          "raw_data_title": "Flujos de Datos de Actores",
+          "raw_data": "Turista: inputs (búsqueda, selección, reserva, checkout), outputs (catálogo, cotización, estado, voucher). Finquero: inputs (bloqueos, tarifas, confirmación), outputs (panel, alertas, resumen). Admin: inputs (aprobación, incidencias, liquidaciones), outputs (métricas, bitácora, estado comisiones).",
+          "exit_label": "CONTRATOS DE ACTORES BLOQUEADOS → 2.1",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Formalización de Contratos de Entrada y Salida por Actor",
+              "objective": "Construir la tabla estructurada de contratos de contexto para los actores humanos.",
+              "how_to": {
+                "steps": [
+                  "Detallar la lista numerada de datos de entrada por actor con su justificación.",
+                  "Detallar la lista numerada de datos de salida por actor con su justificación.",
+                  "Consolidar la tabla oficial de contratos de contexto de actores.",
+                  "Comprobar el pass condition de justificación operativa de cada dato."
+                ],
+                "table_columns": "Actor | Tipo C4 y Justificación | Entradas al Sistema (Input Data) | Salidas del Sistema (Output Data)",
+                "table_rules": "Cada dato de entrada o salida debe responder a una necesidad funcional del software.",
+                "restrictions": [
+                  "Prohibido entradas o salidas genéricas sin especificación de negocio."
+                ],
+                "done_when": "Contratos de datos de actores formalizados y justificados."
+              },
+              "example_title": "Contratos de Contexto de Actores Humanos (Step 1 Output)",
+              "example": "| Actor | Tipo C4 y Justificación | Entradas al Sistema (Input Data) | Salidas del Sistema (Output Data) |\n| --- | --- | --- | --- |\n| **Turista** | **Actor Primario**<br><br>*Justificación:* Inicia el flujo transaccional central de búsqueda, cotización y compra del servicio de alquiler vacacional. | 1. **Criterios de búsqueda:** Destino, fechas y número de huéspedes.<br>2. **Selección de finca:** Elección de propiedad del catálogo.<br>3. **Datos de reserva:** Nombre, teléfono y correo del titular.<br>4. **Confirmación de checkout:** Selección de método de pago. | 1. **Catálogo filtrado:** Listado de propiedades disponibles y fotos.<br>2. **Detalle y cotización:** Ficha técnica y desglose de tarifas.<br>3. **Estado de transacción:** Confirmación o rechazo del pago.<br>4. **Voucher digital:** Comprobante con código de reserva. |\n| **Propietario / Finquero** | **Actor Primario**<br><br>*Justificación:* Proveedor del servicio que alimenta y gestiona el inventario de disponibilidad física de las fincas. | 1. **Bloqueos de fechas:** Deshabilitación manual de días en el calendario.<br>2. **Ajustes tarifarios base:** Modificación de precios por noche.<br>3. **Confirmación de disponibilidad:** Aceptación operativa de estadía. | 1. **Panel de ocupación:** Calendario interactivo con reservas activas.<br>2. **Alertas de reserva:** Notificaciones de nuevos huéspedes.<br>3. **Resumen financiero:** Reporte de ingresos y liquidaciones. |\n| **Administrador NFF** | **Actor Secundario**<br><br>*Justificación:* Opera las funciones de soporte, moderación del catálogo y gobernanza operativa del sistema. | 1. **Aprobación de fincas:** Publicación de nuevas propiedades.<br>2. **Gestión de incidencias:** Cancelaciones y mediación de soporte.<br>3. **Conciliación contable:** Cierre de liquidaciones y comisiones. | 1. **Métricas de plataforma:** Reportes de ocupación y volumen transaccional.<br>2. **Bitácora de auditoría:** Registro de eventos del sistema.<br>3. **Estado de liquidaciones:** Reporte de comisiones pendientes. |",
+              "link_label": "contratos de actores pasan a análisis de sistemas externos (2.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Sistemas Externos e Integraciones de Terceros",
+      "summary": "Identificar los servicios externos integrados con la aplicación, especificando protocolos, sentido de comunicación y contratos de intercambio de datos.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Filtrado de Sistemas Externos y Comprobación de Evidencia",
+          "objective": "Verificar qué plataformas externas cuentan con respaldo en las decisiones de stack del D3 y cuáles quedan excluidas.",
+          "input": "[[example_output_stack_decision]], [[example_output_mvp_definition]] y [[example_output_project_identity]].",
+          "raw_data_title": "Servicios de Terceros Evaluados",
+          "raw_data": "Wompi API (Pasarela aprobada), WhatsApp Cloud API Meta (Mensajería aprobada), OTAs iCal Airbnb/Booking (Excluido vNext), Bot Conversacional IA (Excluido vNext).",
+          "exit_label": "SISTEMAS EXTERNOS FILTRADOS → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Evaluación de Pasarelas, Mensajería y Exclusiones de Terceros",
+              "objective": "Someter cada integración a la comprobación de evidencia documental y justificar su inclusión o exclusión.",
+              "how_to": {
+                "steps": [
+                  "Consultar el catálogo de decisiones de stack aprobado en P2-D3.",
+                  "Verificar la evidencia documental de Wompi API y WhatsApp Cloud API.",
+                  "Documentar la exclusión de sincronizadores iCal y bots conversacionales.",
+                  "Consolidar la tabla de filtrado de sistemas externos."
+                ],
+                "table_columns": "Sistema Externo | Proveedor | Evidencia Documental | Función | Veredicto",
+                "table_rules": "Solo se incluyen integraciones respaldadas por ADRs formales en P2-D3.",
+                "restrictions": [
+                  "Prohibido incorporar APIs o servicios de terceros no aprobados previamente."
+                ],
+                "done_when": "Sistemas externos evaluados con veredicto y evidencia documental."
+              },
+              "example_title": "Filtrado de Sistemas Externos",
+              "example": "| Sistema Externo | Proveedor | Evidencia | Función | Veredicto |\n| --- | --- | --- | --- | --- |\n| Wompi API | Bancolombia | Aprobado en P2-D3 (ADR Pasarela) | Cobros en línea con PSE/Tarjetas | **INCLUIDO** |\n| WhatsApp Cloud API | Meta Graph API | Aprobado en P2-D3 (ADR Mensajería) | Alertas transaccionales instantáneas | **INCLUIDO** |\n| Sincronizador iCal | OTAs Externas | Excluido en P1-D9 y P2-D1 | Sincronización de calendarios | **DIFERIDO (vNext)** |\n| Bot Conversacional | Motor IA | Excluido en P1-D9 | Atención por chat libre | **DIFERIDO (vNext)** |",
+              "link_label": "sistemas externos pasan a declaración de protocolos (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Declaración de Protocolos y Mecanismos de Transporte",
+          "objective": "Definir los protocolos técnicos (REST, Webhooks) y el sincronismo de la comunicación con cada sistema externo.",
+          "input": "Sistemas externos incluidos de 2.1 y arquitectura de red de P2-D3.",
+          "raw_data_title": "Protocolos Técnicos",
+          "raw_data": "Wompi: HTTPS REST API para creación de intención de cobro + Webhooks HTTPS asíncronos con firma SHA-256 e idempotencia. WhatsApp: HTTPS REST (Meta Graph v19+) saliente transaccional + Webhooks.",
+          "exit_label": "PROTOCOLOS TÉCNICOS DECLARADOS → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Mapeo de Protocolos HTTPS REST, Webhooks y Sincronismo",
+              "objective": "Especificar el mecanismo de transporte, sentido de comunicación y manejo síncrono/asíncrono.",
+              "how_to": {
+                "steps": [
+                  "Definir el protocolo HTTPS REST para llamadas salientes a Wompi y Meta.",
+                  "Definir Webhooks HTTPS para recepción de confirmaciones de pago y acuses de entrega.",
+                  "Especificar la firma criptográfica SHA-256 para validación de autenticidad en Wompi.",
+                  "Documentar el sentido de comunicación (Bidireccional) para cada servicio."
+                ],
+                "table_columns": "Servicio Externo | Protocolo Técnico | Sentido | Tipo de Interacción",
+                "table_rules": "Todo webhook debe contar con mecanismo de validación de firma o token.",
+                "restrictions": [
+                  "No dejar canales de integración sin protocolo de seguridad explícito."
+                ],
+                "done_when": "Protocolos técnicos y sentidos de comunicación formalizados."
+              },
+              "example_title": "Protocolos de Integración Externa",
+              "example": "| Servicio | Protocolo Técnico | Sentido | Tipo de Interacción |\n| --- | --- | --- | --- |\n| Wompi API | HTTPS REST API + Webhooks HTTPS (Firma SHA-256) | Bidireccional | Síncrono (creación) / Asíncrono (confirmación) |\n| WhatsApp Cloud API | HTTPS REST API (Meta Graph v19+) + Webhooks | Bidireccional / Saliente | Síncrono (despacho) / Asíncrono (acuses) |",
+              "link_label": "protocolos pasan a contratos de integración multi-ítem (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Contratos de Integración Multi-Ítem con Terceros",
+          "objective": "Detallar los flujos salientes y entrantes con justificación operativa para cada integración de terceros.",
+          "input": "Protocolos técnicos de 2.2 y especificación de transacciones.",
+          "raw_data_title": "Contratos de Integración Externa",
+          "raw_data": "Wompi: Salientes (intención cobro, callbacks, polling contingencia), Entrantes (token checkout, webhook estado, checksum SHA-256). WhatsApp: Salientes (HSM Finquero, HSM Turista, Bearer token), Entrantes (acuses entrega, message ID).",
+          "exit_label": "CONTRATOS DE INTEGRACIÓN BLOQUEADOS → 3.1",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Formalización de Contratos de Integración Externa",
+              "objective": "Construir la tabla estructurada de contratos de integración de sistemas externos.",
+              "how_to": {
+                "steps": [
+                  "Detallar la lista de flujos salientes hacia cada sistema externo con justificación.",
+                  "Detallar la lista de flujos entrantes desde cada sistema externo con justificación.",
+                  "Declarar la responsabilidad principal técnica y operativa de cada integración.",
+                  "Comprobar el pass condition de respaldo documental y contratos de datos completos."
+                ],
+                "table_columns": "Sistema Externo | Tipo, Protocolo y Flujo | Flujos Salientes | Flujos Entrantes | Responsabilidad Principal",
+                "table_rules": "Cada flujo de integración debe señalar su propósito técnico concreto.",
+                "restrictions": [
+                  "Prohibido omitir la responsabilidad delegada (como PCI-DSS en Wompi)."
+                ],
+                "done_when": "Tabla oficial de contratos de integración de sistemas externos formalizada."
+              },
+              "example_title": "Contratos de Integración Externa (Step 2 Output)",
+              "example": "| Sistema Externo | Tipo, Protocolo y Flujo | Flujos Salientes (Hacia el Sistema Externo) | Flujos Entrantes (Desde el Sistema Externo) | Responsabilidad Principal |\n| --- | --- | --- | --- | --- |\n| **Wompi API** | **SaaS / Pasarela de Pagos**<br><br>*Protocolo:* HTTPS REST API + Webhooks HTTPS (Firma SHA-256 e Idempotencia)<br>*Flujo:* Bidireccional | 1. **Intención de cobro:** Monto COP, ID reserva y sesión.<br>2. **Callback URLs:** Redirección post-pago al frontend.<br>3. **Polling de contingencia:** Consulta síncrona por ID. | 1. **Token/URL Checkout:** Render seguro del widget de pago.<br>2. **Webhook de estado:** Evento `APPROVED`/`DECLINED` para transicionar reserva.<br>3. **Checksum SHA-256:** Verificación de autenticidad del webhook. | Delegación 100% segura del procesamiento financiero en COP (PSE/Nequi/Tarjetas) bajo estándar PCI-DSS sin almacenamiento de credenciales bancarias. |\n| **WhatsApp Cloud API (Meta)** | **SaaS / Mensajería Cloud**<br><br>*Protocolo:* HTTPS REST API (Meta Graph v19+) + Webhooks HTTPS<br>*Flujo:* Bidireccional / Saliente transaccional | 1. **Plantilla HSM Finquero:** Alerta instantánea de nueva reserva y fechas.<br>2. **Plantilla HSM Turista:** Confirmación con código de reserva y link a voucher.<br>3. **Bearer Token:** Credenciales de cuenta comercial. | 1. **Acuses de entrega:** Eventos `delivered`/`read`/`failed`.<br>2. **Message ID:** Confirmación síncrona de encolamiento en Meta. | Despacho automatizado e instantáneo de notificaciones transaccionales a turistas y propietarios rurales para coordinar la logística y confirmar la compra. |",
+              "link_label": "contratos de integración pasan a construcción del diagrama C4 (3.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Construcción del Diagrama C4 Nivel 1 (Contexto)",
+      "summary": "Representar visualmente la caja negra del sistema, los actores humanos y las plataformas externas mediante sintaxis Mermaid estándar con cero flechas mudas.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Definición del Sistema Central y Disposición de Nodos",
+          "objective": "Configurar la caja negra central de la plataforma y ubicar los nodos de actores y servicios externos.",
+          "input": "Actores de Step 1 y Sistemas Externos de Step 2.",
+          "raw_data_title": "Nodos del Diagrama C4",
+          "raw_data": "Sistema Central: Plataforma Nos Fuimos de Finca (Web App B2C + Core de Reservas). Actores: Turista, Finquero, Admin NFF. Externos: Wompi API, WhatsApp Cloud API.",
+          "exit_label": "NODOS C4 DISPUESTOS → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Modelado de Caja Negra y Ubicación de Actores y Servicios",
+              "objective": "Disponer los elementos gráficos en jerarquía superior (usuarios) y dependencias inferiores (SaaS).",
+              "how_to": {
+                "steps": [
+                  "Definir el nodo central de la Plataforma Nos Fuimos de Finca sin detalles internos prematuros.",
+                  "Ubicar a los 3 actores humanos en la parte superior.",
+                  "Ubicar a las 2 plataformas externas en la parte inferior.",
+                  "Verificar coherencia total con los catálogos aprobados en Steps 1 y 2."
+                ],
+                "table_columns": "Tipo de Nodo | Identificador | Rol o Propósito Técnico",
+                "table_rules": "El sistema se representa estrictamente como caja negra en este nivel.",
+                "restrictions": [
+                  "Prohibido dibujar bases de datos, módulos de código o componentes internos en el diagrama de contexto."
+                ],
+                "done_when": "Nodos de actores, sistema y servicios externos configurados."
+              },
+              "example_title": "Configuración de Nodos C4 Nivel 1",
+              "example": "| Nodo | Identificador | Descripción C4 |\n| --- | --- | --- |\n| Sistema Central | `NFF` | Plataforma Nos Fuimos de Finca (Web App + Core Reservas) |\n| Actores Humanos | `Turista`, `Finquero`, `AdminNFF` | Clientes, anfitriones rurales y equipo back-office |\n| Sistemas Externos | `Wompi`, `WABA` | Pasarela financiera y mensajería cloud |",
+              "link_label": "nodos pasan a trazado de relaciones y diagramación Mermaid (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Trazado de Relaciones y Diagramación Mermaid C4",
+          "objective": "Codificar en Mermaid el diagrama C4 Nivel 1 con flechas dirigidas y etiquetas concretas de negocio o protocolo.",
+          "input": "Nodos dispuestos de 3.1 y contratos de datos de Steps 1 y 2.",
+          "raw_data_title": "Relaciones Etiquetadas",
+          "raw_data": "Turista -> NFF (Búsqueda y checkout), NFF -> Turista (Catálogo y voucher). Finquero -> NFF (Bloqueos), NFF -> Finquero (Resumen). Admin -> NFF (Moderación), NFF -> Admin (Métricas). NFF -> Wompi (Intención cobro), Wompi -> NFF (Confirmación webhook). NFF -> WABA (Despacho plantillas), WABA -> Finquero/Turista (Alertas).",
+          "exit_label": "DIAGRAMA C4 BLOQUEADO → 4.1",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Generación del Diagrama C4 Nivel 1 con Cero Flechas Mudas",
+              "objective": "Emitir el bloque de código Mermaid estándar que materializa el contexto visual del sistema.",
+              "how_to": {
+                "steps": [
+                  "Escribir la estructura graph TB en Mermaid.",
+                  "Etiquetar cada flecha con verbos de acción y protocolos específicos.",
+                  "Verificar que ninguna flecha quede sin etiqueta explicativa (cero flechas mudas).",
+                  "Comprobar el pass condition de comunicación visual de fronteras del sistema."
+                ],
+                "table_columns": "Origen | Destino | Etiqueta de Relación | Medio Técnico",
+                "table_rules": "Cada relación debe describir con precisión qué acción realiza o qué información transmite.",
+                "restrictions": [
+                  "Prohibido usar etiquetas genéricas como 'usa', 'envía datos' o 'comunicación'."
+                ],
+                "done_when": "Diagrama Mermaid C4 Nivel 1 completamente codificado y validado."
+              },
+              "example_title": "Diagrama C4 Nivel 1 en Mermaid (Step 3 Output)",
+              "example": "```mermaid\ngraph TB\n    %% Nodos de Actores Humanos\n    Turista[\"👤 Turista\\n([Actor Primario - Cliente B2C])\"]\n    Finquero[\"👨‍🌾 Propietario / Finquero\\n([Actor Primario - Anfitrión Rural])\"]\n    AdminNFF[\"🛡️ Administrador NFF\\n([Actor Secundario - Back-office])\"]\n\n    %% Sistema Central (Caja Negra)\n    NFF[\"⚙️ Plataforma Nos Fuimos de Finca\\n([Web App B2C + Core Transaccional de Reservas])\"]\n\n    %% Nodos de Sistemas Externos\n    Wompi[\"💳 Wompi API\\n([SaaS - Pasarela de Pagos])\"]\n    WABA[\"📱 WhatsApp Cloud API\\n([SaaS - Mensajería Cloud Meta])\"]\n\n    %% Relaciones de Actores Humanos\n    Turista -->|\"Búsqueda de fincas, fechas y checkout\"| NFF\n    NFF -->|\"Catálogo disponible, tarifas y voucher digital\"| Turista\n\n    Finquero -->|\"Bloqueo de fechas y consulta de reservas\"| NFF\n    NFF -->|\"Resumen de ocupación y detalle de reservas\"| Finquero\n\n    AdminNFF -->|\"Moderación de fincas y supervisión operativa\"| NFF\n    NFF -->|\"Reportes de reservas y métricas de plataforma\"| AdminNFF\n\n    %% Relaciones con Sistemas Externos\n    NFF -->|\"Creación de intención de cobro (HTTPS REST)\"| Wompi\n    Wompi -->|\"Confirmación de pago (Webhook HTTPS)\"| NFF\n\n    NFF -->|\"Despacho de plantillas HSM (HTTPS REST)\"| WABA\n    WABA -->|\"Alerta inmediata de nueva reserva\"| Finquero\n    WABA -->|\"Comprobante y bienvenida de reserva\"| Turista\n```",
+              "link_label": "diagrama C4 pasa a ensamblaje del documento final (4.1.1)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Ensamblaje del Documento Final",
+      "summary": "Compilar formalmente los contratos de actores, la matriz de integraciones externas, el diagrama C4 y la compuerta de pase en el entregable maestro oficial.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Consolidación de Metadatos y Contratos de Contexto",
+          "objective": "Ensamblar la ficha técnica, la tabla de actores humanos y la tabla de sistemas externos en el documento oficial.",
+          "input": "Metadatos del proyecto y tablas de Steps 1 y 2.",
+          "raw_data_title": "Metadatos y Tablas de Contexto",
+          "raw_data": "Proyecto: Nos Fuimos de Finca, Fase 3 (Ingeniería de Requisitos), Entregable 1 de 9, Estado Aprobado. Contratos de Actores y Sistemas Externos integrados.",
+          "exit_label": "METADATOS Y CONTRATOS INTEGRADOS → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Compilación de Secciones 1, 2 y 3 en Formato Oficial",
+              "objective": "Redactar las secciones 1, 2 y 3 del entregable garantizando estricto formato Markdown.",
+              "how_to": {
+                "steps": [
+                  "Completar los metadatos oficiales del proyecto.",
+                  "Adjuntar la tabla de Actores del Sistema con roles y justificaciones.",
+                  "Adjuntar la tabla de Sistemas Externos e Integraciones con protocolos y responsabilidades.",
+                  "Asegurar consistencia terminológica con Fases 0, 1 y 2."
+                ],
+                "table_columns": "Sección | Contenido Compilado | Estado de Verificación",
+                "table_rules": "Respetar fielmente la estructura de salida dictaminada.",
+                "restrictions": [
+                  "No omitir justificaciones operativas en los contratos de datos."
+                ],
+                "done_when": "Secciones 1, 2 y 3 compiladas correctamente."
+              },
+              "example_title": "Compilación de Metadatos y Contratos",
+              "example": "### 1. Metadatos del Documento\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 3 — Ingeniería de Requisitos\n**Entregable:** 1 de 9\n**Estado:** Aprobado\n\n### 2. Actores del Sistema\n[Tabla de Actores Turista, Finquero y Admin NFF con contratos de entrada y salida]\n\n### 3. Sistemas Externos e Integraciones\n[Tabla de Wompi API y WhatsApp Cloud API con protocolos y responsabilidades]",
+              "link_label": "contratos integrados pasan a anexar diagrama C4 y compuerta (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Integración de Diagrama C4 y Compuerta de Fase",
+          "objective": "Incorporar el bloque gráfico Mermaid C4 Nivel 1 y evaluar el cumplimiento de la compuerta de calidad.",
+          "input": "Diagrama de Step 3 y reglas de compuerta condicional.",
+          "raw_data_title": "Diagrama y Compuerta D1",
+          "raw_data": "Diagrama Mermaid incrustado. Condición: Proceed. Límites del sistema, actores humanos autorizados e integraciones delimitados y trazables.",
+          "exit_label": "DIAGRAMA Y COMPUERTA INCORPORADAS → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Incrustación de Diagrama y Evaluación de Compuerta",
+              "objective": "Completar las secciones 4 y 5 del documento formalizando la representación gráfica y la condición de pase.",
+              "how_to": {
+                "steps": [
+                  "Insertar el código fuente Mermaid validado en la sección 4.",
+                  "Evaluar la compuerta: ¿Actores respaldados, sistemas con protocolos y flechas etiquetadas al 100%?",
+                  "Redactar la declaración formal de avance (Proceed).",
+                  "Confirmar que no existen discrepancias con el alcance aprobado."
+                ],
+                "table_columns": "Elemento de Ensamblaje | Estado | Veredicto",
+                "table_rules": "Si alguna flecha carece de etiqueta explicativa, detener y corregir.",
+                "restrictions": [
+                  "Prohibido otorgar pase con elementos gráficos no respaldados en las tablas previas."
+                ],
+                "done_when": "Secciones de diagrama C4 y compuerta de fase ensambladas."
+              },
+              "example_title": "Diagrama C4 y Compuerta de Fase",
+              "example": "### 4. Diagrama C4 Nivel 1 (Contexto del Sistema)\n```mermaid\ngraph TB\n    %% Diagrama de contexto C4 Nivel 1 validado\n```\n\n### 5. Implicación de Compuerta de Fase\n- **¿Bloquea el avance?:** No.\n- **Condición:** Proceed. Límites del sistema, actores humanos autorizados e integraciones de terceros formalmente delimitados, justificados y trazables con las fases de Viabilidad Temprana (Fase 1) y Project Kickoff (Fase 2).",
+              "link_label": "documento completo pasa a validación final y publicación (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Validación de Integridad y Publicación Oficial",
+          "objective": "Verificar la exactitud del entregable contra el archivo de referencia y concretar la entrega oficial.",
+          "input": "Documento completo ensamblado y archivo de salida oficial.",
+          "raw_data_title": "Validación y Entrega D1 Fase 3",
+          "raw_data": "Verificado contra example_output_system_context_diagram.md. Publicación oficial en docs/03-requirements.",
+          "exit_label": "ENTREGABLE D1 FASE 3 PUBLICADO Y COMPLETADO",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Emisión Oficial del Documento D1 de Fase 3",
+              "objective": "Publicar el Diagrama de Contexto del Sistema oficial como cimiento de la ingeniería de requisitos.",
+              "how_to": {
+                "steps": [
+                  "Comprobar la concordancia completa de todas las tablas y el diagrama.",
+                  "Verificar el enlace al artefacto [[example_output_system_context_diagram]].",
+                  "Validar que el estado del documento sea Aprobado.",
+                  "Registrar el hito en la bitácora de progreso de Fase 3."
+                ],
+                "table_columns": "Criterio de Cierre | Estado | Registro Oficial",
+                "table_rules": "El documento es el insumo fundacional obligatorio para D2 (Actores) y D4 (Elicitación).",
+                "restrictions": [
+                  "No dar por cerrado sin corroborar la trazabilidad con los entregables de Fases 0, 1 y 2."
+                ],
+                "done_when": "Entregable D1 de Fase 3 formalmente emitido y publicado."
+              },
+              "example_title": "Verificación y Publicación Oficial",
+              "example": "El documento final ha sido ensamblado y exportado exitosamente. Ver archivo: `[[example_output_system_context_diagram]]`.\n\nUbicación oficial: `docs/03-requirements/01. Diagrama de Contexto del Sistema.md`.\nEstado: Aprobado por Compuerta de Fase.",
+              "link_label": "entrega completada - fin de flujo D1 Fase 3"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,448 @@
+{
+  "phase": "Phase 0",
+  "deliverable_code": "D3",
+  "deliverable": "Impact Estimate",
+  "purpose": "This deliverable translates the qualitative damage from D1 into a quantitative order-of-magnitude estimate honestly based on the stakeholder's judgment and experience. Its objective is to size the approximate magnitude of the problem without requiring documentary proof, bank statements, or formal audits at this early stage — but without blindly accepting the first figure the stakeholder minimizes by instinct.",
+  "inputs": "| Artifact | Use | Consumed in |\n| --- | --- | --- |\n| [[example_output_problem_statement]] (D1) | Condition (for frequency), Downstream Effect, and `E-XX` records (for unit cost) from D1. | Step 1, Step 2 |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Frequency Estimation",
+      "summary": "Approximate how often booking collisions occur at *Nos Fuimos de Finca*, correcting the natural tendency of owners to minimize the frequency of their own operational failures.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Spontaneous Estimate Capture",
+          "objective": "Record the figure the stakeholder delivers without inducing it.",
+          "input": "- D1 Condition and anchored `E-XX` records from [[example_output_problem_statement]].",
+          "raw_data_title": "Stakeholder Operational Testimonies",
+          "raw_data": "Founders describe booking collisions as rare bad luck: \"Almost never, maybe once or twice a year, we were just unlucky in April.\"",
+          "exit_label": "SPONTANEOUS CAPTURED → 1.2",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Open question",
+              "objective": "Capture the spontaneous frequency response without suggesting a range or requiring proof.",
+              "how_to": {
+                "steps": [
+                  "Pose open-ended question to founders: 'How often does this double-booking problem happen to you?'.",
+                  "Transcribe the literal spontaneous response without interrupting or correcting.",
+                  "Strict rule: do not demand accounting records or physical proof at this stage."
+                ],
+                "table_columns": "Inquiry Type | Stakeholder Question | Spontaneous Response",
+                "table_rules": "One row recording the initial unprompted estimate.",
+                "restrictions": [
+                  "Never suggest a number or range.",
+                  "Never block the process for lack of formal accounting proof."
+                ],
+                "done_when": "Spontaneous estimate recorded."
+              },
+              "example_title": "Spontaneous Estimation",
+              "example": "| Inquiry Type | Stakeholder Question | Spontaneous Response |\n| :--- | :--- | :--- |\n| **Open-ended Interview** | \"How often does this double-booking problem happen to you?\" | \"Almost never, maybe once or twice a year, we were just unlucky in April.\" |",
+              "link_label": "spontaneous figure goes to review (1.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title": "Context Reviewer (Minimization Bias Correction)",
+          "objective": "Contrast the spontaneous figure against available E-XX records to correct minimization bias.",
+          "input": "- Spontaneous estimate (1–2 times/year).\n- Physical records `E-01/E-02/E-03` and `E-04` from D1.",
+          "raw_data_title": "Documentary Incident Evidence",
+          "raw_data": "Record `E-01/02/03` (El Recodo, April 1–3) and `E-04` (La Esperanza, April 18–20): 2 collisions documented in 4 weeks of peak demand.",
+          "exit_label": "FREQUENCY AUDITED → 1.3",
+          "micro": [
+            {
+              "code": "1.2.1",
+              "title": "Cross-check against documentary evidence",
+              "objective": "Expose the mathematical contradiction between spontaneous claims and physical records.",
+              "how_to": {
+                "steps": [
+                  "Count documented events in D1's `E-XX` records within the observed observation window.",
+                  "Compare 2 documented collisions in 4 weeks against the claim of '1–2 per year'.",
+                  "Document the bias: spontaneous figure is mathematically irreconcilable with documented reality."
+                ],
+                "table_columns": "Claim Source | Asserted Frequency | Observed Evidence | Bias Finding",
+                "table_rules": "One row contrasting stakeholder claim against physical evidence.",
+                "restrictions": [
+                  "Contrast must rely on existing D1 E-XX records.",
+                  "Do not label the stakeholder dishonest; frame as natural minimization bias."
+                ],
+                "done_when": "Minimization discrepancy documented."
+              },
+              "example_title": "Documentary Cross-Check",
+              "example": "| Claim Source | Asserted Frequency | Observed Evidence | Bias Finding |\n| :--- | :--- | :--- | :---: |\n| Stakeholder Interview | \"Once or twice a year\" | 2 collisions documented in a single month (April) across holiday weekends (`E-01` and `E-04`). | `MINIMIZATION DETECTED` |\n\n*Analysis:* Asserted annual frequency is irreconcilable with 2 events documented in 4 weeks.",
+              "link_label": "discrepancy goes to conservative rule (1.2.2)"
+            },
+            {
+              "code": "1.2.2",
+              "title": "Conservative value rule upon discrepancy",
+              "objective": "Derive a conservative annual projection consistent with documentary evidence.",
+              "how_to": {
+                "steps": [
+                  "Establish the observed incident rate: 2 collisions across 2 observed holiday weekends.",
+                  "Count the annual high-demand holiday weekends (≈12 holiday weekends/bridges per year).",
+                  "Calculate conservative annualized projection: (2 / 2) × 12 = 12 events/year.",
+                  "Adopt 12 events/year as the evidence-backed baseline."
+                ],
+                "table_columns": "Observed Rate | High-Demand Window | Calculation Formula | Corrected Frequency",
+                "table_rules": "One row showing the conservative projection calculation.",
+                "restrictions": [
+                  "Adopt the most conservative value consistent with evidence.",
+                  "Never adopt ungrounded alarmist extremes."
+                ],
+                "done_when": "Corrected frequency figure calculated."
+              },
+              "example_title": "Conservative Projection",
+              "example": "| Observed Rate | High-Demand Window | Calculation Formula | Corrected Frequency |\n| :---: | :---: | :--- | :---: |\n| 2 collisions in 2 holiday weekends | 12 holiday weekends / year | $(2 / 2) \\times 12 \\text{ weekends}$ | **12 events per year** (≈1/month) |\n\n*Result:* 12 events/year adopted instead of minimized 1–2/year.",
+              "link_label": "corrected rate goes to annualization (1.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title": "Annualization and Occurrence Context",
+          "objective": "Project frequency to annual period and define operational concentration pattern.",
+          "input": "- Corrected frequency: 12 events/year.\n- Agency operational calendar.",
+          "raw_data_title": "Demand Seasonality Pattern",
+          "raw_data": "Rural rentals peak during long holiday bridges, Holy Week, and December-January. Midweek demand is negligible.",
+          "exit_label": "FREQUENCY CONSOLIDATED → Step 2",
+          "micro": [
+            {
+              "code": "1.3.1",
+              "title": "Annualization and concentration projection",
+              "objective": "Formalize the annualized frequency figure and its seasonal concentration context.",
+              "how_to": {
+                "steps": [
+                  "Record annualized frequency: 12 events per year.",
+                  "Document seasonal concentration: high-demand holiday weekends (Holy Week, long weekends, Dec–Jan).",
+                  "Specify baseline low-season behavior (virtually zero during midweek)."
+                ],
+                "table_columns": "Metric | Annualized Value | Operational Context",
+                "table_rules": "One row detailing frequency and operating seasonality.",
+                "restrictions": [
+                  "Context must explain WHY collisions cluster around peak weekends."
+                ],
+                "done_when": "Frequency and context established."
+              },
+              "example_title": "Annualized Frequency & Context",
+              "example": "| Metric | Annualized Value | Operational Context |\n| :--- | :---: | :--- |\n| **Estimated Frequency** | **12 events / year** (≈1/month) | Concentrated across ~12 holiday and peak season weekends per year (Holy Week, holiday bridges, Dec–Jan); virtually zero during midweek low season. |",
+              "link_label": "frequency goes to Step 2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Unit Cost Estimation",
+      "summary": "Deconstruct the D1 Derived Effect into verifiable cost components, rather than relying on an unsubstantiated aggregate lump sum.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Decomposition into Cost Components",
+          "objective": "Break down unit cost into discrete verifiable damage vectors identified in D1.",
+          "input": "- D1 Derived Effect (Cost): forced refunds, fee absorption, lost commissions, reputation damage.\n- Record `E-03` (refund voucher).",
+          "raw_data_title": "D1 Damage Vectors",
+          "raw_data": "1. Refund + bank surcharge absorption (`E-03`). 2. Lost agency commission. 3. Reputational damage & grievance handling.",
+          "exit_label": "VECTORS DECOMPOSED → 2.2",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "One component per Derived Effect vector",
+              "objective": "Assign an individual cost line for each damage vector established in D1.",
+              "how_to": {
+                "steps": [
+                  "Review D1 Derived Effect text and identify all distinct loss categories.",
+                  "Create Component 1: Deposit refund + absorbed bank transfer surcharge (480,000 COP, backed by `E-03`).",
+                  "Create Component 2: Lost brokerage commission (270,000 COP, based on agency 15% rate on 1,800,000 COP rental).",
+                  "Create Component 3: Reputational damage line to be evaluated via proxy."
+                ],
+                "table_columns": "Component | Description | Amount or Proxy | Source / Evidence",
+                "table_rules": "One row per cost vector.",
+                "restrictions": [
+                  "Components must align 1:1 with D1 Derived Effect loss vectors.",
+                  "Cite E-03 or agency rate schedules."
+                ],
+                "done_when": "Cost components itemized."
+              },
+              "example_title": "Cost Components Table",
+              "example": "| Component | Description | Amount or Proxy | Source / Evidence |\n| :--- | :--- | :---: | :--- |\n| **Direct Banking Loss** | Deposit refund + absorbed bank transfer surcharge | 480,000 COP | `E-03` (refund voucher showing deducted bank fee) |\n| **Lost Revenue** | Lost brokerage commission (≈15% of avg 1,800,000 COP reservation) | 270,000 COP | Internal agency commission rate schedule |\n| **Reputational Loss** | Commercial reputation damage & client grievance handling | Proxy needed | Declared in D1 Derived Effect |",
+              "link_label": "components go to proxy valuation (2.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title": "Valuation with Proxy when no direct figure exists",
+          "objective": "Define a reasonable, transparent proxy for intangible reputation damage without requiring external receipts.",
+          "input": "- Reputational damage vector from 2.1.\n- Agency operational crisis time.",
+          "raw_data_title": "Crisis Handling Time Estimate",
+          "raw_data": "Coordinators spend ~2 hours pacifying furious canceled tourists and finding emergency alternatives. Coordinator hourly rate: 25,000 COP.",
+          "exit_label": "PROXY VALUED → 2.3",
+          "micro": [
+            {
+              "code": "2.2.1",
+              "title": "Proxy valuation for intangible damage",
+              "objective": "Value reputation and grievance management using coordinator crisis hours.",
+              "how_to": {
+                "steps": [
+                  "Identify intangible component: client grievance and reputation damage.",
+                  "Establish operational proxy: 2 hours of coordinator crisis management.",
+                  "Calculate proxy valuation: 2 hours × 25,000 COP/hour = 50,000 COP.",
+                  "Explicitly label figure as PROXY in all deliverables."
+                ],
+                "table_columns": "Intangible Component | Proxy Definition | Hourly Basis | Proxy Valuation",
+                "table_rules": "One row detailing proxy justification and computation.",
+                "restrictions": [
+                  "Must be explicitly labeled as proxy, not audited cash outlay.",
+                  "Do not stall process for lack of formal accounting receipts."
+                ],
+                "done_when": "Proxy valuation calculated and declared."
+              },
+              "example_title": "Proxy Valuation Table",
+              "example": "| Intangible Component | Proxy Definition | Hourly Basis | Proxy Valuation |\n| :--- | :--- | :---: | :---: |\n| **Commercial Reputation Damage** | Crisis management: coordinator time spent handling furious client and searching for emergency alternatives | 2 hours @ 25,000 COP/h | **50,000 COP (proxy)** |\n\n*Rule Confirmation:* Labeled as proxy; process continues without external auditor receipts.",
+              "link_label": "proxy goes to cost summation (2.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title": "Sum and Final Composition",
+          "objective": "Sum all components into a total Estimated Unit Cost while preserving itemized transparency.",
+          "input": "- Direct loss: 480,000 COP.\n- Lost commission: 270,000 COP.\n- Reputation proxy: 50,000 COP.",
+          "raw_data_title": "Cost Components Summary",
+          "raw_data": "480,000 + 270,000 + 50,000 = 800,000 COP total unit cost per double-booking event.",
+          "exit_label": "UNIT COST CONSOLIDATED → Step 3",
+          "micro": [
+            {
+              "code": "2.3.1",
+              "title": "Unit cost summation and breakdown composition",
+              "objective": "Compute total unit cost and publish itemized composition formula.",
+              "how_to": {
+                "steps": [
+                  "Sum: 480,000 (refund/fee) + 270,000 (commission) + 50,000 (proxy) = 800,000 COP.",
+                  "Document unit cost per event: 800,000 COP.",
+                  "Preserve the itemized breakdown visible to downstream stakeholders."
+                ],
+                "table_columns": "Component Item | Amount (COP) | Percentage | Nature",
+                "table_rules": "Rows for each component plus the grand total.",
+                "restrictions": [
+                  "Never show only the aggregate sum without its component rows."
+                ],
+                "done_when": "Itemized unit cost calculated."
+              },
+              "example_title": "Itemized Unit Cost Composition",
+              "example": "| Component Item | Amount (COP) | Nature |\n| :--- | :---: | :--- |\n| Deposit refund + bank surcharge | 480,000 COP | Direct financial loss (`E-03`) |\n| Lost brokerage commission | 270,000 COP | Direct revenue loss (15% rate) |\n| Reputational crisis handling | 50,000 COP | Operational proxy (2h staff) |\n| **Total Estimated Unit Cost** | **800,000 COP / event** | **Decomposed Total** |",
+              "link_label": "unit cost goes to Step 3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Magnitude Calculation and Confidence Level",
+      "summary": "Calculate Annual Impact (Frequency × Unit Cost) and honestly rate the Confidence Level of the estimation.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Annual Impact Calculation",
+          "objective": "Multiply annualized frequency by estimated unit cost to obtain annual order of magnitude.",
+          "input": "- Frequency: 12 events/year (Step 1).\n- Unit Cost: 800,000 COP/event (Step 2).",
+          "raw_data_title": "Impact Equation Parameters",
+          "raw_data": "12 events/year × 800,000 COP/event = 9,600,000 COP/year total economic damage.",
+          "exit_label": "MAGNITUDE CALCULATED → 3.2",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Annual impact multiplication",
+              "objective": "Execute the annual magnitude equation and present the result.",
+              "how_to": {
+                "steps": [
+                  "Retrieve verified Frequency: 12 events/year.",
+                  "Retrieve verified Unit Cost: 800,000 COP/event.",
+                  "Calculate: 12 × 800,000 = 9,600,000 COP / year.",
+                  "Publish formula and total annual loss magnitude."
+                ],
+                "table_columns": "Variable | Formula Value | Unit",
+                "table_rules": "Rows for Frequency, Unit Cost, and Calculated Annual Impact.",
+                "restrictions": [
+                  "Mathematical consistency with Steps 1 and 2 is mandatory."
+                ],
+                "done_when": "Annual impact figure computed."
+              },
+              "example_title": "Annual Impact Calculation",
+              "example": "| Variable | Value | Unit |\n| :--- | :---: | :--- |\n| Estimated Frequency | 12 | events / year |\n| Estimated Unit Cost | 800,000 | COP / event |\n| **Estimated Annual Impact** | **9,600,000** | **COP / year** |\n\n*Equation:* $\\text{Annual Impact} = 12 \\text{ events/year} \\times 800,000 \\text{ COP/event} = 9,600,000 \\text{ COP/year}$.",
+              "link_label": "magnitude goes to confidence assessment (3.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title": "Confidence Level Assignment",
+          "objective": "Honestly evaluate evidence solidity and apply the non-blocking confidence rule.",
+          "input": "- Frequency basis: 2 E-XX records in 4 weeks.\n- Unit cost basis: 2 supported components + 1 proxy.",
+          "raw_data_title": "Confidence Evaluation Rubric",
+          "raw_data": "High: Systematic operational measurement. Medium: Reasoned calculation partly backed by E-XX. Low: Pure assumption with 0-1 record.",
+          "exit_label": "CONFIDENCE CERTIFIED → Step 4",
+          "micro": [
+            {
+              "code": "3.2.1",
+              "title": "Confidence criteria application",
+              "objective": "Classify confidence as High, Medium, or Low based on evidence coverage.",
+              "how_to": {
+                "steps": [
+                  "Evaluate frequency evidence: projection from 2 instances (not full-year measurement) -> rules out High.",
+                  "Evaluate cost evidence: 2 components backed by physical slips and rate cards, 1 declared proxy -> rules out Low.",
+                  "Assign Medium Confidence level.",
+                  "Document explicit justification."
+                ],
+                "table_columns": "Dimension | Evidence Solidity | Grade",
+                "table_rules": "Rows evaluating frequency backing, cost backing, and overall level.",
+                "restrictions": [
+                  "Do not claim High confidence without full-year systematic metrics.",
+                  "Do not mark Low when solid vouchers exist."
+                ],
+                "done_when": "Medium confidence assigned and justified."
+              },
+              "example_title": "Confidence Level Assessment",
+              "example": "| Dimension | Evidence Solidity | Grade |\n| :--- | :--- | :---: |\n| Frequency Backing | Projected from 2 documented instances (`E-01…E-04`), not full-year records | Moderate |\n| Unit Cost Backing | 2 of 3 components backed by vouchers (`E-03`) and rate cards; 1 proxy | High / Moderate |\n| **Assigned Confidence Level** | **Medium Confidence** | **`MEDIUM`** |\n\n*Justification:* Sound assumptions with solid voucher backing, but annualized frequency is an extrapolation.",
+              "link_label": "confidence goes to non-blocking rule (3.2.2)"
+            },
+            {
+              "code": "3.2.2",
+              "title": "Non-blocking rule",
+              "objective": "Confirm that Medium confidence authorizes Phase 0 gate approval while logging Phase 1 caveats.",
+              "how_to": {
+                "steps": [
+                  "Verify the non-blocking rule: lack of High certainty never halts Phase 0 gate approval.",
+                  "Formulate the caveat for Phase 1 (Market Validation) to measure real seasonal frequencies.",
+                  "Issue authorization for Step 4 assembly."
+                ],
+                "table_columns": "Gate Policy | Standard Requirement | Case Status | Gate Action",
+                "table_rules": "One row certifying non-blocking compliance.",
+                "restrictions": [
+                  "Never block Phase 0 for lack of accounting audit.",
+                  "Must log caveat for Phase 1."
+                ],
+                "done_when": "Non-blocking status confirmed."
+              },
+              "example_title": "Non-Blocking Gate Compliance",
+              "example": "| Gate Policy | Standard Requirement | Case Status | Gate Action |\n| :--- | :--- | :---: | :---: |\n| **Non-Blocking Rule** | Medium/Low confidence does not halt Phase 0 gate; warning is logged for Phase 1. | Medium confidence justified | **`PROCEED TO STEP 4`** |\n\n*Phase 1 Caveat:* Empirically measure frequency across a full season during Market Validation.",
+              "link_label": "authorization goes to Step 4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "4",
+      "title": "Final Document Assembly (Output Structure)",
+      "summary": "Format the consolidated deliverable with the broken-down estimation table and the mandatory pending validation note.",
+      "substeps": [
+        {
+          "code": "4.1",
+          "title": "Metadata and Formal Structure",
+          "objective": "Assemble deliverable control fields and path convention.",
+          "input": "- Project: Nos Fuimos de Finca\n- Phase 0 Deliverable 3 of 9\n- Status: Approved",
+          "raw_data_title": "Metadata Parameters",
+          "raw_data": "Folder: docs/00-problem-recognition/\nPrefix: 03.\nFilename: Impact Estimate.md",
+          "exit_label": "METADATA ASSEMBLED → 4.2",
+          "micro": [
+            {
+              "code": "4.1.1",
+              "title": "Metadata assembly and path validation",
+              "objective": "Establish mandatory control fields and validate file discoverability.",
+              "how_to": {
+                "steps": [
+                  "Assign Project, Phase, Deliverable, and Status values.",
+                  "Verify deliverable path: 'docs/00-problem-recognition/03. Impact Estimate.md'.",
+                  "Generate front matter metadata section."
+                ],
+                "table_columns": "Field | Assigned Value | Verification Status",
+                "table_rules": "One row per metadata field.",
+                "restrictions": [
+                  "Status Approved upon passing Steps 1–3."
+                ],
+                "done_when": "Metadata section assembled."
+              },
+              "example_title": "Deliverable Metadata",
+              "example": "| Field | Assigned Value | Verification Status |\n| :--- | :--- | :---: |\n| **Project** | Nos Fuimos de Finca | `PASS` |\n| **Phase** | 0 — Problem Recognition | `PASS` |\n| **Deliverable** | 3 of 9 | `PASS` |\n| **Status** | Approved | `PASS` |\n| **File Path** | `docs/00-problem-recognition/03. Impact Estimate.md` | `PASS` |",
+              "link_label": "metadata goes to estimation table (4.2.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title": "Estimation Table",
+          "objective": "Consolidate Frequency, Unit Cost breakdown, Annual Impact, and Confidence Level into the official master table.",
+          "input": "- Steps 1, 2, and 3 validated outputs.",
+          "raw_data_title": "Validated Estimation Parameters",
+          "raw_data": "Freq: 12 events/year. Unit cost: 800,000 COP. Impact: 9,600,000 COP. Confidence: Medium.",
+          "exit_label": "TABLE ASSEMBLED → 4.3",
+          "micro": [
+            {
+              "code": "4.2.1",
+              "title": "Consolidated estimation table mapping",
+              "objective": "Assemble the official 4-row Impact Estimation Table.",
+              "how_to": {
+                "steps": [
+                  "Transcribe Estimated Frequency with operational context and minimization adjustment.",
+                  "Transcribe Estimated Unit Cost with full component breakdown.",
+                  "Transcribe Estimated Annual Impact (9,600,000 COP/year).",
+                  "Transcribe Confidence Level (Medium) with evidence coverage justification."
+                ],
+                "table_columns": "Variable | Stakeholder Estimate | Justification / Calculation Basis",
+                "table_rules": "One row per impact variable in fixed order.",
+                "restrictions": [
+                  "Figures must match Steps 1–3 verbatim without alteration."
+                ],
+                "done_when": "Official Impact Estimation Table assembled."
+              },
+              "example_title": "Official Impact Estimation Table",
+              "example": "| Variable | Stakeholder Estimate | Justification / Calculation Basis |\n| :--- | :--- | :--- |\n| **Estimated Frequency** | 12 events per year (≈1 event/month) | Corrected against `E-01…E-04` (2 documented collisions in 4 weeks of peak season) and projected over ~12 holiday weekends per year; adjusted against minimized spontaneous claim (\"1–2/year\"). |\n| **Estimated Unit Cost** | 800,000 COP per event | Refund + absorbed banking commission (480,000, `E-03`) + lost intermediary commission (270,000) + reputational management proxy (50,000). |\n| **Estimated Annual Impact** | 9,600,000 COP per year | 12 events × 800,000 COP per event. |\n| **Confidence Level** | Medium | Frequency projected from only 2 documented instances; cost mostly supported with one declared proxy component. |",
+              "link_label": "table goes to validation note (4.3.1)"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title": "Pending Validation Note",
+          "objective": "Incorporate the mandatory Phase 1 warning clause and certify publication readiness.",
+          "input": "- Assembled table from 4.2.\n- Mandatory Phase 0 caveat clause.",
+          "raw_data_title": "Mandatory Validation Clause",
+          "raw_data": "Working hypothesis based on stakeholder estimate, not an audited accounting data point. Must be contrasted in Phase 1 before significant budget commitment.",
+          "exit_label": "PUBLISHABLE → Final Deliverable",
+          "micro": [
+            {
+              "code": "4.3.1",
+              "title": "Mandatory Phase 1 warning clause insertion",
+              "objective": "Affix the mandatory validation disclaimer and authorize deliverable release.",
+              "how_to": {
+                "steps": [
+                  "Verify all 4 AI Question Rules conditions are met (Frequency contrasted, Unit cost broken down, Annual impact calculated, Confidence justified).",
+                  "Attach mandatory pending validation warning note.",
+                  "Authorize publication of '03. Impact Estimate.md'."
+                ],
+                "table_columns": "Quality Aspect | Status | Deliverable Verdict",
+                "table_rules": "One row certifying quality gate and publication verdict.",
+                "restrictions": [
+                  "Pending validation note is mandatory; cannot be omitted."
+                ],
+                "done_when": "Deliverable sealed and PUBLISHABLE."
+              },
+              "example_title": "Pending Validation Clause & Release",
+              "example": "| Quality Aspect | Status | Deliverable Verdict |\n| :--- | :---: | :---: |\n| 4 Quality Conditions Verified | 4 of 4 Met | `APPROVED` |\n| Mandatory Caveat Affixed | Phase 1 warning included | `VERIFIED` |\n| **Publication Verdict** | **`PUBLISHABLE`** | **Authorized** |\n\n> *\"This figure is a working hypothesis based on the stakeholder's estimate, not an audited data point with documentary evidence. It must be contrasted with real data during Phase 1 — Market Validation before committing significant budget.\"*",
+              "link_label": "publishes official deliverable"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": {
+    "title": "Final Deliverable — 03. Impact Estimate.md",
+    "markdown": "# 3. Impact Estimate\n\n### 1. Document Metadata\n**Project:** Nos Fuimos de Finca  \n**Phase:** 0 — Problem Recognition  \n**Deliverable:** 3 of 9  \n**Status:** Approved  \n\n### 2. Impact Estimation Table\n| Variable | Stakeholder Estimate | Justification / Calculation Basis |\n| --- | --- | --- |\n| **Estimated Frequency** | 12 events per year (≈1 event/month) | Corrected against `E-01…E-04` (2 documented collisions in 4 weeks of peak season) and projected over the ~12 holiday weekends per year; adjusted against the stakeholder's minimized spontaneous estimate (\"1–2 times per year\"). |\n| **Estimated Unit Cost** | 800,000 COP per event | Refund + absorbed banking commission (480,000, `E-03`) + lost intermediary commission (270,000) + reputational management proxy (50,000). |\n| **Estimated Annual Impact** | 9,600,000 COP per year | 12 events × 800,000 COP per event. |\n| **Confidence Level** | Medium | Frequency projected from only 2 documented instances; cost mostly supported with one declared proxy component. |\n\n### 3. Pending Validation Note\n> *This figure is a working hypothesis based on the stakeholder's estimate, not an audited data point with documentary evidence. It must be contrasted with real data during Phase 1 — Market Validation before committing significant budget.*"
+  }
+}

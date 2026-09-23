@@ -1,0 +1,152 @@
+{
+  "phase": "PHASE 6: TECHNICAL DESIGN",
+  "deliverable_code": "D5",
+  "deliverable": "Class & Entity Diagrams",
+  "purpose": "Traducir las entidades del Modelo de Dominio pertenecientes al Bounded Context de Booking Engine a clases, interfaces y enumeradores TypeScript orientados a objetos con encapsulamiento estricto (atributos privados '-' para status y montos financieros), evitando el anti-patrón de Modelo de Dominio Anémico mediante la incorporación de métodos con lógica de negocio pura (calculateTotal, approve, cancel, applyCoupon) y modelado formal en Mermaid classDiagram.",
+  "inputs": "| Artefacto de Entrada | Ubicación | Uso en este Entregable |\n| --- | --- | --- |\n| Domain Model & ERD (P4-D6) | [[PHASE_4_SYSTEM_MODELING/6.Domain Model and ERD/6.Domain Model and ERD.md]] | Fuente de entidades y atributos conceptuales (Booking, Review, Wishlist). |\n| Bounded Context Formalization (P5-D2) | [[PHASE_5_ARCHITECTURAL_DESIGN/2.Bounded Context Formalization/2.Bounded Context Formalization.md]] | Delimita qué entidades posee exclusivamente el módulo Booking Engine descartando externas. |\n| Module Specification (P3-D7) | [[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module Specification/7.Module Specification.md]] | Fuente de las Business Rules que justifican los métodos de cálculo y validación de estados. |",
+  "steps": [
+    {
+      "code": "1",
+      "title": "Filtrado de Entidades por Bounded Context (Bounded Entity Filtering)",
+      "summary": "Filtrar del Domain Model únicamente las entidades que pertenecen a Booking Engine y mapear modificadores de acceso.",
+      "substeps": [
+        {
+          "code": "1.1",
+          "title": "Aislamiento de Entidades y Mapeo de Atributos TypeScript",
+          "objective": "Aislar las entidades propias del contexto evitando mezclar entidades ajenas que deben referenciarse por ID.",
+          "input": "Bounded Contexts de Fase 5 (D2) y atributos del Modelo de Dominio de Fase 4 (D6).",
+          "raw_data_title": "Matriz de Entidades y Tipado de Atributos TypeScript",
+          "raw_data": "| Entidad (Fase 4) | Pertenencia (Fase 5, D2) | Tipo de Abstracción | Modificadores de Acceso |\n|---|---|---|---|\n| `Booking` | Propia (Booking Engine) | Clave Principal (Aggregate Root) | `- id, - status, - basePrice, - fees, - total; + checkIn, + checkOut, + guestCount` |\n| `Review` | Propia (Booking Engine) | Aggregate Root de Feedback | `- id, - rating (1-5); + propertyId, + guestId, + comment` |\n| `Wishlist` | Propia (Booking Engine) | Data Transfer Object (DTO) | `<<interface>> + id, + userId, + propertyId` |\n| `User` | Externa (Identity Context) | Referencia por Clave Foránea | Solo referenciada como `guestId: string` (UUID) |\n| `Property` | Externa (Catalog Context) | Referencia por Clave Foránea | Solo referenciada como `propertyId: string` (UUID) |",
+          "exit_label": "Entidades Filtradas y Atributos Mapeados",
+          "micro": [
+            {
+              "code": "1.1.1",
+              "title": "Definición del Catálogo de Clases Filtradas",
+              "objective": "Documentar las clases del módulo con tipos estrictos y modificadores privados donde aplique invariante.",
+              "how_to": {
+                "steps": [
+                  "1. Extraer entidades asignadas a Booking Engine en el ADR de Bounded Contexts.",
+                  "2. Referenciar por ID las entidades externas (User, Property).",
+                  "3. Declarar atributos privados para montos financieros y estados mutables.",
+                  "4. Asignar tipos TypeScript precisos para fechas, números y enums."
+                ],
+                "table_columns": [
+                  "Clase / Interfaz",
+                  "Atributo",
+                  "Visibilidad",
+                  "Tipo TypeScript"
+                ],
+                "table_rules": [
+                  "Prohibido mapear clases completas de entidades que pertenezcan a otros módulos",
+                  "Los valores de dinero y estados deben ser privados para prevenir mutaciones externas",
+                  "Las entidades sin comportamiento complejo deben definirse como interfaces"
+                ],
+                "restrictions": "Prohibido el uso del tipo `any` en los atributos de clase.",
+                "done_when": "Mapeo preliminar de clases TypeScript completado y documentado."
+              },
+              "example_title": "Mapeo Preliminar D5",
+              "example": "```markdown\n## Entidades Filtradas para este Módulo (Booking Engine)\n- **class Booking**\n  - `- id: string`\n  - `+ propertyId: string`\n  - `- status: BookingStatus`\n  - `- totalPrice: number`\n- **class Review**\n  - `- rating: number`\n- **interface Wishlist** (Simple DTO)\n  - `+ id: string`\n```",
+              "link_label": "Entidades Filtradas -> Definición de Métodos"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "2",
+      "title": "Definición de Métodos y Modelo Rico (Method Definition)",
+      "summary": "Incorporar métodos de negocio dentro de las entidades para erradicar el modelo anémico y blindar la lógica.",
+      "substeps": [
+        {
+          "code": "2.1",
+          "title": "Inyección de Reglas de Negocio en Métodos de Dominio",
+          "objective": "Asegurar que todas las fórmulas de cálculo y validaciones de estado vivan dentro de las clases.",
+          "input": "Clases preliminares del Step 1 y especificación de módulo de Fase 3 (D7).",
+          "raw_data_title": "Matriz de Métodos de Negocio y Reglas de Dominio",
+          "raw_data": "| Clase | Regla de Negocio (Business Rule) | Método Encapsulado | Comportamiento / Invariante |\n|---|---|---|---|\n| `Booking` | Liquidación financiera automática | `+ calculateTotal(): number` | Suma cargos base, tarifa de limpieza, fees y taxes |\n| `Booking` | Transición controlada a Aprobado | `+ approve(): void` | Válido únicamente desde estado `PENDING` |\n| `Booking` | Cancelación formal con causa | `+ cancel(reason: string): void` | Prohibido cancelar si ya se encuentra en `COMPLETED` |\n| `Booking` | Descuento promocional | `+ applyCoupon(discountPercent, maxAmount): void` | Deducción matemática recalculando el total |\n| `Booking` | Lectura segura de estado | `+ getStatus(): BookingStatus` | Retorna el enum inmutable sin permitir mutación directa |\n| `Review` | Validación de calificación | `+ updateRating(newRating: number): void` | Lanza excepción si el valor no está entre 1 y 5 |",
+          "exit_label": "Comportamientos Ricos de Dominio Formalizados",
+          "micro": [
+            {
+              "code": "2.1.1",
+              "title": "Especificación de Comportamiento Anti-Anémico",
+              "objective": "Documentar la firma de métodos y las validaciones internas de cada operación.",
+              "how_to": {
+                "steps": [
+                  "1. Asociar cada invariante de negocio a un método público de la entidad.",
+                  "2. Programar el cálculo de totales en calculateTotal sin delegar a servicios externos.",
+                  "3. Blindar transiciones de estado en approve() y cancel() validando estados previos.",
+                  "4. Proteger la integridad del rango de calificaciones en updateRating()."
+                ],
+                "table_columns": [
+                  "Entidad",
+                  "Método",
+                  "Firma",
+                  "Validación Interna"
+                ],
+                "table_rules": [
+                  "Ningún cálculo financiero debe dejarse suelto en controladores o frontend",
+                  "Los métodos de transición de estado deben lanzar error ante transiciones inválidas",
+                  "Los getters deben proveer acceso de solo lectura al estado interno"
+                ],
+                "restrictions": "Prohibido crear entidades con únicamente getters y setters triviales sin lógica de negocio.",
+                "done_when": "Tabla de métodos derivados de Business Rules documentada con firmas completas."
+              },
+              "example_title": "Métodos de Dominio D5",
+              "example": "```markdown\n## Métodos Derivados de Business Rules\n| Clase | Regla de Negocio | Método |\n|---|---|---|\n| Booking | Cálculo matemático de cargos y tasas | `+ calculateTotal(): number` |\n| Booking | Transición estricta de PENDING a APPROVED | `+ approve(): void` |\n| Booking | Cancelación con registro de motivo | `+ cancel(reason: string): void` |\n| Review | Validación de puntaje entre 1 y 5 | `+ updateRating(newRating: number): void` |\n```",
+              "link_label": "Métodos Definidos -> Diagramación UML"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "3",
+      "title": "Diagramación UML en Mermaid (UML Diagramming)",
+      "summary": "Compilar el diagrama de clases Mermaid con atributos privados, métodos públicos y relaciones formales.",
+      "substeps": [
+        {
+          "code": "3.1",
+          "title": "Generación del Diagrama de Clases UML",
+          "objective": "Visualizar la estructura completa del módulo Booking Engine en sintaxis classDiagram estándar.",
+          "input": "Clases, métodos y enumeraciones definidos en los Steps 1 y 2.",
+          "raw_data_title": "Inventario de Componentes del Diagrama UML",
+          "raw_data": "| Elemento UML | Tipo de Elemento | Responsabilidad Técnica | Dependencia / Relación |\n|---|---|---|---|\n| `BookingStatus` | Enumeración (`<<enumeration>>`) | Estados formales: PENDING, APPROVED, CANCELLED, COMPLETED | Usado por `Booking` |\n| `Booking` | Clase Rica de Dominio | Entidad raíz del módulo con lógica financiera encapsulada | `Booking ..> BookingStatus : uses` |\n| `Review` | Clase de Dominio | Calificaciones y comentarios con validación de rango | Entidad independiente en módulo |\n| `Wishlist` | Interfaz DTO (`<<interface>>`) | Registro ligero de propiedades favoritas sin lógica compleja | Interfaz desacoplada |",
+          "exit_label": "Diagrama de Clases UML Generado y Validado",
+          "micro": [
+            {
+              "code": "3.1.1",
+              "title": "Codificación Mermaid classDiagram y Consolidación",
+              "objective": "Generar el bloque de código Mermaid con modificadores de acceso y relaciones.",
+              "how_to": {
+                "steps": [
+                  "1. Declarar bloque classDiagram en Mermaid.",
+                  "2. Definir enumeración BookingStatus.",
+                  "3. Declarar clase Booking con modificadores - para datos sensibles y + para métodos.",
+                  "4. Declarar Review y Wishlist con sus respectivas restricciones.",
+                  "5. Conectar Booking con BookingStatus mediante relación de dependencia de uso."
+                ],
+                "table_columns": [
+                  "Clase",
+                  "Modificador",
+                  "Miembro",
+                  "Relación"
+                ],
+                "table_rules": [
+                  "Los modificadores '-' y '+' deben reflejar rigurosamente el encapsulamiento",
+                  "Los enumeradores deben etiquetarse con <<enumeration>>",
+                  "Las interfaces deben etiquetarse con <<interface>>"
+                ],
+                "restrictions": "Prohibido omitir parámetros o tipos de retorno en las firmas de los métodos.",
+                "done_when": "Diagrama Mermaid compilado y renderizable sin advertencias sintácticas."
+              },
+              "example_title": "Diagrama Mermaid D5",
+              "example": "```mermaid\nclassDiagram\n    class BookingStatus {\n        <<enumeration>>\n        PENDING\n        APPROVED\n        CANCELLED\n        COMPLETED\n    }\n    class Booking {\n        -id: string\n        +checkIn: Date\n        +calculateTotal() number\n        +approve() void\n    }\n    Booking ..> BookingStatus : uses\n```",
+              "link_label": "Diagrama UML Compilado -> Entregable D5"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverable_output": "# Deliverable 5 (D5): Class & Entity Diagrams\n\n## 1. Metadata Header\n**Proyecto:** Nos Fuimos de Finca\n**Fase:** 6 — Technical Design\n**Módulo:** MOD-Booking\n**Estado:** Approved\n\n*Backlink a Fase 3 y 5:* Este entregable toma las entidades puras del ERD y les inyecta las Reglas de Negocio definidas en el `[[PHASE_3_REQUIREMENTS_ENGINEERING/7.Module_Specification.md]]`, logrando un Dominio Rico (Rich Domain Model) que será codificado mediante clases de TypeScript bajo los principios de *Clean Architecture* decididos en la Fase 5.\n\n---\n\n## 2. Diagrama de Clases UML (TypeScript Abstraction)\n\n> [!NOTE]\n> Las propiedades marcadas con `-` son privadas y **no pueden ser alteradas directamente** desde controladores externos. Deben usarse los métodos públicos (`+`) provistos, garantizando que ninguna factura se emita con valores matemáticos incorrectos y que no se viole la máquina de estados.\n\n```mermaid\nclassDiagram\n    class BookingStatus {\n        <<enumeration>>\n        PENDING\n        APPROVED\n        CANCELLED\n        COMPLETED\n    }\n\n    class Booking {\n        -id: string\n        +propertyId: string\n        +guestId: string\n        +couponId: string | null\n        +checkIn: Date\n        +checkOut: Date\n        +guestCount: number\n        -basePriceAmount: number\n        -cleaningFeeAmount: number\n        -platformFeeAmount: number\n        -taxesAmount: number\n        -totalPrice: number\n        -status: BookingStatus\n        +cancellationReason: string | null\n        \n        +calculateTotal() number\n        +approve() void\n        +cancel(reason: string) void\n        +applyCoupon(discountPercent: number, maxAmount: number) void\n        +getStatus() BookingStatus\n        +getTotalPrice() number\n    }\n\n    class Review {\n        -id: string\n        +propertyId: string\n        +guestId: string\n        -rating: number\n        +comment: string\n        \n        +updateRating(newRating: number) void\n        +getRating() number\n    }\n\n    class Wishlist {\n        <<interface>>\n        +id: string\n        +userId: string\n        +propertyId: string\n    }\n\n    Booking ..> BookingStatus : uses\n```\n\n---\n\n## 3. Justificación Anti-Anémica\n\nPara evitar el antipatrón del *Modelo de Dominio Anémico* (donde la lógica crítica queda dispersa en múltiples archivos tipo *Service*), la clase **Booking** concentra todas las validaciones financieras internamente:\n\n1. **`calculateTotal()`:** Unifica matemáticamente el valor en centavos (`basePriceAmount` + `cleaningFeeAmount` + `platformFeeAmount` + `taxesAmount`). Ningún programador podrá calcular totales \"a mano\" en la UI o en un endpoint HTTP.\n2. **`approve()` / `cancel()`:** Máquina de estados blindada. El método `cancel()` verificará internamente que el status actual sea `PENDING` o `APPROVED` y lanzará un error si se intenta cancelar una reserva `COMPLETED`. \n3. **`Wishlist` como Interfaz:** La lista de deseos es deliberadamente anémica (declarada como `<<interface>>`) porque, funcionalmente, es solo un Data Transfer Object (DTO) que une al usuario con una finca. No tiene reglas de validación complejas, por lo tanto no requiere encapsulamiento.\n\n---\n\n## 4. Downstream Consumers\nEste diseño es la semilla para el código real del Backend:\n- **Phase 6 — D6 (Data Access & Repositories):** Los repositorios de Supabase deberán devolver instancias reales (new Booking) en lugar de JSONs genéricos, respetando este contrato.\n- **Phase 7 — D5 (Backend API Implementation):** Los desarrolladores transcribirán este diagrama literal en archivos `.ts` (ej. `src/modules/booking/domain/Booking.ts`)."
+}

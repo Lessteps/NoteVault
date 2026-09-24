@@ -31,7 +31,12 @@ módulos restantes.
 | Notas (explorador, pestañas, lectura, editor, búsqueda, marcadores, backlinks, Ctrl+P) | ✅ migrado |
 | Tareas (tabla editable, filtros, calendario con repeticiones, recordatorios, subtareas) | ✅ migrado |
 | Hábitos (vista general con racha, diaria con subtareas y diario, semanal, mensual, anual, gestionar) | ✅ migrado |
-| Vista general, Calendario, Ejercicio, Proyectos, Metas, Finanzas | ⏳ en la app clásica |
+| Vista General (resumen del día con casillas de todos los módulos y registro rápido de gastos) | ✅ migrado |
+| Calendario (día, semana con arrastrar para crear/mover/estirar, mes, agenda, editor de eventos, rutinas, filtros) | ✅ migrado |
+| Proyectos (tablero de proyectos, resumen con gráficas, Kanban, lista, calendario, notas, panel de issue, adjuntos, rúbrica) | ✅ migrado |
+| Metas (tablero por áreas, Hoy, submetas en tarjetas/árbol/detalle, historial, notas, áreas) | ✅ migrado |
+| Finanzas (diario, semanal, mensual, anual, metas de ahorro, categorías con presupuesto, facturas, CSV) | ✅ migrado |
+| Ejercicio (vista general, registro semanal, un día por vista, gestionar rutina, reproductor de video) | ✅ migrado |
 | Canvas, práctica, grafo, asistente IA, WEB | ⏳ en la app clásica |
 
 ## Seguridad
@@ -46,11 +51,18 @@ módulos restantes.
   solo porque el puente de pywebview lo necesita.
 - El puente HTTP de desarrollo (`python -m notevault_app.webapp.devserver`)
   escucha solo en 127.0.0.1, exige un token por sesión y valida el `Host`.
+- Los videos de Ejercicio se sirven desde un servidor local mínimo
+  (`webapp/media.py`): solo 127.0.0.1, un token aleatorio por video y solo los
+  archivos que la API registró; la CSP permite medios solo desde 127.0.0.1.
+- Los datos que terminan en frontmatter (nombres, etiquetas…) se guardan en una
+  sola línea: no pueden inyectar claves nuevas en el archivo.
+- Adjuntos (capturas, facturas): solo imágenes y PDF, 15 MB como máximo, dentro
+  de `.notevault/<módulo>/adjuntos/`; al quitarlos van a la papelera del vault.
 
 ## Pruebas
 
 ```bash
-python -m pytest tests/test_webapp_api.py tests/test_webapp_tasks.py tests/test_webui_e2e.py
+python -m pytest tests/test_webapp_*.py tests/test_webui_e2e.py
 cd frontend && npm test && npm run typecheck
 ```
 

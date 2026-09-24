@@ -84,7 +84,7 @@ export function IconRail() {
   const theme = useApp((s) => s.theme);
   const toggleTheme = useApp((s) => s.toggleTheme);
   return (
-    <nav className="flex w-12 flex-none flex-col items-center gap-1.5 border-r border-line bg-bg py-3">
+    <nav aria-label="Módulos" className="flex w-12 flex-none flex-col items-center gap-1.5 border-r border-line bg-bg py-3">
       {MODULES.map(({ id, label, Icon }) => (
         <button
           key={id}

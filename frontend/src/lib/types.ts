@@ -586,3 +586,26 @@ export interface ExerciseOverview {
   grid: Record<string, number>;
   breakdown: Array<{ day: string; rows: Array<{ id: string; name: string; done: number; total: number }> }>;
 }
+
+// ── Vista General ─────────────────────────────────────────────────────────
+
+export interface HomeOverview {
+  today: string;
+  habits: Array<{ id: string; name: string; icon: string; done: boolean; subs: [number, number] }>;
+  exercise: { day: string; rows: Array<{ id: string; name: string; series_reps: string; how_to: string; entry: ExerciseEntry }> };
+  tasks: { today: HomeTask[]; overdue: HomeTask[] };
+  projects: {
+    issues: Array<{ project: { id: string; name: string; colour: string; done_column: string; first_column: string }; id: string; key: string; title: string; due: string; done: boolean }>;
+    active: Array<{ id: string; name: string; icon: string; colour: string; progress: number }>;
+  };
+  finance: { day: FinTotals; month: FinTotals; prev: FinTotals; checks: Array<{ goal: { id: string; name: string; icon: string; colour: string; suggested_cents: number }; checked: boolean }> };
+  goals: {
+    list: Array<{ id: string; name: string; icon: string; colour: string; progress: number }>;
+    items: Array<{ goal: { id: string; name: string; icon: string; colour: string }; item: { id: string; name: string; priority: number; due_time: string; measurable: boolean; target: number | null; unit: string }; done: boolean }>;
+    any: boolean;
+  };
+}
+
+export interface HomeTask {
+  id: string; name: string; status: string; subject: string; priority: number; due: string | null; done: boolean;
+}

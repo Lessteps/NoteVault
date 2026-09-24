@@ -31,7 +31,7 @@ export function GoalDialog() {
     const g: Partial<Goal> | undefined = editing ? (detail?.goal.id === editing ? detail.goal : cards.find((c) => c.id === editing)) : undefined;
     setF(g ? { ...g } : {
       name: "", icon: "🎯", area: area !== "*" ? area : "", status: meta?.statuses[0] ?? "Activa", priority: 2,
-      start: todayIso(), end: null, colour: "#3f51b5", description: "",
+      start: todayIso(), end: null, colour: "#3f51b5", description: "", in_overview: true,
     });
     setLines("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -43,6 +43,7 @@ export function GoalDialog() {
     const fields: Partial<Goal> = {
       name: f.name, icon: f.icon, area: f.area, status: f.status, priority: f.priority,
       start: f.start || null, end: f.end || null, colour: f.colour, description: f.description,
+      in_overview: f.in_overview,
     };
     try {
       if (editing) {
@@ -89,6 +90,9 @@ export function GoalDialog() {
         <Field label="Fin"><input type="date" className={input} value={f.end ?? ""} onChange={(e) => set({ end: e.target.value || null })} /></Field>
       </div>
       <Field label="Color"><ColourRow colours={GOAL_COLOURS} value={f.colour ?? "#3f51b5"} onChange={(colour) => set({ colour })} /></Field>
+      <label className="flex items-center gap-2 text-[12.5px] text-dim">
+        <input type="checkbox" checked={Boolean(f.in_overview)} onChange={(e) => set({ in_overview: e.target.checked })} /> Mostrar en la Vista General
+      </label>
       <Field label="Descripción">
         <textarea rows={3} className={cn(input, "resize-y")} value={f.description ?? ""} placeholder="Por qué importa y cómo sabrás que la lograste"
           onChange={(e) => set({ description: e.target.value })} />

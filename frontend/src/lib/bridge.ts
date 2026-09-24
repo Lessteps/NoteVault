@@ -6,7 +6,7 @@
 // with a per-run token. Both reject with an Error carrying Python's message.
 
 import type {
-  AppInfo, Area, Bookmark, Exercise, ExerciseDay, ExerciseOverview, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
+  AppInfo, Area, Bookmark, HomeOverview, Exercise, ExerciseDay, ExerciseOverview, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
   IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
 } from "./types";
 
@@ -251,5 +251,6 @@ export const api = {
   exVideoUrl: (id: string) => call<{ url: string; name: string }>("ex_video_url", id),
   exOpenVideo: (id: string) => call<{ ok: boolean }>("ex_open_video", id),
   exPickVideo: (id: string) => call<{ ok: boolean }>("ex_pick_video", id),
+  homeOverview: () => call<HomeOverview>("home_overview"),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

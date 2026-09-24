@@ -23,6 +23,11 @@ try:
 except ImportError:          # pragma: no cover
     sync_playwright = None
 
+def _rail(page, name):
+    """The module button in the icon rail (Vista General has buttons with the same names)."""
+    return page.get_by_role("navigation", name="Módulos").get_by_role("button", name=name, exact=True)
+
+
 READY = (sync_playwright is not None and (DIST / "index.html").is_file()
          and Path(CHROMIUM).exists())
 
@@ -59,6 +64,7 @@ class WebUiE2E(unittest.TestCase):
         self.errors = []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.goto(self.url)
+        _rail(self.page, "Notas").click()
         self.page.get_by_role("treeitem", name="Carpeta").wait_for()
 
     def tearDown(self):
@@ -176,7 +182,7 @@ class TasksE2E(unittest.TestCase):
         self.errors = []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.goto(self.url)
-        self.page.get_by_role("button", name="Tareas").click()
+        _rail(self.page, "Tareas").click()
         self.page.get_by_text("Semilla").first.wait_for()
 
     def tearDown(self):
@@ -249,7 +255,7 @@ class HabitsE2E(unittest.TestCase):
         self.errors = []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.goto(self.url)
-        self.page.get_by_role("button", name="Hábitos").click()
+        _rail(self.page, "Hábitos").click()
         self.page.get_by_text("Habit Streak").wait_for()
 
     def tearDown(self):
@@ -329,7 +335,7 @@ class CalendarE2E(unittest.TestCase):
         self.errors = []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.goto(self.url)
-        self.page.get_by_role("button", name="Calendario").click()
+        _rail(self.page, "Calendario").click()
         self.page.locator("aside nav").get_by_text("Día", exact=True).click()
         self.page.get_by_text("Semilla").first.wait_for()
 
@@ -404,7 +410,7 @@ class ProjectsE2E(unittest.TestCase):
         self.errors = []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.goto(self.url)
-        self.page.get_by_role("button", name="Proyectos", exact=True).click()
+        _rail(self.page, "Proyectos").click()
         self.page.locator("main").get_by_text("Portafolio web").first.click()
         self.page.get_by_role("tab", name="Tablero").wait_for()
 
@@ -485,7 +491,7 @@ class GoalsE2E(unittest.TestCase):
         self.errors = []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.goto(self.url)
-        self.page.get_by_role("button", name="Metas", exact=True).click()
+        _rail(self.page, "Metas").click()
         self.page.get_by_text("Backend").first.wait_for()
 
     def tearDown(self):
@@ -549,7 +555,7 @@ class FinanceE2E(unittest.TestCase):
         self.errors = []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.goto(self.url)
-        self.page.get_by_role("button", name="Finanzas", exact=True).click()
+        _rail(self.page, "Finanzas").click()
         self.page.get_by_text("Registro rápido").wait_for()
 
     def tearDown(self):
@@ -615,7 +621,7 @@ class ExerciseE2E(unittest.TestCase):
         self.errors = []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
         self.page.goto(self.url)
-        self.page.get_by_role("button", name="Ejercicio", exact=True).click()
+        _rail(self.page, "Ejercicio").click()
         self.page.get_by_text("Racha de ejercicio").wait_for()
 
     def tearDown(self):

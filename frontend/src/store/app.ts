@@ -122,7 +122,7 @@ function applyTheme(theme: "dark" | "light") {
 export const useApp = create<State>((set, get) => ({
   info: null,
   theme: "dark",
-  module: "notas",
+  module: "home",
   mode: "read",
   explorerTab: "files",
   explorerOpen: true,

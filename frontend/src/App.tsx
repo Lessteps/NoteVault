@@ -13,6 +13,7 @@ function lazyModule(load: () => Promise<Record<string, unknown>>, name: string) 
   return lazy(async () => ({ default: (await load())[name] as ComponentType }));
 }
 const MODULES: Partial<Record<ModuleId, ComponentType>> = {
+  home: lazyModule(() => import("./components/home/HomeModule"), "HomeModule"),
   tareas: lazyModule(() => import("./components/tasks/TasksModule"), "TasksModule"),
   habits: lazyModule(() => import("./components/habits/HabitsModule"), "HabitsModule"),
   calendario: lazyModule(() => import("./components/calendar/CalendarModule"), "CalendarModule"),

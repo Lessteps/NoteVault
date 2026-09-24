@@ -297,3 +297,26 @@ class TestMixinNames(unittest.TestCase):
                     continue
                 self.assertNotIn(name, seen, f"{name} defined in {seen.get(name)} and {base.__name__}")
                 seen[name] = base.__name__
+
+
+class TestHomeOverview(unittest.TestCase):
+    def test_overview_is_json_and_counts_today(self):
+        import json
+        import shutil
+        import tempfile
+        from datetime import date
+        from pathlib import Path
+        from notevault_app.webapp.api import NoteVaultApi
+        root = Path(tempfile.mkdtemp(prefix="nv_home_"))
+        try:
+            api = NoteVaultApi(root)
+            today = date.today().isoformat()
+            api.tasks_create({"name": "Hoy", "due": today})
+            h = api.habits_list()[0]
+            api.habits_set_done(today, h["id"], True)
+            o = api.home_overview()
+            json.dumps(o)
+            self.assertEqual([t["name"] for t in o["tasks"]["today"]], ["Hoy"])
+            self.assertTrue(next(x for x in o["habits"] if x["id"] == h["id"])["done"])
+        finally:
+            shutil.rmtree(root, ignore_errors=True)

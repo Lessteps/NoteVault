@@ -314,5 +314,10 @@ export const api = {
   studyCardGrade: (srsId: string, quality: number) => call<{ ok: boolean }>("study_card_grade", srsId, quality),
   studyErrorResolve: (id: string) => call<{ ok: boolean }>("study_error_resolve", id),
   studyErrorDigest: () => call<{ text: string }>("study_error_digest"),
+  mapTemplates: () => call<Array<{ name: string; yaml: string }>>("map_templates"),
+  mapBuild: (yaml: string, folder: string, name: string) => call<{ ok: boolean; path?: string; errors?: string[] }>("map_build", yaml, folder, name),
+  mapGenerate: (order: string, context: string[], extra: string, template: string, folder: string, name: string) =>
+    call<{ ok: boolean; path?: string; errors?: string[]; bridge?: boolean; prompt?: string; url?: string; label?: string }>(
+      "map_generate", order, context, extra, template, folder, name),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

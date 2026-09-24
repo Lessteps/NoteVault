@@ -762,6 +762,18 @@ class CanvasE2E(unittest.TestCase):
         self.canvas.press("Control+z")
         self._doc(lambda d: not any(n.get("text") == "Nueva tarjeta" for n in d["nodes"]))
 
+    def test_concept_map_from_yaml(self):
+        self.page.get_by_role("button", name="Cerrar").click()
+        self.page.get_by_role("button", name="Generar mapa conceptual").click()
+        dialog = self.page.get_by_role("dialog", name="Generador de mapas conceptuales")
+        dialog.get_by_placeholder("Describe el mapa").fill(
+            "title: T\nlayout: tree\nnodes:\n  - {id: a, title: Raíz, role: root}\n  - {id: b, title: Rama}\n"
+            "edges:\n  - {from: a, to: b}\n")
+        dialog.get_by_role("button", name="Generar").click()
+        dialog.get_by_role("button", name="Abrir mapa").click()
+        self.canvas.get_by_text("Rama").wait_for()
+        self.assertTrue((self.dir / "Mapa 1.canvas").exists() or (self.dir / "Mapa.canvas").exists())
+
     def test_delete_card_drops_its_edges(self):
         import json
         (self.dir / "Mapa.canvas").write_text(json.dumps({"nodes": [

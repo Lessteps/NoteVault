@@ -9,6 +9,7 @@ import { PropertiesDialog } from "./PropertiesDialog";
 import { useAssistant } from "../../store/assistant";
 import { useCanvas } from "../../store/canvas";
 import { CanvasView } from "../canvas/CanvasView";
+import { ConceptMapDialog } from "../canvas/ConceptMapDialog";
 
 const WIDTH_KEY = "nv.explorer.width";
 
@@ -56,6 +57,7 @@ export function NotesModule() {
       {!canvasPath && (assistantOpen ? <AssistantPanel /> : inspectorOpen && <Inspector />)}
       <AiSettingsDialog />
       <PropertiesDialog />
+      <ConceptMapDialog />
       <EnglishAudioDialog />
     </div>
   );

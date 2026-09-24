@@ -42,7 +42,8 @@ módulos restantes.
 | Práctica (notas `type: exercise`: enunciado, pistas, cronómetro/pomodoro, corrección por IA por API, web o archivo de intercambio, historial, cálculo rápido) | ✅ migrado |
 | Escalera de demostración (L1–L6 para notas de teorema: estrategia, ordenar, completar, justificar, en blanco, variante) | ✅ migrado |
 | Estudio (panel lateral del área: cola de hoy con repasos y tarjetas, ledger de skills y conceptos, registro de errores) | ✅ migrado |
-| Mapa conceptual, WEB | ⏳ en la app clásica |
+| Generador de mapas conceptuales (orden + notas de contexto + plantilla → IA → canvas; también YAML pegado) | ✅ migrado |
+| WEB | ⏳ en la app clásica |
 
 ## Seguridad
 

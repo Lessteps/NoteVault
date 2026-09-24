@@ -226,3 +226,122 @@ class CanvasApi:
             if kind in ("note", "code") and path.stat().st_size <= 2 * 1024 * 1024:
                 out["text"] = path.read_text(encoding="utf-8", errors="replace")[:20000]
             return out
+
+
+# ── concept maps: an order (+ context notes, a template) → AI → YAML spec → .canvas ──
+
+_MAP_SCHEMA = """\
+Return ONLY a YAML document, no prose, with these keys:
+  title: <string>
+  layout: radial | tree | grid | column | row
+  direction: down | right        # optional, for tree/column/row
+  defaults: { card_width: 240 }   # optional
+  nodes:                          # each node:
+    - id: <unique alias>
+      title: <short heading>
+      body: <one sentence>        # optional
+      color: "1".."6"             # optional (red,orange,yellow,green,cyan,purple)
+      role: root                  # optional; marks the centre/root
+      kind: text | note | shape   # optional, default text
+  edges:
+    - from: <alias>
+      to: <alias or [alias, ...]> # a list fans one source to many
+      label: <string>             # optional
+Rules: unique ids; edges reference existing ids; short titles (they become
+headings). Pick the layout that matches the requested shape."""
+MAX_MAP_TEXT = 40_000
+
+
+def _map_yaml(reply: str) -> str:
+    m = re.search(r"```(?:ya?ml)?\s*(.*?)```", reply or "", re.S | re.I)
+    return (m.group(1) if m else (reply or "")).strip()
+
+
+def _map_spec(text: str) -> tuple[dict | None, list[str]]:
+    from ...core import canvas_builder as cb
+    try:
+        spec = cb.spec_from_yaml(text)
+    except Exception as e:  # noqa: BLE001 - shown to the user
+        return None, [f"No pude leer el YAML: {e}"]
+    if not isinstance(spec, dict) or not all(isinstance(n, dict) for n in (spec.get("nodes") or [])) \
+            or not all(isinstance(e, dict) for e in (spec.get("edges") or [])):
+        return None, ["El YAML no tiene la forma de un mapa (nodes/edges)."]
+    if len(spec.get("nodes") or []) > 500:
+        return None, ["Demasiados nodos (máximo 500)."]
+    errors = cb.validate_spec(spec)
+    return (None, errors) if errors else (spec, [])
+
+
+class ConceptMapApi:
+    """Mixed into NoteVaultApi; relies on its _lock, _root, _rel, _resolve and _ai_cfg."""
+
+    def map_templates(self) -> list:
+        from ...core import canvas_builder as cb
+        return [{"name": t["name"], "yaml": t["yaml"]} for t in cb.list_templates()]
+
+    def _map_write(self, spec: dict, folder_rel: str, name: str) -> dict:
+        from ...core import canvas_builder as cb
+        folder = self._resolve(folder_rel, allow_root=True)
+        if not folder.is_dir():
+            raise ApiError("No es una carpeta.")
+        stem = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", str(name or "").strip())[:120]
+        stem = re.sub(r"\.canvas$", "", stem, flags=re.I) or "Mapa"
+        path = folder / f"{stem}{cf.CANVAS_EXT}"
+        n = 1
+        while path.exists():
+            path = folder / f"{stem} {n}{cf.CANVAS_EXT}"
+            n += 1
+        cb.write_canvas(path, spec)
+        return {"ok": True, "path": self._rel(path)}
+
+    def map_build(self, yaml_text: str, folder_rel: str = "", name: str = "Mapa") -> dict:
+        """Create the map from a YAML spec (pasted, or the AI's reply)."""
+        spec, errors = _map_spec(_map_yaml(str(yaml_text or "")[:MAX_MAP_TEXT]))
+        if spec is None:
+            return {"ok": False, "errors": errors}
+        with self._lock:
+            return self._map_write(spec, folder_rel, name)
+
+    def map_generate(self, order: str, context: list, extra: str = "", template: str = "",
+                     folder_rel: str = "", name: str = "Mapa") -> dict:
+        order = str(order or "").strip()[:MAX_MAP_TEXT]
+        if not order:
+            raise ApiError("Escribe una orden (o pega un YAML de spec).")
+        # An order that already is a valid spec is built with no AI.
+        spec, _ = _map_spec(order)
+        if spec is not None:
+            with self._lock:
+                return self._map_write(spec, folder_rel, name)
+        blocks = []
+        with self._lock:
+            for rel in (context if isinstance(context, list) else [])[:12]:
+                path = self._resolve(str(rel))
+                if path.is_file() and path.suffix.lower() in (".md", ".canvas", ".txt"):
+                    blocks.append(f"### {path.name}\n{path.read_text(encoding='utf-8', errors='replace')[:4000]}")
+            self._resolve(folder_rel, allow_root=True)
+        from ...core import canvas_builder as cb
+        tpl = cb.load_template(str(template or "")) if template else ""
+        parts = ["You convert a request into a NoteVault canvas SPEC.", _MAP_SCHEMA,
+                 "TEMPLATE (use its structure as the shape to fill):\n" + (tpl or "none")]
+        if blocks:
+            parts.append("CONTEXT FILES:\n" + "\n".join(blocks))
+        parts.append("EXTRA INSTRUCTIONS:\n" + (str(extra or "").strip()[:MAX_MAP_TEXT] or "none"))
+        parts.append("USER ORDER:\n" + order)
+        prompt = "\n\n".join(parts)
+        from ...core import ai_client as ai
+        cfg = self._ai_cfg()
+        if cfg.is_bridge:
+            return {"ok": False, "bridge": True, "prompt": prompt,
+                    "url": ai.BRIDGE_URLS.get(cfg.provider, ""), "label": cfg.info.label}
+        messages = [{"role": "system", "content": "You output only YAML canvas specs."},
+                    {"role": "user", "content": prompt}]
+        try:
+            reply = ai.send_chat(cfg, messages)
+        except ai.AIError as e:
+            return {"ok": False, "errors": [f"Falló la IA: {e}. Puedes pegar el YAML a mano."],
+                    "prompt": prompt}
+        spec, errors = _map_spec(_map_yaml(reply))
+        if spec is None:
+            return {"ok": False, "errors": errors, "prompt": prompt}
+        with self._lock:
+            return self._map_write(spec, folder_rel, name)

@@ -12,6 +12,7 @@ import { useApp } from "../../store/app";
 import { MODULES } from "../Shell";
 import { askText, cn, Kbd } from "../ui";
 import { newCanvasIn, newNoteIn } from "./FileTree";
+import { useConceptMap } from "../canvas/ConceptMapDialog";
 import { useProperties } from "./PropertiesDialog";
 import { activeEditor, insertAtCursor } from "./SourceEditor";
 
@@ -110,6 +111,7 @@ function commands(): Item[] {
     // Notes
     { id: "new-note", group: "Notas", label: "Nueva nota", run: () => newNoteIn(folder) },
     { id: "new-canvas", group: "Notas", label: "Nuevo canvas", run: () => newCanvasIn(folder) },
+    { id: "concept-map", group: "Notas", label: "Generar mapa conceptual…", run: () => useConceptMap.getState().set(true) },
     {
       id: "new-from-template", group: "Notas", label: "Nueva nota desde plantilla…",
       run: () => templatePage(async (name) => {

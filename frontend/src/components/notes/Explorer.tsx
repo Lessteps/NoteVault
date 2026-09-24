@@ -1,5 +1,5 @@
 import {
-  ArrowLeft, Bookmark, LayoutDashboard, ChevronsDownUp, Hash, Database, FilePlus, Files, FolderPlus, Network, RefreshCw, Search,
+  ArrowLeft, Bookmark, LayoutDashboard, Waypoints, ChevronsDownUp, Hash, Database, FilePlus, Files, FolderPlus, Network, RefreshCw, Search,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
@@ -8,6 +8,7 @@ import { useApp, type ExplorerTab } from "../../store/app";
 import { cn, IconButton } from "../ui";
 import { FileTree, newCanvasIn, newFolderIn, newNoteIn } from "./FileTree";
 import { GraphPanel } from "./GraphPanel";
+import { useConceptMap } from "../canvas/ConceptMapDialog";
 
 const TABS: Array<{ id: ExplorerTab; label: string; icon: ReactNode }> = [
   { id: "files", label: "Files", icon: <Files size={14} /> },
@@ -88,6 +89,9 @@ function FilesPanel() {
         </IconButton>
         <IconButton title="Nuevo canvas" onClick={() => void newCanvasIn(folderOfActive)}>
           <LayoutDashboard size={15} />
+        </IconButton>
+        <IconButton title="Generar mapa conceptual" onClick={() => useConceptMap.getState().set(true)}>
+          <Waypoints size={15} />
         </IconButton>
         <div className="flex-1" />
         <IconButton title="Recargar" onClick={refreshTree}>

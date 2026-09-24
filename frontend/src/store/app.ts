@@ -343,19 +343,38 @@ export const useApp = create<State>((set, get) => ({
   dismiss: (id) => set((st) => ({ toasts: st.toasts.filter((t) => t.id !== id) })),
 }));
 
-// Tell Python how many notes are unsaved, so closing the window can wait
-// for them (run_web.py). Only sent when the number changes.
+// Tell Python how many notes (and other pending edits) are unsaved, so
+// closing the window can wait for them (run_web.py). Only sent when the
+// number changes.
 let reportedUnsaved = 0;
-useApp.subscribe((st) => {
-  const n = Object.values(st.notes).filter((x) => x.dirty || x.saving).length;
+const pendingEdits = new Map<string, () => Promise<void>>();
+
+function reportUnsaved() {
+  const st = useApp.getState();
+  const n = Object.values(st.notes).filter((x) => x.dirty || x.saving).length + pendingEdits.size;
   if (n !== reportedUnsaved) {
     reportedUnsaved = n;
     api.setUnsaved(n).catch(() => undefined);
   }
-});
+}
+useApp.subscribe(reportUnsaved);
+
+/** A module with a debounced write registers it here until it is flushed. */
+export function markPending(key: string, flush: () => Promise<void>) {
+  pendingEdits.set(key, flush);
+  reportUnsaved();
+}
+
+export function clearPending(key: string) {
+  if (pendingEdits.delete(key)) reportUnsaved();
+}
 
 /** Save everything before the window closes. */
 export async function flushAll(): Promise<void> {
   const { notes, save } = useApp.getState();
-  await Promise.all(Object.values(notes).filter((n) => n.dirty).map((n) => save(n.path)));
+  const others = [...pendingEdits.values()];
+  await Promise.all([
+    ...Object.values(notes).filter((n) => n.dirty).map((n) => save(n.path)),
+    ...others.map((f) => f().catch(() => undefined)),
+  ]);
 }

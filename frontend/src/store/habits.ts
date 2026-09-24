@@ -29,7 +29,7 @@ interface HabitsState {
   refreshStats: () => Promise<void>;
   setDone: (date: string, id: string, done: boolean) => Promise<void>;
   setSubtask: (date: string, id: string, sub: string, done: boolean) => Promise<void>;
-  setDayText: (notes: string, journal: string) => Promise<void>;
+  setDayText: (date: string, notes: string, journal: string) => Promise<void>;
   add: (fields?: HabitFields) => Promise<Habit | null>;
   update: (id: string, fields: HabitFields) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -142,12 +142,11 @@ export const useHabits = create<HabitsState>((set, get) => ({
     }
   },
 
-  setDayText: async (notes, journal) => {
+  setDayText: async (date, notes, journal) => {
     const log = get().log;
-    if (!log) return;
-    set({ log: { ...log, notes, journal } });
+    if (log && log.date === date) set({ log: { ...log, notes, journal } });
     try {
-      await api.habitsSetDayText(log.date, notes, journal);
+      await api.habitsSetDayText(date, notes, journal);
     } catch (e) {
       fail(e);
     }

@@ -224,3 +224,121 @@ export interface CalRoutine {
   notes: string;
   reminder_min: number | null;
 }
+
+// ── Áreas y adjuntos ───────────────────────────────────────────────────────
+
+export interface Area {
+  id: string;
+  name: string;
+  icon: string;
+  colour: string;
+  order: number;
+  archived: boolean;
+}
+
+// ── Proyectos ──────────────────────────────────────────────────────────────
+
+export interface Project {
+  id: string;
+  key: string;
+  name: string;
+  status: string;
+  status_colour: string;
+  area: string;
+  colour: string;
+  icon: string;
+  created: string | null;
+  start: string | null;
+  deadline: string | null;
+  columns: string[];
+  done_column: string;
+  in_calendar: boolean;
+  description: string;
+  days_left: number | null;
+  overdue: boolean;
+}
+
+export interface IssueSummary {
+  total: number;
+  done: number;
+  open: number;
+  overdue: number;
+  progress: number;
+  estimate_min: number;
+  estimate_done_min: number;
+  done_this_week?: number;
+  days_left?: number | null;
+}
+
+export interface ProjectCard extends Project {
+  summary: IssueSummary;
+  throughput: number[];
+  next_due: { key: string; title: string; due: string } | null;
+}
+
+export interface Issue {
+  id: string;
+  number: number;
+  key: string;
+  type: string;
+  icon: string;
+  type_colour: string;
+  parent: string;
+  title: string;
+  status: string;
+  priority: number;
+  order: number;
+  estimate_min: number | null;
+  labels: string[];
+  created: string | null;
+  start: string | null;
+  due: string | null;
+  due_time: string;
+  repeat: string;
+  repeat_until: string | null;
+  in_calendar: boolean;
+  reminder: string | null;
+  done_at: string | null;
+  attachments: string[];
+  updated: string | null;
+  description: string;
+  children: string[];
+  done: boolean;
+  overdue: boolean;
+  linked_folder: string;
+  linked_notes: string[];
+}
+
+export interface ProjectDetail {
+  project: Project;
+  progress: number;
+  issues: Issue[];
+  stats: {
+    summary: IssueSummary;
+    by_status: Array<[string, number]>;
+    by_priority: Array<[number, number]>;
+    by_type: Array<[string, number]>;
+    submetas: Array<IssueSummary & { id: string }>;
+    burndown: { days: string[]; remaining: Array<number | null>; ideal: number[] };
+    throughput: Array<[string, number]>;
+    cycle_days: number | null;
+  };
+}
+
+export interface ProjectsMeta {
+  statuses: string[];
+  status_colours: Record<string, string>;
+  types: string[];
+  type_icons: Record<string, string>;
+  type_colours: Record<string, string>;
+  palette: string[];
+  default_columns: string[];
+}
+
+export interface ProjectNoteEntry {
+  path: string;
+  dir: boolean;
+  name: string;
+  size?: number;
+  modified?: number;
+}

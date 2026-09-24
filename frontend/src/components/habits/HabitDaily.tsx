@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { addDays } from "../../lib/habits";
 import { shortDate, todayIso } from "../../lib/tasks";
+import { clearPending, markPending } from "../../store/app";
 import { useHabits } from "../../store/habits";
 import { cn } from "../ui";
 import { HabitCheck, Header, NavButtons } from "./parts";
@@ -24,11 +25,24 @@ function DayText() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
-  const save = (n: string, j: string) => {
+  const pending = useRef<[string, string, string] | null>(null);
+  const flush = async () => {
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => void setDayText(n, j), 700);
+    const p = pending.current;
+    pending.current = null;
+    clearPending("habit-day");
+    if (p) await setDayText(p[0], p[1], p[2]);
   };
-  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const save = (n: string, j: string) => {
+    if (!date) return;
+    pending.current = [date, n, j];
+    markPending("habit-day", flush);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => void flush(), 700);
+  };
+  // Leaving the view or changing the day writes what was typed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => void flush(), [date]);
 
   return (
     <div className="space-y-3">

@@ -39,7 +39,9 @@ from ..core.vault_manager import Note, VaultManager
 from .errors import ApiError
 from .modules.calendar import CalendarApi
 from .modules.context import ManagersMixin
+from .modules.files import FilesApi
 from .modules.habits import HabitsApi
+from .modules.projects import ProjectsApi
 from .modules.tasks import TasksApi
 
 MAX_WRITE_BYTES = 10 * 1024 * 1024
@@ -61,7 +63,7 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
-class NoteVaultApi(ManagersMixin, TasksApi, HabitsApi, CalendarApi):
+class NoteVaultApi(ManagersMixin, FilesApi, TasksApi, HabitsApi, CalendarApi, ProjectsApi):
     """The bridge. Each app module adds its methods through a mixin
     (notevault_app/webapp/modules/), prefixed with the module name."""
 

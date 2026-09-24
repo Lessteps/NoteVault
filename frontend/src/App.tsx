@@ -6,6 +6,7 @@ import { DialogHost, MenuHost } from "./components/ui";
 import { NotesModule } from "./components/notes/NotesModule";
 import { QuickSwitcher } from "./components/notes/QuickSwitcher";
 import { CalendarModule } from "./components/calendar/CalendarModule";
+import { ProjectsModule } from "./components/projects/ProjectsModule";
 import { HabitsModule } from "./components/habits/HabitsModule";
 import { TasksModule } from "./components/tasks/TasksModule";
 import { useTasks } from "./store/tasks";
@@ -120,6 +121,7 @@ export function App() {
           : module === "tareas" ? <TasksModule />
             : module === "habits" ? <HabitsModule />
               : module === "calendario" ? <CalendarModule />
+                : module === "proyectos" ? <ProjectsModule />
               : <ComingSoon module={module} />}
       </div>
       <StatusBar />

@@ -107,6 +107,8 @@ export function DialogHost() {
       onMouseDown={() => close(null)}
     >
       <div
+        role="dialog"
+        aria-label={req.title}
         className="w-[420px] rounded-xl border border-line-strong bg-card p-4 shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >

@@ -6,7 +6,7 @@
 // with a per-run token. Both reject with an Error carrying Python's message.
 
 import type {
-  AppInfo, Bookmark, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
+  AppInfo, Area, Bookmark, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
   IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
 } from "./types";
 
@@ -163,4 +163,37 @@ export const api = {
   calRoutineSave: (id: string | null, fields: Partial<CalRoutine>) =>
     call<{ ok: boolean }>("cal_routine_save", id, fields),
   calRoutineRemove: (id: string) => call<{ ok: boolean }>("cal_routine_remove", id),
+
+  // Áreas y adjuntos
+  areasList: (includeArchived = false) => call<Area[]>("areas_list", includeArchived),
+  areasSave: (id: string, fields: Partial<Area>) => call<Area>("areas_save", id, fields),
+  areasArchive: (id: string, archived = true) => call<{ ok: boolean }>("areas_archive", id, archived),
+  areasCreateSuggested: () => call<Area[]>("areas_create_suggested"),
+  attachAdd: (module: string, owner: string, filename: string, dataB64: string) =>
+    call<{ ref: string }>("attach_add", module, owner, filename, dataB64),
+  attachRead: (ref: string) => call<{ name: string; mime: string; data_url: string }>("attach_read", ref),
+  attachOpen: (ref: string) => call<{ ok: boolean }>("attach_open", ref),
+  attachRemove: (ref: string) => call<{ ok: boolean }>("attach_remove", ref),
+
+  // Proyectos
+  projectsMeta: () => call<ProjectsMeta>("projects_meta"),
+  projectsList: () => call<ProjectCard[]>("projects_list"),
+  projectsGet: (pid: string) => call<ProjectDetail>("projects_get", pid),
+  projectsCreate: (fields: Record<string, unknown>) => call<Project>("projects_create", fields),
+  projectsUpdate: (pid: string, fields: Record<string, unknown>) => call<Project>("projects_update", pid, fields),
+  projectsDelete: (pid: string) => call<{ ok: boolean }>("projects_delete", pid),
+  issueCreate: (pid: string, fields: Partial<Issue>) => call<Issue>("projects_issue_create", pid, fields),
+  issueUpdate: (pid: string, xid: string, fields: Partial<Issue>) =>
+    call<Issue>("projects_issue_update", pid, xid, fields),
+  issueMove: (pid: string, xid: string, status: string, index: number) =>
+    call<{ ok: boolean }>("projects_issue_move", pid, xid, status, index),
+  issueDelete: (pid: string, xid: string) => call<{ ok: boolean }>("projects_issue_delete", pid, xid),
+  projectNotesList: (pid: string) => call<ProjectNoteEntry[]>("projects_notes_list", pid),
+  projectNoteRead: (pid: string, rel: string) =>
+    call<{ path: string; raw: string; modified: number }>("projects_note_read", pid, rel),
+  projectNoteWrite: (pid: string, rel: string, raw: string) =>
+    call<{ ok: boolean; modified: number }>("projects_note_write", pid, rel, raw),
+  projectNoteCreate: (pid: string, folder: string, name: string, isFolder = false) =>
+    call<{ path: string }>("projects_note_create", pid, folder, name, isFolder),
+  projectNoteDelete: (pid: string, rel: string) => call<{ ok: boolean }>("projects_note_delete", pid, rel),
 };

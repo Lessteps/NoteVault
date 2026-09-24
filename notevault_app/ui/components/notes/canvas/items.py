@@ -43,11 +43,11 @@ def _split_frontmatter(text: str):
     return m.group(0), (text or "")[m.end():]
 
 # Palette (dark), matching the rest of the notes module.
-BG_NODE   = QColor("#26262c")
-BORDER    = QColor("#3a3a46")
-BORDER_SEL = QColor("#7c5af0")
-TEXT      = QColor("#dcdde0")
-GRIP      = QColor("#7c5af0")
+BG_NODE   = QColor(theme.tint("#26262c"))
+BORDER    = QColor(theme.tint("#3a3a46"))
+BORDER_SEL = QColor(theme.tint("#7c5af0"))
+TEXT      = QColor(theme.tint("#dcdde0"))
+GRIP      = QColor(theme.tint("#7c5af0"))
 
 # Obsidian's six canvas colours, plus our default.
 CANVAS_COLORS = {

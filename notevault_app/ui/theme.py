@@ -3,8 +3,9 @@ NoteVault theming.
 
 Every panel writes its own Qt stylesheet with the dark palette hard-coded.
 Rather than duplicating each of those stylesheets, the dark palette is the
-single source of truth and, when the light theme is active, every colour is
-re-tinted on its way into Qt.
+single source of truth and every colour is re-tinted on its way into Qt:
+to the "Midnight" palette (the Stitch redesign) in the dark theme, and to the
+warm cream palette in the light theme.
 
 `install()` patches QWidget.setStyleSheet once at start-up so that all widget
 stylesheets go through `skin()`, and remembers the untinted original on the
@@ -18,6 +19,12 @@ from PySide6.QtWidgets import QWidget
 DARK = "dark"
 LIGHT = "light"
 
+# UI typography for the "Midnight" redesign: Inter for UI text, JetBrains
+# Mono for metadata/labels. Both fall back to the Windows system faces when
+# they are not installed.
+UI_FONT_FAMILY = "Inter, 'Segoe UI Variable Text', 'Segoe UI', sans-serif"
+MONO_FONT_FAMILY = "'JetBrains Mono', 'Cascadia Mono', Consolas, monospace"
+
 NOTE_FONT_NAME = "Lexend"
 NOTE_FONT_FAMILY = "Lexend, 'Segoe UI Variable Text', 'Segoe UI', sans-serif"
 CODE_FONT_FAMILY = "'Cascadia Mono', Consolas, monospace"
@@ -29,9 +36,10 @@ def load_fonts():
     from pathlib import Path
     from PySide6.QtGui import QFontDatabase
     base = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).resolve().parent.parent.parent
-    font_path = base / "assets" / "fonts" / "Lexend-Variable.ttf"
-    if font_path.exists():
-        QFontDatabase.addApplicationFont(str(font_path))
+    for name in ("Lexend-Variable.ttf", "Inter-Variable.ttf", "JetBrainsMono-Variable.ttf"):
+        font_path = base / "assets" / "fonts" / name
+        if font_path.exists():
+            QFontDatabase.addApplicationFont(str(font_path))
 
 
 RAW_CSS_PROPERTY = "_nvRawCss"
@@ -173,6 +181,71 @@ _DARK_TO_LIGHT.update({
     "#243044": "#e0d8cb",   # slate card hover
 })
 
+
+# ---------------------------------------------------------------------------
+# Dark -> "Midnight" colour map (the Stitch redesign).
+#
+# Panels still hard-code the original grey dark palette. In the dark theme
+# every colour goes through `_midnight()` instead: neutral greys become a
+# deeper, blue-violet tinted near-black ramp (surfaces sink, borders become
+# faint hairlines), neutral text gets a cool cast, and the brand accent moves
+# to the softer Stitch violet. Saturated semantic colours (module accents,
+# tinted cards) pass through unchanged unless listed in the overrides.
+# ---------------------------------------------------------------------------
+
+_MIDNIGHT_OVERRIDES = {
+    # Brand accent
+    "#7c5af0": "#8b7cf6",
+    "#6a48e0": "#7a6af0",
+    "#6b4ae0": "#7a6af0",
+    "#6b46e5": "#7a6af0",
+    "#a78bfa": "#a99bff",
+    "#c4b0ff": "#c7bdff",
+    # Semantic greens take the Stitch mint
+    "#4ade80": "#34d399",
+    "#3fb950": "#34d399",
+    # Primary text / brightest surfaces
+    "#dcdde0": "#e6e6ef",
+    "#e6e6e6": "#e6e6ef",
+    "#fbfbfd": "#ffffff",
+}
+
+_ACCENT_RGBA_RE = re.compile(r"rgba\(\s*124\s*,\s*90\s*,\s*240\s*,")
+_UI_FONT_RE = re.compile(r"'Segoe UI Variable Text',\s*'Segoe UI'")
+_MONO_FONT_RE = re.compile(r"'Cascadia Mono',\s*Consolas")
+_midnight_cache: dict = {}
+
+
+def _midnight(color: str) -> str:
+    key = color.lower()
+    hit = _midnight_cache.get(key)
+    if hit is not None:
+        return hit
+    out = _MIDNIGHT_OVERRIDES.get(key)
+    if out is None:
+        import colorsys
+        r, g, b = (int(key[i:i + 2], 16) / 255 for i in (1, 3, 5))
+        h, l, s = colorsys.rgb_to_hls(r, g, b)
+        if s > 0.22 and max(r, g, b) - min(r, g, b) > 0.06:
+            out = key                          # saturated: semantic colour
+        elif l < 0.40:
+            # Surfaces & borders: sink and add an indigo cast.
+            nl = min(0.40, (l ** 1.25) * 1.02)
+            out = _hls_hex(0.668, nl, 0.16)
+        elif l < 0.97:
+            # Neutral text: keep lightness, cool it slightly.
+            out = _hls_hex(0.668, l, 0.10)
+        else:
+            out = key
+    _midnight_cache[key] = out
+    return out
+
+
+def _hls_hex(h: float, l: float, s: float) -> str:
+    import colorsys
+    r, g, b = colorsys.hls_to_rgb(h, l, s)
+    return "#{:02x}{:02x}{:02x}".format(round(r * 255), round(g * 255), round(b * 255))
+
 _HEX_RE = re.compile(r"#[0-9a-fA-F]{6}\b")
 _WHITE_RGBA_RE = re.compile(r"rgba\(\s*255\s*,\s*255\s*,\s*255\s*,")
 
@@ -194,14 +267,21 @@ def set_theme(name: str):
 def tint(color: str) -> str:
     """Map a single colour for the active theme (for QColor and friends)."""
     if _current != LIGHT:
+        if isinstance(color, str) and _HEX_RE.fullmatch(color):
+            return _midnight(color)
         return color
     return _DARK_TO_LIGHT.get(color.lower(), color)
 
 
 def skin(css: str) -> str:
     """Re-tint every colour inside a Qt stylesheet for the active theme."""
-    if _current != LIGHT or not css:
+    if not css:
         return css
+    css = _UI_FONT_RE.sub("Inter, 'Segoe UI Variable Text', 'Segoe UI'", css)
+    css = _MONO_FONT_RE.sub("'JetBrains Mono', 'Cascadia Mono', Consolas", css)
+    if _current != LIGHT:
+        css = _HEX_RE.sub(lambda m: _midnight(m.group(0)), css)
+        return _ACCENT_RGBA_RE.sub("rgba(139, 124, 246,", css)
     out = _HEX_RE.sub(
         lambda m: _DARK_TO_LIGHT.get(m.group(0).lower(), m.group(0)), css
     )

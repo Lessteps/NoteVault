@@ -2,8 +2,10 @@ from PySide6.QtWidgets import QGraphicsScene
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QPen, QBrush, QImage, QPainter
 
-BG        = QColor("#1a1a1e")
-GRID_DOT  = QColor("#2c2c34")
+from .... import theme
+
+BG        = QColor(theme.tint("#1a1a1e"))
+GRID_DOT  = QColor(theme.tint("#2c2c34"))
 GRID_STEP = 40
 
 

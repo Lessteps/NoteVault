@@ -29,7 +29,7 @@ DARK_THEME_QSS = """
 QMainWindow, QWidget, QDialog {
     background-color: #1a1a1e;
     color: #dcdde0;
-    font-family: 'Segoe UI Variable Text', 'Segoe UI', -apple-system, sans-serif;
+    font-family: Inter, 'Segoe UI Variable Text', 'Segoe UI', -apple-system, sans-serif;
     font-size: 12px;
 }
 
@@ -844,6 +844,64 @@ QGroupBox::title {
 
 QMessageBox, QProgressDialog {
     background-color: #202024;
+}
+
+/* ---------- Midnight redesign polish (Stitch) ----------
+   Flat, hairline-bordered surfaces with the violet accent reserved for
+   selection and focus. Colours are written in the source palette and
+   re-tinted by theme.skin() like every other sheet. */
+QSplitter::handle:horizontal { width: 1px; }
+QSplitter::handle:vertical { height: 1px; }
+
+QTreeWidget::item:selected, QTreeView::item:selected {
+    background-color: rgba(124, 90, 240, 0.14);
+    color: #dcdde0;
+}
+QListWidget::item:selected {
+    background-color: rgba(124, 90, 240, 0.14);
+    color: #dcdde0;
+}
+
+QPushButton#railIconBtnActive {
+    background-color: rgba(124, 90, 240, 0.18);
+    border: 1px solid rgba(124, 90, 240, 0.35);
+}
+
+QMenu {
+    background-color: #202024;
+    border: 1px solid #33333e;
+    border-radius: 8px;
+    padding: 4px;
+}
+QMenu::item {
+    color: #dcdde0;
+    padding: 6px 18px 6px 12px;
+    border-radius: 5px;
+}
+QMenu::item:selected {
+    background-color: rgba(124, 90, 240, 0.18);
+}
+QMenu::separator {
+    height: 1px;
+    background: #33333e;
+    margin: 4px 6px;
+}
+
+QTabBar::tab {
+    background: transparent;
+    color: #888895;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 7px 14px;
+}
+QTabBar::tab:hover { color: #dcdde0; }
+QTabBar::tab:selected {
+    color: #dcdde0;
+    border-bottom: 2px solid #7c5af0;
+}
+
+QTextEdit:focus, QPlainTextEdit:focus, QLineEdit:focus {
+    border-color: rgba(124, 90, 240, 0.55);
 }
 """
 

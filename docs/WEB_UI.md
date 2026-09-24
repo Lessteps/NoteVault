@@ -28,7 +28,8 @@ módulos restantes.
 
 | Módulo | Estado |
 |---|---|
-| Notas (explorador, pestañas, lectura, editor, búsqueda, marcadores, backlinks, Ctrl+P) | ✅ migrado |
+| Notas (explorador, pestañas, lectura, editor, búsqueda, marcadores, etiquetas, backlinks, grafo, propiedades, asistente IA, Ctrl+P) | ✅ migrado |
+| Paleta de comandos (Ctrl+Shift+P): formato, listas y casillas (Ctrl+L), tablas (Ctrl+Shift+T y edición de filas/columnas), plantillas, nota diaria (Ctrl+Shift+D), atajos (Ctrl+,) | ✅ migrado |
 | Tareas (tabla editable, filtros, calendario con repeticiones, recordatorios, subtareas) | ✅ migrado |
 | Hábitos (vista general con racha, diaria con subtareas y diario, semanal, mensual, anual, gestionar) | ✅ migrado |
 | Vista General (resumen del día con casillas de todos los módulos y registro rápido de gastos) | ✅ migrado |
@@ -37,7 +38,7 @@ módulos restantes.
 | Metas (tablero por áreas, Hoy, submetas en tarjetas/árbol/detalle, historial, notas, áreas) | ✅ migrado |
 | Finanzas (diario, semanal, mensual, anual, metas de ahorro, categorías con presupuesto, facturas, CSV) | ✅ migrado |
 | Ejercicio (vista general, registro semanal, un día por vista, gestionar rutina, reproductor de video) | ✅ migrado |
-| Canvas, práctica, grafo, asistente IA, WEB | ⏳ en la app clásica |
+| Canvas, práctica, mapa conceptual, herramientas de estudio, WEB | ⏳ en la app clásica |
 
 ## Seguridad
 

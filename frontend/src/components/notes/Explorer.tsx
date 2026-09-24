@@ -1,5 +1,5 @@
 import {
-  Bookmark, ChevronsDownUp, Database, FilePlus, Files, FolderPlus, Network, RefreshCw, Search,
+  ArrowLeft, Bookmark, ChevronsDownUp, Hash, Database, FilePlus, Files, FolderPlus, Network, RefreshCw, Search,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
@@ -13,6 +13,7 @@ const TABS: Array<{ id: ExplorerTab; label: string; icon: ReactNode }> = [
   { id: "files", label: "Files", icon: <Files size={14} /> },
   { id: "search", label: "Search", icon: <Search size={14} /> },
   { id: "bookmarks", label: "Bookmarks", icon: <Bookmark size={14} /> },
+  { id: "tags", label: "Etiquetas", icon: <Hash size={14} /> },
   { id: "graph", label: "Grafo", icon: <Network size={14} /> },
 ];
 
@@ -45,6 +46,7 @@ export function Explorer({ width }: { width: number }) {
         {tab === "files" && <FilesPanel />}
         {tab === "search" && <SearchPanel />}
         {tab === "bookmarks" && <BookmarksPanel />}
+        {tab === "tags" && <TagsPanel />}
         {tab === "graph" && <GraphPanel />}
       </div>
 
@@ -243,6 +245,89 @@ function BookmarksPanel() {
           <span className="truncate">{b.label}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+function TagsPanel() {
+  const version = useApp((s) => s.treeVersion);
+  const openNote = useApp((s) => s.openNote);
+  const [tags, setTags] = useState<Array<{ tag: string; count: number }> | null>(null);
+  const [filter, setFilter] = useState("");
+  const [picked, setPicked] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Array<{ path: string; title: string }>>([]);
+
+  useEffect(() => {
+    api.tagsList().then(setTags).catch(() => setTags([]));
+  }, [version]);
+  useEffect(() => {
+    if (!picked) return;
+    api.tagNotes(picked).then(setNotes).catch(() => setNotes([]));
+  }, [picked, version]);
+
+  if (picked) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="flex h-9 flex-none items-center gap-1 px-2">
+          <IconButton title="Volver a las etiquetas" onClick={() => setPicked(null)}>
+            <ArrowLeft size={14} />
+          </IconButton>
+          <span className="truncate text-[12.5px] font-semibold text-accent-text">#{picked}</span>
+          <span className="ml-auto font-mono text-[10.5px] text-faint">{notes.length}</span>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-2 pt-0">
+          {notes.map((n) => (
+            <button
+              key={n.path}
+              type="button"
+              title={n.path}
+              onClick={() => void openNote(n.path)}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-dim hover:bg-hover hover:text-text"
+            >
+              <span className="truncate">{n.title}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const q = filter.trim().toLowerCase().replace(/^#/, "");
+  const shown = (tags ?? []).filter((t) => !q || t.tag.toLowerCase().includes(q));
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex-none p-2 pb-1.5">
+        <label className="flex h-8 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 focus-within:border-accent">
+          <Hash size={13} className="flex-none text-faint" />
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filtrar etiquetas…"
+            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-text outline-none placeholder:text-faint"
+          />
+        </label>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-2 pt-0">
+        {tags === null && <p className="px-2 py-3 text-[12px] text-faint">Leyendo el vault…</p>}
+        {tags?.length === 0 && (
+          <p className="px-2 py-3 text-[12px] leading-relaxed text-faint">
+            Ninguna nota tiene etiquetas. Escribe #etiqueta en una nota o añádela en sus propiedades.
+          </p>
+        )}
+        {shown.map((t) => (
+          <button
+            key={t.tag}
+            type="button"
+            onClick={() => setPicked(t.tag)}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-dim hover:bg-hover hover:text-text"
+          >
+            <span className="truncate text-accent-text">#{t.tag}</span>
+            <span className="ml-auto flex-none rounded border border-line bg-elevated px-1.5 font-mono text-[10px] text-faint">
+              {t.count}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

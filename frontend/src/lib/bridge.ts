@@ -270,5 +270,11 @@ export const api = {
   englishSpeak: (text: string) => call<{ ok: boolean }>("english_speak", text),
   revealInOs: (rel: string) => call<{ ok: boolean }>("reveal_in_os", rel),
   homeOverview: () => call<HomeOverview>("home_overview"),
+  templatesList: () => call<{ folder: string; templates: Array<{ name: string; title: string }> }>("templates_list"),
+  templateText: (name: string, title = "") => call<{ text: string }>("template_text", name, title),
+  noteFromTemplate: (name: string, title: string, folder = "") => call<{ path: string }>("note_from_template", name, title, folder),
+  dailyNote: () => call<{ path: string }>("daily_note"),
+  tagsList: () => call<Array<{ tag: string; count: number }>>("tags_list"),
+  tagNotes: (tag: string) => call<Array<{ path: string; title: string }>>("tag_notes", tag),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

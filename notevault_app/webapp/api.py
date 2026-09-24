@@ -47,6 +47,7 @@ from .modules.finance import FinanceApi
 from .modules.goals import GoalsApi
 from .modules.habits import HabitsApi
 from .modules.home import HomeApi
+from .modules.notes_extras import NotesExtrasApi
 from .modules.projects import ProjectsApi
 from .modules.tasks import TasksApi
 from .modules.vaults import VaultsApi
@@ -104,7 +105,7 @@ def _set_frontmatter_keys(text: str, updates: dict) -> str:
 
 
 class NoteVaultApi(ManagersMixin, FilesApi, TasksApi, HabitsApi, CalendarApi, ProjectsApi, GoalsApi,
-                  FinanceApi, ExerciseApi, HomeApi, VaultsApi, AssistantApi):
+                  FinanceApi, ExerciseApi, HomeApi, VaultsApi, AssistantApi, NotesExtrasApi):
     """The bridge. Each app module adds its methods through a mixin
     (notevault_app/webapp/modules/), prefixed with the module name."""
 

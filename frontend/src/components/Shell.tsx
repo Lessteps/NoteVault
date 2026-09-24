@@ -64,7 +64,7 @@ function SyncState() {
   );
 }
 
-const MODULES: Array<{ id: ModuleId; label: string; Icon: ComponentType<{ size?: number; strokeWidth?: number }> }> = [
+export const MODULES: Array<{ id: ModuleId; label: string; Icon: ComponentType<{ size?: number; strokeWidth?: number }> }> = [
   { id: "home", label: "Vista General", Icon: House },
   { id: "calendario", label: "Calendario", Icon: Calendar },
   { id: "habits", label: "Hábitos", Icon: CircleCheck },

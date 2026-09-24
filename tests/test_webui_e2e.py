@@ -46,6 +46,7 @@ class WebUiE2E(unittest.TestCase):
             "Ver [[Destino]] y [la web](https://example.com).\n", encoding="utf-8")
         (cls.dir / "Destino.md").write_text("# Destino\n\nhola\n", encoding="utf-8")
         (cls.dir / "Windows.md").write_bytes(b"# Windows\r\n\r\nlinea\r\n")
+        (cls.dir / "Comandos.md").write_text("# Comandos\n\ncomprar pan #compras\n", encoding="utf-8")
         cls.api = NoteVaultApi(cls.dir)
         cls.server, cls.url, _ = serve_in_thread(cls.api, 0, DIST)
         cls.pw = sync_playwright().start()
@@ -115,6 +116,39 @@ class WebUiE2E(unittest.TestCase):
         self._wait_disk(path, lambda b: b"mas" in b)
         data = path.read_bytes()
         self.assertNotIn(b"\n", data.replace(b"\r\n", b""), data)
+
+    def test_command_palette_edits_the_note(self):
+        self._open("Comandos")
+        self.page.get_by_role("tab", name="Editar").click()
+        self.page.locator(".cm-content").get_by_text("comprar pan").click()
+        self.page.keyboard.press("Control+l")
+        path = self.dir / "Comandos.md"
+        self._wait_disk(path, lambda b: b"- [ ] comprar pan" in b)
+        self.page.keyboard.press("Control+l")
+        self._wait_disk(path, lambda b: b"- [x] comprar pan" in b)
+        self.page.keyboard.press("Control+End")
+        self.page.keyboard.press("Control+Shift+p")
+        palette = self.page.get_by_role("dialog", name="Paleta de comandos")
+        palette.get_by_role("textbox").fill("insertar tabla")
+        self.page.keyboard.press("Enter")
+        palette.get_by_role("button", name="2 filas × 3 columnas").click()
+        self._wait_disk(path, lambda b: b"| Columna 1 | Columna 2 | Columna 3 |" in b)
+        # Table ops act on the column under the cursor (the new table
+        # leaves it in the first header cell).
+        self.page.keyboard.press("Control+Shift+p")
+        palette.get_by_role("textbox").fill("eliminar columna")
+        self.page.keyboard.press("Enter")
+        self._wait_disk(path, lambda b: b"| Columna 2 | Columna 3 |" in b)
+
+    def test_daily_note_and_tags(self):
+        self.page.keyboard.press("Control+Shift+d")
+        from datetime import date
+        daily = self.dir / "Diario" / f"{date.today().isoformat()}.md"
+        self._wait_disk(daily, lambda b: b"tags: []" in b)
+        self.page.get_by_role("button", name="Etiquetas").click()
+        self.page.get_by_role("button", name="#compras").click()
+        self.page.get_by_role("button", name="Comandos").click()
+        self.page.get_by_role("tab", name="Comandos").wait_for()
 
     def test_quick_switcher_creates_a_note(self):
         self.page.keyboard.press("Control+p")

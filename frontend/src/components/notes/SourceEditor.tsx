@@ -11,6 +11,15 @@ import {
 } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { useEffect, useRef } from "react";
+import { insertTable, toggleTask, wrap } from "../../lib/editorCommands";
+
+// Markdown shortcuts (the Qt editor's Ctrl+B / Ctrl+I / Ctrl+L / Ctrl+Shift+T).
+const mdKeymap = keymap.of([
+  { key: "Mod-b", run: (v) => wrap(v, "**") },
+  { key: "Mod-i", run: (v) => wrap(v, "*") },
+  { key: "Mod-l", run: toggleTask },
+  { key: "Mod-Shift-t", run: (v) => insertTable(v) },
+]);
 
 const theme = EditorView.theme({
   "&": {
@@ -117,6 +126,7 @@ export function SourceEditor({
         highlightActiveLine(),
         highlightSelectionMatches(),
         EditorView.lineWrapping,
+        ...(code ? [] : [mdKeymap]),
         keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
         // The YAML block on top is YAML, not markdown (else "key: v\n---"
         // reads as a setext heading).

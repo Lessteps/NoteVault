@@ -6,6 +6,7 @@ import { DialogHost, MenuHost } from "./components/ui";
 import { VaultDialog } from "./components/VaultDialog";
 import { NotesModule } from "./components/notes/NotesModule";
 import { QuickSwitcher } from "./components/notes/QuickSwitcher";
+import { CommandPalette, openDailyNote, ShortcutsDialog, useShortcutsDialog } from "./components/notes/CommandPalette";
 import { useTasks } from "./store/tasks";
 import type { ModuleId } from "./store/app";
 
@@ -78,7 +79,16 @@ function useShortcuts() {
       if (!mod) return;
       const s = useApp.getState();
       const key = e.key.toLowerCase();
-      if (key === "p" || key === "o") {
+      if (e.shiftKey && key === "p") {
+        e.preventDefault();
+        s.setPalette(true);
+      } else if (e.shiftKey && key === "d") {
+        e.preventDefault();
+        void openDailyNote();
+      } else if (key === ",") {
+        e.preventDefault();
+        useShortcutsDialog.getState().set(true);
+      } else if (key === "p" || key === "o") {
         e.preventDefault();
         s.setSwitcher(true);
       } else if (key === "s") {
@@ -147,6 +157,8 @@ export function App() {
       </div>
       <StatusBar />
       <QuickSwitcher />
+      <CommandPalette />
+      <ShortcutsDialog />
       <VaultDialog />
       <DialogHost />
       <MenuHost />

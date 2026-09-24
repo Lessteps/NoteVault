@@ -9,7 +9,7 @@ export type ModuleId =
   | "metas" | "finanzas" | "notas" | "tareas";
 
 export type ViewMode = "read" | "edit" | "split";
-export type ExplorerTab = "files" | "search" | "bookmarks" | "graph";
+export type ExplorerTab = "files" | "search" | "bookmarks" | "tags" | "graph";
 
 export interface OpenNote {
   path: string;
@@ -82,6 +82,7 @@ interface State {
   /** Bumped when bookmarks change. */
   bookmarkVersion: number;
   switcherOpen: boolean;
+  paletteOpen: boolean;
   cursor: { line: number; col: number } | null;
   toasts: Toast[];
 
@@ -93,6 +94,7 @@ interface State {
   toggleInspector: () => void;
   toggleTheme: () => void;
   setSwitcher: (open: boolean) => void;
+  setPalette: (open: boolean) => void;
   setCursor: (c: { line: number; col: number } | null) => void;
 
   openNote: (path: string, opts?: { line?: number }) => Promise<void>;
@@ -133,6 +135,7 @@ export const useApp = create<State>((set, get) => ({
   treeVersion: 0,
   bookmarkVersion: 0,
   switcherOpen: false,
+  paletteOpen: false,
   cursor: null,
   toasts: [],
 
@@ -157,7 +160,8 @@ export const useApp = create<State>((set, get) => ({
     set({ theme });
     api.setTheme(theme).catch(() => undefined);
   },
-  setSwitcher: (switcherOpen) => set({ switcherOpen }),
+  setSwitcher: (switcherOpen) => set({ switcherOpen, paletteOpen: false }),
+  setPalette: (paletteOpen) => set({ paletteOpen, switcherOpen: false }),
   setCursor: (cursor) => set({ cursor }),
 
   openNote: async (path, opts) => {

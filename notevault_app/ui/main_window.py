@@ -291,6 +291,7 @@ class MainWindow(QMainWindow):
 
         # ── Notes module ──────────────────────────────────────────────
         self._explorer.note_selected.connect(self._open_notes_path)
+        self._explorer.folder_selected.connect(self._notas_center.show_study_for)
         self._explorer.note_selected_new_tab.connect(
             lambda p: self._open_notes_path(p, new_tab=True)
         )

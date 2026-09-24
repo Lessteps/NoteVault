@@ -36,6 +36,7 @@ def sanitize_error(raw: dict[str, Any], fallback_id: str = "") -> dict[str, Any]
     if category not in ERROR_CATEGORIES:
         category = "conceptual"
 
+    occurred_at = str(raw.get("occurred_at") or datetime.now().isoformat())
     return {
         "id": err_id,
         "category": category,
@@ -46,10 +47,24 @@ def sanitize_error(raw: dict[str, Any], fallback_id: str = "") -> dict[str, Any]
         "wrong_answer": str(raw.get("wrong_answer") or "").strip(),
         "expected": str(raw.get("expected") or "").strip(),
         "explanation": str(raw.get("explanation") or "").strip(),
-        "occurred_at": str(raw.get("occurred_at") or datetime.now().isoformat()),
+        "occurred_at": occurred_at,
         "resolved": bool(raw.get("resolved", False)),
         "repeat_count": max(1, int(raw.get("repeat_count") or 1)),
+        "discipline": str(raw.get("discipline") or "").strip(),
+        "skill": str(raw.get("skill") or "").strip(),
+        "mode": str(raw.get("mode") or "").strip(),
+        "anchor": str(raw.get("anchor") or "").strip(),
+        "description_en": str(raw.get("description_en") or "").strip(),
+        "fix_en": str(raw.get("fix_en") or "").strip(),
+        "note_id": str(raw.get("note_id") or "").strip(),
+        "last_seen": str(raw.get("last_seen") or occurred_at),
     }
+
+
+def repeat_key(err: dict[str, Any]) -> tuple:
+    """Errors sharing this key are the same weakness showing up again."""
+    return (err["subject"], err["topic"], err["discipline"], err["skill"],
+            err["anchor"].lower() or err["category"])
 
 
 class StudyErrorManager:
@@ -104,11 +119,13 @@ class StudyErrorManager:
 
     def record_error(self, category: str, subject: str, topic: str,
                      wrong_answer: str, expected: str = "", explanation: str = "",
-                     source_note: str = "", exercise_id: str = "") -> dict[str, Any]:
-        """Record an error and link to SRS if appropriate."""
-        err_id = generate_error_id(subject, topic, category)
+                     source_note: str = "", exercise_id: str = "", *,
+                     discipline: str = "", skill: str = "", mode: str = "",
+                     anchor: str = "", description_en: str = "", fix_en: str = "",
+                     note_id: str = "") -> dict[str, Any]:
+        """Record an error, or bump the unresolved one with the same repeat_key."""
+        now = datetime.now().isoformat()
         data = {
-            "id": err_id,
             "category": category,
             "subject": subject,
             "topic": topic,
@@ -117,11 +134,27 @@ class StudyErrorManager:
             "explanation": explanation,
             "source_note": source_note,
             "exercise_id": exercise_id,
-            "occurred_at": datetime.now().isoformat(),
+            "occurred_at": now,
             "resolved": False,
             "repeat_count": 1,
+            "discipline": discipline,
+            "skill": skill,
+            "mode": mode,
+            "anchor": anchor,
+            "description_en": description_en,
+            "fix_en": fix_en,
+            "note_id": note_id,
+            "last_seen": now,
         }
-        clean = sanitize_error(data, err_id)
+        clean = sanitize_error(data, generate_error_id(subject, topic, category))
+        key = repeat_key(clean)
+        previous = next((e for e in self._load_all().values()
+                         if not e["resolved"] and repeat_key(e) == key), None)
+        if previous:
+            latest = {k: v for k, v in clean.items()
+                      if k not in ("id", "occurred_at", "repeat_count") and v != ""}
+            clean = sanitize_error({**previous, **latest,
+                                    "repeat_count": previous["repeat_count"] + 1})
         store.write_json(self._path(clean["id"]), clean)
         self._cache = None
         return clean

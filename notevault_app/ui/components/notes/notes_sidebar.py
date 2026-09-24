@@ -199,6 +199,7 @@ class _ToolButton(QPushButton):
 
 class NotesSidebar(QWidget):
     note_selected          = Signal(Path)
+    folder_selected        = Signal(Path)
     note_selected_new_tab  = Signal(Path)
     note_selected_at_line  = Signal(Path, int)
     vault_switch_requested = Signal(Path)
@@ -814,6 +815,8 @@ class NotesSidebar(QWidget):
             self.note_selected.emit(Path(data["path"]))
         elif data.get("type") == "folder":
             item.setExpanded(not item.isExpanded())
+            if data.get("path"):
+                self.folder_selected.emit(Path(data["path"]))
 
     def _on_item_double_clicked(self, item: QTreeWidgetItem, col: int):
         data = item.data(0, Qt.UserRole) or {}

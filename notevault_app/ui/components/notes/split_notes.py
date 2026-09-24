@@ -30,9 +30,10 @@ from PySide6.QtGui import (
     QPen,
     QShortcut,
 )
-from PySide6.QtWidgets import QApplication, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QSplitter, QVBoxLayout, QWidget
 
 from ...theme import tint
+from ..estudio.study_sidebar import StudySideBar
 from .markdown_editor import MarkdownEditor
 
 
@@ -120,7 +121,16 @@ class SplitNotes(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-        root.addWidget(self._splitter)
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+        body.addWidget(self._splitter, 1)
+        # Estudio sub-bar: visible while the active note is inside a study area.
+        self._study = StudySideBar(vault)
+        self._study.open_note_requested.connect(self.open_note)
+        self.active_note_changed.connect(self._study.set_note)
+        body.addWidget(self._study)
+        root.addLayout(body)
 
         self._overlay = _DropOverlay(self)
         self._overlay.hide()
@@ -422,6 +432,9 @@ class SplitNotes(QWidget):
             self.split_pane(pane, orientation=Qt.Vertical, after=True, note_to_attach=note)
 
     # ── API delegated to the ACTIVE pane ──────────────────────────────────
+    def show_study_for(self, folder: Path):
+        self._study.set_note(folder)
+
     def open_note(self, path: Path, line: int = 0, new_tab: bool = False):
         self._active.open_note(path, line, new_tab=new_tab)
 
@@ -466,6 +479,7 @@ class SplitNotes(QWidget):
         self.service = service
         for pane in self._panes:
             pane.set_vault(vault, service)
+        self._study.set_vault(vault)
 
     def set_assistant_visible(self, visible: bool):
         self._assistant_visible = visible
@@ -475,6 +489,7 @@ class SplitNotes(QWidget):
     def retheme(self):
         for pane in self._panes:
             pane.retheme()
+        self._study.retheme()
 
     def refresh_mentions(self):
         for pane in self._panes:

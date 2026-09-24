@@ -46,6 +46,8 @@ from .table_picker import TablePicker
 from .note_properties_dialog import NotePropertiesDialog
 from .english_audio_panel import EnglishAudioPanel
 from ....core.frontmatter_utils import parse_frontmatter, dump_frontmatter, sanitize_properties
+from ....core.practice.exercise_note import is_practice_frontmatter
+from ....core.practice.ladder import is_proof_frontmatter, ladder_note
 from ....core.workspace_manager import WorkspaceManager
 from ....core.templates import list_templates, read_and_expand
 from ....core.daily_notes import open_or_create_today
@@ -65,6 +67,9 @@ FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n?", re.S)
 MODE_RICH = 0
 MODE_RAW  = 1
 MODE_READ = 2
+STACK_CANVAS = 3
+STACK_PRACTICE = 4
+STACK_LADDER = 5
 
 PIN_GLYPH = "📌 "
 MAX_MENTION_ROWS = 60
@@ -118,6 +123,7 @@ class _OpenNote:
         self.kind = kind           # "note", "code", or "canvas"
         self.dirty = False
         self.pinned = False
+        self.show_practice = True  # a practice note opens in the practice view until edited
         self._checked_body = None
         self._rich_problem = None
 
@@ -136,6 +142,33 @@ class _OpenNote:
     @property
     def is_canvas(self) -> bool:
         return self.kind == "canvas"
+
+    @property
+    def is_practice(self) -> bool:
+        if self.kind != "note" or not self.frontmatter:
+            return False
+        return is_practice_frontmatter(parse_frontmatter(self.frontmatter)[0])
+
+    @property
+    def is_proof(self) -> bool:
+        """A theorem note whose proof steps the proof ladder can read."""
+        if self.kind != "note" or not self.frontmatter:
+            return False
+        key = (self.frontmatter, self.body)
+        if getattr(self, "_proof_key", None) != key:
+            self._proof_key = key
+            self._is_proof = (
+                is_proof_frontmatter(parse_frontmatter(self.frontmatter)[0])
+                and ladder_note(self.frontmatter + self.body, self.path) is not None)
+        return self._is_proof
+
+    @property
+    def in_ladder_view(self) -> bool:
+        return self.show_practice and self.is_proof and not self.is_practice
+
+    @property
+    def in_practice_view(self) -> bool:
+        return self.show_practice and (self.is_practice or self.is_proof)
 
     @property
     def title(self) -> str:
@@ -209,6 +242,7 @@ class MarkdownEditor(QWidget):
         self._pending_mention = None
         self._init_ui()
         self._init_shortcuts()
+        self._install_media_hooks()
         self._show_placeholder(True)
         QTimer.singleShot(0, self._restore_pinned)
 
@@ -274,6 +308,16 @@ class MarkdownEditor(QWidget):
         self._canvas.open_note_requested.connect(self.open_note_requested.emit)
         self._canvas.open_note_in_new_tab_requested.connect(self.open_note_new_tab)
         self._stack.addWidget(self._canvas)    # 3
+
+        from .practice import PracticeView
+        self._practice = PracticeView(self.vault.vault_root)
+        self._practice.edit_requested.connect(self._edit_practice_note)
+        self._stack.addWidget(self._practice)  # 4
+
+        from .practice.ladder_view import LadderView
+        self._ladder = LadderView(self.vault.vault_root)
+        self._ladder.edit_requested.connect(self._edit_practice_note)
+        self._stack.addWidget(self._ladder)    # 5
 
         root.addWidget(self._stack, stretch=1)
 
@@ -463,7 +507,18 @@ class MarkdownEditor(QWidget):
 
         lay.addStretch()
 
-        palette = _ToolBtn("⌘", "Paleta de comandos: tablas, checklists, adjuntos…  (Ctrl+P)", 28)
+        self._practice_btn = _ToolBtn("▶ Practicar", "Volver a la vista de práctica del ejercicio", 86)
+        self._practice_btn.clicked.connect(self._show_practice_view)
+        self._practice_btn.setVisible(False)
+        lay.addWidget(self._practice_btn)
+
+        self._ladder_btn = _ToolBtn("▶ Practicar demostración",
+                                    "Volver a la escalera de práctica de esta demostración", 170)
+        self._ladder_btn.clicked.connect(self._show_practice_view)
+        self._ladder_btn.setVisible(False)
+        lay.addWidget(self._ladder_btn)
+
+        palette =_ToolBtn("⌘", "Paleta de comandos: tablas, checklists, adjuntos…  (Ctrl+P)", 28)
         palette.clicked.connect(self.open_palette)
         lay.addWidget(palette)
         lay.addWidget(_sep())
@@ -820,7 +875,7 @@ class MarkdownEditor(QWidget):
             for i, note in enumerate(self._open):
                 if note.path == path:
                     self._tabs.setCurrentIndex(i)
-                    if line and not note.is_canvas:
+                    if line and not note.is_canvas and not note.in_practice_view:
                         self._goto_line(line)
                     self._focus_view()
                     return
@@ -828,6 +883,8 @@ class MarkdownEditor(QWidget):
         if not fs.exists():
             QMessageBox.warning(self, "No encontrada",
                                 f"El archivo ya no existe:\n{path}")
+            return
+        if self._open_media_file(fs):
             return
 
         kind = kind_for(path) or "note"
@@ -855,7 +912,7 @@ class MarkdownEditor(QWidget):
         self._tabs.setCurrentIndex(index)
         if self._tabs.currentIndex() == index and self._current != index:
             self._on_tab_changed(index)
-        if line:
+        if line and not note.in_practice_view:
             self._goto_line(line)
         self._focus_view()
 
@@ -1104,12 +1161,33 @@ class MarkdownEditor(QWidget):
             self._ws_frame.setVisible(False)
             self._mentions.setVisible(False)
             self._status.setText("")
-            self._stack.setCurrentIndex(3)
+            self._stack.setCurrentIndex(STACK_CANVAS)
             self._canvas.load(note.path)
             self.active_note_changed.emit(note.path)
             return
 
+        if note.in_ladder_view:
+            self._toolbar_host.setVisible(False)
+            self._ws_frame.setVisible(False)
+            self._mentions.setVisible(False)
+            self._stack.setCurrentIndex(STACK_LADDER)
+            self._ladder.load(note.path, note.frontmatter + note.body)
+            self._status.setText(
+                "Escalera de demostración  ·  «Editar nota» abre el markdown de la demostración")
+            return
+
+        if note.in_practice_view:
+            self._toolbar_host.setVisible(False)
+            self._ws_frame.setVisible(False)
+            self._mentions.setVisible(False)
+            self._stack.setCurrentIndex(STACK_PRACTICE)
+            self._practice.load(note.path, note.frontmatter + note.body)
+            self._status.setText("Práctica  ·  «Editar nota» abre el markdown del ejercicio")
+            return
+
         self._toolbar_host.setVisible(True)
+        self._practice_btn.setVisible(note.is_practice)
+        self._ladder_btn.setVisible(note.is_proof and not note.is_practice)
         mode, problem = self._mode_for(note)
         self._active = mode
         for view in (self._rich, self._raw, self._read):
@@ -1164,13 +1242,15 @@ class MarkdownEditor(QWidget):
     def refresh_mentions(self):
         """Reload mentions for the currently active note."""
         note = self.current_note()
-        if note is not None and not note.is_code and not note.is_canvas:
+        if (note is not None and not note.is_code and not note.is_canvas
+                and not note.in_practice_view):
             self._mentions.load(note.path)
 
     def _on_backlinks_count_changed(self, count: int):
         self._current_backlinks_count = int(count)
         note = self.current_note()
-        if note is not None and not note.is_canvas and not note.is_code:
+        if (note is not None and not note.is_canvas and not note.is_code
+                and not note.in_practice_view):
             self._update_status(note)
 
     def on_note_moved(self, old_path: Path, new_path: Path):
@@ -1209,6 +1289,25 @@ class MarkdownEditor(QWidget):
                         pass
             self.refresh_mentions()
 
+    def _edit_practice_note(self):
+        note = self.current_note()
+        if note is None:
+            return
+        note.show_practice = False
+        self._load_into_view(note)
+        self._focus_view()
+
+    def _show_practice_view(self):
+        note = self.current_note()
+        if note is None or not (note.is_practice or note.is_proof):
+            return
+        self._capture_current()
+        if note.dirty:
+            self._save(self._current)
+        note.show_practice = True
+        self._load_into_view(note)
+        self._focus_view()
+
     def flush_canvas(self):
         """Flush any pending canvas save (call before closing the app)."""
         if hasattr(self, "_canvas"):
@@ -1220,7 +1319,7 @@ class MarkdownEditor(QWidget):
     def _capture_current(self):
         """Pull whatever the visible editor holds back into the model."""
         note = self.current_note()
-        if note is None or self._loading or note.is_canvas:
+        if note is None or self._loading or note.is_canvas or note.in_practice_view:
             return
         mode = self._view_mode()
         if mode == MODE_RAW:
@@ -1313,6 +1412,7 @@ class MarkdownEditor(QWidget):
             return
         self._capture_current()
         self._mode = mode
+        note.show_practice = False
         self._load_into_view(note)
 
     # ── Formatting ────────────────────────────────────────────────────────
@@ -1324,7 +1424,7 @@ class MarkdownEditor(QWidget):
         note = self.current_note()
         if note is None:
             return False
-        if note.is_code:
+        if note.is_code or note.in_practice_view:
             return False
         if self._mode == MODE_READ:
             self.set_mode(MODE_RICH)
@@ -1497,7 +1597,7 @@ class MarkdownEditor(QWidget):
 
     def toggle_current_task(self):
         note = self.current_note()
-        if note is None or note.is_code:
+        if note is None or note.is_code or note.in_practice_view:
             return
         if self._view_mode() == MODE_RAW:
             cursor = self._raw.textCursor()
@@ -1640,10 +1740,31 @@ class MarkdownEditor(QWidget):
             embed_files(self._editor(), [Path(f) for f in files])
 
     def _open_media(self, path: str):
+        if self._open_media_file(path):
+            return
         if attachments.kind_of(path) == "video":
             _VideoDialog(path, self).exec()
         else:
             QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+    # ── English media player hooks (nv://media links, video/audio files) ──
+
+    def _install_media_hooks(self):
+        from ..english.links import MediaLinkClicks, install_media_link_handler
+        install_media_link_handler(lambda: self.vault.vault_root, self.open_note)
+        self._media_link_clicks = [MediaLinkClicks(v, self._open_media_url)
+                                   for v in (self._rich, self._raw)]
+
+    def _open_media_url(self, url: str) -> bool:
+        from ..english.links import open_media_url
+        return open_media_url(url, self.vault.vault_root, self.open_note)
+
+    def _open_media_file(self, path) -> bool:
+        try:
+            from ..english.links import open_media_file
+            return open_media_file(path, self.vault.vault_root, self.open_note)
+        except ImportError:
+            return False
 
     # ── Reading mode ──────────────────────────────────────────────────────
 
@@ -2055,6 +2176,10 @@ class MarkdownEditor(QWidget):
         self._mentions.service = service
         if hasattr(self, "_canvas"):
             self._canvas.set_context(vault, service)
+        if hasattr(self, "_practice"):
+            self._practice.set_vault(vault.vault_root)
+        if hasattr(self, "_ladder"):
+            self._ladder.set_vault(vault.vault_root)
         # Re-point workspace detection at the new vault; otherwise the study
         # toolbar keeps reading profiles from the previous vault's .notevault.
         self._workspace_manager = WorkspaceManager(vault.vault_root)

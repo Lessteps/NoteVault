@@ -21,7 +21,7 @@ from PySide6.QtGui import (
     QPainter, QColor, QPen, QImage, QFont, QTextCursor, QTextDocument,
     QTextListFormat, QTextBlockFormat, QTextImageFormat, QTextTableFormat,
     QTextCharFormat, QTextFormat, QBrush, QTextTable, QDesktopServices,
-    QTextFrameFormat, QTextLength,
+    QTextFrameFormat, QTextLength, QFontInfo,
 )
 from PySide6.QtWidgets import QTextEdit, QTextBrowser, QMenu, QMessageBox
 
@@ -58,6 +58,8 @@ QUOTE_BAR = "#4848a0"
 TABLE_BORDER = "#44444e"
 TABLE_PADDING = 8
 MAX_IMAGE_WIDTH = 900
+# Resource names of rendered LaTeX (practice/math_render.py).
+MATH_SCHEME = "nvmath:"
 
 # Spacing for the rendered views, in pixels.
 PARA_GAP = 12
@@ -293,7 +295,8 @@ class _NoteSurface:
                     continue
             fmt = c.charFormat()
             if fmt.isImageFormat():
-                return fmt.toImageFormat().name()
+                name = fmt.toImageFormat().name()
+                return None if name.startswith(MATH_SCHEME) else name
         return None
 
     def _open_media(self, pos: QPoint) -> bool:
@@ -624,9 +627,16 @@ class NoteTextBrowser(_NoteSurface, QTextBrowser):
         self._init_surface()
         self.setOpenLinks(False)
         self.anchorClicked.connect(self._on_anchor)
+        self.math_enabled = True
 
     def loadResource(self, rtype, url):
         if rtype == QTextDocument.ImageResource:
+            name = self._resource_name(url)
+            if name.startswith(MATH_SCHEME):
+                from .practice import math_render
+                image = math_render.math_image(name)
+                if image is not None:
+                    return image
             return self._load_note_resource(url)
         return super().loadResource(rtype, url)
 
@@ -635,9 +645,16 @@ class NoteTextBrowser(_NoteSurface, QTextBrowser):
         self._paint_guides()
 
     def load_markdown(self, markdown: str):
+        from .practice import math_render
         self.document().clear()
+        if self.math_enabled:
+            self.ensurePolished()
+            px = QFontInfo(self.font()).pixelSize()
+            markdown = math_render.markdown_with_math(markdown, font_px=px)
         self.document().setMarkdown(markdown)
         style_document(self.document())
+        if self.math_enabled:
+            math_render.typeset_document(self.document())
 
     def _on_anchor(self, url: QUrl):
         if url.scheme() == "nv-note":

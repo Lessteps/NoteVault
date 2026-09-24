@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 _pyside6 = Path(sys.exec_prefix) / 'Lib' / 'site-packages' / 'PySide6'
 _mm_plugins = str(_pyside6 / 'plugins' / 'multimedia')
@@ -16,6 +16,13 @@ for dll_name in [
     dll_path = _pyside6 / dll_name
     if dll_path.exists():
         _extra_binaries.append((str(dll_path), '.'))
+
+# FFmpeg DLLs of whatever version PySide6 ships (the English media player needs them).
+for _pattern in ('avcodec-*.dll', 'avformat-*.dll', 'avutil-*.dll',
+                 'swresample-*.dll', 'swscale-*.dll'):
+    for dll_path in _pyside6.glob(_pattern):
+        if (str(dll_path), '.') not in _extra_binaries:
+            _extra_binaries.append((str(dll_path), '.'))
 
 _mm_dir = _pyside6 / 'plugins' / 'multimedia'
 if _mm_dir.exists():
@@ -31,14 +38,18 @@ a = Analysis(
         (_mm_plugins, 'PySide6/plugins/multimedia'),
         (_mm_plugins, 'plugins/multimedia'),
         ('assets', 'assets'),
-    ],
+    ]
+    # LaTeX rendering (practice/math_render.py): math/text fonts and the symbol table.
+    + collect_data_files('ziamath') + collect_data_files('ziafont')
+    + collect_data_files('latex2mathml'),
     hiddenimports=[
         'PySide6.QtMultimedia',
         'PySide6.QtMultimediaWidgets',
         'PySide6.QtOpenGLWidgets',
         'watchdog.observers',
         'watchdog.observers.polling',
-    ] + collect_submodules('notevault_app'),
+        'PySide6.QtSvg',
+    ] + collect_submodules('ziamath') + collect_submodules('notevault_app'),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

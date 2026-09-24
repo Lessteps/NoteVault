@@ -46,6 +46,7 @@ vault/
 │   │   ├── <goal-id>/goal.md              una carpeta por meta
 │   │   ├── <goal-id>/items/<item-id>.md   una submeta por archivo
 │   │   └── registro/YYYY/MM/YYYY-MM-DD.json  checks del día
+│   ├── estudio/                           práctica: intentos, errores, repaso
 │   └── .papelera/                         lo borrado, nunca se elimina de verdad
 ├── .notevault-bookmarks.json              ⚠ global
 └── <lo que sea>/…                         las notas del usuario
@@ -586,6 +587,70 @@ Lista de visitas del día: `{"time": "HH:MM:SS", "url": ..., "title": ...}`, má
 ### `.notevault/web/uso/AAAA/MM/AAAA-MM-DD.json`
 
 Segundos de uso por host ese día, con claves ordenadas: `{"youtube.com": 1260}`.
+
+## Estudio
+
+El sistema de práctica (solo escritorio por ahora) guarda en `.notevault/estudio/`
+todo lo que aprende del estudiante. Los ejercicios son notas normales de la vault
+(`type: exercise` en el frontmatter); la app **nunca** escribe dentro de la nota:
+intentos, errores y repaso espaciado se guardan aquí, indexados por el `id` de la
+nota. El cliente móvil conserva estos archivos sin tocarlos.
+
+| Clave de `LAYOUT` | Ruta |
+|---|---|
+| `study_srs_item` | `.notevault/estudio/srs/<srs-id>.json` — repaso espaciado (SM-2) |
+| `study_error` | `.notevault/estudio/errores/<err-id>.json` — un error clasificado |
+| `study_error_digest` | `.notevault/estudio/errores/ERROR_LOG.md` — resumen en inglés |
+| `study_attempt` | `.notevault/estudio/intentos/<att-id>.json` — intentos de un ejercicio |
+| `study_handoff_request` | `.notevault/estudio/handoff/requests/<req-id>.json` |
+| `study_handoff_response` | `.notevault/estudio/handoff/responses/<req-id>.json` |
+| `study_ledger` | `.notevault/estudio/ledger/<disciplina>.json` — estado por skill (fase 6) |
+| `kb_canvas_manifest` | `.notevault/estudio/kb_canvas_manifest.json` — hashes de canvas generados |
+
+### `.notevault/estudio/intentos/<att-id>.json`
+
+`<att-id>` = `att_` + los primeros 12 hex de `sha256(id de la nota)`.
+
+```json
+{"note_id": "mat.logica.induccion.e01",
+ "note_path": "Matemáticas/…/1.10-E01 Suma de los primeros impares.md",
+ "draft": "",
+ "attempts": [{"at": "2026-09-24T18:03:11", "mode": "prove", "discipline": "math_general",
+   "skill": "", "subject": "mathematics", "answer": "…", "hints_used": 1, "seconds": 842,
+   "solution_seen": false, "transport": "http", "score": 80, "quality": 4,
+   "verdict": "partial", "rubric": [true, true, true, false, true],
+   "errors": [{"category": "logical", "anchor": "", "description": "…",
+               "evidence": "…", "fix": "…"}],
+   "feedback": "…", "next_step": "…", "example": "…"}]}
+```
+
+- `draft` es el borrador que el estudiante está escribiendo; se vacía al entregar.
+- `transport`: `http`, `bridge`, `handoff` o `local` (los sprints de cálculo).
+- `verdict`: `correct`, `partial`, `incorrect` o `ungraded`.
+
+### `.notevault/estudio/errores/<err-id>.json`
+
+Además de los campos de siempre (`category`, `subject`, `topic`, `wrong_answer`,
+`expected`, `explanation`, `resolved`, `repeat_count`…), un error registrado por
+la práctica lleva `discipline`, `skill`, `mode`, `anchor`, `description_en`,
+`fix_en`, `note_id` y `last_seen`. Un error sin resolver con la misma asignatura,
+tema, disciplina, skill y anchor (o categoría si no hay anchor) no crea otro
+archivo: se reescribe con `repeat_count + 1` y `last_seen` actualizado.
+
+`ERROR_LOG.md` se regenera tras cada intento corregido. Está en inglés porque lo
+lee cualquier IA antes de generar o corregir ejercicios; no se edita a mano.
+
+### `.notevault/estudio/handoff/`
+
+Intercambio por archivos con un agente de IA que tenga acceso a la vault.
+
+- Petición: `requests/<req-id>.json` = `{"id", "kind": "grade"|"generate",
+  "created", "note_id", "note_path", "messages", "response_file"}` y, al lado,
+  `requests/<req-id>.md` con el prompt listo para leer.
+- Respuesta: el agente escribe `responses/<req-id>.json` (también se acepta
+  `responses/<req-id>.md` con un bloque JSON).
+- `<req-id>` = `req_` + `AAAAMMDDhhmmss` + `_` + 6 hex.
+- Cuando la app procesa la respuesta mueve la petición a `requests/done/`.
 
 ## Adjuntos
 

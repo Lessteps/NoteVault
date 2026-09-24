@@ -5,6 +5,8 @@ import { ComingSoon, IconRail, StatusBar, Toasts, TopBar } from "./components/Sh
 import { DialogHost, MenuHost } from "./components/ui";
 import { NotesModule } from "./components/notes/NotesModule";
 import { QuickSwitcher } from "./components/notes/QuickSwitcher";
+import { TasksModule } from "./components/tasks/TasksModule";
+import { useTasks } from "./store/tasks";
 
 /**
  * The window must never navigate: a remote page loaded in it would get the
@@ -74,11 +76,35 @@ function useShortcuts() {
   }, []);
 }
 
+/** Task reminders: every minute, show the ones whose time has come. */
+function useTaskReminders() {
+  useEffect(() => {
+    const check = () => {
+      api.tasksDueReminders()
+        .then((due) => {
+          for (const t of due) {
+            useApp.getState().toast("info", `🔔 Recordatorio: ${t.name}`);
+            void api.tasksMarkReminderShown(t.id);
+          }
+          if (due.length) void useTasks.getState().load();
+        })
+        .catch(() => undefined);
+    };
+    const first = setTimeout(check, 3000);
+    const every = setInterval(check, 60_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(every);
+    };
+  }, []);
+}
+
 export function App() {
   const init = useApp((s) => s.init);
   const module = useApp((s) => s.module);
   useNavigationGuard();
   useShortcuts();
+  useTaskReminders();
   useEffect(() => {
     void init();
   }, [init]);
@@ -88,7 +114,9 @@ export function App() {
       <TopBar />
       <div className="flex min-h-0 flex-1">
         <IconRail />
-        {module === "notas" ? <NotesModule /> : <ComingSoon module={module} />}
+        {module === "notas" ? <NotesModule />
+          : module === "tareas" ? <TasksModule />
+            : <ComingSoon module={module} />}
       </div>
       <StatusBar />
       <QuickSwitcher />

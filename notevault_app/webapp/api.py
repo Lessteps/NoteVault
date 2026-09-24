@@ -8,7 +8,9 @@ Every public method here is callable from JavaScript, so the rules are:
   (absolute paths, `..`, symlinks pointing out) or touches internal folders
   (any component starting with a dot: .trash, .notevault, .obsidian…).
 - Only notes and existing code files are ever written, and never above
-  MAX_WRITE_BYTES.
+  __all__ = ["ApiError", "NoteVaultApi", "public_methods"]
+
+MAX_WRITE_BYTES.
 - Return values are plain JSON types. Failures raise ApiError, which both
   transports (pywebview, the dev HTTP bridge) hand to JS as a rejected call.
 - pywebview exposes public methods *and walks public attributes*, so every
@@ -34,15 +36,13 @@ from ..core.file_kinds import kind_for
 from ..core.frontmatter_utils import parse_frontmatter
 from ..core.notes_service import NotesService
 from ..core.vault_manager import Note, VaultManager
+from .errors import ApiError
+from .modules.tasks import TasksApi
 
 MAX_WRITE_BYTES = 10 * 1024 * 1024
 MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
 API_VERSION = 1
-
-
-class ApiError(ValueError):
-    """A request the API refuses; the message is shown to the user."""
 
 
 def _json_safe(value: Any) -> Any:
@@ -58,7 +58,10 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
-class NoteVaultApi:
+class NoteVaultApi(TasksApi):
+    """The bridge. Each app module adds its methods through a mixin
+    (notevault_app/webapp/modules/), prefixed with the module name."""
+
     def __init__(self, vault_path: Optional[Path] = None):
         self._lock = threading.RLock()
         # Window lifecycle (run_web.py): how many notes the UI still has

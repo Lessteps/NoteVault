@@ -6,7 +6,8 @@
 // with a per-run token. Both reject with an Error carrying Python's message.
 
 import type {
-  AppInfo, Bookmark, IndexEntry, Mentions, NoteData, SearchHit, TreeEntry, WriteResult,
+  AppInfo, Bookmark, IndexEntry, Mentions, NoteData, SearchHit, Task, TaskFields, TasksMeta,
+  TreeEntry, WriteResult,
 } from "./types";
 
 type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
@@ -118,4 +119,15 @@ export const api = {
 
   readAttachment: (notePath: string, name: string) =>
     call<{ data_url: string }>("read_attachment", notePath, name),
+
+  // Tareas
+  tasksMeta: () => call<TasksMeta>("tasks_meta"),
+  tasksList: () => call<Task[]>("tasks_list"),
+  tasksInRange: (first: string, last: string) =>
+    call<Array<{ date: string; id: string }>>("tasks_in_range", first, last),
+  tasksCreate: (fields: TaskFields = {}) => call<Task>("tasks_create", fields),
+  tasksUpdate: (id: string, fields: TaskFields) => call<Task>("tasks_update", id, fields),
+  tasksDelete: (id: string) => call<{ ok: boolean }>("tasks_delete", id),
+  tasksDueReminders: () => call<Task[]>("tasks_due_reminders"),
+  tasksMarkReminderShown: (id: string) => call<{ ok: boolean }>("tasks_mark_reminder_shown", id),
 };

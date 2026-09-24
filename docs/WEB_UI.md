@@ -29,7 +29,8 @@ módulos restantes.
 | Módulo | Estado |
 |---|---|
 | Notas (explorador, pestañas, lectura, editor, búsqueda, marcadores, backlinks, Ctrl+P) | ✅ migrado |
-| Vista general, Calendario, Hábitos, Ejercicio, Proyectos, Metas, Finanzas, Tareas | ⏳ en la app clásica |
+| Tareas (tabla editable, filtros, calendario con repeticiones, recordatorios, subtareas) | ✅ migrado |
+| Vista general, Calendario, Hábitos, Ejercicio, Proyectos, Metas, Finanzas | ⏳ en la app clásica |
 | Canvas, práctica, grafo, asistente IA, WEB | ⏳ en la app clásica |
 
 ## Seguridad
@@ -48,6 +49,12 @@ módulos restantes.
 ## Pruebas
 
 ```bash
-python -m pytest tests/test_webapp_api.py tests/test_webui_e2e.py
+python -m pytest tests/test_webapp_api.py tests/test_webapp_tasks.py tests/test_webui_e2e.py
 cd frontend && npm test && npm run typecheck
 ```
+
+## Pendiente conocido
+
+- Los recordatorios de Tareas se avisan **dentro de la app** (cada minuto). La
+  notificación del sistema operativo que daba la app clásica todavía no está en
+  la versión web.

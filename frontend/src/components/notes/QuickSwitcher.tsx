@@ -39,7 +39,6 @@ export function QuickSwitcher() {
     setQ("");
     setSel(0);
     api.noteIndex().then(setIndex).catch(() => setIndex([]));
-    setTimeout(() => input.current?.focus(), 0);
   }, [open]);
 
   const results = useMemo(() => {
@@ -86,6 +85,9 @@ export function QuickSwitcher() {
           <Search size={15} className="text-faint" />
           <input
             ref={input}
+            // Focused as it mounts: typing right after Ctrl+P must not lose
+            // its first keystrokes.
+            autoFocus
             value={q}
             onChange={(e) => {
               setQ(e.target.value);

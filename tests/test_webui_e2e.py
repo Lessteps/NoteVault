@@ -72,10 +72,12 @@ class WebUiE2E(unittest.TestCase):
     def _wait_disk(self, path: Path, predicate, timeout=6.0):
         end = time.time() + timeout
         while time.time() < end:
-            if predicate(path.read_bytes()):
+            # The file may not exist yet: the UI creates it asynchronously.
+            if path.exists() and predicate(path.read_bytes()):
                 return
             time.sleep(0.1)
-        self.fail(f"{path.name} never reached the expected state: {path.read_bytes()!r}")
+        state = path.read_bytes() if path.exists() else "missing"
+        self.fail(f"{path.name} never reached the expected state: {state!r}")
 
     def test_typing_autosaves_to_disk(self):
         self._open("Carpeta", "Nota")
@@ -143,6 +145,76 @@ class WebUiE2E(unittest.TestCase):
         self.assertIn("cambiado por otra app", path.read_text(encoding="utf-8"))
         self.page.get_by_role("button", name="Conservar la mía").click()
         self._wait_disk(path, lambda b: b" mio" in b)
+
+
+@unittest.skipUnless(READY, "needs playwright, Chromium and a built frontend")
+class TasksE2E(unittest.TestCase):
+    """Tareas driven through the browser; checks the task files on disk."""
+
+    @classmethod
+    def setUpClass(cls):
+        from notevault_app.webapp.api import NoteVaultApi
+        from notevault_app.webapp.devserver import serve_in_thread
+
+        cls.dir = Path(tempfile.mkdtemp(prefix="nv_e2e_tasks_"))
+        cls.api = NoteVaultApi(cls.dir)
+        cls.seed = cls.api.tasks_create({"name": "Semilla", "body": "- [ ] paso uno"})
+        cls.server, cls.url, _ = serve_in_thread(cls.api, 0, DIST)
+        cls.pw = sync_playwright().start()
+        cls.browser = cls.pw.chromium.launch(executable_path=CHROMIUM)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.browser.close()
+        cls.pw.stop()
+        cls.server.shutdown()
+        cls.server.server_close()
+        shutil.rmtree(cls.dir, ignore_errors=True)
+
+    def setUp(self):
+        self.page = self.browser.new_page(viewport={"width": 1500, "height": 900})
+        self.errors = []
+        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.page.goto(self.url)
+        self.page.get_by_role("button", name="Tareas").click()
+        self.page.get_by_text("Semilla").first.wait_for()
+
+    def tearDown(self):
+        self.page.close()
+        self.assertEqual(self.errors, [])
+
+    def _task_file(self, tid):
+        from notevault_app.core.task_manager import TaskManager
+        return TaskManager(self.dir).get(tid)
+
+    def _wait(self, predicate, timeout=6.0):
+        end = time.time() + timeout
+        while time.time() < end:
+            if predicate():
+                return
+            time.sleep(0.1)
+        self.fail("state never reached")
+
+    def test_create_and_rename_in_drawer(self):
+        self.page.get_by_role("button", name="Nueva tarea").click()
+        title = self.page.locator("aside input").first
+        title.fill("Creada en la web")
+        title.press("Enter")
+        self._wait(lambda: any(t["name"] == "Creada en la web" for t in self.api.tasks_list()))
+
+    def test_tick_done_and_subtask_write_the_file(self):
+        tid = self.seed["id"]
+        self.page.get_by_text("Semilla").first.click()
+        self.page.get_by_text("paso uno", exact=True).wait_for()
+        self.page.locator("aside").get_by_role("checkbox").first.check()
+        self._wait(lambda: "- [x] paso uno" in self._task_file(tid).body)
+        self.page.get_by_placeholder("Añadir subtarea…").fill("paso dos")
+        self.page.get_by_placeholder("Añadir subtarea…").press("Enter")
+        self._wait(lambda: "- [ ] paso dos" in self._task_file(tid).body)
+        # The row of this task (other tests add tasks that sort before it).
+        row = self.page.locator("div.grid", has=self.page.get_by_text("Semilla", exact=True))
+        row.get_by_title("Marcar como completada").check()
+        self._wait(lambda: self._task_file(tid).status == "Completado")
 
 
 if __name__ == "__main__":

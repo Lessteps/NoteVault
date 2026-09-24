@@ -58,3 +58,36 @@ export interface IndexEntry {
   path: string;
   title: string;
 }
+
+// ── Tareas ─────────────────────────────────────────────────────────────────
+
+export interface Task {
+  id: string;
+  name: string;
+  created: string | null;
+  start: string | null;
+  start_time: string | null;
+  due: string | null;
+  due_time: string | null;
+  status: string;
+  subject: string;
+  priority: number;
+  reminder: string | null;
+  reminder_done: boolean;
+  body: string;
+  repeat: string;
+  repeat_until: string | null;
+  repeat_label: string;
+  overdue: boolean;
+  done: boolean;
+}
+
+export type TaskFields = Partial<Omit<Task, "id" | "created" | "repeat_label" | "overdue" | "done">>;
+
+export interface TasksMeta {
+  statuses: string[];
+  status_colors: Record<string, string>;
+  done_status: string;
+  priority_max: number;
+  subjects: string[];
+}

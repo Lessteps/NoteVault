@@ -295,5 +295,84 @@ class HabitsE2E(unittest.TestCase):
                                 if h["name"] == "Leer 20 min")["days"] == [0, 1, 3, 4, 5, 6])
 
 
+@unittest.skipUnless(READY, "needs playwright, Chromium and a built frontend")
+class CalendarE2E(unittest.TestCase):
+    """Calendario driven through the browser; checks the agenda files on disk."""
+
+    @classmethod
+    def setUpClass(cls):
+        from datetime import date
+        from notevault_app.webapp.api import NoteVaultApi
+        from notevault_app.webapp.devserver import serve_in_thread
+
+        cls.dir = Path(tempfile.mkdtemp(prefix="nv_e2e_cal_"))
+        cls.api = NoteVaultApi(cls.dir)
+        for h in cls.api.habits_list():
+            cls.api.habits_remove(h["id"])
+        cls.today = date.today()
+        cls.api.cal_save(dict(mode="create", kind="event", title="Semilla", date=cls.today.isoformat(),
+                              start="10:00", duration=60, colour="#039be5", repeat="", orig={}))
+        cls.server, cls.url, _ = serve_in_thread(cls.api, 0, DIST)
+        cls.pw = sync_playwright().start()
+        cls.browser = cls.pw.chromium.launch(executable_path=CHROMIUM)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.browser.close()
+        cls.pw.stop()
+        cls.server.shutdown()
+        cls.server.server_close()
+        shutil.rmtree(cls.dir, ignore_errors=True)
+
+    def setUp(self):
+        self.page = self.browser.new_page(viewport={"width": 1500, "height": 900})
+        self.errors = []
+        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.page.goto(self.url)
+        self.page.get_by_role("button", name="Calendario").click()
+        self.page.locator("aside nav").get_by_text("Día", exact=True).click()
+        self.page.get_by_text("Semilla").first.wait_for()
+
+    def tearDown(self):
+        self.page.close()
+        self.assertEqual(self.errors, [])
+
+    def _events(self):
+        from notevault_app.core.schedule_manager import ScheduleManager
+        return ScheduleManager(self.dir).get_day_file(self.today)["events"]
+
+    def _wait(self, predicate, timeout=6.0):
+        end = time.time() + timeout
+        while time.time() < end:
+            if predicate():
+                return
+            time.sleep(0.1)
+        self.fail("state never reached")
+
+    def test_drag_to_create_an_event(self):
+        col = self.page.locator(f"[data-day='{self.today.isoformat()}']").last
+        box = col.bounding_box()
+        # 48 px per hour: from 14:00 to 15:30.
+        x = box["x"] + box["width"] / 2
+        self.page.evaluate("document.querySelector('.overflow-y-auto .relative.flex').parentElement.scrollTop = 13*48")
+        top = col.bounding_box()["y"]
+        self.page.mouse.move(x, top + 14 * 48 + 2)
+        self.page.mouse.down()
+        self.page.mouse.move(x, top + 15.5 * 48, steps=5)
+        self.page.mouse.up()
+        self.page.get_by_placeholder("Añadir título").fill("Arrastrado")
+        self.page.get_by_role("button", name="Guardar").click()
+        self._wait(lambda: any(e["title"] == "Arrastrado" and e["start"] == "14:00"
+                               and e["duration_min"] == 90 for e in self._events()))
+
+    def test_edit_title_and_make_it_weekly(self):
+        self.page.get_by_text("Semilla").first.click()
+        self.page.get_by_placeholder("Añadir título").fill("Semilla editada")
+        self.page.get_by_label("Repetición").select_option("weekly")
+        self.page.get_by_role("button", name="Guardar").click()
+        self._wait(lambda: any(r["title"] == "Semilla editada" for r in self.api.cal_routines()))
+        self.assertFalse([e for e in self._events() if e["title"].startswith("Semilla")])
+
+
 if __name__ == "__main__":
     unittest.main()

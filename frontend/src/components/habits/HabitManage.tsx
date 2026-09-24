@@ -8,7 +8,8 @@ import { useHabits } from "../../store/habits";
 import { cn, confirmAction, IconButton } from "../ui";
 import { Header } from "./parts";
 
-const field = "w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-text outline-none focus:border-accent";
+const base = "rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-text outline-none focus:border-accent";
+const field = `${base} w-full`;
 const labelCls = "mb-1 block font-mono text-[10.5px] uppercase tracking-wider text-faint";
 
 type Mode = "weekdays" | "every" | "monthly";
@@ -69,7 +70,7 @@ function Schedule({ habit, onSave }: { habit: Habit; onSave: (f: HabitFields) =>
             defaultValue={rule.every}
             key={habit.repeat}
             onBlur={(e) => onSave({ repeat: formatRepeat({ ...rule, kind: "every", every: Number(e.target.value) || 2 }) })}
-            className={cn(field, "w-20")}
+            className={cn(base, "w-20")}
           />
           días
         </label>

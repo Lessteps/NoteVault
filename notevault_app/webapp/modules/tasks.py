@@ -44,10 +44,7 @@ class TasksApi:
     """Mixed into NoteVaultApi; relies on its _lock and _root."""
 
     def _task_mgr(self) -> TaskManager:
-        mgr = getattr(self, "_tasks_mgr", None)
-        if mgr is None or mgr.vault_root != self._root:
-            mgr = self._tasks_mgr = TaskManager(self._root)
-        return mgr
+        return self._mgrs().tasks
 
     @staticmethod
     def _task_fields(fields: Any) -> dict:

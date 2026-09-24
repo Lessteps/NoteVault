@@ -28,13 +28,8 @@ class HabitsApi:
     """Mixed into NoteVaultApi; relies on its _lock and _root."""
 
     def _habit_mgr(self) -> HabitManager:
-        mgr = getattr(self, "_habits_mgr", None)
-        if mgr is None or mgr.vault_root != self._root:
-            mgr = self._habits_mgr = HabitManager(self._root)
-        else:
-            # The classic app may have written in between: never serve stale days.
-            mgr.reload()
-        return mgr
+        # _mgrs() drops the cached days: the classic app may have written.
+        return self._mgrs().habits
 
     def _need_habit(self, mgr: HabitManager, habit_id: Any) -> dict:
         h = mgr.get_habit(str(habit_id))

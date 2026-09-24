@@ -153,3 +153,74 @@ export interface HabitStats {
   streak: number;
   habits: Record<string, HabitRates>;
 }
+
+// ── Calendario ─────────────────────────────────────────────────────────────
+
+export interface Occurrence {
+  id: string;
+  title: string;
+  kind: string; // routine | event | habit | exercise | task | project | issue | goal_item | saving
+  date: string;
+  start: string | null;
+  duration_min: number | null;
+  colour: string;
+  done: boolean;
+  source: string;
+  editable: boolean;
+  checkable: boolean;
+  links: Array<Record<string, string>>;
+  reminder_min: number | null;
+}
+
+export interface CalItem {
+  kind: "event" | "routine" | "task";
+  id: string;
+  date: string;
+  title: string;
+  start: string | null;
+  duration: number | null;
+  location: string;
+  description: string;
+  reminder_min: number | null;
+  colour: string | null;
+  repeat: string;
+  until: string | null;
+  subject: string;
+}
+
+export interface CalPayload {
+  mode: "create" | "edit";
+  kind: "event" | "task";
+  orig: { kind?: string; id?: string; date?: string };
+  title: string;
+  date: string;
+  start: string | null;
+  duration: number | null;
+  repeat: string;
+  until: string | null;
+  location: string;
+  description: string;
+  subject: string;
+  reminder_min: number | null;
+  colour: string;
+}
+
+export interface CalSettings {
+  day_start_hour: number;
+  day_end_hour: number;
+  default_duration_min: number;
+}
+
+export interface CalRoutine {
+  id: string;
+  title: string;
+  start: string | null;
+  duration_min: number | null;
+  colour: string;
+  repeat: string;
+  describe: string;
+  active_from: string | null;
+  active_until: string | null;
+  notes: string;
+  reminder_min: number | null;
+}

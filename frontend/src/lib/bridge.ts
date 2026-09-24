@@ -6,8 +6,8 @@
 // with a per-run token. Both reject with an Error carrying Python's message.
 
 import type {
-  AppInfo, Bookmark, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
-  IndexEntry, Mentions, NoteData, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
+  AppInfo, Bookmark, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
+  IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
 } from "./types";
 
 type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
@@ -148,4 +148,19 @@ export const api = {
   habitsReorder: (ids: string[]) => call<{ ok: boolean }>("habits_reorder", ids),
   habitsAddSubtask: (id: string, name: string) => call<HabitSubtask>("habits_add_subtask", id, name),
   habitsRemoveSubtask: (id: string, sub: string) => call<{ ok: boolean }>("habits_remove_subtask", id, sub),
+
+  // Calendario
+  calRange: (first: string, last: string) => call<Record<string, Occurrence[]>>("cal_range", first, last),
+  calSettings: () => call<CalSettings>("cal_settings"),
+  calItem: (day: string, id: string, kind: string) => call<CalItem>("cal_item", day, id, kind),
+  calSave: (p: CalPayload) => call<{ ok: boolean; message: string }>("cal_save", p),
+  calDelete: (orig: { kind: string; id: string; date: string }, scope: "one" | "all" = "all") =>
+    call<{ ok: boolean }>("cal_delete", orig, scope),
+  calMove: (occ: Occurrence, day: string, start: string, duration: number) =>
+    call<{ ok: boolean }>("cal_move", occ, day, start, duration),
+  calSetDone: (day: string, id: string, done: boolean) => call<{ ok: boolean }>("cal_set_done", day, id, done),
+  calRoutines: () => call<CalRoutine[]>("cal_routines"),
+  calRoutineSave: (id: string | null, fields: Partial<CalRoutine>) =>
+    call<{ ok: boolean }>("cal_routine_save", id, fields),
+  calRoutineRemove: (id: string) => call<{ ok: boolean }>("cal_routine_remove", id),
 };

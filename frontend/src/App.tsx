@@ -23,6 +23,7 @@ const MODULES: Partial<Record<ModuleId, ComponentType>> = {
   metas: lazyModule(() => import("./components/goals/GoalsModule"), "GoalsModule"),
   ejercicio: lazyModule(() => import("./components/exercise/ExerciseModule"), "ExerciseModule"),
   finanzas: lazyModule(() => import("./components/finance/FinanceModule"), "FinanceModule"),
+  web: lazyModule(() => import("./components/web/WebModule"), "WebModule"),
 };
 
 function ModuleView({ module }: { module: ModuleId }) {

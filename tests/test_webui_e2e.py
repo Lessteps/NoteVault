@@ -150,6 +150,27 @@ class WebUiE2E(unittest.TestCase):
         self.page.get_by_role("button", name="Comandos").click()
         self.page.get_by_role("tab", name="Comandos").wait_for()
 
+    def test_web_module(self):
+        from notevault_app.core.web_store import WebStore
+        self.page.keyboard.press("Control+Shift+p")
+        self.page.get_by_role("dialog", name="Paleta de comandos").get_by_role("textbox").fill("WEB")
+        self.page.keyboard.press("Enter")
+        self.page.get_by_role("tab", name="Restricciones").click()
+        self.page.get_by_role("button", name="+ Shorts y Reels").click()
+        self.page.get_by_role("button", name="Guardar reglas").click()
+        end = time.time() + 5
+        while time.time() < end and "tiktok.com" not in WebStore(self.dir).restrictions().blocked_domains:
+            time.sleep(0.1)
+        self.assertIn("tiktok.com", WebStore(self.dir).restrictions().blocked_domains)
+        self.page.get_by_label("Dirección o búsqueda").fill("tiktok.com")
+        self.page.get_by_role("button", name="Abrir", exact=True).click()
+        self.page.get_by_text("tiktok.com está bloqueado").wait_for()
+        with mock.patch("webbrowser.open") as op:
+            self.page.get_by_label("Dirección o búsqueda").fill("example.com")
+            self.page.get_by_role("button", name="Abrir", exact=True).click()
+            self.page.get_by_text("navegador del sistema").wait_for()
+        op.assert_called_once_with("https://example.com")
+
     def test_quick_switcher_creates_a_note(self):
         self.page.keyboard.press("Control+p")
         self.page.keyboard.type("Creada desde switcher")

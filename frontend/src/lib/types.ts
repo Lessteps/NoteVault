@@ -754,3 +754,26 @@ export interface StudySnapshot {
     description: string; fix: string; seen: string; note: string; source: string;
   }>;
 }
+
+export interface WebRules {
+  enabled: boolean;
+  mode: "blocklist" | "allowlist";
+  blocked_domains: string[];
+  blocked_patterns: string[];
+  allowed_domains: string[];
+  daily_limits: Record<string, number>;
+  confirm_to_relax: boolean;
+}
+export interface WebOverview {
+  bookmarks: Array<{ id: string; title: string; url: string; folder?: string }>;
+  history: Array<{ time: string; url: string; title: string }>;
+  history_days: string[];
+  day: string;
+  usage: Array<{ host: string; seconds: number }>;
+  week: Array<{ date: string; seconds: number }>;
+  restrictions: WebRules;
+  limits: Array<{ domain: string; minutes: number; used: number }>;
+  presets: string[];
+  relax_phrase: string;
+  embedded: boolean;
+}

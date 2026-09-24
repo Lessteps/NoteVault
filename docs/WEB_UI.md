@@ -43,7 +43,7 @@ módulos restantes.
 | Escalera de demostración (L1–L6 para notas de teorema: estrategia, ordenar, completar, justificar, en blanco, variante) | ✅ migrado |
 | Estudio (panel lateral del área: cola de hoy con repasos y tarjetas, ledger de skills y conceptos, registro de errores) | ✅ migrado |
 | Generador de mapas conceptuales (orden + notas de contexto + plantilla → IA → canvas; también YAML pegado) | ✅ migrado |
-| WEB | ⏳ en la app clásica |
+| WEB (Ctrl+Shift+P → WEB: navegador en ventana aparte con restricciones, marcadores, historial, tiempo por sitio y límites diarios) | ✅ migrado |
 
 ## Seguridad
 
@@ -68,6 +68,9 @@ módulos restantes.
 - Práctica: los pasos ocultos de la escalera y las respuestas del cálculo rápido
   no se envían a la página antes de tiempo; las solicitudes de corrección solo
   se aceptan con su id exacto y para la nota que las creó.
+- WEB: las páginas se abren en una segunda ventana **sin** el puente de Python;
+  las reglas se comprueban cada segundo y una página bloqueada se sustituye
+  por un aviso. Solo se abren direcciones http/https.
 - Adjuntos (capturas, facturas): solo imágenes y PDF, 15 MB como máximo, dentro
   de `.notevault/<módulo>/adjuntos/`; al quitarlos van a la papelera del vault.
 

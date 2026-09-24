@@ -77,7 +77,7 @@ export const MODULES: Array<{ id: ModuleId; label: string; Icon: ComponentType<{
 ];
 
 export function moduleLabel(id: ModuleId): string {
-  return MODULES.find((m) => m.id === id)?.label ?? id;
+  return MODULES.find((m) => m.id === id)?.label ?? (id === "web" ? "WEB" : id);
 }
 
 export function IconRail() {

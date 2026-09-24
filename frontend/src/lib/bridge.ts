@@ -319,5 +319,14 @@ export const api = {
   mapGenerate: (order: string, context: string[], extra: string, template: string, folder: string, name: string) =>
     call<{ ok: boolean; path?: string; errors?: string[]; bridge?: boolean; prompt?: string; url?: string; label?: string }>(
       "map_generate", order, context, extra, template, folder, name),
+  webOverview: (day = "") => call<import("./types").WebOverview>("web_overview", day),
+  webNormalize: (text: string) => call<{ url: string; host: string }>("web_normalize", text),
+  webBookmarkAdd: (title: string, url: string) => call<{ id: string; title: string; url: string }>("web_bookmark_add", title, url),
+  webBookmarkRemove: (url: string) => call<{ ok: boolean }>("web_bookmark_remove", url),
+  webHistoryClear: () => call<{ ok: boolean }>("web_history_clear"),
+  webRestrictionsSave: (data: import("./types").WebRules, phrase = "") =>
+    call<{ ok: boolean; needs_phrase?: boolean; phrase?: string; restrictions?: import("./types").WebRules }>("web_restrictions_save", data, phrase),
+  webPreset: (data: import("./types").WebRules, name: string) => call<import("./types").WebRules>("web_preset", data, name),
+  webOpen: (text: string) => call<{ ok: boolean; blocked?: boolean; reason?: string; system?: boolean }>("web_open", text),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

@@ -52,3 +52,6 @@ logs/
 # ── Web UI (frontend/) ───────────────────────────────────────────
 frontend/node_modules/
 frontend/dist/
+frontend/dist-electron/
+frontend/release/
+*.tsbuildinfo

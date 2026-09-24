@@ -1,0 +1,19 @@
+{
+  "id": "FGOAL_MOTO",
+  "name": "Moto",
+  "icon": "🏍",
+  "colour": "#33b679",
+  "target_cents": 20000000,
+  "currency": "COP",
+  "start": "2026-09-01",
+  "deadline": "2026-10-31",
+  "show_in_daily": true,
+  "cadence": {
+    "mode": "rule",
+    "rule": "weekly:4"
+  },
+  "suggested_cents": 5000000,
+  "status": "Activa",
+  "created": "2026-09-01",
+  "notes": "Casco incluido"
+}

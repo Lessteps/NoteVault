@@ -14,7 +14,7 @@ reminder_min: 15
 target: 3
 unit: "h"
 habit_links: "coding"
-created: 2026-09-16
+created: 2026-09-24
 ---
 
 Notas de la submeta

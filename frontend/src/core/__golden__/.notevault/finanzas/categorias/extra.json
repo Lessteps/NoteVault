@@ -1,0 +1,10 @@
+{
+  "id": "extra",
+  "name": "Extra",
+  "icon": "✨",
+  "colour": "#33b679",
+  "kind": "ingreso",
+  "budget_month_cents": 0,
+  "order": 11,
+  "archived": false
+}

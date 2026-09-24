@@ -1,0 +1,1082 @@
+{
+  "areas": [
+    {
+      "archived": false,
+      "colour": "#3f51b5",
+      "icon": "💻",
+      "id": "programacion",
+      "name": "Programación",
+      "order": 1
+    }
+  ],
+  "exercise_config": {
+    "count": 50,
+    "per_day": {
+      "domingo": 3,
+      "jueves": 10,
+      "lunes": 10,
+      "martes": 10,
+      "miercoles": 4,
+      "sabado": 3,
+      "viernes": 10
+    }
+  },
+  "exercise_day": {
+    "day_pct": 0.0,
+    "entry": {
+      "done": true,
+      "notes": "fácil",
+      "reps": 5,
+      "weight": 60.0
+    },
+    "exercise_id": "lunes_0"
+  },
+  "finance": {
+    "august_totals": {
+      "ahorro": 0,
+      "balance": -99,
+      "gasto": 99,
+      "ingreso": 0,
+      "retiro": 0
+    },
+    "budget_sept": [
+      [
+        "comida",
+        1250000,
+        60000000
+      ]
+    ],
+    "by_category_sept": {
+      "comida": 1250000
+    },
+    "categories": [
+      "comida",
+      "transporte",
+      "vivienda",
+      "servicios",
+      "salud",
+      "educacion",
+      "ocio",
+      "compras",
+      "otros",
+      "salario",
+      "extra",
+      "regalo"
+    ],
+    "day_totals": {
+      "ahorro": 0,
+      "balance": 349750000,
+      "gasto": 1250000,
+      "ingreso": 350000000,
+      "retiro": 1000000
+    },
+    "due_checks": {
+      "2026-09-07": [],
+      "2026-09-08": [],
+      "2026-09-09": [],
+      "2026-09-10": [],
+      "2026-09-11": [
+        [
+          "FGOAL_MOTO",
+          true,
+          [
+            "mv20260911-cccccc"
+          ]
+        ]
+      ],
+      "2026-09-12": [],
+      "2026-09-13": [],
+      "2026-09-14": [],
+      "2026-09-15": [],
+      "2026-09-16": [],
+      "2026-09-17": [],
+      "2026-09-18": [
+        [
+          "FGOAL_MOTO",
+          false,
+          []
+        ]
+      ],
+      "2026-09-19": [],
+      "2026-09-20": []
+    },
+    "format_money": {
+      "-120000000": "-$ 1.200.000",
+      "0": "$ 0",
+      "1": "$ 0",
+      "1250000": "$ 12.500",
+      "49": "$ 0",
+      "50": "$ 1",
+      "99": "$ 1"
+    },
+    "format_money_usd": "$ 12,50",
+    "history_moto": {
+      "days": [
+        [
+          "2026-09-11",
+          5000000,
+          [
+            "mv20260911-cccccc"
+          ]
+        ],
+        [
+          "2026-09-12",
+          -1000000,
+          [
+            "mv20260912-dddddd"
+          ]
+        ]
+      ],
+      "months": [
+        [
+          "2026-09",
+          4000000
+        ]
+      ]
+    },
+    "month_totals": {
+      "ahorro": 14000000,
+      "balance": 335750000,
+      "gasto": 1250000,
+      "ingreso": 350000000,
+      "retiro": 1000000
+    },
+    "pace_moto_on_fixed_day": {
+      "days_left": 49,
+      "per_day": 320000,
+      "per_month": 9600000,
+      "per_week": 2240000,
+      "remaining": 16000000,
+      "saved": 4000000
+    },
+    "projection_moto_on_fixed_day": "2027-01-10",
+    "saved": {
+      "FGOAL_MOTO": 4000000,
+      "FGOAL_TRIP": 9000000
+    },
+    "status": {
+      "FGOAL_MOTO": "Activa",
+      "FGOAL_TRIP": "Cumplida"
+    },
+    "week_totals": {
+      "ahorro": 14000000,
+      "balance": 335750000,
+      "gasto": 1250000,
+      "ingreso": 350000000,
+      "retiro": 1000000
+    }
+  },
+  "goals": {
+    "adherence_7_on_14": 0.3333333333333333,
+    "due_on": {
+      "2026-09-07": [
+        "ITEM_REPEAT"
+      ],
+      "2026-09-08": [],
+      "2026-09-09": [
+        "ITEM_REPEAT"
+      ],
+      "2026-09-10": [
+        "ITEM_CHILD"
+      ],
+      "2026-09-11": [
+        "ITEM_REPEAT"
+      ],
+      "2026-09-12": [],
+      "2026-09-13": [],
+      "2026-09-14": [
+        "ITEM_REPEAT"
+      ],
+      "2026-09-15": [],
+      "2026-09-16": [
+        "ITEM_REPEAT"
+      ]
+    },
+    "goal": {
+      "area": "programacion",
+      "colour": "#3f51b5",
+      "description": "Meta de ejemplo.\n\nCon dos párrafos.",
+      "end": "2026-12-31",
+      "icon": "💻",
+      "in_overview": true,
+      "name": "Ser \"backend\"",
+      "overdue_on_2027_01_01": true,
+      "priority": 3,
+      "progress_on_14": 0.625,
+      "start": "2026-09-07",
+      "status": "Activa"
+    },
+    "habit_coding_marked": [
+      "2026-09-07",
+      "2026-09-11"
+    ],
+    "items": {
+      "ITEM_BRANCH": {
+        "children": [
+          "ITEM_CHILD",
+          "ITEM_MEASURE"
+        ],
+        "done_at": null,
+        "due": null,
+        "due_time": "",
+        "duration_min": null,
+        "habit_links": [],
+        "in_calendar": false,
+        "is_leaf": false,
+        "name": "Aprender Django",
+        "notes": "",
+        "order": 2,
+        "parent": "",
+        "priority": 2,
+        "progress_on_14": 0.75,
+        "reminder_min": null,
+        "repeat": "",
+        "start": null,
+        "status": "Pendiente",
+        "target": null,
+        "unit": "",
+        "value": null
+      },
+      "ITEM_CHILD": {
+        "children": [],
+        "done_at": "2026-09-10",
+        "due": "2026-09-10",
+        "due_time": "",
+        "duration_min": null,
+        "habit_links": [],
+        "in_calendar": false,
+        "is_leaf": true,
+        "name": "Tutorial oficial",
+        "notes": "",
+        "order": 1,
+        "parent": "ITEM_BRANCH",
+        "priority": 4,
+        "progress_on_14": 1.0,
+        "reminder_min": null,
+        "repeat": "",
+        "start": null,
+        "status": "Hecha",
+        "target": null,
+        "unit": "",
+        "value": null
+      },
+      "ITEM_MEASURE": {
+        "children": [],
+        "done_at": null,
+        "due": null,
+        "due_time": "",
+        "duration_min": null,
+        "habit_links": [],
+        "in_calendar": false,
+        "is_leaf": true,
+        "name": "API de ejemplo",
+        "notes": "",
+        "order": 2,
+        "parent": "ITEM_BRANCH",
+        "priority": 2,
+        "progress_on_14": 0.5,
+        "reminder_min": null,
+        "repeat": "",
+        "start": null,
+        "status": "Pendiente",
+        "target": 5,
+        "unit": "endpoints",
+        "value": 2.5
+      },
+      "ITEM_REPEAT": {
+        "children": [],
+        "done_at": null,
+        "due": null,
+        "due_time": "18:00",
+        "duration_min": 180,
+        "habit_links": [
+          "coding"
+        ],
+        "in_calendar": true,
+        "is_leaf": true,
+        "name": "Programar 3 horas",
+        "notes": "Notas de la submeta",
+        "order": 1,
+        "parent": "",
+        "priority": 3,
+        "progress_on_14": 0.5,
+        "reminder_min": 15,
+        "repeat": "weekly:0,2,4",
+        "start": "2026-09-07",
+        "status": "Pendiente",
+        "target": 3,
+        "unit": "h",
+        "value": null
+      }
+    },
+    "log_2026_09_07": "{\n  \"items\": {\n    \"GOAL_ID/ITEM_REPEAT\": {\n      \"done\": true,\n      \"at\": \"07:15\"\n    }\n  },\n  \"habit_marks\": {\n    \"coding\": [\n      \"GOAL_ID/ITEM_REPEAT\"\n    ]\n  }\n}\n",
+    "repeat_done": [
+      "2026-09-07",
+      "2026-09-11"
+    ],
+    "repeat_values": {
+      "2026-09-11": 3.5
+    },
+    "streak_on_11": 1,
+    "tree": [
+      "ITEM_REPEAT",
+      "ITEM_BRANCH"
+    ]
+  },
+  "habit_config": {
+    "coding_subtasks": [
+      "theory",
+      "practice",
+      "review"
+    ],
+    "count": 15,
+    "haircare_days": [
+      1
+    ],
+    "hairwash_days": [
+      0,
+      2,
+      4
+    ],
+    "reading": {
+      "colour": "#33b679",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "duration_min": 30,
+      "icon": "📖",
+      "id": "reading",
+      "in_calendar": true,
+      "name": "Lectura",
+      "reminder_min": 10,
+      "repeat": "every:2",
+      "start_date": "2026-09-12",
+      "subtasks": [],
+      "time": "21:00"
+    },
+    "reading_active": [
+      "2026-09-12",
+      "2026-09-14",
+      "2026-09-16",
+      "2026-09-18",
+      "2026-09-20",
+      "2026-09-22",
+      "2026-09-24",
+      "2026-09-26",
+      "2026-09-28"
+    ]
+  },
+  "habit_day": {
+    "active_habit_ids": [
+      "nophone",
+      "bed",
+      "water",
+      "teeth",
+      "food",
+      "shower",
+      "gym",
+      "nofa",
+      "nomusic",
+      "reading",
+      "coding",
+      "math",
+      "language"
+    ],
+    "completed_true": [
+      "nophone"
+    ],
+    "completion_pct": 0.076923,
+    "date": "2026-09-12",
+    "journal": "Diario de ejemplo.\nSegunda línea.",
+    "subtask_coding_theory": true
+  },
+  "habit_rules": {
+    "days_only": [
+      "2026-09-12",
+      "2026-09-15",
+      "2026-09-19",
+      "2026-09-22",
+      "2026-09-26",
+      "2026-09-29"
+    ],
+    "missing_days_means_all": [
+      "2026-09-09",
+      "2026-09-10",
+      "2026-09-11",
+      "2026-09-12",
+      "2026-09-13",
+      "2026-09-14",
+      "2026-09-15",
+      "2026-09-16",
+      "2026-09-17",
+      "2026-09-18",
+      "2026-09-19",
+      "2026-09-20",
+      "2026-09-21",
+      "2026-09-22",
+      "2026-09-23",
+      "2026-09-24",
+      "2026-09-25",
+      "2026-09-26",
+      "2026-09-27",
+      "2026-09-28",
+      "2026-09-29"
+    ],
+    "monthly": [
+      "2026-09-12",
+      "2026-09-20"
+    ],
+    "paused": [
+      "2026-09-09",
+      "2026-09-10",
+      "2026-09-11",
+      "2026-09-12",
+      "2026-09-13"
+    ],
+    "repeat_wins_over_days": [
+      "2026-09-12",
+      "2026-09-14",
+      "2026-09-16",
+      "2026-09-18",
+      "2026-09-20",
+      "2026-09-22",
+      "2026-09-24",
+      "2026-09-26",
+      "2026-09-28"
+    ],
+    "start_and_end": [
+      "2026-09-13",
+      "2026-09-14",
+      "2026-09-15",
+      "2026-09-16"
+    ]
+  },
+  "project": {
+    "burndown_days": 60,
+    "burndown_last_7": [
+      [
+        "2026-09-06",
+        3
+      ],
+      [
+        "2026-09-07",
+        3
+      ],
+      [
+        "2026-09-08",
+        3
+      ],
+      [
+        "2026-09-09",
+        2
+      ],
+      [
+        "2026-09-10",
+        2
+      ],
+      [
+        "2026-09-11",
+        2
+      ],
+      [
+        "2026-09-12",
+        2
+      ]
+    ],
+    "by_priority": [
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        3,
+        0
+      ],
+      [
+        4,
+        1
+      ]
+    ],
+    "by_status": [
+      [
+        "Por hacer",
+        1
+      ],
+      [
+        "En curso",
+        1
+      ],
+      [
+        "En revisión",
+        0
+      ],
+      [
+        "Hecho",
+        1
+      ]
+    ],
+    "calendar": {
+      "2026-09-10": [
+        "issue:PROJECT_ID/ISSUE_HOME"
+      ],
+      "2026-09-11": [
+        "issue:PROJECT_ID/ISSUE_WEEKLY"
+      ],
+      "2026-09-18": [
+        "issue:PROJECT_ID/ISSUE_WEEKLY"
+      ],
+      "2026-09-20": [
+        "issue:PROJECT_ID/ISSUE_BUG"
+      ]
+    },
+    "derive_key": {
+      "": "PRY",
+      "Backend": "BAC",
+      "Portafolio web": "PW",
+      "Árbol de él": "ADE"
+    },
+    "issues": {
+      "ISSUE_BUG": {
+        "children": [],
+        "description": "",
+        "done_at": "2026-09-09",
+        "due": "2026-09-20",
+        "due_time": "",
+        "estimate_min": null,
+        "is_done": true,
+        "key": "PW-3",
+        "labels": [],
+        "number": 3,
+        "order": 1,
+        "overdue_on_fixed_day": false,
+        "parent": "ISSUE_GOAL",
+        "priority": 2,
+        "reminder": null,
+        "reminder_done": false,
+        "repeat": "",
+        "start": null,
+        "status": "Hecho",
+        "title": "Menú roto en móvil",
+        "type": "Error"
+      },
+      "ISSUE_GOAL": {
+        "children": [
+          "ISSUE_HOME",
+          "ISSUE_BUG"
+        ],
+        "description": "",
+        "done_at": null,
+        "due": null,
+        "due_time": "",
+        "estimate_min": null,
+        "is_done": false,
+        "key": "PW-1",
+        "labels": [],
+        "number": 1,
+        "order": 1,
+        "overdue_on_fixed_day": false,
+        "parent": "",
+        "priority": 3,
+        "reminder": null,
+        "reminder_done": false,
+        "repeat": "",
+        "start": null,
+        "status": "Por hacer",
+        "title": "Lanzar la home",
+        "type": "Submeta"
+      },
+      "ISSUE_HOME": {
+        "children": [],
+        "description": "- [ ] Header\n- [x] Hero",
+        "done_at": null,
+        "due": "2026-09-10",
+        "due_time": "17:00",
+        "estimate_min": 240,
+        "is_done": false,
+        "key": "PW-2",
+        "labels": [
+          "frontend",
+          "diseño"
+        ],
+        "number": 2,
+        "order": 1,
+        "overdue_on_fixed_day": true,
+        "parent": "ISSUE_GOAL",
+        "priority": 4,
+        "reminder": "2026-09-09T18:00",
+        "reminder_done": false,
+        "repeat": "",
+        "start": "2026-09-08",
+        "status": "En curso",
+        "title": "Maquetar la home",
+        "type": "Tarea"
+      },
+      "ISSUE_WEEKLY": {
+        "children": [],
+        "description": "",
+        "done_at": null,
+        "due": "2026-09-11",
+        "due_time": "",
+        "estimate_min": null,
+        "is_done": false,
+        "key": "PW-4",
+        "labels": [],
+        "number": 4,
+        "order": 4,
+        "overdue_on_fixed_day": true,
+        "parent": "",
+        "priority": 2,
+        "reminder": null,
+        "reminder_done": false,
+        "repeat": "weekly:4",
+        "start": null,
+        "status": "Por hacer",
+        "title": "Revisión semanal",
+        "type": "Tarea"
+      }
+    },
+    "migrated": {
+      "colour": "#a78bfa",
+      "description": "Investigación final.",
+      "extra": {
+        "start_time": "08:00"
+      },
+      "issues": [
+        [
+          1,
+          "Elegir tema",
+          "Hecho",
+          "2026-09-05",
+          "2026-09-05"
+        ],
+        [
+          2,
+          "Marco teórico",
+          "Por hacer",
+          "2026-10-01",
+          null
+        ],
+        [
+          3,
+          "Reunión con tutor",
+          "Hecho",
+          null,
+          "2026-09-12"
+        ]
+      ],
+      "key": "TDG",
+      "legacy_in_trash": true,
+      "name": "Tesis de grado",
+      "status": "En curso"
+    },
+    "project": {
+      "area": "programacion",
+      "colour": "#4ade80",
+      "columns": [
+        "Por hacer",
+        "En curso",
+        "En revisión",
+        "Hecho"
+      ],
+      "deadline": "2026-10-30",
+      "description": "Sitio personal.",
+      "done_column": "Hecho",
+      "in_calendar": true,
+      "key": "PW",
+      "name": "Portafolio web",
+      "start": "2026-09-01",
+      "status": "En curso"
+    },
+    "submetas": [
+      [
+        "ISSUE_GOAL",
+        {
+          "done": 1,
+          "estimate_done_min": 0,
+          "estimate_min": 240,
+          "open": 1,
+          "overdue": 1,
+          "progress": 0.5,
+          "total": 2
+        }
+      ]
+    ],
+    "summary": {
+      "days_left": 48,
+      "done": 1,
+      "done_this_week": 1,
+      "estimate_done_min": 0,
+      "estimate_min": 240,
+      "open": 2,
+      "overdue": 2,
+      "progress": 0.3333333333333333,
+      "total": 3
+    },
+    "throughput_4": [
+      [
+        "2026-08-17",
+        0
+      ],
+      [
+        "2026-08-24",
+        0
+      ],
+      [
+        "2026-08-31",
+        0
+      ],
+      [
+        "2026-09-07",
+        1
+      ]
+    ]
+  },
+  "recurrence_rules": {
+    "daily_until": {
+      "anchor": "2026-09-12",
+      "dates": [
+        "2026-09-12",
+        "2026-09-13",
+        "2026-09-14",
+        "2026-09-15",
+        "2026-09-16",
+        "2026-09-17",
+        "2026-09-18",
+        "2026-09-19",
+        "2026-09-20",
+        "2026-09-21",
+        "2026-09-22",
+        "2026-09-23",
+        "2026-09-24"
+      ],
+      "describe": "Todos los días",
+      "next_after_fixed_day": "2026-09-13",
+      "normalised": "daily",
+      "text": "daily",
+      "until": "2026-09-24",
+      "weekdays_mask": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "every_3": {
+      "anchor": "2026-09-12",
+      "dates": [
+        "2026-09-12",
+        "2026-09-15",
+        "2026-09-18",
+        "2026-09-21",
+        "2026-09-24",
+        "2026-09-27",
+        "2026-09-30",
+        "2026-10-03",
+        "2026-10-06",
+        "2026-10-09",
+        "2026-10-12",
+        "2026-10-15",
+        "2026-10-18"
+      ],
+      "describe": "Cada 3 días",
+      "next_after_fixed_day": "2026-09-15",
+      "normalised": "every:3",
+      "text": "every:3",
+      "until": null,
+      "weekdays_mask": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "garbage": {
+      "anchor": null,
+      "dates": [],
+      "describe": "No se repite",
+      "next_after_fixed_day": null,
+      "normalised": "",
+      "text": "weekly:x",
+      "until": null,
+      "weekdays_mask": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "monthly_1_15_31": {
+      "anchor": null,
+      "dates": [
+        "2026-09-15",
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-15"
+      ],
+      "describe": "Cada mes los días 1, 15, 31",
+      "next_after_fixed_day": "2026-09-15",
+      "normalised": "monthly:1,15,31",
+      "text": "monthly:1,15,31",
+      "until": null,
+      "weekdays_mask": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "monthly_31_in_february": true,
+    "none": {
+      "anchor": "2026-09-12",
+      "dates": [
+        "2026-09-12"
+      ],
+      "describe": "No se repite",
+      "next_after_fixed_day": null,
+      "normalised": "",
+      "text": "",
+      "until": null,
+      "weekdays_mask": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "weekly_all_is_daily": {
+      "anchor": null,
+      "dates": [
+        "2026-09-09",
+        "2026-09-10",
+        "2026-09-11",
+        "2026-09-12",
+        "2026-09-13",
+        "2026-09-14",
+        "2026-09-15",
+        "2026-09-16",
+        "2026-09-17",
+        "2026-09-18",
+        "2026-09-19",
+        "2026-09-20",
+        "2026-09-21",
+        "2026-09-22",
+        "2026-09-23",
+        "2026-09-24",
+        "2026-09-25",
+        "2026-09-26",
+        "2026-09-27",
+        "2026-09-28",
+        "2026-09-29",
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07",
+        "2026-10-08",
+        "2026-10-09",
+        "2026-10-10",
+        "2026-10-11",
+        "2026-10-12",
+        "2026-10-13",
+        "2026-10-14",
+        "2026-10-15",
+        "2026-10-16",
+        "2026-10-17",
+        "2026-10-18"
+      ],
+      "describe": "Todos los días",
+      "next_after_fixed_day": "2026-09-13",
+      "normalised": "daily",
+      "text": "weekly:0,1,2,3,4,5,6",
+      "until": null,
+      "weekdays_mask": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "weekly_mon_wed_fri": {
+      "anchor": null,
+      "dates": [
+        "2026-09-09",
+        "2026-09-11",
+        "2026-09-14",
+        "2026-09-16",
+        "2026-09-18",
+        "2026-09-21",
+        "2026-09-23",
+        "2026-09-25",
+        "2026-09-28",
+        "2026-09-30",
+        "2026-10-02",
+        "2026-10-05",
+        "2026-10-07",
+        "2026-10-09",
+        "2026-10-12",
+        "2026-10-14",
+        "2026-10-16"
+      ],
+      "describe": "Cada lun, mié, vie",
+      "next_after_fixed_day": "2026-09-14",
+      "normalised": "weekly:0,2,4",
+      "text": "weekly:0,2,4",
+      "until": null,
+      "weekdays_mask": [
+        0,
+        2,
+        4
+      ]
+    }
+  },
+  "reminder_rules": {
+    "due_now": [
+      "a"
+    ],
+    "keys": {
+      "already_shown": "task:d",
+      "due_5_min_ago": "task:a",
+      "due_in_1_hour": "task:b",
+      "in_30_days": "task:g",
+      "no_reminder": "task:f",
+      "stale_10_days": "task:c",
+      "task_completed": "task:e"
+    },
+    "now": "2026-09-12T10:00",
+    "stale": [
+      "c"
+    ],
+    "stale_after_days": 2,
+    "upcoming_14d": [
+      "b"
+    ],
+    "window_days": 14
+  },
+  "store_encoding": {
+    "body": "Cuerpo",
+    "extra": {
+      "desconocida": "valor: con dos puntos"
+    },
+    "fields": [
+      [
+        "id",
+        "id"
+      ],
+      [
+        "name",
+        "str"
+      ],
+      [
+        "n",
+        "int"
+      ],
+      [
+        "x",
+        "num"
+      ],
+      [
+        "y",
+        "num"
+      ],
+      [
+        "flag",
+        "bool"
+      ],
+      [
+        "off",
+        "bool"
+      ],
+      [
+        "day",
+        "date"
+      ],
+      [
+        "when",
+        "datetime"
+      ],
+      [
+        "tags",
+        "list"
+      ],
+      [
+        "empty",
+        "str"
+      ]
+    ],
+    "no_body": "---\nid: a\n---\n",
+    "parsed": {
+      "day": "2026-09-12",
+      "flag": true,
+      "id": "x20260912-abcdef",
+      "n": 7,
+      "name": "Comillas \"dobles\" y \\ barra",
+      "tags": [
+        "a",
+        "b c"
+      ],
+      "when": "2026-09-12T18:05:00",
+      "x": 2.5,
+      "y": 3
+    },
+    "text": "---\nid: x20260912-abcdef\nname: \"Comillas \\\"dobles\\\" y \\\\ barra\"\nn: 7\nx: 2.5\ny: 3\nflag: true\nday: 2026-09-12\nwhen: 2026-09-12T18:05\ntags: \"a,b c\"\ndesconocida: \"valor: con dos puntos\"\n---\n\nCuerpo\n"
+  },
+  "task": {
+    "body": "# Ensayo\n\n- Buscar fuentes",
+    "created": "2026-09-14",
+    "due": "2026-09-20",
+    "name": "Ensayo de historia",
+    "occurs": [
+      "2026-09-21",
+      "2026-09-24",
+      "2026-09-28",
+      "2026-10-01",
+      "2026-10-05"
+    ],
+    "priority": 2,
+    "reminder": "2026-09-19T18:00",
+    "reminder_done": false,
+    "repeat": "weekly:0,3",
+    "repeat_until": "2026-10-31",
+    "roll_forward": {
+      "due": "2026-09-21",
+      "reminder": "2026-09-20T18:00",
+      "reminder_done": false,
+      "start": "2026-09-13",
+      "status": "Sin empezar"
+    },
+    "start": "2026-09-12",
+    "status": "Sin empezar",
+    "subject": "Historia"
+  }
+}

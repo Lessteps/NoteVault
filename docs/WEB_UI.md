@@ -29,6 +29,7 @@ módulos restantes.
 | Módulo | Estado |
 |---|---|
 | Notas (explorador, pestañas, lectura, editor, búsqueda, marcadores, etiquetas, backlinks, grafo, propiedades, asistente IA, Ctrl+P) | ✅ migrado |
+| Reproductor de inglés (subtítulos EN/ES, lista de frases, repetir, bucle A-B, velocidad, modo sombra con micrófono, minar frases, enlaces `nv://media` a un momento) | ✅ migrado |
 | Vista dividida (clic derecho en una pestaña o nota → «Abrir a la derecha») y espacios de estudio (crear carpetas de Matemáticas/Programación/Inglés) | ✅ migrado |
 | Paleta de comandos (Ctrl+Shift+P): formato, listas y casillas (Ctrl+L), tablas (Ctrl+Shift+T y edición de filas/columnas), plantillas, nota diaria (Ctrl+Shift+D), atajos (Ctrl+,) | ✅ migrado |
 | Tareas (tabla editable, filtros, calendario con repeticiones, recordatorios, subtareas) | ✅ migrado |
@@ -72,6 +73,9 @@ módulos restantes.
 - WEB: las páginas se abren en una segunda ventana **sin** el puente de Python;
   las reglas se comprueban cada segundo y una página bloqueada se sustituye
   por un aviso. Solo se abren direcciones http/https.
+- Reproductor de inglés: la página nunca ve rutas del disco (cada archivo recibe
+  un id opaco); los enlaces `nv://media` solo abren archivos del vault. Las
+  grabaciones del modo sombra se quedan en memoria (no se guardan en disco).
 - Adjuntos (capturas, facturas): solo imágenes y PDF, 15 MB como máximo, dentro
   de `.notevault/<módulo>/adjuntos/`; al quitarlos van a la papelera del vault.
 

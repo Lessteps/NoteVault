@@ -134,3 +134,12 @@ describe("security", () => {
     expect(el.querySelector(".callout-title")?.textContent).toContain("<img");
   });
 });
+
+describe("media links", () => {
+  it("keeps nv:// timestamp links and still drops scripts", async () => {
+    const { renderMarkdown } = await import("./markdown");
+    const html = renderMarkdown("[01:05](nv://media?file=Pelis/a.mp4&t=65) [x](javascript:alert(1)) <a href=\"javascript:alert(1)\">y</a>");
+    expect(html).toContain('href="nv://media?file=Pelis/a.mp4&amp;t=65"');
+    expect(html).not.toMatch(/href="javascript/i);
+  });
+});

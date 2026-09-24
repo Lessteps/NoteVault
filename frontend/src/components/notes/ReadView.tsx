@@ -1,6 +1,8 @@
 import { Braces } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { api } from "../../lib/bridge";
+import { parseMediaUrl } from "../../lib/player";
+import { usePlayer } from "../../store/player";
 import { escapeHtml, renderMarkdown, toggleTaskAt } from "../../lib/markdown";
 import type { Frontmatter } from "../../lib/types";
 import { bodyOf, useApp, type OpenNote } from "../../store/app";
@@ -204,7 +206,14 @@ export function ReadView({ note }: { note: OpenNote }) {
     }
     const a = el.closest("a");
     const href = a?.getAttribute("href");
-    if (href && !/^(https?:|mailto:|#)/i.test(href)) {
+    const media = href ? parseMediaUrl(href) : null;
+    if (media) {
+      // [mm:ss](nv://media?file=…&t=…): that moment in the English player.
+      e.preventDefault();
+      void usePlayer.getState().open(media[0], media[1]);
+      return;
+    }
+    if (href && !/^(https?:|mailto:|#|nv:)/i.test(href)) {
       // [text](other-note.md): a link to another file in the vault.
       e.preventDefault();
       const rel = resolveRelative(note.path, href);

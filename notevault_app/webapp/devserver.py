@@ -30,7 +30,7 @@ from .api import ApiError, NoteVaultApi, public_methods
 
 DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 MAX_BODY = 12 * 1024 * 1024
-CSP = ("default-src 'self'; img-src 'self' data:; media-src http://127.0.0.1:*; style-src 'self' 'unsafe-inline'; "
+CSP = ("default-src 'self'; img-src 'self' data:; media-src http://127.0.0.1:* blob:; style-src 'self' 'unsafe-inline'; "
        "font-src 'self' data:; script-src 'self' 'unsafe-eval'; connect-src 'self'; "
        "object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
 

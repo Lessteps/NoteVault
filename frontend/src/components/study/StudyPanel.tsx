@@ -80,6 +80,12 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
           className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent py-1.5 text-[12.5px] font-semibold text-white hover:bg-accent-strong disabled:opacity-50">
           <Play size={13} /> Practicar ahora
         </button>
+        {snap.area.subject === "english" && (
+          <button type="button" onClick={() => useApp.getState().setModule("player")}
+            className="mt-1.5 w-full rounded-lg border border-line py-1.5 text-[12px] text-text hover:border-dim">
+            🎬 Abrir reproductor
+          </button>
+        )}
         <div className="mt-2 flex gap-1" role="tablist" aria-label="Estudio">
           {([["today", `Hoy${c.total ? `  ${c.total}` : ""}`], ["ledger", "Ledger"], ["errors", `Errores${snap.errors.length ? `  ${snap.errors.length}` : ""}`]] as const).map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}

@@ -777,3 +777,13 @@ export interface WebOverview {
   relax_phrase: string;
   embedded: boolean;
 }
+
+export interface PlayerMedia {
+  id: string;
+  url: string;
+  name: string;
+  seconds: number;
+  pairs: import("./player").Pair[];
+  en_file: string;
+  es_file: string;
+}

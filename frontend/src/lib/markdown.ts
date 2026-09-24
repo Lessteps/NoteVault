@@ -287,6 +287,8 @@ const PURIFY: PurifyConfig = {
     "base", "script", "audio", "video", "source", "track"],
   FORBID_ATTR: ["srcset", "formaction", "action", "background", "ping"],
   ALLOW_UNKNOWN_PROTOCOLS: false,
+  // DOMPurify's default list plus nv: (timestamp links to vault media).
+  ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|nv):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
 };
 
 const cache = new Map<string, string>();

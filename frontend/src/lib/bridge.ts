@@ -330,5 +330,12 @@ export const api = {
   webOpen: (text: string) => call<{ ok: boolean; blocked?: boolean; reason?: string; system?: boolean }>("web_open", text),
   studyFolders: () => call<Array<{ id: string; name: string; icon: string; exists: boolean; index: string }>>("study_folders"),
   studyFolderCreate: (id: string, structure: boolean) => call<{ path: string; created: boolean; index: string }>("study_folder_create", id, structure),
+  enPlayerPick: () => call<import("./types").PlayerMedia & { ok: boolean }>("en_player_pick"),
+  enPlayerOpen: (file: string, seconds = 0) => call<import("./types").PlayerMedia & { ok: boolean }>("en_player_open", file, seconds),
+  enPlayerSubtitles: (id: string, track: "en" | "es") =>
+    call<{ ok: boolean; pairs?: import("./player").Pair[]; en_file?: string; es_file?: string }>("en_player_subtitles", id, track),
+  enPlayerLink: (id: string, seconds: number) => call<{ link: string }>("en_player_link", id, seconds),
+  enPlayerMine: (id: string, fields: { sentence: string; seconds: number; mode: "translate" | "cloze"; target: string; level: string; reference_es: string }) =>
+    call<{ path: string; stamp: string }>("en_player_mine", id, fields),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

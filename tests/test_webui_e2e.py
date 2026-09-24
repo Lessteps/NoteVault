@@ -925,5 +925,59 @@ class PracticeE2E(unittest.TestCase):
         self.assertEqual(len(PracticeAttemptStore(self.dir).attempts("mat.drill.fracciones.e01")), 1)
 
 
+
+@unittest.skipUnless(READY, "needs playwright, Chromium and a built frontend")
+class EnglishPlayerE2E(unittest.TestCase):
+    def setUp(self):
+        from notevault_app.webapp.api import NoteVaultApi
+        from notevault_app.webapp.devserver import serve_in_thread
+
+        self.dir = Path(tempfile.mkdtemp(prefix="nv_e2e_player_"))
+        (self.dir / "Pelis").mkdir()
+        (self.dir / "Pelis" / "film.mp4").write_bytes(b"\x00" * 1024)
+        (self.dir / "Pelis" / "film.en.srt").write_text(
+            "1\n00:00:01,000 --> 00:00:03,000\nHello there.\n\n2\n00:00:04,000 --> 00:00:06,000\nHow are you?\n",
+            encoding="utf-8")
+        (self.dir / "Pelis" / "film.es.srt").write_text(
+            "1\n00:00:04,000 --> 00:00:06,000\n¿Cómo estás?\n", encoding="utf-8")
+        (self.dir / "Escena.md").write_text("# Escena\n\nVer [00:04](nv://media?file=Pelis/film.mp4&t=4).\n",
+                                            encoding="utf-8")
+        self.api = NoteVaultApi(self.dir)
+        self.server, url, _ = serve_in_thread(self.api, 0, DIST)
+        self.pw = sync_playwright().start()
+        self.browser = self.pw.chromium.launch(executable_path=CHROMIUM)
+        self.page = self.browser.new_page(viewport={"width": 1400, "height": 900})
+        self.errors = []
+        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.page.goto(url)
+        _rail(self.page, "Notas").click()
+
+    def tearDown(self):
+        self.page.close()
+        self.browser.close()
+        self.pw.stop()
+        self.server.shutdown()
+        self.server.server_close()
+        if getattr(self.api, "_media", None):
+            self.api._media.shutdown()
+        shutil.rmtree(self.dir, ignore_errors=True)
+        self.assertEqual(self.errors, [])
+
+    def test_link_opens_player_and_mines_a_sentence(self):
+        self.page.get_by_role("treeitem", name="Escena").click()
+        self.page.get_by_role("link", name="00:04").click()
+        sentence = self.page.get_by_role("button", name="How are you?")
+        sentence.wait_for()
+        self.page.get_by_text("¿Cómo estás?").first.wait_for()
+        sentence.click()
+        self.page.get_by_role("button", name="Minar").click()
+        dialog = self.page.get_by_role("dialog", name="Minar frase")
+        dialog.get_by_role("button", name="Crear nota de práctica").click()
+        dialog.wait_for(state="detached")
+        mined = list((self.dir / "Inglés" / "Minería").glob("*.md"))
+        self.assertEqual(len(mined), 1)
+        self.assertIn("How are you?", mined[0].read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

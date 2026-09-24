@@ -172,6 +172,7 @@ function commands(): Item[] {
     { id: "theme", group: "Vista", label: "Cambiar tema claro / oscuro", run: s.toggleTheme },
     { id: "shortcuts", group: "Vista", label: "Atajos de teclado", run: () => useShortcutsDialog.getState().set(true) },
     ...MODULES.map((m) => ({ id: `go-${m.id}`, group: "Ir a", label: m.label, run: () => s.setModule(m.id) })),
+    { id: "go-player", group: "Ir a", label: "Reproductor de inglés", run: () => s.setModule("player") },
     { id: "go-web", group: "Ir a", label: "WEB (navegador con restricciones)", run: () => s.setModule("web") },
     // Formatting
     { id: "bold", group: "Formato", label: "Negrita", keys: "Ctrl+B", run: withEditor((v) => ed.wrap(v, "**")) },

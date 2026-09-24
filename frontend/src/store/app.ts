@@ -113,6 +113,13 @@ interface State {
   dismiss: (id: number) => void;
 }
 
+/** Views that show files outside the note tabs (the canvas) follow these. */
+export const pathEvents = {
+  opened: new Set<(path: string) => void>(),
+  renamed: new Set<(from: string, to: string) => void>(),
+  deleted: new Set<(path: string) => void>(),
+};
+
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const AUTOSAVE_MS = 1200;
 let toastSeq = 0;
@@ -165,6 +172,7 @@ export const useApp = create<State>((set, get) => ({
   setCursor: (cursor) => set({ cursor }),
 
   openNote: async (path, opts) => {
+    pathEvents.opened.forEach((f) => f(path));
     const s = get();
     if (s.notes[path]) {
       set((st) => ({
@@ -298,6 +306,7 @@ export const useApp = create<State>((set, get) => ({
 
   /** A file or folder moved: re-key any open tab under it. */
   pathRenamed: (from, to) => {
+    pathEvents.renamed.forEach((f) => f(from, to));
     set((st) => {
       const remap = (p: string) =>
         p === from ? to : p.startsWith(from + "/") ? to + p.slice(from.length) : p;
@@ -316,6 +325,7 @@ export const useApp = create<State>((set, get) => ({
   },
 
   pathDeleted: (path) => {
+    pathEvents.deleted.forEach((f) => f(path));
     set((st) => {
       const gone = (p: string) => p === path || p.startsWith(path + "/");
       const tabs = st.tabs.filter((t) => !gone(t));

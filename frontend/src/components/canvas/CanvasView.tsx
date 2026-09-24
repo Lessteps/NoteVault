@@ -1,0 +1,760 @@
+// The canvas editor: an infinite board of cards joined by arrows. Same
+// .canvas files as the classic app (and Obsidian).
+
+import {
+  ArrowLeftRight, Diamond, FileText, Grid3x3, Hand, Image as ImageIcon, LayoutDashboard, Link2, Maximize,
+  Minus, PenLine, Plus, Redo2, SquareDashed, StickyNote, Trash2, Undo2,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { api } from "../../lib/bridge";
+import {
+  bounds, cloneNodes, colorOf, contains, drawingNode, edgePath, intersects, nearestSide, newId, PRESET_COLORS,
+  pruneEdges, SHAPES, type CEdge, type CNode, type CanvasDoc, type Rect, type Side,
+} from "../../lib/canvas";
+import { readClipboard } from "../../lib/clipboard";
+import { useApp } from "../../store/app";
+import { useCanvas } from "../../store/canvas";
+import { askText, cn, openMenu } from "../ui";
+import { CanvasNodeView, forgetFileInfo } from "./CanvasNode";
+import { PathPicker } from "./PathPicker";
+import { DRAG_MIME } from "../notes/FileTree";
+
+type View = { x: number; y: number; zoom: number };
+type Drag =
+  | { kind: "pan"; sx: number; sy: number; vx: number; vy: number }
+  | { kind: "move"; sx: number; sy: number; start: Map<string, [number, number]>; moved: boolean }
+  | { kind: "resize"; id: string; sx: number; sy: number; w: number; h: number }
+  | { kind: "connect"; from: string; side: Side; x: number; y: number }
+  | { kind: "box"; x0: number; y0: number; x: number; y: number; add: boolean }
+  | { kind: "draw"; points: Array<[number, number]> };
+
+const GRID = 20;
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 3;
+const snapTo = (v: number, on: boolean) => (on ? Math.round(v / GRID) * GRID : v);
+
+export function CanvasView() {
+  const path = useCanvas((s) => s.path)!;
+  const title = useCanvas((s) => s.title);
+  const doc = useCanvas((s) => s.doc);
+  const dirty = useCanvas((s) => s.dirty);
+  const conflict = useCanvas((s) => s.conflict);
+  const canUndo = useCanvas((s) => s.past.length > 0);
+  const canRedo = useCanvas((s) => s.future.length > 0);
+  const { commit, snapshot, undo, redo } = useCanvas.getState();
+
+  const host = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<View>({ x: 0, y: 0, zoom: 1 });
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [selEdge, setSelEdge] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const dragRef = useRef<Drag | null>(null);
+  dragRef.current = drag;
+  const [drawMode, setDrawMode] = useState(false);
+  const [pen, setPen] = useState({ color: "5", width: 3 });
+  const [snap, setSnap] = useState(() => localStorage.getItem("nv.canvas.snap") === "1");
+  const [picker, setPicker] = useState<null | "note" | "image" | "canvas">(null);
+  const clip = useRef<CanvasDoc | null>(null);
+  const docRef = useRef(doc);
+  docRef.current = doc;
+
+  const byId = useMemo(() => new Map(doc.nodes.map((n) => [n.id, n])), [doc.nodes]);
+
+  // ── coordinates ──────────────────────────────────────────────────────
+  const toWorld = useCallback((cx: number, cy: number): [number, number] => {
+    const r = host.current!.getBoundingClientRect();
+    const v = viewRef.current;
+    return [(cx - r.left - v.x) / v.zoom, (cy - r.top - v.y) / v.zoom];
+  }, []);
+
+  const center = useCallback((): [number, number] => {
+    const r = host.current!.getBoundingClientRect();
+    return toWorld(r.left + r.width / 2, r.top + r.height / 2);
+  }, [toWorld]);
+
+  const fit = useCallback((nodes = docRef.current.nodes) => {
+    const el = host.current;
+    if (!el) return;
+    const b = bounds(nodes);
+    const { width, height } = el.getBoundingClientRect();
+    if (!b) {
+      setView({ x: width / 2, y: height / 2, zoom: 1 });
+      return;
+    }
+    const zoom = Math.min(1.2, Math.max(MIN_ZOOM, Math.min((width - 120) / b.width, (height - 160) / b.height)));
+    setView({ zoom, x: width / 2 - (b.x + b.width / 2) * zoom, y: height / 2 - (b.y + b.height / 2) * zoom });
+  }, []);
+
+  // New file → fresh selection, caches and a view that shows everything.
+  useEffect(() => {
+    setSel(new Set());
+    setSelEdge(null);
+    setEditing(null);
+    forgetFileInfo();
+    requestAnimationFrame(() => fit());
+    host.current?.focus();
+  }, [path, fit]);
+
+  const zoomAt = useCallback((factor: number, cx?: number, cy?: number) => {
+    const el = host.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (cx ?? r.left + r.width / 2) - r.left;
+    const py = (cy ?? r.top + r.height / 2) - r.top;
+    setView((v) => {
+      const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.zoom * factor));
+      const k = zoom / v.zoom;
+      return { zoom, x: px - (px - v.x) * k, y: py - (py - v.y) * k };
+    });
+  }, []);
+
+  // Wheel: pan; Ctrl/pinch: zoom around the pointer. Non-passive to stop
+  // the page from scrolling.
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if ((e.target as Element).closest("textarea")) return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.0022), e.clientX, e.clientY);
+      else setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [zoomAt]);
+
+  // ── document edits ───────────────────────────────────────────────────
+  const addNode = useCallback((n: Omit<CNode, "id"> & { id?: string }, edit = false) => {
+    const node = { ...n, id: n.id ?? newId(), x: snapTo(n.x, snap), y: snapTo(n.y, snap) } as CNode;
+    const d = docRef.current;
+    // Groups sit behind everything else.
+    commit({ ...d, nodes: node.type === "group" ? [node, ...d.nodes] : [...d.nodes, node] });
+    setSel(new Set([node.id]));
+    setSelEdge(null);
+    if (edit) setEditing(node.id);
+    return node;
+  }, [commit, snap]);
+
+  const patchNodes = useCallback((ids: Set<string>, patch: Partial<CNode>) => {
+    const d = docRef.current;
+    commit({ ...d, nodes: d.nodes.map((n) => (ids.has(n.id) ? { ...n, ...patch } : n)) });
+  }, [commit]);
+
+  const patchEdge = useCallback((id: string, patch: Partial<CEdge>) => {
+    const d = docRef.current;
+    commit({ ...d, edges: d.edges.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
+  }, [commit]);
+
+  const deleteSelection = useCallback(() => {
+    const d = docRef.current;
+    if (selEdge) {
+      commit({ ...d, edges: d.edges.filter((e) => e.id !== selEdge) });
+      setSelEdge(null);
+      return;
+    }
+    if (!sel.size) return;
+    commit(pruneEdges({ ...d, nodes: d.nodes.filter((n) => !sel.has(n.id)) }));
+    setSel(new Set());
+  }, [commit, sel, selEdge]);
+
+  const pasteDoc = useCallback((src: CanvasDoc, ids: Set<string>, dx: number, dy: number) => {
+    const d = docRef.current;
+    const copy = cloneNodes(src, ids, dx, dy);
+    if (!copy.nodes.length) return;
+    const groups = copy.nodes.filter((n) => n.type === "group");
+    const rest = copy.nodes.filter((n) => n.type !== "group");
+    commit({ nodes: [...groups, ...d.nodes, ...rest], edges: [...d.edges, ...copy.edges] });
+    setSel(new Set(copy.nodes.map((n) => n.id)));
+  }, [commit]);
+
+  const groupSelection = useCallback(() => {
+    const nodes = docRef.current.nodes.filter((n) => sel.has(n.id));
+    const b = bounds(nodes);
+    if (!b) {
+      const [x, y] = center();
+      addNode({ type: "group", x: x - 200, y: y - 150, width: 400, height: 300, label: "Grupo" });
+      return;
+    }
+    addNode({ type: "group", x: b.x - 30, y: b.y - 30, width: b.width + 60, height: b.height + 60, label: "Grupo" });
+  }, [sel, addNode, center]);
+
+  const addText = useCallback((x?: number, y?: number) => {
+    const [cx, cy] = x === undefined ? center() : [x, y!];
+    addNode({ type: "text", x: cx - 125, y: cy - 40, width: 250, height: 80, text: "" }, true);
+  }, [addNode, center]);
+
+  const addShape = useCallback((kind: string) => {
+    const s = SHAPES.find((x) => x.id === kind)!;
+    const [x, y] = center();
+    addNode({ type: "nv-shape", x: x - s.w / 2, y: y - s.h / 2, width: s.w, height: s.h, text: s.name, nv: { shape: kind } }, true);
+  }, [addNode, center]);
+
+  const addLink = useCallback(async () => {
+    const url = await askText("Dirección web (https://…)", "https://", "Añadir");
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url.trim())) {
+      useApp.getState().toast("error", "Solo enlaces http o https.");
+      return;
+    }
+    const [x, y] = center();
+    addNode({ type: "link", x: x - 150, y: y - 50, width: 300, height: 100, url: url.trim() });
+  }, [addNode, center]);
+
+  const addFile = useCallback((file: string, kind: "note" | "image" | "canvas") => {
+    const [x, y] = center();
+    const [w, h] = kind === "image" ? [320, 240] : kind === "canvas" ? [260, 140] : [360, 300];
+    addNode({ type: "file", x: x - w / 2, y: y - h / 2, width: w, height: h, file });
+  }, [addNode, center]);
+
+  const openFile = useCallback((file: string) => {
+    const s = useApp.getState();
+    if (/\.canvas$/i.test(file)) void useCanvas.getState().open(file);
+    else if (/\.(md|py|js|ts|txt)$/i.test(file) || !file.includes(".")) void s.openNote(file);
+    else void api.revealInOs(file).catch((e: Error) => s.toast("error", e.message));
+  }, []);
+
+  const onEditDone = useCallback((id: string, text: string | null) => {
+    setEditing(null);
+    host.current?.focus();
+    if (text === null) return;
+    const n = docRef.current.nodes.find((x) => x.id === id);
+    if (!n) return;
+    const key = n.type === "group" ? "label" : "text";
+    if ((n[key] ?? "") !== text) patchNodes(new Set([id]), { [key]: text });
+  }, [patchNodes]);
+
+  // ── pointer interactions ─────────────────────────────────────────────
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      startDrag(e, { kind: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y });
+      return;
+    }
+    if (e.button !== 0) return;
+    const t = e.target as Element;
+    if (t.closest("[data-canvas-ui]")) return;
+    const [wx, wy] = toWorld(e.clientX, e.clientY);
+    if (drawMode) {
+      startDrag(e, { kind: "draw", points: [[wx, wy]] });
+      return;
+    }
+    const edgeEl = t.closest("[data-edge-id]");
+    if (edgeEl) {
+      setSelEdge(edgeEl.getAttribute("data-edge-id"));
+      setSel(new Set());
+      return;
+    }
+    const nodeEl = t.closest("[data-node-id]");
+    if (!nodeEl) {
+      setSelEdge(null);
+      if (e.shiftKey) startDrag(e, { kind: "box", x0: wx, y0: wy, x: wx, y: wy, add: true });
+      else {
+        setSel(new Set());
+        startDrag(e, { kind: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y });
+      }
+      return;
+    }
+    const id = nodeEl.getAttribute("data-node-id")!;
+    if (editing === id) return;
+    const port = t.closest("[data-port]");
+    if (port) {
+      startDrag(e, { kind: "connect", from: id, side: port.getAttribute("data-port") as Side, x: wx, y: wy });
+      return;
+    }
+    if (t.closest("[data-resize]")) {
+      const n = byId.get(id)!;
+      snapshot();
+      startDrag(e, { kind: "resize", id, sx: wx, sy: wy, w: n.width, h: n.height });
+      return;
+    }
+    setSelEdge(null);
+    let next = sel;
+    if (e.shiftKey) {
+      next = new Set(sel);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+    } else if (!sel.has(id)) next = new Set([id]);
+    setSel(next);
+    // Moving a group carries the cards inside it.
+    const start = new Map<string, [number, number]>();
+    for (const n of doc.nodes) {
+      if (next.has(n.id)) start.set(n.id, [n.x, n.y]);
+    }
+    for (const g of doc.nodes.filter((n) => next.has(n.id) && n.type === "group")) {
+      for (const n of doc.nodes) if (n.id !== g.id && contains(g, n)) start.set(n.id, [n.x, n.y]);
+    }
+    startDrag(e, { kind: "move", sx: wx, sy: wy, start, moved: false });
+  };
+
+  const startDrag = (e: React.PointerEvent, d: Drag) => {
+    host.current?.setPointerCapture(e.pointerId);
+    setDrag(d);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    if (d.kind === "pan") {
+      setView((v) => ({ ...v, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy }));
+      return;
+    }
+    const [wx, wy] = toWorld(e.clientX, e.clientY);
+    if (d.kind === "move") {
+      const dx = wx - d.sx;
+      const dy = wy - d.sy;
+      if (!d.moved) {
+        if (Math.hypot(dx, dy) * viewRef.current.zoom < 3) return;
+        snapshot();
+        d.moved = true;
+      }
+      const cur = docRef.current;
+      commit({
+        ...cur,
+        nodes: cur.nodes.map((n) => {
+          const s = d.start.get(n.id);
+          return s ? { ...n, x: snapTo(s[0] + dx, snap), y: snapTo(s[1] + dy, snap) } : n;
+        }),
+      }, false);
+    } else if (d.kind === "resize") {
+      const cur = docRef.current;
+      commit({
+        ...cur,
+        nodes: cur.nodes.map((n) => (n.id === d.id
+          ? { ...n, width: Math.max(40, snapTo(d.w + wx - d.sx, snap)), height: Math.max(30, snapTo(d.h + wy - d.sy, snap)) }
+          : n)),
+      }, false);
+    } else if (d.kind === "connect" || d.kind === "box") {
+      setDrag({ ...d, x: wx, y: wy });
+    } else if (d.kind === "draw") {
+      const last = d.points[d.points.length - 1]!;
+      if (Math.hypot(wx - last[0], wy - last[1]) * viewRef.current.zoom >= 2) {
+        setDrag({ kind: "draw", points: [...d.points, [wx, wy]] });
+      }
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    setDrag(null);
+    if (!d) return;
+    if (d.kind === "connect") {
+      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-node-id]");
+      const toId = target?.getAttribute("data-node-id");
+      const cur = docRef.current;
+      const from = byId.get(d.from)!;
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      if (toId && toId !== d.from) {
+        const to = byId.get(toId)!;
+        const edge: CEdge = { id: newId(), fromNode: d.from, fromSide: d.side, toNode: toId, toSide: nearestSide(to, ...portOf(from, d.side)), toEnd: "arrow" };
+        commit({ ...cur, edges: [...cur.edges, edge] });
+        setSelEdge(edge.id);
+        setSel(new Set());
+      } else if (!toId && Math.hypot(wx - portOf(from, d.side)[0], wy - portOf(from, d.side)[1]) > 40) {
+        // Dropped on empty board: a new card there, already connected.
+        const node: CNode = { id: newId(), type: "text", x: snapTo(wx - 125, snap), y: snapTo(wy - 40, snap), width: 250, height: 80, text: "" };
+        const edge: CEdge = { id: newId(), fromNode: d.from, fromSide: d.side, toNode: node.id, toSide: nearestSide(node, ...portOf(from, d.side)), toEnd: "arrow" };
+        commit({ nodes: [...cur.nodes, node], edges: [...cur.edges, edge] });
+        setSel(new Set([node.id]));
+        setEditing(node.id);
+      }
+    } else if (d.kind === "box") {
+      const r: Rect = { x: Math.min(d.x0, d.x), y: Math.min(d.y0, d.y), width: Math.abs(d.x - d.x0), height: Math.abs(d.y - d.y0) };
+      const hit = docRef.current.nodes.filter((n) => intersects(r, n)).map((n) => n.id);
+      setSel(new Set([...(d.add ? sel : []), ...hit]));
+    } else if (d.kind === "draw") {
+      const node = drawingNode(d.points, pen.color, pen.width);
+      if (node) {
+        const cur = docRef.current;
+        commit({ ...cur, nodes: [...cur.nodes, node] });
+      }
+    }
+  };
+
+  const onDoubleClick = (e: React.MouseEvent) => {
+    if (drawMode || (e.target as Element).closest("[data-canvas-ui]")) return;
+    const nodeEl = (e.target as Element).closest("[data-node-id]");
+    if (!nodeEl) {
+      const [x, y] = toWorld(e.clientX, e.clientY);
+      addText(x, y);
+      return;
+    }
+    const n = byId.get(nodeEl.getAttribute("data-node-id")!);
+    if (!n) return;
+    if (n.type === "text" || n.type === "nv-shape" || n.type === "group") setEditing(n.id);
+    else if (n.type === "file" && n.file) openFile(n.file);
+    else if (n.type === "link" && n.url) void api.openExternal(n.url).catch(() => undefined);
+  };
+
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const [x, y] = toWorld(e.clientX, e.clientY);
+    const nodeEl = (e.target as Element).closest("[data-node-id]");
+    if (nodeEl) {
+      const id = nodeEl.getAttribute("data-node-id")!;
+      if (!sel.has(id)) setSel(new Set([id]));
+      const ids = sel.has(id) ? sel : new Set([id]);
+      openMenu(e, [
+        { label: "Duplicar", onSelect: () => pasteDoc(docRef.current, ids, 30, 30) },
+        { label: "Agrupar", onSelect: groupSelection },
+        { label: "Traer al frente", onSelect: () => reorder(ids, true) },
+        { label: "Enviar atrás", onSelect: () => reorder(ids, false) },
+        { label: "Eliminar", danger: true, icon: <Trash2 />, onSelect: () => {
+          const d = docRef.current;
+          commit(pruneEdges({ ...d, nodes: d.nodes.filter((n) => !ids.has(n.id)) }));
+          setSel(new Set());
+        } },
+      ]);
+      return;
+    }
+    openMenu(e, [
+      { label: "Tarjeta de texto", icon: <StickyNote />, onSelect: () => addText(x, y) },
+      { label: "Nota de la vault…", icon: <FileText />, onSelect: () => setPicker("note") },
+      { label: "Imagen de la vault…", icon: <ImageIcon />, onSelect: () => setPicker("image") },
+      { label: "Pegar", onSelect: () => void paste() },
+    ]);
+  };
+
+  const reorder = (ids: Set<string>, front: boolean) => {
+    const d = docRef.current;
+    const picked = d.nodes.filter((n) => ids.has(n.id));
+    const rest = d.nodes.filter((n) => !ids.has(n.id));
+    commit({ ...d, nodes: front ? [...rest, ...picked] : [...picked, ...rest] });
+  };
+
+  const paste = async () => {
+    if (clip.current) {
+      pasteDoc(clip.current, new Set(clip.current.nodes.map((n) => n.id)), 40, 40);
+      return;
+    }
+    const text = await readClipboard().catch(() => "");
+    if (text.trim()) {
+      const [x, y] = center();
+      addNode({ type: "text", x: x - 150, y: y - 60, width: 300, height: 120, text });
+    }
+  };
+
+  // ── keyboard ─────────────────────────────────────────────────────────
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (editing || (e.target as Element).closest("input, textarea")) return;
+    const mod = e.ctrlKey || e.metaKey;
+    const k = e.key.toLowerCase();
+    const run = (f: () => void) => {
+      e.preventDefault();
+      e.stopPropagation();
+      f();
+    };
+    if (e.key === "Delete" || e.key === "Backspace") run(deleteSelection);
+    else if (mod && k === "z" && !e.shiftKey) run(undo);
+    else if (mod && (k === "y" || (k === "z" && e.shiftKey))) run(redo);
+    else if (mod && k === "a") run(() => setSel(new Set(doc.nodes.map((n) => n.id))));
+    else if (mod && k === "d") run(() => pasteDoc(doc, sel, 30, 30));
+    else if (mod && k === "c") run(() => {
+      clip.current = { nodes: doc.nodes.filter((n) => sel.has(n.id)), edges: doc.edges };
+    });
+    else if (mod && k === "v") run(() => void paste());
+    else if (mod && k === "g") run(groupSelection);
+    else if (mod && k === "0") run(() => fit());
+    else if (mod && (k === "=" || k === "+")) run(() => zoomAt(1.2));
+    else if (mod && k === "-") run(() => zoomAt(1 / 1.2));
+    else if (mod) return;
+    else if (e.key === "Escape") run(() => {
+      setSel(new Set());
+      setSelEdge(null);
+      setDrawMode(false);
+    });
+    else if (e.key === "Enter" && sel.size === 1) run(() => setEditing([...sel][0]!));
+    else if (k === "z") run(() => addText());
+    else if (k === "x") run(() => setPicker("note"));
+    else if (k === "c") run(() => setPicker("image"));
+    else if (k === "a") run(() => setPicker("canvas"));
+    else if (k === "s") run(() => void addLink());
+    else if (k === "b") run(groupSelection);
+    else if (k === "n") run(() => setDrawMode((v) => !v));
+    else if (e.key.startsWith("Arrow") && sel.size) {
+      run(() => {
+        const step = e.shiftKey ? 50 : snap ? GRID : 5;
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+        const d = docRef.current;
+        commit({ ...d, nodes: d.nodes.map((n) => (sel.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)) });
+      });
+    }
+  };
+
+  // ── render ───────────────────────────────────────────────────────────
+  const edge = selEdge ? doc.edges.find((x) => x.id === selEdge) : undefined;
+  const single = sel.size === 1 ? byId.get([...sel][0]!) : undefined;
+  const gridSize = GRID * view.zoom;
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col bg-surface">
+      <div className="flex h-10 flex-none items-center gap-2 border-b border-line px-4">
+        <LayoutDashboard size={15} className="text-warn" />
+        <span className="truncate text-[13px] font-semibold text-text">{title}</span>
+        <span className="truncate font-mono text-[10.5px] text-faint">{path}</span>
+        <span className="ml-auto font-mono text-[11px] text-faint">{doc.nodes.length} tarjetas · {Math.round(view.zoom * 100)}%</span>
+        <span className={cn("text-[11px]", dirty ? "text-warn" : "text-mint")}>{dirty ? "Guardando…" : "Guardado"}</span>
+        <button type="button" onClick={() => void useCanvas.getState().close()}
+          className="rounded-md px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">Cerrar</button>
+      </div>
+      {conflict && (
+        <div className="flex flex-none items-center gap-3 border-b border-warn/40 bg-warn-soft px-4 py-2 text-[12.5px] text-text">
+          El canvas cambió en disco (otra app lo editó).
+          <button type="button" className="font-semibold text-accent-text" onClick={() => void useCanvas.getState().open(path)}>Recargar</button>
+          <button type="button" className="font-semibold text-warn" onClick={() => void useCanvas.getState().save(true)}>Sobrescribir</button>
+        </div>
+      )}
+      <div
+        ref={host}
+        tabIndex={0}
+        role="application"
+        aria-label="Canvas"
+        className={cn("nv-canvas relative min-h-0 flex-1 overflow-hidden outline-none",
+          drawMode ? "cursor-crosshair" : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-default")}
+        style={{
+          backgroundImage: "radial-gradient(circle, var(--nv-line-strong) 1px, transparent 1.2px)",
+          backgroundSize: `${gridSize}px ${gridSize}px`,
+          backgroundPosition: `${view.x}px ${view.y}px`,
+        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onDoubleClick={onDoubleClick}
+        onContextMenu={onContextMenu}
+        onKeyDown={onKeyDown}
+        data-dropzone
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes(DRAG_MIME)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }
+        }}
+        onDrop={(e) => {
+          const file = e.dataTransfer.getData(DRAG_MIME);
+          if (!file) return;
+          e.preventDefault();
+          const [x, y] = toWorld(e.clientX, e.clientY);
+          const image = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file);
+          const [w, h] = image ? [320, 240] : /\.canvas$/i.test(file) ? [260, 140] : [360, 300];
+          if (file === path) return;
+          addNode({ type: "file", x: x - w / 2, y: y - h / 2, width: w, height: h, file });
+        }}
+      >
+        <div className="absolute left-0 top-0 origin-top-left"
+          style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
+          {doc.nodes.filter((n) => n.type === "group").map((n) => (
+            <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} editing={editing === n.id} onEditDone={onEditDone} />
+          ))}
+          <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={1} height={1}>
+            {doc.edges.map((e) => {
+              const a = byId.get(e.fromNode);
+              const b = byId.get(e.toNode);
+              return a && b ? <EdgeView key={e.id} edge={e} a={a} b={b} selected={selEdge === e.id} /> : null;
+            })}
+            {drag?.kind === "connect" && byId.get(drag.from) && (
+              <line x1={portOf(byId.get(drag.from)!, drag.side)[0]} y1={portOf(byId.get(drag.from)!, drag.side)[1]}
+                x2={drag.x} y2={drag.y} stroke="var(--nv-accent)" strokeWidth={2 / view.zoom} strokeDasharray="6 4" />
+            )}
+            {drag?.kind === "draw" && (
+              <polyline points={drag.points.map((p) => p.join(",")).join(" ")} fill="none"
+                stroke={colorOf(pen.color)} strokeWidth={pen.width} strokeLinecap="round" strokeLinejoin="round" />
+            )}
+            {drag?.kind === "box" && (
+              <rect x={Math.min(drag.x0, drag.x)} y={Math.min(drag.y0, drag.y)} width={Math.abs(drag.x - drag.x0)}
+                height={Math.abs(drag.y - drag.y0)} fill="var(--nv-accent-soft)" stroke="var(--nv-accent)" strokeWidth={1 / view.zoom} />
+            )}
+          </svg>
+          {doc.nodes.filter((n) => n.type !== "group").map((n) => (
+            <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} editing={editing === n.id} onEditDone={onEditDone} />
+          ))}
+        </div>
+
+        {doc.nodes.length === 0 && !drawMode && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center text-center text-[13px] text-faint">
+            <div>
+              <p className="text-[15px] text-dim">Canvas vacío</p>
+              <p className="mt-1">Doble clic para crear una tarjeta · Z texto · X nota · N dibujar · clic derecho para más</p>
+            </div>
+          </div>
+        )}
+
+        {(sel.size > 0 || edge) && (
+          <SelectionBar
+            node={single}
+            edge={edge}
+            count={sel.size}
+            onColor={(c) => (edge ? patchEdge(edge.id, { color: c }) : patchNodes(sel, { color: c }))}
+            onDelete={deleteSelection}
+            onEdit={single && ["text", "nv-shape", "group"].includes(single.type) ? () => setEditing(single.id) : undefined}
+            onEdge={(p) => edge && patchEdge(edge.id, p)}
+            onEdgeLabel={async () => {
+              if (!edge) return;
+              const label = await askText("Etiqueta de la flecha", edge.label ?? "", "Guardar");
+              if (label !== null) patchEdge(edge.id, { label });
+            }}
+          />
+        )}
+
+        <Toolbar>
+          <Tool title="Tarjeta de texto (Z)" onClick={() => addText()}><StickyNote size={16} /></Tool>
+          <Tool title="Nota de la vault (X)" onClick={() => setPicker("note")}><FileText size={16} /></Tool>
+          <Tool title="Imagen de la vault (C)" onClick={() => setPicker("image")}><ImageIcon size={16} /></Tool>
+          <Tool title="Canvas embebido (A)" onClick={() => setPicker("canvas")}><LayoutDashboard size={16} /></Tool>
+          <Tool title="Enlace web (S)" onClick={() => void addLink()}><Link2 size={16} /></Tool>
+          <Tool title="Forma de diagrama (F)" onClick={(e) => openMenu(e, SHAPES.map((s) => ({ label: s.name, onSelect: () => addShape(s.id) })))}>
+            <Diamond size={16} />
+          </Tool>
+          <Tool title="Grupo (B / Ctrl+G)" onClick={groupSelection}><SquareDashed size={16} /></Tool>
+          <Tool title="Dibujo libre (N)" active={drawMode} onClick={() => setDrawMode((v) => !v)}><PenLine size={16} /></Tool>
+          {drawMode && (
+            <div className="flex items-center gap-1 px-1">
+              {Object.keys(PRESET_COLORS).map((c) => (
+                <button key={c} type="button" title="Color del lápiz" onClick={() => setPen((p) => ({ ...p, color: c }))}
+                  className={cn("h-4 w-4 rounded-full", pen.color === c && "ring-2 ring-text ring-offset-1 ring-offset-card")}
+                  style={{ background: PRESET_COLORS[c] }} />
+              ))}
+              <select value={pen.width} onChange={(e) => setPen((p) => ({ ...p, width: Number(e.target.value) }))}
+                title="Grosor" className="ml-1 rounded border border-line bg-surface px-1 text-[11px] text-text">
+                {[2, 3, 5, 8, 12].map((w) => <option key={w} value={w}>{w}px</option>)}
+              </select>
+            </div>
+          )}
+          <Sep />
+          <Tool title="Ajustar a la cuadrícula" active={snap} onClick={() => setSnap((v) => {
+            localStorage.setItem("nv.canvas.snap", v ? "0" : "1");
+            return !v;
+          })}><Grid3x3 size={16} /></Tool>
+          <Tool title="Alejar (Ctrl+−)" onClick={() => zoomAt(1 / 1.2)}><Minus size={16} /></Tool>
+          <Tool title="Acercar (Ctrl++)" onClick={() => zoomAt(1.2)}><Plus size={16} /></Tool>
+          <Tool title="Ver todo (Ctrl+0)" onClick={() => fit()}><Maximize size={16} /></Tool>
+          <Tool title="Deshacer (Ctrl+Z)" disabled={!canUndo} onClick={undo}><Undo2 size={16} /></Tool>
+          <Tool title="Rehacer (Ctrl+Y)" disabled={!canRedo} onClick={redo}><Redo2 size={16} /></Tool>
+          <Tool title="Mover: arrastra el fondo · Alt+arrastrar · rueda" onClick={() => setDrawMode(false)}><Hand size={16} /></Tool>
+        </Toolbar>
+      </div>
+
+      {picker && (
+        <PathPicker
+          kind={picker}
+          onClose={() => setPicker(null)}
+          onPick={(p) => {
+            setPicker(null);
+            if (picker === "canvas" && p === path) {
+              useApp.getState().toast("info", "Un canvas no puede contenerse a sí mismo.");
+              return;
+            }
+            addFile(p, picker);
+            host.current?.focus();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function portOf(n: Rect, side: Side): [number, number] {
+  switch (side) {
+    case "top": return [n.x + n.width / 2, n.y];
+    case "bottom": return [n.x + n.width / 2, n.y + n.height];
+    case "left": return [n.x, n.y + n.height / 2];
+    default: return [n.x + n.width, n.y + n.height / 2];
+  }
+}
+
+const INWARD: Record<Side, [number, number]> = { top: [0, 1], bottom: [0, -1], left: [1, 0], right: [-1, 0] };
+
+function arrowHead(n: Rect, side: Side, size: number): string {
+  const [x, y] = portOf(n, side);
+  const [dx, dy] = INWARD[side];
+  // The tip touches the card; the base sits `size` outside it.
+  const bx = x - dx * size;
+  const by = y - dy * size;
+  const px = -dy * size * 0.55;
+  const py = dx * size * 0.55;
+  return `${x},${y} ${bx + px},${by + py} ${bx - px},${by - py}`;
+}
+
+function EdgeView({ edge, a, b, selected }: { edge: CEdge; a: CNode; b: CNode; selected: boolean }) {
+  const { d, mid } = edgePath(a, edge.fromSide, b, edge.toSide);
+  const col = selected ? "var(--nv-accent)" : colorOf(edge.color, "var(--nv-dim)");
+  const dash = edge.nv?.style === "dashed" ? "8 6" : edge.nv?.style === "dotted" ? "2 5" : undefined;
+  return (
+    <g>
+      <path data-edge-id={edge.id} d={d} fill="none" stroke="transparent" strokeWidth={14} className="pointer-events-auto cursor-pointer" />
+      <path d={d} fill="none" stroke={col} strokeWidth={selected ? 3 : 2} strokeDasharray={dash} />
+      {(edge.toEnd ?? "arrow") === "arrow" && <polygon points={arrowHead(b, edge.toSide, 12)} fill={col} />}
+      {edge.fromEnd === "arrow" && <polygon points={arrowHead(a, edge.fromSide, 12)} fill={col} />}
+      {edge.label && (
+        <foreignObject x={mid[0] - 90} y={mid[1] - 14} width={180} height={28} className="overflow-visible">
+          <div className="mx-auto w-fit max-w-[180px] truncate rounded-md border border-line bg-card px-2 py-0.5 text-center text-[12px] text-text">
+            {edge.label}
+          </div>
+        </foreignObject>
+      )}
+    </g>
+  );
+}
+
+function Toolbar({ children }: { children: ReactNode }) {
+  return (
+    <div data-canvas-ui className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-xl border border-line-strong bg-card p-1 shadow-xl">
+      {children}
+    </div>
+  );
+}
+
+function Sep() {
+  return <span className="mx-1 h-5 w-px bg-line" />;
+}
+
+function Tool({ title, onClick, children, active, disabled }: {
+  title: string; onClick: (e: React.MouseEvent) => void; children: ReactNode; active?: boolean; disabled?: boolean;
+}) {
+  return (
+    <button type="button" title={title} aria-label={title} disabled={disabled} onClick={onClick}
+      className={cn("grid h-8 w-8 place-items-center rounded-lg transition-colors disabled:opacity-35",
+        active ? "bg-accent-soft text-accent-text" : "text-dim hover:bg-hover hover:text-text")}>
+      {children}
+    </button>
+  );
+}
+
+function SelectionBar({ node, edge, count, onColor, onDelete, onEdit, onEdge, onEdgeLabel }: {
+  node?: CNode; edge?: CEdge; count: number;
+  onColor: (c: string) => void; onDelete: () => void; onEdit?: () => void;
+  onEdge: (p: Partial<CEdge>) => void; onEdgeLabel: () => void;
+}) {
+  const current = edge ? edge.color ?? "" : node?.color ?? "";
+  return (
+    <div data-canvas-ui className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-line-strong bg-card px-2 py-1 shadow-lg">
+      <span className="px-1 text-[11.5px] text-faint">{edge ? "Flecha" : count > 1 ? `${count} tarjetas` : "Tarjeta"}</span>
+      <button type="button" title="Sin color" onClick={() => onColor("")}
+        className={cn("h-4 w-4 rounded-full border border-line-strong bg-surface", !current && "ring-2 ring-text ring-offset-1 ring-offset-card")} />
+      {Object.entries(PRESET_COLORS).map(([k, c]) => (
+        <button key={k} type="button" title="Color" onClick={() => onColor(k)}
+          className={cn("h-4 w-4 rounded-full", current === k && "ring-2 ring-text ring-offset-1 ring-offset-card")} style={{ background: c }} />
+      ))}
+      <Sep />
+      {edge && (
+        <>
+          <button type="button" title="Flecha en ambos extremos"
+            onClick={() => onEdge({ fromEnd: edge.fromEnd === "arrow" ? "none" : "arrow" })}
+            className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-hover hover:text-text"><ArrowLeftRight size={14} /></button>
+          <select value={edge.nv?.style ?? "solid"} title="Estilo de línea"
+            onChange={(e) => onEdge({ nv: { ...edge.nv, style: e.target.value as "solid" } })}
+            className="rounded border border-line bg-surface px-1 py-0.5 text-[11.5px] text-text">
+            <option value="solid">Continua</option>
+            <option value="dashed">Discontinua</option>
+            <option value="dotted">Punteada</option>
+          </select>
+          <button type="button" onClick={onEdgeLabel} className="rounded-md px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">Etiqueta</button>
+        </>
+      )}
+      {onEdit && <button type="button" onClick={onEdit} className="rounded-md px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">Editar</button>}
+      <button type="button" title="Eliminar (Supr)" onClick={onDelete}
+        className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-danger-soft hover:text-danger"><Trash2 size={14} /></button>
+    </div>
+  );
+}

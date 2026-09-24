@@ -1,12 +1,12 @@
 import {
-  ArrowLeft, Bookmark, ChevronsDownUp, Hash, Database, FilePlus, Files, FolderPlus, Network, RefreshCw, Search,
+  ArrowLeft, Bookmark, LayoutDashboard, ChevronsDownUp, Hash, Database, FilePlus, Files, FolderPlus, Network, RefreshCw, Search,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
 import type { Bookmark as BookmarkT, SearchHit } from "../../lib/types";
 import { useApp, type ExplorerTab } from "../../store/app";
 import { cn, IconButton } from "../ui";
-import { FileTree, newFolderIn, newNoteIn } from "./FileTree";
+import { FileTree, newCanvasIn, newFolderIn, newNoteIn } from "./FileTree";
 import { GraphPanel } from "./GraphPanel";
 
 const TABS: Array<{ id: ExplorerTab; label: string; icon: ReactNode }> = [
@@ -85,6 +85,9 @@ function FilesPanel() {
         </IconButton>
         <IconButton title="Nueva carpeta" onClick={() => void newFolderIn(folderOfActive)}>
           <FolderPlus size={15} />
+        </IconButton>
+        <IconButton title="Nuevo canvas" onClick={() => void newCanvasIn(folderOfActive)}>
+          <LayoutDashboard size={15} />
         </IconButton>
         <div className="flex-1" />
         <IconButton title="Recargar" onClick={refreshTree}>

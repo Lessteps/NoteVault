@@ -683,5 +683,100 @@ class ExerciseE2E(unittest.TestCase):
         self.assertEqual((entry.get("done"), entry.get("weight"), entry.get("reps")), (True, 42.5, 8))
 
 
+
+@unittest.skipUnless(READY, "needs playwright, Chromium and a built frontend")
+class CanvasE2E(unittest.TestCase):
+    def setUp(self):
+        import json
+        from notevault_app.webapp.api import NoteVaultApi
+        from notevault_app.webapp.devserver import serve_in_thread
+
+        self.dir = Path(tempfile.mkdtemp(prefix="nv_e2e_canvas_"))
+        (self.dir / "Idea.md").write_text("# Idea\n\nuna idea\n", encoding="utf-8")
+        (self.dir / "Mapa.canvas").write_text(json.dumps({"nodes": [
+            {"id": "n1", "type": "text", "x": 0, "y": 0, "width": 220, "height": 80, "text": "Primera"},
+            {"id": "n2", "type": "file", "x": 400, "y": 0, "width": 300, "height": 200, "file": "Idea.md"},
+        ], "edges": []}), encoding="utf-8")
+        self.api = NoteVaultApi(self.dir)
+        self.server, url, _ = serve_in_thread(self.api, 0, DIST)
+        self.pw = sync_playwright().start()
+        self.browser = self.pw.chromium.launch(executable_path=CHROMIUM)
+        self.page = self.browser.new_page(viewport={"width": 1400, "height": 900})
+        self.errors = []
+        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.page.goto(url)
+        _rail(self.page, "Notas").click()
+        self.page.get_by_role("treeitem", name="Mapa").click()
+        self.canvas = self.page.get_by_role("application", name="Canvas")
+        self.canvas.get_by_text("Primera").wait_for()
+
+    def tearDown(self):
+        self.page.close()
+        self.browser.close()
+        self.pw.stop()
+        self.server.shutdown()
+        self.server.server_close()
+        shutil.rmtree(self.dir, ignore_errors=True)
+        self.assertEqual(self.errors, [])
+
+    def _doc(self, predicate, timeout=6.0):
+        import json
+        end = time.time() + timeout
+        doc = None
+        while time.time() < end:
+            doc = json.loads((self.dir / "Mapa.canvas").read_text(encoding="utf-8"))
+            if predicate(doc):
+                return doc
+            time.sleep(0.1)
+        self.fail(f"canvas never reached the expected state: {doc}")
+
+    def test_note_card_shows_the_note(self):
+        self.canvas.get_by_text("una idea").wait_for()
+
+    def test_connect_move_and_add_cards(self):
+        first = self.page.locator('[data-node-id="n1"]')
+        box = first.bounding_box()
+        # Drag a card: the file moves it.
+        self.page.mouse.move(box["x"] + 60, box["y"] + 40)
+        self.page.mouse.down()
+        self.page.mouse.move(box["x"] + 60, box["y"] + 140, steps=6)
+        self.page.mouse.up()
+        self._doc(lambda d: d["nodes"][0]["y"] > 50)
+        # Connect n1's right port to the note card.
+        first.click()
+        port = first.locator('[data-port="right"]')
+        pb = port.bounding_box()
+        tb = self.page.locator('[data-node-id="n2"]').bounding_box()
+        self.page.mouse.move(pb["x"] + pb["width"] / 2, pb["y"] + pb["height"] / 2)
+        self.page.mouse.down()
+        self.page.mouse.move(tb["x"] + 50, tb["y"] + 50, steps=8)
+        self.page.mouse.up()
+        doc = self._doc(lambda d: len(d["edges"]) == 1)
+        self.assertEqual((doc["edges"][0]["fromNode"], doc["edges"][0]["toNode"]), ("n1", "n2"))
+        # Double-click the board: a new text card, typed in place.
+        self.page.mouse.dblclick(tb["x"] + 150, tb["y"] + 450)
+        self.page.keyboard.type("Nueva tarjeta")
+        self.canvas.click(position={"x": 30, "y": 30})
+        self._doc(lambda d: any(n.get("text") == "Nueva tarjeta" for n in d["nodes"]))
+        # Undo removes it again.
+        self.canvas.press("Control+z")
+        self._doc(lambda d: not any(n.get("text") == "Nueva tarjeta" for n in d["nodes"]))
+
+    def test_delete_card_drops_its_edges(self):
+        import json
+        (self.dir / "Mapa.canvas").write_text(json.dumps({"nodes": [
+            {"id": "n1", "type": "text", "x": 0, "y": 0, "width": 220, "height": 80, "text": "Primera"},
+            {"id": "n3", "type": "nv-shape", "x": 0, "y": 200, "width": 150, "height": 80, "text": "Si",
+             "nv": {"shape": "decision"}},
+        ], "edges": [{"id": "e1", "fromNode": "n1", "toNode": "n3", "fromSide": "bottom", "toSide": "top"}]}),
+            encoding="utf-8")
+        self.page.get_by_role("button", name="Cerrar").click()
+        self.page.get_by_role("treeitem", name="Mapa").click()
+        self.canvas.get_by_text("Si", exact=True).click()
+        self.page.keyboard.press("Delete")
+        doc = self._doc(lambda d: len(d["nodes"]) == 1)
+        self.assertEqual(doc["edges"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

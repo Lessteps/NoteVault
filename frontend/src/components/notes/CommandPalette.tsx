@@ -11,7 +11,7 @@ import type { TableOp } from "../../lib/mdTable";
 import { useApp } from "../../store/app";
 import { MODULES } from "../Shell";
 import { askText, cn, Kbd } from "../ui";
-import { newNoteIn } from "./FileTree";
+import { newCanvasIn, newNoteIn } from "./FileTree";
 import { useProperties } from "./PropertiesDialog";
 import { activeEditor, insertAtCursor } from "./SourceEditor";
 
@@ -109,6 +109,7 @@ function commands(): Item[] {
   const list: Item[] = [
     // Notes
     { id: "new-note", group: "Notas", label: "Nueva nota", run: () => newNoteIn(folder) },
+    { id: "new-canvas", group: "Notas", label: "Nuevo canvas", run: () => newCanvasIn(folder) },
     {
       id: "new-from-template", group: "Notas", label: "Nueva nota desde plantilla…",
       run: () => templatePage(async (name) => {

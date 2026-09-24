@@ -7,6 +7,8 @@ import { AiSettingsDialog, AssistantPanel } from "./AssistantPanel";
 import { EnglishAudioDialog } from "./EnglishAudio";
 import { PropertiesDialog } from "./PropertiesDialog";
 import { useAssistant } from "../../store/assistant";
+import { useCanvas } from "../../store/canvas";
+import { CanvasView } from "../canvas/CanvasView";
 
 const WIDTH_KEY = "nv.explorer.width";
 
@@ -14,6 +16,7 @@ export function NotesModule() {
   const explorerOpen = useApp((s) => s.explorerOpen);
   const inspectorOpen = useApp((s) => s.inspectorOpen);
   const assistantOpen = useAssistant((s) => s.open);
+  const canvasPath = useCanvas((s) => s.path);
   const [width, setWidth] = useState(() => Number(localStorage.getItem(WIDTH_KEY)) || 290);
   const drag = useRef<{ x: number; w: number } | null>(null);
 
@@ -49,8 +52,8 @@ export function NotesModule() {
           />
         </>
       )}
-      <EditorArea />
-      {assistantOpen ? <AssistantPanel /> : inspectorOpen && <Inspector />}
+      {canvasPath ? <CanvasView /> : <EditorArea />}
+      {!canvasPath && (assistantOpen ? <AssistantPanel /> : inspectorOpen && <Inspector />)}
       <AiSettingsDialog />
       <PropertiesDialog />
       <EnglishAudioDialog />

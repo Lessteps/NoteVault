@@ -6,10 +6,11 @@ import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react
 import { api } from "../../lib/bridge";
 import type { IndexEntry, TreeEntry } from "../../lib/types";
 import { useApp } from "../../store/app";
+import { useCanvas } from "../../store/canvas";
 import { askText, cn, confirmAction, openMenu } from "../ui";
 
 const EXPANDED_KEY = "nv.tree.expanded";
-const DRAG_MIME = "application/x-notevault-path";
+export const DRAG_MIME = "application/x-notevault-path";
 
 function loadExpanded(): Set<string> {
   try {
@@ -33,6 +34,20 @@ export async function newNoteIn(folder: string): Promise<void> {
     s.refreshTree();
     await s.openNote(path);
     s.setMode("edit");
+  } catch (e) {
+    s.toast("error", (e as Error).message);
+  }
+}
+
+export async function newCanvasIn(folder: string): Promise<void> {
+  const title = await askText("Nuevo canvas", "", "Crear");
+  if (!title) return;
+  const s = useApp.getState();
+  try {
+    const { path } = await api.canvasCreate(title, folder);
+    s.refreshTree();
+    s.setModule("notas");
+    await useCanvas.getState().open(path);
   } catch (e) {
     s.toast("error", (e as Error).message);
   }
@@ -94,7 +109,7 @@ async function moveInto(src: string, destFolder: string) {
 function openEntry(entry: TreeEntry) {
   const s = useApp.getState();
   if (entry.kind === "canvas") {
-    s.toast("info", "Los canvas todavía se abren en la app clásica (python run_app.py).");
+    void useCanvas.getState().open(entry.path);
     return;
   }
   void s.openNote(entry.path);
@@ -190,6 +205,7 @@ export function FileTree({ filter }: { filter: string }) {
       ? [
         { label: "Nueva nota aquí", icon: <FilePlus />, onSelect: () => void newNoteIn(entry.path) },
         { label: "Nueva carpeta aquí", icon: <FolderPlus />, onSelect: () => void newFolderIn(entry.path) },
+        { label: "Nuevo canvas aquí", icon: <LayoutDashboard />, onSelect: () => void newCanvasIn(entry.path) },
         { label: "Renombrar", icon: <Pencil />, onSelect: () => void renameEntry(entry) },
         { label: "Mover a la papelera", icon: <Trash2 />, danger: true, onSelect: () => void trashEntry(entry) },
       ]

@@ -38,7 +38,8 @@ módulos restantes.
 | Metas (tablero por áreas, Hoy, submetas en tarjetas/árbol/detalle, historial, notas, áreas) | ✅ migrado |
 | Finanzas (diario, semanal, mensual, anual, metas de ahorro, categorías con presupuesto, facturas, CSV) | ✅ migrado |
 | Ejercicio (vista general, registro semanal, un día por vista, gestionar rutina, reproductor de video) | ✅ migrado |
-| Canvas, práctica, mapa conceptual, herramientas de estudio, WEB | ⏳ en la app clásica |
+| Canvas (tarjetas de texto, notas, imágenes, enlaces, grupos, formas de diagrama, dibujo libre, flechas con etiqueta y estilo, zoom, deshacer, cuadrícula; mismo formato que Obsidian) | ✅ migrado |
+| Práctica, mapa conceptual, herramientas de estudio, WEB | ⏳ en la app clásica |
 
 ## Seguridad
 
@@ -57,6 +58,9 @@ módulos restantes.
   archivos que la API registró; la CSP permite medios solo desde 127.0.0.1.
 - Los datos que terminan en frontmatter (nombres, etiquetas…) se guardan en una
   sola línea: no pueden inyectar claves nuevas en el archivo.
+- Los canvas se validan al guardar (ids, tipos, colores, tamaños y número de
+  nodos acotados; flechas solo entre nodos existentes). Las tarjetas de
+  archivo solo leen archivos del vault.
 - Adjuntos (capturas, facturas): solo imágenes y PDF, 15 MB como máximo, dentro
   de `.notevault/<módulo>/adjuntos/`; al quitarlos van a la papelera del vault.
 

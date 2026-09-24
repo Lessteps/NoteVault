@@ -587,3 +587,23 @@ body {
   padding: 8px 12px;
   display: inline-block;
 }
+
+/* Canvas: connection ports appear on hover. */
+[data-node-id]:hover > .nv-port {
+  opacity: 1;
+}
+.nv-canvas .nv-prose {
+  font-size: inherit;
+  max-width: none;
+}
+.nv-canvas .nv-prose h2::before,
+.nv-canvas .nv-prose h3::before,
+.nv-canvas .nv-prose h4::before {
+  content: none;
+}
+.nv-canvas .nv-prose > :first-child {
+  margin-top: 0;
+}
+.nv-canvas .nv-prose h1 {
+  font-size: 1.6em;
+}

@@ -276,5 +276,14 @@ export const api = {
   dailyNote: () => call<{ path: string }>("daily_note"),
   tagsList: () => call<Array<{ tag: string; count: number }>>("tags_list"),
   tagNotes: (tag: string) => call<Array<{ path: string; title: string }>>("tag_notes", tag),
+  canvasRead: (rel: string) => call<{ path: string; title: string; doc: import("./canvas").CanvasDoc; modified: number }>("canvas_read", rel),
+  canvasWrite: (rel: string, doc: import("./canvas").CanvasDoc, expectedModified: number | null) =>
+    call<WriteResult>("canvas_write", rel, doc, expectedModified),
+  canvasCreate: (title: string, folder = "") => call<{ path: string }>("canvas_create", title, folder),
+  canvasList: () => call<Array<{ path: string; title: string }>>("canvas_list"),
+  canvasImages: () => call<Array<{ path: string; title: string }>>("canvas_images"),
+  canvasMedia: (rel: string) => call<{ data_url: string }>("canvas_media", rel),
+  canvasFileInfo: (rel: string) =>
+    call<{ exists: boolean; kind?: string; title?: string; path?: string; text?: string }>("canvas_file_info", rel),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

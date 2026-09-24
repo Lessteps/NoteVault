@@ -607,3 +607,8 @@ body {
 .nv-canvas .nv-prose h1 {
   font-size: 1.6em;
 }
+/* Prose inside cards and lists: no centering, no reading width. */
+.nv-prose.nv-inline {
+  margin: 0;
+  max-width: none;
+}

@@ -285,5 +285,29 @@ export const api = {
   canvasMedia: (rel: string) => call<{ data_url: string }>("canvas_media", rel),
   canvasFileInfo: (rel: string) =>
     call<{ exists: boolean; kind?: string; title?: string; path?: string; text?: string }>("canvas_file_info", rel),
+  practiceLoad: (rel: string) => call<import("./types").PracticeExercise>("practice_load", rel),
+  practiceSolution: (rel: string) => call<{ solution: string }>("practice_solution", rel),
+  practiceSaveDraft: (rel: string, text: string) => call<{ ok: boolean }>("practice_save_draft", rel, text),
+  practiceGrade: (rel: string, answer: string, hints: number, seconds: number, solutionSeen: boolean, via = "") =>
+    call<import("./types").PracticeGraded | import("./types").PracticeWaiting>("practice_grade", rel, answer, hints, seconds, solutionSeen, via),
+  practiceReply: (rel: string, request: string, text = "") =>
+    call<import("./types").PracticeGraded | import("./types").PracticeWaiting>("practice_reply", rel, request, text),
+  practiceDiscard: (rel: string, request: string) => call<{ ok: boolean }>("practice_discard", rel, request),
+  practiceGiveUp: (rel: string, seconds: number, hints: number) => call<import("./types").PracticeGraded>("practice_give_up", rel, seconds, hints),
+  practiceDrillStart: (rel: string) => call<{ session: string; prompts: string[] }>("practice_drill_start", rel),
+  practiceDrillCheck: (session: string, index: number, given: string, seconds: number) =>
+    call<{ ok: boolean; answer: string }>("practice_drill_check", session, index, given, seconds),
+  practiceDrillFinish: (session: string, seconds: number) => call<import("./types").PracticeGraded>("practice_drill_finish", session, seconds),
+  ladderLoad: (rel: string) => call<import("./types").LadderInfo>("ladder_load", rel),
+  ladderLevel: (rel: string, level: number) => call<import("./types").LadderLevel>("ladder_level", rel, level),
+  ladderSaveDraft: (rel: string, level: number, data: import("./types").LadderData) => call<{ ok: boolean }>("ladder_save_draft", rel, level, data),
+  ladderGrade: (rel: string, level: number, data: import("./types").LadderData, seconds: number, solutionSeen: boolean, via = "") =>
+    call<import("./types").LadderGraded | import("./types").PracticeWaiting>("ladder_grade", rel, level, data, seconds, solutionSeen, via),
+  ladderReply: (rel: string, request: string, text = "") =>
+    call<import("./types").LadderGraded | import("./types").PracticeWaiting>("ladder_reply", rel, request, text),
+  ladderDiscard: (rel: string, request: string) => call<{ ok: boolean }>("ladder_discard", rel, request),
+  ladderProof: (rel: string) => call<{ proof: string }>("ladder_proof", rel),
+  ladderGiveUp: (rel: string, level: number, data: import("./types").LadderData, seconds: number) =>
+    call<import("./types").LadderGraded>("ladder_give_up", rel, level, data, seconds),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

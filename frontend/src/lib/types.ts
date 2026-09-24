@@ -645,3 +645,84 @@ export interface AiProvider {
   default_model: string;
   bridge: boolean;
 }
+
+export interface PracticeResult {
+  score: number;
+  verdict: "correct" | "partial" | "incorrect" | string;
+  rubric: boolean[];
+  errors: Array<{ category: string; anchor: string; description: string; evidence: string; fix: string }>;
+  feedback: string;
+  next_step: string;
+  example: string;
+}
+
+export interface PracticeAttempt { at: string; score: number; verdict: string; quality: number | null; seconds: number; transport: string }
+
+export interface PracticePending { id: string; answer: string; hints_used: number; seconds: number; solution_seen: boolean }
+
+export interface PracticeExercise {
+  path: string;
+  note_id: string;
+  title: string;
+  subject: string;
+  discipline: string;
+  skill: string;
+  mode: { id: string; label: string; answer_kind: "text" | "code" | "short" | "drill" };
+  difficulty: number;
+  level: string;
+  assistance: "helper" | "nohelp";
+  timer: import("./practiceTimer").TimerSpec;
+  statement: string;
+  code: string;
+  code_lang: string;
+  hints: string[];
+  has_solution: boolean;
+  rubric: string[];
+  drill: { kind: string; label: string; items: number } | null;
+  draft: string;
+  history: PracticeAttempt[];
+  pending: PracticePending | null;
+}
+
+export interface PracticeGraded { graded: true; result: PracticeResult; quality: number | null; history: PracticeAttempt[]; solution?: string }
+export interface PracticeWaiting {
+  graded: false;
+  waiting?: boolean;
+  request?: string;
+  request_path?: string;
+  response_file?: string;
+  bridge?: boolean;
+  prompt?: string;
+  url?: string;
+  label?: string;
+}
+
+export interface LadderInfo {
+  path: string;
+  title: string;
+  subject: string;
+  technique: string;
+  difficulty: number;
+  statement: string;
+  steps: number;
+  levels: Array<{ number: number; label: string }>;
+  state: { current: number; passed: number[]; best: Record<string, number>; count: Record<string, number> };
+  history: Array<PracticeAttempt & { level: number }>;
+  pending: { id: string; level: number } | null;
+}
+
+export interface LadderLevel {
+  level: number;
+  label: string;
+  task: string;
+  timer: import("./practiceTimer").TimerSpec;
+  fields: string[];
+  order?: number[];
+  hidden?: number[];
+  steps?: Array<{ text: string; why?: string }>;
+  variants?: string[];
+  variant?: number;
+}
+
+export interface LadderData { fields: string[]; order?: number[]; hidden?: number[]; variant?: number }
+export interface LadderGraded { graded: true; result: PracticeResult; quality: number | null; rubric: string[]; passed: boolean; message: string; current: number; proof?: string }

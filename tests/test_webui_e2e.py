@@ -778,5 +778,87 @@ class CanvasE2E(unittest.TestCase):
         self.assertEqual(doc["edges"], [])
 
 
+
+@unittest.skipUnless(READY, "needs playwright, Chromium and a built frontend")
+class PracticeE2E(unittest.TestCase):
+    def setUp(self):
+        from notevault_app.webapp.api import NoteVaultApi
+        from notevault_app.webapp.devserver import serve_in_thread
+
+        self.dir = Path(tempfile.mkdtemp(prefix="nv_e2e_practice_"))
+        src = ROOT / "docs" / "knowledge_base" / "examples"
+        shutil.copy(next((src / "Matemáticas" / "1 Lógica y demostración" / "1.10 Inducción matemática"
+                          / "Ejercicios").glob("1.10-E01*.md")), self.dir / "Impares.md")
+        shutil.copy(next((src / "practice").glob("P-DRILL-01*.md")), self.dir / "Sprint.md")
+        cfg = mock.patch("notevault_app.webapp.modules.assistant.AppConfig")
+        cfg.start().get_ai_config.return_value = {"provider": "lmstudio", "base_url": "http://127.0.0.1:9/v1", "model": "m"}
+        self.addCleanup(cfg.stop)
+        self.api = NoteVaultApi(self.dir)
+        self.server, url, _ = serve_in_thread(self.api, 0, DIST)
+        self.pw = sync_playwright().start()
+        self.browser = self.pw.chromium.launch(executable_path=CHROMIUM)
+        self.page = self.browser.new_page(viewport={"width": 1400, "height": 900})
+        self.errors = []
+        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.page.goto(url)
+        _rail(self.page, "Notas").click()
+
+    def tearDown(self):
+        self.page.close()
+        self.browser.close()
+        self.pw.stop()
+        self.server.shutdown()
+        self.server.server_close()
+        shutil.rmtree(self.dir, ignore_errors=True)
+        self.assertEqual(self.errors, [])
+
+    def test_answer_hint_and_ai_grade(self):
+        import json
+        from notevault_app.core.practice.attempts import PracticeAttemptStore
+        reply = json.dumps({"score": 85, "verdict": "partial", "rubric": [True, True, True, True, False],
+                            "errors": [], "feedback": "Casi perfecto.", "next_step": "Cierra con el principio.",
+                            "example": ""})
+        self.page.get_by_role("treeitem", name="Impares").click()
+        self.page.get_by_text("Demuestra por inducción").wait_for()
+        self.page.get_by_role("button", name="Ver pista 1 de 3").click()
+        self.page.get_by_text("Pista 1.").wait_for()
+        self.page.get_by_label("Tu respuesta").fill("Caso base n=1. Paso inductivo: k^2+2k+1.")
+        with mock.patch("notevault_app.core.ai_client.send_chat", return_value=reply):
+            self.page.get_by_role("button", name="Entregar para corrección").click()
+            self.page.get_by_role("region", name="Corrección").get_by_text("Casi perfecto.").wait_for()
+        att = PracticeAttemptStore(self.dir).attempts("mat.logica.induccion.e01")
+        self.assertEqual((att[0]["score"], att[0]["hints_used"]), (85, 1))
+
+    def test_proof_ladder(self):
+        import json
+        src = ROOT / "docs" / "knowledge_base" / "examples" / "Matemáticas" / "1 Lógica y demostración" / "1.10 Inducción matemática"
+        shutil.copy(next((src / "Demostraciones").glob("1.10-T01*.md")), self.dir / "Teorema.md")
+        self.page.get_by_role("button", name="Recargar").click()
+        self.page.get_by_role("treeitem", name="Teorema").click()
+        self.page.get_by_role("button", name="▶ Practicar demostración").click()
+        self.page.get_by_text("Nivel 1 · Estrategia").wait_for()
+        self.page.get_by_label("Tu respuesta").fill("Inducción sobre n, sumando n+1 a la hipótesis.")
+        reply = json.dumps({"score": 95, "verdict": "correct", "rubric": [True, True, True]})
+        with mock.patch("notevault_app.core.ai_client.send_chat", return_value=reply):
+            self.page.get_by_role("button", name="Entregar para corrección").click()
+            self.page.get_by_text("Nivel superado · se desbloquea L2").wait_for()
+        self.page.get_by_role("button", name="Ir a L2").click()
+        self.page.get_by_role("list", name="Pasos a ordenar").wait_for()
+        self.page.get_by_role("button", name="Comprobar orden").click()
+        self.page.get_by_role("region", name="Corrección").wait_for()
+
+    def test_drill_sprint(self):
+        self.page.get_by_role("treeitem", name="Sprint").click()
+        self.page.get_by_role("button", name="Empezar").click()
+        box = self.page.get_by_label("Resultado")
+        for _ in range(15):
+            box.fill("1")
+            box.press("Enter")
+            self.page.wait_for_timeout(60)
+        self.page.get_by_role("region", name="Corrección").wait_for()
+        from notevault_app.core.practice.attempts import PracticeAttemptStore
+        self.assertEqual(len(PracticeAttemptStore(self.dir).attempts("mat.drill.fracciones.e01")), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

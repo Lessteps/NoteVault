@@ -9,6 +9,8 @@ import { useApp, type OpenNote, type ViewMode } from "../../store/app";
 import { cn, IconButton, Kbd } from "../ui";
 import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
+import { PracticeView } from "../practice/PracticeView";
+import { isProofNote, LadderView, useLadder } from "../practice/LadderView";
 import { SourceEditor } from "./SourceEditor";
 import { StudyBar } from "./StudyBar";
 import { useAssistant } from "../../store/assistant";
@@ -285,10 +287,16 @@ function EmptyState() {
   );
 }
 
+/** Exercise notes (type: exercise) open in the practice view to be read. */
+function isExercise(note: { kind: string; frontmatter: Record<string, unknown> }): boolean {
+  return note.kind === "note" && String(note.frontmatter?.type ?? "").trim().toLowerCase() === "exercise";
+}
+
 export function EditorArea() {
   const note = useApp((s) => (s.active ? s.notes[s.active] : undefined));
   const mode = useApp((s) => s.mode);
   const hasTabs = useApp((s) => s.tabs.length > 0);
+  const ladderOn = useLadder((s) => (note ? s.open.has(note.path) : false));
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-surface">
       {hasTabs && <TabBar />}
@@ -307,7 +315,22 @@ export function EditorArea() {
             )}
             {mode !== "edit" && (
               <div className={cn("min-h-0 min-w-0", mode === "split" ? "w-1/2" : "flex-1")}>
-                <ReadView note={note} />
+                {mode === "read" && isExercise(note) ? <PracticeView note={note} />
+                  : mode === "read" && ladderOn ? <LadderView path={note.path} onExit={() => useLadder.getState().set(note.path, false)} />
+                    : (
+                      <div className="flex h-full flex-col">
+                        {mode === "read" && note.kind === "note" && isProofNote(note.frontmatter) && (
+                          <div className="flex flex-none items-center gap-3 border-b border-line bg-accent-soft px-5 py-2 text-[12.5px] text-text">
+                            Esta nota es una demostración.
+                            <button type="button" onClick={() => useLadder.getState().set(note.path, true)}
+                              className="rounded-md bg-accent px-2.5 py-1 font-semibold text-white hover:bg-accent-strong">
+                              ▶ Practicar demostración
+                            </button>
+                          </div>
+                        )}
+                        <div className="min-h-0 flex-1"><ReadView note={note} /></div>
+                      </div>
+                    )}
               </div>
             )}
           </div>

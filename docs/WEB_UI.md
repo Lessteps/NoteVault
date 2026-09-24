@@ -39,7 +39,9 @@ módulos restantes.
 | Finanzas (diario, semanal, mensual, anual, metas de ahorro, categorías con presupuesto, facturas, CSV) | ✅ migrado |
 | Ejercicio (vista general, registro semanal, un día por vista, gestionar rutina, reproductor de video) | ✅ migrado |
 | Canvas (tarjetas de texto, notas, imágenes, enlaces, grupos, formas de diagrama, dibujo libre, flechas con etiqueta y estilo, zoom, deshacer, cuadrícula; mismo formato que Obsidian) | ✅ migrado |
-| Práctica, mapa conceptual, herramientas de estudio, WEB | ⏳ en la app clásica |
+| Práctica (notas `type: exercise`: enunciado, pistas, cronómetro/pomodoro, corrección por IA por API, web o archivo de intercambio, historial, cálculo rápido) | ✅ migrado |
+| Escalera de demostración (L1–L6 para notas de teorema: estrategia, ordenar, completar, justificar, en blanco, variante) | ✅ migrado |
+| Mapa conceptual, herramientas de estudio (errores, repaso), WEB | ⏳ en la app clásica |
 
 ## Seguridad
 
@@ -61,6 +63,9 @@ módulos restantes.
 - Los canvas se validan al guardar (ids, tipos, colores, tamaños y número de
   nodos acotados; flechas solo entre nodos existentes). Las tarjetas de
   archivo solo leen archivos del vault.
+- Práctica: los pasos ocultos de la escalera y las respuestas del cálculo rápido
+  no se envían a la página antes de tiempo; las solicitudes de corrección solo
+  se aceptan con su id exacto y para la nota que las creó.
 - Adjuntos (capturas, facturas): solo imágenes y PDF, 15 MB como máximo, dentro
   de `.notevault/<módulo>/adjuntos/`; al quitarlos van a la papelera del vault.
 

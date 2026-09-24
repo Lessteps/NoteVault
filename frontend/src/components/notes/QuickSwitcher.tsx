@@ -29,20 +29,23 @@ export function QuickSwitcher() {
   const open = useApp((s) => s.switcherOpen);
   const setOpen = useApp((s) => s.setSwitcher);
   const openNote = useApp((s) => s.openNote);
-  const [index, setIndex] = useState<IndexEntry[]>([]);
+  const [index, setIndex] = useState<IndexEntry[] | null>(null);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
+  const [enterPending, setEnterPending] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
     setQ("");
     setSel(0);
+    setIndex(null);
     api.noteIndex().then(setIndex).catch(() => setIndex([]));
   }, [open]);
 
   const results = useMemo(() => {
     const query = q.trim().toLowerCase();
+    if (!index) return [];
     if (!query) return index.slice(0, 40);
     return index
       .map((n) => ({ n, s: Math.min(score(n.title, query), score(n.path, query) + 5) }))
@@ -53,10 +56,17 @@ export function QuickSwitcher() {
   }, [index, q]);
 
   const exact = results.some((n) => n.title.toLowerCase() === q.trim().toLowerCase());
-  const canCreate = q.trim().length > 0 && !exact;
+  // Until the index is read, Enter must not create a note that may exist.
+  const canCreate = index !== null && q.trim().length > 0 && !exact;
   const total = results.length + (canCreate ? 1 : 0);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (enterPending && index !== null) {
+      setEnterPending(false);
+      if (total) void choose(sel);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enterPending, index]);
 
   const choose = async (i: number) => {
     setOpen(false);
@@ -74,6 +84,8 @@ export function QuickSwitcher() {
       s.toast("error", (e as Error).message);
     }
   };
+
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-40 flex justify-center bg-black/45 pt-[12vh]" onMouseDown={() => setOpen(false)}>
@@ -101,6 +113,10 @@ export function QuickSwitcher() {
               } else if (e.key === "ArrowUp") {
                 e.preventDefault();
                 setSel((v) => Math.max(v - 1, 0));
+              } else if (e.key === "Enter" && index === null) {
+                // Typed faster than the index loaded: act once it arrives.
+                e.preventDefault();
+                setEnterPending(true);
               } else if (e.key === "Enter" && total) {
                 e.preventDefault();
                 void choose(sel);
@@ -148,7 +164,8 @@ export function QuickSwitcher() {
               </button>
             </li>
           )}
-          {!total && <li className="px-3 py-4 text-[12.5px] text-faint">El vault no tiene notas todavía.</li>}
+          {index === null && <li className="px-3 py-4 text-[12.5px] text-faint">Leyendo el vault…</li>}
+          {index !== null && !total && <li className="px-3 py-4 text-[12.5px] text-faint">El vault no tiene notas todavía.</li>}
         </ul>
         <div className="flex items-center gap-3 border-t border-line px-4 py-2 font-mono text-[10.5px] text-faint">
           <span className="flex items-center gap-1"><Kbd>↑↓</Kbd> moverse</span>

@@ -726,3 +726,31 @@ export interface LadderLevel {
 
 export interface LadderData { fields: string[]; order?: number[]; hidden?: number[]; variant?: number }
 export interface LadderGraded { graded: true; result: PracticeResult; quality: number | null; rubric: string[]; passed: boolean; message: string; current: number; proof?: string }
+
+export interface StudyExerciseRef { path: string; note_id: string; title: string; discipline: string; skill: string; mode: string; difficulty: number }
+export interface StudySnapshot {
+  area: { subject: string; title: string; subject_title: string; folder: string };
+  exercises: number;
+  queue: {
+    items: Array<{
+      kind: string; title: string; reason: string;
+      exercise?: StudyExerciseRef;
+      card?: { srs_id: string; source: string; kind: string; question: string; answer: string; missing: boolean };
+    }>;
+    gaps: string[];
+    counts: { recommendations: number; srs_exercises: number; cards: number; total: number };
+  };
+  ledgers: Array<{
+    title: string;
+    skills: Array<{
+      code: string; title: string; status: "not_started" | "practicing" | "consolidated"; label: string;
+      best: number | null; is_due: boolean; due: string; interval_days: number | null; bands: string[];
+      exercises: number; attempted: number; practice: string; practice_title: string;
+    }>;
+  }>;
+  concepts: Array<{ title: string; done: number; total: number; best: number | null }>;
+  errors: Array<{
+    id: string; repeat_count: number; category: string; skill: string; anchor: string;
+    description: string; fix: string; seen: string; note: string; source: string;
+  }>;
+}

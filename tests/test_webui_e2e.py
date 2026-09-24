@@ -847,6 +847,22 @@ class PracticeE2E(unittest.TestCase):
         self.page.get_by_role("button", name="Comprobar orden").click()
         self.page.get_by_role("region", name="Corrección").wait_for()
 
+    def test_study_panel(self):
+        shutil.copytree(ROOT / "docs" / "knowledge_base" / "examples" / "Matemáticas", self.dir / "Matemáticas")
+        self.page.get_by_role("button", name="Recargar").click()
+        self.page.get_by_role("treeitem", name="Matemáticas").click()
+        self.page.get_by_role("treeitem", name="1 Lógica y demostración").click()
+        self.page.get_by_role("treeitem", name="1.10 Inducción matemática").click()
+        self.page.get_by_role("treeitem", name="Ejercicios").click()
+        self.page.get_by_role("treeitem", name="1.10-E01 Suma de los primeros impares").click()
+        panel = self.page.get_by_role("tablist", name="Panel lateral")
+        panel.get_by_role("tab", name="Estudio").wait_for()
+        self.page.get_by_role("tab", name="Ledger").click()
+        self.page.get_by_text("consolidadas").first.wait_for()
+        self.page.get_by_role("tab", name="Hoy", exact=False).click()
+        self.page.get_by_role("button", name="Practicar ahora").first.click()
+        self.page.get_by_label("Tu respuesta").wait_for()
+
     def test_drill_sprint(self):
         self.page.get_by_role("treeitem", name="Sprint").click()
         self.page.get_by_role("button", name="Empezar").click()

@@ -309,5 +309,10 @@ export const api = {
   ladderProof: (rel: string) => call<{ proof: string }>("ladder_proof", rel),
   ladderGiveUp: (rel: string, level: number, data: import("./types").LadderData, seconds: number) =>
     call<import("./types").LadderGraded>("ladder_give_up", rel, level, data, seconds),
+  studyArea: (rel: string) => call<{ subject: string; folder: string; title: string; subject_title: string } | null>("study_area", rel),
+  studySnapshot: (rel: string) => call<import("./types").StudySnapshot>("study_snapshot", rel),
+  studyCardGrade: (srsId: string, quality: number) => call<{ ok: boolean }>("study_card_grade", srsId, quality),
+  studyErrorResolve: (id: string) => call<{ ok: boolean }>("study_error_resolve", id),
+  studyErrorDigest: () => call<{ text: string }>("study_error_digest"),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

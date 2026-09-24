@@ -11,6 +11,7 @@ import { display, initialTimer, tick, type TimerState } from "../../lib/practice
 import type { PracticeExercise, PracticeGraded, PracticeWaiting } from "../../lib/types";
 import { useApp, type OpenNote } from "../../store/app";
 import { cn, confirmAction } from "../ui";
+import { useStudyVersion } from "../study/StudyPanel";
 import { DrillPanel } from "./DrillPanel";
 import { beep, md, ResultCard } from "./common";
 
@@ -100,6 +101,7 @@ export function PracticeView({ note }: { note: OpenNote }) {
   }, [running, ex]);
 
   const finish = (r: PracticeGraded) => {
+    useStudyVersion.getState().bump();
     setResult(r);
     setPending(null);
     setRunning(false);

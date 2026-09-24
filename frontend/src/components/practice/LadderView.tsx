@@ -12,6 +12,7 @@ import { initialTimer, type TimerState } from "../../lib/practiceTimer";
 import type { LadderData, LadderGraded, LadderInfo, LadderLevel, PracticeWaiting } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { cn, confirmAction } from "../ui";
+import { useStudyVersion } from "../study/StudyPanel";
 import { md, ResultCard, TimerBox, useClock } from "./common";
 
 const PROOF_TYPES = new Set(["theorem", "teorema", "proof", "demostracion", "lemma", "lema",
@@ -98,6 +99,7 @@ export function LadderView({ path, onExit }: { path: string; onExit: () => void 
     }
     setResult(r);
     setPending(null);
+    useStudyVersion.getState().bump();
     setRunning(false);
     if (r.proof !== undefined) {
       setProof(r.proof);

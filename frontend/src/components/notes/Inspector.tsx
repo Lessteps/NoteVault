@@ -1,4 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "../../lib/bridge";
+import { StudyPanel } from "../study/StudyPanel";
 import { bodyOf, useApp } from "../../store/app";
 import { cn } from "../ui";
 
@@ -37,7 +39,49 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+/** The right panel: the note's outline, plus Estudio for notes of a study area. */
 export function Inspector() {
+  const active = useApp((s) => s.active);
+  const [area, setArea] = useState<string | null>(null);
+  const [tab, setTab] = useState<"note" | "study">(() => (localStorage.getItem("nv.inspector.tab") === "note" ? "note" : "study"));
+  useEffect(() => {
+    if (!active) {
+      setArea(null);
+      return;
+    }
+    let live = true;
+    api.studyArea(active)
+      .then((a) => live && setArea(a ? `${a.subject}:${a.folder}` : null))
+      .catch(() => live && setArea(null));
+    return () => {
+      live = false;
+    };
+  }, [active]);
+  const pick = (t: "note" | "study") => {
+    setTab(t);
+    try {
+      localStorage.setItem("nv.inspector.tab", t);
+    } catch {
+      /* private mode */
+    }
+  };
+  if (!area || !active) return <NoteInspector />;
+  return (
+    <aside className="flex w-[300px] flex-none flex-col border-l border-line bg-panel">
+      <div className="flex h-9 flex-none items-center gap-1 border-b border-line px-2" role="tablist" aria-label="Panel lateral">
+        {([["study", "Estudio"], ["note", "Nota"]] as const).map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => pick(id)}
+            className={cn("rounded-md px-2.5 py-1 text-[12px]", tab === id ? "bg-accent-soft text-text" : "text-dim hover:bg-hover")}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === "study" ? <StudyPanel path={active} areaKey={area} /> : <NoteInspector embedded />}
+    </aside>
+  );
+}
+
+function NoteInspector({ embedded = false }: { embedded?: boolean }) {
   const note = useApp((s) => (s.active ? s.notes[s.active] : undefined));
   const openNote = useApp((s) => s.openNote);
   const heads = useMemo(() => (note?.kind === "note" ? outline(note.raw) : []), [note?.raw, note?.kind]);
@@ -46,7 +90,7 @@ export function Inspector() {
   const words = note ? (note.raw.match(/\S+/g)?.length ?? 0) : 0;
 
   return (
-    <aside className="flex w-[260px] flex-none flex-col overflow-y-auto border-l border-line bg-panel">
+    <aside className={cn("flex flex-col overflow-y-auto bg-panel", embedded ? "min-h-0 flex-1" : "w-[260px] flex-none border-l border-line")}>
       {!note ? (
         <div className="p-4 text-[12px] text-faint">Abre una nota para ver su esquema.</div>
       ) : (

@@ -41,7 +41,8 @@ módulos restantes.
 | Canvas (tarjetas de texto, notas, imágenes, enlaces, grupos, formas de diagrama, dibujo libre, flechas con etiqueta y estilo, zoom, deshacer, cuadrícula; mismo formato que Obsidian) | ✅ migrado |
 | Práctica (notas `type: exercise`: enunciado, pistas, cronómetro/pomodoro, corrección por IA por API, web o archivo de intercambio, historial, cálculo rápido) | ✅ migrado |
 | Escalera de demostración (L1–L6 para notas de teorema: estrategia, ordenar, completar, justificar, en blanco, variante) | ✅ migrado |
-| Mapa conceptual, herramientas de estudio (errores, repaso), WEB | ⏳ en la app clásica |
+| Estudio (panel lateral del área: cola de hoy con repasos y tarjetas, ledger de skills y conceptos, registro de errores) | ✅ migrado |
+| Mapa conceptual, WEB | ⏳ en la app clásica |
 
 ## Seguridad
 

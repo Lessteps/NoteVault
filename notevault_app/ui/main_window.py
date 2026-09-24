@@ -10,7 +10,7 @@ Mode-switching 3-panel layout:
 from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QSplitter, QStatusBar,
-    QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget,
+    QHBoxLayout, QVBoxLayout, QLabel, QStackedWidget, QFrame, QPushButton,
 )
 from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QTimer, QSize
 
@@ -341,12 +341,19 @@ class MainWindow(QMainWindow):
         self._right_stack.setMaximumWidth(520)
 
         # ── Central widget ────────────────────────────────────────────────
+        body = QWidget()
+        body_layout = QHBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(0)
+        body_layout.addWidget(self.icon_rail)
+        body_layout.addWidget(self.main_splitter, stretch=1)
+
         central = QWidget()
-        central_layout = QHBoxLayout(central)
+        central_layout = QVBoxLayout(central)
         central_layout.setContentsMargins(0, 0, 0, 0)
         central_layout.setSpacing(0)
-        central_layout.addWidget(self.icon_rail)
-        central_layout.addWidget(self.main_splitter, stretch=1)
+        central_layout.addWidget(self._build_top_bar())
+        central_layout.addWidget(body, stretch=1)
         self.setCentralWidget(central)
 
         self.status_bar = QStatusBar()
@@ -701,6 +708,7 @@ class MainWindow(QMainWindow):
         self._dashboard.set_managers(
             self.habits, self.exercise_mgr, self.tasks, self.projects,
             goals=self.goals, areas=self.areas, finances=self.finances)
+        self._refresh_top_bar()
         self.status_bar.showMessage(f"Vault: {vault_path.name}")
 
     # ── Notes helpers ─────────────────────────────────────────────────────
@@ -835,6 +843,77 @@ class MainWindow(QMainWindow):
         self._global_palette.activated.connect(self._open_global_palette)
         self._center_stack.currentChanged.connect(self._sync_global_palette)
         self._sync_global_palette()
+
+    def _build_top_bar(self) -> QWidget:
+        """The app-wide header: brand + vault name on the left, a global
+        search that opens the command palette in the centre, and a sync
+        indicator on the right. Layout only — every action already exists."""
+        bar = QFrame()
+        bar.setObjectName("topBar")
+        bar.setAttribute(Qt.WA_StyledBackground, True)
+        bar.setFixedHeight(44)
+        bar.setStyleSheet(
+            "QFrame#topBar{background:#14141a;border:none;"
+            "border-bottom:1px solid #33333e;}"
+        )
+        lay = QHBoxLayout(bar)
+        lay.setContentsMargins(14, 0, 14, 0)
+        lay.setSpacing(10)
+
+        brand = QLabel("◆  NoteVault")
+        brand.setStyleSheet(
+            "color:#dcdde0;font-size:13px;font-weight:700;background:transparent;")
+        lay.addWidget(brand)
+
+        self._vault_name_lbl = QLabel("")
+        self._vault_name_lbl.setStyleSheet(
+            "color:#888895;font-size:12px;background:transparent;")
+        lay.addWidget(self._vault_name_lbl)
+
+        lay.addStretch(1)
+
+        # Centre: a search box that opens the command palette (Ctrl+P / global).
+        self._top_search = QPushButton("  Buscar notas, bloques, comandos…")
+        self._top_search.setObjectName("topSearch")
+        self._top_search.setCursor(Qt.PointingHandCursor)
+        self._top_search.setFixedWidth(420)
+        self._top_search.setFixedHeight(28)
+        self._top_search.setStyleSheet(
+            "QPushButton#topSearch{background:#202024;border:1px solid #33333e;"
+            "border-radius:8px;color:#666672;font-size:12px;text-align:left;"
+            "padding:0 10px;}"
+            "QPushButton#topSearch:hover{border-color:#7c5af0;color:#888895;}"
+        )
+        self._top_search.clicked.connect(self._top_search_activated)
+        lay.addWidget(self._top_search)
+
+        lay.addStretch(1)
+
+        self._sync_lbl = QLabel("● Sincronizado")
+        self._sync_lbl.setStyleSheet(
+            "color:#3fb950;font-size:11px;background:transparent;")
+        lay.addWidget(self._sync_lbl)
+
+        self._refresh_top_bar()
+        return bar
+
+    def _refresh_top_bar(self):
+        if hasattr(self, "_vault_name_lbl"):
+            try:
+                name = self.vault.vault_root.name or "vault"
+            except Exception:
+                name = "vault"
+            self._vault_name_lbl.setText(f"—  {name}")
+
+    def _top_search_activated(self):
+        # In the notes module the editor owns the richer palette; elsewhere
+        # the global one. Both already exist.
+        if self._center_stack.currentWidget() is self._notas_center:
+            pane = getattr(self._notas_center, "_active", None)
+            if pane is not None and hasattr(pane, "open_palette"):
+                pane.open_palette()
+                return
+        self._open_global_palette()
 
     def _sync_global_palette(self, *_):
         self._global_palette.setEnabled(

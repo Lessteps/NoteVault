@@ -6,8 +6,8 @@
 // with a per-run token. Both reject with an Error carrying Python's message.
 
 import type {
-  AppInfo, Bookmark, IndexEntry, Mentions, NoteData, SearchHit, Task, TaskFields, TasksMeta,
-  TreeEntry, WriteResult,
+  AppInfo, Bookmark, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
+  IndexEntry, Mentions, NoteData, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
 } from "./types";
 
 type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
@@ -130,4 +130,22 @@ export const api = {
   tasksDelete: (id: string) => call<{ ok: boolean }>("tasks_delete", id),
   tasksDueReminders: () => call<Task[]>("tasks_due_reminders"),
   tasksMarkReminderShown: (id: string) => call<{ ok: boolean }>("tasks_mark_reminder_shown", id),
+
+  // Hábitos
+  habitsList: () => call<Habit[]>("habits_list"),
+  habitsRange: (first: string, last: string) => call<HabitRangeDay[]>("habits_range", first, last),
+  habitsDay: (day: string) => call<HabitDayLog>("habits_day", day),
+  habitsStats: (ref = "") => call<HabitStats>("habits_stats", ref),
+  habitsSetDone: (day: string, id: string, done: boolean) =>
+    call<{ ok: boolean; pct: number }>("habits_set_done", day, id, done),
+  habitsSetSubtask: (day: string, id: string, sub: string, done: boolean) =>
+    call<{ ok: boolean }>("habits_set_subtask", day, id, sub, done),
+  habitsSetDayText: (day: string, notes: string, journal: string) =>
+    call<{ ok: boolean }>("habits_set_day_text", day, notes, journal),
+  habitsAdd: (fields: HabitFields = {}) => call<Habit>("habits_add", fields),
+  habitsUpdate: (id: string, fields: HabitFields) => call<Habit>("habits_update", id, fields),
+  habitsRemove: (id: string) => call<{ ok: boolean }>("habits_remove", id),
+  habitsReorder: (ids: string[]) => call<{ ok: boolean }>("habits_reorder", ids),
+  habitsAddSubtask: (id: string, name: string) => call<HabitSubtask>("habits_add_subtask", id, name),
+  habitsRemoveSubtask: (id: string, sub: string) => call<{ ok: boolean }>("habits_remove_subtask", id, sub),
 };

@@ -5,6 +5,7 @@ import { ComingSoon, IconRail, StatusBar, Toasts, TopBar } from "./components/Sh
 import { DialogHost, MenuHost } from "./components/ui";
 import { NotesModule } from "./components/notes/NotesModule";
 import { QuickSwitcher } from "./components/notes/QuickSwitcher";
+import { HabitsModule } from "./components/habits/HabitsModule";
 import { TasksModule } from "./components/tasks/TasksModule";
 import { useTasks } from "./store/tasks";
 
@@ -116,7 +117,8 @@ export function App() {
         <IconRail />
         {module === "notas" ? <NotesModule />
           : module === "tareas" ? <TasksModule />
-            : <ComingSoon module={module} />}
+            : module === "habits" ? <HabitsModule />
+              : <ComingSoon module={module} />}
       </div>
       <StatusBar />
       <QuickSwitcher />

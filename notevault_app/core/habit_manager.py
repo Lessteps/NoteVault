@@ -240,6 +240,11 @@ class HabitManager:
             for h in habits:
                 h.setdefault("days", list(ALL_DAYS))
                 h.setdefault("subtasks", [])
+            if not habits:
+                # The user removed every habit on purpose: an empty list is
+                # a real configuration, not a missing one. Reinstalling the
+                # defaults here brought deleted habits back.
+                return habits
             if habits:
                 # Older v2 configs miss the habits added in later versions;
                 # append them instead of wiping the user's own edits.

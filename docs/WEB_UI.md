@@ -30,7 +30,8 @@ módulos restantes.
 |---|---|
 | Notas (explorador, pestañas, lectura, editor, búsqueda, marcadores, backlinks, Ctrl+P) | ✅ migrado |
 | Tareas (tabla editable, filtros, calendario con repeticiones, recordatorios, subtareas) | ✅ migrado |
-| Vista general, Calendario, Hábitos, Ejercicio, Proyectos, Metas, Finanzas | ⏳ en la app clásica |
+| Hábitos (vista general con racha, diaria con subtareas y diario, semanal, mensual, anual, gestionar) | ✅ migrado |
+| Vista general, Calendario, Ejercicio, Proyectos, Metas, Finanzas | ⏳ en la app clásica |
 | Canvas, práctica, grafo, asistente IA, WEB | ⏳ en la app clásica |
 
 ## Seguridad

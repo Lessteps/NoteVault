@@ -91,3 +91,65 @@ export interface TasksMeta {
   priority_max: number;
   subjects: string[];
 }
+
+// ── Hábitos ────────────────────────────────────────────────────────────────
+
+export interface HabitSubtask {
+  id: string;
+  name: string;
+}
+
+export interface Habit {
+  id: string;
+  name: string;
+  icon: string;
+  days: number[];
+  subtasks: HabitSubtask[];
+  repeat?: string;
+  start_date?: string;
+  end_date?: string;
+  paused_from?: string;
+  time?: string;
+  duration_min?: number;
+  in_calendar?: boolean;
+  reminder_min?: number;
+  colour?: string;
+  notes?: string;
+  area?: string;
+  schedule: string;
+}
+
+export type HabitFields = Partial<Omit<Habit, "id" | "subtasks" | "schedule">>;
+
+export interface HabitRangeDay {
+  date: string;
+  active: string[];
+  done: string[];
+  pct: number;
+}
+
+export interface HabitDayLog {
+  date: string;
+  active: string[];
+  completed: Record<string, boolean>;
+  subtasks: Record<string, Record<string, boolean>>;
+  notes: string;
+  journal: string;
+}
+
+export interface HabitRates {
+  day: number | null;
+  week: number | null;
+  month: number | null;
+  year: number | null;
+}
+
+export interface HabitStats {
+  today: string;
+  day: number;
+  week: number;
+  month: number;
+  year: number;
+  streak: number;
+  habits: Record<string, HabitRates>;
+}

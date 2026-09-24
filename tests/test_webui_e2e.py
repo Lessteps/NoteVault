@@ -217,5 +217,83 @@ class TasksE2E(unittest.TestCase):
         self._wait(lambda: self._task_file(tid).status == "Completado")
 
 
+@unittest.skipUnless(READY, "needs playwright, Chromium and a built frontend")
+class HabitsE2E(unittest.TestCase):
+    """Hábitos driven through the browser; checks the habit files on disk."""
+
+    @classmethod
+    def setUpClass(cls):
+        from notevault_app.webapp.api import NoteVaultApi
+        from notevault_app.webapp.devserver import serve_in_thread
+
+        cls.dir = Path(tempfile.mkdtemp(prefix="nv_e2e_habits_"))
+        cls.api = NoteVaultApi(cls.dir)
+        for h in cls.api.habits_list():
+            cls.api.habits_remove(h["id"])
+        cls.water = cls.api.habits_add({"name": "Agua", "icon": "💧"})
+        cls.sub = cls.api.habits_add_subtask(cls.water["id"], "Primer vaso")
+        cls.server, cls.url, _ = serve_in_thread(cls.api, 0, DIST)
+        cls.pw = sync_playwright().start()
+        cls.browser = cls.pw.chromium.launch(executable_path=CHROMIUM)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.browser.close()
+        cls.pw.stop()
+        cls.server.shutdown()
+        cls.server.server_close()
+        shutil.rmtree(cls.dir, ignore_errors=True)
+
+    def setUp(self):
+        self.page = self.browser.new_page(viewport={"width": 1500, "height": 900})
+        self.errors = []
+        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.page.goto(self.url)
+        self.page.get_by_role("button", name="Hábitos").click()
+        self.page.get_by_text("Habit Streak").wait_for()
+
+    def tearDown(self):
+        self.page.close()
+        self.assertEqual(self.errors, [])
+
+    def _view(self, name):
+        self.page.locator("aside nav").get_by_text(name, exact=True).click()
+
+    def _day(self):
+        from datetime import date
+        from notevault_app.core.habit_manager import HabitManager
+        return HabitManager(self.dir).get_day(date.today())
+
+    def _wait(self, predicate, timeout=6.0):
+        end = time.time() + timeout
+        while time.time() < end:
+            if predicate():
+                return
+            time.sleep(0.1)
+        self.fail("state never reached")
+
+    def test_daily_check_in_subtask_and_journal(self):
+        hid, sid = self.water["id"], self.sub["id"]
+        self._view("Diaria")
+        self.page.get_by_role("checkbox", name="Agua").click()
+        self._wait(lambda: self._day().completed.get(hid) is True)
+        self.page.get_by_label("Primer vaso").check()
+        self._wait(lambda: self._day().subtasks.get(hid, {}).get(sid) is True)
+        self.page.get_by_placeholder("Diario: ¿cómo fue el día?").fill("buen día\n---\nfin")
+        self._wait(lambda: "buen día" in self._day().journal)
+        self.assertTrue(self._day().completed.get(hid))
+
+    def test_create_and_rename_in_manager(self):
+        self._view("Gestionar hábitos")
+        self.page.get_by_role("button", name="Nuevo hábito").click()
+        name = self.page.locator("aside input").nth(1)
+        name.fill("Leer 20 min")
+        name.press("Enter")
+        self._wait(lambda: any(h["name"] == "Leer 20 min" for h in self.api.habits_list()))
+        self.page.get_by_role("button", name="X", exact=True).click()   # drop Wednesday
+        self._wait(lambda: next(h for h in self.api.habits_list()
+                                if h["name"] == "Leer 20 min")["days"] == [0, 1, 3, 4, 5, 6])
+
+
 if __name__ == "__main__":
     unittest.main()

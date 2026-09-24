@@ -37,6 +37,7 @@ from ..core.frontmatter_utils import parse_frontmatter
 from ..core.notes_service import NotesService
 from ..core.vault_manager import Note, VaultManager
 from .errors import ApiError
+from .modules.habits import HabitsApi
 from .modules.tasks import TasksApi
 
 MAX_WRITE_BYTES = 10 * 1024 * 1024
@@ -58,7 +59,7 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
-class NoteVaultApi(TasksApi):
+class NoteVaultApi(TasksApi, HabitsApi):
     """The bridge. Each app module adds its methods through a mixin
     (notevault_app/webapp/modules/), prefixed with the module name."""
 

@@ -571,7 +571,7 @@ def write_fixtures():
         body = stable_ids(path.read_text(encoding="utf-8"))
         target = CONFORMANCE / stable
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(body, encoding="utf-8")
+        target.write_text(body, encoding="utf-8", newline="\n")
         manifest[stable] = len(body)
 
     (CONFORMANCE / "MANIFEST.json").write_text(
@@ -579,6 +579,7 @@ def write_fixtures():
                     "generated_for": FIXED_DAY.isoformat(),
                     "files": manifest}, indent=2, ensure_ascii=False),
         encoding="utf-8",
+        newline="\n",
     )
 
     # What a correct parser must get out of those bytes. The Dart port is
@@ -588,6 +589,7 @@ def write_fixtures():
         json.dumps(expected_values(vault, ids),
                    indent=2, ensure_ascii=False, sort_keys=True),
         encoding="utf-8",
+        newline="\n",
     )
 
     shutil.rmtree(vault, ignore_errors=True)

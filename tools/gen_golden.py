@@ -53,7 +53,7 @@ def gen_frontmatter():
         "Cuerpo de la nota.\n"
     )
     updated = update_frontmatter(sample, {"status": "reviewed", "difficulty": 3})
-    (target / "sample_updated.md").write_text(updated, encoding="utf-8")
+    (target / "sample_updated.md").write_text(updated, encoding="utf-8", newline="\n")
 
 
 def main():
@@ -69,7 +69,7 @@ def main():
         for item in CONFORMANCE.iterdir():
             dest = GOLDEN / item.name
             if item.is_dir():
-                shutil.copytree(item, dest)
+                shutil.copytree(item, dest, dirs_exist_ok=True)
             else:
                 shutil.copy2(item, dest)
 

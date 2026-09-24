@@ -1,5 +1,5 @@
 import {
-  Bookmark, ChevronsDownUp, Database, FilePlus, Files, FolderPlus, RefreshCw, Search,
+  Bookmark, ChevronsDownUp, Database, FilePlus, Files, FolderPlus, Network, RefreshCw, Search,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
@@ -7,11 +7,13 @@ import type { Bookmark as BookmarkT, SearchHit } from "../../lib/types";
 import { useApp, type ExplorerTab } from "../../store/app";
 import { cn, IconButton } from "../ui";
 import { FileTree, newFolderIn, newNoteIn } from "./FileTree";
+import { GraphPanel } from "./GraphPanel";
 
 const TABS: Array<{ id: ExplorerTab; label: string; icon: ReactNode }> = [
   { id: "files", label: "Files", icon: <Files size={14} /> },
   { id: "search", label: "Search", icon: <Search size={14} /> },
   { id: "bookmarks", label: "Bookmarks", icon: <Bookmark size={14} /> },
+  { id: "graph", label: "Grafo", icon: <Network size={14} /> },
 ];
 
 export function Explorer({ width }: { width: number }) {
@@ -20,19 +22,21 @@ export function Explorer({ width }: { width: number }) {
   const info = useApp((s) => s.info);
   return (
     <aside className="flex flex-none flex-col border-r border-line bg-panel" style={{ width }}>
-      <div className="flex h-10 flex-none items-center gap-1 border-b border-line px-2">
+      <div className="flex h-10 flex-none items-center gap-1 overflow-hidden border-b border-line px-2">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
+            title={t.label}
+            aria-label={t.label}
             onClick={() => setTab(t.id)}
             className={cn(
-              "flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors",
+              "flex h-7 flex-none items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors",
               tab === t.id ? "bg-accent-soft text-text" : "text-dim hover:bg-hover hover:text-text",
             )}
           >
             {t.icon}
-            {t.label}
+            {tab === t.id && t.label}
           </button>
         ))}
       </div>
@@ -41,6 +45,7 @@ export function Explorer({ width }: { width: number }) {
         {tab === "files" && <FilesPanel />}
         {tab === "search" && <SearchPanel />}
         {tab === "bookmarks" && <BookmarksPanel />}
+        {tab === "graph" && <GraphPanel />}
       </div>
 
       <div className="m-2 flex flex-none items-center gap-2 rounded-lg border border-line bg-card px-3 py-2">

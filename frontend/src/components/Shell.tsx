@@ -7,6 +7,7 @@ import {
 import type { ComponentType } from "react";
 import { useApp, type ModuleId } from "../store/app";
 import { cn, Kbd } from "./ui";
+import { useVaultDialog } from "./VaultDialog";
 
 export function TopBar() {
   const info = useApp((s) => s.info);
@@ -20,9 +21,10 @@ export function TopBar() {
         <span className="text-[13px] font-semibold tracking-tight text-text">NoteVault</span>
       </div>
       <span className="text-faint">—</span>
-      <span className="font-mono text-[11px] uppercase tracking-wider text-dim">
+      <button type="button" title="Cambiar de vault" onClick={() => useVaultDialog.getState().set(true)}
+        className="rounded-md px-1.5 py-0.5 font-mono text-[11px] uppercase tracking-wider text-dim hover:bg-hover hover:text-text">
         Vault: {info?.vault_name ?? "…"}
-      </span>
+      </button>
 
       <button
         type="button"

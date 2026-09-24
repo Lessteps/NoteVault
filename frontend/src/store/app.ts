@@ -9,7 +9,7 @@ export type ModuleId =
   | "metas" | "finanzas" | "notas" | "tareas";
 
 export type ViewMode = "read" | "edit" | "split";
-export type ExplorerTab = "files" | "search" | "bookmarks";
+export type ExplorerTab = "files" | "search" | "bookmarks" | "graph";
 
 export interface OpenNote {
   path: string;

@@ -609,3 +609,15 @@ export interface HomeOverview {
 export interface HomeTask {
   id: string; name: string; status: string; subject: string; priority: number; due: string | null; done: boolean;
 }
+
+export interface VaultInfo {
+  path: string;
+  name: string;
+  current?: boolean;
+  exists?: boolean;
+  markdown: number;
+  folders: number;
+  code_markers: number;
+  truncated: boolean;
+  obsidian: boolean;
+}

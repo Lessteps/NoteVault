@@ -3,6 +3,7 @@ import { api } from "./lib/bridge";
 import { flushAll, useApp } from "./store/app";
 import { ComingSoon, IconRail, StatusBar, Toasts, TopBar } from "./components/Shell";
 import { DialogHost, MenuHost } from "./components/ui";
+import { VaultDialog } from "./components/VaultDialog";
 import { NotesModule } from "./components/notes/NotesModule";
 import { QuickSwitcher } from "./components/notes/QuickSwitcher";
 import { useTasks } from "./store/tasks";
@@ -146,6 +147,7 @@ export function App() {
       </div>
       <StatusBar />
       <QuickSwitcher />
+      <VaultDialog />
       <DialogHost />
       <MenuHost />
       <Toasts />

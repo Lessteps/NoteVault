@@ -48,6 +48,7 @@ from .modules.habits import HabitsApi
 from .modules.home import HomeApi
 from .modules.projects import ProjectsApi
 from .modules.tasks import TasksApi
+from .modules.vaults import VaultsApi
 
 MAX_WRITE_BYTES = 10 * 1024 * 1024
 MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024
@@ -69,7 +70,7 @@ def _json_safe(value: Any) -> Any:
 
 
 class NoteVaultApi(ManagersMixin, FilesApi, TasksApi, HabitsApi, CalendarApi, ProjectsApi, GoalsApi,
-                  FinanceApi, ExerciseApi, HomeApi):
+                  FinanceApi, ExerciseApi, HomeApi, VaultsApi):
     """The bridge. Each app module adds its methods through a mixin
     (notevault_app/webapp/modules/), prefixed with the module name."""
 
@@ -406,6 +407,13 @@ class NoteVaultApi(ManagersMixin, FilesApi, TasksApi, HabitsApi, CalendarApi, Pr
             return {"bookmarked": bool(self._service.toggle_bookmark(path))}
 
     # ── attachments ───────────────────────────────────────────────────────
+
+    def knowledge_graph(self) -> dict:
+        """Notes as nodes (subject, type, mastery) and their links as edges:
+        prerequisites, uses and wikilinks."""
+        from ..core.knowledge_graph import KnowledgeGraph
+        with self._lock:
+            return KnowledgeGraph(self._root).build_graph()
 
     def read_attachment(self, note_rel: str, name: str) -> dict:
         """An image embedded in a note, as a data: URL. Confined to the vault

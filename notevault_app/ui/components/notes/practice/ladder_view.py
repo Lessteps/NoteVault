@@ -17,7 +17,8 @@ from PySide6.QtCore import Qt, Signal, QTimer
 
 from .... import theme
 from .....config import AppConfig
-from .....core.ai_client import AIConfig, AIWorker, BRIDGE_URLS, build_bridge_prompt
+from .....core.ai_client import AIConfig, BRIDGE_URLS, build_bridge_prompt
+from ....ai_workers import AIWorker
 from .....core.practice import handoff, ladder
 from .....core.practice.attempts import PracticeAttemptStore
 from .....core.practice.error_log import apply_result, recent_errors

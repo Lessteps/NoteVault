@@ -64,6 +64,29 @@ const mdHighlight = HighlightStyle.define([
   { tag: t.meta, color: "var(--nv-faint)" },
 ]);
 
+/** The editor on screen, for tools that act on the selection or cursor
+ * (the assistant inserting an answer, study actions on the selected text). */
+export const activeEditor: { view: EditorView | null } = { view: null };
+
+export function editorSelection(): string {
+  const v = activeEditor.view;
+  if (v) {
+    const { from, to } = v.state.selection.main;
+    if (to > from) return v.state.sliceDoc(from, to);
+  }
+  return window.getSelection()?.toString() ?? "";
+}
+
+/** Insert text at the cursor of the editor; false when no editor is open. */
+export function insertAtCursor(text: string): boolean {
+  const v = activeEditor.view;
+  if (!v) return false;
+  const { from, to } = v.state.selection.main;
+  v.dispatch({ changes: { from, to, insert: text }, selection: { anchor: from + text.length } });
+  v.focus();
+  return true;
+}
+
 export function SourceEditor({
   value, eol, code, onChange, onCursor, revealLine, onRevealed,
 }: {
@@ -113,8 +136,10 @@ export function SourceEditor({
     });
     const v = new EditorView({ state, parent: host.current! });
     view.current = v;
+    activeEditor.view = v;
     v.focus();
     return () => {
+      if (activeEditor.view === v) activeEditor.view = null;
       v.destroy();
       view.current = null;
     };

@@ -18,7 +18,8 @@ from PySide6.QtGui import QDesktopServices
 
 from .... import theme
 from .....config import AppConfig
-from .....core.ai_client import AIConfig, AIWorker, BRIDGE_URLS, build_bridge_prompt
+from .....core.ai_client import AIConfig, BRIDGE_URLS, build_bridge_prompt
+from ....ai_workers import AIWorker
 from .....core.practice import handoff, modes
 from .....core.practice.attempts import PracticeAttemptStore
 from .....core.practice.discipline_catalog import discipline_for, skill_of

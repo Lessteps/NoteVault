@@ -23,8 +23,9 @@ from PySide6.QtGui import QDesktopServices
 
 from ....config import AppConfig
 from ....core import ai_client
+from ...ai_workers import AIWorker, ModelsWorker
 from ....core.ai_client import (
-    AIConfig, AIWorker, ModelsWorker, PROVIDERS, PROVIDER_BY_KEY, BRIDGE_URLS,
+    AIConfig, PROVIDERS, PROVIDER_BY_KEY, BRIDGE_URLS,
     build_messages, build_bridge_prompt,
 )
 

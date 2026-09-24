@@ -6,7 +6,7 @@
 // with a per-run token. Both reject with an Error carrying Python's message.
 
 import type {
-  AppInfo, Area, Bookmark, VaultInfo, HomeOverview, Exercise, ExerciseDay, ExerciseOverview, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
+  AiConfig, AiProvider, AppInfo, Area, Bookmark, VaultInfo, HomeOverview, Exercise, ExerciseDay, ExerciseOverview, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
   IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
 } from "./types";
 
@@ -256,6 +256,19 @@ export const api = {
   vaultCreate: (name: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("vault_create", name),
   vaultOpen: (path: string) => call<{ ok: boolean; name: string; path: string }>("vault_open", path),
   knowledgeGraph: () => call<{ nodes: import("./graph").GraphNode[]; edges: import("./graph").GraphEdge[] }>("knowledge_graph"),
+  aiSettings: () => call<{ config: AiConfig; providers: AiProvider[] }>("ai_settings"),
+  aiSettingsSave: (fields: Partial<AiConfig> & { api_key?: string; clear_key?: boolean }) => call<AiConfig>("ai_settings_save", fields),
+  aiModels: () => call<string[]>("ai_models"),
+  aiTest: () => call<{ ok: boolean; reply: string }>("ai_test"),
+  aiWorkspace: (rel: string) => call<{ id: string; name: string; icon: string }>("ai_workspace", rel),
+  aiChat: (history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "") =>
+    call<{ reply?: string; bridge?: boolean; prompt?: string; url?: string; label?: string }>("ai_chat", history, question, noteRel, selection),
+  notePropertiesMeta: () => call<{ subjects: string[]; types: string[]; statuses: string[] }>("note_properties_meta"),
+  noteSetProperties: (rel: string, props: Record<string, unknown>, expectedModified: number | null = null) =>
+    call<WriteResult>("note_set_properties", rel, props, expectedModified),
+  englishSentences: () => call<string[]>("english_sentences"),
+  englishSpeak: (text: string) => call<{ ok: boolean }>("english_speak", text),
+  revealInOs: (rel: string) => call<{ ok: boolean }>("reveal_in_os", rel),
   homeOverview: () => call<HomeOverview>("home_overview"),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

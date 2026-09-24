@@ -38,6 +38,7 @@ from ..core.frontmatter_utils import parse_frontmatter
 from ..core.notes_service import NotesService
 from ..core.vault_manager import Note, VaultManager
 from .errors import ApiError
+from .modules.assistant import AssistantApi
 from .modules.calendar import CalendarApi
 from .modules.context import ManagersMixin
 from .modules.exercise import ExerciseApi
@@ -69,8 +70,41 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
+def _set_frontmatter_keys(text: str, updates: dict) -> str:
+    """Replace (or add, or remove when None) top-level frontmatter keys,
+    leaving every other line exactly as it was, nested YAML included."""
+    from ..core.frontmatter_utils import dump_frontmatter
+    lines = text.split("\n")
+    if lines and lines[0].strip() == "---":
+        end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    else:
+        end = None
+    if end is None:
+        head, body = [], lines
+    else:
+        head, body = lines[1:end], lines[end + 1:]
+    keep: list = []
+    skipping = False
+    for ln in head:
+        key = ln.split(":", 1)[0].strip() if ln and not ln[0].isspace() and ":" in ln else None
+        if key is not None:
+            skipping = key in updates
+        elif ln.strip().startswith("- ") or (ln[:1].isspace() and ln.strip()):
+            pass            # continuation of the previous key
+        else:
+            skipping = False
+        if not skipping:
+            keep.append(ln)
+    new = [k for k, v in updates.items() if v is not None]
+    added = dump_frontmatter({k: updates[k] for k in new}).split("\n")[1:-2] if new else []
+    head = keep + added
+    if not head:
+        return "\n".join(body)
+    return "\n".join(["---", *head, "---", *body])
+
+
 class NoteVaultApi(ManagersMixin, FilesApi, TasksApi, HabitsApi, CalendarApi, ProjectsApi, GoalsApi,
-                  FinanceApi, ExerciseApi, HomeApi, VaultsApi):
+                  FinanceApi, ExerciseApi, HomeApi, VaultsApi, AssistantApi):
     """The bridge. Each app module adds its methods through a mixin
     (notevault_app/webapp/modules/), prefixed with the module name."""
 
@@ -407,6 +441,98 @@ class NoteVaultApi(ManagersMixin, FilesApi, TasksApi, HabitsApi, CalendarApi, Pr
             return {"bookmarked": bool(self._service.toggle_bookmark(path))}
 
     # ── attachments ───────────────────────────────────────────────────────
+
+    def note_properties_meta(self) -> dict:
+        from ..core.frontmatter_utils import VALID_STATUSES, VALID_SUBJECTS, VALID_TYPES
+        return {"subjects": list(VALID_SUBJECTS), "types": list(VALID_TYPES), "statuses": list(VALID_STATUSES)}
+
+    def note_set_properties(self, rel: str, props: dict,
+                            expected_modified: Optional[float] = None) -> dict:
+        """Study properties of a note (subject, topic, type, difficulty,
+        status, mastery, tags) written into its frontmatter; other keys stay."""
+        import re as _re
+        from ..core.frontmatter_utils import (
+            VALID_STATUSES, VALID_SUBJECTS, VALID_TYPES, sanitize_properties)
+        if not isinstance(props, dict):
+            raise ApiError("Propiedades inválidas.")
+        clean: dict = {}
+        if props.get("subject") in VALID_SUBJECTS:
+            clean["subject"] = props["subject"]
+        if props.get("type") in VALID_TYPES:
+            clean["type"] = props["type"]
+        if props.get("status") in VALID_STATUSES:
+            clean["status"] = props["status"]
+        if "topic" in props:
+            topic = _re.sub(r"[\r\n\t\x00-\x1f]+", " ", str(props.get("topic") or "")).strip()[:120]
+            clean["topic"] = topic or None
+        if "difficulty" in props:
+            clean["difficulty"] = props["difficulty"]
+        if "mastery" in props:
+            clean["mastery"] = props["mastery"]
+        if "tags" in props:
+            tags = props["tags"] if isinstance(props["tags"], list) else str(props["tags"] or "").split(",")
+            tags = [_re.sub(r"[\[\]\"',#\r\n\t\x00-\x1f]+", "", str(t)).strip() for t in tags]
+            clean["tags"] = [t[:40] for t in tags if t][:30] or None
+        clean = sanitize_properties(clean)
+        with self._lock:
+            path = self._resolve(rel)
+            if kind_for(path) != "note":
+                raise ApiError("Solo notas .md.")
+            if (expected_modified is not None
+                    and abs(path.stat().st_mtime - float(expected_modified)) > 1e-6):
+                return {"ok": False, "conflict": True, "modified": path.stat().st_mtime}
+            with open(path, encoding="utf-8", errors="replace", newline="") as fh:
+                raw = fh.read()
+            crlf = "\r\n" in raw
+            text = _set_frontmatter_keys(raw.replace("\r\n", "\n"), clean)
+            if crlf:
+                text = text.replace("\n", "\r\n")
+            with open(path, "w", encoding="utf-8", newline="") as fh:
+                fh.write(text)
+            self._service.note_written(path, text)
+            return {"ok": True, "conflict": False, "modified": path.stat().st_mtime}
+
+    def english_sentences(self) -> list:
+        """Listening practice: example sentences of the vault's vocabulary."""
+        from ..core.english_vocabulary_manager import EnglishVocabularyManager
+        with self._lock:
+            out = []
+            for item in EnglishVocabularyManager(self._root).all_words():
+                out.extend(ex.strip() for ex in item.get("examples", []) if isinstance(ex, str) and ex.strip())
+            return out[:500] or [
+                "The algorithm processes the data efficiently.",
+                "She implemented the feature in less than an hour.",
+                "We need to refactor this function before merging.",
+                "The deadline was postponed until next Friday.",
+                "He submitted a pull request with comprehensive tests.",
+            ]
+
+    def english_speak(self, text: str) -> dict:
+        """Text to speech with the Windows voice, for web views without
+        speechSynthesis. The text is a single-quoted PowerShell literal
+        (quotes doubled) passed as an argument, never through a shell."""
+        import subprocess
+        import sys
+        if sys.platform != "win32":
+            return {"ok": False}
+        safe = re.sub(r"[\r\n\x00-\x1f]+", " ", str(text or ""))[:2000].replace("'", "''")
+        script = ("Add-Type -AssemblyName System.Speech; "
+                  "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                  f"$s.SelectVoiceByHints('en'); $s.Speak('{safe}')")
+        try:
+            subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            return {"ok": False}
+        return {"ok": True}
+
+    def reveal_in_os(self, rel: str) -> dict:
+        """Show a note (its folder) in the system file manager."""
+        from .modules.files import open_with_system
+        with self._lock:
+            path = self._resolve(rel, allow_root=True)
+            open_with_system(path if path.is_dir() else path.parent)
+            return {"ok": True}
 
     def knowledge_graph(self) -> dict:
         """Notes as nodes (subject, type, mastery) and their links as edges:

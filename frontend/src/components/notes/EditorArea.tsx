@@ -1,6 +1,6 @@
 import {
   AlertTriangle, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, FileCode2, FileText,
-  Link2, PanelLeft, PanelRight, PenLine, Plus, X,
+  Link2, PanelLeft, PanelRight, PenLine, Plus, Sparkles, X,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
@@ -10,6 +10,8 @@ import { cn, IconButton, Kbd } from "../ui";
 import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
 import { SourceEditor } from "./SourceEditor";
+import { StudyBar } from "./StudyBar";
+import { useAssistant } from "../../store/assistant";
 
 function TabBar() {
   const tabs = useApp((s) => s.tabs);
@@ -89,6 +91,7 @@ function NoteHeader({ note }: { note: OpenNote }) {
   const toggleInspector = useApp((s) => s.toggleInspector);
   const explorerOpen = useApp((s) => s.explorerOpen);
   const inspectorOpen = useApp((s) => s.inspectorOpen);
+  const assistantOpen = useAssistant((s) => s.open);
   const parts = note.path.split("/");
   return (
     <div className="flex h-11 flex-none items-center gap-2 border-b border-line bg-surface px-3">
@@ -129,7 +132,15 @@ function NoteHeader({ note }: { note: OpenNote }) {
           </button>
         ))}
       </div>
-      <IconButton title="Panel lateral" onClick={toggleInspector} active={inspectorOpen}>
+      <IconButton title="Asistente IA" onClick={() => useAssistant.getState().setOpen(!useAssistant.getState().open)} active={assistantOpen}>
+        <Sparkles size={15} />
+      </IconButton>
+      <IconButton title="Panel lateral" onClick={() => {
+        if (assistantOpen) {
+          useAssistant.getState().setOpen(false);
+          if (!inspectorOpen) toggleInspector();
+        } else toggleInspector();
+      }} active={inspectorOpen && !assistantOpen}>
         <PanelRight size={15} />
       </IconButton>
     </div>
@@ -286,6 +297,7 @@ export function EditorArea() {
       ) : (
         <>
           <NoteHeader note={note} />
+          {note.kind === "note" && <StudyBar note={note} />}
           {note.conflict && <ConflictBanner note={note} />}
           <div className="flex min-h-0 flex-1">
             {mode !== "read" && (

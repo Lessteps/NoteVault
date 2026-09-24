@@ -22,7 +22,6 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
-from PySide6.QtCore import QObject, QThread, Signal
 
 # ── Provider catalogue ─────────────────────────────────────────────────────
 
@@ -317,40 +316,3 @@ def build_bridge_prompt(messages: list) -> str:
         else:
             parts.append(f"[Asistente]\n{m['content']}")
     return "\n\n---\n\n".join(parts)
-
-
-# ── Threaded worker ────────────────────────────────────────────────────────
-
-class AIWorker(QThread):
-    finished_ok = Signal(str)
-    failed = Signal(str)
-
-    def __init__(self, cfg: AIConfig, messages: list, parent=None):
-        super().__init__(parent)
-        self._cfg = cfg
-        self._messages = messages
-
-    def run(self):
-        try:
-            self.finished_ok.emit(send_chat(self._cfg, self._messages))
-        except AIError as e:
-            self.failed.emit(str(e))
-        except Exception as e:  # noqa: BLE001 - surfaced in the UI
-            self.failed.emit(f"{type(e).__name__}: {e}")
-
-
-class ModelsWorker(QThread):
-    finished_ok = Signal(list)
-    failed = Signal(str)
-
-    def __init__(self, cfg: AIConfig, parent=None):
-        super().__init__(parent)
-        self._cfg = cfg
-
-    def run(self):
-        try:
-            self.finished_ok.emit(list_models(self._cfg))
-        except AIError as e:
-            self.failed.emit(str(e))
-        except Exception as e:  # noqa: BLE001
-            self.failed.emit(f"{type(e).__name__}: {e}")

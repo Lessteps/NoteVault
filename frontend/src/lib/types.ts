@@ -621,3 +621,27 @@ export interface VaultInfo {
   truncated: boolean;
   obsidian: boolean;
 }
+
+// ── Asistente ──────────────────────────────────────────────────────────────
+
+export interface AiConfig {
+  provider: string;
+  base_url: string;
+  model: string;
+  has_key: boolean;
+  temperature: number;
+  max_tokens: number;
+  include_note: boolean;
+  is_bridge: boolean;
+}
+
+export interface AiProvider {
+  key: string;
+  label: string;
+  hint: string;
+  needs_key: boolean;
+  needs_url: boolean;
+  default_url: string;
+  default_model: string;
+  bridge: boolean;
+}

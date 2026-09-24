@@ -22,6 +22,7 @@ pywebview runs each call on its own thread, hence the lock.
 from __future__ import annotations
 
 import base64
+import re
 import mimetypes
 import threading
 import webbrowser
@@ -40,6 +41,7 @@ from .errors import ApiError
 from .modules.calendar import CalendarApi
 from .modules.context import ManagersMixin
 from .modules.files import FilesApi
+from .modules.finance import FinanceApi
 from .modules.goals import GoalsApi
 from .modules.habits import HabitsApi
 from .modules.projects import ProjectsApi
@@ -64,7 +66,8 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
-class NoteVaultApi(ManagersMixin, FilesApi, TasksApi, HabitsApi, CalendarApi, ProjectsApi, GoalsApi):
+class NoteVaultApi(ManagersMixin, FilesApi, TasksApi, HabitsApi, CalendarApi, ProjectsApi, GoalsApi,
+                  FinanceApi):
     """The bridge. Each app module adds its methods through a mixin
     (notevault_app/webapp/modules/), prefixed with the module name."""
 
@@ -171,6 +174,29 @@ class NoteVaultApi(ManagersMixin, FilesApi, TasksApi, HabitsApi, CalendarApi, Pr
         if window is not None:
             threading.Thread(target=window.destroy, daemon=True).start()
         return {"ok": True}
+
+    def save_text_as(self, suggested_name: str, text: str) -> dict:
+        """Ask where to save an export (CSV) with the system dialog and write it.
+
+        Only in the desktop window; the browser build downloads the file
+        itself (returns {"ok": False, "fallback": True})."""
+        window = self._window
+        if window is None:
+            return {"ok": False, "fallback": True}
+        name = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', "_", str(suggested_name or "export.csv"))[:120]
+        if not name.lower().endswith((".csv", ".txt", ".md")):
+            name += ".csv"
+        data = str(text if text is not None else "")
+        if len(data.encode("utf-8")) > MAX_WRITE_BYTES:
+            raise ApiError("El archivo es demasiado grande.")
+        import webview
+        chosen = window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name)
+        if not chosen:
+            return {"ok": False}
+        target = Path(chosen[0] if isinstance(chosen, (list, tuple)) else chosen)
+        # UTF-8 with BOM so Excel reads accents correctly.
+        target.write_text(data, encoding="utf-8-sig", newline="")
+        return {"ok": True, "path": str(target)}
 
     def _attach_window(self, window) -> None:
         self._window = window

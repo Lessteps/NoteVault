@@ -521,5 +521,71 @@ class GoalsE2E(unittest.TestCase):
         self.assertEqual(items["Login"].parent, items["Auth"].id)
 
 
+@unittest.skipUnless(READY, "needs playwright, Chromium and a built frontend")
+class FinanceE2E(unittest.TestCase):
+    """Finanzas driven through the browser; checks the day files on disk."""
+
+    @classmethod
+    def setUpClass(cls):
+        from notevault_app.webapp.api import NoteVaultApi
+        from notevault_app.webapp.devserver import serve_in_thread
+
+        cls.dir = Path(tempfile.mkdtemp(prefix="nv_e2e_fin_"))
+        cls.api = NoteVaultApi(cls.dir)
+        cls.server, cls.url, _ = serve_in_thread(cls.api, 0, DIST)
+        cls.pw = sync_playwright().start()
+        cls.browser = cls.pw.chromium.launch(executable_path=CHROMIUM)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.browser.close()
+        cls.pw.stop()
+        cls.server.shutdown()
+        cls.server.server_close()
+        shutil.rmtree(cls.dir, ignore_errors=True)
+
+    def setUp(self):
+        self.page = self.browser.new_page(viewport={"width": 1500, "height": 900})
+        self.errors = []
+        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.page.goto(self.url)
+        self.page.get_by_role("button", name="Finanzas", exact=True).click()
+        self.page.get_by_text("Registro rápido").wait_for()
+
+    def tearDown(self):
+        self.page.close()
+        self.assertEqual(self.errors, [])
+
+    def _day(self):
+        from datetime import date
+        from notevault_app.core.finance_manager import FinanceManager
+        return FinanceManager(self.dir).day(date.today())
+
+    def _wait(self, predicate, timeout=6.0):
+        end = time.time() + timeout
+        while time.time() < end:
+            if predicate():
+                return
+            time.sleep(0.1)
+        self.fail("state never reached")
+
+    def test_quick_entry_parses_spanish_amounts(self):
+        self.page.get_by_label("Importe rápido").fill("12,5k")
+        what = self.page.get_by_placeholder("En qué")
+        what.fill("Almuerzo")
+        what.press("Enter")
+        self._wait(lambda: any(m.get("what") == "Almuerzo" for m in self._day()))
+        self.assertEqual(next(m for m in self._day() if m.get("what") == "Almuerzo")["amount_cents"], 1250000)
+
+    def test_income_dialog(self):
+        self.page.get_by_role("button", name="+  Ingreso").click()
+        dialog = self.page.get_by_role("dialog")
+        dialog.get_by_label("Importe").fill("1.200.000")
+        dialog.get_by_placeholder("p. ej. Almuerzo").fill("Salario")
+        dialog.get_by_role("button", name="Guardar").click()
+        self._wait(lambda: any(m.get("what") == "Salario" and m["type"] == "ingreso"
+                               and m["amount_cents"] == 120000000 for m in self._day()))
+
+
 if __name__ == "__main__":
     unittest.main()

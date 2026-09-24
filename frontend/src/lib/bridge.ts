@@ -6,7 +6,7 @@
 // with a per-run token. Both reject with an Error carrying Python's message.
 
 import type {
-  AppInfo, Area, Bookmark, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
+  AppInfo, Area, Bookmark, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
   IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
 } from "./types";
 
@@ -215,4 +215,28 @@ export const api = {
   goalItemIndent: (gid: string, iid: string, direction: number) => call<{ ok: boolean }>("goals_item_indent", gid, iid, direction),
   goalSetDone: (gid: string, iid: string, day: string, done: boolean, value: number | string | null = null) =>
     call<{ ok: boolean }>("goals_set_done", gid, iid, day, done, value),
+
+  // Finanzas
+  finMeta: () => call<FinMeta>("fin_meta"),
+  finSidebar: () => call<FinSidebar>("fin_sidebar"),
+  finRange: (first: string, last: string) => call<Movement[]>("fin_range", first, last),
+  finMonthExtras: (year: number, month: number) =>
+    call<{ budgets: Array<{ category: FinCategory; used: number; budget: number }>; this: FinTotals; prev: FinTotals }>(
+      "fin_month_extras", year, month),
+  finDueChecks: (day: string) => call<FinCheck[]>("fin_due_checks", day),
+  finNewId: () => call<{ id: string }>("fin_new_id"),
+  finAdd: (day: string, fields: Partial<Movement>) => call<Movement>("fin_add", day, fields),
+  finUpdate: (day: string, id: string, fields: Partial<Movement>, newDay = "") =>
+    call<Movement>("fin_update", day, id, fields, newDay),
+  finDelete: (day: string, id: string) => call<{ ok: boolean }>("fin_delete", day, id),
+  finDeleteMany: (pairs: Array<[string, string]>) => call<{ ok: boolean }>("fin_delete_many", pairs),
+  finCategorySave: (id: string, fields: Partial<FinCategory>) => call<FinCategory>("fin_category_save", id, fields),
+  finGoals: () => call<{ goals: Array<FinGoal & { pace: FinPace; projection: string | null }>; general: number }>("fin_goals"),
+  finGoal: (id: string) => call<{
+    goal: FinGoal; pace: FinPace; projection: string | null; days: Array<{ date: string; net: number }>;
+    months: Array<[string, number]>; movements: Movement[];
+  }>("fin_goal", id),
+  finGoalSave: (id: string, fields: Partial<FinGoal>) => call<FinGoal>("fin_goal_save", id, fields),
+  finGoalDelete: (id: string) => call<{ ok: boolean }>("fin_goal_delete", id),
+  saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

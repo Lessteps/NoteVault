@@ -24,12 +24,12 @@ export function BarList({ rows, max }: {
   return (
     <div className="space-y-1.5">
       {rows.map((r) => (
-        <div key={r.label} className="grid grid-cols-[120px_1fr_48px] items-center gap-2 text-[12px]">
+        <div key={r.label} className="grid grid-cols-[120px_1fr_minmax(48px,auto)] items-center gap-2 text-[12px]">
           <span className="truncate text-dim">{r.label}</span>
           <span className="h-2 overflow-hidden rounded-full bg-elevated">
             <span className="block h-full rounded-full" style={{ width: `${(r.value / top) * 100}%`, background: r.colour ?? "var(--nv-accent)" }} />
           </span>
-          <span className="text-right font-mono text-[11px] text-faint">{r.hint ?? r.value}</span>
+          <span className="whitespace-nowrap text-right font-mono text-[11px] text-faint">{r.hint ?? r.value}</span>
         </div>
       ))}
     </div>
@@ -58,10 +58,11 @@ export function Columns({ values, labels, colour, height = 120, format }: {
 }
 
 /** Line chart; null values leave a gap. Several series share one scale. */
-export function LineChart({ series, labels, height = 160 }: {
+export function LineChart({ series, labels, height = 160, format }: {
   series: Array<{ values: Array<number | null>; colour: string; dashed?: boolean; name: string }>;
   labels: string[];
   height?: number;
+  format?: (v: number) => string;
 }) {
   const width = 600;
   const all = series.flatMap((s) => s.values.filter((v): v is number => v !== null));
@@ -96,7 +97,7 @@ export function LineChart({ series, labels, height = 160 }: {
         <text key={i} x={x(i)} y={height - 3} fontSize={10} fill="var(--nv-faint)"
           textAnchor={i === 0 ? "start" : i === n ? "end" : "middle"}>{labels[i]}</text>
       ))}
-      <text x={4} y={12} fontSize={10} fill="var(--nv-faint)">{Math.round(max)}</text>
+      <text x={4} y={12} fontSize={10} fill="var(--nv-faint)">{format ? format(max) : Math.round(max)}</text>
     </svg>
   );
 }

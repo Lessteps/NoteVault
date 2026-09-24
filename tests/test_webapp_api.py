@@ -281,3 +281,19 @@ class TestDevServer(ApiTestBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMixinNames(unittest.TestCase):
+    def test_module_mixins_do_not_shadow_each_other(self):
+        """Every module mixin must give its helpers distinct names: with
+        multiple inheritance a duplicate silently resolves to one of them."""
+        from notevault_app.webapp.api import NoteVaultApi
+        seen: dict = {}
+        for base in NoteVaultApi.__mro__:
+            if base is object:
+                continue
+            for name in vars(base):
+                if name.startswith("__"):
+                    continue
+                self.assertNotIn(name, seen, f"{name} defined in {seen.get(name)} and {base.__name__}")
+                seen[name] = base.__name__

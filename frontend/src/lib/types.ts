@@ -463,3 +463,88 @@ export interface GoalsMeta {
   item_statuses: string[];
   filters: string[];
 }
+
+// ── Finanzas ───────────────────────────────────────────────────────────────
+
+export type MovementType = "gasto" | "ingreso" | "ahorro" | "retiro";
+
+export interface Movement {
+  id: string;
+  type: MovementType;
+  amount_cents: number;
+  currency: string;
+  category?: string;
+  goal?: string;
+  what?: string;
+  reason?: string;
+  time?: string;
+  attachments: string[];
+  created?: string;
+  date: string;
+}
+
+export interface FinCategory {
+  id: string;
+  name: string;
+  icon: string;
+  colour: string;
+  kind: "gasto" | "ingreso";
+  budget_month_cents: number;
+  order: number;
+  archived: boolean;
+}
+
+export interface FinGoal {
+  id: string;
+  name: string;
+  icon: string;
+  colour: string;
+  target_cents: number;
+  currency: string;
+  start: string;
+  deadline: string;
+  show_in_daily: boolean;
+  cadence: { mode: "rule"; rule: string } | { mode: "period"; period: "week" | "month" };
+  suggested_cents: number;
+  status: string;
+  created: string;
+  notes: string;
+}
+
+export interface FinPace {
+  saved: number;
+  remaining: number;
+  per_day: number | null;
+  per_week: number | null;
+  per_month: number | null;
+  days_left: number | null;
+}
+
+export type FinTotals = Record<MovementType | "balance", number>;
+
+export interface FinMeta {
+  types: MovementType[];
+  type_labels: Record<MovementType, string>;
+  type_colours: Record<MovementType, string>;
+  goal_statuses: string[];
+  currency: string;
+  categories: FinCategory[];
+  goals: FinGoal[];
+}
+
+export interface FinSidebar {
+  pending: number;
+  month: FinTotals;
+  general: number;
+  goals: Array<{ id: string; icon: string; name: string; saved: number }>;
+  total_saved: number;
+}
+
+export interface FinCheck {
+  goal: FinGoal;
+  checked: boolean;
+  ids: string[];
+  pace: FinPace;
+  first: string;
+  last: string;
+}

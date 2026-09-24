@@ -18,6 +18,7 @@ const MODULES: Partial<Record<ModuleId, ComponentType>> = {
   calendario: lazyModule(() => import("./components/calendar/CalendarModule"), "CalendarModule"),
   proyectos: lazyModule(() => import("./components/projects/ProjectsModule"), "ProjectsModule"),
   metas: lazyModule(() => import("./components/goals/GoalsModule"), "GoalsModule"),
+  finanzas: lazyModule(() => import("./components/finance/FinanceModule"), "FinanceModule"),
 };
 
 function ModuleView({ module }: { module: ModuleId }) {
@@ -43,6 +44,8 @@ function useNavigationGuard() {
       if (!a) return;
       const href = a.getAttribute("href");
       if (!href) return;
+      // A file we generated (a CSV export) downloads; it never navigates.
+      if (href.startsWith("blob:") && a.hasAttribute("download")) return;
       e.preventDefault();
       if (/^(https?:|mailto:)/i.test(href)) {
         api.openExternal(href).catch((err: Error) => useApp.getState().toast("error", err.message));

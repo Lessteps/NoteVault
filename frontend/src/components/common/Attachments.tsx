@@ -57,6 +57,7 @@ export function Attachments({ module, owner, refs, onChange }: {
 
   return (
     <div
+      data-dropzone
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();

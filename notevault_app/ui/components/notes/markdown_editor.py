@@ -43,6 +43,7 @@ from .note_view import (
 )
 from .command_palette import Command, CommandPalette
 from .file_icons import icon_for
+from ..line_icons import line_icon
 from .table_picker import TablePicker
 from .note_properties_dialog import NotePropertiesDialog
 from .english_audio_panel import EnglishAudioPanel
@@ -179,6 +180,34 @@ class _ToolBtn(QPushButton):
             f"QPushButton:checked{{background:rgba(124, 90, 240, 0.20);color:{ACCENT};}}"
             f"QPushButton:disabled{{color:#44444e;}}"
         )
+        self._icon_key = None
+        self._hover = False
+
+    def set_line_icon(self, key: str, size: int = 16):
+        """Replace the text glyph with a painted line icon (no colour
+        emoji); it re-tints on hover and when checked."""
+        self._icon_key = key
+        self.setText("")
+        self.setIconSize(QSize(size, size))
+        self.toggled.connect(lambda _on: self._repaint_icon())
+        self._repaint_icon()
+
+    def _repaint_icon(self):
+        if not self._icon_key:
+            return
+        color = (ACCENT if self.isChecked()
+                 else TEXT if self._hover else TEXT_DIM)
+        self.setIcon(line_icon(self._icon_key, color))
+
+    def enterEvent(self, event):
+        self._hover = True
+        self._repaint_icon()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hover = False
+        self._repaint_icon()
+        super().leaveEvent(event)
 
 
 def _sep() -> QFrame:
@@ -597,9 +626,10 @@ class MarkdownEditor(QWidget):
         add(_ToolBtn("⊞", "Insertar tabla", 26), lambda: self.insert_table())
         lay.addWidget(_sep())
 
-        add(_ToolBtn("🔗", "Enlace", 26), self.insert_link)
+        add(_ToolBtn("", "Enlace", 26), self.insert_link).set_line_icon("link")
         add(_ToolBtn("[[ ]]", "Enlace a otra nota", 38), self.insert_wikilink)
-        add(_ToolBtn("📎", "Insertar imagen o video", 26), self.insert_attachment)
+        add(_ToolBtn("", "Insertar imagen o video", 26),
+            self.insert_attachment).set_line_icon("attach")
         add(_ToolBtn("―", "Separador", 26), self.insert_rule)
 
         lay.addStretch()
@@ -620,24 +650,46 @@ class MarkdownEditor(QWidget):
         lay.addWidget(palette)
         lay.addWidget(_sep())
 
-        self._bm_btn = _ToolBtn("🔖", "Marcador", 28)
+        self._bm_btn = _ToolBtn("", "Marcador", 28)
         self._bm_btn.setCheckable(True)
+        self._bm_btn.set_line_icon("bookmark")
         self._bm_btn.clicked.connect(self.toggle_bookmark)
         lay.addWidget(self._bm_btn)
         lay.addWidget(_sep())
 
+        # Editor / Markdown / Lectura as one segmented control; the active
+        # mode is a solid accent pill, as in the redesign.
+        seg = QFrame()
+        seg.setObjectName("modeSeg")
+        seg.setAttribute(Qt.WA_StyledBackground, True)
+        seg.setStyleSheet(
+            f"QFrame#modeSeg{{background:#141417;border:1px solid {BORDER};"
+            "border-radius:7px;}}"
+        )
+        seg_lay = QHBoxLayout(seg)
+        seg_lay.setContentsMargins(2, 2, 2, 2)
+        seg_lay.setSpacing(2)
         self._mode_btns = []
         for idx, (label, tip) in enumerate([
             ("Editor", "Edición con formato, como en Word"),
             ("Markdown", "Ver y editar el markdown en crudo"),
             ("Lectura", "Vista renderizada, solo lectura"),
         ]):
-            b = _ToolBtn(label, tip, 62)
+            b = _ToolBtn(label, tip, 70)
+            b.setFixedHeight(22)
             b.setCheckable(True)
             b.setChecked(idx == MODE_RICH)
+            b.setStyleSheet(
+                "QPushButton{background:transparent;border:none;border-radius:5px;"
+                f"color:{TEXT_DIM};font-size:11px;font-weight:600;padding:0px;}}"
+                f"QPushButton:hover{{color:{TEXT};}}"
+                f"QPushButton:checked{{background:{ACCENT};color:#ffffff;}}"
+                "QPushButton:disabled{color:#44444e;}"
+            )
             b.clicked.connect(lambda _=False, i=idx: self.set_mode(i))
             self._mode_btns.append(b)
-            lay.addWidget(b)
+            seg_lay.addWidget(b)
+        lay.addWidget(seg)
 
         return bar
 
@@ -661,13 +713,16 @@ class MarkdownEditor(QWidget):
 
         # Breadcrumb: 📁 Carpeta › Subcarpeta › Nota.md
         self._breadcrumb_lbl = QLabel("")
+        self._breadcrumb_lbl.setTextFormat(Qt.RichText)
         self._breadcrumb_lbl.setStyleSheet(
             f"color:{TEXT_DIM};font-size:12px;font-weight:500;"
         )
         lay.addWidget(self._breadcrumb_lbl)
 
         # OS Explorer button
-        self._reveal_file_btn = QPushButton("📁 Ver en file")
+        self._reveal_file_btn = QPushButton(" Ver en file")
+        self._reveal_file_btn.setIcon(line_icon("folder", TEXT_DIM, 14))
+        self._reveal_file_btn.setIconSize(QSize(14, 14))
         self._reveal_file_btn.setToolTip("Abrir archivo en el explorador del sistema")
         self._reveal_file_btn.setCursor(Qt.PointingHandCursor)
         self._reveal_file_btn.setStyleSheet(
@@ -689,7 +744,9 @@ class MarkdownEditor(QWidget):
         lay.addWidget(self._ws_badge)
 
         # Properties edit button
-        self._props_btn = QPushButton("Propiedades ⚙")
+        self._props_btn = QPushButton(" Propiedades")
+        self._props_btn.setIcon(line_icon("sliders", TEXT_DIM, 14))
+        self._props_btn.setIconSize(QSize(14, 14))
         self._props_btn.setCursor(Qt.PointingHandCursor)
         self._props_btn.setStyleSheet(
             f"QPushButton {{ background: transparent; border: 1px solid {BORDER}; "
@@ -795,10 +852,14 @@ class MarkdownEditor(QWidget):
 
         try:
             rel_parts = note.path.relative_to(self.vault.vault_root).parts
-            breadcrumb_text = " › ".join(rel_parts)
-            self._breadcrumb_lbl.setText(f"📁 {breadcrumb_text}")
         except Exception:
-            self._breadcrumb_lbl.setText(f"📁 {note.path.name}")
+            rel_parts = (note.path.name,)
+        import html as _html
+        parts = [_html.escape(p) for p in rel_parts]
+        sep = f"<span style='color:{theme.tint(TEXT_FAINT)}'>&nbsp;/&nbsp;</span>"
+        crumbs = sep.join(parts[:-1] + [
+            f"<b style='color:{theme.tint(TEXT)}'>{parts[-1]}</b>"])
+        self._breadcrumb_lbl.setText(crumbs)
 
         fm_data, _ = parse_frontmatter(note.frontmatter)
         try:
@@ -881,12 +942,19 @@ class MarkdownEditor(QWidget):
             ]
 
         for label, act_id, tip in buttons:
-            btn = QPushButton(label)
+            # Drop a leading emoji / symbol token ("💡 Explicar" -> "Explicar");
+            # every action gets the same sparkle line icon instead.
+            head, _, rest = label.partition(" ")
+            if rest and not any(ch.isalpha() for ch in head):
+                label = rest
+            btn = QPushButton(f" {label}")
+            btn.setIcon(line_icon("sparkle", "#a5b4fc", 14))
+            btn.setIconSize(QSize(14, 14))
             btn.setToolTip(tip)
             btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet(
-                f"QPushButton {{ background: #28282e; border: 1px solid {BORDER}; "
-                f"border-radius: 4px; color: {TEXT}; font-size: 11px; padding: 2px 8px; }}"
+                f"QPushButton {{ background: #202024; border: 1px solid {BORDER}; "
+                f"border-radius: 6px; color: {TEXT}; font-size: 11px; padding: 3px 9px; }}"
                 f"QPushButton:hover {{ background: rgba(124, 90, 240, 0.25); border-color: {ACCENT}; color: #ffffff; }}"
             )
             btn.clicked.connect(lambda _=False, a=act_id: self._trigger_context_action(a))

@@ -187,6 +187,34 @@ def _draw(key: str, p: QPainter):
         p.drawPolyline([QPointF(8, 5.5), QPointF(12.5, 10), QPointF(8, 14.5)])
     elif key == "chevron_down":
         p.drawPolyline([QPointF(5.5, 8), QPointF(10, 12.5), QPointF(14.5, 8)])
+    elif key == "link":
+        p.drawRoundedRect(QRectF(2.5, 7.5, 8, 5), 2.5, 2.5)
+        p.drawRoundedRect(QRectF(9.5, 7.5, 8, 5), 2.5, 2.5)
+    elif key == "attach":
+        path = QPainterPath()
+        path.moveTo(13.5, 7)
+        path.lineTo(7.5, 13)
+        path.cubicTo(6.3, 14.2, 4.6, 12.5, 5.8, 11.3)
+        path.lineTo(12.3, 4.8)
+        path.cubicTo(14.3, 2.8, 17.2, 5.7, 15.2, 7.7)
+        path.lineTo(8.8, 14.1)
+        path.cubicTo(6.3, 16.6, 2.4, 12.7, 4.9, 10.2)
+        path.lineTo(10.5, 4.6)
+        p.drawPath(path)
+    elif key == "sliders":
+        for y, x in ((5.5, 12), (10, 7), (14.5, 13.5)):
+            p.drawLine(QPointF(3.5, y), QPointF(16.5, y))
+            p.drawEllipse(QRectF(x - 1.6, y - 1.6, 3.2, 3.2))
+    elif key == "sparkle":
+        path = QPainterPath()
+        path.moveTo(9, 3)
+        path.quadTo(9.6, 8.4, 15, 9)
+        path.quadTo(9.6, 9.6, 9, 15)
+        path.quadTo(8.4, 9.6, 3, 9)
+        path.quadTo(8.4, 8.4, 9, 3)
+        p.drawPath(path)
+        p.drawLine(QPointF(15, 13), QPointF(15, 17))
+        p.drawLine(QPointF(13, 15), QPointF(17, 15))
     elif key == "collapse":
         p.drawPolyline([QPointF(6, 4), QPointF(10, 8), QPointF(14, 4)])
         p.drawPolyline([QPointF(6, 16), QPointF(10, 12), QPointF(14, 16)])

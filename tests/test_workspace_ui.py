@@ -44,13 +44,13 @@ class TestWorkspaceUI(unittest.TestCase):
 
         # Verify buttons
         btn_texts = [
-            self.editor._context_actions_lay.itemAt(i).widget().text()
+            self.editor._context_actions_lay.itemAt(i).widget().text().strip()
             for i in range(self.editor._context_actions_lay.count())
             if self.editor._context_actions_lay.itemAt(i).widget()
         ]
-        self.assertIn("∑ Resolver", btn_texts)
-        self.assertIn("📈 Graficar", btn_texts)
-        self.assertIn("⚡ Ejercicio", btn_texts)
+        self.assertIn("Resolver", btn_texts)
+        self.assertIn("Graficar", btn_texts)
+        self.assertIn("Ejercicio", btn_texts)
 
     def test_workspace_bar_detects_programming(self):
         prog_folder = self.vault_dir / "Programación"
@@ -67,13 +67,13 @@ class TestWorkspaceUI(unittest.TestCase):
         self.assertEqual(self.editor._current_workspace["id"], "programming")
 
         btn_texts = [
-            self.editor._context_actions_lay.itemAt(i).widget().text()
+            self.editor._context_actions_lay.itemAt(i).widget().text().strip()
             for i in range(self.editor._context_actions_lay.count())
             if self.editor._context_actions_lay.itemAt(i).widget()
         ]
-        self.assertIn("▶ Ejecutar", btn_texts)
-        self.assertIn("🧪 Probar", btn_texts)
-        self.assertIn("🐞 Depurar", btn_texts)
+        self.assertIn("Ejecutar", btn_texts)
+        self.assertIn("Probar", btn_texts)
+        self.assertIn("Depurar", btn_texts)
 
     def test_workspace_bar_detects_english(self):
         eng_folder = self.vault_dir / "Inglés"
@@ -90,13 +90,13 @@ class TestWorkspaceUI(unittest.TestCase):
         self.assertEqual(self.editor._current_workspace["id"], "english")
 
         btn_texts = [
-            self.editor._context_actions_lay.itemAt(i).widget().text()
+            self.editor._context_actions_lay.itemAt(i).widget().text().strip()
             for i in range(self.editor._context_actions_lay.count())
             if self.editor._context_actions_lay.itemAt(i).widget()
         ]
-        self.assertIn("📖 Vocabulario", btn_texts)
-        self.assertIn("🔤 Gramática", btn_texts)
-        self.assertIn("🎧 Listening", btn_texts)
+        self.assertIn("Vocabulario", btn_texts)
+        self.assertIn("Gramática", btn_texts)
+        self.assertIn("Listening", btn_texts)
 
     def test_context_action_signal_emitted(self):
         math_folder = self.vault_dir / "Matemáticas"

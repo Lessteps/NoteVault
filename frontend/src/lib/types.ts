@@ -548,3 +548,41 @@ export interface FinCheck {
   first: string;
   last: string;
 }
+
+// ── Ejercicio ──────────────────────────────────────────────────────────────
+
+export interface Exercise {
+  id: string;
+  day: string;
+  name: string;
+  video: string;
+  video_path: string;
+  series_reps: string;
+  rest: string;
+  how_to: string;
+  has_video: boolean;
+  video_name: string;
+}
+
+export interface ExerciseEntry {
+  done?: boolean;
+  weight?: number;
+  reps?: number;
+  notes?: string;
+}
+
+export interface ExerciseDay {
+  date: string;
+  day: string;
+  exercises: Exercise[];
+  log: Record<string, ExerciseEntry>;
+  pct: number;
+}
+
+export interface ExerciseOverview {
+  week: number;
+  month: number;
+  year: number;
+  grid: Record<string, number>;
+  breakdown: Array<{ day: string; rows: Array<{ id: string; name: string; done: number; total: number }> }>;
+}

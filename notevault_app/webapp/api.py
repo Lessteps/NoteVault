@@ -40,6 +40,7 @@ from ..core.vault_manager import Note, VaultManager
 from .errors import ApiError
 from .modules.calendar import CalendarApi
 from .modules.context import ManagersMixin
+from .modules.exercise import ExerciseApi
 from .modules.files import FilesApi
 from .modules.finance import FinanceApi
 from .modules.goals import GoalsApi
@@ -67,7 +68,7 @@ def _json_safe(value: Any) -> Any:
 
 
 class NoteVaultApi(ManagersMixin, FilesApi, TasksApi, HabitsApi, CalendarApi, ProjectsApi, GoalsApi,
-                  FinanceApi):
+                  FinanceApi, ExerciseApi):
     """The bridge. Each app module adds its methods through a mixin
     (notevault_app/webapp/modules/), prefixed with the module name."""
 

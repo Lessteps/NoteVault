@@ -6,7 +6,7 @@
 // with a per-run token. Both reject with an Error carrying Python's message.
 
 import type {
-  AppInfo, Area, Bookmark, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
+  AppInfo, Area, Bookmark, Exercise, ExerciseDay, ExerciseOverview, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
   IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
 } from "./types";
 
@@ -238,5 +238,18 @@ export const api = {
   }>("fin_goal", id),
   finGoalSave: (id: string, fields: Partial<FinGoal>) => call<FinGoal>("fin_goal_save", id, fields),
   finGoalDelete: (id: string) => call<{ ok: boolean }>("fin_goal_delete", id),
+  // Ejercicio
+  exMeta: () => call<{ days: Array<{ key: string; name: string; subtitle: string; glyph: string }> }>("ex_meta"),
+  exList: () => call<Exercise[]>("ex_list"),
+  exDays: (first: string, last: string) => call<ExerciseDay[]>("ex_days", first, last),
+  exMark: (day: string, id: string, done: boolean, weight: number | string = 0, reps: number | string = 0, notes = "") =>
+    call<{ ok: boolean; pct: number }>("ex_mark", day, id, done, weight, reps, notes),
+  exOverview: (year = 0, exerciseId = "") => call<ExerciseOverview>("ex_overview", year, exerciseId),
+  exSave: (id: string, fields: Partial<Exercise>) => call<Exercise>("ex_save", id, fields),
+  exRemove: (id: string) => call<{ ok: boolean }>("ex_remove", id),
+  exLinkVideos: () => call<{ linked: string[]; already: string[]; missing: string[] }>("ex_link_videos"),
+  exVideoUrl: (id: string) => call<{ url: string; name: string }>("ex_video_url", id),
+  exOpenVideo: (id: string) => call<{ ok: boolean }>("ex_open_video", id),
+  exPickVideo: (id: string) => call<{ ok: boolean }>("ex_pick_video", id),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

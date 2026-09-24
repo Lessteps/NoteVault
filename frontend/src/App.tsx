@@ -18,6 +18,7 @@ const MODULES: Partial<Record<ModuleId, ComponentType>> = {
   calendario: lazyModule(() => import("./components/calendar/CalendarModule"), "CalendarModule"),
   proyectos: lazyModule(() => import("./components/projects/ProjectsModule"), "ProjectsModule"),
   metas: lazyModule(() => import("./components/goals/GoalsModule"), "GoalsModule"),
+  ejercicio: lazyModule(() => import("./components/exercise/ExerciseModule"), "ExerciseModule"),
   finanzas: lazyModule(() => import("./components/finance/FinanceModule"), "FinanceModule"),
 };
 

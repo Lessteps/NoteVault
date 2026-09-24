@@ -33,9 +33,10 @@ export function IssueDetail() {
     if (!issue) return;
     setF({ ...issue });
     setHint("");
-    // Only when another issue is opened or it is saved from elsewhere.
+    // Only when another issue is opened: a reload (an attachment added, a
+    // child ticked) must not wipe fields being edited here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [issue?.id, issue?.updated]);
+  }, [issue?.id]);
 
   if (!detail || !issue) return null;
   const p = detail.project;

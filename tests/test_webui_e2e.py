@@ -587,5 +587,61 @@ class FinanceE2E(unittest.TestCase):
                                and m["amount_cents"] == 120000000 for m in self._day()))
 
 
+@unittest.skipUnless(READY, "needs playwright, Chromium and a built frontend")
+class ExerciseE2E(unittest.TestCase):
+    """Ejercicio driven through the browser; checks the day logs on disk."""
+
+    @classmethod
+    def setUpClass(cls):
+        from notevault_app.webapp.api import NoteVaultApi
+        from notevault_app.webapp.devserver import serve_in_thread
+
+        cls.dir = Path(tempfile.mkdtemp(prefix="nv_e2e_ex_"))
+        cls.api = NoteVaultApi(cls.dir)
+        cls.server, cls.url, _ = serve_in_thread(cls.api, 0, DIST)
+        cls.pw = sync_playwright().start()
+        cls.browser = cls.pw.chromium.launch(executable_path=CHROMIUM)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.browser.close()
+        cls.pw.stop()
+        cls.server.shutdown()
+        cls.server.server_close()
+        shutil.rmtree(cls.dir, ignore_errors=True)
+
+    def setUp(self):
+        self.page = self.browser.new_page(viewport={"width": 1500, "height": 900})
+        self.errors = []
+        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.page.goto(self.url)
+        self.page.get_by_role("button", name="Ejercicio", exact=True).click()
+        self.page.get_by_text("Racha de ejercicio").wait_for()
+
+    def tearDown(self):
+        self.page.close()
+        self.assertEqual(self.errors, [])
+
+    def test_log_weight_and_reps_in_registro(self):
+        from datetime import date
+        from notevault_app.core.exercise_manager import ExerciseManager
+        self.page.locator("aside nav").get_by_text("Registro", exact=True).click()
+        first = self.api.ex_days(date.today().isoformat(), date.today().isoformat())[0]["exercises"]
+        if not first:
+            self.skipTest("rest day in the default routine")
+        name = first[0]["name"]
+        self.page.get_by_label(f"Peso: {name}").fill("42,5")
+        self.page.get_by_label(f"Reps: {name}").fill("8")
+        self.page.get_by_label(f"Hecho: {name}").check()
+        end = time.time() + 6
+        entry = {}
+        while time.time() < end:
+            entry = ExerciseManager(self.dir).get_log(date.today()).entries.get(first[0]["id"], {})
+            if entry.get("done") and entry.get("weight") == 42.5 and entry.get("reps") == 8:
+                break
+            time.sleep(0.1)
+        self.assertEqual((entry.get("done"), entry.get("weight"), entry.get("reps")), (True, 42.5, 8))
+
+
 if __name__ == "__main__":
     unittest.main()

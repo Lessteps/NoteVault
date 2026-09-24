@@ -153,6 +153,14 @@ class TasksApi:
             return {"ok": True}
 
     def tasks_mark_reminder_shown(self, task_id: str) -> dict:
+        """The page showed the reminder; in the desktop app the system shows
+        it too (Action Center / notification center)."""
         with self._lock:
-            self._task_mgr().mark_reminder_shown(one_line(task_id, 80))
-            return {"ok": True}
+            tid = one_line(task_id, 80)
+            mgr = self._task_mgr()
+            task = mgr.get(tid)
+            mgr.mark_reminder_shown(tid)
+        if task is not None and getattr(self, "_window", None) is not None:
+            from ..notify import notify
+            notify("🔔 Recordatorio de NoteVault", task.name)
+        return {"ok": True}

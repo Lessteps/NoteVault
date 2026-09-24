@@ -86,8 +86,8 @@ python -m pytest tests/test_webapp_*.py tests/test_webui_e2e.py
 cd frontend && npm test && npm run typecheck
 ```
 
-## Pendiente conocido
+## Notificaciones
 
-- Los recordatorios de Tareas se avisan **dentro de la app** (cada minuto). La
-  notificación del sistema operativo que daba la app clásica todavía no está en
-  la versión web.
+Los recordatorios de Tareas se avisan dentro de la app y, en la app de
+escritorio, también con una notificación del sistema (Windows: centro de
+actividades; macOS: centro de notificaciones; Linux: `notify-send`).

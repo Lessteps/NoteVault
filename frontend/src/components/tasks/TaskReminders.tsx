@@ -27,7 +27,7 @@ export function TaskReminders() {
       <div className="mx-auto max-w-2xl">
         <h2 className="mb-1 text-[16px] font-semibold text-text">Recordatorios</h2>
         <p className="mb-4 text-[12.5px] text-dim">
-          Avisos programados. Cuando llega la hora, NoteVault te avisa dentro de la app.
+          Avisos programados. Cuando llega la hora, NoteVault te avisa dentro de la app y con una notificación del sistema.
         </p>
         {list.length === 0 && (
           <div className="rounded-xl border border-dashed border-line-strong px-4 py-8 text-center text-[13px] text-faint">

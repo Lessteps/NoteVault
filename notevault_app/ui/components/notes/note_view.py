@@ -53,6 +53,16 @@ INLINE_CODE_BG = "#2a2a32"
 CURRENT_LINE_BG = "#202028"
 CODE_BLOCK_BG = "#202024"
 QUOTE_BAR = "#4848a0"
+# Boxes painted behind callouts, code blocks and display math (the
+# redesign's card look). Only paint — nothing here reaches the file.
+BOX_PAD = 12
+BOX_RADIUS = 8
+CALLOUT_BG = "#20202a"
+CALLOUT_ACCENT = "#7c5af0"
+CODE_BOX_BG = "#141417"
+BOX_BORDER_COLOR = "#2e2e38"
+MATH_BOX_BG = "#141417"
+HEADING_DISPLAY_SIZES = {1: 30.0, 2: 21.0, 3: 17.0}
 # The grid of a table reads as a grid only if its lines are a shade lighter
 # than the panel borders around it.
 TABLE_BORDER = "#44444e"
@@ -136,7 +146,65 @@ class _NoteSurface:
         self.note_path = None
         self.vault_root = None
         self._cursor_shape = None
+        self._header_card = None
         self.viewport().setMouseTracking(True)
+        self.verticalScrollBar().valueChanged.connect(self._place_header_card)
+        self.horizontalScrollBar().valueChanged.connect(self._place_header_card)
+
+    # header card (frontmatter) ---------------------------------------------
+
+    def set_header_card(self, card):
+        """Show `card` (a widget, or None) at the top of the page, scrolling
+        with the text. Room for it is made with the root frame's top margin,
+        which the serialiser never reads. Takes effect on the next load."""
+        old = self._header_card
+        if old is not None and old is not card:
+            old.hide()
+            old.deleteLater()
+        self._header_card = card
+        if card is not None:
+            card.setParent(self.viewport())
+            card.show()
+
+    def _apply_header_space(self):
+        """Called right after a load, while the host ignores textChanged."""
+        doc = self.document()
+        root = doc.rootFrame()
+        ff = root.frameFormat()
+        base = doc.documentMargin()
+        gap = 0
+        card = self._header_card
+        if card is not None:
+            self._size_header_card()
+            gap = card.height() + 14
+        if abs(ff.topMargin() - (base + gap)) > 0.5:
+            undo = doc.isUndoRedoEnabled()
+            doc.setUndoRedoEnabled(False)
+            ff.setTopMargin(base + gap)
+            root.setFrameFormat(ff)
+            doc.setUndoRedoEnabled(undo)
+        self._place_header_card()
+
+    def _size_header_card(self):
+        card = self._header_card
+        if card is None:
+            return
+        margin = self.document().documentMargin()
+        card.setFixedWidth(max(220, int(self.viewport().width() - margin * 2)))
+        card.adjustSize()
+
+    def _place_header_card(self, *_):
+        card = self._header_card
+        if card is None:
+            return
+        margin = self.document().documentMargin()
+        card.move(int(margin - self.horizontalScrollBar().value()),
+                  int(margin - self.verticalScrollBar().value()))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._size_header_card()
+        self._place_header_card()
 
     def _set_cursor_shape(self, shape):
         """setCursor() is a window-system call; the mouse moves far more
@@ -193,7 +261,6 @@ class _NoteSurface:
 
         painter = QPainter(vp)
         guide = QPen(QColor(theme.tint(GUIDE_COLOR)), 1)
-        bar = QPen(QColor(theme.tint(QUOTE_BAR)), 3)
         block = self.cursorForPosition(QPoint(0, 0)).block()
         while block.isValid():
             rect = layout.blockBoundingRect(block)
@@ -220,12 +287,121 @@ class _NoteSurface:
                 if fmt.marker() != Marker.NoMarker:
                     self._paint_checkbox(painter, rect, line, dx, dy,
                                          fmt.marker() == Marker.Checked)
-            elif fmt.hasProperty(quote_prop) and fmt.intProperty(quote_prop):
-                painter.setPen(bar)
-                x = rect.left() + dx + fmt.leftMargin() - QUOTE_INDENT / 2
-                painter.drawLine(QPointF(x, rect.top() + dy),
-                                 QPointF(x, rect.bottom() + dy))
             block = block.next()
+        painter.end()
+
+    # redesign boxes ---------------------------------------------------------
+
+    def _visible_blocks(self):
+        """(block, rect in viewport coords) for every block on screen."""
+        doc = self.document()
+        layout = doc.documentLayout()
+        vp = self.viewport()
+        dx = -self.horizontalScrollBar().value()
+        dy = -self.verticalScrollBar().value()
+        top, bottom = -dy, -dy + vp.height()
+        block = self.cursorForPosition(QPoint(0, 0)).block()
+        # Start one run early so a box that began above the fold still
+        # paints its top edge in the right place.
+        while block.previous().isValid() and (
+                _quote_level(block.previous())
+                or block.previous().blockFormat().hasProperty(
+                    QTextFormat.Property.BlockCodeFence)):
+            block = block.previous()
+        while block.isValid():
+            rect = layout.blockBoundingRect(block)
+            if rect.top() > bottom:
+                break
+            yield block, rect.translated(dx, dy)
+            block = block.next()
+
+    def _paint_boxes(self):
+        """Rounded cards behind callouts, code blocks and display math."""
+        vp = self.viewport()
+        painter = QPainter(vp)
+        painter.setRenderHint(QPainter.Antialiasing)
+        border = QPen(QColor(theme.tint(BOX_BORDER_COLOR)), 1)
+        accent = QColor(theme.tint(CALLOUT_ACCENT))
+        right = vp.width() - 6
+        code_prop = QTextFormat.Property.BlockCodeFence
+
+        def card(r: QRectF, bg: str, bar: bool):
+            painter.setPen(border)
+            painter.setBrush(QColor(theme.tint(bg)))
+            painter.drawRoundedRect(r, BOX_RADIUS, BOX_RADIUS)
+            if bar:
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(accent)
+                painter.drawRoundedRect(
+                    QRectF(r.left(), r.top(), 3, r.height()), 1.5, 1.5)
+
+        run_kind, run_rect = None, None
+
+        def flush():
+            if run_rect is None:
+                return
+            if run_kind == "quote":
+                card(run_rect, CALLOUT_BG, True)
+            elif run_kind == "code":
+                card(run_rect, CODE_BOX_BG, False)
+
+        for block, rect in self._visible_blocks():
+            if QTextCursor(block).currentTable() is not None:
+                kind = None
+            elif _quote_level(block):
+                kind = "quote"
+            elif block.blockFormat().hasProperty(code_prop):
+                kind = "code"
+            else:
+                kind = None
+            fmt = block.blockFormat()
+            span = _text_span(block, rect)
+            if kind and span is not None:
+                left = rect.left() + (QUOTE_INDENT * (_quote_level(block) - 1)
+                                      if kind == "quote" else CODE_INDENT - 2)
+                r = QRectF(left, span[0] - BOX_PAD, right - left,
+                           span[1] - span[0] + BOX_PAD * 2)
+                if kind == run_kind and run_rect is not None:
+                    run_rect = run_rect.united(r)
+                else:
+                    flush()
+                    run_kind, run_rect = kind, r
+                continue
+            if kind:
+                continue
+            flush()
+            run_kind, run_rect = None, None
+            if _is_display_math(block) and span is not None:
+                r = QRectF(rect.left(), span[0] - BOX_PAD - 4,
+                           right - rect.left(), span[1] - span[0] + BOX_PAD * 2 + 8)
+                card(r, MATH_BOX_BG, False)
+        flush()
+        painter.end()
+
+    def _paint_done_tasks(self):
+        """Completed checklist items read as done: struck through and dimmed.
+        Painted over the text, so the file never gains ~~ markers."""
+        vp = self.viewport()
+        painter = QPainter(vp)
+        veil = QColor(theme.tint(PAGE_BG))
+        veil.setAlpha(120)
+        strike = QPen(QColor(theme.tint("#888895")), 1.2)
+        for block, rect in self._visible_blocks():
+            if block.textList() is None or \
+                    block.blockFormat().marker() != Marker.Checked:
+                continue
+            layout = block.layout()
+            for i in range(layout.lineCount()):
+                line = layout.lineAt(i)
+                w = line.naturalTextWidth()
+                if w <= 0:
+                    continue
+                x = rect.left() + line.x()
+                y = rect.top() + line.y()
+                painter.fillRect(QRectF(x, y, w, line.height()), veil)
+                painter.setPen(strike)
+                mid = y + line.ascent() * 0.62
+                painter.drawLine(QPointF(x, mid), QPointF(x + w, mid))
         painter.end()
 
     def _paint_checkbox(self, painter, rect, line, dx, dy, checked: bool):
@@ -373,13 +549,16 @@ class NoteTextEdit(_WikilinkClicks, _NoteSurface, QTextEdit):
         return super().loadResource(rtype, url)
 
     def paintEvent(self, event):
+        self._paint_boxes()
         super().paintEvent(event)
         self._paint_guides()
+        self._paint_done_tasks()
 
     def load_markdown(self, markdown: str):
         self.document().clear()
         self.document().setMarkdown(markdown)
         style_document(self.document())
+        self._apply_header_space()
 
     # mouse ----------------------------------------------------------------
 
@@ -641,8 +820,10 @@ class NoteTextBrowser(_NoteSurface, QTextBrowser):
         return super().loadResource(rtype, url)
 
     def paintEvent(self, event):
+        self._paint_boxes()
         super().paintEvent(event)
         self._paint_guides()
+        self._paint_done_tasks()
 
     def load_markdown(self, markdown: str):
         from .practice import math_render
@@ -653,6 +834,7 @@ class NoteTextBrowser(_NoteSurface, QTextBrowser):
             markdown = math_render.markdown_with_math(markdown, font_px=px)
         self.document().setMarkdown(markdown)
         style_document(self.document())
+        self._apply_header_space()
         if self.math_enabled:
             math_render.typeset_document(self.document())
 
@@ -1390,7 +1572,6 @@ def style_document(doc: QTextDocument):
     cursor = QTextCursor(doc)
     cursor.beginEditBlock()
     try:
-        code_bg = QColor(theme.tint(CODE_BLOCK_BG))
         block = doc.begin()
         first = True
         while block.isValid():
@@ -1404,21 +1585,44 @@ def style_document(doc: QTextDocument):
             code = fmt.hasProperty(QTextFormat.Property.BlockCodeFence)
 
             if code:
+                # The box itself is painted (_paint_boxes); the block only
+                # keeps the inner padding so the text sits inside it.
                 fmt.setTopMargin(0)
                 fmt.setBottomMargin(0)
-                fmt.setLeftMargin(CODE_INDENT)
-                fmt.setBackground(code_bg)
+                fmt.setLeftMargin(CODE_INDENT + BOX_PAD)
+                fmt.clearBackground()
+                prev = block.previous()
+                if not (prev.isValid() and prev.blockFormat().hasProperty(
+                        QTextFormat.Property.BlockCodeFence)):
+                    fmt.setTopMargin(BOX_PAD + 4)
+                nxt = block.next()
+                if not (nxt.isValid() and nxt.blockFormat().hasProperty(
+                        QTextFormat.Property.BlockCodeFence)):
+                    fmt.setBottomMargin(BOX_PAD + PARA_GAP)
             elif heading:
-                fmt.setTopMargin(0 if first else HEADING_GAP)
-                fmt.setBottomMargin(HEADING_GAP // 3)
+                fmt.setTopMargin(0 if first else HEADING_GAP + 6)
+                fmt.setBottomMargin(HEADING_GAP // 2)
                 fmt.setLeftMargin(0)
+                _size_heading(block, heading)
             elif quote:
-                fmt.setTopMargin(2)
-                fmt.setBottomMargin(2)
-                fmt.setLeftMargin(QUOTE_INDENT * quote)
+                # Callout box: painted behind the run of quote blocks.
+                fmt.setLeftMargin(QUOTE_INDENT * quote + BOX_PAD + 6)
+                fmt.setRightMargin(BOX_PAD)
+                prev_q = _quote_level(block.previous())
+                next_q = _quote_level(block.next())
+                fmt.setTopMargin(BOX_PAD + 6 if not prev_q else 2)
+                fmt.setBottomMargin(BOX_PAD + PARA_GAP + 4 if not next_q else 2)
+                _tint_callout_marker(block)
             elif block.textList() is not None:
                 fmt.setTopMargin(0)
                 fmt.setBottomMargin(LIST_GAP)
+            elif _is_display_math(block):
+                # $$…$$ reads as a centred equation in its own box.
+                fmt.setAlignment(Qt.AlignHCenter)
+                fmt.setTopMargin(BOX_PAD + 8)
+                fmt.setBottomMargin(BOX_PAD + PARA_GAP + 8)
+                fmt.setLeftMargin(BOX_PAD * 2)
+                fmt.setRightMargin(BOX_PAD * 2)
             else:
                 fmt.setTopMargin(0)
                 fmt.setBottomMargin(PARA_GAP)
@@ -1433,6 +1637,62 @@ def style_document(doc: QTextDocument):
         _shade_inline_code(doc)
     finally:
         cursor.endEditBlock()
+
+
+def _quote_level(block) -> int:
+    if not block.isValid():
+        return 0
+    fmt = block.blockFormat()
+    prop = QTextFormat.Property.BlockQuoteLevel
+    return fmt.intProperty(prop) if fmt.hasProperty(prop) else 0
+
+
+def _text_span(block, rect):
+    """(top, bottom) of a block's laid-out text lines, in the same
+    coordinates as rect. Margins are left out on purpose: the box hugs the
+    text plus BOX_PAD, whatever spacing the block format carries."""
+    layout = block.layout()
+    if layout is None or layout.lineCount() == 0:
+        return None
+    first = layout.lineAt(0)
+    last = layout.lineAt(layout.lineCount() - 1)
+    base = rect.top() + layout.position().y() - \
+        block.document().documentLayout().blockBoundingRect(block).top()
+    return base + first.y(), base + last.y() + last.height()
+
+
+def _is_display_math(block) -> bool:
+    text = block.text().strip()
+    return len(text) > 4 and text.startswith("$$") and text.endswith("$$")
+
+
+def _size_heading(block, level: int):
+    """Display size for a heading. The serialiser writes headings with
+    plain_bold, so their size never reaches the file."""
+    size = HEADING_DISPLAY_SIZES.get(level, 16.0)
+    char = QTextCharFormat()
+    char.setFontPointSize(size)
+    char.setFontWeight(QFont.Bold)
+    span = QTextCursor(block)
+    span.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+    span.mergeCharFormat(char)
+
+
+def _tint_callout_marker(block):
+    """Colour an Obsidian callout marker ([!NOTE], [!warning]…) in the
+    accent. Colour is not serialised, so the file keeps the marker as is."""
+    text = block.text()
+    if not text.startswith("[!"):
+        return
+    end = text.find("]")
+    if end < 0:
+        return
+    char = QTextCharFormat()
+    char.setForeground(QColor(theme.tint(CALLOUT_ACCENT)))
+    span = QTextCursor(block)
+    span.setPosition(block.position())
+    span.setPosition(block.position() + end + 1, QTextCursor.KeepAnchor)
+    span.mergeCharFormat(char)
 
 
 def _shade_inline_code(doc: QTextDocument):

@@ -26,7 +26,7 @@ P = QTextFormat.Property
 
 BASE_FONT_SIZE = 15.0
 MONO_HINTS = ("mono", "consolas", "courier", "cascadia")
-HEADING_SIZES = {1: 26.0, 2: 21.0, 3: 17.0}
+HEADING_SIZES = {1: 30.0, 2: 21.0, 3: 17.0}
 INDENT = "    "
 
 # Obsidian embeds (![[file.png]]) are not markdown. They are loaded as images

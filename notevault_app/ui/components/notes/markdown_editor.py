@@ -19,7 +19,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
     QTabBar, QStackedWidget, QScrollArea, QMessageBox, QInputDialog,
-    QSizePolicy, QLayout, QMenu, QFileDialog, QApplication, QDialog,
+    QSizePolicy, QLayout, QMenu, QFileDialog, QApplication, QDialog, QGridLayout,
 )
 from PySide6.QtCore import Qt, Signal, QTimer, QObject, QRunnable, QThreadPool, QUrl, QMimeData, QPoint, QSize
 from PySide6.QtGui import (
@@ -83,6 +83,80 @@ def _split_frontmatter(text: str):
     if not m:
         return "", text or ""
     return m.group(0), (text or "")[m.end():]
+
+
+def _frontmatter_card(fm_data: dict):
+    """The note's YAML shown as a card at the top of the page (the redesign's
+    `{ } frontmatter :: metadata` block). Display only; None when empty."""
+    items = []
+    for key, value in (fm_data or {}).items():
+        if value in (None, "", [], {}):
+            continue
+        items.append((str(key), value))
+    if not items:
+        return None
+
+    card = QFrame()
+    card.setObjectName("fmCard")
+    card.setAttribute(Qt.WA_StyledBackground, True)
+    card.setStyleSheet(
+        "QFrame#fmCard{background:#141417;border:1px solid #2e2e38;"
+        "border-radius:8px;}"
+        "QLabel{background:transparent;border:none;}"
+    )
+    lay = QVBoxLayout(card)
+    lay.setContentsMargins(16, 12, 16, 12)
+    lay.setSpacing(8)
+
+    head = QHBoxLayout()
+    title = QLabel("{ }  frontmatter :: metadata")
+    title.setStyleSheet(
+        f"color:{TEXT};font-size:12px;font-weight:700;"
+        f"font-family:{theme.CODE_FONT_FAMILY};")
+    head.addWidget(title)
+    head.addStretch()
+    tag = QLabel("YAML Block")
+    tag.setStyleSheet(f"color:{TEXT_FAINT};font-size:11px;")
+    head.addWidget(tag)
+    lay.addLayout(head)
+
+    grid = QGridLayout()
+    grid.setHorizontalSpacing(14)
+    grid.setVerticalSpacing(6)
+    shown = items[:8]
+    for i, (key, value) in enumerate(shown):
+        row, col = divmod(i, 2)
+        k = QLabel(f"{key}:")
+        k.setStyleSheet(f"color:{TEXT_FAINT};font-size:12px;")
+        if key.lower() == "tags":
+            vals = value if isinstance(value, (list, tuple)) else \
+                [t for t in re.split(r"[,\s]+", str(value)) if t]
+            v = QLabel("  ".join(f"#{str(t).lstrip('#')}" for t in vals))
+            v.setStyleSheet("color:#a5b4fc;font-size:12px;")
+        elif key.lower() == "status":
+            v = QLabel(str(value))
+            v.setStyleSheet(
+                "QLabel{color:#3fb950;background:rgba(63, 185, 80, 0.14);"
+                "border:1px solid rgba(63, 185, 80, 0.35);border-radius:4px;"
+                "padding:0 7px;font-size:12px;font-weight:600;}")
+            v.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        else:
+            text = ", ".join(map(str, value)) if isinstance(value, (list, tuple)) \
+                else str(value)
+            if len(text) > 48:
+                text = text[:47] + "…"
+            v = QLabel(text)
+            v.setStyleSheet(f"color:{TEXT};font-size:12px;")
+        cell = QHBoxLayout()
+        cell.setSpacing(8)
+        cell.addWidget(k)
+        cell.addWidget(v)
+        cell.addStretch()
+        grid.addLayout(cell, row, col)
+    grid.setColumnStretch(0, 1)
+    grid.setColumnStretch(1, 1)
+    lay.addLayout(grid)
+    return card
 
 
 class _ToolBtn(QPushButton):
@@ -696,12 +770,10 @@ class MarkdownEditor(QWidget):
         except Exception:
             pass
 
-        has_chips = box.count() > 0
-        if has_chips:
-            box.addStretch()
-        self._prop_chips_box.setVisible(has_chips)
-        # Grow the bar for the second row only when there is one.
-        self._ws_frame.setFixedHeight(58 if has_chips else 34)
+        # The frontmatter card inside the page now shows these fields, so
+        # the chip row stays folded and the bar keeps a single line.
+        self._prop_chips_box.setVisible(False)
+        self._ws_frame.setFixedHeight(34)
 
     def _reveal_current_in_os(self):
         note = self.current_note()
@@ -1312,6 +1384,11 @@ class MarkdownEditor(QWidget):
         self._rich.vault_root = self._read.vault_root = self.vault.vault_root
         self._raw.is_code = note.is_code
 
+        fm_data, _ = parse_frontmatter(note.frontmatter)
+        if not note.is_code:
+            self._rich.set_header_card(_frontmatter_card(fm_data))
+            self._read.set_header_card(_frontmatter_card(fm_data))
+
         self._loading = True
         try:
             if mode == MODE_RAW:
@@ -1559,7 +1636,7 @@ class MarkdownEditor(QWidget):
         block_fmt.setHeadingLevel(level)
         cursor.setBlockFormat(block_fmt)
         char = QTextCharFormat()
-        sizes = {0: 15, 1: 26, 2: 21, 3: 17}
+        sizes = {0: 15, 1: 30, 2: 21, 3: 17}
         char.setFontPointSize(sizes.get(level, 15))
         char.setFontWeight(QFont.Bold if level else QFont.Normal)
         cursor.select(QTextCursor.BlockUnderCursor)
@@ -2564,8 +2641,10 @@ class _MentionsFooter(QFrame):
         outer.setSpacing(0)
 
         head = QWidget()
-        head.setFixedHeight(28)
+        head.setFixedHeight(30)
         head.setStyleSheet("background:transparent;")
+        head.setCursor(Qt.PointingHandCursor)
+        head.mousePressEvent = lambda _e: self._toggle_expanded()
         h = QHBoxLayout(head)
         h.setContentsMargins(16, 0, 12, 0)
         h.setSpacing(8)
@@ -2590,7 +2669,10 @@ class _MentionsFooter(QFrame):
 
         self._count = QLabel("0")
         self._count.setStyleSheet(
-            f"color:{TEXT_FAINT};font-size:11px;background:transparent;border:none;"
+            "QLabel{color:#a5b4fc;font-size:11px;font-weight:600;"
+            "background:rgba(124, 90, 240, 0.15);"
+            "border:1px solid rgba(124, 90, 240, 0.30);border-radius:8px;"
+            "padding:0 8px;}"
         )
         h.addWidget(self._count)
         h.addStretch()
@@ -2619,12 +2701,15 @@ class _MentionsFooter(QFrame):
         self._scroll.setWidget(body)
         outer.addWidget(self._scroll, stretch=1)
 
+        # Start folded into one bar, as in the redesign; the arrow opens it.
+        self._toggle_expanded()
+
     def _toggle_expanded(self):
         self._expanded = not self._expanded
         self._toggle.setText("▾" if self._expanded else "▸")
         self._scroll.setVisible(self._expanded)
-        self.setMinimumHeight(140 if self._expanded else 28)
-        self.setMaximumHeight(230 if self._expanded else 28)
+        self.setMinimumHeight(140 if self._expanded else 30)
+        self.setMaximumHeight(230 if self._expanded else 30)
 
     def clear(self):
         self._generation += 1
@@ -2661,7 +2746,7 @@ class _MentionsFooter(QFrame):
         if generation != self._generation:
             return
         self._clear_rows()
-        self._count.setText(str(len(linked)))
+        self._count.setText(f"{len(linked)} referenciados")
         self.backlinks_count_changed.emit(len(linked))
 
         # Linked mentions

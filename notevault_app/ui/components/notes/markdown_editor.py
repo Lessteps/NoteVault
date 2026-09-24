@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QTabBar, QStackedWidget, QScrollArea, QMessageBox, QInputDialog,
     QSizePolicy, QLayout, QMenu, QFileDialog, QApplication, QDialog,
 )
-from PySide6.QtCore import Qt, Signal, QTimer, QObject, QRunnable, QThreadPool, QUrl, QMimeData, QPoint
+from PySide6.QtCore import Qt, Signal, QTimer, QObject, QRunnable, QThreadPool, QUrl, QMimeData, QPoint, QSize
 from PySide6.QtGui import (
     QTextCursor, QTextCharFormat, QFont, QTextListFormat, QTextBlockFormat,
     QKeySequence, QShortcut, QDesktopServices, QDrag, QPainter, QColor, QPen,
@@ -42,6 +42,7 @@ from .note_view import (
     toggle_marker, embed_files, style_tables,
 )
 from .command_palette import Command, CommandPalette
+from .file_icons import icon_for
 from .table_picker import TablePicker
 from .note_properties_dialog import NotePropertiesDialog
 from .english_audio_panel import EnglishAudioPanel
@@ -362,7 +363,7 @@ class MarkdownEditor(QWidget):
         row.setObjectName("tabRow")
         row.setAttribute(Qt.WA_StyledBackground, True)
         row.setStyleSheet(
-            f"QFrame#tabRow{{background:{BG_BAR};border-top:2px solid {ACCENT};border-bottom:1px solid {BORDER};}}"
+            f"QFrame#tabRow{{background:{BG_BAR};border:none;border-bottom:1px solid {BORDER};}}"
         )
         self._tab_row = row
         # Let the row shrink in a narrow split pane; its right-side buttons clip
@@ -370,7 +371,7 @@ class MarkdownEditor(QWidget):
         row.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         lay = QHBoxLayout(row)
         lay.setContentsMargins(0, 0, 8, 0)
-        lay.setSpacing(6)
+        lay.setSpacing(4)
 
         self._tabs = _DraggableTabBar(self)
         self._tabs.setExpanding(False)
@@ -379,21 +380,43 @@ class MarkdownEditor(QWidget):
         self._tabs.setUsesScrollButtons(True)
         self._tabs.setDrawBase(False)
         self._tabs.setMinimumWidth(0)
-        self._tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        # Preferred (not Ignored): the bar is as wide as its tabs so the "+"
+        # button sits right after the last one; minimumWidth 0 still lets a
+        # narrow pane squeeze it down to its scroll arrows.
+        self._tabs.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self._tabs.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._tabs.setIconSize(QSize(14, 14))
+        # Editor-style tabs: flat, separated by hairlines; the active one takes
+        # the page colour so it reads as joined to the note below it.
         self._tabs.setStyleSheet(
             "QTabBar{background:transparent;border:none;}"
             f"QTabBar::tab{{background:transparent;color:{TEXT_DIM};"
-            "padding:6px 12px;margin:4px 2px 0 2px;border-radius:6px;font-size:12px;}"
-            f"QTabBar::tab:selected{{background:#2e2e38;color:{TEXT};}}"
-            "QTabBar::tab:hover{background:#26262e;}"
-            "QTabBar::close-button{subcontrol-position:right;}"
+            f"border:none;border-right:1px solid {BORDER};"
+            "border-top:2px solid transparent;border-radius:0;"
+            "padding:8px 10px 8px 12px;margin:0;font-size:12px;min-width:60px;}"
+            f"QTabBar::tab:selected{{background:{BG_PAGE};color:{TEXT};"
+            f"border-top:2px solid {ACCENT};}}"
+            f"QTabBar::tab:hover:!selected{{background:#26262e;color:{TEXT};}}"
+            "QTabBar::close-button{subcontrol-position:right;margin-left:4px;}"
         )
         self._tabs.currentChanged.connect(self._on_tab_changed)
         self._tabs.tabCloseRequested.connect(self.close_tab)
         self._tabs.tabMoved.connect(self._on_tab_moved)
         self._tabs.customContextMenuRequested.connect(self._tab_menu)
-        lay.addWidget(self._tabs, stretch=1)
+        lay.addWidget(self._tabs)
+
+        self._new_tab_btn = QPushButton("+")
+        self._new_tab_btn.setCursor(Qt.PointingHandCursor)
+        self._new_tab_btn.setFixedSize(26, 26)
+        self._new_tab_btn.setToolTip("Abrir o crear en una pestaña nueva  (Ctrl+P)")
+        self._new_tab_btn.setStyleSheet(
+            "QPushButton{background:transparent;border:none;border-radius:6px;"
+            f"color:{TEXT_DIM};font-size:16px;padding:0;}}"
+            f"QPushButton:hover{{background:#26262e;color:{TEXT};}}"
+        )
+        self._new_tab_btn.clicked.connect(self.open_palette)
+        lay.addWidget(self._new_tab_btn)
+        lay.addStretch(1)
 
         self._split_btn = QPushButton("◨")
         self._split_btn.setCursor(Qt.PointingHandCursor)
@@ -995,13 +1018,38 @@ class MarkdownEditor(QWidget):
 
     def _refresh_tab(self, index: int):
         note = self._open[index]
-        label = (PIN_GLYPH if note.pinned else "") + ("• " if note.dirty else "") + note.title
+        label = (PIN_GLYPH if note.pinned else "") + note.title + ("  ●" if note.dirty else "")
         self._tabs.setTabText(index, label)
+        self._tabs.setTabIcon(index, icon_for(note.path))
+        if not getattr(self._tabs.tabButton(index, QTabBar.RightSide), "_nv_close", False):
+            self._tabs.setTabButton(index, QTabBar.RightSide, self._make_close_button())
         self._tabs.setTabToolTip(index, str(note.path))
         for side in (QTabBar.RightSide, QTabBar.LeftSide):
             button = self._tabs.tabButton(index, side)
             if button is not None:
                 button.setVisible(not note.pinned)
+
+    def _make_close_button(self) -> QPushButton:
+        """Flat "×" in place of the platform close icon (the Stitch look)."""
+        btn = QPushButton("×")
+        btn._nv_close = True
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setFixedSize(18, 18)
+        btn.setToolTip("Cerrar pestaña")
+        btn.setStyleSheet(
+            "QPushButton{background:transparent;border:none;border-radius:4px;"
+            f"color:{TEXT_DIM};font-size:14px;padding:0;}}"
+            f"QPushButton:hover{{background:#2e2e38;color:{TEXT};}}"
+        )
+
+        def close():
+            for i in range(self._tabs.count()):
+                if self._tabs.tabButton(i, QTabBar.RightSide) is btn:
+                    self._tabs.tabCloseRequested.emit(i)
+                    return
+
+        btn.clicked.connect(close)
+        return btn
 
     def set_pinned(self, index: int, pinned: bool):
         if not (0 <= index < len(self._open)):

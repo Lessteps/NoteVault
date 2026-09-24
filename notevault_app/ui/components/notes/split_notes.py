@@ -258,8 +258,9 @@ class SplitNotes(QWidget):
         if len(self._panes) <= 1 or pane not in self._panes:
             return
         self._panes.remove(pane)
-        if self._active is pane:
-            self._set_active(self._panes[-1])
+        # Re-run even when the active pane survives: dropping back to a single
+        # pane has to clear its split accent strip.
+        self._set_active(self._panes[-1] if self._active is pane else self._active)
 
         parent_sp = self._parent_splitter(pane)
         pane.setParent(None)
@@ -313,9 +314,12 @@ class SplitNotes(QWidget):
 
     def _set_active(self, pane: MarkdownEditor):
         self._active = pane
+        # The accent strip only means something when there is more than one
+        # pane to tell apart; a lone pane keeps the plain tab row.
+        split = len(self._panes) > 1
         for p in self._panes:
             try:
-                p.set_pane_active(p is pane)
+                p.set_pane_active(split and p is pane)
             except RuntimeError:
                 pass
 

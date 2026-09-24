@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Nothing remote is ever loaded: scripts, styles and fonts all ship
+         with the app; images are local data: URLs from the vault.
+         'unsafe-eval' is required by pywebview itself (its api.js builds the
+         bridge functions with new Function). Inline scripts stay forbidden
+         and every note is sanitised by DOMPurify. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-eval'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>NoteVault</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

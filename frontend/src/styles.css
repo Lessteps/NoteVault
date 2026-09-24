@@ -1,0 +1,589 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Design tokens. Every colour in the UI comes from these variables, so a
+   theme is just a different set of values. Tailwind classes such as
+   bg-panel, text-dim or border-line map onto them (see @theme below).
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme="dark"] {
+  /* "Midnight": near-black with an indigo cast, violet accent. */
+  --nv-bg: #0b0b10;
+  --nv-surface: #0e0e13;
+  --nv-panel: #111117;
+  --nv-card: #15151c;
+  --nv-elevated: #1a1a23;
+  --nv-hover: #1f1f29;
+  --nv-line: #22222d;
+  --nv-line-strong: #2d2d3b;
+  --nv-text: #e6e6ef;
+  --nv-dim: #9696ab;
+  --nv-faint: #62627a;
+  --nv-accent: #8b7cf6;
+  --nv-accent-strong: #7a69f0;
+  --nv-accent-soft: rgb(139 124 246 / 0.14);
+  --nv-accent-text: #b9b0ff;
+  --nv-mint: #34d399;
+  --nv-mint-soft: rgb(52 211 153 / 0.14);
+  --nv-danger: #f2555a;
+  --nv-danger-soft: rgb(242 85 90 / 0.14);
+  --nv-warn: #e0a13a;
+  --nv-warn-soft: rgb(224 161 58 / 0.14);
+  --nv-info: #60a5fa;
+  --nv-info-soft: rgb(96 165 250 / 0.14);
+  --nv-code-bg: #101015;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  /* Warm paper, same family as the classic app's light theme. */
+  --nv-bg: #ebe3d3;
+  --nv-surface: #f5efe4;
+  --nv-panel: #efe7d8;
+  --nv-card: #fffaf1;
+  --nv-elevated: #e7dcc6;
+  --nv-hover: #e4d9c3;
+  --nv-line: #d9ccb1;
+  --nv-line-strong: #c4b291;
+  --nv-text: #2b2620;
+  --nv-dim: #5f5747;
+  --nv-faint: #8a8069;
+  --nv-accent: #6d4fd8;
+  --nv-accent-strong: #5a3ec6;
+  --nv-accent-soft: rgb(109 79 216 / 0.12);
+  --nv-accent-text: #5a3ec6;
+  --nv-mint: #2f8f3e;
+  --nv-mint-soft: rgb(47 143 62 / 0.12);
+  --nv-danger: #c1393e;
+  --nv-danger-soft: rgb(193 57 62 / 0.12);
+  --nv-warn: #a66f12;
+  --nv-warn-soft: rgb(166 111 18 / 0.12);
+  --nv-info: #1a6fc4;
+  --nv-info-soft: rgb(26 111 196 / 0.12);
+  --nv-code-bg: #f0e8d9;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--nv-bg);
+  --color-surface: var(--nv-surface);
+  --color-panel: var(--nv-panel);
+  --color-card: var(--nv-card);
+  --color-elevated: var(--nv-elevated);
+  --color-hover: var(--nv-hover);
+  --color-line: var(--nv-line);
+  --color-line-strong: var(--nv-line-strong);
+  --color-text: var(--nv-text);
+  --color-dim: var(--nv-dim);
+  --color-faint: var(--nv-faint);
+  --color-accent: var(--nv-accent);
+  --color-accent-strong: var(--nv-accent-strong);
+  --color-accent-soft: var(--nv-accent-soft);
+  --color-accent-text: var(--nv-accent-text);
+  --color-mint: var(--nv-mint);
+  --color-mint-soft: var(--nv-mint-soft);
+  --color-danger: var(--nv-danger);
+  --color-danger-soft: var(--nv-danger-soft);
+  --color-warn: var(--nv-warn);
+  --color-warn-soft: var(--nv-warn-soft);
+  --color-info: var(--nv-info);
+  --color-info-soft: var(--nv-info-soft);
+  --color-code: var(--nv-code-bg);
+
+  --font-sans: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "Cascadia Mono", Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--nv-bg);
+  color: var(--nv-text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Thin, quiet scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--nv-line-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--nv-line-strong);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::selection {
+  background: var(--nv-accent-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--nv-accent);
+  outline-offset: 1px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Rendered note (.nv-prose). The markdown renderer (lib/markdown.ts)
+   produces plain HTML; everything visual about a note lives here.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.nv-prose {
+  user-select: text;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--nv-text);
+  max-width: 820px;
+  margin: 0 auto;
+  overflow-wrap: anywhere;
+}
+
+.nv-prose > * + * {
+  margin-top: 0.85em;
+}
+
+.nv-prose h1,
+.nv-prose h2,
+.nv-prose h3,
+.nv-prose h4 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  position: relative;
+}
+.nv-prose h1 {
+  font-size: 2.15em;
+  margin-top: 0.4em;
+}
+.nv-prose h2 {
+  font-size: 1.5em;
+  margin-top: 1.6em;
+}
+.nv-prose h3 {
+  font-size: 1.2em;
+  margin-top: 1.4em;
+}
+.nv-prose h4 {
+  font-size: 1.05em;
+  margin-top: 1.2em;
+}
+/* The faint "#", "##"… marker in the margin, as in the mockups. */
+.nv-prose h2::before,
+.nv-prose h3::before,
+.nv-prose h4::before {
+  position: absolute;
+  right: 100%;
+  margin-right: 0.55em;
+  color: var(--nv-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6em;
+  font-weight: 500;
+  white-space: nowrap;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.nv-prose h2::before {
+  content: "##";
+}
+.nv-prose h3::before {
+  content: "###";
+}
+.nv-prose h4::before {
+  content: "####";
+}
+
+.nv-prose p {
+  color: color-mix(in srgb, var(--nv-text) 88%, transparent);
+}
+
+.nv-prose a {
+  color: var(--nv-accent-text);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--nv-accent) 40%, transparent);
+  cursor: pointer;
+}
+.nv-prose a:hover {
+  border-bottom-color: var(--nv-accent);
+}
+.nv-prose a.wikilink.unresolved {
+  color: var(--nv-faint);
+  border-bottom-style: dashed;
+}
+
+.nv-prose strong {
+  font-weight: 650;
+  color: var(--nv-text);
+}
+
+.nv-prose ul,
+.nv-prose ol {
+  padding-left: 1.5em;
+}
+.nv-prose ul {
+  list-style: disc;
+}
+.nv-prose ol {
+  list-style: decimal;
+}
+.nv-prose li + li {
+  margin-top: 0.25em;
+}
+.nv-prose li::marker {
+  color: var(--nv-faint);
+}
+
+/* Task lists. */
+.nv-prose li.task {
+  list-style: none;
+  margin-left: -1.5em;
+}
+.nv-prose .task-box {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0 0.6em 0 0;
+  vertical-align: -0.2em;
+  border: 1.5px solid var(--nv-line-strong);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+}
+.nv-prose .task-box:checked {
+  background: var(--nv-accent);
+  border-color: var(--nv-accent);
+}
+.nv-prose .task-box:checked::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border: 2px solid #fff;
+  border-top: 0;
+  border-right: 0;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+.nv-prose li.task.done .task-text {
+  color: var(--nv-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--nv-faint);
+}
+
+/* Plain quotes. */
+.nv-prose blockquote {
+  border-left: 3px solid var(--nv-line-strong);
+  padding: 0.2em 0 0.2em 1em;
+  color: var(--nv-dim);
+}
+
+/* Obsidian callouts: > [!note] Title */
+.nv-prose .callout {
+  --c: var(--nv-accent);
+  --c-soft: var(--nv-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--c) 28%, var(--nv-line));
+  border-left: 3px solid var(--c);
+  background: color-mix(in srgb, var(--c-soft) 60%, var(--nv-card));
+  border-radius: 10px;
+  padding: 0.85em 1.1em;
+}
+.nv-prose .callout-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c);
+}
+.nv-prose .callout-title svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.nv-prose .callout-body {
+  margin-top: 0.35em;
+}
+.nv-prose .callout-body > * + * {
+  margin-top: 0.6em;
+}
+.nv-prose .callout[data-callout="warning"],
+.nv-prose .callout[data-callout="caution"],
+.nv-prose .callout[data-callout="attention"],
+.nv-prose .callout[data-callout="question"],
+.nv-prose .callout[data-callout="help"],
+.nv-prose .callout[data-callout="faq"] {
+  --c: var(--nv-warn);
+  --c-soft: var(--nv-warn-soft);
+}
+.nv-prose .callout[data-callout="danger"],
+.nv-prose .callout[data-callout="error"],
+.nv-prose .callout[data-callout="bug"],
+.nv-prose .callout[data-callout="failure"],
+.nv-prose .callout[data-callout="fail"],
+.nv-prose .callout[data-callout="missing"] {
+  --c: var(--nv-danger);
+  --c-soft: var(--nv-danger-soft);
+}
+.nv-prose .callout[data-callout="tip"],
+.nv-prose .callout[data-callout="hint"],
+.nv-prose .callout[data-callout="important"],
+.nv-prose .callout[data-callout="success"],
+.nv-prose .callout[data-callout="check"],
+.nv-prose .callout[data-callout="done"] {
+  --c: var(--nv-mint);
+  --c-soft: var(--nv-mint-soft);
+}
+.nv-prose .callout[data-callout="info"],
+.nv-prose .callout[data-callout="todo"],
+.nv-prose .callout[data-callout="abstract"],
+.nv-prose .callout[data-callout="summary"],
+.nv-prose .callout[data-callout="tldr"],
+.nv-prose .callout[data-callout="example"] {
+  --c: var(--nv-info);
+  --c-soft: var(--nv-info-soft);
+}
+
+/* Inline code. */
+.nv-prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  color: var(--nv-accent-text);
+  background: var(--nv-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--nv-accent) 22%, transparent);
+  padding: 0.1em 0.4em;
+  border-radius: 5px;
+}
+
+/* Fenced code: a small window with a header, as in the mockups. */
+.nv-prose .code-block {
+  border: 1px solid var(--nv-line);
+  border-radius: 10px;
+  background: var(--nv-code-bg);
+  overflow: hidden;
+}
+.nv-prose .code-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--nv-line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--nv-faint);
+}
+.nv-prose .code-dots {
+  display: flex;
+  gap: 6px;
+}
+.nv-prose .code-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: block;
+}
+.nv-prose .code-dots i:nth-child(1) {
+  background: #f0857a;
+}
+.nv-prose .code-dots i:nth-child(2) {
+  background: #b9a6ff;
+}
+.nv-prose .code-dots i:nth-child(3) {
+  background: #6fd3a6;
+}
+.nv-prose .code-lang {
+  margin-left: 4px;
+}
+.nv-prose .code-copy {
+  margin-left: auto;
+  color: var(--nv-dim);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  font: inherit;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+.nv-prose .code-copy:hover {
+  color: var(--nv-text);
+  background: var(--nv-hover);
+}
+.nv-prose pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.nv-prose pre code {
+  font-family: inherit;
+  background: none;
+}
+
+/* highlight.js tokens, in the Midnight palette. */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in {
+  color: #b9a6ff;
+}
+.hljs-string,
+.hljs-attr,
+.hljs-template-tag {
+  color: #6fd3a6;
+}
+.hljs-number,
+.hljs-literal {
+  color: #f5b971;
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--nv-faint);
+  font-style: italic;
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-section {
+  color: #7cc4ff;
+}
+.hljs-meta,
+.hljs-decorator {
+  color: #f0857a;
+}
+.hljs-type,
+.hljs-title.class_ {
+  color: #7dd3c0;
+}
+.hljs-variable,
+.hljs-params {
+  color: var(--nv-text);
+}
+[data-theme="light"] .hljs-keyword,
+[data-theme="light"] .hljs-built_in {
+  color: #5a3ec6;
+}
+[data-theme="light"] .hljs-string {
+  color: #1f7a4d;
+}
+[data-theme="light"] .hljs-number {
+  color: #a0580c;
+}
+[data-theme="light"] .hljs-title {
+  color: #1a6fc4;
+}
+
+/* Tables. */
+.nv-prose table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--nv-line);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 13.5px;
+}
+.nv-prose th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nv-dim);
+  background: var(--nv-card);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--nv-line);
+}
+.nv-prose td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--nv-line);
+}
+.nv-prose tr:last-child td {
+  border-bottom: 0;
+}
+.nv-prose tbody tr:hover td {
+  background: color-mix(in srgb, var(--nv-hover) 60%, transparent);
+}
+
+/* ALL-CAPS status words in a table cell read as badges. */
+.nv-prose .badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 5px;
+  color: var(--nv-dim);
+  background: var(--nv-elevated);
+  border: 1px solid var(--nv-line-strong);
+}
+.nv-prose .badge.ok {
+  color: var(--nv-mint);
+  background: var(--nv-mint-soft);
+  border-color: color-mix(in srgb, var(--nv-mint) 35%, transparent);
+}
+.nv-prose .badge.progress {
+  color: var(--nv-accent-text);
+  background: var(--nv-accent-soft);
+  border-color: color-mix(in srgb, var(--nv-accent) 35%, transparent);
+}
+.nv-prose .badge.bad {
+  color: var(--nv-danger);
+  background: var(--nv-danger-soft);
+  border-color: color-mix(in srgb, var(--nv-danger) 35%, transparent);
+}
+.nv-prose .badge.warn {
+  color: var(--nv-warn);
+  background: var(--nv-warn-soft);
+  border-color: color-mix(in srgb, var(--nv-warn) 35%, transparent);
+}
+
+/* Display math sits in its own card. */
+.nv-prose .katex-display {
+  margin: 0;
+  padding: 1.1em 1em;
+  background: var(--nv-code-bg);
+  border: 1px solid var(--nv-line);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.nv-prose hr {
+  border: 0;
+  border-top: 1px solid var(--nv-line);
+  margin: 2em 0;
+}
+
+.nv-prose img {
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--nv-line);
+}
+.nv-prose img.missing {
+  display: none;
+}
+.nv-prose .embed-missing {
+  font-size: 12px;
+  color: var(--nv-faint);
+  border: 1px dashed var(--nv-line-strong);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: inline-block;
+}

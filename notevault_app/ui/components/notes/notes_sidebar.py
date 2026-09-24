@@ -12,8 +12,8 @@ from PySide6.QtWidgets import (
     QListWidgetItem, QInputDialog, QMessageBox, QMenu, QFileDialog, QDialog,
     QApplication, QAbstractItemView,
 )
-from PySide6.QtCore import Qt, Signal, QPoint, QTimer
-from PySide6.QtGui import QFont, QColor, QAction, QDragEnterEvent, QDropEvent
+from PySide6.QtCore import Qt, Signal, QPoint, QTimer, QSize
+from PySide6.QtGui import QFont, QColor, QAction, QDragEnterEvent, QDropEvent, QPalette
 from PySide6.QtWidgets import QStyle
 
 from ....core.vault_manager import VaultManager
@@ -24,6 +24,7 @@ from ....config import AppConfig
 from ... import theme
 from .vault_dialog import VaultDialog
 from .file_icons import icon_for
+from ..line_icons import line_icon, icon_file
 from .knowledge_graph_widget import KnowledgeGraphWidget
 from .study_folders_dialog import StudyFoldersDialog
 
@@ -163,38 +164,83 @@ TAB_GRAPH     = 3
 TAB_TAGS      = 4
 
 
-class _TabButton(QPushButton):
-    """One of the three pinned tabs at the top of the sidebar."""
+class _IconSwap:
+    """Keeps a painted line icon in step with hover / checked state; a
+    QPushButton's icon cannot follow a stylesheet :hover on its own."""
 
-    def __init__(self, glyph: str, tooltip: str, parent=None):
-        super().__init__(glyph, parent)
+    ICON_IDLE = TEXT_DIM
+    ICON_HOVER = TEXT
+    ICON_ON = ACCENT
+
+    def _init_swap(self, key: str, size: int):
+        self._icon_key = key
+        self._hover = False
+        self.setIconSize(QSize(size, size))
+        self.toggled.connect(lambda _on: self._repaint_icon())
+        self._repaint_icon()
+
+    def _repaint_icon(self):
+        color = (self.ICON_ON if self.isChecked()
+                 else self.ICON_HOVER if self._hover else self.ICON_IDLE)
+        self.setIcon(line_icon(self._icon_key, color))
+
+    def enterEvent(self, event):
+        self._hover = True
+        self._repaint_icon()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hover = False
+        self._repaint_icon()
+        super().leaveEvent(event)
+
+
+class _TabButton(_IconSwap, QPushButton):
+    """One of the pinned tabs at the top of the sidebar: icon + label."""
+
+    def __init__(self, icon_key: str, label: str, tooltip: str, parent=None):
+        super().__init__(f" {label}", parent)
+        self._label = label
         self.setCheckable(True)
-        self.setFixedSize(30, 28)
+        self.setFixedHeight(28)
         self.setCursor(Qt.PointingHandCursor)
         self.setToolTip(tooltip)
         self.setStyleSheet(
             "QPushButton{background:transparent;border:none;border-radius:6px;"
-            f"color:{TEXT_FAINT};font-size:14px;padding:0px;}}"
+            f"color:{TEXT_DIM};font-size:12px;padding:0 7px;}}"
             f"QPushButton:hover{{background:#26262e;color:{TEXT};}}"
-            f"QPushButton:checked{{background:{ACCENT_SOFT};color:{ACCENT};}}"
+            f"QPushButton:checked{{background:{ACCENT_SOFT};color:{TEXT};}}"
         )
+        self._init_swap(icon_key, 15)
+        self.toggled.connect(lambda _on: self._sync_label())
+
+    def set_compact(self, compact: bool):
+        """When the sidebar is too narrow for every label, only the active
+        tab keeps its label; the others show just the icon."""
+        self._compact = compact
+        self._sync_label()
+
+    def _sync_label(self):
+        show = not getattr(self, "_compact", False) or self.isChecked()
+        self.setText(f" {self._label}" if show else "")
 
 
-class _ToolButton(QPushButton):
+class _ToolButton(_IconSwap, QPushButton):
     """One icon in the tool row under the tabs."""
 
-    def __init__(self, glyph: str, tooltip: str, parent=None):
-        super().__init__(glyph, parent)
-        self.setFixedSize(26, 24)
+    def __init__(self, icon_key: str, tooltip: str, parent=None):
+        super().__init__("", parent)
+        self.setFixedSize(28, 26)
         self.setCheckable(False)
         self.setCursor(Qt.PointingHandCursor)
         self.setToolTip(tooltip)
         self.setStyleSheet(
-            "QPushButton{background:transparent;border:none;border-radius:5px;"
-            f"color:{TEXT_DIM};font-size:13px;padding:0px;}}"
-            f"QPushButton:hover{{background:#26262e;color:{TEXT};}}"
-            f"QPushButton:checked{{background:{ACCENT_SOFT};color:{ACCENT};}}"
+            "QPushButton{background:transparent;border:none;border-radius:6px;"
+            "padding:0px;}"
+            "QPushButton:hover{background:#26262e;}"
+            f"QPushButton:checked{{background:{ACCENT_SOFT};}}"
         )
+        self._init_swap(icon_key, 17)
 
 
 class NotesSidebar(QWidget):
@@ -258,24 +304,19 @@ class NotesSidebar(QWidget):
         lay.setSpacing(4)
 
         self._tabs = []
-        for idx, (glyph, tip) in enumerate([
-            ("🗀", "Files — explorador de archivos"),
-            ("🔍", "Search — buscar en todas las notas"),
-            ("🔖", "Bookmarks — notas marcadas"),
-            ("🕸", "Grafo — mapa interactivo del conocimiento"),
-            ("#", "Tags — índice de etiquetas"),
+        for idx, (key, label, tip) in enumerate([
+            ("folder",   "Files",     "Files — explorador de archivos"),
+            ("search",   "Search",    "Search — buscar en todas las notas"),
+            ("bookmark", "Bookmarks", "Bookmarks — notas marcadas"),
+            ("graph",    "Graph",     "Grafo — mapa interactivo del conocimiento"),
+            ("tags",     "Tags",      "Tags — índice de etiquetas"),
         ]):
-            b = _TabButton(glyph, tip)
+            b = _TabButton(key, label, tip)
             b.clicked.connect(lambda _=False, i=idx: self.set_tab(i))
             self._tabs.append(b)
             lay.addWidget(b)
 
         lay.addStretch()
-        self._stats_label = QLabel("0 notas")
-        self._stats_label.setStyleSheet(
-            f"color:{TEXT_FAINT};font-size:10px;background:transparent;border:none;"
-        )
-        lay.addWidget(self._stats_label)
         return bar
 
     def _build_tool_row(self) -> QWidget:
@@ -290,37 +331,37 @@ class NotesSidebar(QWidget):
         lay.setContentsMargins(8, 0, 8, 0)
         lay.setSpacing(2)
 
-        self._btn_new_note = _ToolButton("✎", "Nueva nota")
+        self._btn_new_note = _ToolButton("new_note", "Nueva nota")
         self._btn_new_note.clicked.connect(self.new_note)
         lay.addWidget(self._btn_new_note)
 
-        self._btn_new_folder = _ToolButton("🗀", "Nueva carpeta")
+        self._btn_new_folder = _ToolButton("new_folder", "Nueva carpeta")
         self._btn_new_folder.clicked.connect(self.new_folder)
         lay.addWidget(self._btn_new_folder)
 
-        self._btn_map = _ToolButton("🗺", "Generar mapa conceptual")
+        self._btn_map = _ToolButton("map", "Generar mapa conceptual")
         self._btn_map.clicked.connect(self.generate_map_requested.emit)
         lay.addWidget(self._btn_map)
 
-        self._btn_study = _ToolButton("🎓", "Crear espacios de estudio (Matemáticas, Inglés, Programación)")
+        self._btn_study = _ToolButton("study", "Crear espacios de estudio (Matemáticas, Inglés, Programación)")
         self._btn_study.clicked.connect(self.open_study_folders)
         lay.addWidget(self._btn_study)
 
-        self._btn_sort = _ToolButton("⇅", "Ordenar por numeración")
+        self._btn_sort = _ToolButton("sort", "Ordenar por numeración")
         self._btn_sort.setCheckable(True)
         self._btn_sort.setChecked(True)
         self._btn_sort.clicked.connect(self._toggle_sort)
-        lay.addWidget(self._btn_sort)
 
-        self._btn_reveal = _ToolButton("◫", "Revelar el archivo de la pestaña actual")
+        self._btn_reveal = _ToolButton("reveal", "Revelar el archivo de la pestaña actual")
         self._btn_reveal.clicked.connect(self.reveal_active)
         lay.addWidget(self._btn_reveal)
 
-        self._btn_collapse = _ToolButton("✕", "Colapsar todas las carpetas")
+        self._btn_collapse = _ToolButton("collapse", "Colapsar todas las carpetas")
         self._btn_collapse.clicked.connect(self.collapse_all)
-        lay.addWidget(self._btn_collapse)
-
         lay.addStretch()
+        # Sort and collapse sit on the right, as in the redesign.
+        lay.addWidget(self._btn_sort)
+        lay.addWidget(self._btn_collapse)
         return row
 
     # ── Files page ────────────────────────────────────────────────────────
@@ -336,13 +377,28 @@ class NotesSidebar(QWidget):
         self._filter.setPlaceholderText("Filtrar por nombre…")
         self._filter.setObjectName("inlineSearch")
         self._filter.textChanged.connect(self._filter_tree)
-        lay.addWidget(self._filter)
+        self._filter.addAction(line_icon("search", TEXT_FAINT, 14),
+                               QLineEdit.LeadingPosition)
+        filter_row = QHBoxLayout()
+        filter_row.setContentsMargins(0, 0, 0, 0)
+        filter_row.setSpacing(6)
+        filter_row.addWidget(self._filter, stretch=1)
+        # Note count, as a small badge at the end of the filter row.
+        self._stats_label = QLabel("0 notas")
+        self._stats_label.setStyleSheet(
+            f"QLabel{{color:{TEXT_DIM};font-size:10px;background:#26262e;"
+            f"border:1px solid {BORDER};border-radius:4px;padding:1px 6px;}}"
+        )
+        filter_row.addWidget(self._stats_label)
+        lay.addLayout(filter_row)
 
         self._tree = _DraggableTree()
         self._tree.drop_handler = self._on_tree_drop
         self._tree.middle_clicked.connect(self.note_selected_new_tab.emit)
         self._tree.setHeaderHidden(True)
-        self._tree.setIndentation(14)
+        self._tree.setIndentation(16)
+        self._tree.setIconSize(QSize(16, 16))
+        self._style_tree()
         self._tree.setRootIsDecorated(True)
         self._tree.setFrameShape(QTreeWidget.NoFrame)
         self._tree.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -517,6 +573,42 @@ class NotesSidebar(QWidget):
                 self.vault_switch_requested.emit(Path(dlg.selected))
 
     # ── Tabs ──────────────────────────────────────────────────────────────
+
+    def _style_tree(self):
+        """Redesign tree: line chevrons, roomier rows, accent selection that
+        does not spill a system-blue block into the branch column."""
+        # The branch column paints its selection with the palette's
+        # Highlight, outside the stylesheet; clear it.
+        pal = self._tree.palette()
+        pal.setColor(QPalette.Highlight, QColor(0, 0, 0, 0))
+        self._tree.setPalette(pal)
+        closed = icon_file("chevron_right", TEXT_FAINT, 12)
+        opened = icon_file("chevron_down", TEXT_FAINT, 12)
+        self._tree.setStyleSheet(
+            "QTreeWidget{background:transparent;border:none;outline:none;"
+            "font-size:13px;show-decoration-selected:0;}"
+            "QTreeWidget::item{padding:4px 4px;border-radius:5px;}"
+            "QTreeWidget::item:hover{background:#26262e;}"
+            "QTreeWidget::item:selected{background:rgba(124, 90, 240, 0.16);"
+            f"color:{TEXT};}}"
+            "QTreeWidget::branch,QTreeWidget::branch:selected,"
+            "QTreeWidget::branch:selected:adjoins-item,"
+            "QTreeWidget::branch:hover{background:transparent;"
+            "border:none;}"
+            "QTreeWidget::branch:has-children:!has-siblings:closed,"
+            "QTreeWidget::branch:closed:has-children:has-siblings"
+            f"{{border-image:none;image:url({closed});}}"
+            "QTreeWidget::branch:open:has-children:!has-siblings,"
+            "QTreeWidget::branch:open:has-children:has-siblings"
+            f"{{border-image:none;image:url({opened});}}"
+        )
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Every label needs ~340 px; below that only the active one shows.
+        compact = self.width() < 340
+        for b in getattr(self, "_tabs", []):
+            b.set_compact(compact)
 
     def set_tab(self, index: int):
         for i, b in enumerate(self._tabs):
@@ -695,15 +787,10 @@ class NotesSidebar(QWidget):
 
     def _add_item(self, parent, data: dict):
         item = QTreeWidgetItem(parent)
-        style = QApplication.style()
         if data["type"] == "folder":
-            item.setIcon(0, style.standardIcon(QStyle.SP_DirIcon))
+            item.setIcon(0, line_icon("folder", TEXT_DIM, 16))
             item.setText(0, data["name"])
-            item.setForeground(0, QColor(theme.tint(TEXT_DIM)))
-            f = item.font(0)
-            f.setBold(True)
-            f.setPointSizeF(8.5)
-            item.setFont(0, f)
+            item.setForeground(0, QColor(theme.tint(TEXT)))
             item.setData(0, Qt.UserRole, {"type": "folder", "path": data["path"],
                                           "loaded": False})
             item.setToolTip(0, str(data["path"]))

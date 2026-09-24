@@ -863,8 +863,12 @@ QListWidget::item:selected {
 }
 
 QPushButton#railIconBtnActive {
-    background-color: rgba(124, 90, 240, 0.18);
-    border: 1px solid rgba(124, 90, 240, 0.35);
+    background-color: #7c5af0;
+    border: none;
+    border-radius: 8px;
+}
+QPushButton#railIconBtn {
+    border-radius: 8px;
 }
 
 QMenu {

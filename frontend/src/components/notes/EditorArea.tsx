@@ -1,4 +1,5 @@
 import {
+  ArrowLeftRight,
   AlertTriangle, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, FileCode2, FileText,
   Link2, PanelLeft, PanelRight, PenLine, Plus, Sparkles, X,
 } from "lucide-react";
@@ -6,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { Mentions } from "../../lib/types";
 import { useApp, type OpenNote, type ViewMode } from "../../store/app";
-import { cn, IconButton, Kbd } from "../ui";
+import { cn, IconButton, Kbd, openMenu } from "../ui";
 import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
 import { PracticeView } from "../practice/PracticeView";
@@ -35,6 +36,13 @@ function TabBar() {
             title={path}
             onClick={() => setActive(path)}
             onAuxClick={(e) => e.button === 1 && void closeTab(path)}
+            onContextMenu={(e) => openMenu(e, [
+              { label: "Abrir a la derecha", icon: <Columns2 />, onSelect: () => void useApp.getState().openSide(path) },
+              { label: "Cerrar", icon: <X />, onSelect: () => void closeTab(path) },
+              { label: "Cerrar las demás", onSelect: () => {
+                for (const t of useApp.getState().tabs) if (t !== path) void closeTab(t);
+              } },
+            ])}
             className={cn(
               "group flex h-full max-w-[240px] flex-none cursor-pointer items-center gap-2 border-r border-line px-3 text-[12.5px]",
               on
@@ -294,49 +302,82 @@ function isExercise(note: { kind: string; frontmatter: Record<string, unknown> }
 
 export function EditorArea() {
   const note = useApp((s) => (s.active ? s.notes[s.active] : undefined));
+  const side = useApp((s) => (s.side && s.side !== s.active ? s.notes[s.side] : undefined));
   const mode = useApp((s) => s.mode);
   const hasTabs = useApp((s) => s.tabs.length > 0);
   const ladderOn = useLadder((s) => (note ? s.open.has(note.path) : false));
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-surface">
       {hasTabs && <TabBar />}
-      {!note ? (
-        <EmptyState />
-      ) : (
-        <>
-          <NoteHeader note={note} />
-          {note.kind === "note" && <StudyBar note={note} />}
-          {note.conflict && <ConflictBanner note={note} />}
-          <div className="flex min-h-0 flex-1">
-            {mode !== "read" && (
-              <div className={cn("min-h-0 min-w-0", mode === "split" ? "w-1/2 border-r border-line" : "flex-1")}>
-                <Editor note={note} />
-              </div>
-            )}
-            {mode !== "edit" && (
-              <div className={cn("min-h-0 min-w-0", mode === "split" ? "w-1/2" : "flex-1")}>
-                {mode === "read" && isExercise(note) ? <PracticeView note={note} />
-                  : mode === "read" && ladderOn ? <LadderView path={note.path} onExit={() => useLadder.getState().set(note.path, false)} />
-                    : (
-                      <div className="flex h-full flex-col">
-                        {mode === "read" && note.kind === "note" && isProofNote(note.frontmatter) && (
-                          <div className="flex flex-none items-center gap-3 border-b border-line bg-accent-soft px-5 py-2 text-[12.5px] text-text">
-                            Esta nota es una demostración.
-                            <button type="button" onClick={() => useLadder.getState().set(note.path, true)}
-                              className="rounded-md bg-accent px-2.5 py-1 font-semibold text-white hover:bg-accent-strong">
-                              ▶ Practicar demostración
-                            </button>
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          {!note ? (
+            <EmptyState />
+          ) : (
+            <>
+              <NoteHeader note={note} />
+              {note.kind === "note" && <StudyBar note={note} />}
+              {note.conflict && <ConflictBanner note={note} />}
+              <div className="flex min-h-0 flex-1">
+                {mode !== "read" && (
+                  <div className={cn("min-h-0 min-w-0", mode === "split" ? "w-1/2 border-r border-line" : "flex-1")}>
+                    <Editor note={note} />
+                  </div>
+                )}
+                {mode !== "edit" && (
+                  <div className={cn("min-h-0 min-w-0", mode === "split" ? "w-1/2" : "flex-1")}>
+                    {mode === "read" && isExercise(note) ? <PracticeView note={note} />
+                      : mode === "read" && ladderOn ? <LadderView path={note.path} onExit={() => useLadder.getState().set(note.path, false)} />
+                        : (
+                          <div className="flex h-full flex-col">
+                            {mode === "read" && note.kind === "note" && isProofNote(note.frontmatter) && (
+                              <div className="flex flex-none items-center gap-3 border-b border-line bg-accent-soft px-5 py-2 text-[12.5px] text-text">
+                                Esta nota es una demostración.
+                                <button type="button" onClick={() => useLadder.getState().set(note.path, true)}
+                                  className="rounded-md bg-accent px-2.5 py-1 font-semibold text-white hover:bg-accent-strong">
+                                  ▶ Practicar demostración
+                                </button>
+                              </div>
+                            )}
+                            <div className="min-h-0 flex-1"><ReadView note={note} /></div>
                           </div>
                         )}
-                        <div className="min-h-0 flex-1"><ReadView note={note} /></div>
-                      </div>
-                    )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <BacklinksBar note={note} />
-        </>
-      )}
+              <BacklinksBar note={note} />
+            </>
+          )}
+        </div>
+        {side && <SidePane note={side} />}
+      </div>
     </main>
+  );
+}
+
+/** The second note of the split view: read or edited on its own. */
+function SidePane({ note }: { note: OpenNote }) {
+  const [editing, setEditing] = useState(false);
+  const s = useApp.getState();
+  return (
+    <section aria-label="Panel derecho" className="flex w-1/2 min-w-0 flex-none flex-col border-l border-line-strong">
+      <div className="flex h-10 flex-none items-center gap-2 border-b border-line bg-panel px-3">
+        <FileText size={14} className="flex-none text-accent-text" />
+        <span className="truncate text-[12.5px] font-semibold text-text" title={note.path}>{note.title}</span>
+        {note.dirty && <span className="h-2 w-2 flex-none rounded-full bg-accent" title="Sin guardar" />}
+        <div className="flex-1" />
+        <div className="flex rounded-lg border border-line bg-surface p-0.5">
+          {([[false, "Lectura"], [true, "Editar"]] as const).map(([on, label]) => (
+            <button key={label} type="button" onClick={() => setEditing(on)}
+              className={cn("h-6 rounded-md px-2 text-[11px]", editing === on ? "bg-accent text-white" : "text-dim hover:text-text")}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <IconButton title="Hacerla la nota principal" onClick={() => s.setActive(note.path)}><ArrowLeftRight size={14} /></IconButton>
+        <IconButton title="Cerrar panel derecho" onClick={() => void s.openSide(null)}><X size={14} /></IconButton>
+      </div>
+      <div className="min-h-0 flex-1">{editing ? <Editor note={note} /> : <ReadView note={note} />}</div>
+    </section>
   );
 }

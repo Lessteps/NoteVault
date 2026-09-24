@@ -181,3 +181,34 @@ class StudyApi:
                 return {"text": path.read_text(encoding="utf-8")}
             except OSError:
                 return {"text": "Todavía no hay ERROR_LOG.md: se genera al corregir el primer intento."}
+
+
+STUDY_IDS = ("mathematics", "programming", "english")
+
+
+class StudyFoldersApi:
+    """The Mathematics / Programming / English study folders, created from
+    buttons at the vault root (nothing is ever overwritten)."""
+
+    def study_folders(self) -> list:
+        with self._lock:
+            ws = WorkspaceManager(self._root)
+            out = []
+            for wid in STUDY_IDS:
+                w = ws.get(wid)
+                if not w:
+                    continue
+                folder = ws.find_existing_folder(wid)
+                index = folder / "00 Índice.md" if folder else None
+                out.append({"id": wid, "name": w["name"], "icon": w.get("icon", "📁"),
+                            "exists": folder is not None,
+                            "index": self._study_rel(index) if index and index.exists() else ""})
+            return out
+
+    def study_folder_create(self, ws_id: str, with_structure: bool = True) -> dict:
+        if ws_id not in STUDY_IDS:
+            raise ApiError("Espacio de estudio desconocido.")
+        with self._lock:
+            res = WorkspaceManager(self._root).ensure_folder(ws_id, bool(with_structure))
+            return {"path": self._rel(res["path"]), "created": res["created"],
+                    "index": self._study_rel(res["index"]) if res.get("index") else ""}

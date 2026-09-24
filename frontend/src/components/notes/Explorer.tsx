@@ -1,5 +1,5 @@
 import {
-  ArrowLeft, Bookmark, LayoutDashboard, Waypoints, ChevronsDownUp, Hash, Database, FilePlus, Files, FolderPlus, Network, RefreshCw, Search,
+  ArrowLeft, Bookmark, GraduationCap, LayoutDashboard, Waypoints, ChevronsDownUp, Hash, Database, FilePlus, Files, FolderPlus, Network, RefreshCw, Search,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
@@ -9,6 +9,7 @@ import { cn, IconButton } from "../ui";
 import { FileTree, newCanvasIn, newFolderIn, newNoteIn } from "./FileTree";
 import { GraphPanel } from "./GraphPanel";
 import { useConceptMap } from "../canvas/ConceptMapDialog";
+import { useStudyFolders } from "../study/StudyFoldersDialog";
 
 const TABS: Array<{ id: ExplorerTab; label: string; icon: ReactNode }> = [
   { id: "files", label: "Files", icon: <Files size={14} /> },
@@ -92,6 +93,9 @@ function FilesPanel() {
         </IconButton>
         <IconButton title="Generar mapa conceptual" onClick={() => useConceptMap.getState().set(true)}>
           <Waypoints size={15} />
+        </IconButton>
+        <IconButton title="Espacios de estudio" onClick={() => useStudyFolders.getState().set(true)}>
+          <GraduationCap size={15} />
         </IconButton>
         <div className="flex-1" />
         <IconButton title="Recargar" onClick={refreshTree}>

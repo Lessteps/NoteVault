@@ -29,6 +29,7 @@ módulos restantes.
 | Módulo | Estado |
 |---|---|
 | Notas (explorador, pestañas, lectura, editor, búsqueda, marcadores, etiquetas, backlinks, grafo, propiedades, asistente IA, Ctrl+P) | ✅ migrado |
+| Vista dividida (clic derecho en una pestaña o nota → «Abrir a la derecha») y espacios de estudio (crear carpetas de Matemáticas/Programación/Inglés) | ✅ migrado |
 | Paleta de comandos (Ctrl+Shift+P): formato, listas y casillas (Ctrl+L), tablas (Ctrl+Shift+T y edición de filas/columnas), plantillas, nota diaria (Ctrl+Shift+D), atajos (Ctrl+,) | ✅ migrado |
 | Tareas (tabla editable, filtros, calendario con repeticiones, recordatorios, subtareas) | ✅ migrado |
 | Hábitos (vista general con racha, diaria con subtareas y diario, semanal, mensual, anual, gestionar) | ✅ migrado |

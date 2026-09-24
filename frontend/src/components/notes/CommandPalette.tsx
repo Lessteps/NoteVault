@@ -13,6 +13,7 @@ import { MODULES } from "../Shell";
 import { askText, cn, Kbd } from "../ui";
 import { newCanvasIn, newNoteIn } from "./FileTree";
 import { useConceptMap } from "../canvas/ConceptMapDialog";
+import { useStudyFolders } from "../study/StudyFoldersDialog";
 import { useProperties } from "./PropertiesDialog";
 import { activeEditor, insertAtCursor } from "./SourceEditor";
 
@@ -112,6 +113,10 @@ function commands(): Item[] {
     { id: "new-note", group: "Notas", label: "Nueva nota", run: () => newNoteIn(folder) },
     { id: "new-canvas", group: "Notas", label: "Nuevo canvas", run: () => newCanvasIn(folder) },
     { id: "concept-map", group: "Notas", label: "Generar mapa conceptual…", run: () => useConceptMap.getState().set(true) },
+    { id: "study-folders", group: "Notas", label: "Espacios de estudio (crear carpetas)…", run: () => {
+      s.setModule("notas");
+      useStudyFolders.getState().set(true);
+    } },
     {
       id: "new-from-template", group: "Notas", label: "Nueva nota desde plantilla…",
       run: () => templatePage(async (name) => {
@@ -153,6 +158,14 @@ function commands(): Item[] {
     { id: "mode-edit", group: "Vista", label: "Modo edición", run: () => s.setMode("edit") },
     { id: "mode-split", group: "Vista", label: "Modo dividido (editor + vista previa)", run: () => s.setMode("split") },
     { id: "explorer", group: "Vista", label: "Mostrar / ocultar explorador", keys: "Ctrl+\\", run: s.toggleExplorer },
+    {
+      id: "split-open", group: "Vista", label: "Abrir otra nota a la derecha…",
+      run: () => ({
+        placeholder: "Nota para el panel derecho…",
+        items: async () => (await api.noteIndex()).map((n) => ({ id: n.path, label: n.title, run: () => void s.openSide(n.path) })),
+      }),
+    },
+    ...(s.side ? [{ id: "split-close", group: "Vista", label: "Cerrar el panel derecho", run: () => void s.openSide(null) }] : []),
     { id: "inspector", group: "Vista", label: "Mostrar / ocultar panel derecho", run: s.toggleInspector },
     { id: "tags", group: "Vista", label: "Ver etiquetas", run: () => { s.setModule("notas"); s.setExplorerTab("tags"); } },
     { id: "graph", group: "Vista", label: "Ver grafo de conocimiento", run: () => { s.setModule("notas"); s.setExplorerTab("graph"); } },
@@ -251,11 +264,12 @@ export function CommandPalette() {
 
   const results = useMemo(() => {
     const query = q.trim().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
-    if (!query) return items;
+    if (!query) return items.slice(0, 200);
     return items
       .map((it) => ({ it, s: Math.min(score(it.label, query), score(`${it.group ?? ""} ${it.label}`, query) + 3) }))
       .filter((x) => x.s < Infinity)
       .sort((a, b) => a.s - b.s)
+      .slice(0, 200)
       .map((x) => x.it);
   }, [items, q]);
 

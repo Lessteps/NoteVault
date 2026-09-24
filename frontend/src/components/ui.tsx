@@ -190,6 +190,7 @@ export function MenuHost() {
   const y = Math.min(menu.y, window.innerHeight - menu.items.length * 32 - 16);
   return (
     <div
+      role="menu"
       className="fixed z-50 min-w-[200px] rounded-lg border border-line-strong bg-card p-1 shadow-2xl"
       style={{ left: x, top: y }}
       onMouseDown={(e) => e.stopPropagation()}
@@ -198,6 +199,7 @@ export function MenuHost() {
         <button
           key={it.label}
           type="button"
+          role="menuitem"
           onClick={() => {
             set(null);
             it.onSelect();

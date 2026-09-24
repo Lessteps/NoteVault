@@ -10,6 +10,7 @@ import { useAssistant } from "../../store/assistant";
 import { useCanvas } from "../../store/canvas";
 import { CanvasView } from "../canvas/CanvasView";
 import { ConceptMapDialog } from "../canvas/ConceptMapDialog";
+import { StudyFoldersDialog } from "../study/StudyFoldersDialog";
 
 const WIDTH_KEY = "nv.explorer.width";
 
@@ -58,6 +59,7 @@ export function NotesModule() {
       <AiSettingsDialog />
       <PropertiesDialog />
       <ConceptMapDialog />
+      <StudyFoldersDialog />
       <EnglishAudioDialog />
     </div>
   );

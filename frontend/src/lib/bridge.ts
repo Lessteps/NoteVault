@@ -328,5 +328,7 @@ export const api = {
     call<{ ok: boolean; needs_phrase?: boolean; phrase?: string; restrictions?: import("./types").WebRules }>("web_restrictions_save", data, phrase),
   webPreset: (data: import("./types").WebRules, name: string) => call<import("./types").WebRules>("web_preset", data, name),
   webOpen: (text: string) => call<{ ok: boolean; blocked?: boolean; reason?: string; system?: boolean }>("web_open", text),
+  studyFolders: () => call<Array<{ id: string; name: string; icon: string; exists: boolean; index: string }>>("study_folders"),
+  studyFolderCreate: (id: string, structure: boolean) => call<{ path: string; created: boolean; index: string }>("study_folder_create", id, structure),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
 };

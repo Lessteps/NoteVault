@@ -62,3 +62,21 @@ class TestStudyApi(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStudyFolders(unittest.TestCase):
+    def test_create_folders_without_overwriting(self):
+        d = Path(tempfile.mkdtemp(prefix="nv_studyf_"))
+        self.addCleanup(shutil.rmtree, d, True)
+        api = NoteVaultApi(d)
+        self.assertFalse(any(f["exists"] for f in api.study_folders()))
+        out = api.study_folder_create("mathematics")
+        self.assertTrue(out["created"])
+        (d / out["index"]).write_text("mío", encoding="utf-8")
+        again = api.study_folder_create("mathematics")
+        self.assertFalse(again["created"])
+        self.assertEqual((d / out["index"]).read_text(encoding="utf-8"), "mío")
+        self.assertTrue(next(f for f in api.study_folders() if f["id"] == "mathematics")["exists"])
+        self.assertEqual(api.study_area(out["index"])["subject"], "mathematics")
+        with self.assertRaises(ApiError):
+            api.study_folder_create("../x")

@@ -171,6 +171,22 @@ class WebUiE2E(unittest.TestCase):
             self.page.get_by_text("navegador del sistema").wait_for()
         op.assert_called_once_with("https://example.com")
 
+    def test_split_view(self):
+        self._open("Destino")
+        self.page.get_by_role("treeitem", name="Windows", exact=True).click(button="right")
+        self.page.get_by_role("menuitem", name="Abrir a la derecha").click()
+        pane = self.page.get_by_role("region", name="Panel derecho")
+        pane.get_by_text("linea").wait_for()
+        pane.get_by_role("button", name="Editar").click()
+        pane.locator(".cm-content").click()
+        self.page.keyboard.press("Control+End")
+        self.page.keyboard.type("desde la derecha")
+        self._wait_disk(self.dir / "Windows.md", lambda b: b"desde la derecha" in b)
+        # The left note is untouched and still the active one.
+        self.assertNotIn("desde la derecha", (self.dir / "Destino.md").read_text(encoding="utf-8"))
+        pane.get_by_role("button", name="Cerrar panel derecho").click()
+        pane.wait_for(state="detached")
+
     def test_quick_switcher_creates_a_note(self):
         self.page.keyboard.press("Control+p")
         self.page.keyboard.type("Creada desde switcher")

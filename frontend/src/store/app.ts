@@ -83,6 +83,8 @@ interface State {
   bookmarkVersion: number;
   switcherOpen: boolean;
   paletteOpen: boolean;
+  /** A second note shown to the right of the active one (split view). */
+  side: string | null;
   cursor: { line: number; col: number } | null;
   toasts: Toast[];
 
@@ -95,6 +97,7 @@ interface State {
   toggleTheme: () => void;
   setSwitcher: (open: boolean) => void;
   setPalette: (open: boolean) => void;
+  openSide: (path: string | null) => Promise<void>;
   setCursor: (c: { line: number; col: number } | null) => void;
 
   openNote: (path: string, opts?: { line?: number }) => Promise<void>;
@@ -143,6 +146,7 @@ export const useApp = create<State>((set, get) => ({
   bookmarkVersion: 0,
   switcherOpen: false,
   paletteOpen: false,
+  side: null,
   cursor: null,
   toasts: [],
 
@@ -169,6 +173,26 @@ export const useApp = create<State>((set, get) => ({
   },
   setSwitcher: (switcherOpen) => set({ switcherOpen, paletteOpen: false }),
   setPalette: (paletteOpen) => set({ paletteOpen, switcherOpen: false }),
+  openSide: async (path) => {
+    if (!path) {
+      set({ side: null });
+      return;
+    }
+    const st = get();
+    if (!st.notes[path]) {
+      try {
+        const data = await api.readNote(path);
+        set((s2) => ({
+          notes: { ...s2.notes, [path]: fromData(data) },
+          tabs: s2.tabs.includes(path) ? s2.tabs : [...s2.tabs, path],
+        }));
+      } catch (e) {
+        get().toast("error", (e as Error).message);
+        return;
+      }
+    }
+    set((s2) => ({ module: "notas", side: path, active: s2.active === path || !s2.active ? (s2.tabs.find((t) => t !== path) ?? null) : s2.active }));
+  },
   setCursor: (cursor) => set({ cursor }),
 
   openNote: async (path, opts) => {
@@ -177,6 +201,7 @@ export const useApp = create<State>((set, get) => ({
     if (s.notes[path]) {
       set((st) => ({
         active: path,
+        side: st.side === path ? st.active : st.side,
         module: "notas",
         notes: opts?.line !== undefined
           ? { ...st.notes, [path]: { ...st.notes[path]!, revealLine: opts.line } }
@@ -208,11 +233,12 @@ export const useApp = create<State>((set, get) => ({
       const active = st.active === path
         ? (tabs[Math.min(idx, tabs.length - 1)] ?? null)
         : st.active;
-      return { tabs, notes, active };
+      return { tabs, notes, active, side: st.side === path ? null : st.side };
     });
   },
 
-  setActive: (active) => set({ active }),
+  // Activating the note of the right pane swaps the two panes.
+  setActive: (active) => set((st) => ({ active, side: st.side === active ? st.active : st.side })),
 
   editRaw: (path, raw) => {
     set((st) => {
@@ -319,6 +345,7 @@ export const useApp = create<State>((set, get) => ({
         notes,
         tabs: st.tabs.map(remap),
         active: st.active ? remap(st.active) : null,
+        side: st.side ? remap(st.side) : null,
         treeVersion: st.treeVersion + 1,
       };
     });
@@ -334,6 +361,7 @@ export const useApp = create<State>((set, get) => ({
         tabs,
         notes,
         active: st.active && gone(st.active) ? (tabs[0] ?? null) : st.active,
+        side: st.side && gone(st.side) ? null : st.side,
         treeVersion: st.treeVersion + 1,
       };
     });

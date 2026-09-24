@@ -1,6 +1,6 @@
 import {
   Bookmark, ChevronRight, FileCode2, FilePlus, FileText, Folder, FolderOpen, FolderPlus,
-  LayoutDashboard, Pencil, SquareArrowOutUpRight, Trash2,
+  Columns2, LayoutDashboard, Pencil, SquareArrowOutUpRight, Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { api } from "../../lib/bridge";
@@ -211,6 +211,7 @@ export function FileTree({ filter }: { filter: string }) {
       ]
       : [
         { label: "Abrir", icon: <SquareArrowOutUpRight />, onSelect: () => openEntry(entry) },
+        ...(entry.kind === "canvas" ? [] : [{ label: "Abrir a la derecha", icon: <Columns2 />, onSelect: () => void s.openSide(entry.path) }]),
         { label: "Marcador", icon: <Bookmark />, onSelect: () => void s.toggleBookmark(entry.path) },
         { label: "Renombrar", icon: <Pencil />, onSelect: () => void renameEntry(entry) },
         { label: "Mover a la papelera", icon: <Trash2 />, danger: true, onSelect: () => void trashEntry(entry) },

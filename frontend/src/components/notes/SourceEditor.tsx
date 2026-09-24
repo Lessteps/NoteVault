@@ -134,6 +134,8 @@ export function SourceEditor({
         theme,
         EditorView.editorAttributes.of({ class: code ? "cm-code" : "" }),
         EditorView.contentAttributes.of({ spellcheck: code ? "false" : "true", lang: "es" }),
+        // With two editors (split view) the tools act on the focused one.
+        EditorView.domEventHandlers({ focus: (_e, view) => { activeEditor.view = view; } }),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) cb.current.onChange(u.state.sliceDoc());
           if (u.docChanged || u.selectionSet) {

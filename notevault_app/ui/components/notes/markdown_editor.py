@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QTimer, QObject, QRunnable, QThreadPool, QUrl, QMimeData, QPoint, QSize
 from PySide6.QtGui import (
     QTextCursor, QTextCharFormat, QFont, QTextListFormat, QTextBlockFormat,
-    QKeySequence, QShortcut, QDesktopServices, QDrag, QPainter, QColor, QPen,
+    QKeySequence, QShortcut, QDesktopServices, QDrag, QPainter, QColor, QPen, QFontMetrics,
 )
 
 from ....config import AppConfig
@@ -575,9 +575,15 @@ class MarkdownEditor(QWidget):
         self._ws_frame.setStyleSheet(
             f"QFrame{{background:{BG_BAR};border:none;border-bottom:1px solid {BORDER};}}"
         )
-        lay = QHBoxLayout(self._ws_frame)
+        outer = QVBoxLayout(self._ws_frame)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        top_row = QWidget()
+        lay = QHBoxLayout(top_row)
         lay.setContentsMargins(10, 0, 10, 0)
         lay.setSpacing(8)
+        outer.addWidget(top_row)
 
         # Breadcrumb: 📁 Carpeta › Subcarpeta › Nota.md
         self._breadcrumb_lbl = QLabel("")
@@ -634,7 +640,68 @@ class MarkdownEditor(QWidget):
         self._context_actions_lay.setSpacing(4)
         lay.addWidget(self._context_actions_box)
 
+        # Frontmatter chips (status · due · tags) on their own row under the
+        # breadcrumb, the way the mockup shows them. Pills built from the
+        # note's own YAML; the row hides (and the bar shrinks) when empty.
+        self._prop_chips_box = QWidget()
+        self._prop_chips_lay = QHBoxLayout(self._prop_chips_box)
+        self._prop_chips_lay.setContentsMargins(10, 0, 10, 4)
+        self._prop_chips_lay.setSpacing(6)
+        self._prop_chips_box.setVisible(False)
+        outer.addWidget(self._prop_chips_box)
+
         return self._ws_frame
+
+    def _set_prop_chips(self, fm_data: dict):
+        """Fill the context bar with status / due / tag pills from the note's
+        frontmatter. Pure display of already-parsed YAML; clears when empty."""
+        box = getattr(self, "_prop_chips_lay", None)
+        if box is None:
+            return
+        while box.count():
+            item = box.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        def pill(text: str, fg: str, bg: str, bd: str):
+            lbl = QLabel(text)
+            # Set the font in code so the width we measure matches what is
+            # painted; a QLabel sizes itself before its CSS font applies and
+            # otherwise clips the last characters.
+            f = QFont(lbl.font())
+            f.setPixelSize(11)
+            f.setWeight(QFont.DemiBold)
+            lbl.setFont(f)
+            lbl.setStyleSheet(
+                f"QLabel{{background:{bg};color:{fg};border:1px solid {bd};"
+                "border-radius:9px;padding:1px 9px;}}"
+            )
+            lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            lbl.setFixedWidth(QFontMetrics(f).horizontalAdvance(text) + 38)
+            box.addWidget(lbl)
+
+        try:
+            status = fm_data.get("status")
+            if status:
+                pill(f"status: {status}", "#a5b4fc",
+                     "rgba(124, 90, 240, 0.15)", "rgba(124, 90, 240, 0.35)")
+            due = fm_data.get("due")
+            if due:
+                pill(f"due: {due}", TEXT_DIM, "transparent", BORDER)
+            tags = fm_data.get("tags") or []
+            if isinstance(tags, str):
+                tags = [t.strip() for t in re.split(r"[,\s]+", tags) if t.strip()]
+            for tag in list(tags)[:6]:
+                pill(f"#{str(tag).lstrip('#')}", TEXT_DIM, "transparent", BORDER)
+        except Exception:
+            pass
+
+        has_chips = box.count() > 0
+        if has_chips:
+            box.addStretch()
+        self._prop_chips_box.setVisible(has_chips)
+        # Grow the bar for the second row only when there is one.
+        self._ws_frame.setFixedHeight(58 if has_chips else 34)
 
     def _reveal_current_in_os(self):
         note = self.current_note()
@@ -696,6 +763,8 @@ class MarkdownEditor(QWidget):
         else:
             self._props_summary.setText("")
             self._props_summary.setVisible(False)
+
+        self._set_prop_chips(fm_data)
 
         # Rebuild action buttons
         while self._context_actions_lay.count():

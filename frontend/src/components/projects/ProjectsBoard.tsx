@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { shortDate } from "../../lib/tasks";
+import { shortDate, todayIso } from "../../lib/tasks";
 import type { ProjectCard } from "../../lib/types";
 import { api } from "../../lib/bridge";
 import { useApp } from "../../store/app";
@@ -105,7 +105,7 @@ export function ProjectsBoard() {
                       <span className="ml-auto"><Sparkline values={p.throughput} colour={p.colour} /></span>
                     </div>
                     {p.next_due && (
-                      <div className={cn("mt-1.5 truncate text-[11px]", p.next_due.due < new Date().toISOString().slice(0, 10) ? "text-danger" : "text-dim")}>
+                      <div className={cn("mt-1.5 truncate text-[11px]", p.next_due.due < todayIso() ? "text-danger" : "text-dim")}>
                         Próximo: {p.next_due.key} {p.next_due.title} · {shortDate(p.next_due.due)}
                       </div>
                     )}

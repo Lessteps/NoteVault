@@ -342,3 +342,124 @@ export interface ProjectNoteEntry {
   size?: number;
   modified?: number;
 }
+
+// ── Metas ──────────────────────────────────────────────────────────────────
+
+export interface Goal {
+  id: string;
+  name: string;
+  area: string;
+  status: string;
+  status_colour: string;
+  priority: number;
+  start: string | null;
+  end: string | null;
+  icon: string;
+  colour: string;
+  in_overview: boolean;
+  order: number | null;
+  created: string | null;
+  description: string;
+  overdue: boolean;
+  days_left: number | null;
+  linked_folder: string;
+  linked_notes: string[];
+}
+
+export interface GoalCard extends Goal {
+  progress: number;
+  counts: [number, number];
+  adherence7: number | null;
+  daily: number[];
+  next: { name: string; date: string } | null;
+  overdue_items: number;
+  habits: Array<{ id: string; name: string; icon: string }>;
+}
+
+export interface GoalItem {
+  id: string;
+  goal: string;
+  parent: string;
+  name: string;
+  status: string;
+  priority: number;
+  order: number;
+  start: string | null;
+  due: string | null;
+  due_time: string;
+  duration_min: number | null;
+  repeat: string;
+  repeat_until: string | null;
+  in_calendar: boolean;
+  reminder_min: number | null;
+  target: number | null;
+  unit: string;
+  value: number | null;
+  habit_links: string[];
+  done_at: string | null;
+  created: string | null;
+  notes: string;
+  category: string;
+  is_priority: boolean;
+  children: string[];
+  is_leaf: boolean;
+  measurable: boolean;
+  schedule: string;
+  progress: number;
+  counts: [number, number];
+  adherence7: number | null;
+  adherence30: number | null;
+  streak: number;
+  done_today: boolean;
+  value_today: number | null;
+  late: boolean;
+  linked_folder: string;
+  linked_notes: string[];
+}
+
+export interface GoalDetail {
+  goal: Goal;
+  items: GoalItem[];
+  categories: string[];
+  stats: {
+    progress: number;
+    counts: [number, number];
+    adherence7: number | null;
+    adherence30: number | null;
+    best_streak: number;
+    days_left: number | null;
+  };
+  history: {
+    days: string[];
+    daily: number[];
+    repeating: Array<{ id: string; name: string; cells: Array<number | null>; streak: number; progress: number }>;
+    completed: Array<{ id: string; name: string; done_at: string }>;
+  };
+}
+
+export interface GoalsTodayRow {
+  goal: { id: string; name: string; icon: string; colour: string; area: string };
+  item: {
+    id: string; name: string; priority: number; due: string | null; due_time: string;
+    repeating: boolean; measurable: boolean; target: number | null; unit: string;
+  };
+  done: boolean;
+  value: number | null;
+  late: boolean;
+  streak: number;
+}
+
+export interface GoalsSidebar {
+  today: number;
+  areas: Record<string, number>;
+  no_area: number;
+  all: number;
+  filters: Record<string, number>;
+}
+
+export interface GoalsMeta {
+  statuses: string[];
+  status_colours: Record<string, string>;
+  item_statuses: string[];
+  filters: string[];
+}

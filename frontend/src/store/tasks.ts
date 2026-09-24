@@ -4,6 +4,7 @@
 import { create } from "zustand";
 import { api } from "../lib/bridge";
 import type { Task, TaskFields, TasksMeta } from "../lib/types";
+import { todayIso } from "../lib/tasks";
 import { useApp } from "./app";
 
 export type TasksView = "tabla" | "calendario" | "recordatorios";
@@ -86,7 +87,7 @@ export const useTasks = create<TasksState>((set, get) => ({
     const optimistic = (t: Task): Task => {
       const next = { ...t, ...fields } as Task;
       next.done = next.status === doneStatus;
-      next.overdue = Boolean(next.due && !next.done && next.due < new Date().toISOString().slice(0, 10));
+      next.overdue = Boolean(next.due && !next.done && next.due < todayIso());
       return next;
     };
     set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? optimistic(t) : t)) }));

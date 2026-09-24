@@ -118,6 +118,12 @@ export function todayIso(): string {
   return isoDate(new Date());
 }
 
+/** Local "YYYY-MM-DDTHH:MM", the format reminders are stored in. */
+export function nowLocal(): string {
+  const d = new Date();
+  return `${isoDate(d)}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 /** "2026-09-20" -> "20 sep" (and the year when it is not this year). */
 export function shortDate(iso: string | null): string {
   if (!iso) return "";

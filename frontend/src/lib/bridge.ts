@@ -6,7 +6,7 @@
 // with a per-run token. Both reject with an Error carrying Python's message.
 
 import type {
-  AppInfo, Area, Bookmark, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
+  AppInfo, Area, Bookmark, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
   IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
 } from "./types";
 
@@ -196,4 +196,23 @@ export const api = {
   projectNoteCreate: (pid: string, folder: string, name: string, isFolder = false) =>
     call<{ path: string }>("projects_note_create", pid, folder, name, isFolder),
   projectNoteDelete: (pid: string, rel: string) => call<{ ok: boolean }>("projects_note_delete", pid, rel),
+
+  // Metas
+  goalsMeta: () => call<GoalsMeta>("goals_meta"),
+  goalsSidebar: () => call<GoalsSidebar>("goals_sidebar"),
+  goalsList: (filter: string, area: string) => call<GoalCard[]>("goals_list", filter, area),
+  goalsGet: (gid: string) => call<GoalDetail>("goals_get", gid),
+  goalsToday: (day = "", gid = "") => call<{ date: string; rows: GoalsTodayRow[] }>("goals_today", day, gid),
+  goalsCreate: (fields: Partial<Goal>, submetas: string[] = []) => call<Goal>("goals_create", fields, submetas),
+  goalsUpdate: (gid: string, fields: Partial<Goal>) => call<Goal>("goals_update", gid, fields),
+  goalsDelete: (gid: string) => call<{ ok: boolean }>("goals_delete", gid),
+  goalItemCreate: (gid: string, name: string, parent = "", fields: Partial<GoalItem> = {}, subtasks: string[] = []) =>
+    call<GoalItem>("goals_item_create", gid, name, parent, fields, subtasks),
+  goalItemUpdate: (gid: string, iid: string, fields: Partial<GoalItem>) => call<GoalItem>("goals_item_update", gid, iid, fields),
+  goalItemDelete: (gid: string, iid: string) => call<{ ok: boolean }>("goals_item_delete", gid, iid),
+  goalItemMove: (gid: string, iid: string, parent: string, index: number) =>
+    call<{ ok: boolean }>("goals_item_move", gid, iid, parent, index),
+  goalItemIndent: (gid: string, iid: string, direction: number) => call<{ ok: boolean }>("goals_item_indent", gid, iid, direction),
+  goalSetDone: (gid: string, iid: string, day: string, done: boolean, value: number | string | null = null) =>
+    call<{ ok: boolean }>("goals_set_done", gid, iid, day, done, value),
 };

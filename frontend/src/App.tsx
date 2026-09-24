@@ -1,15 +1,35 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { api } from "./lib/bridge";
 import { flushAll, useApp } from "./store/app";
 import { ComingSoon, IconRail, StatusBar, Toasts, TopBar } from "./components/Shell";
 import { DialogHost, MenuHost } from "./components/ui";
 import { NotesModule } from "./components/notes/NotesModule";
 import { QuickSwitcher } from "./components/notes/QuickSwitcher";
-import { CalendarModule } from "./components/calendar/CalendarModule";
-import { ProjectsModule } from "./components/projects/ProjectsModule";
-import { HabitsModule } from "./components/habits/HabitsModule";
-import { TasksModule } from "./components/tasks/TasksModule";
 import { useTasks } from "./store/tasks";
+import type { ModuleId } from "./store/app";
+
+// Every module but Notas loads on first use: startup parses less code.
+function lazyModule(load: () => Promise<Record<string, unknown>>, name: string) {
+  return lazy(async () => ({ default: (await load())[name] as ComponentType }));
+}
+const MODULES: Partial<Record<ModuleId, ComponentType>> = {
+  tareas: lazyModule(() => import("./components/tasks/TasksModule"), "TasksModule"),
+  habits: lazyModule(() => import("./components/habits/HabitsModule"), "HabitsModule"),
+  calendario: lazyModule(() => import("./components/calendar/CalendarModule"), "CalendarModule"),
+  proyectos: lazyModule(() => import("./components/projects/ProjectsModule"), "ProjectsModule"),
+  metas: lazyModule(() => import("./components/goals/GoalsModule"), "GoalsModule"),
+};
+
+function ModuleView({ module }: { module: ModuleId }) {
+  if (module === "notas") return <NotesModule />;
+  const View = MODULES[module];
+  if (!View) return <ComingSoon module={module} />;
+  return (
+    <Suspense fallback={<div className="grid flex-1 place-items-center bg-surface text-[13px] text-faint">Cargando…</div>}>
+      <View />
+    </Suspense>
+  );
+}
 
 /**
  * The window must never navigate: a remote page loaded in it would get the
@@ -117,12 +137,7 @@ export function App() {
       <TopBar />
       <div className="flex min-h-0 flex-1">
         <IconRail />
-        {module === "notas" ? <NotesModule />
-          : module === "tareas" ? <TasksModule />
-            : module === "habits" ? <HabitsModule />
-              : module === "calendario" ? <CalendarModule />
-                : module === "proyectos" ? <ProjectsModule />
-              : <ComingSoon module={module} />}
+        <ModuleView module={module} />
       </div>
       <StatusBar />
       <QuickSwitcher />

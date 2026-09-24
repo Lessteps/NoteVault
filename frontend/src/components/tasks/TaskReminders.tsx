@@ -1,5 +1,6 @@
 import { BellOff, BellRing } from "lucide-react";
 import { useMemo } from "react";
+import { nowLocal } from "../../lib/tasks";
 import { useTasks } from "../../store/tasks";
 import { cn } from "../ui";
 
@@ -19,7 +20,7 @@ export function TaskReminders() {
   const open = useTasks((s) => s.open);
   const update = useTasks((s) => s.update);
   const list = useMemo(() => pendingReminders(tasks), [tasks]);
-  const now = new Date().toISOString().slice(0, 16);
+  const now = nowLocal();
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">

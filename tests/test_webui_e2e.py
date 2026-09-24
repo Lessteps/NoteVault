@@ -456,5 +456,70 @@ class ProjectsE2E(unittest.TestCase):
         self._wait(lambda: note.exists() and "texto del proyecto" in note.read_text(encoding="utf-8"))
 
 
+@unittest.skipUnless(READY, "needs playwright, Chromium and a built frontend")
+class GoalsE2E(unittest.TestCase):
+    """Metas driven through the browser; checks the goal files on disk."""
+
+    @classmethod
+    def setUpClass(cls):
+        from notevault_app.webapp.api import NoteVaultApi
+        from notevault_app.webapp.devserver import serve_in_thread
+
+        cls.dir = Path(tempfile.mkdtemp(prefix="nv_e2e_goals_"))
+        cls.api = NoteVaultApi(cls.dir)
+        cls.g = cls.api.goals_create({"name": "Backend"}, ["Aprender SQL"])
+        cls.server, cls.url, _ = serve_in_thread(cls.api, 0, DIST)
+        cls.pw = sync_playwright().start()
+        cls.browser = cls.pw.chromium.launch(executable_path=CHROMIUM)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.browser.close()
+        cls.pw.stop()
+        cls.server.shutdown()
+        cls.server.server_close()
+        shutil.rmtree(cls.dir, ignore_errors=True)
+
+    def setUp(self):
+        self.page = self.browser.new_page(viewport={"width": 1500, "height": 900})
+        self.errors = []
+        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.page.goto(self.url)
+        self.page.get_by_role("button", name="Metas", exact=True).click()
+        self.page.get_by_text("Backend").first.wait_for()
+
+    def tearDown(self):
+        self.page.close()
+        self.assertEqual(self.errors, [])
+
+    def _items(self):
+        from notevault_app.core.goal_manager import GoalManager
+        return {i.name: i for i in GoalManager(self.dir).items(self.g["id"])}
+
+    def _wait(self, predicate, timeout=6.0):
+        end = time.time() + timeout
+        while time.time() < end:
+            if predicate():
+                return
+            time.sleep(0.1)
+        self.fail("state never reached")
+
+    def test_tick_a_submeta_in_the_cards(self):
+        self.page.locator("main").get_by_text("Backend").first.click()
+        self.page.get_by_role("checkbox", name="Hecha: Aprender SQL").check()
+        self._wait(lambda: self._items()["Aprender SQL"].status == "Hecha")
+
+    def test_checklist_dialog_creates_children(self):
+        self.page.locator("main").get_by_text("Backend").first.click()
+        self.page.get_by_role("button", name="Submeta con checklist").click()
+        dialog = self.page.get_by_role("dialog", name="Nueva submeta con checklist")
+        dialog.get_by_placeholder("p. ej. Módulo de Autenticación y JWT").fill("Auth")
+        dialog.locator("textarea").fill("Login\nLogout")
+        dialog.get_by_role("button", name="Crear").click()
+        self._wait(lambda: {"Auth", "Login", "Logout"} <= set(self._items()))
+        items = self._items()
+        self.assertEqual(items["Login"].parent, items["Auth"].id)
+
+
 if __name__ == "__main__":
     unittest.main()

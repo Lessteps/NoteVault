@@ -8,6 +8,7 @@ import { AppState } from "./appState.js";
 import { appApi } from "./modules/app.js";
 import { homeApi } from "./modules/home.js";
 import { tasksApi } from "./modules/tasks.js";
+import { webApi } from "./modules/web.js";
 
 export type Method = (...args: any[]) => unknown;
 export type Registry = Record<string, Method>;
@@ -18,6 +19,7 @@ export function buildRegistry(app: AppState): Registry {
     ...appApi(app),
     ...tasksApi(app),
     ...homeApi(app),
+    ...webApi(app),
     // Antigravity: add `...<m>Api(app),` here as each module lands.
   };
 }

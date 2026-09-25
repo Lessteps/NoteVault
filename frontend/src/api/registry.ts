@@ -11,6 +11,7 @@ import { filesApi } from "./modules/files.js";
 import { homeApi } from "./modules/home.js";
 import { notesExtrasApi } from "./modules/notes_extras.js";
 import { tasksApi } from "./modules/tasks.js";
+import { vaultsApi } from "./modules/vaults.js";
 import { webApi } from "./modules/web.js";
 
 export type Method = (...args: any[]) => unknown;
@@ -25,6 +26,7 @@ export function buildRegistry(app: AppState): Registry {
     ...homeApi(app),
     ...filesApi(app),
     ...notesExtrasApi(app),
+    ...vaultsApi(app),
     ...webApi(app),
     // Antigravity: add `...<m>Api(app),` here as each module lands.
   };

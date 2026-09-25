@@ -13,6 +13,9 @@ export function nowLocalIso(d: Date = new Date()): string {
   return `${todayIso(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+export const formatIsoDate = todayIso;
+export const formatIsoDatetime = nowLocalIso;
+
 /** date.fromisoformat("YYYY-MM-DD") → local Date at midnight, or null. Accepts Date or string. */
 export function parseIsoDate(s: unknown): Date | null {
   if (s instanceof Date) {

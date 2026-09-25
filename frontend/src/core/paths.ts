@@ -3,7 +3,9 @@ import * as path from "node:path";
 
 /** Normalize any path to use forward slashes (POSIX format). */
 export function toPosix(p: string): string {
-  return p.split(path.sep).join("/");
+  // Normalise both separators: path.relative returns "\" on Windows and "/" on
+  // POSIX, and vault paths may carry either — always emit forward slashes.
+  return p.split(/[\\/]/).join("/");
 }
 
 /** Return relative path from root to target with forward slashes (e.g. "notes/daily.md").

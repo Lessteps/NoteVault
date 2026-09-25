@@ -317,7 +317,9 @@ describe("LedgerStore and Recommender Vault tests", () => {
     for (const noteId of ["e011", "e012", "e021", "e022"]) {
       srs.registerItem(noteId, "exercise", "programming");
     }
-    const items = snapshot().queue.items;
+    // registerItem sets next_review to the real today, so evaluate the queue at
+    // the real today (not the fixed TODAY) or none of the items count as due.
+    const items = rc.hubSnapshot(vaultDir, new VaultManager(vaultDir).notePaths(), new Date()).queue.items;
     const skills = items.filter((i) => i.exercise).map((i) => i.exercise!.skill);
     expect(skills.length).toBe(4);
     expect(skills[0]).not.toBe(skills[1]);

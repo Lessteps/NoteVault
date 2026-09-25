@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell } from "electron";
 import path from "node:path";
 import { registerIpc } from "./ipc";
+import { getAppState, initRegistry } from "../src/api/registry";
 
 import fs from "node:fs";
 
@@ -24,6 +25,8 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+  const state = getAppState();
+  if (state) state.window = win;
   // The window must never navigate away; external links open in the OS browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) void shell.openExternal(url);
@@ -41,6 +44,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  initRegistry();
   registerIpc();
   createWindow();
   app.on("activate", () => {

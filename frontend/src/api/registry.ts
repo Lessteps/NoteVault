@@ -3,18 +3,39 @@
 // AppState, mirroring the mixins on the Python NoteVaultApi. Batch 9 fills this
 // in module by module.
 
-import type { AppState } from "./appState.js";
+import { AppConfig } from "./appConfig.js";
+import { AppState } from "./appState.js";
+import { appApi } from "./modules/app.js";
 import { tasksApi } from "./modules/tasks.js";
 
 export type Method = (...args: any[]) => unknown;
 export type Registry = Record<string, Method>;
 
+/** Assemble every module's methods against one shared AppState. */
 export function buildRegistry(app: AppState): Registry {
   return {
+    ...appApi(app),
     ...tasksApi(app),
+    // Antigravity: add `...<m>Api(app),` here as each module lands.
   };
 }
 
-// Empty until the IPC handler is wired to an AppState (later in Batch 9), so
-// the app still opens.
-export const registry: Registry = {};
+let appState: AppState | null = null;
+let current: Registry = {};
+
+/** Create the AppState for the active vault and build the registry. Called once
+ * from the Electron main process on startup. */
+export function initRegistry(vaultPath?: string): AppState {
+  appState = new AppState(vaultPath ?? AppConfig.get_active_vault());
+  current = buildRegistry(appState);
+  return appState;
+}
+
+/** The live registry used by the IPC handler. */
+export function getRegistry(): Registry {
+  return current;
+}
+
+export function getAppState(): AppState | null {
+  return appState;
+}

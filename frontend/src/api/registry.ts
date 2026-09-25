@@ -6,6 +6,7 @@
 import { AppConfig } from "./appConfig.js";
 import { AppState } from "./appState.js";
 import { appApi } from "./modules/app.js";
+import { homeApi } from "./modules/home.js";
 import { tasksApi } from "./modules/tasks.js";
 
 export type Method = (...args: any[]) => unknown;
@@ -16,6 +17,7 @@ export function buildRegistry(app: AppState): Registry {
   return {
     ...appApi(app),
     ...tasksApi(app),
+    ...homeApi(app),
     // Antigravity: add `...<m>Api(app),` here as each module lands.
   };
 }

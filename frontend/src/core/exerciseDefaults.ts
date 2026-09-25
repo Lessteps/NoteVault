@@ -1,0 +1,502 @@
+export const DEFAULT_EXERCISES = [
+  {
+    "id": "lunes_0",
+    "day": "lunes",
+    "name": "Calentamiento (Bench + OHP)",
+    "video": "",
+    "video_path": "",
+    "series_reps": "2-3 series: 50%→70%→85%",
+    "rest": "60 seg",
+    "how_to": "Progresivo antes de ambos compuestos, no lo saltes"
+  },
+  {
+    "id": "lunes_1",
+    "day": "lunes",
+    "name": "Bench Press",
+    "video": "1.bench_press.mp4",
+    "video_path": "",
+    "series_reps": "4x5",
+    "rest": "2-3 min",
+    "how_to": "Escápulas retraídas, barra baja al pecho, control en la bajada"
+  },
+  {
+    "id": "lunes_2",
+    "day": "lunes",
+    "name": "Pull-ups",
+    "video": "2.pull_ups.mp4",
+    "video_path": "",
+    "series_reps": "4x5-6",
+    "rest": "2-3 min",
+    "how_to": "Agarre prono, subir hasta que barbilla pase la barra, sin balanceo"
+  },
+  {
+    "id": "lunes_3",
+    "day": "lunes",
+    "name": "Overhead Press",
+    "video": "3.perfect_overhead.mp4",
+    "video_path": "",
+    "series_reps": "4x5",
+    "rest": "2-3 min",
+    "how_to": "De pie, core apretado, no arquear lumbar"
+  },
+  {
+    "id": "lunes_4",
+    "day": "lunes",
+    "name": "One-Arm DB Row",
+    "video": "4.One_arm_dumbell_row.mp4",
+    "video_path": "",
+    "series_reps": "4x6 c/lado",
+    "rest": "90 seg",
+    "how_to": "Espalda plana, jalar con codo pegado al cuerpo"
+  },
+  {
+    "id": "lunes_5",
+    "day": "lunes",
+    "name": "Face Pull",
+    "video": "5.Facepull.mp4",
+    "video_path": "",
+    "series_reps": "3x10",
+    "rest": "60 seg",
+    "how_to": "Tirar hacia la cara, codos altos, deltoide posterior"
+  },
+  {
+    "id": "lunes_6",
+    "day": "lunes",
+    "name": "Triceps Extension",
+    "video": "6.The PERFECT Overhead.mp4",
+    "video_path": "",
+    "series_reps": "3x8",
+    "rest": "60 seg",
+    "how_to": "Codos fijos, bajar controlado detrás de la cabeza"
+  },
+  {
+    "id": "lunes_7",
+    "day": "lunes",
+    "name": "Hammer Curl",
+    "video": "7.Dumbbell Hammer Curls.mp4",
+    "video_path": "",
+    "series_reps": "3x8",
+    "rest": "60 seg",
+    "how_to": "Agarre neutro, sin balanceo de hombros"
+  },
+  {
+    "id": "lunes_8",
+    "day": "lunes",
+    "name": "Wrist Curl / Reverse",
+    "video": "8.Wrist Curl.mp4",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "45 seg",
+    "how_to": "Antebrazo apoyado, rango completo de muñeca"
+  },
+  {
+    "id": "lunes_99",
+    "day": "lunes",
+    "name": "Estiramientos",
+    "video": "estiramientos.mp4",
+    "video_path": "",
+    "series_reps": "8-10 min",
+    "rest": "—",
+    "how_to": "Estiramiento estático al final: 30 seg por grupo muscular trabajado, sin rebotes"
+  },
+  {
+    "id": "martes_0",
+    "day": "martes",
+    "name": "Calentamiento (Squat + RDL)",
+    "video": "",
+    "video_path": "",
+    "series_reps": "2-3 series: 50%→70%→85%",
+    "rest": "60 seg",
+    "how_to": "Igual que lunes, progresivo antes de los compuestos"
+  },
+  {
+    "id": "martes_1",
+    "day": "martes",
+    "name": "Back Squat",
+    "video": "1.Back Squat.mp4",
+    "video_path": "",
+    "series_reps": "4x5",
+    "rest": "2-3 min",
+    "how_to": "Profundidad hasta paralelo, rodillas alineadas con pies"
+  },
+  {
+    "id": "martes_2",
+    "day": "martes",
+    "name": "Romanian Deadlift",
+    "video": "2.Deadlift vs RD.mp4",
+    "video_path": "",
+    "series_reps": "4x6",
+    "rest": "2 min",
+    "how_to": "Cadera atrás, barra pegada a piernas, isquios en tensión"
+  },
+  {
+    "id": "martes_3",
+    "day": "martes",
+    "name": "Hip Thrust",
+    "video": "3.Hip Thrust.mp4",
+    "video_path": "",
+    "series_reps": "3x8",
+    "rest": "90 seg",
+    "how_to": "Espalda apoyada en banco, glúteo contraído arriba"
+  },
+  {
+    "id": "martes_4",
+    "day": "martes",
+    "name": "Standing Calf Raise",
+    "video": "4.Calf Raise.mp4",
+    "video_path": "",
+    "series_reps": "4x10",
+    "rest": "45 seg",
+    "how_to": "Rango completo, pausa arriba"
+  },
+  {
+    "id": "martes_5",
+    "day": "martes",
+    "name": "Reverse Crunch",
+    "video": "5.reverse crunch.mp4",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "45 seg",
+    "how_to": "Movimiento con cadera, no con impulso de piernas"
+  },
+  {
+    "id": "martes_6",
+    "day": "martes",
+    "name": "Farmer's Walk",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x20-30m",
+    "rest": "90 seg",
+    "how_to": "Core apretado, pasos cortos y rápidos"
+  },
+  {
+    "id": "martes_7",
+    "day": "martes",
+    "name": "Abducción de cadera",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x15",
+    "rest": "60 seg",
+    "how_to": "Rango controlado, sin balanceo de tronco"
+  },
+  {
+    "id": "martes_8",
+    "day": "martes",
+    "name": "Leg Extension",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "60 seg",
+    "how_to": "Extensión completa, pausa arriba, bajada controlada"
+  },
+  {
+    "id": "martes_99",
+    "day": "martes",
+    "name": "Estiramientos",
+    "video": "estiramientos.mp4",
+    "video_path": "",
+    "series_reps": "8-10 min",
+    "rest": "—",
+    "how_to": "Estiramiento estático al final: 30 seg por grupo muscular trabajado, sin rebotes"
+  },
+  {
+    "id": "miercoles_1",
+    "day": "miercoles",
+    "name": "Dead Hang",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x20-30 seg",
+    "rest": "60 seg",
+    "how_to": "Cuelgue pasivo de barra fija, hombros activos, respiración controlada"
+  },
+  {
+    "id": "miercoles_2",
+    "day": "miercoles",
+    "name": "Plate Pinch Hold",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x20 seg c/lado",
+    "rest": "60 seg",
+    "how_to": "Sujeta un disco por el borde con dedos extendidos, sin apoyar en el muslo"
+  },
+  {
+    "id": "miercoles_3",
+    "day": "miercoles",
+    "name": "Neck Flexion/Extension",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "30 seg",
+    "how_to": "Movimiento lento y controlado, sin manos"
+  },
+  {
+    "id": "miercoles_99",
+    "day": "miercoles",
+    "name": "Estiramientos",
+    "video": "estiramientos.mp4",
+    "video_path": "",
+    "series_reps": "8-10 min",
+    "rest": "—",
+    "how_to": "Estiramiento estático al final: 30 seg por grupo muscular trabajado, sin rebotes"
+  },
+  {
+    "id": "jueves_0",
+    "day": "jueves",
+    "name": "Calentamiento (Row + Incline Press)",
+    "video": "",
+    "video_path": "",
+    "series_reps": "1-2 series ligeras",
+    "rest": "45 seg",
+    "how_to": "Menos crítico que fuerza, pero no lo saltes"
+  },
+  {
+    "id": "jueves_1",
+    "day": "jueves",
+    "name": "Barbell Row",
+    "video": "1.the PERFECT Barbell Row.mp4",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "60 seg",
+    "how_to": "Torso a 45°, jalar hacia ombligo"
+  },
+  {
+    "id": "jueves_2",
+    "day": "jueves",
+    "name": "Incline DB Press",
+    "video": "2.The PERFECT Incline.mp4",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "60 seg",
+    "how_to": "Banco a 30-45°, control en bajada"
+  },
+  {
+    "id": "jueves_3",
+    "day": "jueves",
+    "name": "Lat Pulldown",
+    "video": "3.Lat Pulldown Mistakes.mp4",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "60 seg",
+    "how_to": "Jalar hacia clavícula, no hacia atrás de nuca"
+  },
+  {
+    "id": "jueves_4",
+    "day": "jueves",
+    "name": "Rack/Overhead Carry",
+    "video": "4.Overhead Carry.mp4",
+    "video_path": "",
+    "series_reps": "3x20-30m",
+    "rest": "90 seg",
+    "how_to": "Core estable, pasos controlados"
+  },
+  {
+    "id": "jueves_5",
+    "day": "jueves",
+    "name": "Barbell Curl",
+    "video": "5.The Perfect Barbell.mp4",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "45 seg",
+    "how_to": "Codos fijos, sin impulso lumbar"
+  },
+  {
+    "id": "jueves_6",
+    "day": "jueves",
+    "name": "Triceps Pushdown",
+    "video": "6.The Perfect Triceps.mp4",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "45 seg",
+    "how_to": "Codos pegados al cuerpo, extensión completa"
+  },
+  {
+    "id": "jueves_7",
+    "day": "jueves",
+    "name": "Lateral Raise",
+    "video": "7.The Perfect Lateral.mp4",
+    "video_path": "",
+    "series_reps": "3x15",
+    "rest": "45 seg",
+    "how_to": "Brazos semi-flexionados, subir hasta altura de hombro"
+  },
+  {
+    "id": "jueves_8",
+    "day": "jueves",
+    "name": "Wrist Curl / Reverse",
+    "video": "8.Wrist Curl.mp4",
+    "video_path": "",
+    "series_reps": "3x15",
+    "rest": "45 seg",
+    "how_to": "Igual que lunes, antebrazo apoyado"
+  },
+  {
+    "id": "jueves_99",
+    "day": "jueves",
+    "name": "Estiramientos",
+    "video": "estiramientos.mp4",
+    "video_path": "",
+    "series_reps": "8-10 min",
+    "rest": "—",
+    "how_to": "Estiramiento estático al final: 30 seg por grupo muscular trabajado, sin rebotes"
+  },
+  {
+    "id": "viernes_0",
+    "day": "viernes",
+    "name": "Calentamiento (Deadlift)",
+    "video": "",
+    "video_path": "",
+    "series_reps": "2 series: 50%→75%",
+    "rest": "60 seg",
+    "how_to": "Necesario aunque sea resistencia: es deadlift convencional"
+  },
+  {
+    "id": "viernes_1",
+    "day": "viernes",
+    "name": "Conventional Deadlift",
+    "video": "1.Dead lift.mp4",
+    "video_path": "",
+    "series_reps": "3x6",
+    "rest": "2 min",
+    "how_to": "Espalda neutra, barra pegada a piernas todo el recorrido"
+  },
+  {
+    "id": "viernes_2",
+    "day": "viernes",
+    "name": "Leg Press",
+    "video": "2.The PERFECT Leg Press.mp4",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "90 seg",
+    "how_to": "Rango completo, sin bloquear rodillas arriba"
+  },
+  {
+    "id": "viernes_3",
+    "day": "viernes",
+    "name": "Bulgarian Split Squat",
+    "video": "3.Bulgarian Split Squat.mp4",
+    "video_path": "",
+    "series_reps": "3x10 c/lado",
+    "rest": "60 seg",
+    "how_to": "Pie trasero elevado, torso ligeramente inclinado"
+  },
+  {
+    "id": "viernes_4",
+    "day": "viernes",
+    "name": "Single-Leg RDL",
+    "video": "4.Single-leg RDL.mp4",
+    "video_path": "",
+    "series_reps": "3x10 c/lado",
+    "rest": "60 seg",
+    "how_to": "Equilibrio, cadera como bisagra"
+  },
+  {
+    "id": "viernes_5",
+    "day": "viernes",
+    "name": "Leg Extension",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "60 seg",
+    "how_to": "Extensión completa, pausa arriba, bajada controlada"
+  },
+  {
+    "id": "viernes_6",
+    "day": "viernes",
+    "name": "Abducción de cadera",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x15",
+    "rest": "60 seg",
+    "how_to": "Rango controlado, sin balanceo de tronco"
+  },
+  {
+    "id": "viernes_7",
+    "day": "viernes",
+    "name": "Weighted Plank / Russian Twist",
+    "video": "5.The PERFECT Plank.mp4",
+    "video_path": "",
+    "series_reps": "3x30-45seg / 3x15",
+    "rest": "45 seg",
+    "how_to": "Core rígido, sin dejar caer cadera"
+  },
+  {
+    "id": "viernes_8",
+    "day": "viernes",
+    "name": "Standing Calf Raise",
+    "video": "4.Calf Raise.mp4",
+    "video_path": "",
+    "series_reps": "4x10",
+    "rest": "45 seg",
+    "how_to": "Igual que martes, rango completo"
+  },
+  {
+    "id": "viernes_99",
+    "day": "viernes",
+    "name": "Estiramientos",
+    "video": "estiramientos.mp4",
+    "video_path": "",
+    "series_reps": "8-10 min",
+    "rest": "—",
+    "how_to": "Estiramiento estático al final: 30 seg por grupo muscular trabajado, sin rebotes"
+  },
+  {
+    "id": "sabado_1",
+    "day": "sabado",
+    "name": "Towel/Barbell Hang",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x15-20 seg",
+    "rest": "60 seg",
+    "how_to": "Más carga que miércoles, foco en fuerza bruta de agarre, sin balanceo"
+  },
+  {
+    "id": "sabado_2",
+    "day": "sabado",
+    "name": "Wrist Roller",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x1 (subida + bajada)",
+    "rest": "90 seg",
+    "how_to": "Enrolla y desenrolla controlado, no dejes caer el peso de golpe"
+  },
+  {
+    "id": "sabado_99",
+    "day": "sabado",
+    "name": "Estiramientos",
+    "video": "estiramientos.mp4",
+    "video_path": "",
+    "series_reps": "8-10 min",
+    "rest": "—",
+    "how_to": "Estiramiento estático al final: 30 seg por grupo muscular trabajado, sin rebotes"
+  },
+  {
+    "id": "domingo_1",
+    "day": "domingo",
+    "name": "Trote",
+    "video": "",
+    "video_path": "",
+    "series_reps": "30-40 min",
+    "rest": "—",
+    "how_to": "Ritmo constante, zona 2 (puedes hablar sin ahogarte)"
+  },
+  {
+    "id": "domingo_2",
+    "day": "domingo",
+    "name": "Neck Flexion/Extension",
+    "video": "",
+    "video_path": "",
+    "series_reps": "3x12",
+    "rest": "30 seg",
+    "how_to": "Movimiento lento y controlado, sin manos"
+  },
+  {
+    "id": "domingo_99",
+    "day": "domingo",
+    "name": "Estiramientos",
+    "video": "estiramientos.mp4",
+    "video_path": "",
+    "series_reps": "8-10 min",
+    "rest": "—",
+    "how_to": "Estiramiento estático al final: 30 seg por grupo muscular trabajado, sin rebotes"
+  }
+] as const;

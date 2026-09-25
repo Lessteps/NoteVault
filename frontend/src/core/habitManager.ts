@@ -140,6 +140,8 @@ export function habitScheduleText(habit: Record<string, any>): string {
   if (habit.paused_from) parts.push("en pausa");
   return parts.join(" · ");
 }
+export const habit_active_on = habitActiveOn;
+export const habit_schedule_text = habitScheduleText;
 
 export const OPTIONAL_KEYS = HABIT_OPTIONAL_KEYS;
 

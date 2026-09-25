@@ -6,6 +6,7 @@
 import { AppConfig } from "./appConfig.js";
 import { AppState } from "./appState.js";
 import { appApi } from "./modules/app.js";
+import { assistantApi } from "./modules/assistant.js";
 import { filesApi } from "./modules/files.js";
 import { homeApi } from "./modules/home.js";
 import { tasksApi } from "./modules/tasks.js";
@@ -18,6 +19,7 @@ export type Registry = Record<string, Method>;
 export function buildRegistry(app: AppState): Registry {
   return {
     ...appApi(app),
+    ...assistantApi(app),
     ...tasksApi(app),
     ...homeApi(app),
     ...filesApi(app),

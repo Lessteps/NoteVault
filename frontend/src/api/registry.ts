@@ -16,6 +16,7 @@ import { goalsApi } from "./modules/goals.js";
 import { habitsApi } from "./modules/habits.js";
 import { homeApi } from "./modules/home.js";
 import { notesExtrasApi } from "./modules/notes_extras.js";
+import { practiceApi } from "./modules/practice.js";
 import { projectsApi } from "./modules/projects.js";
 import { studyApi } from "./modules/study.js";
 import { tasksApi } from "./modules/tasks.js";
@@ -44,6 +45,7 @@ export function buildRegistry(app: AppState): Registry {
     ...projectsApi(app),
     ...calendarApi(app),
     ...studyApi(app),
+    ...practiceApi(app),
     // Antigravity: add `...<m>Api(app),` here as each module lands.
   };
 }

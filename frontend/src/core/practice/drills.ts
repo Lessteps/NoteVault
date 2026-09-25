@@ -50,7 +50,7 @@ class Rng {
 
   constructor(seed?: any) {
     if (seed === undefined || seed === null) {
-      this.h = (Date.now() ^ (process.hrtime.bigint() as any)) | 0;
+      this.h = (Date.now() ^ Number(process.hrtime.bigint() & 0xffffffffn)) | 0;
     } else {
       let h = 0;
       const s = String(seed);

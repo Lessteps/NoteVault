@@ -9,6 +9,7 @@ import { appApi } from "./modules/app.js";
 import { assistantApi } from "./modules/assistant.js";
 import { englishPlayerApi } from "./modules/englishPlayer.js";
 import { filesApi } from "./modules/files.js";
+import { habitsApi } from "./modules/habits.js";
 import { homeApi } from "./modules/home.js";
 import { notesExtrasApi } from "./modules/notes_extras.js";
 import { tasksApi } from "./modules/tasks.js";
@@ -30,6 +31,7 @@ export function buildRegistry(app: AppState): Registry {
     ...notesExtrasApi(app),
     ...vaultsApi(app),
     ...webApi(app),
+    ...habitsApi(app),
     // Antigravity: add `...<m>Api(app),` here as each module lands.
   };
 }

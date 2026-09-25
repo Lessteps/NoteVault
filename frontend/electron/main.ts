@@ -1,9 +1,13 @@
 import { app, BrowserWindow, shell } from "electron";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { registerIpc } from "./ipc";
 import { getAppState, initRegistry } from "../src/api/registry";
 
 import fs from "node:fs";
+
+// The bundle is loaded as an ES module, where __dirname is undefined.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 let win: BrowserWindow | null = null;

@@ -8,6 +8,7 @@ import { AppState } from "./appState.js";
 import { appApi } from "./modules/app.js";
 import { assistantApi } from "./modules/assistant.js";
 import { calendarApi } from "./modules/calendar.js";
+import { canvasApi } from "./modules/canvas.js";
 import { englishPlayerApi } from "./modules/englishPlayer.js";
 import { exerciseApi } from "./modules/exercise.js";
 import { filesApi } from "./modules/files.js";
@@ -48,6 +49,7 @@ export function buildRegistry(app: AppState): Registry {
     ...studyApi(app),
     ...practiceApi(app),
     ...ladderApi(app),
+    ...canvasApi(app),
     // Antigravity: add `...<m>Api(app),` here as each module lands.
   };
 }

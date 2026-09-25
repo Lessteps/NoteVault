@@ -1,0 +1,399 @@
+import * as path from "node:path";
+import { addDays, todayIso, weekday } from "../../core/dates.js";
+import { ApiError } from "../../core/errors.js";
+import {
+  ExerciseManager,
+  VIDEO_EXTS,
+} from "../../core/exerciseManager.js";
+import type { AppState } from "../appState.js";
+import { clampInt, oneLine, optDate } from "../common.js";
+import { MediaServer } from "../media.js";
+
+export const DAY_KEYS = [
+  "lunes",
+  "martes",
+  "miercoles",
+  "jueves",
+  "viernes",
+  "sabado",
+  "domingo",
+] as const;
+
+export const GLYPHS = ["💪", "🦵", "💪", "🦵", "🔥", "🚶", "😴"] as const;
+
+export const DAY_METAS = [
+  { key: "lunes", name: "Lunes", subtitle: "Top A — Fuerza" },
+  { key: "martes", name: "Martes", subtitle: "Bottom A — Fuerza" },
+  { key: "miercoles", name: "Miércoles", subtitle: "Recuperación activa" },
+  { key: "jueves", name: "Jueves", subtitle: "Top B — Resistencia" },
+  { key: "viernes", name: "Viernes", subtitle: "Bottom B — Resistencia" },
+  { key: "sabado", name: "Sábado", subtitle: "Recuperación activa" },
+  { key: "domingo", name: "Domingo", subtitle: "Cardio / Descanso" },
+] as const;
+
+function dayKey(d: Date): string {
+  return DAY_KEYS[weekday(d)]!;
+}
+
+function num(value: unknown, lo: number, hi: number): number {
+  let v = 0.0;
+  if (value !== null && value !== undefined && value !== "") {
+    const s = String(value).replace(/,/g, ".");
+    v = parseFloat(s);
+    if (Number.isNaN(v)) {
+      throw new ApiError(`Número inválido: ${value}`);
+    }
+  }
+  if (!Number.isFinite(v) || v < lo || v > hi) {
+    throw new ApiError(`Número inválido: ${value}`);
+  }
+  return v;
+}
+
+function exDict(mgr: ExerciseManager, e: Record<string, any>): Record<string, unknown> {
+  const videoFile = mgr.resolveVideo(e);
+  return {
+    id: e.id,
+    day: e.day || "",
+    name: e.name || "",
+    video: e.video || "",
+    video_path: e.video_path || "",
+    series_reps: e.series_reps || "",
+    rest: e.rest || "",
+    how_to: e.how_to || "",
+    has_video: videoFile !== null,
+    video_name: videoFile ? path.basename(videoFile) : "",
+  };
+}
+
+function exFields(fields: unknown) {
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) {
+    throw new ApiError("Datos inválidos.");
+  }
+  const f = fields as Record<string, any>;
+  const day = f.day ?? "lunes";
+  if (!DAY_KEYS.includes(day)) {
+    throw new ApiError("Día inválido.");
+  }
+  const videoPath = oneLine(f.video_path, 1000);
+  if (videoPath) {
+    const ext = path.extname(videoPath).toLowerCase();
+    if (!VIDEO_EXTS.includes(ext as any)) {
+      throw new ApiError(
+        "Eso no es un video (mp4, mov, webm, mkv, m4v, avi)."
+      );
+    }
+  }
+  return {
+    day,
+    name: oneLine(f.name, 120) || "Ejercicio",
+    video_path: videoPath,
+    series_reps: oneLine(f.series_reps, 120),
+    rest: oneLine(f.rest, 60),
+    how_to: String(f.how_to || "").slice(0, 4000),
+  };
+}
+
+function openWithSystem(filePath: string): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const electron = require("electron") as {
+      shell: { openPath(p: string): Promise<string> };
+    };
+    electron.shell.openPath(filePath);
+  } catch {
+    // best-effort
+  }
+}
+
+export function exerciseApi(app: AppState) {
+  const mgr = () => app.mgrs().exercise;
+  let media: MediaServer | null = null;
+  const server = (): MediaServer => (media ??= new MediaServer());
+
+  function exDate(value: unknown): Date {
+    const d = optDate(value);
+    if (!d) {
+      throw new ApiError("Fecha inválida.");
+    }
+    return d;
+  }
+
+  function exVideo(exerciseId: string): string {
+    const m = mgr();
+    const e = m.exercises().find((x) => x.id === exerciseId);
+    if (!e) {
+      throw new ApiError("Ese ejercicio ya no existe.");
+    }
+    const hit = m.resolveVideo(e);
+    if (!hit) {
+      throw new ApiError(
+        "No se encontró el video. Vincúlalo en «Gestionar ejercicios»."
+      );
+    }
+    const ext = path.extname(hit).toLowerCase();
+    if (!VIDEO_EXTS.includes(ext as any)) {
+      throw new ApiError("Eso no es un video.");
+    }
+    return path.resolve(hit);
+  }
+
+  return {
+    _shutdown_media() {
+      if (media) {
+        media.shutdown();
+        media = null;
+      }
+    },
+
+    ex_meta() {
+      return {
+        days: DAY_METAS.map((d, i) => ({
+          key: d.key,
+          name: d.name,
+          subtitle: d.subtitle,
+          glyph: GLYPHS[i]!,
+        })),
+      };
+    },
+
+    ex_list() {
+      const m = mgr();
+      return m.exercises().map((e) => exDict(m, e));
+    },
+
+    ex_days(first: string, last: string) {
+      const a = exDate(first);
+      const b = exDate(last);
+      const diffDays = Math.round(
+        (b.getTime() - a.getTime()) / (24 * 60 * 60 * 1000)
+      );
+      if (b < a || diffDays > 31) {
+        throw new ApiError("Rango de fechas inválido.");
+      }
+      const m = mgr();
+      const out: Array<Record<string, unknown>> = [];
+      let curr = new Date(a);
+      while (curr <= b) {
+        const dk = dayKey(curr);
+        const exs = m.exercisesForDay(dk);
+        const log = m.getLog(curr);
+        out.push({
+          date: todayIso(curr),
+          day: dk,
+          exercises: exs.map((e) => exDict(m, e)),
+          log: Object.fromEntries(
+            exs.map((e) => [e.id, log.entries[e.id] ?? {}])
+          ),
+          pct: m.dayPct(curr),
+        });
+        curr = addDays(curr, 1);
+      }
+      return out;
+    },
+
+    ex_mark(
+      day: string,
+      exerciseId: string,
+      done: boolean,
+      weight: unknown = 0,
+      reps: unknown = 0,
+      notes = ""
+    ) {
+      const d = exDate(day);
+      const m = mgr();
+      if (!m.exercises().some((e) => e.id === exerciseId)) {
+        throw new ApiError("Ese ejercicio ya no existe.");
+      }
+      m.markDone(
+        d,
+        String(exerciseId),
+        Boolean(done),
+        num(weight, 0, 2000),
+        Math.trunc(num(reps, 0, 10000)),
+        oneLine(notes, 300)
+      );
+      return { ok: true, pct: m.dayPct(d) };
+    },
+
+    ex_overview(year = 0, exerciseId = "") {
+      const m = mgr();
+      const today = new Date();
+      const y = clampInt(
+        year || today.getFullYear(),
+        1970,
+        3000,
+        today.getFullYear()
+      );
+      const dayOfWeek = weekday(today);
+      const monday = addDays(today, -dayOfWeek);
+      let week = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = addDays(monday, i);
+        if (d <= today && m.dayPct(d) > 0) {
+          week += 1;
+        }
+      }
+      let month = 0;
+      for (let n = 1; n <= today.getDate(); n++) {
+        const d = new Date(today.getFullYear(), today.getMonth(), n);
+        if (m.dayPct(d) > 0) {
+          month += 1;
+        }
+      }
+      const yearPcts = m.rangePctByDay(today.getFullYear());
+      let yearTrained = 0;
+      for (const p of Object.values(yearPcts)) {
+        if (p > 0) yearTrained += 1;
+      }
+
+      let grid: Record<string, number> = {};
+      if (exerciseId) {
+        const hist = m.exerciseHistory(String(exerciseId), y);
+        for (const [d, v] of Object.entries(hist)) {
+          grid[d] = v ? 1.0 : 0.0;
+        }
+      } else {
+        grid = m.rangePctByDay(y);
+      }
+
+      const breakdown: Array<{
+        day: string;
+        rows: Array<{ id: string; name: string; done: number; total: number }>;
+      }> = [];
+      for (const key of DAY_KEYS) {
+        const rows: Array<{
+          id: string;
+          name: string;
+          done: number;
+          total: number;
+        }> = [];
+        for (const e of m.exercisesForDay(key)) {
+          const hist = m.exerciseHistory(e.id, today.getFullYear());
+          let done = 0;
+          for (const v of Object.values(hist)) {
+            if (v) done += 1;
+          }
+          rows.push({
+            id: e.id,
+            name: e.name || "",
+            done,
+            total: Object.keys(hist).length,
+          });
+        }
+        if (rows.length) {
+          breakdown.push({ day: key, rows });
+        }
+      }
+
+      return {
+        week,
+        month,
+        year: yearTrained,
+        grid,
+        breakdown,
+      };
+    },
+
+    ex_save(exerciseId: string, fields: unknown) {
+      const f = exFields(fields);
+      const m = mgr();
+      if (!exerciseId) {
+        const e = m.addExercise(
+          f.name,
+          f.day,
+          f.video_path,
+          f.series_reps,
+          f.rest,
+          f.how_to
+        );
+        return exDict(m, e);
+      }
+      if (!m.exercises().some((e) => e.id === exerciseId)) {
+        throw new ApiError("Ese ejercicio ya no existe.");
+      }
+      const updates: Record<string, any> = { ...f };
+      if (f.video_path) {
+        updates.video = path.basename(f.video_path);
+      }
+      m.updateExercise(String(exerciseId), updates);
+      const updated = m.exercises().find((e) => e.id === exerciseId)!;
+      return exDict(m, updated);
+    },
+
+    ex_remove(exerciseId: string) {
+      const m = mgr();
+      if (!m.exercises().some((e) => e.id === exerciseId)) {
+        throw new ApiError("Ese ejercicio ya no existe.");
+      }
+      m.removeExercise(String(exerciseId));
+      return { ok: true };
+    },
+
+    ex_link_videos() {
+      return mgr().linkVideos();
+    },
+
+    async ex_video_url(exerciseId: string) {
+      const videoPath = exVideo(String(exerciseId));
+      const srv = server();
+      return {
+        url: await srv.urlFor(videoPath),
+        name: path.basename(videoPath),
+      };
+    },
+
+    ex_open_video(exerciseId: string) {
+      const videoPath = exVideo(String(exerciseId));
+      openWithSystem(videoPath);
+      return { ok: true };
+    },
+
+    ex_pick_video(exerciseId: string) {
+      if (app.window === null || app.window === undefined) {
+        throw new ApiError("Solo disponible en la app de escritorio.");
+      }
+      let chosen: string | null = null;
+      const win = app.window as any;
+      if (typeof win.create_file_dialog === "function") {
+        const res = win.create_file_dialog(1, [
+          "Videos (*.mp4 *.mov *.webm *.mkv *.m4v *.avi)",
+        ]);
+        if (res) chosen = Array.isArray(res) ? res[0] : res;
+      } else {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const electron = require("electron") as {
+            dialog: { showOpenDialogSync(opts: unknown): string[] | undefined };
+          };
+          const res = electron.dialog.showOpenDialogSync({
+            properties: ["openFile"],
+            filters: [
+              {
+                name: "Videos",
+                extensions: ["mp4", "mov", "webm", "mkv", "m4v", "avi"],
+              },
+            ],
+          });
+          if (res && res.length) chosen = res[0]!;
+        } catch {
+          chosen = null;
+        }
+      }
+      if (!chosen) {
+        return { ok: false };
+      }
+      const source = path.resolve(chosen);
+      const ext = path.extname(source).toLowerCase();
+      if (!VIDEO_EXTS.includes(ext as any)) {
+        throw new ApiError("Eso no es un video.");
+      }
+      const m = mgr();
+      if (!m.exercises().some((e) => e.id === exerciseId)) {
+        throw new ApiError("Ese ejercicio ya no existe.");
+      }
+      m.importVideo(String(exerciseId), source);
+      return { ok: true };
+    },
+  };
+}

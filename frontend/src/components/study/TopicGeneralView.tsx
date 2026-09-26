@@ -1,6 +1,8 @@
 import { Award, CheckCircle2, Clock, Play, Sparkles } from "lucide-react";
+import { useState } from "react";
 import type { StudySnapshot, TopicData } from "../../lib/types";
 import { cn } from "../ui";
+import { ExamRunnerModal } from "./ExamRunnerModal";
 
 interface TopicGeneralViewProps {
   topicData: TopicData;
@@ -15,6 +17,7 @@ export function TopicGeneralView({
   onOpenConfigurator,
   onPractice,
 }: TopicGeneralViewProps) {
+  const [showExamModal, setShowExamModal] = useState(false);
   const manifest = topicData.topic;
   const progress = topicData.progress;
 
@@ -87,13 +90,29 @@ export function TopicGeneralView({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={onOpenConfigurator}
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent py-1.5 text-[12.5px] font-semibold text-white hover:bg-accent-strong"
-        >
-          <Sparkles size={13} /> Practicar este tema (Configurar)
-        </button>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            onClick={onOpenConfigurator}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent py-1.5 text-[12.5px] font-semibold text-white hover:bg-accent-strong"
+          >
+            <Sparkles size={13} /> Practicar tema
+          </button>
+          {manifest.mastery.exam === "required" && (
+            <button
+              type="button"
+              onClick={() => setShowExamModal(true)}
+              className={cn(
+                "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition-colors",
+                progress.examPassed
+                  ? "border-mint/30 bg-mint-soft text-mint hover:bg-mint/20"
+                  : "border-warn/40 bg-warn-soft text-warn hover:bg-warn/20",
+              )}
+            >
+              <Award size={13} /> {progress.examPassed ? "Repetir examen" : "Tomar examen"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Skill x Difficulty Matrix */}
@@ -237,6 +256,17 @@ export function TopicGeneralView({
           </div>
         )}
       </div>
+
+      {showExamModal && (
+        <ExamRunnerModal
+          topicFolder={topicData.folder}
+          manifest={manifest}
+          onClose={() => setShowExamModal(false)}
+          onExamFinished={() => {
+            setShowExamModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }

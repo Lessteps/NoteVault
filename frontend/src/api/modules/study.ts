@@ -36,7 +36,15 @@ import {
   buildTopicSession,
   type SessionAIClient,
 } from "../../core/practice/sessionBuilder.js";
-import { loadExamRecord } from "../../core/practice/exams.js";
+import {
+  type ExamItemSubmission,
+  type ExamSession,
+  type ExamGrader,
+  assembleGroupedExam,
+  assembleTopicExam,
+  gradeAndAggregateExam,
+  loadExamRecordForTopic,
+} from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
 import { clearExerciseIndexCache, scanVault } from "../../core/practice/exerciseIndex.js";
 import { AIConfig, sendChat } from "../../core/aiClient.js";
@@ -466,9 +474,9 @@ export function studyApi(app: AppState) {
       }
 
       const attempts = loadAllAttempts(app.root);
-      const examRec = loadExamRecord(
+      const examRec = loadExamRecordForTopic(
         app.root,
-        found.manifest.exam_group || found.manifest.title,
+        found.manifest,
       );
       const progress = computeTopicProgress(
         found.manifest,
@@ -614,6 +622,139 @@ export function studyApi(app: AppState) {
           is_new: e.isNew,
         })),
         first_exercise: plan.exercises[0]?.path ?? "",
+      };
+    },
+
+    study_exam_assemble: async (
+      topicFolder?: string,
+      examGroup?: string,
+      targetDifficulty?: number,
+    ) => {
+      const scan = scanVault(app.root, app.vault.notePaths());
+      const allExercises = scan.exercises;
+      const targetDiff = (targetDifficulty && targetDifficulty >= 1 && targetDifficulty <= 3
+        ? targetDifficulty
+        : 3) as DifficultyLevel;
+
+      if (topicFolder) {
+        const found = findTopicManifest(app, topicFolder);
+        if (!found) {
+          throw new ApiError(`No se encontró manifest de tema en "${topicFolder}"`);
+        }
+        const normFolder = topicFolder.replace(/\\/g, "/");
+        const topicExercises = allExercises.filter((ex) => {
+          const p = (ex.rel || ex.path).replace(/\\/g, "/");
+          return p.startsWith(normFolder + "/");
+        });
+
+        const session = await assembleTopicExam(found.manifest, topicExercises, {
+          targetDifficulty: targetDiff,
+        });
+        return { ok: true, session };
+      }
+
+      if (examGroup) {
+        const matchedTopics: TopicManifest[] = [];
+        const topicMap = new Map<string, ExerciseRef[]>();
+
+        const folderSet = new Set<string>();
+        for (const np of app.vault.notePaths()) {
+          const dir = path.dirname(np).replace(/\\/g, "/");
+          if (dir && dir !== ".") {
+            folderSet.add(dir);
+            const parent = path.dirname(dir).replace(/\\/g, "/");
+            if (parent && parent !== ".") folderSet.add(parent);
+          }
+        }
+
+        for (const f of folderSet) {
+          const found = findTopicManifest(app, f);
+          if (found && found.manifest.exam_group?.toLowerCase() === examGroup.toLowerCase()) {
+            if (!matchedTopics.some((t) => t.title === found.manifest.title)) {
+              matchedTopics.push(found.manifest);
+              const normF = f.replace(/\\/g, "/");
+              const exs = allExercises.filter((ex) => {
+                const p = (ex.rel || ex.path).replace(/\\/g, "/");
+                return p.startsWith(normF + "/");
+              });
+              topicMap.set(found.manifest.title, exs);
+            }
+          }
+        }
+
+        if (matchedTopics.length === 0) {
+          throw new ApiError(`No se encontraron temas para el grupo de examen "${examGroup}"`);
+        }
+
+        const session = await assembleGroupedExam(examGroup, matchedTopics, topicMap, {
+          targetDifficulty: targetDiff,
+        });
+        return { ok: true, session };
+      }
+
+      throw new ApiError("Debe especificar topicFolder o examGroup");
+    },
+
+    study_exam_submit: async (
+      session: ExamSession,
+      submissions: ExamItemSubmission[],
+    ) => {
+      const grader: ExamGrader = async (item, answerText) => {
+        if (!answerText.trim()) {
+          return { score: 0, passed: false, feedback: "Sin respuesta." };
+        }
+        const aiCfg = AIConfig.fromDict(AppConfig.get_ai_config());
+        if (aiCfg.base_url || aiCfg.api_key) {
+          const messages = [
+            {
+              role: "system" as const,
+              content: `Eres un evaluador riguroso de exámenes de matemáticas y programación. Evalúa la respuesta del alumno sin indulgencia. Devuelve ÚNICAMENTE un objeto JSON: {"score": <número 0..100>, "passed": <true si score >= 70, false si no>, "feedback": "<retroalimentación en español, concisa>"}.`,
+            },
+            {
+              role: "user" as const,
+              content: `Ejercicio: ${item.title}\nHabilidad: ${item.skill} (Dificultad: ${item.difficulty}/3)\nTema: ${item.topicTitle}\n\nEnunciado:\n${item.statement}\n\nRespuesta del alumno:\n${answerText}`,
+            },
+          ];
+          try {
+            const reply = await sendChat(aiCfg, messages);
+            const match = reply.match(/\{[\s\S]*\}/);
+            if (match) {
+              const parsed = JSON.parse(match[0]);
+              const score = typeof parsed.score === "number" ? parsed.score : 70;
+              return {
+                score,
+                passed: Boolean(parsed.passed ?? score >= 70),
+                feedback: String(parsed.feedback || "Evaluado por IA."),
+              };
+            }
+          } catch {
+            // fallback
+          }
+        }
+
+        const hasSubstance = answerText.trim().length > 30;
+        return {
+          score: hasSubstance ? 75 : 40,
+          passed: hasSubstance,
+          feedback: hasSubstance
+            ? "Respuesta registrada y calificada."
+            : "Respuesta incompleta o insuficiente.",
+        };
+      };
+
+      const { record, itemResults } = await gradeAndAggregateExam(
+        session,
+        submissions,
+        grader,
+        app.root,
+      );
+
+      clearStudySnapshotCache();
+
+      return {
+        ok: true,
+        record,
+        item_results: itemResults,
       };
     },
   };

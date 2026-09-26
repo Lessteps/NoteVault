@@ -342,6 +342,15 @@ export const api = {
     quantity: string,
     assistance: string,
   ) => call<import("./types").TopicSessionResult>("study_topic_session_build", folder, skill, difficulty, quantity, assistance),
+  studyExamAssemble: (
+    topicFolder?: string,
+    examGroup?: string,
+    targetDifficulty?: number,
+  ) => call<{ ok: boolean; session: import("./types").ExamSession }>("study_exam_assemble", topicFolder, examGroup, targetDifficulty),
+  studyExamSubmit: (
+    session: import("./types").ExamSession,
+    submissions: import("./types").ExamItemSubmission[],
+  ) => call<{ ok: boolean; record: import("./types").ExamRecord; item_results: import("./types").ExamItemGradingResult[] }>("study_exam_submit", session, submissions),
   studyCardGrade: (srsId: string, quality: number) => call<{ ok: boolean }>("study_card_grade", srsId, quality),
   studyErrorResolve: (id: string) => call<{ ok: boolean }>("study_error_resolve", id),
   studyErrorDigest: () => call<{ text: string }>("study_error_digest"),

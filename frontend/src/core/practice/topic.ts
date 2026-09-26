@@ -264,7 +264,8 @@ export function computeTopicProgress(
     for (const ex of matchingExercises) {
       const diff = Math.min(3, Math.max(1, ex.difficulty)) as DifficultyLevel;
       const cell = cells[diff];
-      const exAttempts = attempts[ex.note_id]?.attempts || [];
+      const exEntry = attempts[ex.note_id];
+      const exAttempts = Array.isArray(exEntry) ? exEntry : exEntry?.attempts || [];
 
       for (const a of exAttempts) {
         totalAttempts++;

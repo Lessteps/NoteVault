@@ -875,3 +875,57 @@ export interface TopicSessionResult {
   exercises: Array<{ id: string; title: string; path: string; is_new: boolean }>;
   first_exercise: string;
 }
+
+export interface ExamSkillVerdict {
+  passed: boolean;
+  score: number;
+  totalQuestions?: number;
+}
+
+export interface ExamRecord {
+  id: string;
+  topic_or_group: string;
+  passed: boolean;
+  score: number;
+  skills: Record<string, ExamSkillVerdict>;
+  created_at: string;
+  duration_seconds: number;
+  topicsCovered?: string[];
+}
+
+export interface ExamExerciseItem {
+  id: string;
+  title: string;
+  topicTitle: string;
+  skill: string;
+  difficulty: 1 | 2 | 3;
+  statement: string;
+  filePath?: string;
+  isNew?: boolean;
+}
+
+export interface ExamSession {
+  id: string;
+  title: string;
+  topicOrGroup: string;
+  isGrouped: boolean;
+  targetDifficulty: 1 | 2 | 3;
+  topics: TopicManifest[];
+  items: ExamExerciseItem[];
+  timeLimitMinutes: number;
+  assistance: "no_help";
+}
+
+export interface ExamItemSubmission {
+  itemId: string;
+  answerText: string;
+}
+
+export interface ExamItemGradingResult {
+  itemId: string;
+  skill: string;
+  score: number;
+  passed: boolean;
+  feedback: string;
+}
+

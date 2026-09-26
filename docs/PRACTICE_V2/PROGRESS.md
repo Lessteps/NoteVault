@@ -12,7 +12,7 @@ Execution log of `docs/PRACTICE_V2/PLAN.md` on branch `web-migration`.
 | **Phase 5** | Topic and grouped exams at target difficulty with exam runner modal, grading, and persistence | `cdb3830` | Tests green (532 tests passed, 0 type errors) |
 | **Phase 6** | Aggregated topic-progress dashboard with area collapse, filters, KPIs, and topic progress bars | `c664b1e` | Tests green (533 tests passed, 0 type errors) |
 | **Phase 7** | Math drawing input surface (heuristic stroke recognition for fractions, radicals, powers to LaTeX) | `03b8572` | Tests green (525 tests passed, 0 type errors) |
-| **Phase 8** | Verification, documentation (`VAULT_FORMAT.md`, `PLAN_PRACTICE_SYSTEM.md`), mobile contract, and build | Pending | Tests green (80 test files, 525 passed, electron build packaging OK) |
+| **Phase 8** | Verification, documentation (`VAULT_FORMAT.md`, `PLAN_PRACTICE_SYSTEM.md`), mobile contract, and build | `9069b09` | Tests green (80 test files, 525 passed, electron build packaging OK) |
 
 ## Verification Details
 

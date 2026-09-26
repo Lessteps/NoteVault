@@ -1,14 +1,16 @@
 // Estudio: the study area of the open note — today's queue, the ledger of
 // skills and the error log of its subject.
 
-import { Play, RefreshCw } from "lucide-react";
+import { Play, RefreshCw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { create } from "zustand";
 import { api } from "../../lib/bridge";
 import { renderMarkdown } from "../../lib/markdown";
-import type { StudySnapshot } from "../../lib/types";
+import type { StudySnapshot, TopicData } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { cn, IconButton } from "../ui";
+import { TopicConfiguratorDialog } from "./TopicConfiguratorDialog";
+import { TopicGeneralView } from "./TopicGeneralView";
 
 const KIND: Record<string, [string, string]> = {
   remediation: ["Corregir error", "text-danger bg-danger-soft"],
@@ -32,13 +34,20 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
   const openNote = useApp((s) => s.openNote);
   const toast = useApp((s) => s.toast);
   const [snap, setSnap] = useState<StudySnapshot | null>(null);
-  const [tab, setTab] = useState<"today" | "ledger" | "errors">("today");
+  const [topicData, setTopicData] = useState<TopicData | null>(null);
+  const [tab, setTab] = useState<"today" | "topic" | "ledger" | "errors">("today");
+  const [showConfigurator, setShowConfigurator] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setSnap(await api.studySnapshot(path));
+      const [sData, tData] = await Promise.all([
+        api.studySnapshot(path),
+        api.studyTopicGet(path).catch(() => null),
+      ]);
+      setSnap(sData);
+      setTopicData(tData);
     } catch (e) {
       toast("error", (e as Error).message);
     } finally {
@@ -59,9 +68,33 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
     useApp.getState().setMode("read");
   };
 
+  const handleConvertToTopic = async () => {
+    if (!topicData?.folder) return;
+    try {
+      await api.studyTopicConvert(topicData.folder);
+      toast("info", "Tema creado correctamente (_tema.md).");
+      useStudyVersion.getState().bump();
+      void refresh();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
+
   if (!snap) return <div className="p-4 text-[12px] text-faint">{loading ? "Leyendo el área de estudio…" : ""}</div>;
   const first = snap.queue.items.find((i) => i.exercise)?.exercise;
   const c = snap.queue.counts;
+
+  const tabs: Array<["today" | "topic" | "ledger" | "errors", string]> = [
+    ["today", `Hoy${c.total ? `  ${c.total}` : ""}`],
+  ];
+  if (topicData?.is_topic) {
+    tabs.push([
+      "topic",
+      `Tema${topicData.progress ? ` ${topicData.progress.completenessPct}%` : ""}`,
+    ]);
+  }
+  tabs.push(["ledger", "Ledger"]);
+  tabs.push(["errors", `Errores${snap.errors.length ? `  ${snap.errors.length}` : ""}`]);
 
   return (
     <div className="nv-study-panel flex min-h-0 flex-1 flex-col">
@@ -76,10 +109,41 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
         <div className="text-[11px] text-faint">
           {snap.area.title !== snap.area.subject_title ? snap.area.subject_title : "Materia completa"} · {snap.exercises} ejercicio{snap.exercises === 1 ? "" : "s"}
         </div>
+
+        {topicData?.is_topic && (
+          <button
+            type="button"
+            onClick={() => setShowConfigurator(true)}
+            className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent py-1.5 text-[12.5px] font-semibold text-white hover:bg-accent-strong"
+          >
+            <Sparkles size={13} /> Practicar este tema
+          </button>
+        )}
+
         <button type="button" disabled={!first} onClick={() => first && practice(first.path)}
-          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent py-1.5 text-[12.5px] font-semibold text-white hover:bg-accent-strong disabled:opacity-50">
-          <Play size={13} /> Practicar ahora
+          className={cn(
+            "flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-semibold transition disabled:opacity-50",
+            topicData?.is_topic
+              ? "mt-1.5 border border-line text-text hover:bg-hover"
+              : "mt-2 bg-accent text-white hover:bg-accent-strong"
+          )}>
+          <Play size={12} /> {topicData?.is_topic ? "Práctica del día (Hoy)" : "Practicar ahora"}
         </button>
+
+        {!topicData?.is_topic && topicData?.can_convert && (
+          <div className="mt-2 rounded-lg border border-accent/30 bg-accent-soft p-2.5 text-[11px]">
+            <div className="font-semibold text-text">Carpeta con ejercicios de práctica</div>
+            <div className="mt-0.5 text-faint">Convierte esta carpeta en tema para configurar sesiones y medir dominio.</div>
+            <button
+              type="button"
+              onClick={() => void handleConvertToTopic()}
+              className="mt-1.5 rounded-md bg-accent px-2 py-0.5 text-[10.5px] font-semibold text-white hover:bg-accent-strong"
+            >
+              Convertir en tema
+            </button>
+          </div>
+        )}
+
         {snap.area.subject === "english" && (
           <button type="button" onClick={() => useApp.getState().setModule("player")}
             className="mt-1.5 w-full rounded-lg border border-line py-1.5 text-[12px] text-text hover:border-dim">
@@ -87,7 +151,7 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
           </button>
         )}
         <div className="mt-2 flex gap-1" role="tablist" aria-label="Estudio">
-          {([["today", `Hoy${c.total ? `  ${c.total}` : ""}`], ["ledger", "Ledger"], ["errors", `Errores${snap.errors.length ? `  ${snap.errors.length}` : ""}`]] as const).map(([id, label]) => (
+          {tabs.map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
               className={cn("rounded-md px-2 py-1 text-[11.5px]", tab === id ? "bg-accent-soft text-text" : "text-dim hover:bg-hover")}>
               {label}
@@ -97,9 +161,27 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {tab === "today" && <Today snap={snap} onPractice={practice} />}
+        {tab === "topic" && topicData && (
+          <TopicGeneralView
+            topicData={topicData}
+            snap={snap}
+            onOpenConfigurator={() => setShowConfigurator(true)}
+            onPractice={practice}
+          />
+        )}
         {tab === "ledger" && <Ledger snap={snap} onPractice={practice} />}
         {tab === "errors" && <Errors snap={snap} onOpen={practice} onChanged={refresh} />}
       </div>
+
+      {showConfigurator && topicData?.is_topic && (
+        <TopicConfiguratorDialog
+          topicData={topicData}
+          onClose={() => setShowConfigurator(false)}
+          onStarted={() => {
+            void refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

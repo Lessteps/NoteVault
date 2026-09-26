@@ -804,3 +804,74 @@ export interface PlayerMedia {
   en_file: string;
   es_file: string;
 }
+
+export interface TopicMasteryConfig {
+  min_per_skill: number;
+  target_difficulty: 1 | 2 | 3;
+  exam: "required" | "optional" | "none";
+}
+
+export interface TopicManifest {
+  type: "topic";
+  subject: string;
+  title: string;
+  skills: string[];
+  mastery: TopicMasteryConfig;
+  exam_group?: string;
+  path?: string;
+  folder?: string;
+}
+
+export interface TopicCellProgress {
+  skill: string;
+  difficulty: 1 | 2 | 3;
+  attempts: number;
+  passes: number;
+  bestScore: number | null;
+}
+
+export interface TopicSkillProgress {
+  skill: string;
+  label: string;
+  status: "not_started" | "practicing" | "consolidated";
+  totalAttempts: number;
+  totalPasses: number;
+  bestScore: number | null;
+  highestPassedDifficulty: 1 | 2 | 3 | 0;
+  cells: Record<1 | 2 | 3, TopicCellProgress>;
+  consolidated: boolean;
+  mastered: boolean;
+}
+
+export interface TopicProgress {
+  topic: TopicManifest;
+  skills: Record<string, TopicSkillProgress>;
+  examPassed: boolean;
+  examScore: number | null;
+  isComplete: boolean;
+  completenessPct: number;
+  theoryNotesCount: number;
+  exerciseNotesCount: number;
+}
+
+export interface TopicData {
+  is_topic: boolean;
+  folder: string;
+  topic?: TopicManifest;
+  progress?: TopicProgress;
+  theory_notes?: Array<{ rel: string; title: string }>;
+  exercises?: StudyExerciseRef[];
+  can_convert?: boolean;
+}
+
+export interface TopicSessionResult {
+  ok: boolean;
+  skill: string;
+  difficulty: number;
+  assistance: string;
+  target_count: number;
+  existing_count: number;
+  generated_count: number;
+  exercises: Array<{ id: string; title: string; path: string; is_new: boolean }>;
+  first_exercise: string;
+}

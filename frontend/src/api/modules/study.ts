@@ -23,6 +23,25 @@ import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { LAYOUT } from "../../core/vaultFormat.js";
 import { WorkspaceManager } from "../../core/workspaceManager.js";
+import {
+  type TopicManifest,
+  computeTopicProgress,
+  createDefaultTopicManifest,
+  parseTopicManifest,
+  serializeTopicManifest,
+} from "../../core/practice/topic.js";
+import {
+  type QuantityOption,
+  type TheoryNoteContext,
+  buildTopicSession,
+  type SessionAIClient,
+} from "../../core/practice/sessionBuilder.js";
+import { loadExamRecord } from "../../core/practice/exams.js";
+import { loadAllAttempts } from "../../core/practice/ledger.js";
+import { clearExerciseIndexCache, scanVault } from "../../core/practice/exerciseIndex.js";
+import { AIConfig, sendChat } from "../../core/aiClient.js";
+import { AppConfig } from "../appConfig.js";
+import type { DifficultyLevel } from "../../core/practice/skills.js";
 import type { AppState } from "../appState.js";
 import { isoDate } from "../common.js";
 
@@ -100,6 +119,68 @@ const SNAPSHOT_CACHE_TTL_MS = 30_000;
 
 export function clearStudySnapshotCache(): void {
   _snapshotCache.clear();
+}
+
+function resolveTopicDir(app: AppState, relPath: string): string {
+  try {
+    const abs = app.resolve(relPath, { allowRoot: true });
+    let dir = fs.statSync(abs).isDirectory() ? abs : path.dirname(abs);
+    const base = path.basename(dir).toLowerCase();
+    if (["ejercicios", "exercises", "demostraciones", "proofs", "practica"].includes(base)) {
+      const parent = path.dirname(dir);
+      if (parent !== app.root) dir = parent;
+    }
+    return app.rel(dir);
+  } catch {
+    return "";
+  }
+}
+
+function findTopicManifest(
+  app: AppState,
+  topicFolder: string,
+): { path: string; manifest: TopicManifest } | null {
+  try {
+    const absDir = app.resolve(topicFolder, { allowRoot: true });
+    if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) return null;
+
+    const preferred = path.join(absDir, "_tema.md");
+    if (fs.existsSync(preferred)) {
+      const raw = fs.readFileSync(preferred, "utf-8");
+      const m = parseTopicManifest(raw, path.basename(absDir));
+      if (m) {
+        m.path = app.rel(preferred);
+        m.folder = topicFolder;
+        return { path: m.path, manifest: m };
+      }
+    }
+
+    const alt = path.join(absDir, "tema.md");
+    if (fs.existsSync(alt)) {
+      const raw = fs.readFileSync(alt, "utf-8");
+      const m = parseTopicManifest(raw, path.basename(absDir));
+      if (m) {
+        m.path = app.rel(alt);
+        m.folder = topicFolder;
+        return { path: m.path, manifest: m };
+      }
+    }
+
+    const entries = fs.readdirSync(absDir, { withFileTypes: true });
+    for (const ent of entries) {
+      if (ent.isFile() && ent.name.toLowerCase().endsWith(".md")) {
+        const p = path.join(absDir, ent.name);
+        const raw = fs.readFileSync(p, "utf-8");
+        const m = parseTopicManifest(raw, path.basename(absDir));
+        if (m) {
+          m.path = app.rel(p);
+          m.folder = topicFolder;
+          return { path: m.path, manifest: m };
+        }
+      }
+    }
+  } catch {}
+  return null;
 }
 
 export function studyApi(app: AppState) {
@@ -345,6 +426,194 @@ export function studyApi(app: AppState) {
         path: app.rel(res.path),
         created: res.created,
         index: res.index ? studyRel(app, res.index) : "",
+      };
+    },
+
+    study_topic_get(rel: string) {
+      const topicFolder = resolveTopicDir(app, rel);
+      if (!topicFolder) {
+        return { is_topic: false, folder: "", can_convert: false };
+      }
+      const found = findTopicManifest(app, topicFolder);
+      const scan = scanVault(app.root, app.vault.notePaths());
+      const normFolder = topicFolder.replace(/\\/g, "/");
+      const topicExercises = scan.exercises.filter((e) => {
+        const p = (e.rel || e.path).replace(/\\/g, "/");
+        return p.startsWith(normFolder + "/");
+      });
+
+      // Scan theory notes in folder
+      const absDir = app.resolve(topicFolder, { allowRoot: true });
+      const theoryNotes: Array<{ rel: string; title: string }> = [];
+      try {
+        const files = fs.readdirSync(absDir, { withFileTypes: true });
+        for (const f of files) {
+          if (f.isFile() && f.name.endsWith(".md") && !f.name.startsWith("_tema")) {
+            theoryNotes.push({
+              rel: `${normFolder}/${f.name}`,
+              title: f.name.replace(/\.md$/, ""),
+            });
+          }
+        }
+      } catch {}
+
+      if (!found) {
+        return {
+          is_topic: false,
+          folder: topicFolder,
+          can_convert: topicExercises.length > 0 || theoryNotes.length > 0,
+        };
+      }
+
+      const attempts = loadAllAttempts(app.root);
+      const examRec = loadExamRecord(
+        app.root,
+        found.manifest.exam_group || found.manifest.title,
+      );
+      const progress = computeTopicProgress(
+        found.manifest,
+        topicExercises,
+        attempts,
+        examRec,
+        theoryNotes.length,
+      );
+
+      return {
+        is_topic: true,
+        folder: topicFolder,
+        topic: found.manifest,
+        progress,
+        theory_notes: theoryNotes,
+        exercises: topicExercises.map((e) => exerciseDict(e, studyRel(app, e.path))),
+        can_convert: false,
+      };
+    },
+
+    study_topic_convert(folder: string) {
+      const absDir = app.resolve(folder, { allowRoot: true });
+      if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) {
+        throw new ApiError("Carpeta no encontrada.");
+      }
+      const manifestPath = path.join(absDir, "_tema.md");
+      if (fs.existsSync(manifestPath)) {
+        throw new ApiError("El tema ya tiene un archivo de manifiesto (_tema.md).");
+      }
+      const scan = scanVault(app.root, app.vault.notePaths());
+      const folderRel = app.rel(absDir);
+      const topicExercises = scan.exercises.filter((e) =>
+        (e.rel || e.path).replace(/\\/g, "/").startsWith(folderRel + "/"),
+      );
+      const area = getStudyArea(app, folderRel);
+      const subject = area ? area.subject : "mathematics";
+      const manifest = createDefaultTopicManifest(
+        folderRel,
+        path.basename(absDir),
+        subject,
+        topicExercises,
+      );
+      const text = serializeTopicManifest(manifest);
+      fs.writeFileSync(manifestPath, text, "utf-8");
+      clearExerciseIndexCache();
+      clearStudySnapshotCache();
+      return { ok: true, path: app.rel(manifestPath), manifest };
+    },
+
+    async study_topic_session_build(
+      folder: string,
+      skill: string,
+      difficulty: number,
+      quantity = "3-5",
+      assistance = "no_help",
+    ) {
+      const normFolder = app.rel(app.resolve(folder, { allowRoot: true }));
+      const found = findTopicManifest(app, normFolder);
+      if (!found) {
+        throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+      }
+      const scan = scanVault(app.root, app.vault.notePaths());
+      const diff = Math.min(
+        3,
+        Math.max(1, parseInt(String(difficulty), 10) || 2),
+      ) as DifficultyLevel;
+      const ast = assistance === "helper" ? "helper" : "no_help";
+      const qty = (quantity || "3-5") as QuantityOption;
+
+      // Extract theory notes
+      const absDir = app.resolve(normFolder);
+      const theoryNotes: TheoryNoteContext[] = [];
+      try {
+        const files = fs.readdirSync(absDir, { withFileTypes: true });
+        for (const f of files) {
+          if (f.isFile() && f.name.endsWith(".md") && !f.name.startsWith("_tema")) {
+            const full = path.join(absDir, f.name);
+            const content = fs.readFileSync(full, "utf-8");
+            theoryNotes.push({
+              rel: app.rel(full),
+              title: f.name.replace(/\.md$/, ""),
+              content,
+            });
+          }
+        }
+      } catch {}
+
+      const aiClient: SessionAIClient = {
+        async generateExercises(messages) {
+          try {
+            const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+            if (cfg.is_bridge) return [];
+            const reply = await sendChat(cfg, messages as any);
+            let cleaned = reply.trim();
+            const match = /```(?:json)?\s*([\s\S]*?)```/i.exec(cleaned);
+            if (match) cleaned = match[1]!.trim();
+            const start = cleaned.indexOf("[");
+            const end = cleaned.lastIndexOf("]");
+            if (start !== -1 && end !== -1 && end > start) {
+              cleaned = cleaned.slice(start, end + 1);
+            }
+            return JSON.parse(cleaned);
+          } catch {
+            return [];
+          }
+        },
+      };
+
+      const plan = await buildTopicSession(
+        found.manifest,
+        normFolder,
+        { skill, difficulty: diff, quantity: qty, assistance: ast },
+        scan.exercises,
+        theoryNotes,
+        aiClient,
+      );
+
+      for (const ex of plan.exercises) {
+        if (ex.isNew && ex.content) {
+          const targetAbs = app.resolve(ex.path, { allowRoot: false, mustExist: false });
+          fs.mkdirSync(path.dirname(targetAbs), { recursive: true });
+          fs.writeFileSync(targetAbs, ex.content, "utf-8");
+        }
+      }
+
+      if (plan.generatedCount > 0) {
+        clearExerciseIndexCache();
+        clearStudySnapshotCache();
+      }
+
+      return {
+        ok: true,
+        skill: plan.skill,
+        difficulty: plan.difficulty,
+        assistance: plan.assistance,
+        target_count: plan.targetCount,
+        existing_count: plan.existingCount,
+        generated_count: plan.generatedCount,
+        exercises: plan.exercises.map((e) => ({
+          id: e.id,
+          title: e.title,
+          path: e.path,
+          is_new: e.isNew,
+        })),
+        first_exercise: plan.exercises[0]?.path ?? "",
       };
     },
   };

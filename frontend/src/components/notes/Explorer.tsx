@@ -6,6 +6,7 @@ import { api } from "../../lib/bridge";
 import type { Bookmark as BookmarkT, SearchHit } from "../../lib/types";
 import { useApp, type ExplorerTab } from "../../store/app";
 import { cn, IconButton } from "../ui";
+import { useVirtualList } from "../../lib/useVirtualList";
 import { FileTree, newCanvasIn, newFolderIn, newNoteIn } from "./FileTree";
 import { GraphPanel } from "./GraphPanel";
 import { useConceptMap } from "../canvas/ConceptMapDialog";
@@ -184,6 +185,28 @@ function SearchPanel() {
     return [...m.entries()];
   }, [hits]);
 
+  const rows = useMemo(() => {
+    const list: Array<
+      | { kind: "header"; path: string; title: string }
+      | { kind: "hit"; path: string; line_no: number; line: string }
+    > = [];
+    for (const [path, hitList] of groups) {
+      list.push({ kind: "header", path, title: hitList[0]!.title });
+      for (const h of hitList.filter((x: SearchHit) => x.line_no > 0).slice(0, 6)) {
+        list.push({ kind: "hit", path, line_no: h.line_no, line: h.line });
+      }
+    }
+    return list;
+  }, [groups]);
+
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchVirtual = useVirtualList({
+    itemCount: rows.length,
+    itemHeight: 28,
+    containerRef: searchContainerRef,
+    overscan: 6,
+  });
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex-none p-2">
@@ -203,29 +226,33 @@ function SearchPanel() {
           </div>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {groups.map(([path, list]) => (
-          <div key={path} className="mb-2">
-            <button
-              type="button"
-              onClick={() => void openNote(path)}
-              className="w-full truncate rounded px-1.5 py-1 text-left text-[12.5px] font-semibold text-text hover:bg-hover"
-            >
-              {list[0]!.title}
-            </button>
-            {list.filter((h) => h.line_no > 0).slice(0, 6).map((h) => (
-              <button
-                key={h.line_no}
-                type="button"
-                onClick={() => void openNote(path, { line: h.line_no })}
-                className="block w-full truncate rounded px-1.5 py-0.5 pl-4 text-left text-[12px] text-dim hover:bg-hover"
-              >
-                <span className="mr-1.5 font-mono text-[10px] text-faint">{h.line_no}</span>
-                <Highlight text={h.line} query={query.trim()} />
-              </button>
-            ))}
+      <div ref={searchContainerRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        <div style={{ height: searchVirtual.totalHeight, position: "relative" }}>
+          <div style={{ transform: `translateY(${searchVirtual.startOffset}px)` }}>
+            {rows.slice(searchVirtual.startIndex, searchVirtual.endIndex).map((r, i) =>
+              r.kind === "header" ? (
+                <button
+                  key={`${r.path}:h:${searchVirtual.startIndex + i}`}
+                  type="button"
+                  onClick={() => void openNote(r.path)}
+                  className="mt-1 w-full truncate rounded px-1.5 py-1 text-left text-[12.5px] font-semibold text-text hover:bg-hover"
+                >
+                  {r.title}
+                </button>
+              ) : (
+                <button
+                  key={`${r.path}:${r.line_no}`}
+                  type="button"
+                  onClick={() => void openNote(r.path, { line: r.line_no })}
+                  className="block w-full truncate rounded px-1.5 py-0.5 pl-4 text-left text-[12px] text-dim hover:bg-hover"
+                >
+                  <span className="mr-1.5 font-mono text-[10px] text-faint">{r.line_no}</span>
+                  <Highlight text={r.line} query={query.trim()} />
+                </button>
+              ),
+            )}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );

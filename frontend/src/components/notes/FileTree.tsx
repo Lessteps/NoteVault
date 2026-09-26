@@ -2,9 +2,10 @@ import {
   Bookmark, ChevronRight, FileCode2, FilePlus, FileText, Folder, FolderOpen, FolderPlus,
   Columns2, LayoutDashboard, Pencil, SquareArrowOutUpRight, Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { api } from "../../lib/bridge";
 import type { IndexEntry, TreeEntry } from "../../lib/types";
+import { useVirtualList } from "../../lib/useVirtualList";
 import { useApp } from "../../store/app";
 import { useCanvas } from "../../store/canvas";
 import { askText, cn, confirmAction, openMenu } from "../ui";
@@ -219,44 +220,33 @@ export function FileTree({ filter }: { filter: string }) {
     openMenu(e, items);
   };
 
-  const renderEntries = (entries: TreeEntry[] | undefined, depth: number) =>
-    entries?.map((entry) => {
-      const isFolder = entry.type === "folder";
-      const open = isFolder && expanded.has(entry.path);
-      return (
-        <div key={entry.path}>
-          <div
-            role="treeitem"
-            aria-expanded={isFolder ? open : undefined}
-            draggable
-            onDragStart={(e) => onDragStart(e, entry.path)}
-            {...(isFolder ? dropProps(entry.path) : {})}
-            onClick={() => (isFolder ? toggle(entry.path) : openEntry(entry))}
-            onAuxClick={(e) => e.button === 1 && !isFolder && openEntry(entry)}
-            onContextMenu={menuFor(entry)}
-            className={cn(
-              "group flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md pr-2 text-[13px]",
-              active === entry.path
-                ? "bg-accent-soft text-text"
-                : "text-dim hover:bg-hover hover:text-text",
-              dropTarget === entry.path && "outline outline-1 outline-accent",
-            )}
-            style={{ paddingLeft: 6 + depth * 14 }}
-          >
-            <ChevronRight
-              className={cn(
-                "h-3.5 w-3.5 flex-none text-faint transition-transform",
-                !isFolder || entry.has_children === false ? "invisible" : "",
-                open && "rotate-90",
-              )}
-            />
-            <EntryIcon entry={entry} open={open} />
-            <span className="truncate">{entry.name}</span>
-          </div>
-          {open && renderEntries(children[entry.path], depth + 1)}
-        </div>
-      );
-    });
+  interface FlatTreeItem {
+    entry: TreeEntry;
+    depth: number;
+  }
+
+  const flatItems = useMemo<FlatTreeItem[]>(() => {
+    const list: FlatTreeItem[] = [];
+    function walk(entries: TreeEntry[] | undefined, depth: number) {
+      if (!entries) return;
+      for (const entry of entries) {
+        list.push({ entry, depth });
+        if (entry.type === "folder" && expanded.has(entry.path)) {
+          walk(children[entry.path], depth + 1);
+        }
+      }
+    }
+    walk(children[""], 0);
+    return list;
+  }, [children, expanded]);
+
+  const treeContainerRef = useRef<HTMLDivElement>(null);
+  const treeVirtual = useVirtualList({
+    itemCount: flatItems.length,
+    itemHeight: 30,
+    containerRef: treeContainerRef,
+    overscan: 6,
+  });
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -266,35 +256,89 @@ export function FileTree({ filter }: { filter: string }) {
       .slice(0, 200);
   }, [filter, index]);
 
+  const filteredContainerRef = useRef<HTMLDivElement>(null);
+  const filteredVirtual = useVirtualList({
+    itemCount: filtered?.length ?? 0,
+    itemHeight: 46,
+    containerRef: filteredContainerRef,
+    overscan: 5,
+  });
+
   if (filtered) {
+    const visibleFiltered = filtered.slice(filteredVirtual.startIndex, filteredVirtual.endIndex);
     return (
-      <div className="flex flex-col gap-px px-2 py-1">
+      <div ref={filteredContainerRef} className="h-full overflow-y-auto px-2 py-1">
         {filtered.length === 0 && <div className="px-2 py-3 text-[12px] text-faint">Sin coincidencias.</div>}
-        {filtered.map((n) => (
-          <button
-            key={n.path}
-            type="button"
-            onClick={() => void useApp.getState().openNote(n.path)}
-            className={cn(
-              "flex flex-col items-start rounded-md px-2 py-1.5 text-left",
-              active === n.path ? "bg-accent-soft" : "hover:bg-hover",
-            )}
-          >
-            <span className="flex items-center gap-1.5 text-[13px] text-text">
-              <FileText className="h-3.5 w-3.5 text-accent-text" /> {n.title}
-            </span>
-            <span className="truncate pl-5 font-mono text-[10.5px] text-faint">{parentOf(n.path) || "/"}</span>
-          </button>
-        ))}
+        <div style={{ height: filteredVirtual.totalHeight, position: "relative" }}>
+          <div style={{ transform: `translateY(${filteredVirtual.startOffset}px)` }}>
+            {visibleFiltered.map((n) => (
+              <button
+                key={n.path}
+                type="button"
+                onClick={() => void useApp.getState().openNote(n.path)}
+                className={cn(
+                  "flex h-[46px] w-full flex-col justify-center rounded-md px-2 py-1 text-left",
+                  active === n.path ? "bg-accent-soft" : "hover:bg-hover",
+                )}
+              >
+                <span className="flex items-center gap-1.5 text-[13px] text-text">
+                  <FileText className="h-3.5 w-3.5 flex-none text-accent-text" /> <span className="truncate">{n.title}</span>
+                </span>
+                <span className="truncate pl-5 font-mono text-[10.5px] text-faint">{parentOf(n.path) || "/"}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
+  const visibleTree = flatItems.slice(treeVirtual.startIndex, treeVirtual.endIndex);
+
   return (
-    <div role="tree" className="min-h-full px-2 py-1" {...dropProps("")}>
-      {renderEntries(children[""], 0)}
-      {children[""]?.length === 0 && (
+    <div ref={treeContainerRef} role="tree" className="h-full overflow-y-auto px-2 py-1" {...dropProps("")}>
+      {children[""]?.length === 0 ? (
         <div className="px-2 py-3 text-[12px] text-faint">El vault está vacío. Crea tu primera nota.</div>
+      ) : (
+        <div style={{ height: treeVirtual.totalHeight, position: "relative" }}>
+          <div style={{ transform: `translateY(${treeVirtual.startOffset}px)` }}>
+            {visibleTree.map(({ entry, depth }) => {
+              const isFolder = entry.type === "folder";
+              const open = isFolder && expanded.has(entry.path);
+              return (
+                <div
+                  key={entry.path}
+                  role="treeitem"
+                  aria-expanded={isFolder ? open : undefined}
+                  draggable
+                  onDragStart={(e) => onDragStart(e, entry.path)}
+                  {...(isFolder ? dropProps(entry.path) : {})}
+                  onClick={() => (isFolder ? toggle(entry.path) : openEntry(entry))}
+                  onAuxClick={(e) => e.button === 1 && !isFolder && openEntry(entry)}
+                  onContextMenu={menuFor(entry)}
+                  className={cn(
+                    "group flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md pr-2 text-[13px]",
+                    active === entry.path
+                      ? "bg-accent-soft text-text"
+                      : "text-dim hover:bg-hover hover:text-text",
+                    dropTarget === entry.path && "outline outline-1 outline-accent",
+                  )}
+                  style={{ paddingLeft: 6 + depth * 14 }}
+                >
+                  <ChevronRight
+                    className={cn(
+                      "h-3.5 w-3.5 flex-none text-faint transition-transform",
+                      !isFolder || entry.has_children === false ? "invisible" : "",
+                      open && "rotate-90",
+                    )}
+                  />
+                  <EntryIcon entry={entry} open={open} />
+                  <span className="truncate">{entry.name}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );

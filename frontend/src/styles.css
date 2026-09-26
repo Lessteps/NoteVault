@@ -157,6 +157,11 @@ body {
   overflow-wrap: anywhere;
 }
 
+.nv-prose > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
+}
+
 .nv-prose > * + * {
   margin-top: 0.85em;
 }
@@ -694,5 +699,26 @@ html[data-perf="lite"] *::after {
   transition-duration: 0.001ms !important;
   transition: none !important;
   scroll-behavior: auto !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Higher-level rendering: content-visibility optimizations
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Reading view: skip layout & paint for offscreen markdown blocks */
+.nv-prose > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 40px;
+}
+
+/* Offscreen paint skipping for search results and backlinks */
+.nv-search-group {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
+}
+
+.nv-backlink-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 40px;
 }
 

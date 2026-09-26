@@ -3,9 +3,10 @@ import {
   AlertTriangle, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, FileCode2, FileText,
   Link2, PanelLeft, PanelRight, PenLine, Plus, Sparkles, X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
-import type { Mentions } from "../../lib/types";
+import type { Mentions, SearchHit } from "../../lib/types";
+import { useVirtualList } from "../../lib/useVirtualList";
 import { useApp, type OpenNote, type ViewMode } from "../../store/app";
 import { cn, IconButton, Kbd, openMenu } from "../ui";
 import { newNoteIn } from "./FileTree";
@@ -224,31 +225,67 @@ function BacklinksBar({ note }: { note: OpenNote }) {
         )}
       </button>
       {open && data && (
-        <div className="grid max-h-56 grid-cols-2 gap-4 overflow-y-auto px-4 pb-3">
-          {([["Menciones enlazadas", data.linked], ["Menciones sin enlazar", data.unlinked]] as const).map(
-            ([label, list]) => (
-              <div key={label}>
-                <div className="mb-1 font-mono text-[10.5px] uppercase tracking-wider text-faint">
-                  {label} ({list.length})
-                </div>
-                {list.length === 0 && <div className="text-[12px] text-faint">Nada todavía.</div>}
-                {list.slice(0, 50).map((m) => (
-                  <button
-                    key={`${m.path}:${m.line_no}`}
-                    type="button"
-                    onClick={() => void openNote(m.path, { line: m.line_no })}
-                    className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-hover"
-                  >
-                    <div className="flex items-center justify-between gap-2 text-[12.5px] text-text">
-                      <span className="truncate">{m.title}</span>
-                      <span className="flex-none font-mono text-[10px] text-faint">ln {m.line_no}</span>
-                    </div>
-                    <div className="truncate text-[11.5px] text-dim">{m.line}</div>
-                  </button>
-                ))}
-              </div>
-            ),
-          )}
+        <div className="grid max-h-56 grid-cols-2 gap-4 px-4 pb-3">
+          <MentionsColumn
+            label="Menciones enlazadas"
+            list={data.linked}
+            onSelect={(path, line) => void openNote(path, { line })}
+          />
+          <MentionsColumn
+            label="Menciones sin enlazar"
+            list={data.unlinked}
+            onSelect={(path, line) => void openNote(path, { line })}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MentionsColumn({
+  label,
+  list,
+  onSelect,
+}: {
+  label: string;
+  list: SearchHit[];
+  onSelect: (path: string, line: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const virtual = useVirtualList({
+    itemCount: list.length,
+    itemHeight: 46,
+    containerRef,
+    overscan: 4,
+  });
+
+  return (
+    <div className="flex min-h-0 flex-col">
+      <div className="mb-1 flex-none font-mono text-[10.5px] uppercase tracking-wider text-faint">
+        {label} ({list.length})
+      </div>
+      {list.length === 0 ? (
+        <div className="text-[12px] text-faint">Nada todavía.</div>
+      ) : (
+        <div ref={containerRef} className="max-h-48 overflow-y-auto pr-1">
+          <div style={{ height: virtual.totalHeight, position: "relative" }}>
+            <div style={{ transform: `translateY(${virtual.startOffset}px)` }}>
+              {list.slice(virtual.startIndex, virtual.endIndex).map((m) => (
+                <button
+                  key={`${m.path}:${m.line_no}`}
+                  type="button"
+                  onClick={() => onSelect(m.path, m.line_no)}
+                  className="nv-backlink-item block h-[46px] w-full rounded-md px-2 py-1 text-left hover:bg-hover"
+                >
+                  <div className="flex items-center justify-between gap-2 text-[12.5px] text-text">
+                    <span className="truncate">{m.title}</span>
+                    <span className="flex-none font-mono text-[10px] text-faint">ln {m.line_no}</span>
+                  </div>
+                  <div className="truncate text-[11.5px] text-dim">{m.line}</div>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

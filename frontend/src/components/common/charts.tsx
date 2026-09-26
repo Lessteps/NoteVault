@@ -16,6 +16,80 @@ export function Sparkline({ values, colour, width = 80, height = 22 }: {
   );
 }
 
+/** Smooth curved sparkline with gradient fill for stat cards (matching Vista General redesign). */
+export function SmoothSparkline({
+  values,
+  colour,
+  width = 140,
+  height = 36,
+  strokeWidth = 2.5,
+  fill = true,
+  className,
+}: {
+  values?: number[];
+  colour: string;
+  width?: number;
+  height?: number;
+  strokeWidth?: number;
+  fill?: boolean;
+  className?: string;
+}) {
+  // Generate stable sanitized ID for gradient
+  const gradId = `spark-grad-${colour.replace(/[^a-zA-Z0-9]/g, "")}-${width}-${height}`;
+  const ptsData = values && values.length >= 2 ? values : [3, 5, 4, 8, 7, 10, 8, 12];
+  const max = Math.max(1, ...ptsData);
+  const min = Math.min(...ptsData);
+  const range = max - min || 1;
+  const step = width / (ptsData.length - 1);
+  const coords: Array<[number, number]> = ptsData.map((v, i) => [
+    i * step,
+    height - 4 - ((v - min) / range) * (height - 10),
+  ]);
+
+  let strokeD = `M ${coords[0]![0].toFixed(1)},${coords[0]![1].toFixed(1)}`;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p0 = coords[Math.max(0, i - 1)]!;
+    const p1 = coords[i]!;
+    const p2 = coords[i + 1]!;
+    const p3 = coords[Math.min(coords.length - 1, i + 2)]!;
+
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+
+    strokeD += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+
+  const fillD = `${strokeD} L ${width},${height} L 0,${height} Z`;
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className={cn("w-full overflow-visible", className)}
+      style={{ height }}
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={colour} stopOpacity={0.28} />
+          <stop offset="100%" stopColor={colour} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      {fill && <path d={fillD} fill={`url(#${gradId})`} />}
+      <path
+        d={strokeD}
+        fill="none"
+        stroke={colour}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /** Horizontal bars with a label and a value. */
 export function BarList({ rows, max }: {
   rows: Array<{ label: string; value: number; colour?: string; hint?: string }>; max?: number;

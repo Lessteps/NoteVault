@@ -757,5 +757,86 @@ export function studyApi(app: AppState) {
         item_results: itemResults,
       };
     },
+
+    study_topic_dashboard: async (subjectFilter?: string) => {
+      const scan = scanVault(app.root, app.vault.notePaths());
+      const allExercises = scan.exercises;
+      const attempts = loadAllAttempts(app.root);
+
+      const folderSet = new Set<string>();
+      for (const np of app.vault.notePaths()) {
+        const dir = path.dirname(np).replace(/\\/g, "/");
+        if (dir && dir !== ".") {
+          folderSet.add(dir);
+          const parent = path.dirname(dir).replace(/\\/g, "/");
+          if (parent && parent !== ".") folderSet.add(parent);
+        }
+      }
+
+      const foundMap = new Map<string, { folder: string; manifest: TopicManifest }>();
+
+      for (const folder of folderSet) {
+        const found = findTopicManifest(app, folder);
+        if (found) {
+          const key = found.manifest.title;
+          if (!foundMap.has(key)) {
+            foundMap.set(key, { folder, manifest: found.manifest });
+          }
+        }
+      }
+
+      const items: Array<{
+        folder: string;
+        area: string;
+        subject: string;
+        manifest: TopicManifest;
+        progress: ReturnType<typeof computeTopicProgress>;
+      }> = [];
+      const subjectsSet = new Set<string>();
+      const areasSet = new Set<string>();
+
+      for (const { folder, manifest } of foundMap.values()) {
+        if (subjectFilter && manifest.subject.toLowerCase() !== subjectFilter.toLowerCase()) {
+          continue;
+        }
+
+        const normFolder = folder.replace(/\\/g, "/");
+        const topicExercises = allExercises.filter((ex) => {
+          const p = (ex.rel || ex.path).replace(/\\/g, "/");
+          return p.startsWith(normFolder + "/");
+        });
+
+        const parentDir = path.dirname(normFolder);
+        const areaName = parentDir && parentDir !== "." ? path.basename(parentDir) : manifest.exam_group || "General";
+
+        const examRec = loadExamRecordForTopic(app.root, manifest);
+        const progress = computeTopicProgress(
+          manifest,
+          topicExercises,
+          attempts,
+          examRec,
+          0,
+        );
+
+        subjectsSet.add(manifest.subject);
+        areasSet.add(areaName);
+
+        items.push({
+          folder,
+          area: areaName,
+          subject: manifest.subject,
+          manifest,
+          progress,
+        });
+      }
+
+      items.sort((a, b) => a.area.localeCompare(b.area) || a.manifest.title.localeCompare(b.manifest.title));
+
+      return {
+        subjects: Array.from(subjectsSet),
+        areas: Array.from(areasSet),
+        topics: items,
+      };
+    },
   };
 }

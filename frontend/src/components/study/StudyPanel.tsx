@@ -10,6 +10,7 @@ import type { StudySnapshot, TopicData } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { cn, IconButton } from "../ui";
 import { TopicConfiguratorDialog } from "./TopicConfiguratorDialog";
+import { TopicDashboardView } from "./TopicDashboardView";
 import { TopicGeneralView } from "./TopicGeneralView";
 
 const KIND: Record<string, [string, string]> = {
@@ -35,7 +36,7 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
   const toast = useApp((s) => s.toast);
   const [snap, setSnap] = useState<StudySnapshot | null>(null);
   const [topicData, setTopicData] = useState<TopicData | null>(null);
-  const [tab, setTab] = useState<"today" | "topic" | "ledger" | "errors">("today");
+  const [tab, setTab] = useState<"today" | "topic" | "dashboard" | "ledger" | "errors">("today");
   const [showConfigurator, setShowConfigurator] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -84,7 +85,7 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
   const first = snap.queue.items.find((i) => i.exercise)?.exercise;
   const c = snap.queue.counts;
 
-  const tabs: Array<["today" | "topic" | "ledger" | "errors", string]> = [
+  const tabs: Array<["today" | "topic" | "dashboard" | "ledger" | "errors", string]> = [
     ["today", `Hoy${c.total ? `  ${c.total}` : ""}`],
   ];
   if (topicData?.is_topic) {
@@ -93,6 +94,7 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
       `Tema${topicData.progress ? ` ${topicData.progress.completenessPct}%` : ""}`,
     ]);
   }
+  tabs.push(["dashboard", "Temas"]);
   tabs.push(["ledger", "Ledger"]);
   tabs.push(["errors", `Errores${snap.errors.length ? `  ${snap.errors.length}` : ""}`]);
 
@@ -169,6 +171,7 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
             onPractice={practice}
           />
         )}
+        {tab === "dashboard" && <TopicDashboardView />}
         {tab === "ledger" && <Ledger snap={snap} onPractice={practice} />}
         {tab === "errors" && <Errors snap={snap} onOpen={practice} onChanged={refresh} />}
       </div>

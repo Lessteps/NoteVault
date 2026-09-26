@@ -342,6 +342,7 @@ export const api = {
     quantity: string,
     assistance: string,
   ) => call<import("./types").TopicSessionResult>("study_topic_session_build", folder, skill, difficulty, quantity, assistance),
+  studyTopicDashboard: (subject?: string) => call<import("./types").TopicDashboardData>("study_topic_dashboard", subject),
   studyExamAssemble: (
     topicFolder?: string,
     examGroup?: string,

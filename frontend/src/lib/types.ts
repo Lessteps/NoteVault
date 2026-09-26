@@ -929,3 +929,18 @@ export interface ExamItemGradingResult {
   feedback: string;
 }
 
+export interface TopicDashboardItem {
+  folder: string;
+  area: string;
+  subject: string;
+  manifest: TopicManifest;
+  progress: TopicProgress;
+}
+
+export interface TopicDashboardData {
+  subjects: string[];
+  areas: string[];
+  topics: TopicDashboardItem[];
+}
+
+

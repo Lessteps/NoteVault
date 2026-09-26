@@ -47,6 +47,11 @@ vault/
 │   │   ├── <goal-id>/items/<item-id>.md   una submeta por archivo
 │   │   └── registro/YYYY/MM/YYYY-MM-DD.json  checks del día
 │   ├── estudio/                           práctica: intentos, errores, repaso
+│   ├── web/                               módulo WEB: marcadores, reglas, historial, uso
+│   │   ├── marcadores.json
+│   │   ├── restricciones.json
+│   │   ├── historial/YYYY/MM/YYYY-MM-DD.json
+│   │   └── uso/YYYY/MM/YYYY-MM-DD.json
 │   └── .papelera/                         lo borrado, nunca se elimina de verdad
 ├── .notevault-bookmarks.json              ⚠ global
 └── <lo que sea>/…                         las notas del usuario
@@ -759,6 +764,34 @@ deben operar de forma simétrica:
    - Todos los errores se registran en `.notevault/estudio/errores/<err-id>.json`.
    - Ni la app de escritorio ni la app móvil modifican jamás el cuerpo de las notas
      de ejercicios (`type: exercise`).
+
+## Web (Navegador y Enfoque)
+
+Los datos portables del módulo Web residen dentro de `.notevault/web/`:
+
+```
+.notevault/web/
+├── marcadores.json                      marcadores guardados por el usuario
+├── restricciones.json                   reglas de enfoque y consumo
+├── historial/AAAA/MM/AAAA-MM-DD.json    páginas visitadas por día
+└── uso/AAAA/MM/AAAA-MM-DD.json          segundos dedicados por host/dominio por día
+```
+
+### `marcadores.json`
+Lista de marcadores con campos `id`, `title`, `url` y fecha `created`.
+
+### `restricciones.json`
+Configuración de reglas con campos:
+- `enabled`: booleano.
+- `mode`: `"blocklist"` o `"allowlist"`.
+- `blocked_domains` / `blocked_patterns` / `allowed_domains`: listas de cadenas.
+- `daily_limits`: diccionario de dominio a minutos máximos por día.
+- `confirm_to_relax`: booleano que exige frase de confirmación para flexibilizar reglas.
+
+### `historial/` y `uso/`
+Archivos diarios particionados por año y mes (`AAAA/MM/AAAA-MM-DD.json`).
+
+> **Nota de paridad móvil**: Las sesiones de login, cookies locales y caché de navegación en la app de escritorio se almacenan en la partición aislada de Electron `persist:nvweb` (en el directorio de datos de usuario de la máquina local, fuera de la vault). Solo los datos de valor permanente (marcadores, reglas, historial y tiempo) viajan dentro de `.notevault/web/` para sincronizarse entre plataformas.
 
 ## Adjuntos
 

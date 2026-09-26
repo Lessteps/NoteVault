@@ -2,8 +2,9 @@
 // (app_info, stats, set_theme, open_external, set_unsaved, close_window).
 
 import { ApiError } from "../../core/errors.js";
-import { AppConfig } from "../appConfig.js";
+import { AppConfig, type Rendering } from "../appConfig.js";
 import { API_VERSION, type AppState } from "../appState.js";
+import { readGpuStatus, type GpuStatusResult } from "../gpuStatus.js";
 
 /** Open a link in the OS browser via Electron shell (lazy so this module can
  * be unit-tested outside an Electron runtime). Returns false if unavailable. */
@@ -27,7 +28,37 @@ export function appApi(app: AppState) {
         vault_name: app.vault.vaultRoot.split(/[\\/]/).filter(Boolean).pop() ?? "",
         vault_path: app.root,
         theme: AppConfig.get_theme(),
+        rendering: AppConfig.get_rendering(),
       };
+    },
+
+    get_rendering(): Rendering {
+      return AppConfig.get_rendering();
+    },
+
+    set_rendering(patch: Partial<Rendering>): Rendering {
+      if (!patch || typeof patch !== "object") {
+        return AppConfig.get_rendering();
+      }
+      return AppConfig.set_rendering(patch);
+    },
+
+    async gpu_status(): Promise<GpuStatusResult> {
+      return await readGpuStatus();
+    },
+
+    relaunch_app(): Record<string, unknown> {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const electron = require("electron") as { app?: { relaunch(): void; exit(code?: number): void } };
+        if (electron?.app) {
+          electron.app.relaunch();
+          electron.app.exit(0);
+        }
+      } catch {
+        /* best effort */
+      }
+      return { ok: true };
     },
 
     stats(): Record<string, unknown> {

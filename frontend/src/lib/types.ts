@@ -1,10 +1,27 @@
 // Shapes returned by notevault_app/webapp/api.py. Keep in step with it.
 
+export type RenderingMode = "auto" | "hardware" | "software";
+export type AngleBackend = "default" | "d3d11" | "d3d11on12" | "gl" | "d3d9" | "vulkan";
+
+export interface RenderingSettings {
+  mode: RenderingMode;
+  angle: AngleBackend;
+  liteEffects: boolean;
+  reduceMotion: boolean;
+}
+
+export interface GpuStatus {
+  features: Record<string, string>;
+  active: string[];
+  angle: string;
+}
+
 export interface AppInfo {
   api_version: number;
   vault_name: string;
   vault_path: string;
   theme: "dark" | "light";
+  rendering?: RenderingSettings;
 }
 
 export interface TreeEntry {

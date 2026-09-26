@@ -8,6 +8,7 @@
 import type {
   AiConfig, AiProvider, AppInfo, Area, Bookmark, VaultInfo, HomeOverview, Exercise, ExerciseDay, ExerciseOverview, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
   IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
+  RenderingSettings, GpuStatus,
 } from "./types";
 
 type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
@@ -102,12 +103,21 @@ export async function call<T>(method: string, ...args: unknown[]): Promise<T> {
   return payload.result as T;
 }
 
+export const getRendering = () => call<RenderingSettings>("get_rendering");
+export const setRendering = (patch: Partial<RenderingSettings>) => call<RenderingSettings>("set_rendering", patch);
+export const gpuStatus = () => call<GpuStatus>("gpu_status");
+export const relaunchApp = () => call<{ ok: boolean }>("relaunch_app");
+
 export const api = {
   appInfo: () => call<AppInfo>("app_info"),
   stats: () => call<{ notes: number }>("stats"),
   setTheme: (theme: "dark" | "light") => call<{ theme: string }>("set_theme", theme),
   openExternal: (url: string) => call<{ ok: boolean }>("open_external", url),
   setUnsaved: (count: number) => call<{ ok: boolean }>("set_unsaved", count),
+  getRendering,
+  setRendering,
+  gpuStatus,
+  relaunchApp,
 
   listDir: (path = "") => call<TreeEntry[]>("list_dir", path),
   noteIndex: () => call<IndexEntry[]>("note_index"),

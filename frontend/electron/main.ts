@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, Menu, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerIpc } from "./ipc";
@@ -23,6 +23,7 @@ function createWindow() {
     width: 1400,
     height: 900,
     backgroundColor: "#191919",
+    autoHideMenuBar: true,
     webPreferences: {
       preload: getPreloadPath(),
       contextIsolation: true,
@@ -48,6 +49,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // The app has its own custom top bar; drop Electron's native File/Edit/View menu.
+  Menu.setApplicationMenu(null);
   initRegistry();
   registerIpc();
   createWindow();

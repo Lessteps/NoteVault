@@ -2,7 +2,7 @@
 // answer, hints, timer, AI grading and the attempt history.
 
 import {
-  ClipboardPaste, Eye, FileOutput, Lightbulb, Pause, Pencil, Play, RotateCcw, Send, Timer, X,
+  ClipboardPaste, Eye, FileOutput, Lightbulb, Pause, Pencil, PenTool, Play, RotateCcw, Send, Timer, X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
@@ -13,6 +13,7 @@ import { useApp, type OpenNote } from "../../store/app";
 import { cn, confirmAction } from "../ui";
 import { useStudyVersion } from "../study/StudyPanel";
 import { DrillPanel } from "./DrillPanel";
+import { MathDrawingInput } from "./MathDrawingInput";
 import { beep, md, ResultCard } from "./common";
 
 const SUBJECTS: Record<string, string> = { mathematics: "Matemáticas", programming: "Programación", english: "Inglés", general: "General" };
@@ -48,6 +49,7 @@ export function PracticeView({ note }: { note: OpenNote }) {
   const [pending, setPending] = useState<PracticeWaiting | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ text: string; error?: boolean } | null>(null);
+  const [showDrawing, setShowDrawing] = useState(false);
   const [timer, setTimer] = useState<TimerState>(initialTimer);
   const [running, setRunning] = useState(false);
   const secondsOverride = useRef<number | null>(null);
@@ -339,7 +341,34 @@ export function PracticeView({ note }: { note: OpenNote }) {
           />
         ) : (
           <section className="flex flex-col gap-2">
-            <h2 className="font-mono text-[10.5px] uppercase tracking-wider text-faint">Tu respuesta</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-mono text-[10.5px] uppercase tracking-wider text-faint">Tu respuesta</h2>
+              {(ex.subject === "mathematics" || ["prove", "solve", "process", "counterexample", "true_false", "find_error", "drill", "explain"].includes(ex.mode.id)) && !graded && (
+                <button
+                  type="button"
+                  onClick={() => setShowDrawing(!showDrawing)}
+                  className={cn(
+                    "flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11.5px] font-semibold transition-colors",
+                    showDrawing
+                      ? "bg-accent text-white"
+                      : "border border-line bg-card text-dim hover:text-ink hover:border-accent",
+                  )}
+                >
+                  <PenTool size={12} /> {showDrawing ? "Ocultar dibujo" : "✏️ Dibujar (LaTeX)"}
+                </button>
+              )}
+            </div>
+
+            {showDrawing && !graded && (
+              <MathDrawingInput
+                onInsertLatex={(latex) => {
+                  const updated = answer ? `${answer.trimEnd()}\n${latex}` : latex;
+                  onAnswer(updated);
+                }}
+                onClose={() => setShowDrawing(false)}
+              />
+            )}
+
             <textarea
               aria-label="Tu respuesta"
               value={answer}

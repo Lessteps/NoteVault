@@ -1,1 +1,0 @@
-"""Vista General (dashboard) module."""

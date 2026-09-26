@@ -18,6 +18,7 @@ import { beep, md, ResultCard } from "./common";
 const SUBJECTS: Record<string, string> = { mathematics: "Matemáticas", programming: "Programación", english: "Inglés", general: "General" };
 const PLACEHOLDERS: Record<string, string> = {
   prove: "Escribe la demostración paso a paso, justificando cada paso.",
+  process: "Escribe el desarrollo paso a paso aplicando la técnica o método adecuado, justificando cada transformación.",
   counterexample: "Da el objeto concreto y comprueba que cumple las hipótesis y falla la conclusión.",
   true_false: "Escribe «Verdadero» o «Falso» y justifícalo con una prueba o un contraejemplo.",
   find_error: "Señala dónde está el error, por qué está mal y cómo se corrige.",

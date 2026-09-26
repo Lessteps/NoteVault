@@ -79,7 +79,7 @@ function _result(
 
 describe("TestModes", () => {
   it("catalogue", () => {
-    expect(Object.keys(MODES).length).toBe(16);
+    expect(Object.keys(MODES).length).toBe(17);
     for (const mode of Object.values(MODES)) {
       expect(["text", "code", "short", "drill"]).toContain(mode.answer_kind);
       const spec = parseTimer(undefined, 0, mode.timer);

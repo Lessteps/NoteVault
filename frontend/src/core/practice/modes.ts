@@ -16,6 +16,8 @@ export interface PracticeMode {
   readonly timer: string;
   readonly judge_focus: string;
   readonly subjects: readonly string[];
+  readonly assistance_protocol?: string;
+  readonly min_difficulty?: number;
 }
 
 const _CATALOGUE: readonly PracticeMode[] = [
@@ -41,6 +43,20 @@ const _CATALOGUE: readonly PracticeMode[] = [
       "The final result is correct and the procedure that reaches it is justified step by " +
       "step; units, domains and special cases are respected.",
     subjects: [MATH, GEN],
+  },
+  {
+    id: "process",
+    label: "Procedimiento guiado",
+    act: "Work the problem step by step using the named study technique, showing every intermediate step.",
+    answer_kind: "text",
+    timer: "pomodoro",
+    judge_focus:
+      "Grade the procedure, execution of the method and study technique used, not only the final answer: " +
+      "each intermediate transformation must be justified; correct choice and application of the technique; " +
+      "structure and clarity of the steps.",
+    subjects: [MATH],
+    assistance_protocol:
+      "Hints name the next step or the applicable study technique, never the answer or full transformation.",
   },
   {
     id: "counterexample",
@@ -206,6 +222,9 @@ export const PRACTICE_ALIASES: Record<string, string> = {
   demostracion: "prove",
   calculo: "solve",
   problema: "solve",
+  procedimiento: "process",
+  tecnica: "process",
+  proceso: "process",
   contraejemplo: "counterexample",
   verdadero_falso: "true_false",
   encontrar_error: "find_error",

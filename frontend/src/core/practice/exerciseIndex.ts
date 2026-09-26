@@ -26,6 +26,7 @@ export const MODE_SKILLS: Record<string, Record<string, string>> = {
   math_general: {
     prove: "01",
     solve: "02",
+    process: "02",
     explain: "03",
     counterexample: "04",
     true_false: "04",

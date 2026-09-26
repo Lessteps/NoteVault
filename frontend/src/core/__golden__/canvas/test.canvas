@@ -1,0 +1,33 @@
+{
+  "nodes": [
+    {
+      "id": "node_1",
+      "type": "text",
+      "x": 100,
+      "y": 100,
+      "width": 200,
+      "height": 100,
+      "color": "1",
+      "text": "Nodo de texto"
+    },
+    {
+      "id": "node_2",
+      "type": "file",
+      "x": 400,
+      "y": 100,
+      "width": 250,
+      "height": 150,
+      "file": "Notas/Idea.md"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "fromNode": "node_1",
+      "fromSide": "right",
+      "toNode": "node_2",
+      "toSide": "left",
+      "label": "conecta con"
+    }
+  ]
+}

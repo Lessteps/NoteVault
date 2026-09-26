@@ -15,10 +15,11 @@ type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
 declare global {
   interface Window {
     pywebview?: { api: PyApi };
+    nv?: { invoke: (method: string, args: unknown[]) => Promise<unknown> };
   }
 }
 
-type Transport = { kind: "pywebview" } | { kind: "http"; token: string };
+type Transport = { kind: "pywebview" } | { kind: "http"; token: string } | { kind: "electron" };
 
 let transport: Promise<Transport> | null = null;
 
@@ -36,6 +37,10 @@ function getTransport(): Promise<Transport> {
         resolve(t);
       }
     };
+    if (window.nv) {
+      done({ kind: "electron" });
+      return;
+    }
     if (window.pywebview?.api && Object.keys(window.pywebview.api).length) {
       done({ kind: "pywebview" });
       return;
@@ -71,6 +76,13 @@ function asError(e: unknown): Error {
 
 export async function call<T>(method: string, ...args: unknown[]): Promise<T> {
   const t = await getTransport();
+  if (t.kind === "electron") {
+    try {
+      return (await window.nv!.invoke(method, args)) as T;
+    } catch (e) {
+      throw asError(e);
+    }
+  }
   if (t.kind === "pywebview") {
     const fn = window.pywebview?.api?.[method];
     if (!fn) throw new Error(`Método desconocido: ${method}`);

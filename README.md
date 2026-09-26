@@ -1,72 +1,39 @@
-# SDD Desktop Studio — Environment Setup
+# NoteVault
 
-This project uses a stdlib virtual environment (`./.venv`) and declarative
-dependency management via `pyproject.toml` (PEP 621).
+NoteVault es un entorno de estudio, gestión personal y toma de notas construido con **Electron**, **TypeScript** y **React**.
 
-## Setup — One-time
+## Requisitos previos
 
-```bash
-# Create the virtual environment
-python -m venv .venv
+- **Node.js**: v20+ o v22+
+- **npm**: v10+
 
-# Install project dependencies (runtime + dev)
-pip install -e .[dev]
-```
-
-### On Windows
-
-```bat
-python -m venv .venv
-.venv\Scripts\pythonw.exe -m pip install -e .[dev]
-```
-
-## Running the Application
+## Instalación y Desarrollo
 
 ```bash
-# From the venv (recommended)
-source .venv/bin/activate
-python run_app.py
-# or
-.venv\Scripts\pythonw.exe run_app.py
-
-# From the global interpreter (if deps are also installed globally)
-python run_app.py
+cd frontend
+npm install
+npm run electron:dev
 ```
 
-## Running Tests
+## Pruebas y Control de Calidad
 
 ```bash
-# From the venv
-source .venv/bin/activate
-QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests
-# or via mise
-mise run test
+cd frontend
+npm run typecheck    # Verificación de tipos TypeScript
+npx vitest run       # Pruebas unitarias de core y API
 ```
 
-### Windows
+## Compilación y Generación del Instalador (.exe)
 
-```bat
-.venv\Scripts\activate
-set QT_QPA_PLATFORM=offscreen
-python -m unittest discover -s tests
-```
-
-## Launcher (Windows)
-
-```bat
-:: Iniciar_SDD_Studio.bat
-:: Uses .venv\Scripts\pythonw.exe with missing-venv guard
-```
-
-## Rollback
-
-To roll back this change:
+En Windows, ejecuta:
 
 ```bash
-deactivate 2>/dev/null || true
-rm -rf .venv
-rm pyproject.toml
-rm mise.toml
-rm README.md
-:: Revert Iniciar_SDD_Studio.bat to original (bare pythonw)
+cd frontend
+npm run electron:build
 ```
+
+Esto generará el instalador ejecutable en `frontend/release/NoteVault Setup 0.1.0.exe` y la versión portable desempaquetada en `frontend/release/win-unpacked/NoteVault.exe`.
+
+## Documentación adicional
+
+Para detalles sobre la arquitectura IPC y seguridad de la aplicación, consulta [docs/WEB_UI.md](docs/WEB_UI.md).

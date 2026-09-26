@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../core/errors.js";
+import { todayIso } from "../../core/dates.js";
 import { AppConfig } from "../appConfig.js";
 import { AppState } from "../appState.js";
 import { notesExtrasApi } from "./notes_extras.js";
@@ -58,8 +59,7 @@ describe("notesExtrasApi", () => {
 
     const textRes = api.template_text("Clase.md", "Álgebra");
     expect(textRes.text).toContain("# Álgebra");
-    const todayIso = new Date().toISOString().slice(0, 10);
-    expect(textRes.text).toContain(todayIso);
+    expect(textRes.text).toContain(todayIso());
 
     expect(() => api.template_text("../secret.md")).toThrow(ApiError);
   });
@@ -75,8 +75,7 @@ describe("notesExtrasApi", () => {
 
   it("daily_note is idempotent and confined to vault", () => {
     const a = api.daily_note().path;
-    const todayIso = new Date().toISOString().slice(0, 10);
-    expect(a).toBe(`Diario/${todayIso}.md`);
+    expect(a).toBe(`Diario/${todayIso()}.md`);
 
     fs.writeFileSync(path.join(tmpDir, a), "hola", "utf-8");
     expect(api.daily_note().path).toBe(a);

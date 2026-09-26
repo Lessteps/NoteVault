@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Golden fixtures must keep exact LF line endings across all platforms
+frontend/src/core/__golden__/** eol=lf

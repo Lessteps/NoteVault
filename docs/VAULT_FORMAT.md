@@ -605,6 +605,7 @@ nota. El cliente móvil conserva estos archivos sin tocarlos.
 | `study_handoff_request` | `.notevault/estudio/handoff/requests/<req-id>.json` |
 | `study_handoff_response` | `.notevault/estudio/handoff/responses/<req-id>.json` |
 | `study_ledger` | `.notevault/estudio/ledger/<disciplina>.json` — estado por skill (fase 6) |
+| `study_exam` | `.notevault/estudio/exams/<slug>.json` — registros de exámenes rendidos (fase 5) |
 | `kb_canvas_manifest` | `.notevault/estudio/kb_canvas_manifest.json` — hashes de canvas generados |
 
 ### `.notevault/estudio/intentos/<att-id>.json`
@@ -651,6 +652,113 @@ Intercambio por archivos con un agente de IA que tenga acceso a la vault.
   `responses/<req-id>.md` con un bloque JSON).
 - `<req-id>` = `req_` + `AAAAMMDDhhmmss` + `_` + 6 hex.
 - Cuando la app procesa la respuesta mueve la petición a `requests/done/`.
+
+### `.notevault/estudio/exams/<slug>.json`
+
+Registros de examen aprobados o rendidos por tema o grupo de temas (`exam_group`).
+`<slug>` es el identificador sanitizado del tema (`mat-1-1-numeros-naturales`) o
+del grupo de temas (`exam_group`).
+
+```json
+{
+  "slug": "mat-1-1-numeros-naturales",
+  "topic_id": "mat.1.1.numeros_naturales",
+  "exam_group": null,
+  "title": "Examen: Números Naturales",
+  "at": "2026-09-26T14:00:00",
+  "score": 85,
+  "passed": true,
+  "skills": {
+    "computation": "correct",
+    "drill": "correct",
+    "exercise": "partial"
+  },
+  "results": [
+    {
+      "note_id": "mat.1.1.e01",
+      "skill": "computation",
+      "difficulty": "medium",
+      "score": 100,
+      "verdict": "correct",
+      "feedback": "Cálculo aritmético impecable."
+    }
+  ]
+}
+```
+
+- `slug`: identificador único del examen (usado como nombre de archivo `<slug>.json`).
+- `passed`: `true` si el puntaje ponderado alcanza o supera el 75%.
+- `skills`: diccionario `{ [skillId]: verdict }`. Si el examen aprueba, estas skills
+  se computan como consolidadas/aprobadas para el cálculo de completitud del tema.
+- `results`: desglose de cada ejercicio evaluado (con puntaje, feedback y veredicto).
+
+### Manifiesto de tema (`_tema.md`)
+
+En cada carpeta que represente un tema de estudio (`topic`), puede existir un
+archivo de manifiesto `_tema.md` con frontmatter YAML `type: topic`:
+
+```markdown
+---
+type: topic
+id: mat.aritmetica.1.1.naturales
+title: 1.1 Números Naturales
+area: 1 Aritmética
+subject: mathematics
+target_difficulty: hard
+exam_group: null
+skills:
+  - computation
+  - drill
+  - exercise
+  - proof
+tags:
+  - math
+  - arithmetic
+---
+
+# 1.1 Números Naturales
+
+Resumen de conceptos y competencias del tema.
+```
+
+- `id`: identificador global único del tema (`subject.area.topic_name`).
+- `title`: nombre legible del tema.
+- `area`: nombre del área padre (ej. `1 Aritmética`, `2 Álgebra`).
+- `subject`: `mathematics` | `programming` | `english`.
+- `target_difficulty`: dificultad requerida para completar (`easy` | `medium` | `hard`).
+- `exam_group`: string opcional; si varios temas contiguos comparten `exam_group`,
+  se evalúan en un único examen unificado.
+- `skills`: lista de competencias requeridas para este tema.
+- Si una carpeta carece de `_tema.md`, NoteVault infiere dinámicamente el tema a
+  partir de las etiquetas (`tags`) y la ubicación de las notas hijas.
+
+## Contrato móvil (Mobile Contract)
+
+La aplicación móvil Android (`notevault_mobile` escrita en Dart/Flutter) y la app
+de escritorio (`NoteVault`) comparten exactamente la misma bóveda (`vault`) y
+deben operar de forma simétrica:
+
+1. **Lectura de temas y manifiestos**:
+   - `notevault_mobile` debe escanear los archivos `_tema.md` (`type: topic`)
+     para poblar la lista de temas y el desglose de competencias (`skills`).
+   - La inferencia basada en etiquetas (`#tema/...` o frontmatter `tags`)
+     debe seguir el mismo estándar de normalización (`src/core/practice/topic.ts`).
+2. **Lectura y escritura de exámenes**:
+   - `notevault_mobile` lee `.notevault/estudio/exams/<slug>.json` para conocer
+     si el examen fue aprobado y reflejar la completitud del tema sin divergencias.
+   - Si la app móvil evalúa o sincroniza un examen, debe escribir el mismo JSON
+     con los campos `slug`, `topic_id`, `at`, `score`, `passed`, `skills`, `results`.
+3. **Cálculo de completitud uniforme**:
+   - Completitud (%) = promedio ponderado de avance por cada skill requerida.
+   - Una skill está al 100% si:
+     - El examen del tema está aprobado (`passed: true`), O
+     - En el ledger (`.notevault/estudio/ledger/<disciplina>.json`) la skill ha
+       alcanzado o superado la `target_difficulty` del tema.
+4. **Almacenamiento de práctica en `.notevault/estudio/`**:
+   - Todos los intentos se registran en `.notevault/estudio/intentos/<att-id>.json`.
+   - Todos los errores se registran en `.notevault/estudio/errores/<err-id>.json`.
+   - Ni la app de escritorio ni la app móvil modifican jamás el cuerpo de las notas
+     de ejercicios (`type: exercise`).
 
 ## Adjuntos
 

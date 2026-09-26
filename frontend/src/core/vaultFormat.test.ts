@@ -38,6 +38,8 @@ describe("vaultFormat", () => {
     expect(LAYOUT.trash_dir).toBe(".notevault/.papelera");
     expect(LAYOUT.bookmarks).toBe(".notevault-bookmarks.json");
     expect(LAYOUT.study_ledger).toBe(".notevault/estudio/ledger/{id}.json");
+    expect(LAYOUT.study_exams_dir).toBe(".notevault/estudio/exams");
+    expect(LAYOUT.study_exam).toBe(".notevault/estudio/exams/{id}.json");
   });
 
   it("formats layout templates correctly", () => {

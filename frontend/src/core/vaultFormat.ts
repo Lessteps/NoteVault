@@ -71,6 +71,8 @@ export const LAYOUT = {
   study_handoff_response: `${DATA_DIR}/estudio/handoff/responses/{id}.json`,
   study_ledger_dir: `${DATA_DIR}/estudio/ledger`,
   study_ledger: `${DATA_DIR}/estudio/ledger/{id}.json`,
+  study_exams_dir: `${DATA_DIR}/estudio/exams`,
+  study_exam: `${DATA_DIR}/estudio/exams/{id}.json`,
   kb_canvas_manifest: `${DATA_DIR}/estudio/kb_canvas_manifest.json`,
   web_dir: `${DATA_DIR}/web`,
   web_bookmarks: `${DATA_DIR}/web/marcadores.json`,

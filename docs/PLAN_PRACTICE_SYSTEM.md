@@ -1,7 +1,13 @@
 # PLAN — NoteVault Practice System (the "teacher")
 
-Status: active. Owner of design: Claude. Executors: Claude, then Antigravity (or any AI) from the
-first unchecked task in §12. Written 2026-09-24.
+> [!NOTE]
+> **REFORMADO POR PRACTICE V2 (`docs/PRACTICE_V2/PLAN.md`)**:
+> La experiencia de práctica, configuración y generación fue reformada e implementada en V2:
+> 1. **UX dirigida por el usuario**: supera la selección a priori rígida; el estudiante configura directamente tema, skill, dificultad (fácil, media, difícil), cantidad y nivel de asistencia (`TopicConfiguratorDialog`).
+> 2. **Generación especializada por concepto**: sustituye al antiguo generador genérico (que estaba en ON-HOLD), permitiendo prácticas y variantes calibradas por concepto y topic manifest.
+> 3. **Modelo de temas y exámenes**: manifiestos `_tema.md` (`type: topic`), matriz de avance `skill × dificultad`, exámenes por tema o grupos de temas (`.notevault/estudio/exams/<slug>.json`), dashboard agregado de progreso y entrada matemática por trazo/dibujo local a LaTeX.
+
+Status: active (reformed by Practice V2). Owner of design: Claude. Executors: Claude, then Antigravity. Written 2026-09-24.
 
 **If you are an AI continuing this work: read §0, then jump to §12 (Progress log) and continue
 from the first task whose box is not checked. Never redo a checked task. Tick the box and add a
@@ -653,12 +659,10 @@ look at them, fix layout issues.
   the embedded messages and write `responses/<id>.json`".
 - Rebuild `NoteVault.exe` (rule 0.8).
 
-### Phase 4 — Exercise generation — ON HOLD (2026-09-24, user decision)
-The user rejected a generic "AI writes exercises from a skill" feature: exercises are designed per
-concrete concept, with the practice type that fits that concept, as part of the knowledge base.
-Do not implement this phase; it will be redefined when the theory/exercise structure is replanned.
-Where Phase 6 says "ask the generator for a fresh exercise", use an existing, not-yet-attempted
-exercise note of that skill/concept instead. Original text kept for reference:
+### Phase 4 — Exercise generation — SUPERSEDED BY PRACTICE V2 (2026-09-26)
+> **Actualización V2**: Superado por Practice V2 (`docs/PRACTICE_V2/PLAN.md`). La generación genérica previa en ON-HOLD ha sido reemplazada por generación dirigida por el usuario (`TopicConfiguratorDialog`) y especializada por concepto dentro de los manifiestos de tema (`_tema.md`), con ensamblaje de exámenes calibrados por dificultad (`src/core/practice/exams.ts`).
+
+El texto original se conserva a continuación como referencia histórica:
 - `core/practice/generation.py`: `build_generation_messages(discipline, skill, mode, count,
   difficulty, *, concept_note_text="", chapter="", level="", recent_errors=[], assistance)` —
   embeds the discipline framing, anchors, mode act, the note format of §5.1, the study-technique

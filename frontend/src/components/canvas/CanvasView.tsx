@@ -23,7 +23,7 @@ type View = { x: number; y: number; zoom: number };
 type Drag =
   | { kind: "pan"; sx: number; sy: number; vx: number; vy: number }
   | { kind: "move"; sx: number; sy: number; start: Map<string, [number, number]>; moved: boolean }
-  | { kind: "resize"; id: string; sx: number; sy: number; w: number; h: number }
+  | { kind: "resize"; id: string; sx: number; sy: number; w: number; h: number; x: number; y: number; handle: string }
   | { kind: "connect"; from: string; side: Side; x: number; y: number }
   | { kind: "box"; x0: number; y0: number; x: number; y: number; add: boolean }
   | { kind: "draw"; points: Array<[number, number]> };
@@ -55,7 +55,8 @@ export function CanvasView() {
   dragRef.current = drag;
   const [drawMode, setDrawMode] = useState(false);
   const [pen, setPen] = useState({ color: "5", width: 3 });
-  const [snap, setSnap] = useState(() => localStorage.getItem("nv.canvas.snap") === "1");
+  const [snap, setSnap] = useState(() => localStorage.getItem("nv.canvas.snap") !== "0");
+  const [showGrid, setShowGrid] = useState(() => localStorage.getItem("nv.canvas.grid") !== "0");
   const [picker, setPicker] = useState<null | "note" | "image" | "canvas">(null);
   const clip = useRef<CanvasDoc | null>(null);
   const docRef = useRef(doc);
@@ -265,8 +266,9 @@ export function CanvasView() {
     }
     if (t.closest("[data-resize]")) {
       const n = byId.get(id)!;
+      const handle = (t as Element).getAttribute("data-resize") ?? "se";
       snapshot();
-      startDrag(e, { kind: "resize", id, sx: wx, sy: wy, w: n.width, h: n.height });
+      startDrag(e, { kind: "resize", id, sx: wx, sy: wy, w: n.width, h: n.height, x: n.x, y: n.y, handle });
       return;
     }
     setSelEdge(null);
@@ -319,10 +321,27 @@ export function CanvasView() {
       }, false);
     } else if (d.kind === "resize") {
       const cur = docRef.current;
+      const dx = wx - d.sx;
+      const dy = wy - d.sy;
+      const h = d.handle;
+      const isW = h.includes("w");
+      const isN = h.includes("n");
+      const isE = h.includes("e");
+      const isS = h.includes("s");
+      // Horizontal
+      let newX = d.x;
+      let newW = d.w;
+      if (isE) newW = Math.max(40, snapTo(d.w + dx, snap));
+      if (isW) { newW = Math.max(40, snapTo(d.w - dx, snap)); newX = snapTo(d.x + d.w - newW, snap); }
+      // Vertical
+      let newY = d.y;
+      let newH = d.h;
+      if (isS) newH = Math.max(30, snapTo(d.h + dy, snap));
+      if (isN) { newH = Math.max(30, snapTo(d.h - dy, snap)); newY = snapTo(d.y + d.h - newH, snap); }
       commit({
         ...cur,
         nodes: cur.nodes.map((n) => (n.id === d.id
-          ? { ...n, width: Math.max(40, snapTo(d.w + wx - d.sx, snap)), height: Math.max(30, snapTo(d.h + wy - d.sy, snap)) }
+          ? { ...n, x: newX, y: newY, width: newW, height: newH }
           : n)),
       }, false);
     } else if (d.kind === "connect" || d.kind === "box") {
@@ -398,6 +417,9 @@ export function CanvasView() {
       openMenu(e, [
         { label: "Duplicar", onSelect: () => pasteDoc(docRef.current, ids, 30, 30) },
         { label: "Agrupar", onSelect: groupSelection },
+        { label: "Grosor: Fino (1px)", onSelect: () => setThickness(ids, 1) },
+        { label: "Grosor: Normal (2px)", onSelect: () => setThickness(ids, 2) },
+        { label: "Grosor: Grueso (4px)", onSelect: () => setThickness(ids, 4) },
         { label: "Traer al frente", onSelect: () => reorder(ids, true) },
         { label: "Enviar atrás", onSelect: () => reorder(ids, false) },
         { label: "Eliminar", danger: true, icon: <Trash2 />, onSelect: () => {
@@ -412,8 +434,19 @@ export function CanvasView() {
       { label: "Tarjeta de texto", icon: <StickyNote />, onSelect: () => addText(x, y) },
       { label: "Nota de la vault…", icon: <FileText />, onSelect: () => setPicker("note") },
       { label: "Imagen de la vault…", icon: <ImageIcon />, onSelect: () => setPicker("image") },
+      { label: "Nuevo grupo vacío", icon: <SquareDashed />, onSelect: () => {
+        addNode({ type: "group", x: x - 200, y: y - 150, width: 400, height: 300, label: "Grupo" });
+      }},
       { label: "Pegar", onSelect: () => void paste() },
     ]);
+  };
+
+  const setThickness = (ids: Set<string>, borderWidth: number) => {
+    const d = docRef.current;
+    commit({
+      ...d,
+      nodes: d.nodes.map((n) => (ids.has(n.id) ? { ...n, nv: { ...n.nv, borderWidth } } : n)),
+    });
   };
 
   const reorder = (ids: Set<string>, front: boolean) => {
@@ -468,10 +501,12 @@ export function CanvasView() {
     else if (k === "z") run(() => addText());
     else if (k === "x") run(() => setPicker("note"));
     else if (k === "c") run(() => setPicker("image"));
-    else if (k === "a") run(() => setPicker("canvas"));
-    else if (k === "s") run(() => void addLink());
+    else if (k === "v") run(() => void addLink());
     else if (k === "b") run(groupSelection);
     else if (k === "n") run(() => setDrawMode((v) => !v));
+    else if (k === "m") run(() => addShape("process"));
+    else if (k === "a") run(() => setPicker("canvas"));
+    else if (k === "s") run(() => void addLink());
     else if (e.key.startsWith("Arrow") && sel.size) {
       run(() => {
         const step = e.shiftKey ? 50 : snap ? GRID : 5;
@@ -514,7 +549,7 @@ export function CanvasView() {
         className={cn("nv-canvas relative min-h-0 flex-1 overflow-hidden outline-none",
           drawMode ? "cursor-crosshair" : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-default")}
         style={{
-          backgroundImage: "radial-gradient(circle, var(--nv-line-strong) 1px, transparent 1.2px)",
+          backgroundImage: showGrid ? "radial-gradient(circle, var(--nv-line-strong) 1px, transparent 1.2px)" : "none",
           backgroundSize: `${gridSize}px ${gridSize}px`,
           backgroundPosition: `${view.x}px ${view.y}px`,
         }}
@@ -598,16 +633,16 @@ export function CanvasView() {
         )}
 
         <Toolbar>
-          <Tool title="Tarjeta de texto (Z)" onClick={() => addText()}><StickyNote size={16} /></Tool>
-          <Tool title="Nota de la vault (X)" onClick={() => setPicker("note")}><FileText size={16} /></Tool>
-          <Tool title="Imagen de la vault (C)" onClick={() => setPicker("image")}><ImageIcon size={16} /></Tool>
+          <Tool title="Tarjeta de texto (Z)" kbd="Z" onClick={() => addText()}><StickyNote size={16} /></Tool>
+          <Tool title="Nota de la vault (X)" kbd="X" onClick={() => setPicker("note")}><FileText size={16} /></Tool>
+          <Tool title="Imagen de la vault (C)" kbd="C" onClick={() => setPicker("image")}><ImageIcon size={16} /></Tool>
           <Tool title="Canvas embebido (A)" onClick={() => setPicker("canvas")}><LayoutDashboard size={16} /></Tool>
-          <Tool title="Enlace web (S)" onClick={() => void addLink()}><Link2 size={16} /></Tool>
-          <Tool title="Forma de diagrama (F)" onClick={(e) => openMenu(e, SHAPES.map((s) => ({ label: s.name, onSelect: () => addShape(s.id) })))}>
+          <Tool title="Enlace web (V)" kbd="V" onClick={() => void addLink()}><Link2 size={16} /></Tool>
+          <Tool title="Forma de diagrama (M)" kbd="M" onClick={(e) => openMenu(e, SHAPES.map((s) => ({ label: s.name, onSelect: () => addShape(s.id) })))}>
             <Diamond size={16} />
           </Tool>
-          <Tool title="Grupo (B / Ctrl+G)" onClick={groupSelection}><SquareDashed size={16} /></Tool>
-          <Tool title="Dibujo libre (N)" active={drawMode} onClick={() => setDrawMode((v) => !v)}><PenLine size={16} /></Tool>
+          <Tool title="Grupo (B / Ctrl+G)" kbd="B" onClick={groupSelection}><SquareDashed size={16} /></Tool>
+          <Tool title="Dibujo libre (N)" kbd="N" active={drawMode} onClick={() => setDrawMode((v) => !v)}><PenLine size={16} /></Tool>
           {drawMode && (
             <div className="flex items-center gap-1 px-1">
               {Object.keys(PRESET_COLORS).map((c) => (
@@ -622,10 +657,14 @@ export function CanvasView() {
             </div>
           )}
           <Sep />
+          <Tool title="Cuadrícula" active={showGrid} onClick={() => setShowGrid((v) => {
+            localStorage.setItem("nv.canvas.grid", v ? "0" : "1");
+            return !v;
+          })}><Grid3x3 size={16} /></Tool>
           <Tool title="Ajustar a la cuadrícula" active={snap} onClick={() => setSnap((v) => {
             localStorage.setItem("nv.canvas.snap", v ? "0" : "1");
             return !v;
-          })}><Grid3x3 size={16} /></Tool>
+          })}><Hand size={16} /></Tool>
           <Tool title="Alejar (Ctrl+−)" onClick={() => zoomAt(1 / 1.2)}><Minus size={16} /></Tool>
           <Tool title="Acercar (Ctrl++)" onClick={() => zoomAt(1.2)}><Plus size={16} /></Tool>
           <Tool title="Ver todo (Ctrl+0)" onClick={() => fit()}><Maximize size={16} /></Tool>
@@ -709,14 +748,15 @@ function Sep() {
   return <span className="mx-1 h-5 w-px bg-line" />;
 }
 
-function Tool({ title, onClick, children, active, disabled }: {
-  title: string; onClick: (e: React.MouseEvent) => void; children: ReactNode; active?: boolean; disabled?: boolean;
+function Tool({ title, kbd, onClick, children, active, disabled }: {
+  title: string; kbd?: string; onClick: (e: React.MouseEvent) => void; children: ReactNode; active?: boolean; disabled?: boolean;
 }) {
   return (
     <button type="button" title={title} aria-label={title} disabled={disabled} onClick={onClick}
-      className={cn("grid h-8 w-8 place-items-center rounded-lg transition-colors disabled:opacity-35",
+      className={cn("relative grid h-8 place-items-center rounded-lg px-1.5 transition-colors disabled:opacity-35 min-w-[2rem]",
         active ? "bg-accent-soft text-accent-text" : "text-dim hover:bg-hover hover:text-text")}>
       {children}
+      {kbd && <span className="absolute bottom-0.5 right-0.5 font-mono text-[8px] opacity-50 leading-none">{kbd}</span>}
     </button>
   );
 }

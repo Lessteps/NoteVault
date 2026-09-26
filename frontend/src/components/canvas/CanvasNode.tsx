@@ -75,7 +75,7 @@ function FileBody({ node }: { node: CNode }) {
       </div>
       {info.kind === "note" ? (
         <div
-          className="nv-prose min-h-0 flex-1 overflow-hidden px-3 py-2 text-[12.5px]"
+          className="nv-prose min-h-0 flex-1 px-3 py-2 text-[12.5px]"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(stripFrontmatter(info.text ?? "")) }}
         />
       ) : (
@@ -129,14 +129,22 @@ export const CanvasNodeView = memo(function CanvasNodeView({
 }) {
   const col = colorOf(node.color);
   const tint = node.color ? `color-mix(in srgb, ${col} 12%, var(--nv-card))` : "var(--nv-card)";
-  const style = { left: node.x, top: node.y, width: node.width, height: node.height };
+  const borderWidth = typeof node.nv?.borderWidth === "number" ? node.nv.borderWidth : 2;
+  const style: React.CSSProperties = {
+    left: node.x,
+    top: node.y,
+    width: node.width,
+    height: node.height,
+    borderWidth,
+    borderStyle: "solid",
+  };
   const done = (v: string | null) => onEditDone(node.id, v);
 
   if (node.type === "group") {
     return (
       <div
         data-node-id={node.id}
-        className={cn("absolute rounded-2xl border-2", selected && "outline outline-2 outline-offset-2 outline-accent")}
+        className={cn("absolute rounded-2xl", selected && "outline outline-2 outline-offset-2 outline-accent")}
         style={{ ...style, borderColor: col, background: `color-mix(in srgb, ${colorOf(node.color, "var(--nv-dim)")} 7%, transparent)` }}
       >
         <div className="absolute -top-8 left-0 flex h-7 max-w-full items-center rounded-lg px-2 text-[14px] font-semibold text-text"
@@ -159,7 +167,7 @@ export const CanvasNodeView = memo(function CanvasNodeView({
   if (node.type === "nv-drawing") {
     const strokes = node.nv?.strokes ?? [];
     return (
-      <div data-node-id={node.id} className={cn("absolute", selected && "rounded outline-dashed outline-1 outline-accent")} style={style}>
+      <div data-node-id={node.id} className={cn("absolute", selected && "rounded outline-dashed outline-1 outline-accent")} style={{ left: node.x, top: node.y, width: node.width, height: node.height }}>
         <svg width={node.width} height={node.height} className="overflow-visible">
           {strokes.map((s, i) => (
             <polyline key={i} points={s.points.map((p) => p.join(",")).join(" ")} fill="none"
@@ -174,11 +182,11 @@ export const CanvasNodeView = memo(function CanvasNodeView({
   if (node.type === "nv-shape") {
     const stroke = colorOf(node.color, "var(--nv-accent)");
     return (
-      <div data-node-id={node.id} className="absolute" style={style}>
+      <div data-node-id={node.id} className="absolute" style={{ left: node.x, top: node.y, width: node.width, height: node.height }}>
         <svg width={node.width} height={node.height} className="absolute inset-0 overflow-visible">
           <path d={shapePath(node.nv?.shape ?? "process", node.width, node.height)}
             fill={node.nv?.shape === "comment" ? "none" : `color-mix(in srgb, ${stroke} 14%, var(--nv-card))`}
-            stroke={selected ? "var(--nv-accent)" : stroke} strokeWidth={selected ? 2.5 : 1.6} />
+            stroke={selected ? "var(--nv-accent)" : stroke} strokeWidth={selected ? borderWidth + 1 : borderWidth} />
         </svg>
         <div className="absolute inset-0 grid place-items-center px-4 text-center text-[13px] font-medium text-text">
           {editing ? <TextEditor value={node.text ?? ""} onDone={done} className="text-center" /> : node.text}
@@ -192,7 +200,7 @@ export const CanvasNodeView = memo(function CanvasNodeView({
     <div
       data-node-id={node.id}
       className={cn(
-        "absolute flex flex-col overflow-hidden rounded-xl border-2 shadow-sm",
+        "absolute flex flex-col overflow-hidden rounded-xl shadow-sm",
         selected && "ring-2 ring-accent ring-offset-1 ring-offset-surface",
       )}
       style={{ ...style, borderColor: col, background: tint }}
@@ -200,7 +208,7 @@ export const CanvasNodeView = memo(function CanvasNodeView({
       {node.type === "text" && (editing
         ? <TextEditor value={node.text ?? ""} onDone={done} />
         : (
-          <div className="nv-prose h-full overflow-hidden px-3 py-2 text-[13.5px]"
+          <div className="nv-prose h-full px-3 py-2 text-[13.5px]"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(node.text ?? "") }} />
         ))}
       {node.type === "file" && <FileBody node={node} />}
@@ -216,7 +224,18 @@ export const CanvasNodeView = memo(function CanvasNodeView({
   );
 });
 
-/** Ports to drag connections from, and the resize grip. */
+const RESIZE_HANDLES = [
+  { pos: "top-0 left-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize", handle: "nw" },
+  { pos: "top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize", handle: "n" },
+  { pos: "top-0 right-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize", handle: "ne" },
+  { pos: "top-1/2 right-0 translate-x-1/2 -translate-y-1/2 cursor-ew-resize", handle: "e" },
+  { pos: "bottom-0 right-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize", handle: "se" },
+  { pos: "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize", handle: "s" },
+  { pos: "bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize", handle: "sw" },
+  { pos: "top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize", handle: "w" },
+];
+
+/** Ports to drag connections from, and the 8 resize handles. */
 function Handles({ selected }: { selected: boolean }) {
   return (
     <>
@@ -226,15 +245,23 @@ function Handles({ selected }: { selected: boolean }) {
           data-port={s}
           title="Arrastra para conectar"
           className={cn(
-            "nv-port absolute z-10 h-3.5 w-3.5 cursor-crosshair rounded-full border-2 border-accent bg-card",
+            "nv-port absolute z-20 h-3.5 w-3.5 cursor-crosshair rounded-full border-2 border-accent bg-card",
             PORT_POS[s], selected ? "opacity-100" : "opacity-0",
           )}
         />
       ))}
-      {selected && (
-        <span data-resize="1" title="Cambiar tamaño"
-          className="absolute -bottom-1.5 -right-1.5 z-10 h-3.5 w-3.5 cursor-nwse-resize rounded-sm border-2 border-accent bg-card" />
-      )}
+      {selected && RESIZE_HANDLES.map(({ pos, handle }) => (
+        <span
+          key={handle}
+          data-resize={handle}
+          title="Cambiar tamaño"
+          className={cn(
+            "absolute z-10 rounded-sm border-2 border-accent bg-card",
+            handle === "n" || handle === "s" ? "h-3.5 w-7" : handle === "w" || handle === "e" ? "h-7 w-3.5" : "h-3.5 w-3.5",
+            pos,
+          )}
+        />
+      ))}
     </>
   );
 }

@@ -64,7 +64,7 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
   const c = snap.queue.counts;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="nv-study-panel flex min-h-0 flex-1 flex-col">
       <div className="flex-none border-b border-line px-4 py-3">
         <div className="flex items-center">
           <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-faint">Estudio</span>

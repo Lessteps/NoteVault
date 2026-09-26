@@ -90,6 +90,18 @@ function getStudyArea(app: AppState, rel: string): StudyArea | null {
   return detectStudyArea(r, fm, workspaces);
 }
 
+interface CachedStudySnapshot {
+  data: any;
+  timestamp: number;
+}
+
+const _snapshotCache = new Map<string, CachedStudySnapshot>();
+const SNAPSHOT_CACHE_TTL_MS = 30_000;
+
+export function clearStudySnapshotCache(): void {
+  _snapshotCache.clear();
+}
+
 export function studyApi(app: AppState) {
   return {
     study_area(rel: string) {
@@ -109,6 +121,11 @@ export function studyApi(app: AppState) {
       const area = getStudyArea(app, rel);
       if (!area) {
         throw new ApiError("Esta nota no está en un área de estudio.");
+      }
+      const cacheKey = `${app.root}::${area.subject}::${area.folder}`;
+      const cached = _snapshotCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < SNAPSHOT_CACHE_TTL_MS) {
+        return cached.data;
       }
       const snap = hubSnapshot(app.root, app.vault.notePaths(), null, area);
       const srs = new StudySRSManager(app.root);
@@ -239,7 +256,7 @@ export function studyApi(app: AppState) {
       errors.sort((a, b) => Number(b.repeat_count) - Number(a.repeat_count));
       srs.allItems(); // warm cache
 
-      return {
+      const result = {
         area: {
           subject: area.subject,
           title: area.title,
@@ -258,9 +275,12 @@ export function studyApi(app: AppState) {
         concepts: conceptRows,
         errors,
       };
+      _snapshotCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
     },
 
     study_card_grade(srs_id: string, quality: number) {
+      clearStudySnapshotCache();
       const q =
         typeof quality === "number"
           ? Math.trunc(quality)
@@ -275,6 +295,7 @@ export function studyApi(app: AppState) {
     },
 
     study_error_resolve(error_id: string) {
+      clearStudySnapshotCache();
       if (new StudyErrorManager(app.root).markResolved(String(error_id)) === null) {
         throw new ApiError("Ese error ya no existe.");
       }

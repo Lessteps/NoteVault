@@ -43,6 +43,7 @@ import { parseTimer } from "../../core/practice/timer.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 import { clampInt } from "../common.js";
+import { clearStudySnapshotCache } from "./study.js";
 
 export const MAX_ANSWER = 60_000;
 const _REQ_RE = /^req_\d{14}_[0-9a-f]{6}$/;
@@ -160,6 +161,7 @@ function practiceApply(
     transport,
     result,
   });
+  clearStudySnapshotCache();
   const history = historyList(new PracticeAttemptStore(app.root).attempts(ex.note_id));
   return {
     graded: true,

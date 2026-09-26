@@ -722,3 +722,14 @@ html[data-perf="lite"] *::after {
   contain-intrinsic-size: auto 40px;
 }
 
+/* Practice and study panel containment */
+.nv-study-panel,
+.nv-practice-view {
+  contain: content;
+}
+
+html[data-perf="lite"] .nv-study-panel,
+html[data-perf="lite"] .nv-practice-view {
+  contain: content;
+}
+

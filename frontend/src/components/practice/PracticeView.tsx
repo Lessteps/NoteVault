@@ -245,6 +245,20 @@ export function PracticeView({ note }: { note: OpenNote }) {
     return s;
   }, [ex]);
 
+  const renderedStatement = useMemo(() => (statement ? md(statement) : null), [statement]);
+
+  const hintsMd = useMemo(() => {
+    if (!ex || hints <= 0) return "";
+    return ex.hints.slice(0, hints).map((h, i) => `**Pista ${i + 1}.** ${h.trim()}`).join("\n\n");
+  }, [ex, hints]);
+
+  const renderedHints = useMemo(() => (hintsMd ? md(hintsMd) : null), [hintsMd]);
+
+  const renderedSolution = useMemo(() => {
+    if (solution === null) return null;
+    return md(solution.trim() || "_(La nota no trae solución modelo.)_");
+  }, [solution]);
+
   if (error) {
     return <div className="p-8 text-[13px] text-danger">No se pudo leer el ejercicio: {error}</div>;
   }
@@ -256,7 +270,7 @@ export function PracticeView({ note }: { note: OpenNote }) {
   const best = ex.history.length ? Math.max(...ex.history.map((h) => h.score)) : null;
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto nv-practice-view">
       <div className="mx-auto flex max-w-[860px] flex-col gap-4 px-8 py-6">
         <header className="flex items-start gap-4">
           <div className="min-w-0 flex-1">
@@ -302,10 +316,10 @@ export function PracticeView({ note }: { note: OpenNote }) {
           </button>
         </header>
 
-        {statement && (
+        {renderedStatement && (
           <section>
             <h2 className="mb-1.5 font-mono text-[10.5px] uppercase tracking-wider text-faint">Enunciado</h2>
-            <div className="nv-prose rounded-xl border border-line bg-card px-5 py-4 text-[15px]" dangerouslySetInnerHTML={md(statement)} />
+            <div className="nv-prose rounded-xl border border-line bg-card px-5 py-4 text-[15px]" dangerouslySetInnerHTML={renderedStatement} />
           </section>
         )}
 
@@ -337,9 +351,9 @@ export function PracticeView({ note }: { note: OpenNote }) {
                 code && "font-mono text-[13px]",
               )}
             />
-            {hints > 0 && (
+            {renderedHints && (
               <div className="nv-prose rounded-xl border border-warn/40 bg-warn-soft px-4 py-3 text-[14px]"
-                dangerouslySetInnerHTML={md(ex.hints.slice(0, hints).map((h, i) => `**Pista ${i + 1}.** ${h.trim()}`).join("\n\n"))} />
+                dangerouslySetInnerHTML={renderedHints} />
             )}
             <div className="flex flex-wrap items-center gap-2">
               {!pending && !graded && (
@@ -388,11 +402,11 @@ export function PracticeView({ note }: { note: OpenNote }) {
 
         {result && <ResultCard result={result.result} quality={result.quality} rubric={ex.rubric} onRetry={retry} />}
 
-        {showSolution && solution !== null && (
+        {showSolution && renderedSolution && (
           <section>
             <h2 className="mb-1.5 font-mono text-[10.5px] uppercase tracking-wider text-faint">Solución modelo</h2>
             <div className="nv-prose rounded-xl border border-line bg-card px-5 py-4 text-[15px]"
-              dangerouslySetInnerHTML={md(solution.trim() || "_(La nota no trae solución modelo.)_")} />
+              dangerouslySetInnerHTML={renderedSolution} />
           </section>
         )}
       </div>

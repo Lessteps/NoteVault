@@ -8,7 +8,23 @@ import type { PracticeResult } from "../../lib/types";
 import { cn } from "../ui";
 
 export const VERDICTS: Record<string, string> = { correct: "Correcto", partial: "Parcialmente correcto", incorrect: "Incorrecto" };
-export const md = (text: string) => ({ __html: renderMarkdown(text) });
+
+const _mdCache = new Map<string, { __html: string }>();
+const MAX_MD_CACHE = 300;
+
+export const md = (text: string): { __html: string } => {
+  let cached = _mdCache.get(text);
+  if (!cached) {
+    if (_mdCache.size >= MAX_MD_CACHE) {
+      const firstKey = _mdCache.keys().next().value;
+      if (firstKey !== undefined) _mdCache.delete(firstKey);
+    }
+    cached = { __html: renderMarkdown(text) };
+    _mdCache.set(text, cached);
+  }
+  return cached;
+};
+
 export const scoreColour = (s: number) => (s >= 75 ? "text-mint" : s >= 40 ? "text-warn" : "text-danger");
 
 export function beep() {

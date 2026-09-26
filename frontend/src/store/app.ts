@@ -338,6 +338,11 @@ export const useApp = create<State>((set, get) => ({
   reload: async (path) => {
     try {
       const data = await api.readNote(path);
+      const cur = get().notes[path];
+      if (cur?.dirty) {
+        set((st) => ({ notes: { ...st.notes, [path]: { ...st.notes[path]!, conflict: true } } }));
+        return;
+      }
       set((st) => ({ notes: { ...st.notes, [path]: fromData(data) } }));
     } catch (e) {
       get().toast("error", (e as Error).message);

@@ -5,17 +5,35 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { ATTACHMENTS_DIR } from "./attachments";
+
+export interface WatchEvent {
+  eventType: string;
+  relPath: string;
+  fullPath: string;
+}
+
+export type WatchCallback = (event: WatchEvent) => void;
 
 export class FileWatcherService {
   private watchDir: string;
-  private onModifiedCallback: (p: string) => void;
+  private onModifiedCallback: WatchCallback;
   private watcher: fs.FSWatcher | null = null;
-  private lastModifiedTime = 0;
+  private lastTriggerTimes = new Map<string, number>();
   isRunning = false;
 
-  constructor(watchDir: string, onModifiedCallback: (p: string) => void) {
+  constructor(watchDir: string, onModifiedCallback: WatchCallback | ((p: string) => void)) {
     this.watchDir = path.resolve(watchDir);
-    this.onModifiedCallback = onModifiedCallback;
+    this.onModifiedCallback = (event: WatchEvent) => {
+      if (typeof onModifiedCallback === "function") {
+        try {
+          (onModifiedCallback as any)(event.fullPath, event);
+          (onModifiedCallback as any)(event);
+        } catch {
+          // Ignore callback errors
+        }
+      }
+    };
   }
 
   start(): void {
@@ -24,20 +42,34 @@ export class FileWatcherService {
     }
 
     try {
-      this.watcher = fs.watch(this.watchDir, { recursive: true }, (_eventType, filename) => {
-        if (!filename || !filename.endsWith(".md")) {
+      this.watcher = fs.watch(this.watchDir, { recursive: true }, (eventType, rawFilename) => {
+        if (!rawFilename) return;
+        const filename = String(rawFilename).replace(/\\/g, "/");
+
+        // Ignore internal directories and attachments:
+        // .git, .trash, .notevault, node_modules, etc.
+        const parts = filename.split("/").filter(Boolean);
+        if (parts.some((p) => p.startsWith(".") || p === "node_modules" || p === "__pycache__" || p === ATTACHMENTS_DIR)) {
           return;
         }
 
         const now = performance.now();
-        if (now - this.lastModifiedTime < 300) {
+        const prev = this.lastTriggerTimes.get(filename) ?? 0;
+        if (now - prev < 200) {
           return;
         }
-        this.lastModifiedTime = now;
+        this.lastTriggerTimes.set(filename, now);
+        if (this.lastTriggerTimes.size > 200) {
+          this.lastTriggerTimes.clear();
+        }
 
         const fullPath = path.join(this.watchDir, filename);
         try {
-          this.onModifiedCallback(fullPath);
+          this.onModifiedCallback({
+            eventType: eventType ?? "change",
+            relPath: filename,
+            fullPath,
+          });
         } catch {
           // Ignore callback errors
         }
@@ -50,16 +82,23 @@ export class FileWatcherService {
 
   stop(): void {
     if (this.watcher) {
-      this.watcher.close();
+      try {
+        this.watcher.close();
+      } catch {
+        /* ignore close errors */
+      }
       this.watcher = null;
     }
     this.isRunning = false;
   }
 
   refresh(): void {
-    // Manual trigger hook for renderer refresh requests
     try {
-      this.onModifiedCallback(this.watchDir);
+      this.onModifiedCallback({
+        eventType: "change",
+        relPath: "",
+        fullPath: this.watchDir,
+      });
     } catch {
       // Ignore
     }

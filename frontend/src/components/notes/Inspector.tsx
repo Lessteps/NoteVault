@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { StudyPanel } from "../study/StudyPanel";
 import { bodyOf, useApp } from "../../store/app";
@@ -42,6 +43,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 /** The right panel: the note's outline, plus Estudio for notes of a study area. */
 export function Inspector() {
   const active = useApp((s) => s.active);
+  const toggleInspector = useApp((s) => s.toggleInspector);
   const [area, setArea] = useState<string | null>(null);
   const [tab, setTab] = useState<"note" | "study">(() => (localStorage.getItem("nv.inspector.tab") === "note" ? "note" : "study"));
   useEffect(() => {
@@ -65,9 +67,9 @@ export function Inspector() {
       /* private mode */
     }
   };
-  if (!area || !active) return <NoteInspector />;
+  if (!area || !active) return <NoteInspector onClose={toggleInspector} />;
   return (
-    <aside className="flex w-[300px] flex-none flex-col border-l border-line bg-panel">
+    <aside className="flex w-[300px] flex-none flex-col border-l border-line bg-panel" aria-label="Panel lateral">
       <div className="flex h-9 flex-none items-center gap-1 border-b border-line px-2" role="tablist" aria-label="Panel lateral">
         {([["study", "Estudio"], ["note", "Nota"]] as const).map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => pick(id)}
@@ -75,22 +77,48 @@ export function Inspector() {
             {label}
           </button>
         ))}
+        <button
+          type="button"
+          title="Cerrar panel lateral"
+          aria-label="Cerrar panel lateral"
+          onClick={toggleInspector}
+          className="ml-auto grid h-6 w-6 place-items-center rounded text-faint hover:bg-hover hover:text-text"
+        >
+          <X size={14} />
+        </button>
       </div>
-      {tab === "study" ? <StudyPanel path={active} areaKey={area} /> : <NoteInspector embedded />}
+      {tab === "study" ? <StudyPanel path={active} areaKey={area} /> : <NoteInspector embedded onClose={toggleInspector} />}
     </aside>
   );
 }
 
-function NoteInspector({ embedded = false }: { embedded?: boolean }) {
+function NoteInspector({ embedded = false, onClose }: { embedded?: boolean; onClose?: () => void }) {
   const note = useApp((s) => (s.active ? s.notes[s.active] : undefined));
   const openNote = useApp((s) => s.openNote);
+  const toggleInspector = useApp((s) => s.toggleInspector);
+  const closeAction = onClose ?? toggleInspector;
   const heads = useMemo(() => (note?.kind === "note" ? outline(note.raw) : []), [note?.raw, note?.kind]);
   const minLevel = Math.min(...heads.map((h) => h.level), 6);
   const fm = Object.entries(note?.frontmatter ?? {}).filter(([k]) => k.toLowerCase() !== "tags");
   const words = note ? (note.raw.match(/\S+/g)?.length ?? 0) : 0;
 
   return (
-    <aside className={cn("flex flex-col overflow-y-auto bg-panel", embedded ? "min-h-0 flex-1" : "w-[260px] flex-none border-l border-line")}>
+    <aside className={cn("flex flex-col bg-panel", embedded ? "min-h-0 flex-1" : "w-[260px] flex-none border-l border-line")} aria-label="Panel de nota">
+      {!embedded && (
+        <div className="flex h-9 flex-none items-center justify-between border-b border-line px-3">
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-faint">Nota</span>
+          <button
+            type="button"
+            title="Cerrar panel lateral"
+            aria-label="Cerrar panel lateral"
+            onClick={closeAction}
+            className="grid h-6 w-6 place-items-center rounded text-faint hover:bg-hover hover:text-text"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+      <div className="min-h-0 flex-1 overflow-y-auto">
       {!note ? (
         <div className="p-4 text-[12px] text-faint">Abre una nota para ver su esquema.</div>
       ) : (
@@ -137,6 +165,7 @@ function NoteInspector({ embedded = false }: { embedded?: boolean }) {
           </Section>
         </>
       )}
+      </div>
     </aside>
   );
 }

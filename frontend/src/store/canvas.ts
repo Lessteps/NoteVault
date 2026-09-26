@@ -25,6 +25,7 @@ interface CanvasState {
   undo: () => void;
   redo: () => void;
   save: (force?: boolean) => Promise<void>;
+  reload: () => Promise<void>;
   renamed: (from: string, to: string) => void;
 }
 
@@ -109,6 +110,28 @@ export const useCanvas = create<CanvasState>((set, get) => {
         if (get().doc === doc) clearPending(`canvas:${path}`);
       } catch (e) {
         useApp.getState().toast("error", (e as Error).message);
+      }
+    },
+
+    reload: async () => {
+      const { path, dirty } = get();
+      if (!path) return;
+      if (dirty) {
+        set({ conflict: true });
+        return;
+      }
+      try {
+        const r = await api.canvasRead(path);
+        set({
+          path: r.path,
+          title: r.title,
+          doc: r.doc,
+          modified: r.modified,
+          dirty: false,
+          conflict: false,
+        });
+      } catch {
+        /* file might have moved or disappeared */
       }
     },
 

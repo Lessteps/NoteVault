@@ -96,17 +96,6 @@ async function trashEntry(entry: TreeEntry) {
   }
 }
 
-async function moveInto(src: string, destFolder: string) {
-  if (!src || parentOf(src) === destFolder || src === destFolder) return;
-  const s = useApp.getState();
-  try {
-    const { path } = await api.move(src, destFolder);
-    s.pathRenamed(src, path);
-  } catch (e) {
-    s.toast("error", (e as Error).message);
-  }
-}
-
 function openEntry(entry: TreeEntry) {
   const s = useApp.getState();
   if (entry.kind === "canvas") {
@@ -132,6 +121,7 @@ export function FileTree({ filter }: { filter: string }) {
   const active = useApp((s) => s.active);
   const [children, setChildren] = useState<Record<string, TreeEntry[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
+  const expandedRef = useRef(expanded);
   const [index, setIndex] = useState<IndexEntry[] | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
@@ -149,16 +139,17 @@ export function FileTree({ filter }: { filter: string }) {
     }
   }, []);
 
+  useEffect(() => {
+    expandedRef.current = expanded;
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify([...expanded]));
+  }, [expanded]);
+
   // (Re)load the root and every open folder whenever the tree changes.
   useEffect(() => {
     void load("");
-    for (const p of loadExpanded()) void load(p);
+    for (const p of expandedRef.current) void load(p);
     setIndex(null);
   }, [version, load]);
-
-  useEffect(() => {
-    localStorage.setItem(EXPANDED_KEY, JSON.stringify([...expanded]));
-  }, [expanded]);
 
   // The filter searches every note, not just the folders already opened.
   useEffect(() => {
@@ -173,10 +164,31 @@ export function FileTree({ filter }: { filter: string }) {
       if (next.has(path)) next.delete(path);
       else {
         next.add(path);
-        if (!children[path]) void load(path);
+        void load(path);
       }
       return next;
     });
+  };
+
+  const moveInto = async (src: string, destFolder: string) => {
+    if (!src || parentOf(src) === destFolder || src === destFolder) return;
+    const s = useApp.getState();
+    try {
+      const { path } = await api.move(src, destFolder);
+      s.pathRenamed(src, path);
+      if (destFolder) {
+        setExpanded((ex) => {
+          const next = new Set(ex);
+          next.add(destFolder);
+          return next;
+        });
+        void load(destFolder);
+      }
+      void load(parentOf(src));
+      void load("");
+    } catch (e) {
+      s.toast("error", (e as Error).message);
+    }
   };
 
   const onDragStart = (e: DragEvent, path: string) => {

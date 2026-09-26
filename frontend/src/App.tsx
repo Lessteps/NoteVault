@@ -9,6 +9,7 @@ import { NotesModule } from "./components/notes/NotesModule";
 import { QuickSwitcher } from "./components/notes/QuickSwitcher";
 import { CommandPalette, openDailyNote, ShortcutsDialog, useShortcutsDialog } from "./components/notes/CommandPalette";
 import { useTasks } from "./store/tasks";
+import { useCanvas } from "./store/canvas";
 import type { ModuleId } from "./store/app";
 
 // Every module but Notas loads on first use: startup parses less code.
@@ -141,12 +142,32 @@ function useTaskReminders() {
   }, []);
 }
 
+function useFileWatcherListener() {
+  useEffect(() => {
+    return api.onWatchEvent((ev) => {
+      useApp.getState().refreshTree();
+      const rel = ev.relPath;
+      if (rel) {
+        const s = useApp.getState();
+        if (s.notes[rel]) {
+          void s.reload(rel);
+        }
+        const canvas = useCanvas.getState();
+        if (canvas.path === rel) {
+          void canvas.reload();
+        }
+      }
+    });
+  }, []);
+}
+
 export function App() {
   const init = useApp((s) => s.init);
   const module = useApp((s) => s.module);
   useNavigationGuard();
   useShortcuts();
   useTaskReminders();
+  useFileWatcherListener();
   useEffect(() => {
     void init();
   }, [init]);

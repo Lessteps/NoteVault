@@ -16,7 +16,10 @@ type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
 declare global {
   interface Window {
     pywebview?: { api: PyApi };
-    nv?: { invoke: (method: string, args: unknown[]) => Promise<unknown> };
+    nv?: {
+      invoke: (method: string, args: unknown[]) => Promise<unknown>;
+      onWatchEvent?: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void) => () => void;
+    };
   }
 }
 
@@ -379,4 +382,10 @@ export const api = {
   enPlayerMine: (id: string, fields: { sentence: string; seconds: number; mode: "translate" | "cloze"; target: string; level: string; reference_es: string }) =>
     call<{ path: string; stamp: string }>("en_player_mine", id, fields),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
+  onWatchEvent: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onWatchEvent) {
+      return window.nv.onWatchEvent(cb);
+    }
+    return () => {};
+  },
 };

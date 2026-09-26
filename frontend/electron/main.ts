@@ -34,9 +34,28 @@ export async function gpuStatus() {
 
 // The bundle is loaded as an ES module, where __dirname is undefined.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
+
+import { FileWatcherService, type WatchEvent } from "../src/core/fileWatcher";
+
 let win: BrowserWindow | null = null;
+let fileWatcher: FileWatcherService | null = null;
+
+export function restartFileWatcher(root?: string) {
+  if (fileWatcher) {
+    fileWatcher.stop();
+    fileWatcher = null;
+  }
+  const target = root ?? getAppState()?.root;
+  if (target && fs.existsSync(target)) {
+    fileWatcher = new FileWatcherService(target, (event: WatchEvent) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("vault-watch-event", event);
+      }
+    });
+    fileWatcher.start();
+  }
+}
 
 function getPreloadPath(): string {
   const mjs = path.join(__dirname, "preload.mjs");
@@ -58,6 +77,7 @@ function createWindow() {
   });
   const state = getAppState();
   if (state) state.window = win;
+  restartFileWatcher();
   // The window must never navigate away; external links open in the OS browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) void shell.openExternal(url);
@@ -87,4 +107,8 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("before-quit", () => {
+  fileWatcher?.stop();
 });

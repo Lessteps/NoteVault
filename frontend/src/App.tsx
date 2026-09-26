@@ -4,6 +4,7 @@ import { flushAll, useApp } from "./store/app";
 import { ComingSoon, IconRail, StatusBar, Toasts, TopBar } from "./components/Shell";
 import { DialogHost, MenuHost } from "./components/ui";
 import { VaultDialog } from "./components/VaultDialog";
+import { SettingsDialog } from "./components/settings/SettingsDialog";
 import { NotesModule } from "./components/notes/NotesModule";
 import { QuickSwitcher } from "./components/notes/QuickSwitcher";
 import { CommandPalette, openDailyNote, ShortcutsDialog, useShortcutsDialog } from "./components/notes/CommandPalette";
@@ -162,6 +163,7 @@ export function App() {
       <CommandPalette />
       <ShortcutsDialog />
       <VaultDialog />
+      <SettingsDialog />
       <DialogHost />
       <MenuHost />
       <Toasts />

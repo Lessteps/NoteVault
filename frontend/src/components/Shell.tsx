@@ -2,12 +2,13 @@
 
 import {
   Calendar, CircleCheck, Dumbbell, Flag, House, Kanban, Moon, PenLine, Search,
-  SquareCheck, Sun, Wallet, X, Gem, Cloud, CloudUpload, CircleAlert,
+  SquareCheck, Sun, Wallet, X, Gem, Cloud, CloudUpload, CircleAlert, Settings,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { useApp, type ModuleId } from "../store/app";
 import { cn, Kbd } from "./ui";
 import { useVaultDialog } from "./VaultDialog";
+import { useSettingsDialog } from "./settings/SettingsDialog";
 
 export function TopBar() {
   const info = useApp((s) => s.info);
@@ -105,6 +106,15 @@ export function IconRail() {
         </button>
       ))}
       <div className="flex-1" />
+      <button
+        type="button"
+        title="Configuración"
+        aria-label="Configuración"
+        onClick={() => useSettingsDialog.getState().set(true)}
+        className="grid h-9 w-9 place-items-center rounded-lg text-faint hover:bg-hover hover:text-text"
+      >
+        <Settings size={17} strokeWidth={1.8} />
+      </button>
       <button
         type="button"
         title="Cambiar tema"

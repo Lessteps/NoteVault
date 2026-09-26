@@ -15,6 +15,7 @@ import { newCanvasIn, newNoteIn } from "./FileTree";
 import { useConceptMap } from "../canvas/ConceptMapDialog";
 import { useStudyFolders } from "../study/StudyFoldersDialog";
 import { useProperties } from "./PropertiesDialog";
+import { useSettingsDialog } from "../settings/SettingsDialog";
 import { activeEditor, insertAtCursor } from "./SourceEditor";
 
 interface Item {
@@ -170,6 +171,7 @@ function commands(): Item[] {
     { id: "tags", group: "Vista", label: "Ver etiquetas", run: () => { s.setModule("notas"); s.setExplorerTab("tags"); } },
     { id: "graph", group: "Vista", label: "Ver grafo de conocimiento", run: () => { s.setModule("notas"); s.setExplorerTab("graph"); } },
     { id: "theme", group: "Vista", label: "Cambiar tema claro / oscuro", run: s.toggleTheme },
+    { id: "settings", group: "Vista", label: "Configuración", run: () => useSettingsDialog.getState().set(true) },
     { id: "shortcuts", group: "Vista", label: "Atajos de teclado", run: () => useShortcutsDialog.getState().set(true) },
     ...MODULES.map((m) => ({ id: `go-${m.id}`, group: "Ir a", label: m.label, run: () => s.setModule(m.id) })),
     { id: "go-player", group: "Ir a", label: "Reproductor de inglés", run: () => s.setModule("player") },

@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { api } from "../lib/bridge";
-import type { AppInfo, Frontmatter, NoteData } from "../lib/types";
+import type { AppInfo, Frontmatter, NoteData, RenderingSettings } from "../lib/types";
 
 export type ModuleId =
   | "home" | "calendario" | "habits" | "ejercicio" | "proyectos"
@@ -95,6 +95,7 @@ interface State {
   toggleExplorer: () => void;
   toggleInspector: () => void;
   toggleTheme: () => void;
+  setTheme: (theme: "dark" | "light") => void;
   setSwitcher: (open: boolean) => void;
   setPalette: (open: boolean) => void;
   openSide: (path: string | null) => Promise<void>;
@@ -131,6 +132,22 @@ function applyTheme(theme: "dark" | "light") {
   document.documentElement.dataset.theme = theme;
 }
 
+export function applyRenderingSettings(r: Partial<RenderingSettings>) {
+  if (typeof document === "undefined") return;
+  if (r.liteEffects) {
+    document.documentElement.dataset.perf = "lite";
+  } else {
+    delete document.documentElement.dataset.perf;
+  }
+  if (r.reduceMotion) {
+    document.documentElement.dataset.motion = "reduced";
+  } else {
+    delete document.documentElement.dataset.motion;
+  }
+}
+
+export const applyRendering = applyRenderingSettings;
+
 export const useApp = create<State>((set, get) => ({
   info: null,
   theme: "dark",
@@ -154,6 +171,12 @@ export const useApp = create<State>((set, get) => ({
     try {
       const info = await api.appInfo();
       applyTheme(info.theme);
+      if (info.rendering) {
+        applyRenderingSettings(info.rendering);
+      } else {
+        const r = await api.getRendering().catch(() => null);
+        if (r) applyRenderingSettings(r);
+      }
       set({ info, theme: info.theme });
     } catch (e) {
       get().toast("error", (e as Error).message);
@@ -167,6 +190,12 @@ export const useApp = create<State>((set, get) => ({
   toggleInspector: () => set((s) => ({ inspectorOpen: !s.inspectorOpen })),
   toggleTheme: () => {
     const theme = get().theme === "dark" ? "light" : "dark";
+    applyTheme(theme);
+    set({ theme });
+    api.setTheme(theme).catch(() => undefined);
+  },
+  setTheme: (theme) => {
+    if (get().theme === theme) return;
     applyTheme(theme);
     set({ theme });
     api.setTheme(theme).catch(() => undefined);

@@ -247,8 +247,68 @@ export function webApi(app: AppState) {
       }
       const [ok, reason] = web().restrictions().check(url, meter().today());
       if (!ok) return { ok: false, blocked: true, reason };
-      // Without a desktop window (or until the enforced window is wired), open
-      // in the system browser, matching the dev-bridge behaviour.
+
+      if (app.window) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const electron = require("electron") as {
+            BrowserWindow?: new (opts: Record<string, unknown>) => any;
+          };
+          if (electron?.BrowserWindow) {
+            const browserWin = new electron.BrowserWindow({
+              width: 1200,
+              height: 800,
+              title: "NoteVault — WEB",
+              backgroundColor: "#191919",
+              webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+              },
+            });
+            const browserLike: BrowserLike = {
+              getCurrentUrl: () => {
+                try {
+                  return browserWin.webContents.getURL() || "";
+                } catch {
+                  return "";
+                }
+              },
+              getTitle: () => {
+                try {
+                  return browserWin.webContents.getTitle() || "";
+                } catch {
+                  return "";
+                }
+              },
+              loadHtml: (html: string) => {
+                try {
+                  void browserWin.webContents.loadURL(
+                    `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
+                  );
+                } catch {}
+              },
+            };
+            const session = new BrowserSession(browserLike, web(), meter());
+            const timer = setInterval(() => {
+              if (browserWin.isDestroyed()) {
+                clearInterval(timer);
+                return;
+              }
+              try {
+                session.poll();
+              } catch {}
+            }, 1000);
+            browserWin.on("closed", () => {
+              clearInterval(timer);
+            });
+            void browserWin.loadURL(url);
+            return { ok: true, desktop: true };
+          }
+        } catch {
+          // fallback to openInShell
+        }
+      }
+
       openInShell(url);
       return { ok: true, system: true };
     },

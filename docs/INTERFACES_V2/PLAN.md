@@ -202,6 +202,68 @@ webPreferences, navigation/rule enforcement), the web API modules and
   `npm run electron:build` launches and browsing works.
 Commit: `feat(web): embedded browser (WebContentsView) with sessions, video, rules and right-bar entry`.
 
+## Area H — Vista General (Home) visual redesign
+
+The user provided a reference mockup: **`docs/INTERFACES_V2/vista_general_ref.webp`**
+— open it and replicate it element by element (reference-fidelity rule: verify by
+rendering before declaring done). Redesign **only the Vista General main content**
+(`frontend/src/components/home/HomeModule.tsx` and its parts under
+`frontend/src/components/common/`). **Do NOT change the right sidebar** (Agenda &
+Calendario / Próximas actividades / Scratchpad) — leave it exactly as it is today.
+This supersedes/absorbs task **A2** (the exercise card): the new "Ejercicio —
+Sábado" panel covers it. Keep all A1 behaviour.
+
+Layout to match, top to bottom (center column):
+
+1. **Header row**: title **"Vista General"** with a small pill badge to its right
+   ("Sprint v2.4" in the mock — use a real value such as the vault/version).
+   Subtitle line under it (e.g. "Vault Programming · Modo Productividad Profunda").
+   On the right of the row: a date pill with a calendar icon (today's long date in
+   Spanish) and the existing **"+ Nueva Nota"** button (teal/cyan accent).
+
+2. **Focus banner** (full-width hero card, subtle gradient): a small chip
+   "NOTEVAULT FOCUS ENGINE" + a streak chip ("🔥 N Días de Racha activa"); a large
+   welcome heading ("¡Bienvenido de nuevo! Mantén el enfoque…"); a one-line summary
+   built from real data ("Tienes 12 hábitos programados, 3 ejercicios… y 2
+   revisiones… pendientes."); and on the right a segmented filter **Todos ·
+   Hábitos · Código · Notas** that filters what the dashboard emphasises.
+
+3. **Five stat cards in a row**, each: uppercase title, a small status badge, a big
+   number/fraction, a short subtitle, and a **mini sparkline** in the card's accent
+   colour. Use the real modules and colours:
+   - **Hábitos de hoy** — `hechos/total` + "% " badge — cyan.
+   - **Ejercicio** — `hechos/total` + day badge — amber.
+   - **Proyectos** — issues-in-sprint + "N Activos" badge — purple.
+   - **Tareas para hoy** — count + "Al día"/overdue badge — blue.
+   - **Finanzas** — balance + trend badge (e.g. "+14.2%") — green.
+   Reuse the existing chart helpers in `components/common/charts.tsx` for the
+   sparklines (add a small area/line sparkline if none exists).
+
+4. **Two large panels side by side**:
+   - **Hábitos de hoy** — header with a `hechos/total` badge; a **two-column**
+     list of habits, each a checkbox + emoji icon + label (some with an extra like
+     "Programar NoteVault 0/3 hrs"). Checking persists (reuse today's toggle).
+   - **Ejercicio — <día>** — header with `hechos/total` badge; a list of the day's
+     exercises, each showing name + short description + a pill with sets/reps
+     ("3 × 15-20 seg"); a footer line "Rango de descanso: … · Total estimado: …".
+     Checking an exercise persists (this is A2, done here).
+
+5. **Bottom row (two panels)**: **"Analítica Semanal — Horas de Código vs.
+   Hábitos"** (a chart with a legend Hábitos / Horas Código) and **"Progreso de
+   Objetivos — Consistencia y Maestría"** (reuse the goals data). Match the mock's
+   card styling (rounded, subtle border, dark surface, accent sparklines/legends).
+
+Style: dark surfaces, rounded cards, thin borders, accent-coloured sparklines and
+chips, emoji icons — as in the mock. Keep it responsive and honour
+`html[data-perf="lite"]` (no heavy blur/shadow under lite mode). All numbers come
+from real data (habits, exercise, projects, tasks, finance, goals) — no hardcoded
+figures.
+
+- Acceptance: the Vista General matches the reference image (verify by rendering
+  and comparing), the right sidebar is unchanged, every figure is real and
+  interactive where the mock implies it, typecheck + vitest green.
+Commit: `feat(home): redesign the Vista General to match the reference mockup`.
+
 ## Area G — Verify & document
 
 1. `npm run typecheck` clean, `npx vitest run` green, `npm run electron:build`

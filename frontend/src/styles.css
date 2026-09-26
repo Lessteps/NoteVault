@@ -637,7 +637,9 @@ html[data-perf="lite"] *::after {
 html[data-perf="lite"] .shadow-2xl,
 html[data-perf="lite"] .shadow-xl,
 html[data-perf="lite"] .shadow-lg,
-html[data-perf="lite"] .shadow-md {
+html[data-perf="lite"] .shadow-md,
+html[data-perf="lite"] .shadow,
+html[data-perf="lite"] .shadow-sm {
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.35) !important;
 }
 
@@ -648,11 +650,19 @@ html[data-perf="lite"] .nv-prose p {
 html[data-perf="lite"] .nv-prose a {
   border-bottom-color: var(--nv-accent);
 }
-html[data-perf="lite"] .nv-prose .badge.mint,
-html[data-perf="lite"] .nv-prose .badge.accent,
-html[data-perf="lite"] .nv-prose .badge.danger,
-html[data-perf="lite"] .nv-prose .badge.warn {
-  border-color: var(--nv-line-strong);
+html[data-perf="lite"] .nv-prose tbody tr:hover td {
+  background: var(--nv-hover);
+}
+html[data-perf="lite"] .nv-prose .callout {
+  border: 1px solid var(--nv-line-strong);
+  border-left: 3px solid var(--c);
+  background: var(--nv-card);
+}
+html[data-perf="lite"] .nv-prose :not(pre) > code {
+  border: 1px solid var(--nv-line);
+}
+html[data-perf="lite"] .nv-prose .badge {
+  border-color: var(--nv-line-strong) !important;
 }
 
 /* Remove repetitive procedural radial gradients on large canvas surfaces */

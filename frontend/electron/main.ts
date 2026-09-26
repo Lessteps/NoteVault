@@ -5,6 +5,32 @@ import { registerIpc } from "./ipc";
 import { getAppState, initRegistry } from "../src/api/registry";
 
 import fs from "node:fs";
+import { AppConfig } from "../src/api/appConfig";
+import { readGpuStatus } from "../src/api/gpuStatus";
+
+// Configure GPU and rendering switches before app ready to maximize performance and respect settings
+try {
+  const rendering = AppConfig.get_rendering();
+  if (rendering.mode === "software") {
+    app.disableHardwareAcceleration();
+  } else {
+    app.commandLine.appendSwitch("ignore-gpu-blocklist");
+    app.commandLine.appendSwitch("enable-gpu-rasterization");
+    app.commandLine.appendSwitch("enable-zero-copy");
+    if (rendering.angle !== "default") {
+      app.commandLine.appendSwitch("use-angle", rendering.angle);
+    }
+    if (rendering.angle === "vulkan") {
+      app.commandLine.appendSwitch("enable-features", "Vulkan");
+    }
+  }
+} catch (e) {
+  console.warn("Failed to apply rendering command-line switches:", e);
+}
+
+export async function gpuStatus() {
+  return readGpuStatus();
+}
 
 // The bundle is loaded as an ES module, where __dirname is undefined.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

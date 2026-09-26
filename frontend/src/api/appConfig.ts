@@ -12,18 +12,45 @@ export const APP_DATA_DIR = path.join(os.homedir(), ".notevault");
 export const SETTINGS_FILE = path.join(APP_DATA_DIR, "settings.json");
 export const DEFAULT_VAULT = path.join(os.homedir(), "NoteVault");
 
+export type RenderingMode = "auto" | "hardware" | "software";
+export type AngleBackend = "default" | "d3d11" | "d3d11on12" | "gl" | "d3d9" | "vulkan";
+
+export interface Rendering {
+  mode: RenderingMode;
+  angle: AngleBackend;
+  liteEffects: boolean;
+  reduceMotion: boolean;
+}
+
+export const DEFAULT_RENDERING: Rendering = {
+  mode: "auto",
+  angle: "default",
+  liteEffects: false,
+  reduceMotion: false,
+};
+
 try {
   fs.mkdirSync(APP_DATA_DIR, { recursive: true });
 } catch {
   /* best effort */
 }
 
+let customSettingsFile: string | null = null;
+export function _setSettingsFileForTest(p: string | null): void {
+  customSettingsFile = p;
+}
+
+function getSettingsPath(): string {
+  return customSettingsFile ?? SETTINGS_FILE;
+}
+
 type Settings = Record<string, any>;
 
 function read(): Settings {
   try {
-    if (fs.existsSync(SETTINGS_FILE)) {
-      return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
+    const target = getSettingsPath();
+    if (fs.existsSync(target)) {
+      return JSON.parse(fs.readFileSync(target, "utf-8"));
     }
   } catch {
     /* fall through */
@@ -33,7 +60,8 @@ function read(): Settings {
 
 function write(data: Settings): void {
   try {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const target = getSettingsPath();
+    fs.writeFileSync(target, JSON.stringify(data, null, 2), "utf-8");
   } catch (e) {
     console.error(`Error saving settings: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -60,6 +88,38 @@ export const AppConfig = {
     const s = read();
     s.theme = theme === "light" ? "light" : "dark";
     write(s);
+  },
+
+  // ── Rendering & Performance ────────────────────────────────────────────────
+  get_rendering(): Rendering {
+    const raw = read().rendering ?? {};
+    return {
+      mode: ["auto", "hardware", "software"].includes(raw.mode) ? raw.mode : DEFAULT_RENDERING.mode,
+      angle: ["default", "d3d11", "d3d11on12", "gl", "d3d9", "vulkan"].includes(raw.angle)
+        ? raw.angle
+        : DEFAULT_RENDERING.angle,
+      liteEffects: typeof raw.liteEffects === "boolean" ? raw.liteEffects : DEFAULT_RENDERING.liteEffects,
+      reduceMotion: typeof raw.reduceMotion === "boolean" ? raw.reduceMotion : DEFAULT_RENDERING.reduceMotion,
+    };
+  },
+  set_rendering(patch: Partial<Rendering>): Rendering {
+    const s = read();
+    const current = AppConfig.get_rendering();
+    const next: Rendering = {
+      mode:
+        patch.mode !== undefined && ["auto", "hardware", "software"].includes(patch.mode)
+          ? patch.mode
+          : current.mode,
+      angle:
+        patch.angle !== undefined && ["default", "d3d11", "d3d11on12", "gl", "d3d9", "vulkan"].includes(patch.angle)
+          ? patch.angle
+          : current.angle,
+      liteEffects: patch.liteEffects !== undefined ? Boolean(patch.liteEffects) : current.liteEffects,
+      reduceMotion: patch.reduceMotion !== undefined ? Boolean(patch.reduceMotion) : current.reduceMotion,
+    };
+    s.rendering = next;
+    write(s);
+    return next;
   },
 
   // ── Active vault ───────────────────────────────────────────────────────────

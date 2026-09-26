@@ -11,6 +11,10 @@ import * as cf from "./canvasFormat.js";
 export const GAP = 60.0;
 export const RANK_GAP = 140.0;
 export const DEFAULT_CARD_W = 240.0;
+/** Per-line pixel height used for auto-sizing text nodes. */
+export const LINE_H = 22.0;
+/** Minimum / header overhead pixels. */
+export const NODE_OVERHEAD = 44.0;
 export const LAYOUTS = ["radial", "tree", "grid", "column", "row"] as const;
 export const KINDS = ["text", "note", "shape"] as const;
 
@@ -72,9 +76,13 @@ function sizeNode(nspec: Spec, defaultW: number): [number, number] {
   if (kind === "shape") return [180.0, 90.0];
   const w = Number(nspec.width || defaultW);
   const body = composeText(nspec.title ?? "", nspec.body ?? "");
-  const charsPerLine = Math.max(8.0, (w - 24.0) / 7.5);
-  const lines = Math.ceil(Math.max(1, body.length) / charsPerLine) + (nspec.title ? 2 : 0);
-  const h = Math.min(360.0, Math.max(70.0, 44.0 + lines * 22.0));
+  // Use ~8 px per char with comfortable padding; no upper cap so all text is visible.
+  const charsPerLine = Math.max(8.0, (w - 32.0) / 8.0);
+  const rawLines = body.split("\n").reduce((acc, line) => {
+    return acc + Math.max(1, Math.ceil((line.length || 1) / charsPerLine));
+  }, 0);
+  const lines = rawLines + (nspec.title ? 2 : 0);
+  const h = Math.max(70.0, NODE_OVERHEAD + lines * LINE_H);
   return [w, h];
 }
 

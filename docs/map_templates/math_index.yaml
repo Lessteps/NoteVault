@@ -1,0 +1,85 @@
+# name: Índice Matemáticas
+# Index canvas for the Matemáticas knowledge base.
+# Box sizing: each node has an explicit width/height so the entire topic list is legible.
+# Coverage follows the syllabus: Fundamentos → Álgebra → Cálculo → … → Probabilidad
+layout: grid
+defaults:
+  card_width: 340
+nodes:
+  - id: area_fundamentos
+    title: "Fundamentos"
+    body: |
+      Lógica proposicional · Conjuntos
+      Relaciones y funciones
+      Números naturales, enteros, racionales
+      Inducción matemática · Principio del palomar
+    color: "6"
+
+  - id: area_algebra
+    title: "Álgebra"
+    body: |
+      Grupos · Anillos · Cuerpos
+      Polinomios y factorización
+      Sistemas de ecuaciones lineales
+      Matrices y determinantes
+      Valores propios y vectores propios
+    color: "3"
+
+  - id: area_calculo
+    title: "Cálculo"
+    body: |
+      Límites y continuidad
+      Derivadas (reglas, derivadas de orden superior)
+      Integrales (indefinida, definida, impropia)
+      Teorema fundamental del cálculo
+      Series de Taylor y de potencias
+    color: "4"
+
+  - id: area_analisis
+    title: "Análisis"
+    body: |
+      Sucesiones y series numéricas
+      Convergencia (criterios: razón, raíz, integral)
+      Análisis en Rⁿ: diferenciabilidad
+      Teorema de la función implícita
+      Espacios métricos · Compacidad
+    color: "5"
+
+  - id: area_algebra_lineal
+    title: "Álgebra Lineal"
+    body: |
+      Espacios vectoriales y subespacios
+      Bases y dimensión
+      Transformaciones lineales
+      Diagonalización · Descomposición SVD
+      Formas cuadráticas
+    color: "3"
+
+  - id: area_ecuaciones_dif
+    title: "Ecuaciones Diferenciales"
+    body: |
+      EDOs de primer orden (separables, lineales)
+      EDOs de segundo orden
+      Sistemas de EDOs
+      Transformada de Laplace
+      Introducción a EDPs
+    color: "1"
+
+  - id: area_discreta
+    title: "Matemática Discreta"
+    body: |
+      Combinatoria (permutaciones, combinaciones)
+      Teoría de grafos (caminos, árboles, coloración)
+      Algoritmos y complejidad
+      Criptografía básica
+    color: "2"
+
+  - id: area_probabilidad
+    title: "Probabilidad y Estadística"
+    body: |
+      Espacios de probabilidad
+      Variables aleatorias (discretas y continuas)
+      Distribuciones notables (Binomial, Normal…)
+      Estadística descriptiva e inferencial
+      Cadenas de Markov
+    color: "4"

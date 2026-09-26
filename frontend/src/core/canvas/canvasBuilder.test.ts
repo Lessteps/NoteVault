@@ -122,4 +122,40 @@ describe("canvas builder — round-trip, yaml, templates", () => {
     expect(names.length).toBeGreaterThan(0);
     expect(cb.loadTemplate(names[0]!)).toContain("nodes");
   });
+
+  it("math concept template has Definición, Ejemplos, Contraejemplos and no Intuición/Práctica", () => {
+    const yaml = cb.loadTemplate("Concepto Matemático");
+    expect(yaml).toBeTruthy();
+    expect(yaml.toLowerCase()).toContain("definicion");
+    expect(yaml.toLowerCase()).toContain("ejemplos");
+    expect(yaml.toLowerCase()).toContain("contraejemplos");
+    // Must not contain the removed categories
+    expect(yaml.toLowerCase()).not.toContain("intuic");
+    expect(yaml.toLowerCase()).not.toContain("práctica");
+    // Building must succeed
+    const s = cb.specFromYaml(yaml);
+    expect(cb.validateSpec(s)).toEqual([]);
+    const doc = cb.buildCanvas(s);
+    // root + definicion + ejemplos + contraejemplos = 4 nodes
+    expect(doc.nodes.length).toBe(4);
+    expect(doc.edges.length).toBe(3);
+  });
+
+  it("math index template lists multiple areas and validates", () => {
+    const yaml = cb.loadTemplate("Índice Matemáticas");
+    expect(yaml).toBeTruthy();
+    const s = cb.specFromYaml(yaml);
+    expect(cb.validateSpec(s)).toEqual([]);
+    const doc = cb.buildCanvas(s);
+    // Must cover at least 6 areas
+    expect(doc.nodes.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("auto-sizes nodes beyond 360px when content is tall", () => {
+    const longBody = Array.from({ length: 30 }, (_, i) => `Línea ${i + 1}`).join("\n");
+    const s = { layout: "column", nodes: [{ id: "big", title: "Nodo Grande", body: longBody }] };
+    const doc = cb.buildCanvas(s);
+    // Height must exceed the old 360 cap
+    expect(doc.nodes[0]!.height).toBeGreaterThan(360);
+  });
 });

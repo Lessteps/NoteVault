@@ -1,0 +1,51 @@
+# name: Concepto Matemático
+# Math concept template: Definición · Ejemplos · Contraejemplos + Errores comunes
+# The practice box and the intuition box are omitted — they belong in Practice V2.
+layout: tree
+direction: down
+defaults:
+  card_width: 320
+nodes:
+  - id: root
+    title: "Nombre del Concepto"
+    body: |
+      Idea central del concepto.
+      ¿Qué es? ¿Por qué existe?
+    role: root
+    color: "6"
+
+  - id: definicion
+    title: "Definición"
+    body: |
+      Definición formal clara y concisa.
+
+      Incluye la notación simbólica y,
+      cuando sea posible, una representación
+      visual (diagrama, gráfica, tabla).
+    color: "3"
+
+  - id: ejemplos
+    title: "Ejemplos"
+    body: |
+      Ejemplo 1: …
+      Ejemplo 2: …
+      Ejemplo 3 (variante): …
+
+      Muestra casos representativos que
+      ilustren las propiedades clave.
+    color: "4"
+
+  - id: contraejemplos
+    title: "Contraejemplos + Errores comunes"
+    body: |
+      Contraejemplo 1: ¿Por qué falla aquí?
+      Contraejemplo 2: …
+
+      Errores frecuentes:
+      - Confundir X con Y.
+      - Aplicar el teorema fuera de su dominio.
+    color: "1"
+
+edges:
+  - from: root
+    to: [definicion, ejemplos, contraejemplos]

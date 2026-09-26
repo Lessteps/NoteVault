@@ -22,7 +22,9 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
   },
   test: {
-    environment: "jsdom",
+    // The suite is logic-only; the fast Node environment is the default. The
+    // few files that touch the DOM opt in with `// @vitest-environment jsdom`.
+    environment: "node",
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });

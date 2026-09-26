@@ -55,4 +55,30 @@ describe("KnowledgeGraph", () => {
     expect(relatedEdge?.source).toBe("Derivatives.md");
     expect(relatedEdge?.target).toBe("Optimization.md");
   });
+
+  it("resolves wikilinks with extensions, subfolders, and aliases", () => {
+    const subDir = path.join(tempDir, "Calculus");
+    fs.mkdirSync(subDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(subDir, "Limits.md"),
+      "---\nsubject: mathematics\ntopic: calculus\n---\n# Limits",
+      "utf-8",
+    );
+
+    fs.writeFileSync(
+      path.join(subDir, "Continuity.md"),
+      "---\nsubject: mathematics\ntopic: calculus\n---\n# Continuity\nRequires [[Calculus/Limits.md|Limites]] and [[Limits]]",
+      "utf-8",
+    );
+
+    const kg = new KnowledgeGraph(tempDir);
+    const graph = kg.buildGraph();
+
+    expect(graph.total_nodes).toBe(2);
+    expect(graph.total_edges).toBe(1);
+    expect(graph.edges[0]?.source).toBe("Calculus/Continuity.md");
+    expect(graph.edges[0]?.target).toBe("Calculus/Limits.md");
+    expect(graph.edges[0]?.relation_type).toBe("related");
+  });
 });

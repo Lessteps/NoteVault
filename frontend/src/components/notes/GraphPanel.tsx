@@ -24,32 +24,48 @@ function GraphCanvas({ nodes, edges, onOpen }: { nodes: GraphNode[]; edges: Grap
   const hover = useRef<string | null>(null);
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const [, force] = useState(0);
+  const hasFitted = useRef(false);
 
   const fit = useCallback(() => {
     const el = wrap.current;
     if (!el || !pos.size) return;
+    const cw = el.clientWidth || 400;
+    const ch = el.clientHeight || 400;
     const xs = [...pos.values()].map((p) => p[0]);
     const ys = [...pos.values()].map((p) => p[1]);
     const w = Math.max(1, Math.max(...xs) - Math.min(...xs) + 80);
     const h = Math.max(1, Math.max(...ys) - Math.min(...ys) + 80);
-    const k = Math.min(2, el.clientWidth / w, el.clientHeight / h);
-    view.current = { k, x: el.clientWidth / 2 - ((Math.max(...xs) + Math.min(...xs)) / 2) * k, y: el.clientHeight / 2 - ((Math.max(...ys) + Math.min(...ys)) / 2) * k };
+    const k = Math.max(0.15, Math.min(2, cw / w, ch / h));
+    view.current = {
+      k,
+      x: cw / 2 - ((Math.max(...xs) + Math.min(...xs)) / 2) * k,
+      y: ch / 2 - ((Math.max(...ys) + Math.min(...ys)) / 2) * k,
+    };
+    hasFitted.current = true;
     force((n) => n + 1);
   }, [pos]);
-  useEffect(fit, [fit]);
+
+  useEffect(() => {
+    hasFitted.current = false;
+    fit();
+  }, [fit]);
 
   const draw = useCallback(() => {
     const c = canvas.current;
     const el = wrap.current;
     if (!c || !el) return;
+    const cw = el.clientWidth;
+    const ch = el.clientHeight;
+    if (cw === 0 || ch === 0) return;
     const dpr = window.devicePixelRatio || 1;
-    c.width = el.clientWidth * dpr;
-    c.height = el.clientHeight * dpr;
-    c.style.width = `${el.clientWidth}px`;
-    c.style.height = `${el.clientHeight}px`;
-    const g = c.getContext("2d")!;
+    c.width = cw * dpr;
+    c.height = ch * dpr;
+    c.style.width = `${cw}px`;
+    c.style.height = `${ch}px`;
+    const g = c.getContext("2d");
+    if (!g) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.clearRect(0, 0, el.clientWidth, el.clientHeight);
+    g.clearRect(0, 0, cw, ch);
     const { x, y, k } = view.current;
     // Nodes and labels keep a readable size whatever the zoom.
     const rr = R * Math.max(0.6, Math.min(1.4, k));
@@ -102,11 +118,20 @@ function GraphCanvas({ nodes, edges, onOpen }: { nodes: GraphNode[]; edges: Grap
   }, [nodes, edges, pos]);
 
   useEffect(() => {
-    draw();
-    const ro = new ResizeObserver(draw);
+    const onResize = () => {
+      const el = wrap.current;
+      if (el && el.clientWidth > 0 && el.clientHeight > 0) {
+        if (!hasFitted.current) {
+          fit();
+        }
+        draw();
+      }
+    };
+    onResize();
+    const ro = new ResizeObserver(onResize);
     if (wrap.current) ro.observe(wrap.current);
     return () => ro.disconnect();
-  });
+  }, [draw, fit]);
 
   const nodeAt = (mx: number, my: number): string | null => {
     const { x, y, k } = view.current;

@@ -64,6 +64,7 @@ export class KnowledgeGraph {
     const nodes: KnowledgeGraphNode[] = [];
     const edges: KnowledgeGraphEdge[] = [];
     const nodesByTitle = new Map<string, string>(); // title.toLowerCase() -> nodeId
+    const nodesByRelPath = new Map<string, string>(); // relPath.toLowerCase() -> nodeId
 
     const fmByNote = new Map<string, Record<string, any>>();
 
@@ -89,7 +90,23 @@ export class KnowledgeGraph {
         mastery,
       });
       nodesByTitle.set(note.title.toLowerCase(), nodeId);
+      nodesByRelPath.set(nodeId.toLowerCase(), nodeId);
+      if (nodeId.toLowerCase().endsWith(".md")) {
+        nodesByRelPath.set(nodeId.slice(0, -3).toLowerCase(), nodeId);
+      }
     }
+
+    const resolveTarget = (raw: string): string | undefined => {
+      const clean = raw.trim().toLowerCase();
+      const withoutMd = clean.endsWith(".md") ? clean.slice(0, -3) : clean;
+      return (
+        nodesByTitle.get(withoutMd) ||
+        nodesByTitle.get(clean) ||
+        nodesByRelPath.get(clean) ||
+        nodesByRelPath.get(withoutMd) ||
+        nodesByTitle.get(path.basename(withoutMd).toLowerCase())
+      );
+    };
 
     const edgePairs = new Set<string>();
 
@@ -107,8 +124,7 @@ export class KnowledgeGraph {
           : [];
 
       for (const p of prereqs) {
-        const targetTitle = String(p).trim().toLowerCase();
-        const targetId = nodesByTitle.get(targetTitle);
+        const targetId = resolveTarget(String(p));
         if (targetId && !edgePairs.has(`${targetId}|${sourceId}`)) {
           edgePairs.add(`${targetId}|${sourceId}`);
           edges.push({
@@ -128,8 +144,7 @@ export class KnowledgeGraph {
           : [];
 
       for (const u of usesList) {
-        const targetTitle = String(u).trim().toLowerCase();
-        const targetId = nodesByTitle.get(targetTitle);
+        const targetId = resolveTarget(String(u));
         if (targetId && !edgePairs.has(`${sourceId}|${targetId}`)) {
           edgePairs.add(`${sourceId}|${targetId}`);
           edges.push({
@@ -142,8 +157,7 @@ export class KnowledgeGraph {
 
       // Wikilinks (general bidirectional related links)
       for (const link of note.wikilinks) {
-        const targetTitle = link.trim().toLowerCase();
-        const targetId = nodesByTitle.get(targetTitle);
+        const targetId = resolveTarget(link);
         if (targetId && targetId !== sourceId && !edgePairs.has(`${sourceId}|${targetId}`)) {
           edgePairs.add(`${sourceId}|${targetId}`);
           edges.push({

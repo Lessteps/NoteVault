@@ -40,7 +40,7 @@ const theme = EditorView.theme({
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
     backgroundColor: "var(--nv-accent-soft) !important",
   },
-  ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--nv-hover) 55%, transparent)" },
+  ".cm-activeLine": { backgroundColor: "var(--nv-active-line, color-mix(in srgb, var(--nv-hover) 55%, transparent))" },
   ".cm-gutters": {
     backgroundColor: "transparent",
     color: "var(--nv-faint)",

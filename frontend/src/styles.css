@@ -33,6 +33,7 @@
   --nv-info: #60a5fa;
   --nv-info-soft: rgb(96 165 250 / 0.14);
   --nv-code-bg: #101015;
+  --nv-active-line: color-mix(in srgb, var(--nv-hover) 55%, transparent);
   color-scheme: dark;
 }
 
@@ -62,6 +63,7 @@
   --nv-info: #1a6fc4;
   --nv-info-soft: rgb(26 111 196 / 0.12);
   --nv-code-bg: #f0e8d9;
+  --nv-active-line: color-mix(in srgb, var(--nv-hover) 55%, transparent);
   color-scheme: light;
 }
 
@@ -612,3 +614,75 @@ body {
   margin: 0;
   max-width: none;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Performance mode ("lite") & Reduced motion overrides
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root[data-perf="lite"],
+html[data-perf="lite"] {
+  --nv-active-line: var(--nv-hover);
+}
+
+/* Neutralise backdrop-filter and blur filters under lite mode */
+html[data-perf="lite"] *,
+html[data-perf="lite"] *::before,
+html[data-perf="lite"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+}
+
+/* Replace expensive multi-layer/large box-shadows with a subtle, cheap single shadow or border */
+html[data-perf="lite"] .shadow-2xl,
+html[data-perf="lite"] .shadow-xl,
+html[data-perf="lite"] .shadow-lg,
+html[data-perf="lite"] .shadow-md {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.35) !important;
+}
+
+/* Precomputed flat colors in place of live color-mix repaints in hot prose/inline elements */
+html[data-perf="lite"] .nv-prose p {
+  color: var(--nv-text);
+}
+html[data-perf="lite"] .nv-prose a {
+  border-bottom-color: var(--nv-accent);
+}
+html[data-perf="lite"] .nv-prose .badge.mint,
+html[data-perf="lite"] .nv-prose .badge.accent,
+html[data-perf="lite"] .nv-prose .badge.danger,
+html[data-perf="lite"] .nv-prose .badge.warn {
+  border-color: var(--nv-line-strong);
+}
+
+/* Remove repetitive procedural radial gradients on large canvas surfaces */
+html[data-perf="lite"] .nv-canvas {
+  background-image: none !important;
+  background-color: var(--nv-bg) !important;
+}
+
+/* Disable transitions and animations under reduceMotion, lite mode, or OS setting */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after,
+html[data-perf="lite"] *,
+html[data-perf="lite"] *::before,
+html[data-perf="lite"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+

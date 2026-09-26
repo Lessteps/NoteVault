@@ -76,7 +76,22 @@ function ExerciseRow({ day, ex, entry, onChanged, onVideo, compact }: {
       <div className="flex items-center gap-3">
         <input type="checkbox" aria-label={`Hecho: ${ex.name}`} checked={done} disabled={future} style={{ accentColor: ORANGE }}
           onChange={(e) => { setDone(e.target.checked); void save({ done: e.target.checked }); }} />
-        <span className={cn("min-w-0 flex-1 truncate text-[13px]", done ? "text-faint line-through" : "text-text")}>{ex.name}</span>
+        {onVideo && (ex.has_video || Boolean(ex.video_path)) ? (
+          <button
+            type="button"
+            onClick={() => onVideo(ex)}
+            title={`Ver video: ${ex.name}`}
+            className={cn(
+              "flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 truncate text-left text-[13px] hover:underline",
+              done ? "text-faint line-through" : "text-text hover:text-accent-text"
+            )}
+          >
+            <span>{ex.name}</span>
+            <Play size={11} className="flex-none text-amber-400" />
+          </button>
+        ) : (
+          <span className={cn("min-w-0 flex-1 truncate text-[13px]", done ? "text-faint line-through" : "text-text")}>{ex.name}</span>
+        )}
         {ex.series_reps && <span className="text-[11.5px] text-dim">{ex.series_reps}</span>}
         {!compact && ex.rest && <span className="text-[11px] text-faint">⏱ {ex.rest}</span>}
         <input className={small} placeholder="kg" aria-label={`Peso: ${ex.name}`} value={weight} disabled={future}
@@ -87,7 +102,7 @@ function ExerciseRow({ day, ex, entry, onChanged, onVideo, compact }: {
           <input className={cn(inputBase, "w-44 py-1 text-[12px]")} placeholder="Notas" value={notes} disabled={future}
             onChange={(e) => { setNotes(e.target.value); change({ notes: e.target.value }); }} onBlur={() => void save()} />
         )}
-        {onVideo && ex.has_video && <GhostButton onClick={() => onVideo(ex)} className="py-1"><Play size={12} /> Video</GhostButton>}
+        {onVideo && (ex.has_video || Boolean(ex.video_path)) && <GhostButton onClick={() => onVideo(ex)} className="py-1"><Play size={12} /> Video</GhostButton>}
       </div>
       {!compact && ex.how_to && <p className="mt-1.5 pl-7 text-[12px] leading-relaxed text-faint">{ex.how_to}</p>}
     </div>
@@ -123,7 +138,7 @@ function DayTracker({ meta, onVideo }: { meta: DayMeta; onVideo: (ex: Exercise) 
   );
 }
 
-function Registro() {
+function Registro({ onVideo }: { onVideo?: (ex: Exercise) => void }) {
   const fail = useFail();
   const [monday, setMonday] = useState(weekStart(todayIso()));
   const [days, setDays] = useState<ExerciseDay[]>([]);
@@ -163,7 +178,7 @@ function Registro() {
             </button>
             {isOpen && (
               <div className="space-y-1.5 px-4 pb-3">
-                {d.exercises.map((ex) => <ExerciseRow key={ex.id} compact day={d.date} ex={ex} entry={d.log[ex.id] ?? {}} onChanged={() => void load()} />)}
+                {d.exercises.map((ex) => <ExerciseRow key={ex.id} compact day={d.date} ex={ex} entry={d.log[ex.id] ?? {}} onChanged={() => void load()} onVideo={onVideo} />)}
                 {!d.exercises.length && <p className="text-[12px] text-faint">Descanso.</p>}
               </div>
             )}
@@ -383,7 +398,7 @@ export function ExerciseModule() {
       <main className="flex min-w-0 flex-1 flex-col bg-surface">
         {video ? <VideoPlayer ex={video} onBack={() => setVideo(null)} />
           : view === "overview" ? <Overview days={days} list={list} />
-            : view === "registro" ? <Registro />
+            : view === "registro" ? <Registro onVideo={setVideo} />
               : view === "manage" ? <Manage days={days} list={list} reload={() => void reload()} />
                 : dayMeta ? <DayTracker key={dayMeta.key} meta={dayMeta} onVideo={setVideo} />
                   : null}

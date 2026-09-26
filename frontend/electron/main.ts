@@ -7,6 +7,10 @@ import { getAppState, initRegistry } from "../src/api/registry";
 import fs from "node:fs";
 import { AppConfig } from "../src/api/appConfig";
 import { readGpuStatus } from "../src/api/gpuStatus";
+import { browserManager } from "./browserManager";
+
+// Allow HTML5 video and audio autoplay in embedded views
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 // Configure GPU and rendering switches before app ready to maximize performance and respect settings
 try {
@@ -77,6 +81,7 @@ function createWindow() {
   });
   const state = getAppState();
   if (state) state.window = win;
+  browserManager.setWindow(win);
   restartFileWatcher();
   // The window must never navigate away; external links open in the OS browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -110,5 +115,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  browserManager.destroy();
   fileWatcher?.stop();
 });

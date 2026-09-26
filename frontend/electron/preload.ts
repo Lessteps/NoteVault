@@ -10,4 +10,11 @@ contextBridge.exposeInMainWorld("nv", {
       ipcRenderer.removeListener("vault-watch-event", handler);
     };
   },
+  onBrowserState: (cb: (data: any) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: any) => cb(data);
+    ipcRenderer.on("nv-browser-state", handler);
+    return () => {
+      ipcRenderer.removeListener("nv-browser-state", handler);
+    };
+  },
 });

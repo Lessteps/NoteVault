@@ -312,5 +312,24 @@ export function webApi(app: AppState) {
       openInShell(url);
       return { ok: true, system: true };
     },
+
+    browser_attach(_bounds: unknown, url = ""): Record<string, unknown> {
+      return { url: url || "https://www.google.com", title: "Navegador", canGoBack: false, canGoForward: false, isLoading: false };
+    },
+    browser_detach(): Record<string, unknown> {
+      return { ok: true };
+    },
+    browser_set_bounds(): Record<string, unknown> {
+      return { ok: true };
+    },
+    browser_navigate(url: string): Record<string, unknown> {
+      return { url: normalizeUrl(url), title: "Página", canGoBack: false, canGoForward: false, isLoading: false };
+    },
+    browser_action(): Record<string, unknown> {
+      return { url: "", title: "", canGoBack: false, canGoForward: false, isLoading: false };
+    },
+    browser_state(): Record<string, unknown> {
+      return { url: "https://www.google.com", title: "Navegador", canGoBack: false, canGoForward: false, isLoading: false };
+    },
   };
 }

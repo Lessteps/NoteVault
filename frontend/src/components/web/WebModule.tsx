@@ -11,16 +11,18 @@ import { useCanvas } from "../../store/canvas";
 import { Columns } from "../common/charts";
 import { Field, input, PrimaryButton } from "../common/forms";
 import { askText, cn, confirmAction } from "../ui";
+import { BrowserPanel } from "./BrowserPanel";
 
-type Tab = "bookmarks" | "history" | "usage" | "rules";
+type Tab = "browser" | "bookmarks" | "history" | "usage" | "rules";
 
 const mins = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : `${Math.round(s / 60)} min`);
 
 export function WebModule() {
   const toast = useApp((s) => s.toast);
   const [data, setData] = useState<WebOverview | null>(null);
-  const [tab, setTab] = useState<Tab>("bookmarks");
+  const [tab, setTab] = useState<Tab>("browser");
   const [address, setAddress] = useState("");
+  const [currentBrowseUrl, setCurrentBrowseUrl] = useState("https://www.google.com");
   const [day, setDay] = useState("");
 
   const load = useCallback(async (d = day) => {
@@ -37,14 +39,11 @@ export function WebModule() {
 
   const open = async (text: string) => {
     if (!text.trim()) return;
+    setCurrentBrowseUrl(text);
+    setTab("browser");
     try {
-      const r = await api.webOpen(text);
-      if (r.blocked) toast("error", `⛔ ${r.reason}`);
-      else if (r.system) toast("info", "Abierto en el navegador del sistema (las reglas solo se aplican en la app de escritorio).");
-      setTimeout(() => void load(), 1500);
-    } catch (e) {
-      toast("error", (e as Error).message);
-    }
+      await api.browserNavigate(text);
+    } catch {}
   };
 
   const toCanvas = async (url: string, title: string) => {
@@ -78,28 +77,35 @@ export function WebModule() {
           : <span className="flex items-center gap-1 text-[11.5px] text-mint"><Shield size={13} /> Reglas activas{data.restrictions.mode === "allowlist" && " · modo enfoque"}</span>}
       </div>
       <div className="flex flex-none gap-1 border-b border-line px-5 py-2" role="tablist" aria-label="WEB">
-        {([["bookmarks", "Marcadores", <Bookmark key="b" size={14} />], ["history", "Historial", <History key="h" size={14} />],
-          ["usage", "Tiempo", <Timer key="t" size={14} />], ["rules", "Restricciones", <Shield key="r" size={14} />]] as Array<[Tab, string, ReactNode]>).map(([id, label, icon]) => (
+        {([["browser", "Navegador", <Globe key="g" size={14} />],
+          ["bookmarks", "Marcadores", <Bookmark key="b" size={14} />],
+          ["history", "Historial", <History key="h" size={14} />],
+          ["usage", "Tiempo", <Timer key="t" size={14} />],
+          ["rules", "Restricciones", <Shield key="r" size={14} />]] as Array<[Tab, string, ReactNode]>).map(([id, label, icon]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
             className={cn("flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px]", tab === id ? "bg-accent-soft text-text" : "text-dim hover:bg-hover")}>
             {icon}{label}
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="mx-auto max-w-3xl">
-          {tab === "bookmarks" && (
-            <Bookmarks data={data} onOpen={open} onCanvas={toCanvas} onChanged={() => void load()} current={address} />
-          )}
-          {tab === "history" && (
-            <HistoryTab data={data} onOpen={open} onCanvas={toCanvas} onDay={(d) => {
-              setDay(d);
-              void load(d);
-            }} onChanged={() => void load()} />
-          )}
-          {tab === "usage" && <Usage data={data} />}
-          {tab === "rules" && <Rules data={data} onSaved={() => void load()} />}
-        </div>
+      <div className={cn("min-h-0 flex-1 overflow-y-auto", tab === "browser" ? "p-0 flex flex-col" : "px-5 py-4")}>
+        {tab === "browser" ? (
+          <BrowserPanel initialUrl={currentBrowseUrl} />
+        ) : (
+          <div className="mx-auto max-w-3xl">
+            {tab === "bookmarks" && (
+              <Bookmarks data={data} onOpen={open} onCanvas={toCanvas} onChanged={() => void load()} current={address} />
+            )}
+            {tab === "history" && (
+              <HistoryTab data={data} onOpen={open} onCanvas={toCanvas} onDay={(d) => {
+                setDay(d);
+                void load(d);
+              }} onChanged={() => void load()} />
+            )}
+            {tab === "usage" && <Usage data={data} />}
+            {tab === "rules" && <Rules data={data} onSaved={() => void load()} />}
+          </div>
+        )}
       </div>
     </div>
   );

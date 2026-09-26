@@ -19,8 +19,24 @@ declare global {
     nv?: {
       invoke: (method: string, args: unknown[]) => Promise<unknown>;
       onWatchEvent?: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void) => () => void;
+      onBrowserState?: (cb: (data: BrowserState) => void) => () => void;
     };
   }
+}
+
+export interface BrowserBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface BrowserState {
+  url: string;
+  title: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  isLoading: boolean;
 }
 
 type Transport = { kind: "pywebview" } | { kind: "http"; token: string } | { kind: "electron" };
@@ -385,6 +401,18 @@ export const api = {
   onWatchEvent: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void): (() => void) => {
     if (typeof window !== "undefined" && window.nv?.onWatchEvent) {
       return window.nv.onWatchEvent(cb);
+    }
+    return () => {};
+  },
+  browserAttach: (bounds: BrowserBounds, url?: string) => call<BrowserState>("browser_attach", bounds, url),
+  browserDetach: () => call<{ ok: boolean }>("browser_detach"),
+  browserSetBounds: (bounds: BrowserBounds) => call<{ ok: boolean }>("browser_set_bounds", bounds),
+  browserNavigate: (url: string) => call<BrowserState>("browser_navigate", url),
+  browserAction: (action: "back" | "forward" | "reload" | "stop") => call<BrowserState>("browser_action", action),
+  browserState: () => call<BrowserState>("browser_state"),
+  onBrowserState: (cb: (state: BrowserState) => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onBrowserState) {
+      return window.nv.onBrowserState(cb);
     }
     return () => {};
   },

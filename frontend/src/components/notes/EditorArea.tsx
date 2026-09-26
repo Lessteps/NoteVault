@@ -1,7 +1,7 @@
 import {
   ArrowLeftRight,
   AlertTriangle, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, FileCode2, FileText,
-  Link2, PanelLeft, PanelRight, PenLine, Plus, Sparkles, X,
+  Globe, Link2, PanelLeft, PanelRight, PenLine, Plus, Sparkles, X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
@@ -145,6 +145,13 @@ function NoteHeader({ note }: { note: OpenNote }) {
       </div>
       <IconButton title="Asistente IA" onClick={() => useAssistant.getState().setOpen(!useAssistant.getState().open)} active={assistantOpen}>
         <Sparkles size={15} />
+      </IconButton>
+      <IconButton title="Navegador web" onClick={() => {
+        if (!inspectorOpen) toggleInspector();
+        localStorage.setItem("nv.inspector.tab", "browser");
+        window.dispatchEvent(new CustomEvent("nv-set-inspector-tab", { detail: "browser" }));
+      }}>
+        <Globe size={15} />
       </IconButton>
       <IconButton title="Panel lateral" onClick={() => {
         if (assistantOpen) {

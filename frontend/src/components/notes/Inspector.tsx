@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Globe, X } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { StudyPanel } from "../study/StudyPanel";
+import { BrowserPanel } from "../web/BrowserPanel";
 import { bodyOf, useApp } from "../../store/app";
 import { cn } from "../ui";
 
@@ -40,12 +41,59 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-/** The right panel: the note's outline, plus Estudio for notes of a study area. */
+export type InspectorTab = "note" | "study" | "browser";
+
+/** The right panel: the note's outline, Estudio, and the embedded web browser. */
 export function Inspector() {
   const active = useApp((s) => s.active);
   const toggleInspector = useApp((s) => s.toggleInspector);
   const [area, setArea] = useState<string | null>(null);
-  const [tab, setTab] = useState<"note" | "study">(() => (localStorage.getItem("nv.inspector.tab") === "note" ? "note" : "study"));
+  const [tab, setTab] = useState<InspectorTab>(() => {
+    const saved = localStorage.getItem("nv.inspector.tab");
+    return saved === "browser" || saved === "note" || saved === "study" ? saved : "note";
+  });
+
+  const [width, setWidth] = useState(() => {
+    const saved = Number(localStorage.getItem("nv.inspector.width"));
+    return saved && saved >= 280 ? saved : (tab === "browser" ? 520 : 300);
+  });
+  const drag = useRef<{ x: number; w: number } | null>(null);
+
+  useEffect(() => {
+    const handleSetTab = (e: Event) => {
+      const detail = (e as CustomEvent<InspectorTab>).detail;
+      if (detail) {
+        setTab(detail);
+        if (detail === "browser" && width < 480) {
+          setWidth(520);
+        }
+      }
+    };
+    window.addEventListener("nv-set-inspector-tab", handleSetTab);
+    return () => window.removeEventListener("nv-set-inspector-tab", handleSetTab);
+  }, [width]);
+
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      if (!drag.current) return;
+      const newW = Math.min(900, Math.max(280, drag.current.w + (drag.current.x - e.clientX)));
+      setWidth(newW);
+    };
+    const up = () => {
+      if (drag.current) {
+        localStorage.setItem("nv.inspector.width", String(width));
+      }
+      drag.current = null;
+      document.body.style.cursor = "";
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  }, [width]);
+
   useEffect(() => {
     if (!active) {
       setArea(null);
@@ -59,36 +107,70 @@ export function Inspector() {
       live = false;
     };
   }, [active]);
-  const pick = (t: "note" | "study") => {
+
+  const pick = (t: InspectorTab) => {
     setTab(t);
     try {
       localStorage.setItem("nv.inspector.tab", t);
-    } catch {
-      /* private mode */
+    } catch {}
+    if (t === "browser" && width < 480) {
+      setWidth(520);
     }
   };
-  if (!area || !active) return <NoteInspector onClose={toggleInspector} />;
+
+  const tabs: Array<[InspectorTab, string, React.ReactNode]> = [];
+  if (area) tabs.push(["study", "Estudio", null]);
+  if (active) tabs.push(["note", "Nota", null]);
+  tabs.push(["browser", "Navegador", <Globe size={13} className="text-accent-text" />]);
+
+  const effectiveTab = tabs.some(([id]) => id === tab) ? tab : tabs[0]?.[0] ?? "browser";
+
   return (
-    <aside className="flex w-[300px] flex-none flex-col border-l border-line bg-panel" aria-label="Panel lateral">
-      <div className="flex h-9 flex-none items-center gap-1 border-b border-line px-2" role="tablist" aria-label="Panel lateral">
-        {([["study", "Estudio"], ["note", "Nota"]] as const).map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => pick(id)}
-            className={cn("rounded-md px-2.5 py-1 text-[12px]", tab === id ? "bg-accent-soft text-text" : "text-dim hover:bg-hover")}>
-            {label}
+    <div className="relative flex flex-none h-full">
+      <div
+        className="w-[5px] flex-none cursor-col-resize hover:bg-accent/40 z-10 -mr-[3px]"
+        onMouseDown={(e) => {
+          drag.current = { x: e.clientX, w: width };
+          document.body.style.cursor = "col-resize";
+        }}
+      />
+      <aside
+        className="flex flex-none flex-col border-l border-line bg-panel overflow-hidden"
+        style={{ width: `${width}px` }}
+        aria-label="Panel lateral"
+      >
+        <div className="flex h-9 flex-none items-center gap-1 border-b border-line px-2" role="tablist" aria-label="Panel lateral">
+          {tabs.map(([id, label, icon]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={effectiveTab === id}
+              onClick={() => pick(id)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] transition-colors",
+                effectiveTab === id ? "bg-accent-soft text-text font-medium" : "text-dim hover:bg-hover",
+              )}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            title="Cerrar panel lateral"
+            aria-label="Cerrar panel lateral"
+            onClick={toggleInspector}
+            className="ml-auto grid h-6 w-6 place-items-center rounded text-faint hover:bg-hover hover:text-text"
+          >
+            <X size={14} />
           </button>
-        ))}
-        <button
-          type="button"
-          title="Cerrar panel lateral"
-          aria-label="Cerrar panel lateral"
-          onClick={toggleInspector}
-          className="ml-auto grid h-6 w-6 place-items-center rounded text-faint hover:bg-hover hover:text-text"
-        >
-          <X size={14} />
-        </button>
-      </div>
-      {tab === "study" ? <StudyPanel path={active} areaKey={area} /> : <NoteInspector embedded onClose={toggleInspector} />}
-    </aside>
+        </div>
+        {effectiveTab === "browser" && <BrowserPanel />}
+        {effectiveTab === "study" && active && area && <StudyPanel path={active} areaKey={area} />}
+        {effectiveTab === "note" && <NoteInspector embedded onClose={toggleInspector} />}
+      </aside>
+    </div>
   );
 }
 

@@ -2,7 +2,7 @@
 
 import {
   Bookmark, Calendar, CircleCheck, Copy, Dumbbell, Files, Flag, Globe, House, Kanban, Minus, Moon, PanelLeft,
-  PenLine, Pin, PinOff, Plus, Search, Square, SquareCheck, Sun, Wallet, X, Gem, Cloud, CloudUpload,
+  PenLine, Pin, PinOff, Plus, Search, Square, SquareCheck, Sun, Wallet, X, Cloud, CloudUpload,
   CircleAlert, Settings, FileCode2, FileText, LayoutDashboard,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -161,8 +161,6 @@ function TabStrip() {
 // state and the window controls in the same row. Nothing is stacked above it.
 
 export function TopBar() {
-  const info = useApp((s) => s.info);
-
   return (
     <header
       className="nv-titlebar flex h-10 flex-none items-stretch border-b border-line bg-bg"
@@ -172,22 +170,6 @@ export function TopBar() {
         void api.windowToggleMaximize().catch(() => undefined);
       }}
     >
-      {/* App identity + vault switcher */}
-      <div className="flex flex-none items-center gap-2 border-r border-line px-3">
-        <span className="grid h-5 w-5 place-items-center rounded bg-accent text-white">
-          <Gem size={12} strokeWidth={2.2} />
-        </span>
-        <span className="text-[12.5px] font-semibold text-text">NoteVault</span>
-        <button
-          type="button"
-          title="Cambiar de vault"
-          onClick={() => useVaultDialog.getState().set(true)}
-          className="rounded px-1 font-mono text-[10.5px] uppercase tracking-wider text-dim hover:text-text"
-        >
-          {info?.vault_name ?? "…"}
-        </button>
-      </div>
-
       {/* Workspace icons: the explorer panel and its three views */}
       <WorkspaceIcons />
 
@@ -419,9 +401,15 @@ export function StatusBar() {
   const words = note ? (note.raw.match(/\S+/g)?.length ?? 0) : 0;
   return (
     <footer className="flex h-7 flex-none items-center gap-3 border-t border-line bg-bg px-3 font-mono text-[10.5px] text-faint">
-      <span className="flex items-center gap-1.5 text-mint">
+      {/* The vault switcher lives here: the top bar only carries tabs. */}
+      <button
+        type="button"
+        title="Cambiar de vault"
+        onClick={() => useVaultDialog.getState().set(true)}
+        className="flex items-center gap-1.5 text-mint hover:text-text"
+      >
         <Cloud size={12} /> {info?.vault_name ?? "vault"}
-      </span>
+      </button>
       {note && (
         <>
           <Sep />

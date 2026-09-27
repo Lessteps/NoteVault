@@ -10,7 +10,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MenuHost } from "./ui";
-import { TopBar } from "./Shell";
+import { StatusBar, TopBar } from "./Shell";
+import { useVaultDialog } from "./VaultDialog";
 import { useApp } from "../store/app";
 
 // Electron host: the bar draws the window controls and asks the shell for them.
@@ -111,17 +112,18 @@ describe("TopBar", () => {
     expect(closeButton(tab("mapa"))).toBeDefined();
   });
 
-  it("is one bar: brand, workspace icons, tabs, sync state and window controls", () => {
+  it("is one bar: workspace icons, tabs, sync state and window controls", () => {
     const headers = [...container.querySelectorAll("header")];
     expect(headers).toHaveLength(1);
     // The bar is the window's title bar, so its background drags the window.
     expect(headers[0]!.className).toContain("nv-titlebar");
 
     const text = headers[0]!.textContent ?? "";
-    expect(text).toContain("NoteVault");
-    expect(text).toContain("vault-a");
     expect(text).toContain("Guardado");
     expect(text).toContain("Calendario"); // the tabs live in this same row
+    // No brand block: the bar carries the tabs, not the app name or the vault.
+    expect(text).not.toContain("NoteVault");
+    expect(text).not.toContain("vault-a");
 
     for (const label of ["Panel lateral", "Archivos", "Buscar", "Marcadores"]) {
       expect(container.querySelector(`button[aria-label="${label}"]`), `missing “${label}”`).not.toBeNull();
@@ -166,5 +168,23 @@ describe("TopBar", () => {
     act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Cerrar"]')!.click());
     // Closing asks the shell; the jsdom bridge records the call.
     expect(useApp.getState().openTabs.length).toBe(3);
+  });
+});
+
+describe("StatusBar", () => {
+  it("keeps the vault switcher, now that the top bar has no brand block", () => {
+    const other = document.createElement("div");
+    document.body.appendChild(other);
+    act(() => {
+      createRoot(other).render(<StatusBar />);
+    });
+
+    const vault = other.querySelector<HTMLButtonElement>('button[title="Cambiar de vault"]');
+    expect(vault).not.toBeNull();
+    expect(vault!.textContent).toContain("vault-a");
+
+    useVaultDialog.setState({ open: false });
+    act(() => vault!.click());
+    expect(useVaultDialog.getState().open).toBe(true);
   });
 });

@@ -847,8 +847,14 @@ de Obsidian `[[Título de la nota]]`.
     cliente persiste sus propias pestañas fijadas con ese mismo esquema de
     identificadores. Las pestañas fijadas no pueden cerrarse accidentalmente mediante
     click, clic central ni atajos de cierre.
-- **Descubrimiento Jerárquico de Temas (`_tema.md`)**:
-  - Tanto la app de escritorio como la app móvil deben descubrir el tema activo ascendiendo por el árbol de carpetas (`findAncestorTopicManifest`) desde cualquier nota o subcarpeta (`Ejercicios/`, `Apuntes/`, etc.) hasta encontrar el primer `_tema.md` ascendente. Esto garantiza que notas en subárboles hereden siempre el contexto del tema y el catálogo completo de competencias matemáticas (solve, process, prove, counterexample, true_false, find_error, drill, explain).
+- **Descubrimiento Jerárquico de Temas (`_tema.md` y `<carpeta>.practica.md`)**:
+  - Tanto la app de escritorio como la app móvil deben descubrir el tema activo ascendiendo por el árbol de carpetas (`findAncestorTopicManifest`) desde cualquier nota o subcarpeta (`Ejercicios/`, `Apuntes/`, etc.) hasta encontrar el primer manifiesto ascendente: un `_tema.md` o `tema.md` (formato heredado, todavía aceptado) o cualquier nota cuyo frontmatter declare `type: topic` **o `type: practica`** — que es donde vive el manifiesto desde la migración. Esto garantiza que notas en subárboles hereden siempre el contexto del tema y el catálogo completo de competencias matemáticas (solve, process, prove, counterexample, true_false, find_error, drill, explain).
+- **Archivos de vista de estudio (`<carpeta>.<tipo>.md`)**:
+  - Una carpeta de estudio expone su contenido con dos ficheros de vista visibles en lugar de un `_tema.md` oculto entre las notas. Son notas normales de markdown (frontmatter + cuerpo) y su nombre sigue la convención `<nombre de la carpeta>.<tipo>.md`:
+    - `<carpeta>.practica.md` (`type: practica`): la vista de práctica del tema. **Contiene el manifiesto del tema en el frontmatter** (`subject`, `title`, `skills`, `min_per_skill`, `target_difficulty`, `exam`, `exam_group`); es el fichero que el descubrimiento jerárquico encuentra.
+    - `<carpeta>.teorica.md` (`type: teorica`): la puerta a la teoría del tema. Apunta a la nota de teoría con `teoria: <ruta relativa al vault>` y, si el tema tiene mapa, a su canvas con `mapa: <ruta relativa al vault>`. Si no se indica `teoria`, se usa la nota del mismo nombre que la carpeta.
+    - `<carpeta>.resumen.md` (`type: resumen`): el panorama agregado de un área (o de la materia entera, con `scope: <carpeta del vault>`): totales, progreso por competencia y dificultad, errores frecuentes y una entrada para practicar el área completa.
+  - El escritorio reconoce esos ficheros por su frontmatter `type` y los abre con su interfaz integrada en lugar del editor de markdown. **Paridad móvil**: para un cliente que no implemente las vistas no hay nada especial que respetar; son notas de markdown válidas y su cuerpo explica qué son. El escritorio crea el fichero de vista que falte al hacer click en una carpeta (`study_view_ensure`), y nunca lo sobrescribe si ya existe.
 - **Persistencia de Navegación Web**:
   - Las particiones de sesión web se mantienen aisladas bajo `persist:nvweb`, con historial y métricas de uso sincronizadas en `.notevault/web/`.
 

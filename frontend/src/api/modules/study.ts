@@ -126,8 +126,12 @@ interface CachedStudySnapshot {
 const _snapshotCache = new Map<string, CachedStudySnapshot>();
 const SNAPSHOT_CACHE_TTL_MS = 30_000;
 
+/** The per-subject dashboard is expensive (it scans the whole vault), so it is memoed. */
+const _dashboardCache = new Map<string, { data: unknown; timestamp: number }>();
+
 export function clearStudySnapshotCache(): void {
   _snapshotCache.clear();
+  _dashboardCache.clear();
 }
 
 function resolveTopicDir(app: AppState, relPath: string): string {
@@ -849,18 +853,28 @@ export function studyApi(app: AppState) {
     },
 
     study_topic_dashboard: async (subjectFilter?: string) => {
+      const cacheKey = `${app.root}::${subjectFilter ?? ""}`;
+      const cachedDashboard = _dashboardCache.get(cacheKey) as
+        | { data: { subjects: string[]; areas: string[]; topics: unknown[] }; timestamp: number }
+        | undefined;
+      if (cachedDashboard && Date.now() - cachedDashboard.timestamp < SNAPSHOT_CACHE_TTL_MS) {
+        return cachedDashboard.data;
+      }
       const scan = scanVault(app.root, app.vault.notePaths());
       const allExercises = scan.exercises;
       const attempts = loadAllAttempts(app.root);
 
+      // The vault walk yields absolute paths, but every lookup of the practice
+      // model speaks vault-relative ones: converting here is what makes the
+      // dashboard find the topics at all.
       const folderSet = new Set<string>();
       for (const np of app.vault.notePaths()) {
-        const dir = path.dirname(np).replace(/\\/g, "/");
-        if (dir && dir !== ".") {
-          folderSet.add(dir);
-          const parent = path.dirname(dir).replace(/\\/g, "/");
-          if (parent && parent !== ".") folderSet.add(parent);
-        }
+        const rel = app.rel(np).replace(/\\/g, "/");
+        const dir = path.posix.dirname(rel);
+        if (!dir || dir === "." || dir === "/" || dir.startsWith("..")) continue;
+        folderSet.add(dir);
+        const parent = path.posix.dirname(dir);
+        if (parent && parent !== "." && parent !== "/" && !parent.startsWith("..")) folderSet.add(parent);
       }
 
       const foundMap = new Map<string, { folder: string; manifest: TopicManifest }>();
@@ -922,11 +936,13 @@ export function studyApi(app: AppState) {
 
       items.sort((a, b) => a.area.localeCompare(b.area) || a.manifest.title.localeCompare(b.manifest.title));
 
-      return {
+      const payload = {
         subjects: Array.from(subjectsSet),
         areas: Array.from(areasSet),
         topics: items,
       };
+      _dashboardCache.set(cacheKey, { data: payload, timestamp: Date.now() });
+      return payload;
     },
   };
 }

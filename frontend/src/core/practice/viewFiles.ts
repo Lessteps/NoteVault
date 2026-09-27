@@ -58,6 +58,48 @@ export function isTopicFolder(rootAbs: string, folderAbs: string): boolean {
   return findAncestorTopicManifest(folderAbs, rootAbs)?.topicFolder === path.resolve(folderAbs);
 }
 
+/**
+ * True when the folder holds topic folders somewhere below it: that is what
+ * makes it a *grouping* folder with an overview of its own (as opposed to a
+ * plain folder, which gets no view file just because it was clicked).
+ */
+export function folderHasTopicsBelow(rootAbs: string, folderAbs: string, maxDepth = 6): boolean {
+  const root = path.resolve(folderAbs);
+  const isTopic = (dir: string): boolean => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    const files = entries.filter((e) => e.isFile()).map((e) => e.name.toLowerCase());
+    const name = path.basename(dir);
+    return (
+      files.includes(TOPIC_MARKER_FILE) ||
+      files.includes(viewFileName(name, "practica").toLowerCase())
+    );
+  };
+  const visit = (dir: string, depth: number): boolean => {
+    if (depth > maxDepth) return false;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const base = entry.name;
+      if (base.startsWith(".") || IGNORED.has(base)) continue;
+      const child = path.join(dir, base);
+      if (isTopic(child) || visit(child, depth + 1)) return true;
+    }
+    return false;
+  };
+  void rootAbs;
+  return visit(root, 0);
+}
+
 /** The topic manifest of a folder, from its `practica` view or a legacy `_tema.md`. */
 export function topicManifestOf(rootAbs: string, folderAbs: string): TopicManifest | null {
   const found = findAncestorTopicManifest(folderAbs, rootAbs);

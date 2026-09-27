@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { findAncestorTopicManifest, parseTopicManifest } from "./topic";
 import {
   ensureTopicViewFiles,
+  folderHasTopicsBelow,
   migrateVault,
   practiceFileText,
   theoryNoteOf,
@@ -193,6 +194,25 @@ describe("migrateVault", () => {
       const again = ensureTopicViewFiles(root, topic);
       expect(again.created).toEqual([]);
       expect(again.skipped).toHaveLength(2);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("folderHasTopicsBelow", () => {
+  it("tells a grouping folder from a plain one", () => {
+    const root = makeVault();
+    try {
+      migrateVault(root);
+      const mat = path.join(root, "Matemáticas");
+      expect(folderHasTopicsBelow(root, mat)).toBe(true);
+      expect(folderHasTopicsBelow(root, path.join(mat, "1 Aritmética"))).toBe(true);
+      // A topic folder holds exercises, not topics.
+      expect(folderHasTopicsBelow(root, path.join(mat, "1 Aritmética", "1.1 Números naturales"))).toBe(false);
+
+      fs.mkdirSync(path.join(root, "Suelta"), { recursive: true });
+      expect(folderHasTopicsBelow(root, path.join(root, "Suelta"))).toBe(false);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

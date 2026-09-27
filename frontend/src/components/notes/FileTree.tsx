@@ -94,6 +94,29 @@ async function trashEntry(entry: TreeEntry) {
   }
 }
 
+/**
+ * Notion-style folder click: the folder's *name* opens its view file (the topic's
+ * practice view, or the area's overview — created on the spot when missing) and
+ * the chevron expands/collapses its children. Plain folders have no view, so
+ * they keep behaving as a plain toggle.
+ */
+async function openFolderView(entry: TreeEntry, toggle: (path: string) => void) {
+  const s = useApp.getState();
+  try {
+    const view = await api.studyViewEnsure(entry.path);
+    if (view.ok && view.path) {
+      if (view.created.length) s.toast("info", `Vista creada: ${view.path.split("/").pop()}`);
+      s.refreshTree();
+      await s.openNote(view.path);
+      s.setMode("read");
+      return;
+    }
+  } catch (e) {
+    s.toast("error", (e as Error).message);
+  }
+  toggle(entry.path);
+}
+
 function openEntry(entry: TreeEntry) {
   const s = useApp.getState();
   if (entry.kind === "canvas") {
@@ -324,7 +347,7 @@ export function FileTree({ filter }: { filter: string }) {
                   draggable
                   onDragStart={(e) => onDragStart(e, entry.path)}
                   {...(isFolder ? dropProps(entry.path) : {})}
-                  onClick={() => (isFolder ? toggle(entry.path) : openEntry(entry))}
+                  onClick={() => (isFolder ? void openFolderView(entry, toggle) : openEntry(entry))}
                   onAuxClick={(e) => e.button === 1 && !isFolder && openEntry(entry)}
                   onContextMenu={menuFor(entry)}
                   className={cn(
@@ -336,13 +359,24 @@ export function FileTree({ filter }: { filter: string }) {
                   )}
                   style={{ paddingLeft: 6 + depth * 14 }}
                 >
-                  <ChevronRight
+                  <button
+                    type="button"
+                    title={open ? "Contraer" : "Expandir"}
+                    aria-label={open ? `Contraer ${entry.name}` : `Expandir ${entry.name}`}
+                    onClick={(e) => {
+                      // The chevron expands; the name opens the folder's view.
+                      e.stopPropagation();
+                      if (isFolder) toggle(entry.path);
+                    }}
                     className={cn(
-                      "h-3.5 w-3.5 flex-none text-faint transition-transform",
-                      !isFolder || entry.has_children === false ? "invisible" : "",
-                      open && "rotate-90",
+                      "grid h-4 w-4 flex-none place-items-center rounded",
+                      !isFolder || entry.has_children === false ? "invisible" : "hover:bg-hover",
                     )}
-                  />
+                  >
+                    <ChevronRight
+                      className={cn("h-3.5 w-3.5 text-faint transition-transform", open && "rotate-90")}
+                    />
+                  </button>
                   <EntryIcon entry={entry} open={open} />
                   <span className="truncate">{entry.name}</span>
                 </div>

@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { api } from "../../lib/bridge";
-import { StudyPanel } from "../study/StudyPanel";
 import { bodyOf, useApp } from "../../store/app";
 import { cn } from "../ui";
 
@@ -40,34 +38,21 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export type InspectorTab = "note" | "study";
+export type InspectorTab = "note";
 
-/** The right panel: the note's outline and Estudio. */
+/** The right panel: the note's outline, properties and backlinks.
+ *
+ * Practice lives in the study view files (`type: practica`, `type: resumen`),
+ * so this panel no longer hosts the study surface. */
 export function Inspector() {
   const active = useApp((s) => s.active);
   const toggleInspector = useApp((s) => s.toggleInspector);
-  const [area, setArea] = useState<string | null>(null);
-  const [tab, setTab] = useState<InspectorTab>(() => {
-    const saved = localStorage.getItem("nv.inspector.tab");
-    return saved === "note" || saved === "study" ? saved : "note";
-  });
 
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem("nv.inspector.width"));
     return saved && saved >= 280 ? saved : 300;
   });
   const drag = useRef<{ x: number; w: number } | null>(null);
-
-  useEffect(() => {
-    const handleSetTab = (e: Event) => {
-      const detail = (e as CustomEvent<InspectorTab>).detail;
-      if (detail === "note" || detail === "study") {
-        setTab(detail);
-      }
-    };
-    window.addEventListener("nv-set-inspector-tab", handleSetTab);
-    return () => window.removeEventListener("nv-set-inspector-tab", handleSetTab);
-  }, []);
 
   useEffect(() => {
     const move = (e: MouseEvent) => {
@@ -90,32 +75,10 @@ export function Inspector() {
     };
   }, [width]);
 
-  useEffect(() => {
-    if (!active) {
-      setArea(null);
-      return;
-    }
-    let live = true;
-    api.studyArea(active)
-      .then((a) => live && setArea(a ? `${a.subject}:${a.folder}` : null))
-      .catch(() => live && setArea(null));
-    return () => {
-      live = false;
-    };
-  }, [active]);
-
-  const pick = (t: InspectorTab) => {
-    setTab(t);
-    try {
-      localStorage.setItem("nv.inspector.tab", t);
-    } catch {}
-  };
-
   const tabs: Array<[InspectorTab, string, React.ReactNode]> = [];
-  if (area) tabs.push(["study", "Estudio", null]);
   if (active) tabs.push(["note", "Nota", null]);
 
-  const effectiveTab = tabs.some(([id]) => id === tab) ? tab : tabs[0]?.[0] ?? "note";
+  const effectiveTab = tabs[0]?.[0] ?? "note";
 
   return (
     <div className="relative flex flex-none h-full">
@@ -138,7 +101,7 @@ export function Inspector() {
               type="button"
               role="tab"
               aria-selected={effectiveTab === id}
-              onClick={() => pick(id)}
+              onClick={() => undefined}
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] transition-colors",
                 effectiveTab === id ? "bg-accent-soft text-text font-medium" : "text-dim hover:bg-hover",
@@ -158,7 +121,6 @@ export function Inspector() {
             <X size={14} />
           </button>
         </div>
-        {effectiveTab === "study" && active && area && <StudyPanel path={active} areaKey={area} />}
         {effectiveTab === "note" && <NoteInspector embedded onClose={toggleInspector} />}
       </aside>
     </div>

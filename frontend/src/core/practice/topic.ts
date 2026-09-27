@@ -210,6 +210,8 @@ export function parseTopicManifest(
 
   const isTopic =
     type === "topic" ||
+    // A `practica` view file carries the topic manifest (see viewFiles.ts).
+    type === "practica" ||
     tag === "tema" ||
     tag === "topic" ||
     tags.includes("tema") ||

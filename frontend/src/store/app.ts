@@ -90,6 +90,11 @@ function frontmatterText(raw: string): string {
   return FRONTMATTER.exec(raw)?.[1] ?? "";
 }
 
+/** Note data from the bridge → the shape the views render. */
+export function toOpenNote(d: NoteData, revealLine?: number): OpenNote {
+  return fromData(d, revealLine);
+}
+
 function fromData(d: NoteData, revealLine?: number): OpenNote {
   return {
     path: d.path,

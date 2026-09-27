@@ -14,6 +14,8 @@ export const VALID_TYPES = [
   "concept", "topic", "chapter", "skill", "method", "formula",
   "definition", "theorem", "example", "exercise", "flashcard",
   "error", "project", "vocabulary", "grammar", "note",
+  // Study view files (see core/practice/viewFiles.ts).
+  "teorica", "practica", "resumen",
 ] as const;
 export const VALID_STATUSES = ["learning", "reviewing", "mastered", "pending"] as const;
 

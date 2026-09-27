@@ -20,6 +20,8 @@ interface TopicConfiguratorDialogProps {
   topicData: TopicData;
   onClose: () => void;
   onStarted?: (firstPath: string) => void;
+  /** Rendered inside a view file instead of as a modal dialog. */
+  inline?: boolean;
 }
 
 const QUANTITY_OPTIONS: Array<{ id: QuantityOption; label: string; desc: string }> = [
@@ -34,6 +36,7 @@ export function TopicConfiguratorDialog({
   topicData,
   onClose,
   onStarted,
+  inline = false,
 }: TopicConfiguratorDialogProps) {
   const toast = useApp((s) => s.toast);
   const openNote = useApp((s) => s.openNote);
@@ -137,14 +140,21 @@ export function TopicConfiguratorDialog({
     }
   };
 
+  const modal = !inline;
+
   return (
     <div
-      role="dialog"
-      aria-modal="true"
+      role={modal ? "dialog" : undefined}
+      aria-modal={modal ? "true" : undefined}
       aria-labelledby="topic-config-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className={modal
+        ? "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+        : "flex w-full flex-col"}
     >
-      <div className="flex max-h-[90vh] w-full max-w-[620px] flex-col overflow-hidden rounded-2xl border border-line-strong bg-card shadow-2xl">
+      <div className={cn(
+        "flex w-full flex-col overflow-hidden border border-line-strong bg-card",
+        modal ? "max-h-[90vh] max-w-[620px] rounded-2xl shadow-2xl" : "min-h-0 rounded-2xl",
+      )}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div>

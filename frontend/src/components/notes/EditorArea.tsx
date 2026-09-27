@@ -12,6 +12,9 @@ import { cn, IconButton, Kbd } from "../ui";
 import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
 import { PracticeView } from "../practice/PracticeView";
+import { TeoricaView } from "../study/TeoricaView";
+import { TopicFileView } from "../study/TopicFileView";
+import { viewFileKind } from "../../lib/viewFiles";
 import { isProofNote, LadderView, useLadder } from "../practice/LadderView";
 import { SourceEditor } from "./SourceEditor";
 import { StudyBar } from "./StudyBar";
@@ -273,6 +276,15 @@ function isExercise(note: { kind: string; frontmatter: Record<string, unknown> }
   return note.kind === "note" && String(note.frontmatter?.type ?? "").trim().toLowerCase() === "exercise";
 }
 
+/**
+ * View files (`type: practica` / `teorica` / `resumen`) open their own
+ * full-screen surface instead of the markdown editor, the same way an exercise
+ * note opens the practice view. See lib/viewFiles.ts (core mirrors it).
+ */
+function isViewFile(note: { kind: string; frontmatter: Record<string, unknown> }, kind: string): boolean {
+  return note.kind === "note" && viewFileKind(note.frontmatter) === kind;
+}
+
 export function EditorArea() {
   const note = useApp((s) => (s.active ? s.notes[s.active] : undefined));
   const side = useApp((s) => (s.side && s.side !== s.active ? s.notes[s.side] : undefined));
@@ -297,7 +309,9 @@ export function EditorArea() {
                 )}
                 {mode !== "edit" && (
                   <div className={cn("min-h-0 min-w-0", mode === "split" ? "w-1/2" : "flex-1")}>
-                    {mode === "read" && isExercise(note) ? <PracticeView note={note} />
+                    {mode === "read" && isViewFile(note, "practica") ? <TopicFileView note={note} />
+                      : mode === "read" && isViewFile(note, "teorica") ? <TeoricaView note={note} />
+                        : mode === "read" && isExercise(note) ? <PracticeView note={note} />
                       : mode === "read" && ladderOn ? <LadderView path={note.path} onExit={() => useLadder.getState().set(note.path, false)} />
                         : (
                           <div className="flex h-full flex-col">

@@ -1,7 +1,7 @@
 import {
   ArrowLeftRight,
   AlertTriangle, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, FileCode2, FileText,
-  Globe, Link2, PanelLeft, PanelRight, PenLine, Plus, Sparkles, X,
+  Link2, PanelLeft, PenLine, Plus, X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
@@ -15,7 +15,6 @@ import { PracticeView } from "../practice/PracticeView";
 import { isProofNote, LadderView, useLadder } from "../practice/LadderView";
 import { SourceEditor } from "./SourceEditor";
 import { StudyBar } from "./StudyBar";
-import { useAssistant } from "../../store/assistant";
 
 function TabBar() {
   const tabs = useApp((s) => s.tabs);
@@ -99,10 +98,7 @@ function NoteHeader({ note }: { note: OpenNote }) {
   const setMode = useApp((s) => s.setMode);
   const toggleBookmark = useApp((s) => s.toggleBookmark);
   const toggleExplorer = useApp((s) => s.toggleExplorer);
-  const toggleInspector = useApp((s) => s.toggleInspector);
   const explorerOpen = useApp((s) => s.explorerOpen);
-  const inspectorOpen = useApp((s) => s.inspectorOpen);
-  const assistantOpen = useAssistant((s) => s.open);
   const parts = note.path.split("/");
   return (
     <div className="flex h-11 flex-none items-center gap-2 border-b border-line bg-surface px-3">
@@ -143,20 +139,6 @@ function NoteHeader({ note }: { note: OpenNote }) {
           </button>
         ))}
       </div>
-      <IconButton title="Asistente IA" onClick={() => useAssistant.getState().setOpen(!useAssistant.getState().open)} active={assistantOpen}>
-        <Sparkles size={15} />
-      </IconButton>
-      <IconButton title="Navegador web" onClick={() => useApp.getState().setModule("web")}>
-        <Globe size={15} />
-      </IconButton>
-      <IconButton title="Panel lateral" onClick={() => {
-        if (assistantOpen) {
-          useAssistant.getState().setOpen(false);
-          if (!inspectorOpen) toggleInspector();
-        } else toggleInspector();
-      }} active={inspectorOpen && !assistantOpen}>
-        <PanelRight size={15} />
-      </IconButton>
     </div>
   );
 }
@@ -317,10 +299,7 @@ function Editor({ note }: { note: OpenNote }) {
 
 function EmptyState() {
   const toggleExplorer = useApp((s) => s.toggleExplorer);
-  const toggleInspector = useApp((s) => s.toggleInspector);
   const explorerOpen = useApp((s) => s.explorerOpen);
-  const inspectorOpen = useApp((s) => s.inspectorOpen);
-  const assistantOpen = useAssistant((s) => s.open);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -329,28 +308,6 @@ function EmptyState() {
           <PanelLeft size={15} />
         </IconButton>
         <span className="text-[12px] text-faint">Notas</span>
-        <div className="flex-1" />
-        <IconButton title="Asistente IA" onClick={() => useAssistant.getState().setOpen(!useAssistant.getState().open)} active={assistantOpen}>
-          <Sparkles size={15} />
-        </IconButton>
-        <IconButton
-          title="Navegador web"
-          onClick={() => useApp.getState().setModule("web")}
-        >
-          <Globe size={15} />
-        </IconButton>
-        <IconButton
-          title="Panel lateral"
-          onClick={() => {
-            if (assistantOpen) {
-              useAssistant.getState().setOpen(false);
-              if (!inspectorOpen) toggleInspector();
-            } else toggleInspector();
-          }}
-          active={inspectorOpen && !assistantOpen}
-        >
-          <PanelRight size={15} />
-        </IconButton>
       </div>
       <div className="grid flex-1 place-items-center bg-surface">
         <div className="max-w-sm text-center">

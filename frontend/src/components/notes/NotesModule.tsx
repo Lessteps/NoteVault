@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Globe, PanelRight } from "lucide-react";
+import { Globe, PanelRight, Sparkles } from "lucide-react";
 import { useApp } from "../../store/app";
 import { EditorArea } from "./EditorArea";
 import { Explorer } from "./Explorer";
@@ -68,6 +68,17 @@ export function NotesModule() {
           >
             <button
               type="button"
+              title="Abrir Asistente IA"
+              onClick={() => {
+                if (inspectorOpen) useApp.getState().toggleInspector();
+                useAssistant.getState().setOpen(true);
+              }}
+              className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
+            >
+              <Sparkles size={16} />
+            </button>
+            <button
+              type="button"
               title="Abrir Navegador web"
               onClick={() => useApp.getState().setModule("web")}
               className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
@@ -77,7 +88,10 @@ export function NotesModule() {
             <button
               type="button"
               title="Abrir panel lateral"
-              onClick={() => useApp.getState().toggleInspector()}
+              onClick={() => {
+                if (assistantOpen) useAssistant.getState().setOpen(false);
+                useApp.getState().toggleInspector();
+              }}
               className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
             >
               <PanelRight size={16} />

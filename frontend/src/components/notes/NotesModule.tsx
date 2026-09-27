@@ -69,11 +69,7 @@ export function NotesModule() {
             <button
               type="button"
               title="Abrir Navegador web"
-              onClick={() => {
-                useApp.getState().toggleInspector();
-                localStorage.setItem("nv.inspector.tab", "browser");
-                window.dispatchEvent(new CustomEvent("nv-set-inspector-tab", { detail: "browser" }));
-              }}
+              onClick={() => useApp.getState().setModule("web")}
               className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
             >
               <Globe size={16} />

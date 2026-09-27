@@ -146,11 +146,7 @@ function NoteHeader({ note }: { note: OpenNote }) {
       <IconButton title="Asistente IA" onClick={() => useAssistant.getState().setOpen(!useAssistant.getState().open)} active={assistantOpen}>
         <Sparkles size={15} />
       </IconButton>
-      <IconButton title="Navegador web" onClick={() => {
-        if (!inspectorOpen) toggleInspector();
-        localStorage.setItem("nv.inspector.tab", "browser");
-        window.dispatchEvent(new CustomEvent("nv-set-inspector-tab", { detail: "browser" }));
-      }}>
+      <IconButton title="Navegador web" onClick={() => useApp.getState().setModule("web")}>
         <Globe size={15} />
       </IconButton>
       <IconButton title="Panel lateral" onClick={() => {
@@ -339,11 +335,7 @@ function EmptyState() {
         </IconButton>
         <IconButton
           title="Navegador web"
-          onClick={() => {
-            if (!inspectorOpen) toggleInspector();
-            localStorage.setItem("nv.inspector.tab", "browser");
-            window.dispatchEvent(new CustomEvent("nv-set-inspector-tab", { detail: "browser" }));
-          }}
+          onClick={() => useApp.getState().setModule("web")}
         >
           <Globe size={15} />
         </IconButton>

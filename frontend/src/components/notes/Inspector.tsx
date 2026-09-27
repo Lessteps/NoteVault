@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Globe, X } from "lucide-react";
+import { X } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { StudyPanel } from "../study/StudyPanel";
-import { BrowserPanel } from "../web/BrowserPanel";
 import { bodyOf, useApp } from "../../store/app";
 import { cn } from "../ui";
 
@@ -41,37 +40,34 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export type InspectorTab = "note" | "study" | "browser";
+export type InspectorTab = "note" | "study";
 
-/** The right panel: the note's outline, Estudio, and the embedded web browser. */
+/** The right panel: the note's outline and Estudio. */
 export function Inspector() {
   const active = useApp((s) => s.active);
   const toggleInspector = useApp((s) => s.toggleInspector);
   const [area, setArea] = useState<string | null>(null);
   const [tab, setTab] = useState<InspectorTab>(() => {
     const saved = localStorage.getItem("nv.inspector.tab");
-    return saved === "browser" || saved === "note" || saved === "study" ? saved : "note";
+    return saved === "note" || saved === "study" ? saved : "note";
   });
 
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem("nv.inspector.width"));
-    return saved && saved >= 280 ? saved : (tab === "browser" ? 520 : 300);
+    return saved && saved >= 280 ? saved : 300;
   });
   const drag = useRef<{ x: number; w: number } | null>(null);
 
   useEffect(() => {
     const handleSetTab = (e: Event) => {
       const detail = (e as CustomEvent<InspectorTab>).detail;
-      if (detail) {
+      if (detail === "note" || detail === "study") {
         setTab(detail);
-        if (detail === "browser" && width < 480) {
-          setWidth(520);
-        }
       }
     };
     window.addEventListener("nv-set-inspector-tab", handleSetTab);
     return () => window.removeEventListener("nv-set-inspector-tab", handleSetTab);
-  }, [width]);
+  }, []);
 
   useEffect(() => {
     const move = (e: MouseEvent) => {
@@ -113,17 +109,13 @@ export function Inspector() {
     try {
       localStorage.setItem("nv.inspector.tab", t);
     } catch {}
-    if (t === "browser" && width < 480) {
-      setWidth(520);
-    }
   };
 
   const tabs: Array<[InspectorTab, string, React.ReactNode]> = [];
   if (area) tabs.push(["study", "Estudio", null]);
   if (active) tabs.push(["note", "Nota", null]);
-  tabs.push(["browser", "Navegador", <Globe size={13} className="text-accent-text" />]);
 
-  const effectiveTab = tabs.some(([id]) => id === tab) ? tab : tabs[0]?.[0] ?? "browser";
+  const effectiveTab = tabs.some(([id]) => id === tab) ? tab : tabs[0]?.[0] ?? "note";
 
   return (
     <div className="relative flex flex-none h-full">
@@ -166,7 +158,6 @@ export function Inspector() {
             <X size={14} />
           </button>
         </div>
-        {effectiveTab === "browser" && <BrowserPanel />}
         {effectiveTab === "study" && active && area && <StudyPanel path={active} areaKey={area} />}
         {effectiveTab === "note" && <NoteInspector embedded onClose={toggleInspector} />}
       </aside>

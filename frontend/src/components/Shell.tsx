@@ -43,14 +43,7 @@ export function TopBar() {
         type="button"
         title="Navegador Web"
         onClick={() => {
-          if (useApp.getState().module === "notas") {
-            const s = useApp.getState();
-            if (!s.inspectorOpen) s.toggleInspector();
-            localStorage.setItem("nv.inspector.tab", "browser");
-            window.dispatchEvent(new CustomEvent("nv-set-inspector-tab", { detail: "browser" }));
-          } else {
-            useApp.getState().setModule("web");
-          }
+          useApp.getState().setModule("web");
         }}
         className="flex h-7 items-center gap-1.5 rounded-lg border border-line bg-panel px-2 text-[12px] text-dim transition-colors hover:border-line-strong hover:text-text"
       >

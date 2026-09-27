@@ -21,7 +21,6 @@ export function WebModule() {
   const toast = useApp((s) => s.toast);
   const [data, setData] = useState<WebOverview | null>(null);
   const [tab, setTab] = useState<Tab>("browser");
-  const [address, setAddress] = useState("");
   const [currentBrowseUrl, setCurrentBrowseUrl] = useState("https://www.google.com");
   const [day, setDay] = useState("");
 
@@ -62,39 +61,32 @@ export function WebModule() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-surface">
-      <div className="flex flex-none items-center gap-3 border-b border-line px-5 py-3">
-        <Globe size={18} className="text-accent-text" />
-        <form className="flex flex-1 gap-2" onSubmit={(e) => {
-          e.preventDefault();
-          void open(address);
-        }}>
-          <input aria-label="Dirección o búsqueda" value={address} onChange={(e) => setAddress(e.target.value)}
-            placeholder="Escribe una dirección o lo que quieras buscar…" className={cn(input, "h-9")} />
-          <PrimaryButton type="submit">Abrir</PrimaryButton>
-        </form>
-        {!data.restrictions.enabled
-          ? <span className="text-[11.5px] text-faint">Reglas desactivadas</span>
-          : <span className="flex items-center gap-1 text-[11.5px] text-mint"><Shield size={13} /> Reglas activas{data.restrictions.mode === "allowlist" && " · modo enfoque"}</span>}
+      <div className="flex h-10 flex-none items-center justify-between border-b border-line bg-panel px-4" role="tablist" aria-label="WEB">
+        <div className="flex items-center gap-1">
+          {([["browser", "Navegador", <Globe key="g" size={14} />],
+            ["bookmarks", "Marcadores", <Bookmark key="b" size={14} />],
+            ["history", "Historial", <History key="h" size={14} />],
+            ["usage", "Tiempo", <Timer key="t" size={14} />],
+            ["rules", "Restricciones", <Shield key="r" size={14} />]] as Array<[Tab, string, ReactNode]>).map(([id, label, icon]) => (
+            <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+              className={cn("flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-medium transition-colors", tab === id ? "bg-accent-soft text-text" : "text-dim hover:bg-hover hover:text-text")}>
+              {icon}{label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          {!data.restrictions.enabled
+            ? <span className="text-[11.5px] text-faint">Reglas desactivadas</span>
+            : <span className="flex items-center gap-1 text-[11.5px] text-mint"><Shield size={13} /> Reglas activas{data.restrictions.mode === "allowlist" && " · modo enfoque"}</span>}
+        </div>
       </div>
-      <div className="flex flex-none gap-1 border-b border-line px-5 py-2" role="tablist" aria-label="WEB">
-        {([["browser", "Navegador", <Globe key="g" size={14} />],
-          ["bookmarks", "Marcadores", <Bookmark key="b" size={14} />],
-          ["history", "Historial", <History key="h" size={14} />],
-          ["usage", "Tiempo", <Timer key="t" size={14} />],
-          ["rules", "Restricciones", <Shield key="r" size={14} />]] as Array<[Tab, string, ReactNode]>).map(([id, label, icon]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
-            className={cn("flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px]", tab === id ? "bg-accent-soft text-text" : "text-dim hover:bg-hover")}>
-            {icon}{label}
-          </button>
-        ))}
-      </div>
-      <div className={cn("min-h-0 flex-1 overflow-y-auto", tab === "browser" ? "p-0 flex flex-col" : "px-5 py-4")}>
+      <div className={cn("min-h-0 flex-1", tab === "browser" ? "p-0 flex flex-col" : "overflow-y-auto px-5 py-4")}>
         {tab === "browser" ? (
           <BrowserPanel initialUrl={currentBrowseUrl} />
         ) : (
           <div className="mx-auto max-w-3xl">
             {tab === "bookmarks" && (
-              <Bookmarks data={data} onOpen={open} onCanvas={toCanvas} onChanged={() => void load()} current={address} />
+              <Bookmarks data={data} onOpen={open} onCanvas={toCanvas} onChanged={() => void load()} current={currentBrowseUrl} />
             )}
             {tab === "history" && (
               <HistoryTab data={data} onOpen={open} onCanvas={toCanvas} onDay={(d) => {

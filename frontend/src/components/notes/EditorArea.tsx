@@ -12,6 +12,7 @@ import { cn, IconButton, Kbd } from "../ui";
 import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
 import { PracticeView } from "../practice/PracticeView";
+import { ResumenView } from "../study/ResumenView";
 import { TeoricaView } from "../study/TeoricaView";
 import { TopicFileView } from "../study/TopicFileView";
 import { viewFileKind } from "../../lib/viewFiles";
@@ -311,6 +312,7 @@ export function EditorArea() {
                   <div className={cn("min-h-0 min-w-0", mode === "split" ? "w-1/2" : "flex-1")}>
                     {mode === "read" && isViewFile(note, "practica") ? <TopicFileView note={note} />
                       : mode === "read" && isViewFile(note, "teorica") ? <TeoricaView note={note} />
+                        : mode === "read" && isViewFile(note, "resumen") ? <ResumenView note={note} />
                         : mode === "read" && isExercise(note) ? <PracticeView note={note} />
                       : mode === "read" && ladderOn ? <LadderView path={note.path} onExit={() => useLadder.getState().set(note.path, false)} />
                         : (

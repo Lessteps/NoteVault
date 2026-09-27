@@ -19,6 +19,7 @@ import {
   skillLabel,
 } from "../../core/practice/recommender.js";
 import { StudyArea, detectStudyArea } from "../../core/practice/studyArea.js";
+import { ensureOverviewFile, ensureTopicViewFiles, isTopicFolder } from "../../core/practice/viewFiles.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { LAYOUT } from "../../core/vaultFormat.js";
@@ -413,6 +414,44 @@ export function studyApi(app: AppState) {
       };
     },
 
+    /**
+     * The view file of a folder: the topic's `practica` file for a topic folder,
+     * the `resumen` overview otherwise. Creates it when it is missing (the
+     * explorer's "open the folder's view" and "create view" action).
+     */
+    study_view_ensure(rel: string) {
+      const abs = app.resolve(rel, { allowRoot: true });
+      let stat: fs.Stats;
+      try {
+        stat = fs.statSync(abs);
+      } catch {
+        throw new ApiError("Esa carpeta no existe.");
+      }
+      // A file was passed: use the folder it lives in.
+      const folderAbs = stat.isDirectory() ? abs : path.dirname(abs);
+      const topic = isTopicFolder(app.root, folderAbs);
+      const result = topic
+        ? ensureTopicViewFiles(app.root, folderAbs)
+        : ensureOverviewFile(app.root, folderAbs);
+
+      const created = [...result.created];
+      if (created.length) {
+        clearExerciseIndexCache();
+        clearStudySnapshotCache();
+      }
+      const kind = topic ? "practica" : "resumen";
+      const fileAbs = topic
+        ? path.join(folderAbs, `${path.basename(folderAbs)}.practica.md`)
+        : path.join(folderAbs, `${path.basename(folderAbs)}.resumen.md`);
+      return {
+        ok: fs.existsSync(fileAbs),
+        kind,
+        path: app.rel(fileAbs),
+        created: created.map((c) => app.rel(c)),
+        errors: result.errors.map((e) => app.rel(e)),
+      };
+    },
+
     study_topic_get(rel: string) {
       const absPath = app.resolve(rel, { allowRoot: true });
       const found = findAncestorTopicManifest(absPath, app.root);
@@ -617,6 +656,58 @@ export function studyApi(app: AppState) {
           is_new: e.isNew,
         })),
         first_exercise: plan.exercises[0]?.path ?? "",
+      };
+    },
+
+    /**
+     * A session that draws from every topic of an area (or the whole subject),
+     * instead of one topic: the exercises that already exist in the area's
+     * topics are filtered by skill and difficulty. Nothing is generated here —
+     * the per-topic builder keeps owning generation.
+     */
+    study_area_session_build(
+      folder: string,
+      skill: string,
+      difficulty: number,
+      quantity = "6-10",
+      assistance = "no_help",
+    ) {
+      const normFolder = app.rel(app.resolve(folder, { allowRoot: true })).split(path.sep).join("/").replace(/^\/+|\/+$/g, "");
+      const scan = scanVault(app.root, app.vault.notePaths());
+      const prefix = normFolder ? `${normFolder}/` : "";
+      const inArea = scan.exercises.filter((e) => String(e.rel || e.path || "").split(path.sep).join("/").startsWith(prefix));
+
+      const diff = Math.min(3, Math.max(1, parseInt(String(difficulty), 10) || 2));
+      const wantSkill = String(skill || "").trim().toLowerCase();
+      const hasSkill = (e: (typeof inArea)[number]) =>
+        (e.mode || "").toLowerCase() === wantSkill || (e.skill || "").toLowerCase() === wantSkill;
+
+      // Skill + difficulty first, then skill, then difficulty, then anything.
+      const tiers = [
+        inArea.filter((e) => hasSkill(e) && e.difficulty === diff),
+        inArea.filter((e) => hasSkill(e)),
+        inArea.filter((e) => e.difficulty === diff),
+        inArea,
+      ];
+      const picked = tiers.find((t) => t.length) ?? [];
+      const wanted = quantity === "3-5" ? 5 : quantity === "11+" ? 12 : quantity === "all" ? picked.length : 10;
+      const chosen = picked.slice(0, Math.max(1, wanted));
+
+      return {
+        ok: chosen.length > 0,
+        skill: wantSkill || "solve",
+        difficulty: diff,
+        assistance: assistance === "helper" ? "helper" : "no_help",
+        target_count: wanted,
+        existing_count: inArea.length,
+        generated_count: 0,
+        exercises: chosen.map((e) => ({
+          id: e.note_id,
+          title: e.title,
+          path: e.rel || e.path,
+          is_new: false,
+        })),
+        first_exercise: chosen[0]?.rel ?? "",
       };
     },
 

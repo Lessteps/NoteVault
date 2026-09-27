@@ -354,6 +354,9 @@ export const api = {
   studyArea: (rel: string) => call<{ subject: string; folder: string; title: string; subject_title: string } | null>("study_area", rel),
   studySnapshot: (rel: string) => call<import("./types").StudySnapshot>("study_snapshot", rel),
   studyTopicGet: (rel: string) => call<import("./types").TopicData>("study_topic_get", rel),
+  /** The view file of a folder (created when missing): practica or resumen. */
+  studyViewEnsure: (rel: string) =>
+    call<{ ok: boolean; kind: "practica" | "resumen"; path: string; created: string[]; errors: string[] }>("study_view_ensure", rel),
   studyTopicConvert: (folder: string) => call<{ ok: boolean; path: string; manifest: any }>("study_topic_convert", folder),
   studyTopicSessionBuild: (
     folder: string,
@@ -363,6 +366,14 @@ export const api = {
     assistance: string,
   ) => call<import("./types").TopicSessionResult>("study_topic_session_build", folder, skill, difficulty, quantity, assistance),
   studyTopicDashboard: (subject?: string) => call<import("./types").TopicDashboardData>("study_topic_dashboard", subject),
+  /** A session drawn from every topic of an area (see `study_area_session_build`). */
+  studyAreaSessionBuild: (
+    folder: string,
+    skill: string,
+    difficulty: number,
+    quantity: string,
+    assistance: string,
+  ) => call<import("./types").TopicSessionResult>("study_area_session_build", folder, skill, difficulty, quantity, assistance),
   studyExamAssemble: (
     topicFolder?: string,
     examGroup?: string,

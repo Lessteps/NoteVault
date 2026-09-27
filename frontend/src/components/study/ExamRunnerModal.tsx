@@ -1,5 +1,6 @@
-import { Award, CheckCircle2, ChevronLeft, ChevronRight, Clock, Loader2, Send, X, XCircle } from "lucide-react";
+import { Award, CheckCircle2, ChevronLeft, ChevronRight, Clock, Loader2, PenTool, Send, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MathDrawingInput } from "../practice/MathDrawingInput";
 import { api } from "../../lib/bridge";
 import { renderMarkdown } from "../../lib/markdown";
 import type {
@@ -33,6 +34,7 @@ export function ExamRunnerModal({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
+  const [showDrawing, setShowDrawing] = useState(false);
   const [result, setResult] = useState<{
     record: ExamRecord;
     item_results: ExamItemGradingResult[];
@@ -321,9 +323,38 @@ export function ExamRunnerModal({
 
               {/* Answer Input */}
               <div>
-                <label className="mb-1.5 block font-mono text-[10px] font-semibold uppercase tracking-wider text-faint">
-                  Tu respuesta completa (justifica todos los pasos)
-                </label>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-faint">
+                    Tu respuesta completa (justifica todos los pasos)
+                  </label>
+                  {(manifest.subject === "mathematics" || ["prove", "solve", "process", "counterexample", "true_false", "find_error", "drill", "explain"].includes(currentItem.skill)) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDrawing(!showDrawing)}
+                      className={cn(
+                        "flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-semibold transition-colors",
+                        showDrawing
+                          ? "bg-accent text-white"
+                          : "border border-line bg-card text-dim hover:text-ink hover:border-accent",
+                      )}
+                    >
+                      <PenTool size={11} /> {showDrawing ? "Ocultar dibujo" : "✏️ Dibujar (LaTeX)"}
+                    </button>
+                  )}
+                </div>
+
+                {showDrawing && (
+                  <div className="mb-3">
+                    <MathDrawingInput
+                      onInsertLatex={(latex) => {
+                        const cur = answers[currentItem.id] || "";
+                        handleAnswerChange(cur ? `${cur.trimEnd()}\n${latex}` : latex);
+                      }}
+                      onClose={() => setShowDrawing(false)}
+                    />
+                  </div>
+                )}
+
                 <textarea
                   value={answers[currentItem.id] || ""}
                   onChange={(e) => handleAnswerChange(e.target.value)}

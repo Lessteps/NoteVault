@@ -1,11 +1,16 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   computeTopicProgress,
   createDefaultTopicManifest,
+  findAncestorTopicManifest,
   isTheoreticalTopic,
   parseTopicManifest,
   serializeTopicManifest,
   type TopicManifest,
+  widenTopicSkills,
 } from "./topic";
 import type { ExerciseRef } from "./exerciseIndex";
 
@@ -232,5 +237,78 @@ Contenido`;
     expect(p3.completenessPct).toBe(100);
     expect(p3.examPassed).toBe(true);
     expect(p3.examScore).toBe(92);
+  });
+
+  it("widens math skills when manifest declares only a subset", () => {
+    const raw = `---
+type: topic
+subject: mathematics
+title: "Tema con pocas skills"
+skills: [solve]
+---
+`;
+    const manifest = parseTopicManifest(raw);
+    expect(manifest).not.toBeNull();
+    expect(manifest?.skills).toEqual(["solve"]);
+
+    const widened = widenTopicSkills(manifest!);
+    // Must contain solve first, and then the other math skills (process, prove, counterexample, true_false, find_error, drill, explain)
+    expect(widened).toContain("solve");
+    expect(widened).toContain("process");
+    expect(widened).toContain("prove");
+    expect(widened).toContain("counterexample");
+    expect(widened).toContain("true_false");
+    expect(widened).toContain("find_error");
+    expect(widened).toContain("drill");
+    expect(widened).toContain("explain");
+    expect(widened.length).toBe(8);
+    expect(widened[0]).toBe("solve");
+  });
+
+  it("climbs the directory tree to find the nearest ancestor topic manifest", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nv-topic-tree-"));
+    try {
+      const topicDir = path.join(tmpDir, "Matemáticas", "1.1 Espacios Vectoriales");
+      const subDir = path.join(topicDir, "Subespacios");
+      const exercisesDir = path.join(subDir, "Ejercicios");
+      fs.mkdirSync(exercisesDir, { recursive: true });
+
+      const manifestContent = `---
+type: topic
+subject: mathematics
+title: "1.1 Espacios Vectoriales"
+skills: [prove, solve]
+---
+# 1.1 Espacios Vectoriales
+`;
+      const manifestPath = path.join(topicDir, "_tema.md");
+      fs.writeFileSync(manifestPath, manifestContent, "utf-8");
+
+      const exerciseNotePath = path.join(exercisesDir, "1.1.1 Ejercicio 01.md");
+      fs.writeFileSync(exerciseNotePath, "# Ejercicio 1\n", "utf-8");
+
+      // 1. From an exercise deeply nested inside the topic subtree
+      const fromExercise = findAncestorTopicManifest(exerciseNotePath, tmpDir);
+      expect(fromExercise).not.toBeNull();
+      expect(path.resolve(fromExercise!.manifestPath)).toBe(path.resolve(manifestPath));
+      expect(path.resolve(fromExercise!.topicFolder)).toBe(path.resolve(topicDir));
+      expect(fromExercise!.manifest.title).toBe("1.1 Espacios Vectoriales");
+
+      // 2. From an intermediate directory
+      const fromSubDir = findAncestorTopicManifest(subDir, tmpDir);
+      expect(fromSubDir).not.toBeNull();
+      expect(path.resolve(fromSubDir!.topicFolder)).toBe(path.resolve(topicDir));
+
+      // 3. From a note outside any topic
+      const outsideDir = path.join(tmpDir, "General", "Apuntes");
+      fs.mkdirSync(outsideDir, { recursive: true });
+      const outsideNote = path.join(outsideDir, "nota.md");
+      fs.writeFileSync(outsideNote, "# Nota suelta\n", "utf-8");
+
+      const fromOutside = findAncestorTopicManifest(outsideNote, tmpDir);
+      expect(fromOutside).toBeNull();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

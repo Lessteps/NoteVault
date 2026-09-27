@@ -27,7 +27,7 @@ import {
   type TopicManifest,
   computeTopicProgress,
   createDefaultTopicManifest,
-  parseTopicManifest,
+  findAncestorTopicManifest,
   serializeTopicManifest,
 } from "../../core/practice/topic.js";
 import {
@@ -150,42 +150,18 @@ function findTopicManifest(
 ): { path: string; manifest: TopicManifest } | null {
   try {
     const absDir = app.resolve(topicFolder, { allowRoot: true });
-    if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) return null;
-
-    const preferred = path.join(absDir, "_tema.md");
-    if (fs.existsSync(preferred)) {
-      const raw = fs.readFileSync(preferred, "utf-8");
-      const m = parseTopicManifest(raw, path.basename(absDir));
-      if (m) {
-        m.path = app.rel(preferred);
-        m.folder = topicFolder;
-        return { path: m.path, manifest: m };
-      }
-    }
-
-    const alt = path.join(absDir, "tema.md");
-    if (fs.existsSync(alt)) {
-      const raw = fs.readFileSync(alt, "utf-8");
-      const m = parseTopicManifest(raw, path.basename(absDir));
-      if (m) {
-        m.path = app.rel(alt);
-        m.folder = topicFolder;
-        return { path: m.path, manifest: m };
-      }
-    }
-
-    const entries = fs.readdirSync(absDir, { withFileTypes: true });
-    for (const ent of entries) {
-      if (ent.isFile() && ent.name.toLowerCase().endsWith(".md")) {
-        const p = path.join(absDir, ent.name);
-        const raw = fs.readFileSync(p, "utf-8");
-        const m = parseTopicManifest(raw, path.basename(absDir));
-        if (m) {
-          m.path = app.rel(p);
-          m.folder = topicFolder;
-          return { path: m.path, manifest: m };
-        }
-      }
+    const found = findAncestorTopicManifest(absDir, app.root);
+    if (found) {
+      const relPath = app.rel(found.manifestPath);
+      const relFolder = app.rel(found.topicFolder);
+      return {
+        path: relPath,
+        manifest: {
+          ...found.manifest,
+          path: relPath,
+          folder: relFolder,
+        },
+      };
     }
   } catch {}
   return null;
@@ -438,11 +414,19 @@ export function studyApi(app: AppState) {
     },
 
     study_topic_get(rel: string) {
-      const topicFolder = resolveTopicDir(app, rel);
-      if (!topicFolder) {
-        return { is_topic: false, folder: "", can_convert: false };
+      const absPath = app.resolve(rel, { allowRoot: true });
+      const found = findAncestorTopicManifest(absPath, app.root);
+
+      let topicFolder: string;
+      if (found) {
+        topicFolder = app.rel(found.topicFolder);
+      } else {
+        topicFolder = resolveTopicDir(app, rel);
+        if (!topicFolder) {
+          return { is_topic: false, folder: "", can_convert: false };
+        }
       }
-      const found = findTopicManifest(app, topicFolder);
+
       const scan = scanVault(app.root, app.vault.notePaths());
       const normFolder = topicFolder.replace(/\\/g, "/");
       const topicExercises = scan.exercises.filter((e) => {
@@ -450,20 +434,25 @@ export function studyApi(app: AppState) {
         return p.startsWith(normFolder + "/");
       });
 
-      // Scan theory notes in folder
-      const absDir = app.resolve(topicFolder, { allowRoot: true });
+      // Scan theory notes in topic folder and all subfolders
       const theoryNotes: Array<{ rel: string; title: string }> = [];
-      try {
-        const files = fs.readdirSync(absDir, { withFileTypes: true });
-        for (const f of files) {
-          if (f.isFile() && f.name.endsWith(".md") && !f.name.startsWith("_tema")) {
+      const exercisePaths = new Set(topicExercises.map((e) => (e.rel || e.path).replace(/\\/g, "/")));
+      for (const np of app.vault.notePaths()) {
+        const normNp = np.replace(/\\/g, "/");
+        if (
+          normNp.startsWith(normFolder + "/") &&
+          !normNp.endsWith("/_tema.md") &&
+          !normNp.endsWith("/tema.md")
+        ) {
+          if (!exercisePaths.has(normNp)) {
+            const baseName = path.basename(normNp).replace(/\.md$/, "");
             theoryNotes.push({
-              rel: `${normFolder}/${f.name}`,
-              title: f.name.replace(/\.md$/, ""),
+              rel: normNp,
+              title: baseName,
             });
           }
         }
-      } catch {}
+      }
 
       if (!found) {
         return {
@@ -474,12 +463,18 @@ export function studyApi(app: AppState) {
       }
 
       const attempts = loadAllAttempts(app.root);
+      const manifestWithRelPaths: TopicManifest = {
+        ...found.manifest,
+        path: app.rel(found.manifestPath),
+        folder: topicFolder,
+      };
+
       const examRec = loadExamRecordForTopic(
         app.root,
-        found.manifest,
+        manifestWithRelPaths,
       );
       const progress = computeTopicProgress(
-        found.manifest,
+        manifestWithRelPaths,
         topicExercises,
         attempts,
         examRec,
@@ -489,7 +484,7 @@ export function studyApi(app: AppState) {
       return {
         is_topic: true,
         folder: topicFolder,
-        topic: found.manifest,
+        topic: manifestWithRelPaths,
         progress,
         theory_notes: theoryNotes,
         exercises: topicExercises.map((e) => exerciseDict(e, studyRel(app, e.path))),

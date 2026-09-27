@@ -12,6 +12,7 @@ import {
   isDifficultyAllowed,
   isTheoreticalTopic,
   type QuantityOption,
+  type SkillDefinition,
   skillsForSubject,
 } from "../../lib/skills";
 
@@ -47,19 +48,34 @@ export function TopicConfiguratorDialog({
   const theoreticalOrder = ["prove", "explain", "true_false", "counterexample"];
   const practicalOrder = ["solve", "process", "drill", "implement", "debug", "refactor"];
 
-  const declaredSkills = manifest.skills
-    .map((id) => allSubjectSkills.find((s) => s.id === id))
-    .filter((s): s is NonNullable<typeof s> => s !== undefined)
-    .sort((a, b) => {
-      if (isTheoretical) {
-        const aTheo = theoreticalOrder.includes(a.id) ? 0 : 1;
-        const bTheo = theoreticalOrder.includes(b.id) ? 0 : 1;
-        return aTheo - bTheo;
-      }
-      const aPract = practicalOrder.includes(a.id) ? 0 : 1;
-      const bPract = practicalOrder.includes(b.id) ? 0 : 1;
-      return aPract - bPract;
-    });
+  // Skills list: start with skills declared in the manifest, then widen with remaining subject skills so all modes are accessible
+  const manifestSkillsSet = new Set((manifest.skills || []).map((s) => s.toLowerCase()));
+  const skillsToInclude: SkillDefinition[] = [];
+
+  for (const s of allSubjectSkills) {
+    if (manifestSkillsSet.has(s.id.toLowerCase())) {
+      skillsToInclude.push(s);
+    }
+  }
+  for (const s of allSubjectSkills) {
+    if (!manifestSkillsSet.has(s.id.toLowerCase())) {
+      skillsToInclude.push(s);
+    }
+  }
+
+  const declaredSkills = skillsToInclude.sort((a, b) => {
+    const aDeclared = manifestSkillsSet.has(a.id.toLowerCase()) ? 0 : 1;
+    const bDeclared = manifestSkillsSet.has(b.id.toLowerCase()) ? 0 : 1;
+    if (aDeclared !== bDeclared) return aDeclared - bDeclared;
+    if (isTheoretical) {
+      const aTheo = theoreticalOrder.includes(a.id) ? 0 : 1;
+      const bTheo = theoreticalOrder.includes(b.id) ? 0 : 1;
+      return aTheo - bTheo;
+    }
+    const aPract = practicalOrder.includes(a.id) ? 0 : 1;
+    const bPract = practicalOrder.includes(b.id) ? 0 : 1;
+    return aPract - bPract;
+  });
 
   const [selectedSkill, setSelectedSkill] = useState<string>(
     declaredSkills[0]?.id ?? "solve",

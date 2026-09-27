@@ -4,6 +4,8 @@
  * Computes skill x difficulty progress matrices and completeness rules.
  */
 
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { parseFrontmatter } from "../frontmatter";
 import type { ExerciseRef } from "./exerciseIndex";
 import { attemptPassed } from "./ledger";
@@ -61,6 +63,12 @@ export interface TopicProgress {
   exerciseNotesCount: number;
 }
 
+export interface DiscoveredTopicManifest {
+  manifestPath: string;
+  topicFolder: string;
+  manifest: TopicManifest;
+}
+
 export const DEFAULT_MASTERY_CONFIG: TopicMasteryConfig = {
   min_per_skill: 6,
   target_difficulty: 3,
@@ -76,6 +84,104 @@ export function isTheoreticalTopic(manifest: TopicManifest): boolean {
     if (THEORETICAL_SKILLS.has(s.toLowerCase())) theoreticalCount++;
   }
   return theoreticalCount >= manifest.skills.length / 2;
+}
+
+/**
+ * Searches for a topic manifest (_tema.md, tema.md, or frontmatter with type:topic)
+ * in the given path or by climbing UP ancestor directories until reaching rootDir or filesystem boundary.
+ */
+export function findAncestorTopicManifest(
+  startPath: string,
+  rootDir: string,
+): DiscoveredTopicManifest | null {
+  try {
+    const absRoot = path.resolve(rootDir);
+    let absStart = path.resolve(startPath);
+    if (!absStart.startsWith(absRoot) && absStart !== absRoot) {
+      absStart = path.resolve(rootDir, startPath);
+    }
+
+    let currDir: string;
+    try {
+      const st = fs.statSync(absStart);
+      if (st.isFile()) {
+        // If the startPath file itself is a topic manifest
+        try {
+          const raw = fs.readFileSync(absStart, "utf-8");
+          const m = parseTopicManifest(raw, path.basename(absStart).replace(/\.md$/, ""));
+          if (m) {
+            m.path = absStart;
+            m.folder = path.dirname(absStart);
+            return { manifestPath: absStart, topicFolder: path.dirname(absStart), manifest: m };
+          }
+        } catch {}
+        currDir = path.dirname(absStart);
+      } else {
+        currDir = absStart;
+      }
+    } catch {
+      currDir = path.dirname(absStart);
+    }
+
+    while (true) {
+      // 1. Check for _tema.md
+      const preferred = path.join(currDir, "_tema.md");
+      if (fs.existsSync(preferred)) {
+        try {
+          const raw = fs.readFileSync(preferred, "utf-8");
+          const m = parseTopicManifest(raw, path.basename(currDir));
+          if (m) {
+            m.path = preferred;
+            m.folder = currDir;
+            return { manifestPath: preferred, topicFolder: currDir, manifest: m };
+          }
+        } catch {}
+      }
+
+      // 2. Check for tema.md
+      const alt = path.join(currDir, "tema.md");
+      if (fs.existsSync(alt)) {
+        try {
+          const raw = fs.readFileSync(alt, "utf-8");
+          const m = parseTopicManifest(raw, path.basename(currDir));
+          if (m) {
+            m.path = alt;
+            m.folder = currDir;
+            return { manifestPath: alt, topicFolder: currDir, manifest: m };
+          }
+        } catch {}
+      }
+
+      // 3. Check any .md files in currDir
+      try {
+        const entries = fs.readdirSync(currDir, { withFileTypes: true });
+        for (const ent of entries) {
+          if (ent.isFile() && ent.name.toLowerCase().endsWith(".md")) {
+            const p = path.join(currDir, ent.name);
+            const raw = fs.readFileSync(p, "utf-8");
+            const m = parseTopicManifest(raw, path.basename(currDir));
+            if (m) {
+              m.path = p;
+              m.folder = currDir;
+              return { manifestPath: p, topicFolder: currDir, manifest: m };
+            }
+          }
+        }
+      } catch {}
+
+      // Stop condition: if we reached the rootDir or filesystem boundary
+      if (path.resolve(currDir) === absRoot) {
+        break;
+      }
+      const parent = path.dirname(currDir);
+      if (parent === currDir || !parent.startsWith(absRoot)) {
+        break;
+      }
+      currDir = parent;
+    }
+  } catch {}
+
+  return null;
 }
 
 /**
@@ -159,6 +265,27 @@ export function parseTopicManifest(
   }
 
   return manifest;
+}
+
+/**
+ * Widens a topic manifest's skills to ensure all subject catalogue skills (e.g. all 8 math skills)
+ * are available, prioritizing declared skills first.
+ */
+export function widenTopicSkills(manifest: TopicManifest): string[] {
+  const subjectSkills = skillsForSubject(manifest.subject || "mathematics");
+  const widened: string[] = [];
+
+  for (const s of manifest.skills || []) {
+    if (!widened.includes(s.toLowerCase())) {
+      widened.push(s.toLowerCase());
+    }
+  }
+  for (const s of subjectSkills) {
+    if (!widened.includes(s.id.toLowerCase())) {
+      widened.push(s.id.toLowerCase());
+    }
+  }
+  return widened;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Globe, PanelRight } from "lucide-react";
 import { useApp } from "../../store/app";
 import { EditorArea } from "./EditorArea";
 import { Explorer } from "./Explorer";
@@ -55,7 +56,39 @@ export function NotesModule() {
         </>
       )}
       {canvasPath ? <CanvasView /> : <EditorArea />}
-      {!canvasPath && (assistantOpen ? <AssistantPanel /> : inspectorOpen && <Inspector />)}
+      {!canvasPath && (
+        assistantOpen ? (
+          <AssistantPanel />
+        ) : inspectorOpen ? (
+          <Inspector />
+        ) : (
+          <aside
+            aria-label="Acceso panel lateral"
+            className="flex w-10 flex-none flex-col items-center gap-2 border-l border-line bg-panel py-3"
+          >
+            <button
+              type="button"
+              title="Abrir Navegador web"
+              onClick={() => {
+                useApp.getState().toggleInspector();
+                localStorage.setItem("nv.inspector.tab", "browser");
+                window.dispatchEvent(new CustomEvent("nv-set-inspector-tab", { detail: "browser" }));
+              }}
+              className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
+            >
+              <Globe size={16} />
+            </button>
+            <button
+              type="button"
+              title="Abrir panel lateral"
+              onClick={() => useApp.getState().toggleInspector()}
+              className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
+            >
+              <PanelRight size={16} />
+            </button>
+          </aside>
+        )
+      )}
       <AiSettingsDialog />
       <PropertiesDialog />
       <ConceptMapDialog />

@@ -320,20 +320,60 @@ function Editor({ note }: { note: OpenNote }) {
 }
 
 function EmptyState() {
+  const toggleExplorer = useApp((s) => s.toggleExplorer);
+  const toggleInspector = useApp((s) => s.toggleInspector);
+  const explorerOpen = useApp((s) => s.explorerOpen);
+  const inspectorOpen = useApp((s) => s.inspectorOpen);
+  const assistantOpen = useAssistant((s) => s.open);
+
   return (
-    <div className="grid flex-1 place-items-center bg-surface">
-      <div className="max-w-sm text-center">
-        <div className="text-[16px] font-semibold text-text">Sin nota abierta</div>
-        <p className="mt-2 text-[13px] leading-relaxed text-dim">
-          Elige una nota en el explorador, o busca y crea con <Kbd>Ctrl P</Kbd>.
-        </p>
-        <button
-          type="button"
-          onClick={() => void newNoteIn("")}
-          className="mt-5 rounded-lg bg-accent px-4 py-2 text-[12.5px] font-semibold text-white hover:bg-accent-strong"
+    <div className="flex flex-1 flex-col">
+      <div className="flex h-11 flex-none items-center gap-2 border-b border-line bg-surface px-3">
+        <IconButton title="Explorador (Ctrl+\)" onClick={toggleExplorer} active={explorerOpen}>
+          <PanelLeft size={15} />
+        </IconButton>
+        <span className="text-[12px] text-faint">Notas</span>
+        <div className="flex-1" />
+        <IconButton title="Asistente IA" onClick={() => useAssistant.getState().setOpen(!useAssistant.getState().open)} active={assistantOpen}>
+          <Sparkles size={15} />
+        </IconButton>
+        <IconButton
+          title="Navegador web"
+          onClick={() => {
+            if (!inspectorOpen) toggleInspector();
+            localStorage.setItem("nv.inspector.tab", "browser");
+            window.dispatchEvent(new CustomEvent("nv-set-inspector-tab", { detail: "browser" }));
+          }}
         >
-          Nueva nota
-        </button>
+          <Globe size={15} />
+        </IconButton>
+        <IconButton
+          title="Panel lateral"
+          onClick={() => {
+            if (assistantOpen) {
+              useAssistant.getState().setOpen(false);
+              if (!inspectorOpen) toggleInspector();
+            } else toggleInspector();
+          }}
+          active={inspectorOpen && !assistantOpen}
+        >
+          <PanelRight size={15} />
+        </IconButton>
+      </div>
+      <div className="grid flex-1 place-items-center bg-surface">
+        <div className="max-w-sm text-center">
+          <div className="text-[16px] font-semibold text-text">Sin nota abierta</div>
+          <p className="mt-2 text-[13px] leading-relaxed text-dim">
+            Elige una nota en el explorador, o busca y crea con <Kbd>Ctrl P</Kbd>.
+          </p>
+          <button
+            type="button"
+            onClick={() => void newNoteIn("")}
+            className="mt-5 rounded-lg bg-accent px-4 py-2 text-[12.5px] font-semibold text-white hover:bg-accent-strong"
+          >
+            Nueva nota
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 // App chrome: top bar, icon rail, status bar, toasts.
 
 import {
-  Calendar, CircleCheck, Dumbbell, Flag, House, Kanban, Moon, PenLine, Search,
+  Calendar, CircleCheck, Dumbbell, Flag, Globe, House, Kanban, Moon, PenLine, Search,
   SquareCheck, Sun, Wallet, X, Gem, Cloud, CloudUpload, CircleAlert, Settings,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -37,6 +37,25 @@ export function TopBar() {
         <span className="ml-auto">
           <Kbd>Ctrl P</Kbd>
         </span>
+      </button>
+
+      <button
+        type="button"
+        title="Navegador Web"
+        onClick={() => {
+          if (useApp.getState().module === "notas") {
+            const s = useApp.getState();
+            if (!s.inspectorOpen) s.toggleInspector();
+            localStorage.setItem("nv.inspector.tab", "browser");
+            window.dispatchEvent(new CustomEvent("nv-set-inspector-tab", { detail: "browser" }));
+          } else {
+            useApp.getState().setModule("web");
+          }
+        }}
+        className="flex h-7 items-center gap-1.5 rounded-lg border border-line bg-panel px-2 text-[12px] text-dim transition-colors hover:border-line-strong hover:text-text"
+      >
+        <Globe size={13} className="text-accent-text" />
+        <span className="hidden sm:inline">Navegador</span>
       </button>
 
       <SyncState />
@@ -75,10 +94,11 @@ export const MODULES: Array<{ id: ModuleId; label: string; Icon: ComponentType<{
   { id: "finanzas", label: "Finanzas", Icon: Wallet },
   { id: "notas", label: "Notas", Icon: PenLine },
   { id: "tareas", label: "Tareas", Icon: SquareCheck },
+  { id: "web", label: "Navegador Web", Icon: Globe },
 ];
 
 export function moduleLabel(id: ModuleId): string {
-  return MODULES.find((m) => m.id === id)?.label ?? (id === "web" ? "WEB" : id === "player" ? "Reproductor de inglés" : id);
+  return MODULES.find((m) => m.id === id)?.label ?? (id === "web" ? "Navegador Web" : id === "player" ? "Reproductor de inglés" : id);
 }
 
 export function IconRail() {

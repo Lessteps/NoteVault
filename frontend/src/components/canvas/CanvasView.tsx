@@ -12,6 +12,7 @@ import {
   pruneEdges, SHAPES, type CEdge, type CNode, type CanvasDoc, type Rect, type Side,
 } from "../../lib/canvas";
 import { readClipboard } from "../../lib/clipboard";
+import { inViewport, visibleCanvas, visibleWorldRect } from "../../lib/canvasViewport";
 import { useApp } from "../../store/app";
 import { useCanvas } from "../../store/canvas";
 import { askText, cn, openMenu } from "../ui";
@@ -539,23 +540,15 @@ export function CanvasView() {
   const single = sel.size === 1 ? byId.get([...sel][0]!) : undefined;
   const gridSize = GRID * view.zoom;
 
-  // Viewport culling: compute world-space visible rect with overscan
-  const OVERSCAN = 600; // world pixels beyond visible area to keep rendered
-  const vpWorldLeft = -view.x / view.zoom - OVERSCAN;
-  const vpWorldTop = -view.y / view.zoom - OVERSCAN;
-  const vpWorldRight = (-view.x + hostSize.w) / view.zoom + OVERSCAN;
-  const vpWorldBottom = (-view.y + hostSize.h) / view.zoom + OVERSCAN;
-
-  function inViewport(n: { x: number; y: number; width: number; height: number }): boolean {
-    return n.x < vpWorldRight && n.x + n.width > vpWorldLeft &&
-      n.y < vpWorldBottom && n.y + n.height > vpWorldTop;
-  }
-
-  const visibleNodes = doc.nodes.filter((n) => sel.has(n.id) || inViewport(n));
-  const visibleNodeIds = new Set(visibleNodes.map((n) => n.id));
-  const visibleEdges = doc.edges.filter((e) =>
-    visibleNodeIds.has(e.fromNode) || visibleNodeIds.has(e.toNode)
+  // Viewport culling: only the cards near the view are mounted (see
+  // lib/canvasViewport.ts), so a large map does not parse every card on open.
+  const viewport = visibleWorldRect(view, { w: hostSize.w, h: hostSize.h });
+  const visible = useMemo(
+    () => visibleCanvas(doc, viewport, sel),
+    // `viewport` is a fresh object per render: compare its numbers instead.
+    [doc, viewport.x, viewport.y, viewport.width, viewport.height, sel],
   );
+  const groups = doc.nodes.filter((n) => n.type === "group" && inViewport(n, viewport));
 
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-surface">
@@ -613,11 +606,11 @@ export function CanvasView() {
       >
         <div className="absolute left-0 top-0 origin-top-left"
           style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
-          {doc.nodes.filter((n) => n.type === "group" && inViewport(n)).map((n) => (
+          {groups.map((n) => (
             <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} editing={editing === n.id} onEditDone={onEditDone} />
           ))}
           <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={1} height={1}>
-            {visibleEdges.map((e) => {
+            {visible.edges.map((e) => {
               const a = byId.get(e.fromNode);
               const b = byId.get(e.toNode);
               return a && b ? <EdgeView key={e.id} edge={e} a={a} b={b} selected={selEdge === e.id} /> : null;
@@ -635,7 +628,7 @@ export function CanvasView() {
                 height={Math.abs(drag.y - drag.y0)} fill="var(--nv-accent-soft)" stroke="var(--nv-accent)" strokeWidth={1 / view.zoom} />
             )}
           </svg>
-          {visibleNodes.filter((n) => n.type !== "group").map((n) => (
+          {visible.nodes.filter((n) => n.type !== "group").map((n) => (
             <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} editing={editing === n.id} onEditDone={onEditDone} />
           ))}
         </div>

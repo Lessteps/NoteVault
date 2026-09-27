@@ -12,14 +12,14 @@ export function BrowserPanel({ initialUrl }: { initialUrl?: string }) {
   const attached = useRef(false);
 
   const [state, setState] = useState<BrowserState>({
-    url: initialUrl || "https://www.google.com",
+    url: initialUrl || "",
     title: "",
     canGoBack: false,
     canGoForward: false,
     isLoading: false,
   });
 
-  const [inputUrl, setInputUrl] = useState(initialUrl || "https://www.google.com");
+  const [inputUrl, setInputUrl] = useState(initialUrl || "");
   const [isBookmarked, setIsBookmarked] = useState(false);
 
   // Sync input text when the active page navigates
@@ -57,8 +57,11 @@ export function BrowserPanel({ initialUrl }: { initialUrl?: string }) {
     if (bounds.width > 0 && bounds.height > 0) {
       if (!attached.current) {
         attached.current = true;
-        api.browserAttach(bounds, initialUrl || undefined).then((s) => {
-          if (s) setState(s);
+        api.browserAttach(bounds, initialUrl).then((s) => {
+          if (s) {
+            setState(s);
+            if (s.url && s.url !== "about:blank") setInputUrl(s.url);
+          }
         }).catch(() => undefined);
       } else {
         void api.browserSetBounds(bounds);
@@ -78,11 +81,17 @@ export function BrowserPanel({ initialUrl }: { initialUrl?: string }) {
 
     const unsubState = api.onBrowserState((newState) => {
       setState(newState);
+      if (newState.url && newState.url !== "about:blank") {
+        setInputUrl(newState.url);
+      }
     });
 
     // Initial state query
     api.browserState().then((s) => {
-      if (s && s.url) setState(s);
+      if (s && s.url && s.url !== "about:blank") {
+        setState(s);
+        setInputUrl(s.url);
+      }
     }).catch(() => undefined);
 
     return () => {

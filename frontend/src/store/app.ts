@@ -375,6 +375,15 @@ export const useApp = create<State>((set, get) => ({
     if (tab.kind === "note" && s.notes[tab.path]?.dirty) {
       await s.save(tab.path);
     }
+    const isWeb = tab.kind === "web" || (tab.kind === "module" && tab.id === "web");
+    if (isWeb) {
+      const remainingWeb = s.openTabs.some(
+        (t) => t.tabId !== tabIdToClose && (t.kind === "web" || (t.kind === "module" && t.id === "web")),
+      );
+      if (!remainingWeb) {
+        void api.browserDestroy().catch(() => undefined);
+      }
+    }
     const nextId = pickNext(s.openTabs, tabIdToClose, s.activeTabId);
     const nextTab = nextId ? get().openTabs.find((t) => t.tabId === nextId) : null;
     set((st) => {

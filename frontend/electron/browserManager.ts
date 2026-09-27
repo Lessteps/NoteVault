@@ -1,4 +1,4 @@
-import { WebContentsView, BrowserWindow } from "electron";
+import { WebContentsView, BrowserWindow, shell } from "electron";
 import { blockedPageHtml, hostOf, normalizeUrl, UsageMeter, WebStore } from "../src/core/webStore.js";
 import { getAppState } from "../src/api/registry.js";
 
@@ -73,14 +73,39 @@ export class BrowserManager {
     });
 
     wc.setWindowOpenHandler(({ url }) => {
+      // Content rules check
+      const state = getAppState();
+      if (state) {
+        const store = new WebStore(state.root);
+        const meter = new UsageMeter(store);
+        const [allowed] = store.restrictions().check(url, meter.today());
+        if (!allowed) {
+          return { action: "deny" };
+        }
+      }
       if (/^https?:/i.test(url)) {
-        void this.navigate(url);
+        try {
+          const currentHost = hostOf(this.currentUrl || wc.getURL());
+          const targetHost = hostOf(url);
+          if (currentHost && targetHost && currentHost === targetHost) {
+            void this.navigate(url);
+          } else {
+            void shell.openExternal(url);
+          }
+        } catch {
+          void shell.openExternal(url);
+        }
       }
       return { action: "deny" };
     });
 
     const checkNavigation = (e: Electron.Event, url: string) => {
-      if (!url.startsWith("http://") && !url.startsWith("https://")) return;
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        if (url.startsWith("file:") || url.startsWith("chrome:")) {
+          e.preventDefault();
+        }
+        return;
+      }
       const state = getAppState();
       if (!state) return;
       const store = new WebStore(state.root);
@@ -140,7 +165,11 @@ export class BrowserManager {
     if (!this.win || this.win.isDestroyed()) return this.getState();
     const view = this.ensureView();
     if (!this.attached) {
-      this.win.contentView.addChildView(view);
+      try {
+        this.win.contentView.addChildView(view);
+      } catch {
+        // Ignore if already child
+      }
       this.attached = true;
     }
     view.setBounds({
@@ -149,10 +178,15 @@ export class BrowserManager {
       width: Math.max(0, Math.round(bounds.width)),
       height: Math.max(0, Math.round(bounds.height)),
     });
-    if (url && url !== view.webContents.getURL()) {
+    view.setVisible(true);
+
+    const currentWcUrl = view.webContents.getURL();
+    // If the webContents has never loaded a page (or is blank), navigate to initial URL
+    if (!currentWcUrl || currentWcUrl === "about:blank") {
+      void this.navigate(url || this.currentUrl || "https://www.google.com");
+    } else if (url && url !== currentWcUrl && url !== "https://www.google.com" && url !== this.currentUrl) {
+      // Explicit new target requested (e.g. user clicked bookmark or search)
       void this.navigate(url);
-    } else if (!view.webContents.getURL()) {
-      void this.navigate(this.currentUrl);
     }
     return this.getState();
   }
@@ -160,6 +194,8 @@ export class BrowserManager {
   detach(): void {
     if (!this.win || !this.view || !this.attached) return;
     try {
+      this.view.setVisible(false);
+      this.view.setBounds({ x: -10000, y: -10000, width: 0, height: 0 });
       this.win.contentView.removeChildView(this.view);
     } catch {
       // Ignore
@@ -211,7 +247,15 @@ export class BrowserManager {
       this.meterTimer = null;
     }
     this.detach();
-    this.view = null;
+    if (this.view) {
+      try {
+        this.view.webContents.close();
+      } catch {}
+      this.view = null;
+    }
+    this.currentUrl = "https://www.google.com";
+    this.currentTitle = "";
+    this.isLoading = false;
   }
 }
 

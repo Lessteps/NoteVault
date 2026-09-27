@@ -331,5 +331,8 @@ export function webApi(app: AppState) {
     browser_state(): Record<string, unknown> {
       return { url: "https://www.google.com", title: "Navegador", canGoBack: false, canGoForward: false, isLoading: false };
     },
+    browser_destroy(): Record<string, unknown> {
+      return { ok: true };
+    },
   };
 }

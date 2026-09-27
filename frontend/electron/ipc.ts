@@ -19,6 +19,9 @@ export function registerIpc(): void {
         return browserManager.action(args[0] as "back" | "forward" | "reload" | "stop");
       case "browser_state":
         return browserManager.getState();
+      case "browser_destroy":
+        browserManager.destroy();
+        return { ok: true };
     }
 
     const fn = getRegistry()[method];

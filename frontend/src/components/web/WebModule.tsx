@@ -15,14 +15,27 @@ import { BrowserPanel } from "./BrowserPanel";
 
 type Tab = "browser" | "bookmarks" | "history" | "usage" | "rules";
 
+let _savedWebTab: Tab = "browser";
+let _savedBrowseUrl: string | undefined = undefined;
+
 const mins = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : `${Math.round(s / 60)} min`);
 
 export function WebModule() {
   const toast = useApp((s) => s.toast);
   const [data, setData] = useState<WebOverview | null>(null);
-  const [tab, setTab] = useState<Tab>("browser");
-  const [currentBrowseUrl, setCurrentBrowseUrl] = useState("https://www.google.com");
+  const [tab, setTabState] = useState<Tab>(_savedWebTab);
+  const [currentBrowseUrl, setCurrentBrowseUrlState] = useState<string | undefined>(_savedBrowseUrl);
   const [day, setDay] = useState("");
+
+  const setTab = (t: Tab) => {
+    _savedWebTab = t;
+    setTabState(t);
+  };
+
+  const setCurrentBrowseUrl = (u: string) => {
+    _savedBrowseUrl = u;
+    setCurrentBrowseUrlState(u);
+  };
 
   const load = useCallback(async (d = day) => {
     try {
@@ -86,7 +99,7 @@ export function WebModule() {
         ) : (
           <div className="mx-auto max-w-3xl">
             {tab === "bookmarks" && (
-              <Bookmarks data={data} onOpen={open} onCanvas={toCanvas} onChanged={() => void load()} current={currentBrowseUrl} />
+              <Bookmarks data={data} onOpen={open} onCanvas={toCanvas} onChanged={() => void load()} current={currentBrowseUrl || ""} />
             )}
             {tab === "history" && (
               <HistoryTab data={data} onOpen={open} onCanvas={toCanvas} onDay={(d) => {

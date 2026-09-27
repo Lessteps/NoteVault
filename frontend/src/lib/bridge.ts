@@ -410,6 +410,7 @@ export const api = {
   browserNavigate: (url: string) => call<BrowserState>("browser_navigate", url),
   browserAction: (action: "back" | "forward" | "reload" | "stop") => call<BrowserState>("browser_action", action),
   browserState: () => call<BrowserState>("browser_state"),
+  browserDestroy: () => call<{ ok: boolean }>("browser_destroy"),
   onBrowserState: (cb: (state: BrowserState) => void): (() => void) => {
     if (typeof window !== "undefined" && window.nv?.onBrowserState) {
       return window.nv.onBrowserState(cb);

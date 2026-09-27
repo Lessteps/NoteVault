@@ -837,9 +837,16 @@ de Obsidian `[[Título de la nota]]`.
 
 ## Interfaces V3 — Mobile Parity & State Storage
 
-- **Pinned Tabs (`pinned_tabs`)**:
-  - Desktop almacena las pestañas fijadas por vault/sesión mediante la clave de almacenamiento `nv.pinnedTabs` (array JSON de identificadores: `module:<id>`, `note:<path>`, `canvas:<path>`, `web`).
-  - Para paridad móvil (Dart/Flutter), los clientes que persistan estado en vault pueden opcionalmente respaldar estas referencias en `.notevault/app_config.json` bajo la clave `"pinned_tabs": ["..."]`. Las pestañas fijadas no pueden cerrarse accidentalmente mediante click ni atajos de cierre.
+- **Pinned Tabs**:
+  - El escritorio recuerda las pestañas fijadas **por vault**, en el almacenamiento
+    local del cliente, con la clave `nv.pinnedTabs:<ruta del vault>` (array JSON de
+    identificadores: `module:<id>`, `note:<ruta>`, `canvas:<ruta>`, `web`). Es estado
+    de interfaz: no vive en el vault, y el mismo identificador apunta a otro archivo
+    en otro vault.
+  - Para paridad móvil (Dart/Flutter) no hay nada que respetar dentro del vault: cada
+    cliente persiste sus propias pestañas fijadas con ese mismo esquema de
+    identificadores. Las pestañas fijadas no pueden cerrarse accidentalmente mediante
+    click, clic central ni atajos de cierre.
 - **Descubrimiento Jerárquico de Temas (`_tema.md`)**:
   - Tanto la app de escritorio como la app móvil deben descubrir el tema activo ascendiendo por el árbol de carpetas (`findAncestorTopicManifest`) desde cualquier nota o subcarpeta (`Ejercicios/`, `Apuntes/`, etc.) hasta encontrar el primer `_tema.md` ascendente. Esto garantiza que notas en subárboles hereden siempre el contexto del tema y el catálogo completo de competencias matemáticas (solve, process, prove, counterexample, true_false, find_error, drill, explain).
 - **Persistencia de Navegación Web**:

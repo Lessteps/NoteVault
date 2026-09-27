@@ -733,3 +733,21 @@ html[data-perf="lite"] .nv-practice-view {
   contain: content;
 }
 
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Title bar. The window has no OS frame, so the top bar *is* the title bar:
+   its background drags the window and every control inside it opts out.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.nv-titlebar {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.nv-titlebar button,
+.nv-titlebar [role="tab"],
+.nv-titlebar a,
+.nv-titlebar input,
+.nv-titlebar .nv-no-drag {
+  -webkit-app-region: no-drag;
+}

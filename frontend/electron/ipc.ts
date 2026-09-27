@@ -1,10 +1,30 @@
-import { ipcMain } from "electron";
+import { BrowserWindow, ipcMain } from "electron";
 import { getRegistry } from "../src/api/registry";
 import { browserManager, type BrowserBounds } from "./browserManager";
+
+/** The window the app is drawing its own title bar for. */
+function appWindow(): BrowserWindow | null {
+  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
+}
 
 export function registerIpc(): void {
   ipcMain.handle("nv", async (_e, method: string, args: unknown[]) => {
     switch (method) {
+      case "window_minimize":
+        appWindow()?.minimize();
+        return { maximized: appWindow()?.isMaximized() ?? false };
+      case "window_toggle_maximize": {
+        const win = appWindow();
+        if (!win) return { maximized: false };
+        if (win.isMaximized()) win.unmaximize();
+        else win.maximize();
+        return { maximized: win.isMaximized() };
+      }
+      case "window_close":
+        appWindow()?.close();
+        return { ok: true };
+      case "window_state":
+        return { maximized: appWindow()?.isMaximized() ?? false };
       case "browser_attach":
         return browserManager.attach(args[0] as BrowserBounds, args[1] as string | undefined);
       case "browser_detach":

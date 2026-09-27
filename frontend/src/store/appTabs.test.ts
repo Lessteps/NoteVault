@@ -9,7 +9,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The bridge talks to the core through `window.nv.invoke` in the desktop app;
 // a jsdom test plays that role.
-const invoke = vi.fn(async (): Promise<unknown> => ({ ok: true }));
+function noteData(path: string) {
+  return {
+    path,
+    title: (path.split("/").pop() ?? path).replace(/\.md$/, ""),
+    kind: "note" as const,
+    raw: `# ${path}\n\ncuerpo\n`,
+    frontmatter: {},
+    modified: 1,
+    bookmarked: false,
+  };
+}
+
+const invoke = vi.fn(async (method: string, args?: unknown[]): Promise<unknown> => {
+  if (method === "read_note") return noteData(String(args?.[0] ?? ""));
+  return { ok: true };
+});
 (window as unknown as { nv: unknown }).nv = { invoke };
 
 import { loadPinnedIds, useApp } from "./app";
@@ -21,6 +36,7 @@ function reset() {
   invoke.mockClear();
   useApp.setState({
     vault: "C:/vault-a",
+    module: "home",
     openTabs: [],
     activeTabId: null,
     active: null,
@@ -148,6 +164,50 @@ describe("unified tab strip", () => {
     await app().init();
     expect(app().vault).toBe("C:/vault-a");
     expect([...app().pinnedTabIds]).toEqual(["module:home"]);
+  });
+
+  it("opens a note from the explorer and shows it", async () => {
+    await app().openNote("Matemáticas/1.1/nota.md");
+
+    expect(invoke).toHaveBeenCalledWith("read_note", ["Matemáticas/1.1/nota.md"]);
+    expect(app().openTabs.map((t) => t.tabId)).toEqual(["note:Matemáticas/1.1/nota.md"]);
+    expect(app().activeTabId).toBe("note:Matemáticas/1.1/nota.md");
+    expect(app().active).toBe("Matemáticas/1.1/nota.md");
+    expect(app().module).toBe("notas");
+    expect(app().notes["Matemáticas/1.1/nota.md"]?.title).toBe("nota");
+  });
+
+  it("keeps one tab per note and follows the note that is shown", async () => {
+    await app().openNote("a.md");
+    await app().openNote("b.md");
+    await app().openNote("a.md");
+
+    expect(app().openTabs.map((t) => t.tabId)).toEqual(["note:a.md", "note:b.md"]);
+    expect(app().active).toBe("a.md");
+    expect(app().module).toBe("notas");
+    // The note left behind stays loaded, so switching back is instant.
+    expect(app().notes["b.md"]).toBeDefined();
+
+    app().setActiveTab("note:b.md");
+    expect(app().active).toBe("b.md");
+    expect(app().module).toBe("notas");
+  });
+
+  it("never lets `module` disagree with the active tab", async () => {
+    await app().openNote("a.md");
+    expect(app().module).toBe("notas");
+
+    app().setModule("calendario");
+    expect(app().module).toBe("calendario");
+
+    app().openTab({ kind: "note", path: "a.md" });
+    expect(app().module).toBe("notas");
+
+    app().openTab({ kind: "canvas", path: "mapa.canvas" });
+    expect(app().module).toBe("notas");
+
+    app().openTab({ kind: "web" });
+    expect(app().module).toBe("web");
   });
 
   it("keeps the embedded browser alive until its last web tab closes", async () => {

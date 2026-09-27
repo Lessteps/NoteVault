@@ -73,12 +73,18 @@ function createWindow() {
     height: 900,
     backgroundColor: "#191919",
     autoHideMenuBar: true,
+    // The app draws its own title bar: one row with the tab strip, the sync
+    // status and the window controls. Without `frame: false` Windows puts its
+    // own title bar above that one and the interface loses the space.
+    frame: false,
     webPreferences: {
       preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+  win.on("maximize", () => win?.webContents.send("nv-window-state", { maximized: true }));
+  win.on("unmaximize", () => win?.webContents.send("nv-window-state", { maximized: false }));
   const state = getAppState();
   if (state) state.window = win;
   browserManager.setWindow(win);

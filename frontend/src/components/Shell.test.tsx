@@ -6,12 +6,16 @@
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MenuHost } from "./ui";
 import { TopBar } from "./Shell";
 import { useApp } from "../store/app";
+
+// Electron host: the bar draws the window controls and asks the shell for them.
+const invoke = vi.fn(async (_method: string, _args?: unknown[]): Promise<unknown> => ({ maximized: false, ok: true }));
+(window as unknown as { nv: unknown }).nv = { invoke };
 
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -47,6 +51,9 @@ beforeEach(() => {
   localStorage.clear();
   useApp.setState({
     vault: "C:/vault-a",
+    module: "notas",
+    explorerTab: "files",
+    explorerOpen: true,
     info: { api_version: 1, vault_name: "vault-a", vault_path: "C:/vault-a", theme: "dark" },
     openTabs: [
       { kind: "module", id: "calendario", tabId: "module:calendario" },
@@ -102,5 +109,62 @@ describe("TopBar", () => {
     expect(tab("nota").querySelector("svg.lucide-pin")).not.toBeNull();
     expect(closeButton(tab("nota"))).toBeUndefined();
     expect(closeButton(tab("mapa"))).toBeDefined();
+  });
+
+  it("is one bar: brand, workspace icons, tabs, sync state and window controls", () => {
+    const headers = [...container.querySelectorAll("header")];
+    expect(headers).toHaveLength(1);
+    // The bar is the window's title bar, so its background drags the window.
+    expect(headers[0]!.className).toContain("nv-titlebar");
+
+    const text = headers[0]!.textContent ?? "";
+    expect(text).toContain("NoteVault");
+    expect(text).toContain("vault-a");
+    expect(text).toContain("Guardado");
+    expect(text).toContain("Calendario"); // the tabs live in this same row
+
+    for (const label of ["Panel lateral", "Archivos", "Buscar", "Marcadores"]) {
+      expect(container.querySelector(`button[aria-label="${label}"]`), `missing “${label}”`).not.toBeNull();
+    }
+    for (const label of ["Minimizar", "Maximizar", "Cerrar"]) {
+      expect(container.querySelector(`button[aria-label="${label}"]`), `missing “${label}”`).not.toBeNull();
+    }
+    // Nothing stacked above the bar.
+    expect(container.querySelector("header + header")).toBeNull();
+  });
+
+  it("hides the window controls when the host brings its own chrome", () => {
+    const nv = (window as unknown as { nv?: unknown }).nv;
+    delete (window as unknown as { nv?: unknown }).nv;
+    try {
+      const other = document.createElement("div");
+      document.body.appendChild(other);
+      act(() => {
+        createRoot(other).render(<TopBar />);
+      });
+      expect(other.querySelector('button[aria-label="Minimizar"]')).toBeNull();
+      expect(other.querySelector('button[aria-label="Cerrar"]')).toBeNull();
+      // The rest of the bar is still there.
+      expect(other.querySelector('[role="tablist"]')).not.toBeNull();
+    } finally {
+      (window as unknown as { nv?: unknown }).nv = nv;
+    }
+  });
+
+  it("workspace icons open the matching explorer view", () => {
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Buscar"]')!.click());
+    expect(useApp.getState().explorerTab).toBe("search");
+    expect(useApp.getState().explorerOpen).toBe(true);
+    expect(useApp.getState().module).toBe("notas");
+
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Marcadores"]')!.click());
+    expect(useApp.getState().explorerTab).toBe("bookmarks");
+
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Panel lateral"]')!.click());
+    expect(useApp.getState().explorerOpen).toBe(false);
+
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Cerrar"]')!.click());
+    // Closing asks the shell; the jsdom bridge records the call.
+    expect(useApp.getState().openTabs.length).toBe(3);
   });
 });

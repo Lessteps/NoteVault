@@ -20,6 +20,7 @@ declare global {
       invoke: (method: string, args: unknown[]) => Promise<unknown>;
       onWatchEvent?: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void) => () => void;
       onBrowserState?: (cb: (data: BrowserState) => void) => () => void;
+      onWindowState?: (cb: (data: { maximized: boolean }) => void) => () => void;
     };
   }
 }
@@ -417,4 +418,24 @@ export const api = {
     }
     return () => {};
   },
+
+  // ── Window controls (the app draws its own title bar) ────────────────
+  windowMinimize: () => call<{ maximized: boolean }>("window_minimize"),
+  windowToggleMaximize: () => call<{ maximized: boolean }>("window_toggle_maximize"),
+  windowClose: () => call<{ ok: boolean }>("window_close"),
+  windowState: () => call<{ maximized: boolean }>("window_state"),
+  onWindowState: (cb: (state: { maximized: boolean }) => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onWindowState) {
+      return window.nv.onWindowState(cb);
+    }
+    return () => {};
+  },
 };
+
+/**
+ * True when the UI runs inside the Electron shell, the only host that has a
+ * window of its own to minimise/maximise/close (pywebview and the dev bridge
+ * bring their own chrome).
+ */
+export const isElectron = (): boolean =>
+  typeof window !== "undefined" && Boolean(window.nv);

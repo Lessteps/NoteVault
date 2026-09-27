@@ -17,4 +17,11 @@ contextBridge.exposeInMainWorld("nv", {
       ipcRenderer.removeListener("nv-browser-state", handler);
     };
   },
+  onWindowState: (cb: (data: { maximized: boolean }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: { maximized: boolean }) => cb(data);
+    ipcRenderer.on("nv-window-state", handler);
+    return () => {
+      ipcRenderer.removeListener("nv-window-state", handler);
+    };
+  },
 });

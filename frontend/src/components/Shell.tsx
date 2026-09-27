@@ -1,12 +1,14 @@
 // App chrome: top bar (with unified tab strip), icon rail, status bar, toasts.
 
 import {
-  Calendar, CircleCheck, Dumbbell, Flag, Globe, House, Kanban, Moon, PenLine,
-  Pin, PinOff, Plus, SquareCheck, Sun, Wallet, X, Gem, Cloud, CloudUpload,
+  Bookmark, Calendar, CircleCheck, Copy, Dumbbell, Files, Flag, Globe, House, Kanban, Minus, Moon, PanelLeft,
+  PenLine, Pin, PinOff, Plus, Search, Square, SquareCheck, Sun, Wallet, X, Gem, Cloud, CloudUpload,
   CircleAlert, Settings, FileCode2, FileText, LayoutDashboard,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import { useApp, type AppTab, type ModuleId } from "../store/app";
+import { useEffect, useState } from "react";
+import { api, isElectron } from "../lib/bridge";
+import { useApp, type AppTab, type ExplorerTab, type ModuleId } from "../store/app";
 import { cn, openMenu } from "./ui";
 import { useVaultDialog } from "./VaultDialog";
 import { useSettingsDialog } from "./settings/SettingsDialog";
@@ -153,16 +155,29 @@ function TabStrip() {
 }
 
 // ── TopBar ──────────────────────────────────────────────────────────────────
+//
+// One single bar: it is the window's title bar (the window has no OS frame), so
+// it holds the brand and vault, the workspace icons, the open tabs, the sync
+// state and the window controls in the same row. Nothing is stacked above it.
 
 export function TopBar() {
   const info = useApp((s) => s.info);
+
   return (
-    <header className="flex h-10 flex-none items-stretch gap-0 border-b border-line bg-bg">
+    <header
+      className="nv-titlebar flex h-10 flex-none items-stretch border-b border-line bg-bg"
+      onDoubleClick={(e) => {
+        // Double-clicking the bar maximizes, the way any title bar does.
+        if ((e.target as Element).closest("button, [role=tab]")) return;
+        void api.windowToggleMaximize().catch(() => undefined);
+      }}
+    >
       {/* App identity + vault switcher */}
-      <div className="flex flex-none items-center gap-2 px-3 border-r border-line">
+      <div className="flex flex-none items-center gap-2 border-r border-line px-3">
         <span className="grid h-5 w-5 place-items-center rounded bg-accent text-white">
           <Gem size={12} strokeWidth={2.2} />
         </span>
+        <span className="text-[12.5px] font-semibold text-text">NoteVault</span>
         <button
           type="button"
           title="Cambiar de vault"
@@ -173,14 +188,142 @@ export function TopBar() {
         </button>
       </div>
 
-      {/* Tab strip takes remaining space */}
+      {/* Workspace icons: the explorer panel and its three views */}
+      <WorkspaceIcons />
+
+      {/* Tab strip takes the remaining space */}
       <TabStrip />
 
-      {/* Sync state on the right */}
-      <div className="flex flex-none items-center px-3 border-l border-line">
+      <div className="min-w-2 flex-1" />
+
+      {/* Sync state + window controls on the right */}
+      <div className="flex flex-none items-center border-l border-line px-3">
         <SyncState />
       </div>
+      <WindowControls />
     </header>
+  );
+}
+
+// ── Workspace icons ─────────────────────────────────────────────────────────
+
+const WORKSPACE_VIEWS: Array<{ id: ExplorerTab; label: string; Icon: ComponentType<{ size?: number; strokeWidth?: number }> }> = [
+  { id: "files", label: "Archivos", Icon: Files },
+  { id: "search", label: "Buscar", Icon: Search },
+  { id: "bookmarks", label: "Marcadores", Icon: Bookmark },
+];
+
+function WorkspaceIcons() {
+  const explorerTab = useApp((s) => s.explorerTab);
+  const explorerOpen = useApp((s) => s.explorerOpen);
+  const toggleExplorer = useApp((s) => s.toggleExplorer);
+  const setExplorerTab = useApp((s) => s.setExplorerTab);
+  const module = useApp((s) => s.module);
+
+  // A view lives inside the Notes module: the icon takes you there.
+  const show = (id: ExplorerTab) => {
+    if (module !== "notas") useApp.getState().setModule("notas");
+    setExplorerTab(id);
+  };
+  const shown = module === "notas" && explorerOpen;
+
+  return (
+    <div className="flex flex-none items-center gap-0.5 border-r border-line px-1.5">
+      <button
+        type="button"
+        title="Panel lateral"
+        aria-label="Panel lateral"
+        aria-pressed={explorerOpen}
+        onClick={toggleExplorer}
+        className={cn(
+          "grid h-7 w-7 place-items-center rounded-md transition-colors",
+          explorerOpen ? "text-text hover:bg-hover" : "text-faint hover:bg-hover hover:text-text",
+        )}
+      >
+        <PanelLeft size={16} strokeWidth={1.8} />
+      </button>
+      {WORKSPACE_VIEWS.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          title={label}
+          aria-label={label}
+          aria-pressed={shown && explorerTab === id}
+          onClick={() => show(id)}
+          className={cn(
+            "grid h-7 w-7 place-items-center rounded-md transition-colors",
+            shown && explorerTab === id ? "bg-accent-soft text-accent-text" : "text-faint hover:bg-hover hover:text-text",
+          )}
+        >
+          <Icon size={16} strokeWidth={1.8} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Window controls ─────────────────────────────────────────────────────────
+
+const CTRL = "grid w-11 place-items-center text-dim transition-colors hover:bg-hover hover:text-text";
+
+function WindowControls() {
+  const [maximized, setMaximized] = useState(false);
+  const electron = isElectron();
+
+  useEffect(() => {
+    if (!electron) return;
+    let live = true;
+    const read = () => {
+      void api.windowState()
+        .then((s) => { if (live) setMaximized(Boolean(s?.maximized)); })
+        .catch(() => undefined);
+    };
+    read();
+    // Maximizing from anywhere else (double click, Win+Up) keeps the icon honest.
+    const off = api.onWindowState((s) => setMaximized(Boolean(s?.maximized)));
+    window.addEventListener("resize", read);
+    return () => {
+      live = false;
+      off();
+      window.removeEventListener("resize", read);
+    };
+  }, [electron]);
+
+  // pywebview and the dev bridge bring their own window chrome.
+  if (!electron) return null;
+
+  return (
+    <div className="flex flex-none items-stretch border-l border-line">
+      <button
+        type="button"
+        title="Minimizar"
+        aria-label="Minimizar"
+        onClick={() => void api.windowMinimize().catch(() => undefined)}
+        className={CTRL}
+      >
+        <Minus size={14} />
+      </button>
+      <button
+        type="button"
+        title={maximized ? "Restaurar" : "Maximizar"}
+        aria-label={maximized ? "Restaurar" : "Maximizar"}
+        onClick={() => void api.windowToggleMaximize()
+          .then((s) => setMaximized(Boolean(s?.maximized)))
+          .catch(() => undefined)}
+        className={CTRL}
+      >
+        {maximized ? <Copy size={12} /> : <Square size={12} />}
+      </button>
+      <button
+        type="button"
+        title="Cerrar"
+        aria-label="Cerrar"
+        onClick={() => void api.windowClose().catch(() => undefined)}
+        className={cn(CTRL, "hover:bg-danger hover:text-white")}
+      >
+        <X size={15} />
+      </button>
+    </div>
   );
 }
 

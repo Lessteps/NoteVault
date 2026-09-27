@@ -253,14 +253,21 @@ function noteTabPaths(s: Pick<State, "openTabs">): string[] {
 }
 
 export const useApp = create<State>((setState, get) => {
-  // `active` and `tabs` are derived from the tab list. They are real fields and
-  // not getters because zustand copies the state on every update (Object.assign),
-  // which turns an accessor into a frozen value — a getter would keep reporting
-  // whatever it returned during the first update. So every update re-derives them.
+  // `active`, `tabs` and `module` are derived from the tab list. They are real
+  // fields and not getters because zustand copies the state on every update
+  // (Object.assign), which turns an accessor into a frozen value — a getter would
+  // keep reporting whatever it returned during the first update. So every update
+  // re-derives them here, which also keeps `module` (the view App renders) from
+  // ever disagreeing with the active tab: a note/canvas tab always shows Notes.
   const set = (patch: Patch): void => {
     setState(patch);
     const st = get();
-    setState({ active: activePathOf(st), tabs: noteTabPaths(st) });
+    const tab = st.openTabs.find((t) => t.tabId === st.activeTabId);
+    setState({
+      active: activePathOf(st),
+      tabs: noteTabPaths(st),
+      module: tab ? tabModuleId(tab) : st.module,
+    });
   };
 
   return {

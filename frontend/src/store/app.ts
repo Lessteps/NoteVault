@@ -25,15 +25,23 @@ function moduleTabId(id: ModuleId): string { return `module:${id}`; }
 
 const PINNED_KEY = "nv.pinnedTabs";
 
-function loadPinned(): Set<string> {
+/** Pinned tabs are remembered **per vault**: the same tab id (`note:1.1 …`)
+ *  points at a different file in another vault, so a single global list would
+ *  pin unrelated tabs when the vault changes. */
+export function pinnedStorageKey(vault: string | null | undefined): string {
+  return vault ? `${PINNED_KEY}:${vault}` : PINNED_KEY;
+}
+
+/** Pinned tab ids remembered for `vault` (empty set when nothing was pinned). */
+export function loadPinnedIds(vault: string | null | undefined): Set<string> {
   try {
-    const raw = localStorage.getItem(PINNED_KEY);
+    const raw = localStorage.getItem(pinnedStorageKey(vault));
     return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
   } catch { return new Set(); }
 }
 
-function savePinned(ids: Set<string>) {
-  try { localStorage.setItem(PINNED_KEY, JSON.stringify([...ids])); } catch {}
+function savePinned(vault: string | null | undefined, ids: Set<string>) {
+  try { localStorage.setItem(pinnedStorageKey(vault), JSON.stringify([...ids])); } catch {}
 }
 
 // ── Note / open‑note model ──────────────────────────────────────────────────
@@ -96,6 +104,8 @@ function fromData(d: NoteData, revealLine?: number): OpenNote {
 interface State {
   info: AppInfo | null;
   theme: "dark" | "light";
+  /** Identity of the open vault (`vault_path`): pinned tabs are stored per vault. */
+  vault: string;
   /** Legacy: the module currently shown — kept for backward compat but driven by active tab. */
   module: ModuleId;
   mode: ViewMode;
@@ -160,7 +170,7 @@ interface State {
   toast: (kind: Toast["kind"], text: string) => void;
   dismiss: (id: number) => void;
 
-  // ── Computed helpers (not state, just getters) ─────────────────────
+  // ── Derived from the tab list (refreshed on every update) ──────────
   /** Active note path (from the active note/canvas tab). */
   active: string | null;
   /** Back-compat: note path → tab list. */
@@ -217,9 +227,39 @@ function pickNext(tabs: AppTab[], closedId: string, currentId: string | null): s
   return remaining[Math.min(idx, remaining.length - 1)]!.tabId;
 }
 
-export const useApp = create<State>((set, get) => ({
+/** A state update: a partial state, or a function of the current state. */
+type Patch = Partial<State> | ((state: State) => State | Partial<State>);
+
+/** The note/canvas shown by the active tab (null for module/web tabs). */
+function activePathOf(s: Pick<State, "openTabs" | "activeTabId">): string | null {
+  if (!s.activeTabId) return null;
+  const t = s.openTabs.find((x) => x.tabId === s.activeTabId);
+  if (!t || (t.kind !== "note" && t.kind !== "canvas")) return null;
+  return t.path;
+}
+
+/** Back-compat: every open note/canvas path, in tab order. */
+function noteTabPaths(s: Pick<State, "openTabs">): string[] {
+  return s.openTabs
+    .filter((t) => t.kind === "note" || t.kind === "canvas")
+    .map((t) => (t as { path: string }).path);
+}
+
+export const useApp = create<State>((setState, get) => {
+  // `active` and `tabs` are derived from the tab list. They are real fields and
+  // not getters because zustand copies the state on every update (Object.assign),
+  // which turns an accessor into a frozen value — a getter would keep reporting
+  // whatever it returned during the first update. So every update re-derives them.
+  const set = (patch: Patch): void => {
+    setState(patch);
+    const st = get();
+    setState({ active: activePathOf(st), tabs: noteTabPaths(st) });
+  };
+
+  return {
   info: null,
   theme: "dark",
+  vault: "",
   module: "home",
   mode: "read",
   explorerTab: "files",
@@ -237,19 +277,9 @@ export const useApp = create<State>((set, get) => ({
   cursor: null,
   toasts: [],
 
-  // Computed getters that derive from openTabs / activeTabId
-  get active(): string | null {
-    const { openTabs, activeTabId } = get();
-    if (!activeTabId) return null;
-    const t = openTabs.find((t) => t.tabId === activeTabId);
-    if (!t || (t.kind !== "note" && t.kind !== "canvas")) return null;
-    return t.path;
-  },
-  get tabs(): string[] {
-    return get().openTabs
-      .filter((t) => t.kind === "note" || t.kind === "canvas")
-      .map((t) => (t as { path: string }).path);
-  },
+  // Derived from openTabs / activeTabId by `set` above.
+  active: null,
+  tabs: [],
 
   init: async () => {
     try {
@@ -261,8 +291,8 @@ export const useApp = create<State>((set, get) => ({
         const r = await api.getRendering().catch(() => null);
         if (r) applyRenderingSettings(r);
       }
-      const pinned = loadPinned();
-      set({ info, theme: info.theme, pinnedTabIds: pinned });
+      const pinned = loadPinnedIds(info.vault_path || info.vault_name);
+      set({ info, theme: info.theme, vault: info.vault_path || info.vault_name, pinnedTabIds: pinned });
       // Open the "home" module tab by default if no tabs
       if (get().openTabs.length === 0) {
         get().setModule("home");
@@ -409,14 +439,14 @@ export const useApp = create<State>((set, get) => ({
   pinTab: (id) => {
     const pinned = new Set(get().pinnedTabIds);
     pinned.add(id);
-    savePinned(pinned);
+    savePinned(get().vault, pinned);
     set({ pinnedTabIds: pinned });
   },
 
   unpinTab: (id) => {
     const pinned = new Set(get().pinnedTabIds);
     pinned.delete(id);
-    savePinned(pinned);
+    savePinned(get().vault, pinned);
     set({ pinnedTabIds: pinned });
   },
 
@@ -648,7 +678,8 @@ export const useApp = create<State>((set, get) => ({
     setTimeout(() => get().dismiss(id), kind === "error" ? 7000 : 3500);
   },
   dismiss: (id) => set((st) => ({ toasts: st.toasts.filter((t) => t.id !== id) })),
-}));
+  };
+});
 
 // Tell Python how many notes (and other pending edits) are unsaved, so
 // closing the window can wait for them (run_web.py). Only sent when the

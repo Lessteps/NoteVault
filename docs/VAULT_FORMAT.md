@@ -834,3 +834,14 @@ de Obsidian `[[Título de la nota]]`.
   frontmatter que no conoce, debe volver a escribirlo tal cual al guardar.
 - **Detectar los conflictos de sincronización.** Los archivos
   `*.sync-conflict-*` de Syncthing deben mostrarse al usuario, no ignorarse.
+
+## Interfaces V3 — Mobile Parity & State Storage
+
+- **Pinned Tabs (`pinned_tabs`)**:
+  - Desktop almacena las pestañas fijadas por vault/sesión mediante la clave de almacenamiento `nv.pinnedTabs` (array JSON de identificadores: `module:<id>`, `note:<path>`, `canvas:<path>`, `web`).
+  - Para paridad móvil (Dart/Flutter), los clientes que persistan estado en vault pueden opcionalmente respaldar estas referencias en `.notevault/app_config.json` bajo la clave `"pinned_tabs": ["..."]`. Las pestañas fijadas no pueden cerrarse accidentalmente mediante click ni atajos de cierre.
+- **Descubrimiento Jerárquico de Temas (`_tema.md`)**:
+  - Tanto la app de escritorio como la app móvil deben descubrir el tema activo ascendiendo por el árbol de carpetas (`findAncestorTopicManifest`) desde cualquier nota o subcarpeta (`Ejercicios/`, `Apuntes/`, etc.) hasta encontrar el primer `_tema.md` ascendente. Esto garantiza que notas en subárboles hereden siempre el contexto del tema y el catálogo completo de competencias matemáticas (solve, process, prove, counterexample, true_false, find_error, drill, explain).
+- **Persistencia de Navegación Web**:
+  - Las particiones de sesión web se mantienen aisladas bajo `persist:nvweb`, con historial y métricas de uso sincronizadas en `.notevault/web/`.
+

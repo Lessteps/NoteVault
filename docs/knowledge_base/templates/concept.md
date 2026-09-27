@@ -20,13 +20,11 @@ tags: [matematicas, <area slug>]
 ## Idea en una frase
 <ONE sentence, max 45 words, no LaTeX display blocks. What the concept lets you do or say.>
 
-## Intuición
-<80-250 words. A picture, analogy or story that makes the formal definition feel inevitable.
-Say what problem the concept solves and why the definition has each of its parts.>
-
 ## Definición formal
-**<Term> (<English term>).** <Precise definition with $inline$ and $$display$$ LaTeX.
-If there are several definitions (e.g. weak/strong version), one bold paragraph each.>
+**<Term> (<English term>).** <Precise, short and explanatory definition with $inline$ and
+$$display$$ LaTeX, plus, whenever possible, a **visual example**: a diagram, graph or
+table that shows the definition at work. If there are several definitions (e.g.
+weak/strong version), one bold paragraph each.>
 
 ## Notación
 - $<symbol>$: <how it is read and what it means>.
@@ -40,19 +38,18 @@ If there are several definitions (e.g. weak/strong version), one bold paragraph 
 ### Ejemplo 3 — <short name>
 <... at least 3, from easy to less obvious>
 
-## No-ejemplos
-### No-ejemplo 1 — <short name>
+## Contraejemplos y errores comunes
+### Contraejemplo 1 — <short name>
 <Something that looks like it satisfies the definition but does not, and which exact
 part fails.>
-### No-ejemplo 2 — <short name>
+### Contraejemplo 2 — <short name>
 <... at least 2>
+### Errores frecuentes
+- <A mistake students really make, and the correction. At least 3 bullets.>
 
 ## Resultados clave
 - [[<number>-T01 <theorem title>]] — <one line: what it says, in words>.
 - <one bullet per key result of the syllabus row, in the same order>
-
-## Errores comunes
-- <A mistake students really make, and the correction. At least 3 bullets.>
 
 ## Conexiones
 - **Requiere** [[<prerequisite note name>]] — <why, max 50 characters>
@@ -71,6 +68,3 @@ part fails.>
 contraejemplo, notacion, hipotesis, estrategia, conexion, error.
 At least 4 different types; at least one definicion.>
 
-## Práctica
-- Demostraciones: [[<number>-T01 <title>]], [[<number>-T02 <title>]]
-- Ejercicios: [[<number>-E01 <title>]], [[<number>-E02 <title>]], <... every exercise>

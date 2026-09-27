@@ -52,7 +52,7 @@ Acceptance: `python -m pytest tests\test_kb_canvas.py -q` passes, then the whole
    ```
    Area folder names are in the syllabus headings (e.g. `2 Conjuntos`, `3 Relaciones y funciones`).
    Required extension, per concept:
-   - Concept note: all 11 sections; Intuición 80–250 words; ≥ 3 examples; ≥ 2 no-examples; ≥ 3 common errors; every prerequisite as a `**Requiere**` connection plus the real forward uses (`**Se usa en**`); every Conexiones reason ≤ 50 characters (it becomes an arrow label); 8–15 cards.
+   - Concept note: every section of the template (Idea en una frase · Definición formal with a visual example · Notación · Ejemplos · Contraejemplos y errores comunes · Resultados clave · Conexiones · Tarjetas). **No `Intuición` section and no `Práctica` section** (the reformed structure); ≥ 3 examples; ≥ 2 counterexamples; ≥ 3 common errors; every prerequisite as a `**Requiere**` connection plus the real forward uses (`**Se usa en**`); every Conexiones reason ≤ 50 characters (it becomes an arrow label); 8–15 cards.
    - Proof notes: one per key result; ≥ 3 steps each (typically 5–10); every Por qué ≤ 80 characters (arrow label); a checked counterexample for every hypothesis (or `*(no removible: …)*`); ≥ 2 variants.
    - Exercise notes: 6–10, each with 1–3 escalating hints, a complete model solution, a rubric of exactly 5 `- [ ] (1) …` items, and `## Errores típicos` (plural) with ≥ 1 item.
 5. **Verify the mathematics** before running the validator:

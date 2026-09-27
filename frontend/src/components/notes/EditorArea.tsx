@@ -1,14 +1,14 @@
 import {
   ArrowLeftRight,
-  AlertTriangle, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, FileCode2, FileText,
-  Link2, PanelLeft, PenLine, Plus, X,
+  AlertTriangle, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, FileText,
+  Link2, PanelLeft, PenLine, X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { Mentions, SearchHit } from "../../lib/types";
 import { useVirtualList } from "../../lib/useVirtualList";
 import { useApp, type OpenNote, type ViewMode } from "../../store/app";
-import { cn, IconButton, Kbd, openMenu } from "../ui";
+import { cn, IconButton, Kbd } from "../ui";
 import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
 import { PracticeView } from "../practice/PracticeView";
@@ -16,76 +16,6 @@ import { isProofNote, LadderView, useLadder } from "../practice/LadderView";
 import { SourceEditor } from "./SourceEditor";
 import { StudyBar } from "./StudyBar";
 
-function TabBar() {
-  const tabs = useApp((s) => s.tabs);
-  const active = useApp((s) => s.active);
-  const notes = useApp((s) => s.notes);
-  const setActive = useApp((s) => s.setActive);
-  const closeTab = useApp((s) => s.closeTab);
-  return (
-    <div className="flex h-10 flex-none items-end overflow-x-auto border-b border-line bg-panel">
-      {tabs.map((path) => {
-        const n = notes[path];
-        if (!n) return null;
-        const on = path === active;
-        return (
-          <div
-            key={path}
-            role="tab"
-            aria-selected={on}
-            title={path}
-            onClick={() => setActive(path)}
-            onAuxClick={(e) => e.button === 1 && void closeTab(path)}
-            onContextMenu={(e) => openMenu(e, [
-              { label: "Abrir a la derecha", icon: <Columns2 />, onSelect: () => void useApp.getState().openSide(path) },
-              { label: "Cerrar", icon: <X />, onSelect: () => void closeTab(path) },
-              { label: "Cerrar las demás", onSelect: () => {
-                for (const t of useApp.getState().tabs) if (t !== path) void closeTab(t);
-              } },
-            ])}
-            className={cn(
-              "group flex h-full max-w-[240px] flex-none cursor-pointer items-center gap-2 border-r border-line px-3 text-[12.5px]",
-              on
-                ? "bg-surface text-text shadow-[inset_0_2px_0_var(--nv-accent)]"
-                : "text-dim hover:bg-hover hover:text-text",
-            )}
-          >
-            {n.kind === "code"
-              ? <FileCode2 size={14} className="flex-none text-mint" />
-              : <FileText size={14} className="flex-none text-accent-text" />}
-            <span className="truncate">{n.title}</span>
-            <button
-              type="button"
-              title="Cerrar (Ctrl+W)"
-              onClick={(e) => {
-                e.stopPropagation();
-                void closeTab(path);
-              }}
-              className="relative grid h-5 w-5 flex-none place-items-center rounded text-faint hover:bg-hover hover:text-text"
-            >
-              {n.dirty || n.saving ? (
-                <>
-                  <span className="h-2 w-2 rounded-full bg-accent group-hover:hidden" />
-                  <X size={13} className="hidden group-hover:block" />
-                </>
-              ) : (
-                <X size={13} className={on ? "" : "opacity-0 group-hover:opacity-100"} />
-              )}
-            </button>
-          </div>
-        );
-      })}
-      <button
-        type="button"
-        title="Nueva nota"
-        onClick={() => void newNoteIn("")}
-        className="mb-1.5 ml-1 grid h-7 w-7 flex-none place-items-center rounded-md text-faint hover:bg-hover hover:text-text"
-      >
-        <Plus size={15} />
-      </button>
-    </div>
-  );
-}
 
 const MODES: Array<{ id: ViewMode; label: string; icon: React.ReactNode }> = [
   { id: "read", label: "Lectura", icon: <BookOpen size={13} /> },
@@ -100,6 +30,7 @@ function NoteHeader({ note }: { note: OpenNote }) {
   const toggleExplorer = useApp((s) => s.toggleExplorer);
   const explorerOpen = useApp((s) => s.explorerOpen);
   const parts = note.path.split("/");
+  const { openSide } = useApp.getState();
   return (
     <div className="flex h-11 flex-none items-center gap-2 border-b border-line bg-surface px-3">
       <IconButton title="Explorador (Ctrl+\)" onClick={toggleExplorer} active={explorerOpen}>
@@ -121,6 +52,15 @@ function NoteHeader({ note }: { note: OpenNote }) {
       >
         <Bookmark size={15} fill={note.bookmarked ? "currentColor" : "none"} />
       </IconButton>
+      {/* Open-to-the-right button */}
+      <button
+        type="button"
+        title="Abrir a la derecha"
+        onClick={() => void openSide(note.path)}
+        className="grid h-6 w-6 place-items-center rounded text-faint hover:bg-hover hover:text-text"
+      >
+        <Columns2 size={14} />
+      </button>
       <div className="flex rounded-lg border border-line bg-panel p-0.5" role="tablist" aria-label="Modo">
         {MODES.map((m) => (
           <button
@@ -337,11 +277,9 @@ export function EditorArea() {
   const note = useApp((s) => (s.active ? s.notes[s.active] : undefined));
   const side = useApp((s) => (s.side && s.side !== s.active ? s.notes[s.side] : undefined));
   const mode = useApp((s) => s.mode);
-  const hasTabs = useApp((s) => s.tabs.length > 0);
   const ladderOn = useLadder((s) => (note ? s.open.has(note.path) : false));
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-surface">
-      {hasTabs && <TabBar />}
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
           {!note ? (
@@ -391,7 +329,6 @@ export function EditorArea() {
 /** The second note of the split view: read or edited on its own. */
 function SidePane({ note }: { note: OpenNote }) {
   const [editing, setEditing] = useState(false);
-  const s = useApp.getState();
   return (
     <section aria-label="Panel derecho" className="flex w-1/2 min-w-0 flex-none flex-col border-l border-line-strong">
       <div className="flex h-10 flex-none items-center gap-2 border-b border-line bg-panel px-3">
@@ -407,8 +344,8 @@ function SidePane({ note }: { note: OpenNote }) {
             </button>
           ))}
         </div>
-        <IconButton title="Hacerla la nota principal" onClick={() => s.setActive(note.path)}><ArrowLeftRight size={14} /></IconButton>
-        <IconButton title="Cerrar panel derecho" onClick={() => void s.openSide(null)}><X size={14} /></IconButton>
+        <IconButton title="Hacerla la nota principal" onClick={() => useApp.getState().setActive(note.path)}><ArrowLeftRight size={14} /></IconButton>
+        <IconButton title="Cerrar panel derecho" onClick={() => void useApp.getState().openSide(null)}><X size={14} /></IconButton>
       </div>
       <div className="min-h-0 flex-1">{editing ? <Editor note={note} /> : <ReadView note={note} />}</div>
     </section>

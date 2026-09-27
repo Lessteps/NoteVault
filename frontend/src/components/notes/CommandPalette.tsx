@@ -149,7 +149,7 @@ function commands(): Item[] {
     { id: "switcher", group: "Notas", label: "Abrir nota rápida", keys: "Ctrl+P", run: () => s.setSwitcher(true) },
     ...(s.active ? [
       { id: "save", group: "Notas", label: "Guardar", keys: "Ctrl+S", run: () => void s.save(s.active!, { force: true }) },
-      { id: "close", group: "Notas", label: "Cerrar pestaña", keys: "Ctrl+W", run: () => void s.closeTab(s.active!) },
+      { id: "close", group: "Notas", label: "Cerrar pestaña", keys: "Ctrl+W", run: () => void s.closeNoteTab(s.active!) },
       { id: "bookmark", group: "Notas", label: "Añadir / quitar marcador", run: () => void s.toggleBookmark(s.active!) },
       { id: "properties", group: "Notas", label: "Propiedades de la nota…", run: () => useProperties.getState().show(s.active) },
       { id: "reveal", group: "Notas", label: "Mostrar en el explorador del sistema", run: () => void api.revealInOs(s.active!).catch(toastErr) },

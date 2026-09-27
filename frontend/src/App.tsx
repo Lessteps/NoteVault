@@ -97,13 +97,18 @@ function useShortcuts() {
         s.setSwitcher(true);
       } else if (key === "s") {
         e.preventDefault();
-        if (s.active) void s.save(s.active, { force: true });
+        const active = s.active;
+        if (active) void s.save(active, { force: true });
       } else if (key === "e") {
         e.preventDefault();
         s.setMode(s.mode === "read" ? "edit" : "read");
-      } else if (key === "w" && s.active) {
+      } else if (key === "w") {
         e.preventDefault();
-        void s.closeTab(s.active);
+        // Close the active tab
+        const { activeTabId, pinnedTabIds } = s;
+        if (activeTabId && !pinnedTabIds.has(activeTabId)) {
+          void s.closeTab(activeTabId);
+        }
       } else if (key === "\\") {
         e.preventDefault();
         s.toggleExplorer();
@@ -163,6 +168,7 @@ function useFileWatcherListener() {
 
 export function App() {
   const init = useApp((s) => s.init);
+  // The view to show is driven by the active tab's module id.
   const module = useApp((s) => s.module);
   useNavigationGuard();
   useShortcuts();

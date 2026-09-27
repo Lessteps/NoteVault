@@ -1,69 +1,18 @@
-// App chrome: top bar, icon rail, status bar, toasts.
+// App chrome: top bar (with unified tab strip), icon rail, status bar, toasts.
 
 import {
-  Calendar, CircleCheck, Dumbbell, Flag, Globe, House, Kanban, Moon, PenLine, Search,
-  SquareCheck, Sun, Wallet, X, Gem, Cloud, CloudUpload, CircleAlert, Settings,
+  Calendar, CircleCheck, Dumbbell, Flag, Globe, House, Kanban, Moon, PenLine,
+  Pin, PinOff, Plus, SquareCheck, Sun, Wallet, X, Gem, Cloud, CloudUpload,
+  CircleAlert, Settings, FileCode2, FileText, LayoutDashboard,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import { useApp, type ModuleId } from "../store/app";
-import { cn, Kbd } from "./ui";
+import { useApp, type AppTab, type ModuleId } from "../store/app";
+import { cn, openMenu } from "./ui";
 import { useVaultDialog } from "./VaultDialog";
 import { useSettingsDialog } from "./settings/SettingsDialog";
+import { newNoteIn } from "./notes/FileTree";
 
-export function TopBar() {
-  const info = useApp((s) => s.info);
-  const setSwitcher = useApp((s) => s.setSwitcher);
-  return (
-    <header className="flex h-11 flex-none items-center gap-3 border-b border-line bg-bg px-4">
-      <div className="flex items-center gap-2">
-        <span className="grid h-6 w-6 place-items-center rounded-md bg-accent text-white">
-          <Gem size={14} strokeWidth={2.2} />
-        </span>
-        <span className="text-[13px] font-semibold tracking-tight text-text">NoteVault</span>
-      </div>
-      <span className="text-faint">—</span>
-      <button type="button" title="Cambiar de vault" onClick={() => useVaultDialog.getState().set(true)}
-        className="rounded-md px-1.5 py-0.5 font-mono text-[11px] uppercase tracking-wider text-dim hover:bg-hover hover:text-text">
-        Vault: {info?.vault_name ?? "…"}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => setSwitcher(true)}
-        className="mx-auto flex h-7 w-[440px] max-w-[40vw] items-center gap-2 rounded-lg border border-line bg-panel px-3 text-[12px] text-faint transition-colors hover:border-line-strong hover:text-dim"
-      >
-        <Search size={13} />
-        <span>Buscar notas, abrir o crear…</span>
-        <span className="ml-auto">
-          <Kbd>Ctrl P</Kbd>
-        </span>
-      </button>
-
-      <SyncState />
-    </header>
-  );
-}
-
-function SyncState() {
-  const pending = useApp((s) => Object.values(s.notes).filter((n) => n.dirty || n.saving).length);
-  const conflicts = useApp((s) => Object.values(s.notes).filter((n) => n.conflict).length);
-  if (conflicts) {
-    return (
-      <span className="flex items-center gap-1.5 text-[11px] text-warn">
-        <CircleAlert size={13} /> Conflicto
-      </span>
-    );
-  }
-  return pending ? (
-    <span className="flex items-center gap-1.5 text-[11px] text-dim">
-      <CloudUpload size={13} /> Guardando…
-    </span>
-  ) : (
-    <span className="flex items-center gap-1.5 text-[11px] text-mint">
-      <Cloud size={13} /> Guardado
-    </span>
-  );
-}
+// ── Module registry ─────────────────────────────────────────────────────────
 
 export const MODULES: Array<{ id: ModuleId; label: string; Icon: ComponentType<{ size?: number; strokeWidth?: number }> }> = [
   { id: "home", label: "Vista General", Icon: House },
@@ -79,14 +28,200 @@ export const MODULES: Array<{ id: ModuleId; label: string; Icon: ComponentType<{
 ];
 
 export function moduleLabel(id: ModuleId): string {
-  return MODULES.find((m) => m.id === id)?.label ?? (id === "web" ? "Navegador Web" : id === "player" ? "Reproductor de inglés" : id);
+  return MODULES.find((m) => m.id === id)?.label
+    ?? (id === "web" ? "Navegador Web" : id === "player" ? "Reproductor de inglés" : id);
 }
 
+function moduleIcon(id: ModuleId): ComponentType<{ size?: number; strokeWidth?: number }> {
+  return MODULES.find((m) => m.id === id)?.Icon ?? PenLine;
+}
+
+// ── Tab label / icon helpers ────────────────────────────────────────────────
+
+function tabLabel(tab: AppTab, notes: Record<string, { title: string; kind: string }>): string {
+  if (tab.kind === "module") return moduleLabel(tab.id);
+  if (tab.kind === "web") return "Navegador";
+  if (tab.kind === "canvas") {
+    return tab.path.split("/").pop()?.replace(/\.canvas$/i, "") ?? tab.path;
+  }
+  return notes[tab.path]?.title ?? tab.path.split("/").pop()?.replace(/\.md$/, "") ?? tab.path;
+}
+
+function TabIcon({ tab, notes }: { tab: AppTab; notes: Record<string, { kind: string }> }) {
+  if (tab.kind === "module") {
+    const Icon = moduleIcon(tab.id);
+    return <Icon size={13} strokeWidth={1.8} />;
+  }
+  if (tab.kind === "web") return <Globe size={13} strokeWidth={1.8} />;
+  if (tab.kind === "canvas") return <LayoutDashboard size={13} strokeWidth={1.8} className="text-mint" />;
+  const kind = notes[tab.path]?.kind;
+  return kind === "code"
+    ? <FileCode2 size={13} className="flex-none text-mint" />
+    : <FileText size={13} className="flex-none text-accent-text" />;
+}
+
+// ── Unified Tab Strip ───────────────────────────────────────────────────────
+
+function TabStrip() {
+  const openTabs = useApp((s) => s.openTabs);
+  const activeTabId = useApp((s) => s.activeTabId);
+  const pinnedTabIds = useApp((s) => s.pinnedTabIds);
+  const notes = useApp((s) => s.notes);
+  const { setActiveTab, closeTab, pinTab, unpinTab } = useApp.getState();
+
+  return (
+    <div className="flex min-w-0 flex-1 items-end overflow-x-auto" role="tablist" aria-label="Pestañas abiertas">
+      {openTabs.map((tab) => {
+        const isActive = tab.tabId === activeTabId;
+        const isPinned = pinnedTabIds.has(tab.tabId);
+        const isDirty = (tab.kind === "note" && notes[tab.path]?.dirty) ||
+          (tab.kind === "note" && notes[tab.path]?.saving);
+        const label = tabLabel(tab, notes as Record<string, { title: string; kind: string }>);
+
+        return (
+          <div
+            key={tab.tabId}
+            id={`tab-${tab.tabId.replace(/[^a-z0-9]/gi, "-")}`}
+            role="tab"
+            aria-selected={isActive}
+            title={tab.kind === "note" || tab.kind === "canvas" ? tab.path : label}
+            onClick={() => setActiveTab(tab.tabId)}
+            onAuxClick={(e) => e.button === 1 && !isPinned && void closeTab(tab.tabId)}
+            onContextMenu={(e) => openMenu(e, [
+              isPinned
+                ? { label: "Dejar de fijar", icon: <PinOff />, onSelect: () => unpinTab(tab.tabId) }
+                : { label: "Fijar", icon: <Pin />, onSelect: () => pinTab(tab.tabId) },
+              { label: "Cerrar", icon: <X />, onSelect: () => !isPinned && void closeTab(tab.tabId) },
+              {
+                label: "Cerrar las demás", onSelect: () => {
+                  for (const t of useApp.getState().openTabs) {
+                    if (t.tabId !== tab.tabId && !useApp.getState().pinnedTabIds.has(t.tabId)) {
+                      void closeTab(t.tabId);
+                    }
+                  }
+                },
+              },
+            ])}
+            className={cn(
+              "group relative flex h-full max-w-[200px] flex-none cursor-pointer items-center gap-1.5 border-r border-line px-2.5 text-[12px]",
+              isActive
+                ? "bg-surface text-text shadow-[inset_0_2px_0_var(--nv-accent)]"
+                : "text-dim hover:bg-hover hover:text-text",
+            )}
+          >
+            <TabIcon tab={tab} notes={notes as Record<string, { kind: string }>} />
+            <span className="truncate">{label}</span>
+            {isPinned ? (
+              <Pin size={11} className="flex-none text-accent-text" />
+            ) : (
+              <button
+                type="button"
+                title="Cerrar pestaña"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void closeTab(tab.tabId);
+                }}
+                className={cn(
+                  "relative grid h-4 w-4 flex-none place-items-center rounded text-faint hover:bg-hover hover:text-text",
+                  !isActive && "opacity-0 group-hover:opacity-100",
+                )}
+              >
+                {isDirty ? (
+                  <>
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent group-hover:hidden" />
+                    <X size={11} className="hidden group-hover:block" />
+                  </>
+                ) : (
+                  <X size={11} />
+                )}
+              </button>
+            )}
+          </div>
+        );
+      })}
+      {/* New note button */}
+      <button
+        type="button"
+        title="Nueva nota (Ctrl+P)"
+        onClick={() => void newNoteIn("")}
+        className="mb-1 ml-1 grid h-6 w-6 flex-none place-items-center rounded text-faint hover:bg-hover hover:text-text"
+      >
+        <Plus size={14} />
+      </button>
+    </div>
+  );
+}
+
+// ── TopBar ──────────────────────────────────────────────────────────────────
+
+export function TopBar() {
+  const info = useApp((s) => s.info);
+  return (
+    <header className="flex h-10 flex-none items-stretch gap-0 border-b border-line bg-bg">
+      {/* App identity + vault switcher */}
+      <div className="flex flex-none items-center gap-2 px-3 border-r border-line">
+        <span className="grid h-5 w-5 place-items-center rounded bg-accent text-white">
+          <Gem size={12} strokeWidth={2.2} />
+        </span>
+        <button
+          type="button"
+          title="Cambiar de vault"
+          onClick={() => useVaultDialog.getState().set(true)}
+          className="rounded px-1 font-mono text-[10.5px] uppercase tracking-wider text-dim hover:text-text"
+        >
+          {info?.vault_name ?? "…"}
+        </button>
+      </div>
+
+      {/* Tab strip takes remaining space */}
+      <TabStrip />
+
+      {/* Sync state on the right */}
+      <div className="flex flex-none items-center px-3 border-l border-line">
+        <SyncState />
+      </div>
+    </header>
+  );
+}
+
+// ── SyncState ───────────────────────────────────────────────────────────────
+
+function SyncState() {
+  const pending = useApp((s) => Object.values(s.notes).filter((n) => n.dirty || n.saving).length);
+  const conflicts = useApp((s) => Object.values(s.notes).filter((n) => n.conflict).length);
+  if (conflicts) {
+    return (
+      <span className="flex items-center gap-1.5 text-[11px] text-warn">
+        <CircleAlert size={12} /> Conflicto
+      </span>
+    );
+  }
+  return pending ? (
+    <span className="flex items-center gap-1.5 text-[11px] text-dim">
+      <CloudUpload size={12} /> Guardando…
+    </span>
+  ) : (
+    <span className="flex items-center gap-1.5 text-[11px] text-mint">
+      <Cloud size={12} /> Guardado
+    </span>
+  );
+}
+
+// ── Icon Rail (launcher) ────────────────────────────────────────────────────
+
 export function IconRail() {
-  const current = useApp((s) => s.module);
+  const activeTabId = useApp((s) => s.activeTabId);
+  const openTabs = useApp((s) => s.openTabs);
   const setModule = useApp((s) => s.setModule);
   const theme = useApp((s) => s.theme);
   const toggleTheme = useApp((s) => s.toggleTheme);
+
+  // Highlight the icon when that module's tab is the active one
+  const activeModuleId = (() => {
+    const tab = openTabs.find((t) => t.tabId === activeTabId);
+    return tab?.kind === "module" ? tab.id : null;
+  })();
+
   return (
     <nav aria-label="Módulos" className="flex w-12 flex-none flex-col items-center gap-1.5 border-r border-line bg-bg py-3">
       {MODULES.map(({ id, label, Icon }) => (
@@ -98,7 +233,7 @@ export function IconRail() {
           onClick={() => setModule(id)}
           className={cn(
             "grid h-9 w-9 place-items-center rounded-lg transition-colors",
-            current === id
+            activeModuleId === id
               ? "bg-accent text-white shadow-[0_0_0_1px_var(--nv-accent)]"
               : "text-faint hover:bg-hover hover:text-text",
           )}
@@ -129,8 +264,12 @@ export function IconRail() {
   );
 }
 
+// ── StatusBar ───────────────────────────────────────────────────────────────
+
 export function StatusBar() {
-  const note = useApp((s) => (s.active ? s.notes[s.active] : undefined));
+  const active = useApp((s) => s.active);
+  const notes = useApp((s) => s.notes);
+  const note = active ? notes[active] : undefined;
   const cursor = useApp((s) => s.cursor);
   const mode = useApp((s) => s.mode);
   const info = useApp((s) => s.info);
@@ -160,6 +299,8 @@ function Sep() {
   return <span className="text-line-strong">|</span>;
 }
 
+// ── Toasts ──────────────────────────────────────────────────────────────────
+
 export function Toasts() {
   const toasts = useApp((s) => s.toasts);
   const dismiss = useApp((s) => s.dismiss);
@@ -185,6 +326,8 @@ export function Toasts() {
     </div>
   );
 }
+
+// ── ComingSoon ──────────────────────────────────────────────────────────────
 
 export function ComingSoon({ module }: { module: ModuleId }) {
   return (

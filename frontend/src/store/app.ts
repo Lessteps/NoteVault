@@ -11,6 +11,33 @@ export type ModuleId =
 export type ViewMode = "read" | "edit" | "split";
 export type ExplorerTab = "files" | "search" | "bookmarks" | "tags" | "graph";
 
+// ── Unified tab model ───────────────────────────────────────────────────────
+
+export type AppTab =
+  | { kind: "module"; id: ModuleId; tabId: string }
+  | { kind: "note"; path: string; tabId: string }
+  | { kind: "canvas"; path: string; tabId: string }
+  | { kind: "web"; tabId: string };
+
+
+/** Stable id for a module tab (one per module). */
+function moduleTabId(id: ModuleId): string { return `module:${id}`; }
+
+const PINNED_KEY = "nv.pinnedTabs";
+
+function loadPinned(): Set<string> {
+  try {
+    const raw = localStorage.getItem(PINNED_KEY);
+    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch { return new Set(); }
+}
+
+function savePinned(ids: Set<string>) {
+  try { localStorage.setItem(PINNED_KEY, JSON.stringify([...ids])); } catch {}
+}
+
+// ── Note / open‑note model ──────────────────────────────────────────────────
+
 export interface OpenNote {
   path: string;
   title: string;
@@ -69,13 +96,20 @@ function fromData(d: NoteData, revealLine?: number): OpenNote {
 interface State {
   info: AppInfo | null;
   theme: "dark" | "light";
+  /** Legacy: the module currently shown — kept for backward compat but driven by active tab. */
   module: ModuleId;
   mode: ViewMode;
   explorerTab: ExplorerTab;
   explorerOpen: boolean;
   inspectorOpen: boolean;
-  tabs: string[];
-  active: string | null;
+
+  // ── Unified tab strip ──────────────────────────────────────────────
+  openTabs: AppTab[];
+  activeTabId: string | null;
+  pinnedTabIds: Set<string>;
+
+  // ── Note state (notes open in note/canvas tabs) ────────────────────
+  /** Note data keyed by vault-relative path. */
   notes: Record<string, OpenNote>;
   /** Bumped whenever the file tree must be re-read. */
   treeVersion: number;
@@ -89,6 +123,7 @@ interface State {
   toasts: Toast[];
 
   init: () => Promise<void>;
+  // Module-level launcher: focuses or creates a module tab.
   setModule: (m: ModuleId) => void;
   setMode: (m: ViewMode) => void;
   setExplorerTab: (t: ExplorerTab) => void;
@@ -101,8 +136,17 @@ interface State {
   openSide: (path: string | null) => Promise<void>;
   setCursor: (c: { line: number; col: number } | null) => void;
 
+  // ── Tab actions ────────────────────────────────────────────────────
+  openTab: (tab: Omit<AppTab, "tabId">) => void;
+  closeTab: (tabId: string) => Promise<void>;
+  setActiveTab: (tabId: string) => void;
+  pinTab: (tabId: string) => void;
+  unpinTab: (tabId: string) => void;
+
+  // ── Note actions ───────────────────────────────────────────────────
   openNote: (path: string, opts?: { line?: number }) => Promise<void>;
-  closeTab: (path: string) => Promise<void>;
+  /** Close a note tab by note path (legacy alias used by EditorArea). */
+  closeNoteTab: (path: string) => Promise<void>;
   setActive: (path: string) => void;
   editRaw: (path: string, raw: string) => void;
   save: (path: string, opts?: { force?: boolean }) => Promise<void>;
@@ -115,6 +159,12 @@ interface State {
 
   toast: (kind: Toast["kind"], text: string) => void;
   dismiss: (id: number) => void;
+
+  // ── Computed helpers (not state, just getters) ─────────────────────
+  /** Active note path (from the active note/canvas tab). */
+  active: string | null;
+  /** Back-compat: note path → tab list. */
+  tabs: string[];
 }
 
 /** Views that show files outside the note tabs (the canvas) follow these. */
@@ -148,6 +198,25 @@ export function applyRenderingSettings(r: Partial<RenderingSettings>) {
 
 export const applyRendering = applyRenderingSettings;
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+
+/** Returns the module id that drives the active view for a given tab. */
+function tabModuleId(tab: AppTab): ModuleId {
+  if (tab.kind === "module") return tab.id;
+  if (tab.kind === "note" || tab.kind === "canvas") return "notas";
+  return "web";
+}
+
+/** Pick the tab to activate after closing `closedId`. */
+function pickNext(tabs: AppTab[], closedId: string, currentId: string | null): string | null {
+  if (currentId !== closedId) return currentId;
+  const idx = tabs.findIndex((t) => t.tabId === closedId);
+  const remaining = tabs.filter((t) => t.tabId !== closedId);
+  if (!remaining.length) return null;
+  return remaining[Math.min(idx, remaining.length - 1)]!.tabId;
+}
+
 export const useApp = create<State>((set, get) => ({
   info: null,
   theme: "dark",
@@ -156,8 +225,9 @@ export const useApp = create<State>((set, get) => ({
   explorerTab: "files",
   explorerOpen: true,
   inspectorOpen: true,
-  tabs: [],
-  active: null,
+  openTabs: [],
+  activeTabId: null,
+  pinnedTabIds: new Set<string>(),
   notes: {},
   treeVersion: 0,
   bookmarkVersion: 0,
@@ -166,6 +236,20 @@ export const useApp = create<State>((set, get) => ({
   side: null,
   cursor: null,
   toasts: [],
+
+  // Computed getters that derive from openTabs / activeTabId
+  get active(): string | null {
+    const { openTabs, activeTabId } = get();
+    if (!activeTabId) return null;
+    const t = openTabs.find((t) => t.tabId === activeTabId);
+    if (!t || (t.kind !== "note" && t.kind !== "canvas")) return null;
+    return t.path;
+  },
+  get tabs(): string[] {
+    return get().openTabs
+      .filter((t) => t.kind === "note" || t.kind === "canvas")
+      .map((t) => (t as { path: string }).path);
+  },
 
   init: async () => {
     try {
@@ -177,13 +261,30 @@ export const useApp = create<State>((set, get) => ({
         const r = await api.getRendering().catch(() => null);
         if (r) applyRenderingSettings(r);
       }
-      set({ info, theme: info.theme });
+      const pinned = loadPinned();
+      set({ info, theme: info.theme, pinnedTabIds: pinned });
+      // Open the "home" module tab by default if no tabs
+      if (get().openTabs.length === 0) {
+        get().setModule("home");
+      }
     } catch (e) {
       get().toast("error", (e as Error).message);
     }
   },
 
-  setModule: (module) => set({ module }),
+  // ── Module launcher: focuses or creates a module tab ────────────────
+  setModule: (m) => {
+    const id = moduleTabId(m);
+    const { openTabs } = get();
+    const existing = openTabs.find((t) => t.tabId === id);
+    if (existing) {
+      set({ activeTabId: id, module: m });
+      return;
+    }
+    const tab: AppTab = { kind: "module", id: m, tabId: id };
+    set({ openTabs: [...openTabs, tab], activeTabId: id, module: m });
+  },
+
   setMode: (mode) => set({ mode }),
   setExplorerTab: (explorerTab) => set({ explorerTab, explorerOpen: true }),
   toggleExplorer: () => set((s) => ({ explorerOpen: !s.explorerOpen })),
@@ -202,6 +303,7 @@ export const useApp = create<State>((set, get) => ({
   },
   setSwitcher: (switcherOpen) => set({ switcherOpen, paletteOpen: false }),
   setPalette: (paletteOpen) => set({ paletteOpen, switcherOpen: false }),
+
   openSide: async (path) => {
     if (!path) {
       set({ side: null });
@@ -211,27 +313,116 @@ export const useApp = create<State>((set, get) => ({
     if (!st.notes[path]) {
       try {
         const data = await api.readNote(path);
+        const newTab: AppTab = { kind: "note", path, tabId: `note:${path}` };
         set((s2) => ({
           notes: { ...s2.notes, [path]: fromData(data) },
-          tabs: s2.tabs.includes(path) ? s2.tabs : [...s2.tabs, path],
+          openTabs: s2.openTabs.some((t) => t.tabId === newTab.tabId)
+            ? s2.openTabs
+            : [...s2.openTabs, newTab],
         }));
       } catch (e) {
         get().toast("error", (e as Error).message);
         return;
       }
     }
-    set((s2) => ({ module: "notas", side: path, active: s2.active === path || !s2.active ? (s2.tabs.find((t) => t !== path) ?? null) : s2.active }));
+    const active = get().active;
+    set({ side: path, module: "notas" });
+    if (!active || active === path) {
+      // Activate a different note tab if possible
+      const other = get().openTabs.find((t) => (t.kind === "note" || t.kind === "canvas") && t.tabId !== `note:${path}`);
+      if (other) set({ activeTabId: other.tabId });
+    }
   },
+
   setCursor: (cursor) => set({ cursor }),
 
+  // ── Generic tab ops ──────────────────────────────────────────────────
+  openTab: (tabSpec) => {
+    let newTab: AppTab;
+    let id: string;
+    const kind = tabSpec.kind;
+    if (kind === "module") {
+      const spec = tabSpec as { kind: "module"; id: ModuleId };
+      id = moduleTabId(spec.id);
+      newTab = { kind: "module", id: spec.id, tabId: id };
+    } else if (kind === "note") {
+      const spec = tabSpec as { kind: "note"; path: string };
+      id = `note:${spec.path}`;
+      newTab = { kind: "note", path: spec.path, tabId: id };
+    } else if (kind === "canvas") {
+      const spec = tabSpec as { kind: "canvas"; path: string };
+      id = `canvas:${spec.path}`;
+      newTab = { kind: "canvas", path: spec.path, tabId: id };
+    } else {
+      id = "web";
+      newTab = { kind: "web", tabId: id };
+    }
+    const { openTabs } = get();
+    const exists = openTabs.find((t) => t.tabId === id);
+    if (exists) {
+      set({ activeTabId: id, module: tabModuleId(exists) });
+      return;
+    }
+    set({ openTabs: [...openTabs, newTab], activeTabId: id, module: tabModuleId(newTab) });
+  },
+
+  closeTab: async (tabIdToClose) => {
+    const s = get();
+    if (s.pinnedTabIds.has(tabIdToClose)) return; // pinned → cannot close
+    const tab = s.openTabs.find((t) => t.tabId === tabIdToClose);
+    if (!tab) return;
+    // Save dirty note before closing
+    if (tab.kind === "note" && s.notes[tab.path]?.dirty) {
+      await s.save(tab.path);
+    }
+    const nextId = pickNext(s.openTabs, tabIdToClose, s.activeTabId);
+    const nextTab = nextId ? get().openTabs.find((t) => t.tabId === nextId) : null;
+    set((st) => {
+      const newTabs = st.openTabs.filter((t) => t.tabId !== tabIdToClose);
+      const newNotes = { ...st.notes };
+      if (tab.kind === "note") delete newNotes[tab.path];
+      return {
+        openTabs: newTabs,
+        notes: newNotes,
+        activeTabId: nextId,
+        module: nextTab ? tabModuleId(nextTab) : st.module,
+        side: tab.kind === "note" && st.side === tab.path ? null : st.side,
+      };
+    });
+  },
+
+  setActiveTab: (id) => {
+    const tab = get().openTabs.find((t) => t.tabId === id);
+    if (!tab) return;
+    set({ activeTabId: id, module: tabModuleId(tab) });
+  },
+
+  pinTab: (id) => {
+    const pinned = new Set(get().pinnedTabIds);
+    pinned.add(id);
+    savePinned(pinned);
+    set({ pinnedTabIds: pinned });
+  },
+
+  unpinTab: (id) => {
+    const pinned = new Set(get().pinnedTabIds);
+    pinned.delete(id);
+    savePinned(pinned);
+    set({ pinnedTabIds: pinned });
+  },
+
+  // ── Note actions ─────────────────────────────────────────────────────
   openNote: async (path, opts) => {
     pathEvents.opened.forEach((f) => f(path));
     const s = get();
+    const noteTabId = `note:${path}`;
     if (s.notes[path]) {
+      const existing = s.openTabs.find((t) => t.tabId === noteTabId);
       set((st) => ({
-        active: path,
-        side: st.side === path ? st.active : st.side,
+        activeTabId: noteTabId,
         module: "notas",
+        side: st.side === path ? st.active : st.side,
+        openTabs: existing ? st.openTabs : [...st.openTabs, { kind: "note", path, tabId: noteTabId }],
         notes: opts?.line !== undefined
           ? { ...st.notes, [path]: { ...st.notes[path]!, revealLine: opts.line } }
           : st.notes,
@@ -243,31 +434,30 @@ export const useApp = create<State>((set, get) => ({
       set((st) => ({
         module: "notas",
         notes: { ...st.notes, [path]: fromData(data, opts?.line) },
-        tabs: st.tabs.includes(path) ? st.tabs : [...st.tabs, path],
-        active: path,
+        openTabs: st.openTabs.some((t) => t.tabId === noteTabId)
+          ? st.openTabs
+          : [...st.openTabs, { kind: "note", path, tabId: noteTabId }],
+        activeTabId: noteTabId,
       }));
     } catch (e) {
       get().toast("error", (e as Error).message);
     }
   },
 
-  closeTab: async (path) => {
-    const note = get().notes[path];
-    if (note?.dirty) await get().save(path);
-    set((st) => {
-      const idx = st.tabs.indexOf(path);
-      const tabs = st.tabs.filter((t) => t !== path);
-      const notes = { ...st.notes };
-      delete notes[path];
-      const active = st.active === path
-        ? (tabs[Math.min(idx, tabs.length - 1)] ?? null)
-        : st.active;
-      return { tabs, notes, active, side: st.side === path ? null : st.side };
-    });
+  /** Close note tab by path (legacy api used by Ctrl-W and old references). */
+  closeNoteTab: async (path) => {
+    return get().closeTab(`note:${path}`);
   },
 
-  // Activating the note of the right pane swaps the two panes.
-  setActive: (active) => set((st) => ({ active, side: st.side === active ? st.active : st.side })),
+  /** Legacy `setActive`: activates a note by path. */
+  setActive: (path) => {
+    const noteTabId = `note:${path}`;
+    const st = get();
+    const tab = st.openTabs.find((t) => t.tabId === noteTabId);
+    if (tab) {
+      set({ activeTabId: noteTabId, module: "notas", side: st.side === path ? st.active : st.side });
+    }
+  },
 
   editRaw: (path, raw) => {
     set((st) => {
@@ -375,10 +565,32 @@ export const useApp = create<State>((set, get) => ({
         const np = remap(p);
         notes[np] = np === p ? n : { ...n, path: np, title: np.split("/").pop()!.replace(/\.md$/, "") };
       }
+      const openTabs = st.openTabs.map((t) => {
+        if (t.kind === "note") {
+          const np = remap(t.path);
+          return np === t.path ? t : { ...t, path: np, tabId: `note:${np}` };
+        }
+        if (t.kind === "canvas") {
+          const np = remap(t.path);
+          return np === t.path ? t : { ...t, path: np, tabId: `canvas:${np}` };
+        }
+        return t;
+      });
+      // Remap the activeTabId if it pointed to a renamed note/canvas tab
+      let activeTabId = st.activeTabId;
+      if (activeTabId) {
+        const newActive = openTabs.find((t) => {
+          const old = st.openTabs.find((o) => o.tabId === activeTabId);
+          if (!old) return false;
+          if (old.kind === "note" || old.kind === "canvas") return t.kind === old.kind;
+          return t.tabId === activeTabId;
+        });
+        activeTabId = newActive?.tabId ?? activeTabId;
+      }
       return {
         notes,
-        tabs: st.tabs.map(remap),
-        active: st.active ? remap(st.active) : null,
+        openTabs,
+        activeTabId,
         side: st.side ? remap(st.side) : null,
         treeVersion: st.treeVersion + 1,
       };
@@ -389,12 +601,22 @@ export const useApp = create<State>((set, get) => ({
     pathEvents.deleted.forEach((f) => f(path));
     set((st) => {
       const gone = (p: string) => p === path || p.startsWith(path + "/");
-      const tabs = st.tabs.filter((t) => !gone(t));
+      const openTabs = st.openTabs.filter((t) => {
+        if (t.kind === "note" || t.kind === "canvas") return !gone(t.path);
+        return true;
+      });
       const notes = Object.fromEntries(Object.entries(st.notes).filter(([p]) => !gone(p)));
+      const activeTabId = st.activeTabId
+        ? openTabs.find((t) => t.tabId === st.activeTabId)
+          ? st.activeTabId
+          : (openTabs[0]?.tabId ?? null)
+        : null;
+      const activeTab = activeTabId ? openTabs.find((t) => t.tabId === activeTabId) : null;
       return {
-        tabs,
+        openTabs,
         notes,
-        active: st.active && gone(st.active) ? (tabs[0] ?? null) : st.active,
+        activeTabId,
+        module: activeTab ? tabModuleId(activeTab) : st.module,
         side: st.side && gone(st.side) ? null : st.side,
         treeVersion: st.treeVersion + 1,
       };

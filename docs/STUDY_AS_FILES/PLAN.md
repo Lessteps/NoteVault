@@ -20,7 +20,12 @@ New model, per folder:
 - **Topic folder** (has the topic manifest, e.g. `1.1 Números naturales …`): shown
   by two *visible* files instead of a confusing `_tema.md` sitting next to the
   note:
-  - **`<name>.teorica.md`** — the theory (frontmatter `type: teorica`).
+  - **The theory note already exists** (e.g. `1.1 Números naturales ….md`, the one
+    the canvas maps link as a file node and backlinks point to). **Do NOT rename it
+    and do NOT create a separate `.teorica.md`** — renaming would break the canvas
+    file-node links and wikilinks. Instead **mark the existing note with frontmatter
+    `type: teorica`** (name and body untouched) so the system recognises it as the
+    topic's theory view.
   - **`<name>.practica.md`** — the practice interface (frontmatter
     `type: practica`): the skill/difficulty/quantity/assistance configurator **plus**
     the topic progress summary (the `skill × difficulty` matrix, exercises done,
@@ -60,10 +65,13 @@ Reuse the existing React pieces — `TopicConfiguratorDialog`, `TopicGeneralView
    `PracticeView`.
 3. `type: teorica` renders the theory (today's concept content / its canvas link).
 4. Add a `tools/` migration (Node TS, idempotent) that, for every topic folder that
-   has a `_tema.md`, creates `<name>.practica.md` and `<name>.teorica.md`, moves the
-   manifest metadata into the `.practica` frontmatter, and removes the stray visible
-   `_tema.md` duplication (keep a hidden marker only if detection needs it). Print a
-   report. Run it against the real vault tree `C:\PROGRAMMING\Matemáticas`.
+   has a `_tema.md`: (a) finds the **existing theory note** (the topic's main `.md`,
+   linked by the canvas maps) and adds `type: teorica` to its frontmatter **without
+   renaming it or touching its body**; (b) creates `<name>.practica.md` with the
+   manifest metadata moved into its frontmatter; (c) **deletes** the `_tema.md`. Do
+   NOT create a `.teorica.md`. If detection still needs a hidden marker, keep it
+   hidden (never a second visible note for the same topic). Print a report and run it
+   against the real vault tree `C:\PROGRAMMING\Matemáticas`.
 5. **Remove the study right sub-bar** as the practice surface (keep the code but
    stop mounting `StudyPanel` in the inspector). The inspector goes back to just
    Nota metadata.

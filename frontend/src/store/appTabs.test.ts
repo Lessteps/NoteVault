@@ -81,6 +81,17 @@ describe("unified tab strip", () => {
     expect(app().active).toBe("Matemáticas/1.1/mapa.canvas");
   });
 
+  it("opens a canvas as a tab of its own inside the Notes view", async () => {
+    app().openTab({ kind: "canvas", path: "Matemáticas/1.1 — mapa.canvas" });
+    expect(app().openTabs.map((t) => t.tabId)).toEqual(["canvas:Matemáticas/1.1 — mapa.canvas"]);
+    expect(app().module).toBe("notas");
+    expect(app().active).toBe("Matemáticas/1.1 — mapa.canvas");
+
+    await app().closeTab("canvas:Matemáticas/1.1 — mapa.canvas");
+    expect(app().openTabs).toEqual([]);
+    expect(app().active).toBeNull();
+  });
+
   it("closing a tab removes it and activates a neighbour", async () => {
     app().openTab({ kind: "note", path: "a.md" });
     app().openTab({ kind: "note", path: "b.md" });

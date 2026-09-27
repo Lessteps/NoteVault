@@ -7,7 +7,6 @@ import { create } from "zustand";
 import { api } from "../../lib/bridge";
 import { copyText } from "../../lib/clipboard";
 import { useApp } from "../../store/app";
-import { useCanvas } from "../../store/canvas";
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
 import { PathPicker } from "./PathPicker";
 
@@ -93,8 +92,7 @@ export function ConceptMapDialog() {
           {created && (
             <PrimaryButton onClick={() => {
               close();
-              useApp.getState().setModule("notas");
-              void useCanvas.getState().open(created);
+              useApp.getState().openTab({ kind: "canvas", path: created });
             }}><LayoutDashboard size={14} /> Abrir mapa</PrimaryButton>
           )}
         </>

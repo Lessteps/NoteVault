@@ -19,6 +19,13 @@ export type AppTab =
   | { kind: "canvas"; path: string; tabId: string }
   | { kind: "web"; tabId: string };
 
+/** A tab as callers open it: `openTab` derives the id from the target. */
+export type TabSpec =
+  | { kind: "module"; id: ModuleId }
+  | { kind: "note"; path: string }
+  | { kind: "canvas"; path: string }
+  | { kind: "web" };
+
 
 /** Stable id for a module tab (one per module). */
 function moduleTabId(id: ModuleId): string { return `module:${id}`; }
@@ -147,7 +154,7 @@ interface State {
   setCursor: (c: { line: number; col: number } | null) => void;
 
   // ── Tab actions ────────────────────────────────────────────────────
-  openTab: (tab: Omit<AppTab, "tabId">) => void;
+  openTab: (tab: TabSpec) => void;
   closeTab: (tabId: string) => Promise<void>;
   setActiveTab: (tabId: string) => void;
   pinTab: (tabId: string) => void;

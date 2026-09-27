@@ -7,7 +7,6 @@ import { api } from "../../lib/bridge";
 import type { IndexEntry, TreeEntry } from "../../lib/types";
 import { useVirtualList } from "../../lib/useVirtualList";
 import { useApp } from "../../store/app";
-import { useCanvas } from "../../store/canvas";
 import { askText, cn, confirmAction, openMenu } from "../ui";
 
 const EXPANDED_KEY = "nv.tree.expanded";
@@ -47,8 +46,7 @@ export async function newCanvasIn(folder: string): Promise<void> {
   try {
     const { path } = await api.canvasCreate(title, folder);
     s.refreshTree();
-    s.setModule("notas");
-    await useCanvas.getState().open(path);
+    s.openTab({ kind: "canvas", path });
   } catch (e) {
     s.toast("error", (e as Error).message);
   }
@@ -99,7 +97,8 @@ async function trashEntry(entry: TreeEntry) {
 function openEntry(entry: TreeEntry) {
   const s = useApp.getState();
   if (entry.kind === "canvas") {
-    void useCanvas.getState().open(entry.path);
+    // A canvas is a tab like any other target; NotesModule loads it.
+    s.openTab({ kind: "canvas", path: entry.path });
     return;
   }
   void s.openNote(entry.path);

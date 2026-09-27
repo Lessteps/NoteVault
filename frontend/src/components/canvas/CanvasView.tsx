@@ -229,7 +229,7 @@ export function CanvasView() {
 
   const openFile = useCallback((file: string) => {
     const s = useApp.getState();
-    if (/\.canvas$/i.test(file)) void useCanvas.getState().open(file);
+    if (/\.canvas$/i.test(file)) s.openTab({ kind: "canvas", path: file });
     else if (/\.(md|py|js|ts|txt)$/i.test(file) || !file.includes(".")) void s.openNote(file);
     else void api.revealInOs(file).catch((e: Error) => s.toast("error", e.message));
   }, []);

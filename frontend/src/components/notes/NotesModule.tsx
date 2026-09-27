@@ -20,8 +20,22 @@ export function NotesModule() {
   const inspectorOpen = useApp((s) => s.inspectorOpen);
   const assistantOpen = useAssistant((s) => s.open);
   const canvasPath = useCanvas((s) => s.path);
+  const openCanvas = useCanvas((s) => s.open);
+  const closeCanvas = useCanvas((s) => s.close);
+  // The view follows the active tab: a canvas tab loads its board, and moving to
+  // any other tab leaves the canvas.
+  const activeCanvas = useApp((s) => {
+    const t = s.openTabs.find((x) => x.tabId === s.activeTabId);
+    return t?.kind === "canvas" ? t.path : null;
+  });
   const [width, setWidth] = useState(() => Number(localStorage.getItem(WIDTH_KEY)) || 290);
   const drag = useRef<{ x: number; w: number } | null>(null);
+
+  useEffect(() => {
+    if (activeCanvas === canvasPath) return;
+    if (activeCanvas) void openCanvas(activeCanvas);
+    else if (canvasPath) void closeCanvas();
+  }, [activeCanvas, canvasPath, openCanvas, closeCanvas]);
 
   useEffect(() => {
     const move = (e: MouseEvent) => {

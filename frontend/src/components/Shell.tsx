@@ -39,18 +39,6 @@ export function TopBar() {
         </span>
       </button>
 
-      <button
-        type="button"
-        title="Navegador Web"
-        onClick={() => {
-          useApp.getState().setModule("web");
-        }}
-        className="flex h-7 items-center gap-1.5 rounded-lg border border-line bg-panel px-2 text-[12px] text-dim transition-colors hover:border-line-strong hover:text-text"
-      >
-        <Globe size={13} className="text-accent-text" />
-        <span className="hidden sm:inline">Navegador</span>
-      </button>
-
       <SyncState />
     </header>
   );

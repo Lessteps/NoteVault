@@ -3,14 +3,14 @@
 // same handler and the same save() call the panel used.
 
 import {
-  Bell, Calendar, CalendarCheck, CalendarDays, CircleDot, Clock, FileText, Flag, Folder,
-  GitBranch, Maximize2, Minimize2, Paperclip, Repeat, Tag, Tags, Timer, Trash2, X,
+  Bell, Calendar, CalendarCheck, CalendarDays, ChevronLeft, CircleDot, Clock, FileText, Flag, Folder,
+  GitBranch, Maximize2, Minimize2, Paperclip, Plus, Repeat, Tag, Tags, Timer, Trash2, X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { Issue } from "../../lib/types";
 import { useApp } from "../../store/app";
-import { issueById, useProjects } from "../../store/projects";
+import { descendants, issueById, useProjects } from "../../store/projects";
 import { Attachments } from "../common/Attachments";
 import { GhostButton, PrimaryButton, PRIORITY_COLOURS, PRIORITY_GLYPHS, PRIORITY_NAMES } from "../common/forms";
 import { LinkedNotes } from "../common/LinkedNotes";
@@ -55,6 +55,9 @@ export function IssuePeek() {
   const issue = issueId ? issueById(detail, issueId) : undefined;
   const [f, setF] = useState<Partial<Issue>>({});
   const [child, setChild] = useState("");
+  const [sub, setSub] = useState("");
+  /** Which subtask the inline "add a subtask" field sits under (null: only the one at the end). */
+  const [addingFor, setAddingFor] = useState<string | null>(null);
   const [hint, setHint] = useState("");
   const [rubric, setRubric] = useState<RubricResult | null>(null);
   const [rubricOpen, setRubricOpen] = useState(false);
@@ -67,6 +70,8 @@ export function IssuePeek() {
     setF({ ...issue });
     setHint("");
     setChild("");
+    setSub("");
+    setAddingFor(null);
     setExpanded(false);
     // Only when another issue is opened: a reload (an attachment added, a child
     // ticked) must not wipe fields being edited here.
@@ -146,7 +151,50 @@ export function IssuePeek() {
     }
   };
 
-  const kids = issue.children.map((id) => issueById(detail, id)).filter((x): x is Issue => Boolean(x));
+  const parent = issue.parent ? issueById(detail, issue.parent) : undefined;
+
+  /** The whole subtree of this issue, flattened with its depth (same data as the list view). */
+  const tree: Array<{ k: Issue; depth: number }> = [];
+  {
+    const seen = new Set<string>();
+    const walk = (ids: string[], depth: number) => {
+      for (const id of ids) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const it = issueById(detail, id);
+        if (!it) continue;
+        tree.push({ k: it, depth });
+        walk(it.children, depth + 1);
+      }
+    };
+    walk(issue.children, 0);
+  }
+
+  /** Deleting a subtask can take a whole branch: ask first, as deleting the issue does. */
+  const removeKid = async (k: Issue) => {
+    const n = descendants(detail, k.id).size;
+    if (!(await confirmAction("Eliminar subtarea", `¿Eliminar ${k.key} «${k.title}»${n ? ` y sus ${n} subtareas` : ""}? Se mueve a la papelera de la vault.`, "Eliminar", true))) return;
+    try {
+      await api.issueDelete(p.id, k.id);
+      await reload();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
+
+  /** A subtask of a subtask: the same call the field at the end makes, with another parent. */
+  const addUnder = async (parentId: string) => {
+    const t = sub.trim();
+    if (!t) return;
+    try {
+      await api.issueCreate(p.id, { title: t, parent: parentId, type: "Subtarea" });
+      setSub("");
+      setAddingFor(null);
+      await reload();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
 
   const typeOptions: PeekOption[] = (meta?.types ?? []).map((t) => ({ value: t, label: `${meta?.type_icons[t] ?? ""} ${t}`.trim() }));
   const statusOptions: PeekOption[] = p.columns.map((c) => ({
@@ -161,6 +209,12 @@ export function IssuePeek() {
   }));
   const parentMenuOptions: PeekOption[] = [{ value: "", label: "Sin padre" },
     ...parentOptions(detail, issue.id).map((o) => ({ value: o.id, label: `${o.icon} ${o.key} ${o.title}` }))];
+  // That picker hides Subtarea parents (the API allows nesting subtasks): show the
+  // real one, so the row never claims "Sin padre" while the issue does have one.
+  if (f.parent && !parentMenuOptions.some((o) => o.value === f.parent)) {
+    const cur = issueById(detail, f.parent);
+    if (cur) parentMenuOptions.splice(1, 0, { value: cur.id, label: `${cur.icon} ${cur.key} ${cur.title}` });
+  }
 
   return (
     <div
@@ -184,6 +238,12 @@ export function IssuePeek() {
           <IconButton title={expanded ? "Contraer" : "Expandir"} onClick={() => setExpanded((v) => !v)}>
             {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
           </IconButton>
+          {parent && (
+            <button type="button" title={`Volver a ${parent.key} — ${parent.title}`} onClick={() => openIssue(parent.id)}
+              className="flex flex-none items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] text-dim hover:bg-hover hover:text-text">
+              <ChevronLeft size={13} /> {parent.key}
+            </button>
+          )}
           <span className="font-mono text-[12px] font-semibold text-faint">{issue.icon} {issue.key}</span>
           <span className="truncate text-[10.5px] text-faint">
             {issue.updated ? `· Modificado ${issue.updated.replace("T", " ")}` : issue.created ? `· Creado ${issue.created}` : ""}
@@ -279,39 +339,55 @@ export function IssuePeek() {
 
             <hr className="my-6 border-line" />
 
-            <Section label={`Subtareas${kids.length ? ` · ${kids.filter((k) => k.done).length}/${kids.length}` : ""}`}>
+            <Section label={`Subtareas${tree.length ? ` · ${tree.filter(({ k }) => k.done).length}/${tree.length}` : ""}`}>
               <ul className="space-y-0.5">
-                {kids.map((k) => (
-                  <li key={k.id} className="group flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-white/[0.04]">
-                    <Tick checked={k.done} ariaLabel={`Hecha: ${k.title}`}
-                      onChange={(done) => void moveIssue(k.id, done ? p.done_column : p.columns[0]!, 10 ** 6)} />
-                    <button type="button" onClick={() => openIssue(k.id)}
-                      className={cn("min-w-0 flex-1 truncate text-left text-[13px]", k.done ? "text-faint line-through" : "text-text")}>
-                      <span className="mr-1.5 font-mono text-[11px] text-faint">{k.key}</span>{k.title}
-                    </button>
-                    <PeekMenu ariaLabel={`Estado de ${k.key}`} chip menuWidth={200} value={k.status}
-                      options={p.columns.map((c) => ({
-                        value: c,
-                        label: `${c === p.done_column ? "✓ " : ""}${c}`,
-                        colour: meta?.status_colours[c],
-                      }))}
-                      onChange={(status) => void moveIssue(k.id, status, 10 ** 6)} />
-                    <IconButton title="Eliminar subtarea" className="opacity-0 group-hover:opacity-100"
-                      onClick={async () => {
-                        try {
-                          await api.issueDelete(p.id, k.id);
-                          await reload();
-                        } catch (e) {
-                          toast("error", (e as Error).message);
-                        }
-                      }}><Trash2 size={12} /></IconButton>
+                {tree.map(({ k, depth }) => (
+                  <li key={k.id}>
+                    <div className="group flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-white/[0.04]">
+                      <span className="flex-none" style={{ width: depth * 18 }} />
+                      <Tick checked={k.done} ariaLabel={`Hecha: ${k.title}`}
+                        onChange={(done) => void moveIssue(k.id, done ? p.done_column : p.columns[0]!, 10 ** 6)} />
+                      <button type="button" title={`Abrir ${k.key}`} onClick={() => openIssue(k.id)}
+                        className={cn("min-w-0 flex-1 truncate text-left text-[13px] hover:underline", k.done ? "text-faint line-through" : "text-text")}>
+                        <span className="mr-1.5 font-mono text-[11px] text-faint">{k.key}</span>{k.title}
+                      </button>
+                      <PeekMenu ariaLabel={`Estado de ${k.key}`} chip menuWidth={200} value={k.status}
+                        options={p.columns.map((c) => ({
+                          value: c,
+                          label: `${c === p.done_column ? "✓ " : ""}${c}`,
+                          colour: meta?.status_colours[c],
+                        }))}
+                        onChange={(status) => void moveIssue(k.id, status, 10 ** 6)} />
+                      <IconButton title={`Añadir subtarea a ${k.key}`} className="opacity-0 group-hover:opacity-100"
+                        onClick={() => { setSub(""); setAddingFor(addingFor === k.id ? null : k.id); }}><Plus size={12} /></IconButton>
+                      <IconButton title="Eliminar subtarea" className="opacity-0 group-hover:opacity-100 hover:text-danger"
+                        onClick={() => void removeKid(k)}><Trash2 size={12} /></IconButton>
+                    </div>
+                    {addingFor === k.id && (
+                      <div className="flex items-center gap-1.5 rounded-md px-1 py-0.5 text-[13px] focus-within:bg-white/[0.04]"
+                        style={{ paddingLeft: 4 + (depth + 1) * 18 }}>
+                        <span className="text-faint">↳</span>
+                        <input autoFocus className="min-w-0 flex-1 bg-transparent py-0.5 outline-none placeholder:text-faint" style={{ color: PEEK_TEXT }}
+                          value={sub} placeholder={`Añadir subtarea a ${k.key}…`} aria-label={`Añadir subtarea a ${k.key}`}
+                          onChange={(e) => setSub(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void addUnder(k.id);
+                            if (e.key === "Escape") {
+                              // Esc cancels this field, it must not close the whole peek.
+                              e.nativeEvent.stopImmediatePropagation();
+                              setAddingFor(null);
+                            }
+                          }}
+                          onBlur={() => { if (!sub.trim()) setAddingFor(null); }} />
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
               <div className="mt-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 text-[13px] focus-within:bg-white/[0.04] hover:bg-white/[0.04]">
                 <span className="text-faint">+</span>
                 <input className="min-w-0 flex-1 bg-transparent py-0.5 outline-none placeholder:text-faint" style={{ color: PEEK_TEXT }}
-                  value={child} placeholder="Añadir subtarea…" aria-label="Añadir subtarea"
+                  value={child} placeholder={`Añadir subtarea a ${issue.key}…`} aria-label="Añadir subtarea"
                   onChange={(e) => setChild(e.target.value)}
                   onKeyDown={async (e) => {
                     if (e.key !== "Enter" || !child.trim()) return;

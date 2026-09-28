@@ -96,17 +96,20 @@ async function trashEntry(entry: TreeEntry) {
 
 /**
  * Notion-style folder click: the folder's *name* opens its view file (the topic's
- * practice view, or the area's overview — created on the spot when missing) and
- * the chevron expands/collapses its children. Plain folders have no view, so
- * they keep behaving as a plain toggle.
+ * practice view, or the area's overview — created on the spot when missing) **and**
+ * expands the folder so its own files render too; the chevron only expands and
+ * collapses. Plain folders have no view, so they keep behaving as a plain toggle.
  */
-async function openFolderView(entry: TreeEntry, toggle: (path: string) => void) {
+export async function openFolderView(entry: TreeEntry, toggle: (path: string) => void, isOpen = false) {
   const s = useApp.getState();
   try {
     const view = await api.studyViewEnsure(entry.path);
     if (view.ok && view.path) {
       if (view.created.length) s.toast("info", `Vista creada: ${view.path.split("/").pop()}`);
       s.refreshTree();
+      // Expanding is not optional: the children have to render too, and a folder
+      // that is already open must not be collapsed by the click.
+      if (!isOpen) toggle(entry.path);
       await s.openNote(view.path);
       s.setMode("read");
       return;
@@ -347,7 +350,7 @@ export function FileTree({ filter }: { filter: string }) {
                   draggable
                   onDragStart={(e) => onDragStart(e, entry.path)}
                   {...(isFolder ? dropProps(entry.path) : {})}
-                  onClick={() => (isFolder ? void openFolderView(entry, toggle) : openEntry(entry))}
+                  onClick={() => (isFolder ? void openFolderView(entry, toggle, open) : openEntry(entry))}
                   onAuxClick={(e) => e.button === 1 && !isFolder && openEntry(entry)}
                   onContextMenu={menuFor(entry)}
                   className={cn(

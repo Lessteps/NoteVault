@@ -124,6 +124,7 @@ describe("WebRail", () => {
     expect(useWebPages.getState().open).toBe(false);
 
     // Hidden means gone from the DOM, not a broken half-panel.
+    // Hidden is not gone: a slim handle on the edge brings the pages back.
     act(() => {
       document.body.removeChild(container);
       const next = document.createElement("div");
@@ -131,6 +132,15 @@ describe("WebRail", () => {
       createRoot(next).render(<WebRail />);
       container = next;
     });
-    expect(container.innerHTML).toBe("");
+    const handle = container.querySelector<HTMLButtonElement>('button[aria-label="Mostrar las páginas del navegador"]')!;
+    expect(handle).toBeTruthy();
+    expect(handle.textContent).toContain("1");
+    // …and never as a wide panel.
+    expect(container.querySelector('aside[aria-label="Páginas del navegador"]')).toBeNull();
+
+    act(() => {
+      handle.click();
+    });
+    expect(useWebPages.getState().open).toBe(true);
   });
 });

@@ -51,7 +51,23 @@ export function WebRail() {
   const { add, close, activate, setOpen, setCompact } = useWebPages.getState();
   const active = activeWebPage({ pages, activeId });
 
-  if (!open) return null;
+  // Hidden: a slim handle stays on the edge so the pages are never lost.
+  if (!open) {
+    return (
+      <button
+        type="button"
+        title={pages.length ? `Mostrar las páginas del navegador (${pages.length})` : "Mostrar las páginas del navegador"}
+        aria-label="Mostrar las páginas del navegador"
+        onClick={() => setOpen(true)}
+        className="flex w-5 flex-none flex-col items-center gap-2 border-l border-line bg-panel py-2 text-faint transition-colors hover:bg-hover hover:text-text"
+      >
+        <Globe size={13} />
+        {pages.length > 0 && (
+          <span className="rounded-full bg-accent px-1 font-mono text-[9px] font-bold text-white">{pages.length}</span>
+        )}
+      </button>
+    );
+  }
 
   const newPage = async () => {
     const url = await askText("Nueva página del navegador", "https://", "Abrir");

@@ -8,7 +8,6 @@ import {
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
 import { api, isElectron } from "../lib/bridge";
-import { useWebPages } from "../store/webPages";
 import { useApp, type AppTab, type ExplorerTab, type ModuleId } from "../store/app";
 import { cn, openMenu } from "./ui";
 import { useVaultDialog } from "./VaultDialog";
@@ -218,7 +217,6 @@ export function TopBar() {
 
       {/* Sync state + window controls on the right */}
       <div className="flex flex-none items-center gap-3 border-l border-line px-3">
-        <BrowserRailButton />
         <SyncState />
       </div>
       <WindowControls />
@@ -345,35 +343,6 @@ function WindowControls() {
         <X size={15} />
       </button>
     </div>
-  );
-}
-
-// ── Browser rail toggle ─────────────────────────────────────────────────────
-
-/** The browser pages live in the right-hand rail; this brings it back. */
-function BrowserRailButton() {
-  const pages = useWebPages((s) => s.pages.length);
-  const open = useWebPages((s) => s.open);
-  const setOpen = useWebPages((s) => s.setOpen);
-  return (
-    <button
-      type="button"
-      title={open ? "Ocultar las páginas del navegador" : "Mostrar las páginas del navegador"}
-      aria-label="Páginas del navegador"
-      aria-pressed={open}
-      onClick={() => setOpen(!open)}
-      className={cn(
-        "relative flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors",
-        open ? "text-text" : "text-faint hover:bg-hover hover:text-text",
-      )}
-    >
-      <Globe size={14} />
-      {pages > 0 && (
-        <span className="rounded-full bg-accent-soft px-1.5 font-mono text-[10px] font-semibold text-accent-text">
-          {pages}
-        </span>
-      )}
-    </button>
   );
 }
 

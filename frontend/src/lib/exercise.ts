@@ -70,19 +70,19 @@ export function trained(day: LoggedDay | undefined): boolean {
 }
 
 /**
- * Completion of a period: everything done over everything that was due, counting
- * only dates up to `today` (a future day is not a failure).
+ * Completion of a period: the mean of the daily percentages of the days that had
+ * a routine, up to `today` (a future day is not a failure, a rest day is not a
+ * day at all).
+ *
+ * Hábitos uses this same denominator — every day weighs the same — so a day with
+ * one exercise cannot outvote a day with ten.
  */
 export function periodPct(days: LoggedDay[], today: string): number {
-  let done = 0;
-  let total = 0;
-  for (const day of days) {
-    if (day.date > today) continue;
-    const c = dayCounts(day);
-    done += c.done;
-    total += c.total;
-  }
-  return total ? done / total : 0;
+  const vals = days
+    .filter((day) => day.date <= today && day.exercises.length > 0)
+    .map((day) => dayPct(day));
+  if (!vals.length) return 0;
+  return vals.reduce((a, v) => a + v, 0) / vals.length;
 }
 
 /** Days trained inside a period, which is what the statistics panel counts. */

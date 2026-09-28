@@ -241,7 +241,7 @@ export function exerciseApi(app: AppState) {
           month += 1;
         }
       }
-      const yearPcts = m.rangePctByDay(today.getFullYear());
+      const yearPcts = m.rangePctByDay(y);
       let yearTrained = 0;
       for (const p of Object.values(yearPcts)) {
         if (p > 0) yearTrained += 1;
@@ -269,7 +269,7 @@ export function exerciseApi(app: AppState) {
           total: number;
         }> = [];
         for (const e of m.exercisesForDay(key)) {
-          const hist = m.exerciseHistory(e.id, today.getFullYear());
+          const hist = m.exerciseHistory(e.id, y);
           let done = 0;
           for (const v of Object.values(hist)) {
             if (v) done += 1;
@@ -315,12 +315,13 @@ export function exerciseApi(app: AppState) {
         return ids.filter((id) => log.isDone(id)).length;
       };
 
-      /** Everything done over everything due, up to today. */
+      /** Everything done over everything due, up to today, plus the day counts. */
       const tally = (from: Date, to: Date) => {
         let done = 0;
         let total = 0;
         let trained = 0;
         let due = 0;
+        const pcts: number[] = [];
         for (let d = new Date(from); d <= to && d <= midnight; d = addDays(d, 1)) {
           const ids = dueIds(d);
           if (!ids.length) continue;
@@ -328,9 +329,13 @@ export function exerciseApi(app: AppState) {
           const dDone = doneOn(d);
           done += dDone;
           total += ids.length;
+          pcts.push(dDone / ids.length);
           if (dDone > 0) trained += 1;
         }
-        return { done, total, pct: total ? done / total : 0, trained, due };
+        // The mean of the daily percentages, as in Hábitos: every day weighs the
+        // same, so a day with one exercise cannot outvote a day with ten.
+        const pct = pcts.length ? pcts.reduce((a, v) => a + v, 0) / pcts.length : 0;
+        return { done, total, pct, trained, due };
       };
 
       const monday = addDays(midnight, -weekday(midnight));

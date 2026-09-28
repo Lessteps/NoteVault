@@ -172,4 +172,23 @@ describe("exerciseApi", () => {
     expect(stats.anual.total).toBeGreaterThanOrEqual(stats.today.total);
     expect(stats.anual.pct).toBeGreaterThan(0);
   });
+
+  it("ex_overview counts the year it was asked for, not always this one", () => {
+    const year = new Date().getFullYear();
+    const past = year - 1;
+    // A Monday of the previous year, which the seeded routine covers.
+    const monday = `${past}-01-05`;
+    const day = api.ex_days(monday, monday)[0]!;
+    const exs = day.exercises as Array<{ id: string }>;
+    expect(exs.length).toBeGreaterThan(0);
+    api.ex_mark(monday, exs[0]!.id, true, 0, 0, "");
+
+    const old = api.ex_overview(past);
+    const hits = old.breakdown.flatMap((b) => b.rows).filter((r) => r.done > 0);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(old.grid[monday]).toBeGreaterThan(0);
+
+    const current = api.ex_overview(year);
+    expect(current.breakdown.flatMap((b) => b.rows).every((r) => r.done === 0)).toBe(true);
+  });
 });

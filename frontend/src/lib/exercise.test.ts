@@ -59,9 +59,15 @@ describe("periods", () => {
     rest("2026-10-01"),
   ];
 
-  it("adds up everything due inside the period", () => {
-    // 5 done of 8 due.
-    expect(periodPct(week, "2026-09-30")).toBeCloseTo(5 / 8);
+  it("averages the days of the period, as Hábitos does", () => {
+    // 100%, 50% and 0% on three days with a routine: 50%.
+    expect(periodPct(week, "2026-09-30")).toBeCloseTo(0.5);
+  });
+
+  it("does not let a long day outvote a short one", () => {
+    const heavy = [day("2026-09-28", 10, 0), day("2026-09-29", 1, 1)];
+    // The short day counts as much as the long one: 0% and 100% → 50%.
+    expect(periodPct(heavy, "2026-09-29")).toBeCloseTo(0.5);
   });
 
   it("ignores the days still to come", () => {

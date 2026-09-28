@@ -42,6 +42,8 @@ export interface TopicCellProgress {
 export interface TopicSkillProgress {
   skill: string;
   label: string;
+  /** obligatory short Spanish description of what the skill trains */
+  description: string;
   status: "not_started" | "practicing" | "consolidated";
   totalAttempts: number;
   totalPasses: number;
@@ -370,6 +372,7 @@ export function computeTopicProgress(
 ): TopicProgress {
   const subjectSkills = skillsForSubject(topic.subject);
   const skillLabelMap = new Map(subjectSkills.map((s) => [s.id, s.label]));
+  const skillDescriptionMap = new Map(subjectSkills.map((s) => [s.id, s.description]));
 
   const skillsProgress: Record<string, TopicSkillProgress> = {};
 
@@ -436,6 +439,7 @@ export function computeTopicProgress(
     skillsProgress[skillId] = {
       skill: skillId,
       label: skillLabelMap.get(skillId) ?? skillId,
+      description: skillDescriptionMap.get(skillId) ?? "",
       status,
       totalAttempts,
       totalPasses,

@@ -210,7 +210,7 @@ export function TopicConfiguratorDialog({
                     )}
                   >
                     <span className="text-[13px] font-semibold">{s.label}</span>
-                    <span className="mt-0.5 text-[10.5px] text-faint line-clamp-1">{s.act}</span>
+                    <span className="mt-0.5 text-[10.5px] leading-snug text-faint line-clamp-2">{s.description}</span>
                     {prog && (
                       <span className="mt-1 text-[10px] font-mono text-dim">
                         {prog.status === "consolidated"

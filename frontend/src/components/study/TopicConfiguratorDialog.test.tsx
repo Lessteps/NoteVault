@@ -9,6 +9,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import { MATHEMATICS_SKILLS } from "../../lib/skills";
 import { TopicConfiguratorDialog } from "./TopicConfiguratorDialog";
 import type { TopicData } from "../../lib/types";
 
@@ -81,5 +82,12 @@ describe("TopicConfiguratorDialog", () => {
     act(() => counterexample.click());
 
     expect(container.textContent).toContain("Contraejemplo · Nivel 1");
+  });
+
+  it("shows a Spanish description on every skill of the picker", () => {
+    const text = container.textContent ?? "";
+    for (const skill of MATHEMATICS_SKILLS) {
+      expect(text, `“${skill.label}” has no description`).toContain(skill.description);
+    }
   });
 });

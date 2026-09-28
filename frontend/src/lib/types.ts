@@ -833,6 +833,7 @@ export interface TopicCellProgress {
 export interface TopicSkillProgress {
   skill: string;
   label: string;
+  description: string;
   status: "not_started" | "practicing" | "consolidated";
   totalAttempts: number;
   totalPasses: number;

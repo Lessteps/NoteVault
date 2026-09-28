@@ -139,9 +139,13 @@ export function TopicGeneralView({
                     key={sp.skill}
                     className="border-b border-line/60 last:border-none hover:bg-hover/50"
                   >
-                    <td className="py-2 pl-3 pr-2 font-medium text-text">
-                      <div className="truncate max-w-[120px]" title={sp.label}>
+                    <td className="py-2 pl-3 pr-2">
+                      <div className="truncate font-medium text-text" title={sp.label}>
                         {sp.label}
+                      </div>
+                      {/* Obligatory: a skill row without its description is a bug. */}
+                      <div className="mt-0.5 line-clamp-2 max-w-[220px] text-[10.5px] leading-snug text-faint">
+                        {sp.description}
                       </div>
                     </td>
                     {([1, 2, 3] as const).map((d) => {

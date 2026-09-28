@@ -102,7 +102,7 @@ function createSkill(
     label: opts?.labelOverride ?? mode.label,
     act: mode.act,
     subject,
-    description: opts?.description ?? mode.judge_focus,
+    description: opts?.description ?? mode.description,
     allowedDifficulties: difficulties,
     allowedAssistance: assistance,
     defaultDifficulty: opts?.defaultDifficulty ?? (beginnerOk ? 1 : 2),
@@ -116,35 +116,35 @@ function createSkill(
 
 export const MATHEMATICS_SKILLS: readonly SkillDefinition[] = [
   createSkill(MATH, "solve", {
-    description: "Resolver problemas y justificar el procedimiento matemático paso a paso.",
+    description: "Resolución de problemas contextualizados y aplicados.",
   }),
   createSkill(MATH, "process", {
     labelOverride: "Procedimiento guiado",
-    description: "Desarrollo paso a paso aplicando la técnica o método de estudio adecuado; se califica el proceso.",
+    description: "Scaffolding paso a paso para consolidar la base.",
     assistanceProtocol: "Pistas que señalan el siguiente paso o la técnica requerida, jamás el resultado directo.",
   }),
   createSkill(MATH, "prove", {
-    description: "Demostración rigurosa con justificación completa de hipótesis, pasos intermedios y conclusión.",
+    description: "Rigor matemático, proporciones formales y álgebra.",
   }),
   createSkill(MATH, "counterexample", {
-    description: "Refutar afirmaciones generales mediante la construcción y verificación de contraejemplos concretos.",
+    description: "Identificación de casos límite y refutación de hipótesis.",
   }),
   createSkill(MATH, "true_false", {
-    description: "Determinar veracidad o falsedad argumentada con demostración o contraejemplo verificado.",
+    description: "Discernimiento rápido de postulados y propiedades.",
   }),
   createSkill(MATH, "find_error", {
     labelOverride: "Encontrar el error",
     allowedDifficulties: NO_BEGINNER_DIFFICULTIES, // Beginner not allowed
-    description: "Localizar, explicar la causa raíz y corregir errores en razonamientos matemáticos.",
+    description: "Detección analítica de falacias y pasos fallidos.",
   }),
   createSkill(MATH, "drill", {
     labelOverride: "Cálculo rápido",
     allowedAssistance: ["no_help"], // Speed calculation without hints
-    description: "Cálculo mental y aritmético rápido bajo límite estricto de tiempo.",
+    description: "Agilidad aritmética, simplificación y estimación de porcentajes.",
   }),
   createSkill(MATH, "explain", {
     labelOverride: "Explicar (Feynman)",
-    description: "Explicar con palabras llanas y ejemplos claros, como enseñando a un principiante.",
+    description: "Explicar conceptos complejos con tus propias palabras.",
   }),
 ];
 

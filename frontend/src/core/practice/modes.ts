@@ -11,6 +11,8 @@ export const GEN = "general";
 export interface PracticeMode {
   readonly id: string;
   readonly label: string;
+  /** short Spanish description shown wherever the skill is listed (obligatory) */
+  readonly description: string;
   readonly act: string;
   readonly answer_kind: string;
   readonly timer: string;
@@ -24,6 +26,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "prove",
     label: "Demostración",
+    description: "Rigor matemático, proporciones formales y álgebra.",
     act: "Write a complete proof of the statement.",
     answer_kind: "text",
     timer: "pomodoro",
@@ -36,6 +39,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "solve",
     label: "Problema",
+    description: "Resolución de problemas contextualizados y aplicados.",
     act: "Solve the problem and justify the procedure.",
     answer_kind: "text",
     timer: "pomodoro",
@@ -47,6 +51,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "process",
     label: "Procedimiento guiado",
+    description: "Scaffolding paso a paso para consolidar la base.",
     act: "Work the problem step by step using the named study technique, showing every intermediate step.",
     answer_kind: "text",
     timer: "pomodoro",
@@ -61,6 +66,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "counterexample",
     label: "Contraejemplo",
+    description: "Identificación de casos límite y refutación de hipótesis.",
     act: "Refute a general claim with a concrete counterexample.",
     answer_kind: "text",
     timer: "15m",
@@ -72,6 +78,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "true_false",
     label: "Verdadero o falso",
+    description: "Discernimiento rápido de postulados y propiedades.",
     act: "Decide whether the statement is true or false and justify the verdict.",
     answer_kind: "text",
     timer: "10m",
@@ -83,6 +90,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "find_error",
     label: "Encontrar el error",
+    description: "Detección analítica de falacias y pasos fallidos.",
     act: "Locate the error in the given work, explain it and correct it.",
     answer_kind: "text",
     timer: "15m",
@@ -94,6 +102,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "explain",
     label: "Explicar (Feynman)",
+    description: "Explicar conceptos complejos con tus propias palabras.",
     act: "Explain the concept in plain words, as if teaching a beginner.",
     answer_kind: "text",
     timer: "10m",
@@ -105,6 +114,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "drill",
     label: "Cálculo rápido",
+    description: "Agilidad aritmética, simplificación y estimación de porcentajes.",
     act: "Answer a timed series of short calculations.",
     answer_kind: "drill",
     timer: "5m",
@@ -114,6 +124,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "implement",
     label: "Implementar",
+    description: "Escribir el código que resuelve el problema y justificar las decisiones.",
     act: "Write code that solves the stated task.",
     answer_kind: "code",
     timer: "pomodoro",
@@ -126,6 +137,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "debug",
     label: "Depurar",
+    description: "Localizar la causa raíz de un fallo y corregirlo con evidencia.",
     act: "Find and fix the bugs in the given code.",
     answer_kind: "code",
     timer: "pomodoro",
@@ -139,6 +151,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "refactor",
     label: "Refactorizar",
+    description: "Mejorar el diseño del código sin cambiar su comportamiento.",
     act: "Improve the given working code without changing its behaviour.",
     answer_kind: "code",
     timer: "pomodoro",
@@ -150,6 +163,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "design",
     label: "Diseño (esquema/arquitectura)",
+    description: "Elegir y justificar la estructura: esquema, módulos y contratos.",
     act: "Design a schema or architecture that satisfies the stated requirements.",
     answer_kind: "code",
     timer: "pomodoro",
@@ -161,6 +175,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "commands",
     label: "Secuencia de comandos",
+    description: "Componer la secuencia exacta de comandos que logra el objetivo.",
     act: "Write the sequence of commands that reaches the requested state.",
     answer_kind: "code",
     timer: "15m",
@@ -173,6 +188,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "translate",
     label: "Traducir",
+    description: "Traducir con precisión de significado, registro y matiz.",
     act: "Translate the text between Spanish and English.",
     answer_kind: "text",
     timer: "10m",
@@ -184,6 +200,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "rewrite",
     label: "Reescribir / corregir",
+    description: "Corregir y mejorar un texto conservando su intención.",
     act: "Rewrite the given text correcting its errors or using a target structure.",
     answer_kind: "text",
     timer: "10m",
@@ -195,6 +212,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "writing",
     label: "Redacción libre",
+    description: "Producir un texto propio claro, coherente y bien estructurado.",
     act: "Write an original text for the given task.",
     answer_kind: "text",
     timer: "pomodoro",
@@ -206,6 +224,7 @@ const _CATALOGUE: readonly PracticeMode[] = [
   {
     id: "cloze",
     label: "Completar huecos",
+    description: "Reconstruir los huecos a partir del contexto del texto.",
     act: "Fill in each blank of the text.",
     answer_kind: "short",
     timer: "5m",

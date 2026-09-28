@@ -17,6 +17,8 @@ export interface BrowserState {
   isLoading: boolean;
   /** The site's icon, inlined as a data URL so the renderer can show it (its CSP blocks remote images). */
   favicon: string;
+  /** Whether the native view is currently attached to the window. */
+  attached: boolean;
 }
 
 export class BrowserManager {
@@ -170,6 +172,7 @@ export class BrowserManager {
       canGoForward: wc?.canGoForward() ?? false,
       isLoading: this.isLoading,
       favicon: this.currentFavicon,
+      attached: this.attached,
     };
   }
 

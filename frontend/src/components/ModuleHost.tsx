@@ -6,9 +6,20 @@
 // view is visible (a module is mounted the first time it is activated), so
 // nothing measures its layout while it has no size.
 
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { cn } from "./ui";
 import type { ModuleId } from "../store/app";
+
+/**
+ * Whether the functionality that owns the tree is the one on screen. A module
+ * that paints outside the DOM (the browser's native view) needs to know: hiding
+ * its container with CSS does not hide what the main process draws.
+ */
+export const ModuleVisible = createContext(true);
+
+export function useModuleVisible(): boolean {
+  return useContext(ModuleVisible);
+}
 
 export function ModuleHost({
   module,
@@ -37,7 +48,7 @@ export function ModuleHost({
             aria-hidden={!isActive}
             inert={!isActive}
           >
-            {render(id)}
+            <ModuleVisible.Provider value={isActive}>{render(id)}</ModuleVisible.Provider>
           </div>
         );
       })}

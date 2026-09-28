@@ -40,6 +40,8 @@ export interface BrowserState {
   isLoading: boolean;
   /** site icon as a data URL, empty when unknown */
   favicon?: string;
+  /** whether the native view is attached to the window */
+  attached?: boolean;
 }
 
 type Transport = { kind: "pywebview" } | { kind: "http"; token: string } | { kind: "electron" };

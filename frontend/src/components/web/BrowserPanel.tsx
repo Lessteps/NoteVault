@@ -5,6 +5,7 @@ import { newId } from "../../lib/canvas";
 import { useApp } from "../../store/app";
 import { useCanvas } from "../../store/canvas";
 import { IconButton } from "../ui";
+import { useModuleVisible } from "../ModuleHost";
 
 export function BrowserPanel({
   url,
@@ -29,6 +30,7 @@ export function BrowserPanel({
   });
 
   const [inputUrl, setInputUrl] = useState(initialUrl || "");
+  const visible = useModuleVisible();
   const [isBookmarked, setIsBookmarked] = useState(false);
 
   // Sync input text when the active page navigates
@@ -75,8 +77,28 @@ export function BrowserPanel({
       } else {
         void api.browserSetBounds(bounds);
       }
+    } else if (attached.current) {
+      // The pane has no room: the functionality was switched away and this view
+      // is hidden. A native view lives *outside* the DOM, so `hidden` does not
+      // hide it — it has to be detached here and re-attached when it comes back
+      // (the observer reports the new size then).
+      attached.current = false;
+      void api.browserDetach().catch(() => undefined);
     }
   }, [initialUrl]);
+
+  // Another functionality took the screen: the native view has to go away with
+  // it, and come back attached to the same page.
+  useEffect(() => {
+    if (visible) {
+      updateBounds();
+      return;
+    }
+    if (attached.current) {
+      attached.current = false;
+      void api.browserDetach().catch(() => undefined);
+    }
+  }, [visible, updateBounds]);
 
   useEffect(() => {
     updateBounds();

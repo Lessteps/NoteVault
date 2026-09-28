@@ -748,6 +748,129 @@ html[data-perf="lite"] .nv-practice-view {
 
 
 /* ─────────────────────────────────────────────────────────────────────────
+   Chat panel (.nv-chat-prose). An agent answer is plain markdown on the panel
+   background — no bubble — so it reuses the note styles at panel size: the
+   note's 15px/centred/820px column would read as an article, not a chat.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.nv-chat-prose {
+  user-select: text;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--nv-text);
+  overflow-wrap: anywhere;
+}
+
+.nv-chat-prose > * {
+  content-visibility: visible;
+  contain-intrinsic-size: auto;
+}
+
+.nv-chat-prose > * + * {
+  margin-top: 0.6em;
+}
+
+.nv-chat-prose h1,
+.nv-chat-prose h2,
+.nv-chat-prose h3,
+.nv-chat-prose h4 {
+  font-size: 1.05em;
+  font-weight: 650;
+  margin-top: 0.9em;
+}
+
+/* The margin "##" markers need room the panel does not have. */
+.nv-chat-prose h2::before,
+.nv-chat-prose h3::before,
+.nv-chat-prose h4::before {
+  content: none;
+}
+
+.nv-chat-prose ul,
+.nv-chat-prose ol {
+  padding-left: 1.35em;
+  list-style: disc;
+}
+.nv-chat-prose ol {
+  list-style: decimal;
+}
+.nv-chat-prose li + li {
+  margin-top: 0.2em;
+}
+.nv-chat-prose li::marker {
+  color: var(--nv-faint);
+}
+
+.nv-chat-prose .code-block {
+  border-radius: 8px;
+}
+.nv-chat-prose .code-head {
+  padding: 5px 10px;
+  font-size: 10px;
+}
+.nv-chat-prose .code-dots {
+  display: none;
+}
+.nv-chat-prose pre {
+  padding: 10px 12px;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+.nv-chat-prose :not(pre) > code {
+  font-size: 0.9em;
+  padding: 0.05em 0.32em;
+}
+
+.nv-chat-prose table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+.nv-chat-prose th,
+.nv-chat-prose td {
+  border: 1px solid var(--nv-line);
+  padding: 4px 8px;
+  text-align: left;
+}
+.nv-chat-prose th {
+  background: var(--nv-elevated);
+  font-weight: 600;
+}
+.nv-chat-prose blockquote {
+  border-left: 2px solid var(--nv-line-strong);
+  padding-left: 0.8em;
+  color: var(--nv-dim);
+}
+.nv-chat-prose .callout {
+  padding: 0.6em 0.8em;
+  font-size: 0.96em;
+}
+
+/* The caret that marks an answer still streaming. */
+.nv-caret {
+  display: inline-block;
+  width: 7px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--nv-accent);
+  animation: nv-caret-blink 1s steps(2, start) infinite;
+}
+
+@keyframes nv-caret-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nv-caret {
+    animation: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    Title bar. The window has no OS frame, so the top bar *is* the title bar:
    its background drags the window and every control inside it opts out.
    ───────────────────────────────────────────────────────────────────────── */

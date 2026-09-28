@@ -152,6 +152,21 @@ function useTaskReminders() {
   }, []);
 }
 
+/**
+ * A second window is opened *at* one file (`?note=…`): open it, so the window
+ * has the same tabs, editor and canvases as any other, just started there.
+ */
+function useWindowNoteParam() {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const rel = new URLSearchParams(window.location.search).get("note");
+    if (!rel) return;
+    const s = useApp.getState();
+    if (/\.canvas$/i.test(rel)) s.openTab({ kind: "canvas", path: rel });
+    else void s.openNote(rel);
+  }, []);
+}
+
 function useFileWatcherListener() {
   useEffect(() => {
     return api.onWatchEvent((ev) => {
@@ -179,6 +194,7 @@ export function App() {
   useShortcuts();
   useTaskReminders();
   useFileWatcherListener();
+  useWindowNoteParam();
   useEffect(() => {
     void init();
   }, [init]);

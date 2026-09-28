@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from "electron";
 import { getRegistry } from "../src/api/registry";
 import { browserManager, type BrowserBounds } from "./browserManager";
+import { openSecondaryWindow } from "./windowFactory";
 
 /** The window the app is drawing its own title bar for. */
 function appWindow(): BrowserWindow | null {
@@ -23,6 +24,8 @@ export function registerIpc(): void {
       case "window_close":
         appWindow()?.close();
         return { ok: true };
+      case "window_open_new":
+        return openSecondaryWindow(String(args[0] ?? ""));
       case "window_state":
         return { maximized: appWindow()?.isMaximized() ?? false };
       case "browser_attach":

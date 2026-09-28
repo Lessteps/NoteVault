@@ -8,6 +8,7 @@ import fs from "node:fs";
 import { AppConfig } from "../src/api/appConfig";
 import { readGpuStatus } from "../src/api/gpuStatus";
 import { browserManager } from "./browserManager";
+import { getPreloadPath } from "./windowFactory";
 
 // Allow HTML5 video and audio autoplay in embedded views
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -59,12 +60,6 @@ export function restartFileWatcher(root?: string) {
     });
     fileWatcher.start();
   }
-}
-
-function getPreloadPath(): string {
-  const mjs = path.join(__dirname, "preload.mjs");
-  if (fs.existsSync(mjs)) return mjs;
-  return path.join(__dirname, "preload.js");
 }
 
 function createWindow() {

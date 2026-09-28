@@ -228,3 +228,51 @@ describe("unified tab strip", () => {
     expect(invoke).toHaveBeenCalledWith("browser_destroy", []);
   });
 });
+
+// Deleting a file must not throw you back to Vista General: the view you were
+// looking at (the map open next to the note, the note next to it) survives.
+describe("deleting an open file", () => {
+  it("keeps the map that was open next to the note", () => {
+    app().openTab({ kind: "module", id: "home" });
+    app().openTab({ kind: "module", id: "notas" });
+    app().openTab({ kind: "canvas", path: "mapa.canvas" });
+    app().openTab({ kind: "note", path: "nota.md" });
+    expect(app().activeTabId).toBe("note:nota.md");
+
+    app().pathDeleted("nota.md");
+
+    expect(app().activeTabId).toBe("canvas:mapa.canvas");
+    expect(app().module).toBe("notas");
+  });
+
+  it("falls back to the note next to it, not to the first tab of the strip", () => {
+    app().openTab({ kind: "module", id: "home" });
+    app().openTab({ kind: "note", path: "a.md" });
+    app().openTab({ kind: "note", path: "b.md" });
+
+    app().pathDeleted("b.md");
+
+    expect(app().activeTabId).toBe("note:a.md");
+  });
+
+  it("leaves the neighbouring functionality when a folder takes its notes away", () => {
+    app().openTab({ kind: "module", id: "home" });
+    app().openTab({ kind: "module", id: "ejercicio" });
+    app().openTab({ kind: "note", path: "carpeta/nota.md" });
+    app().openTab({ kind: "note", path: "otra.md" });
+
+    app().pathDeleted("carpeta");
+
+    expect(app().activeTabId).toBe("note:otra.md");
+  });
+
+  it("keeps the current tab when the deleted file was not on screen", () => {
+    app().openTab({ kind: "module", id: "home" });
+    app().openTab({ kind: "canvas", path: "mapa.canvas" });
+
+    app().pathDeleted("otra.md");
+
+    expect(app().activeTabId).toBe("canvas:mapa.canvas");
+    expect(app().module).toBe("notas");
+  });
+});

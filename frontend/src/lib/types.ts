@@ -660,6 +660,8 @@ export interface AiProvider {
   needs_url: boolean;
   default_url: string;
   default_model: string;
+  /** Curated models of this provider, offered by the model selector. */
+  default_models: string[];
   bridge: boolean;
 }
 

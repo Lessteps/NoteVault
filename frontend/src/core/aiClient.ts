@@ -1,8 +1,9 @@
 // Ported from notevault_app/core/ai_client.py
 //
 // Two families of providers:
-//   Conectados - the app talks to a model over HTTP (LM Studio / Ollama /
-//                OpenAI-compatible local server, or OpenAI / Anthropic proper).
+//   Conectados - the app talks to a model over HTTP (DeepSeek, LM Studio /
+//                Ollama / OpenAI-compatible local server, or OpenAI /
+//                Anthropic proper).
 //   Puente     - no API: the app builds the full prompt, copies it to the
 //                clipboard and opens Claude / ChatGPT / Antigravity.
 //
@@ -11,6 +12,7 @@
 
 // ── Provider catalogue ─────────────────────────────────────────────────────
 
+export const DEEPSEEK = "deepseek";
 export const LM_STUDIO = "lmstudio";
 export const OLLAMA = "ollama";
 export const OPENAI_COMPATIBLE = "openai_compatible";
@@ -36,6 +38,8 @@ export interface ProviderInfo {
   needs_url: boolean;
   default_url: string;
   default_model: string;
+  /** Offered in the model selector before (or instead of) asking the server. */
+  default_models: string[];
   bridge: boolean;
 }
 
@@ -53,11 +57,26 @@ function provider(
     needs_url: opts.needs_url ?? false,
     default_url: opts.default_url ?? "",
     default_model: opts.default_model ?? "",
+    default_models: opts.default_models ?? [],
     bridge: opts.bridge ?? false,
   };
 }
 
 export const PROVIDERS: ProviderInfo[] = [
+  provider(
+    DEEPSEEK,
+    "DeepSeek (API key)",
+    "API oficial de DeepSeek (compatible con OpenAI). Requiere una clave " +
+      "sk-... y funciona con cualquier modelo de la cuenta " +
+      "(GET /models los lista).",
+    {
+      needs_key: true,
+      needs_url: true,
+      default_url: "https://api.deepseek.com/v1",
+      default_model: "deepseek-flash",
+      default_models: ["deepseek-flash", "deepseek-v4-pro"],
+    },
+  ),
   provider(
     LM_STUDIO,
     "LM Studio (local)",
@@ -87,6 +106,7 @@ export const PROVIDERS: ProviderInfo[] = [
       needs_url: true,
       default_url: "https://api.openai.com/v1",
       default_model: "gpt-4o-mini",
+      default_models: ["gpt-4o-mini", "gpt-4o"],
     },
   ),
   provider(
@@ -98,6 +118,7 @@ export const PROVIDERS: ProviderInfo[] = [
       needs_url: true,
       default_url: "https://api.anthropic.com/v1",
       default_model: "claude-sonnet-4-6",
+      default_models: ["claude-sonnet-4-6", "claude-opus-4-6"],
     },
   ),
   provider(
@@ -154,9 +175,9 @@ export interface ChatMessage {
 }
 
 export class AIConfig {
-  provider: string = LM_STUDIO;
-  base_url: string = "http://localhost:1234/v1";
-  model: string = "local-model";
+  provider: string = DEEPSEEK;
+  base_url: string = "https://api.deepseek.com/v1";
+  model: string = "deepseek-flash";
   api_key: string = "";
   temperature: number = 0.7;
   max_tokens: number = 1500;
@@ -322,6 +343,142 @@ export async function listModels(cfg: AIConfig): Promise<string[]> {
   return out.sort();
 }
 
+// ── Streaming ──────────────────────────────────────────────────────────────
+
+export interface StreamHandlers {
+  /** An answer token: what the user reads. */
+  onDelta?: (text: string) => void;
+  /** A reasoning token (DeepSeek's `reasoning_content`), shown collapsed. */
+  onThinking?: (text: string) => void;
+  /** Cancels the request; the promise resolves with the text received so far. */
+  signal?: AbortSignal;
+}
+
+/** One SSE line -> the token it carries, or null when it carries none. */
+function tokenFromSse(line: string): { text?: string; thinking?: string } | null {
+  if (!line.startsWith("data:")) return null; // `event:`/`id:` lines and blanks
+  const payload = line.slice(5).trim();
+  if (!payload || payload === "[DONE]") return null;
+  let obj: {
+    choices?: { delta?: { content?: string | null; reasoning_content?: string | null } }[];
+    type?: string;
+    delta?: { text?: string; thinking?: string };
+  };
+  try {
+    obj = JSON.parse(payload);
+  } catch {
+    return null; // a partial/keep-alive frame; the next read finishes it
+  }
+  const delta = obj.choices?.[0]?.delta;
+  if (delta?.content) return { text: delta.content };
+  if (delta?.reasoning_content) return { thinking: delta.reasoning_content };
+  if (obj.type === "content_block_delta") {
+    if (obj.delta?.text) return { text: obj.delta.text };
+    if (obj.delta?.thinking) return { thinking: obj.delta.thinking };
+  }
+  return null;
+}
+
+/**
+ * Chat with token-by-token delivery over SSE. Returns the whole answer; if the
+ * caller aborts, it returns the part received before the abort instead of
+ * throwing, so a stopped answer is still a usable answer.
+ */
+export async function streamChat(
+  cfg: AIConfig,
+  messages: ChatMessage[],
+  handlers: StreamHandlers = {},
+): Promise<string> {
+  if (cfg.is_bridge) {
+    throw new AIError(
+      "Este proveedor funciona en modo puente: copia el prompt y pega la respuesta manualmente.",
+    );
+  }
+  const anthropic = cfg.provider === ANTHROPIC;
+  const base = cfg.base_url.replace(/\/+$/, "");
+  const headers: Record<string, string> = { Accept: "text/event-stream" };
+  let url: string;
+  let payload: unknown;
+  if (anthropic) {
+    if (!cfg.api_key) throw new AIError("Falta la API key de Anthropic.");
+    url = base + "/messages";
+    headers["x-api-key"] = cfg.api_key;
+    headers["anthropic-version"] = "2023-06-01";
+    payload = {
+      model: cfg.model,
+      system: messages.filter((m) => m.role === "system").map((m) => m.content).join("\n"),
+      messages: messages.filter((m) => m.role !== "system"),
+      max_tokens: cfg.max_tokens,
+      temperature: cfg.temperature,
+      stream: true,
+    };
+  } else {
+    if (cfg.api_key) headers["Authorization"] = `Bearer ${cfg.api_key}`;
+    url = base + "/chat/completions";
+    payload = {
+      model: cfg.model,
+      messages,
+      temperature: cfg.temperature,
+      max_tokens: cfg.max_tokens,
+      stream: true,
+    };
+  }
+
+  let resp: Response;
+  try {
+    resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(payload),
+      signal: handlers.signal,
+    });
+  } catch (e) {
+    if (handlers.signal?.aborted) return "";
+    const reason = e instanceof Error ? e.message : String(e);
+    throw new AIError(
+      `No se pudo conectar con ${url}.\n${reason}\n\n` +
+        "Si usas LM Studio u Ollama, comprueba que el servidor local esté encendido.",
+    );
+  }
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new AIError(`HTTP ${resp.status}: ${text.slice(0, 400)}`);
+  }
+  if (!resp.body) throw new AIError("El servidor no devolvió un flujo de datos.");
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let answer = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, nl).replace(/\r$/, "");
+        buffer = buffer.slice(nl + 1);
+        if (line) {
+          const token = tokenFromSse(line);
+          if (token?.text) {
+            answer += token.text;
+            handlers.onDelta?.(token.text);
+          } else if (token?.thinking) {
+            handlers.onThinking?.(token.thinking);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // A cancel lands here as an AbortError on the reader: keep what we got.
+    if (!handlers.signal?.aborted) {
+      throw new AIError(e instanceof Error ? e.message : String(e));
+    }
+  }
+  return answer;
+}
+
 // ── Prompt building ────────────────────────────────────────────────────────
 
 export interface BuildMessagesOpts {
@@ -384,4 +541,5 @@ export function buildBridgePrompt(messages: ChatMessage[]): string {
 export const build_messages = buildMessages;
 export const build_bridge_prompt = buildBridgePrompt;
 export const send_chat = sendChat;
+export const stream_chat = streamChat;
 export const list_models = listModels;

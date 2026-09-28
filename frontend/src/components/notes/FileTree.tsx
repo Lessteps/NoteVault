@@ -1,12 +1,13 @@
-import {
-  Bookmark, ChevronRight, FileCode2, FilePlus, FileText, Folder, FolderOpen, FolderPlus,
-  Columns2, LayoutDashboard, Pencil, SquareArrowOutUpRight, Trash2,
-} from "lucide-react";
+import { ChevronRight, FileCode2, FileText, Folder, FolderOpen, LayoutDashboard } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { api } from "../../lib/bridge";
 import type { IndexEntry, TreeEntry } from "../../lib/types";
 import { useVirtualList } from "../../lib/useVirtualList";
 import { useApp } from "../../store/app";
+import { copyText } from "../../lib/clipboard";
+import { fileMenuItems, pathFlavors, type PathFlavor } from "./fileMenu";
+import { MoveEntryDialog } from "./MoveEntryDialog";
+import { VersionHistoryDialog } from "./VersionHistoryDialog";
 import { askText, cn, confirmAction, openMenu } from "../ui";
 
 const EXPANDED_KEY = "nv.tree.expanded";
@@ -237,24 +238,61 @@ export function FileTree({ filter }: { filter: string }) {
     },
   });
 
-  const menuFor = (entry: TreeEntry) => (e: React.MouseEvent) => {
+  /** Every action the right-click menu offers for an entry. */
+  const [moveEntry, setMoveEntry] = useState<TreeEntry | null>(null);
+  const [historyEntry, setHistoryEntry] = useState<string | null>(null);
+
+  const menuActions = (entry: TreeEntry) => {
     const s = useApp.getState();
-    const items = entry.type === "folder"
-      ? [
-        { label: "Nueva nota aquí", icon: <FilePlus />, onSelect: () => void newNoteIn(entry.path) },
-        { label: "Nueva carpeta aquí", icon: <FolderPlus />, onSelect: () => void newFolderIn(entry.path) },
-        { label: "Nuevo canvas aquí", icon: <LayoutDashboard />, onSelect: () => void newCanvasIn(entry.path) },
-        { label: "Renombrar", icon: <Pencil />, onSelect: () => void renameEntry(entry) },
-        { label: "Mover a la papelera", icon: <Trash2 />, danger: true, onSelect: () => void trashEntry(entry) },
-      ]
-      : [
-        { label: "Abrir", icon: <SquareArrowOutUpRight />, onSelect: () => openEntry(entry) },
-        ...(entry.kind === "canvas" ? [] : [{ label: "Abrir a la derecha", icon: <Columns2 />, onSelect: () => void s.openSide(entry.path) }]),
-        { label: "Marcador", icon: <Bookmark />, onSelect: () => void s.toggleBookmark(entry.path) },
-        { label: "Renombrar", icon: <Pencil />, onSelect: () => void renameEntry(entry) },
-        { label: "Mover a la papelera", icon: <Trash2 />, danger: true, onSelect: () => void trashEntry(entry) },
-      ];
-    openMenu(e, items);
+    return {
+      openInNewTab: () => openEntry(entry),
+      openToTheRight: () => void s.openSide(entry.path),
+      openInNewWindow: () => {
+        void api.openInNewWindow(entry.path).catch((e: Error) => s.toast("error", e.message));
+      },
+      makeCopy: () => {
+        void api
+          .duplicate(entry.path)
+          .then(({ path }) => {
+            s.refreshTree();
+            s.toast("info", `Copia creada: ${path.split("/").pop()}`);
+          })
+          .catch((e: Error) => s.toast("error", e.message));
+      },
+      moveToFolder: () => setMoveEntry(entry),
+      toggleBookmark: () => void s.toggleBookmark(entry.path),
+      copyPath: (flavor: PathFlavor) => {
+        const root = useApp.getState().vault ?? "";
+        const vaultName = root.split(/[\/]/).filter(Boolean).pop() ?? "vault";
+        const value = pathFlavors(entry.path, root, vaultName)[flavor];
+        void copyText(value).then((ok) =>
+          s.toast(ok ? "info" : "error", ok ? `Ruta copiada: ${value}` : "No se pudo copiar la ruta."),
+        );
+      },
+      versionHistory: () => setHistoryEntry(entry.path),
+      openInDefaultApp: () => {
+        void api.openInDefaultApp(entry.path).catch((e: Error) => s.toast("error", e.message));
+      },
+      revealInExplorer: () => {
+        void api.revealInOs(entry.path).catch((e: Error) => s.toast("error", e.message));
+      },
+      rename: () => void renameEntry(entry),
+      trash: () => void trashEntry(entry),
+      newNoteHere: () => void newNoteIn(entry.path),
+      newFolderHere: () => void newFolderIn(entry.path),
+      newCanvasHere: () => void newCanvasIn(entry.path),
+    };
+  };
+
+  const menuFor = (entry: TreeEntry) => (e: React.MouseEvent) => {
+    const known = useApp.getState().notes[entry.path]?.bookmarked;
+    openMenu(
+      e,
+      fileMenuItems(
+        { entry, bookmarked: known, canCopy: entry.type !== "folder" },
+        menuActions(entry),
+      ),
+    );
   };
 
   interface FlatTreeItem {
@@ -388,6 +426,14 @@ export function FileTree({ filter }: { filter: string }) {
           </div>
         </div>
       )}
+      {moveEntry && (
+        <MoveEntryDialog
+          entry={{ path: moveEntry.path, name: moveEntry.name, type: moveEntry.type }}
+          onClose={() => setMoveEntry(null)}
+          onDone={() => setMoveEntry(null)}
+        />
+      )}
+      {historyEntry && <VersionHistoryDialog rel={historyEntry} onClose={() => setHistoryEntry(null)} />}
     </div>
   );
 }

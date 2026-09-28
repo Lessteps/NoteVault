@@ -15,6 +15,7 @@ import {
   buildMessages,
   listModels,
   sendChat,
+  streamChat,
   type ChatMessage,
 } from "../../core/aiClient.js";
 import { parseFrontmatter } from "../../core/frontmatter.js";
@@ -55,11 +56,69 @@ function schemeOf(url: string): string {
 export function assistantApi(app: AppState) {
   const aiCfg = (): AIConfig => AIConfig.fromDict(AppConfig.get_ai_config());
 
+  /** Cancels in-flight streamed answers, keyed by the id the renderer sent. */
+  const streams = new Map<string, AbortController>();
+
+  /** Push one stream event to the window (no-op when there is no window). */
+  const emit = (data: Record<string, unknown>): void => {
+    const win = app.window as
+      | { webContents?: { send: (channel: string, payload: unknown) => void } }
+      | null;
+    win?.webContents?.send("nv-ai-stream", data);
+  };
+
+  /** Everything ai_chat and ai_chat_stream need before touching a provider. */
+  const chatMessages = (
+    history: unknown,
+    question: string,
+    noteRel: string,
+    selection: string,
+  ): ChatMessage[] => {
+    if (!Array.isArray(history)) throw new ApiError("Historial inválido.");
+    const q = String(question || "").trim().slice(0, MAX_TEXT);
+    if (!q) throw new ApiError("Escribe una pregunta.");
+    const clean: ChatMessage[] = [];
+    for (const m of history.slice(-MAX_HISTORY)) {
+      if (m && typeof m === "object") {
+        const role = (m as Record<string, unknown>).role;
+        if (role === "user" || role === "assistant") {
+          clean.push({
+            role,
+            content: String((m as Record<string, unknown>).content || "").slice(0, MAX_TEXT),
+          });
+        }
+      }
+    }
+    let title = "";
+    let body = "";
+    let wsPrompt = "";
+    if (noteRel) {
+      const p = app.resolve(noteRel);
+      const raw = fs.readFileSync(p, "utf-8");
+      const parsed = parseFrontmatter(raw);
+      const fm = parsed[0];
+      body = parsed[1];
+      title = path.parse(p).name;
+      const ws = new WorkspaceManager(app.root).detectForPath(
+        noteRel,
+        fm && typeof fm === "object" ? fm : {},
+      );
+      wsPrompt = ws.id !== "general" ? ws.system_prompt || "" : "";
+    }
+    return buildMessages(aiCfg(), clean, q, {
+      note_title: title,
+      note_body: body,
+      selection: String(selection || "").slice(0, MAX_TEXT),
+      workspace_prompt: wsPrompt,
+    });
+  };
+
   return {
     ai_settings(): Record<string, unknown> {
       const cfg = aiCfg();
       return {
         config: publicCfg(cfg),
+        models: cfg.info.default_models,
         providers: PROVIDERS.map((p) => ({
           key: p.key,
           label: p.label,
@@ -68,6 +127,7 @@ export function assistantApi(app: AppState) {
           needs_url: p.needs_url,
           default_url: p.default_url,
           default_model: p.default_model,
+          default_models: p.default_models,
           bridge: p.bridge,
         })),
       };
@@ -147,41 +207,8 @@ export function assistantApi(app: AppState) {
       noteRel = "",
       selection = "",
     ): Promise<Record<string, unknown>> {
-      if (!Array.isArray(history)) throw new ApiError("Historial inválido.");
-      const q = String(question || "").trim().slice(0, MAX_TEXT);
-      if (!q) throw new ApiError("Escribe una pregunta.");
-      const clean: ChatMessage[] = [];
-      for (const m of history.slice(-MAX_HISTORY)) {
-        if (m && typeof m === "object") {
-          const role = (m as Record<string, unknown>).role;
-          if (role === "user" || role === "assistant") {
-            clean.push({ role, content: String((m as Record<string, unknown>).content || "").slice(0, MAX_TEXT) });
-          }
-        }
-      }
-      let title = "";
-      let body = "";
-      let wsPrompt = "";
-      if (noteRel) {
-        const p = app.resolve(noteRel);
-        const raw = fs.readFileSync(p, "utf-8");
-        const parsed = parseFrontmatter(raw);
-        const fm = parsed[0];
-        body = parsed[1];
-        title = path.parse(p).name;
-        const ws = new WorkspaceManager(app.root).detectForPath(
-          noteRel,
-          fm && typeof fm === "object" ? fm : {},
-        );
-        wsPrompt = ws.id !== "general" ? ws.system_prompt || "" : "";
-      }
+      const messages = chatMessages(history, question, noteRel, selection);
       const cfg = aiCfg();
-      const messages = buildMessages(cfg, clean, q, {
-        note_title: title,
-        note_body: body,
-        selection: String(selection || "").slice(0, MAX_TEXT),
-        workspace_prompt: wsPrompt,
-      });
       if (cfg.is_bridge) {
         return {
           bridge: true,
@@ -195,6 +222,61 @@ export function assistantApi(app: AppState) {
       } catch (e) {
         throw new ApiError(e instanceof AIError ? e.message : String(e));
       }
+    },
+
+    /**
+     * Same conversation as ai_chat, delivered token by token over
+     * `nv-ai-stream` events ({id, type: "delta"|"thinking"|"done"|"error"}).
+     * Resolves with the whole answer once the stream ends; `stopped` says
+     * whether the user cancelled it (the partial text is still returned).
+     */
+    async ai_chat_stream(
+      streamId: string,
+      history: unknown,
+      question: string,
+      noteRel = "",
+      selection = "",
+    ): Promise<Record<string, unknown>> {
+      const id = String(streamId || "").slice(0, 64);
+      if (!id) throw new ApiError("Falta el identificador del flujo.");
+      const messages = chatMessages(history, question, noteRel, selection);
+      const cfg = aiCfg();
+      if (cfg.is_bridge) {
+        return {
+          bridge: true,
+          prompt: buildBridgePrompt(messages),
+          url: BRIDGE_URLS[cfg.provider] ?? "",
+          label: cfg.info.label,
+        };
+      }
+      const controller = new AbortController();
+      streams.set(id, controller);
+      emit({ id, type: "start" });
+      try {
+        const reply = await streamChat(cfg, messages, {
+          signal: controller.signal,
+          onDelta: (text) => emit({ id, type: "delta", text }),
+          onThinking: (text) => emit({ id, type: "thinking", text }),
+        });
+        const stopped = controller.signal.aborted;
+        emit({ id, type: "done", stopped });
+        return { reply, stopped };
+      } catch (e) {
+        const message = e instanceof AIError ? e.message : String(e);
+        emit({ id, type: "error", message });
+        throw new ApiError(message);
+      } finally {
+        streams.delete(id);
+      }
+    },
+
+    ai_chat_cancel(streamId: string): Record<string, unknown> {
+      const id = String(streamId || "");
+      const controller = streams.get(id);
+      if (!controller) return { ok: false };
+      controller.abort();
+      streams.delete(id);
+      return { ok: true };
     },
   };
 }

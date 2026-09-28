@@ -1,6 +1,7 @@
 // Small shared building blocks.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import { create } from "zustand";
 
 export function cn(...parts: Array<string | false | null | undefined>): string {
@@ -11,7 +12,8 @@ export function IconButton({
   title, onClick, active, children, className, disabled,
 }: {
   title: string;
-  onClick?: () => void;
+  /** The click event is passed through so a caller can anchor a menu on it. */
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   active?: boolean;
   children: ReactNode;
   className?: string;
@@ -155,10 +157,17 @@ export function DialogHost() {
 // ── Context menu ──────────────────────────────────────────────────────────
 
 export interface MenuItem {
-  label: string;
+  /** A rule between groups; `label`, `icon` and `onSelect` are ignored. */
+  separator?: boolean;
+  label?: string;
   icon?: ReactNode;
   danger?: boolean;
-  onSelect: () => void;
+  disabled?: boolean;
+  /** Nested items: a submenu, opened on hover. */
+  items?: MenuItem[];
+  /** Right-edge hint (a shortcut, a date…). */
+  hint?: string;
+  onSelect?: () => void;
 }
 
 const useMenu = create<{
@@ -186,33 +195,71 @@ export function MenuHost() {
     };
   }, [menu, set]);
   if (!menu) return null;
-  const x = Math.min(menu.x, window.innerWidth - 220);
+  const x = Math.min(menu.x, window.innerWidth - 240);
   const y = Math.min(menu.y, window.innerHeight - menu.items.length * 32 - 16);
   return (
     <div
       role="menu"
-      className="fixed z-50 min-w-[200px] rounded-lg border border-line-strong bg-card p-1 shadow-2xl"
+      className="fixed z-50 min-w-[220px] rounded-lg border border-line-strong bg-card p-1 shadow-2xl"
       style={{ left: x, top: y }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      {menu.items.map((it) => (
-        <button
-          key={it.label}
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            set(null);
-            it.onSelect();
-          }}
-          className={cn(
-            "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px]",
-            it.danger ? "text-danger hover:bg-danger-soft" : "text-text hover:bg-hover",
-          )}
-        >
-          <span className="text-dim [&>svg]:h-3.5 [&>svg]:w-3.5">{it.icon}</span>
-          {it.label}
-        </button>
-      ))}
+      <MenuItems items={menu.items} onDone={() => set(null)} />
     </div>
+  );
+}
+
+/** The rows of a menu; recursive so an item can hold a submenu. */
+function MenuItems({ items, onDone }: { items: MenuItem[]; onDone: () => void }) {
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <>
+      {items.map((it, i) => {
+        if (it.separator) {
+          return <div key={`sep-${i}`} className="my-1 h-px bg-line" role="separator" />;
+        }
+        const nested = Boolean(it.items?.length);
+        return (
+          <div
+            key={it.label ?? i}
+            className="relative"
+            onMouseEnter={() => setOpen(nested ? (it.label ?? String(i)) : null)}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              disabled={it.disabled}
+              onClick={() => {
+                if (it.disabled || nested) return;
+                onDone();
+                it.onSelect?.();
+              }}
+              className={cn(
+                "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px]",
+                it.disabled
+                  ? "cursor-default text-faint"
+                  : it.danger
+                    ? "text-danger hover:bg-danger-soft"
+                    : "text-text hover:bg-hover",
+              )}
+            >
+              <span className="text-dim [&>svg]:h-3.5 [&>svg]:w-3.5">{it.icon}</span>
+              <span className="flex-1 truncate">{it.label}</span>
+              {it.hint && <span className="text-[11px] text-faint">{it.hint}</span>}
+              {nested && <ChevronRight size={13} className="text-faint" />}
+            </button>
+            {nested && open === (it.label ?? String(i)) && (
+              <div
+                role="menu"
+                className="absolute left-[calc(100%-4px)] top-[-4px] min-w-[210px] rounded-lg border border-line-strong bg-card p-1 shadow-2xl"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <MenuItems items={it.items ?? []} onDone={onDone} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
   );
 }

@@ -25,9 +25,33 @@ import {
   type AppState,
 } from "../appState.js";
 
+/** One record per line; git separates the fields inside it with US (0x1f). */
+const SPLIT_LINE = "\n";
+const SPLIT_FIELD = "\u001f";
+
 function isInside(root: string, child: string): boolean {
   const rel = path.relative(root, child);
   return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+
+/**
+ * Run git inside the vault. Returns "" when there is no repository or nothing to
+ * report, and null from `strict` calls so callers can tell "missing" from "empty".
+ */
+function git(root: string, args: string[], strict = false): string | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { execFileSync } = require("node:child_process") as typeof import("node:child_process");
+    const out = execFileSync("git", ["-C", root, ...args], {
+      encoding: "utf-8",
+      timeout: 15000,
+      maxBuffer: 8 * 1024 * 1024,
+      windowsHide: true,
+    });
+    return out;
+  } catch {
+    return strict ? null : "";
+  }
 }
 
 export function notesApi(app: AppState) {
@@ -406,6 +430,81 @@ export function notesApi(app: AppState) {
         return { ok: false };
       }
       return { ok: true };
+    },
+
+    duplicate(rel: string): { path: string } {
+      const src = app.resolve(rel);
+      if (!fs.statSync(src).isFile()) {
+        throw new ApiError("Solo se pueden copiar archivos.");
+      }
+      const dir = path.dirname(src);
+      const ext = path.extname(src);
+      const base = path.basename(src, ext);
+      let target = path.join(dir, `${base} (copia)${ext}`);
+      let n = 2;
+      while (fs.existsSync(target)) {
+        target = path.join(dir, `${base} (copia ${n})${ext}`);
+        n += 1;
+      }
+      fs.copyFileSync(src, target);
+      return { path: app.rel(target) };
+    },
+
+    open_in_default_app(rel: string): { ok: boolean } {
+      const p = app.resolve(rel, { allowRoot: true });
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const electron = require("electron") as {
+          shell?: { openPath(p: string): Promise<string> };
+        };
+        if (electron?.shell) void electron.shell.openPath(p);
+      } catch {
+        // Ignore outside electron runtime
+      }
+      return { ok: true };
+    },
+
+    /** Past revisions of a file, straight from the vault's git repository. */
+    version_history(rel: string): { hash: string; date: string; author: string; subject: string }[] {
+      const p = app.resolve(rel, { allowRoot: true });
+      if (!isInside(app.root, p)) {
+        throw new ApiError("El archivo está fuera del vault.");
+      }
+      const out = git(app.root, [
+        "log",
+        "--follow",
+        "--no-color",
+        "--date=iso-strict",
+        "--pretty=format:%H%x1f%ad%x1f%an%x1f%s",
+        "--",
+        p,
+      ]);
+      if (!out) return [];
+      return out
+        .split(SPLIT_LINE)
+        .filter((line) => line.trim())
+        .map((line) => {
+          const [hash = "", date = "", author = "", subject = ""] = line.split(SPLIT_FIELD);
+          return { hash, date, author, subject };
+        });
+    },
+
+    /** The content of a file as it was in a given revision. */
+    version_file(rel: string, hash: string): { content: string } {
+      const p = app.resolve(rel, { allowRoot: true });
+      if (!isInside(app.root, p)) {
+        throw new ApiError("El archivo está fuera del vault.");
+      }
+      const clean = String(hash || "").trim();
+      if (!/^[0-9a-f]{7,40}$/i.test(clean)) {
+        throw new ApiError("Revisión inválida.");
+      }
+      const repoPath = path.relative(app.root, p).split(path.sep).join("/");
+      const content = git(app.root, ["show", `${clean}:${repoPath}`], true);
+      if (content === null) {
+        throw new ApiError("Esa revisión no contiene el archivo.");
+      }
+      return { content };
     },
 
     reveal_in_os(rel: string): { ok: boolean } {

@@ -239,6 +239,38 @@ function pickNext(tabs: AppTab[], closedId: string, currentId: string | null): s
   return remaining[Math.min(idx, remaining.length - 1)]!.tabId;
 }
 
+/**
+ * Pick the tab to activate when `closedId` is gone for good (file deleted).
+ *
+ * Never the first tab of the strip: the neighbour you were looking at wins —
+ * same functionality first, then any note or canvas, then anything left. Deleting
+ * a note that had a map open next to it keeps you on the map instead of throwing
+ * you back to Vista General.
+ */
+function pickSurvivor(before: AppTab[], remaining: AppTab[], closedId: string): string | null {
+  if (!remaining.length) return null;
+  const idx = before.findIndex((t) => t.tabId === closedId);
+  const closed = idx >= 0 ? before[idx]! : null;
+  const closedModule = closed ? tabModuleId(closed) : null;
+  const rank = (tab: AppTab, at: number) => {
+    const sameModule = closedModule !== null && tabModuleId(tab) === closedModule ? 0 : 1;
+    const isFile = tab.kind === "note" || tab.kind === "canvas" ? 0 : 1;
+    return sameModule * 10 + isFile * 5 + (at === -1 ? 0 : 0);
+  };
+  const positions = remaining.map((tab) => ({ tab, at: before.findIndex((t) => t.tabId === tab.tabId) }));
+  const distance = (at: number) => (idx < 0 ? at : Math.abs(at - idx));
+  positions.sort((a, b) => {
+    const ra = rank(a.tab, a.at);
+    const rb = rank(b.tab, b.at);
+    if (ra !== rb) return ra - rb;
+    const da = distance(a.at);
+    const db = distance(b.at);
+    if (da !== db) return da - db;
+    return a.at - b.at;
+  });
+  return positions[0]!.tab.tabId;
+}
+
 /** A state update: a partial state, or a function of the current state. */
 type Patch = Partial<State> | ((state: State) => State | Partial<State>);
 
@@ -667,7 +699,7 @@ export const useApp = create<State>((setState, get) => {
       const activeTabId = st.activeTabId
         ? openTabs.find((t) => t.tabId === st.activeTabId)
           ? st.activeTabId
-          : (openTabs[0]?.tabId ?? null)
+          : pickSurvivor(st.openTabs, openTabs, st.activeTabId)
         : null;
       const activeTab = activeTabId ? openTabs.find((t) => t.tabId === activeTabId) : null;
       return {

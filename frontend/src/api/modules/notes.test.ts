@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
 import { ApiError } from "../../core/errors.js";
 import { AppState } from "../appState.js";
 import { notesApi } from "./notes.js";
@@ -146,5 +147,57 @@ describe("notesApi", () => {
     const updated = api.read_note("Target.md");
     expect((updated.frontmatter as any).subject).toBe("mathematics");
     expect((updated.frontmatter as any).difficulty).toBe(3);
+  });
+
+  it("duplicate copies the file next to it and never overwrites", () => {
+    const first = api.duplicate("Target.md");
+    expect(first.path).toBe("Target (copia).md");
+    expect(fs.readFileSync(path.join(dir, first.path), "utf-8")).toContain("# Target");
+
+    const second = api.duplicate("Target.md");
+    expect(second.path).toBe("Target (copia 2).md");
+
+    const inFolder = api.duplicate("Programación/script.py");
+    expect(inFolder.path).toBe("Programación/script (copia).py");
+    expect(fs.existsSync(path.join(dir, inFolder.path))).toBe(true);
+
+    expect(() => api.duplicate("Programación")).toThrow(ApiError);
+  });
+
+  it("version_file refuses a revision that is not a hash", () => {
+    expect(() => api.version_file("Target.md", "HEAD~1")).toThrow(ApiError);
+    expect(() => api.version_file("Target.md", "zzz")).toThrow(ApiError);
+  });
+
+  it("version_history is empty (not an error) outside a repository", () => {
+    expect(api.version_history("Target.md")).toEqual([]);
+  });
+
+  it("version_history and version_file read the vault's own git history", () => {
+    let gitOk = true;
+    try {
+      execFileSync("git", ["--version"], { stdio: "ignore" });
+    } catch {
+      gitOk = false;
+    }
+    if (!gitOk) return;
+
+    const run = (args: string[]) =>
+      execFileSync("git", ["-C", dir, ...args], { stdio: "ignore", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
+    run(["init"]);
+    run(["add", "Target.md"]);
+    run(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "primera versión"]);
+    fs.writeFileSync(path.join(dir, "Target.md"), "# Target\n\ncuerpo cambiado\n", "utf-8");
+    run(["add", "Target.md"]);
+    run(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "segunda versión"]);
+
+    const history = api.version_history("Target.md");
+    expect(history.length).toBe(2);
+    expect(history[0]!.subject).toBe("segunda versión");
+    expect(history[1]!.subject).toBe("primera versión");
+
+    const old = api.version_file("Target.md", history[1]!.hash);
+    expect(old.content).toContain("cuerpo");
+    expect(old.content).not.toContain("cambiado");
   });
 });

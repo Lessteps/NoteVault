@@ -21,8 +21,29 @@ declare global {
       onWatchEvent?: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void) => () => void;
       onBrowserState?: (cb: (data: BrowserState) => void) => () => void;
       onWindowState?: (cb: (data: { maximized: boolean }) => void) => () => void;
+      onAiStream?: (cb: (data: AiStreamEvent) => void) => () => void;
     };
   }
+}
+
+/** One event of a streamed assistant answer (channel `nv-ai-stream`). */
+export interface AiStreamEvent {
+  id: string;
+  type: "start" | "delta" | "thinking" | "done" | "error";
+  /** A token, for `delta` (answer) and `thinking` (model reasoning). */
+  text?: string;
+  /** The failure, for `error`. */
+  message?: string;
+  /** For `done`: the user cancelled, so the answer is partial. */
+  stopped?: boolean;
+}
+
+/** A past revision of a file, as reported by the vault's git repository. */
+export interface VersionRevision {
+  hash: string;
+  date: string;
+  author: string;
+  subject: string;
 }
 
 export interface BrowserBounds {
@@ -302,19 +323,36 @@ export const api = {
   vaultCreate: (name: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("vault_create", name),
   vaultOpen: (path: string) => call<{ ok: boolean; name: string; path: string }>("vault_open", path),
   knowledgeGraph: () => call<{ nodes: import("./graph").GraphNode[]; edges: import("./graph").GraphEdge[] }>("knowledge_graph"),
-  aiSettings: () => call<{ config: AiConfig; providers: AiProvider[] }>("ai_settings"),
+  aiSettings: () => call<{ config: AiConfig; providers: AiProvider[]; models: string[] }>("ai_settings"),
   aiSettingsSave: (fields: Partial<AiConfig> & { api_key?: string; clear_key?: boolean }) => call<AiConfig>("ai_settings_save", fields),
   aiModels: () => call<string[]>("ai_models"),
   aiTest: () => call<{ ok: boolean; reply: string }>("ai_test"),
   aiWorkspace: (rel: string) => call<{ id: string; name: string; icon: string }>("ai_workspace", rel),
   aiChat: (history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "") =>
     call<{ reply?: string; bridge?: boolean; prompt?: string; url?: string; label?: string }>("ai_chat", history, question, noteRel, selection),
+  /** Streamed chat: the answer arrives over onAiStream, the promise holds it whole. */
+  aiChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "") =>
+    call<{ reply?: string; stopped?: boolean; bridge?: boolean; prompt?: string; url?: string; label?: string }>(
+      "ai_chat_stream", id, history, question, noteRel, selection,
+    ),
+  aiChatCancel: (id: string) => call<{ ok: boolean }>("ai_chat_cancel", id),
+  onAiStream: (cb: (ev: AiStreamEvent) => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onAiStream) {
+      return window.nv.onAiStream(cb);
+    }
+    return () => {};
+  },
   notePropertiesMeta: () => call<{ subjects: string[]; types: string[]; statuses: string[] }>("note_properties_meta"),
   noteSetProperties: (rel: string, props: Record<string, unknown>, expectedModified: number | null = null) =>
     call<WriteResult>("note_set_properties", rel, props, expectedModified),
   englishSentences: () => call<string[]>("english_sentences"),
   englishSpeak: (text: string) => call<{ ok: boolean }>("english_speak", text),
   revealInOs: (rel: string) => call<{ ok: boolean }>("reveal_in_os", rel),
+  duplicate: (rel: string) => call<{ path: string }>("duplicate", rel),
+  openInDefaultApp: (rel: string) => call<{ ok: boolean }>("open_in_default_app", rel),
+  openInNewWindow: (rel: string) => call<{ ok: boolean }>("window_open_new", rel),
+  versionHistory: (rel: string) => call<{ hash: string; date: string; author: string; subject: string }[]>("version_history", rel),
+  versionFile: (rel: string, hash: string) => call<{ content: string }>("version_file", rel, hash),
   homeOverview: () => call<HomeOverview>("home_overview"),
   templatesList: () => call<{ folder: string; templates: Array<{ name: string; title: string }> }>("templates_list"),
   templateText: (name: string, title = "") => call<{ text: string }>("template_text", name, title),

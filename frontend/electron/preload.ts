@@ -24,4 +24,20 @@ contextBridge.exposeInMainWorld("nv", {
       ipcRenderer.removeListener("nv-window-state", handler);
     };
   },
+  /** Tokens of a streamed AI answer (channel: nv-ai-stream). */
+  onAiStream: (
+    cb: (data: {
+      id: string;
+      type: "start" | "delta" | "thinking" | "done" | "error";
+      text?: string;
+      message?: string;
+      stopped?: boolean;
+    }) => void,
+  ) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: any) => cb(data);
+    ipcRenderer.on("nv-ai-stream", handler);
+    return () => {
+      ipcRenderer.removeListener("nv-ai-stream", handler);
+    };
+  },
 });

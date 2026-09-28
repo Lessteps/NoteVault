@@ -22,9 +22,12 @@ let api: ReturnType<typeof assistantApi>;
 let srv: http.Server;
 let seen: any[];
 let port: number;
+/** When true the SSE response sends one token and then never ends. */
+let hold = false;
 
 beforeEach(async () => {
   for (const k of Object.keys(hoisted.store)) delete hoisted.store[k];
+  hold = false;
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "nv_ai_"));
   fs.mkdirSync(path.join(dir, "Matemáticas"));
   fs.writeFileSync(
@@ -39,7 +42,19 @@ beforeEach(async () => {
       let body = "";
       req.on("data", (c) => (body += c));
       req.on("end", () => {
-        seen.push(JSON.parse(body));
+        const payload = JSON.parse(body);
+        seen.push(payload);
+        if (payload.stream) {
+          res.writeHead(200, { "Content-Type": "text/event-stream" });
+          const frame = (o: unknown) => res.write(`data: ${JSON.stringify(o)}\n\n`);
+          frame({ choices: [{ delta: { reasoning_content: "pensando " } }] });
+          frame({ choices: [{ delta: { content: "Hola" } }] });
+          if (hold) return; // the client is expected to abort
+          frame({ choices: [{ delta: { content: " mundo" } }] });
+          res.write("data: [DONE]\n\n");
+          res.end();
+          return;
+        }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ choices: [{ message: { content: "respuesta de prueba" } }] }));
       });
@@ -53,9 +68,17 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  srv.closeAllConnections?.();
   await new Promise<void>((resolve) => srv.close(() => resolve()));
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+/** An api whose window records what reaches the renderer. */
+function withWindow(events: Array<Record<string, unknown>>): ReturnType<typeof assistantApi> {
+  const state = new AppState(dir);
+  state.window = { webContents: { send: (_ch: string, payload: unknown) => events.push(payload as Record<string, unknown>) } };
+  return assistantApi(state);
+}
 
 describe("assistant api", () => {
   it("stores the key but never returns it", () => {
@@ -109,5 +132,71 @@ describe("assistant api", () => {
 
   it("refuses notes outside the vault", async () => {
     await expect(api.ai_chat([], "x", "../secreto.md")).rejects.toThrow(ApiError);
+  });
+
+  it("lists DeepSeek's models as the default provider", () => {
+    const s = api.ai_settings() as { config: { provider: string }; models: string[] };
+    expect(s.config.provider).toBe("deepseek");
+    expect(s.models).toContain("deepseek-flash");
+  });
+
+  it("streams the answer to the window and returns it whole", async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const streaming = withWindow(events);
+    streaming.ai_settings_save({
+      provider: "deepseek",
+      base_url: `http://127.0.0.1:${port}/v1`,
+      model: "deepseek-flash",
+      api_key: "sk-x",
+    });
+    const r = await streaming.ai_chat_stream("s1", [
+      { role: "user", content: "hola" },
+    ], "¿Qué es?", "Matemáticas/Derivadas.md");
+
+    expect(r.reply).toBe("Hola mundo");
+    expect(r.stopped).toBe(false);
+    expect(events.map((e) => e.type)).toEqual(["start", "thinking", "delta", "delta", "done"]);
+    expect(events.filter((e) => e.type === "delta").map((e) => e.text).join("")).toBe("Hola mundo");
+    // the note still travels with the turn
+    expect(JSON.stringify(seen[seen.length - 1]!.messages)).toContain("regla de la cadena");
+    expect(seen[seen.length - 1]!.stream).toBe(true);
+  });
+
+  it("cancels a stream and keeps the partial answer", async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const streaming = withWindow(events);
+    streaming.ai_settings_save({
+      provider: "deepseek",
+      base_url: `http://127.0.0.1:${port}/v1`,
+      model: "deepseek-flash",
+      api_key: "sk-x",
+    });
+    hold = true;
+    const pending = streaming.ai_chat_stream("s2", [], "cuenta", "");
+    // wait for the first token before stopping, as the panel does
+    for (let i = 0; i < 100 && !events.some((e) => e.type === "delta"); i++) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(streaming.ai_chat_cancel("s2")).toEqual({ ok: true });
+    const r = await pending;
+    expect(r.stopped).toBe(true);
+    expect(r.reply).toBe("Hola");
+    expect(events[events.length - 1]!.type).toBe("done");
+    expect(events[events.length - 1]!.stopped).toBe(true);
+    expect(streaming.ai_chat_cancel("s2")).toEqual({ ok: false });
+  });
+
+  it("reports a provider failure to the window", async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const streaming = withWindow(events);
+    streaming.ai_settings_save({
+      provider: "deepseek",
+      base_url: `http://127.0.0.1:${port}/v1`,
+      model: "deepseek-flash",
+      api_key: "sk-x",
+    });
+    // a note outside the vault blows up before any provider call
+    await expect(streaming.ai_chat_stream("s3", [], "x", "../secreto.md")).rejects.toThrow(ApiError);
+    expect(events).toEqual([]);
   });
 });

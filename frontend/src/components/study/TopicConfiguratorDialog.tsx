@@ -22,6 +22,8 @@ interface TopicConfiguratorDialogProps {
   onStarted?: (firstPath: string) => void;
   /** Rendered inside a view file instead of as a modal dialog. */
   inline?: boolean;
+  /** Pre-selected competency (the matrix row's own "Practicar"). */
+  initialSkill?: string;
 }
 
 const QUANTITY_OPTIONS: Array<{ id: QuantityOption; label: string; desc: string }> = [
@@ -37,6 +39,7 @@ export function TopicConfiguratorDialog({
   onClose,
   onStarted,
   inline = false,
+  initialSkill,
 }: TopicConfiguratorDialogProps) {
   const toast = useApp((s) => s.toast);
   const openNote = useApp((s) => s.openNote);
@@ -81,7 +84,7 @@ export function TopicConfiguratorDialog({
   });
 
   const [selectedSkill, setSelectedSkill] = useState<string>(
-    declaredSkills[0]?.id ?? "solve",
+    initialSkill ?? declaredSkills[0]?.id ?? "solve",
   );
 
   // Check if beginner allowed for selected skill
@@ -202,6 +205,7 @@ export function TopicConfiguratorDialog({
                     key={s.id}
                     type="button"
                     onClick={() => handleSkillChange(s.id)}
+                    aria-pressed={isSelected}
                     className={cn(
                       "flex flex-col rounded-xl border p-2.5 text-left transition",
                       isSelected

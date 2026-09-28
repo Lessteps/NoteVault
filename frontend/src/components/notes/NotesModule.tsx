@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Globe, PanelRight, Sparkles } from "lucide-react";
 import { useApp } from "../../store/app";
 import { EditorArea } from "./EditorArea";
 import { Explorer } from "./Explorer";
@@ -12,10 +11,12 @@ import { useCanvas } from "../../store/canvas";
 import { CanvasView } from "../canvas/CanvasView";
 import { ConceptMapDialog } from "../canvas/ConceptMapDialog";
 import { StudyFoldersDialog } from "../study/StudyFoldersDialog";
+import { PanelLaunchers } from "./PanelLaunchers";
 
 const WIDTH_KEY = "nv.explorer.width";
 
 export function NotesModule() {
+  const active = useApp((s) => s.active);
   const explorerOpen = useApp((s) => s.explorerOpen);
   const inspectorOpen = useApp((s) => s.inspectorOpen);
   const assistantOpen = useAssistant((s) => s.open);
@@ -73,44 +74,11 @@ export function NotesModule() {
       {!canvasPath && (
         assistantOpen ? (
           <AssistantPanel />
-        ) : inspectorOpen ? (
+        ) : inspectorOpen && active ? (
+          // The outline is a *note's* outline: with no note there is no panel.
           <Inspector />
         ) : (
-          <aside
-            aria-label="Acceso panel lateral"
-            className="flex w-10 flex-none flex-col items-center gap-2 border-l border-line bg-panel py-3"
-          >
-            <button
-              type="button"
-              title="Abrir Asistente IA"
-              onClick={() => {
-                if (inspectorOpen) useApp.getState().toggleInspector();
-                useAssistant.getState().setOpen(true);
-              }}
-              className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
-            >
-              <Sparkles size={16} />
-            </button>
-            <button
-              type="button"
-              title="Abrir Navegador web"
-              onClick={() => useApp.getState().setModule("web")}
-              className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
-            >
-              <Globe size={16} />
-            </button>
-            <button
-              type="button"
-              title="Abrir panel lateral"
-              onClick={() => {
-                if (assistantOpen) useAssistant.getState().setOpen(false);
-                useApp.getState().toggleInspector();
-              }}
-              className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
-            >
-              <PanelRight size={16} />
-            </button>
-          </aside>
+          <PanelLaunchers />
         )
       )}
       <AiSettingsDialog />

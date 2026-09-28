@@ -50,6 +50,11 @@ export interface AreaOverview {
 
 const DIFFICULTIES: Array<1 | 2 | 3> = [1, 2, 3];
 
+/** `Matemáticas\1 Área/1.1 Tema` → `Matemáticas/1 Área/1.1 Tema`, without edges. */
+export function normFolder(folder: string): string {
+  return String(folder ?? "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+}
+
 /** True when `folder` is `scope` itself or a descendant of it. */
 export function folderInScope(folder: string, scope: string): boolean {
   const f = folder.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
@@ -123,4 +128,117 @@ export function aggregateArea(topics: TopicDashboardItem[]): AreaOverview {
     // Share of the area's topics that are fully mastered.
     pct: topics.length ? Math.round((completed / topics.length) * 100) : 0,
   };
+}
+
+// ── The completion dashboard: groups, rings and what is still missing ────────
+
+/** The engine's own completeness for a topic, clamped to 0..100. */
+export function topicPct(item: TopicDashboardItem): number {
+  return Math.max(0, Math.min(100, Math.round(item.progress?.completenessPct ?? 0)));
+}
+
+export interface OverviewGroup {
+  /** vault-relative folder of the group */
+  key: string;
+  title: string;
+  /** true when the group *is* a topic: it has no children to expand into */
+  isTopic: boolean;
+  topics: TopicDashboardItem[];
+  /** average mastery of the group's topics */
+  pct: number;
+  mastered: number;
+}
+
+const titleOf = (folder: string): string => folder.split("/").filter(Boolean).pop() ?? folder;
+
+/**
+ * Folds a scope's topics into the cards the dashboard shows: at the subject root
+ * one card per internal area, at an area one card per topic.
+ */
+export function groupTopics(topics: TopicDashboardItem[], scope: string): OverviewGroup[] {
+  const base = normFolder(scope);
+  const groups = new Map<string, TopicDashboardItem[]>();
+  for (const item of topics) {
+    const folder = normFolder(item.folder ?? "");
+    // A dashboard only ever shows its own scope, whatever it is handed.
+    if (base && !folderInScope(folder, base)) continue;
+    const rest = base && folder.startsWith(`${base}/`) ? folder.slice(base.length + 1) : folder;
+    const child = rest.split("/")[0] ?? "";
+    const key = base ? `${base}/${child}` : child;
+    const list = groups.get(key) ?? [];
+    list.push(item);
+    groups.set(key, list);
+  }
+
+  return [...groups.entries()]
+    .map(([key, items]) => {
+      const isTopic = items.length === 1 && normFolder(items[0]!.folder) === key;
+      const pct = items.length ? Math.round(items.reduce((a, i) => a + topicPct(i), 0) / items.length) : 0;
+      return {
+        key,
+        title: isTopic ? items[0]!.manifest.title : titleOf(key),
+        isTopic,
+        topics: [...items].sort((a, b) => a.manifest.title.localeCompare(b.manifest.title)),
+        pct,
+        mastered: items.filter((i) => i.progress?.isComplete || i.progress?.examPassed).length,
+      };
+    })
+    .sort((a, b) => a.title.localeCompare(b.title));
+}
+
+export interface SkillRing {
+  skill: string;
+  label: string;
+  description: string;
+  /** share of the required passes at or above the target difficulty */
+  pct: number;
+  done: number;
+  required: number;
+  /** what is still missing, in plain Spanish */
+  missing: string[];
+}
+
+const STARS = ["", "★ Fácil", "★★ Med", "★★★ Dif"];
+
+/**
+ * One ring per competency of a topic: how much of the required practice at (or
+ * above) the target difficulty is done, and what is left.
+ */
+export function skillRings(item: TopicDashboardItem): SkillRing[] {
+  const min = Math.max(1, item.manifest.mastery?.min_per_skill ?? 6);
+  const target = Math.max(1, Math.min(3, item.manifest.mastery?.target_difficulty ?? 3));
+  const levels = ([1, 2, 3] as const).filter((d) => d >= target);
+
+  return (item.manifest.skills ?? []).map((skill) => {
+    const progress = item.progress?.skills?.[skill];
+    const required = min * levels.length;
+    let done = 0;
+    const missing: string[] = [];
+    const touched = (progress?.totalAttempts ?? 0) > 0;
+    for (const d of levels) {
+      const passes = progress?.cells?.[d]?.passes ?? 0;
+      done += Math.min(min, passes);
+      if (passes === 0) missing.push(touched ? `falta ${STARS[d]}` : `sin empezar ${STARS[d]}`);
+    }
+    return {
+      skill,
+      label: progress?.label ?? skill,
+      description: progress?.description ?? "",
+      pct: required ? Math.round((100 * done) / required) : 0,
+      done,
+      required,
+      missing,
+    };
+  });
+}
+
+/** The competencies and difficulties of a topic that have not been practised. */
+export function missingOf(item: TopicDashboardItem): string[] {
+  const out: string[] = [];
+  for (const ring of skillRings(item)) {
+    if (ring.pct >= 100) continue;
+    const detail = ring.missing.length ? ring.missing.join(", ") : `${ring.done}/${ring.required}`;
+    out.push(`${ring.label}: ${detail}`);
+  }
+  return out;
 }

@@ -54,8 +54,8 @@ export function existingViewFile(folderAbs: string, kind: ViewFileKind): string 
 }
 
 /** True when the folder carries a topic manifest (view file or legacy marker). */
-export function isTopicFolder(rootAbs: string, folderAbs: string): boolean {
-  return findAncestorTopicManifest(folderAbs, rootAbs)?.topicFolder === path.resolve(folderAbs);
+export function isTopicFolder(_rootAbs: string, folderAbs: string): boolean {
+  return hasTopicMarker(folderAbs);
 }
 
 /**
@@ -63,22 +63,46 @@ export function isTopicFolder(rootAbs: string, folderAbs: string): boolean {
  * makes it a *grouping* folder with an overview of its own (as opposed to a
  * plain folder, which gets no view file just because it was clicked).
  */
-export function folderHasTopicsBelow(rootAbs: string, folderAbs: string, maxDepth = 6): boolean {
-  const root = path.resolve(folderAbs);
-  const isTopic = (dir: string): boolean => {
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return false;
-    }
-    const files = entries.filter((e) => e.isFile()).map((e) => e.name.toLowerCase());
-    const name = path.basename(dir);
-    return (
-      files.includes(TOPIC_MARKER_FILE) ||
-      files.includes(viewFileName(name, "practica").toLowerCase())
-    );
-  };
+/** A folder holds topics when one of its markers is there (no frontmatter parsing). */
+function hasTopicMarker(dir: string): boolean {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  const files = entries.filter((e) => e.isFile()).map((e) => e.name.toLowerCase());
+  return files.includes(TOPIC_MARKER_FILE) || files.includes(viewFileName(path.basename(dir), "practica").toLowerCase());
+}
+
+/**
+ * The *subject root* (e.g. `Matemáticas`) groups areas: its children are folders
+ * that hold topics, and no child is a topic itself. It has no practice of its
+ * own, so it must never get a `practica` or a `teorica` view — only its overview.
+ */
+export function isSubjectRoot(rootAbs: string, folderAbs: string, maxDepth = 6): boolean {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(folderAbs, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  const children = entries
+    .filter((e) => e.isDirectory() && !e.name.startsWith(".") && !IGNORED.has(e.name))
+    .map((e) => path.join(folderAbs, e.name));
+  if (!children.length) return false;
+  let areas = 0;
+  for (const child of children) {
+    if (hasTopicMarker(child)) return false; // a direct topic child: this folder is an area
+    if (folderHasTopicsBelow(rootAbs, child, maxDepth - 1)) areas += 1;
+  }
+  return areas > 0;
+}
+
+/**
+ * A folder holds topics when one of its markers is there (no frontmatter parsing).
+ */
+export function folderHasTopicsBelow(_rootAbs: string, folderAbs: string, maxDepth = 6): boolean {
   const visit = (dir: string, depth: number): boolean => {
     if (depth > maxDepth) return false;
     let entries: fs.Dirent[];
@@ -92,12 +116,11 @@ export function folderHasTopicsBelow(rootAbs: string, folderAbs: string, maxDept
       const base = entry.name;
       if (base.startsWith(".") || IGNORED.has(base)) continue;
       const child = path.join(dir, base);
-      if (isTopic(child) || visit(child, depth + 1)) return true;
+      if (hasTopicMarker(child) || visit(child, depth + 1)) return true;
     }
     return false;
   };
-  void rootAbs;
-  return visit(root, 0);
+  return visit(folderAbs, 0);
 }
 
 /** The topic manifest of a folder, from its `practica` view or a legacy `_tema.md`. */
@@ -242,6 +265,11 @@ function writeIfMissing(fileAbs: string, text: string, out: CreateResult, dryRun
 /** Creates `practica` + `teorica` for a topic folder; never overwrites. */
 export function ensureTopicViewFiles(rootAbs: string, folderAbs: string, dryRun = false): CreateResult {
   const out: CreateResult = { created: [], skipped: [], tagged: [], errors: [] };
+  if (isSubjectRoot(rootAbs, folderAbs)) {
+    // The subject root groups areas: only its overview, never a practica/teorica.
+    out.errors.push(folderAbs);
+    return out;
+  }
   const manifest = topicManifestOf(rootAbs, folderAbs);
   if (!manifest) {
     out.errors.push(folderAbs);
@@ -424,7 +452,13 @@ export function migrateVault(
   const report: MigrationReport = { topicFolders: [], areas: [], created: [], tagged: [], skipped: [], deleted: [], errors: [] };
   const before = walk(root);
 
+  const subjectRoots = new Set<string>();
+  for (const folder of [...before.legacy, ...before.topics]) {
+    if (isSubjectRoot(root, folder)) subjectRoots.add(folder);
+  }
+
   for (const folder of before.legacy) {
+    if (subjectRoots.has(folder)) continue;
     report.topicFolders.push(folder);
     const marker = path.join(folder, TOPIC_MARKER_FILE);
     const [fm] = parseFrontmatter(read(marker) ?? "");
@@ -452,7 +486,7 @@ export function migrateVault(
 
   // Topic folders that already use the view model (no legacy marker).
   for (const folder of before.topics) {
-    if (report.topicFolders.includes(folder)) continue;
+    if (subjectRoots.has(folder) || report.topicFolders.includes(folder)) continue;
     report.topicFolders.push(folder);
     const result = ensureTopicViewFiles(root, folder, Boolean(opts.dryRun));
     report.created.push(...result.created);
@@ -463,7 +497,7 @@ export function migrateVault(
 
   // Overviews: the subject root plus every grouping folder.
   const overviewBase = opts.overviewRoot ? path.resolve(root, opts.overviewRoot) : root;
-  const overviews = new Set<string>([overviewBase]);
+  const overviews = new Set<string>([overviewBase, ...subjectRoots]);
   for (const area of before.areas) {
     // The vault root is not an "area" when the subject root is someone else.
     if (area === root && overviewBase !== root) continue;

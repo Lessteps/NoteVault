@@ -1,97 +1,116 @@
-// The `type: resumen` view file: the overview of an area (or of the whole
-// subject). It aggregates what the practice model already knows — per topic,
-// skill and difficulty — and offers a session that draws from every topic of
-// the area. Nothing is recomputed here: `study_topic_dashboard` gives the
-// per-topic progress and `lib/areaOverview.ts` folds it.
+// The `type: resumen` view file: the completion dashboard of a subject or an area.
+//
+// It is deliberately *not* a competency matrix (that belongs to the topic view):
+// here each internal area — and, when an area is opened, each of its topics —
+// gets its own completion ring, and every card expands down to the per-topic
+// skill rings and what is still missing. All numbers come from the practice
+// engine's own progress (`studyTopicDashboard`).
 
-import { AlertTriangle, BarChart3, ExternalLink, Play, RefreshCw } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Play, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
-import { aggregateArea, folderInScope } from "../../lib/areaOverview";
-import type { TopicDashboardData } from "../../lib/types";
+import {
+  aggregateArea,
+  folderInScope,
+  groupTopics,
+  missingOf,
+  skillRings,
+  topicPct,
+  type OverviewGroup,
+} from "../../lib/areaOverview";
+import type { TopicDashboardData, TopicDashboardItem } from "../../lib/types";
 import { useApp, type OpenNote } from "../../store/app";
-import { BarList, Donut } from "../common/charts";
+import { Donut } from "../common/charts";
 import { cn } from "../ui";
 import { useStudyVersion } from "./StudyPanel";
 
-const MATH_SKILLS: Array<[string, string]> = [
-  ["solve", "Problema"],
-  ["process", "Procedimiento guiado"],
-  ["prove", "Demostración"],
-  ["counterexample", "Contraejemplo"],
-  ["true_false", "Verdadero o falso"],
-  ["find_error", "Encontrar el error"],
-  ["drill", "Cálculo rápido"],
-  ["explain", "Explicar (Feynman)"],
-];
+const DIFFICULTY_COLOURS = ["var(--nv-mint)", "var(--nv-accent)", "var(--nv-info)"];
+const DIFFICULTY_LABELS = ["★ Fácil", "★★ Med", "★★★ Dif"];
 
-const DIFFICULTY_LABEL: Record<number, string> = { 1: "Principiante", 2: "Intermedio", 3: "Avanzado" };
+/** Green → amber → grey, so the ring reads at a glance. */
+function ringColour(pct: number): string {
+  if (pct >= 80) return "var(--nv-mint)";
+  if (pct >= 40) return "var(--nv-accent)";
+  if (pct > 0) return "var(--nv-warn)";
+  return "var(--nv-line-strong)";
+}
 
 export function ResumenView({ note }: { note: OpenNote }) {
   const toast = useApp((s) => s.toast);
   const openNote = useApp((s) => s.openNote);
   const version = useStudyVersion((s) => s.v);
-
-  const scope = String(note.frontmatter?.scope ?? "").trim().replace(/\\/g, "/");
-  const subject = String(note.frontmatter?.subject ?? "mathematics").trim() || "mathematics";
-
   const [data, setData] = useState<TopicDashboardData | null>(null);
   const [errors, setErrors] = useState("");
   const [loading, setLoading] = useState(true);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [openTopics, setOpenTopics] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
-  const [skill, setSkill] = useState("solve");
-  const [difficulty, setDifficulty] = useState(2);
+
+  const scope = String(note.frontmatter?.scope ?? "").trim();
+  const subject = String(note.frontmatter?.subject ?? "").trim();
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [dash, digest] = await Promise.all([
-        api.studyTopicDashboard(scope ? undefined : subject).catch(() => null),
-        api.studyErrorDigest().catch(() => null),
-      ]);
-      setData(dash);
-      setErrors(digest?.text ?? "");
+      setData(await api.studyTopicDashboard(subject || undefined));
+    } catch (e) {
+      toast("error", (e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [scope, subject]);
+  }, [subject, toast]);
 
   useEffect(() => {
     void refresh();
   }, [refresh, version]);
 
-  const scoped = useMemo(
-    () => (data?.topics ?? []).filter((t) => folderInScope(t.folder, scope)),
+  useEffect(() => {
+    let live = true;
+    api
+      .studyErrorDigest()
+      .then((res) => {
+        if (live) setErrors(String(res?.text ?? ""));
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [subject, version]);
+
+  const topics = useMemo(
+    () => (data?.topics ?? []).filter((t) => folderInScope(t.folder ?? "", scope)),
     [data, scope],
   );
-  const area = useMemo(() => aggregateArea(scoped), [scoped]);
+  const stats = useMemo(() => aggregateArea(topics), [topics]);
+  const groups = useMemo(() => groupTopics(topics, scope), [topics, scope]);
 
-  /** Opens a topic's practice view, creating it when the folder has none. */
-  const openTopicView = async (folder: string) => {
+  const title = String(note.frontmatter?.title ?? note.title ?? "");
+  const atSubjectRoot = groups.length > 0 && groups.some((g) => !g.isTopic);
+
+  /** A topic's own view file holds its practice; open it (creating it if needed). */
+  const openTopicView = async (item: TopicDashboardItem) => {
     try {
-      const res = await api.studyViewEnsure(folder);
-      if (!res.ok) {
-        toast("error", "No se pudo crear la vista de ese tema.");
+      const view = await api.studyViewEnsure(item.folder);
+      if (view.ok && view.path) {
+        await openNote(view.path);
         return;
       }
-      await openNote(res.path);
-      useApp.getState().setMode("read");
     } catch (e) {
       toast("error", (e as Error).message);
     }
+    toast("info", "Ese tema todavía no tiene vista de práctica.");
   };
 
-  const practiseArea = async () => {
+  const practiceArea = async () => {
     setBusy(true);
     try {
-      const res = await api.studyAreaSessionBuild(scope, skill, difficulty, "6-10", "no_help");
-      if (!res.ok || !res.first_exercise) {
-        toast("error", "No hay ejercicios de ese tipo en esta área todavía.");
-        return;
+      const res = await api.studyAreaSessionBuild(scope, "solve", 2, "6-10", "no_help");
+      if (res.ok && res.first_exercise) {
+        await openNote(res.first_exercise);
+        toast("info", `Sesión de ${res.exercises.length} ejercicio(s).`);
+      } else {
+        toast("info", "Esta área todavía no tiene ejercicios para practicar.");
       }
-      await openNote(res.first_exercise);
-      useApp.getState().setMode("read");
-      toast("info", `Práctica del área: ${res.exercises.length} ejercicios.`);
     } catch (e) {
       toast("error", (e as Error).message);
     } finally {
@@ -99,206 +118,306 @@ export function ResumenView({ note }: { note: OpenNote }) {
     }
   };
 
-  const skillPalette = ["var(--nv-mint)", "var(--nv-accent)", "var(--nv-warn)", "var(--nv-info)"];
-  const skillDonut = area.skills.map((s, i) => ({
-    name: `${s.label}: ${s.passes} aprobados de ${s.attempts}`,
-    value: s.passes,
-    colour: skillPalette[i % skillPalette.length]!,
-  }));
-  const difficultyDonut = area.difficulties.map((d) => ({
-    name: `${DIFFICULTY_LABEL[d.difficulty]}: ${d.passes}/${d.attempts}`,
-    value: d.passes,
-    colour: d.difficulty === 1 ? "var(--nv-mint)" : d.difficulty === 2 ? "var(--nv-warn)" : "var(--nv-danger)",
-  }));
-
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface">
-      <header className="flex flex-none flex-wrap items-center gap-3 border-b border-line px-5 py-3">
+    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5 p-5">
+      <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-accent-text">
-            <BarChart3 size={12} /> {scope ? "Resumen del área" : "Resumen de la asignatura"}
+          <div className="font-mono text-[10px] font-semibold uppercase tracking-wider text-accent-text">
+            {atSubjectRoot ? "Resumen de la materia" : "Resumen del área"}
           </div>
-          <h1 className="truncate text-[16px] font-bold text-text" title={scope || subject}>
-            {note.title}
+          <h1 className="truncate text-[21px] font-bold leading-tight text-text" title={note.path}>
+            {title}
           </h1>
         </div>
-        <Stat label="Temas" value={`${area.completed}/${area.topics}`} hint="completados" />
-        <Stat label="Progreso" value={`${area.pct}%`} hint="del área" />
-        <Stat label="Aprobados" value={`${area.passes}/${area.attempts}`} hint="ejercicios" />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void practiceArea()}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-accent-strong disabled:opacity-50"
+        >
+          <Play size={13} /> Practicar el área
+        </button>
         <button
           type="button"
           title="Recargar"
           aria-label="Recargar"
           onClick={() => void refresh()}
-          className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-hover hover:text-text"
+          className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel text-faint hover:text-text"
         >
-          <RefreshCw size={14} className={cn(loading && "animate-spin")} />
+          <RefreshCw size={13} className={cn(loading && "animate-spin")} />
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        {!data ? (
-          <p className="text-[13px] text-faint">{loading ? "Cargando el resumen…" : "No se pudo leer el progreso."}</p>
-        ) : area.topics === 0 ? (
-          <p className="text-[13px] text-faint">Esta área todavía no tiene temas con ejercicios registrados.</p>
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi label="Temas" value={`${stats.started}/${stats.topics}`} hint="iniciados" />
+        <Kpi label="Progreso" value={`${stats.pct}%`} hint="dominio medio" />
+        <Kpi
+          label="Competencias"
+          value={`${stats.skills.filter((s) => s.mastered > 0).length}/${stats.skills.length}`}
+          hint="con dominio"
+        />
+        <Kpi label="Intentos" value={String(stats.attempts)} hint={`${stats.passes} aprobados`} />
+      </div>
+
+      {/* Completion rings: one per area (subject root) or per topic (area) */}
+      <section>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-[13px] font-bold uppercase tracking-wide text-text">
+            {atSubjectRoot ? "Áreas" : "Temas"}
+          </h2>
+          <span className="text-[10.5px] text-faint">
+            {groups.length} {atSubjectRoot ? "áreas" : "temas"} · cada tarjeta se abre para ver el detalle
+          </span>
+        </div>
+
+        {loading && !data ? (
+          <p className="mt-3 text-[13px] text-faint">Cargando el progreso…</p>
+        ) : groups.length === 0 ? (
+          <p className="mt-3 rounded-xl border border-line bg-panel px-3.5 py-3 text-[12px] text-faint">
+            Esta parte de la materia todavía no tiene temas con ejercicios registrados.
+          </p>
         ) : (
-          <div className="mx-auto grid w-full max-w-[1100px] gap-5 lg:grid-cols-2">
-            {/* Charts */}
-            <Card title="Competencias del área">
-              <div className="flex flex-wrap items-center gap-5">
-                <Donut parts={skillDonut} label={`${area.passes}`} size={140} />
-                <div className="min-w-[220px] flex-1">
-                  <BarList
-                    rows={area.skills.map((s) => ({
-                      label: s.label,
-                      value: s.passes,
-                      hint: `${s.passes}/${s.attempts} · ${s.mastered}/${s.topics} temas`,
-                    }))}
-                  />
-                </div>
-              </div>
-            </Card>
-
-            <Card title="Por dificultad">
-              <div className="flex flex-wrap items-center gap-5">
-                <Donut parts={difficultyDonut} label={`${area.topics}`} size={140} />
-                <div className="min-w-[220px] flex-1">
-                  <BarList
-                    rows={area.difficulties.map((d) => ({
-                      label: DIFFICULTY_LABEL[d.difficulty]!,
-                      value: d.passes,
-                      hint: `${d.passes}/${d.attempts}`,
-                      colour: d.difficulty === 1 ? "var(--nv-mint)" : d.difficulty === 2 ? "var(--nv-warn)" : "var(--nv-danger)",
-                    }))}
-                  />
-                </div>
-              </div>
-            </Card>
-
-            {/* Progression */}
-            <Card title={`Progresión por tema (${area.started} en marcha)`} className="lg:col-span-2">
-              <ul className="divide-y divide-line">
-                {area.topicRows.map((t) => (
-                  <li key={t.folder} className="flex items-center gap-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => void openTopicView(t.folder)}
-                      title={t.folder}
-                      className="min-w-0 flex-1 truncate text-left text-[12.5px] text-text hover:text-accent-text"
-                    >
-                      {t.title}
-                    </button>
-                    <span className="hidden flex-none font-mono text-[11px] text-faint sm:inline">
-                      {t.passes}/{t.attempts}
-                    </span>
-                    <span className="h-2 w-40 flex-none overflow-hidden rounded-full bg-elevated">
-                      <span
-                        className={cn("block h-full rounded-full", t.completed ? "bg-mint" : "bg-accent")}
-                        style={{ width: `${Math.max(0, Math.min(100, t.pct))}%` }}
-                      />
-                    </span>
-                    <span className="w-10 flex-none text-right font-mono text-[11px] text-dim">{t.pct}%</span>
-                    <button
-                      type="button"
-                      title="Abrir la práctica del tema"
-                      aria-label={`Abrir la práctica de ${t.title}`}
-                      onClick={() => void openTopicView(t.folder)}
-                      className="grid h-6 w-6 flex-none place-items-center rounded text-faint hover:bg-hover hover:text-text"
-                    >
-                      <ExternalLink size={13} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-
-            {/* Practise the whole area */}
-            <Card
-              title="Practicar el área"
-              subtitle="Una sesión con los ejercicios de todos los temas del área."
-              actions={<Play size={14} className="text-mint" />}
-            >
-              <div className="flex flex-wrap items-end gap-3">
-                <label className="flex flex-col gap-1 text-[11px] text-faint">
-                  Competencia
-                  <select
-                    value={skill}
-                    onChange={(e) => setSkill(e.target.value)}
-                    className="rounded-lg border border-line bg-panel px-2 py-1.5 text-[12.5px] text-text"
-                  >
-                    {MATH_SKILLS.map(([id, label]) => (
-                      <option key={id} value={id}>{label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1 text-[11px] text-faint">
-                  Dificultad
-                  <select
-                    value={difficulty}
-                    onChange={(e) => setDifficulty(Number(e.target.value))}
-                    className="rounded-lg border border-line bg-panel px-2 py-1.5 text-[12.5px] text-text"
-                  >
-                    {[1, 2, 3].map((d) => (
-                      <option key={d} value={d}>{DIFFICULTY_LABEL[d]}</option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void practiseArea()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[12.5px] font-semibold text-white hover:bg-accent-strong disabled:opacity-50"
-                >
-                  <Play size={14} /> {busy ? "Preparando…" : "Empezar"}
-                </button>
-              </div>
-            </Card>
-
-            {/* Common errors */}
-            {errors && (
-              <Card title="Errores comunes" actions={<AlertTriangle size={14} className="text-warn" />}>
-                <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap font-mono text-[11.5px] text-dim">
-                  {errors}
-                </pre>
-              </Card>
-            )}
+          <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+            {groups.map((group) => (
+              <GroupCard
+                key={group.key}
+                group={group}
+                open={Boolean(openGroups[group.key])}
+                onToggle={() => setOpenGroups((s) => ({ ...s, [group.key]: !s[group.key] }))}
+                openTopics={openTopics}
+                onToggleTopic={(folder) => setOpenTopics((s) => ({ ...s, [folder]: !s[folder] }))}
+                onOpenTopicView={(item) => void openTopicView(item)}
+              />
+            ))}
           </div>
         )}
-      </div>
+      </section>
+
+      {/* Difficulty breakdown of the scope (a ring, never a matrix) */}
+      {stats.difficulties.some((d) => d.attempts > 0) && (
+        <section className="rounded-2xl border border-line-strong bg-card p-4">
+          <h2 className="text-[13px] font-bold uppercase tracking-wide text-text">Por dificultad</h2>
+          <div className="mt-3 flex flex-wrap items-center gap-6">
+            <Donut
+              size={132}
+              thickness={14}
+              label={`${stats.passes}`}
+              parts={stats.difficulties.map((d, i) => ({
+                value: d.passes,
+                colour: DIFFICULTY_COLOURS[i]!,
+                name: `${DIFFICULTY_LABELS[i]}: ${d.passes}/${d.attempts}`,
+              }))}
+            />
+            <div className="flex flex-col gap-1.5">
+              {stats.difficulties.map((d, i) => (
+                <div key={d.difficulty} className="flex items-center gap-2 text-[11.5px] text-dim">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: DIFFICULTY_COLOURS[i] }} />
+                  <span className="w-[74px] text-text">{DIFFICULTY_LABELS[i]}</span>
+                  <span className="font-mono">
+                    {d.passes}/{d.attempts}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {errors.trim() && (
+        <section className="rounded-2xl border border-warn/30 bg-warn-soft/40 p-4">
+          <h2 className="text-[13px] font-bold uppercase tracking-wide text-warn">Errores frecuentes</h2>
+          <pre className="mt-2 whitespace-pre-wrap font-sans text-[11.5px] leading-snug text-dim">{errors}</pre>
+        </section>
+      )}
     </div>
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Kpi({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="flex-none rounded-lg border border-line bg-panel px-3 py-1.5 text-center" title={hint}>
-      <div className="font-mono text-[10px] uppercase tracking-wider text-faint">{label}</div>
-      <div className="text-[14px] font-semibold text-text">{value}</div>
+    <div className="rounded-2xl border border-line-strong bg-card px-3.5 py-3">
+      <div className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-faint">{label}</div>
+      <div className="mt-1 text-[19px] font-bold leading-none text-text">{value}</div>
+      <div className="mt-1 text-[10.5px] text-faint">{hint}</div>
     </div>
   );
 }
 
-function Card({
-  title,
-  subtitle,
-  actions,
-  className,
-  children,
+/** A card per area (or per topic) with its ring, and its detail when expanded. */
+function GroupCard({
+  group,
+  open,
+  onToggle,
+  openTopics,
+  onToggleTopic,
+  onOpenTopicView,
 }: {
-  title: string;
-  subtitle?: string;
-  actions?: React.ReactNode;
-  className?: string;
-  children: React.ReactNode;
+  group: OverviewGroup;
+  open: boolean;
+  onToggle: () => void;
+  openTopics: Record<string, boolean>;
+  onToggleTopic: (folder: string) => void;
+  onOpenTopicView: (item: TopicDashboardItem) => void;
 }) {
+  const Chevron = open ? ChevronDown : ChevronRight;
   return (
-    <section className={cn("rounded-xl border border-line bg-panel p-4", className)}>
-      <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-[13px] font-semibold text-text">{title}</h2>
-        {actions}
-        {subtitle && <span className="ml-auto text-[11px] text-faint">{subtitle}</span>}
+    <div className="rounded-2xl border border-line-strong bg-card p-4">
+      <div className="flex w-full items-center gap-3">
+        <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-4 text-left">
+          <Donut
+            size={92}
+            thickness={10}
+            label={`${group.pct}%`}
+            parts={[
+              { value: group.pct, colour: ringColour(group.pct), name: "Progreso" },
+              { value: 100 - group.pct, colour: "var(--nv-elevated)", name: "Pendiente" },
+            ]}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="truncate text-[14px] font-bold text-text" title={group.title}>
+                {group.title}
+              </h3>
+              <Chevron size={15} className="flex-none text-faint" />
+            </div>
+            <div className="mt-0.5 text-[11px] text-faint">
+              {group.isTopic
+                ? group.topics[0]!.manifest.exam_group || "Tema"
+                : `${group.topics.length} tema${group.topics.length === 1 ? "" : "s"}`}
+              {group.mastered > 0 && <span className="text-mint"> · {group.mastered} dominado(s)</span>}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {group.topics.slice(0, 4).map((t) => (
+                <span
+                  key={t.folder}
+                  className="rounded-full border border-line bg-panel px-2 py-0.5 text-[10px] text-dim"
+                  title={t.manifest.title}
+                >
+                  {t.manifest.title.split(" ")[0]} {topicPct(t)}%
+                </span>
+              ))}
+              {group.topics.length > 4 && (
+                <span className="rounded-full border border-line bg-panel px-2 py-0.5 text-[10px] text-dim">
+                  +{group.topics.length - 4}
+                </span>
+              )}
+            </div>
+          </div>
+        </button>
+        {group.isTopic && (
+          <button
+            type="button"
+            onClick={() => onOpenTopicView(group.topics[0]!)}
+            className="flex-none rounded-lg border border-line bg-panel px-2.5 py-1 text-[11px] font-semibold text-text hover:border-accent"
+          >
+            Practicar
+          </button>
+        )}
       </div>
-      {children}
-    </section>
+
+      {open && (
+        <div className="mt-3 flex flex-col gap-2 border-t border-line pt-3">
+          {group.topics.map((item) => (
+            <TopicRow
+              key={item.folder}
+              item={item}
+              open={Boolean(openTopics[item.folder])}
+              onToggle={() => onToggleTopic(item.folder)}
+              onOpenView={() => onOpenTopicView(item)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A topic inside an area: its ring, and its per-skill rings when expanded. */
+function TopicRow({
+  item,
+  open,
+  onToggle,
+  onOpenView,
+}: {
+  item: TopicDashboardItem;
+  open: boolean;
+  onToggle: () => void;
+  onOpenView: () => void;
+}) {
+  const pct = topicPct(item);
+  const rings = skillRings(item);
+  const missing = missingOf(item);
+  const Chevron = open ? ChevronDown : ChevronRight;
+
+  return (
+    <div className="rounded-xl border border-line bg-panel/60 px-3 py-2.5">
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+          <Donut
+            size={54}
+            thickness={7}
+            parts={[
+              { value: pct, colour: ringColour(pct), name: "Progreso" },
+              { value: 100 - pct, colour: "var(--nv-elevated)", name: "Pendiente" },
+            ]}
+          />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-[12.5px] font-semibold text-text">{item.manifest.title}</span>
+              <Chevron size={14} className="flex-none text-faint" />
+            </div>
+            <div className="text-[10.5px] text-faint">
+              {pct}% · {item.progress?.exerciseNotesCount ?? 0} ejercicios
+              {missing.length > 0 && <span className="text-warn"> · falta {missing.length} competencia(s)</span>}
+            </div>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenView}
+          className="flex-none rounded-lg border border-line bg-card px-2.5 py-1 text-[11px] font-semibold text-text hover:border-accent"
+        >
+          Practicar
+        </button>
+      </div>
+
+      {open && (
+        <div className="mt-2.5 border-t border-line pt-2.5">
+          <div className="flex flex-wrap gap-3">
+            {rings.map((ring) => (
+              <div key={ring.skill} className="flex w-[132px] flex-col items-center gap-1" title={ring.description}>
+                <Donut
+                  size={58}
+                  thickness={7}
+                  label={`${ring.pct}%`}
+                  parts={[
+                    { value: ring.pct, colour: ringColour(ring.pct), name: ring.label },
+                    { value: 100 - ring.pct, colour: "var(--nv-elevated)", name: "Pendiente" },
+                  ]}
+                />
+                <div className="w-full truncate text-center text-[10.5px] font-semibold text-text">{ring.label}</div>
+                <div className="text-center font-mono text-[9.5px] text-faint">
+                  {ring.done}/{ring.required}
+                </div>
+              </div>
+            ))}
+          </div>
+          {missing.length > 0 && (
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+              <AlertTriangle size={12} className="text-warn" />
+              {missing.slice(0, 6).map((m) => (
+                <span key={m} className="rounded-full border border-line bg-card px-2 py-0.5 text-[10px] text-dim">
+                  {m}
+                </span>
+              ))}
+              {missing.length > 6 && (
+                <span className="text-[10px] text-faint">+{missing.length - 6} más</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

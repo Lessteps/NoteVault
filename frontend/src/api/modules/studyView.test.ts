@@ -59,6 +59,15 @@ describe("study_view_ensure", () => {
     expect(posix(again.path)).toBe("Matemáticas/1 Aritmética/1.1 X/1.1 X.practica.md");
   });
 
+  it("gives the subject root only an overview, never practice or theory views", () => {
+    const res = api.study_view_ensure("Matemáticas");
+
+    expect(res.kind).toBe("resumen");
+    expect(posix(res.path)).toBe("Matemáticas/Matemáticas.resumen.md");
+    expect(fs.existsSync(path.join(tmp, "Matemáticas", "Matemáticas.practica.md"))).toBe(false);
+    expect(fs.existsSync(path.join(tmp, "Matemáticas", "Matemáticas.teorica.md"))).toBe(false);
+  });
+
   it("creates the overview of a grouping folder", () => {
     const res = api.study_view_ensure("Matemáticas/1 Aritmética");
     expect(res.kind).toBe("resumen");

@@ -19,7 +19,7 @@ import {
   skillLabel,
 } from "../../core/practice/recommender.js";
 import { StudyArea, detectStudyArea } from "../../core/practice/studyArea.js";
-import { ensureOverviewFile, ensureTopicViewFiles, folderHasTopicsBelow, isTopicFolder, mapNoteOf } from "../../core/practice/viewFiles.js";
+import { ensureOverviewFile, ensureTopicViewFiles, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf } from "../../core/practice/viewFiles.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { LAYOUT } from "../../core/vaultFormat.js";
@@ -433,8 +433,10 @@ export function studyApi(app: AppState) {
       }
       // A file was passed: use the folder it lives in.
       const folderAbs = stat.isDirectory() ? abs : path.dirname(abs);
-      const topic = isTopicFolder(app.root, folderAbs);
-      if (!topic && !folderHasTopicsBelow(app.root, folderAbs)) {
+      // The subject root groups areas: it gets its overview and nothing else.
+      const subjectRoot = isSubjectRoot(app.root, folderAbs);
+      const topic = !subjectRoot && isTopicFolder(app.root, folderAbs);
+      if (!topic && !subjectRoot && !folderHasTopicsBelow(app.root, folderAbs)) {
         // A plain folder has no view: the explorer falls back to expanding it.
         return { ok: false, kind: "none", path: "", created: [], errors: [] };
       }

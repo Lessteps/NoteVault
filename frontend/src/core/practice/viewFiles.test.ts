@@ -88,7 +88,7 @@ describe("view file convention", () => {
 });
 
 describe("migrateVault", () => {
-  it("turns every _tema.md into a visible practica + teorica pair", () => {
+  it("turns every _tema.md into a visible practica file and tags the theory note", () => {
     const root = makeVault();
     try {
       const report = migrateVault(root);
@@ -98,12 +98,14 @@ describe("migrateVault", () => {
       const topic = path.join(root, "Matemáticas", "1 Aritmética", "1.1 Números naturales");
       expect(fs.existsSync(path.join(topic, "_tema.md"))).toBe(false);
       expect(fs.existsSync(path.join(topic, "1.1 Números naturales.practica.md"))).toBe(true);
-      expect(fs.existsSync(path.join(topic, "1.1 Números naturales.teorica.md"))).toBe(true);
+      expect(fs.existsSync(path.join(topic, "1.1 Números naturales.teorica.md"))).toBe(false);
 
-      // The theory view points at the concept note the canvases already link to.
-      const theoryView = fs.readFileSync(path.join(topic, "1.1 Números naturales.teorica.md"), "utf-8");
-      expect(theoryView).toContain("type: teorica");
-      expect(theoryView).toContain("teoria: Matemáticas/1 Aritmética/1.1 Números naturales/1.1 Números naturales.md");
+      // The theory note is marked in place: no rename, no second note, body and
+      // every other frontmatter key untouched.
+      const theoryNote = fs.readFileSync(path.join(topic, "1.1 Números naturales.md"), "utf-8");
+      expect(theoryNote).toContain("type: teorica");
+      expect(theoryNote).toContain("id: mat.aritmetica.enteros");
+      expect(theoryNote).toContain("# Números naturales");
 
       // Overviews: the subject root and each grouping area.
       for (const p of [
@@ -189,7 +191,6 @@ describe("migrateVault", () => {
       const first = ensureTopicViewFiles(root, topic);
       expect(first.created.map((c) => path.basename(c)).sort()).toEqual([
         "1.1 Números naturales.practica.md",
-        "1.1 Números naturales.teorica.md",
       ]);
       const again = ensureTopicViewFiles(root, topic);
       expect(again.created).toEqual([]);

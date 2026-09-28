@@ -35,7 +35,9 @@ describe("migrate_study_view_files", () => {
       const { report, text } = runMigration({ vault: root });
       expect(report.topicFolders).toHaveLength(1);
       expect(report.created.some((f) => f.endsWith("1.1 X.practica.md"))).toBe(true);
-      expect(report.created.some((f) => f.endsWith("1.1 X.teorica.md"))).toBe(true);
+      // The theory note is marked in place, not duplicated.
+      expect(report.created.some((f) => f.endsWith(".teorica.md"))).toBe(false);
+      expect(report.tagged.some((f) => f.endsWith("1.1 X.md"))).toBe(true);
       expect(report.created.some((f) => f.endsWith("Matemáticas.resumen.md"))).toBe(true);
       expect(report.created.some((f) => f.endsWith("1 Área.resumen.md"))).toBe(true);
       expect(report.deleted.some((f) => f.endsWith("_tema.md"))).toBe(true);

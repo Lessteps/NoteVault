@@ -19,7 +19,7 @@ import {
   skillLabel,
 } from "../../core/practice/recommender.js";
 import { StudyArea, detectStudyArea } from "../../core/practice/studyArea.js";
-import { ensureOverviewFile, ensureTopicViewFiles, folderHasTopicsBelow, isTopicFolder } from "../../core/practice/viewFiles.js";
+import { ensureOverviewFile, ensureTopicViewFiles, folderHasTopicsBelow, isTopicFolder, mapNoteOf } from "../../core/practice/viewFiles.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { LAYOUT } from "../../core/vaultFormat.js";
@@ -443,7 +443,8 @@ export function studyApi(app: AppState) {
         : ensureOverviewFile(app.root, folderAbs);
 
       const created = [...result.created];
-      if (created.length) {
+      const tagged = [...result.tagged];
+      if (created.length || tagged.length) {
         clearExerciseIndexCache();
         clearStudySnapshotCache();
       }
@@ -456,8 +457,25 @@ export function studyApi(app: AppState) {
         kind,
         path: app.rel(fileAbs),
         created: created.map((c) => app.rel(c)),
+        /** theory notes marked `type: teorica` by this call */
+        tagged: tagged.map((t) => app.rel(t)),
         errors: result.errors.map((e) => app.rel(e)),
       };
+    },
+
+    /** The canvas of the topic the given path belongs to, if it has one. */
+    study_topic_map(rel: string) {
+      const abs = app.resolve(rel, { allowRoot: true });
+      let folderAbs: string;
+      try {
+        folderAbs = fs.statSync(abs).isDirectory() ? abs : path.dirname(abs);
+      } catch {
+        throw new ApiError("Esa ruta no existe.");
+      }
+      const found = findAncestorTopicManifest(abs, app.root);
+      const topicAbs = found ? found.topicFolder : folderAbs;
+      const map = mapNoteOf(topicAbs);
+      return { ok: Boolean(map), path: map ? app.rel(map) : "" };
     },
 
     study_topic_get(rel: string) {

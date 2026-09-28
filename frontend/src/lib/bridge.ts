@@ -355,8 +355,9 @@ export const api = {
   studySnapshot: (rel: string) => call<import("./types").StudySnapshot>("study_snapshot", rel),
   studyTopicGet: (rel: string) => call<import("./types").TopicData>("study_topic_get", rel),
   /** The view file of a folder (created when missing): practica or resumen. */
-  studyViewEnsure: (rel: string) =>
-    call<{ ok: boolean; kind: "practica" | "resumen" | "none"; path: string; created: string[]; errors: string[] }>("study_view_ensure", rel),
+studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic_map", rel),
+    studyViewEnsure: (rel: string) =>
+    call<{ ok: boolean; kind: "practica" | "resumen" | "none"; path: string; created: string[]; tagged: string[]; errors: string[] }>("study_view_ensure", rel),
   studyTopicConvert: (folder: string) => call<{ ok: boolean; path: string; manifest: any }>("study_topic_convert", folder),
   studyTopicSessionBuild: (
     folder: string,

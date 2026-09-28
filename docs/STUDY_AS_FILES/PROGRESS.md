@@ -33,34 +33,43 @@ ejercicios + su mapa) se presenta ahora con **dos ficheros visibles**:
   **Practicar** (el configurador de 8 modos, dificultad, cantidad y asistencia,
   ahora también en modo `inline`), construida con los componentes de práctica
   existentes.
-- `components/study/TeoricaView.tsx`: renderiza la nota de teoría del tema
-  (concept note, a la que apuntan los mapas) con su contenido completo, más
-  «Abrir mapa» (si el tema tiene canvas) y «Abrir la nota de teoría».
+- `components/study/TeoricaView.tsx`: la vista `teorica` renderiza **su propia
+  nota** —la que está marcada, con su contenido de teoría completo— y añade
+  «Abrir mapa» (el canvas del tema, resuelto por `study_topic_map`) y «Editar la
+  teoría».
 - **La barra lateral derecha ya no monta Estudio**: se eliminó la sub-barra
   Estudio/Nota que llevaba a lo mismo que las pestañas del tema. El código del
   panel se conserva porque de él viven los componentes reutilizados.
 
-### Decisión sobre la nota de teoría (consultada al usuario)
+### La nota de teoría se marca en su sitio (plan enmendado)
 
-El plan nombra `<carpeta>.teorica.md` como fichero de teoría. En el vault, la
-teoría ya existe como apunte con el nombre del tema (`1.1 Números...md`) y —esto
-es lo decisivo— **423 nodos de archivo de los mapas apuntan a esas notas por
-ruta**: renombrarlas rompería los mapas. La migración crea `<carpeta>.teorica.md`
-como puerta que renderiza esa nota (campo `teoria:`), sin renombrar ni borrar
-nada. El usuario confirmó seguir el plan tal cual, que es lo implementado.
+El plan se enmendó durante la ejecución (commit `2d4dfa9`, «keep existing theory
+note (tag type:teorica), don't rename or duplicate it»): no se crea ningún
+`.teorica.md` para un tema que ya tiene su nota de teoría. Esa nota —a la que
+apuntan como nodo de archivo 423 nodos de los mapas y los backlinks— recibe
+`type: teorica` **en su frontmatter, editado textualmente**: no se renombra, no se
+duplica y ni el cuerpo ni el resto de claves (ni su formato: `number: "1.1"` sigue
+entrecomillado) se tocan. Re-serializar el YAML perdía ese formato, así que la
+migración edita el bloque de frontmatter línea a línea.
+
+Solo una carpeta de tema **sin** nota de teoría recibe un `<carpeta>.teorica.md`
+nuevo, para no dejarla sin puerta visible a la teoría (es el único `.teorica.md`
+del vault).
 
 ### Migración ejecutada sobre el vault real (`C:\PROGRAMMING`)
 
 ```
-$ NV_APPLY=1 vitest run … (tools/migrate_study_view_files.ts)
-Topic folders: 41        Areas: 5        Created: 87      Skipped: 0
-Removed _tema.md: 41     Errors: 0
+Topic folders: 41        Areas: 5        Errors: 0
+1ª pasada:  87 ficheros de vista creados, 41 _tema.md eliminados
+2ª pasada (plan enmendado): 41 .teorica.md duplicados retirados, 40 notas marcadas
 ```
 
-Verificado después, en el vault: 0 `_tema.md`, 41 `.practica.md`, 41
-`.teorica.md`, 5 `.resumen.md`; el manifiesto del tema se resuelve desde el
-ejercicio (`findAncestorTopicManifest` → `.practica.md`, con sus 8 competencias y
-`exam_group` intactos); re-ejecutarla no crea ni borra nada.
+Estado final verificado en el vault: 0 `_tema.md`, **41 `.practica.md`**,
+**1 `.teorica.md`** (la carpeta sin nota de teoría), **5 `.resumen.md`**, 41 notas
+con `type: teorica`; el manifiesto del tema se resuelve desde el ejercicio
+(`findAncestorTopicManifest` → `.practica.md`, con sus 8 competencias y
+`exam_group` intactos); re-ejecutar la migración no crea, no borra y no vuelve a
+marcar nada.
 
 ## Área B — vistas de resumen
 

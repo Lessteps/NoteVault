@@ -15,7 +15,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { dumpFrontmatter, parseFrontmatter } from "../src/core/frontmatter";
+import { parseFrontmatter } from "../src/core/frontmatter";
 
 const DROP_SECTIONS = ["intuición", "intuicion", "práctica", "practica"];
 const NO_EXAMPLES = ["no-ejemplos", "no ejemplos", "contraejemplos"];
@@ -57,9 +57,14 @@ export interface ReformResult {
   merged: boolean;
 }
 
-/** Reform one note's text (frontmatter untouched). */
+/** Reform one note's text. The frontmatter block is kept byte for byte. */
 export function reformConceptNoteText(raw: string): { text: string; result: ReformResult } {
-  const [fm, body] = parseFrontmatter(raw);
+  // A verbatim frontmatter block: re-serialising the YAML would requote values
+  // (and turn `number: "1.1"` into a number), so it never goes through a parser.
+  const fmEnd = /^---\r?\n[\s\S]*?\r?\n---/.exec(raw);
+  const fmBlock = fmEnd ? fmEnd[0] : "";
+  const body = raw.slice(fmBlock.length);
+  const NL = raw.includes("\r\n") ? "\r\n" : "\n";
   const { preamble, sections } = splitSections(body);
   const result: ReformResult = { changed: false, dropped: [], merged: false };
 
@@ -113,8 +118,8 @@ export function reformConceptNoteText(raw: string): { text: string; result: Refo
 
   const out = [preamble.replace(/\s+$/, ""), ...kept.map((s) => s.body.replace(/\s+$/, ""))]
     .filter((p) => p.length)
-    .join("\n\n");
-  return { text: `${dumpFrontmatter(fm as Record<string, unknown>)}${out}\n`, result };
+    .join(`${NL}${NL}`);
+  return { text: `${fmBlock}${NL}${out}${NL}`, result };
 }
 
 export interface ConceptReformReport {

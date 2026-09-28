@@ -221,6 +221,8 @@ export interface CreateResult {
   created: string[];
   /** view files that were already there */
   skipped: string[];
+  /** theory notes marked `type: teorica` so they open as the topic's theory */
+  tagged: string[];
   /** the folder had nothing to build a view from (no manifest / no theory) */
   errors: string[];
 }
@@ -239,7 +241,7 @@ function writeIfMissing(fileAbs: string, text: string, out: CreateResult, dryRun
 
 /** Creates `practica` + `teorica` for a topic folder; never overwrites. */
 export function ensureTopicViewFiles(rootAbs: string, folderAbs: string, dryRun = false): CreateResult {
-  const out: CreateResult = { created: [], skipped: [], errors: [] };
+  const out: CreateResult = { created: [], skipped: [], tagged: [], errors: [] };
   const manifest = topicManifestOf(rootAbs, folderAbs);
   if (!manifest) {
     out.errors.push(folderAbs);
@@ -248,22 +250,76 @@ export function ensureTopicViewFiles(rootAbs: string, folderAbs: string, dryRun 
   const folderName = path.basename(folderAbs);
   writeIfMissing(path.join(folderAbs, viewFileName(folderName, "practica")), practiceFileText(manifest), out, dryRun);
 
+  // The theory note the vault already has — the one the maps link by path — *is*
+  // the topic's theory view: it gets `type: teorica` in place, and is never
+  // renamed nor duplicated. Only a folder with no theory note at all gets a new
+  // `<name>.teorica.md`, so the topic still has a visible door to its theory.
   const theory = theoryNoteOf(folderAbs);
-  const theoryRel = theory ? path.relative(rootAbs, theory).split(path.sep).join("/") : null;
-  const map = mapNoteOf(folderAbs);
-  const mapRel = map ? path.relative(rootAbs, map).split(path.sep).join("/") : null;
-  writeIfMissing(
-    path.join(folderAbs, viewFileName(folderName, "teorica")),
-    theoryFileText(manifest.title, manifest.subject, theoryRel, mapRel),
-    out,
-    dryRun,
-  );
+  if (theory) {
+    if (markTheoryNote(theory, out, dryRun)) out.tagged.push(theory);
+  } else {
+    const map = mapNoteOf(folderAbs);
+    const mapRel = map ? path.relative(rootAbs, map).split(path.sep).join("/") : null;
+    writeIfMissing(
+      path.join(folderAbs, viewFileName(folderName, "teorica")),
+      theoryFileText(manifest.title, manifest.subject, null, mapRel),
+      out,
+      dryRun,
+    );
+  }
   return out;
+}
+
+/**
+ * Marks a note as the topic's theory view by editing its frontmatter *textually*:
+ * the body and every other key keep their exact formatting (re-serialising the
+ * YAML would requote values and turn `"1.1"` into a number). `type` is replaced
+ * when present and inserted right after the opening fence when it is not.
+ * Returns true when the file changed.
+ */
+export function markTheoryNote(fileAbs: string, out: CreateResult, dryRun = false): boolean {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(fileAbs, "utf-8");
+  } catch {
+    return false;
+  }
+  // Never mark a manifest: the practice view carries the topic's frontmatter.
+  if (parseTopicManifest(raw)) {
+    out.skipped.push(fileAbs);
+    return false;
+  }
+  const type = String((parseFrontmatter(raw)[0] as Record<string, unknown>).type ?? "").trim().toLowerCase();
+  if (type === "teorica") {
+    out.skipped.push(fileAbs);
+    return false;
+  }
+  const marked = frontmatterWithType(raw, "teorica");
+  if (marked === null || marked === raw) {
+    out.skipped.push(fileAbs);
+    return false;
+  }
+  if (!dryRun) fs.writeFileSync(fileAbs, marked, "utf-8");
+  return true;
+}
+
+/** `raw` with `type: <value>` set in its frontmatter, or null when it has none. */
+export function frontmatterWithType(raw: string, value: string): string | null {
+  const eol = raw.includes("\r\n") ? "\r\n" : "\n";
+  const lines = raw.split(/\r?\n/);
+  if ((lines[0] ?? "").trim() !== "---") return null;
+  const end = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
+  if (end < 0) return null;
+  const fm = lines.slice(1, end);
+  const at = fm.findIndex((line) => /^type\s*:/.test(line.trim()));
+  if (at >= 0) fm[at] = `type: ${value}`;
+  else fm.unshift(`type: ${value}`);
+  return ["---", ...fm, ...lines.slice(end)].join(eol);
 }
 
 /** Creates the `resumen` overview of an area folder (or the subject root). */
 export function ensureOverviewFile(rootAbs: string, folderAbs: string, title?: string, dryRun = false): CreateResult {
-  const out: CreateResult = { created: [], skipped: [], errors: [] };
+  const out: CreateResult = { created: [], skipped: [], tagged: [], errors: [] };
   const folderName = path.basename(folderAbs || rootAbs);
   const scopeRel = path.resolve(folderAbs) === path.resolve(rootAbs)
     ? ""
@@ -284,6 +340,8 @@ export interface MigrationReport {
   topicFolders: string[];
   areas: string[];
   created: string[];
+  /** theory notes marked `type: teorica` */
+  tagged: string[];
   skipped: string[];
   deleted: string[];
   errors: string[];
@@ -363,7 +421,7 @@ export function migrateVault(
   } = {},
 ): MigrationReport {
   const root = path.resolve(rootAbs);
-  const report: MigrationReport = { topicFolders: [], areas: [], created: [], skipped: [], deleted: [], errors: [] };
+  const report: MigrationReport = { topicFolders: [], areas: [], created: [], tagged: [], skipped: [], deleted: [], errors: [] };
   const before = walk(root);
 
   for (const folder of before.legacy) {
@@ -377,6 +435,7 @@ export function migrateVault(
     }
     const result = ensureTopicViewFiles(root, folder, Boolean(opts.dryRun));
     report.created.push(...result.created);
+    report.tagged.push(...result.tagged);
     report.skipped.push(...result.skipped);
     report.errors.push(...result.errors);
 
@@ -397,6 +456,7 @@ export function migrateVault(
     report.topicFolders.push(folder);
     const result = ensureTopicViewFiles(root, folder, Boolean(opts.dryRun));
     report.created.push(...result.created);
+    report.tagged.push(...result.tagged);
     report.skipped.push(...result.skipped);
     report.errors.push(...result.errors);
   }
@@ -413,6 +473,7 @@ export function migrateVault(
     report.areas.push(folder);
     const result = ensureOverviewFile(root, folder, undefined, Boolean(opts.dryRun));
     report.created.push(...result.created);
+    report.tagged.push(...result.tagged);
     report.skipped.push(...result.skipped);
     report.errors.push(...result.errors);
   }

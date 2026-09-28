@@ -46,13 +46,16 @@ describe("study_view_ensure", () => {
     expect(posix(res.path)).toBe("Matemáticas/1 Aritmética/1.1 X/1.1 X.practica.md");
     expect(res.created.map(posix).sort()).toEqual([
       "Matemáticas/1 Aritmética/1.1 X/1.1 X.practica.md",
-      "Matemáticas/1 Aritmética/1.1 X/1.1 X.teorica.md",
+
     ]);
     expect(fs.existsSync(path.join(tmp, res.path))).toBe(true);
 
     // Idempotent: the second call finds them.
     const again = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X");
+    expect((res.tagged ?? []).map(posix)).toEqual(["Matemáticas/1 Aritmética/1.1 X/1.1 X.md"]);
+    expect(fs.readFileSync(path.join(tmp, "Matemáticas/1 Aritmética/1.1 X/1.1 X.md"), "utf-8")).toContain("type: teorica");
     expect(again.created).toEqual([]);
+    expect(again.tagged).toEqual([]);
     expect(posix(again.path)).toBe("Matemáticas/1 Aritmética/1.1 X/1.1 X.practica.md");
   });
 

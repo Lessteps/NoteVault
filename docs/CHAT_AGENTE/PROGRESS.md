@@ -40,18 +40,23 @@ Pruebas:
   `assistant.test.ts` (DeepSeek por defecto, stream + eventos al renderer,
   cancelación con parcial + `done.stopped`).
 - App empaquetada (`release/win-unpacked/NoteVault.exe`, CDP 9223), vault real
-  `C:\PROGRAMMING`:
+  `C:\PROGRAMMING`, ejecución final sobre app recién arrancada:
   - panel: ancho 340, header 36px, textarea, botón enviar, selector mostrando
     `deepseek-flash`, botones `Nueva conversación / Historial (Fase 2) /
     Cambios (Fase 4) / Más / Cerrar / Añadir contexto / Proveedor: DeepSeek /
     Dictado (deshabilitado) / Enviar`.
-  - "Cuenta del 1 al 20 separado por comas" → respuesta correcta en el panel,
-    con caret, botón Detener y bloque de razonamiento presentes durante el turno.
-  - Turno instrumentado escuchando `window.nv.onAiStream`: tipos `start`,
-    `thinking`, `delta`, `done`; **183 deltas** de respuesta y 380 fragmentos de
-    razonamiento repartidos en 662 ms (tras la fase de razonamiento).
-  - Detener en medio de un ensayo de 400 palabras → "Detenido por ti.", el texto
-    parcial permanece en el panel y llega `done` con `stopped: true`.
+  - `ai_settings` por IPC → `provider: deepseek`, `has_key: true`, `models:
+    [deepseek-flash, deepseek-v4-pro]`; `ai_test` → `{ok: true, reply: "OK"}`
+    (el archivo de ajustes tenía la IA sin configurar: apuntaba a LM Studio).
+  - Turno escuchando `window.nv.onAiStream`: **130 eventos**, tipos `start`,
+    `thinking`, `delta`, `done`; **90 deltas** de respuesta repartidos en 428 ms
+    (+38 fragmentos de razonamiento). Respuesta correcta en el panel.
+  - Barra de acciones del último mensaje: `Copiar respuesta / Insertar en la
+    nota / Crear nota con la respuesta / Buena respuesta / Mala respuesta`.
+  - Bloque de razonamiento: se abre solo mientras es el único progreso visible
+    (verificado durante el turno) y se colapsa al llegar la respuesta.
+  - Detener en medio de un ensayo de 500 palabras → "Detenido por ti.", el
+    parcial permanece, `done` con `stopped: true`, y vuelve el botón enviar.
 
 Corrección derivada de la prueba real: la fase de razonamiento de DeepSeek tarda
 decenas de segundos antes del primer token de respuesta (una petición medida:

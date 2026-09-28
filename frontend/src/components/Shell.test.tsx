@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MenuHost } from "./ui";
-import { StatusBar, TopBar } from "./Shell";
+import { isBrowserTab, StatusBar, TopBar } from "./Shell";
 import { useVaultDialog } from "./VaultDialog";
 import { useApp } from "../store/app";
 
@@ -172,15 +172,28 @@ describe("TopBar", () => {
 });
 
 describe("the tab strip", () => {
-  it("never lists a browser page", () => {
+  it("never lists the browser: neither its pages nor its surface", () => {
     useApp.setState({
-      openTabs: [...useApp.getState().openTabs, { kind: "web", tabId: "web" }],
+      openTabs: [
+        ...useApp.getState().openTabs,
+        { kind: "web", tabId: "web" },
+        { kind: "module", id: "web", tabId: "module:web" },
+      ],
     });
     mount();
 
     const labels = tabs().map((t) => t.textContent ?? "");
     expect(labels.some((l) => l.includes("Navegador"))).toBe(false);
-    expect(labels.length).toBeGreaterThan(0);
+    // The tabs that do belong here are untouched.
+    expect(labels.some((l) => l.includes("Calendario"))).toBe(true);
+  });
+
+  it("knows what belongs to the rail instead of the bar", () => {
+    expect(isBrowserTab({ kind: "web" })).toBe(true);
+    expect(isBrowserTab({ kind: "module", id: "web" })).toBe(true);
+    expect(isBrowserTab({ kind: "module", id: "ejercicio" })).toBe(false);
+    expect(isBrowserTab({ kind: "note" })).toBe(false);
+    expect(isBrowserTab({ kind: "canvas" })).toBe(false);
   });
 
   it("hides its scrollbar and keeps every tab it holds", () => {

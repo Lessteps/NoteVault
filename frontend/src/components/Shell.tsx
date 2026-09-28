@@ -63,6 +63,14 @@ function TabIcon({ tab, notes }: { tab: AppTab; notes: Record<string, { kind: st
     : <FileText size={13} className="flex-none text-accent-text" />;
 }
 
+/**
+ * The browser's surface and its pages: they belong to the right-hand rail, not
+ * to the horizontal bar (see `components/web/WebRail.tsx`).
+ */
+export function isBrowserTab(t: { kind: string; id?: string }): boolean {
+  return t.kind === "web" || (t.kind === "module" && t.id === "web");
+}
+
 // ── Unified Tab Strip ───────────────────────────────────────────────────────
 
 function TabStrip() {
@@ -72,9 +80,10 @@ function TabStrip() {
   const notes = useApp((s) => s.notes);
   const { setActiveTab, closeTab, pinTab, unpinTab } = useApp.getState();
   const stripRef = useRef<HTMLDivElement>(null);
-  // Browser pages are not tabs: they live in the right-hand browser rail. The
-  // strip only carries notes, canvases and functionalities.
-  const stripTabs = openTabs.filter((t) => t.kind !== "web");
+  // The browser is not a tab: its pages live in the right-hand rail, and the
+  // surface that shows them is not listed here either. The strip carries notes,
+  // canvases and the other functionalities only.
+  const stripTabs = openTabs.filter((t) => !isBrowserTab(t));
 
   // The strip hides its scrollbar (it would eat the bar's height), so it has to
   // bring the tab you are on into view by itself.

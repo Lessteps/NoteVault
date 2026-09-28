@@ -276,3 +276,60 @@ describe("deleting an open file", () => {
     expect(app().module).toBe("notas");
   });
 });
+
+// Arrastrar una pestaña sobre otra (o fuera de la barra) activa el modo dividido.
+describe("modo dividido arrastrando pestañas", () => {
+  /** openSide reads the note before showing it: let that promise land. */
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it("manda la pestaña arrastrada al panel derecho", async () => {
+    app().openTab({ kind: "note", path: "principal.md" });
+    app().openTab({ kind: "note", path: "otra.md" });
+
+    app().splitTab("note:otra.md", "note:principal.md", "right");
+    await flush();
+
+    expect(useApp.getState().side).toBe("otra.md");
+  });
+
+  it("al soltarla a la izquierda cambia quién manda y quién acompaña", async () => {
+    app().openTab({ kind: "note", path: "principal.md" });
+    app().openTab({ kind: "note", path: "otra.md" });
+
+    app().splitTab("note:otra.md", "note:principal.md", "left");
+    await flush();
+
+    expect(useApp.getState().side).toBe("principal.md");
+    expect(useApp.getState().activeTabId).toBe("note:otra.md");
+  });
+
+  it("una funcionalidad abre su propio panel, y no comparte el de las notas", () => {
+    app().openTab({ kind: "module", id: "notas" });
+    app().openTab({ kind: "module", id: "ejercicio" });
+    app().splitTab("note:x.md", "note:x.md", "right");
+
+    app().splitTab("module:ejercicio", "module:notas", "right");
+
+    expect(useApp.getState().sideModule).toBe("ejercicio");
+    expect(useApp.getState().side).toBeNull();
+  });
+
+  it("cerrar el panel derecho lo deja vacío", () => {
+    app().openTab({ kind: "module", id: "ejercicio" });
+    app().splitTab("module:ejercicio", null, "right");
+    expect(useApp.getState().sideModule).toBe("ejercicio");
+
+    app().setSideModule(null);
+    expect(useApp.getState().sideModule).toBeNull();
+  });
+
+  it("una página del navegador no se divide: vive en su barra", () => {
+    app().openTab({ kind: "web" });
+    app().openTab({ kind: "note", path: "principal.md" });
+
+    app().splitTab("web", "note:principal.md", "right");
+
+    expect(useApp.getState().side).toBeNull();
+    expect(useApp.getState().sideModule).toBeNull();
+  });
+});

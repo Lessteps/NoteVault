@@ -1,8 +1,10 @@
-import { lazy, Suspense, useEffect, type ComponentType } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { api } from "./lib/bridge";
 import { flushAll, useApp, wasJustWritten } from "./store/app";
-import { ComingSoon, IconRail, StatusBar, Toasts, TopBar } from "./components/Shell";
+import { ComingSoon, IconRail, MODULES as MODULE_LABELS, StatusBar, Toasts, TopBar, TAB_MIME } from "./components/Shell";
 import { ModuleHost } from "./components/ModuleHost";
+import { useTabDrag } from "./store/tabDrag";
+import { X } from "lucide-react";
 import { WebRail } from "./components/web/WebRail";
 import { DialogHost, MenuHost } from "./components/ui";
 import { VaultDialog } from "./components/VaultDialog";
@@ -192,6 +194,9 @@ export function App() {
   const init = useApp((s) => s.init);
   // The view to show is driven by the active tab's module id.
   const module = useApp((s) => s.module);
+  const sideModule = useApp((s) => s.sideModule);
+  const draggingTabId = useTabDrag((s) => s.draggingTabId);
+  const [dropReady, setDropReady] = useState(false);
   useNavigationGuard();
   useShortcuts();
   useTaskReminders();
@@ -204,12 +209,56 @@ export function App() {
   return (
     <div className="flex h-full flex-col">
       <TopBar />
-      <div className="flex min-h-0 flex-1">
+      <div
+        className="relative flex min-h-0 flex-1"
+        // Arrastrar una pestaña fuera de la barra también divide: soltarla aquí
+        // la manda al panel derecho.
+        onDragOver={(e) => {
+          if (!draggingTabId) return;
+          e.preventDefault();
+          setDropReady(true);
+        }}
+        onDragLeave={() => setDropReady(false)}
+        onDrop={(e) => {
+          const draggedId = e.dataTransfer.getData(TAB_MIME) || draggingTabId;
+          setDropReady(false);
+          useTabDrag.getState().drag(null);
+          if (draggedId) useApp.getState().splitTab(draggedId, null, "right");
+        }}
+      >
         <IconRail />
         {/* Every visited functionality stays mounted: its sub-tab, its scroll and
             its forms survive a tab switch (see ModuleHost). */}
         <ModuleHost module={module} render={renderModule} />
+        {/* El panel derecho de las funcionalidades que no son notas: la pestaña
+            que se soltó a la derecha, con su propia cabecera. */}
+        {sideModule && (
+          <section
+            aria-label="Panel derecho"
+            className="flex min-w-0 flex-1 flex-col border-l border-line-strong bg-surface"
+          >
+            <header className="flex h-9 flex-none items-center gap-2 border-b border-line bg-panel px-3">
+              <span className="truncate text-[12.5px] font-semibold text-text">
+                {MODULE_LABELS.find((m) => m.id === sideModule)?.label ?? sideModule}
+              </span>
+              <span className="flex-1" />
+              <button
+                type="button"
+                title="Cerrar panel derecho"
+                aria-label="Cerrar panel derecho"
+                onClick={() => useApp.getState().setSideModule(null)}
+                className="grid h-6 w-6 place-items-center rounded text-faint hover:bg-hover hover:text-text"
+              >
+                <X size={13} />
+              </button>
+            </header>
+            <div className="flex min-h-0 flex-1">{renderModule(sideModule)}</div>
+          </section>
+        )}
         <WebRail />
+        {dropReady && draggingTabId && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 border-l-2 border-accent bg-accent-soft/20" aria-hidden="true" />
+        )}
       </div>
       <StatusBar />
       <QuickSwitcher />

@@ -11,6 +11,7 @@ import { api, isElectron } from "../lib/bridge";
 import { useApp, type AppTab, type ModuleId } from "../store/app";
 import { cn, openMenu } from "./ui";
 import { useVaultDialog } from "./VaultDialog";
+import { useTabDrag } from "../store/tabDrag";
 import { useSettingsDialog } from "./settings/SettingsDialog";
 import { newNoteIn } from "./notes/FileTree";
 
@@ -79,6 +80,9 @@ function TabStrip() {
   const notes = useApp((s) => s.notes);
   const { setActiveTab, closeTab, pinTab, unpinTab } = useApp.getState();
   const stripRef = useRef<HTMLDivElement>(null);
+  const drag = useTabDrag((s) => s.drag);
+  const dragging = useTabDrag((s) => s.draggingTabId);
+  const [dropAt, setDropAt] = useState<{ tabId: string; side: "left" | "right" } | null>(null);
   // The browser is not a tab: its pages live in the right-hand rail, and the
   // surface that shows them is not listed here either. The strip carries notes,
   // canvases and the other functionalities only.
@@ -126,6 +130,32 @@ function TabStrip() {
             title={tab.kind === "note" || tab.kind === "canvas" ? tab.path : label}
             onClick={() => setActiveTab(tab.tabId)}
             onAuxClick={(e) => e.button === 1 && !isPinned && void closeTab(tab.tabId)}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData(TAB_MIME, tab.tabId);
+              e.dataTransfer.effectAllowed = "move";
+              drag(tab.tabId);
+            }}
+            onDragEnd={() => {
+              drag(null);
+              setDropAt(null);
+            }}
+            onDragOver={(e) => {
+              if (!dragging || dragging === tab.tabId) return;
+              e.preventDefault();
+              const r = e.currentTarget.getBoundingClientRect();
+              const side = e.clientX < r.left + r.width / 2 ? "left" : "right";
+              if (dropAt?.tabId !== tab.tabId || dropAt.side !== side) setDropAt({ tabId: tab.tabId, side });
+            }}
+            onDragLeave={() => setDropAt((d) => (d?.tabId === tab.tabId ? null : d))}
+            onDrop={(e) => {
+              e.preventDefault();
+              const draggedId = e.dataTransfer.getData(TAB_MIME) || dragging;
+              const side = dropAt?.tabId === tab.tabId ? dropAt.side : "right";
+              setDropAt(null);
+              drag(null);
+              if (draggedId) useApp.getState().splitTab(draggedId, tab.tabId, side);
+            }}
             onContextMenu={(e) => openMenu(e, [
               isPinned
                 ? { label: "Dejar de fijar", icon: <PinOff />, onSelect: () => unpinTab(tab.tabId) }
@@ -143,6 +173,10 @@ function TabStrip() {
             ])}
             className={cn(
               "group relative flex h-full max-w-[176px] flex-none cursor-pointer items-center gap-1.5 border-r border-line px-2.5 text-[12px]",
+              dragging === tab.tabId && "opacity-50",
+              dropAt?.tabId === tab.tabId && (dropAt.side === "left"
+                ? "shadow-[inset_2px_0_0_var(--nv-accent)]"
+                : "shadow-[inset_-2px_0_0_var(--nv-accent)]"),
               isActive
                 ? "bg-surface text-text shadow-[inset_0_2px_0_var(--nv-accent)]"
                 : "text-dim hover:bg-hover hover:text-text",
@@ -196,6 +230,9 @@ function TabStrip() {
 // One single bar: it is the window's title bar (the window has no OS frame), so
 // it holds the brand and vault, the workspace icons, the open tabs, the sync
 // state and the window controls in the same row. Nothing is stacked above it.
+
+/** El tipo de dato que viaja al arrastrar una pestaña. */
+export const TAB_MIME = "application/x-notevault-tab";
 
 export function TopBar() {
   return (

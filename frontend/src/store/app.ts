@@ -141,6 +141,11 @@ interface State {
   paletteOpen: boolean;
   /** A second note shown to the right of the active one (split view). */
   side: string | null;
+  /**
+   * El modulo que ocupa el panel derecho. Las notas y los canvas usan `side`
+   * (su panel ya sabe pintarlos); el resto de funcionalidades viven aqui.
+   */
+  sideModule: ModuleId | null;
   cursor: { line: number; col: number } | null;
   toasts: Toast[];
 
@@ -156,6 +161,13 @@ interface State {
   setSwitcher: (open: boolean) => void;
   setPalette: (open: boolean) => void;
   openSide: (path: string | null) => Promise<void>;
+  setSideModule: (module: ModuleId | null) => void;
+  /**
+   * Soltar una pestaña sobre otra: la de `draggedId` pasa al panel dividido.
+   * A la derecha el destino se queda como nota principal; a la izquierda se
+   * intercambian, que es lo que espera quien arrastra hacia ese lado.
+   */
+  splitTab: (draggedId: string, targetId: string | null, side: "left" | "right") => void;
   setCursor: (c: { line: number; col: number } | null) => void;
 
   // ── Tab actions ────────────────────────────────────────────────────
@@ -336,6 +348,7 @@ export const useApp = create<State>((setState, get) => {
   switcherOpen: false,
   paletteOpen: false,
   side: null,
+  sideModule: null,
   cursor: null,
   toasts: [],
 
@@ -395,6 +408,43 @@ export const useApp = create<State>((setState, get) => {
   },
   setSwitcher: (switcherOpen) => set({ switcherOpen, paletteOpen: false }),
   setPalette: (paletteOpen) => set({ paletteOpen, switcherOpen: false }),
+
+  setSideModule: (module) => {
+    set({ sideModule: module });
+  },
+
+  splitTab: (draggedId, targetId, side) => {
+    const st = get();
+    const dragged = st.openTabs.find((t) => t.tabId === draggedId);
+    const found = targetId ? st.openTabs.find((t) => t.tabId === targetId) : undefined;
+    if (!dragged || (found && dragged.tabId === found.tabId)) return;
+    const isFile = (t: AppTab | undefined): t is Extract<AppTab, { path: string }> =>
+      Boolean(t) && (t!.kind === "note" || t!.kind === "canvas");
+    const keepTargetAsMain = side === "left" && isFile(found);
+    const targetFile = isFile(found) ? found : null;
+
+    if (isFile(dragged)) {
+      // The notes module paints its right pane from `side`.
+      set({ sideModule: null });
+      if (keepTargetAsMain && targetFile) {
+        set({ activeTabId: dragged.tabId, module: tabModuleId(dragged) });
+        void get().openSide(targetFile.path);
+      } else {
+        void get().openSide(dragged.path);
+      }
+      return;
+    }
+    if (dragged.kind === "module" && dragged.id !== "notas") {
+      // Anything that is not a note needs its own pane: the right column shows
+      // the module itself, with the tab as its only header.
+      set({ sideModule: dragged.id, side: null });
+      if (keepTargetAsMain) {
+        set({ activeTabId: dragged.tabId, module: tabModuleId(dragged) });
+      }
+      return;
+    }
+    // A web page lives in its own rail; there is nothing to split.
+  },
 
   openSide: async (path) => {
     if (!path) {

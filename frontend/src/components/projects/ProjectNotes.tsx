@@ -13,6 +13,7 @@ import { useApp } from "../../store/app";
 import { useProjects } from "../../store/projects";
 import { askText, cn } from "../ui";
 import { NotesTree, type OpenTarget } from "./NotesTree";
+import { NoteEditor } from "./NoteEditor";
 
 interface OpenDoc {
   folderId: string;
@@ -21,6 +22,10 @@ interface OpenDoc {
   kind: "markdown" | "text" | "code" | "binary";
   /** The text as it is on disk right now (what we compare against). */
   disk: string;
+  /** The text the editor was built from: it only changes on an open or a reload. */
+  loaded: string;
+  /** Bumped to force the editor to rebuild (another file, or a reload). */
+  revision: number;
   /** What the editor holds; saved 800ms after the last keystroke. */
   text: string;
   /** mtime of the read, so the API can refuse to overwrite someone else's write. */
@@ -104,6 +109,8 @@ export function ProjectNotes() {
         name: nameOf(t.rel),
         kind: (meta.kind as OpenDoc["kind"]) ?? "text",
         disk: meta.raw,
+        loaded: meta.raw,
+        revision: 0,
         text: meta.raw,
         modified: meta.modified,
         readonly: meta.readonly,
@@ -301,7 +308,15 @@ export function ProjectNotes() {
                   onClick={async () => {
                     try {
                       const meta = await api.projectFileRead(pid, active.folderId, active.rel);
-                      setDocs((d) => ({ ...d, [activeKey]: { ...d[activeKey]!, disk: meta.raw, text: meta.raw, modified: meta.modified, conflict: false } }));
+                      setDocs((d) => ({ ...d, [activeKey]: {
+                        ...d[activeKey]!,
+                        disk: meta.raw,
+                        loaded: meta.raw,
+                        text: meta.raw,
+                        modified: meta.modified,
+                        conflict: false,
+                        revision: (d[activeKey]!.revision ?? 0) + 1,
+                      } }));
                     } catch (e) {
                       fail(e);
                     }
@@ -329,7 +344,11 @@ export function ProjectNotes() {
                 )}
               </div>
             )}
-            {active && !active.binary && (
+            {active && !active.binary && active.kind === "markdown" && (
+              <NoteEditor initial={active.loaded} revision={active.revision} readOnly={active.readonly}
+                onMarkdown={editar} onSave={() => void flush(activeKey)} />
+            )}
+            {active && !active.binary && active.kind !== "markdown" && (
               <textarea
                 aria-label="Archivo"
                 value={active.text}

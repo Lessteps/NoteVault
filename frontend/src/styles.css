@@ -884,7 +884,6 @@ html[data-perf="lite"] .nv-practice-view {
    Center Peek (Proyectos): the issue editor as a centred modal over a blurred
    overlay. 150ms fade + scale, per the brief.
    ───────────────────────────────────────────────────────────────────────── */
-
 @keyframes nv-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -901,6 +900,91 @@ html[data-perf="lite"] .nv-practice-view {
 
 .nv-peek {
   animation: nv-peek-in 150ms ease-out;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Notas · the visual Markdown editor (Milkdown). The content borrows .nv-prose
+   so it looks like the rendered notes; these rules only tame ProseMirror.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.nv-editor {
+  /* .nv-prose carries max-width + auto margins, which would make this flex item
+     shrink-wrap to its content (a 40px column). The readable measure goes on the
+     ProseMirror box instead. */
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.nv-editor .milkdown {
+  min-height: 100%;
+}
+
+.nv-editor .ProseMirror {
+  min-height: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 18px 22px 40px;
+  outline: none;
+}
+
+/* While editing, every block must be rendered: content-visibility: auto (from
+   .nv-prose) would skip off-screen blocks and fight the caret. */
+.nv-editor .ProseMirror>* {
+  content-visibility: visible;
+}
+
+.nv-editor .ProseMirror>*:first-child {
+  margin-top: 0;
+}
+
+/* A task list item: GFM keeps "checked" on the list item, not on an input. */
+.nv-editor .ProseMirror li[data-item-type="task"],
+.nv-editor .ProseMirror li.task-list-item {
+  list-style: none;
+  position: relative;
+  padding-left: 1.35em;
+}
+
+.nv-editor .ProseMirror li[data-item-type="task"]::before,
+.nv-editor .ProseMirror li.task-list-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 0.85em;
+  height: 0.85em;
+  border: 1px solid var(--nv-line-strong);
+  border-radius: 3px;
+}
+
+.nv-editor .ProseMirror li[data-item-type="task"][data-checked="true"]::before,
+.nv-editor .ProseMirror li.task-list-item[data-checked="true"]::before {
+  background: var(--nv-accent);
+  border-color: var(--nv-accent);
+}
+
+.nv-editor .ProseMirror li[data-item-type="task"][data-checked="true"] {
+  color: var(--nv-faint);
+}
+
+.nv-editor .ProseMirror table {
+  border-collapse: collapse;
+}
+
+.nv-editor .ProseMirror td,
+.nv-editor .ProseMirror th {
+  border: 1px solid var(--nv-line-strong);
+  padding: 4px 8px;
+}
+
+.nv-editor .ProseMirror th {
+  background: var(--nv-elevated);
+}
+
+/* Selection of a table cell / a node uses the accent. */
+.nv-editor .ProseMirror .selectedCell::after {
+  background: var(--nv-accent-soft);
 }
 
 .nv-titlebar button,

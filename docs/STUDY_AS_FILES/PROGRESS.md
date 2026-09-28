@@ -161,3 +161,96 @@ completo, es extender `fixCanvasBoxes` a `type: "file"`.
 `_piloto_logica`). No tiene relación con la migración —no se renombró ni se borró
 ninguna nota— y se detecta porque ningún `_tema`/`.practica`/`.teorica`/`.resumen`
 aparece entre las referencias rotas.
+
+---
+
+# FIX_VIEWS (`docs/STUDY_AS_FILES/FIX_VIEWS.md`)
+
+Ejecución del plan de arreglos sobre `web-migration`, área por área, con
+typecheck limpio y `npx vitest run` en verde antes de cada push.
+
+| Área | Commit | Tests | Estado |
+|---|---|---|---|
+| A — Click de carpeta: expandir **y** abrir la vista | `c5a7433` | 609 verdes | hecho y verificado en la app |
+| B — Descripción obligatoria en cada competencia | `bf07192` | 619 verdes | hecho y verificado en la app |
+| C — Reforma visual de la vista de tema | `fe13272` | 622 verdes | hecho y verificado en la app |
+| D — Resumen como dashboard de avance, expandible | `fbf39aa` | 635 verdes | hecho y verificado en la app |
+| E — Verificación y documentación | este commit | 635 verdes | hecho |
+
+## Área A — el click de carpeta hace las dos cosas
+
+`openFolderView` abría la vista y volvía con `return`, así que los ficheros de
+dentro nunca aparecían. Ahora expande la carpeta (sin colapsarla si ya estaba
+abierta) y después abre la vista: tema → `.practica`, área → `.resumen`. Una
+carpeta sin vista conserva el despliegue normal. Test propio
+(`components/notes/FileTree.test.tsx`, 3 casos) sobre la función exportada.
+
+## Área B — la descripción de cada competencia es obligatoria
+
+Las 8 competencias de matemáticas llevan ahora la descripción corta en español
+del diseño («Resolución de problemas contextualizados y aplicados», «Detección
+analítica de falacias y pasos fallidos», …) en las tres copias que existían
+—`core/practice/modes.ts` (nuevo campo `description`, que sustituye al
+`judge_focus` inglés como respaldo), `core/practice/skills.ts` y `lib/skills.ts`—
+y viajan hasta la interfaz dentro del propio progreso (`TopicSkillProgress.
+description`). Se renderizan en las filas de la matriz y en el selector del
+configurador (que antes mostraba `act`). Dos tests las vigilan: uno comprueba en
+el core que las tres copias coinciden y que ninguna cae en inglés, y otro en la
+interfaz que el configurador las muestra.
+
+## Área C — reforma visual de la vista de tema
+
+Elemento por elemento según `topic_view_ref.webp`: chips «Práctica del tema» y
+SRS (ámbar cuando hay repasos), número del tema separado del título, conmutador
+Resumen / Practicar tema, recarga y avatar de la materia; hero «Estado global»
+con el anillo de dominio sobre los estados reales por competencia, las tarjetas
+«Meta por Skill» y «Examen Final», la franja de aviso con `iniciadas/total` y los
+dos botones de acción; matriz con glifo, nombre, **descripción**, tres columnas de
+dificultad con `hechos / mínimo`, estado y «Practicar» por fila (que abre el
+configurador con esa competencia ya seleccionada); tarjeta de repasos SRS con
+contador, «Configurar intervalos» (nuevo `SrsIntervalsDialog`, que muestra la
+escalera real 1 → 6 → × facilidad por competencia) y el estado vacío; y el atajo
+de teclado, que es real: Espacio abre el configurador salvo mientras se escribe o
+hay un diálogo abierto.
+
+## Área D — el resumen es un dashboard de avance
+
+`ResumenView` deja de parecerse a la matriz: KPIs (temas iniciados, dominio
+medio, competencias con dominio, intentos), un anillo por **área** en la raíz de
+la materia —uno por **tema** cuando el resumen es de un área—, un anillo por
+dificultad y el digest de errores. Cada tarjeta se abre: el área lista sus temas
+y cada tema muestra sus anillos por competencia (`hechos / requeridos`) y lo que
+falta («falta ★★★ Dif», «sin empezar ★★ Med»), con su botón «Practicar» que abre
+la vista del tema (creándola si la carpeta aún no la tiene). Los ayudantes viven
+en `lib/areaOverview.ts` (`topicPct`, `groupTopics`, `skillRings`, `missingOf`,
+`normFolder`) y están testeados; los anillos reutilizan el `Donut` existente y
+todos los números salen del motor.
+
+**La raíz de la materia no tiene práctica ni teoría.** `isSubjectRoot` reconoce
+una carpeta cuyos hijos son áreas, `ensureTopicViewFiles` se niega a crear ficheros
+de vista ahí, `study_view_ensure` devuelve su resumen y la migración la manda a los
+resúmenes. Se eliminaron `Matemáticas.practica.md` y `Matemáticas.teorica.md`
+(creados por un click anterior) y `isTopicFolder` ahora se fía del fichero de vista
+y no de una nota con `type: topic`, así que el `00 Temario.md` del vault no puede
+volver a convertir la raíz en un tema.
+
+## Área E — verificación en la app empaquetada
+
+`npm run electron:build` + `release/win-unpacked/NoteVault.exe` (CDP 9223), sobre
+el vault real:
+
+- Click en `Matemáticas` (raíz) → el árbol **se expande** (se ven las áreas y su
+  `.resumen`) y se abre `Matemáticas.resumen.md`: «RESUMEN DE LA MATERIA», KPIs
+  (TEMAS 0/41, PROGRESO 0%, COMPETENCIAS 0/8, INTENTOS 0), 4 anillos (uno por
+  área) y **ninguna matriz**.
+- Abrir el área de Aritmética lista sus temas (`0% · 7 ejercicios · falta 8
+  competencia(s)`) y abrir un tema muestra sus anillos por competencia con los
+  chips de lo que falta; el árbol pasó de 4 a 16 a 24 anillos según se despliega.
+- «Practicar» en una fila abre la vista del tema: chips, hero completo («ESTADO
+  GLOBAL», «Dominio del Tema», «Meta por Skill», «Examen Final», «Iniciar Práctica
+  Global», «Tomar examen»), matriz con las 24 celdas `0 / 6`, 8 acciones
+  «Practicar», descripciones en cada fila, tarjeta SRS con «Configurar
+  intervalos» y el aviso de «Espacio para practicar».
+- Pestaña «Practicar tema»: el configurador muestra las descripciones nuevas
+  («Rigor matemático, proporciones formales y álgebra», «Scaffolding paso a paso
+  para consolidar la base», …) con dificultad, cantidad y asistencia.

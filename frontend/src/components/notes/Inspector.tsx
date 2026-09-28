@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { bodyOf, useApp } from "../../store/app";
 import { cn } from "../ui";
+import { useProperties } from "./PropertiesDialog";
 
 interface Heading {
   level: number;
@@ -190,6 +191,18 @@ function NoteInspector({ embedded = false, onClose }: { embedded?: boolean; onCl
                 </li>
               ))}
             </ul>
+          </Section>
+          <Section title="Propiedades">
+            <button
+              type="button"
+              onClick={() => useProperties.getState().show(note.path)}
+              className="flex w-full items-center gap-2 rounded-md border border-line px-2 py-1 text-[12px] text-dim hover:border-accent hover:text-text"
+            >
+              <SlidersHorizontal size={12} /> Editar propiedades
+            </button>
+            <div className="mt-1.5 text-[11px] text-faint">
+              Asunto, tipo, estado, etiquetas y dificultad de la nota.
+            </div>
           </Section>
           <Section title="Nota">
             <div className="space-y-1 font-mono text-[11px] text-dim">

@@ -125,8 +125,11 @@ describe("TopBar", () => {
     expect(text).not.toContain("NoteVault");
     expect(text).not.toContain("vault-a");
 
-    for (const label of ["Panel lateral", "Archivos", "Buscar", "Marcadores"]) {
-      expect(container.querySelector(`button[aria-label="${label}"]`), `missing “${label}”`).not.toBeNull();
+    // The bar keeps the tab strip and the window's own controls; the three view
+    // shortcuts are gone (the explorer panel carries its own tabs).
+    expect(container.querySelector('button[aria-label="Panel lateral"]')).not.toBeNull();
+    for (const label of ["Archivos", "Buscar", "Marcadores"]) {
+      expect(container.querySelector(`button[aria-label="${label}"]`), `sobra “${label}”`).toBeNull();
     }
     for (const label of ["Minimizar", "Maximizar", "Cerrar"]) {
       expect(container.querySelector(`button[aria-label="${label}"]`), `missing “${label}”`).not.toBeNull();
@@ -153,14 +156,16 @@ describe("TopBar", () => {
     }
   });
 
-  it("workspace icons open the matching explorer view", () => {
-    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Buscar"]')!.click());
-    expect(useApp.getState().explorerTab).toBe("search");
-    expect(useApp.getState().explorerOpen).toBe(true);
-    expect(useApp.getState().module).toBe("notas");
-
-    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Marcadores"]')!.click());
-    expect(useApp.getState().explorerTab).toBe("bookmarks");
+  it("the strip owns the bar: only the panel toggle and the window controls are fixed", () => {
+    // The tabs are what takes the space, so the strip must not sit next to three
+    // view buttons anymore.
+    const strip = container.querySelector('[role="tablist"]');
+    expect(strip).not.toBeNull();
+    const buttons = [...container.querySelectorAll("header button[aria-label]")].map((b) => b.getAttribute("aria-label"));
+    expect(buttons).toContain("Panel lateral");
+    expect(buttons).not.toContain("Archivos");
+    expect(buttons).not.toContain("Buscar");
+    expect(buttons).not.toContain("Marcadores");
 
     act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Panel lateral"]')!.click());
     expect(useApp.getState().explorerOpen).toBe(false);

@@ -1,14 +1,14 @@
 // App chrome: top bar (with unified tab strip), icon rail, status bar, toasts.
 
 import {
-  Bookmark, Calendar, CircleCheck, Copy, Dumbbell, Files, Flag, Globe, House, Kanban, Minus, Moon, PanelLeft,
-  PenLine, Pin, PinOff, Plus, Search, Square, SquareCheck, Sun, Wallet, X, Cloud, CloudUpload,
+  Calendar, CircleCheck, Copy, Dumbbell, Flag, Globe, House, Kanban, Minus, Moon, PanelLeft,
+  PenLine, Pin, PinOff, Plus, Square, SquareCheck, Sun, Wallet, X, Cloud, CloudUpload,
   CircleAlert, Settings, FileCode2, FileText, LayoutDashboard,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
 import { api, isElectron } from "../lib/bridge";
-import { useApp, type AppTab, type ExplorerTab, type ModuleId } from "../store/app";
+import { useApp, type AppTab, type ModuleId } from "../store/app";
 import { cn, openMenu } from "./ui";
 import { useVaultDialog } from "./VaultDialog";
 import { useSettingsDialog } from "./settings/SettingsDialog";
@@ -226,26 +226,14 @@ export function TopBar() {
 
 // ── Workspace icons ─────────────────────────────────────────────────────────
 
-const WORKSPACE_VIEWS: Array<{ id: ExplorerTab; label: string; Icon: ComponentType<{ size?: number; strokeWidth?: number }> }> = [
-  { id: "files", label: "Archivos", Icon: Files },
-  { id: "search", label: "Buscar", Icon: Search },
-  { id: "bookmarks", label: "Marcadores", Icon: Bookmark },
-];
-
 function WorkspaceIcons() {
-  const explorerTab = useApp((s) => s.explorerTab);
   const explorerOpen = useApp((s) => s.explorerOpen);
   const toggleExplorer = useApp((s) => s.toggleExplorer);
-  const setExplorerTab = useApp((s) => s.setExplorerTab);
-  const module = useApp((s) => s.module);
 
-  // A view lives inside the Notes module: the icon takes you there.
-  const show = (id: ExplorerTab) => {
-    if (module !== "notas") useApp.getState().setModule("notas");
-    setExplorerTab(id);
-  };
-  const shown = module === "notas" && explorerOpen;
-
+  // The three view shortcuts that used to live here are gone: the explorer panel
+  // carries its own tabs (Archivos · Buscar · Marcadores · Etiquetas · Grafo), so
+  // the strip gives that space back to the tabs. Only the panel toggle stays,
+  // because it is the one thing that belongs to the window and not to a module.
   return (
     <div className="flex flex-none items-center gap-0.5 border-r border-line px-1.5">
       <button
@@ -261,22 +249,6 @@ function WorkspaceIcons() {
       >
         <PanelLeft size={16} strokeWidth={1.8} />
       </button>
-      {WORKSPACE_VIEWS.map(({ id, label, Icon }) => (
-        <button
-          key={id}
-          type="button"
-          title={label}
-          aria-label={label}
-          aria-pressed={shown && explorerTab === id}
-          onClick={() => show(id)}
-          className={cn(
-            "grid h-7 w-7 place-items-center rounded-md transition-colors",
-            shown && explorerTab === id ? "bg-accent-soft text-accent-text" : "text-faint hover:bg-hover hover:text-text",
-          )}
-        >
-          <Icon size={16} strokeWidth={1.8} />
-        </button>
-      ))}
     </div>
   );
 }

@@ -18,7 +18,6 @@ import { TopicFileView } from "../study/TopicFileView";
 import { viewFileKind } from "../../lib/viewFiles";
 import { isProofNote, LadderView, useLadder } from "../practice/LadderView";
 import { SourceEditor } from "./SourceEditor";
-import { StudyBar } from "./StudyBar";
 
 
 const MODES: Array<{ id: ViewMode; label: string; icon: React.ReactNode }> = [
@@ -300,7 +299,6 @@ export function EditorArea() {
           ) : (
             <>
               <NoteHeader note={note} />
-              {note.kind === "note" && <StudyBar note={note} />}
               {note.conflict && <ConflictBanner note={note} />}
               <div className="flex min-h-0 flex-1">
                 {mode !== "read" && (

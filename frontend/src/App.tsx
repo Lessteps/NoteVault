@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { api } from "./lib/bridge";
-import { flushAll, useApp } from "./store/app";
+import { flushAll, useApp, wasJustWritten } from "./store/app";
 import { ComingSoon, IconRail, StatusBar, Toasts, TopBar } from "./components/Shell";
 import { ModuleHost } from "./components/ModuleHost";
 import { WebRail } from "./components/web/WebRail";
@@ -174,7 +174,9 @@ function useFileWatcherListener() {
       const rel = ev.relPath;
       if (rel) {
         const s = useApp.getState();
-        if (s.notes[rel]) {
+        // Our own save comes back as a file event: re-reading it would rebuild the
+        // editor with what it already shows.
+        if (s.notes[rel] && !wasJustWritten(rel)) {
           void s.reload(rel);
         }
         const canvas = useCanvas.getState();

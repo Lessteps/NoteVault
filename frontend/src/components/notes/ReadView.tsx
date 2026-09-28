@@ -1,5 +1,5 @@
 import { Braces } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef } from "react";
 import { api } from "../../lib/bridge";
 import { parseMediaUrl } from "../../lib/player";
 import { usePlayer } from "../../store/player";
@@ -146,11 +146,15 @@ function hydrate(root: HTMLElement, notePath: string, depth: number) {
 
 export function ReadView({ note }: { note: OpenNote }) {
   const body = bodyOf(note.raw);
+  // Rendering a long note (markdown-it plus one KaTeX pass per formula) takes long
+  // enough to be felt on open and on every keystroke in split mode. The deferred
+  // value renders the same HTML, just without holding up what is being typed.
+  const deferred = useDeferredValue(note);
   const html = useMemo(
-    () => (note.kind === "code"
-      ? renderMarkdown("```" + (note.path.split(".").pop() ?? "") + "\n" + note.raw + "\n```")
-      : renderMarkdown(body)),
-    [note.kind, note.path, note.raw, body],
+    () => (deferred.kind === "code"
+      ? renderMarkdown("```" + (deferred.path.split(".").pop() ?? "") + "\n" + deferred.raw + "\n```")
+      : renderMarkdown(bodyOf(deferred.raw))),
+    [deferred.kind, deferred.path, deferred.raw],
   );
   const ref = useRef<HTMLElement>(null);
   const editRaw = useApp((s) => s.editRaw);

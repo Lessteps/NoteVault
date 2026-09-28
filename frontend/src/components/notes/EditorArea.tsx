@@ -18,6 +18,7 @@ import { TopicFileView } from "../study/TopicFileView";
 import { viewFileKind } from "../../lib/viewFiles";
 import { isProofNote, LadderView, useLadder } from "../practice/LadderView";
 import { SourceEditor } from "./SourceEditor";
+import { FormatBar } from "./FormatBar";
 
 
 const MODES: Array<{ id: ViewMode; label: string; icon: React.ReactNode }> = [
@@ -299,6 +300,9 @@ export function EditorArea() {
           ) : (
             <>
               <NoteHeader note={note} />
+              {/* La barra de formato vive justo debajo de Lectura / Editar: en
+                  modo lectura no hay nada que formatear. */}
+              {mode !== "read" && note.kind === "note" && <FormatBar />}
               {note.conflict && <ConflictBanner note={note} />}
               <div className="flex min-h-0 flex-1">
                 {mode !== "read" && (

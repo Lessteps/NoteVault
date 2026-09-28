@@ -12,6 +12,7 @@ import {
 import { tags as t } from "@lezer/highlight";
 import { useEffect, useRef } from "react";
 import { insertTable, toggleTask, wrap } from "../../lib/editorCommands";
+import { livePreview } from "../../lib/livePreview";
 
 // Markdown shortcuts (the Qt editor's Ctrl+B / Ctrl+I / Ctrl+L / Ctrl+Shift+T).
 const mdKeymap = keymap.of([
@@ -55,6 +56,21 @@ const theme = EditorView.theme({
   ".cm-searchMatch": { backgroundColor: "var(--nv-warn-soft)" },
   ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--nv-accent-soft)" },
   ".cm-selectionMatch": { backgroundColor: "var(--nv-accent-soft)" },
+  // Lo que pinta la vista indexada (lib/mdPreview): un código en línea se ve
+  // como código y un enlace como enlace, sin sus marcas.
+  ".cm-nv-code": {
+    fontFamily: "var(--font-mono)",
+    fontSize: "0.9em",
+    background: "var(--nv-elevated)",
+    borderRadius: "4px",
+    padding: "1px 4px",
+  },
+  ".cm-nv-link": {
+    color: "var(--nv-accent-text)",
+    textDecoration: "underline",
+    textDecorationColor: "color-mix(in srgb, var(--nv-accent-text) 40%, transparent)",
+  },
+  ".cm-nv-bullet": { color: "var(--nv-accent-text)", fontWeight: "700" },
 });
 
 const mdHighlight = HighlightStyle.define([
@@ -112,6 +128,9 @@ export function SourceEditor({
   // Latest callbacks without rebuilding the editor on every render.
   const cb = useRef({ onChange, onCursor });
   cb.current = { onChange, onCursor };
+  // Lo ultimo que este editor entrego, para distinguir el eco de nuestro propio
+  // guardado de un cambio real en disco.
+  const lastSent = useRef(value);
 
   useEffect(() => {
     const state = EditorState.create({
@@ -119,8 +138,9 @@ export function SourceEditor({
       extensions: [
         // Keep the file's own line endings on the way out.
         EditorState.lineSeparator.of(eol),
-        lineNumbers(),
-        highlightActiveLineGutter(),
+        // A note is read, not debugged: no gutter, and the Markdown markers are
+        // hidden (see livePreview). Code files keep both.
+        ...(code ? [lineNumbers(), highlightActiveLineGutter()] : [livePreview]),
         history(),
         drawSelection(),
         highlightActiveLine(),
@@ -137,7 +157,11 @@ export function SourceEditor({
         // With two editors (split view) the tools act on the focused one.
         EditorView.domEventHandlers({ focus: (_e, view) => { activeEditor.view = view; } }),
         EditorView.updateListener.of((u) => {
-          if (u.docChanged) cb.current.onChange(u.state.sliceDoc());
+          if (u.docChanged) {
+            const text = u.state.sliceDoc();
+            lastSent.current = text;
+            cb.current.onChange(text);
+          }
           if (u.docChanged || u.selectionSet) {
             const head = u.state.selection.main.head;
             const line = u.state.doc.lineAt(head);
@@ -160,14 +184,22 @@ export function SourceEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eol, code]);
 
-  // Outside changes (reload from disk, a task ticked in the preview).
+  // Outside changes (reload from disk, a task ticked in the preview). The echo of
+  // our own save is ignored: replacing the document with what it already says
+  // re-parses the whole note and throws the cursor away, and that is the freeze
+  // felt right after typing.
   useEffect(() => {
     const v = view.current;
     if (!v) return;
+    if (value === lastSent.current) return;
     const cur = v.state.sliceDoc();
-    if (cur !== value) {
-      v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: value } });
-    }
+    if (cur === value) return;
+    lastSent.current = value;
+    const anchor = Math.min(v.state.selection.main.head, value.length);
+    v.dispatch({
+      changes: { from: 0, to: v.state.doc.length, insert: value },
+      selection: { anchor },
+    });
   }, [value]);
 
   useEffect(() => {

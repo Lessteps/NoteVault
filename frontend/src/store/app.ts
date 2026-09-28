@@ -197,6 +197,17 @@ export const pathEvents = {
 };
 
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+// Notes this app just wrote. The file watcher reports our own saves too, and
+// reloading them re-reads the file and rebuilds the editor for nothing.
+const recentWrites = new Map<string, number>();
+const WRITE_ECHO_MS = 2500;
+
+/** True when the change the watcher is reporting is probably our own save. */
+export function wasJustWritten(path: string): boolean {
+  const at = recentWrites.get(path);
+  return at !== undefined && Date.now() - at < WRITE_ECHO_MS;
+}
 const AUTOSAVE_MS = 1200;
 let toastSeq = 0;
 
@@ -578,6 +589,7 @@ export const useApp = create<State>((setState, get) => {
         if (res.conflict) {
           return { notes: { ...st.notes, [path]: { ...cur, saving: false, conflict: true } } };
         }
+        recentWrites.set(path, Date.now());
         return {
           notes: {
             ...st.notes,

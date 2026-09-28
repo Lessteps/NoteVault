@@ -38,6 +38,8 @@ export interface BrowserState {
   canGoBack: boolean;
   canGoForward: boolean;
   isLoading: boolean;
+  /** site icon as a data URL, empty when unknown */
+  favicon?: string;
 }
 
 type Transport = { kind: "pywebview" } | { kind: "http"; token: string } | { kind: "electron" };

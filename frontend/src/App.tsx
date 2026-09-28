@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { api } from "./lib/bridge";
 import { flushAll, useApp } from "./store/app";
 import { ComingSoon, IconRail, StatusBar, Toasts, TopBar } from "./components/Shell";
+import { ModuleHost } from "./components/ModuleHost";
+import { WebRail } from "./components/web/WebRail";
 import { DialogHost, MenuHost } from "./components/ui";
 import { VaultDialog } from "./components/VaultDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
@@ -28,6 +30,9 @@ const MODULES: Partial<Record<ModuleId, ComponentType>> = {
   web: lazyModule(() => import("./components/web/WebModule"), "WebModule"),
   player: lazyModule(() => import("./components/english/EnglishPlayer"), "EnglishPlayer"),
 };
+
+/** The host renders one module at a time; this is how each of them is built. */
+const renderModule = (id: ModuleId) => <ModuleView module={id} />;
 
 function ModuleView({ module }: { module: ModuleId }) {
   if (module === "notas") return <NotesModule />;
@@ -183,7 +188,10 @@ export function App() {
       <TopBar />
       <div className="flex min-h-0 flex-1">
         <IconRail />
-        <ModuleView module={module} />
+        {/* Every visited functionality stays mounted: its sub-tab, its scroll and
+            its forms survive a tab switch (see ModuleHost). */}
+        <ModuleHost module={module} render={renderModule} />
+        <WebRail />
       </div>
       <StatusBar />
       <QuickSwitcher />

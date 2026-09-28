@@ -2,6 +2,7 @@
 // blocks of the range on screen and the editor.
 
 import { create } from "zustand";
+import { persistField } from "./navState";
 import { api } from "../lib/bridge";
 import { addDays, parseIso, weekStart } from "../lib/habits";
 import { isoDate, todayIso } from "../lib/tasks";
@@ -183,3 +184,6 @@ export const useCalendar = create<CalState>((set, get) => ({
     }
   },
 }));
+
+// La vista interna del módulo se recuerda entre reinicios.
+persistField(useCalendar, "view", "calendar.view");

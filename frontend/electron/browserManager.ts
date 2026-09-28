@@ -1,4 +1,4 @@
-import { WebContentsView, BrowserWindow, shell } from "electron";
+import { WebContentsView, BrowserWindow, net, shell } from "electron";
 import { blockedPageHtml, hostOf, normalizeUrl, UsageMeter, WebStore } from "../src/core/webStore.js";
 import { getAppState } from "../src/api/registry.js";
 
@@ -15,6 +15,8 @@ export interface BrowserState {
   canGoBack: boolean;
   canGoForward: boolean;
   isLoading: boolean;
+  /** The site's icon, inlined as a data URL so the renderer can show it (its CSP blocks remote images). */
+  favicon: string;
 }
 
 export class BrowserManager {
@@ -24,6 +26,7 @@ export class BrowserManager {
   private currentUrl = "https://www.google.com";
   private currentTitle = "";
   private isLoading = false;
+  private currentFavicon = "";
   private meterTimer: NodeJS.Timeout | null = null;
 
   setWindow(win: BrowserWindow) {
@@ -47,6 +50,7 @@ export class BrowserManager {
 
     wc.on("did-start-loading", () => {
       this.isLoading = true;
+      this.currentFavicon = "";
       this.notifyState();
     });
 
@@ -70,6 +74,13 @@ export class BrowserManager {
     wc.on("page-title-updated", (_e, title) => {
       this.currentTitle = title;
       this.notifyState();
+    });
+
+    // The renderer cannot load remote images, so the icon is fetched here and
+    // handed over as a data URL; the rail falls back to a monogram without it.
+    wc.on("page-favicon-updated", (_e, favicons) => {
+      const icon = favicons[0];
+      if (icon) void this.loadFavicon(icon);
     });
 
     wc.setWindowOpenHandler(({ url }) => {
@@ -158,7 +169,24 @@ export class BrowserManager {
       canGoBack: wc?.canGoBack() ?? false,
       canGoForward: wc?.canGoForward() ?? false,
       isLoading: this.isLoading,
+      favicon: this.currentFavicon,
     };
+  }
+
+  /** Fetches the site's icon and keeps it as a small data URL. */
+  private async loadFavicon(url: string): Promise<void> {
+    try {
+      const res = await net.fetch(url);
+      if (!res.ok) return;
+      const type = res.headers.get("content-type") ?? "image/png";
+      if (!type.startsWith("image/")) return;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (!buf.byteLength || buf.byteLength > 96 * 1024) return;
+      this.currentFavicon = `data:${type};base64,${buf.toString("base64")}`;
+      this.notifyState();
+    } catch {
+      // Offline or a dead icon: the rail shows the monogram instead.
+    }
   }
 
   attach(bounds: BrowserBounds, url?: string): BrowserState {

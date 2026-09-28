@@ -172,6 +172,17 @@ describe("TopBar", () => {
 });
 
 describe("the tab strip", () => {
+  it("never lists a browser page", () => {
+    useApp.setState({
+      openTabs: [...useApp.getState().openTabs, { kind: "web", tabId: "web" }],
+    });
+    mount();
+
+    const labels = tabs().map((t) => t.textContent ?? "");
+    expect(labels.some((l) => l.includes("Navegador"))).toBe(false);
+    expect(labels.length).toBeGreaterThan(0);
+  });
+
   it("hides its scrollbar and keeps every tab it holds", () => {
     mount();
     const strip = container.querySelector('[role="tablist"][aria-label="Pestañas abiertas"]')!;

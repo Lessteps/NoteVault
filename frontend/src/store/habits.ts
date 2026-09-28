@@ -2,6 +2,7 @@
 // them; the stats are re-read after every write.
 
 import { create } from "zustand";
+import { persistField } from "./navState";
 import { api } from "../lib/bridge";
 import type { Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats } from "../lib/types";
 import { todayIso } from "../lib/tasks";
@@ -236,3 +237,6 @@ export const useHabits = create<HabitsState>((set, get) => ({
     }
   },
 }));
+
+// La vista interna del módulo se recuerda entre reinicios.
+persistField(useHabits, "view", "habits.view");

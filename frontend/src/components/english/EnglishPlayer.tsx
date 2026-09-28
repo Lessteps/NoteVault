@@ -11,6 +11,7 @@ import { copyText } from "../../lib/clipboard";
 import { clock, cueAt, cueBefore, nextTarget, previousTarget, SPEEDS, type Pair } from "../../lib/player";
 import type { PlayerMedia } from "../../lib/types";
 import { useApp } from "../../store/app";
+import { usePersistedNav } from "../../store/navState";
 import { usePlayer } from "../../store/player";
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
@@ -386,7 +387,7 @@ export function EnglishPlayer() {
 
 function MineDialog({ media, pair, onClose }: { media: PlayerMedia; pair: Pair; onClose: () => void }) {
   const [sentence, setSentence] = useState(pair.en || pair.es);
-  const [mode, setMode] = useState<"translate" | "cloze">("translate");
+  const [mode, setMode] = usePersistedNav<"translate" | "cloze">("player.mode", "translate");
   const [target, setTarget] = useState("");
   const [level, setLevel] = useState("B1");
   const [error, setError] = useState("");

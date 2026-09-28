@@ -2,6 +2,7 @@
 
 import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Film, LayoutGrid, Link2, ListChecks, Pencil, Play, Settings2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePersistedNav } from "../../store/navState";
 import { api } from "../../lib/bridge";
 import { MONTHS_ES } from "../../lib/calendar";
 import { addDays, weekStart } from "../../lib/habits";
@@ -374,7 +375,8 @@ function VideoPlayer({ ex, onBack }: { ex: Exercise; onBack: () => void }) {
 
 export function ExerciseModule() {
   const fail = useFail();
-  const [view, setView] = useState("overview");
+  // Su vista interna (Vista general / Registro / un día) se recuerda.
+  const [view, setView] = usePersistedNav("ejercicio.view", "overview");
   const [days, setDays] = useState<DayMeta[]>([]);
   const [list, setList] = useState<Exercise[]>([]);
   const [video, setVideo] = useState<Exercise | null>(null);

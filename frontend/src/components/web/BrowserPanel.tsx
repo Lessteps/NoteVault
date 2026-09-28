@@ -6,7 +6,16 @@ import { useApp } from "../../store/app";
 import { useCanvas } from "../../store/canvas";
 import { IconButton } from "../ui";
 
-export function BrowserPanel({ initialUrl }: { initialUrl?: string }) {
+export function BrowserPanel({
+  url,
+  onPageState,
+}: {
+  /** The page the rail selected: changing it navigates the browser there. */
+  url?: string;
+  /** Lets the rail keep the page's title, address and icon up to date. */
+  onPageState?: (state: BrowserState) => void;
+}) {
+  const initialUrl = url;
   const toast = useApp((s) => s.toast);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const attached = useRef(false);
@@ -81,6 +90,7 @@ export function BrowserPanel({ initialUrl }: { initialUrl?: string }) {
 
     const unsubState = api.onBrowserState((newState) => {
       setState(newState);
+      onPageState?.(newState);
       if (newState.url && newState.url !== "about:blank") {
         setInputUrl(newState.url);
       }
@@ -102,6 +112,19 @@ export function BrowserPanel({ initialUrl }: { initialUrl?: string }) {
       void api.browserDetach();
     };
   }, [updateBounds]);
+
+  // The rail picked another page: the one native view navigates to it.
+  useEffect(() => {
+    if (!url || !attached.current) return;
+    if (url === state.url) return;
+    api.browserNavigate(url).then((s) => {
+      if (s) {
+        setState(s);
+        onPageState?.(s);
+      }
+    }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
 
   const handleNavigate = (e?: React.FormEvent) => {
     e?.preventDefault();

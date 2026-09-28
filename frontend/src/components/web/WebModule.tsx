@@ -12,10 +12,13 @@ import { Columns } from "../common/charts";
 import { Field, input, PrimaryButton } from "../common/forms";
 import { askText, cn, confirmAction } from "../ui";
 import { BrowserPanel } from "./BrowserPanel";
+import { activeWebPage, useWebPages } from "../../store/webPages";
+import { usePersistedNav } from "../../store/navState";
 
 type Tab = "browser" | "bookmarks" | "history" | "usage" | "rules";
 
-let _savedWebTab: Tab = "browser";
+// The last page the browser surface showed, kept only for the bookmarks and
+// history tabs' "open" shortcut; the rail owns the real page list.
 let _savedBrowseUrl: string | undefined = undefined;
 
 const mins = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : `${Math.round(s / 60)} min`);
@@ -23,14 +26,17 @@ const mins = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round
 export function WebModule() {
   const toast = useApp((s) => s.toast);
   const [data, setData] = useState<WebOverview | null>(null);
-  const [tab, setTabState] = useState<Tab>(_savedWebTab);
+  // Su sub-pestaña (navegador / marcadores / historial / uso) se recuerda.
+  const [tab, setTabState] = usePersistedNav<Tab>("web.tab", "browser");
+  const pages = useWebPages((s) => s.pages);
+  const activeId = useWebPages((s) => s.activeId);
+  const patchPage = useWebPages((s) => s.patch);
+  const addPage = useWebPages((s) => s.add);
+  const page = activeWebPage({ pages, activeId });
   const [currentBrowseUrl, setCurrentBrowseUrlState] = useState<string | undefined>(_savedBrowseUrl);
   const [day, setDay] = useState("");
 
-  const setTab = (t: Tab) => {
-    _savedWebTab = t;
-    setTabState(t);
-  };
+  const setTab = (t: Tab) => setTabState(t);
 
   const setCurrentBrowseUrl = (u: string) => {
     _savedBrowseUrl = u;
@@ -95,7 +101,30 @@ export function WebModule() {
       </div>
       <div className={cn("min-h-0 flex-1", tab === "browser" ? "p-0 flex flex-col" : "overflow-y-auto px-5 py-4")}>
         {tab === "browser" ? (
-          <BrowserPanel initialUrl={currentBrowseUrl} />
+          page ? (
+            <BrowserPanel
+              url={page.url}
+              onPageState={(state) =>
+                patchPage(page.id, { url: state.url, title: state.title, favicon: state.favicon })
+              }
+            />
+          ) : (
+            <div className="grid flex-1 place-items-center px-6 text-center">
+              <div className="max-w-sm">
+                <Globe size={22} className="mx-auto text-faint" />
+                <p className="mt-2 text-[13px] text-dim">
+                  No hay ninguna página abierta. El panel de la derecha las lista; usa su «+» para abrir una.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => addPage("https://")}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-accent-strong"
+                >
+                  Abrir la primera página
+                </button>
+              </div>
+            </div>
+          )
         ) : (
           <div className="mx-auto max-w-3xl">
             {tab === "bookmarks" && (

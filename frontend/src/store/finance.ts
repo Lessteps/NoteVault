@@ -1,6 +1,7 @@
 // Finanzas state: the view, catalogues (categories, goals) and dialogs.
 
 import { create } from "zustand";
+import { persistField } from "./navState";
 import { api } from "../lib/bridge";
 import type { FinCategory, FinGoal, FinMeta, FinSidebar, Movement, MovementType } from "../lib/types";
 import { useApp } from "./app";
@@ -71,3 +72,6 @@ export function categoryOf(meta: FinMeta | null, id: string | undefined): FinCat
 export function goalOf(meta: FinMeta | null, id: string | undefined): FinGoal | undefined {
   return id ? meta?.goals.find((g) => g.id === id) : undefined;
 }
+
+// La vista interna del módulo se recuerda entre reinicios.
+persistField(useFinance, "view", "finance.view");

@@ -6,7 +6,7 @@ import {
   CircleAlert, Settings, FileCode2, FileText, LayoutDashboard,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, isElectron } from "../lib/bridge";
 import { useApp, type AppTab, type ExplorerTab, type ModuleId } from "../store/app";
 import { cn, openMenu } from "./ui";
@@ -70,9 +70,34 @@ function TabStrip() {
   const pinnedTabIds = useApp((s) => s.pinnedTabIds);
   const notes = useApp((s) => s.notes);
   const { setActiveTab, closeTab, pinTab, unpinTab } = useApp.getState();
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  // The strip hides its scrollbar (it would eat the bar's height), so it has to
+  // bring the tab you are on into view by itself.
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip || !activeTabId) return;
+    const el = document.getElementById(`tab-${activeTabId.replace(/[^a-z0-9]/gi, "-")}`);
+    if (!el) return;
+    const view = strip.getBoundingClientRect();
+    const tab = el.getBoundingClientRect();
+    if (tab.left < view.left) strip.scrollLeft -= view.left - tab.left + 8;
+    else if (tab.right > view.right) strip.scrollLeft += tab.right - view.right + 8;
+  }, [activeTabId, openTabs.length]);
 
   return (
-    <div className="flex min-w-0 flex-1 items-end overflow-x-auto" role="tablist" aria-label="Pestañas abiertas">
+    <div
+      ref={stripRef}
+      onWheel={(e) => {
+        const strip = stripRef.current;
+        if (!strip || strip.scrollWidth <= strip.clientWidth) return;
+        if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+        strip.scrollLeft += e.deltaY;
+      }}
+      className="nv-tabstrip flex min-w-0 flex-1 items-end overflow-x-auto"
+      role="tablist"
+      aria-label="Pestañas abiertas"
+    >
       {openTabs.map((tab) => {
         const isActive = tab.tabId === activeTabId;
         const isPinned = pinnedTabIds.has(tab.tabId);
@@ -105,7 +130,7 @@ function TabStrip() {
               },
             ])}
             className={cn(
-              "group relative flex h-full max-w-[200px] flex-none cursor-pointer items-center gap-1.5 border-r border-line px-2.5 text-[12px]",
+              "group relative flex h-full max-w-[176px] flex-none cursor-pointer items-center gap-1.5 border-r border-line px-2.5 text-[12px]",
               isActive
                 ? "bg-surface text-text shadow-[inset_0_2px_0_var(--nv-accent)]"
                 : "text-dim hover:bg-hover hover:text-text",

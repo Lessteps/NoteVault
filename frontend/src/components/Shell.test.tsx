@@ -171,6 +171,16 @@ describe("TopBar", () => {
   });
 });
 
+describe("the tab strip", () => {
+  it("hides its scrollbar and keeps every tab it holds", () => {
+    mount();
+    const strip = container.querySelector('[role="tablist"][aria-label="Pestañas abiertas"]')!;
+    // The class is what removes the horizontal scrollbar (see styles.css).
+    expect(strip.className).toContain("nv-tabstrip");
+    expect(strip.className).toContain("overflow-x-auto");
+  });
+});
+
 describe("StatusBar", () => {
   it("keeps the vault switcher, now that the top bar has no brand block", () => {
     const other = document.createElement("div");

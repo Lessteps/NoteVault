@@ -114,6 +114,19 @@ body {
   user-select: none;
 }
 
+/* The tab strip scrolls sideways, but never shows a scrollbar: it would eat the
+   bar's height and put Windows' arrows right next to the window controls. */
+.nv-tabstrip {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior-x: contain;
+}
+.nv-tabstrip::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 /* Thin, quiet scrollbars. */
 * {
   scrollbar-width: thin;

@@ -3,24 +3,32 @@
 import { formatRepeat, parseRepeat, WEEKDAYS, type RepeatKind } from "../../lib/tasks";
 import { cn } from "../ui";
 import { input, inputBase } from "./forms";
+import { PeekMenu, type PeekOption } from "./peek";
 
-export function RepeatPicker({ value, onChange }: { value: string; onChange: (rule: string) => void }) {
+/** The app's own repetition rule menu; `menu` swaps the native select of the Center Peek. */
+const KINDS: PeekOption[] = [
+  { value: "none", label: "No se repite" },
+  { value: "daily", label: "Cada día" },
+  { value: "weekly", label: "Días de la semana" },
+  { value: "every", label: "Cada N días" },
+  { value: "monthly", label: "Días del mes" },
+];
+
+export function RepeatPicker({ value, onChange, menu }: { value: string; onChange: (rule: string) => void; menu?: boolean }) {
   const r = parseRepeat(value);
   const kind: RepeatKind = r.kind === "workdays" ? "weekly" : r.kind;
+  const pick = (k: RepeatKind) => onChange(k === "none" ? "" : k === "daily" ? "daily" : k === "weekly" ? "weekly:0"
+    : k === "every" ? "every:2" : "monthly:1");
   return (
-    <div className="space-y-1.5">
-      <select aria-label="Repetición" className={input} value={kind}
-        onChange={(e) => {
-          const k = e.target.value as RepeatKind;
-          onChange(k === "none" ? "" : k === "daily" ? "daily" : k === "weekly" ? "weekly:0"
-            : k === "every" ? "every:2" : "monthly:1");
-        }}>
-        <option value="none">No se repite</option>
-        <option value="daily">Cada día</option>
-        <option value="weekly">Días de la semana</option>
-        <option value="every">Cada N días</option>
-        <option value="monthly">Días del mes</option>
-      </select>
+    <div className="w-full space-y-1.5">
+      {menu ? (
+        <PeekMenu ariaLabel="Repetición" value={kind} options={KINDS} placeholder="No se repite" menuWidth={220}
+          onChange={(v) => pick(v as RepeatKind)} />
+      ) : (
+        <select aria-label="Repetición" className={input} value={kind} onChange={(e) => pick(e.target.value as RepeatKind)}>
+          {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+        </select>
+      )}
       {kind === "weekly" && (
         <div className="flex gap-1">
           {WEEKDAYS.map((w, i) => {

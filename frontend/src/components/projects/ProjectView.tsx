@@ -9,7 +9,10 @@ import { useProjects, type ProjectTab } from "../../store/projects";
 import { BlockProgress } from "../common/charts";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn, confirmAction } from "../ui";
-import { IssueDetail } from "./IssueDetail";
+// The right panel is disabled while the Center Peek is being validated: the
+// component and its file are untouched, only the rendering below is commented.
+// import { IssueDetail } from "./IssueDetail";
+import { IssuePeek } from "./IssuePeek";
 import { IssueList } from "./IssueList";
 import { Kanban } from "./Kanban";
 import { ProjectCalendar } from "./ProjectCalendar";
@@ -96,7 +99,8 @@ export function ProjectView() {
         {tab === "resumen" ? <Resumen /> : tab === "tablero" ? <Kanban /> : tab === "lista" ? <IssueList />
           : tab === "calendario" ? <ProjectCalendar /> : <ProjectNotes />}
       </div>
-      <IssueDetail />
+      {/* <IssueDetail /> — the old right panel, replaced by the centred peek. */}
+      <IssuePeek />
     </div>
   );
 }

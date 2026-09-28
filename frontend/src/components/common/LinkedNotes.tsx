@@ -8,8 +8,10 @@ import { useApp } from "../../store/app";
 import { IconButton } from "../ui";
 import { input } from "./forms";
 
-export function LinkedNotes({ notes, folder, onChange }: {
+export function LinkedNotes({ notes, folder, onChange, part = "both" }: {
   notes: string[]; folder: string; onChange: (notes: string[], folder: string) => void;
+  /** Which half to draw: the Center Peek shows the folder and the notes on their own rows. */
+  part?: "both" | "folder" | "notes";
 }) {
   const [picking, setPicking] = useState(false);
   const [q, setQ] = useState("");
@@ -30,38 +32,44 @@ export function LinkedNotes({ notes, folder, onChange }: {
 
   return (
     <div className="space-y-1.5">
-      <label className="flex items-center gap-2">
-        <Folder size={14} className="flex-none text-faint" />
-        <input className={input} value={folder} placeholder="Carpeta del vault (opcional)"
-          onChange={(e) => onChange(notes, e.target.value)} />
-      </label>
-      <ul className="space-y-0.5">
-        {notes.map((n) => (
-          <li key={n} className="group flex items-center gap-2 rounded-md px-1 hover:bg-hover">
-            <FileText size={13} className="flex-none text-accent-text" />
-            <button type="button" onClick={() => openNote(n)} className="min-w-0 flex-1 truncate text-left text-[12.5px] text-text hover:underline">{n}</button>
-            <IconButton title="Desvincular" onClick={() => onChange(notes.filter((x) => x !== n), folder)} className="opacity-0 group-hover:opacity-100"><X size={12} /></IconButton>
-          </li>
-        ))}
-      </ul>
-      {picking ? (
-        <div className="rounded-lg border border-line p-1.5">
-          <input autoFocus className={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nota…"
-            onKeyDown={(e) => e.key === "Escape" && setPicking(false)} />
-          <ul className="mt-1 max-h-48 overflow-y-auto">
-            {hits.map((n) => (
-              <li key={n.path}>
-                <button type="button" onClick={() => { onChange([...notes, n.path], folder); setPicking(false); setQ(""); }}
-                  className="block w-full truncate rounded px-2 py-1 text-left text-[12.5px] text-dim hover:bg-hover hover:text-text">{n.path}</button>
+      {part !== "notes" && (
+        <label className="flex items-center gap-2">
+          <Folder size={14} className="flex-none text-faint" />
+          <input className={input} value={folder} placeholder="Carpeta del vault (opcional)"
+            onChange={(e) => onChange(notes, e.target.value)} />
+        </label>
+      )}
+      {part === "folder" ? null : (
+        <>
+          <ul className="space-y-0.5">
+            {notes.map((n) => (
+              <li key={n} className="group flex items-center gap-2 rounded-md px-1 hover:bg-hover">
+                <FileText size={13} className="flex-none text-accent-text" />
+                <button type="button" onClick={() => openNote(n)} className="min-w-0 flex-1 truncate text-left text-[12.5px] text-text hover:underline">{n}</button>
+                <IconButton title="Desvincular" onClick={() => onChange(notes.filter((x) => x !== n), folder)} className="opacity-0 group-hover:opacity-100"><X size={12} /></IconButton>
               </li>
             ))}
-            {!hits.length && <li className="px-2 py-1 text-[12px] text-faint">Sin resultados.</li>}
           </ul>
-        </div>
-      ) : (
-        <button type="button" onClick={() => setPicking(true)} className="flex items-center gap-1.5 text-[12px] text-accent-text hover:underline">
-          <Plus size={12} /> Vincular nota
-        </button>
+          {picking ? (
+            <div className="rounded-lg border border-line p-1.5">
+              <input autoFocus className={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nota…"
+                onKeyDown={(e) => e.key === "Escape" && setPicking(false)} />
+              <ul className="mt-1 max-h-48 overflow-y-auto">
+                {hits.map((n) => (
+                  <li key={n.path}>
+                    <button type="button" onClick={() => { onChange([...notes, n.path], folder); setPicking(false); setQ(""); }}
+                      className="block w-full truncate rounded px-2 py-1 text-left text-[12.5px] text-dim hover:bg-hover hover:text-text">{n.path}</button>
+                  </li>
+                ))}
+                {!hits.length && <li className="px-2 py-1 text-[12px] text-faint">Sin resultados.</li>}
+              </ul>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setPicking(true)} className="flex items-center gap-1.5 text-[12px] text-accent-text hover:underline">
+              <Plus size={12} /> Vincular nota
+            </button>
+          )}
+        </>
       )}
     </div>
   );

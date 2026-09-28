@@ -8,7 +8,7 @@
 import type {
   AiConfig, AiProvider, AppInfo, Area, Bookmark, VaultInfo, HomeOverview, Exercise, ExerciseDay, ExerciseOverview, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
   IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
-  RenderingSettings, GpuStatus,
+  RenderingSettings, GpuStatus, Conversation, ConversationMeta,
 } from "./types";
 
 type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
@@ -342,6 +342,16 @@ export const api = {
     }
     return () => {};
   },
+
+  // ── Historial de conversaciones (privado, en los datos de la app) ────
+  conversationList: () => call<ConversationMeta[]>("conversation_list"),
+  conversationGet: (id: string) => call<Conversation>("conversation_get", id),
+  conversationSave: (id: string | null, messages: unknown[], model = "", title = "") =>
+    call<Conversation>("conversation_save", id, messages, model, title),
+  conversationRename: (id: string, title: string) => call<Conversation>("conversation_rename", id, title),
+  conversationDelete: (id: string) => call<{ ok: boolean }>("conversation_delete", id),
+  aiTitle: (id: string, question: string, answer = "") =>
+    call<{ title: string; fallback?: boolean; error?: string }>("ai_title", id, question, answer),
   notePropertiesMeta: () => call<{ subjects: string[]; types: string[]; statuses: string[] }>("note_properties_meta"),
   noteSetProperties: (rel: string, props: Record<string, unknown>, expectedModified: number | null = null) =>
     call<WriteResult>("note_set_properties", rel, props, expectedModified),

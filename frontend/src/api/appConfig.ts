@@ -205,6 +205,12 @@ export const AppConfig = {
     write(s);
   },
 
+  /** Chat history lives beside the settings, never inside a vault: the vault is
+   * synced between devices and a tutoring conversation is private to this one. */
+  get_conversations_dir(): string {
+    return path.join(APP_DATA_DIR, "conversations");
+  },
+
   // ── Window geometry ──────────────────────────────────────────────────────
   get_window_state(): Record<string, unknown> {
     return read().window ?? {};

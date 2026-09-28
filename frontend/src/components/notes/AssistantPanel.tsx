@@ -3,19 +3,20 @@
 // Answers can go back into the note.
 
 import {
-  ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus, GitCompare,
-  History, Mic, MoreHorizontal, Paperclip, Plus, Settings2, Sparkles, Square, ThumbsDown,
-  ThumbsUp, Trash2, X,
+  ArrowLeft, ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
+  GitCompare, History, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
+  Square, ThumbsDown, ThumbsUp, Trash2, X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import { api } from "../../lib/bridge";
 import { copyText, readClipboard } from "../../lib/clipboard";
+import { groupByDate, matchesQuery, whenLabel } from "../../lib/conversationDates";
 import { renderMarkdown } from "../../lib/markdown";
-import type { AiConfig, AiProvider } from "../../lib/types";
+import type { AiConfig, AiProvider, ConversationMeta } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useAssistant, type ChatContext, type ChatMessage } from "../../store/assistant";
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
-import { cn, IconButton, openMenu } from "../ui";
+import { askText, cn, confirmAction, IconButton, openMenu } from "../ui";
 import { editorSelection, insertAtCursor } from "./SourceEditor";
 
 const WIDTH_KEY = "nv.assistant.width";
@@ -356,12 +357,17 @@ function Composer() {
 export function AssistantPanel() {
   const messages = useAssistant((s) => s.messages);
   const busy = useAssistant((s) => s.busy);
-  const clear = useAssistant((s) => s.clear);
   const setOpen = useAssistant((s) => s.setOpen);
   const setSettings = useAssistant((s) => s.setSettings);
   const awaiting = useAssistant((s) => s.awaitingPaste);
   const pasteReply = useAssistant((s) => s.pasteReply);
   const loadModels = useAssistant((s) => s.loadModels);
+  const conversationId = useAssistant((s) => s.conversationId);
+  const conversationTitle = useAssistant((s) => s.title);
+  const historyOpen = useAssistant((s) => s.historyOpen);
+  const setHistory = useAssistant((s) => s.setHistory);
+  const newConversation = useAssistant((s) => s.newConversation);
+  const renameConversation = useAssistant((s) => s.renameConversation);
   const [width, setWidth] = useState(() => {
     const stored = Number(localStorage.getItem(WIDTH_KEY));
     return stored >= MIN_WIDTH ? stored : 340;
@@ -405,10 +411,12 @@ export function AssistantPanel() {
     el.scrollTop = el.scrollHeight;
   }, [messages.length, lastLen, busy]);
 
-  const title = useMemo(() => {
+  const firstQuestion = useMemo(() => {
     const first = messages.find((m) => m.role === "user");
-    return first ? first.content.trim().split("\n")[0]!.slice(0, 60) : "Nueva conversación";
+    return first ? first.content.trim().split("\n")[0]!.slice(0, 60) : "";
   }, [messages]);
+  // Until the model names the conversation, the first question stands in for it.
+  const heading = conversationTitle || firstQuestion || "Nueva conversación";
 
   return (
     <aside
@@ -427,17 +435,19 @@ export function AssistantPanel() {
       />
       <div className="flex h-9 flex-none items-center gap-0.5 border-b border-line px-2">
         <Sparkles size={14} className="flex-none text-accent-text" />
-        <span className="min-w-0 flex-1 truncate pl-1 text-[12.5px] font-medium text-text">{title}</span>
+        <span className="min-w-0 flex-1 truncate pl-1 text-[12.5px] font-medium text-text" title={heading}>
+          {heading}
+        </span>
         <IconButton
           title="Nueva conversación"
           onClick={() => {
-            clear();
+            newConversation();
             stick.current = true;
           }}
         >
           <Plus size={15} />
         </IconButton>
-        <IconButton title="Historial (Fase 2)" disabled>
+        <IconButton title="Historial" onClick={() => setHistory(true)}>
           <History size={15} />
         </IconButton>
         <IconButton title="Cambios (Fase 4)" disabled>
@@ -448,9 +458,21 @@ export function AssistantPanel() {
           onClick={(e) =>
             openMenu(e, [
               { label: "Personalizar (ajustes de IA)…", icon: <Settings2 size={13} />, onSelect: () => setSettings(true) },
+              {
+                label: "Renombrar conversación…",
+                icon: <Pencil size={13} />,
+                disabled: !conversationId,
+                onSelect: () => {
+                  void (async () => {
+                    const next = await askText("Renombrar conversación", conversationTitle || heading, "Guardar");
+                    if (next === null || !next.trim() || !conversationId) return;
+                    await renameConversation(conversationId, next.trim());
+                  })();
+                },
+              },
               { label: "Exportar (Fase 5)", disabled: true },
               { separator: true },
-              { label: "Limpiar conversación", icon: <Trash2 size={13} />, danger: true, onSelect: clear },
+              { label: "Nueva conversación", icon: <Plus size={13} />, onSelect: newConversation },
             ])
           }
         >
@@ -461,38 +483,176 @@ export function AssistantPanel() {
         </IconButton>
       </div>
 
-      <div
-        ref={list}
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-        }}
-        className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-3 py-3"
-      >
-        {!messages.length && (
-          <div className="rounded-xl border border-dashed border-line-strong p-3 text-[12.5px] leading-relaxed text-dim">
-            Pregunta sobre la nota abierta: explicar, resumir, generar ejercicios… Si seleccionas un fragmento en el
-            editor, se envía como contexto. Las acciones de estudio de la nota también llegan aquí.
+      {historyOpen ? (
+        <HistoryPanel />
+      ) : (
+        <>
+          <div
+            ref={list}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+            }}
+            className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-3 py-3"
+          >
+            {!messages.length && (
+              <div className="rounded-xl border border-dashed border-line-strong p-3 text-[12.5px] leading-relaxed text-dim">
+                Pregunta sobre la nota abierta: explicar, resumir, generar ejercicios… Si seleccionas un fragmento en el
+                editor, se envía como contexto. Las acciones de estudio de la nota también llegan aquí.
+              </div>
+            )}
+            {messages.map((m, i) => (
+              <Message key={m.id} m={m} live={i === messages.length - 1} />
+            ))}
           </div>
+
+          {awaiting && (
+            <div className="flex-none border-t border-line px-3 py-2">
+              <GhostButton
+                onClick={async () => pasteReply(await readClipboard())}
+                className="w-full justify-center"
+              >
+                <ClipboardPaste size={13} /> Pegar respuesta
+              </GhostButton>
+            </div>
+          )}
+
+          <Composer />
+        </>
+      )}
+    </aside>
+  );
+}
+
+/** The conversations kept on this machine: search, grouped by date. */
+function HistoryPanel() {
+  const history = useAssistant((s) => s.history);
+  const query = useAssistant((s) => s.historyQuery);
+  const setQuery = useAssistant((s) => s.setHistoryQuery);
+  const setHistory = useAssistant((s) => s.setHistory);
+  const openConversation = useAssistant((s) => s.openConversation);
+  const renameConversation = useAssistant((s) => s.renameConversation);
+  const deleteConversation = useAssistant((s) => s.deleteConversation);
+  const newConversation = useAssistant((s) => s.newConversation);
+  const currentId = useAssistant((s) => s.conversationId);
+  const [error, setError] = useState("");
+  const toast = useApp((s) => s.toast);
+
+  const groups = useMemo(
+    () => groupByDate(history.filter((h) => matchesQuery(h.title, query))),
+    [history, query],
+  );
+
+  const rename = async (item: ConversationMeta) => {
+    const next = await askText("Renombrar conversación", item.title, "Guardar");
+    if (next === null || next.trim() === item.title) return;
+    try {
+      await renameConversation(item.id, next.trim());
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
+
+  const remove = async (item: ConversationMeta) => {
+    const ok = await confirmAction(
+      "Eliminar conversación",
+      `Se borrará «${item.title}» de este equipo. No se puede deshacer.`,
+      "Eliminar",
+      true,
+    );
+    if (!ok) return;
+    try {
+      await deleteConversation(item.id);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col bg-panel" aria-label="Historial de conversaciones">
+      <div className="flex h-9 flex-none items-center gap-0.5 border-b border-line px-2">
+        <IconButton title="Volver al chat" onClick={() => setHistory(false)}>
+          <ArrowLeft size={15} />
+        </IconButton>
+        <span className="min-w-0 flex-1 truncate pl-1 text-[12.5px] font-medium text-text">Historial</span>
+        <IconButton title="Nueva conversación" onClick={newConversation}>
+          <Plus size={15} />
+        </IconButton>
+        <IconButton title="Cerrar" onClick={() => setHistory(false)}>
+          <X size={15} />
+        </IconButton>
+      </div>
+      <div className="flex-none px-2.5 pt-2">
+        <div className="flex items-center gap-1.5 rounded-lg border border-line bg-elevated px-2 focus-within:border-accent">
+          <Search size={12} className="flex-none text-faint" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Buscar conversación"
+            placeholder="Buscar conversación…"
+            className="w-full bg-transparent py-1.5 text-[12.5px] text-text outline-none placeholder:text-faint"
+          />
+          {query && (
+            <button type="button" title="Limpiar" onClick={() => setQuery("")} className="text-faint hover:text-text">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+        {error && <p className="px-1 pt-2 text-[11.5px] text-danger">⚠ {error}</p>}
+        {!groups.length && (
+          <p className="px-1 py-4 text-[12px] leading-relaxed text-faint">
+            {history.length
+              ? "Ninguna conversación coincide con la búsqueda."
+              : "Aún no hay conversaciones guardadas. Pregunta algo en el chat y aparecerá aquí."}
+          </p>
         )}
-        {messages.map((m, i) => (
-          <Message key={m.id} m={m} live={i === messages.length - 1} />
+        {groups.map((group) => (
+          <div key={group.label}>
+            <div className="px-1 pb-1 pt-2.5 font-mono text-[10px] uppercase tracking-wider text-faint">
+              {group.label}
+            </div>
+            {group.items.map((item) => (
+              <div
+                key={item.id}
+                className={cn(
+                  "group flex items-center gap-0.5 rounded-lg px-2 py-1.5",
+                  item.id === currentId ? "bg-accent-soft" : "hover:bg-hover",
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => void openConversation(item.id)}
+                  title={item.title}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <div className="truncate text-[12.5px] text-text">{item.title}</div>
+                  <div className="truncate text-[11px] text-faint">
+                    {whenLabel(item.updated_at)} · {item.count} mensaje{item.count === 1 ? "" : "s"}
+                    {item.model ? ` · ${item.model}` : ""}
+                  </div>
+                </button>
+                <IconButton
+                  title="Renombrar"
+                  className="opacity-0 group-hover:opacity-100"
+                  onClick={() => void rename(item)}
+                >
+                  <Pencil size={12} />
+                </IconButton>
+                <IconButton
+                  title="Eliminar"
+                  className="opacity-0 group-hover:opacity-100"
+                  onClick={() => void remove(item)}
+                >
+                  <Trash2 size={12} />
+                </IconButton>
+              </div>
+            ))}
+          </div>
         ))}
       </div>
-
-      {awaiting && (
-        <div className="flex-none border-t border-line px-3 py-2">
-          <GhostButton
-            onClick={async () => pasteReply(await readClipboard())}
-            className="w-full justify-center"
-          >
-            <ClipboardPaste size={13} /> Pegar respuesta
-          </GhostButton>
-        </div>
-      )}
-
-      <Composer />
-    </aside>
+    </div>
   );
 }
 

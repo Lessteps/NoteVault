@@ -2,12 +2,14 @@
 //
 // The answer streams in token by token (main process → `nv-ai-stream` →
 // api.onAiStream), so the panel paints it as it is written and the user can
-// stop it. The conversation itself is still in memory only; persistence
-// (history, per-conversation files) is the next phase.
+// stop it. Conversations are saved as they happen — one private file per
+// conversation in the app's data folder, never in the vault — and the history
+// panel reads them back.
 
 import { create } from "zustand";
 import { api } from "../lib/bridge";
 import { copyText } from "../lib/clipboard";
+import type { ConversationMeta } from "../lib/types";
 import { bodyOf, useApp } from "./app";
 
 /** A piece of context attached to a user turn (Fase 3 fills these in). */
@@ -35,7 +37,7 @@ export interface ChatMessage {
   error?: boolean;
   /** Context chips of a user turn. */
   contexts?: ChatContext[];
-  /** Local thumbs; where the vote is stored is a later phase. */
+  /** Local thumbs; persisted with the conversation, not sent anywhere. */
   vote?: 0 | 1 | -1;
 }
 
@@ -55,6 +57,15 @@ interface AssistantState {
   /** Models of the active provider (live list, or the curated one). */
   models: string[];
   providerLabel: string;
+
+  // ── The conversation being held, and the ones kept ────────────────────
+  /** Id of the saved conversation; null until the first turn is stored. */
+  conversationId: string | null;
+  title: string;
+  historyOpen: boolean;
+  history: ConversationMeta[];
+  historyQuery: string;
+
   setOpen: (open: boolean) => void;
   setSettings: (open: boolean) => void;
   clear: () => void;
@@ -65,6 +76,15 @@ interface AssistantState {
   /** Re-read provider/model, and ask the provider for its model list. */
   loadModels: (probe?: boolean) => Promise<void>;
   setModel: (model: string) => Promise<void>;
+
+  setHistory: (open: boolean) => void;
+  setHistoryQuery: (q: string) => void;
+  refreshHistory: () => Promise<void>;
+  /** Start a fresh conversation; the current one is already in the history. */
+  newConversation: () => void;
+  openConversation: (id: string) => Promise<void>;
+  renameConversation: (id: string, title: string) => Promise<void>;
+  deleteConversation: (id: string) => Promise<void>;
 }
 
 let seq = 0;
@@ -91,6 +111,11 @@ export const useAssistant = create<AssistantState>((set, get) => ({
   model: "",
   models: [],
   providerLabel: "",
+  conversationId: null,
+  title: "",
+  historyOpen: false,
+  history: [],
+  historyQuery: "",
 
   setOpen: (open) => {
     set({ open });
@@ -130,7 +155,12 @@ export const useAssistant = create<AssistantState>((set, get) => ({
       at: Date.now(),
       streaming: true,
     };
+    const firstTurn = !get().messages.some((m) => m.role === "user");
     set((s) => ({ messages: [...s.messages, userMsg, answer], busy: true, streamingId: answerId }));
+
+    // Store the turn as soon as it is asked, so closing the app mid-answer does
+    // not lose the question.
+    await persist(set, get);
 
     if (!listener) listener = api.onAiStream((ev) => applyStreamEvent(set, get, ev));
 
@@ -161,6 +191,10 @@ export const useAssistant = create<AssistantState>((set, get) => ({
       finishAnswer(set, answerId, "", false, Date.now() - started, (e as Error).message);
     } finally {
       set({ busy: false, streamingId: null });
+      await persist(set, get);
+      // The name is written by the model; failures fall back to the question.
+      // A bridge turn has no answer yet, so it keeps the question as its name.
+      if (firstTurn && !get().awaitingPaste) await nameConversation(set, get, q);
     }
   },
 
@@ -170,15 +204,18 @@ export const useAssistant = create<AssistantState>((set, get) => ({
     await api.aiChatCancel(id).catch(() => undefined);
   },
 
-  vote: (id, value) =>
+  vote: (id, value) => {
     set((s) => ({
       messages: s.messages.map((m) => (m.id === id ? { ...m, vote: m.vote === value ? 0 : value } : m)),
-    })),
+    }));
+    void persist(set, get);
+  },
 
   pasteReply: (text) => {
     const t = text.trim();
     if (!t) return;
     set((s) => ({ awaitingPaste: false, messages: [...s.messages, { id: uid(), role: "assistant", content: t, at: Date.now() }] }));
+    void persist(set, get);
   },
 
   loadModels: async (probe = false) => {
@@ -204,6 +241,51 @@ export const useAssistant = create<AssistantState>((set, get) => ({
     } catch {
       /* the selection stays visible; saving it is best-effort */
     }
+  },
+
+  setHistory: (historyOpen) => {
+    set({ historyOpen });
+    if (historyOpen) void get().refreshHistory();
+  },
+  setHistoryQuery: (historyQuery) => set({ historyQuery }),
+
+  refreshHistory: async () => {
+    try {
+      set({ history: await api.conversationList() });
+    } catch {
+      set({ history: [] });
+    }
+  },
+
+  newConversation: () => {
+    set({ messages: [], awaitingPaste: false, conversationId: null, title: "", historyOpen: false });
+  },
+
+  openConversation: async (id) => {
+    const conv = await api.conversationGet(id);
+    set({
+      conversationId: conv.id,
+      title: conv.title,
+      messages: conv.messages.map((m) => ({ ...m, id: uid(), streaming: false })),
+      awaitingPaste: false,
+      historyOpen: false,
+      busy: false,
+      streamingId: null,
+    });
+  },
+
+  renameConversation: async (id, title) => {
+    const conv = await api.conversationRename(id, title);
+    if (get().conversationId === id) set({ title: conv.title });
+    await get().refreshHistory();
+  },
+
+  deleteConversation: async (id) => {
+    await api.conversationDelete(id);
+    if (get().conversationId === id) {
+      set({ conversationId: null, title: "", messages: [] });
+    }
+    await get().refreshHistory();
   },
 }));
 
@@ -234,6 +316,43 @@ function finishAnswer(set: Setter, id: string, reply: string, stopped: boolean, 
         : m,
     ),
   }));
+}
+
+/** Write the current messages to disk; returns the stored conversation. */
+async function persist(
+  set: Setter,
+  get: Getter,
+  id?: string | null,
+): Promise<{ id: string } | null> {
+  const state = get();
+  if (!state.messages.length) return null;
+  try {
+    const conv = await api.conversationSave(
+      id ?? state.conversationId,
+      state.messages.filter((m) => !m.streaming || m.content),
+      state.model,
+      state.title,
+    );
+    set({ conversationId: conv.id, title: conv.title });
+    return { id: conv.id };
+  } catch {
+    return null; // a failed save never breaks the conversation on screen
+  }
+}
+
+/** Ask the model to name the conversation (falls back to the question). */
+async function nameConversation(set: Setter, get: Getter, question: string): Promise<void> {
+  const id = get().conversationId;
+  if (!id) return;
+  const answer = [...get().messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  try {
+    const r = await api.aiTitle(id, question, answer);
+    if (r.fallback) console.warn("[ai_title] el modelo no dio título:", r.error ?? "respuesta vacía");
+    if (r.title) set({ title: r.title });
+    await get().refreshHistory();
+  } catch (e) {
+    console.warn("[ai_title] falló:", (e as Error).message);
+  }
 }
 
 /** The text study actions work on: the selection, or the start of the note. */

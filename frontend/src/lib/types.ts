@@ -641,6 +641,39 @@ export interface VaultInfo {
 
 // ── Asistente ──────────────────────────────────────────────────────────────
 
+/** A fragment of a file attached to a user turn. */
+export interface ConversationContext {
+  path: string;
+  start_line?: number;
+  end_line?: number;
+  text: string;
+}
+
+export interface ConversationMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+  thinking?: string;
+  at: number;
+  ms?: number;
+  stopped?: boolean;
+  error?: boolean;
+  contexts?: ConversationContext[];
+  vote?: 0 | 1 | -1;
+}
+
+export interface ConversationMeta {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  count: number;
+  model: string;
+}
+
+export interface Conversation extends ConversationMeta {
+  messages: ConversationMessage[];
+}
+
 export interface AiConfig {
   provider: string;
   base_url: string;

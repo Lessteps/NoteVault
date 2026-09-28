@@ -308,6 +308,7 @@ export const api = {
   // Ejercicio
   exMeta: () => call<{ days: Array<{ key: string; name: string; subtitle: string; glyph: string }> }>("ex_meta"),
   exList: () => call<Exercise[]>("ex_list"),
+  exStats: (year = 0) => call<import("./types").ExerciseStats>("ex_stats", year),
   exDays: (first: string, last: string) => call<ExerciseDay[]>("ex_days", first, last),
   exMark: (day: string, id: string, done: boolean, weight: number | string = 0, reps: number | string = 0, notes = "") =>
     call<{ ok: boolean; pct: number }>("ex_mark", day, id, done, weight, reps, notes),

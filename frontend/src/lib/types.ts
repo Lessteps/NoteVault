@@ -604,6 +604,27 @@ export interface ExerciseOverview {
   breakdown: Array<{ day: string; rows: Array<{ id: string; name: string; done: number; total: number }> }>;
 }
 
+/** One period of the Ejercicio module: everything done over everything due. */
+export interface ExercisePeriod {
+  done: number;
+  total: number;
+  pct: number;
+  /** Days of the period that had a routine and at least one exercise done. */
+  trained: number;
+  /** Days of the period that had a routine. */
+  due: number;
+}
+
+export interface ExerciseStats {
+  year: number;
+  today: { done: number; total: number; pct: number };
+  week: ExercisePeriod;
+  month: ExercisePeriod;
+  anual: ExercisePeriod;
+  /** `current` is the run ending today; `best`, the longest of the year. */
+  streak: { current: number; best: number };
+}
+
 // ── Vista General ─────────────────────────────────────────────────────────
 
 export interface HomeOverview {

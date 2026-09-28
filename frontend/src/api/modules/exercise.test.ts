@@ -126,4 +126,50 @@ describe("exerciseApi", () => {
     };
     await expect(api.ex_video_url(e.id)).rejects.toThrow(ApiError);
   });
+
+  it("stats report the four periods, with nothing trained on an empty log", () => {
+    const stats = api.ex_stats();
+    expect(stats.today.done).toBe(0);
+    expect(stats.today.pct).toBe(0);
+    expect(stats.streak).toEqual({ current: 0, best: 0 });
+    for (const period of [stats.week, stats.month, stats.anual]) {
+      expect(period.done).toBe(0);
+      expect(period.pct).toBe(0);
+      expect(period.trained).toBe(0);
+      // The routine is seeded for every weekday, so the period has days due.
+      expect(period.due).toBeGreaterThan(0);
+      expect(period.total).toBeGreaterThan(0);
+    }
+  });
+
+  it("stats follow the ticks: one exercise is enough to train the day", () => {
+    const day = api.ex_days(today, today)[0]!;
+    const exs = day.exercises as Array<{ id: string }>;
+    const first = api.ex_stats();
+    expect(first.today.total).toBe(exs.length);
+
+    api.ex_mark(today, exs[0]!.id, true, 0, 0, "");
+
+    const stats = api.ex_stats();
+    expect(stats.today.done).toBe(1);
+    expect(stats.today.pct).toBeCloseTo(1 / exs.length);
+    expect(stats.week.trained).toBe(1);
+    expect(stats.week.pct).toBeGreaterThan(0);
+    expect(stats.month.trained).toBe(1);
+    expect(stats.anual.trained).toBe(1);
+    expect(stats.streak.current).toBe(1);
+    expect(stats.streak.best).toBeGreaterThanOrEqual(stats.streak.current);
+  });
+
+  it("stats count the whole routine of the period, not just today", () => {
+    const day = api.ex_days(today, today)[0]!;
+    const exs = day.exercises as Array<{ id: string }>;
+    for (const ex of exs) api.ex_mark(today, ex.id, true, 0, 0, "");
+
+    const stats = api.ex_stats();
+    expect(stats.today.pct).toBe(1);
+    // The yearly total is what every day of the year had due.
+    expect(stats.anual.total).toBeGreaterThanOrEqual(stats.today.total);
+    expect(stats.anual.pct).toBeGreaterThan(0);
+  });
 });

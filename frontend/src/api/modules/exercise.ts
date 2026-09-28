@@ -295,6 +295,81 @@ export function exerciseApi(app: AppState) {
       };
     },
 
+    /**
+     * The four periods of the module, the streak and the trained-day counts.
+     *
+     * Same definitions the views use: a day is due when its weekday has a
+     * routine, it counts as trained when at least one exercise of it is done,
+     * and a rest day neither adds to the streak nor breaks it (the Hábitos rule).
+     */
+    ex_stats(year = 0) {
+      const m = mgr();
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const y = clampInt(year || now.getFullYear(), 1970, 3000, now.getFullYear());
+
+      const dueIds = (d: Date) => m.exercisesForDay(DAY_KEYS[weekday(d)]!).map((e) => e.id);
+      const doneOn = (d: Date) => {
+        const ids = dueIds(d);
+        const log = m.getLog(d);
+        return ids.filter((id) => log.isDone(id)).length;
+      };
+
+      /** Everything done over everything due, up to today. */
+      const tally = (from: Date, to: Date) => {
+        let done = 0;
+        let total = 0;
+        let trained = 0;
+        let due = 0;
+        for (let d = new Date(from); d <= to && d <= midnight; d = addDays(d, 1)) {
+          const ids = dueIds(d);
+          if (!ids.length) continue;
+          due += 1;
+          const dDone = doneOn(d);
+          done += dDone;
+          total += ids.length;
+          if (dDone > 0) trained += 1;
+        }
+        return { done, total, pct: total ? done / total : 0, trained, due };
+      };
+
+      const monday = addDays(midnight, -weekday(midnight));
+      const todayIds = dueIds(midnight);
+      const todayDone = doneOn(midnight);
+
+      let current = 0;
+      for (let i = 0; i < 400; i += 1) {
+        const d = addDays(midnight, -i);
+        if (!dueIds(d).length) continue;
+        if (m.dayPct(d) > 0) current += 1;
+        else break;
+      }
+      let best = 0;
+      let run = 0;
+      for (let d = new Date(y, 0, 1); d <= midnight; d = addDays(d, 1)) {
+        if (!dueIds(d).length) continue;
+        if (m.dayPct(d) > 0) {
+          run += 1;
+          if (run > best) best = run;
+        } else {
+          run = 0;
+        }
+      }
+
+      return {
+        year: y,
+        today: {
+          done: todayDone,
+          total: todayIds.length,
+          pct: todayIds.length ? todayDone / todayIds.length : 0,
+        },
+        week: tally(monday, addDays(monday, 6)),
+        month: tally(new Date(y, midnight.getMonth(), 1), new Date(y, midnight.getMonth() + 1, 0)),
+        anual: tally(new Date(y, 0, 1), new Date(y, 11, 31)),
+        streak: { current, best },
+      };
+    },
+
     ex_save(exerciseId: string, fields: unknown) {
       const f = exFields(fields);
       const m = mgr();

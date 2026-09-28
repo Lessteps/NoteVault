@@ -101,6 +101,15 @@ export function projectDict(p: Project, today: Date): Record<string, unknown> {
     description: p.description,
     days_left: p.days_left(today),
     overdue: p.is_overdue(today),
+    folders: (Array.isArray((p.extra as Record<string, unknown>)?.folders) ? (p.extra as Record<string, unknown>).folders as unknown[] : [])
+      .filter((f): f is Record<string, unknown> => Boolean(f) && typeof f === "object")
+      .map((f) => ({
+        id: String(f.id || ""),
+        path: String(f.path || ""),
+        name: String(f.name || ""),
+        target: Boolean(f.target),
+      }))
+      .filter((f) => f.id && f.path),
   };
 }
 

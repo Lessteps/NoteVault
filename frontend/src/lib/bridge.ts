@@ -6,7 +6,7 @@
 // with a per-run token. Both reject with an Error carrying Python's message.
 
 import type {
-  AiConfig, AiProvider, AppInfo, Area, Bookmark, VaultInfo, HomeOverview, Exercise, ExerciseDay, ExerciseOverview, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
+  AiConfig, AiProvider, AppInfo, Area, Bookmark, VaultInfo, HomeOverview, Exercise, ExerciseDay, ExerciseOverview, FinCategory, FinCheck, FinGoal, FinMeta, FinPace, FinSidebar, FinTotals, Movement, Goal, GoalCard, GoalDetail, GoalItem, GoalsMeta, GoalsSidebar, GoalsTodayRow, Issue, Project, ProjectCard, ProjectDetail, ProjectFolder, FolderEntry, ProjectNoteEntry, ProjectsMeta, CalItem, CalPayload, CalRoutine, CalSettings, Habit, HabitDayLog, HabitFields, HabitRangeDay, HabitStats, HabitSubtask,
   IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
   RenderingSettings, GpuStatus, Conversation, ConversationMeta,
 } from "./types";
@@ -263,6 +263,37 @@ export const api = {
   projectNoteCreate: (pid: string, folder: string, name: string, isFolder = false) =>
     call<{ path: string }>("projects_note_create", pid, folder, name, isFolder),
   projectNoteDelete: (pid: string, rel: string) => call<{ ok: boolean }>("projects_note_delete", pid, rel),
+
+  // Proyectos · carpetas vinculadas (Notas)
+  pickFolder: () => call<{ path: string | null }>("projects_pick_folder"),
+  projectFolders: (pid: string) => call<ProjectFolder[]>("projects_folders", pid),
+  projectFolderLink: (pid: string, folderPath: string) =>
+    call<{ folder: ProjectFolder; folders: ProjectFolder[]; warning: string }>("projects_folder_link", pid, folderPath),
+  projectFolderUnlink: (pid: string, folderId: string) =>
+    call<{ folders: ProjectFolder[] }>("projects_folder_unlink", pid, folderId),
+  projectFolderTarget: (pid: string, folderId: string) =>
+    call<{ folders: ProjectFolder[] }>("projects_folder_target", pid, folderId),
+  projectFolderTree: (pid: string, folderId: string) =>
+    call<{ folder: ProjectFolder; entries: FolderEntry[] }>("projects_folder_tree", pid, folderId),
+  projectFileRead: (pid: string, folderId: string, rel: string) =>
+    call<{ raw: string; modified: number; size: number; kind: string; readonly: boolean }>("projects_file_read", pid, folderId, rel),
+  projectFileWrite: (pid: string, folderId: string, rel: string, raw: string, expectedModified: number | null = null) =>
+    call<{ ok: boolean; conflict: boolean; modified: number }>("projects_file_write", pid, folderId, rel, raw, expectedModified),
+  projectFileCreate: (pid: string, folderId: string, rel: string, name: string, isFolder = false) =>
+    call<{ entry: FolderEntry }>("projects_file_create", pid, folderId, rel, name, isFolder),
+  projectFileRename: (pid: string, folderId: string, rel: string, newName: string) =>
+    call<{ entry: FolderEntry }>("projects_file_rename", pid, folderId, rel, newName),
+  projectFileMove: (pid: string, folderId: string, rel: string, destRel: string, destFolderId = "") =>
+    call<{ entry: FolderEntry }>("projects_file_move", pid, folderId, rel, destRel, destFolderId),
+  projectFileDelete: (pid: string, folderId: string, rel: string) =>
+    call<{ ok: boolean }>("projects_file_delete", pid, folderId, rel),
+  projectFileOpen: (pid: string, folderId: string, rel: string, mode: "open" | "reveal" = "open") =>
+    call<{ ok: boolean }>("projects_file_open", pid, folderId, rel, mode),
+  projectFileData: (pid: string, folderId: string, rel: string) =>
+    call<{ data_url: string; mime: string; size: number }>("projects_file_data", pid, folderId, rel),
+  projectNotesMigrate: (pid: string, folderId: string) =>
+    call<{ moved: string[]; skipped: string[] }>("projects_notes_migrate", pid, folderId),
+  projectNotesLegacy: (pid: string) => call<{ dir: string; files: string[] }>("projects_notes_legacy", pid),
 
   // Metas
   goalsMeta: () => call<GoalsMeta>("goals_meta"),

@@ -23,6 +23,7 @@ import { notesApi } from "./modules/notes.js";
 import { notesExtrasApi } from "./modules/notes_extras.js";
 import { practiceApi } from "./modules/practice.js";
 import { projectsApi } from "./modules/projects.js";
+import { projectFoldersApi } from "./modules/projectFolders.js";
 import { studyApi } from "./modules/study.js";
 import { tasksApi } from "./modules/tasks.js";
 import { vaultsApi } from "./modules/vaults.js";
@@ -49,6 +50,7 @@ export function buildRegistry(app: AppState): Registry {
     ...financeApi(app),
     ...goalsApi(app),
     ...projectsApi(app),
+    ...projectFoldersApi(app),
     ...calendarApi(app),
     ...studyApi(app),
     ...practiceApi(app),

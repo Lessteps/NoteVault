@@ -255,6 +255,25 @@ export interface Area {
 
 // ── Proyectos ──────────────────────────────────────────────────────────────
 
+export interface ProjectFolder {
+  id: string;
+  path: string;
+  name: string;
+  /** The destination folder: new notes are created here. Exactly one per project. */
+  target: boolean;
+  /** Linked but no longer on disk. */
+  missing?: boolean;
+}
+
+/** One node of a linked folder's tree, as the explorer receives it. */
+export interface FolderEntry {
+  name: string;
+  rel: string;
+  dir: boolean;
+  size: number;
+  modified: number;
+}
+
 export interface Project {
   id: string;
   key: string;
@@ -273,6 +292,8 @@ export interface Project {
   description: string;
   days_left: number | null;
   overdue: boolean;
+  /** Windows folders the project works in (the Notas tab). */
+  folders: ProjectFolder[];
 }
 
 export interface IssueSummary {

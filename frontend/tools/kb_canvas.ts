@@ -41,6 +41,7 @@ import * as path from "node:path";
 import * as cf from "../src/core/canvas/canvasFormat";
 import { requiredTextHeight } from "../src/core/canvas/boxSizing";
 import { parseFrontmatter } from "../src/core/frontmatter";
+import { edgePath, type Side } from "../src/lib/canvas";
 
 /* ── constants ───────────────────────────────────────────────────────────── */
 
@@ -52,11 +53,16 @@ const QUE_W = 620;
 const LINK_W = 320;
 const LINK_H = 150;
 /** Horizontal gap between two panels, grown when a long label crosses it. */
-const GAP_X_MIN = 200;
-/** Vertical gap between two chained cards (room for one label line). */
-const GAP_Y = 56;
+const GAP_X_MIN = 260;
+/** Vertical gap between two chained panels: room for one 28 px label line. */
+const GAP_Y = 96;
 /** Vertical gap between two groups in the same column. */
 const GROUP_GAP = 120;
+/** Extra gap between two blocks of panels sharing one column (Ejemplos|Errores). */
+const BLOCK_GAP = 200;
+/** The renderer draws every edge label in this box, centred on the curve midpoint. */
+const LABEL_W = 180;
+const LABEL_H = 28;
 /** Group padding / space for the group label. */
 const PAD = 24;
 const TOP = 48;
@@ -418,18 +424,23 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
   }
   b.edge(que, modelo, "se entiende con", "bottom", "top");
 
-  /* ── Panel 3 — Ejemplos: one group per example, four panels each ───────── */
-  const exampleLabels = c.examples.map(() => "se aplica en");
-  const xEj = explicacionGroup.x + explicacionGroup.width + gapFor(exampleLabels);
+  /* ── Panels 3 and 4 — Ejemplos, and Errores comunes below them ─────────── */
+  // Both hang from `Explicación`, so they share one column. An arrow from column
+  // 2 to a fourth column would cross column 3 and drop its 180 px label on top
+  // of column 3's labels: that is the defect the user reported on 2026-09-28.
+  const crossLabels = ["se aplica en", "se falla cuando", "otro caso"];
+  const x3 = explicacionGroup.x + explicacionGroup.width + gapFor(crossLabels);
+
   const exampleGroups: cf.CanvasNode[] = [];
-  const exampleAnchors: cf.CanvasNode[] = [];
-  let yEj = 0;
+  const exampleFirst: cf.CanvasNode[] = [];
+  const exampleLast: cf.CanvasNode[] = [];
+  let y3 = 0;
 
   for (const ex of c.examples) {
     const cards: Array<{ field: Field; node: cf.CanvasNode }> = [];
-    let y = yEj;
+    let y = y3;
     for (const f of ex.fields) {
-      const card = b.text(xEj, y, PANEL_W, `### ${f.label}\n\n${f.text}`);
+      const card = b.text(x3, y, PANEL_W, `### ${f.label}\n\n${f.text}`);
       cards.push({ field: f, node: card });
       y = card.y + card.height + GAP_Y;
     }
@@ -440,33 +451,39 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
       b.edge(prev.node, cur.node, arrowInto(cur.field.label), "bottom", "top");
     }
     const first = cards[0];
-    if (!first) continue;
-    exampleAnchors.push(first.node);
+    const last = cards[cards.length - 1];
+    if (!first || !last) continue;
+    exampleFirst.push(first.node);
+    exampleLast.push(last.node);
     exampleGroups.push(b.add(group(ex.title, cards.map((c) => c.node), C_EXAMPLE, -2)));
-    yEj = first.node.y + Math.max(...cards.map((c) => c.node.height + c.node.y - first.node.y)) + GROUP_GAP;
+    y3 = last.node.y + last.node.height + GROUP_GAP;
   }
-  const ejemplosGroup = exampleGroups.length
-    ? b.add(group("Ejemplos", exampleGroups, C_EXAMPLE, -10))
-    : undefined;
-  for (const anchor of exampleAnchors) b.edge(modelo, anchor, "se aplica en");
+  if (exampleGroups.length) b.add(group("Ejemplos", exampleGroups, C_EXAMPLE, -10));
 
-  /* ── Panel 4 — Errores comunes: one panel per error ────────────────────── */
-  const errorLabels = ["se falla cuando"];
-  const xErr = (ejemplosGroup ? ejemplosGroup.x + ejemplosGroup.width : xEj + PANEL_W) + gapFor(errorLabels);
-  const errorGroups: cf.CanvasNode[] = [];
+  /* ── Panel 4 — Errores comunes: one panel per error, below the examples ── */
   const errorCards: cf.CanvasNode[] = [];
-  let yErr = 0;
+  const errorGroups: cf.CanvasNode[] = [];
+  let yErr = (c.examples.length ? y3 + BLOCK_GAP : 0);
 
   for (const err of c.errors) {
     const md =
       `**${err.title}**\n\n` +
       err.fields.map((f) => `- **${f.label}:** ${f.text}`).join("\n");
-    const card = b.text(xErr, yErr, PANEL_W, md, C_ERROR);
+    const card = b.text(x3, yErr, PANEL_W, md, C_ERROR);
     errorCards.push(card);
     errorGroups.push(b.add(group(err.title, [card], C_ERROR, -2)));
     yErr = card.y + card.height + GROUP_GAP;
   }
   if (errorGroups.length) b.add(group("Errores comunes", errorGroups, C_ERROR, -10));
+
+  /* ── Arrows ────────────────────────────────────────────────────────────── */
+  const firstExample = exampleFirst[0];
+  if (firstExample) b.edge(modelo, firstExample, "se aplica en");
+  for (let i = 1; i < exampleFirst.length; i++) {
+    const prev = exampleLast[i - 1];
+    const cur = exampleFirst[i];
+    if (prev && cur) b.edge(prev, cur, "otro caso", "bottom", "top");
+  }
   for (const card of errorCards) b.edge(que, card, "se falla cuando");
 
   return b.doc;
@@ -539,6 +556,42 @@ export function verifyCanvas(doc: cf.CanvasDoc): string[] {
   for (const n of leaves) {
     if (n.nv["role"] === ROLE_NO_PREREQ) continue; // placeholder, nothing to connect
     if (!connected.has(n.id)) problems.push(`tarjeta desconectada: "${firstLine(n.text || n.file)}"`);
+  }
+
+  // Where does each label land? Exactly where the renderer draws it: the app
+  // centres a LABEL_W × LABEL_H box on the midpoint of the edge's cubic
+  // (`edgePath(...).mid` in CanvasView). A label on a card, or two labels on top
+  // of each other, is the defect the user reported on 2026-09-28. Overlapping a
+  // *group* rectangle is fine: arrows live inside the group they belong to.
+  const boxes = doc.edges.map((ed) => {
+    const a = doc.nodeById(ed.fromNode);
+    const c = doc.nodeById(ed.toNode);
+    const mid = a && c ? edgePath(a, ed.fromSide as Side, c, ed.toSide as Side).mid : [0, 0];
+    return {
+      label: ed.label,
+      rect: {
+        x: Number(mid[0]) - LABEL_W / 2,
+        y: Number(mid[1]) - LABEL_H / 2,
+        width: LABEL_W,
+        height: LABEL_H,
+      },
+    };
+  });
+  for (const box of boxes) {
+    for (const card of leaves) {
+      if (intersects(box.rect, card)) {
+        problems.push(`la etiqueta "${box.label}" pisa la tarjeta "${firstLine(card.text || card.file)}"`);
+      }
+    }
+  }
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i];
+      const c = boxes[j];
+      if (a && c && intersects(a.rect, c.rect)) {
+        problems.push(`las etiquetas "${a.label}" y "${c.label}" se pisan`);
+      }
+    }
   }
   return problems;
 }

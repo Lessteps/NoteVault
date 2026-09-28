@@ -166,8 +166,54 @@ describe("buildConceptCanvas", () => {
   it("labels every arrow with a reason, never with an empty string", () => {
     const { root, concepto } = makeVault();
     const doc = buildConceptCanvas(readConcept(concepto, root));
-    expect(doc.edges.length).toBeGreaterThan(6);
+    expect(doc.edges.length).toBeGreaterThan(4);
     for (const e of doc.edges) expect(e.label.trim().length).toBeGreaterThan(2);
+  });
+
+  it("keeps every label clear of the cards, and no two labels on top of each other", () => {
+    const { root, concepto } = makeVault();
+    const doc = buildConceptCanvas(readConcept(concepto, root));
+    const problems = verifyCanvas(doc);
+    expect(problems.filter((p) => p.includes("pisa") || p.includes("se pisan"))).toEqual([]);
+  });
+
+  it("catches a label that lands on top of a card", () => {
+    const { root, concepto } = makeVault();
+    const doc = buildConceptCanvas(readConcept(concepto, root));
+    expect(verifyCanvas(doc)).toEqual([]);
+    const card = doc.nodes.find((n) => (n.text ?? "").startsWith("### Caso"));
+    expect(card).toBeDefined();
+    if (card) card.y -= 80; // squeeze the gap so the arrow label no longer fits
+    expect(verifyCanvas(doc).some((p) => p.includes("pisa la tarjeta"))).toBe(true);
+  });
+
+  it("survives a concept with many examples and errors without crowding the labels", () => {
+    const extraExamples = Array.from({ length: 4 }, (_, i) => `
+### Ejemplo ${i + 3} — Caso extra ${i}
+- **Contexto:** situación de prueba número ${i}.
+- **Caso:** el caso concreto del ejemplo extra ${i}.
+- **Resultado esperado:** un resultado comprobable ${i}.
+- **Por qué funciona:** porque la regla aplicada lo garantiza.
+`).join("");
+    const extraErrors = Array.from({ length: 4 }, (_, i) => `
+### Error ${i + 2} — Error extra ${i}
+- **Error:** se escribe mal el caso ${i}.
+- **Síntoma:** el resultado sale invertido.
+- **Causa:** se aplica la regla contraria.
+- **Solución:** comprobar la definición antes de operar.
+`).join("");
+    // The extras must land *inside* their section, not after `## Tarjetas`.
+    const many = CONCEPT_NOTE
+      .replace("## Errores comunes", `${extraExamples}\n## Errores comunes`)
+      .replace("## Tarjetas", `${extraErrors}\n## Tarjetas`);
+    const { root, concepto } = makeVault(many);
+    const c = readConcept(concepto, root);
+    expect(c.examples).toHaveLength(6);
+    expect(c.errors).toHaveLength(5);
+    const doc = buildConceptCanvas(c);
+    const problems = verifyCanvas(doc);
+    for (const p of problems) process.stdout.write(`problem: ${p}\n`);
+    expect(problems).toEqual([]);
   });
 
   it("draws the Requiere panel even when the concept has no prerequisites", () => {

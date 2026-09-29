@@ -16,10 +16,12 @@ import { PanelLaunchers } from "./PanelLaunchers";
 import { Inspector } from "./Inspector";
 import { AssistantPanel } from "./AssistantPanel";
 import { WebRail } from "../web/WebRail";
+import { ReviewPanel, useReviewPanel } from "../study/ReviewPanel";
 
 export function RightPanel({ module, canvas = false }: { module: string; canvas?: boolean }) {
   const assistantOpen = useAssistant((s) => s.open);
   const pagesOpen = useWebPages((s) => s.open);
+  const reviewOpen = useReviewPanel((s) => s.open);
   const muscleOpen = useApp((s) => s.muscleOpen);
   const inspectorOpen = useApp((s) => s.inspectorOpen);
   const active = useApp((s) => s.active);
@@ -29,6 +31,7 @@ export function RightPanel({ module, canvas = false }: { module: string; canvas?
 
   if (assistantOpen) return <AssistantPanel />;
   if (pagesOpen) return <WebRail />;
+  if (reviewOpen && module === "notas") return <ReviewPanel />;
   // El esquema muscular solo tiene sentido dentro de Ejercicio.
   if (muscleOpen && module === "ejercicio") return <MuscleSchemaPanel />;
   if (inspectorOpen && active) return <Inspector />;

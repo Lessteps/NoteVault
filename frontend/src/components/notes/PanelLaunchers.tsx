@@ -4,7 +4,8 @@
 // El globo no es el modulo del navegador: muestra y oculta la lista de paginas
 // *dentro* del panel, sin moverte de donde estas.
 
-import { Globe, ListTree, Map as MapIcon, Sparkles } from "lucide-react";
+import { CalendarClock, Globe, ListTree, Map as MapIcon, Sparkles } from "lucide-react";
+import { useReviewPanel } from "../study/ReviewPanel";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
 import { useWebPages } from "../../store/webPages";
@@ -17,17 +18,20 @@ export function PanelLaunchers({ module }: { module: string }) {
   const assistantOpen = useAssistant((s) => s.open);
   const pages = useWebPages((s) => s.pages.length);
   const pagesOpen = useWebPages((s) => s.open);
+  const reviewOpen = useReviewPanel((s) => s.open);
 
   /** Una cara a la vez: la que se abre se lleva el panel. */
   const soloMuscle = () => {
     if (assistantOpen) useAssistant.getState().setOpen(false);
     if (pagesOpen) useWebPages.getState().setOpen(false);
     if (inspectorOpen) useApp.getState().toggleInspector();
+    if (reviewOpen) useReviewPanel.getState().setOpen(false);
     useApp.getState().setMuscleOpen(true);
   };
   /** Y el ✕ de cada cara devuelve el hueco a la tira. */
   const cierraMuscle = () => {
     if (muscleOpen) useApp.getState().setMuscleOpen(false);
+    if (reviewOpen) useReviewPanel.getState().setOpen(false);
   };
 
   return (
@@ -115,6 +119,33 @@ export function PanelLaunchers({ module }: { module: string }) {
       >
         <ListTree size={16} />
       </button>
+
+      {/* Repaso (spaced repetition): only inside Notas, where the study areas live. */}
+      {module === "notas" && (
+        <button
+          type="button"
+          title="Repaso espaciado"
+          aria-label="Repaso"
+          aria-pressed={reviewOpen}
+          onClick={() => {
+            if (reviewOpen) {
+              useReviewPanel.getState().setOpen(false);
+              return;
+            }
+            cierraMuscle();
+            if (assistantOpen) useAssistant.getState().setOpen(false);
+            if (pagesOpen) useWebPages.getState().setOpen(false);
+            if (inspectorOpen) useApp.getState().toggleInspector();
+            useReviewPanel.getState().setOpen(true);
+          }}
+          className={cn(
+            "grid h-8 w-8 place-items-center rounded-lg transition-colors",
+            reviewOpen ? "bg-hover text-text" : "text-dim hover:bg-hover hover:text-text",
+          )}
+        >
+          <CalendarClock size={16} />
+        </button>
+      )}
     </aside>
   );
 }

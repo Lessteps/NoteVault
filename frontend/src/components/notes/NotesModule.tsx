@@ -11,14 +11,11 @@ import { useCanvas } from "../../store/canvas";
 import { CanvasView } from "../canvas/CanvasView";
 import { ConceptMapDialog } from "../canvas/ConceptMapDialog";
 import { StudyFoldersDialog } from "../study/StudyFoldersDialog";
-import { PanelLaunchers } from "./PanelLaunchers";
 
 const WIDTH_KEY = "nv.explorer.width";
 
 export function NotesModule() {
-  const active = useApp((s) => s.active);
   const explorerOpen = useApp((s) => s.explorerOpen);
-  const inspectorOpen = useApp((s) => s.inspectorOpen);
   const assistantOpen = useAssistant((s) => s.open);
   const canvasPath = useCanvas((s) => s.path);
   const openCanvas = useCanvas((s) => s.open);
@@ -71,16 +68,9 @@ export function NotesModule() {
         </>
       )}
       {canvasPath ? <CanvasView /> : <EditorArea />}
-      {!canvasPath && (
-        assistantOpen ? (
-          <AssistantPanel />
-        ) : inspectorOpen && active ? (
-          // The outline is a *note's* outline: with no note there is no panel.
-          <Inspector />
-        ) : (
-          <PanelLaunchers />
-        )
-      )}
+      {/* El panel de la nota es permanente: el esquema y las propiedades siempre
+          estan a la vista. El asistente lo ocupa solo mientras esta abierto. */}
+      {!canvasPath && (assistantOpen ? <AssistantPanel /> : <Inspector />)}
       <AiSettingsDialog />
       <PropertiesDialog />
       <ConceptMapDialog />

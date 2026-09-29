@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { bodyOf, useApp } from "../../store/app";
 import { cn } from "../ui";
 import { useProperties } from "./PropertiesDialog";
@@ -47,7 +47,6 @@ export type InspectorTab = "note";
  * so this panel no longer hosts the study surface. */
 export function Inspector() {
   const active = useApp((s) => s.active);
-  const toggleInspector = useApp((s) => s.toggleInspector);
 
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem("nv.inspector.width"));
@@ -112,27 +111,16 @@ export function Inspector() {
               {label}
             </button>
           ))}
-          <button
-            type="button"
-            title="Cerrar panel lateral"
-            aria-label="Cerrar panel lateral"
-            onClick={toggleInspector}
-            className="ml-auto grid h-6 w-6 place-items-center rounded text-faint hover:bg-hover hover:text-text"
-          >
-            <X size={14} />
-          </button>
         </div>
-        {effectiveTab === "note" && <NoteInspector embedded onClose={toggleInspector} />}
+        {effectiveTab === "note" && <NoteInspector embedded />}
       </aside>
     </div>
   );
 }
 
-function NoteInspector({ embedded = false, onClose }: { embedded?: boolean; onClose?: () => void }) {
+function NoteInspector({ embedded = false }: { embedded?: boolean }) {
   const note = useApp((s) => (s.active ? s.notes[s.active] : undefined));
   const openNote = useApp((s) => s.openNote);
-  const toggleInspector = useApp((s) => s.toggleInspector);
-  const closeAction = onClose ?? toggleInspector;
   const heads = useMemo(() => (note?.kind === "note" ? outline(note.raw) : []), [note?.raw, note?.kind]);
   const minLevel = Math.min(...heads.map((h) => h.level), 6);
   const fm = Object.entries(note?.frontmatter ?? {}).filter(([k]) => k.toLowerCase() !== "tags");
@@ -142,16 +130,8 @@ function NoteInspector({ embedded = false, onClose }: { embedded?: boolean; onCl
     <aside className={cn("flex flex-col bg-panel", embedded ? "min-h-0 flex-1" : "w-[260px] flex-none border-l border-line")} aria-label="Panel de nota">
       {!embedded && (
         <div className="flex h-9 flex-none items-center justify-between border-b border-line px-3">
+          {/* Sin boton de cerrar: este panel no se cierra. */}
           <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-faint">Nota</span>
-          <button
-            type="button"
-            title="Cerrar panel lateral"
-            aria-label="Cerrar panel lateral"
-            onClick={closeAction}
-            className="grid h-6 w-6 place-items-center rounded text-faint hover:bg-hover hover:text-text"
-          >
-            <X size={14} />
-          </button>
         </div>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">

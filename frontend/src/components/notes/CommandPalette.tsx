@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { create } from "zustand";
 import type { EditorView } from "@codemirror/view";
 import { api } from "../../lib/bridge";
+import { useAssistant } from "../../store/assistant";
 import * as ed from "../../lib/editorCommands";
 import type { TableOp } from "../../lib/mdTable";
 import { useApp } from "../../store/app";
@@ -167,7 +168,9 @@ function commands(): Item[] {
       }),
     },
     ...(s.side ? [{ id: "split-close", group: "Vista", label: "Cerrar el panel derecho", run: () => void s.openSide(null) }] : []),
-    { id: "inspector", group: "Vista", label: "Mostrar / ocultar panel derecho", run: s.toggleInspector },
+    // El panel de la nota ya no se oculta (siempre esta a la vista), asi que el
+    // asistente necesita su propia entrada.
+    { id: "assistant", group: "Vista", label: "Abrir el asistente", run: () => useAssistant.getState().setOpen(true) },
     { id: "tags", group: "Vista", label: "Ver etiquetas", run: () => { s.setModule("notas"); s.setExplorerTab("tags"); } },
     { id: "graph", group: "Vista", label: "Ver grafo de conocimiento", run: () => { s.setModule("notas"); s.setExplorerTab("graph"); } },
     { id: "theme", group: "Vista", label: "Cambiar tema claro / oscuro", run: s.toggleTheme },

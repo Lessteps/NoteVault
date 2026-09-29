@@ -451,6 +451,9 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
     assistance: string,
   ) => call<import("./types").TopicSessionResult>("study_topic_session_build", folder, skill, difficulty, quantity, assistance),
   studyTopicDashboard: (subject?: string) => call<import("./types").TopicDashboardData>("study_topic_dashboard", subject),
+  /** AI-drafts a subject's areas/topics and creates the folder tree + overviews. */
+  studyGenerateSyllabus: (subject: string) =>
+    call<{ ok: boolean; created: string[]; folders: string[]; plan: unknown }>("study_generate_syllabus", subject),
   /** A session drawn from every topic of an area (see `study_area_session_build`). */
   studyAreaSessionBuild: (
     folder: string,

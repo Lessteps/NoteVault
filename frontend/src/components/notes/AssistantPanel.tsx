@@ -3,7 +3,7 @@
 // Answers can go back into the note.
 
 import {
-  ArrowLeft, ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
+  ArrowLeft, ArrowUp, BookOpen, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
   GitCompare, History, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
   Square, ThumbsDown, ThumbsUp, Trash2, X,
 } from "lucide-react";
@@ -253,8 +253,10 @@ function Composer() {
   const stop = useAssistant((s) => s.stop);
   const busy = useAssistant((s) => s.busy);
   const streamingId = useAssistant((s) => s.streamingId);
+  const toast = useApp((s) => s.toast);
   const [text, setText] = useState("");
   const [pending, setPending] = useState<ChatContext[]>([]);
+  const [syllabusBusy, setSyllabusBusy] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
 
   const grow = () => {
@@ -283,6 +285,21 @@ function Composer() {
     const sel = editorSelection();
     if (!sel.trim()) return;
     setPending((p) => [...p, { path: note?.path ?? "", text: sel }]);
+  };
+
+  const generateSyllabus = async () => {
+    const subject = await askText("Generar temario (nombre de la materia)", "", "Generar");
+    if (subject === null || !subject.trim()) return;
+    setSyllabusBusy(true);
+    try {
+      const res = await api.studyGenerateSyllabus(subject.trim());
+      useApp.getState().refreshTree();
+      toast("info", `Temario creado: ${res.folders.length} carpeta(s), ${res.created.length} vista(s).`);
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setSyllabusBusy(false);
+    }
   };
 
   return (
@@ -327,6 +344,15 @@ function Composer() {
             <Plus size={15} />
           </button>
           <ModelSelector />
+          <button
+            type="button"
+            title="Generar temario completo de una materia con IA"
+            disabled={syllabusBusy}
+            onClick={() => void generateSyllabus()}
+            className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-hover hover:text-text disabled:opacity-50"
+          >
+            <BookOpen size={14} className={cn(syllabusBusy && "animate-pulse")} />
+          </button>
           <span className="flex-1" />
           <IconButton title="Dictado por voz — fuera de alcance" disabled>
             <Mic size={14} />

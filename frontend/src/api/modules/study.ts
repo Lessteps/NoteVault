@@ -19,7 +19,7 @@ import {
   skillLabel,
 } from "../../core/practice/recommender.js";
 import { StudyArea, detectStudyArea } from "../../core/practice/studyArea.js";
-import { ensureOverviewFile, ensureTopicViewFiles, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf } from "../../core/practice/viewFiles.js";
+import { ensureOverviewFile, ensureTopicViewFiles, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf, overviewFileText, viewFileName } from "../../core/practice/viewFiles.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { LAYOUT } from "../../core/vaultFormat.js";
@@ -959,6 +959,77 @@ export function studyApi(app: AppState) {
         record,
         item_results: itemResults,
       };
+    },
+
+    /**
+     * Draft the whole syllabus of a subject with the AI and lay it out on disk:
+     * one folder per area (with its `.resumen.md` overview) and one folder per
+     * topic. Existing folders and overviews are left untouched.
+     */
+    study_generate_syllabus: async (subject: string) => {
+      const name = String(subject || "").trim();
+      if (!name) throw new ApiError("Indica el nombre de la materia.");
+      const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+      if (cfg.is_bridge) {
+        throw new ApiError("El proveedor de IA está en modo puente; no se puede generar automáticamente.");
+      }
+
+      const ask = (prompt: string): Promise<string> => sendChat(cfg, [{ role: "user", content: prompt }]);
+
+      const areasResponse = await ask(
+        `Eres un experto en diseño curricular. Dame las 8-12 áreas principales de «${name}» ` +
+          `numeradas (ej: "1 Aritmética", "2 Álgebra"). Solo la lista, sin explicaciones.`,
+      );
+      const topicsResponse = await ask(
+        `Dadas estas áreas de ${name}:\n${areasResponse}\n\n` +
+          `Para cada área, da de 6 a 12 temas numerados (ej: "1.1 Números naturales"). ` +
+          `Formato: AREA > temas. Sin explicaciones extra.`,
+      );
+      const structured = await ask(
+        `Convierte este temario en JSON. Solo JSON, sin comentarios:\n${topicsResponse}\n\n` +
+          `{"areas":[{"name":"1 Aritmética","folder":"1 Aritmética elemental y operativa",` +
+          `"topics":[{"name":"1.1 Números naturales","folder":"1.1 Números naturales enteros y recta numérica"}]}]}`,
+      );
+
+      const match = structured.match(/\{[\s\S]*\}/);
+      if (!match) throw new ApiError("La IA no pudo estructurar el temario.");
+      let plan: { areas?: Array<{ name?: string; folder?: string; topics?: Array<{ name?: string; folder?: string }> }> };
+      try {
+        plan = JSON.parse(match[0]);
+      } catch {
+        throw new ApiError("La IA devolvió un temario con formato inválido.");
+      }
+
+      const subjectDir = path.join(app.root, name);
+      fs.mkdirSync(subjectDir, { recursive: true });
+      const created: string[] = [];
+      const folders: string[] = [];
+
+      for (const area of plan.areas ?? []) {
+        const areaFolder = String(area.folder || area.name || "").trim().replace(/[\\/]+$/g, "");
+        if (!areaFolder) continue;
+        const areaDir = path.join(subjectDir, areaFolder);
+        fs.mkdirSync(areaDir, { recursive: true });
+        folders.push(app.rel(areaDir).replace(/\\/g, "/"));
+
+        const overview = path.join(areaDir, viewFileName(areaFolder, "resumen"));
+        if (!fs.existsSync(overview)) {
+          const scope = `${name}/${areaFolder}`.replace(/\\/g, "/");
+          fs.writeFileSync(overview, overviewFileText(String(area.name || areaFolder), name, scope), "utf-8");
+          created.push(app.rel(overview).replace(/\\/g, "/"));
+        }
+
+        for (const topic of area.topics ?? []) {
+          const topicFolder = String(topic.folder || topic.name || "").trim().replace(/[\\/]+$/g, "");
+          if (!topicFolder) continue;
+          const topicDir = path.join(areaDir, topicFolder);
+          fs.mkdirSync(topicDir, { recursive: true });
+          folders.push(app.rel(topicDir).replace(/\\/g, "/"));
+        }
+      }
+
+      clearStudySnapshotCache();
+      return { ok: true, created, folders, plan };
     },
 
     study_topic_dashboard: async (subjectFilter?: string) => {

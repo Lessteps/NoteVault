@@ -8,9 +8,13 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-export const APP_DATA_DIR = path.join(os.homedir(), ".notevault");
+// NV_E2E_HOME redirige el home solo en tests E2E Playwright (aisla
+// ~/.notevault y ~/NoteVault sin tocar USERPROFILE/APPDATA, que
+// Playwright/Chromium necesitan intactos).
+const HOMEDIR = process.env.NV_E2E_HOME || os.homedir();
+export const APP_DATA_DIR = path.join(HOMEDIR, ".notevault");
 export const SETTINGS_FILE = path.join(APP_DATA_DIR, "settings.json");
-export const DEFAULT_VAULT = path.join(os.homedir(), "NoteVault");
+export const DEFAULT_VAULT = path.join(HOMEDIR, "NoteVault");
 
 export type RenderingMode = "auto" | "hardware" | "software";
 export type AngleBackend = "default" | "d3d11" | "d3d11on12" | "gl" | "d3d9" | "vulkan";

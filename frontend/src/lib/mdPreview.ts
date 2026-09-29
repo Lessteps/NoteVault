@@ -25,9 +25,11 @@ export interface LinePreview {
   replace: Array<{ from: number; to: number; text: string }>;
   /** Ranges that get a class: inline code, links, bold, italic. */
   marks: Array<{ from: number; to: number; kind: "code" | "link" | "strong" | "em" }>;
+  /** Inline `$formula$` spans, drawn as typeset math on lines the cursor is not on. */
+  math: Array<{ from: number; to: number; tex: string }>;
 }
 
-const EMPTY: LinePreview = { hide: [], replace: [], marks: [] };
+const EMPTY: LinePreview = { hide: [], replace: [], marks: [], math: [] };
 
 /** `### Título` → hide the hashes; `- cosa` → a real bullet. */
 function blockLevel(text: string, out: LinePreview): number {
@@ -56,6 +58,14 @@ function inline(text: string, offset: number, out: LinePreview): void {
     out.hide.push({ from, to: from + 1 });
     out.hide.push({ from: from + m[0].length - 1, to: from + m[0].length });
     out.marks.push({ from: from + 1, to: from + m[0].length - 1, kind: "code" });
+    protectedRanges.push({ from: m.index, to: m.index + m[0].length });
+  }
+  // Inline math is literal too: `*` and `_` inside a formula are not emphasis.
+  const inlineMath = /(?<![\\$])\$(?!\$)([^$\n]+?)\$(?![$\d])/g;
+  while ((m = inlineMath.exec(text)) !== null) {
+    const tex = m[1]!;
+    if (/^\s|\s$/.test(tex)) continue;
+    out.math.push({ from: offset + m.index, to: offset + m.index + m[0].length, tex });
     protectedRanges.push({ from: m.index, to: m.index + m[0].length });
   }
   const isProtected = (at: number) => protectedRanges.some((r) => at >= r.from && at < r.to);
@@ -143,11 +153,12 @@ function inline(text: string, offset: number, out: LinePreview): void {
  */
 export function linePreview(text: string, plain = false): LinePreview {
   if (plain || !text.trim()) return EMPTY;
-  const out: LinePreview = { hide: [], replace: [], marks: [] };
+  const out: LinePreview = { hide: [], replace: [], marks: [], math: [] };
   const lead = blockLevel(text, out);
   // Fences and table rows keep their syntax: they are structure, not markup to
-  // be hidden (a table without its pipes is not a table).
-  if (text.trimStart().startsWith("```") || text.includes("|")) return out;
+  // be hidden (a table without its pipes is not a table). Whole tables are drawn
+  // by the block widgets; a `|` inside a sentence (|x| is an absolute value) is text.
+  if (text.trimStart().startsWith("```") || text.trimStart().startsWith("|")) return out;
   inline(text.slice(lead), lead, out);
   return out;
 }

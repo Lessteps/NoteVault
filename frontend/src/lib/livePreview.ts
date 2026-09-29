@@ -7,6 +7,7 @@
 import { RangeSetBuilder, type EditorState } from "@codemirror/state";
 import { Decoration, ViewPlugin, WidgetType, type DecorationSet, type EditorView, type ViewUpdate } from "@codemirror/view";
 import { linePreview } from "./mdPreview";
+import { renderTex } from "./tex";
 
 /** El punto que sustituye al "- " de una viñeta. */
 class BulletWidget extends WidgetType {
@@ -18,6 +19,22 @@ class BulletWidget extends WidgetType {
   }
   ignoreEvent(): boolean {
     return false;
+  }
+}
+
+/** A `$formula$` typeset in place. */
+class MathWidget extends WidgetType {
+  constructor(readonly tex: string) {
+    super();
+  }
+  eq(o: MathWidget): boolean {
+    return o.tex === this.tex;
+  }
+  toDOM(): HTMLElement {
+    const span = document.createElement("span");
+    span.className = "cm-nv-math";
+    span.innerHTML = renderTex(this.tex, false);
+    return span;
   }
 }
 
@@ -79,6 +96,9 @@ export const livePreview = ViewPlugin.fromClass(
           }
           for (const r of p.replace) {
             out.push({ from: line.from + r.from, to: line.from + r.to, deco: BULLET });
+          }
+          for (const mt of p.math) {
+            out.push({ from: line.from + mt.from, to: line.from + mt.to, deco: Decoration.replace({ widget: new MathWidget(mt.tex) }) });
           }
           for (const m of p.marks) {
             if (m.to > m.from) {

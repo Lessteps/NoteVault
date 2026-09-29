@@ -68,7 +68,7 @@ describe("vista indexada", () => {
     expect(rendered("# hello", true)).toBe("# hello");
     expect(rendered("| a | b |")).toBe("| a | b |");
     expect(rendered("```ts")).toBe("```ts");
-    expect(linePreview("   ")).toEqual({ hide: [], replace: [], marks: [] });
+    expect(linePreview("   ")).toEqual({ hide: [], replace: [], marks: [], math: [] });
   });
 
   it("devuelve desplazamientos dentro de la línea", () => {
@@ -81,5 +81,22 @@ describe("vista indexada", () => {
       expect(h.to).toBeLessThanOrEqual("## Título con **fuerza**".length);
       expect(h.to).toBeGreaterThan(h.from);
     }
+  });
+});
+
+describe("vista indexada: fórmulas en línea", () => {
+  it("reports $..$ spans and keeps their contents literal", () => {
+    const p = linePreview("Sea $a*b*c$ y $|x|$ dos casos");
+    expect(p.math.map((m) => m.tex)).toEqual(["a*b*c", "|x|"]);
+    // The asterisks inside the formula are not emphasis.
+    expect(p.hide).toEqual([]);
+  });
+
+  it("ignores prices and escaped dollars", () => {
+    expect(linePreview("Cuesta $5 y $ 6 $ o \$x\$").math).toEqual([]);
+  });
+
+  it("gives the cursor's line back untouched", () => {
+    expect(linePreview("$x$", true).math).toEqual([]);
   });
 });

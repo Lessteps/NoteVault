@@ -13,6 +13,7 @@ import { tags as t } from "@lezer/highlight";
 import { useEffect, useRef } from "react";
 import { insertTable, toggleTask, wrap } from "../../lib/editorCommands";
 import { livePreview } from "../../lib/livePreview";
+import { livePreviewBlocks } from "../../lib/livePreviewBlocks";
 
 // Markdown shortcuts (the Qt editor's Ctrl+B / Ctrl+I / Ctrl+L / Ctrl+Shift+T).
 const mdKeymap = keymap.of([
@@ -73,6 +74,19 @@ const theme = EditorView.theme({
     textDecorationColor: "color-mix(in srgb, var(--nv-accent-text) 40%, transparent)",
   },
   ".cm-nv-bullet": { color: "var(--nv-accent-text)", fontWeight: "700" },
+  // Bloques dibujados (lib/livePreviewBlocks): frontmatter, tablas, fórmulas y
+  // reglas se ven como en la lectura; el Markdown crudo aparece donde está el cursor.
+  ".cm-nv-block": { margin: "10px 0", cursor: "default" },
+  ".cm-nv-fm, .cm-nv-math-block, .cm-nv-rule": { cursor: "text" },
+  ".cm-nv-table.nv-prose": { maxWidth: "none", margin: "10px 0", overflowX: "auto" },
+  ".cm-nv-table th:focus, .cm-nv-table td:focus": {
+    outline: "2px solid var(--nv-accent)",
+    outlineOffset: "-2px",
+    background: "var(--nv-accent-soft)",
+  },
+  ".cm-nv-math-block": { textAlign: "center", overflowX: "auto" },
+  ".cm-nv-math": { display: "inline-block", verticalAlign: "baseline" },
+  ".cm-nv-rule hr": { border: "0", borderTop: "1px solid var(--nv-line-strong)", margin: "14px 0" },
 });
 
 const mdHighlight = HighlightStyle.define([
@@ -143,7 +157,7 @@ export function SourceEditor({
         EditorState.lineSeparator.of(eol),
         // A note is read, not debugged: no gutter, and the Markdown markers are
         // hidden (see livePreview). Code files keep both.
-        ...(code ? [lineNumbers(), highlightActiveLineGutter()] : [livePreview]),
+        ...(code ? [lineNumbers(), highlightActiveLineGutter()] : [livePreview, ...livePreviewBlocks]),
         history(),
         drawSelection(),
         highlightActiveLine(),

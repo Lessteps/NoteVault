@@ -32,6 +32,7 @@ import { ExerciseMonth, ExerciseWeek } from "./Grids";
 import { Overview } from "./Overview";
 import { ORANGE, SideStats, useFail } from "./parts";
 import { MuscleCount, MusclePicker } from "./MusclePicker";
+import { MuscleMapDebug } from "./MuscleMapDebug";
 import { Yearly } from "./Yearly";
 
 const EMPTY: Partial<Exercise> = { day: "lunes", name: "", video_path: "", series_reps: "", rest: "", how_to: "", muscles: { primary: [], secondary: [] } };
@@ -46,6 +47,7 @@ function Manage() {
   const [editing, setEditing] = useState<string>("");
   const [f, setF] = useState<Partial<Exercise>>(EMPTY);
   const [status, setStatus] = useState("");
+  const [debug, setDebug] = useState(false);
 
   const save = async () => {
     if (!f.name?.trim()) return setStatus("El ejercicio necesita un nombre.");
@@ -66,6 +68,9 @@ function Manage() {
         <div className="flex items-center gap-2">
           <h1 className="text-[21px] font-semibold text-text">⚙ Gestionar ejercicios</h1>
           <span className="flex-1" />
+          {/* TEMPORAL: verificación visual del mapeo forma → músculo. Se borra
+              cuando el mapeo esté aprobado (aquí y en MuscleMapDebug.tsx). */}
+          <GhostButton onClick={() => setDebug(true)}>🔎 Verificación del mapeo</GhostButton>
           <GhostButton onClick={async () => {
             try {
               const r = await api.exLinkVideos();
@@ -141,6 +146,7 @@ function Manage() {
         </div>
         {status && <p className="text-[12px] text-dim">{status}</p>}
       </aside>
+      {debug && <MuscleMapDebug onClose={() => setDebug(false)} />}
     </div>
   );
 }

@@ -36,11 +36,16 @@ describe("create_syllabus", () => {
 
   it("plans without writing, then creates areas, overviews and topic practice files", () => {
     const plan = planAssistantAction(root, action);
-    expect(plan.ops.filter((o) => o.kind === "write").length).toBe(5);
+    expect(plan.ops.filter((o) => o.kind === "write").length).toBe(8);
     expect(fs.existsSync(path.join(root, "JavaScript"))).toBe(false);
 
     const res = applyAssistantAction(root, action);
     expect(res.written).toContain("JavaScript/1 Fundamentos/1 Fundamentos.resumen.md");
+    expect(res.written).toContain("JavaScript/JavaScript.resumen.md");
+    // Each grouping area gets its map, with every arrow labelled.
+    const map = JSON.parse(read("JavaScript/1 Fundamentos/00 Mapa — 1 Fundamentos.canvas"));
+    expect(map.nodes).toHaveLength(3);
+    expect(map.edges.every((e: { label: string }) => e.label)).toBe(true);
     const practica = read("JavaScript/1 Fundamentos/1.1 Variables y tipos/1.1 Variables y tipos.practica.md");
     const manifest = parseTopicManifest(practica)!;
     expect(manifest.subject).toBe("programming");

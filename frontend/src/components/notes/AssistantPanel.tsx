@@ -4,7 +4,7 @@
 
 import {
   ArrowLeft, ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
-  GitCompare, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
+  GitCompare, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
   Square, ThumbsDown, ThumbsUp, Trash2, Wand2, X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
@@ -18,6 +18,7 @@ import { useApp } from "../../store/app";
 import { useAssistant, type ChatContext, type ChatMessage } from "../../store/assistant";
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
 import { askText, cn, confirmAction, IconButton, openMenu } from "../ui";
+import { useStudySpaceDialog } from "../study/StudySpaceDialog";
 import { ActionCard } from "./ActionCard";
 import { editorSelection, insertAtCursor } from "./SourceEditor";
 
@@ -381,6 +382,15 @@ function Composer() {
             <Plus size={15} />
           </button>
           <ModelSelector />
+          <button
+            type="button"
+            title="Generar espacio de estudio (temario, teoría, práctica y mapas)"
+            aria-label="Generar espacio de estudio"
+            onClick={() => useStudySpaceDialog.getState().setOpen(true)}
+            className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-hover hover:text-text"
+          >
+            <GraduationCap size={14} />
+          </button>
           <button
             type="button"
             title="Modos: temario, canvas, nuevo tema, re-evaluar práctica"

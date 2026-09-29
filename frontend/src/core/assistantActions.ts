@@ -11,6 +11,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ApiError } from "./errors.js";
+import { buildAreaMapCanvas } from "./areaMap.js";
 import { dumpFrontmatter } from "./frontmatter.js";
 import { catalogSkill, deterministicSkillSelector } from "./practice/skillSelection.js";
 import { createDefaultTopicManifest } from "./practice/topic.js";
@@ -134,6 +135,13 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
   if (!areas.length) throw new ApiError("El temario no tiene áreas.");
 
   const ops: PlannedOp[] = [mkdirOp(root, subject)];
+  const rootOverview = `${subject}/${viewFileName(subject, "resumen")}`;
+  ops.push({
+    kind: "write",
+    rel: rootOverview,
+    content: overviewFileText(subject, subjectId, subject),
+    exists: fs.existsSync(absOf(root, rootOverview)),
+  });
   for (const area of areas) {
     const areaName = safeName(area?.folder || area?.name);
     if (!areaName) continue;
@@ -147,11 +155,23 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
       exists: fs.existsSync(absOf(root, overview)),
     });
     const topics = Array.isArray(area?.topics) ? area.topics.slice(0, MAX_TOPICS) : [];
+    const topicNames: string[] = [];
     for (const topic of topics) {
       const topicName = safeName(topic?.folder || topic?.name);
       if (!topicName) continue;
+      topicNames.push(topicName);
       const topicRel = `${areaRel}/${topicName}`;
       ops.push(mkdirOp(root, topicRel), ...topicFiles(root, topicRel, topicName, subjectId, topic?.skills));
+    }
+    // Every grouping area gets its map (canvas), built from its topics (see mapa_skill).
+    if (args.map !== false && topicNames.length) {
+      const mapRel = `${areaRel}/00 Mapa — ${areaName}.canvas`;
+      ops.push({
+        kind: "write",
+        rel: mapRel,
+        content: JSON.stringify(buildAreaMapCanvas(safeName(area?.name) || areaName, topicNames), null, "\t") + "\n",
+        exists: fs.existsSync(absOf(root, mapRel)),
+      });
     }
   }
   return { action: "create_syllabus", title: `Crear el temario de ${subject}`, ops, warnings: [] };

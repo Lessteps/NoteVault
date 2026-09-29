@@ -55,6 +55,17 @@ export const livePreview = ViewPlugin.fromClass(
       }
     }
     build(view: EditorView): DecorationSet {
+      try {
+        return this.buildRanges(view);
+      } catch (e) {
+        // Un juego de decoraciones imposible (dos rangos que se solapan) tiraba el
+        // editor entero al montar. Sin marcas la nota sigue abriéndose y se puede
+        // editar; solo se ve el Markdown tal cual.
+        console.warn("[NoteVault] la vista indexada falló; la nota se muestra sin ocultar marcas:", e);
+        return Decoration.none;
+      }
+    }
+    buildRanges(view: EditorView): DecorationSet {
       const out: Array<{ from: number; to: number; deco: Decoration }> = [];
       const last = view.state.doc.lines;
       for (const range of view.visibleRanges) {

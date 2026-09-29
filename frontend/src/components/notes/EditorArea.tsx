@@ -9,6 +9,7 @@ import type { Mentions, SearchHit } from "../../lib/types";
 import { useVirtualList } from "../../lib/useVirtualList";
 import { useApp, type OpenNote, type ViewMode } from "../../store/app";
 import { cn, IconButton, Kbd } from "../ui";
+import { ErrorBoundary } from "../common/ErrorBoundary";
 import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
 import { PracticeView } from "../practice/PracticeView";
@@ -304,6 +305,9 @@ export function EditorArea() {
                   modo lectura no hay nada que formatear. */}
               {mode !== "read" && note.kind === "note" && <FormatBar />}
               {note.conflict && <ConflictBanner note={note} />}
+              {/* Una nota que rompe su vista no puede llevarse la ventana: la red
+                  muestra qué pasó y la nota se sigue pudiendo editar. */}
+              <ErrorBoundary key={note.path} path={note.path} what="La vista de la nota">
               <div className="flex min-h-0 flex-1">
                 {mode !== "read" && (
                   <div className={cn("min-h-0 min-w-0", mode === "split" ? "w-1/2 border-r border-line" : "flex-1")}>
@@ -334,11 +338,16 @@ export function EditorArea() {
                   </div>
                 )}
               </div>
+              </ErrorBoundary>
               <BacklinksBar note={note} />
             </>
           )}
         </div>
-        {side && <SidePane note={side} />}
+        {side && (
+          <ErrorBoundary key={`side:${side.path}`} path={side.path} what="La vista del panel derecho">
+            <SidePane note={side} />
+          </ErrorBoundary>
+        )}
       </div>
     </main>
   );

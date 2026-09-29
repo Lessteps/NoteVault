@@ -24,7 +24,7 @@ import { notesExtrasApi } from "./modules/notes_extras.js";
 import { practiceApi } from "./modules/practice.js";
 import { projectsApi } from "./modules/projects.js";
 import { projectFoldersApi } from "./modules/projectFolders.js";
-import { studyApi } from "./modules/study.js";
+import { studyApi, setWarmApp, warmStudyIndex } from "./modules/study.js";
 import { tasksApi } from "./modules/tasks.js";
 import { vaultsApi } from "./modules/vaults.js";
 import { webApi } from "./modules/web.js";
@@ -70,8 +70,13 @@ let current: Registry = {};
 export function initRegistry(vaultPath?: string): AppState {
   appState = new AppState(vaultPath ?? AppConfig.get_active_vault());
   current = buildRegistry(appState);
+  // The study module warms its cache off-thread at startup (see warmStudyIndex).
+  setWarmApp(appState);
   return appState;
 }
+
+/** Read the vault into the study cache in the background. Called once on startup. */
+export { warmStudyIndex };
 
 /** The live registry used by the IPC handler. */
 export function getRegistry(): Registry {

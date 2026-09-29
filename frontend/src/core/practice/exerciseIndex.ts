@@ -71,9 +71,22 @@ export interface CardNote {
   text: string;
 }
 
+/** A note as the scan saw it: enough to classify it without reading it again. */
+export interface NoteFacts {
+  path: string;
+  rel: string;
+  frontmatter: Record<string, any>;
+}
+
 export class VaultScan {
   exercises: ExerciseRef[] = [];
   card_notes: CardNote[] = [];
+  /**
+   * Every note the scan read, with its frontmatter: the cheap source for
+   * vault-wide questions ("which notes are topic manifests?"). `card_notes` is not
+   * a substitute — it only holds notes that carry cards.
+   */
+  notes: NoteFacts[] = [];
 
   get cardNotes(): CardNote[] {
     return this.card_notes;
@@ -192,6 +205,29 @@ export function clearExerciseIndexCache(): void {
   _cache.clear();
 }
 
+/**
+ * Read `paths` into the per-file cache in batches, yielding to the event loop
+ * between them.
+ *
+ * The first `scanVault` of a cold process reads every note of the vault: measured
+ * 30 s of disk I/O over 2 107 notes (0.35 ms each once the OS cache is warm). This
+ * warming moves that cost off the click that needs it, and the yields keep the
+ * main process answering IPC while it runs, instead of freezing the window.
+ */
+export async function warmNoteCache(paths: Iterable<string>, batch = 150): Promise<number> {
+  let read = 0;
+  let sinceYield = 0;
+  for (const p of paths) {
+    _read(p);
+    read += 1;
+    if (++sinceYield >= batch) {
+      sinceYield = 0;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+  return read;
+}
+
 function _read(filePath: string): CacheEntry | null {
   let st: fs.Stats;
   try {
@@ -241,15 +277,17 @@ export function scanVault(vaultRoot: string, paths: Iterable<string>): VaultScan
     if (!entry) continue;
 
     const [fm, text] = entry;
+    const rel = (() => {
+      try {
+        return path.relative(resolvedRoot, absPath).replace(/\\/g, "/");
+      } catch {
+        return absPath.replace(/\\/g, "/");
+      }
+    })();
+    scan.notes.push({ path: absPath, rel, frontmatter: fm });
     if (isPracticeFrontmatter(fm)) {
       scan.exercises.push(exerciseRef(absPath, resolvedRoot, fm));
     } else if (text) {
-      let rel: string;
-      try {
-        rel = path.relative(resolvedRoot, absPath).replace(/\\/g, "/");
-      } catch {
-        rel = absPath.replace(/\\/g, "/");
-      }
       const stem = path.basename(absPath, path.extname(absPath));
       scan.card_notes.push({
         path: absPath,

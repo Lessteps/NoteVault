@@ -10,7 +10,7 @@ import { parseFrontmatter } from "../../core/frontmatter.js";
 import { loadCard } from "../../core/practice/cards.js";
 import { DISCIPLINES, skillOf } from "../../core/practice/disciplineCatalog.js";
 import { writeErrorDigest } from "../../core/practice/errorLog.js";
-import type { ExerciseRef } from "../../core/practice/exerciseIndex.js";
+import type { ExerciseRef, VaultScan } from "../../core/practice/exerciseIndex.js";
 import { BANDS, attemptPassed } from "../../core/practice/ledger.js";
 import { MODES } from "../../core/practice/modes.js";
 import {
@@ -29,6 +29,7 @@ import {
   computeTopicProgress,
   createDefaultTopicManifest,
   findAncestorTopicManifest,
+  manifestsFromNotes,
   serializeTopicManifest,
 } from "../../core/practice/topic.js";
 import {
@@ -47,7 +48,7 @@ import {
   loadExamRecordForTopic,
 } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
-import { clearExerciseIndexCache, scanVault } from "../../core/practice/exerciseIndex.js";
+import { clearExerciseIndexCache, scanVault, warmNoteCache } from "../../core/practice/exerciseIndex.js";
 import { AIConfig, sendChat } from "../../core/aiClient.js";
 import { AppConfig } from "../appConfig.js";
 import type { DifficultyLevel } from "../../core/practice/skills.js";
@@ -129,9 +130,53 @@ const SNAPSHOT_CACHE_TTL_MS = 30_000;
 /** The per-subject dashboard is expensive (it scans the whole vault), so it is memoed. */
 const _dashboardCache = new Map<string, { data: unknown; timestamp: number }>();
 
+/**
+ * One vault scan, shared by every study call that needs it.
+ *
+ * Reading every note is the expensive part of the whole study API (six call sites
+ * used to do it independently, each paying the disk cost), so the scan is kept
+ * here and dropped whenever the vault changes — the same invalidation the
+ * snapshots use, plus the TTL as a safety net.
+ */
+const _scanCache = new Map<string, { data: VaultScan; timestamp: number }>();
+
+export function vaultScan(app: AppState): VaultScan {
+  const hit = _scanCache.get(app.root);
+  if (hit && Date.now() - hit.timestamp < SNAPSHOT_CACHE_TTL_MS) return hit.data;
+  const data = scanVault(app.root, app.vault.notePaths());
+  _scanCache.set(app.root, { data, timestamp: Date.now() });
+  return data;
+}
+
 export function clearStudySnapshotCache(): void {
   _snapshotCache.clear();
   _dashboardCache.clear();
+  _scanCache.clear();
+}
+
+/**
+ * Read the vault into the per-file cache in the background, once the window is up.
+ *
+ * The first study view opened in a cold process used to wait for the whole vault to
+ * be read (measured: 30 s over 2 107 notes, with the main process blocked the whole
+ * time). Warming it here — in batches, yielding between them — moves that cost to
+ * right after launch, where nothing is waiting for it.
+ */
+export async function warmStudyIndex(): Promise<{ notes: number; ms: number }> {
+  const app = getWarmApp();
+  if (!app) return { notes: 0, ms: 0 };
+  const started = Date.now();
+  const notes = await warmNoteCache(app.vault.notePaths());
+  return { notes, ms: Date.now() - started };
+}
+
+/** Set by the registry (the study module is built against an AppState). */
+let warmApp: AppState | null = null;
+function getWarmApp(): AppState | null {
+  return warmApp;
+}
+export function setWarmApp(app: AppState): void {
+  warmApp = app;
 }
 
 function resolveTopicDir(app: AppState, relPath: string): string {
@@ -494,7 +539,7 @@ export function studyApi(app: AppState) {
         }
       }
 
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const normFolder = topicFolder.replace(/\\/g, "/");
       const topicExercises = scan.exercises.filter((e) => {
         const p = (e.rel || e.path).replace(/\\/g, "/");
@@ -568,7 +613,7 @@ export function studyApi(app: AppState) {
       if (fs.existsSync(manifestPath)) {
         throw new ApiError("El tema ya tiene un archivo de manifiesto (_tema.md).");
       }
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const folderRel = app.rel(absDir);
       const topicExercises = scan.exercises.filter((e) =>
         (e.rel || e.path).replace(/\\/g, "/").startsWith(folderRel + "/"),
@@ -600,7 +645,7 @@ export function studyApi(app: AppState) {
       if (!found) {
         throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
       }
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const diff = Math.min(
         3,
         Math.max(1, parseInt(String(difficulty), 10) || 2),
@@ -701,7 +746,7 @@ export function studyApi(app: AppState) {
       assistance = "no_help",
     ) {
       const normFolder = app.rel(app.resolve(folder, { allowRoot: true })).split(path.sep).join("/").replace(/^\/+|\/+$/g, "");
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const prefix = normFolder ? `${normFolder}/` : "";
       const inArea = scan.exercises.filter((e) => String(e.rel || e.path || "").split(path.sep).join("/").startsWith(prefix));
 
@@ -744,7 +789,7 @@ export function studyApi(app: AppState) {
       examGroup?: string,
       targetDifficulty?: number,
     ) => {
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const allExercises = scan.exercises;
       const targetDiff = (targetDifficulty && targetDifficulty >= 1 && targetDifficulty <= 3
         ? targetDifficulty
@@ -880,33 +925,22 @@ export function studyApi(app: AppState) {
       if (cachedDashboard && Date.now() - cachedDashboard.timestamp < SNAPSHOT_CACHE_TTL_MS) {
         return cachedDashboard.data;
       }
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const allExercises = scan.exercises;
       const attempts = loadAllAttempts(app.root);
 
-      // The vault walk yields absolute paths, but every lookup of the practice
-      // model speaks vault-relative ones: converting here is what makes the
-      // dashboard find the topics at all.
-      const folderSet = new Set<string>();
-      for (const np of app.vault.notePaths()) {
-        const rel = app.rel(np).replace(/\\/g, "/");
-        const dir = path.posix.dirname(rel);
-        if (!dir || dir === "." || dir === "/" || dir.startsWith("..")) continue;
-        folderSet.add(dir);
-        const parent = path.posix.dirname(dir);
-        if (parent && parent !== "." && parent !== "/" && !parent.startsWith("..")) folderSet.add(parent);
-      }
-
+      // The manifests come from the notes the scan already read: enumerating them by
+      // name and type costs nothing, while the per-folder climb re-read every note of
+      // the vault (measured on the real vault: 593 folders → 2 680 ms, for 42 topics).
       const foundMap = new Map<string, { folder: string; manifest: TopicManifest }>();
-
-      for (const folder of folderSet) {
-        const found = findTopicManifest(app, folder);
-        if (found) {
-          const key = found.manifest.title;
-          if (!foundMap.has(key)) {
-            foundMap.set(key, { folder, manifest: found.manifest });
-          }
-        }
+      for (const found of manifestsFromNotes(scan.notes)) {
+        const title = found.manifest.title;
+        if (foundMap.has(title)) continue;
+        const folder = app.rel(found.topicFolder).replace(/\\/g, "/");
+        foundMap.set(title, {
+          folder,
+          manifest: { ...found.manifest, path: app.rel(found.manifestPath), folder },
+        });
       }
 
       const items: Array<{

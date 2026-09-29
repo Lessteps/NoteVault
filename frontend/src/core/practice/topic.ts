@@ -480,3 +480,55 @@ export function computeTopicProgress(
     exerciseNotesCount: exercises.length,
   };
 }
+
+export interface NoteForManifest {
+  /** Vault-relative POSIX path of the note. */
+  rel: string;
+  /** Absolute path of the note. */
+  path: string;
+  frontmatter: Record<string, any>;
+}
+
+/** A manifest's file name: the new view file first, then the legacy names. */
+function manifestNameRank(base: string): number {
+  const low = base.toLowerCase();
+  if (low.endsWith(".practica.md")) return 0;
+  if (low === "_tema.md") return 1;
+  if (low === "tema.md") return 2;
+  return 3;
+}
+
+/**
+ * The vault's topic manifests, discovered from notes that have already been read.
+ *
+ * This replaces the per-folder climb for whole-vault sweeps:
+ * `findAncestorTopicManifest` re-reads every `.md` of every folder it walks
+ * (measured: 593 folders → a second full vault read, 2 680 ms warm), while this
+ * needs no I/O at all. Same rules as `parseTopicManifest`: a manifest is a note
+ * whose frontmatter parses as a topic (`type: topic`, `type: practica` — the
+ * `<folder>.practica.md` view file — or a `tema`/`topic` tag), and the topic is
+ * the folder the manifest lives in.
+ */
+export function manifestsFromNotes(notes: Iterable<NoteForManifest>): DiscoveredTopicManifest[] {
+  const best = new Map<string, { found: DiscoveredTopicManifest; rank: number }>();
+  for (const note of notes) {
+    const rel = note.rel.replace(/\\/g, "/");
+    const folderRel = path.posix.dirname(rel);
+    const folderName = path.posix.basename(folderRel) || path.posix.basename(path.posix.dirname(folderRel));
+    const manifest = parseTopicManifest(note.frontmatter, folderName || "Tema sin título");
+    if (!manifest) continue;
+    const rank = manifestNameRank(path.posix.basename(rel));
+    const prev = best.get(folderRel);
+    if (prev && prev.rank <= rank) continue;
+    const folderAbs = path.dirname(note.path);
+    best.set(folderRel, {
+      rank,
+      found: {
+        manifestPath: note.path,
+        topicFolder: folderAbs,
+        manifest: { ...manifest, path: note.path, folder: folderAbs },
+      },
+    });
+  }
+  return [...best.values()].map((entry) => entry.found);
+}

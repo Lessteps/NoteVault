@@ -127,3 +127,44 @@ describe("Math Heuristic Stroke Recognizer", () => {
     expect(res.latex).toMatch(/\^\{.+\}/);
   });
 });
+
+describe("whole expressions from handwriting-like ink", () => {
+  const line = (...pts: Array<[number, number]>): Stroke => pts.map(([x, y]) => ({ x, y }));
+  /** Places a glyph's strokes (drawn in a 100-box) at (x, y) with the given height. */
+  const put = (strokes: Stroke[], x: number, y: number, h: number): Stroke[] =>
+    strokes.map((s) => s.map((p) => ({ x: x + (p.x * h) / 100, y: y + (p.y * h) / 100 })));
+
+  const FIVE = [line([70, 8], [26, 8]), line([26, 8], [22, 46], [58, 42], [76, 62], [66, 88], [38, 94], [18, 82])];
+  const TWO = [line([24, 28], [40, 8], [68, 10], [78, 34], [22, 92], [84, 92])];
+  const ONE = [line([54, 6], [54, 94])];
+  const THREE = [line([22, 14], [50, 6], [74, 24], [48, 46], [78, 66], [56, 94], [20, 84])];
+  const X = [line([15, 15], [85, 85]), line([85, 15], [15, 85])];
+  const PLUS = [line([15, 50], [85, 50]), line([50, 15], [50, 85])];
+
+  it("reads a lone 5 as 5", () => {
+    expect(recognizeStrokesToLatex(put(FIVE, 0, 0, 80)).latex).toBe("5");
+  });
+
+  it("reads digits side by side as one number", () => {
+    const ink = [...put(ONE, 0, 0, 80), ...put(TWO, 60, 0, 80), ...put(THREE, 130, 0, 80)];
+    expect(recognizeStrokesToLatex(ink).latex).toBe("123");
+  });
+
+  it("reads 2 + 3", () => {
+    const ink = [...put(TWO, 0, 0, 80), ...put(PLUS, 90, 20, 45), ...put(THREE, 170, 0, 80)];
+    expect(recognizeStrokesToLatex(ink).latex.replace(/\s+/g, "")).toBe("2+3");
+  });
+
+  it("reads x with a raised 2 as x^{2}", () => {
+    const ink = [...put(X, 0, 30, 60), ...put(TWO, 70, 0, 30)];
+    const res = recognizeStrokesToLatex(ink);
+    expect(res.latex.replace(/\s+/g, "")).toBe("x^{2}");
+    expect(res.detectedStructures).toContain("superscript");
+  });
+
+  it("reads a fraction with digits above and below the bar", () => {
+    const ink = [line([0, 100], [90, 100]), ...put(ONE, 35, 10, 70), ...put(TWO, 30, 115, 70)];
+    const BS = String.fromCharCode(92);
+    expect(recognizeStrokesToLatex(ink).latex.replace(/\s+/g, "")).toBe(`${BS}frac{1}{2}`);
+  });
+});

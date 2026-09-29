@@ -116,10 +116,13 @@ function Message({ m, live }: { m: ChatMessage; live: boolean }) {
 
   const asNote = async () => {
     const raw = m.content.split("\n")[0] ?? "";
-    const title = (/^#+\s*(.+)$/m.exec(m.content)?.[1] ?? raw).replace(/[\\/:*?"<>|#]/g, "").trim().slice(0, 60) || "Respuesta";
+    const suggested = (/^#+\s*(.+)$/m.exec(m.content)?.[1] ?? raw).replace(/[\\/:*?"<>|#]/g, "").trim().slice(0, 60) || "Respuesta";
+    const app = useApp.getState();
+    const title = await askText("Nombre de la nota", suggested, "Crear");
+    if (!title) return;
+    const folder = app.active?.includes("/") ? app.active.slice(0, app.active.lastIndexOf("/")) : "";
     try {
-      const r = await api.createNote(title, "");
-      const app = useApp.getState();
+      const r = await api.createNote(title, folder);
       app.refreshTree();
       await app.openNote(r.path);
       if (useApp.getState().notes[r.path]) useApp.getState().editRaw(r.path, `${m.content}\n`);

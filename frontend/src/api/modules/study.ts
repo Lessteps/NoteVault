@@ -36,6 +36,7 @@ import {
   type QuantityOption,
   type TheoryNoteContext,
   buildTopicSession,
+  parseExerciseArray,
   type SessionAIClient,
 } from "../../core/practice/sessionBuilder.js";
 import {
@@ -267,6 +268,24 @@ function findTopicManifest(
   return null;
 }
 
+/**
+ * A reasoning model spends part of max_tokens thinking before it writes, so the
+ * chat's small budget (1500 by default) returns an EMPTY answer for anything
+ * structured (measured with deepseek: exercises and practice plans came back
+ * blank). Structured calls get a generous budget, and one bigger retry when the
+ * answer still comes back empty.
+ */
+const STRUCTURED_BUDGETS = [6000, 12000];
+async function askStructured(cfg: AIConfig, messages: Array<{ role: string; content: string }>): Promise<string> {
+  let reply = "";
+  for (const budget of STRUCTURED_BUDGETS) {
+    const wide = new AIConfig({ ...cfg.toDict(), max_tokens: Math.max(cfg.max_tokens, budget), include_note: false });
+    reply = await sendChat(wide, messages as any);
+    if (reply.trim()) return reply;
+  }
+  return reply;
+}
+
 /** The topic's own theory notes (everything that is not a view file or the manifest). */
 function readTheoryNotes(app: AppState, absDir: string): TheoryNoteContext[] {
   const out: TheoryNoteContext[] = [];
@@ -318,9 +337,12 @@ async function reevaluateTopic(app: AppState, folder: string): Promise<{ plan: P
     currentSkills: manifest.skills,
   });
 
-  const reply = await sendChat(cfg, messages as any);
+  const reply = await askStructured(cfg, messages);
   const plan = parsePracticePlan(reply, catalog);
-  if (!plan) throw new ApiError("La IA no devolvió un plan de práctica válido. Inténtalo de nuevo.");
+  if (!plan) {
+    const snippet = String(reply ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new ApiError(`La IA no devolvió un plan de práctica válido. Respuesta: «${snippet || "vacía"}»`);
+  }
   plan.topicType = topicType;
 
   const practicaAbs = path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica"));
@@ -810,22 +832,18 @@ export function studyApi(app: AppState) {
 
       const aiClient: SessionAIClient = {
         async generateExercises(messages) {
-          try {
-            const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
-            if (cfg.is_bridge) return [];
-            const reply = await sendChat(cfg, messages as any);
-            let cleaned = reply.trim();
-            const match = /```(?:json)?\s*([\s\S]*?)```/i.exec(cleaned);
-            if (match) cleaned = match[1]!.trim();
-            const start = cleaned.indexOf("[");
-            const end = cleaned.lastIndexOf("]");
-            if (start !== -1 && end !== -1 && end > start) {
-              cleaned = cleaned.slice(start, end + 1);
+          const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+          if (cfg.is_bridge) return [];
+          // A model now and then returns nothing usable: one more try before giving up.
+          for (let attempt = 0; attempt < 2; attempt += 1) {
+            try {
+              const found = parseExerciseArray(await askStructured(cfg, messages as any));
+              if (found.length) return found;
+            } catch {
+              /* network or provider error: retry once */
             }
-            return JSON.parse(cleaned);
-          } catch {
-            return [];
           }
+          return [];
         },
       };
 
@@ -1032,7 +1050,7 @@ export function studyApi(app: AppState) {
             },
           ];
           try {
-            const reply = await sendChat(aiCfg, messages);
+            const reply = await askStructured(aiCfg, messages);
             const match = reply.match(/\{[\s\S]*\}/);
             if (match) {
               const parsed = JSON.parse(match[0]);
@@ -1087,7 +1105,7 @@ export function studyApi(app: AppState) {
         throw new ApiError("El proveedor de IA está en modo puente; no se puede generar automáticamente.");
       }
 
-      const ask = (prompt: string): Promise<string> => sendChat(cfg, [{ role: "user", content: prompt }]);
+      const ask = (prompt: string): Promise<string> => askStructured(cfg, [{ role: "user", content: prompt }]);
 
       const areasResponse = await ask(
         `Eres un experto en diseño curricular. Dame las 8-12 áreas principales de «${name}» ` +

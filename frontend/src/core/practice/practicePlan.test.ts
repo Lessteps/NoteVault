@@ -110,3 +110,25 @@ describe("practice plan", () => {
     expect(result.exercises[0]!.path.startsWith("Mat/1.1 T/Ejercicios/solve/")).toBe(true);
   });
 });
+
+describe("parseExerciseArray", () => {
+  const good = (t: string) => `{"title":"${t}","statement":"Calcula $|-3|$","hints":["h"],"solution":"3","rubric":["ok"]}`;
+
+  it("parses a fenced array", async () => {
+    const { parseExerciseArray } = await import("./sessionBuilder");
+    expect(parseExerciseArray("```json\n[" + good("A") + "," + good("B") + "]\n```")).toHaveLength(2);
+  });
+
+  it("salvages the good objects when one is broken", async () => {
+    const { parseExerciseArray } = await import("./sessionBuilder");
+    const broken = `{"title":"X","statement":"oops" "hints":[]}`;
+    const list = parseExerciseArray(`[${good("A")},${broken},${good("C")}]`);
+    expect(list.map((e) => e.title)).toEqual(["A", "C"]);
+  });
+
+  it("returns nothing for an empty or unusable reply", async () => {
+    const { parseExerciseArray } = await import("./sessionBuilder");
+    expect(parseExerciseArray("")).toEqual([]);
+    expect(parseExerciseArray("lo siento, no puedo")).toEqual([]);
+  });
+});

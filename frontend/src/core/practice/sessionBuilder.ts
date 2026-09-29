@@ -191,6 +191,79 @@ ${rubricList || "- [ ] Procedimiento y resultado correctos."}
 `;
 }
 
+export interface GeneratedExercise {
+  title: string;
+  statement: string;
+  hints: string[];
+  solution: string;
+  rubric: string[];
+}
+
+function normaliseExercise(raw: any): GeneratedExercise | null {
+  if (!raw || typeof raw !== "object") return null;
+  const title = String(raw.title ?? "").trim();
+  const statement = String(raw.statement ?? "").trim();
+  if (!title || !statement) return null;
+  const list = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)).filter((x) => x.trim()) : []);
+  return { title, statement, hints: list(raw.hints), solution: String(raw.solution ?? ""), rubric: list(raw.rubric) };
+}
+
+/** The top-level `{...}` chunks of a (possibly broken) JSON array text, string-aware. */
+function objectChunks(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i]!;
+    if (inString) {
+      if (c === "\\") i += 1;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') inString = true;
+    else if (c === "{") {
+      if (depth === 0) start = i;
+      depth += 1;
+    } else if (c === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start >= 0) out.push(text.slice(start, i + 1));
+    }
+  }
+  return out;
+}
+
+/**
+ * The exercises in an AI reply. Models sometimes return an array with one broken
+ * item (or a fence, or text around it): a strict parse is tried first, and when it
+ * fails every well-formed object is salvaged instead of losing the whole batch.
+ */
+export function parseExerciseArray(reply: string): GeneratedExercise[] {
+  let text = String(reply ?? "").trim();
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
+  if (fence) text = fence[1]!.trim();
+  const start = text.indexOf("[");
+  const end = text.lastIndexOf("]");
+  const body = start >= 0 ? text.slice(start, end > start ? end + 1 : undefined) : text;
+  try {
+    const parsed = JSON.parse(body);
+    const list = (Array.isArray(parsed) ? parsed : [parsed]).map(normaliseExercise).filter(Boolean);
+    if (list.length) return list as GeneratedExercise[];
+  } catch {
+    /* fall through to salvage */
+  }
+  const salvaged: GeneratedExercise[] = [];
+  for (const chunk of objectChunks(body)) {
+    try {
+      const ex = normaliseExercise(JSON.parse(chunk));
+      if (ex) salvaged.push(ex);
+    } catch {
+      /* this object is broken: skip it */
+    }
+  }
+  return salvaged;
+}
+
 export interface SessionAIClient {
   generateExercises(
     messages: Array<{ role: "system" | "user"; content: string }>,

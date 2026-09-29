@@ -94,7 +94,8 @@ export function MuscleBody({ view, states, highlight, active, onMuscle, onHover,
   /** The muscle currently open in the panel. */
   active?: string | null;
   onMuscle?: (id: string) => void;
-  onHover?: (id: string | null) => void;
+  /** The pointer position travels with the id so the modal can put a tooltip there. */
+  onHover?: (id: string | null, at?: { x: number; y: number }) => void;
   /** Spanish name for each id, for the accessible label. */
   label: (id: string) => string;
 }) {
@@ -110,7 +111,8 @@ export function MuscleBody({ view, states, highlight, active, onMuscle, onHover,
           <path key={`${s.id}-${i}`} d={s.d} data-muscle={s.id}
             className={`nv-muscle nv-muscle--${state}${dim ? " is-dim" : ""}${active === s.id ? " is-active" : ""}`}
             onClick={onMuscle ? () => onMuscle(s.id) : undefined}
-            onMouseEnter={onHover ? () => onHover(s.id) : undefined}
+            onMouseEnter={onHover ? (e) => onHover(s.id, { x: e.clientX, y: e.clientY }) : undefined}
+            onMouseMove={onHover ? (e) => onHover(s.id, { x: e.clientX, y: e.clientY }) : undefined}
             onMouseLeave={onHover ? () => onHover(null) : undefined}>
             <title>{`${label(s.id)}${state === "done" ? " · hecho" : ""}`}</title>
           </path>

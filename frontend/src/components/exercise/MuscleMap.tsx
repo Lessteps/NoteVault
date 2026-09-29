@@ -47,6 +47,7 @@ export function MuscleMap({ date, day, onChanged, onClose, onVideo }: {
   const [flipped, setFlipped] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   const [pinned, setPinned] = useState(false);
+  const [tip, setTip] = useState<{ id: string; x: number; y: number } | null>(null);
   const [week, setWeek] = useState<ExerciseDay[] | null>(null);
   const [year, setYear] = useState<ExerciseOverview | null>(null);
 
@@ -196,12 +197,14 @@ export function MuscleMap({ date, day, onChanged, onClose, onVideo }: {
                 <div className="nv-flip-face">
                   <MuscleBody view="front" states={data.states} highlight={highlight} active={picked}
                     label={(id) => muscleById(id)?.name_es ?? id}
-                    onMuscle={(id) => setPicked((p) => (p === id ? null : id))} onHover={() => {}} />
+                    onMuscle={(id) => setPicked((p) => (p === id ? null : id))}
+                    onHover={(id, at) => setTip(id && at ? { id, x: at.x, y: at.y } : null)} />
                 </div>
                 <div className="nv-flip-face nv-flip-face--back">
                   <MuscleBody view="back" states={data.states} highlight={highlight} active={picked}
                     label={(id) => muscleById(id)?.name_es ?? id}
-                    onMuscle={(id) => setPicked((p) => (p === id ? null : id))} onHover={() => {}} />
+                    onMuscle={(id) => setPicked((p) => (p === id ? null : id))}
+                    onHover={(id, at) => setTip(id && at ? { id, x: at.x, y: at.y } : null)} />
                 </div>
               </div>
             </div>
@@ -285,6 +288,16 @@ export function MuscleMap({ date, day, onChanged, onClose, onVideo }: {
             </div>
           </div>
         </div>
+
+        {/* El nombre del músculo bajo el puntero, sin robar el hover. */}
+        {tip && (
+          <div data-muscle-tip={tip.id}
+            className="pointer-events-none fixed z-50 rounded-md border border-line-strong px-2 py-1 text-[11.5px] text-text shadow-lg"
+            style={{ left: Math.min(tip.x + 14, window.innerWidth - 190), top: tip.y + 14, background: "var(--nv-elevated)" }}>
+            {muscleById(tip.id)?.name_es ?? tip.id}
+            <span className="ml-1.5 text-faint">{muscleById(tip.id)?.group}</span>
+          </div>
+        )}
       </div>
     </div>
   );

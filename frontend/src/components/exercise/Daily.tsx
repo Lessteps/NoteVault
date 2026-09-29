@@ -13,7 +13,6 @@ import { NavButtons } from "../habits/parts";
 import { cn } from "../ui";
 import { ORANGE, useFail } from "./parts";
 import { MuscleMap } from "./MuscleMap";
-import { useMuscleMap } from "../../store/muscleMap";
 
 /** One exercise row: tick, weight, reps, notes (saved on change / blur). */
 export function ExerciseRow({ day, ex, entry, onChanged, onVideo, compact }: {
@@ -128,8 +127,6 @@ export function Daily({ onVideo }: { onVideo: (ex: Exercise) => void }) {
   const meta = days.find((d) => d.key === key);
 
   const load = () => api.exDays(date, date).then((d) => setDay(d[0] ?? null)).catch(fail);
-  // El panel derecho muestra el esquema del día que se está mirando aquí.
-  useEffect(() => { useMuscleMap.getState().setDate(date); }, [date]);
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps

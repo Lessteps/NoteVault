@@ -11,7 +11,6 @@
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
 import { useWebPages } from "../../store/webPages";
-import { MusclePanel } from "../exercise/MusclePanel";
 import { PanelLaunchers } from "./PanelLaunchers";
 import { Inspector } from "./Inspector";
 import { AssistantPanel } from "./AssistantPanel";
@@ -21,16 +20,13 @@ export function RightPanel({ module, canvas = false }: { module: string; canvas?
   const assistantOpen = useAssistant((s) => s.open);
   const pagesOpen = useWebPages((s) => s.open);
   const inspectorOpen = useApp((s) => s.inspectorOpen);
-  const muscleOpen = useApp((s) => s.muscleOpen);
   const active = useApp((s) => s.active);
 
   // El lienzo de Notas se queda con todo el ancho.
   if (module === "notas" && canvas) return null;
 
-  // El esquema muscular solo tiene sentido dentro de Ejercicio.
-  if (muscleOpen && module === "ejercicio") return <MusclePanel />;
   if (assistantOpen) return <AssistantPanel />;
   if (pagesOpen) return <WebRail />;
   if (inspectorOpen && active) return <Inspector />;
-  return <PanelLaunchers module={module} />;
+  return <PanelLaunchers />;
 }

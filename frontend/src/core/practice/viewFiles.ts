@@ -147,6 +147,7 @@ export function practiceFileText(manifest: TopicManifest): string {
     type: "practica",
     subject: manifest.subject,
     title: manifest.title,
+    ...(manifest.topic_type ? { topic_type: manifest.topic_type } : {}),
     skills: manifest.skills,
     min_per_skill: manifest.mastery.min_per_skill,
     target_difficulty: manifest.mastery.target_difficulty,

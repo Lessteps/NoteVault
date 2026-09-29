@@ -13,6 +13,7 @@ import {
   type DifficultyLevel,
   skillsForSubject,
 } from "./skills";
+import { type TopicType, normaliseTopicType } from "./topicType";
 
 export interface TopicMasteryConfig {
   min_per_skill: number;
@@ -26,6 +27,8 @@ export interface TopicManifest {
   title: string;
   skills: string[];
   mastery: TopicMasteryConfig;
+  /** Teórico · procedimental · mixto: decide qué skills se recomiendan (ver topicType.ts). */
+  topic_type?: TopicType;
   exam_group?: string;
   path?: string;
   folder?: string;
@@ -268,6 +271,11 @@ export function parseTopicManifest(
     manifest.exam_group = String(fm.exam_group).trim();
   }
 
+  const topicType = normaliseTopicType(fm.topic_type);
+  if (topicType) {
+    manifest.topic_type = topicType;
+  }
+
   return manifest;
 }
 
@@ -307,6 +315,10 @@ export function serializeTopicManifest(manifest: TopicManifest): string {
     `  target_difficulty: ${manifest.mastery.target_difficulty}`,
     `  exam: ${manifest.mastery.exam}`,
   ];
+
+  if (manifest.topic_type) {
+    lines.push(`topic_type: ${manifest.topic_type}`);
+  }
 
   if (manifest.exam_group) {
     lines.push(`exam_group: "${manifest.exam_group.replace(/"/g, '\\"')}"`);

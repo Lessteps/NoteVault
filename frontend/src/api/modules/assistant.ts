@@ -18,12 +18,17 @@ import {
   streamChat,
   type ChatMessage,
 } from "../../core/aiClient.js";
+import { applyAssistantAction, planAssistantAction } from "../../core/assistantActions.js";
+import { buildModeContext, isVaultMode } from "../../core/assistantModes.js";
 import { parseFrontmatter } from "../../core/frontmatter.js";
+import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
+import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
 import { WorkspaceManager } from "../../core/workspaceManager.js";
 import { ApiError } from "../../core/errors.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 import { oneLine } from "../common.js";
+import { clearStudySnapshotCache } from "./study.js";
 
 const MAX_HISTORY = 40;
 const MAX_TEXT = 60_000;
@@ -73,6 +78,7 @@ export function assistantApi(app: AppState) {
     question: string,
     noteRel: string,
     selection: string,
+    mode = "",
   ): ChatMessage[] => {
     if (!Array.isArray(history)) throw new ApiError("Historial inválido.");
     const q = String(question || "").trim().slice(0, MAX_TEXT);
@@ -105,12 +111,52 @@ export function assistantApi(app: AppState) {
       );
       wsPrompt = ws.id !== "general" ? ws.system_prompt || "" : "";
     }
+    const vaultMode = isVaultMode(mode) ? mode : "";
     return buildMessages(aiCfg(), clean, q, {
       note_title: title,
       note_body: body,
       selection: String(selection || "").slice(0, MAX_TEXT),
-      workspace_prompt: wsPrompt,
+      workspace_prompt: [wsPrompt, vaultMode ? modeContext(vaultMode, noteRel) : ""].filter(Boolean).join("\n\n"),
+      ...(vaultMode ? { mode: vaultMode } : {}),
     });
+  };
+
+  /** The vault's skills and, for a new topic, the area being worked on. */
+  const modeContext = (_mode: string, noteRel: string): string => {
+    let areaFolder = "";
+    let areaTopics: string[] = [];
+    if (noteRel) {
+      let dir = noteRel.includes("/") ? noteRel.slice(0, noteRel.lastIndexOf("/")) : "";
+      const isTopicDir = (d: string): boolean => {
+        try {
+          return fs.readdirSync(app.resolve(d, { allowRoot: true })).some((f) => f.toLowerCase().endsWith(".practica.md"));
+        } catch {
+          return false;
+        }
+      };
+      if (dir && isTopicDir(dir)) dir = dir.includes("/") ? dir.slice(0, dir.lastIndexOf("/")) : "";
+      if (dir) {
+        areaFolder = dir;
+        try {
+          areaTopics = fs
+            .readdirSync(app.resolve(dir, { allowRoot: true }), { withFileTypes: true })
+            .filter((e) => e.isDirectory() && !e.name.startsWith(".") && !e.name.startsWith("_"))
+            .map((e) => e.name);
+        } catch {
+          areaTopics = [];
+        }
+      }
+    }
+    const noteFolder = noteRel.includes("/") ? noteRel.slice(0, noteRel.lastIndexOf("/")) : "";
+    return buildModeContext({ skills: readSkillTemplates(app.root, noteRel), areaFolder, areaTopics, noteFolder });
+  };
+
+  /** A structured reply (a whole syllabus as JSON) does not fit the chat's small token budget. */
+  const configFor = (mode: string): AIConfig => {
+    const cfg = aiCfg();
+    return isVaultMode(mode) && cfg.max_tokens < 12_000
+      ? new AIConfig({ ...cfg.toDict(), max_tokens: 12_000 })
+      : cfg;
   };
 
   return {
@@ -236,11 +282,12 @@ export function assistantApi(app: AppState) {
       question: string,
       noteRel = "",
       selection = "",
+      mode = "",
     ): Promise<Record<string, unknown>> {
       const id = String(streamId || "").slice(0, 64);
       if (!id) throw new ApiError("Falta el identificador del flujo.");
-      const messages = chatMessages(history, question, noteRel, selection);
-      const cfg = aiCfg();
+      const messages = chatMessages(history, question, noteRel, selection, mode);
+      const cfg = configFor(mode);
       if (cfg.is_bridge) {
         return {
           bridge: true,
@@ -268,6 +315,25 @@ export function assistantApi(app: AppState) {
       } finally {
         streams.delete(id);
       }
+    },
+
+    /** What an action from the chat would create, without writing anything. */
+    assistant_action_preview(action: unknown): Record<string, unknown> {
+      const plan = planAssistantAction(app.root, action as never);
+      return {
+        title: plan.title,
+        warnings: plan.warnings,
+        open: plan.open ?? "",
+        ops: plan.ops.map((o) => ({ kind: o.kind, rel: o.rel, exists: o.exists, overwrite: Boolean(o.overwrite) })),
+      };
+    },
+
+    /** Runs an action the user accepted. */
+    assistant_action_apply(action: unknown): Record<string, unknown> {
+      const res = applyAssistantAction(app.root, action as never);
+      clearStudySnapshotCache();
+      clearExerciseIndexCache();
+      return { ok: true, written: res.written, skipped: res.skipped, open: res.open ?? "" };
     },
 
     ai_chat_cancel(streamId: string): Record<string, unknown> {

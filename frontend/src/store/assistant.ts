@@ -10,6 +10,7 @@ import { create } from "zustand";
 import { api } from "../lib/bridge";
 import { copyText } from "../lib/clipboard";
 import type { ConversationMeta } from "../lib/types";
+import { vaultMode } from "../lib/assistantModes";
 import { bodyOf, useApp } from "./app";
 
 /** A piece of context attached to a user turn (Fase 3 fills these in). */
@@ -57,6 +58,8 @@ interface AssistantState {
   /** Models of the active provider (live list, or the curated one). */
   models: string[];
   providerLabel: string;
+  /** The vault mode in force ("" = a plain conversation). */
+  mode: string;
 
   // ── The conversation being held, and the ones kept ────────────────────
   /** Id of the saved conversation; null until the first turn is stored. */
@@ -69,6 +72,8 @@ interface AssistantState {
   setOpen: (open: boolean) => void;
   setSettings: (open: boolean) => void;
   clear: () => void;
+  /** Switch a vault mode on or off; switching on greets the user in the chat. */
+  setMode: (mode: string) => void;
   ask: (question: string, selection?: string) => Promise<void>;
   stop: () => Promise<void>;
   vote: (id: string, value: 1 | -1) => void;
@@ -111,6 +116,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
   model: "",
   models: [],
   providerLabel: "",
+  mode: "",
   conversationId: null,
   title: "",
   historyOpen: false,
@@ -126,7 +132,16 @@ export const useAssistant = create<AssistantState>((set, get) => ({
     }
   },
   setSettings: (settingsOpen) => set({ settingsOpen }),
-  clear: () => set({ messages: [], awaitingPaste: false }),
+  clear: () => set({ messages: [], awaitingPaste: false, mode: "" }),
+  setMode: (mode) => {
+    const info = vaultMode(mode);
+    set((s) => ({
+      mode: info ? info.id : "",
+      messages: info
+        ? [...s.messages, { id: uid(), role: "system" as const, content: info.opener, at: Date.now() }]
+        : s.messages,
+    }));
+  },
 
   ask: async (question, selection = "") => {
     const q = question.trim();
@@ -166,7 +181,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
 
     const started = Date.now();
     try {
-      const r = await api.aiChatStream(answerId, history, q, noteRel, sel);
+      const r = await api.aiChatStream(answerId, history, q, noteRel, sel, get().mode);
       if (r.bridge) {
         await copyText(r.prompt ?? "");
         if (r.url) await api.openExternal(r.url).catch(() => undefined);
@@ -258,7 +273,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
   },
 
   newConversation: () => {
-    set({ messages: [], awaitingPaste: false, conversationId: null, title: "", historyOpen: false });
+    set({ messages: [], awaitingPaste: false, conversationId: null, title: "", historyOpen: false, mode: "" });
   },
 
   openConversation: async (id) => {
@@ -269,6 +284,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
       messages: conv.messages.map((m) => ({ ...m, id: uid(), streaming: false })),
       awaitingPaste: false,
       historyOpen: false,
+      mode: "",
       busy: false,
       streamingId: null,
     });

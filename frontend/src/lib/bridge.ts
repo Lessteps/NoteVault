@@ -363,10 +363,18 @@ export const api = {
   aiChat: (history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "") =>
     call<{ reply?: string; bridge?: boolean; prompt?: string; url?: string; label?: string }>("ai_chat", history, question, noteRel, selection),
   /** Streamed chat: the answer arrives over onAiStream, the promise holds it whole. */
-  aiChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "") =>
+  aiChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "", mode = "") =>
     call<{ reply?: string; stopped?: boolean; bridge?: boolean; prompt?: string; url?: string; label?: string }>(
-      "ai_chat_stream", id, history, question, noteRel, selection,
+      "ai_chat_stream", id, history, question, noteRel, selection, mode,
     ),
+  /** What a chat action would create (nothing is written). */
+  assistantActionPreview: (action: unknown) =>
+    call<{ title: string; warnings: string[]; open: string; ops: Array<{ kind: "mkdir" | "write"; rel: string; exists: boolean; overwrite: boolean }> }>(
+      "assistant_action_preview", action,
+    ),
+  /** Runs an action the user accepted. */
+  assistantActionApply: (action: unknown) =>
+    call<{ ok: boolean; written: string[]; skipped: string[]; open: string }>("assistant_action_apply", action),
   aiChatCancel: (id: string) => call<{ ok: boolean }>("ai_chat_cancel", id),
   onAiStream: (cb: (ev: AiStreamEvent) => void): (() => void) => {
     if (typeof window !== "undefined" && window.nv?.onAiStream) {

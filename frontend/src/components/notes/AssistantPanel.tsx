@@ -3,20 +3,22 @@
 // Answers can go back into the note.
 
 import {
-  ArrowLeft, ArrowUp, BookOpen, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
-  GitCompare, History, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
-  Square, ThumbsDown, ThumbsUp, Trash2, X,
+  ArrowLeft, ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
+  GitCompare, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
+  Square, ThumbsDown, ThumbsUp, Trash2, Wand2, X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import { api } from "../../lib/bridge";
 import { copyText, readClipboard } from "../../lib/clipboard";
 import { groupByDate, matchesQuery, whenLabel } from "../../lib/conversationDates";
+import { splitAction, vaultMode, VAULT_MODES } from "../../lib/assistantModes";
 import { renderMarkdown } from "../../lib/markdown";
 import type { AiConfig, AiProvider, ConversationMeta } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useAssistant, type ChatContext, type ChatMessage } from "../../store/assistant";
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
 import { askText, cn, confirmAction, IconButton, openMenu } from "../ui";
+import { ActionCard } from "./ActionCard";
 import { editorSelection, insertAtCursor } from "./SourceEditor";
 
 const WIDTH_KEY = "nv.assistant.width";
@@ -73,9 +75,16 @@ function ContextChip({ ctx, onRemove }: { ctx: ChatContext; onRemove?: () => voi
 
 function AssistantBody({ m }: { m: ChatMessage }) {
   const ref = useRef<HTMLDivElement>(null);
-  const html = useMemo(() => renderMarkdown(m.content), [m.content]);
+  // The `nv-action` block is not shown as text: it becomes a card once complete.
+  const { text, action } = useMemo(() => splitAction(m.content), [m.content]);
+  const html = useMemo(() => renderMarkdown(text), [text]);
   useCodeCopy(ref);
-  return <div ref={ref} className="nv-chat-prose" dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <>
+      <div ref={ref} className="nv-chat-prose" dangerouslySetInnerHTML={{ __html: html }} />
+      {action && !m.streaming && <ActionCard action={action} />}
+    </>
+  );
 }
 
 /** A live seconds counter while something is streaming. */
@@ -256,7 +265,10 @@ function Composer() {
   const toast = useApp((s) => s.toast);
   const [text, setText] = useState("");
   const [pending, setPending] = useState<ChatContext[]>([]);
-  const [syllabusBusy, setSyllabusBusy] = useState(false);
+  const mode = useAssistant((s) => s.mode);
+  const setMode = useAssistant((s) => s.setMode);
+  const modeInfo = vaultMode(mode);
+  const [evaluating, setEvaluating] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
 
   const grow = () => {
@@ -287,20 +299,35 @@ function Composer() {
     setPending((p) => [...p, { path: note?.path ?? "", text: sel }]);
   };
 
-  const generateSyllabus = async () => {
-    const subject = await askText("Generar temario (nombre de la materia)", "", "Generar");
-    if (subject === null || !subject.trim()) return;
-    setSyllabusBusy(true);
+  /** The AI re-reads the open topic's theory and rewrites its practice plan. */
+  const reevaluate = async () => {
+    const active = useApp.getState().active;
+    if (!active || !active.includes("/")) {
+      toast("error", "Abre una nota de un tema para re-evaluar su práctica.");
+      return;
+    }
+    setEvaluating(true);
     try {
-      const res = await api.studyGenerateSyllabus(subject.trim());
-      useApp.getState().refreshTree();
-      toast("info", `Temario creado: ${res.folders.length} carpeta(s), ${res.created.length} vista(s).`);
+      const res = await api.studyTopicReevaluate(active.slice(0, active.lastIndexOf("/")));
+      toast("info", res.plan.summary || `Plan de práctica actualizado (${res.plan.skills.length} competencias).`);
     } catch (e) {
       toast("error", (e as Error).message);
     } finally {
-      setSyllabusBusy(false);
+      setEvaluating(false);
     }
   };
+
+  const openModes = (e: ReactMouseEvent<HTMLButtonElement>) =>
+    openMenu(e, [
+      ...VAULT_MODES.map((m) => ({
+        label: m.label,
+        hint: mode === m.id ? "activo" : m.hint,
+        icon: <Wand2 size={13} />,
+        onSelect: () => setMode(m.id),
+      })),
+      { label: "Re-evaluar práctica del tema abierto", hint: "Elige competencias y cantidades", icon: <Sparkles size={13} />, onSelect: () => void reevaluate() },
+      ...(mode ? [{ label: "Salir del modo", icon: <X size={13} />, onSelect: () => setMode("") }] : []),
+    ]);
 
   return (
     <div className="flex-none p-2.5">
@@ -311,6 +338,16 @@ function Composer() {
           ))}
         </div>
       )}
+      {modeInfo && (
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-semibold text-accent-text">
+            <Wand2 size={11} /> {modeInfo.label}
+            <button type="button" aria-label="Salir del modo" onClick={() => setMode("")} className="rounded hover:text-text">
+              <X size={11} />
+            </button>
+          </span>
+        </div>
+      )}
       <div className="rounded-xl border border-line bg-elevated px-2.5 py-2 focus-within:border-accent">
         <textarea
           ref={area}
@@ -318,7 +355,7 @@ function Composer() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           aria-label="Pregunta al asistente"
-          placeholder="Pregunta algo sobre esta nota…"
+          placeholder={modeInfo?.placeholder ?? "Pregunta algo sobre esta nota…"}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -346,12 +383,16 @@ function Composer() {
           <ModelSelector />
           <button
             type="button"
-            title="Generar temario completo de una materia con IA"
-            disabled={syllabusBusy}
-            onClick={() => void generateSyllabus()}
-            className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-hover hover:text-text disabled:opacity-50"
+            title="Modos: temario, canvas, nuevo tema, re-evaluar práctica"
+            aria-label="Modos del asistente"
+            disabled={evaluating}
+            onClick={openModes}
+            className={cn(
+              "grid h-7 w-7 place-items-center rounded-md hover:bg-hover hover:text-text disabled:opacity-50",
+              mode ? "bg-accent-soft text-accent-text" : "text-dim",
+            )}
           >
-            <BookOpen size={14} className={cn(syllabusBusy && "animate-pulse")} />
+            <Layers size={14} className={cn(evaluating && "animate-pulse")} />
           </button>
           <span className="flex-1" />
           <IconButton title="Dictado por voz — fuera de alcance" disabled>

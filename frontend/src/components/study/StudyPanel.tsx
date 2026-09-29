@@ -129,9 +129,15 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
           </button>
         )}
 
-        <button type="button" disabled={!first} onClick={() => first && practice(first.path)}
+        <button
+          type="button"
+          onClick={() =>
+            first
+              ? practice(first.path)
+              : toast("info", "No hay ejercicios en cola. Abre un tema y usa «Practicar este tema» para generar práctica con IA.")
+          }
           className={cn(
-            "flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-semibold transition disabled:opacity-50",
+            "flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-semibold transition",
             topicData?.is_topic
               ? "mt-1.5 border border-line text-text hover:bg-hover"
               : "mt-2 bg-accent text-white hover:bg-accent-strong"

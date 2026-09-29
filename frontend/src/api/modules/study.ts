@@ -82,6 +82,35 @@ function studyRel(app: AppState, p: string | null | undefined): string {
   }
 }
 
+/**
+ * The `_skills/` templates that guide the AI's exercise design, read from the
+ * vault root and the subject folder (whichever exists). Empty when there are none.
+ */
+function skillTemplates(app: AppState, topicFolderRel: string): TheoryNoteContext[] {
+  const first = topicFolderRel.replace(/\\/g, "/").split("/")[0];
+  const candidates = [path.join(app.root, "_skills")];
+  if (first) candidates.push(path.join(app.root, first, "_skills"));
+  const out: TheoryNoteContext[] = [];
+  for (const dir of candidates) {
+    let files: fs.Dirent[];
+    try {
+      files = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const f of files) {
+      if (!f.isFile() || !f.name.toLowerCase().endsWith(".md")) continue;
+      try {
+        const full = path.join(dir, f.name);
+        out.push({ rel: app.rel(full), title: f.name.replace(/\.md$/i, ""), content: fs.readFileSync(full, "utf-8") });
+      } catch {
+        /* unreadable template: skip it */
+      }
+    }
+  }
+  return out;
+}
+
 function getStudyArea(app: AppState, rel: string): StudyArea | null {
   const absPath = app.resolve(rel, { allowRoot: true });
   let stat: fs.Stats;
@@ -681,6 +710,10 @@ export function studyApi(app: AppState) {
           }
         }
       } catch {}
+
+      // The `_skills/` templates steer the prompt (how a concept/practice note
+      // is shaped, which exercise types exist) alongside the topic's own theory.
+      theoryNotes.push(...skillTemplates(app, normFolder));
 
       const aiClient: SessionAIClient = {
         async generateExercises(messages) {

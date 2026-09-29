@@ -12,7 +12,7 @@
  *   <folder>.ejercicios.md the exercises of a folder  (type: ejercicios)
  */
 
-export const VIEW_FILE_KINDS = ["teorica", "practica", "resumen", "ejercicios"] as const;
+export const VIEW_FILE_KINDS = ["teorica", "practica", "resumen", "ejercicios", "dibujo"] as const;
 export type ViewFileKind = (typeof VIEW_FILE_KINDS)[number];
 
 /** `type:` of a note → the view it opens, or null when it opens as markdown. */

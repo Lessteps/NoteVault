@@ -14,6 +14,7 @@ import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
 import { PracticeView } from "../practice/PracticeView";
 import { ExerciseFolderView } from "../practice/ExerciseFolderView";
+import { InkPad } from "../practice/InkPad";
 import { ResumenView } from "../study/ResumenView";
 import { TeoricaView } from "../study/TeoricaView";
 import { TopicFileView } from "../study/TopicFileView";
@@ -321,6 +322,7 @@ export function EditorArea() {
                       : mode === "read" && isViewFile(note, "teorica") ? <TeoricaView note={note} />
                         : mode === "read" && isViewFile(note, "resumen") ? <ResumenView note={note} />
                         : mode === "read" && isViewFile(note, "ejercicios") ? <ExerciseFolderView note={note} />
+                        : mode === "read" && isViewFile(note, "dibujo") ? <InkPad note={note} />
                         : mode === "read" && isExercise(note) ? <PracticeView note={note} />
                       : mode === "read" && ladderOn ? <LadderView path={note.path} onExit={() => useLadder.getState().set(note.path, false)} />
                         : (
@@ -376,7 +378,7 @@ function SidePane({ note }: { note: OpenNote }) {
         <IconButton title="Hacerla la nota principal" onClick={() => useApp.getState().setActive(note.path)}><ArrowLeftRight size={14} /></IconButton>
         <IconButton title="Cerrar panel derecho" onClick={() => void useApp.getState().openSide(null)}><X size={14} /></IconButton>
       </div>
-      <div className="min-h-0 flex-1">{editing ? <Editor note={note} /> : <ReadView note={note} />}</div>
+      <div className="min-h-0 flex-1">{editing ? <Editor note={note} /> : isViewFile(note, "dibujo") ? <InkPad note={note} /> : <ReadView note={note} />}</div>
     </section>
   );
 }

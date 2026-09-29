@@ -4,7 +4,8 @@
 // El globo no es el modulo del navegador: muestra y oculta la lista de paginas
 // *dentro* del panel, sin moverte de donde estas.
 
-import { CalendarClock, Globe, ListTree, Map as MapIcon, Sparkles } from "lucide-react";
+import { CalendarClock, Globe, ListTree, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
+import { openInkPad } from "../practice/inkBridge";
 import { useReviewPanel } from "../study/ReviewPanel";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
@@ -144,6 +145,19 @@ export function PanelLaunchers({ module }: { module: string }) {
           )}
         >
           <CalendarClock size={16} />
+        </button>
+      )}
+
+      {/* A drawing pad in a split view, saved beside the open note. */}
+      {module === "notas" && (
+        <button
+          type="button"
+          title="Dibujar LaTeX (lienzo infinito en vista dividida)"
+          aria-label="Dibujar LaTeX"
+          onClick={() => void openInkPad()}
+          className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
+        >
+          <PenTool size={16} />
         </button>
       )}
     </aside>

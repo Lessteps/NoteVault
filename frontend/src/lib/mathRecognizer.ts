@@ -371,6 +371,11 @@ function readGlyph(strokes: Stroke[]): Glyph {
   return { latex: best.latex, bb, score: best.score };
 }
 
+/** Glyphs that join terms or group them: they never begin an exponent or a subscript. */
+const OPERATORS = new Set(["+", "=", "<", ">", "/", "(", ")"]);
+/** A LaTeX command such as the centred dot also separates terms. */
+const isCommand = (latex: string): boolean => latex.charCodeAt(0) === 92;
+
 /** Lays glyphs out left to right; smaller, raised (or lowered) ones after a base become its script. */
 function layoutGlyphs(glyphs: Glyph[], detected: string[]): string {
   let out = "";
@@ -390,10 +395,13 @@ function layoutGlyphs(glyphs: Glyph[], detected: string[]): string {
     if (base) {
       const small = g.bb.height <= base.bb.height * 0.75;
       const right = g.bb.minX >= base.bb.centerX;
-      const raised = g.bb.centerY < base.bb.minY + base.bb.height * 0.45;
+      // Clearly above (or below) the base: an operator written at mid-height is not a script.
+      const raised = g.bb.centerY < base.bb.minY + base.bb.height * 0.4 && g.bb.maxY < base.bb.minY + base.bb.height * 0.7;
       const lowered = g.bb.centerY > base.bb.maxY - base.bb.height * 0.2;
       const kind = small && right ? (raised ? "sup" : lowered ? "sub" : null) : null;
-      if (kind) {
+      // Operators and brackets separate terms; only a script already under way can contain them.
+      const startsScript = !scriptKind && (OPERATORS.has(g.latex) || isCommand(g.latex));
+      if (kind && !startsScript) {
         if (scriptKind && scriptKind !== kind) flush();
         scriptKind = kind;
         script += g.latex;

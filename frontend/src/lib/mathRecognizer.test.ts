@@ -168,3 +168,19 @@ describe("whole expressions from handwriting-like ink", () => {
     expect(recognizeStrokesToLatex(ink).latex.replace(/\s+/g, "")).toBe(`${BS}frac{1}{2}`);
   });
 });
+
+describe("operators written at mid-height", () => {
+  it("keeps 5 + 3 as a sum, never as an exponent", () => {
+    const line = (...pts: Array<[number, number]>): Stroke => pts.map(([x, y]) => ({ x, y }));
+    const ink: Stroke[] = [
+      line([140, 100], [86, 100]),
+      line([86, 100], [82, 150], [118, 144], [136, 170], [126, 205], [98, 212], [78, 198]),
+      line([230, 150], [290, 150]),
+      line([260, 120], [260, 180]),
+      line([330, 108], [358, 100], [382, 118], [356, 142], [386, 164], [364, 208], [328, 196]),
+    ];
+    const res = recognizeStrokesToLatex(ink);
+    expect(res.latex.replace(/\s+/g, "")).toBe("5+3");
+    expect(res.detectedStructures).not.toContain("superscript");
+  });
+});

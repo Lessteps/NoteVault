@@ -35,7 +35,11 @@ export interface PlannedExercise {
 export interface SessionPlanResult {
   skill: string;
   difficulty: DifficultyLevel;
+  /** Los tres mandos de la sesión: dificultad, cantidad y ayuda. */
+  quantity: QuantityOption;
   assistance: AssistanceLevel;
+  /** `true` cuando la sesión admite pistas o ayuda (se refleja en los ejercicios). */
+  hints: boolean;
   targetCount: number;
   exercises: PlannedExercise[];
   existingCount: number;
@@ -263,7 +267,9 @@ export async function buildTopicSession(
   return {
     skill: config.skill,
     difficulty: config.difficulty,
+    quantity: config.quantity,
     assistance: config.assistance,
+    hints: config.assistance === "helper",
     targetCount,
     exercises: planned,
     existingCount: matching.length,

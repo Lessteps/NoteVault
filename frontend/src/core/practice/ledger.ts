@@ -82,6 +82,58 @@ export function attemptNoHelp(attempt: Record<string, any>): boolean {
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Fase 2 · qué cuenta.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** Por qué un intento no cuenta para el progreso ni para la próxima revisión. */
+export const NO_COUNT_REASONS: Record<string, string> = {
+  ungraded: "no se llegó a calificar",
+  solution_seen: "se vio la solución",
+  hints_used: "se usó una pista o la ayuda",
+  gave_up: "se abandonó el ejercicio",
+};
+
+export interface AttemptCounting {
+  counted: boolean;
+  /** Vacío cuando cuenta. */
+  reasons: string[];
+  /** Los códigos, para la interfaz. */
+  codes: string[];
+}
+
+/**
+ * Lo que cuenta un intento.
+ *
+ * Un intento cuenta para el progreso, la maestría y la programación de repasos
+ * (estilo chess.com) solo si fue calificado, no se vio la solución, no se usó
+ * ninguna pista o ayuda y no se abandonó. Si no cuenta se guarda igual: es
+ * práctica, alimenta el registro de errores y el historial, pero no mueve nada
+ * hasta que el ejercicio se rehaga sin ayuda.
+ *
+ * Un `counted` explícito en el registro manda (lo escribe quien conoce el caso);
+ * en los registros antiguos, que no lo traen, se deduce de sus propios campos.
+ */
+export function countAttempt(attempt: Record<string, any>): AttemptCounting {
+  const codes: string[] = [];
+  const verdict = String(attempt.verdict ?? "ungraded").trim().toLowerCase();
+  if (verdict === "ungraded" || !verdict) codes.push("ungraded");
+  if (attempt.solution_seen) codes.push("solution_seen");
+  if ((parseInt(String(attempt.hints_used), 10) || 0) > 0) codes.push("hints_used");
+  if (attempt.gave_up || String(attempt.outcome ?? "").trim().toLowerCase() === "gave_up") codes.push("gave_up");
+  return {
+    counted: codes.length === 0,
+    reasons: codes.map((c) => NO_COUNT_REASONS[c] ?? c),
+    codes,
+  };
+}
+
+/** Si el intento cuenta: lo que diga el registro, o la regla si no lo trae. */
+export function attemptCounts(attempt: Record<string, any>): boolean {
+  if (typeof attempt.counted === "boolean") return attempt.counted;
+  return countAttempt(attempt).counted;
+}
+
 function _day(stamp: any): string {
   if (!stamp) return formatIsoDate(new Date());
   const d = parseIsoDate(stamp);
@@ -97,6 +149,10 @@ function addDays(dayStr: string, days: number): string {
 export interface SkillReplay {
   status: string;
   attempts: number;
+  /** Intentos que cuentan (sin ayuda, sin solución vista, calificados). */
+  counted_attempts: number;
+  /** Práctica que no movió nada (fase 2): se ve en el historial, no en el progreso. */
+  ignored_attempts: number;
   best: number | null;
   last_at: string;
   bands: string[];
@@ -125,7 +181,11 @@ export function replay(
     String(a.at || "").localeCompare(String(b.at || ""))
   );
 
-  for (const ev of sortedEvents) {
+  // Fase 2: la práctica con ayuda no mueve estado, banda, intervalo ni próxima
+  // revisión. Se queda en el historial (attempts) pero no entra en el motor.
+  const countedEvents = sortedEvents.filter(attemptCounts);
+
+  for (const ev of countedEvents) {
     const day = _day(ev.at);
     if (status === NOT_STARTED) {
       status = PRACTICING;
@@ -163,7 +223,7 @@ export function replay(
   }
 
   const scores: number[] = [];
-  for (const e of events) {
+  for (const e of countedEvents) {
     if (e.verdict !== "ungraded") {
       scores.push(parseInt(String(e.score), 10) || 0);
     }
@@ -178,6 +238,8 @@ export function replay(
   return {
     status,
     attempts: events.length,
+    counted_attempts: countedEvents.length,
+    ignored_attempts: events.length - countedEvents.length,
     best: scores.length > 0 ? Math.max(...scores) : null,
     last_at: last,
     bands: BANDS.filter((b) => bands.has(b)),

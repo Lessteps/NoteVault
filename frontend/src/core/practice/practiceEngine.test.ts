@@ -745,8 +745,11 @@ describe("TestApplyResult", () => {
     expect(items[0]!.entity_id).toBe(ex.note_id);
     expect(items[0]!.entity_type).toBe("exercise");
     expect(items[0]!.topic).toBe("math_general");
-    expect(items[0]!.repetitions).toBe(1);
-    expect(items[0]!.history[0]!.grade).toBe(4);
+    // Fase 2: el intento usó una pista, así que no cuenta: el ítem se registra pero
+    // la revisión no se reprograma (queda para cuando se rehaga sin ayuda).
+    expect(items[0]!.repetitions).toBe(0);
+    expect(items[0]!.history.length).toBe(0);
+    expect(attempt["counted"]).toBe(false);
 
     applyResult(vault, ex, "Mat/E01.md", {
       answer: "proof 2",
@@ -758,7 +761,9 @@ describe("TestApplyResult", () => {
     });
     items = new StudySRSManager(vault).allItems();
     expect(items.length).toBe(1);
-    expect(items[0]!.repetitions).toBe(2);
+    // Rehecho sin ayuda: ahora sí cuenta y reprograma la revisión.
+    expect(items[0]!.repetitions).toBe(1);
+    expect(items[0]!.history.length).toBe(1);
   });
 });
 

@@ -116,7 +116,13 @@ describe("LedgerReplay", () => {
 
   it("does not consolidate with implement mode or hints", () => {
     expect(lg.replay([ev(3, 95, 5, "implement")], TODAY).status).toBe(lg.PRACTICING);
-    expect(lg.replay([ev(3, 95, 5, "debug", 1)], TODAY).status).toBe(lg.PRACTICING);
+    // Fase 2: con una pista usada el intento no cuenta, así que el skill ni siquiera
+    // arranca; vuelve a contar cuando se rehace sin ayuda.
+    const helped = lg.replay([ev(3, 95, 5, "debug", 1)], TODAY);
+    expect(helped.status).toBe(lg.NOT_STARTED);
+    expect(helped.counted_attempts).toBe(0);
+    expect(helped.ignored_attempts).toBe(1);
+    expect(lg.replay([ev(3, 95, 5, "debug", 1), ev(3, 95, 5, "debug")], TODAY).status).toBe(lg.CONSOLIDATED);
   });
 
   it("consolidates with all three difficulty bands", () => {

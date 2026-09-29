@@ -461,6 +461,9 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   /** AI reads the topic's theory and rewrites its practice plan (skills x difficulty counts). */
   studyTopicReevaluate: (folder: string) =>
     call<{ ok: boolean; plan: import("./types").PracticePlan; path: string }>("study_topic_reevaluate", folder),
+  /** The topic review notes: when each practised topic is due again. */
+  studyReviewsList: () =>
+    call<{ today: string; items: import("./types").ReviewItem[] }>("study_reviews_list"),
   studyTopicPlan: (folder: string) =>
     call<{ plan: import("./types").PracticePlan | null }>("study_topic_plan", folder),
   studyTopicDashboard: (subject?: string) => call<import("./types").TopicDashboardData>("study_topic_dashboard", subject),

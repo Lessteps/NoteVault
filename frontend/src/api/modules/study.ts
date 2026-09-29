@@ -59,6 +59,7 @@ import {
   readPlanFromPractica,
   type PracticePlan,
 } from "../../core/practice/practicePlan.js";
+import { listReviews } from "../../core/practice/reviewFiles.js";
 import { catalogFor } from "../../core/practice/skillSelection.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
 import { detectTopicType } from "../../core/practice/topicType.js";
@@ -874,6 +875,12 @@ export function studyApi(app: AppState) {
         })),
         first_exercise: plan.exercises[0]?.path ?? "",
       };
+    },
+
+    /** The topic review notes (spaced repetition), soonest first. */
+    study_reviews_list() {
+      const today = isoDate(new Date())!;
+      return { today, items: listReviews(app.root, today) };
     },
 
     /** Re-reads the topic's theory with the AI and rewrites its practice plan. */

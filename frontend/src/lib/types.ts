@@ -1038,3 +1038,16 @@ export interface PracticePlan {
   summary: string;
   topicType?: "theoretical" | "procedural" | "mixed";
 }
+
+export interface ReviewItem {
+  path: string;
+  topic: string;
+  topicPath: string;
+  subject: string;
+  subjectFolder: string;
+  next: string;
+  last: string;
+  level: number;
+  inDays: number;
+  skills: string[];
+}

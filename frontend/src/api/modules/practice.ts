@@ -39,6 +39,8 @@ import {
   writeRequest,
 } from "../../core/practice/handoff.js";
 import { MODES, modeFor } from "../../core/practice/modes.js";
+import { attemptPassed } from "../../core/practice/ledger.js";
+import { recordTopicPractice } from "../../core/practice/reviewFiles.js";
 import { parseTimer } from "../../core/practice/timer.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
@@ -162,6 +164,12 @@ function practiceApply(
     result,
   });
   clearStudySnapshotCache();
+  // The topic's review note follows every graded attempt, whatever the skill.
+  try {
+    recordTopicPractice(app.root, p, { skill: String(ex.mode || ""), passed: attemptPassed(attempt as Record<string, any>) });
+  } catch {
+    /* a review note that cannot be written must never break grading */
+  }
   const history = historyList(new PracticeAttemptStore(app.root).attempts(ex.note_id));
   return {
     graded: true,

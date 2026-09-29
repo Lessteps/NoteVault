@@ -17,11 +17,11 @@ import { PanelLaunchers } from "./PanelLaunchers";
 
 let container: HTMLDivElement;
 
-function mount() {
+function mount(module = "notas") {
   container = document.createElement("div");
   document.body.appendChild(container);
   act(() => {
-    createRoot(container).render(<PanelLaunchers />);
+    createRoot(container).render(<PanelLaunchers module={module} />);
   });
 }
 
@@ -105,5 +105,26 @@ describe("PanelLaunchers", () => {
       byLabel("Asistente IA").click();
     });
     expect(useAssistant.getState().open).toBe(true);
+  });
+
+  it("el esquema muscular solo existe en Ejercicio, y cierra las otras caras", () => {
+    mount("finanzas");
+    expect(container.querySelector('button[aria-label="Esquema muscular"]')).toBeNull();
+
+    mount("ejercicio");
+    act(() => {
+      useAssistant.setState({ open: true });
+    });
+    act(() => {
+      byLabel("Esquema muscular").click();
+    });
+    expect(useApp.getState().muscleOpen).toBe(true);
+    expect(useAssistant.getState().open).toBe(false);
+
+    // Y al revés: otra cara se lleva el panel.
+    act(() => {
+      byLabel("Asistente IA").click();
+    });
+    expect(useApp.getState().muscleOpen).toBe(false);
   });
 });

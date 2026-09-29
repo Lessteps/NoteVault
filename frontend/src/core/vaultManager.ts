@@ -434,7 +434,7 @@ export class VaultManager {
   createNote(title: string, folder?: string | null): Note {
     const parent = folder ? path.resolve(folder) : this.vaultRoot;
     fs.mkdirSync(parent, { recursive: true });
-    const safeTitle = title.replace(/[\\/:*?"<>|]/g, "_");
+    const safeTitle = title.replace(/[\\/:*?"<>|]/g, "_").replace(/^\.+/, "_");
     let candidate = path.join(parent, `${safeTitle}.md`);
     let counter = 1;
     while (fs.existsSync(candidate)) {
@@ -455,7 +455,7 @@ export class VaultManager {
   }
 
   renameNote(note: Note, newTitle: string): Note {
-    const safe = newTitle.replace(/[\\/:*?"<>|]/g, "_");
+    const safe = newTitle.replace(/[\\/:*?"<>|]/g, "_").replace(/^\.+/, "_");
     const newPath = path.join(path.dirname(note.path), `${safe}.md`);
     fs.renameSync(note.path, newPath);
     return new Note(newPath, this.vaultRoot);

@@ -14,7 +14,7 @@ import {
   folderInScope,
   groupTopics,
   missingOf,
-  skillRings,
+  skillMatrix,
   topicPct,
   type OverviewGroup,
 } from "../../lib/areaOverview";
@@ -141,6 +141,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
   };
 
   return (
+    <div className="h-full min-h-0 overflow-y-auto">
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5 p-5">
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
@@ -200,7 +201,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
             Esta parte de la materia todavía no tiene temas con ejercicios registrados.
           </p>
         ) : (
-          <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
             {groups.map((group) => (
               <GroupCard
                 key={group.key}
@@ -252,6 +253,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
           <pre className="mt-2 whitespace-pre-wrap font-sans text-[11.5px] leading-snug text-dim">{errors}</pre>
         </section>
       )}
+    </div>
     </div>
   );
 }
@@ -338,7 +340,12 @@ function GroupCard({
         )}
       </div>
 
-      {open && (
+      {open && group.isTopic && (
+        <div className="mt-3 border-t border-line pt-3">
+          <SkillMatrix item={group.topics[0]!} />
+        </div>
+      )}
+      {open && !group.isTopic && (
         <div className="mt-3 flex flex-col gap-2 border-t border-line pt-3">
           {group.topics.map((item) => (
             <TopicRow
@@ -368,7 +375,6 @@ function TopicRow({
   onOpenView: () => void;
 }) {
   const pct = topicPct(item);
-  const rings = skillRings(item);
   const missing = missingOf(item);
   const Chevron = open ? ChevronDown : ChevronRight;
 
@@ -406,25 +412,7 @@ function TopicRow({
 
       {open && (
         <div className="mt-2.5 border-t border-line pt-2.5">
-          <div className="flex flex-wrap gap-3">
-            {rings.map((ring) => (
-              <div key={ring.skill} className="flex w-[132px] flex-col items-center gap-1" title={ring.description}>
-                <Donut
-                  size={58}
-                  thickness={7}
-                  label={`${ring.pct}%`}
-                  parts={[
-                    { value: ring.pct, colour: ringColour(ring.pct), name: ring.label },
-                    { value: 100 - ring.pct, colour: "var(--nv-elevated)", name: "Pendiente" },
-                  ]}
-                />
-                <div className="w-full truncate text-center text-[10.5px] font-semibold text-text">{ring.label}</div>
-                <div className="text-center font-mono text-[9.5px] text-faint">
-                  {ring.done}/{ring.required}
-                </div>
-              </div>
-            ))}
-          </div>
+          <SkillMatrix item={item} />
           {missing.length > 0 && (
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               <AlertTriangle size={12} className="text-warn" />
@@ -440,6 +428,40 @@ function TopicRow({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Competencies × difficulty: passes against the required count, nothing else. */
+function SkillMatrix({ item }: { item: TopicDashboardItem }) {
+  const rows = skillMatrix(item);
+  if (rows.length === 0) {
+    return <p className="text-[11px] text-faint">Este tema todavía no tiene competencias definidas.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="grid grid-cols-[minmax(0,1fr)_repeat(3,72px)] items-center gap-2 font-mono text-[9.5px] uppercase tracking-wider text-faint">
+        <span>Competencia</span>
+        {DIFFICULTY_LABELS.map((l) => (
+          <span key={l} className="text-center">{l}</span>
+        ))}
+      </div>
+      {rows.map((row) => (
+        <div key={row.skill} className="grid grid-cols-[minmax(0,1fr)_repeat(3,72px)] items-center gap-2" title={row.description}>
+          <span className="truncate text-[11.5px] font-semibold text-text">{row.label}</span>
+          {row.cells.map((c, i) => {
+            const pct = Math.min(100, Math.round((100 * c.passes) / c.required));
+            return (
+              <div key={c.difficulty} className={cn("flex flex-col gap-0.5", !c.counts && "opacity-50")}>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-panel">
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: DIFFICULTY_COLOURS[i] }} />
+                </div>
+                <span className="text-center font-mono text-[9.5px] text-faint">{c.passes}/{c.required}</span>
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

@@ -241,6 +241,43 @@ export function skillRings(item: TopicDashboardItem): SkillRing[] {
   });
 }
 
+export interface SkillMatrixCell {
+  difficulty: 1 | 2 | 3;
+  passes: number;
+  attempts: number;
+  required: number;
+  /** false for difficulties below the topic's target: shown, but not required */
+  counts: boolean;
+}
+
+export interface SkillMatrixRow {
+  skill: string;
+  label: string;
+  description: string;
+  cells: SkillMatrixCell[];
+}
+
+/** One row per competency, one cell per difficulty: passes against what is required. */
+export function skillMatrix(item: TopicDashboardItem): SkillMatrixRow[] {
+  const min = Math.max(1, item.manifest.mastery?.min_per_skill ?? 6);
+  const target = Math.max(1, Math.min(3, item.manifest.mastery?.target_difficulty ?? 3));
+  return (item.manifest.skills ?? []).map((skill) => {
+    const progress = item.progress?.skills?.[skill];
+    return {
+      skill,
+      label: progress?.label ?? skill,
+      description: progress?.description ?? "",
+      cells: DIFFICULTIES.map((difficulty) => ({
+        difficulty,
+        passes: progress?.cells?.[difficulty]?.passes ?? 0,
+        attempts: progress?.cells?.[difficulty]?.attempts ?? 0,
+        required: min,
+        counts: difficulty >= target,
+      })),
+    };
+  });
+}
+
 /** The competencies and difficulties of a topic that have not been practised. */
 export function missingOf(item: TopicDashboardItem): string[] {
   const out: string[] = [];

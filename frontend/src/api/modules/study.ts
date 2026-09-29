@@ -19,7 +19,7 @@ import {
   skillLabel,
 } from "../../core/practice/recommender.js";
 import { StudyArea, detectStudyArea } from "../../core/practice/studyArea.js";
-import { ensureOverviewFile, ensureTopicViewFiles, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf, overviewFileText, viewFileName } from "../../core/practice/viewFiles.js";
+import { ensureExerciseSetFile, ensureOverviewFile, ensureTopicViewFiles, isExerciseFolder, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf, overviewFileText, viewFileName } from "../../core/practice/viewFiles.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { LAYOUT } from "../../core/vaultFormat.js";
@@ -617,6 +617,18 @@ export function studyApi(app: AppState) {
       }
       // A file was passed: use the folder it lives in.
       const folderAbs = stat.isDirectory() ? abs : path.dirname(abs);
+      // `Ejercicios` and its per-skill folders open as a navigable set of exercises.
+      if (stat.isDirectory() && !isSubjectRoot(app.root, folderAbs) && isExerciseFolder(folderAbs)) {
+        const { file, created } = ensureExerciseSetFile(folderAbs);
+        if (created) clearExerciseIndexCache();
+        return {
+          ok: true,
+          kind: "ejercicios",
+          path: app.rel(file).split(path.sep).join("/"),
+          created: created ? [app.rel(file)] : [],
+          errors: [],
+        };
+      }
       // The subject root groups areas: it gets its overview and nothing else.
       const subjectRoot = isSubjectRoot(app.root, folderAbs);
       const topic = !subjectRoot && isTopicFolder(app.root, folderAbs);

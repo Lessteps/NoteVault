@@ -93,4 +93,15 @@ describe("study_view_ensure", () => {
     expect(res.kind).toBe("practica");
     expect(posix(res.path)).toContain("1.1 X.practica.md");
   });
+  it("opens an exercise folder as an exercises view, without touching the topic", () => {
+    const dir = path.join(tmp, "Matemáticas", "1 Aritmética", "1.1 X", "Ejercicios", "solve");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "ej1.md"), "---\ntype: exercise\n---\n# uno\n", "utf-8");
+    const res = api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X/Ejercicios/solve");
+    expect(res.kind).toBe("ejercicios");
+    expect(posix(res.path)).toBe("Matemáticas/1 Aritmética/1.1 X/Ejercicios/solve/solve.ejercicios.md");
+    expect(fs.readFileSync(path.join(dir, "solve.ejercicios.md"), "utf-8")).toContain("type: ejercicios");
+    // A second click reuses the file.
+    expect(api.study_view_ensure("Matemáticas/1 Aritmética/1.1 X/Ejercicios/solve").created).toEqual([]);
+  });
 });

@@ -13,6 +13,7 @@ import { ErrorBoundary } from "../common/ErrorBoundary";
 import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
 import { PracticeView } from "../practice/PracticeView";
+import { ExerciseFolderView } from "../practice/ExerciseFolderView";
 import { ResumenView } from "../study/ResumenView";
 import { TeoricaView } from "../study/TeoricaView";
 import { TopicFileView } from "../study/TopicFileView";
@@ -319,6 +320,7 @@ export function EditorArea() {
                     {mode === "read" && isViewFile(note, "practica") ? <TopicFileView note={note} />
                       : mode === "read" && isViewFile(note, "teorica") ? <TeoricaView note={note} />
                         : mode === "read" && isViewFile(note, "resumen") ? <ResumenView note={note} />
+                        : mode === "read" && isViewFile(note, "ejercicios") ? <ExerciseFolderView note={note} />
                         : mode === "read" && isExercise(note) ? <PracticeView note={note} />
                       : mode === "read" && ladderOn ? <LadderView path={note.path} onExit={() => useLadder.getState().set(note.path, false)} />
                         : (

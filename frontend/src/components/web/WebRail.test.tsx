@@ -26,7 +26,7 @@ const text = () => container.textContent ?? "";
 
 beforeEach(() => {
   localStorage.clear();
-  useWebPages.setState({ pages: [], activeId: null, open: true, compact: false });
+  useWebPages.setState({ pages: [], activeId: null, open: true });
 });
 
 describe("WebRail", () => {
@@ -90,8 +90,7 @@ describe("WebRail", () => {
     const plus = container.querySelector<HTMLButtonElement>('button[aria-label="Nueva página"]')!;
     expect(plus).toBeTruthy();
     // The panel is still whole: header, actions and empty message.
-    expect(container.querySelector('button[aria-label="Ocultar el panel"]')).toBeTruthy();
-    expect(container.querySelector('button[aria-label="Solo iconos"]')).toBeTruthy();
+    expect(container.querySelector('button[aria-label="Ocultar las páginas"]')).toBeTruthy();
   });
 
   it("opens a page from the + button", async () => {
@@ -107,24 +106,16 @@ describe("WebRail", () => {
     expect(add).not.toHaveBeenCalled();
   });
 
-  it("shrinks to icons and can be hidden", () => {
+  it("se cierra y deja el sitio al panel: no es una columna propia", () => {
     useWebPages.setState({ pages: [{ id: "a", url: "https://a.test", title: "Página A" }], activeId: "a" });
     mount();
 
     act(() => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Solo iconos"]')!.click();
-    });
-    expect(useWebPages.getState().compact).toBe(true);
-    expect(text()).not.toContain("Página A"); // titles gone, the row is still there
-    expect(rows()).toHaveLength(1);
-
-    act(() => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Ocultar el panel"]')!.click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Ocultar las páginas"]')!.click();
     });
     expect(useWebPages.getState().open).toBe(false);
 
-    // Hidden means gone from the DOM, not a broken half-panel.
-    // Hidden is not gone: a slim handle on the edge brings the pages back.
+    // Cerrado no dibuja nada: ni panel, ni asa, ni columna vacía.
     act(() => {
       document.body.removeChild(container);
       const next = document.createElement("div");
@@ -132,15 +123,21 @@ describe("WebRail", () => {
       createRoot(next).render(<WebRail />);
       container = next;
     });
-    const handle = container.querySelector<HTMLButtonElement>('button[aria-label="Mostrar las páginas del navegador"]')!;
-    expect(handle).toBeTruthy();
-    expect(handle.textContent).toContain("1");
-    // …and never as a wide panel.
+    expect(container.innerHTML).toBe("");
     expect(container.querySelector('aside[aria-label="Páginas del navegador"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Mostrar las páginas del navegador"]')).toBeNull();
 
+    // El globo de la tira de lanzadores es quien lo trae de vuelta.
     act(() => {
-      handle.click();
+      useWebPages.getState().setOpen(true);
     });
-    expect(useWebPages.getState().open).toBe(true);
+    act(() => {
+      document.body.removeChild(container);
+      const next = document.createElement("div");
+      document.body.appendChild(next);
+      createRoot(next).render(<WebRail />);
+      container = next;
+    });
+    expect(container.querySelector('aside[aria-label="Páginas del navegador"]')).not.toBeNull();
   });
 });

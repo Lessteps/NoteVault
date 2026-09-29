@@ -6,6 +6,7 @@ import { ModuleHost } from "./components/ModuleHost";
 import { useTabDrag } from "./store/tabDrag";
 import { X } from "lucide-react";
 import { WebRail } from "./components/web/WebRail";
+import { useWebPages } from "./store/webPages";
 import { DialogHost, MenuHost } from "./components/ui";
 import { VaultDialog } from "./components/VaultDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
@@ -195,6 +196,7 @@ export function App() {
   // The view to show is driven by the active tab's module id.
   const module = useApp((s) => s.module);
   const sideModule = useApp((s) => s.sideModule);
+  const pagesOpen = useWebPages((s) => s.open);
   const draggingTabId = useTabDrag((s) => s.draggingTabId);
   const [dropReady, setDropReady] = useState(false);
   useNavigationGuard();
@@ -255,7 +257,9 @@ export function App() {
             <div className="flex min-h-0 flex-1">{renderModule(sideModule)}</div>
           </section>
         )}
-        <WebRail />
+        {/* Fuera de Notas (p. ej. la superficie del navegador) el panel de paginas
+            sigue siendo el mismo: una cara del panel derecho, no una columna. */}
+        {module !== "notas" && pagesOpen && <WebRail />}
         {dropReady && draggingTabId && (
           <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 border-l-2 border-accent bg-accent-soft/20" aria-hidden="true" />
         )}

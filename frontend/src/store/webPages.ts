@@ -1,13 +1,18 @@
-// The pages open in the browser rail.
+// The pages of the browser.
 //
-// Brave-style: the browser pages are *not* top-bar tabs, they live in the
-// right-hand rail, one row each, and the rail only ever picks which one the
-// browser surface shows. State is small and worth keeping, so it is persisted.
+// Brave-style, and *not* top-bar tabs: the pages are one row each, and the list
+// only ever picks which one the browser surface shows. It is shown inside the
+// note panel (the globe of the launcher strip), never as a column of its own.
+// State is small and worth keeping, so it is persisted.
 
 import { create } from "zustand";
 import { useApp } from "./app";
 
 const STORAGE_KEY = "nv.webPages";
+// El "esta abierto" cambio de significado (antes: una columna propia; ahora: la
+// cara de paginas del panel derecho), asi que empieza en su propia clave y en
+// cerrado, en vez de heredar lo que hubiera guardado la columna de antes.
+const OPEN_KEY = "nv.webPages.open";
 
 export interface WebPage {
   id: string;
@@ -20,11 +25,11 @@ export interface WebPage {
 interface Persisted {
   pages: WebPage[];
   activeId: string | null;
+  /** Whether the pages are being shown in the right panel. */
   open: boolean;
-  compact: boolean;
 }
 
-const EMPTY: Persisted = { pages: [], activeId: null, open: true, compact: false };
+const EMPTY: Persisted = { pages: [], activeId: null, open: false };
 
 function stored(): Persisted {
   try {
@@ -34,17 +39,17 @@ function stored(): Persisted {
     return {
       pages: parsed.pages.filter((p): p is WebPage => Boolean(p && typeof p.id === "string")),
       activeId: typeof parsed.activeId === "string" ? parsed.activeId : null,
-      open: parsed.open !== false,
-      compact: Boolean(parsed.compact),
+      open: localStorage.getItem(OPEN_KEY) === "1",
     };
   } catch {
     return EMPTY;
   }
 }
 
-function persist(state: Pick<Persisted, "pages" | "activeId" | "open" | "compact">): void {
+function persist(state: Persisted): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ pages: state.pages, activeId: state.activeId }));
+    localStorage.setItem(OPEN_KEY, state.open ? "1" : "0");
   } catch {
     // Best effort.
   }
@@ -57,13 +62,12 @@ interface WebPagesState extends Persisted {
   activate: (id: string) => void;
   patch: (id: string, patch: Partial<WebPage>) => void;
   setOpen: (open: boolean) => void;
-  setCompact: (compact: boolean) => void;
 }
 
 let counter = 0;
 const nextId = () => `page-${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
-const snapshot = (s: WebPagesState) => ({ pages: s.pages, activeId: s.activeId, open: s.open, compact: s.compact });
+const snapshot = (s: WebPagesState) => ({ pages: s.pages, activeId: s.activeId, open: s.open });
 
 export const useWebPages = create<WebPagesState>((set, get) => ({
   ...(typeof localStorage === "undefined" ? EMPTY : stored()),
@@ -75,7 +79,7 @@ export const useWebPages = create<WebPagesState>((set, get) => ({
     void useApp.getState().openTab({ kind: "module", id: "web" });
     set((s) => {
       const pages = [...s.pages, page];
-      persist({ pages, activeId: id, open: s.open, compact: s.compact });
+      persist({ pages, activeId: id, open: true });
       return { pages, activeId: id, open: true };
     });
     return id;
@@ -87,10 +91,10 @@ export const useWebPages = create<WebPagesState>((set, get) => ({
       if (index < 0) return {};
       const pages = s.pages.filter((p) => p.id !== id);
       // Closing the active page falls back to its neighbour; closing the last one
-      // leaves the rail empty but usable (never a broken panel).
+      // leaves the list empty but usable (never a broken panel).
       const activeId =
         s.activeId === id ? (pages[index] ?? pages[index - 1] ?? null)?.id ?? null : s.activeId;
-      persist({ pages, activeId, open: s.open, compact: s.compact });
+      persist({ pages, activeId, open: s.open });
       return { pages, activeId };
     });
   },
@@ -99,7 +103,7 @@ export const useWebPages = create<WebPagesState>((set, get) => ({
     if (!get().pages.some((p) => p.id === id)) return;
     void useApp.getState().openTab({ kind: "module", id: "web" });
     set((s) => {
-      persist({ pages: s.pages, activeId: id, open: s.open, compact: s.compact });
+      persist({ pages: s.pages, activeId: id, open: s.open });
       return { activeId: id };
     });
   },
@@ -115,7 +119,7 @@ export const useWebPages = create<WebPagesState>((set, get) => ({
         return next;
       });
       if (!touched) return {};
-      persist({ pages, activeId: s.activeId, open: s.open, compact: s.compact });
+      persist({ pages, activeId: s.activeId, open: s.open });
       return { pages };
     }),
 
@@ -125,11 +129,6 @@ export const useWebPages = create<WebPagesState>((set, get) => ({
       return { open };
     }),
 
-  setCompact: (compact) =>
-    set((s) => {
-      persist({ ...snapshot(s), compact });
-      return { compact };
-    }),
 }));
 
 /** The page the browser surface shows, if any. */

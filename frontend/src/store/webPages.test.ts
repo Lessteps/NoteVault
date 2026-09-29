@@ -9,7 +9,7 @@ import { activeWebPage, pageLabel, useWebPages } from "./webPages";
 
 beforeEach(() => {
   localStorage.clear();
-  useWebPages.setState({ pages: [], activeId: null, open: true, compact: false });
+  useWebPages.setState({ pages: [], activeId: null, open: true });
 });
 
 describe("web pages", () => {
@@ -67,15 +67,18 @@ describe("web pages", () => {
     expect(s.pages).toEqual([]);
     expect(s.activeId).toBeNull();
     expect(activeWebPage(s)).toBeNull();
-    expect(s.open).toBe(true); // the rail is still there, with its "+"
+    expect(s.open).toBe(true); // the list stays, with its "+"
   });
 
-  it("remembers the rail's own state", () => {
-    useWebPages.getState().setCompact(true);
-    useWebPages.getState().setOpen(false);
+  it("remembers whether the pages were being shown", () => {
+    useWebPages.getState().setOpen(true);
+    expect(localStorage.getItem("nv.webPages.open")).toBe("1");
 
+    useWebPages.getState().setOpen(false);
+    expect(localStorage.getItem("nv.webPages.open")).toBe("0");
+    // La lista de páginas se guarda aparte: la cara abierta no la arrastra.
     const saved = JSON.parse(localStorage.getItem("nv.webPages")!);
-    expect(saved).toMatchObject({ compact: true, open: false });
+    expect(saved).toMatchObject({ pages: [], activeId: null });
   });
 
   it("labels a page by title, else by host, else neutrally", () => {

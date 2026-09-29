@@ -1,11 +1,10 @@
-// The browser rail: every open page, one row each, down the right-hand side.
+// Las paginas del navegador, dentro del panel derecho.
 //
-// It is Brave's side panel: the pages are *not* top-bar tabs. Clicking a row
-// makes it the page the browser surface shows, the rail can shrink to icons or
-// be hidden altogether, and closing the last page leaves an empty rail with its
-// "+" still there instead of a broken panel.
+// No es una columna aparte: el panel derecho es uno solo y esta es una de sus
+// caras, la que abre el globo de la tira de lanzadores. Una fila por pagina, el
+// "+" para abrir otra y la cruz para devolver el panel a lo que hubiera.
 
-import { Globe, PanelRightClose, Plus, Rows3, X } from "lucide-react";
+import { Globe, PanelRightClose, Plus, X } from "lucide-react";
 import { askText, cn } from "../ui";
 import { activeWebPage, pageLabel, useWebPages, type WebPage } from "../../store/webPages";
 
@@ -46,28 +45,12 @@ function PageIcon({ page, size = 16 }: { page: WebPage; size?: number }) {
 export function WebRail() {
   const pages = useWebPages((s) => s.pages);
   const open = useWebPages((s) => s.open);
-  const compact = useWebPages((s) => s.compact);
   const activeId = useWebPages((s) => s.activeId);
-  const { add, close, activate, setOpen, setCompact } = useWebPages.getState();
+  const { add, close, activate, setOpen } = useWebPages.getState();
   const active = activeWebPage({ pages, activeId });
 
-  // Hidden: a slim handle stays on the edge so the pages are never lost.
-  if (!open) {
-    return (
-      <button
-        type="button"
-        title={pages.length ? `Mostrar las páginas del navegador (${pages.length})` : "Mostrar las páginas del navegador"}
-        aria-label="Mostrar las páginas del navegador"
-        onClick={() => setOpen(true)}
-        className="flex w-5 flex-none flex-col items-center gap-2 border-l border-line bg-panel py-2 text-faint transition-colors hover:bg-hover hover:text-text"
-      >
-        <Globe size={13} />
-        {pages.length > 0 && (
-          <span className="rounded-full bg-accent px-1 font-mono text-[9px] font-bold text-white">{pages.length}</span>
-        )}
-      </button>
-    );
-  }
+  // Cerrado no ocupa nada: el panel lo vuelve a llenar la tira de lanzadores.
+  if (!open) return null;
 
   const newPage = async () => {
     const url = await askText("Nueva página del navegador", "https://", "Abrir");
@@ -78,15 +61,13 @@ export function WebRail() {
   return (
     <aside
       aria-label="Páginas del navegador"
-      className={cn("flex flex-none flex-col border-l border-line bg-panel", compact ? "w-12" : "w-[236px]")}
+      className="flex w-[300px] min-w-0 flex-none flex-col border-l border-line bg-panel"
     >
       <header className="flex h-9 flex-none items-center gap-1 border-b border-line px-2">
         <Globe size={13} className="flex-none text-accent-text" />
-        {!compact && (
-          <span className="flex-1 truncate font-mono text-[9.5px] font-semibold uppercase tracking-wider text-faint">
-            Navegador
-          </span>
-        )}
+        <span className="flex-1 truncate font-mono text-[10px] font-semibold uppercase tracking-wider text-faint">
+          Navegador
+        </span>
         <button
           type="button"
           title="Nueva página"
@@ -98,17 +79,8 @@ export function WebRail() {
         </button>
         <button
           type="button"
-          title={compact ? "Mostrar títulos" : "Solo iconos"}
-          aria-label={compact ? "Mostrar títulos" : "Solo iconos"}
-          onClick={() => setCompact(!compact)}
-          className="grid h-6 w-6 flex-none place-items-center rounded text-faint hover:bg-hover hover:text-text"
-        >
-          <Rows3 size={13} />
-        </button>
-        <button
-          type="button"
-          title="Ocultar el panel"
-          aria-label="Ocultar el panel"
+          title="Ocultar las páginas"
+          aria-label="Ocultar las páginas"
           onClick={() => setOpen(false)}
           className="grid h-6 w-6 flex-none place-items-center rounded text-faint hover:bg-hover hover:text-text"
         >
@@ -118,11 +90,9 @@ export function WebRail() {
 
       <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
         {pages.length === 0 ? (
-          !compact && (
-            <p className="px-2 py-3 text-[11px] leading-snug text-faint">
-              No hay páginas abiertas. Usa <span className="text-dim">+</span> para abrir una.
-            </p>
-          )
+          <p className="px-2 py-3 text-[11px] leading-snug text-faint">
+            No hay páginas abiertas. Usa <span className="text-dim">+</span> para abrir una.
+          </p>
         ) : (
           <ul className="flex flex-col gap-0.5">
             {pages.map((page) => {
@@ -141,7 +111,7 @@ export function WebRail() {
                     )}
                   >
                     <PageIcon page={page} />
-                    {!compact && <span className="min-w-0 flex-1 truncate text-[12px]">{label}</span>}
+                    <span className="min-w-0 flex-1 truncate text-[12px]">{label}</span>
                     <span
                       role="button"
                       tabIndex={-1}
@@ -166,7 +136,7 @@ export function WebRail() {
         )}
       </div>
 
-      {!compact && active && (
+      {active && (
         <footer className="flex-none border-t border-line px-2 py-1.5">
           <div className="truncate font-mono text-[9.5px] text-faint" title={active.url}>
             {active.url || "sin dirección"}

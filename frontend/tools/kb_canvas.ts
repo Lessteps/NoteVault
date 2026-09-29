@@ -79,6 +79,9 @@ const MAX_LABEL = 46;
 const IGNORED_DIRS = new Set([
   ".git", ".trash", ".notevault", "node_modules", "dist", "build",
   "release", "attachments", "Demostraciones", "Ejercicios", "__pycache__", ".venv",
+  // The app repo holds copies of notes under docs/knowledge_base/examples; a
+  // prerequisite link must resolve to the vault's note, never to a copy.
+  "PROJECTS",
 ]);
 
 /* ── note parsing ────────────────────────────────────────────────────────── */
@@ -311,14 +314,30 @@ function walkNotes(root: string, out: string[] = []): string[] {
   return out;
 }
 
-/** `[[<number> <title>]]` → its note, by basename (the note is named after it). */
-export function findNote(label: string, vaultRoot: string): string | undefined {
-  const wanted = label.trim().toLowerCase();
+const noteIndexCache = new Map<string, Map<string, string>>();
+
+/** Basename (lowercase, no extension) → vault-relative path. Walking 3.6k notes
+ * once per process instead of once per prerequisite keeps a 40-map pass fast. */
+function noteIndex(vaultRoot: string): Map<string, string> {
+  const cached = noteIndexCache.get(vaultRoot);
+  if (cached) return cached;
+  const idx = new Map<string, string>();
   for (const file of walkNotes(vaultRoot)) {
     const base = path.basename(file, ".md").toLowerCase();
-    if (base === wanted || base.startsWith(`${wanted} `)) {
-      return path.relative(vaultRoot, file).split(path.sep).join("/");
-    }
+    if (!idx.has(base)) idx.set(base, path.relative(vaultRoot, file).split(path.sep).join("/"));
+  }
+  noteIndexCache.set(vaultRoot, idx);
+  return idx;
+}
+
+/** `[[<number> <title>]]` → its note, by basename (the note is named after it). */
+export function findNote(label: string, vaultRoot: string): string | undefined {
+  const idx = noteIndex(vaultRoot);
+  const wanted = label.trim().toLowerCase();
+  const exact = idx.get(wanted);
+  if (exact) return exact;
+  for (const [base, rel] of idx) {
+    if (base.startsWith(`${wanted} `)) return rel;
   }
   return undefined;
 }
@@ -666,13 +685,17 @@ export interface GenerateResult {
 }
 
 /** Generates the canvas of one concept folder and verifies it. */
-export function generateConcept(folder: string): GenerateResult {
+export function generateConcept(folder: string, opts: { dryRun?: boolean } = {}): GenerateResult {
   const vaultRoot = findVaultRoot(folder);
   const concept = readConcept(folder, vaultRoot);
   const doc = buildConceptCanvas(concept);
   const problems = verifyCanvas(doc);
   const canvasPath = path.join(path.resolve(folder), `${path.basename(path.resolve(folder))} — mapa.canvas`);
-  const written = problems.length ? "not written (fix the problems first)" : writeGenerated(canvasPath, doc, vaultRoot);
+  const written = problems.length
+    ? "not written (fix the problems first)"
+    : opts.dryRun
+      ? "dry run: nothing written"
+      : writeGenerated(canvasPath, doc, vaultRoot);
   return {
     canvasPath,
     lines: [
@@ -687,13 +710,67 @@ export function generateConcept(folder: string): GenerateResult {
   };
 }
 
+export interface BatchResult {
+  folders: number;
+  written: number;
+  kept: number;
+  blocked: string[];
+  warnings: string[];
+  lines: string[];
+}
+
+const CONCEPT_SKIP = new Set(["Demostraciones", "Ejercicios", "attachments", "__pycache__"]);
+
+/** Every concept folder under `root`: one that holds a note named like itself. */
+export function findConceptFolders(root: string): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, depth: number): void => {
+    if (depth > 2) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (!e.isDirectory() || e.name.startsWith(".") || CONCEPT_SKIP.has(e.name)) continue;
+      const full = path.join(dir, e.name);
+      if (fs.existsSync(path.join(full, `${e.name}.md`))) out.push(full);
+      else walk(full, depth + 1);
+    }
+  };
+  walk(path.resolve(root), 0);
+  return out.sort();
+}
+
+/** Generates (or dry-runs) the concept map of every concept under `root`. */
+export function generateAll(root: string, opts: { dryRun?: boolean } = {}): BatchResult {
+  const folders = findConceptFolders(root);
+  const res: BatchResult = { folders: folders.length, written: 0, kept: 0, blocked: [], warnings: [], lines: [] };
+  for (const folder of folders) {
+    const r = generateConcept(folder, { dryRun: opts.dryRun });
+    const name = path.basename(folder);
+    if (r.problems.length) {
+      res.blocked.push(name);
+      for (const p of r.problems) res.lines.push(`problem @ ${name}: ${p}`);
+    } else if (r.written.startsWith("kept")) {
+      res.kept += 1;
+    } else if (!opts.dryRun) {
+      res.written += 1;
+    }
+    for (const w of r.warnings) res.warnings.push(`${name}: ${w}`);
+    res.lines.push(`${name}: ${r.problems.length ? "BLOQUEADO" : "ok"} · ${r.written}`);
+  }
+  return res;
+}
+
 function main(argv: string[]): number {
   const folder = argv[0];
   if (!folder) {
     process.stderr.write("uso: node tools/kb_canvas.ts <carpeta del concepto>\n");
     return 2;
   }
-  const r = generateConcept(folder);
+  const r = generateConcept(folder, { dryRun: process.env.KB_CANVAS_DRY === "1" });
   for (const l of r.lines) process.stdout.write(`${l}\n`);
   for (const w of r.warnings) process.stdout.write(`warning: ${w}\n`);
   for (const p of r.problems) process.stdout.write(`problem: ${p}\n`);

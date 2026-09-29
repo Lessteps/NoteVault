@@ -15,8 +15,10 @@ import * as path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   buildConceptCanvas,
+  findConceptFolders,
   findNote,
   findVaultRoot,
+  generateAll,
   generateConcept,
   readConcept,
   verifyCanvas,
@@ -259,12 +261,38 @@ describe("generateConcept", () => {
 
   const real = process.env.KB_CANVAS_FOLDER;
   (real ? it : it.skip)("generates the real concept canvas and verifies it", () => {
-    const r = generateConcept(real as string);
+    const dryRun = process.env.KB_CANVAS_DRY === "1";
+    const r = generateConcept(real as string, { dryRun });
     for (const line of r.lines) process.stdout.write(`${line}\n`);
     for (const w of r.warnings) process.stdout.write(`warning: ${w}\n`);
     for (const p of r.problems) process.stdout.write(`problem: ${p}\n`);
     process.stdout.write(`${r.written}\n`);
     expect(r.problems).toEqual([]);
     expect(r.warnings).toEqual([]);
+  });
+
+  const all = process.env.KB_CANVAS_ALL;
+  (all ? it : it.skip)("generates every concept map under KB_CANVAS_ALL", () => {
+    const r = generateAll(all as string, { dryRun: process.env.KB_CANVAS_DRY === "1" });
+    for (const line of r.lines) process.stdout.write(`${line}\n`);
+    for (const w of r.warnings) process.stdout.write(`warning: ${w}\n`);
+    process.stdout.write(
+      `conceptos: ${r.folders} · escritos: ${r.written} · conservados: ${r.kept} · `
+      + `bloqueados: ${r.blocked.length} · avisos: ${r.warnings.length}\n`,
+    );
+    expect(r.blocked).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+});
+
+describe("findConceptFolders", () => {
+  const root = process.env.KB_CANVAS_ALL;
+  (root ? it : it.skip)("finds every concept folder of a knowledge base", () => {
+    const folders = findConceptFolders(root as string);
+    expect(folders.length).toBeGreaterThan(0);
+    for (const f of folders) {
+      expect(fs.existsSync(path.join(f, `${path.basename(f)}.md`))).toBe(true);
+    }
+    process.stdout.write(`carpetas de concepto: ${folders.length}\n`);
   });
 });

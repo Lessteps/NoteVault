@@ -50,6 +50,15 @@ export interface AreaOverview {
 
 const DIFFICULTIES: Array<1 | 2 | 3> = [1, 2, 3];
 
+/**
+ * Natural order for titles with numeric prefixes: "1.2" before "1.10", which
+ * plain `localeCompare` gets backwards. (`core/notesService.compareNumeric`
+ * would do it too, but importing that here would drag `node:fs` into the
+ * renderer bundle.)
+ */
+const compareNatural = (a: string, b: string): number =>
+  a.localeCompare(b, "es", { numeric: true, sensitivity: "base" });
+
 /** `Matemáticas\1 Área/1.1 Tema` → `Matemáticas/1 Área/1.1 Tema`, without edges. */
 export function normFolder(folder: string): string {
   return String(folder ?? "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
@@ -113,7 +122,7 @@ export function aggregateArea(topics: TopicDashboardItem[]): AreaOverview {
     });
   }
 
-  topicRows.sort((a, b) => b.pct - a.pct || a.title.localeCompare(b.title));
+  topicRows.sort((a, b) => b.pct - a.pct || compareNatural(a.title, b.title));
   const skillRows = [...skills.values()].sort((a, b) => b.passes - a.passes || a.label.localeCompare(b.label));
 
   return {
@@ -178,12 +187,12 @@ export function groupTopics(topics: TopicDashboardItem[], scope: string): Overvi
         key,
         title: isTopic ? items[0]!.manifest.title : titleOf(key),
         isTopic,
-        topics: [...items].sort((a, b) => a.manifest.title.localeCompare(b.manifest.title)),
+        topics: [...items].sort((a, b) => compareNatural(a.manifest.title, b.manifest.title)),
         pct,
         mastered: items.filter((i) => i.progress?.isComplete || i.progress?.examPassed).length,
       };
     })
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .sort((a, b) => compareNatural(a.title, b.title));
 }
 
 export interface SkillRing {

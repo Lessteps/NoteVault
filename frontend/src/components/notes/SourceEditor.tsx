@@ -23,19 +23,21 @@ const mdKeymap = keymap.of([
 ]);
 
 const theme = EditorView.theme({
+  // Editing reads like the reading view: same 15px / 1.7 metrics and the same
+  // 820px column as `.nv-prose`, so switching Lectura ↔ Editar does not reflow.
   "&": {
     height: "100%",
     color: "var(--nv-text)",
     backgroundColor: "transparent",
-    fontSize: "14.5px",
+    fontSize: "15px",
   },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": {
     fontFamily: "var(--font-sans)",
-    lineHeight: "1.75",
-    padding: "20px 0 120px",
+    lineHeight: "1.7",
+    padding: "28px 0 96px",
   },
-  ".cm-content": { maxWidth: "860px", caretColor: "var(--nv-accent)", paddingRight: "32px" },
+  ".cm-content": { maxWidth: "820px", caretColor: "var(--nv-accent)", paddingRight: "32px" },
   ".cm-code .cm-scroller": { fontFamily: "var(--font-mono)", fontSize: "13px" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--nv-accent)", borderLeftWidth: "2px" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
@@ -74,9 +76,10 @@ const theme = EditorView.theme({
 });
 
 const mdHighlight = HighlightStyle.define([
-  { tag: t.heading1, fontSize: "1.55em", fontWeight: "700", color: "var(--nv-text)" },
-  { tag: t.heading2, fontSize: "1.3em", fontWeight: "700", color: "var(--nv-text)" },
-  { tag: t.heading3, fontSize: "1.12em", fontWeight: "700", color: "var(--nv-text)" },
+  // Same heading scale as `.nv-prose` (2.15em / 1.5em / 1.2em).
+  { tag: t.heading1, fontSize: "2.15em", fontWeight: "700", color: "var(--nv-text)" },
+  { tag: t.heading2, fontSize: "1.5em", fontWeight: "700", color: "var(--nv-text)" },
+  { tag: t.heading3, fontSize: "1.2em", fontWeight: "700", color: "var(--nv-text)" },
   { tag: [t.heading4, t.heading5, t.heading6], fontWeight: "700" },
   { tag: t.strong, fontWeight: "700" },
   { tag: t.emphasis, fontStyle: "italic" },

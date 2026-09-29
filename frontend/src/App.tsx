@@ -5,8 +5,7 @@ import { ComingSoon, IconRail, MODULES as MODULE_LABELS, StatusBar, Toasts, TopB
 import { ModuleHost } from "./components/ModuleHost";
 import { useTabDrag } from "./store/tabDrag";
 import { X } from "lucide-react";
-import { WebRail } from "./components/web/WebRail";
-import { useWebPages } from "./store/webPages";
+import { RightPanel } from "./components/notes/RightPanel";
 import { DialogHost, MenuHost } from "./components/ui";
 import { VaultDialog } from "./components/VaultDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
@@ -196,7 +195,7 @@ export function App() {
   // The view to show is driven by the active tab's module id.
   const module = useApp((s) => s.module);
   const sideModule = useApp((s) => s.sideModule);
-  const pagesOpen = useWebPages((s) => s.open);
+  const canvasPath = useCanvas((s) => s.path);
   const draggingTabId = useTabDrag((s) => s.draggingTabId);
   const [dropReady, setDropReady] = useState(false);
   useNavigationGuard();
@@ -257,9 +256,9 @@ export function App() {
             <div className="flex min-h-0 flex-1">{renderModule(sideModule)}</div>
           </section>
         )}
-        {/* Fuera de Notas (p. ej. la superficie del navegador) el panel de paginas
-            sigue siendo el mismo: una cara del panel derecho, no una columna. */}
-        {module !== "notas" && pagesOpen && <WebRail />}
+        {/* Una sola columna derecha en toda la app: la tira de lanzadores o la
+            cara que sus botones abran. */}
+        <RightPanel module={module} canvas={module === "notas" && !!canvasPath} />
         {dropReady && draggingTabId && (
           <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 border-l-2 border-accent bg-accent-soft/20" aria-hidden="true" />
         )}

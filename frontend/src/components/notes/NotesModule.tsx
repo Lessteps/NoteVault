@@ -2,27 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../store/app";
 import { EditorArea } from "./EditorArea";
 import { Explorer } from "./Explorer";
-import { Inspector } from "./Inspector";
-import { AiSettingsDialog, AssistantPanel } from "./AssistantPanel";
+import { AiSettingsDialog } from "./AssistantPanel";
 import { EnglishAudioDialog } from "./EnglishAudio";
 import { PropertiesDialog } from "./PropertiesDialog";
-import { useAssistant } from "../../store/assistant";
 import { useCanvas } from "../../store/canvas";
 import { CanvasView } from "../canvas/CanvasView";
 import { ConceptMapDialog } from "../canvas/ConceptMapDialog";
 import { StudyFoldersDialog } from "../study/StudyFoldersDialog";
-import { PanelLaunchers } from "./PanelLaunchers";
-import { WebRail } from "../web/WebRail";
-import { useWebPages } from "../../store/webPages";
 
 const WIDTH_KEY = "nv.explorer.width";
 
 export function NotesModule() {
-  const active = useApp((s) => s.active);
   const explorerOpen = useApp((s) => s.explorerOpen);
-  const inspectorOpen = useApp((s) => s.inspectorOpen);
-  const assistantOpen = useAssistant((s) => s.open);
-  const pagesOpen = useWebPages((s) => s.open);
   const canvasPath = useCanvas((s) => s.path);
   const openCanvas = useCanvas((s) => s.open);
   const closeCanvas = useCanvas((s) => s.close);
@@ -74,20 +65,8 @@ export function NotesModule() {
         </>
       )}
       {canvasPath ? <CanvasView /> : <EditorArea />}
-      {/* Un solo panel derecho con tres caras: el asistente, las paginas del
-          navegador (el globo de la tira) y el esquema de la nota. Sin ninguna
-          abierta queda la tira de lanzadores. */}
-      {!canvasPath && (
-        assistantOpen ? (
-          <AssistantPanel />
-        ) : pagesOpen ? (
-          <WebRail />
-        ) : inspectorOpen && active ? (
-          <Inspector />
-        ) : (
-          <PanelLaunchers />
-        )
-      )}
+      {/* El panel derecho vive en el armazón: es el mismo en todas las
+          funcionalidades. */}
       <AiSettingsDialog />
       <PropertiesDialog />
       <ConceptMapDialog />

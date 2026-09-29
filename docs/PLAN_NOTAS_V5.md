@@ -18,7 +18,13 @@ DONE (commits `21101db`, `c2aeff8`):
 - Items 1.1/1.2: expanded topic card now shows `SkillMatrix` (competencies × ★/★★/★★★, passes/required). Grid uses `items-start` so expanding one card no longer stretches its row neighbour. Helper `skillMatrix()` in `src/lib/areaOverview.ts`.
 - Item 3: `StudyPanel` (which held the Repaso tab) was never rendered anywhere. Added `components/study/ReviewPanel.tsx` (+ `useReviewPanel` store), a right-panel face and a launcher button (CalendarClock) below "Esquema de la nota" in `PanelLaunchers.tsx`; `RightPanel.tsx` renders it.
 
-TODO: phases A–E below.
+PHASES A-E ARE DONE (see the phases below for the original spec; commits: A `70cc406`, B `6c8d5c9` + `c1361d3`, C `e0fe75c`, D `431c7fc` + `8b3e93a`, E `a9e1498`). Verified: full test suite green; B and E were run live against DeepSeek on a temp copy of topic 1.1 (plan written into the .practica.md, exercises generated into Ejercicios/<skill>/, syllabus wizard walked all 7 steps, canvas mode produced a valid 8-node canvas with labelled arrows); A and D were driven in a browser harness.
+
+Known gaps / next steps for whoever continues:
+- Table cells in edit mode show the cell's raw Markdown only while that cell has focus (rendered otherwise).
+- Drawing pad: no "Reconocer con IA" (vision) button yet; recognition is offline templates (digits, + - = x / ( ) < >, fractions, roots, exponents). Add more glyph templates in `lib/glyphRecognizer.ts` if a symbol is misread.
+- Chat modes: the wizard is prompt-driven (no UI checklist for extensions); theory/practice/canvas per topic are created afterwards with the "Nuevo tema" and "Generar canvas" modes.
+- Verify by hand in the built app: Repaso launcher, split drawing pad, exercise folder view, Modes menu.
 
 ---
 

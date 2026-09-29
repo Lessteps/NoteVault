@@ -55,7 +55,9 @@ describe("vista general de Ejercicio", () => {
     });
     const { host, cleanup } = mount(<Overview />);
     try {
-      const rings = [...host.querySelectorAll('svg[role="img"]')].map((s) => s.getAttribute("aria-label"));
+      const rings = [...host.querySelectorAll('svg[role="img"]')]
+        .map((s) => s.getAttribute("aria-label") ?? "")
+        .filter((label) => /^(Hoy|Semana|Mes|Año):/.test(label));
       expect(rings).toEqual(["Hoy: 25%", "Semana: 25%", "Mes: 23%", "Año: 23%"]);
       // Y la racha, con la mejor del año.
       expect(host.textContent).toContain("Racha actual");

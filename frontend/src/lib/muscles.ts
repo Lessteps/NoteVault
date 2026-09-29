@@ -6,6 +6,7 @@
  * owns the little bit of logic the map needs: which exercises hit a muscle and
  * what colour that muscle should be today.
  */
+import { shapesForMuscle } from "./bodyMuscleMap";
 
 export interface MuscleDef {
   id: string;
@@ -72,6 +73,18 @@ export function musclesOfView(view: "front" | "back"): MuscleDef[] {
   return MUSCLES.filter((m) => m.view === view);
 }
 
+/** Which view shows a muscle: the coarse catalogue, or the asset when granular. */
+export function viewOfMuscle(id: string): "front" | "back" | null {
+  const coarse = muscleById(id);
+  if (coarse) return coarse.view;
+  const front = shapesForMuscle(id, "front").length;
+  const back = shapesForMuscle(id, "back").length;
+  if (front && !back) return "front";
+  if (back && !front) return "back";
+  if (front && back) return "front"; // neck and forearms show on both: count them once
+  return null;
+}
+
 /** Primary + secondary, deduplicated: what an exercise paints. */
 export function musclesOfExercise(ex: { primary?: string[]; secondary?: string[] }): string[] {
   const primary = ex.primary ?? [];
@@ -95,35 +108,131 @@ export function muscleMapData(exercises: MuscleExercise[]): MuscleMapData {
       (byMuscle[id] ??= []).push(ex);
     }
   }
-  for (const m of MUSCLES) {
-    const all = byMuscle[m.id] ?? [];
-    const primary = all.filter((e) => e.primary.includes(m.id));
-    const secondary = all.filter((e) => e.secondary.includes(m.id));
+  // Both catalogues, plus whatever the rows mention: the exercises still store
+  // the coarse ids while the figure paints the asset's granular ones.
+  const ids = [...new Set([...MUSCLES.map((m) => m.id), ...GRANULAR_MUSCLES.map((m) => m.id), ...Object.keys(byMuscle)])];
+  for (const id of ids) {
+    const all = byMuscle[id] ?? [];
+    const primary = all.filter((e) => e.primary.includes(id));
+    const secondary = all.filter((e) => e.secondary.includes(id));
     if (primary.some((e) => e.done)) {
-      states[m.id] = "done";
+      states[id] = "done";
     } else if (primary.length) {
-      states[m.id] = "primary";
+      states[id] = "primary";
     } else if (secondary.some((e) => e.done)) {
-      states[m.id] = "done";
+      states[id] = "done";
     } else if (secondary.length) {
-      states[m.id] = "secondary";
+      states[id] = "secondary";
     } else {
-      states[m.id] = "idle";
+      states[id] = "idle";
     }
     // Primary work first in the panel.
     if (all.length) {
-      byMuscle[m.id] = [
-        ...all.filter((e) => e.primary.includes(m.id)),
-        ...all.filter((e) => !e.primary.includes(m.id)),
+      byMuscle[id] = [
+        ...all.filter((e) => e.primary.includes(id)),
+        ...all.filter((e) => !e.primary.includes(id)),
       ];
     }
   }
   const count = (view: "front" | "back") =>
-    musclesOfView(view).filter((m) => states[m.id] !== "idle").length;
+    ids.filter((id) => viewOfMuscle(id) === view && states[id] !== "idle").length;
   return { states, byMuscle, unassigned, active: { front: count("front"), back: count("back") } };
 }
 
 /** The view with more active muscles for the day (front on a tie). */
 export function bestView(data: MuscleMapData): "front" | "back" {
   return data.active.back > data.active.front ? "back" : "front";
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Granular catalogue (the accepted asset's ids) + the bridge from the coarse
+   ids the saved exercises still use. Nothing writes granular ids yet: that is
+   the migration the review table awaits.
+   ───────────────────────────────────────────────────────────────────────── */
+
+export interface GranularMuscle {
+  id: string;
+  name_es: string;
+  group: string;
+}
+
+export const GRANULAR_MUSCLES: GranularMuscle[] = [
+  { id: "pectoral-upper", name_es: "Pectoral superior", group: "Pecho" },
+  { id: "pectoral-lower", name_es: "Pectoral inferior", group: "Pecho" },
+  { id: "serratus", name_es: "Serrato anterior", group: "Pecho" },
+  { id: "deltoid-front", name_es: "Deltoides anterior", group: "Hombros" },
+  { id: "deltoid-side", name_es: "Deltoides lateral", group: "Hombros" },
+  { id: "deltoid-rear", name_es: "Deltoides posterior", group: "Hombros" },
+  { id: "rotator-cuff", name_es: "Manguito rotador", group: "Hombros" },
+  { id: "neck", name_es: "Cuello", group: "Hombros" },
+  { id: "trapezius-upper", name_es: "Trapecio superior", group: "Espalda" },
+  { id: "trapezius-mid", name_es: "Trapecio medio", group: "Espalda" },
+  { id: "trapezius-lower", name_es: "Trapecio inferior", group: "Espalda" },
+  { id: "lats", name_es: "Dorsal ancho", group: "Espalda" },
+  { id: "teres", name_es: "Redondo mayor", group: "Espalda" },
+  { id: "lower-back", name_es: "Lumbar", group: "Espalda" },
+  { id: "biceps", name_es: "Bíceps", group: "Brazos" },
+  { id: "brachialis", name_es: "Braquial", group: "Brazos" },
+  { id: "triceps", name_es: "Tríceps", group: "Brazos" },
+  { id: "forearm-flexors", name_es: "Antebrazo flexor", group: "Brazos" },
+  { id: "forearm-extensors", name_es: "Antebrazo extensor", group: "Brazos" },
+  { id: "abs-upper", name_es: "Abdominales altos", group: "Core" },
+  { id: "abs-lower", name_es: "Abdominales bajos", group: "Core" },
+  { id: "obliques", name_es: "Oblicuos", group: "Core" },
+  { id: "hip-flexors", name_es: "Flexores de cadera", group: "Core" },
+  { id: "quads-rectus-femoris", name_es: "Recto femoral", group: "Piernas" },
+  { id: "quads-vastus-lateralis", name_es: "Vasto lateral", group: "Piernas" },
+  { id: "quads-vastus-medialis", name_es: "Vasto medial", group: "Piernas" },
+  { id: "hamstrings-biceps-femris", name_es: "Bíceps femoral", group: "Piernas" },
+  { id: "hamstrings-semi", name_es: "Semitendinoso", group: "Piernas" },
+  { id: "glutes-max", name_es: "Glúteo mayor", group: "Piernas" },
+  { id: "glutes-med", name_es: "Glúteo medio", group: "Piernas" },
+  { id: "abductors", name_es: "Abductores", group: "Piernas" },
+  { id: "adductors", name_es: "Aductores", group: "Piernas" },
+  { id: "calves-gastrocnemius", name_es: "Gemelos", group: "Piernas" },
+  { id: "soleus", name_es: "Sóleo", group: "Piernas" },
+  { id: "tibialis", name_es: "Tibial anterior", group: "Piernas" },
+  { id: "calves-front", name_es: "Gemelos (frontal)", group: "Piernas" },
+];
+
+export const GRANULAR_GROUPS: string[] = ["Pecho", "Hombros", "Espalda", "Brazos", "Core", "Piernas"];
+
+/** The coarse ids still stored in the exercises → the granular ids they cover. */
+export const LEGACY_TO_GRANULAR: Record<string, string[]> = {
+  pectoral: ["pectoral-upper", "pectoral-lower"],
+  "deltoid-front": ["deltoid-front"],
+  biceps: ["biceps"],
+  forearm: ["forearm-flexors", "forearm-extensors"],
+  abs: ["abs-upper", "abs-lower"],
+  obliques: ["obliques"],
+  neck: ["neck"],
+  quads: ["quads-rectus-femoris"],
+  adductors: ["adductors"],
+  trapezius: ["trapezius-upper", "trapezius-mid", "trapezius-lower"],
+  "deltoid-rear": ["deltoid-rear"],
+  triceps: ["triceps"],
+  lats: ["lats"],
+  "lower-back": ["lower-back"],
+  glutes: ["glutes-max", "glutes-med"],
+  hamstrings: ["hamstrings-biceps-femris", "hamstrings-semi"],
+  abductors: ["abductors"],
+  calves: ["calves-gastrocnemius", "soleus"],
+};
+
+/** Granular ids for whatever is stored (granular ids pass through untouched). */
+export function expandMuscles(ids: string[] | undefined): string[] {
+  const out: string[] = [];
+  for (const id of ids ?? []) {
+    const mapped = LEGACY_TO_GRANULAR[id] ?? [id];
+    for (const g of mapped) if (!out.includes(g)) out.push(g);
+  }
+  return out;
+}
+
+export function granularName(id: string): string {
+  return GRANULAR_MUSCLES.find((m) => m.id === id)?.name_es ?? muscleName(id);
+}
+
+export function granularGroup(id: string): string {
+  return GRANULAR_MUSCLES.find((m) => m.id === id)?.group ?? "";
 }

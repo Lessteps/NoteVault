@@ -11,12 +11,13 @@ import { api } from "../../lib/bridge";
 import type { Exercise, ExerciseDay, ExerciseOverview } from "../../lib/types";
 import { addDays, weekStart } from "../../lib/habits";
 import {
-  MUSCLES, bestView, muscleById, muscleMapData, musclesOfExercise, type MuscleExercise,
+  GRANULAR_MUSCLES, bestView, expandMuscles, granularGroup, granularName, muscleMapData, musclesOfExercise,
+  type MuscleExercise,
 } from "../../lib/muscles";
 import { shortDate, todayIso } from "../../lib/tasks";
 import { useExercise } from "../../store/exercise";
 import { cn, IconButton } from "../ui";
-import { MuscleBody } from "./MuscleBody";
+import { BodyFigure } from "./BodyFigure";
 import { useFail } from "./parts";
 
 type Mode = "day" | "week" | "year";
@@ -92,15 +93,20 @@ export function MuscleMap({ date, day, onChanged, onClose, onVideo }: {
     return rowsOut;
   }, [mode, day, date, week, year, byId]);
 
-  const data = useMemo(() => muscleMapData(rows), [rows]);
+  /** The saved ids are still coarse: expand them to the asset's granular ones. */
+  const expandRow = useCallback((r: MuscleExercise): MuscleExercise =>
+    ({ ...r, primary: expandMuscles(r.primary), secondary: expandMuscles(r.secondary) }), []);
+  const grain = useMemo(() => rows.map(expandRow), [rows, expandRow]);
+
+  const data = useMemo(() => muscleMapData(grain), [grain]);
 
   // The view with more active muscles for the day decides what opens first.
   const openSide = useMemo(() => bestView(muscleMapData(
     (day?.exercises ?? []).flatMap((e) => {
       const ex = byId.get(e.id);
-      return ex ? [{ id: e.id, name: ex.name, primary: ex.muscles?.primary ?? [], secondary: ex.muscles?.secondary ?? [], done: Boolean(day?.log[e.id]?.done) }] : [];
+      return ex ? [expandRow({ id: e.id, name: ex.name, primary: ex.muscles?.primary ?? [], secondary: ex.muscles?.secondary ?? [], done: Boolean(day?.log[e.id]?.done) })] : [];
     }),
-  )), [day, byId]);
+  )), [day, byId, expandRow]);
 
   useEffect(() => { setFlipped(openSide === "back"); }, [openSide]);
 
@@ -125,7 +131,7 @@ export function MuscleMap({ date, day, onChanged, onClose, onVideo }: {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const muscle = picked ? muscleById(picked) : undefined;
+  const muscle = picked ? { name_es: granularName(picked), group: granularGroup(picked) } : undefined;
   const panelRows = useMemo<Row[]>(() => {
     // byMuscle carries the same rows, only regrouped.
     if (picked) return data.byMuscle[picked] ?? [];
@@ -137,7 +143,7 @@ export function MuscleMap({ date, day, onChanged, onClose, onVideo }: {
   const highlight = useMemo(() => {
     if (pinned && picked) return new Set([picked]);
     const focused = rows.find((r) => r.id === pinnedExercise);
-    return focused ? new Set(musclesOfExercise(focused)) : null;
+    return focused ? new Set(expandMuscles(musclesOfExercise(focused))) : null;
   }, [pinned, picked, pinnedExercise, rows]);
 
   const toggle = useCallback(async (row: Row) => {
@@ -195,14 +201,14 @@ export function MuscleMap({ date, day, onChanged, onClose, onVideo }: {
             <div className="nv-flip min-h-0 flex-1 px-4 py-3">
               <div className="nv-flip-inner" data-face={flipped ? "back" : "front"}>
                 <div className="nv-flip-face">
-                  <MuscleBody view="front" states={data.states} highlight={highlight} active={picked}
-                    label={(id) => muscleById(id)?.name_es ?? id}
+                  <BodyFigure view="front" fit="height" states={data.states} highlight={highlight} active={picked}
+                    label={granularName}
                     onMuscle={(id) => setPicked((p) => (p === id ? null : id))}
                     onHover={(id, at) => setTip(id && at ? { id, x: at.x, y: at.y } : null)} />
                 </div>
                 <div className="nv-flip-face nv-flip-face--back">
-                  <MuscleBody view="back" states={data.states} highlight={highlight} active={picked}
-                    label={(id) => muscleById(id)?.name_es ?? id}
+                  <BodyFigure view="back" fit="height" states={data.states} highlight={highlight} active={picked}
+                    label={granularName}
                     onMuscle={(id) => setPicked((p) => (p === id ? null : id))}
                     onHover={(id, at) => setTip(id && at ? { id, x: at.x, y: at.y } : null)} />
                 </div>
@@ -215,7 +221,7 @@ export function MuscleMap({ date, day, onChanged, onClose, onVideo }: {
                   {label}
                 </span>
               ))}
-              <span className="ml-auto">{MUSCLES.length} músculos · {rows.length} ejercicios</span>
+              <span className="ml-auto">{GRANULAR_MUSCLES.length} músculos · {rows.length} ejercicios</span>
             </div>
           </div>
 
@@ -294,8 +300,8 @@ export function MuscleMap({ date, day, onChanged, onClose, onVideo }: {
           <div data-muscle-tip={tip.id}
             className="pointer-events-none fixed z-50 rounded-md border border-line-strong px-2 py-1 text-[11.5px] text-text shadow-lg"
             style={{ left: Math.min(tip.x + 14, window.innerWidth - 190), top: tip.y + 14, background: "var(--nv-elevated)" }}>
-            {muscleById(tip.id)?.name_es ?? tip.id}
-            <span className="ml-1.5 text-faint">{muscleById(tip.id)?.group}</span>
+            {granularName(tip.id)}
+            <span className="ml-1.5 text-faint">{granularGroup(tip.id)}</span>
           </div>
         )}
       </div>

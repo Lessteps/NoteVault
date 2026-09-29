@@ -996,29 +996,30 @@ html[data-perf="lite"] .nv-practice-view {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Mapa muscular (Ejercicio). Grey = not trained today, lime = primary work
-   pending, dim lime = secondary only, green = done. The lime is a token of its
-   own so it does not depend on the theme accent.
+   Mapa muscular (Ejercicio). Dark body with hairline light separations, as in the
+   reference: grey = not trained today, orange = the day's primary work pending,
+   dim orange = secondary only, green = done. Tokens of their own so they do not
+   depend on the theme accent.
    ───────────────────────────────────────────────────────────────────────── */
 
 :root,
 [data-theme="dark"] {
-  --nv-muscle-body: #1b1b24;
-  --nv-muscle-idle: #3a3a48;
-  --nv-muscle-line: #4b4b5e;
-  --nv-muscle-primary: #a3e635;
-  --nv-muscle-secondary: color-mix(in srgb, #a3e635 42%, #3a3a48);
-  --nv-muscle-secondary-text: #9dbf49;
+  --nv-muscle-body: #23232c;
+  --nv-muscle-idle: #3d3d4a;
+  --nv-muscle-line: rgba(255, 255, 255, 0.34);
+  --nv-muscle-primary: #ff9632;
+  --nv-muscle-secondary: color-mix(in srgb, #ff9632 45%, #3d3d4a);
+  --nv-muscle-secondary-text: #c9803c;
   --nv-muscle-done: var(--nv-mint);
 }
 
 [data-theme="light"] {
   --nv-muscle-body: #e7ddc7;
   --nv-muscle-idle: #cdc1a6;
-  --nv-muscle-line: #b5a586;
-  --nv-muscle-primary: #79a800;
-  --nv-muscle-secondary: color-mix(in srgb, #79a800 38%, #cdc1a6);
-  --nv-muscle-secondary-text: #6d8f1a;
+  --nv-muscle-line: rgba(60, 45, 20, 0.3);
+  --nv-muscle-primary: #e2761b;
+  --nv-muscle-secondary: color-mix(in srgb, #e2761b 40%, #cdc1a6);
+  --nv-muscle-secondary-text: #a8590f;
   --nv-muscle-done: var(--nv-mint);
 }
 
@@ -1037,18 +1038,17 @@ html[data-perf="lite"] .nv-practice-view {
   stroke-linejoin: round;
 }
 
+/* Non-muscle parts (head, spine, hands, feet, joints): a silhouette, no outline,
+   so they read as the body behind the muscles instead of as empty shapes. */
 .nv-body-detail {
-  fill: none;
-  stroke: var(--nv-muscle-line);
-  stroke-width: 0.85;
-  opacity: 0.65;
+  fill: var(--nv-muscle-body);
+  stroke: none;
 }
 
 .nv-muscle {
+  fill: var(--nv-muscle-idle);
   stroke: var(--nv-muscle-line);
-  stroke-width: 1;
   stroke-linejoin: round;
-  cursor: pointer;
   transition: fill 180ms ease, opacity 180ms ease, stroke 120ms ease;
 }
 
@@ -1059,10 +1059,10 @@ html[data-perf="lite"] .nv-practice-view {
 
 .nv-muscle.is-dim { opacity: 0.22; }
 
-.nv-muscle:hover,
+.nv-muscle.cursor-pointer:hover,
 .nv-muscle.is-active {
-  stroke: var(--nv-text);
-  stroke-width: 1.6;
+  stroke: var(--nv-muscle-primary);
+  stroke-width: 2.4;
 }
 
 .nv-legend {

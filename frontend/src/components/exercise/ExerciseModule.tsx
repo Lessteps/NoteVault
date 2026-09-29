@@ -225,7 +225,7 @@ export function ExerciseModule() {
           <div className="grid flex-1 place-items-center text-[13px] text-faint">Cargando ejercicios…</div>
         ) : error ? (
           <div className="grid flex-1 place-items-center text-[13px] text-danger">{error}</div>
-        ) : view === "general" ? <Overview />
+        ) : view === "general" ? <Overview onVideo={setVideo} />
           : view === "diaria" ? <Daily onVideo={setVideo} />
             : view === "semanal" ? <ExerciseWeek />
               : view === "mensual" ? <ExerciseMonth />

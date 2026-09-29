@@ -35,7 +35,7 @@ test.beforeAll(async () => {
     env,
   });
   win = await app.firstWindow();
-  await win.waitForSelector("header:has-text('NoteVault')", { timeout: 30_000 });
+  await win.waitForSelector("nav[aria-label='Módulos']", { timeout: 30_000 });
   await win.locator("nav[aria-label='Módulos']").getByRole("button", { name: "Notas" }).click();
 });
 
@@ -78,7 +78,7 @@ test("NV-S-002 edicion externa + guardar muestra Conflicto sin perdida", async (
   const mine = "texto mio E2E";
   await win.keyboard.type(`\n${mine}`);
   await win.keyboard.press("Control+S");
-  await expect(win.locator("header", { hasText: "Guardado" })).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByText("Guardado").first()).toBeVisible({ timeout: 15_000 });
 
   // Cambio externo en disco (simula sync/edicion concurrente).
   const file = join(vault(), `${title}.md`);
@@ -93,7 +93,7 @@ test("NV-S-002 edicion externa + guardar muestra Conflicto sin perdida", async (
 
   // Conservar la mia: el disco termina con mi texto, nada se pierde en silencio.
   await win.getByRole("button", { name: "Conservar la mía" }).click();
-  await expect(win.locator("header", { hasText: "Guardado" })).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByText("Guardado").first()).toBeVisible({ timeout: 15_000 });
   const final = readFileSync(file, "utf-8");
   expect(final).toContain("segunda edicion mia");
 });

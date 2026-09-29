@@ -28,7 +28,7 @@ test.beforeAll(async () => {
     env,
   });
   win = await app.firstWindow();
-  await win.waitForSelector("header:has-text('NoteVault')", { timeout: 30_000 });
+  await win.waitForSelector("nav[aria-label='Módulos']", { timeout: 30_000 });
   await win.locator("nav[aria-label='Módulos']").getByRole("button", { name: "Calendario" }).click();
   await expect(win.getByRole("button", { name: "Crear" })).toBeVisible({ timeout: 15_000 });
 });

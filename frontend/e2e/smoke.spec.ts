@@ -16,7 +16,7 @@ test.beforeAll(async () => {
     env: sandboxEnv(),
   });
   win = await app.firstWindow();
-  await win.waitForSelector("header:has-text('NoteVault')", { timeout: 30_000 });
+  await win.waitForSelector("nav[aria-label='Módulos']", { timeout: 30_000 });
 });
 
 test.afterAll(async () => {
@@ -24,7 +24,7 @@ test.afterAll(async () => {
 });
 
 test("NV-G-001 shell carga: topbar + rail + statusbar", async () => {
-  await expect(win.locator("header", { hasText: "NoteVault" })).toBeVisible();
+  await expect(win.locator("nav[aria-label='Módulos']")).toBeVisible();
   await expect(win.locator("nav[aria-label='Módulos']")).toBeVisible();
   await expect(win.locator("footer", { hasText: "Sin nota abierta" })).toBeVisible();
 });

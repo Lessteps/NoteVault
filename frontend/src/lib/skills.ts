@@ -6,7 +6,7 @@
 export type DifficultyLevel = 1 | 2 | 3;
 export type DifficultyId = "beginner" | "intermediate" | "advanced";
 export type AssistanceLevel = "no_help" | "helper";
-export type QuantityOption = "3-5" | "6-10" | "11+" | "all" | "auto";
+export type QuantityOption = "3-5" | "6-10" | "11+" | "all" | "auto" | "ai";
 
 export interface DifficultySpec {
   readonly level: DifficultyLevel;

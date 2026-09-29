@@ -450,6 +450,11 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
     quantity: string,
     assistance: string,
   ) => call<import("./types").TopicSessionResult>("study_topic_session_build", folder, skill, difficulty, quantity, assistance),
+  /** AI reads the topic's theory and rewrites its practice plan (skills x difficulty counts). */
+  studyTopicReevaluate: (folder: string) =>
+    call<{ ok: boolean; plan: import("./types").PracticePlan; path: string }>("study_topic_reevaluate", folder),
+  studyTopicPlan: (folder: string) =>
+    call<{ plan: import("./types").PracticePlan | null }>("study_topic_plan", folder),
   studyTopicDashboard: (subject?: string) => call<import("./types").TopicDashboardData>("study_topic_dashboard", subject),
   /** AI-drafts a subject's areas/topics and creates the folder tree + overviews. */
   studyGenerateSyllabus: (subject: string) =>

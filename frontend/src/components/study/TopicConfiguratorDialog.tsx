@@ -1,7 +1,7 @@
 import { CheckCircle2, ChevronRight, Sparkles, X, Zap } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../lib/bridge";
-import type { TopicData } from "../../lib/types";
+import type { PracticePlan, TopicData } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { cn } from "../ui";
 import {
@@ -22,6 +22,8 @@ interface TopicConfiguratorDialogProps {
   onStarted?: (firstPath: string) => void;
   /** Rendered inside a view file instead of as a modal dialog. */
   inline?: boolean;
+  /** The AI's practice plan for this topic, when it has one. */
+  plan?: PracticePlan | null;
   /** Pre-selected competency (the matrix row's own "Practicar"). */
   initialSkill?: string;
 }
@@ -31,7 +33,7 @@ const QUANTITY_OPTIONS: Array<{ id: QuantityOption; label: string; desc: string 
   { id: "6-10", label: "6–10", desc: "Completo (8 ej.)" },
   { id: "11+", label: "11+", desc: "Saturación (12 ej.)" },
   { id: "all", label: "Todos", desc: "Sub-casos existentes" },
-  { id: "auto", label: "Decide tú", desc: "Adaptativo a maestría" },
+  { id: "ai", label: "IA", desc: "Lo que decidió la IA" },
 ];
 
 export function TopicConfiguratorDialog({
@@ -40,6 +42,7 @@ export function TopicConfiguratorDialog({
   onStarted,
   inline = false,
   initialSkill,
+  plan = null,
 }: TopicConfiguratorDialogProps) {
   const toast = useApp((s) => s.toast);
   const openNote = useApp((s) => s.openNote);
@@ -94,7 +97,7 @@ export function TopicConfiguratorDialog({
   const [difficulty, setDifficulty] = useState<DifficultyLevel>(
     beginnerOk ? 1 : 2,
   );
-  const [quantity, setQuantity] = useState<QuantityOption>("3-5");
+  const [quantity, setQuantity] = useState<QuantityOption>(plan ? "ai" : "3-5");
 
   const helperOk = isAssistanceAllowed(subject, selectedSkill, "helper");
   const [assistance, setAssistance] = useState<AssistanceLevel>(
@@ -292,6 +295,15 @@ export function TopicConfiguratorDialog({
                 );
               })}
             </div>
+            {quantity === "ai" && (
+              <p className="mt-1.5 text-[11px] text-faint">
+                {plan
+                  ? (plan.skills.find((s) => s.skill === selectedSkill)?.counts[difficulty] ?? 0) > 0
+                    ? `La IA propone ${plan.skills.find((s) => s.skill === selectedSkill)!.counts[difficulty]} ejercicios para esta competencia y dificultad.`
+                    : "El plan de la IA no incluye esta combinación: se usarán 3 ejercicios."
+                  : "Aún no hay plan: la IA lo decidirá leyendo la teoría al empezar."}
+              </p>
+            )}
           </div>
 
           {/* 4. Assistance */}

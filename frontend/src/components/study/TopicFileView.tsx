@@ -7,10 +7,10 @@
 // The practice engine itself is untouched: a session is started exactly the way
 // the right panel used to start it (`studyTopicSessionBuild` → first exercise).
 
-import { AlertTriangle, BarChart3, CheckCircle2, Play, RefreshCw, Sparkles } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, Play, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
-import type { StudySnapshot, TopicData } from "../../lib/types";
+import type { PracticePlan, StudySnapshot, TopicData } from "../../lib/types";
 import { useApp, type OpenNote } from "../../store/app";
 import { cn } from "../ui";
 import { useStudyVersion } from "./StudyPanel";
@@ -30,6 +30,8 @@ export function TopicFileView({ note }: { note: OpenNote }) {
   const [snap, setSnap] = useState<StudySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [configSkill, setConfigSkill] = useState<string | undefined>(undefined);
+  const [plan, setPlan] = useState<PracticePlan | null>(null);
+  const [evaluating, setEvaluating] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -40,6 +42,7 @@ export function TopicFileView({ note }: { note: OpenNote }) {
       ]);
       setTopicData(t);
       setSnap(s);
+      setPlan(t.is_topic ? (await api.studyTopicPlan(t.folder).catch(() => ({ plan: null }))).plan : null);
     } catch (e) {
       toast("error", (e as Error).message);
     } finally {
@@ -50,6 +53,22 @@ export function TopicFileView({ note }: { note: OpenNote }) {
   useEffect(() => {
     void refresh();
   }, [refresh, version]);
+
+  /** The AI re-reads the theory and rewrites which competencies to practise, and how much. */
+  const reevaluate = async () => {
+    if (!topicData?.folder || evaluating) return;
+    setEvaluating(true);
+    try {
+      const res = await api.studyTopicReevaluate(topicData.folder);
+      toast("info", res.plan.summary || `Plan de práctica actualizado (${res.plan.skills.length} competencias).`);
+      useStudyVersion.getState().bump();
+      await refresh();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setEvaluating(false);
+    }
+  };
 
   /** Same contract as the old study panel: opening an exercise runs the session. */
   const practice = (rel: string) => {
@@ -139,6 +158,16 @@ export function TopicFileView({ note }: { note: OpenNote }) {
             </div>
             <button
               type="button"
+              title="Re-evaluar la práctica con IA: lee la teoría y elige competencias y cantidades"
+              aria-label="Re-evaluar práctica"
+              disabled={evaluating || !topicData?.is_topic}
+              onClick={() => void reevaluate()}
+              className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel text-faint transition-colors hover:text-text disabled:opacity-40"
+            >
+              <Wand2 size={13} className={cn(evaluating && "animate-pulse text-accent-text")} />
+            </button>
+            <button
+              type="button"
               title="Recargar"
               aria-label="Recargar"
               onClick={() => void refresh()}
@@ -170,12 +199,15 @@ export function TopicFileView({ note }: { note: OpenNote }) {
           <NoTopic folder={topicData?.folder || ""} onConverted={refresh} />
         ) : tab === "resumen" ? (
           snap && topicData ? (
-            <TopicGeneralView
-              topicData={topicData}
-              snap={snap}
-              onOpenConfigurator={openConfigurator}
-              onPractice={practice}
-            />
+            <>
+              {plan && <PlanTable plan={plan} skills={topicData.progress?.skills} />}
+              <TopicGeneralView
+                topicData={topicData}
+                snap={snap}
+                onOpenConfigurator={openConfigurator}
+                onPractice={practice}
+              />
+            </>
           ) : (
             <p className="p-5 text-[13px] text-faint">No se pudo leer el progreso del tema.</p>
           )
@@ -183,6 +215,7 @@ export function TopicFileView({ note }: { note: OpenNote }) {
           <div className="mx-auto w-full max-w-[980px] p-5">
             <TopicConfiguratorDialog
               topicData={topicData}
+              plan={plan}
               inline
               initialSkill={configSkill}
               onClose={() => setTab("resumen")}
@@ -222,5 +255,38 @@ function NoTopic({ folder, onConverted }: { folder: string; onConverted: () => P
         </button>
       </div>
     </div>
+  );
+}
+
+/** What the AI decided: competencies × difficulty, with the exercise count of each cell. */
+function PlanTable({ plan, skills }: { plan: PracticePlan; skills?: Record<string, { label: string }> }) {
+  return (
+    <section className="mb-4 rounded-2xl border border-line-strong bg-card px-4 py-3.5">
+      <div className="flex items-center gap-2">
+        <Wand2 size={14} className="text-accent-text" />
+        <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-text">Plan de práctica de la IA</h3>
+      </div>
+      {plan.summary && <p className="mt-1 text-[12px] text-dim">{plan.summary}</p>}
+      <table className="mt-2 w-full text-left text-[12px]">
+        <thead className="font-mono text-[9.5px] uppercase tracking-wider text-faint">
+          <tr>
+            <th className="py-1 pr-2">Competencia</th>
+            <th className="w-16 text-center">★ Fácil</th>
+            <th className="w-16 text-center">★★ Media</th>
+            <th className="w-16 text-center">★★★ Difícil</th>
+          </tr>
+        </thead>
+        <tbody>
+          {plan.skills.map((s) => (
+            <tr key={s.skill} className="border-t border-line" title={s.why}>
+              <td className="py-1.5 pr-2 font-semibold text-text">{skills?.[s.skill]?.label ?? s.skill}</td>
+              {([1, 2, 3] as const).map((d) => (
+                <td key={d} className="text-center font-mono text-dim">{s.counts[d] > 0 ? s.counts[d] : "—"}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }

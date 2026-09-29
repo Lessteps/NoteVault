@@ -9,7 +9,7 @@ import type { ExerciseRef } from "./exerciseIndex";
 import { type AssistanceLevel, type DifficultyLevel, difficultyLabel } from "./skills";
 import type { TopicManifest } from "./topic";
 
-export type QuantityOption = "3-5" | "6-10" | "11+" | "all" | "auto";
+export type QuantityOption = "3-5" | "6-10" | "11+" | "all" | "auto" | "ai";
 
 export interface TheoryNoteContext {
   rel: string;
@@ -22,6 +22,8 @@ export interface SessionConfig {
   difficulty: DifficultyLevel;
   quantity: QuantityOption;
   assistance: AssistanceLevel;
+  /** What the topic's AI practice plan asks for this skill and difficulty (used by `"ai"`). */
+  planCount?: number | null;
 }
 
 export interface PlannedExercise {
@@ -46,7 +48,7 @@ export interface SessionPlanResult {
   generatedCount: number;
 }
 
-export function resolveTargetQuantity(quantity: QuantityOption, availableCount: number): number {
+export function resolveTargetQuantity(quantity: QuantityOption, availableCount: number, planCount?: number | null): number {
   switch (quantity) {
     case "3-5":
       return 4;
@@ -58,6 +60,8 @@ export function resolveTargetQuantity(quantity: QuantityOption, availableCount: 
       return Math.max(1, availableCount);
     case "auto":
       return 5;
+    case "ai":
+      return planCount && planCount > 0 ? planCount : 3;
   }
 }
 
@@ -214,7 +218,7 @@ export async function buildTopicSession(
   aiClient?: SessionAIClient,
 ): Promise<SessionPlanResult> {
   const matching = filterTopicExercises(allExercises, topicFolder, config.skill, config.difficulty);
-  const targetCount = resolveTargetQuantity(config.quantity, matching.length);
+  const targetCount = resolveTargetQuantity(config.quantity, matching.length, config.planCount);
 
   const planned: PlannedExercise[] = matching.slice(0, targetCount).map((ex) => ({
     id: ex.note_id,
@@ -241,7 +245,8 @@ export async function buildTopicSession(
         const title = item.title || `Ejercicio ${config.skill} ${count}`;
         const filename = `ej_${config.skill}_d${config.difficulty}_${Date.now()}_${count}.md`;
         const folder = topicFolder ? topicFolder.replace(/\/$/, "") : "";
-        const relPath = folder ? `${folder}/ejercicios/${filename}` : `ejercicios/${filename}`;
+        const skillDir = `Ejercicios/${config.skill}`;
+        const relPath = folder ? `${folder}/${skillDir}/${filename}` : `${skillDir}/${filename}`;
         const content = formatExerciseNote(
           manifest,
           config.skill,

@@ -69,7 +69,7 @@ describe("TopicConfiguratorDialog", () => {
     expect(text).toContain("2. Dificultad");
     expect(text).toContain("3. Cantidad de ejercicios");
     expect(text).toContain("4. Nivel de Asistencia");
-    for (const opt of ["3–5", "6–10", "11+", "Decide tú", "Sin ayuda (No Help)", "Asistente (Helper)"]) {
+    for (const opt of ["3–5", "6–10", "11+", "Lo que decidió la IA", "Sin ayuda (No Help)", "Asistente (Helper)"]) {
       expect(text, `missing “${opt}”`).toContain(opt);
     }
   });

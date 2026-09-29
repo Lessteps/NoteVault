@@ -50,6 +50,16 @@ import {
 import { loadAllAttempts } from "../../core/practice/ledger.js";
 import { clearExerciseIndexCache, scanVault, warmNoteCache } from "../../core/practice/exerciseIndex.js";
 import { AIConfig, sendChat } from "../../core/aiClient.js";
+import {
+  applyPlanToPractica,
+  buildReevaluationMessages,
+  parsePracticePlan,
+  planCount,
+  readPlanFromPractica,
+  type PracticePlan,
+} from "../../core/practice/practicePlan.js";
+import { catalogFor } from "../../core/practice/skillSelection.js";
+import { detectTopicType } from "../../core/practice/topicType.js";
 import { AppConfig } from "../appConfig.js";
 import type { DifficultyLevel } from "../../core/practice/skills.js";
 import type { AppState } from "../appState.js";
@@ -255,6 +265,73 @@ function findTopicManifest(
     }
   } catch {}
   return null;
+}
+
+/** The topic's own theory notes (everything that is not a view file or the manifest). */
+function readTheoryNotes(app: AppState, absDir: string): TheoryNoteContext[] {
+  const out: TheoryNoteContext[] = [];
+  let files: fs.Dirent[] = [];
+  try {
+    files = fs.readdirSync(absDir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const f of files) {
+    if (!f.isFile() || !f.name.toLowerCase().endsWith(".md") || f.name.startsWith("_tema")) continue;
+    if (/\.(practica|resumen)\.md$/i.test(f.name)) continue;
+    try {
+      const full = path.join(absDir, f.name);
+      out.push({ rel: app.rel(full), title: f.name.replace(/\.md$/i, ""), content: fs.readFileSync(full, "utf-8") });
+    } catch {
+      /* unreadable note: skip it */
+    }
+  }
+  return out;
+}
+
+/**
+ * Asks the AI which competencies a topic should train and how many exercises per
+ * difficulty, and stores the answer in the topic's `.practica.md`.
+ */
+async function reevaluateTopic(app: AppState, folder: string): Promise<{ plan: PracticePlan; path: string }> {
+  const normFolder = app.rel(app.resolve(folder, { allowRoot: true }));
+  const found = findTopicManifest(app, normFolder);
+  if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+  const manifest = found.manifest;
+  const topicAbs = app.resolve(manifest.folder || normFolder, { allowRoot: true });
+
+  const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+  if (cfg.is_bridge) {
+    throw new ApiError("El proveedor de IA está en modo puente; no se puede re-evaluar automáticamente.");
+  }
+
+  const subject = manifest.subject || "mathematics";
+  const topicType = manifest.topic_type ?? detectTopicType({ name: manifest.title }).type;
+  const catalog = catalogFor(subject);
+  const messages = buildReevaluationMessages({
+    subject,
+    title: manifest.title,
+    topicType,
+    catalog,
+    theory: readTheoryNotes(app, topicAbs),
+    templates: skillTemplates(app, normFolder),
+    currentSkills: manifest.skills,
+  });
+
+  const reply = await sendChat(cfg, messages as any);
+  const plan = parsePracticePlan(reply, catalog);
+  if (!plan) throw new ApiError("La IA no devolvió un plan de práctica válido. Inténtalo de nuevo.");
+  plan.topicType = topicType;
+
+  const practicaAbs = path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica"));
+  if (!fs.existsSync(practicaAbs)) ensureTopicViewFiles(app.root, topicAbs);
+  if (!fs.existsSync(practicaAbs)) throw new ApiError("No se pudo crear el archivo .practica del tema.");
+  const labels = Object.fromEntries(catalog.map((s) => [s.id, s.label]));
+  fs.writeFileSync(practicaAbs, applyPlanToPractica(fs.readFileSync(practicaAbs, "utf-8"), plan, labels), "utf-8");
+
+  clearExerciseIndexCache();
+  clearStudySnapshotCache();
+  return { plan, path: app.rel(practicaAbs).split(path.sep).join("/") };
 }
 
 export function studyApi(app: AppState) {
@@ -693,6 +770,22 @@ export function studyApi(app: AppState) {
       const ast = assistance === "helper" ? "helper" : "no_help";
       const qty = (quantity || "3-5") as QuantityOption;
 
+      // "ai": the count comes from the topic's practice plan; without one, ask the AI first.
+      let aiCount: number | null = null;
+      if (qty === "ai") {
+        const topicAbsForPlan = app.resolve(found.manifest.folder || normFolder, { allowRoot: true });
+        const practicaAbs = path.join(topicAbsForPlan, viewFileName(path.basename(topicAbsForPlan), "practica"));
+        const readPlan = () => {
+          try {
+            return readPlanFromPractica(fs.readFileSync(practicaAbs, "utf-8"));
+          } catch {
+            return null;
+          }
+        };
+        const plan = readPlan() ?? (await reevaluateTopic(app, normFolder)).plan;
+        aiCount = planCount(plan, skill, diff);
+      }
+
       // Extract theory notes
       const absDir = app.resolve(normFolder);
       const theoryNotes: TheoryNoteContext[] = [];
@@ -739,7 +832,7 @@ export function studyApi(app: AppState) {
       const plan = await buildTopicSession(
         found.manifest,
         normFolder,
-        { skill, difficulty: diff, quantity: qty, assistance: ast },
+        { skill, difficulty: diff, quantity: qty, assistance: ast, planCount: aiCount },
         scan.exercises,
         theoryNotes,
         aiClient,
@@ -774,6 +867,26 @@ export function studyApi(app: AppState) {
         })),
         first_exercise: plan.exercises[0]?.path ?? "",
       };
+    },
+
+    /** Re-reads the topic's theory with the AI and rewrites its practice plan. */
+    async study_topic_reevaluate(folder: string) {
+      const { plan, path: practicePath } = await reevaluateTopic(app, folder);
+      return { ok: true, plan, path: practicePath };
+    },
+
+    /** The stored practice plan of a topic (null when it has none yet). */
+    study_topic_plan(folder: string) {
+      const normFolder = app.rel(app.resolve(folder, { allowRoot: true }));
+      const found = findTopicManifest(app, normFolder);
+      if (!found) return { plan: null };
+      const topicAbs = app.resolve(found.manifest.folder || normFolder, { allowRoot: true });
+      try {
+        const text = fs.readFileSync(path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica")), "utf-8");
+        return { plan: readPlanFromPractica(text) };
+      } catch {
+        return { plan: null };
+      }
     },
 
     /**

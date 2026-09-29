@@ -1026,3 +1026,15 @@ export interface TopicDashboardData {
 }
 
 
+
+export interface PracticePlanSkill {
+  skill: string;
+  counts: Record<1 | 2 | 3, number>;
+  why: string;
+}
+
+export interface PracticePlan {
+  skills: PracticePlanSkill[];
+  summary: string;
+  topicType?: "theoretical" | "procedural" | "mixed";
+}

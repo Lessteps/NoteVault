@@ -53,7 +53,12 @@ export function jsonSafe(value: unknown): unknown {
 /** Replace (or add, or remove when null) top-level frontmatter keys, leaving
  * every other line exactly as it was, nested YAML included. */
 export function setFrontmatterKeys(text: string, updates: Record<string, unknown>): string {
-  const lines = text.split("\n");
+  // A vault on Windows holds CRLF files (git with autocrlf, editors, Syncthing).
+  // Splitting on "\n" would leave the \r glued to every content line, and
+  // re-joining with "\n" would hand back a file that is half CRLF, half LF.
+  // Work in \n internally, then restore whatever the note came in with.
+  const crlf = text.includes("\r\n");
+  const lines = (crlf ? text.replace(/\r\n/g, "\n") : text).split("\n");
   let end: number | null = null;
   if (lines.length && lines[0]!.trim() === "---") {
     for (let i = 1; i < lines.length; i++) {
@@ -96,8 +101,8 @@ export function setFrontmatterKeys(text: string, updates: Record<string, unknown
     added = dumpFrontmatter(obj).split("\n").slice(1, -2);
   }
   const newHead = [...keep, ...added];
-  if (!newHead.length) return body.join("\n");
-  return ["---", ...newHead, "---", ...body].join("\n");
+  const out = newHead.length ? ["---", ...newHead, "---", ...body].join("\n") : body.join("\n");
+  return crlf ? out.replace(/\n/g, "\r\n") : out;
 }
 
 export class AppState {

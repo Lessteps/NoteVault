@@ -56,4 +56,5 @@ frontend/dist-electron/
 frontend/release/
 frontend/test-results/
 frontend/playwright-report/
+frontend/coverage/
 *.tsbuildinfo

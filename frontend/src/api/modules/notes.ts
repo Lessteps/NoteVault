@@ -383,9 +383,8 @@ export function notesApi(app: AppState) {
       }
 
       const raw = fs.readFileSync(p, "utf-8");
-      const crlf = raw.includes("\r\n");
-      let text = setFrontmatterKeys(raw.replace(/\r\n/g, "\n"), sanitized);
-      if (crlf) text = text.replace(/\n/g, "\r\n");
+      // setFrontmatterKeys preserves the note's own line endings.
+      const text = setFrontmatterKeys(raw, sanitized);
       fs.writeFileSync(p, text, "utf-8");
       app.service.noteWritten(p, text);
       return { ok: true, conflict: false, modified: fs.statSync(p).mtimeMs / 1000 };

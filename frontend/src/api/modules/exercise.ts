@@ -5,6 +5,7 @@ import {
   ExerciseManager,
   VIDEO_EXTS,
 } from "../../core/exerciseManager.js";
+import { normalizeMuscles } from "../../core/exerciseMuscles.js";
 import type { AppState } from "../appState.js";
 import { clampInt, oneLine, optDate } from "../common.js";
 import { MediaServer } from "../media.js";
@@ -63,6 +64,7 @@ function exDict(mgr: ExerciseManager, e: Record<string, any>): Record<string, un
     how_to: e.how_to || "",
     has_video: videoFile !== null,
     video_name: videoFile ? path.basename(videoFile) : "",
+    muscles: normalizeMuscles(e.muscles),
   };
 }
 
@@ -91,6 +93,7 @@ function exFields(fields: unknown) {
     series_reps: oneLine(f.series_reps, 120),
     rest: oneLine(f.rest, 60),
     how_to: String(f.how_to || "").slice(0, 4000),
+    muscles: normalizeMuscles(f.muscles),
   };
 }
 
@@ -387,7 +390,11 @@ export function exerciseApi(app: AppState) {
           f.rest,
           f.how_to
         );
-        return exDict(m, e);
+        // addExercise keeps its old signature, so the muscles go in a second step.
+        if (f.muscles.primary.length || f.muscles.secondary.length) {
+          m.updateExercise(String(e.id), { muscles: f.muscles });
+        }
+        return exDict(m, m.exercises().find((x) => x.id === e.id)!);
       }
       if (!m.exercises().some((e) => e.id === exerciseId)) {
         throw new ApiError("Ese ejercicio ya no existe.");

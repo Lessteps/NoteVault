@@ -31,9 +31,10 @@ import { Daily } from "./Daily";
 import { ExerciseMonth, ExerciseWeek } from "./Grids";
 import { Overview } from "./Overview";
 import { ORANGE, SideStats, useFail } from "./parts";
+import { MuscleCount, MusclePicker } from "./MusclePicker";
 import { Yearly } from "./Yearly";
 
-const EMPTY: Partial<Exercise> = { day: "lunes", name: "", video_path: "", series_reps: "", rest: "", how_to: "" };
+const EMPTY: Partial<Exercise> = { day: "lunes", name: "", video_path: "", series_reps: "", rest: "", how_to: "", muscles: { primary: [], secondary: [] } };
 
 /** Gestionar ejercicios: la rutina por días y el formulario de uno. */
 function Manage() {
@@ -87,6 +88,7 @@ function Manage() {
                   <div key={e.id} className={cn("group flex items-center gap-2 px-3 py-1.5 text-[12.5px]", editing === e.id && "bg-accent-soft")}>
                     <span className="min-w-0 flex-1 truncate text-text">{e.name}</span>
                     <span className="text-[11.5px] text-dim">{e.series_reps}</span>
+                    <MuscleCount muscles={e.muscles} />
                     <span title={e.has_video ? e.video_name : "Sin video"} className={e.has_video ? "text-mint" : "text-faint"}><Film size={13} /></span>
                     <IconButton title="Editar" onClick={() => { setEditing(e.id); setF({ ...e }); setStatus(""); }}><Pencil size={12} /></IconButton>
                     <IconButton title="Quitar" onClick={async () => {
@@ -130,6 +132,9 @@ function Manage() {
           <Field label="Descanso"><input className={input} value={f.rest ?? ""} placeholder="90 s" onChange={(e) => setF({ ...f, rest: e.target.value })} /></Field>
         </div>
         <Field label="Cómo hacerlo"><textarea rows={4} className={cn(input, "resize-y")} value={f.how_to ?? ""} onChange={(e) => setF({ ...f, how_to: e.target.value })} /></Field>
+        <Field label="Músculos">
+          <MusclePicker value={f.muscles} onChange={(muscles) => setF({ ...f, muscles })} />
+        </Field>
         <div className="flex gap-2">
           <PrimaryButton onClick={() => void save()}>Guardar ejercicio</PrimaryButton>
           {editing && <GhostButton onClick={() => { setEditing(""); setF({ ...EMPTY, day: f.day }); setStatus(""); }}>Cancelar</GhostButton>}

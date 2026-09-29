@@ -994,3 +994,117 @@ html[data-perf="lite"] .nv-practice-view {
 .nv-titlebar .nv-no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Mapa muscular (Ejercicio). Grey = not trained today, lime = primary work
+   pending, dim lime = secondary only, green = done. The lime is a token of its
+   own so it does not depend on the theme accent.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme="dark"] {
+  --nv-muscle-body: #1b1b24;
+  --nv-muscle-idle: #3a3a48;
+  --nv-muscle-line: #4b4b5e;
+  --nv-muscle-primary: #a3e635;
+  --nv-muscle-secondary: color-mix(in srgb, #a3e635 42%, #3a3a48);
+  --nv-muscle-secondary-text: #9dbf49;
+  --nv-muscle-done: var(--nv-mint);
+}
+
+[data-theme="light"] {
+  --nv-muscle-body: #e7ddc7;
+  --nv-muscle-idle: #cdc1a6;
+  --nv-muscle-line: #b5a586;
+  --nv-muscle-primary: #79a800;
+  --nv-muscle-secondary: color-mix(in srgb, #79a800 38%, #cdc1a6);
+  --nv-muscle-secondary-text: #6d8f1a;
+  --nv-muscle-done: var(--nv-mint);
+}
+
+.nv-body {
+  display: block;
+  height: 100%;
+  max-height: 100%;
+  width: auto;
+  max-width: 100%;
+}
+
+.nv-body-sil {
+  fill: var(--nv-muscle-body);
+  stroke: var(--nv-muscle-line);
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+
+.nv-body-detail {
+  fill: none;
+  stroke: var(--nv-muscle-line);
+  stroke-width: 0.85;
+  opacity: 0.65;
+}
+
+.nv-muscle {
+  stroke: var(--nv-muscle-line);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  cursor: pointer;
+  transition: fill 180ms ease, opacity 180ms ease, stroke 120ms ease;
+}
+
+.nv-muscle--idle { fill: var(--nv-muscle-idle); }
+.nv-muscle--primary { fill: var(--nv-muscle-primary); }
+.nv-muscle--secondary { fill: var(--nv-muscle-secondary); }
+.nv-muscle--done { fill: var(--nv-muscle-done); }
+
+.nv-muscle.is-dim { opacity: 0.22; }
+
+.nv-muscle:hover,
+.nv-muscle.is-active {
+  stroke: var(--nv-text);
+  stroke-width: 1.6;
+}
+
+.nv-legend {
+  display: inline-block;
+  height: 10px;
+  width: 10px;
+  border: 1px solid var(--nv-muscle-line);
+  border-radius: 3px;
+}
+
+.nv-legend--idle { background: var(--nv-muscle-idle); }
+.nv-legend--primary { background: var(--nv-muscle-primary); }
+.nv-legend--secondary { background: var(--nv-muscle-secondary); }
+.nv-legend--done { background: var(--nv-muscle-done); }
+
+/* The 3D flip between the front and the back of the body. */
+.nv-flip {
+  display: grid;
+  place-items: center;
+  perspective: 1200px;
+}
+
+.nv-flip-inner {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  transform-style: preserve-3d;
+  transition: transform 400ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.nv-flip-inner[data-face="back"] {
+  transform: rotateY(180deg);
+}
+
+.nv-flip-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  backface-visibility: hidden;
+}
+
+.nv-flip-face--back {
+  transform: rotateY(180deg);
+}

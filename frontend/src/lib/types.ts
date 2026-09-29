@@ -600,6 +600,8 @@ export interface Exercise {
   how_to: string;
   has_video: boolean;
   video_name: string;
+  /** What the body map paints. Ids come from the muscle catalogue. */
+  muscles: { primary: string[]; secondary: string[] };
 }
 
 export interface ExerciseEntry {

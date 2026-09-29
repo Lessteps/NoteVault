@@ -1,6 +1,7 @@
 // Diaria: the routine of one date, with weight, reps and notes per exercise.
 
 import { useEffect, useRef, useState } from "react";
+import { Map as MapIcon } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { addDays } from "../../lib/habits";
 import { shortDate, todayIso } from "../../lib/tasks";
@@ -11,6 +12,7 @@ import { inputBase, GhostButton } from "../common/forms";
 import { NavButtons } from "../habits/parts";
 import { cn } from "../ui";
 import { ORANGE, useFail } from "./parts";
+import { MuscleMap } from "./MuscleMap";
 
 /** One exercise row: tick, weight, reps, notes (saved on change / blur). */
 export function ExerciseRow({ day, ex, entry, onChanged, onVideo, compact }: {
@@ -120,6 +122,7 @@ export function Daily({ onVideo }: { onVideo: (ex: Exercise) => void }) {
   const refreshStats = useExercise((s) => s.refreshStats);
   const [date, setDate] = useState(() => todayIso());
   const [day, setDay] = useState<ExerciseDay | null>(null);
+  const [map, setMap] = useState(false);
   const key = weekdayKeyOf(date);
   const meta = days.find((d) => d.key === key);
 
@@ -145,6 +148,10 @@ export function Daily({ onVideo }: { onVideo: (ex: Exercise) => void }) {
               {done}/{day.exercises.length}
             </span>
           )}
+          <button type="button" onClick={() => setMap(true)} title="Mapa muscular del día"
+            className="flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">
+            <MapIcon size={13} /> Mapa
+          </button>
           <NavButtons
             label={`${shortDate(date)}${isToday ? " · hoy" : ""}`}
             onPrev={() => setDate(addDays(date, -1))}
@@ -164,6 +171,15 @@ export function Daily({ onVideo }: { onVideo: (ex: Exercise) => void }) {
           }}
         />
       </div>
+      {map && (
+        <MuscleMap
+          date={date}
+          day={day}
+          onVideo={onVideo}
+          onChanged={() => { void load(); void refreshStats(); }}
+          onClose={() => setMap(false)}
+        />
+      )}
     </>
   );
 }

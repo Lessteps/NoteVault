@@ -7,7 +7,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AppState } from "../appState.js";
-import { clearStudySnapshotCache, studyApi } from "./study.js";
+import { clearStudySnapshotCache, setWarmApp, studyApi, warmStudyIndex } from "./study.js";
 
 const MANIFEST = `---
 type: topic
@@ -34,7 +34,7 @@ describe("study_topic_dashboard", () => {
   let tmp: string;
   let api: ReturnType<typeof studyApi>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nv_dash_"));
     const topic = path.join(tmp, "Matemáticas", "1 Aritmética", "1.1 Números");
     fs.mkdirSync(path.join(topic, "Ejercicios"), { recursive: true });
@@ -42,7 +42,12 @@ describe("study_topic_dashboard", () => {
     fs.writeFileSync(path.join(topic, "1.1 Números.md"), "---\ntype: concept\n---\n\n# Números\n", "utf-8");
     fs.writeFileSync(path.join(topic, "Ejercicios", "e1.md"), EXERCISE, "utf-8");
     clearStudySnapshotCache();
-    api = studyApi(new AppState(tmp) as never);
+    const app = new AppState(tmp) as never;
+    api = studyApi(app);
+    // The dashboard answers with a provisional payload until the vault index is
+    // warm (as at startup in the real app); warm it so this test sees the data.
+    setWarmApp(app);
+    await warmStudyIndex();
   });
 
   it("finds the topic of the vault and reports vault-relative paths", async () => {

@@ -140,6 +140,15 @@ const _dashboardCache = new Map<string, { data: unknown; timestamp: number }>();
  */
 const _scanCache = new Map<string, { data: VaultScan; timestamp: number }>();
 
+/**
+ * True once `warmStudyIndex` has read every note into the per-file cache, so a
+ * later `scanVault` is cheap. Until then, blocks like the topic dashboard must
+ * not pay the cold read themselves (see `study_topic_dashboard`).
+ */
+let _indexWarmed = false;
+/** Vaults whose background scan has already been kicked off. */
+const _scanKicked = new Set<string>();
+
 export function vaultScan(app: AppState): VaultScan {
   const hit = _scanCache.get(app.root);
   if (hit && Date.now() - hit.timestamp < SNAPSHOT_CACHE_TTL_MS) return hit.data;
@@ -152,6 +161,7 @@ export function clearStudySnapshotCache(): void {
   _snapshotCache.clear();
   _dashboardCache.clear();
   _scanCache.clear();
+  _scanKicked.clear();
 }
 
 /**
@@ -167,6 +177,7 @@ export async function warmStudyIndex(): Promise<{ notes: number; ms: number }> {
   if (!app) return { notes: 0, ms: 0 };
   const started = Date.now();
   const notes = await warmNoteCache(app.vault.notePaths());
+  _indexWarmed = true;
   return { notes, ms: Date.now() - started };
 }
 
@@ -924,6 +935,25 @@ export function studyApi(app: AppState) {
         | undefined;
       if (cachedDashboard && Date.now() - cachedDashboard.timestamp < SNAPSHOT_CACHE_TTL_MS) {
         return cachedDashboard.data;
+      }
+      // A cold process would block the renderer for as long as it takes to read
+      // every note (measured: 30 s over 2 107 notes). Return a provisional empty
+      // payload instead and let the startup warm — or this background scan — fill
+      // the cache; the view retries until the real data arrives.
+      if (!_scanCache.has(app.root) && !_indexWarmed) {
+        if (!_scanKicked.has(app.root)) {
+          _scanKicked.add(app.root);
+          setImmediate(() => {
+            try {
+              vaultScan(app);
+            } catch {
+              /* the renderer's retry will surface any error */
+            } finally {
+              _scanKicked.delete(app.root);
+            }
+          });
+        }
+        return { subjects: [], areas: [], topics: [], loading: true };
       }
       const scan = vaultScan(app);
       const allExercises = scan.exercises;

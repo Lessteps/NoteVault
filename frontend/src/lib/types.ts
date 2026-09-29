@@ -1021,6 +1021,8 @@ export interface TopicDashboardData {
   subjects: string[];
   areas: string[];
   topics: TopicDashboardItem[];
+  /** True when the vault index is still warming and the payload is provisional. */
+  loading?: boolean;
 }
 
 

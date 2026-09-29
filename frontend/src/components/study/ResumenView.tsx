@@ -7,7 +7,7 @@
 // engine's own progress (`studyTopicDashboard`).
 
 import { AlertTriangle, ChevronDown, ChevronRight, Play, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import {
   aggregateArea,
@@ -45,6 +45,11 @@ export function ResumenView({ note }: { note: OpenNote }) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [openTopics, setOpenTopics] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
+  // The dashboard answers with a provisional empty payload while the vault index
+  // warms in the main process; keep the skeleton up and retry until the real data
+  // arrives instead of freezing on the cold read.
+  const retryRef = useRef(0);
+  const retryTimer = useRef<number | null>(null);
 
   const scope = String(note.frontmatter?.scope ?? "").trim();
   const subject = String(note.frontmatter?.subject ?? "").trim();
@@ -52,10 +57,20 @@ export function ResumenView({ note }: { note: OpenNote }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setData(await api.studyTopicDashboard(subject || undefined));
+      const result = await api.studyTopicDashboard(subject || undefined);
+      if (result.loading) {
+        if (retryRef.current < 40) {
+          retryRef.current += 1;
+          if (retryTimer.current) window.clearTimeout(retryTimer.current);
+          retryTimer.current = window.setTimeout(() => void refresh(), 1500);
+        }
+        return;
+      }
+      retryRef.current = 0;
+      setData(result);
+      setLoading(false);
     } catch (e) {
       toast("error", (e as Error).message);
-    } finally {
       setLoading(false);
     }
   }, [subject, toast]);
@@ -63,6 +78,13 @@ export function ResumenView({ note }: { note: OpenNote }) {
   useEffect(() => {
     void refresh();
   }, [refresh, version]);
+
+  useEffect(
+    () => () => {
+      if (retryTimer.current) window.clearTimeout(retryTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     let live = true;

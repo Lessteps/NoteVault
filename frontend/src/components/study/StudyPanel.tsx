@@ -9,6 +9,7 @@ import { renderMarkdown } from "../../lib/markdown";
 import type { StudySnapshot, TopicData } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { cn, IconButton } from "../ui";
+import { SrsCalendarView } from "./SrsCalendarView";
 import { TopicConfiguratorDialog } from "./TopicConfiguratorDialog";
 import { TopicDashboardView } from "./TopicDashboardView";
 import { TopicGeneralView } from "./TopicGeneralView";
@@ -36,7 +37,7 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
   const toast = useApp((s) => s.toast);
   const [snap, setSnap] = useState<StudySnapshot | null>(null);
   const [topicData, setTopicData] = useState<TopicData | null>(null);
-  const [tab, setTab] = useState<"today" | "topic" | "dashboard" | "ledger" | "errors">("today");
+  const [tab, setTab] = useState<"today" | "repaso" | "topic" | "dashboard" | "ledger" | "errors">("today");
   const [showConfigurator, setShowConfigurator] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -85,8 +86,14 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
   const first = snap.queue.items.find((i) => i.exercise)?.exercise;
   const c = snap.queue.counts;
 
-  const tabs: Array<["today" | "topic" | "dashboard" | "ledger" | "errors", string]> = [
+  const srsScheduled = snap.ledgers.reduce(
+    (n, l) => n + l.skills.filter((s) => s.status === "consolidated" && s.due).length,
+    0,
+  );
+
+  const tabs: Array<["today" | "repaso" | "topic" | "dashboard" | "ledger" | "errors", string]> = [
     ["today", `Hoy${c.total ? `  ${c.total}` : ""}`],
+    ["repaso", `Repaso${srsScheduled ? `  ${srsScheduled}` : ""}`],
   ];
   if (topicData?.is_topic) {
     tabs.push([
@@ -163,6 +170,7 @@ export function StudyPanel({ path, areaKey }: { path: string; areaKey: string })
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {tab === "today" && <Today snap={snap} onPractice={practice} />}
+        {tab === "repaso" && <SrsCalendarView snap={snap} />}
         {tab === "topic" && topicData && (
           <TopicGeneralView
             topicData={topicData}

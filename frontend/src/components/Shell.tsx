@@ -272,7 +272,7 @@ function WorkspaceIcons() {
   // the strip gives that space back to the tabs. Only the panel toggle stays,
   // because it is the one thing that belongs to the window and not to a module.
   return (
-    <div className="flex flex-none items-center gap-0.5 border-r border-line px-1.5">
+    <div className="flex flex-none items-center gap-0.5 pl-2 pr-1">
       <button
         type="button"
         title="Panel lateral"

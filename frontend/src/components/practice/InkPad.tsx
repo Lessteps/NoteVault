@@ -5,9 +5,10 @@
 // Draw with the mouse or a pen. Move around with the hand tool, the middle button,
 // Space + drag or the wheel; zoom with Ctrl + wheel.
 
-import { Check, Copy, Eraser, Hand, PenLine, Undo2 } from "lucide-react";
+import { Check, Copy, Eraser, FilePlus2, Hand, PenLine, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { readInk, writeInk, type InkStroke } from "../../lib/inkFile";
+import { api } from "../../lib/bridge";
+import { inkNoteText, readInk, writeInk, type InkStroke } from "../../lib/inkFile";
 import { recognizeStrokesToLatex } from "../../lib/mathRecognizer";
 import { copyText } from "../../lib/clipboard";
 import { renderTex } from "../../lib/tex";
@@ -22,6 +23,30 @@ interface View {
 }
 
 const INK = "#8b5cf6";
+const DRAFT_KEY = "nv.ink.draft";
+
+/** The unsaved session: it lives in the browser storage until "Crear archivo" turns it into a file. */
+function loadDraft(): { strokes: InkStroke[]; latex: string } {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      const d = JSON.parse(raw) as { raw: string; latex: string };
+      return { strokes: readInk(d.raw), latex: d.latex ?? "" };
+    }
+  } catch {
+    /* a corrupt draft is just an empty page */
+  }
+  return { strokes: [], latex: "" };
+}
+
+function saveDraft(strokes: InkStroke[], latex: string): void {
+  try {
+    if (!strokes.length) window.localStorage.removeItem(DRAFT_KEY);
+    else window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ raw: writeInk(inkNoteText("draft"), strokes, latex), latex }));
+  } catch {
+    /* storage may be unavailable: the draft is a convenience */
+  }
+}
 const MIN_K = 0.25;
 const MAX_K = 4;
 const QUICK: Array<[string, string]> = [
@@ -29,13 +54,17 @@ const QUICK: Array<[string, string]> = [
   ["≤", "\\leq"], ["≥", "\\geq"], ["≠", "\\neq"], ["×", "\\times"], ["÷", "\\div"], ["∈", "\\in"], ["ℕ", "\\mathbb{N}"], ["ℤ", "\\mathbb{Z}"],
 ];
 
-export function InkPad({ note }: { note: OpenNote }) {
+/**
+ * With a `note` the pad edits that drawing file. Without one it is a draft: nothing
+ * exists on disk (so a stray click leaves no file behind) until "Crear archivo".
+ */
+export function InkPad({ note, folder = "" }: { note?: OpenNote; folder?: string }) {
   const editRaw = useApp((s) => s.editRaw);
   const toast = useApp((s) => s.toast);
 
-  const [strokes, setStrokes] = useState<InkStroke[]>(() => readInk(note.raw));
+  const [strokes, setStrokes] = useState<InkStroke[]>(() => (note ? readInk(note.raw) : loadDraft().strokes));
   const [view, setView] = useState<View>({ x: 40, y: 40, k: 1 });
-  const [latex, setLatex] = useState("");
+  const [latex, setLatex] = useState(() => (note ? "" : loadDraft().latex));
   const [display, setDisplay] = useState(true);
   const [tool, setTool] = useState<"pen" | "hand">("pen");
 
@@ -52,10 +81,11 @@ export function InkPad({ note }: { note: OpenNote }) {
 
   // A different drawing note: load its ink.
   useEffect(() => {
+    if (!note) return;
     setStrokes(readInk(note.raw));
     setLatex("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note.path]);
+  }, [note?.path]);
 
   // ── Painting ──────────────────────────────────────────────────────────────
   const paint = useCallback(() => {
@@ -225,6 +255,10 @@ export function InkPad({ note }: { note: OpenNote }) {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      if (!note) {
+        saveDraft(strokes, latex);
+        return;
+      }
       const next = writeInk(note.raw, strokes, latex);
       if (next !== note.raw) editRaw(note.path, next);
     }, 700);
@@ -260,11 +294,53 @@ export function InkPad({ note }: { note: OpenNote }) {
     setLatex("");
   };
 
+  /** Turns the draft into `Dibujo LaTeX N` in the folder it was opened from. */
+  const createFile = async () => {
+    const app = useApp.getState();
+    try {
+      const used = new Set((await api.listDir(folder)).map((e) => e.name.toLowerCase()));
+      let n = 1;
+      while (used.has(`dibujo latex ${n}`)) n += 1;
+      const title = `Dibujo LaTeX ${n}`;
+      const { path } = await api.createNote(title, folder);
+      await api.writeNote(path, writeInk(inkNoteText(title), strokes, latex), null);
+      window.localStorage.removeItem(DRAFT_KEY);
+      app.refreshTree();
+      await useApp.getState().openSide(path);
+      toast("info", `Archivo creado: ${title}`);
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface">
       <div className="flex flex-none items-center gap-1.5 border-b border-line px-3 py-1.5">
         <PenLine size={14} className="text-accent-text" />
-        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-text" title={note.path}>{note.title}</span>
+        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-text" title={note?.path ?? "Sin guardar"}>
+          {note ? note.title : "Dibujo sin guardar"}
+        </span>
+        {!note && (
+          <>
+            <button
+              type="button"
+              disabled={!strokes.length}
+              onClick={() => void createFile()}
+              title="Crear el archivo de este dibujo en la carpeta de la nota"
+              className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[11.5px] font-semibold text-white hover:bg-accent-strong disabled:opacity-40"
+            >
+              <FilePlus2 size={12} /> Crear archivo
+            </button>
+            <button
+              type="button"
+              title="Cerrar (la sesión se conserva hasta que crees el archivo)"
+              onClick={() => useApp.getState().setInkDraft(null)}
+              className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-hover"
+            >
+              <X size={14} />
+            </button>
+          </>
+        )}
         <button type="button" title="Lápiz" onClick={() => setTool("pen")}
           className={cn("grid h-7 w-7 place-items-center rounded-md", tool === "pen" ? "bg-accent text-white" : "text-dim hover:bg-hover")}>
           <PenLine size={14} />

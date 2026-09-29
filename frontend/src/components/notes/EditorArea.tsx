@@ -292,6 +292,7 @@ function isViewFile(note: { kind: string; frontmatter: Record<string, unknown> }
 export function EditorArea() {
   const note = useApp((s) => (s.active ? s.notes[s.active] : undefined));
   const side = useApp((s) => (s.side && s.side !== s.active ? s.notes[s.side] : undefined));
+  const inkDraft = useApp((s) => s.inkDraft);
   const mode = useApp((s) => s.mode);
   const ladderOn = useLadder((s) => (note ? s.open.has(note.path) : false));
   return (
@@ -351,6 +352,11 @@ export function EditorArea() {
           <ErrorBoundary key={`side:${side.path}`} path={side.path} what="La vista del panel derecho">
             <SidePane note={side} />
           </ErrorBoundary>
+        )}
+        {inkDraft && (
+          <section aria-label="Dibujo LaTeX" className="flex w-1/2 min-w-0 flex-none flex-col border-l border-line-strong">
+            <InkPad folder={inkDraft.folder} />
+          </section>
         )}
       </div>
     </main>

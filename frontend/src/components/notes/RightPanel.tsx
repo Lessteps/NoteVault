@@ -18,16 +18,13 @@ import { AssistantPanel } from "./AssistantPanel";
 import { WebRail } from "../web/WebRail";
 import { ReviewPanel, useReviewPanel } from "../study/ReviewPanel";
 
-export function RightPanel({ module, canvas = false }: { module: string; canvas?: boolean }) {
+export function RightPanel({ module }: { module: string }) {
   const assistantOpen = useAssistant((s) => s.open);
   const pagesOpen = useWebPages((s) => s.open);
   const reviewOpen = useReviewPanel((s) => s.open);
   const muscleOpen = useApp((s) => s.muscleOpen);
   const inspectorOpen = useApp((s) => s.inspectorOpen);
   const active = useApp((s) => s.active);
-
-  // El lienzo de Notas se queda con todo el ancho.
-  if (module === "notas" && canvas) return null;
 
   if (assistantOpen) return <AssistantPanel />;
   if (pagesOpen) return <WebRail />;

@@ -3,8 +3,7 @@
 //
 // Esta es la regla que pidió el usuario: la tira de lanzadores (y la cara que
 // abra) no pertenece a Notas, así que se ve igual en cualquier funcionalidad —
-// por ejemplo en Ejercicio. La única excepción es el lienzo de Notas, que se
-// queda con todo el ancho.
+// por ejemplo en Ejercicio, o con un lienzo de Notas abierto.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
@@ -21,9 +20,9 @@ import { useWebPages } from "../../store/webPages";
 let container: HTMLDivElement;
 let root: Root;
 
-function mount(module: string, canvas = false) {
+function mount(module: string) {
   act(() => {
-    root.render(<RightPanel module={module} canvas={canvas} />);
+    root.render(<RightPanel module={module} />);
   });
 }
 
@@ -90,15 +89,9 @@ describe("RightPanel", () => {
     expect(labels()).not.toContain("Panel lateral");
   });
 
-  it("el lienzo de Notas se queda con todo el ancho", () => {
+  it("con un lienzo de Notas abierto el panel sigue ahí", () => {
     useWebPages.setState({ open: false });
-    mount("notas", true);
-    expect(container.innerHTML).toBe("");
-  });
-
-  it("pero un lienzo abierto no se lleva el panel de los demás módulos", () => {
-    useWebPages.setState({ open: false });
-    mount("ejercicio", true);
+    mount("notas");
     expect(labels()).toContain("Acceso panel lateral");
   });
 });

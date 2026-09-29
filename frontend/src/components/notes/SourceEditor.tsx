@@ -36,9 +36,17 @@ const theme = EditorView.theme({
   ".cm-scroller": {
     fontFamily: "var(--font-sans)",
     lineHeight: "1.7",
-    padding: "28px 0 96px",
+    // Same gutters as the reading view (px-10, pt-8): the page is centred.
+    padding: "32px 40px 96px",
   },
-  ".cm-content": { maxWidth: "820px", caretColor: "var(--nv-accent)", paddingRight: "32px" },
+  ".cm-content": {
+    width: "100%",
+    maxWidth: "820px",
+    margin: "0 auto",
+    flexGrow: "0",
+    padding: "0",
+    caretColor: "var(--nv-accent)",
+  },
   ".cm-code .cm-scroller": { fontFamily: "var(--font-mono)", fontSize: "13px" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--nv-accent)", borderLeftWidth: "2px" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {

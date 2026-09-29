@@ -143,6 +143,9 @@ interface State {
   paletteOpen: boolean;
   /** A second note shown to the right of the active one (split view). */
   side: string | null;
+  /** The drawing pad while it has no file yet (folder = where the file will go once created). */
+  inkDraft: { folder: string } | null;
+  setInkDraft: (draft: { folder: string } | null) => void;
   /**
    * El modulo que ocupa el panel derecho. Las notas y los canvas usan `side`
    * (su panel ya sabe pintarlos); el resto de funcionalidades viven aqui.
@@ -352,6 +355,7 @@ export const useApp = create<State>((setState, get) => {
   switcherOpen: false,
   paletteOpen: false,
   side: null,
+  inkDraft: null,
   sideModule: null,
   cursor: null,
   toasts: [],
@@ -451,9 +455,11 @@ export const useApp = create<State>((setState, get) => {
     // A web page lives in its own rail; there is nothing to split.
   },
 
+  setInkDraft: (inkDraft) => set(inkDraft ? { inkDraft, side: null, module: "notas" } : { inkDraft }),
+
   openSide: async (path) => {
     if (!path) {
-      set({ side: null });
+      set({ side: null, inkDraft: null });
       return;
     }
     const st = get();
@@ -473,7 +479,7 @@ export const useApp = create<State>((setState, get) => {
       }
     }
     const active = get().active;
-    set({ side: path, module: "notas" });
+    set({ side: path, inkDraft: null, module: "notas" });
     if (!active || active === path) {
       // Activate a different note tab if possible
       const other = get().openTabs.find((t) => (t.kind === "note" || t.kind === "canvas") && t.tabId !== `note:${path}`);

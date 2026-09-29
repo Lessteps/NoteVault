@@ -2,8 +2,7 @@
 // (creating its file beside the open note) and handing recognised LaTeX to the
 // place the user is writing in.
 
-import { api } from "../../lib/bridge";
-import { inkNoteText, latexForNote } from "../../lib/inkFile";
+import { latexForNote } from "../../lib/inkFile";
 import { useApp } from "../../store/app";
 import { insertAtCursor } from "../notes/SourceEditor";
 
@@ -33,21 +32,9 @@ export function insertLatex(latex: string, display: boolean): "answer" | "editor
   return "note";
 }
 
-/** Creates `Dibujo LaTeX N` in the folder of the open note and shows it in a split view. */
-export async function openInkPad(): Promise<void> {
+/** Opens the drawing pad in a split view. Nothing is written to disk until "Crear archivo". */
+export function openInkPad(): void {
   const app = useApp.getState();
   const folder = app.active?.includes("/") ? app.active.slice(0, app.active.lastIndexOf("/")) : "";
-  try {
-    const siblings = await api.listDir(folder);
-    const used = new Set(siblings.map((e) => e.name.toLowerCase()));
-    let n = 1;
-    while (used.has(`dibujo latex ${n}`)) n += 1;
-    const title = `Dibujo LaTeX ${n}`;
-    const { path } = await api.createNote(title, folder);
-    await api.writeNote(path, inkNoteText(title), null);
-    app.refreshTree();
-    await useApp.getState().openSide(path);
-  } catch (e) {
-    app.toast("error", (e as Error).message);
-  }
+  app.setInkDraft({ folder });
 }

@@ -195,7 +195,7 @@ export function App() {
   // The view to show is driven by the active tab's module id.
   const module = useApp((s) => s.module);
   const sideModule = useApp((s) => s.sideModule);
-  const canvasPath = useCanvas((s) => s.path);
+
   const draggingTabId = useTabDrag((s) => s.draggingTabId);
   const [dropReady, setDropReady] = useState(false);
   useNavigationGuard();
@@ -258,7 +258,7 @@ export function App() {
         )}
         {/* Una sola columna derecha en toda la app: la tira de lanzadores o la
             cara que sus botones abran. */}
-        <RightPanel module={module} canvas={module === "notas" && !!canvasPath} />
+        <RightPanel module={module} />
         {dropReady && draggingTabId && (
           <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 border-l-2 border-accent bg-accent-soft/20" aria-hidden="true" />
         )}

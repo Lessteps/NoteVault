@@ -51,7 +51,6 @@ describe("countAttempt", () => {
 
 describe("el progreso ignora lo que no cuenta", () => {
   it("una sesión con ayuda no suma al progreso ni al «mejor»", () => {
-    const clean = replay([pass(), pass(), pass()]);
     const helped = replay([pass(), pass(), pass({ hints_used: 1 })]);
     expect(helped.counted_attempts).toBe(2);
     expect(helped.attempts).toBe(3);

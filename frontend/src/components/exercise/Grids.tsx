@@ -13,8 +13,10 @@ import { appliesOn } from "../../lib/exercise";
 import { MONTHS, shortDate, todayIso, WEEKDAYS } from "../../lib/tasks";
 import { useExercise } from "../../store/exercise";
 import type { ExerciseDay } from "../../lib/types";
+import type { MuscleExercise } from "../../lib/muscles";
 import { cn } from "../ui";
 import { Header, NavButtons } from "../habits/parts";
+import { MuscleMini, muscleRows } from "./MuscleFocus";
 import { ORANGE, useFail } from "./parts";
 
 /** The square a cell gets, same idea as the habit check. */
@@ -42,7 +44,9 @@ function ExerciseCheck({ done, disabled, label, onToggle }: {
   );
 }
 
-function Grid({ days }: { days: string[] }) {
+/** `focus` añade la fila del enfoque muscular: el cuerpo de cada día, en
+ *  pequeño. La rejilla del mes no la lleva (31 columnas no caben). */
+function Grid({ days, focus = false }: { days: string[]; focus?: boolean }) {
   const fail = useFail();
   const list = useExercise((s) => s.list);
   const days_ = useExercise((s) => s.days);
@@ -80,6 +84,13 @@ function Grid({ days }: { days: string[] }) {
     [days_, list],
   );
 
+  /** Lo que trabaja cada fecha del periodo, ya listo para el cuerpo pequeño. */
+  const mini = useMemo(() => {
+    const out: Record<string, MuscleExercise[]> = {};
+    for (const d of days) out[d] = muscleRows(data[d] ?? null, list);
+    return out;
+  }, [days, data, list]);
+
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-card">
       <table className="w-full border-collapse text-[12.5px]">
@@ -103,6 +114,22 @@ function Grid({ days }: { days: string[] }) {
             <th className="px-3 font-mono text-[10.5px] font-normal text-faint">%</th>
           </tr>
         </thead>
+        {focus && (
+          <tbody>
+            {/* Qué se trabaja cada día de la semana, de un vistazo. */}
+            <tr className="border-b border-line bg-elevated/20">
+              <td className="sticky left-0 z-10 bg-card px-4 py-1.5">
+                <span className="font-mono text-[10.5px] uppercase tracking-wider text-faint">Enfoque muscular</span>
+              </td>
+              {days.map((d) => (
+                <td key={d} className={cn("px-0.5 py-1.5 align-middle", d === today && "bg-accent-soft/40")}>
+                  <MuscleMini date={d} rows={mini[d] ?? []} width={34} />
+                </td>
+              ))}
+              <td />
+            </tr>
+          </tbody>
+        )}
         <tbody>
           {grouped.map((group) => (
             <Fragment key={group.day.key}>
@@ -187,7 +214,7 @@ export function ExerciseWeek() {
         />
       </Header>
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
-        <Grid days={days} />
+        <Grid days={days} focus />
       </div>
     </>
   );

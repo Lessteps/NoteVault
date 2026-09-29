@@ -124,6 +124,8 @@ interface State {
   explorerTab: ExplorerTab;
   explorerOpen: boolean;
   inspectorOpen: boolean;
+  /** El esquema muscular ocupando el panel derecho. Solo tiene sentido en Ejercicio. */
+  muscleOpen: boolean;
 
   // ── Unified tab strip ──────────────────────────────────────────────
   openTabs: AppTab[];
@@ -156,6 +158,7 @@ interface State {
   setExplorerTab: (t: ExplorerTab) => void;
   toggleExplorer: () => void;
   toggleInspector: () => void;
+  setMuscleOpen: (open: boolean) => void;
   toggleTheme: () => void;
   setTheme: (theme: "dark" | "light") => void;
   setSwitcher: (open: boolean) => void;
@@ -339,6 +342,7 @@ export const useApp = create<State>((setState, get) => {
   explorerTab: "files",
   explorerOpen: true,
   inspectorOpen: true,
+  muscleOpen: false,
   openTabs: [],
   activeTabId: null,
   pinnedTabIds: new Set<string>(),
@@ -394,6 +398,7 @@ export const useApp = create<State>((setState, get) => {
   setExplorerTab: (explorerTab) => set({ explorerTab, explorerOpen: true }),
   toggleExplorer: () => set((s) => ({ explorerOpen: !s.explorerOpen })),
   toggleInspector: () => set((s) => ({ inspectorOpen: !s.inspectorOpen })),
+  setMuscleOpen: (muscleOpen) => set({ muscleOpen }),
   toggleTheme: () => {
     const theme = get().theme === "dark" ? "light" : "dark";
     applyTheme(theme);

@@ -1,6 +1,10 @@
-// Diaria: the routine of one date, with weight, reps and notes per exercise.
+// Diaria: la rutina de una fecha, con peso, reps y notas por ejercicio — y al
+// lado el enfoque muscular de esa misma fecha: el cuerpo con las zonas que
+// trabaja, y al pasar el puntero por un músculo, el ejercicio que lo entrena.
+//
+// El cuerpo se sincroniza solo: relee el día cada vez que se marca algo.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Map as MapIcon } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { addDays } from "../../lib/habits";
@@ -11,8 +15,9 @@ import type { Exercise, ExerciseDay } from "../../lib/types";
 import { inputBase, GhostButton } from "../common/forms";
 import { NavButtons } from "../habits/parts";
 import { cn } from "../ui";
-import { ORANGE, useFail } from "./parts";
+import { MuscleFocusCard, muscleRows } from "./MuscleFocus";
 import { MuscleMap } from "./MuscleMap";
+import { ORANGE, seriesOf, useFail } from "./parts";
 
 /** One exercise row: tick, weight, reps, notes (saved on change / blur). */
 export function ExerciseRow({ day, ex, entry, onChanged, onVideo, compact }: {
@@ -59,7 +64,7 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo, compact }: {
   };
   const small = cn(inputBase, "w-16 py-1 text-right text-[12px]");
   return (
-    <div className={cn("rounded-lg border border-line bg-card px-3", compact ? "py-1.5" : "py-2.5")}>
+    <div className={cn("rounded-2xl border border-line bg-card px-3", compact ? "py-1.5" : "py-2.5")}>
       <div className="flex items-center gap-3">
         <input type="checkbox" aria-label={`Hecho: ${ex.name}`} checked={done} disabled={future} style={{ accentColor: ORANGE }}
           onChange={(e) => { setDone(e.target.checked); void save({ done: e.target.checked }); }} />
@@ -119,6 +124,7 @@ export function DayList({ date, day, onVideo, onChanged, compact }: {
 export function Daily({ onVideo }: { onVideo: (ex: Exercise) => void }) {
   const fail = useFail();
   const days = useExercise((s) => s.days);
+  const list = useExercise((s) => s.list);
   const refreshStats = useExercise((s) => s.refreshStats);
   const [date, setDate] = useState(() => todayIso());
   const [day, setDay] = useState<ExerciseDay | null>(null);
@@ -132,6 +138,11 @@ export function Daily({ onVideo }: { onVideo: (ex: Exercise) => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
+  const byId = useMemo(() => new Map(list.map((e) => [e.id, e])), [list]);
+  /** La fecha abierta, con los identificadores que pinta el cuerpo. */
+  const rows = useMemo(() => muscleRows(day, list), [day, list]);
+  const series = (day?.exercises ?? []).reduce((sum, e) => sum + seriesOf(byId.get(e.id)?.series_reps), 0);
+
   const done = day ? day.exercises.filter((e) => day.log[e.id]?.done).length : 0;
   const isToday = date === todayIso();
 
@@ -144,12 +155,12 @@ export function Daily({ onVideo }: { onVideo: (ex: Exercise) => void }) {
         {meta && <span className="text-[12px] text-faint">{meta.subtitle}</span>}
         <div className="ml-auto flex items-center gap-2">
           {day && day.exercises.length > 0 && (
-            <span className="rounded-md px-2 py-0.5 font-mono text-[12px]" style={{ background: `color-mix(in srgb, ${ORANGE} 18%, transparent)`, color: ORANGE }}>
+            <span className="rounded-full px-2.5 py-0.5 font-mono text-[12px]" style={{ background: `color-mix(in srgb, ${ORANGE} 18%, transparent)`, color: ORANGE }}>
               {done}/{day.exercises.length}
             </span>
           )}
           <button type="button" onClick={() => setMap(true)} title="Mapa muscular del día"
-            className="flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">
+            className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">
             <MapIcon size={13} /> Mapa
           </button>
           <NavButtons
@@ -161,15 +172,21 @@ export function Daily({ onVideo }: { onVideo: (ex: Exercise) => void }) {
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-        <DayList
-          date={date}
-          day={day}
-          onVideo={onVideo}
-          onChanged={() => {
-            void load();
-            void refreshStats();
-          }}
-        />
+        {/* Los ejercicios y, al lado, lo que se trabaja con ellos. */}
+        <div className="grid items-start gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 372px" }}>
+          <DayList
+            date={date}
+            day={day}
+            onVideo={onVideo}
+            onChanged={() => {
+              void load();
+              void refreshStats();
+            }}
+          />
+          <section className="rounded-2xl border border-line bg-card">
+            <MuscleFocusCard rows={rows} series={series} />
+          </section>
+        </div>
       </div>
       {map && (
         <MuscleMap

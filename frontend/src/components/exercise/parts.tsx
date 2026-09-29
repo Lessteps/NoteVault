@@ -8,6 +8,12 @@ import { pct } from "../../lib/habits";
 
 export const ORANGE = "#ff9632";
 
+/** "4x5", "3 x 12", "3x20-30m" → the leading number of series. */
+export function seriesOf(prescription?: string): number {
+  const m = /^\s*(\d+)\s*[x×]/i.exec(prescription ?? "");
+  return m ? Number(m[1]) : 0;
+}
+
 export function useFail() {
   const toast = useApp((s) => s.toast);
   return (e: unknown) => toast("error", (e as Error).message);

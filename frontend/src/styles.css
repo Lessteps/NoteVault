@@ -1065,12 +1065,13 @@ html[data-perf="lite"] .nv-practice-view {
   stroke-width: 2.4;
 }
 
+/* Puntos, no cuadraditos: la leyenda del músculo y la del mapa son círculos. */
 .nv-legend {
   display: inline-block;
   height: 10px;
   width: 10px;
   border: 1px solid var(--nv-muscle-line);
-  border-radius: 3px;
+  border-radius: 9999px;
 }
 
 .nv-legend--idle { background: var(--nv-muscle-idle); }

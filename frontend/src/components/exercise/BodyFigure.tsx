@@ -91,22 +91,27 @@ export function BodyFigure({
   return <div className={cn("relative flex flex-col items-center", className)} style={{ width }}>{svg}{cap}</div>;
 }
 
-/** Front + back side by side, both display-only (the general view's card). */
+/** Front + back side by side. Display-only by default (theme figures, grids);
+ *  `interactive` hands the pointer to the caller (the focus cards, so hovering a
+ *  muscle can name the exercise that trains it). */
 export function BodyPair({
-  states, highlight, width = 118, gap = 8, caption = true,
+  states, highlight, width = 118, gap = 8, caption = true, active, interactive = false, onMuscle, onHover,
 }: {
   states?: Record<string, MuscleState>;
   highlight?: Set<string> | null;
   width?: number;
   gap?: number;
   caption?: boolean;
+  active?: string | null;
+  interactive?: boolean;
+  onMuscle?: (id: string) => void;
+  onHover?: (id: string | null, at?: { x: number; y: number }) => void;
 }) {
+  const shared = { states, highlight, width, strokeWidth: 0.2, active, interactive, onMuscle, onHover };
   return (
     <div className="flex items-start justify-center" style={{ gap }}>
-      <BodyFigure view="front" states={states} highlight={highlight} width={width} strokeWidth={0.2}
-        interactive={false} caption={caption ? "Vista anterior" : undefined} />
-      <BodyFigure view="back" states={states} highlight={highlight} width={width} strokeWidth={0.2}
-        interactive={false} caption={caption ? "Vista posterior" : undefined} />
+      <BodyFigure view="front" {...shared} caption={caption ? "Vista anterior" : undefined} />
+      <BodyFigure view="back" {...shared} caption={caption ? "Vista posterior" : undefined} />
     </div>
   );
 }

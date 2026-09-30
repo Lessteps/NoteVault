@@ -462,6 +462,13 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
     assistance: string,
   ) => call<import("./types").TopicSessionResult>("study_topic_session_build", folder, skill, difficulty, quantity, assistance),
   /** AI reads the topic's theory and rewrites its practice plan (skills x difficulty counts). */
+  /** Mistakes record per competency of a topic: is the box on, how many mistakes it holds. */
+  studyLearningStatus: (folder: string) => call<Record<string, { enabled: boolean; entries: number }>>("study_learning_status", folder),
+  studyLearningSet: (folder: string, skill: string, enabled: boolean) =>
+    call<{ skill: string; enabled: boolean; entries: number }>("study_learning_set", folder, skill, enabled),
+  /** The competency checklist for the chat: recommended ones, and how every skill would be practised here. */
+  studyTopicSkillOptions: (folder: string) =>
+    call<import("../lib/assistantModes").ParsedSkills & { current?: boolean }>("study_topic_skill_options", folder),
   studyTopicReevaluate: (folder: string) =>
     call<{ ok: boolean; plan: import("./types").PracticePlan; path: string }>("study_topic_reevaluate", folder),
   /** The topic review notes: when each practised topic is due again. */

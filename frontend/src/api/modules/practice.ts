@@ -41,6 +41,8 @@ import {
 import { MODES, modeFor } from "../../core/practice/modes.js";
 import { attemptPassed } from "../../core/practice/ledger.js";
 import { recordTopicPractice } from "../../core/practice/reviewFiles.js";
+import { recordLearning } from "../../core/practice/learningLog.js";
+import { findAncestorTopicManifest } from "../../core/practice/topic.js";
 import { parseTimer } from "../../core/practice/timer.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
@@ -169,6 +171,22 @@ function practiceApply(
     recordTopicPractice(app.root, p, { skill: String(ex.mode || ""), passed: attemptPassed(attempt as Record<string, any>) });
   } catch {
     /* a review note that cannot be written must never break grading */
+  }
+  // The mistakes of this attempt go to the competency's learning record, when its box is on.
+  try {
+    const found = findAncestorTopicManifest(p, app.root);
+    if (found) {
+      const at = new Date().toISOString();
+      const base = { at, exercise: ex.note_id, title: ex.title, score: result.score };
+      const entries = result.errors.length
+        ? result.errors.map((e) => ({ ...base, category: e.category, description: e.description, evidence: e.evidence || answer, fix: e.fix }))
+        : result.score < 60
+          ? [{ ...base, category: "other", description: result.feedback, evidence: answer, fix: result.next_step }]
+          : [];
+      recordLearning(app.root, app.rel(found.topicFolder).replace(/\\/g, "/"), String(ex.mode || ""), entries);
+    }
+  } catch {
+    /* the learning record never breaks grading */
   }
   const history = historyList(new PracticeAttemptStore(app.root).attempts(ex.note_id));
   return {

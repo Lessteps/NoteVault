@@ -88,6 +88,83 @@ export function buildReevaluationMessages(input: ReevaluationInput): Array<{ rol
   ];
 }
 
+/**
+ * The prompt for the competency CHECKLIST shown in the chat: the AI marks which competencies it
+ * recommends for this topic, and for EVERY one of them says how the student would practise it here,
+ * so the user can decide with the whole picture in front of them.
+ */
+export function buildSkillOptionsMessages(input: ReevaluationInput): Array<{ role: "system" | "user"; content: string }> {
+  const [system, user] = buildReevaluationMessages(input);
+  const extra = [
+    "",
+    "THIS TIME the user will choose, so list EVERY skill of the catalogue (all of them), each once:",
+    '  "recommended": true only for the 3-6 that serve this topic best (and suit its type), false for the rest;',
+    '  "difficulties": how many exercises at 1/2/3 you would suggest (also for the not recommended ones, as a sensible default; 0 where a level is not allowed);',
+    '  "why": ONE short Spanish sentence: why it is or is not recommended for THIS topic;',
+    '  "how": ONE short Spanish sentence: how the student would probably practise this topic with this skill (a concrete example of exercise).',
+    'Format: {"topic_type":"...","skills":[{"skill":"<id>","recommended":true,"difficulties":{"1":n,"2":n,"3":n},"why":"...","how":"..."}],"summary":"<one sentence>"}',
+  ].join("\n");
+  return [{ role: "system", content: `${system!.content}${extra}` }, user!];
+}
+
+export interface SkillOption {
+  skill: string;
+  label: string;
+  recommended: boolean;
+  levels: [number, number, number];
+  why: string;
+  how: string;
+  /** false when the catalogue says this skill does not usually suit the topic's nature */
+  fits: boolean;
+}
+
+/** The AI's checklist, completed with every catalogue skill and cleaned against the catalogue. */
+export function parseSkillOptions(
+  reply: string,
+  catalog: readonly CatalogSkill[],
+  fallbackType?: TopicType,
+): { options: SkillOption[]; topicType?: TopicType; summary: string } | null {
+  let text = String(reply ?? "").trim();
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
+  if (fence) text = fence[1]!.trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  let raw: any;
+  try {
+    raw = JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+  if (!raw || !Array.isArray(raw.skills)) return null;
+  const declared = String(raw.topic_type ?? "").trim().toLowerCase();
+  const topicType = (["theoretical", "procedural", "mixed"].includes(declared) ? declared : fallbackType) as TopicType | undefined;
+  const said = new Map<string, any>();
+  for (const item of raw.skills) said.set(String(item?.skill ?? "").trim().toLowerCase(), item);
+
+  const options: SkillOption[] = catalog.map((def) => {
+    const item = said.get(def.id.toLowerCase());
+    const d = item?.difficulties ?? item?.counts ?? {};
+    const levels = LEVELS.map((level) =>
+      def.allowedDifficulties.includes(level) ? clampCount(d[level] ?? d[String(level)] ?? (item ? 0 : 3)) : 0,
+    ) as [number, number, number];
+    const fits = !topicType || def.topicTypes.includes(topicType);
+    const recommended = Boolean(item?.recommended) && fits && levels.some((n) => n > 0);
+    const why = String(item?.why ?? "").replace(/\s+/g, " ").trim();
+    return {
+      skill: def.id.toLowerCase(),
+      label: def.label,
+      recommended,
+      levels,
+      why: !fits ? `${why ? `${why} ` : ""}No suele encajar con un tema ${topicType === "theoretical" ? "teórico" : "de procedimiento"}.`.trim() : why,
+      how: String(item?.how ?? "").replace(/\s+/g, " ").trim(),
+      fits,
+    };
+  });
+  if (!options.some((o) => o.recommended)) return null;
+  return { options, summary: String(raw.summary ?? "").replace(/\s+/g, " ").trim(), ...(topicType ? { topicType } : {}) };
+}
+
 function clampCount(value: unknown): number {
   const n = Math.round(Number(value));
   if (!Number.isFinite(n) || n < 0) return 0;
@@ -99,6 +176,8 @@ export function parsePracticePlan(
   reply: string,
   catalog: readonly CatalogSkill[],
   fallbackType?: TopicType,
+  /** the user ticked it themselves: a skill that "does not suit" the topic type is kept */
+  keepUnfit = false,
 ): PracticePlan | null {
   let text = String(reply ?? "").trim();
   const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
@@ -124,7 +203,7 @@ export function parsePracticePlan(
     const def = byId.get(id);
     if (!def || seen.has(id)) continue;
     // A skill that does not suit the topic's nature is dropped, whatever the model said.
-    if (topicType && !def.topicTypes.includes(topicType)) continue;
+    if (!keepUnfit && topicType && !def.topicTypes.includes(topicType)) continue;
     const d = item?.difficulties ?? item?.counts ?? {};
     const counts = { 1: 0, 2: 0, 3: 0 } as Record<DifficultyLevel, number>;
     for (const level of LEVELS) {

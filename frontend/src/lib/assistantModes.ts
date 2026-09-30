@@ -62,29 +62,76 @@ export interface ParsedAction {
   args: Record<string, unknown>;
 }
 
-export interface SplitReply {
-  /** the reply without the action block (also hides a block still being streamed) */
-  text: string;
-  action: ParsedAction | null;
+/** A question the assistant asks with buttons instead of guessing (an `nv-ask` block). */
+export interface ParsedAsk {
+  question: string;
+  options: Array<{ label: string; value: string }>;
+  /** several answers can be ticked before sending */
+  multiple: boolean;
 }
 
-/** Separates the visible reply from the `nv-action` block the model ends it with. */
+/** A checklist of competencies (an `nv-skills` block): the user ticks, accepts, and it is applied. */
+export interface ParsedSkills {
+  /** topic folder the matrix belongs to */
+  topic: string;
+  title: string;
+  topicType?: string;
+  summary?: string;
+  skills: Array<{
+    skill: string;
+    label: string;
+    recommended: boolean;
+    /** exercises for easy / medium / hard */
+    levels: [number, number, number];
+    /** why it is (or is not) recommended for THIS topic */
+    why: string;
+    /** how this topic would probably be practised with this competency */
+    how: string;
+  }>;
+}
+
+export interface SplitReply {
+  /** the reply without its blocks (also hides a block still being streamed) */
+  text: string;
+  action: ParsedAction | null;
+  ask: ParsedAsk | null;
+  skills: ParsedSkills | null;
+}
+
+const BLOCK = /```(nv-action|nv-ask|nv-skills)[ \t]*\r?\n([\s\S]*?)```/g;
+
+/**
+ * Separates the visible reply from the fenced blocks the model (or the app) puts in it:
+ * `nv-action` (files to create or change), `nv-ask` (a question with options) and
+ * `nv-skills` (the competency checklist).
+ */
 export function splitAction(content: string): SplitReply {
-  const start = content.indexOf("```nv-action");
-  if (start < 0) return { text: content, action: null };
-  const text = content.slice(0, start).trimEnd();
-  const close = content.indexOf("```", start + 12);
-  if (close < 0) return { text, action: null };
-  try {
-    const parsed = JSON.parse(content.slice(start + 12, close).trim());
-    if (parsed && typeof parsed.action === "string") {
-      // Models sometimes put the fields beside `action` instead of inside `args`.
-      const { action: name, args: inner, ...rest } = parsed as Record<string, unknown>;
-      const args = inner && typeof inner === "object" ? (inner as Record<string, unknown>) : rest;
-      return { text, action: { action: String(name), args } };
+  let action: ParsedAction | null = null;
+  let ask: ParsedAsk | null = null;
+  let skills: ParsedSkills | null = null;
+  let text = content.replace(BLOCK, (_all, kind: string, body: string) => {
+    try {
+      const parsed = JSON.parse(body.trim());
+      if (kind === "nv-action" && parsed && typeof parsed.action === "string") {
+        // Models sometimes put the fields beside `action` instead of inside `args`.
+        const { action: name, args: inner, ...rest } = parsed as Record<string, unknown>;
+        const args = inner && typeof inner === "object" ? (inner as Record<string, unknown>) : rest;
+        action = { action: String(name), args };
+      } else if (kind === "nv-ask" && parsed && typeof parsed.question === "string" && Array.isArray(parsed.options)) {
+        const options = (parsed.options as unknown[])
+          .map((o) => (typeof o === "string" ? { label: o, value: o } : { label: String((o as any)?.label ?? ""), value: String((o as any)?.value ?? (o as any)?.label ?? "") }))
+          .filter((o) => o.label);
+        if (options.length) ask = { question: parsed.question, options, multiple: parsed.multiple === true };
+      } else if (kind === "nv-skills" && parsed && Array.isArray(parsed.skills)) {
+        skills = parsed as ParsedSkills;
+      }
+    } catch {
+      /* a malformed block is not shown */
     }
-  } catch {
-    /* a malformed block is not shown as an action */
-  }
-  return { text, action: null };
+    return "";
+  });
+  // A block still being streamed (opened, not closed yet) is hidden too.
+  const open = text.search(/```nv-(action|ask|skills)/);
+  if (open >= 0) text = text.slice(0, open);
+  return { text: text.trimEnd(), action, ask, skills };
 }

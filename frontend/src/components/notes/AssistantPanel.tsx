@@ -4,7 +4,7 @@
 
 import {
   ArrowLeft, ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
-  Folder, FolderPlus, GitCompare, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
+  Folder, FolderPlus, GitCompare, Loader2, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
   Square, ThumbsDown, ThumbsUp, Trash2, Wand2, X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
@@ -20,6 +20,7 @@ import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms
 import { askText, cn, confirmAction, IconButton, openMenu } from "../ui";
 import { generateTopicFrom, useStudySpaceDialog } from "../study/StudySpaceDialog";
 import { ActionCard } from "./ActionCard";
+import { AskCard, SkillsCard } from "./ChatCards";
 import { editorSelection, insertAtCursor } from "./SourceEditor";
 
 const WIDTH_KEY = "nv.assistant.width";
@@ -111,13 +112,15 @@ function ContextChip({ ctx, onRemove }: { ctx: ChatContext; onRemove?: () => voi
 function AssistantBody({ m }: { m: ChatMessage }) {
   const ref = useRef<HTMLDivElement>(null);
   // The `nv-action` block is not shown as text: it becomes a card once complete.
-  const { text, action } = useMemo(() => splitAction(m.content), [m.content]);
+  const { text, action, ask, skills } = useMemo(() => splitAction(m.content), [m.content]);
   const html = useMemo(() => renderMarkdown(text), [text]);
   useCodeCopy(ref);
   return (
     <>
       <div ref={ref} className="nv-chat-prose" dangerouslySetInnerHTML={{ __html: html }} />
       {action && !m.streaming && <ActionCard action={action} />}
+      {ask && !m.streaming && <AskCard ask={ask} />}
+      {skills && !m.streaming && <SkillsCard data={skills} />}
     </>
   );
 }
@@ -358,10 +361,16 @@ function Composer() {
       return;
     }
     setEvaluating(true);
+    const name = target.split("/").pop();
+    const chat = useAssistant.getState();
+    await chat.addMessage("system", `Re-evaluando la práctica de «${name}»: la IA lee su teoría y prepara la lista de competencias…`);
     try {
-      const res = await api.studyTopicReevaluate(target);
-      toast("info", res.plan.summary || `Plan de práctica actualizado (${res.plan.skills.length} competencias).`);
+      // Nothing is changed yet: the chat shows the checklist and the user decides.
+      const options = await api.studyTopicSkillOptions(target);
+      const block = "```nv-skills\n" + JSON.stringify(options) + "\n```";
+      await chat.addMessage("assistant", `Estas son las competencias para «${options.title}». Marqué las que recomiendo; debajo de cada una explico por qué y cómo se practicaría en este tema. Ajusta lo que quieras y pulsa **Aplicar**.\n\n${block}`);
     } catch (e) {
+      await chat.addMessage("system", `✗ No pude preparar la lista: ${(e as Error).message}`);
       toast("error", (e as Error).message);
     } finally {
       setEvaluating(false);
@@ -431,6 +440,13 @@ function Composer() {
           {pending.map((c, i) => (
             <ContextChip key={i} ctx={c} onRemove={() => setPending((p) => p.filter((_, j) => j !== i))} />
           ))}
+        </div>
+      )}
+      {evaluating && (
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-semibold text-accent-text">
+            <Loader2 size={11} className="animate-spin" /> Re-evaluando práctica del tema…
+          </span>
         </div>
       )}
       {modeInfo && (

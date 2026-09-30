@@ -24,6 +24,11 @@ export interface SessionConfig {
   assistance: AssistanceLevel;
   /** What the topic's AI practice plan asks for this skill and difficulty (used by `"ai"`). */
   planCount?: number | null;
+  /**
+   * The student's recorded mistakes in this competency (the "registro de errores" box):
+   * most of the NEW exercises are written around them, the rest train the whole competency.
+   */
+  learning?: string[];
 }
 
 export interface PlannedExercise {
@@ -101,6 +106,7 @@ export function buildExerciseGenerationPrompt(
   difficulty: DifficultyLevel,
   assistance: AssistanceLevel,
   countToGenerate: number,
+  learning: string[] = [],
 ): Array<{ role: "system" | "user"; content: string }> {
   const diffName = difficultyLabel(difficulty);
   const isHelper = assistance === "helper";
@@ -135,6 +141,14 @@ export function buildExerciseGenerationPrompt(
     `Required skill: ${skill}`,
     `Difficulty: ${difficulty} (${diffName})`,
     `Assistance: ${assistance}`,
+    learning.length
+      ? [
+          "",
+          "REGISTRO DE ERRORES del estudiante en esta competencia (más recientes primero):",
+          ...learning.map((l) => `- ${l}`),
+          "Escribe alrededor del 60 % de los ejercicios para atacar EXACTAMENTE estos errores (el mismo tipo de fallo, con otros números o contexto, sin repetir enunciados) y el resto para entrenar toda la competencia y mantener activo lo que ya domina.",
+        ].join("\n")
+      : "",
     "",
     "Return ONLY the JSON array of exercises.",
   ].join("\n");
@@ -293,7 +307,10 @@ export async function buildTopicSession(
   const matching = filterTopicExercises(allExercises, topicFolder, config.skill, config.difficulty);
   const targetCount = resolveTargetQuantity(config.quantity, matching.length, config.planCount);
 
-  const planned: PlannedExercise[] = matching.slice(0, targetCount).map((ex) => ({
+  // With a mistakes record, fresh exercises built around it take most of the session.
+  const learning = config.learning ?? [];
+  const focus = aiClient && learning.length ? Math.max(1, Math.ceil(targetCount * 0.6)) : 0;
+  const planned: PlannedExercise[] = matching.slice(0, targetCount - focus).map((ex) => ({
     id: ex.note_id,
     title: ex.title,
     path: ex.rel || ex.path,
@@ -310,6 +327,7 @@ export async function buildTopicSession(
       config.difficulty,
       config.assistance,
       needed,
+      learning,
     );
     try {
       const generated = await aiClient.generateExercises(messages);

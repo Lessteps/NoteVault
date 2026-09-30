@@ -333,6 +333,8 @@ function planMatrix(root: string, args: Record<string, any>): ActionPlan {
     JSON.stringify({ topic_type: args.topic_type, skills: requested, summary: args.summary ?? "" }),
     catalog,
     topicTypeFromName(name) ?? "mixed",
+    // The chat's checklist: what the user ticked stays, even if it does not usually suit the topic.
+    args.force === true,
   );
   if (!plan) throw new ApiError("La matriz no tiene ninguna competencia válida para este tema.");
   const kept = new Set(plan.skills.map((s) => s.skill));

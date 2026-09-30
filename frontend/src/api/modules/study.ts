@@ -54,7 +54,9 @@ import { AIConfig, sendChat } from "../../core/aiClient.js";
 import {
   applyPlanToPractica,
   buildReevaluationMessages,
+  buildSkillOptionsMessages,
   parsePracticePlan,
+  parseSkillOptions,
   planCount,
   readPlanFromPractica,
   type PracticePlan,
@@ -63,6 +65,13 @@ import { listReviews } from "../../core/practice/reviewFiles.js";
 import { catalogFor } from "../../core/practice/skillSelection.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
 import { detectTopicType } from "../../core/practice/topicType.js";
+import {
+  learningPromptLines,
+  learningStatus,
+  readLearning,
+  seedFromErrorLog,
+  setLearningEnabled,
+} from "../../core/practice/learningLog.js";
 import { AppConfig } from "../appConfig.js";
 import type { DifficultyLevel } from "../../core/practice/skills.js";
 import type { AppState } from "../appState.js";
@@ -343,8 +352,55 @@ export async function reevaluateTopic(app: AppState, folder: string): Promise<{ 
   return { plan, reply, path: app.rel(practicaAbs).split(path.sep).join("/") };
 }
 
+/**
+ * The competency checklist of a topic for the chat: which skills the AI recommends and, for every
+ * skill of the catalogue, why and how it would be practised here. Writes nothing: the user ticks
+ * and accepts in the chat, and only then is the matrix changed.
+ */
+export async function topicSkillOptions(app: AppState, folder: string) {
+  const normFolder = app.rel(app.resolve(folder, { allowRoot: true })).replace(/\\/g, "/");
+  const found = findTopicManifest(app, normFolder);
+  if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+  const manifest = found.manifest;
+  const topicAbs = app.resolve(manifest.folder || normFolder, { allowRoot: true });
+  const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+  if (cfg.is_bridge) throw new ApiError("El proveedor de IA está en modo puente; no se puede re-evaluar automáticamente.");
+
+  const subject = manifest.subject || "mathematics";
+  const topicType = manifest.topic_type ?? detectTopicType({ name: manifest.title }).type;
+  const catalog = catalogFor(subject);
+  const messages = buildSkillOptionsMessages({
+    subject,
+    title: manifest.title,
+    topicType,
+    catalog,
+    theory: readTheoryNotes(app, topicAbs),
+    templates: skillTemplates(app, normFolder),
+    currentSkills: manifest.skills,
+  });
+  const reply = await askStructured(cfg, messages, (r) => parseSkillOptions(r, catalog, topicType) !== null);
+  const parsed = parseSkillOptions(reply, catalog, topicType);
+  if (!parsed) {
+    const snippet = String(reply ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new ApiError(`La IA no devolvió la lista de competencias. Respuesta: «${snippet || "vacía"}»`);
+  }
+  const current = new Set((manifest.skills ?? []).map((s) => s.toLowerCase()));
+  return {
+    topic: normFolder,
+    title: manifest.title,
+    topicType: parsed.topicType ?? topicType,
+    summary: parsed.summary,
+    skills: parsed.options.map((o) => ({ ...o, current: current.has(o.skill) })),
+  };
+}
+
 export function studyApi(app: AppState) {
   return {
+    /** The competency checklist the chat shows when re-evaluating a topic's practice. */
+    async study_topic_skill_options(folder: string) {
+      return topicSkillOptions(app, folder);
+    },
+
     study_area(rel: string) {
       const area = getStudyArea(app, rel);
       if (!area) {
@@ -849,7 +905,14 @@ export function studyApi(app: AppState) {
       const plan = await buildTopicSession(
         found.manifest,
         normFolder,
-        { skill, difficulty: diff, quantity: qty, assistance: ast, planCount: aiCount },
+        {
+          skill,
+          difficulty: diff,
+          quantity: qty,
+          assistance: ast,
+          planCount: aiCount,
+          learning: learningPromptLines(app.root, normFolder.replace(/\\/g, "/"), skill),
+        },
         scan.exercises,
         theoryNotes,
         aiClient,
@@ -884,6 +947,24 @@ export function studyApi(app: AppState) {
         })),
         first_exercise: plan.exercises[0]?.path ?? "",
       };
+    },
+
+    /** Per competency of a topic: is its mistakes record on, and how many mistakes it holds. */
+    study_learning_status(folder: string) {
+      const rel = app.rel(app.resolve(folder, { allowRoot: true })).replace(/\\/g, "/");
+      return learningStatus(app.root, rel);
+    },
+
+    /** The "Activar registro de errores" box of one competency of one topic. */
+    study_learning_set(folder: string, skill: string, enabled: boolean) {
+      const rel = app.rel(app.resolve(folder, { allowRoot: true })).replace(/\\/g, "/");
+      const found = findTopicManifest(app, rel);
+      if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+      const sk = String(skill || "").toLowerCase();
+      const existing = readLearning(app.root, rel, sk);
+      const seed = existing ? [] : seedFromErrorLog(app.root, rel, found.manifest.subject, sk);
+      const rec = setLearningEnabled(app.root, rel, found.manifest.title, sk, Boolean(enabled), seed);
+      return { skill: sk, enabled: rec.enabled, entries: rec.entries.length };
     },
 
     /** The topic review notes (spaced repetition), soonest first. */

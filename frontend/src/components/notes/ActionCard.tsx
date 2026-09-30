@@ -6,6 +6,7 @@ import { Check, FilePlus2, FolderPlus, Loader2, RefreshCw, Wand2, X } from "luci
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { ParsedAction } from "../../lib/assistantModes";
+import { cardKey, getCardState, setCardState } from "../../lib/cardState";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
 import { cn } from "../ui";
@@ -25,7 +26,11 @@ export function ActionCard({ action: proposed }: { action: ParsedAction }) {
   );
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
-  const [state, setState] = useState<"idle" | "applying" | "applied" | "dismissed">("idle");
+  // What was decided is remembered by the card's content: reopening the chat shows it marked.
+  const decided = useMemo(() => getCardState(cardKey(action)), [action]);
+  const [state, setState] = useState<"idle" | "applying" | "applied" | "dismissed">(
+    decided === "applied" ? "applied" : decided === "dismissed" ? "dismissed" : "idle",
+  );
   const [result, setResult] = useState<{ written: number; skipped: number } | null>(null);
   const key = JSON.stringify(action);
 
@@ -44,7 +49,13 @@ export function ActionCard({ action: proposed }: { action: ParsedAction }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  if (state === "dismissed") return null;
+  if (state === "dismissed") {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[11.5px] text-faint">
+        <X size={12} /> Descartado · {preview?.title ?? "propuesta del asistente"}
+      </div>
+    );
+  }
 
   const apply = async () => {
     const app = useApp.getState();
@@ -52,6 +63,7 @@ export function ActionCard({ action: proposed }: { action: ParsedAction }) {
     try {
       const res = await api.assistantActionApply(action);
       setResult({ written: res.written.length, skipped: res.skipped.length });
+      setCardState(cardKey(action), "applied");
       setState("applied");
       app.refreshTree();
       app.toast("info", `${res.written.length} archivo(s) creado(s)${res.skipped.length ? `, ${res.skipped.length} ya existían` : ""}.`);
@@ -131,7 +143,10 @@ export function ActionCard({ action: proposed }: { action: ParsedAction }) {
             </button>
             <button
               type="button"
-              onClick={() => setState("dismissed")}
+              onClick={() => {
+                setCardState(cardKey(action), "dismissed");
+                setState("dismissed");
+              }}
               className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-[12px] text-dim hover:text-text"
             >
               <X size={12} /> Descartar

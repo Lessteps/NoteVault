@@ -85,6 +85,8 @@ interface AssistantState {
   clear: () => void;
   /** Switch a vault mode on or off; switching on greets the user in the chat. */
   setMode: (mode: string) => void;
+  /** Adds a message the app itself writes (a status line, or an interactive card) and saves the conversation. */
+  addMessage: (role: "system" | "assistant", content: string) => Promise<void>;
   ask: (question: string, selection?: string) => Promise<void>;
   stop: () => Promise<void>;
   vote: (id: string, value: 1 | -1) => void;
@@ -157,6 +159,12 @@ export const useAssistant = create<AssistantState>((set, get) => ({
         ? [...s.messages, { id: uid(), role: "system" as const, content: info.opener, at: Date.now() }]
         : s.messages,
     }));
+  },
+
+  addMessage: async (role, content) => {
+    if (!get().open) get().setOpen(true);
+    set((s) => ({ messages: [...s.messages, { id: uid(), role, content, at: Date.now() }] }));
+    await persist(set, get);
   },
 
   ask: async (question, selection = "") => {

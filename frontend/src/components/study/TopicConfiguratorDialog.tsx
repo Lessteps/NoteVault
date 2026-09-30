@@ -1,5 +1,5 @@
 import { CheckCircle2, ChevronRight, Sparkles, X, Zap } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { TopicData } from "../../lib/types";
 import { useApp } from "../../store/app";
@@ -96,6 +96,26 @@ export function TopicConfiguratorDialog({
     helperOk ? "helper" : "no_help",
   );
   const [loading, setLoading] = useState(false);
+
+  // "Activar registro de errores", one box per competency: while on, the mistakes of graded
+  // attempts are kept (private, in .notevault) and the next sessions are built around them.
+  const [learning, setLearning] = useState<Record<string, { enabled: boolean; entries: number }>>({});
+  useEffect(() => {
+    let live = true;
+    api.studyLearningStatus(topicData.folder).then((s) => live && setLearning(s)).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [topicData.folder]);
+  const toggleLearning = async (skill: string, enabled: boolean) => {
+    try {
+      const r = await api.studyLearningSet(topicData.folder, skill, enabled);
+      setLearning((l) => ({ ...l, [skill]: { enabled: r.enabled, entries: r.entries } }));
+      toast("info", r.enabled ? `Registro de errores activado${r.entries ? ` (${r.entries} errores previos)` : ""}.` : "Registro de errores desactivado (se conserva lo guardado).");
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
 
   // If user switches to a skill where beginner is not allowed, bump difficulty
   const handleSkillChange = (skillId: string) => {
@@ -222,6 +242,28 @@ export function TopicConfiguratorDialog({
               })}
             </div>
           </div>
+
+          {/* Mistakes record of the chosen competency */}
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line bg-panel p-3">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={learning[selectedSkill]?.enabled ?? false}
+              onChange={(e) => void toggleLearning(selectedSkill, e.target.checked)}
+            />
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-text">
+                Activar registro de errores{skillDef ? ` · ${skillDef.label}` : ""}
+                {(learning[selectedSkill]?.entries ?? 0) > 0 && (
+                  <span className="ml-2 font-mono text-[10.5px] font-normal text-warn">{learning[selectedSkill]!.entries} registrados</span>
+                )}
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-faint">
+                Guarda en privado cómo fallas en esta competencia de este tema. Las próximas sesiones se centran sobre todo en
+                esos errores (con ejercicios nuevos parecidos) y siguen entrenando la competencia completa.
+              </span>
+            </span>
+          </label>
 
           {/* 2. Difficulty */}
           <div>

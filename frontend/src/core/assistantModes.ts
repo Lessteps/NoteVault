@@ -24,6 +24,7 @@ export const ACTION_PROTOCOL = [
   '- write_skill: {"name":"canvas_skill","folder":"<optional subject folder>","content":"<markdown>"}  (saved in _skills/, replaces the file with that name)',
   '- create_note: {"path":"<vault path>","content":"<markdown>"}',
   '- edit_file: {"path":"<existing .md or .canvas>","edits":[{"find":"<exact text that occurs ONCE>","replace":"<new text>"}],"append":"<optional text added at the end>"}  (small changes to an existing file, e.g. one selected in the chat: send only what changes; if "find" is not unique or not exact the app rejects it)',
+  'ASK, DO NOT GUESS. When the request is ambiguous or a decision is the user\'s (which topic or file, which competencies, whether to replace something, how much), ask ONE short question instead of acting: end your reply with a fenced block ```nv-ask {"question":"<Spanish question>","options":["<option 1>","<option 2>"],"multiple":false}``` (options are buttons; "multiple":true lets them tick several). Prefer a question over a wrong action. Never put an nv-ask and an nv-action in the same reply.',
   "Rules: at most one action per reply; strictly valid JSON (escape newlines as \\n and backslashes as \\\\); folder and file names have no / \\ : * ? \" < > |; paths are relative to the vault and never leave it; talk to the user in Spanish, briefly, before the block. Nothing is created until they accept, so never claim it already exists.",
 ].join("\n");
 

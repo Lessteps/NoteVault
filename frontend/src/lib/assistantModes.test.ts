@@ -17,9 +17,22 @@ describe("assistant vault modes", () => {
   });
 
   it("hides a block that is still streaming and ignores a malformed one", () => {
-    expect(splitAction('Hola\n```nv-action\n{"action":"cre')).toEqual({ text: "Hola", action: null });
+    expect(splitAction('Hola\n```nv-action\n{"action":"cre')).toEqual({ text: "Hola", action: null, ask: null, skills: null });
     expect(splitAction("Hola\n```nv-action\n{no json}\n```").action).toBeNull();
-    expect(splitAction("solo texto")).toEqual({ text: "solo texto", action: null });
+    expect(splitAction("solo texto")).toEqual({ text: "solo texto", action: null, ask: null, skills: null });
+  });
+
+  it("reads a question with options and a competency checklist", () => {
+    const ask = splitAction('¿Cuál?\n```nv-ask\n{"question":"¿Qué competencias?","options":["Cálculo rápido",{"label":"Problemas","value":"solve"}]}\n```');
+    expect(ask.text).toBe("¿Cuál?");
+    expect(ask.ask).toEqual({
+      question: "¿Qué competencias?",
+      options: [{ label: "Cálculo rápido", value: "Cálculo rápido" }, { label: "Problemas", value: "solve" }],
+      multiple: false,
+    });
+    const sk = splitAction('```nv-skills\n{"topic":"A/B","title":"T","skills":[{"skill":"drill","label":"Cálculo rápido","recommended":true,"levels":[3,3,2],"why":"x","how":"y"}]}\n```');
+    expect(sk.skills?.skills[0]?.skill).toBe("drill");
+    expect(sk.text).toBe("");
   });
 });
 

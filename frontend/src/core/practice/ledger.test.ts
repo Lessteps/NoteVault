@@ -78,7 +78,10 @@ function recordAttempt(
     data = { note_id: noteId, note_path: "", draft: "", attempts: [] };
   }
 
-  const at = new Date();
+  // The attempts are dated from TODAY, the day the ledgers are evaluated at —
+  // not from the real today, which drifts and would make "12 days ago" mean a
+  // different interval every time this suite runs.
+  const at = new Date(TODAY);
   at.setDate(at.getDate() - daysAgo);
   const pad = (n: number) => String(n).padStart(2, "0");
   const stamp = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`;

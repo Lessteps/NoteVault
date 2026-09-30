@@ -772,7 +772,7 @@ export interface PracticeExercise {
   /** English listening: the text the app plays aloud (shown only after grading). */
   audio_text?: string;
   /** English listening from the player: the stretch of a vault media file that is the audio (seconds). */
-  media?: { file: string; start: number; end: number } | null;
+  media?: { file: string; source?: string; start: number; end: number } | null;
   code: string;
   code_lang: string;
   hints: string[];
@@ -876,6 +876,18 @@ export interface WebOverview {
   presets: string[];
   relax_phrase: string;
   embedded: boolean;
+}
+
+/** A podcast, film or TED talk of the learner's library, with its transcript. */
+export interface EnglishSource {
+  id: string;
+  kind: "podcast" | "movie" | "ted";
+  title: string;
+  media: string;
+  transcript: string;
+  added: string;
+  has_media: boolean;
+  has_transcript: boolean;
 }
 
 export interface PlayerMedia {

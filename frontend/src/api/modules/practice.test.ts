@@ -85,6 +85,49 @@ describe("practiceApi", () => {
     expect(() => api.practice_load("../x.md")).toThrow(ApiError);
   });
 
+  it("grades an English dictation against its transcript with no AI call", async () => {
+    const sendSpy = vi.spyOn(aiClient, "sendChat").mockResolvedValue(REPLY);
+    fs.writeFileSync(
+      path.join(tmpDir, "Dictado.md"),
+      `---
+type: exercise
+subject: english
+title: "Dictado"
+mode: ls_dictation
+discipline: english_listening
+difficulty: 1
+level: A2
+assistance: nohelp
+---
+
+# Dictado
+
+## Enunciado
+Escribe lo que oigas.
+
+## Texto del audio
+The next train leaves at ten to six.
+
+## Solución
+The next train leaves at ten to six.
+
+## Rúbrica
+- [ ] Todas las palabras
+- [ ] Ortografía
+- [ ] Terminaciones
+`,
+      "utf-8",
+    );
+    const out = (await api.practice_grade("Dictado.md", "the next train leave at ten six")) as Record<string, any>;
+    expect(out.graded).toBe(true);
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(out.result.feedback).toContain("Te faltaron: «to»");
+    expect(out.result.score).toBeLessThan(90);
+    const exact = (await api.practice_grade("Dictado.md", "The next train leaves at ten to six.")) as Record<string, any>;
+    expect(exact.result.score).toBe(100);
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
   it("test_http_grading_records_the_attempt", async () => {
     const sendSpy = vi.spyOn(aiClient, "sendChat").mockResolvedValue(REPLY);
 

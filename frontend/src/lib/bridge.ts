@@ -544,6 +544,14 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studyFolders: () => call<Array<{ id: string; name: string; icon: string; exists: boolean; index: string }>>("study_folders"),
   studyFolderCreate: (id: string, structure: boolean) => call<{ path: string; created: boolean; index: string }>("study_folder_create", id, structure),
   enPlayerPick: () => call<import("./types").PlayerMedia & { ok: boolean }>("en_player_pick"),
+  enSourceList: () => call<{ items: import("./types").EnglishSource[]; kinds: { id: string; label: string }[] }>("en_source_list"),
+  enSourceAdd: (kind: string, title = "", withTranscript = true) =>
+    call<{ ok: boolean; source?: import("./types").EnglishSource }>("en_source_add", kind, title, withTranscript),
+  enSourceTranscript: (id: string) => call<{ ok: boolean; source?: import("./types").EnglishSource }>("en_source_transcript", id),
+  enSourceRemove: (id: string) => call<{ ok: boolean }>("en_source_remove", id),
+  enSourceOpen: (id: string, seconds = 0) => call<import("./types").PlayerMedia & { ok: boolean; source: import("./types").EnglishSource }>("en_source_open", id, seconds),
+  enSourceSession: (id: string, kind: "dictation" | "shadowing" | "podcast" = "dictation", count = 5) =>
+    call<{ ok: boolean; paths?: string[]; first?: string; count?: number; reason?: string; message?: string }>("en_source_session", id, kind, count),
   enPlayerOpen: (file: string, seconds = 0) => call<import("./types").PlayerMedia & { ok: boolean }>("en_player_open", file, seconds),
   enPlayerSubtitles: (id: string, track: "en" | "es") =>
     call<{ ok: boolean; pairs?: import("./player").Pair[]; en_file?: string; es_file?: string }>("en_player_subtitles", id, track),

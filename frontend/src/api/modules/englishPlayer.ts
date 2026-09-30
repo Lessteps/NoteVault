@@ -13,10 +13,11 @@ import {
   vaultRelative,
 } from "../../core/english/mediaLinks.js";
 import { CEFR_LEVELS, MiningError, writeMinedNote } from "../../core/english/mining.js";
-import { NO_SUBTITLES_MESSAGE, pickDictationClip, pickPodcastClip } from "../../core/english/dictation.js";
+import { cleanCueText, NO_SUBTITLES_MESSAGE, pickDictationClip, pickPodcastClip } from "../../core/english/dictation.js";
+import { absolutePath, addSource, getSource, listSources, removeSource, setTranscript, SOURCE_KIND_LABELS, SOURCE_KINDS } from "../../core/english/sources.js";
 import { EnglishVocabularyManager } from "../../core/englishVocabularyManager.js";
 import { formatEnglishExerciseNote } from "../../core/practice/englishExercises.js";
-import { createDefaultTopicManifest } from "../../core/practice/topic.js";
+import { createDefaultTopicManifest, parseTopicManifest } from "../../core/practice/topic.js";
 import { practiceFileText, viewFileName } from "../../core/practice/viewFiles.js";
 import { englishSpaceFolder } from "./study.js";
 import { isIsoDate } from "../../core/practice/reviewSchedule.js";
@@ -99,7 +100,7 @@ export function englishPlayerApi(app: AppState) {
     };
   };
 
-  const load = async (p: string, seconds = 0): Promise<Record<string, unknown>> => {
+  const load = async (p: string, seconds = 0, transcript?: string): Promise<Record<string, unknown>> => {
     if (!fs.existsSync(p) || !fs.statSync(p).isFile() || !isMediaFile(p)) {
       throw new ApiError("Eso no es un archivo de audio o video.");
     }
@@ -120,6 +121,7 @@ export function englishPlayerApi(app: AppState) {
       reg.set(mid!, { path: p, en, es });
     }
     const entry = reg.get(mid!)!;
+    if (transcript) entry.en = transcript;
     return {
       id: mid,
       url: await server().urlFor(p),
@@ -140,6 +142,75 @@ export function englishPlayerApi(app: AppState) {
     const chosen = electron.dialog.showOpenDialogSync({ properties: ["openFile"], filters });
     if (!chosen || !chosen.length) return null;
     return chosen[0]!;
+  };
+
+  const openSourceById = async (id: string, seconds = 0): Promise<Record<string, unknown>> => {
+    const s = getSource(app.root, id);
+    if (!s) throw new ApiError("Esa fuente ya no existe.");
+    const media = absolutePath(app.root, s.media);
+    if (!fs.existsSync(media)) throw new ApiError(`No encuentro el archivo de «${s.title}». Quizá lo moviste: vuelve a añadir la fuente.`);
+    const transcript = s.transcript ? absolutePath(app.root, s.transcript) : "";
+    return { ...(await load(media, toFloat(seconds), transcript && fs.existsSync(transcript) ? transcript : undefined)), ok: true, source: s };
+  };
+
+  /** The English cues of a media entry (empty when it has no English subtitles or they cannot be read). */
+  const cuesOf = (entry: Entry): Array<{ start: number; end: number; en: string }> => {
+    try {
+      return (pairsOf(entry).pairs as Array<{ start: number; end: number; en: string }>) ?? [];
+    } catch {
+      return [];
+    }
+  };
+
+  /**
+   * Writes one listening exercise for `clip` in the topic that trains its skill (4.5 Shadowing, 4.4 Podcasts; a vault
+   * without it gets a topic collecting the player's exercises). `sourceId` ties it to a library source, so the audio
+   * can be played even when the file lives outside the vault. Never throws for missing pieces: it answers `{ ok: false }`.
+   */
+  const createListeningExercise = (entry: Entry, clip: { text: string; start: number; end: number }, kind: string, sourceId: string): Record<string, unknown> => {
+    const spec = PLAYER_EXERCISES[kind] ?? PLAYER_EXERCISES.dictation!;
+    const space = englishSpaceFolder(app);
+    if (!space) return { ok: false, reason: "no_space", message: "Todavía no hay un espacio de inglés: genera uno primero y vuelve a intentarlo." };
+    const branchDir = path.join(app.root, space, "4 Escucha");
+    const found = fs.existsSync(branchDir)
+      ? fs.readdirSync(branchDir, { withFileTypes: true }).find((d) => d.isDirectory() && spec.topic.test(d.name))?.name
+      : undefined;
+    const topicName = found ?? "Dictados del reproductor";
+    const topicRel = `${space}/4 Escucha/${topicName}`;
+    const topicAbs = path.join(app.root, ...topicRel.split("/"));
+    fs.mkdirSync(topicAbs, { recursive: true });
+    let manifest = createDefaultTopicManifest(topicRel, topicName, "english", []);
+    const practica = path.join(topicAbs, viewFileName(topicName, "practica"));
+    if (!fs.existsSync(practica)) fs.writeFileSync(practica, practiceFileText(manifest), "utf-8");
+    // The topic's own level (its `level:`) decides the CEFR of the exercise.
+    manifest = parseTopicManifest(fs.readFileSync(practica, "utf-8"), topicName) ?? manifest;
+
+    let media = "";
+    try {
+      media = vaultRelative(entry.path, app.root);
+    } catch {
+      media = ""; // outside the vault: a library source plays it by id, otherwise the app's voice reads the subtitle
+    }
+    let note = formatEnglishExerciseNote(manifest, spec.skill, 2, spec.assistance, {
+      title: `${spec.title}: ${clip.text.split(" ").slice(0, 6).join(" ")}…`,
+      statement: spec.statement,
+      hints: [],
+      solution: clip.text,
+      rubric: spec.rubric,
+      audio_text: clip.text,
+    });
+    const fields = [
+      media && !sourceId ? `media: "${media.replace(/"/g, '\\"')}"` : "",
+      sourceId ? `source: ${sourceId}` : "",
+      media || sourceId ? `media_start: ${clip.start.toFixed(2)}` : "",
+      media || sourceId ? `media_end: ${clip.end.toFixed(2)}` : "",
+    ].filter(Boolean);
+    if (fields.length) note = note.replace("\ntopic:", `\n${fields.join("\n")}\ntopic:`);
+    const dir = path.join(topicAbs, "Ejercicios", spec.skill);
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `ej_${spec.skill}_d2_${Date.now()}_${Math.random().toString(36).slice(2, 6)}_player.md`);
+    fs.writeFileSync(file, note, "utf-8");
+    return { ok: true, path: app.rel(file).replace(/\\/g, "/"), text: clip.text, from_media: Boolean(media || sourceId) };
   };
 
   return {
@@ -199,54 +270,85 @@ export function englishPlayerApi(app: AppState) {
      * With no English subtitles (or no English space) it answers `{ ok: false, message }`, never an error.
      */
     en_player_dictation(mediaId: string, seconds = 0, kind = "dictation"): Record<string, unknown> {
-      const spec = PLAYER_EXERCISES[kind] ?? PLAYER_EXERCISES.dictation!;
       const entry = entryOf(mediaId);
-      let cues: Array<{ start: number; end: number; en: string }> = [];
-      try {
-        cues = (pairsOf(entry).pairs as Array<{ start: number; end: number; en: string }>) ?? [];
-      } catch {
-        cues = [];
-      }
-      const clip = (kind === "podcast" ? pickPodcastClip : pickDictationClip)(cues, toFloat(seconds) * 1000);
+      const clip = (kind === "podcast" ? pickPodcastClip : pickDictationClip)(cuesOf(entry), toFloat(seconds) * 1000);
       if (!clip) return { ok: false, reason: "no_subtitles", message: NO_SUBTITLES_MESSAGE };
-      const space = englishSpaceFolder(app);
-      if (!space) return { ok: false, reason: "no_space", message: "Todavía no hay un espacio de inglés: genera uno primero y vuelve a intentarlo." };
+      return createListeningExercise(entry, clip, kind, "");
+    },
 
-      // The listening topic that trains this skill (4.5 Shadowing, 4.4 Podcasts); a vault without it gets one collecting the player's exercises.
-      const branchDir = path.join(app.root, space, "4 Escucha");
-      const found = fs.existsSync(branchDir)
-        ? fs.readdirSync(branchDir, { withFileTypes: true }).find((d) => d.isDirectory() && spec.topic.test(d.name))?.name
-        : undefined;
-      const topicName = found ?? "Dictados del reproductor";
-      const topicRel = `${space}/4 Escucha/${topicName}`;
-      const topicAbs = path.join(app.root, ...topicRel.split("/"));
-      fs.mkdirSync(topicAbs, { recursive: true });
-      const manifest = createDefaultTopicManifest(topicRel, topicName, "english", []);
-      const practica = path.join(topicAbs, viewFileName(topicName, "practica"));
-      if (!fs.existsSync(practica)) fs.writeFileSync(practica, practiceFileText(manifest), "utf-8");
+    /** The learner's library: podcasts, films and TED talks with their transcripts. */
+    en_source_list(): Record<string, unknown> {
+      const items = listSources(app.root).map((s) => ({
+        ...s,
+        has_media: fs.existsSync(absolutePath(app.root, s.media)),
+        has_transcript: Boolean(s.transcript) && fs.existsSync(absolutePath(app.root, s.transcript)),
+      }));
+      return { items, kinds: SOURCE_KINDS.map((k) => ({ id: k, label: SOURCE_KIND_LABELS[k] })) };
+    },
 
-      let media = "";
-      try {
-        media = vaultRelative(entry.path, app.root);
-      } catch {
-        media = ""; // outside the vault: the app's voice reads the subtitle instead
+    /** Adds a source: the app asks for the audio/video file and, optionally, its subtitle/transcript file. */
+    en_source_add(kind: string, title = "", withTranscript = true): Record<string, unknown> {
+      const media = dialog([
+        { name: "Audio y video", extensions: ["mp4", "mkv", "webm", "mov", "avi", "m4v", "mp3", "m4a", "wav", "ogg", "flac", "opus"] },
+        { name: "Todos los archivos", extensions: ["*"] },
+      ]);
+      if (media === null) return { ok: false };
+      if (!isMediaFile(media)) throw new ApiError("Eso no es un archivo de audio o video.");
+      let transcript = "";
+      if (withTranscript) {
+        const found = findSiblingSubtitles(media)[0];
+        transcript = found ?? dialog([{ name: "Subtítulos o transcripción (con tiempos)", extensions: ["srt", "vtt"] }]) ?? "";
       }
-      let note = formatEnglishExerciseNote(manifest, spec.skill, 2, spec.assistance, {
-        title: `${spec.title}: ${clip.text.split(" ").slice(0, 6).join(" ")}…`,
-        statement: spec.statement,
-        hints: [],
-        solution: clip.text,
-        rubric: spec.rubric,
-        audio_text: clip.text,
-      });
-      if (media) {
-        note = note.replace("\ntopic:", `\nmedia: "${media.replace(/"/g, '\\"')}"\nmedia_start: ${clip.start.toFixed(2)}\nmedia_end: ${clip.end.toFixed(2)}\ntopic:`);
+      const source = addSource(app.root, { kind, title, media, transcript });
+      return { ok: true, source };
+    },
+
+    /** Sets the transcript of a source from a subtitle file the learner picks. */
+    en_source_transcript(id: string): Record<string, unknown> {
+      if (!getSource(app.root, id)) throw new ApiError("Esa fuente ya no existe.");
+      const p = dialog([{ name: "Subtítulos o transcripción (con tiempos)", extensions: ["srt", "vtt"] }]);
+      if (p === null) return { ok: false };
+      if (!SUBTITLE_EXTS.includes(path.extname(p).toLowerCase())) throw new ApiError("Elige un archivo .srt o .vtt.");
+      return { ok: true, source: setTranscript(app.root, id, p) };
+    },
+
+    en_source_remove(id: string): Record<string, unknown> {
+      return { ok: removeSource(app.root, id) };
+    },
+
+    /** Opens a source in the player with its transcript as the English subtitles. */
+    async en_source_open(id: string, seconds = 0): Promise<Record<string, unknown>> {
+      return openSourceById(id, seconds);
+    },
+
+    /**
+     * A practice session made from a source: \`count\` exercises spread along the episode, every one compared with the
+     * transcript (dictation and shadowing are one sentence; podcast is ~45 s). No AI is used to build them.
+     */
+    async en_source_session(id: string, kind = "dictation", count = 5): Promise<Record<string, unknown>> {
+      const s = getSource(app.root, id);
+      if (!s) throw new ApiError("Esa fuente ya no existe.");
+      if (!s.transcript) return { ok: false, reason: "no_subtitles", message: "Esta fuente todavía no tiene transcripción con tiempos. Añade un .srt o .vtt y vuelve a intentarlo." };
+      const opened = (await openSourceById(id, 0)) as { id: string };
+      const entry = entryOf(opened.id);
+      const cues = cuesOf(entry);
+      const want = Math.max(1, Math.min(10, Math.trunc(Number(count)) || 5));
+      const usable = cues
+        .map((c) => ({ ...c, text: cleanCueText(c.en) }))
+        .filter((c) => c.text.split(" ").length >= 5 && c.text.length <= 220)
+        .sort((a, b) => a.start - b.start);
+      if (!usable.length) return { ok: false, reason: "no_subtitles", message: NO_SUBTITLES_MESSAGE };
+      const step = usable.length / Math.min(want, usable.length);
+      const paths: string[] = [];
+      for (let i = 0; i < Math.min(want, usable.length); i++) {
+        const c = usable[Math.floor(i * step)]!;
+        const clip = kind === "podcast" ? pickPodcastClip(cues, c.start) : { text: c.text, start: Math.max(0, c.start / 1000 - 0.3), end: c.end / 1000 + 0.3 };
+        if (!clip) continue;
+        const made = createListeningExercise(entry, clip, kind, s.id);
+        if (!made.ok) return made;
+        paths.push(String(made.path));
       }
-      const dir = path.join(topicAbs, "Ejercicios", spec.skill);
-      fs.mkdirSync(dir, { recursive: true });
-      const file = path.join(dir, `ej_${spec.skill}_d2_${Date.now()}_player.md`);
-      fs.writeFileSync(file, note, "utf-8");
-      return { ok: true, path: app.rel(file).replace(/\\/g, "/"), text: clip.text, from_media: Boolean(media) };
+      return { ok: true, paths, first: paths[0] ?? "", count: paths.length };
     },
 
     en_player_link(mediaId: string, seconds: number): Record<string, unknown> {

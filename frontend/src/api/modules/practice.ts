@@ -45,6 +45,7 @@ import { EnglishVocabularyManager } from "../../core/englishVocabularyManager.js
 import { isEnglishSubject } from "../../core/practice/domain.js";
 import { isoDate } from "../../core/practice/reviewSchedule.js";
 import { isVocabularySkill } from "../../lib/englishSkillData.js";
+import { gradeDictation } from "../../core/english/dictationGrade.js";
 import { recordLearning } from "../../core/practice/learningLog.js";
 import { findAncestorTopicManifest } from "../../core/practice/topic.js";
 import { parseTimer } from "../../core/practice/timer.js";
@@ -281,8 +282,8 @@ export function practiceApi(app: AppState) {
         },
         statement: ex.statement,
         audio_text: ex.audio_text,
-        media: ex.frontmatter.media
-          ? { file: String(ex.frontmatter.media), start: Number(ex.frontmatter.media_start) || 0, end: Number(ex.frontmatter.media_end) || 0 }
+        media: ex.frontmatter.media || ex.frontmatter.source
+          ? { file: String(ex.frontmatter.media ?? ""), source: String(ex.frontmatter.source ?? ""), start: Number(ex.frontmatter.media_start) || 0, end: Number(ex.frontmatter.media_end) || 0 }
           : null,
         code: ex.code,
         code_lang: ex.code_lang,
@@ -336,6 +337,10 @@ export function practiceApi(app: AppState) {
 
       const [p, ex] = getExercise(app, rel);
       new PracticeAttemptStore(app.root).saveDraft(ex.note_id, app.rel(p), ans);
+      // A dictation is graded by comparing it with its transcript: exact, instant, offline and with no AI at all.
+      if (isEnglishSubject(ex.subject) && ex.mode === "ls_dictation" && (ex.audio_text || "").trim()) {
+        return practiceApply(app, p, ex, gradeDictation(ex.audio_text!, ans, ex.rubric.length), "local", ans, hints, secs, seen);
+      }
       const messages = practiceMessages(app.root, ex, ans, hints, secs, seen);
       const cfg = aiCfg();
 

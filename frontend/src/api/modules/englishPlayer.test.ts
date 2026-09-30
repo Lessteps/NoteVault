@@ -3,6 +3,7 @@ import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { addSource } from "../../core/english/sources.js";
 import { ApiError } from "../../core/errors.js";
 import { AppState } from "../appState.js";
 import { englishPlayerApi } from "./englishPlayer.js";
@@ -128,5 +129,71 @@ describe("dictation from the player's subtitles", () => {
   it("without an English space it says so", async () => {
     const media = (await api.en_player_open("Pelis/film.mp4")) as { id: string };
     expect(api.en_player_dictation(media.id, 2)).toMatchObject({ ok: false, reason: "no_space" });
+  });
+});
+
+describe("library of sources", () => {
+  const makeSpace = () => {
+    fs.mkdirSync(path.join(dir, "Inglés 1", "4 Escucha", "4.5 Shadowing to repeat what you hear"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "Inglés 1", "Inglés 1.resumen.md"), "---\nsubject: english\n---\n", "utf-8");
+  };
+  const LONG = Array.from({ length: 12 }, (_, i) => `${i + 1}\n00:00:${String(i * 5).padStart(2, "0")},000 --> 00:00:${String(i * 5 + 3).padStart(2, "0")},500\nThis is the sentence number ${i} of the show.\n`).join("\n");
+
+  it("lists sources, opens one with ITS transcript (not the film's sibling subtitles) and keeps paths private", async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "nv_outside_"));
+    try {
+      fs.writeFileSync(path.join(outside, "ep1.mp3"), Buffer.alloc(1024));
+      fs.writeFileSync(path.join(outside, "ep1-transcript.srt"), LONG, "utf-8");
+      const s = addSource(dir, { kind: "podcast", title: "6 Minute English — ep 1", media: path.join(outside, "ep1.mp3"), transcript: path.join(outside, "ep1-transcript.srt") });
+      const list = api.en_source_list() as { items: Array<{ id: string; has_media: boolean; has_transcript: boolean; kind: string }> };
+      expect(list.items).toHaveLength(1);
+      expect(list.items[0]).toMatchObject({ id: s.id, kind: "podcast", has_media: true, has_transcript: true });
+      const opened = (await api.en_source_open(s.id, 0)) as { pairs: Array<{ en: string }>; url: string };
+      expect(opened.pairs).toHaveLength(12);
+      expect(opened.pairs[3]!.en).toContain("number 3");
+      expect(JSON.stringify(opened)).not.toContain(outside);
+      expect((await get(opened.url)).length).toBe(1024);
+      // a source whose file went away says so instead of failing obscurely
+      fs.rmSync(path.join(outside, "ep1.mp3"));
+      expect((api.en_source_list() as { items: Array<{ has_media: boolean }> }).items[0]!.has_media).toBe(false);
+      await expect(api.en_source_open(s.id)).rejects.toThrow(/No encuentro el archivo/);
+      expect(api.en_source_remove(s.id)).toEqual({ ok: true });
+      expect((api.en_source_list() as { items: unknown[] }).items).toEqual([]);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("builds a session of dictations spread along the episode, tied to the source, with no AI", async () => {
+    makeSpace();
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "nv_outside_"));
+    try {
+      fs.writeFileSync(path.join(outside, "ep.mp3"), Buffer.alloc(512));
+      fs.writeFileSync(path.join(outside, "ep.srt"), LONG, "utf-8");
+      const s = addSource(dir, { kind: "podcast", title: "Ep", media: path.join(outside, "ep.mp3"), transcript: path.join(outside, "ep.srt") });
+      const out = (await api.en_source_session(s.id, "dictation", 4)) as { ok: boolean; paths: string[]; count: number };
+      expect(out).toMatchObject({ ok: true, count: 4 });
+      const notes = out.paths.map((p) => fs.readFileSync(path.join(dir, ...p.split("/")), "utf-8"));
+      expect(out.paths[0]).toContain("4.5 Shadowing to repeat what you hear/Ejercicios/ls_dictation/");
+      expect(new Set(out.paths).size).toBe(4);
+      for (const n of notes) {
+        expect(n).toContain(`source: ${s.id}`);
+        expect(n).not.toContain("media: ");
+        expect(n).toContain("## Texto del audio\nThis is the sentence number");
+      }
+      // spread: not four neighbours
+      const starts = notes.map((n) => Number(/media_start: ([\d.]+)/.exec(n)![1]));
+      expect(starts[3]! - starts[0]!).toBeGreaterThan(20);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("explains when the source has no transcript yet", async () => {
+    makeSpace();
+    fs.writeFileSync(path.join(dir, "Pelis", "solo.mp3"), Buffer.alloc(64));
+    const s = addSource(dir, { kind: "ted", title: "Talk", media: path.join(dir, "Pelis", "solo.mp3") });
+    expect(s.media).toBe("Pelis/solo.mp3"); // inside the vault: stored relative to it
+    expect(await api.en_source_session(s.id)).toMatchObject({ ok: false, reason: "no_subtitles" });
   });
 });

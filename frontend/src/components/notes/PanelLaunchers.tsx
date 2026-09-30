@@ -4,11 +4,12 @@
 // El globo no es el modulo del navegador: muestra y oculta la lista de paginas
 // *dentro* del panel, sin moverte de donde estas.
 
-import { CalendarClock, Globe, ListTree, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
+import { CalendarClock, Globe, Headphones, ListTree, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
 import { useEffect } from "react";
 import { toggleFace } from "../../lib/panelFaces";
 import { subjectUsesLatex, useActiveSubject } from "../../lib/useActiveSubject";
 import { useReviewPanel } from "../study/ReviewPanel";
+import { useSourcesPanel } from "../english/SourcesPanel";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
 import { useWebPages } from "../../store/webPages";
@@ -23,12 +24,18 @@ export function PanelLaunchers({ module }: { module: string }) {
   const pagesOpen = useWebPages((s) => s.open);
   const reviewOpen = useReviewPanel((s) => s.open);
   const inkOpen = useApp((s) => s.inkDraft !== null);
+  const sourcesOpen = useSourcesPanel((s) => s.open);
   const subject = useActiveSubject();
   const latexTool = subjectUsesLatex(subject);
   // Moving to an English area closes a drawing pad that was left open in a maths one.
   useEffect(() => {
     if (!latexTool && inkOpen) useApp.getState().setInkDraft(null);
   }, [latexTool, inkOpen]);
+  // The English tools (library of sources) belong to English spaces only.
+  const englishTools = subject.toLowerCase() === "english";
+  useEffect(() => {
+    if (!englishTools && sourcesOpen) useSourcesPanel.getState().setOpen(false);
+  }, [englishTools, sourcesOpen]);
 
   const cell = (on: boolean, enabled = true) =>
     cn(
@@ -94,6 +101,20 @@ export function PanelLaunchers({ module }: { module: string }) {
       >
         <ListTree size={16} />
       </button>
+
+      {/* English tools, right under the note outline: the library of podcasts, films and TED talks. */}
+      {module === "notas" && englishTools && (
+        <button
+          type="button"
+          title={sourcesOpen ? "Cerrar el reproductor" : "Reproductor: tus podcasts, películas y TED con su transcripción"}
+          aria-label="Reproductor"
+          aria-pressed={sourcesOpen}
+          onClick={() => toggleFace("sources")}
+          className={cell(sourcesOpen)}
+        >
+          <Headphones size={16} />
+        </button>
+      )}
 
       {/* Repaso (spaced repetition): only inside Notas, where the study areas live. */}
       {module === "notas" && (

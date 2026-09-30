@@ -14,6 +14,8 @@ const SPEEDS: Array<[string, number]> = [["0.7×", 0.7], ["1×", 1], ["1.25×", 
 
 export interface MediaClip {
   file: string;
+  /** a library source that owns the audio (its file may live outside the vault) */
+  source?: string;
   start: number;
   end: number;
 }
@@ -76,7 +78,7 @@ export function AudioClip({ text, media = null, revealed }: { text: string; medi
   const playMedia = useCallback(async () => {
     if (!media) return;
     try {
-      if (!url.current) url.current = (await api.enPlayerOpen(media.file, 0)).url;
+      if (!url.current) url.current = (media.source ? await api.enSourceOpen(media.source, 0) : await api.enPlayerOpen(media.file, 0)).url;
       const el = audio.current ?? new Audio();
       audio.current = el;
       el.src = url.current;

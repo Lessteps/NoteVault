@@ -1,0 +1,411 @@
+[
+  {
+    "slug": "barbell-row",
+    "name": "Barbell Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con la barra a la altura de las rodillas y el agarre ligeramente más ancho que los hombros.",
+      "Flexiona la cadera hasta tener el torso a unos 45 grados, con la espalda recta y las rodillas apenas flexionadas.",
+      "Tira de la barra hacia el abdomen, llevando los codos hacia atrás y los omóplatos hacia la columna.",
+      "Aprieta la espalda alta un segundo arriba sin tirar del cuello con las manos.",
+      "Baja la barra hasta estirar los brazos del todo, manteniendo el torso fijo.",
+      "El torso no sube ni baja al remar: si cambia el ángulo, la carga es demasiado pesada.",
+      "Mantén el cuello en línea con la columna; mirar al suelo reduce la fatiga del manguito rotador."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "t-bar-row",
+    "name": "T-Bar Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca los pies bajo la barra en una máquina o en un landmine y sujétala con agarre neutro.",
+      "Flexiona la cadera hasta un ángulo de unos 45 grados, con las rodillas suaves y la espalda recta.",
+      "Tira de la barra hacia el abdomen con los codos bien pegados al torso.",
+      "Aprieta los omóplatos un segundo arriba.",
+      "Baja despacio hasta extender los brazos, con el torso inmóvil durante todo el recorrido.",
+      "Si la zona lumbar o los antebrazos molestan, baja el pecho o el recorrido."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "pendlay-row",
+    "name": "Pendlay Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca la barra en un rack a la altura de la cadera, o en el suelo si trabajas desde abajo.",
+      "Sujétala con un agarre ligeramente más ancho que los hombros y flexiona la cadera hasta un torso de unos 70 grados, con la espalda recta.",
+      "Tira de la barra hacia el abdomen con los codos hacia atrás.",
+      "La barra debe tocar el torso en la parte baja: si se queda por delante, estás cerrando el recorrido.",
+      "Baja la barra hasta estirar los brazos sin perder la posición del torso.",
+      "Es la versión con más carga de la remo: técnica impecable o la espalda cobra la factura."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-bent-over-row",
+    "name": "Dumbbell Bent Over Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con una mancuerna en cada mano y los pies a la anchura de la cadera.",
+      "Flexiona la cadera hasta un torso de unos 45 grados con las rodillas flexionadas y la espalda recta.",
+      "Deja las mancuernas colgando perpendiculares al suelo, con los hombros relajados.",
+      "Rema llevando los codos hacia atrás y arriba hasta que la mancuerna llegue a la altura de las costillas.",
+      "Aprieta los omóplatos un segundo arriba sin tirar del cuello.",
+      "Baja despacio hasta estirar los brazos del todo.",
+      "Si la espalda se redondea al subir, usa menos carga o sube el torso."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "one-arm-dumbbell-row",
+    "name": "One-Arm Dumbbell Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una rodilla y la mano del mismo lado sobre un banco o silla, con la otra pierna apoyada en el suelo.",
+      "Sujeta una mancuerna con la mano libre y deja el brazo estirado hacia el suelo.",
+      "Inclina el torso hasta que esté casi paralelo al suelo, con la espalda en línea recta con la cabeza.",
+      "Rema llevando el codo hacia la cadera, más arriba y más atrás que hacia atrás a secas.",
+      "Aprieta el omóplato un segundo arriba y gira ligeramente la palma hacia el cuerpo.",
+      "Baja despacio hasta estirar el brazo.",
+      "Sin rotar el torso: si el pecho gira, la mancuerna es pesada."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "seated-row",
+    "name": "Seated Cable Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en la máquina con los pies apoyados en la plataforma y las rodillas flexionadas.",
+      "Sujeta el asa con agarre neutro y mantén el tronco erguido, con la columna neutra y el pecho abierto.",
+      "Tira del asa hacia el abdomen llevando los codos hacia atrás, sin inclinarte hacia atrás paracompensar el peso.",
+      "Aprieta los omóplatos un segundo al final del recorrido.",
+      "Deja que los brazos se extiendan de forma controlada sin redondear la espalda.",
+      "Si la espalda baja se curva al estirar, el recorrido es demasiado largo para tu movilidad."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "machine-row",
+    "name": "Machine Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ajusta el respaldo y los pedales para que los pies queden bien apoyados y el torso contra el apoyo.",
+      "Sujeta los agarres con agarre neutro y los brazos estirados al frente.",
+      "Rema llevando los antebrazos hacia el cuerpo y los codos hacia atrás, sin dejar que el pecho salga del respaldo.",
+      "Aprieta la espalda alta un segundo arriba.",
+      "Baja despacio hasta devolver los brazos al frente.",
+      "El respaldo limita el balanceo: si puedes remar más peso, sube el respaldo o aumenta la carga."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "single-arm-cable-row",
+    "name": "Single-Arm Cable Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea y engancha un asa en una sola mano.",
+      "Ponte de pie con el torso ligeramente inclinado y las rodillas suaves, con el cable cruzando el cuerpo.",
+      "Tira del asa hacia la cadera con el codo pegado al costado, sin rotar el tronco hacia atrás.",
+      "Aprieta el omóplato un segundo arriba.",
+      "Deja que el brazo se extienda de forma controlada manteniendo el torso quieto.",
+      "Alterna lados cada serie y apoya la mano libre en el muslo si pierdes estabilidad."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "inverted-row",
+    "name": "Inverted Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una barra en un rack o dossupports a la altura de la cadera, o sujétate a una mesa si es más bajo.",
+      "Sujétate con agarre neutro y colócate debajo de la barra con los pies en el suelo.",
+      "Inclinando el cuerpo hacia atrás, lleva el pecho hasta tocar la barra con los codos flexionados.",
+      "Empuja hacia atrás hasta extender los codos, manteniendo el cuerpo en una línea recta.",
+      "Si usas una mesa, cuidado con su estabilidad: prueba primero con un empuje suave.",
+      "Cuanto más lejos de la barra estén los pies, más difícil; acércate para bajar la carga."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "rack-pull",
+    "name": "Rack Pull",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca la barra en el rack a la altura media de la pantorrilla o algo más baja.",
+      "Colócate delante del rack con un agarre mixto: una mano en pronación y la otra en supinación, o una sobre la otra.",
+      "Tira de la barra hacia arriba hasta extensión completa de la cadera y de la rodilla, apretando los glúteos arriba.",
+      "Baja despacio hasta que la barra vuelva a apoyarse en el rack sin que el torso se doble.",
+      "Mantén el torso erguido durante todo el recorrido: este ejercicio trabaja la cadera, no la espalda baja.",
+      "Baja la carga si no puedes mantener esa postura con la misma carga."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "towel-row",
+    "name": "Towel Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Pasa una toalla resistente por la barra de un rack o un pomo y agárrala con las dos manos a la misma altura.",
+      "Siéntate o ponte de pie con las piernas extendidas y la espalda recta, tirando con cuidado para no tirar la barra.",
+      "Tira de la toalla hacia el abdomen flexionando los codos hacia atrás.",
+      "Aprieta los omóplatos un segundo arriba.",
+      "Baja despacio hasta estirar los brazos.",
+      "Es más duro de lo que parece: la toalla resbala y el agarre de antebrazo se agota pronto."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "lat-pulldown",
+    "name": "Lat Pulldown",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en la máquina y fija los muslos bajo los rodillos o las plataformas.",
+      "Sujeta la barra con agarre ancho en pronación, por fuera de los hombros, y deja los brazos completamente estirados arriba.",
+      "Inclina el torso unos diez grados hacia atrás, con el pecho abierto.",
+      "Tira de la barra hacia la parte alta del pecho llevando los codos hacia los pies.",
+      "Aprieta los dorsales un segundo abajo, deprimiendo los omóplatos.",
+      "Sube hasta estirar los brazos sin encoger los hombros hacia las orejas.",
+      "Si no llegas con la espalda abajo, el agarre es demasiado ancho: ciérralo un poco."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "close-grip-lat-pulldown",
+    "name": "Close-Grip Lat Pulldown",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate con las rodillas fijas y sujeta la barra con agarre paralelo, más cerrado que los hombros.",
+      "Deja los brazos estirados arriba y el torso ligeramente inclinado hacia atrás.",
+      "Tira de la barra hacia la parte alta del pecho, llevando los codos hacia el cuerpo y por detrás.",
+      "Aprieta los dorsales un segundo abajo.",
+      "Sube despacio hasta estirar los brazos.",
+      "El agarre cerrado desplaza el trabajo hacia los dorsales externos y el bíceps; el ángulo de los codos marca la sensación."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "straight-arm-pulldown",
+    "name": "Straight-Arm Pulldown",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea alta y engancha un asa solo en una mano, o una barra recta con las dos.",
+      "Ponte de pie con los pies separados, el abdomen firme y las manos ligeramente por delante de los hombros.",
+      "Tira de la barra hacia los muslos extendiendo los codos, que quedan casi fijos durante el recorrido.",
+      "Aprieta los dorsales abajo y baja hasta que las manos lleguen a los muslos.",
+      "Sube despacio hasta estirar los brazos sin relajar la espalda baja.",
+      "El torso no se flexiona: si te inclinas hacia delante, la carga es demasiado grande para sentir el dorsal."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "pull-up",
+    "name": "Pull-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate bajo la barra con un agarre en pronación ligeramente más ancho que los hombros, y cuélgate con los brazos estirados.",
+      "Inicia el movimiento bajando los omóplatos: lleva los hombros hacia los bolsillos traseros.",
+      "Tira de la barra hacia la parte alta del pecho acercando los codos hacia las costillas.",
+      "Sube hasta que la barbilla supere la barra y la base del cuello esté cerca de la altura de las manos.",
+      "Baja de forma controlada hasta extender los brazos del todo.",
+      "Si balanceas el cuerpo para subir, has perdido la fase más útil: reduce la carga con bandas o usa la máquina de assistance."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "neutral-grip-pull-up",
+    "name": "Neutral-Grip Pull-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Sujeta la barra con las palmas enfrentadas entre sí, una hacia dentro y la otra hacia fuera.",
+      "Cuélgate con los brazos estirados y el pecho abierto.",
+      "Tira hacia la parte alta del pecho con los codos hacia los pies.",
+      "Aprieta los dorsales un segundo arriba.",
+      "Baja de forma controlada hasta la extensión completa.",
+      "El agarre neutro suele ser más fácil que el prono y da menos desgaste en los hombros: es una buena primera dominada."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "weighted-pull-up",
+    "name": "Weighted Pull-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca un disco en la banda entre las piernas o en un arnés, bien centrado y sin holgura.",
+      "Colócate bajo la barra y cuélgate con un agarre algo más ancho que los hombros.",
+      "Tira de la barra hacia el pecho con los codos hacia las costillas.",
+      "Sube hasta superar la barra con la barbilla y baja hasta estirar los brazos.",
+      "Empieza con cargas pequeñas y sube en pasos de uno o dos kilos: el peso añadido no arregla una técnica mala.",
+      "Si la técnica se rompe en las últimas repeticiones, es demasiado peso para hoy."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "assisted-pull-up",
+    "name": "Assisted Pull-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en la máquina de Assisted con las rodillas o los codos sobre el apoyo y la barra al alcance.",
+      "Deja que la máquina compense parte de tu peso al subir.",
+      "Tira de la barra hacia el pecho con los codos hacia abajo y atrás.",
+      "Baja despacio hasta extender los brazos.",
+      "A medida que controles, baja el peso de la asistencia en cada serie.",
+      "Es la forma más segura de aprender el patrón antes de cargar bodyweight."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "scapular-pull-up",
+    "name": "Scapular Pull-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate bajo la barra con agarre en pronación y los brazos estirados, sin colgarte.",
+      "Deja el peso del cuerpo en los pies y solo deprime los omóplatos hacia abajo.",
+      "Mantén los brazos estirados y sube los hombros lejos de las orejas.",
+      "Sube hasta que los omóplatos se toquen arriba y baje hasta sentirlos abrirse.",
+      "Es un trabajo escapular, no una dominada: los codos no deben flexiarse.",
+      "Prepara el hombro para la primera dominada y trabaja el manguito rotador."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "l-sit-pull-up",
+    "name": "L-Sit Pull-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate bajo la barra y cuélgate con los brazos estirados.",
+      "Levanta las piernas hasta mantenerlas extendidas en paralelo al suelo, con las rodillas sin flexionar.",
+      "Con las piernas arriba, tira de la barra hacia el pecho con los codos hacia las costillas.",
+      "Vuelve a bajar hasta estirar los brazos manteniendo las piernas en L.",
+      "Empieza con las rodillas flexionadas o con las piernas apoyadas en un banco si la L todavía no te sale.",
+      "La posición de la L carga el core mientras se tira: no subas el torso para compensar."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "shrug",
+    "name": "Barbell Shrug",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con la barra a la altura de la pantorrilla y el agarre a la anchura de la cadera.",
+      "Con los brazos estirados a los lados, eleva los hombros hacia las orejas sin flexionar los codos.",
+      "Sube hasta el punto más alto, apretando los trapecios un segundo.",
+      "Baja despacio hasta que los hombros estén relajados, sin dejarlos caer de golpe.",
+      "El movimiento son solo los hombros hacia arriba y abajo: si doblas la cintura, es una remo y otra cosa.",
+      "Los codos deben quedarse quietos durante todo el recorrido."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-shrug",
+    "name": "Dumbbell Shrug",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con una mancuerna en cada mano, con los brazos colgando a los lados.",
+      "Sube los hombros hacia las orejas apretando los trapecios.",
+      "Aprieta un segundo arriba sin rotar los brazos hacia dentro.",
+      "Baja despacio hasta la posición inicial.",
+      "No flexiones los codos ni ladees los hombros: eso sería un remo o un alzado lateral.",
+      "Útil para la parte alta de la espalda cuando el agarre limita las dominadas."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "reverse-curl",
+    "name": "Reverse Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con la barra a la altura de la cadera y el agarre en supinación, con las palmas mirando al frente.",
+      "Mantén los codos pegados al torso y los brazos estirados.",
+      "Sube la barra girando solo las muñecas, hasta que llegue a la altura de los hombros.",
+      "Aprieta el antebrazo un segundo arriba.",
+      "Baja despacio hasta estirar los brazos del todo.",
+      "El nombre va de supinación, no de Reverse: las palmas miran al frente durante todo el movimiento."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "wrist-curl",
+    "name": "Wrist Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate y apoya los antebrazos en los muslos con las palmas hacia arriba y las muñecas colgando por el borde de las rodillas.",
+      "Sujeta una barra o mancuernas ligeras con agarre en supinación.",
+      "Flexiona solo las muñecas para subir la carga hasta la parte baja del antebrazo.",
+      "Aprieta un segundo arriba.",
+      "Baja despacio hasta que las muñecas queden por debajo del nivel de las rodillas.",
+      "Usa cargas muy ligeras y muchas repeticiones; aquí el antebrazo se agota antes que la muñeca."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "farmer-carry",
+    "name": "Farmer Carry",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Sujeta una mancuerna pesada en cada mano con agarre neutro.",
+      "Ponte de pie con los hombros hacia atrás, el pecho abierto y los brazos colgando a los lados.",
+      "Camina despacio dando pasos cortos y constantes, sin letrear y sin balancear el cuerpo.",
+      "Mantén los hombros lejos de las orejas y el abdomen apretado durante todo el recorrido.",
+      "Detente cuando la postura empiece a romperse, no cuando el brazo se canse.",
+      "Si la columna se redondea, la carga es excesiva o el agarre ya no es firme."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "reverse-hyperextension",
+    "name": "Reverse Hyperextension",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate boca abajo en un banco de hiperextensiones con los muslos apoyados y el cuerpo por delante del banco.",
+      "Baja el torso hacia el suelo hasta que quede casi paralelo, con las manos detrás de la cabeza o en el pecho.",
+      "Empuja con los glúteos hasta subir a una línea recta de cadera a rodilla, sin hiperextender la lumbar.",
+      "Detente arriba sin pasar de la horizontal: el exceso de recorrido se paga en el disco.",
+      "Baja de forma controlada y mantén el cuello en línea con la columna.",
+      "Si sientes la lumbar y no los glúteos, acorta el recorrido o baja la carga."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "superman",
+    "name": "Superman",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca abajo con los brazos extendidos por delante y las piernas rectas juntas.",
+      "Levanta a la vez los brazos, el pecho y las piernas unos centímetros del suelo.",
+      "Aprieta los glúteos y la espalda baja manteniendo el cuello relajado mirando al suelo.",
+      "Mantén el tiempo objetivo respirando con normalidad.",
+      "Baja todo a la vez de forma controlada.",
+      "Empieza con cinco segundos: la calidad de la contracción importa más que la altura."
+    ],
+    "steps_en": []
+  }
+]

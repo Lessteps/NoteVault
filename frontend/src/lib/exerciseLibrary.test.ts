@@ -50,6 +50,12 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
+  test("grupo espalda redactado a mano (barbell-row, lat-pulldown, pull-up)", () => {
+    expect(getInstructions("barbell-row")!.source).toBe("propia");
+    expect(getInstructions("lat-pulldown")!.steps_es.join(" ")).toMatch(/polea|agarre/i);
+    expect(getInstructions("pull-up")!.steps_es.length).toBeGreaterThanOrEqual(5);
+  });
+
   test("grupo triceps redactado a mano (tricep-pushdown, diamond-push-up)", () => {
     expect(getInstructions("tricep-pushdown")!.source).toBe("propia");
     expect(getInstructions("diamond-push-up")!.steps_es.join(" ")).toMatch(/dedos|triceps/i);

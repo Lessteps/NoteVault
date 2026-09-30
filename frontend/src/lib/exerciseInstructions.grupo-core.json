@@ -1,0 +1,431 @@
+[
+  {
+    "slug": "plank",
+    "name": "Plank",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate boca abajo, apoyado en los antebrazos con los codos bajo los hombros.",
+      "Extiende las piernas hacia atrás y apóyate en las puntas de los pies.",
+      "Aprieta el abdomen y los glúteos para que el cuerpo forme una línea recta de la cabeza a los talones.",
+      "Empuja con los antebrazos contra el suelo y con los codos hacia los pies, con el cuello en línea con la columna.",
+      "No subas la cadera ni la bajes: si no aguantas la línea, acorta el tiempo en lugar de mantener una mala postura.",
+      "Respira con normalidad, en diagonal hacia abajo para no elevar la cadera al inspirar.",
+      "Empieza en veinte segundos y progresa con el tiempo, no con las repeticiones."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "side-plank",
+    "name": "Side Plank",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate de lado y apóyate en el antebrazo, con el codo bajo el hombro.",
+      "Apila los pies o apóyalos en la rodilla de la pierna de abajo, según lo que controles.",
+      "Levanta la cadera hasta formar una línea recta del hombro a la cadera y de ahí al pie o a la rodilla.",
+      "Aprieta el costado y los glúteos de la pierna de arriba para que la cadera no se hunda.",
+      "Mantén los hombros lejos de las orejas y el cuello en línea con la columna.",
+      "Cambia de lado al terminar los segundos."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "plank-shoulder-tap",
+    "name": "Plank Shoulder Tap",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en plancha alta con las manos bajo los hombros y los brazos extendidos.",
+      "Aprieta el abdomen y los glúteos para que la cadera no se mueva.",
+      "Levanta una mano y toca el hombro contrario, y vuelve a apoyarla.",
+      "Alterna brazos con un ritmo lento, sin que la cadera gire hacia el lado de la mano levantada.",
+      "Si la cadera se mueve como una balança, baja la velocidad o hazlo inclinado, con las manos más altas."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "push-up-shoulder-tap",
+    "name": "Push-up Shoulder Tap",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en plancha alta con las manos ligeramente más anchas que los hombros.",
+      "Realiza una flexión completa hasta acercar el pecho al suelo.",
+      "Sin cambiar la posición de la cadera, levanta una mano y toca el hombro contrario.",
+      "Apoya la mano y sube a la posición de flexiones.",
+      "Repite y alterna el lado de la mano en cada repetición.",
+      "La cadera no se mueve ni un centímetro: si gira, quita el toque de hombro y quédate en la flexión."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dead-bug",
+    "name": "Dead Bug",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con los brazos hacia el techo y las rodillas por encima de la cadera, a 90 grados.",
+      "Aprieta la zona lumbar contra el suelo: esa es la posición de partida y no se pierde nunca.",
+      "Baja un brazo y la pierna opuesta hasta que queden casi paralelos al suelo, sin tocar el suelo.",
+      "Vuelve inhalando y repite con el otro lado.",
+      "Si la espalda baja se despega del suelo, acorta el recorrido: menos amplitud antes que perder la técnica."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "bird-dog",
+    "name": "Bird Dog",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate a cuatro patas con las manos bajo los hombros y las rodillas bajo la cadera.",
+      "Aprieta el abdomen como si pusheslightly levantas la pelvis del suelo.",
+      "Estiende un brazo hacia delante y la pierna opuesta hacia atrás, alineados con el torso.",
+      "Mantén dos segundos sin que la cadera gire ni la espalda se hunda.",
+      "Vuelve despacio y cambia de lado.",
+      "Alarga el cuello hacia delante y mira al suelo para que la columna no se hiperextienda."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "bear-crawl",
+    "name": "Bear Crawl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate a cuatro patas con las manos bajo los hombros y las rodillas a unos cinco centímetros del suelo.",
+      "Mantén las rodillas cerca del suelo y el abdomen firme.",
+      "Avanza con una mano y la rodilla opuesta al mismo tiempo, como si gateases pero sin dejar los rodillas en el suelo.",
+      "Mantén la cadera baja y el cuerpo estable en cada movimiento.",
+      "Recorre el espacio ida y vuelta sin dejar de mantener la posición.",
+      "Es cardio y core a la vez: cuidar las muñecas y los hombros limita hasta dónde puedes llegar."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "inchworm",
+    "name": "Inchworm",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate de pie y flexiona la cadera y las rodillas, apoyando las manos en el suelo delante de los pies.",
+      "Camina con las manos hacia delante hasta llegar a una posición de plancha alta, con el cuerpo recto.",
+      "Mantén la cadera nivelada y los abdominales apretados en todo el recorrido.",
+      "Vuelve caminando con las manos hasta volver a la posición de agachado.",
+      "Sube de pie con un impulso suave de las piernas o sin impulso, según lo que controles.",
+      "Si la cadera sube por encima de la línea de los hombros al caminar, acorta el alcance de los pasos."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "mountain-climber",
+    "name": "Mountain Climber",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en plancha alta con las manos bajo los hombros y el abdomen apretado.",
+      "Trae una rodilla hacia el pecho sin levantarla por encima de la línea de las caderas.",
+      "Extiende esa pierna atrás y trae la otra rodilla, alternando con un ritmo que puedas controlar.",
+      "La cadera no sube ni baja: los hombros se quedan quietos sobre las manos.",
+      "Si la postura se rompe, baja el ritmo o apoya las manos en un banco para reducir la carga.",
+      "Es cardio: aguanta lo que la técnica permita, no lo que el orgullo pida."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "crunch",
+    "name": "Crunch",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con las rodillas flexionadas y los pies bien apoyados en el suelo.",
+      "Coloca las manos detrás de la cabeza con los dedos tocando suavemente, sin tirar del cuello.",
+      "Levanta el escápulas del suelo curvando la espalda, acortando la distancia entre el esternón y la pelvis.",
+      "Baja despacio hasta apoyar la nuca, sin relajar del todo.",
+      "El movimiento es corto: si te Incorporas hasta sentarte, el trabajo pasa a los flexores de la cadera.",
+      "Si el cuello se molesta, apóyate en los codos o entrelaza las manos bajo el pecho."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "weighted-crunch",
+    "name": "Weighted Crunch",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con las rodillas flexionadas y sujeta un disco o una mancuerna contra el pecho, con las manos detrás de la cabeza.",
+      "Levanta las escápulas curvando la espalda, como en un crunch normal.",
+      "Baja despacio hasta apoyar la nuca.",
+      "La carga solo aumenta la dificultad: no permite llegar más lejos ni hacer más repeticiones.",
+      "Usa cargas moderadas y prioriza el control de la bajada, que es donde más se trabaja."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "reverse-crunch",
+    "name": "Reverse Crunch",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con las rodillas flexionadas a 90 grados y los brazos a los lados.",
+      "Levanta la pelvis del suelo llevándola hacia el techo con un movimiento de encogimiento abdominal, no de patadas.",
+      "Acerca las rodillas al pecho sin usar el impulso de los pies.",
+      "Baja despacio hasta que la lumbar toque el suelo.",
+      "Si sientes la lumbar, el movimiento viene de empujar con los pies: mantén las piernas más quietas."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cable-crunch",
+    "name": "Cable Crunch",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea alta y engancha una cuerda a la cadena.",
+      "Agáchate sujetando la cuerda con las manos a la altura del pecho y las rodillas flexionadas.",
+      "Flexiona el torso hacia abajo apretando el abdomen, con los codos hacia las rodillas.",
+      "Sube de forma controlada extendiendo las rodillas a la vez.",
+      "El vientre se acorta hacia la columna; si solo doblas la espalda, el ejercicio pierde sentido.",
+      "Mantén los huesos de la cadera alineados: no metas la pelvis."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "russian-twist",
+    "name": "Russian Twist",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate con las rodillas flexionadas y los pies ligeramente separados del suelo, o apoyados si necesitas estabilidad.",
+      "Inclínate hacia atrás unos 45 grados con la espalda recta, no arqueada.",
+      "Sujeta una mancuerna o una pesa con las dos manos y llévala a un lado del cuerpo, rozando el suelo.",
+      "Gira el torso para llevarla al lado contrario, girando desde las costillas.",
+      "Repite con un ritmo controlado y sin rebotes.",
+      "Si molestan la zona lumbar o el cuello, hazlo sin carga y con las piernas más recogidas."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "weighted-russian-twist",
+    "name": "Weighted Russian Twist",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en la misma posición que en el giro ruso: sentado, inclinado hacia atrás a 45 grados, con la espalda recta.",
+      "Sujeta una mancuerna con las dos manos y llévala de un lado al otro rozando el suelo.",
+      "Gira el torso, no solo los brazos: el movimiento sale de las costillas.",
+      "Baja la carga si la velocidad se pierde o si te tiemblan los oblicuos.",
+      "La carga aumenta la dificultad del core, pero no cambia el patrón del movimiento."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "bicycle-crunch",
+    "name": "Bicycle Crunch",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con las manos detrás de la cabeza y los codos abiertos.",
+      "Levanta el escápulas y las piernas, con las rodillas a 90 grados.",
+      "Gira el torso llevando un codo hacia la rodilla del lado contrario, como si pedaleas.",
+      "Alarga la otra pierna sin llegar a tocar el suelo y cambia de lado.",
+      "El movimiento es lento: si te aceleras, se convierte en una serie de coletillas.",
+      "Si el cuello molesta, baja las piernas o hazlo con las manos en el pecho."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-side-bend",
+    "name": "Dumbbell Side Bend",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con una mancuerna en una mano y el brazo estirado a lo largo del cuerpo.",
+      "Flexiona el torso hacia ese lado dejando que la mano quede por fuera de la pierna.",
+      "Vuelve al centro manteniendo los hombros nivelados.",
+      "Repite y cambia de lado al terminar la serie.",
+      "La carga debe ser ligera: este ejercicio trabaja más los oblicuos laterales que la zona lumbar.",
+      "No flexiones las rodillas ni uses impulso para bajar."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "ab-wheel",
+    "name": "Ab Wheel Rollout",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de rodillas y sujeta la rueda con las manos, con las palmas hacia abajo y los brazos por encima de los hombros.",
+      "Extiende los brazos y lleva la rueda hacia delante, manteniendo la cadera y el abdomen apretados.",
+      "Alarga el cuerpo hasta quedar casi paralelo al suelo, sin dejar caer la zona lumbar.",
+      "Vuelve hacia las rodillas con la misma tensión, sin dejar que la rueda se escape de las manos.",
+      "Empieza con un recorrido corto y progresa cuando puedas mantener la línea del cuerpo.",
+      "Es el ejercicio de abdominal donde más fácil se arquea la espalda: acorta antes que perder la técnica."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "v-up",
+    "name": "V-Up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con los brazos extendidos por encima de la cabeza y las piernas rectas.",
+      "Levanta a la vez los brazos y las piernas, buscando tocarte las manos con los pies.",
+      "Baja despacio hasta casi tocar el suelo, sin relajar la zona lumbar.",
+      "Si no llegas a tocar y la espalda baja se despega, haz V-ups con las rodillas más flexionadas.",
+      "Es de los Abdominales más exigentes: si la técnica se rompe, retrocede a las piernas cruzadas o a raised legs."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "flutter-kick",
+    "name": "Flutter Kick",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba, presiona la zona lumbar contra el suelo y levanta las piernas a unos 30 centímetros del suelo.",
+      "Coloca las manos bajo los glúteos y empieza a alternar las piernas muy rápido.",
+      "Mantén las piernas casi en el mismo plano, sin elevarlas ni bajarlas.",
+      "Respira con normalidad aunque el ritmo sea rápido.",
+      "Si la lumbar se despega del suelo, sube las piernas un poco o dobla las rodillas.",
+      "Es más cardio de abdominal que fuerza: úsalo al final de la sesión."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "lying-leg-raise",
+    "name": "Lying Leg Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con los brazos a los lados del cuerpo y las piernas extendidas.",
+      "Presiona la zona lumbar contra el suelo y apóyate en los antebrazos si necesitas más estabilidad.",
+      "Levanta las piernas hasta la vertical sin doblar la rodilla.",
+      "Baja despacio hasta casi tocar el suelo, sin que la lumbar se despegue.",
+      "Si la espalda baja se levanta, no subas tan alto o dobla ligeramente las rodillas.",
+      "Sube la cadera un centímetro al llegar arriba solo si tienes control; no es obligatorio."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "hanging-leg-raise",
+    "name": "Hanging Leg Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Cuélgate de una barra alta con agarre mixto y los brazos estirados, con los pies despegados del suelo.",
+      "Inicia desde una posición de hanging con las piernas ligeramente por delante del cuerpo.",
+      "Sube las piernas por encima de la horizontal, e intenta llevar los pies a la altura de la barra.",
+      "Baja despacio hasta la extensión completa sin balancearte en la barra.",
+      "Si balanceas, dobla las rodillas o usa una flexión de colgado en lugar de extensión.",
+      "Empieza con las rodillas flexionadas si el colgado sin control te desgasta los hombros."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "hanging-knee-raise",
+    "name": "Hanging Knee Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Cuélgate de una barra con agarre mixto y los brazos estirados, con las rodillas flexionadas y las piernas por delante.",
+      "Sube las rodillas hacia el pecho contrayendo el abdomen.",
+      "Intenta llevar los codos hacia las rodillas sin balancear la barra.",
+      "Baja despacio hasta la extensión de los brazos.",
+      "Si balanceas, haz la versión con los pies apoyados en un banco o sentada en el suelo con los pies colgando.",
+      "El agarre abierto y el peso del cuerpo hacen más trabajo de hombros del que parece: al principio, pocos segundos."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "toe-touch",
+    "name": "Toe Touch",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con las piernas extendidas y los brazos a los lados.",
+      "Estira los brazos hacia los dedos de los pies sin flexionar la cadera: es un abdominal, no una Cimpa.",
+      "Sube las manos sin despegar los hombros más de unos centímetros.",
+      "Baja despacio hasta apoyar los brazos en el suelo.",
+      "Si el recorrido es demasiado grande para tu movilidad lumbar, hazlo con las piernas en una caja.",
+      "La versión de pie es un estiramiento; esta es la que trabaja el abdomen."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "heel-tap",
+    "name": "Heel Tap",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con los brazos extendidos a los lados y las piernas rectas.",
+      "Presiona la zona lumbar contra el suelo y levanta la cadera un centímetro.",
+      "Toca un talón con la mano del lado contrario sin levantar el otro.",
+      "Alterna lados con un ritmo lento, manteniendo la cadera quieta.",
+      "Si la zona lumbar se despega del suelo, baja la cadera o hazlo con las rodillas dobladas."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "decline-sit-up",
+    "name": "Decline Sit-Up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Agarra los pies bajo un rodillo o hazlos contra una pared, con el banco ligeramente inclinado hacia abajo.",
+      "Túmbate boca arriba con las rodillas flexionadas y los brazos cruzados sobre el pecho.",
+      "Sube el torso por curling abdominal hasta que el pecho se acerque a los muslos.",
+      "Baja despacio sin dejar caer el torso de golpe.",
+      "El abdomen aquí trabaja muy acortado: cuidado con el cuello, que es el punto débil.",
+      "Si la carga en el cuello es alta, haz crunches en banco plano."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "pallof-press",
+    "name": "Pallof Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea a la altura del pecho y engancha una cinta en un extremo.",
+      "Ponte de pie con los pies anchos, sujetando la cinta con ambas manos al centro del pecho.",
+      "Empuja las manos al frente hasta extender los brazos, resistiendo el tirón hacia el lado.",
+      "Mantén la cadera y el torso quietos mientras sostienes la extensión.",
+      "Vuelve llevando las manos de vuelta a ritmo lento.",
+      "Es anti-rotación: si el torso gira, la carga es excesiva o el rango es demasiado largo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "l-sit-hold",
+    "name": "L-Sit Hold",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en una barra o en el suelo, apoyándote en los brazos con las manos bajo los hombros.",
+      "Levanta las piernas hasta mantenerlas paralelas al suelo, con las rodillas extendidas y los pies juntos.",
+      "Aprieta el abdomen para que la cadera no se abra hacia el suelo.",
+      "Mantén la posición el tiempo objetivo con los codos rectos o ligeramente flexionados.",
+      "Empieza con las rodillas flexionadas o los pies apoyados en el suelo si todavía no te sale la L.",
+      "Cuando la postura se rompa, baja los pies: no cuelgues del hombro para seguir aguantando."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "seated-knee-tuck",
+    "name": "Seated Knee Tuck",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en el suelo con las rodillas flexionadas y los pies apoyados, o en el borde de un banco con los pies colgando.",
+      "Inclínate ligeramente hacia atrás con la espalda recta, sin arquearla.",
+      "Lleva las rodillas hacia el pecho contrayendo el abdomen.",
+      "Baja despacio hasta casi tocar el suelo con los pies.",
+      "Si necesitas agarrarte, hazlo a una altura más alta: la las manos pierden tensión y se pierde tensión.",
+      "Es más fácil que el colgado de rodillas y es un buen primer paso hacia él."
+    ],
+    "steps_en": []
+  }
+]

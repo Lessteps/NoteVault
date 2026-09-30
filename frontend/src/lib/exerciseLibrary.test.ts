@@ -50,6 +50,13 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
+  test("grupo core redactado a mano (plank, russian-twist, v-up)", () => {
+    expect(getInstructions("plank")!.source).toBe("propia");
+    // plank antes venía de "power point plank", un variante distinto.
+    expect(getInstructions("plank")!.steps_es.length).toBeGreaterThanOrEqual(4);
+    expect(getInstructions("russian-twist")!.steps_es.join(" ")).toMatch(/torso|rot/i);
+  });
+
   test("grupo gluteos/isbios redactado a mano (deadlift, leg-curl, kettlebell-swing)", () => {
     expect(getInstructions("deadlift")!.source).toBe("propia");
     // leg-curl antes venía de "biceps leg concentration curl": no era el mismo.

@@ -194,7 +194,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
   };
   const natural = (x: string, y: string) => x.localeCompare(y, "es", { numeric: true });
   const existingAreas = dirs(subject).filter((n) => !newNames.has(n));
-  const everyArea: Array<{ name: string; topics: string[]; prerequisites?: number }> = [
+  const everyArea: Array<{ name: string; topics: readonly string[]; prerequisites?: number }> = [
     ...spaceAreas.map((a) => ({ ...a })),
     ...existingAreas.map((name) => ({ name, topics: dirs(`${subject}/${name}`).sort(natural) })),
   ].sort((x, y) => natural(x.name, y.name));

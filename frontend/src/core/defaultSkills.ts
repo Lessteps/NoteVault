@@ -10,6 +10,8 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { ENGLISH_DEFAULT_SKILLS } from "./englishDefaultSkills.js";
+import { domainOfSubject, type Domain } from "./practice/domain.js";
 
 const FENCE = "```";
 
@@ -200,24 +202,53 @@ Cómo añadir un tema (o dividir uno) dentro de un área ya existente.
 `,
 };
 
-/** A sibling subject's `_skills` folder: "Matemáticas 1" → "Matemáticas". */
-function siblingSkillsDir(rootAbs: string, spaceFolder: string): string | null {
+/** The domain of an existing space, from the subject of its overview (`<space>.resumen.md`); null when unknown. */
+function spaceDomain(rootAbs: string, name: string): Domain | null {
+  try {
+    const head = fs.readFileSync(path.join(rootAbs, name, `${name}.resumen.md`), "utf-8").slice(0, 800);
+    const subject = /^subject:\s*["']?([^"'\n]+?)["']?\s*$/m.exec(head)?.[1];
+    return subject ? domainOfSubject(subject) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A sibling subject's `_skills` folder: "Matemáticas 1" → "Matemáticas". Only a space of the SAME domain
+ * counts, so an English space never inherits mathematics skill notes and a mathematics one never inherits
+ * English ones (a space whose domain is unknown still counts for mathematics, as before).
+ */
+function siblingSkillsDir(rootAbs: string, spaceFolder: string, domain: Domain): string | null {
   const stem = spaceFolder.replace(/\s*\d+\s*$/, "").trim();
   const candidates = [stem, ...fs.readdirSync(rootAbs, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)];
   for (const name of candidates) {
     if (!name || name === spaceFolder || name.startsWith(".")) continue;
     const dir = path.join(rootAbs, name, "_skills");
-    if (fs.existsSync(dir)) return dir;
+    if (!fs.existsSync(dir)) continue;
+    const theirs = spaceDomain(rootAbs, name);
+    if (domain === "english" ? theirs !== "english" : theirs === "english") continue;
+    return dir;
   }
   return null;
 }
 
+/** The default skill notes of a domain. The mathematics set is `DEFAULT_SKILLS`; nothing of it is used for English. */
+export function defaultSkillsFor(domain: Domain): Record<string, string> {
+  return domain === "english" ? ENGLISH_DEFAULT_SKILLS : DEFAULT_SKILLS;
+}
+
 /**
- * Makes sure `<space>/_skills` has every default skill; existing files are never touched.
+ * Makes sure `<space>/_skills` has every default skill of the space's domain; existing files are never touched.
  * Returns what it created. `refresh` names default skills to REPLACE even if present
  * (used once to upgrade the thin first-generation templates of an existing subject).
  */
-export function ensureDefaultSkills(rootAbs: string, spaceFolder: string, refresh: readonly string[] = []): string[] {
+export function ensureDefaultSkills(
+  rootAbs: string,
+  spaceFolder: string,
+  refresh: readonly string[] = [],
+  subjectId = "mathematics",
+): string[] {
+  const domain = domainOfSubject(subjectId);
   const dir = path.join(rootAbs, spaceFolder, "_skills");
   fs.mkdirSync(dir, { recursive: true });
   const created: string[] = [];
@@ -229,8 +260,8 @@ export function ensureDefaultSkills(rootAbs: string, spaceFolder: string, refres
   };
   // The built-in skills first (they are the up-to-date ones); a sibling subject then
   // only contributes files this space does not have (its own canvas / practice notes).
-  for (const [name, content] of Object.entries(DEFAULT_SKILLS)) put(`${name}.md`, content, refresh.includes(name));
-  const sibling = siblingSkillsDir(rootAbs, spaceFolder);
+  for (const [name, content] of Object.entries(defaultSkillsFor(domain))) put(`${name}.md`, content, refresh.includes(name));
+  const sibling = siblingSkillsDir(rootAbs, spaceFolder, domain);
   if (sibling) {
     for (const f of fs.readdirSync(sibling)) {
       if (f.toLowerCase().endsWith(".md")) put(f, fs.readFileSync(path.join(sibling, f), "utf-8"));

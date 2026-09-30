@@ -14,7 +14,7 @@ import { ApiError } from "./errors.js";
 import { buildAreaMapCanvas, buildSpaceMapCanvas, type MapTopic, type SpaceMapArea, type TopicDependency } from "./areaMap.js";
 import { dumpFrontmatter } from "./frontmatter.js";
 import { applyPlanToPractica, parsePracticePlan } from "./practice/practicePlan.js";
-import { branchFromPath, isEnglishBranch, type EnglishBranch } from "../lib/englishSkillData.js";
+import { branchFromPath, ENGLISH_VOCABULARY_FOLDER, isEnglishBranch, type EnglishBranch } from "../lib/englishSkillData.js";
 import { domainOfSubject } from "./practice/domain.js";
 import { catalogFor, catalogSkill, deterministicSkillSelector, skillsForBranch } from "./practice/skillSelection.js";
 import { createDefaultTopicManifest } from "./practice/topic.js";
@@ -198,7 +198,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
     try {
       return fs
         .readdirSync(absOf(root, rel), { withFileTypes: true })
-        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith("."))
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".") && d.name !== ENGLISH_VOCABULARY_FOLDER)
         .map((d) => d.name);
     } catch {
       return [];

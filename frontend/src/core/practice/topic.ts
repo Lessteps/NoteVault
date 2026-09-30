@@ -270,7 +270,17 @@ export function parseTopicManifest(
   const plan = parsePlanString(fm.plan);
   const planned = plan ? Object.keys(plan).filter((s) => knownSkillIds.has(s)) : [];
   const validSkills = (planned.length ? planned : rawSkills).filter((s) => knownSkillIds.has(s));
-  const skills = validSkills.length > 0 ? validSkills : subjectSkills.map((s) => s.id);
+  // No declared skills: mathematics/programming offer the whole subject (as always). English does NOT: it
+  // offers its branch's skills, and an unclassified topic (no `branch:`) offers none until it is classified.
+  const declaredBranch = String(fm.branch ?? "").trim().toLowerCase();
+  const skills =
+    validSkills.length > 0
+      ? validSkills
+      : domainOfSubject(subject) === "english"
+        ? isEnglishBranch(declaredBranch)
+          ? skillsForBranch(subject, declaredBranch)
+          : []
+        : subjectSkills.map((s) => s.id);
 
   // Mastery config: supports nested object or flat/indented keys from parseFrontmatter
   const rawMastery = fm.mastery && typeof fm.mastery === "object" ? fm.mastery : {};

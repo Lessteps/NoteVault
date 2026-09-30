@@ -240,3 +240,27 @@ export function suggestBranch(name: string): EnglishBranch | null {
   ];
   return rules.find(([, re]) => re.test(n))?.[0] ?? null;
 }
+
+/** What a syllabus and a theory note of each branch is about; the generators quote it. */
+export const ENGLISH_BRANCH_BRIEF: Record<EnglishBranch, { syllabus: string; theory: string }> = {
+  grammar: {
+    syllabus: "Each topic is ONE grammar point (a tense, articles, prepositions, conditionals, the passive, relative clauses, reported speech…), ordered by CEFR level from A2 to C1 and by dependency.",
+    theory: "The note explains the rule (form, use, exceptions), contrasts it with Spanish and shows it in realistic work and daily-life sentences.",
+  },
+  writing: {
+    syllabus: "Each topic is ONE writing sub-skill or text type (building sentences, linkers, a paragraph, an email, an opinion text, register, self-review), from A2 to C1.",
+    theory: "The note teaches the structure of that text or sub-skill and includes a model text; the examples are short pieces of writing with why they work.",
+  },
+  reading: {
+    syllabus: "Each topic is ONE reading strategy or text type (skimming and scanning, guessing words from context, inference, main ideas and summaries, text structure, articles, instructions, emails), from A2 to C1.",
+    theory: "The note teaches the strategy step by step and uses short sample texts; the examples show the strategy applied to a text.",
+  },
+  listening: {
+    syllabus: "Each topic is ONE listening skill or sound pattern (weak forms and contractions, numbers and dates, stress and rhythm, accents, meetings, phone calls, instructions), from A2 to C1.",
+    theory: "The note explains the pattern or strategy and includes transcripts of sample audios; the examples are short transcripts with what to listen for.",
+  },
+  speaking: {
+    syllabus: "Each topic is ONE communicative function or pronunciation pattern (introducing yourself, asking and answering, giving opinions, meetings, presentations, phone calls, problem sounds), from A2 to C1.",
+    theory: "The note teaches the function or sound with model phrases and typical Spanish-speaker slips; the examples are short exchanges or phrases to say aloud.",
+  },
+};

@@ -14,6 +14,9 @@ import { applyAssistantAction, safeName, subjectIdOf } from "../../core/assistan
 import { buildAreaMapCanvas, buildSpaceMapCanvas, type MapTopic, type SpaceMapArea, type TopicDependency } from "../../core/areaMap.js";
 import { ConversationStore, type StoredMessage } from "../../core/conversations.js";
 import { ensureDefaultSkills } from "../../core/defaultSkills.js";
+import { ENGLISH_DEFAULT_SKILLS } from "../../core/englishDefaultSkills.js";
+import { domainOfSubject } from "../../core/practice/domain.js";
+import { branchFromPath, ENGLISH_BRANCH_BRIEF, ENGLISH_BRANCHES, ENGLISH_VOCABULARY_FOLDER, type EnglishBranch } from "../../lib/englishSkillData.js";
 import { ApiError } from "../../core/errors.js";
 import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
@@ -135,6 +138,72 @@ function aiConfig(): AIConfig {
 const skillText = (app: AppState, spaceFolder: string, name: string, max = 6000): string =>
   readSkillTemplates(app.root, spaceFolder).find((s) => s.title === name)?.content.slice(0, max) ?? "";
 
+/**
+ * `<space>/Vocabulario/`: the home of the ONE word bank the branches feed. It is not a branch (no syllabus,
+ * no topics); the words themselves live in the private bank (`.notevault/estudio/vocabulario`).
+ */
+export function ensureVocabularyHome(root: string, space: string): void {
+  const dir = path.join(root, space, ENGLISH_VOCABULARY_FOLDER);
+  fs.mkdirSync(dir, { recursive: true });
+  const note = path.join(dir, "00 Banco de palabras.md");
+  if (fs.existsSync(note)) return;
+  fs.writeFileSync(
+    note,
+    [
+      "---",
+      "title: Banco de palabras",
+      "subject: english",
+      "type: index",
+      "---",
+      "",
+      "# Banco de palabras",
+      "",
+      "El vocabulario **no es una rama**: es un único banco de palabras que alimentan todas las ramas (gramática, escritura,",
+      "lectura, escucha y habla) y que se practica con las competencias `vc_` (recuerdo, reconocimiento, uso en oraciones,",
+      "familias de palabras y colocaciones). Cada palabra tiene su propio repaso espaciado en el calendario.",
+      "",
+      "Se añaden palabras desde el reproductor (al minar subtítulos), desde la lista «Vocabulario nuevo» de cada tema y a mano.",
+      "",
+    ].join("\n"),
+    "utf-8",
+  );
+}
+
+/** The line of the theory prompt that says which English branch the topic is (empty for other subjects). */
+function englishBrief(subjectName: string, areaName: string): string {
+  const branch = domainOfSubject(subjectName) === "english" ? branchFromPath(areaName) : null;
+  if (!branch) return "";
+  return (
+    `Rama de inglés: ${branch}. ${ENGLISH_BRANCH_BRIEF[branch].theory} ` +
+    "La explicación va en español; los ejemplos, las frases modelo y las tarjetas (respuestas) en inglés con su glosa.\n"
+  );
+}
+
+/** Branches named in a free-text scope ("solo lectura y escucha"); none named → all five. */
+export function branchesInScope(scope: string): EnglishBranch[] {
+  const text = scope.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const named = ENGLISH_BRANCHES.filter((b) => b.words.some((w) => text.includes(w))).map((b) => b.id);
+  return named.length ? named : ENGLISH_BRANCHES.map((b) => b.id);
+}
+
+/**
+ * The topics of one English branch as the model returned them, renumbered N.1, N.2… deterministically
+ * (the model's own numbering is not trusted) and cleaned into safe folder names.
+ */
+export function parseBranchTopics(reply: string, branchNumber: number): SpaceTopic[] {
+  const raw = extractJson(reply);
+  const seen = new Set<string>();
+  const out: SpaceTopic[] = [];
+  for (const t of (Array.isArray(raw?.topics) ? raw.topics : []).slice(0, MAX_TOPICS)) {
+    const title = safeName(typeof t === "string" ? t : (t?.name ?? t?.folder)).replace(/^\d+(?:\.\d+)*\s+/, "").trim();
+    if (!title || seen.has(title.toLowerCase())) continue;
+    seen.add(title.toLowerCase());
+    out.push({ name: `${branchNumber}.${out.length + 1} ${title}` });
+  }
+  if (!out.length) throw new ApiError("La IA no propuso ningún tema para esa rama.");
+  return out;
+}
+
 /** Appends exchanges to one saved conversation, creating it on first use. */
 class ChatLog {
   private store = new ConversationStore(AppConfig.get_conversations_dir());
@@ -186,6 +255,7 @@ export function studySpaceApi(app: AppState) {
       role: "user",
       content:
         `Materia: ${subjectName}. Área: ${areaName}. Tema: ${topic}.\n` +
+        englishBrief(subjectName, areaName) +
         `Temas anteriores que puedes usar como prerrequisito en «## Requiere» (nombre EXACTO entre [[ ]]; solo estos): ${previous.length ? previous.join("; ") : "(ninguno: escribe *Sin prerrequisitos.*)"}.\n\n` +
         `Escribe la nota completa en Markdown SIN frontmatter (lo añade la app). Empieza con «# ${topic}» y termina con «## Tarjetas». ` +
         "Incluye 3 ejemplos y 4–5 errores, cada uno con sus cuatro campos exactos.",
@@ -204,6 +274,7 @@ export function studySpaceApi(app: AppState) {
       "type: teorica",
       "difficulty: 1",
       `subject: ${subjectId}`,
+      ...(domainOfSubject(subjectId) === "english" && branchFromPath(areaName) ? [`branch: ${branchFromPath(areaName)}`] : []),
       "prerequisites: []",
       "status: draft",
       "verified: false",
@@ -246,7 +317,8 @@ export function studySpaceApi(app: AppState) {
         areas: req.areas.map((a) => ({ name: a.name, folder: a.name, topics: a.topics.map((t) => ({ name: t.name })) })),
       },
     });
-    const skills = ensureDefaultSkills(app.root, folder);
+    const skills = ensureDefaultSkills(app.root, folder, [], subjectId);
+    if (domainOfSubject(subjectId) === "english") ensureVocabularyHome(app.root, folder);
     say(`Carpetas y vistas listas (${made.written.length} archivos); skills por defecto: ${skills.length} nuevas en ${folder}/_skills.`);
     chat.note(
       `Espacio «${folder}»: ${req.areas.length} área(s), ${allTopics.length} tema(s). ` +
@@ -358,7 +430,8 @@ export function studySpaceApi(app: AppState) {
       // The space map lists EVERY area on disk, so adding an area keeps the earlier ones.
       const onDisk = fs
         .readdirSync(path.join(app.root, folder), { withFileTypes: true })
-        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith("."))
+        // The word bank folder is not an area of the syllabus (vocabulary is not a branch).
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".") && d.name !== ENGLISH_VOCABULARY_FOLDER)
         .map((d) => d.name)
         .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
       const all: SpaceMapArea[] = onDisk.map((name) => {
@@ -416,6 +489,40 @@ export function studySpaceApi(app: AppState) {
       const existing = space && fs.existsSync(path.join(app.root, space))
         ? fs.readdirSync(path.join(app.root, space), { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".")).map((d) => d.name)
         : [];
+      if (domainOfSubject(name) === "english") {
+        // English: each branch gets its OWN syllabus, specialised in what that branch teaches (one call per branch).
+        const chat = new ChatLog(undefined, `Espacio de estudio: ${space || name}`, cfg.model);
+        const temario = skillText(app, space || name, "temario_skill", 3500) || ENGLISH_DEFAULT_SKILLS.temario_skill!.slice(0, 3500);
+        const areas: SpaceArea[] = [];
+        for (const id of branchesInScope(scope)) {
+          const b = ENGLISH_BRANCHES.find((x) => x.id === id)!;
+          if (existing.includes(b.folder)) continue;
+          const number = ENGLISH_BRANCHES.indexOf(b) + 1;
+          const system =
+            "Eres un diseñador curricular de inglés para un hispanohablante (hoy A2, meta C1). Propones el temario de UNA rama. " +
+            'Responde SOLO con JSON: {"topics":[{"name":"Nombre del tema"}]}. ' +
+            `${ENGLISH_BRANCH_BRIEF[id].syllabus} ` +
+            "6–12 temas, ordenados por nivel MCER y por dependencia; nombres cortos en inglés (sin numeración: la pone la app) " +
+            'y sin / \\ : * ? " < > |.\n\nSigue esta skill de la bóveda:\n' + temario;
+          const user =
+            `Rama: ${b.label} (carpeta «${b.folder}»).\n` +
+            (scope.trim() ? `Alcance pedido: ${scope.trim()}.\n` : "") +
+            (objective.trim() ? `Objetivo del estudiante: ${objective.trim()}.\n` : "");
+          const reply = await askStructured(cfg, [{ role: "system", content: system }, { role: "user", content: user }], (r) => {
+            try {
+              parseBranchTopics(r, number);
+              return true;
+            } catch {
+              return false;
+            }
+          });
+          const topics = parseBranchTopics(reply, number);
+          areas.push({ name: b.folder, topics });
+          chat.exchange(`Propón el temario de la rama ${b.label}. ${user.trim()}`, `Propuesta de DeepSeek para ${b.folder}:\n\n${topics.map((t) => `- ${t.name}`).join("\n")}`);
+        }
+        if (!areas.length) throw new ApiError("Esas ramas ya existen en este espacio.");
+        return { areas, conversationId: chat.id };
+      }
       const skill = skillText(app, space || name, "temario_skill", 3000);
       const system =
         "Eres un diseñador curricular. Propones el temario de una materia en español. Responde SOLO con JSON: " +

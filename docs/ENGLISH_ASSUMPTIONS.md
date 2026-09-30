@@ -37,3 +37,20 @@ here was asked back to the user; each entry can be reversed by changing the one 
    what is graded. `sp_*` skills are therefore text exercises whose framing says so.
 10. **Listening audio** is played by the app (browser speech synthesis or the media player) and the text stays
     hidden; `ls_dictation`, `ls_gap` and `vc_recall` are always without help (a hint would give the answer away).
+
+## Structure (phase 8)
+
+11. **Layout.** `Inglés N/<1 Gramática | 2 Escritura | 3 Lectura | 4 Escucha | 5 Habla>/<N.M tema>/`, plus
+    `Vocabulario/` (the word bank's home, NOT a branch: it is excluded from the space map and the outline).
+    Topics keep the mathematics file conventions: theory named after its folder, `.practica.md`, review file in
+    `Repaso/`, exercises in `Ejercicios/<skill>/`.
+12. **One syllabus per branch** (one AI call each, with that branch's brief), topics renumbered by the app
+    (`N.1`, `N.2`… — the model's numbering is not trusted). The scope text may name branches ("solo lectura y
+    escucha"); none named → all five. Topic names are in English (the learner studies English); explanations in
+    Spanish.
+13. **Default `_skills` per domain.** `ensureDefaultSkills(root, folder, refresh, subjectId)`: an English space gets
+    `ENGLISH_DEFAULT_SKILLS` (theory contract kept identical so the topic map still builds), a mathematics space gets
+    `DEFAULT_SKILLS` unchanged. A sibling space's `_skills` are inherited only from a space of the SAME domain (its
+    subject is read from its overview; an unreadable overview still counts for mathematics, as before).
+14. **No "all skills" default for English.** A practice file with no skills gets its branch's skills, or none when it has
+    no branch (previously any subject fell back to every skill of the subject).

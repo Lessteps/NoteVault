@@ -30,6 +30,12 @@ export interface TopicManifest {
   /** Teórico · procedimental · mixto: decide qué skills se recomiendan (ver topicType.ts). */
   topic_type?: TopicType;
   exam_group?: string;
+  /**
+   * The AI's plan for THIS topic: which competencies it trains and how many passed
+   * exercises each difficulty needs ([easy, medium, hard]; 0 = not practised there).
+   * When present it replaces the fixed `min_per_skill` / `target_difficulty` rule.
+   */
+  plan?: Record<string, [number, number, number]>;
   path?: string;
   folder?: string;
 }
@@ -40,6 +46,24 @@ export interface TopicCellProgress {
   attempts: number;
   passes: number;
   bestScore: number | null;
+  /** passes this cell needs according to the topic's plan; undefined without a plan */
+  required?: number;
+}
+
+/** `solve=3/4/2, process=2/3/0` ⇄ the plan map. Unknown or empty entries are dropped. */
+export function parsePlanString(text: unknown): Record<string, [number, number, number]> | undefined {
+  const out: Record<string, [number, number, number]> = {};
+  for (const part of String(text ?? "").split(",")) {
+    const m = /^\s*([a-z_]+)\s*=\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s*$/i.exec(part);
+    if (!m) continue;
+    const counts: [number, number, number] = [Number(m[2]), Number(m[3]), Number(m[4])];
+    if (counts[0] + counts[1] + counts[2] > 0) out[m[1]!.toLowerCase()] = counts;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+export function formatPlanString(plan: Record<string, [number, number, number]>): string {
+  return Object.entries(plan).map(([skill, c]) => `${skill}=${c[0]}/${c[1]}/${c[2]}`).join(", ");
 }
 
 export interface TopicSkillProgress {
@@ -238,7 +262,9 @@ export function parseTopicManifest(
     rawSkills = fm.skills.split(/[,\s]+/).map((s) => s.trim().toLowerCase());
   }
 
-  const validSkills = rawSkills.filter((s) => knownSkillIds.has(s));
+  const plan = parsePlanString(fm.plan);
+  const planned = plan ? Object.keys(plan).filter((s) => knownSkillIds.has(s)) : [];
+  const validSkills = (planned.length ? planned : rawSkills).filter((s) => knownSkillIds.has(s));
   const skills = validSkills.length > 0 ? validSkills : subjectSkills.map((s) => s.id);
 
   // Mastery config: supports nested object or flat/indented keys from parseFrontmatter
@@ -274,6 +300,10 @@ export function parseTopicManifest(
   const topicType = normaliseTopicType(fm.topic_type);
   if (topicType) {
     manifest.topic_type = topicType;
+  }
+
+  if (plan && planned.length) {
+    manifest.plan = Object.fromEntries(planned.map((sk) => [sk, plan[sk]!]));
   }
 
   return manifest;
@@ -389,10 +419,11 @@ export function computeTopicProgress(
   const skillsProgress: Record<string, TopicSkillProgress> = {};
 
   for (const skillId of topic.skills) {
+    const planned = topic.plan?.[skillId];
     const cells: Record<DifficultyLevel, TopicCellProgress> = {
-      1: { skill: skillId, difficulty: 1, attempts: 0, passes: 0, bestScore: null },
-      2: { skill: skillId, difficulty: 2, attempts: 0, passes: 0, bestScore: null },
-      3: { skill: skillId, difficulty: 3, attempts: 0, passes: 0, bestScore: null },
+      1: { skill: skillId, difficulty: 1, attempts: 0, passes: 0, bestScore: null, ...(planned ? { required: planned[0] } : {}) },
+      2: { skill: skillId, difficulty: 2, attempts: 0, passes: 0, bestScore: null, ...(planned ? { required: planned[1] } : {}) },
+      3: { skill: skillId, difficulty: 3, attempts: 0, passes: 0, bestScore: null, ...(planned ? { required: planned[2] } : {}) },
     };
 
     let totalAttempts = 0;
@@ -436,14 +467,25 @@ export function computeTopicProgress(
       }
     }
 
-    // Consolidated: >= min_per_skill passes and passed at least once at target or intermediate
-    const consolidated =
-      totalPasses >= topic.mastery.min_per_skill &&
-      (highestPassedDiff >= Math.min(2, topic.mastery.target_difficulty) ||
-        (bestScore !== null && bestScore >= 75));
-
-    // Mastered: consolidated AND reached target_difficulty
-    const mastered = consolidated && highestPassedDiff >= topic.mastery.target_difficulty;
+    let consolidated: boolean;
+    let mastered: boolean;
+    if (planned) {
+      // With the AI's plan the matrix cells ARE the requirement: mastered when every
+      // planned cell has its passes, consolidated from half of what is planned.
+      const needed = ([1, 2, 3] as const).filter((d) => (cells[d].required ?? 0) > 0);
+      mastered = needed.every((d) => cells[d].passes >= cells[d].required!);
+      const planTotal = needed.reduce((n, d) => n + cells[d].required!, 0);
+      const done = needed.reduce((n, d) => n + Math.min(cells[d].passes, cells[d].required!), 0);
+      consolidated = mastered || (planTotal > 0 && done * 2 >= planTotal);
+    } else {
+      // Consolidated: >= min_per_skill passes and passed at least once at target or intermediate
+      consolidated =
+        totalPasses >= topic.mastery.min_per_skill &&
+        (highestPassedDiff >= Math.min(2, topic.mastery.target_difficulty) ||
+          (bestScore !== null && bestScore >= 75));
+      // Mastered: consolidated AND reached target_difficulty
+      mastered = consolidated && highestPassedDiff >= topic.mastery.target_difficulty;
+    }
 
     const status: "not_started" | "practicing" | "consolidated" =
       totalAttempts === 0 ? "not_started" : consolidated ? "consolidated" : "practicing";

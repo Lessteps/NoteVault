@@ -897,6 +897,8 @@ export interface TopicManifest {
   skills: string[];
   mastery: TopicMasteryConfig;
   exam_group?: string;
+  /** The AI's plan for this topic: passes needed per skill at [easy, medium, hard]. */
+  plan?: Record<string, [number, number, number]>;
   path?: string;
   folder?: string;
 }
@@ -907,6 +909,8 @@ export interface TopicCellProgress {
   attempts: number;
   passes: number;
   bestScore: number | null;
+  /** passes this cell needs per the topic's plan (undefined without a plan) */
+  required?: number;
 }
 
 export interface TopicSkillProgress {

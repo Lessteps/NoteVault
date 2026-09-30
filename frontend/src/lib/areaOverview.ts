@@ -267,13 +267,17 @@ export function skillMatrix(item: TopicDashboardItem): SkillMatrixRow[] {
       skill,
       label: progress?.label ?? skill,
       description: progress?.description ?? "",
-      cells: DIFFICULTIES.map((difficulty) => ({
-        difficulty,
-        passes: progress?.cells?.[difficulty]?.passes ?? 0,
-        attempts: progress?.cells?.[difficulty]?.attempts ?? 0,
-        required: min,
-        counts: difficulty >= target,
-      })),
+      cells: DIFFICULTIES.map((difficulty) => {
+        // The topic's own AI plan, when it has one, decides what each cell needs.
+        const planned = item.manifest.plan?.[skill]?.[difficulty - 1];
+        return {
+          difficulty,
+          passes: progress?.cells?.[difficulty]?.passes ?? 0,
+          attempts: progress?.cells?.[difficulty]?.attempts ?? 0,
+          required: planned ?? min,
+          counts: item.manifest.plan ? (planned ?? 0) > 0 : difficulty >= target,
+        };
+      }),
     };
   });
 }

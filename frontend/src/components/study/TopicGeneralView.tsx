@@ -104,8 +104,9 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
               </div>
               <h2 className="mt-0.5 text-[17px] font-bold leading-tight text-text">Dominio del Tema</h2>
               <p className="mt-1.5 max-w-[300px] text-[11.5px] leading-snug text-faint">
-                Completá las {skillsList.length} habilidades en dificultad {target === 3 ? "media y alta" : "media"} para
-                desbloquear la certificación.
+                {manifest.plan
+                  ? `Completa las casillas de las ${skillsList.length} competencias que la IA eligió para este tema.`
+                  : `Completá las ${skillsList.length} habilidades en dificultad ${target === 3 ? "media y alta" : "media"} para desbloquear la certificación.`}
               </p>
             </div>
           </div>
@@ -115,9 +116,21 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
               <div className="flex items-center gap-2 text-[11.5px] font-semibold text-text">
                 <Target size={13} className="text-accent-text" /> Meta por Skill
               </div>
-              <div className="mt-1.5 text-[15px] font-bold text-text">Dificultad {target}</div>
-              <div className="text-[12px] tracking-[0.2em] text-warn">{"★".repeat(target)}</div>
-              <div className="mt-1 text-[10.5px] text-faint">Mínimo {minPerSkill} ejercicios c/u</div>
+              {manifest.plan ? (
+                <>
+                  <div className="mt-1.5 text-[15px] font-bold text-text">Plan de la IA</div>
+                  <div className="text-[12px] tracking-[0.2em] text-warn">
+                    {Object.values(manifest.plan).reduce((n, c) => n + c[0] + c[1] + c[2], 0)} ejercicios
+                  </div>
+                  <div className="mt-1 text-[10.5px] text-faint">Los que marca cada casilla de la matriz</div>
+                </>
+              ) : (
+                <>
+                  <div className="mt-1.5 text-[15px] font-bold text-text">Dificultad {target}</div>
+                  <div className="text-[12px] tracking-[0.2em] text-warn">{"★".repeat(target)}</div>
+                  <div className="mt-1 text-[10.5px] text-faint">Mínimo {minPerSkill} ejercicios c/u</div>
+                </>
+              )}
             </div>
             <div className="flex-1 rounded-xl border border-line bg-panel p-3">
               <div className="flex items-center gap-2 text-[11.5px] font-semibold text-text">
@@ -247,6 +260,15 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
                     </td>
                     {([1, 2, 3] as const).map((d) => {
                       const cell = sp.cells[d];
+                      const required = cell.required ?? minPerSkill;
+                      // With the AI's plan a cell it did not plan is simply not part of this topic.
+                      if (manifest.plan && required === 0) {
+                        return (
+                          <td key={d} className="px-2 py-2.5">
+                            <div className="mx-auto flex h-7 w-[76px] items-center justify-center font-mono text-[11px] text-faint/50" title="El plan de la IA no incluye este nivel">—</div>
+                          </td>
+                        );
+                      }
                       return (
                         <td key={d} className="px-2 py-2.5">
                           <div
@@ -260,7 +282,7 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
                             )}
                             title={`${cell.passes} aprobados de ${cell.attempts} intentos. Mejor: ${cell.bestScore ?? "—"}`}
                           >
-                            {cell.passes} / {minPerSkill}
+                            {cell.passes} / {required}
                           </div>
                         </td>
                       );

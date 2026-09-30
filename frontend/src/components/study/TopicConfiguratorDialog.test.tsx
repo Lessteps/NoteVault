@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 //
-// Area C (Interfaces V3), verified by rendering: the per-topic configurator
-// offers every mathematics mode (not only the ones the manifest happens to
-// declare), plus difficulty, quantity and assistance.
+// The per-topic configurator offers ONLY the skills the topic declares (with the
+// AI's plan, the ones it chose for that topic), plus difficulty, quantity and
+// assistance.
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -28,11 +28,6 @@ const topicData: TopicData = {
   theory_notes: [],
 };
 
-const MATH_MODES = [
-  "Problema", "Procedimiento guiado", "Demostración", "Contraejemplo",
-  "Verdadero o falso", "Encontrar el error", "Cálculo rápido", "Explicar (Feynman)",
-];
-
 let container: HTMLDivElement;
 
 function mount(data: TopicData = topicData) {
@@ -49,18 +44,13 @@ const buttons = () => [...container.querySelectorAll("button")].map((b) => b.tex
 beforeEach(() => mount());
 
 describe("TopicConfiguratorDialog", () => {
-  it("lists every mathematics mode, the declared ones first", () => {
+  it("lists only the skills the topic declares", () => {
     const labels = buttons();
-    for (const label of MATH_MODES) {
-      expect(labels.some((l) => l.includes(label)), `missing “${label}”`).toBe(true);
+    expect(labels.some((l) => l.includes("Problema"))).toBe(true);
+    expect(labels.some((l) => l.includes("Procedimiento guiado"))).toBe(true);
+    for (const other of ["Demostración", "Contraejemplo", "Verdadero o falso", "Cálculo rápido", "Explicar (Feynman)"]) {
+      expect(labels.some((l) => l.includes(other)), `“${other}” should not be offered`).toBe(false);
     }
-
-    // solve / process are declared by the manifest; the rest is widened in.
-    const positions = ["Problema", "Procedimiento guiado", "Demostración"].map((l) =>
-      buttons().findIndex((b) => b.includes(l)),
-    );
-    expect(positions[0]).toBeLessThan(positions[1]!);
-    expect(positions[1]).toBeLessThan(positions[2]!);
   });
 
   it("offers difficulty, quantity and assistance for the chosen mode", () => {
@@ -74,19 +64,27 @@ describe("TopicConfiguratorDialog", () => {
     }
   });
 
-  it("lets a widened mode be picked, and tracks it in the progress card", () => {
+  it("picks another declared skill and tracks it in the progress card", () => {
     expect(container.textContent).toContain("Problema · Nivel 1");
-
-    const counterexample = [...container.querySelectorAll("button")]
-      .find((b) => b.textContent?.includes("Contraejemplo"))!;
-    act(() => counterexample.click());
-
-    expect(container.textContent).toContain("Contraejemplo · Nivel 1");
+    const process = [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Procedimiento guiado"))!;
+    act(() => process.click());
+    expect(container.textContent).toContain("Procedimiento guiado · Nivel 1");
   });
 
-  it("shows a Spanish description on every skill of the picker", () => {
+  it("with an AI plan, only planned difficulties can be chosen", () => {
+    container.remove();
+    mount({ ...topicData, topic: { ...topicData.topic!, plan: { solve: [0, 3, 2], process: [4, 0, 0] } } });
+    const level = (label: string) => [...container.querySelectorAll("button")].find((b) => b.textContent?.includes(label))!;
+    // solve is selected first: easy is not planned for it.
+    expect((level("Principiante") as HTMLButtonElement).disabled).toBe(true);
+    expect((level("Intermedio") as HTMLButtonElement).disabled).toBe(false);
+    expect(container.textContent).toContain("3 ej. planeados");
+    expect(container.textContent).toContain("Fuera del plan");
+  });
+
+  it("shows a Spanish description on every offered skill", () => {
     const text = container.textContent ?? "";
-    for (const skill of MATHEMATICS_SKILLS) {
+    for (const skill of MATHEMATICS_SKILLS.filter((s) => ["solve", "process"].includes(s.id))) {
       expect(text, `“${skill.label}” has no description`).toContain(skill.description);
     }
   });

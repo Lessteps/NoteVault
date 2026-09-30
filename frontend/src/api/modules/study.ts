@@ -324,12 +324,12 @@ export async function reevaluateTopic(app: AppState, folder: string): Promise<{ 
   });
 
   const reply = await askStructured(cfg, messages);
-  const plan = parsePracticePlan(reply, catalog);
+  const plan = parsePracticePlan(reply, catalog, topicType);
   if (!plan) {
     const snippet = String(reply ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
     throw new ApiError(`La IA no devolvió un plan de práctica válido. Respuesta: «${snippet || "vacía"}»`);
   }
-  plan.topicType = topicType;
+  plan.topicType = plan.topicType ?? topicType;
 
   const practicaAbs = path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica"));
   if (!fs.existsSync(practicaAbs)) ensureTopicViewFiles(app.root, topicAbs);

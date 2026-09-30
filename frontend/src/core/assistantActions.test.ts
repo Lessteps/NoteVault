@@ -124,3 +124,30 @@ describe("subjectIdOf", () => {
     expect(subjectIdOf("Cálculo diferencial")).toBe("mathematics");
   });
 });
+
+describe("set_practice_plan", () => {
+  it("rewrites one topic's matrix and drops skills that do not suit it", () => {
+    const topic = path.join(root, "Matemáticas", "1 A", "1.1 Números");
+    fs.mkdirSync(topic, { recursive: true });
+    fs.writeFileSync(path.join(topic, "1.1 Números.practica.md"), "---\ntype: practica\nsubject: mathematics\ntitle: 1.1 Números\nskills: [solve, drill]\n---\n\n# Práctica\n", "utf-8");
+
+    const action = {
+      action: "set_practice_plan",
+      args: {
+        topic: "Matemáticas/1 A/1.1 Números",
+        topic_type: "theoretical",
+        skills: [
+          { skill: "explain", difficulties: { 1: 2, 2: 2, 3: 1 }, why: "conceptos" },
+          { skill: "drill", difficulties: { 1: 3, 2: 3, 3: 0 }, why: "cálculo" },
+        ],
+      },
+    };
+    const plan = planAssistantAction(root, action);
+    expect(plan.warnings[0]).toContain("drill");
+    applyAssistantAction(root, action);
+    const text = read("Matemáticas/1 A/1.1 Números/1.1 Números.practica.md");
+    expect(text).toContain('plan: "explain=2/2/1"');
+    expect(text).toContain("skills: [explain]");
+    expect(parseTopicManifest(text)!.plan).toEqual({ explain: [2, 2, 1] });
+  });
+});

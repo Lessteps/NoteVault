@@ -4,7 +4,7 @@
  * `src/core`); a test keeps both lists in step.
  */
 
-export const VAULT_MODE_IDS = ["temario", "canvas", "tema"] as const;
+export const VAULT_MODE_IDS = ["temario", "canvas", "tema", "matriz"] as const;
 export type VaultModeId = (typeof VAULT_MODE_IDS)[number];
 
 export function isVaultMode(value: unknown): value is VaultModeId {
@@ -20,6 +20,7 @@ export const ACTION_PROTOCOL = [
   '- create_syllabus: {"subject":"JavaScript","subject_id":"mathematics|programming|english","areas":[{"name":"1 Fundamentos","folder":"1 Fundamentos","topics":[{"name":"1.1 Variables y tipos"}]}]}',
   '- create_topic: {"area":"<existing vault folder of the area>","subject_id":"...","topic":{"name":"1.13 Conjuntos"},"theory":"<markdown of the theory note>","skills":["solve","prove"]}  (skills optional, ids of the subject catalogue)',
   '- create_canvas: {"path":"<vault path without extension>","canvas":{"nodes":[{"id":"n1","type":"text","text":"...","x":0,"y":0,"width":260,"height":120}],"edges":[{"id":"e1","fromNode":"n1","toNode":"n2","label":"why they connect"}]}}',
+  '- set_practice_plan: {"topic":"<vault path of the topic folder>","topic_type":"theoretical|procedural|mixed","skills":[{"skill":"solve","difficulties":{"1":3,"2":4,"3":2},"why":"..."}],"summary":"..."}  (replaces the competency matrix of THAT topic only; send the FULL matrix, not just the changes)',
   '- write_skill: {"name":"canvas_skill","folder":"<optional subject folder>","content":"<markdown>"}  (saved in _skills/, replaces the file with that name)',
   '- create_note: {"path":"<vault path>","content":"<markdown>"}',
   "Rules: at most one action per reply; strictly valid JSON (escape newlines as \\n and backslashes as \\\\); folder and file names have no / \\ : * ? \" < > |; paths are relative to the vault and never leave it; talk to the user in Spanish, briefly, before the block. Nothing is created until they accept, so never claim it already exists.",
@@ -49,11 +50,18 @@ const TEMA = [
   "Tell the user that afterwards the wand button of the topic's practice tab lets the AI choose the competencies and how many exercises to do.",
 ].join("\n");
 
+const MATRIZ = [
+  'MODE: COMPETENCY MATRIX OF THE OPEN TOPIC. The user wants to change which competencies (skills) THIS topic trains and how many passed exercises each difficulty needs. The current matrix and the skill catalogue are under "Matrix context".',
+  "Rules: only skills whose type fits the topic (a theoretical topic never gets quick calculation `drill`; a procedural one gets no proofs); 3-6 skills; counts per difficulty 0-12 (0 = that level is not practised); the change affects only this topic.",
+  "Explain briefly what you will change and why, then end with the set_practice_plan action containing the COMPLETE new matrix (every skill that must remain, not only the changed ones).",
+].join("\n");
+
 /** Directive text per mode; the protocol is appended so every mode can act. */
 export const VAULT_MODE_DIRECTIVES: Record<VaultModeId, string> = {
   temario: `${TEMARIO}\n\n${ACTION_PROTOCOL}`,
   canvas: `${CANVAS}\n\n${ACTION_PROTOCOL}`,
   tema: `${TEMA}\n\n${ACTION_PROTOCOL}`,
+  matriz: `${MATRIZ}\n\n${ACTION_PROTOCOL}`,
 };
 
 const MAX_SKILL_CHARS = 3000;
@@ -65,6 +73,8 @@ export function buildModeContext(input: {
   areaTopics?: readonly string[];
   /** folder of the open note: files that belong to its topic go there */
   noteFolder?: string;
+  /** the open topic's competency matrix and the catalogue, for the matrix mode */
+  matrix?: string;
 }): string {
   const parts: string[] = [];
   if (input.skills.length) {
@@ -78,6 +88,7 @@ export function buildModeContext(input: {
       `Area context: folder "${input.areaFolder}". Existing topics: ${input.areaTopics?.length ? input.areaTopics.join("; ") : "(none)"}.`,
     );
   }
+  if (input.matrix) parts.push(`Matrix context:\n${input.matrix}`);
   if (input.noteFolder) {
     parts.push(
       `Open note folder: "${input.noteFolder}". Put new files that belong to this note's topic (its canvas, for example) inside that folder.`,

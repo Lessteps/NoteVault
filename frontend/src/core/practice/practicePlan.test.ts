@@ -132,3 +132,39 @@ describe("parseExerciseArray", () => {
     expect(parseExerciseArray("lo siento, no puedo")).toEqual([]);
   });
 });
+
+describe("plan drives the competency matrix", () => {
+  const reply = (type: string) =>
+    JSON.stringify({
+      topic_type: type,
+      skills: [
+        { skill: "drill", difficulties: { 1: 3, 2: 3, 3: 0 }, why: "x" },
+        { skill: "explain", difficulties: { 1: 2, 2: 2, 3: 1 }, why: "y" },
+        { skill: "true_false", difficulties: { 1: 3, 2: 2, 3: 0 }, why: "z" },
+      ],
+      summary: "s",
+    });
+
+  it("never keeps quick calculation on a theoretical topic", async () => {
+    const plan = parsePracticePlan(reply("theoretical"), catalog)!;
+    expect(plan.skills.map((s) => s.skill)).toEqual(["explain", "true_false"]);
+    expect(plan.topicType).toBe("theoretical");
+    expect(parsePracticePlan(reply("procedural"), catalog)!.skills.map((s) => s.skill)).toEqual(["drill"]);
+  });
+
+  it("is read back as the topic's manifest and sets each matrix cell's requirement", async () => {
+    const { parseTopicManifest, computeTopicProgress } = await import("./topic");
+    const plan = parsePracticePlan(reply("theoretical"), catalog)!;
+    const text = applyPlanToPractica(PRACTICA, plan);
+    expect(text).toContain('plan: "explain=2/2/1, true_false=3/2/0"');
+
+    const manifest = parseTopicManifest(text)!;
+    expect(manifest.skills).toEqual(["explain", "true_false"]);
+    expect(manifest.plan).toEqual({ explain: [2, 2, 1], true_false: [3, 2, 0] });
+
+    const progress = computeTopicProgress(manifest, [], {});
+    expect(progress.skills.explain!.cells[1].required).toBe(2);
+    expect(progress.skills.true_false!.cells[3].required).toBe(0);
+    expect(progress.skills.explain!.mastered).toBe(false);
+  });
+});

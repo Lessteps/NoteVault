@@ -58,18 +58,22 @@ export function buildReevaluationMessages(input: ReevaluationInput): Array<{ rol
     .join("\n\n");
 
   const system = [
-    "You are NoteVault's practice designer. You read a topic's theory and decide which competencies (skills) a student must train to master it.",
-    "Choose ONLY skill ids from the catalogue below. Prefer the few skills that really fit the content: theory-heavy topics need reasoning skills (prove, explain, true_false, counterexample, find_error); procedural topics need execution skills (solve, process, drill, implement, debug, refactor).",
-    "For each chosen skill give how many exercises to do at difficulty 1 (basic), 2 (intermediate) and 3 (advanced). Use 0 where a level makes no sense or is not allowed. Typical totals per skill: 3-12. Harder or more central skills get more.",
+    "You are NoteVault's practice designer. You read ONE topic and decide (1) what kind of topic it is and (2) which competencies (skills) a student must train to master exactly that topic.",
+    "STEP 1 - topic_type. Decide it from what the student has to DO with the topic:",
+    '  "theoretical": the topic is about definitions, concepts, representations, classifications, properties or proofs (what things are and how they relate). Examples: natural numbers, integers and the number line; what a fraction is; sets and notation.',
+    '  "procedural": the topic is about executing a method or a calculation (operations, algorithms, conversions). Examples: adding and subtracting integers; long division; simplifying fractions; percentages.',
+    '  "mixed": both weigh about the same (a method that must also be justified), e.g. gcd and lcm.',
+    "STEP 2 - skills. Choose ONLY skill ids from the catalogue, and ONLY ones that suit the topic_type: each catalogue line says which types it suits. A skill that does not suit the type must NOT be chosen (for example `drill`, quick calculation, is never right for a theoretical topic).",
+    "Prefer 3-6 skills that really serve THIS topic over covering the catalogue. For each give how many exercises at difficulty 1 (basic), 2 (intermediate) and 3 (advanced); 0 where a level makes no sense or is not allowed. Typical totals per skill: 3-10; central skills get more.",
     "Answer with ONE JSON object and nothing else:",
-    '{"skills":[{"skill":"<id>","difficulties":{"1":n,"2":n,"3":n},"why":"<one short sentence in Spanish>"}],"summary":"<one sentence in Spanish>"}',
+    '{"topic_type":"theoretical|procedural|mixed","skills":[{"skill":"<id>","difficulties":{"1":n,"2":n,"3":n},"why":"<one short sentence in Spanish>"}],"summary":"<one sentence in Spanish>"}',
     "",
     `Catalogue for subject "${input.subject}":`,
     catalog,
   ].join("\n");
 
   const user = [
-    `Topic: "${input.title}" (type: ${input.topicType}).`,
+    `Topic: "${input.title}" (subject: ${input.subject}). Decide its topic_type yourself.`,
     input.currentSkills?.length ? `Currently declared skills: ${input.currentSkills.join(", ")}.` : "",
     templates ? `\nVault guidance:\n${templates}\n` : "",
     theory ? `\nTheory of the topic:\n${theory}\n` : "\n(The topic has no theory notes yet: decide from its title and type.)\n",
@@ -91,7 +95,11 @@ function clampCount(value: unknown): number {
 }
 
 /** Extracts and validates the AI's JSON. Unknown skills are dropped; disallowed levels are zeroed. */
-export function parsePracticePlan(reply: string, catalog: readonly CatalogSkill[]): PracticePlan | null {
+export function parsePracticePlan(
+  reply: string,
+  catalog: readonly CatalogSkill[],
+  fallbackType?: TopicType,
+): PracticePlan | null {
   let text = String(reply ?? "").trim();
   const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
   if (fence) text = fence[1]!.trim();
@@ -106,6 +114,8 @@ export function parsePracticePlan(reply: string, catalog: readonly CatalogSkill[
   }
   if (!raw || !Array.isArray(raw.skills)) return null;
 
+  const declared = String(raw.topic_type ?? "").trim().toLowerCase();
+  const topicType = (["theoretical", "procedural", "mixed"].includes(declared) ? declared : fallbackType) as TopicType | undefined;
   const byId = new Map(catalog.map((s) => [s.id.toLowerCase(), s]));
   const seen = new Set<string>();
   const skills: PracticePlanSkill[] = [];
@@ -113,6 +123,8 @@ export function parsePracticePlan(reply: string, catalog: readonly CatalogSkill[
     const id = String(item?.skill ?? "").trim().toLowerCase();
     const def = byId.get(id);
     if (!def || seen.has(id)) continue;
+    // A skill that does not suit the topic's nature is dropped, whatever the model said.
+    if (topicType && !def.topicTypes.includes(topicType)) continue;
     const d = item?.difficulties ?? item?.counts ?? {};
     const counts = { 1: 0, 2: 0, 3: 0 } as Record<DifficultyLevel, number>;
     for (const level of LEVELS) {
@@ -123,7 +135,12 @@ export function parsePracticePlan(reply: string, catalog: readonly CatalogSkill[
     skills.push({ skill: id, counts, why: String(item?.why ?? "").replace(/\s+/g, " ").trim() });
   }
   if (!skills.length) return null;
-  return { skills, summary: String(raw.summary ?? "").replace(/\s+/g, " ").trim() };
+  return { skills, summary: String(raw.summary ?? "").replace(/\s+/g, " ").trim(), ...(topicType ? { topicType } : {}) };
+}
+
+/** The plan as the `plan:` frontmatter value, e.g. `solve=3/4/2, process=2/3/0`. */
+export function planToString(plan: PracticePlan): string {
+  return plan.skills.map((s) => `${s.skill}=${s.counts[1]}/${s.counts[2]}/${s.counts[3]}`).join(", ");
 }
 
 /** How many exercises the plan wants for a skill at a difficulty; null when it says nothing. */
@@ -194,6 +211,8 @@ function setFrontmatterKey(text: string, key: string, value: string): string {
  */
 export function applyPlanToPractica(text: string, plan: PracticePlan, labels: Record<string, string> = {}): string {
   let out = setFrontmatterKey(text, "skills", `[${plan.skills.map((s) => s.skill).join(", ")}]`);
+  // The competency matrix reads this line: rows are these skills, cells these counts.
+  out = setFrontmatterKey(out, "plan", `"${planToString(plan)}"`);
   if (plan.topicType) out = setFrontmatterKey(out, "topic_type", plan.topicType);
   const section = renderPlanSection(plan, labels);
   const a = out.indexOf(PLAN_START);

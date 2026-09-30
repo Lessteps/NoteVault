@@ -1,7 +1,7 @@
 import { CheckCircle2, ChevronRight, Sparkles, X, Zap } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../lib/bridge";
-import type { PracticePlan, TopicData } from "../../lib/types";
+import type { TopicData } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { cn } from "../ui";
 import {
@@ -22,8 +22,6 @@ interface TopicConfiguratorDialogProps {
   onStarted?: (firstPath: string) => void;
   /** Rendered inside a view file instead of as a modal dialog. */
   inline?: boolean;
-  /** The AI's practice plan for this topic, when it has one. */
-  plan?: PracticePlan | null;
   /** Pre-selected competency (the matrix row's own "Practicar"). */
   initialSkill?: string;
 }
@@ -42,7 +40,6 @@ export function TopicConfiguratorDialog({
   onStarted,
   inline = false,
   initialSkill,
-  plan = null,
 }: TopicConfiguratorDialogProps) {
   const toast = useApp((s) => s.toast);
   const openNote = useApp((s) => s.openNote);
@@ -57,20 +54,14 @@ export function TopicConfiguratorDialog({
   const theoreticalOrder = ["prove", "explain", "true_false", "counterexample"];
   const practicalOrder = ["solve", "process", "drill", "implement", "debug", "refactor"];
 
-  // Skills list: start with skills declared in the manifest, then widen with remaining subject skills so all modes are accessible
+  // Only the skills this topic declares: with the AI's plan those are the ones it
+  // chose for THIS topic, and nothing else is offered to practise.
   const manifestSkillsSet = new Set((manifest.skills || []).map((s) => s.toLowerCase()));
-  const skillsToInclude: SkillDefinition[] = [];
-
-  for (const s of allSubjectSkills) {
-    if (manifestSkillsSet.has(s.id.toLowerCase())) {
-      skillsToInclude.push(s);
-    }
-  }
-  for (const s of allSubjectSkills) {
-    if (!manifestSkillsSet.has(s.id.toLowerCase())) {
-      skillsToInclude.push(s);
-    }
-  }
+  const plan = manifest.plan ?? null;
+  const skillsToInclude: SkillDefinition[] = allSubjectSkills.filter((s) => manifestSkillsSet.has(s.id.toLowerCase()));
+  /** Exercises the plan wants for a skill at a difficulty (null without a plan). */
+  const plannedCount = (skill: string, level: DifficultyLevel): number | null =>
+    plan ? (plan[skill]?.[level - 1] ?? 0) : null;
 
   const declaredSkills = skillsToInclude.sort((a, b) => {
     const aDeclared = manifestSkillsSet.has(a.id.toLowerCase()) ? 0 : 1;
@@ -92,11 +83,12 @@ export function TopicConfiguratorDialog({
 
   // Check if beginner allowed for selected skill
   const skillDef = allSubjectSkills.find((s) => s.id === selectedSkill);
-  const beginnerOk = isDifficultyAllowed(subject, selectedSkill, 1);
+  const levelOk = (skill: string, level: DifficultyLevel): boolean =>
+    isDifficultyAllowed(subject, skill, level) && (plannedCount(skill, level) ?? 1) > 0;
+  const firstLevel = (skill: string): DifficultyLevel =>
+    ([1, 2, 3] as const).find((l) => levelOk(skill, l)) ?? 2;
 
-  const [difficulty, setDifficulty] = useState<DifficultyLevel>(
-    beginnerOk ? 1 : 2,
-  );
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>(firstLevel(selectedSkill));
   const [quantity, setQuantity] = useState<QuantityOption>(plan ? "ai" : "3-5");
 
   const helperOk = isAssistanceAllowed(subject, selectedSkill, "helper");
@@ -108,9 +100,7 @@ export function TopicConfiguratorDialog({
   // If user switches to a skill where beginner is not allowed, bump difficulty
   const handleSkillChange = (skillId: string) => {
     setSelectedSkill(skillId);
-    if (!isDifficultyAllowed(subject, skillId, 1) && difficulty === 1) {
-      setDifficulty(2);
-    }
+    if (!levelOk(skillId, difficulty)) setDifficulty(firstLevel(skillId));
     if (!isAssistanceAllowed(subject, skillId, "helper") && assistance === "helper") {
       setAssistance("no_help");
     }
@@ -240,7 +230,8 @@ export function TopicConfiguratorDialog({
             </label>
             <div className="grid grid-cols-3 gap-2">
               {DIFFICULTY_LEVELS.map((d) => {
-                const allowed = isDifficultyAllowed(subject, selectedSkill, d.level);
+                const allowed = levelOk(selectedSkill, d.level);
+                const unplanned = allowed === false && isDifficultyAllowed(subject, selectedSkill, d.level);
                 const isSelected = difficulty === d.level;
                 return (
                   <button
@@ -258,8 +249,11 @@ export function TopicConfiguratorDialog({
                   >
                     <span className="text-[13px]">{d.label}</span>
                     <span className="mt-0.5 text-[10px] text-warn">{"★".repeat(d.level)}</span>
+                    {plan && allowed && (
+                      <span className="mt-0.5 font-mono text-[9.5px] text-faint">{plannedCount(selectedSkill, d.level)} ej. planeados</span>
+                    )}
                     {!allowed && (
-                      <span className="mt-0.5 text-[9.5px] text-danger">No disponible</span>
+                      <span className={cn("mt-0.5 text-[9.5px]", unplanned ? "text-faint" : "text-danger")}>{unplanned ? "Fuera del plan" : "No disponible"}</span>
                     )}
                   </button>
                 );
@@ -298,9 +292,7 @@ export function TopicConfiguratorDialog({
             {quantity === "ai" && (
               <p className="mt-1.5 text-[11px] text-faint">
                 {plan
-                  ? (plan.skills.find((s) => s.skill === selectedSkill)?.counts[difficulty] ?? 0) > 0
-                    ? `La IA propone ${plan.skills.find((s) => s.skill === selectedSkill)!.counts[difficulty]} ejercicios para esta competencia y dificultad.`
-                    : "El plan de la IA no incluye esta combinación: se usarán 3 ejercicios."
+                  ? `La IA planeó ${plannedCount(selectedSkill, difficulty) ?? 0} ejercicios para esta competencia y dificultad.`
                   : "Aún no hay plan: la IA lo decidirá leyendo la teoría al empezar."}
               </p>
             )}

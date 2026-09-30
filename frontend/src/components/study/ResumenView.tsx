@@ -450,6 +450,9 @@ function SkillMatrix({ item }: { item: TopicDashboardItem }) {
         <div key={row.skill} className="grid grid-cols-[minmax(0,1fr)_repeat(3,72px)] items-center gap-2" title={row.description}>
           <span className="truncate text-[11.5px] font-semibold text-text">{row.label}</span>
           {row.cells.map((c, i) => {
+            if (c.required === 0) {
+              return <span key={c.difficulty} className="text-center font-mono text-[10px] text-faint/50">—</span>;
+            }
             const pct = Math.min(100, Math.round((100 * c.passes) / c.required));
             return (
               <div key={c.difficulty} className={cn("flex flex-col gap-0.5", !c.counts && "opacity-50")}>

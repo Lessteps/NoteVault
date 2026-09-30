@@ -13,12 +13,13 @@ import * as path from "node:path";
 import { ApiError } from "./errors.js";
 import { buildAreaMapCanvas } from "./areaMap.js";
 import { dumpFrontmatter } from "./frontmatter.js";
-import { catalogSkill, deterministicSkillSelector } from "./practice/skillSelection.js";
+import { applyPlanToPractica, parsePracticePlan } from "./practice/practicePlan.js";
+import { catalogFor, catalogSkill, deterministicSkillSelector } from "./practice/skillSelection.js";
 import { createDefaultTopicManifest } from "./practice/topic.js";
 import { topicTypeFromName } from "./practice/topicType.js";
 import { frontmatterWithType, overviewFileText, practiceFileText, viewFileName } from "./practice/viewFiles.js";
 
-export const ACTION_NAMES = ["create_syllabus", "create_topic", "create_canvas", "write_skill", "create_note"] as const;
+export const ACTION_NAMES = ["create_syllabus", "create_topic", "create_canvas", "write_skill", "create_note", "set_practice_plan"] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 
 export interface AssistantAction {
@@ -245,6 +246,49 @@ function planCanvas(root: string, args: Record<string, any>): ActionPlan {
   };
 }
 
+/**
+ * Rewrites the competency matrix of ONE topic: which skills it trains and how many
+ * passed exercises each difficulty needs. Skills that do not suit the topic's nature
+ * are dropped (and reported), exactly as when the AI first plans the topic.
+ */
+function planMatrix(root: string, args: Record<string, any>): ActionPlan {
+  const topicRel = safeRel(args.topic);
+  const topicAbs = absOf(root, topicRel);
+  if (!fs.existsSync(topicAbs) || !fs.statSync(topicAbs).isDirectory()) throw new ApiError(`El tema «${topicRel}» no existe.`);
+  const name = topicRel.split("/").pop()!;
+  const practicaRel = `${topicRel}/${viewFileName(name, "practica")}`;
+  const practicaAbs = absOf(root, practicaRel);
+  let current = "";
+  try {
+    current = fs.readFileSync(practicaAbs, "utf-8");
+  } catch {
+    current = "";
+  }
+  const subject = /^subject:\s*(\w+)\s*$/m.exec(current)?.[1] ?? subjectIdOf(topicRel, args.subject_id);
+  if (!current) {
+    const manifest = createDefaultTopicManifest(topicRel, name, subject, []);
+    current = practiceFileText(manifest);
+  }
+  const catalog = catalogFor(subject);
+  const requested: any[] = Array.isArray(args.skills) ? args.skills : [];
+  const plan = parsePracticePlan(
+    JSON.stringify({ topic_type: args.topic_type, skills: requested, summary: args.summary ?? "" }),
+    catalog,
+    topicTypeFromName(name) ?? "mixed",
+  );
+  if (!plan) throw new ApiError("La matriz no tiene ninguna competencia válida para este tema.");
+  const kept = new Set(plan.skills.map((s) => s.skill));
+  const dropped = requested.map((s) => String(s?.skill ?? "").toLowerCase()).filter((s) => s && !kept.has(s));
+  const labels = Object.fromEntries(catalog.map((s) => [s.id, s.label]));
+  return {
+    action: "set_practice_plan",
+    title: `Cambiar la matriz de competencias de «${name}»`,
+    ops: [{ kind: "write", rel: practicaRel, content: applyPlanToPractica(current, plan, labels), overwrite: true, exists: fs.existsSync(practicaAbs) }],
+    open: practicaRel,
+    warnings: dropped.length ? [`Se descartaron por no encajar con el tema o no existir: ${dropped.join(", ")}.`] : [],
+  };
+}
+
 function planSkill(root: string, args: Record<string, any>): ActionPlan {
   const name = safeName(args.name).replace(/\.md$/i, "");
   if (!name) throw new ApiError("Falta el nombre de la skill.");
@@ -286,6 +330,8 @@ export function planAssistantAction(root: string, action: AssistantAction): Acti
       return planCanvas(root, args);
     case "write_skill":
       return planSkill(root, args);
+    case "set_practice_plan":
+      return planMatrix(root, args);
     case "create_note":
       return planNote(root, args);
     default:

@@ -23,6 +23,8 @@ import { buildModeContext, isVaultMode } from "../../core/assistantModes.js";
 import { parseFrontmatter } from "../../core/frontmatter.js";
 import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
+import { findAncestorTopicManifest } from "../../core/practice/topic.js";
+import { catalogFor } from "../../core/practice/skillSelection.js";
 import { WorkspaceManager } from "../../core/workspaceManager.js";
 import { ApiError } from "../../core/errors.js";
 import { AppConfig } from "../appConfig.js";
@@ -121,8 +123,28 @@ export function assistantApi(app: AppState) {
     });
   };
 
+  /** The open topic's competency matrix and the catalogue with what each skill suits. */
+  const matrixContext = (noteRel: string): string => {
+    if (!noteRel) return "No note is open, so there is no topic.";
+    const found = findAncestorTopicManifest(app.resolve(noteRel), app.root);
+    if (!found) return "The open note is not inside a topic.";
+    const m = found.manifest;
+    const current = m.plan
+      ? Object.entries(m.plan).map(([skill, c]) => `${skill}=${c[0]}/${c[1]}/${c[2]}`).join(", ")
+      : `${m.skills.join(", ")} (no AI plan yet: default requirement)`;
+    const catalog = catalogFor(m.subject)
+      .map((s) => `- ${s.id}: ${s.label} - suits ${s.topicTypes.join("/")}; difficulties ${s.allowedDifficulties.join(",")}`)
+      .join("\n");
+    return [
+      `Topic folder: ${app.rel(found.topicFolder)}`,
+      `Topic: ${m.title} (subject ${m.subject}${m.topic_type ? `, type ${m.topic_type}` : ""})`,
+      `Current matrix (skill=easy/medium/hard): ${current}`,
+      `Catalogue:\n${catalog}`,
+    ].join("\n");
+  };
+
   /** The vault's skills and, for a new topic, the area being worked on. */
-  const modeContext = (_mode: string, noteRel: string): string => {
+  const modeContext = (mode: string, noteRel: string): string => {
     let areaFolder = "";
     let areaTopics: string[] = [];
     if (noteRel) {
@@ -148,7 +170,7 @@ export function assistantApi(app: AppState) {
       }
     }
     const noteFolder = noteRel.includes("/") ? noteRel.slice(0, noteRel.lastIndexOf("/")) : "";
-    return buildModeContext({ skills: readSkillTemplates(app.root, noteRel), areaFolder, areaTopics, noteFolder });
+    return buildModeContext({ skills: readSkillTemplates(app.root, noteRel), areaFolder, areaTopics, noteFolder, matrix: mode === "matriz" ? matrixContext(noteRel) : undefined });
   };
 
   /** A structured reply (a whole syllabus as JSON) does not fit the chat's small token budget. */

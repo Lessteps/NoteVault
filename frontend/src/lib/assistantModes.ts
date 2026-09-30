@@ -2,7 +2,7 @@
 // `core/assistantModes.ts`, which the UI project cannot import). A test keeps the
 // ids in step.
 
-export const VAULT_MODE_IDS = ["temario", "canvas", "tema"] as const;
+export const VAULT_MODE_IDS = ["temario", "canvas", "tema", "matriz"] as const;
 export type VaultModeId = (typeof VAULT_MODE_IDS)[number];
 
 export interface VaultModeInfo {
@@ -32,6 +32,15 @@ export const VAULT_MODES: readonly VaultModeInfo[] = [
     opener:
       "Modo «Generar canvas»: seguiré la skill de canvas del vault. Dime el tema; si tienes un canvas de ejemplo, " +
       "ábrelo o adjunta su contenido y lo usaré de plantilla. También puedo ajustar la skill si me lo pides.",
+  },
+  {
+    id: "matriz",
+    label: "Ajustar matriz de competencias",
+    hint: "Cambia las skills y cantidades del tema abierto",
+    placeholder: "¿Qué quieres cambiar de la matriz de este tema? (p. ej. quita «Cálculo rápido»)",
+    opener:
+      "Modo «Matriz de competencias»: veo las skills y las cantidades del tema abierto. Dime qué cambiar " +
+      "(quitar una skill, añadir otra, más ejercicios en una dificultad…) y lo aplicaré solo a este tema cuando lo aceptes.",
   },
   {
     id: "tema",

@@ -8,6 +8,7 @@ import { searchExercises, type Exercise as GuideExercise } from "@bryllim/workou
 import instructionsData from "./exerciseInstructions.json";
 import customInstructions from "./exerciseInstructions.custom.json";
 import lote3Instructions from "./exerciseInstructions.lote3.json";
+import grupoPecho from "./exerciseInstructions.grupo-pecho.json";
 
 /** Mapeo guía → músculos locales (`frontend/src/lib/muscles.ts`). */
 const GUIDE_TO_LOCAL: Record<string, string[]> = {
@@ -105,6 +106,7 @@ const instructionsBySlug = new Map(
     ...(instructionsData as ExerciseInstructions[]),
     ...(customInstructions as ExerciseInstructions[]),
     ...(lote3Instructions as ExerciseInstructions[]),
+    ...(grupoPecho as ExerciseInstructions[]),
   ].map((r) => [r.slug, r]),
 );
 

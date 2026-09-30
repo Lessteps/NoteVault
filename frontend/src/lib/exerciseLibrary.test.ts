@@ -50,6 +50,16 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
+  test("grupo pecho redactado a mano (bench-press, push-up)", () => {
+    const press = getInstructions("bench-press");
+    expect(press!.source).toBe("propia");
+    expect(press!.steps_es.join(" ")).toMatch(/barra|banco/i);
+    expect(press!.steps_es.length).toBeGreaterThanOrEqual(5);
+    // push-up no puede venir del dataset: ese slug está cubierto por el
+    // alias automático, así que exigimos fuente propia explícita.
+    expect(getInstructions("push-up")!.source).toBe("propia");
+  });
+
   test("lote propio 3: bandas, core y movilidad (banded-row, bird-dog)", () => {
     expect(getInstructions("banded-row")!.steps_es.length).toBeGreaterThanOrEqual(4);
     expect(getInstructions("bird-dog")!.steps_es.join(" ")).toMatch(/columna|espina/i);

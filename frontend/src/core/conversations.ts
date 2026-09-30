@@ -33,6 +33,7 @@ export interface StoredContext {
   end_line?: number;
   text: string;
   folder?: boolean;
+  file?: boolean;
 }
 
 export interface StoredMessage {
@@ -118,6 +119,7 @@ export function cleanMessages(input: unknown): StoredMessage[] {
           end_line: Number.isFinite(Number(ctx.end_line)) ? Number(ctx.end_line) : undefined,
           text: String(ctx.text ?? "").slice(0, MAX_CONTENT),
           ...(ctx.folder === true ? { folder: true } : {}),
+          ...(ctx.file === true ? { file: true } : {}),
         });
       }
       if (contexts.length) msg.contexts = contexts;

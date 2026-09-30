@@ -19,7 +19,8 @@ import {
   type ChatMessage,
 } from "../../core/aiClient.js";
 import { applyAssistantAction, planAssistantAction } from "../../core/assistantActions.js";
-import { buildModeContext, isVaultMode } from "../../core/assistantModes.js";
+import { buildModeContext, FILES_MODE, isVaultMode } from "../../core/assistantModes.js";
+import { detectFileKind } from "../../core/fileKind.js";
 import { parseFrontmatter } from "../../core/frontmatter.js";
 import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
@@ -82,6 +83,7 @@ export function assistantApi(app: AppState) {
     selection: string,
     mode = "",
     folders: string[] = [],
+    files: string[] = [],
   ): ChatMessage[] => {
     if (!Array.isArray(history)) throw new ApiError("Historial inválido.");
     const q = String(question || "").trim().slice(0, MAX_TEXT);
@@ -115,12 +117,20 @@ export function assistantApi(app: AppState) {
       wsPrompt = ws.id !== "general" ? ws.system_prompt || "" : "";
     }
     const vaultMode = isVaultMode(mode) ? mode : "";
+    const picked = readSelectedFiles(files);
+    // The selected file is what the assistant works on: its folder and topic drive the skills and the matrix.
+    const focus = picked[0]?.path ?? noteRel;
+    const workspace = vaultMode
+      ? modeContext(vaultMode, focus, folders, picked)
+      : picked.length || folders.length
+        ? selectionContext(folders, picked)
+        : "";
     return buildMessages(aiCfg(), clean, q, {
       note_title: title,
       note_body: body,
       selection: String(selection || "").slice(0, MAX_TEXT),
-      workspace_prompt: [wsPrompt, vaultMode ? modeContext(vaultMode, noteRel, folders) : foldersContext(folders)].filter(Boolean).join("\n\n"),
-      ...(vaultMode ? { mode: vaultMode } : {}),
+      workspace_prompt: [wsPrompt, workspace].filter(Boolean).join("\n\n"),
+      ...(vaultMode ? { mode: vaultMode } : picked.length ? { mode: FILES_MODE } : {}),
     });
   };
 
@@ -157,14 +167,31 @@ export function assistantApi(app: AppState) {
         }
       });
 
-  /** Plain (no mode) conversations still learn which folders "esta carpeta" means. */
-  const foldersContext = (folders: string[]): string => {
-    const list = existingFolders(folders);
-    return list.length ? buildModeContext({ skills: [], folders: list }) : "";
+  /** The files the user selected, read and classified: the model never has to ask for them, and their kind decides the skills. */
+  const readSelectedFiles = (files: string[]) =>
+    files.slice(0, 6).flatMap((f) => {
+      try {
+        const abs = app.resolve(f.replace(/\\/g, "/").replace(/^\/+/, ""));
+        if (!fs.statSync(abs).isFile() || !/\.(md|canvas)$/i.test(abs)) return [];
+        const rel = app.rel(abs).replace(/\\/g, "/");
+        const raw = fs.readFileSync(abs, "utf-8");
+        const info = detectFileKind(rel, raw);
+        const cap = /\.canvas$/i.test(rel) ? 14_000 : 12_000;
+        return [{ path: rel, label: info.label, content: raw.slice(0, cap), truncated: raw.length > cap, skills: info.skills }];
+      } catch {
+        return [];
+      }
+    });
+
+  /** No mode: which folders and files are selected, plus ONLY the skills that fit those files (their kind decides). */
+  const selectionContext = (folders: string[], picked: ReturnType<typeof readSelectedFiles>): string => {
+    const wanted = new Set(picked.flatMap((p) => p.skills));
+    const skills = picked.length ? readSkillTemplates(app.root, picked[0]!.path).filter((s) => wanted.has(s.title)) : [];
+    return buildModeContext({ skills, folders: existingFolders(folders), files: picked });
   };
 
   /** The vault's skills and, for a new topic, the area being worked on. */
-  const modeContext = (mode: string, noteRel: string, folders: string[] = []): string => {
+  const modeContext = (mode: string, noteRel: string, folders: string[] = [], picked: ReturnType<typeof readSelectedFiles> = []): string => {
     let areaFolder = "";
     let areaTopics: string[] = [];
     if (noteRel) {
@@ -190,7 +217,7 @@ export function assistantApi(app: AppState) {
       }
     }
     const noteFolder = noteRel.includes("/") ? noteRel.slice(0, noteRel.lastIndexOf("/")) : "";
-    return buildModeContext({ skills: readSkillTemplates(app.root, noteRel), areaFolder, areaTopics, noteFolder, matrix: mode === "matriz" ? matrixContext(noteRel) : undefined, folders: existingFolders(folders) });
+    return buildModeContext({ skills: readSkillTemplates(app.root, noteRel), areaFolder, areaTopics, noteFolder, matrix: mode === "matriz" ? matrixContext(noteRel) : undefined, folders: existingFolders(folders), files: picked });
   };
 
   /** A structured reply (a whole syllabus as JSON) does not fit the chat's small token budget. */
@@ -326,10 +353,11 @@ export function assistantApi(app: AppState) {
       selection = "",
       mode = "",
       folders: unknown = [],
+      files: unknown = [],
     ): Promise<Record<string, unknown>> {
       const id = String(streamId || "").slice(0, 64);
       if (!id) throw new ApiError("Falta el identificador del flujo.");
-      const messages = chatMessages(history, question, noteRel, selection, mode, Array.isArray(folders) ? folders.map(String) : []);
+      const messages = chatMessages(history, question, noteRel, selection, mode, Array.isArray(folders) ? folders.map(String) : [], Array.isArray(files) ? files.map(String) : []);
       const cfg = configFor(mode);
       if (cfg.is_bridge) {
         return {

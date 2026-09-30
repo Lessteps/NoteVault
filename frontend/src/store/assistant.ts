@@ -23,6 +23,8 @@ export interface ChatContext {
   text: string;
   /** A whole folder pointed at (path is the folder; text is empty). */
   folder?: boolean;
+  /** A whole file pointed at (path is the file; the model receives its content). */
+  file?: boolean;
 }
 
 export interface ChatMessage {
@@ -66,6 +68,9 @@ interface AssistantState {
   folders: string[];
   toggleFolder: (path: string) => void;
   clearFolders: () => void;
+  /** Vault files (notes, practice files, canvases) pointed at: their content and matching skills reach the model. */
+  files: string[];
+  toggleFile: (path: string) => void;
 
   // ── The conversation being held, and the ones kept ────────────────────
   /** Id of the saved conversation; null until the first turn is stored. */
@@ -126,6 +131,8 @@ export const useAssistant = create<AssistantState>((set, get) => ({
   folders: [],
   toggleFolder: (p) => set((s) => ({ folders: s.folders.includes(p) ? s.folders.filter((f) => f !== p) : [...s.folders, p] })),
   clearFolders: () => set({ folders: [] }),
+  files: [],
+  toggleFile: (p) => set((s) => ({ files: s.files.includes(p) ? s.files.filter((f) => f !== p) : [...s.files, p].slice(-6) })),
   conversationId: null,
   title: "",
   historyOpen: false,
@@ -171,6 +178,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
       at: Date.now(),
       contexts: [
         ...get().folders.map((f) => ({ path: f, text: "", folder: true })),
+        ...get().files.map((f) => ({ path: f, text: "", file: true })),
         ...(sel ? [{ path: noteRel, text: sel }] : []),
       ],
     };
@@ -196,7 +204,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
 
     const started = Date.now();
     try {
-      const r = await api.aiChatStream(answerId, history, asked, noteRel, sel, get().mode, folders);
+      const r = await api.aiChatStream(answerId, history, asked, noteRel, sel, get().mode, folders, get().files);
       if (r.bridge) {
         await copyText(r.prompt ?? "");
         if (r.url) await api.openExternal(r.url).catch(() => undefined);

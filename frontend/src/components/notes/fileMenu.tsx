@@ -112,6 +112,10 @@ export function fileMenuItems(opts: FileMenuOptions, a: FileMenuActions): MenuIt
       items.push({ label: "Abrir a la derecha", icon: <Columns2 />, onSelect: a.openToTheRight });
     }
     items.push({ label: "Abrir en una ventana nueva", icon: <AppWindow />, onSelect: a.openInNewWindow });
+    // Notes and canvases can be pointed at from the AI chat (its content and fitting skills go with them).
+    if (/\.(md|canvas)$/i.test(opts.entry.path) || opts.entry.kind === "note" || opts.entry.kind === "canvas") {
+      items.push({ label: opts.inChat ? "Quitar del chat de IA" : "Añadir al chat de IA", icon: <MessageSquarePlus />, onSelect: () => a.addToChat?.() });
+    }
   }
 
   items.push({ separator: true });

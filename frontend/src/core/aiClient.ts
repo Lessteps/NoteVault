@@ -10,7 +10,7 @@
 // The Python original used the stdlib urllib so the frozen .exe stayed
 // dependency free. In the Electron main process we use the global fetch.
 
-import { VAULT_MODE_DIRECTIVES } from "./assistantModes.js";
+import { FILES_DIRECTIVE, FILES_MODE, VAULT_MODE_DIRECTIVES } from "./assistantModes.js";
 
 // ── Provider catalogue ─────────────────────────────────────────────────────
 
@@ -507,7 +507,7 @@ export function buildMessages(
   let sysContent = SYSTEM_PROMPT;
   if (workspacePrompt) sysContent += `\n\nContexto de disciplina:\n${workspacePrompt}`;
   // The vault modes (syllabus, canvas, new topic) carry the file-action protocol.
-  const directive = AI_MODES[mode] ?? (VAULT_MODE_DIRECTIVES as Record<string, string>)[mode];
+  const directive = AI_MODES[mode] ?? (VAULT_MODE_DIRECTIVES as Record<string, string>)[mode] ?? (mode === FILES_MODE ? FILES_DIRECTIVE : undefined);
   if (directive) sysContent += `\n\nDirectiva de modo activo:\n${directive}`;
 
   const messages: ChatMessage[] = [{ role: "system", content: sysContent }];

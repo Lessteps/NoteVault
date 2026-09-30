@@ -172,3 +172,35 @@ describe("create_syllabus into a space that already has areas", () => {
     expect(read("Mat 1/00 Temario.md")).toBe("# el mío\n");
   });
 });
+
+describe("edit_file", () => {
+  const put = (rel: string, text: string) => {
+    fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    fs.writeFileSync(path.join(root, rel), text, "utf-8");
+  };
+
+  it("replaces one exact fragment, appends text, and shows that it replaces the file", () => {
+    put("A/nota.md", "# Título\n\nHola mundo.\n");
+    const action = { action: "edit_file", args: { path: "A/nota.md", edits: [{ find: "Hola mundo.", replace: "Hola, mundo." }], append: "## Extra\n\ntexto" } };
+    const plan = planAssistantAction(root, action);
+    expect(plan.ops[0]).toMatchObject({ rel: "A/nota.md", overwrite: true, exists: true });
+    applyAssistantAction(root, action);
+    expect(fs.readFileSync(path.join(root, "A/nota.md"), "utf-8")).toBe("# Título\n\nHola, mundo.\n\n## Extra\n\ntexto\n");
+  });
+
+  it("refuses text that is missing or ambiguous, other file types, and files that do not exist", () => {
+    put("A/nota.md", "uno uno\n");
+    const edit = (args: Record<string, unknown>) => planAssistantAction(root, { action: "edit_file", args });
+    expect(() => edit({ path: "A/nota.md", edits: [{ find: "uno", replace: "x" }] })).toThrow(/aparece 2 veces/);
+    expect(() => edit({ path: "A/nota.md", edits: [{ find: "tres", replace: "x" }] })).toThrow(/No encuentro/);
+    expect(() => edit({ path: "A/otra.md", append: "x" })).toThrow(/no existe/);
+    expect(() => edit({ path: "A/script.py", append: "x" })).toThrow(/solo se pueden|Solo se pueden/);
+  });
+
+  it("keeps a canvas valid", () => {
+    put("A/m.canvas", JSON.stringify({ nodes: [{ id: "a", type: "text", text: "hola", x: 0, y: 0, width: 100, height: 50 }], edges: [] }));
+    expect(() => planAssistantAction(root, { action: "edit_file", args: { path: "A/m.canvas", edits: [{ find: "\"hola\"", replace: "hola" }] } })).toThrow(/JSON/);
+    const ok = planAssistantAction(root, { action: "edit_file", args: { path: "A/m.canvas", edits: [{ find: "hola", replace: "adiós" }] } });
+    expect(ok.ops[0]!.content).toContain("adiós");
+  });
+});

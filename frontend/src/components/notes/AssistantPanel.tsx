@@ -51,6 +51,24 @@ function useCodeCopy(root: RefObject<HTMLDivElement | null>) {
 }
 
 function ContextChip({ ctx, onRemove }: { ctx: ChatContext; onRemove?: () => void }) {
+  if (ctx.file) {
+    const kind = ctx.path.toLowerCase().endsWith(".canvas") ? "canvas" : /\.practica\.md$/i.test(ctx.path) ? "práctica" : /\.resumen\.md$/i.test(ctx.path) ? "resumen" : "";
+    return (
+      <span
+        title={`Archivo seleccionado: ${ctx.path}`}
+        className="inline-flex max-w-full items-center gap-1 rounded-md border border-mint/40 bg-mint/10 px-1.5 py-0.5 text-[11px] text-text"
+      >
+        <FileCode2 size={11} className="flex-none text-mint" />
+        <span className="truncate">{ctx.path.split("/").pop()}</span>
+        {kind && <span className="flex-none text-[10px] text-faint">· {kind}</span>}
+        {onRemove && (
+          <button type="button" aria-label="Quitar archivo" onClick={onRemove} className="ml-0.5 rounded hover:text-text">
+            <X size={10} />
+          </button>
+        )}
+      </span>
+    );
+  }
   if (ctx.folder) {
     return (
       <span
@@ -287,6 +305,8 @@ function Composer() {
   const modeInfo = vaultMode(mode);
   const folders = useAssistant((s) => s.folders);
   const toggleFolder = useAssistant((s) => s.toggleFolder);
+  const files = useAssistant((s) => s.files);
+  const toggleFile = useAssistant((s) => s.toggleFile);
   const [evaluating, setEvaluating] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
 
@@ -320,6 +340,11 @@ function Composer() {
 
   /** The topic folder the actions work on: the one selected in the chat, else the open note's folder. */
   const topicTarget = (): string => {
+    // A selected file (typically the practice file) names its topic folder: nothing to search for.
+    if (files.length) {
+      const f = files[0]!;
+      return f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : "";
+    }
     if (folders.length === 1) return folders[0]!;
     const active = useApp.getState().active;
     return active && active.includes("/") ? active.slice(0, active.lastIndexOf("/")) : "";
@@ -395,8 +420,11 @@ function Composer() {
 
   return (
     <div className="flex-none p-2.5">
-      {(!!pending.length || !!folders.length) && (
+      {(!!pending.length || !!folders.length || !!files.length) && (
         <div className="mb-1.5 flex flex-wrap gap-1">
+          {files.map((f) => (
+            <ContextChip key={`file:${f}`} ctx={{ path: f, text: "", file: true }} onRemove={() => toggleFile(f)} />
+          ))}
           {folders.map((f) => (
             <ContextChip key={f} ctx={{ path: f, text: "", folder: true }} onRemove={() => toggleFolder(f)} />
           ))}
@@ -438,6 +466,19 @@ function Composer() {
             onClick={(e) =>
               openMenu(e, [
                 { label: "Selección del editor", icon: <Paperclip size={13} />, onSelect: addSelection },
+                (() => {
+                  // The tab on screen: a note or a canvas.
+                  const st = useApp.getState();
+                  const tab = st.openTabs.find((t) => t.tabId === st.activeTabId);
+                  const active = tab && (tab.kind === "note" || tab.kind === "canvas") ? tab.path : "";
+                  return {
+                    label: "Archivo abierto",
+                    description: !active ? "Abre un archivo primero." : files.includes(active) ? `Quitar «${active.split("/").pop()}» del chat` : `Añadir «${active.split("/").pop()}» al chat (con sus skills)`,
+                    icon: <FileCode2 size={13} />,
+                    disabled: !active,
+                    onSelect: () => toggleFile(active!),
+                  };
+                })(),
                 (() => {
                   const active = useApp.getState().active;
                   const dir = active && active.includes("/") ? active.slice(0, active.lastIndexOf("/")) : "";

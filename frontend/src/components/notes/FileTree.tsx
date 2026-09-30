@@ -285,7 +285,8 @@ export function FileTree({ filter }: { filter: string }) {
       newCanvasHere: () => void newCanvasIn(entry.path),
       addToChat: () => {
         const a = useAssistant.getState();
-        a.toggleFolder(entry.path);
+        if (entry.type === "folder") a.toggleFolder(entry.path);
+        else a.toggleFile(entry.path);
         a.setOpen(true);
       },
       generateTopic: () => void generateTopicFrom(entry.path),
@@ -297,7 +298,7 @@ export function FileTree({ filter }: { filter: string }) {
     openMenu(
       e,
       fileMenuItems(
-        { entry, bookmarked: known, canCopy: entry.type !== "folder", inChat: useAssistant.getState().folders.includes(entry.path) },
+        { entry, bookmarked: known, canCopy: entry.type !== "folder", inChat: useAssistant.getState().folders.includes(entry.path) || useAssistant.getState().files.includes(entry.path) },
         menuActions(entry),
       ),
     );

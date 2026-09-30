@@ -23,6 +23,7 @@ export const ACTION_PROTOCOL = [
   '- set_practice_plan: {"topic":"<vault path of the topic folder>","topic_type":"theoretical|procedural|mixed","skills":[{"skill":"solve","difficulties":{"1":3,"2":4,"3":2},"why":"..."}],"summary":"..."}  (replaces the competency matrix of THAT topic only; send the FULL matrix, not just the changes)',
   '- write_skill: {"name":"canvas_skill","folder":"<optional subject folder>","content":"<markdown>"}  (saved in _skills/, replaces the file with that name)',
   '- create_note: {"path":"<vault path>","content":"<markdown>"}',
+  '- edit_file: {"path":"<existing .md or .canvas>","edits":[{"find":"<exact text that occurs ONCE>","replace":"<new text>"}],"append":"<optional text added at the end>"}  (small changes to an existing file, e.g. one selected in the chat: send only what changes; if "find" is not unique or not exact the app rejects it)',
   "Rules: at most one action per reply; strictly valid JSON (escape newlines as \\n and backslashes as \\\\); folder and file names have no / \\ : * ? \" < > |; paths are relative to the vault and never leave it; talk to the user in Spanish, briefly, before the block. Nothing is created until they accept, so never claim it already exists.",
 ].join("\n");
 
@@ -65,6 +66,16 @@ export const VAULT_MODE_DIRECTIVES: Record<VaultModeId, string> = {
   matriz: `${MATRIZ}\n\n${ACTION_PROTOCOL}`,
 };
 
+/**
+ * Not a mode the user picks: the plain conversation while files are selected. The model
+ * may answer questions about them, and propose small changes with the file-action protocol.
+ */
+export const FILES_MODE = "archivos";
+export const FILES_DIRECTIVE = [
+  "FILES IN THE CHAT. The user selected one or more vault files; their content and the vault skills that fit them are in the context. Answer their questions about those files, and when they ask for a change or an addition, propose it with edit_file (or set_practice_plan for the competencies of a practice file) instead of rewriting the file. Keep to the conventions of the skills provided.",
+  ACTION_PROTOCOL,
+].join("\n\n");
+
 const MAX_SKILL_CHARS = 3000;
 
 /** The dynamic part of a mode's prompt: the vault's skills and the area being worked on. */
@@ -78,6 +89,8 @@ export function buildModeContext(input: {
   matrix?: string;
   /** folders the user selected in the chat (vault-relative paths) */
   folders?: readonly string[];
+  /** files the user selected in the chat, already read and classified */
+  files?: ReadonlyArray<{ path: string; label: string; content: string; truncated?: boolean }>;
 }): string {
   const parts: string[] = [];
   if (input.skills.length) {
@@ -96,6 +109,14 @@ export function buildModeContext(input: {
       'Folders selected by the user in the chat ("this folder", "this topic" and "here" refer to them; work INSIDE them and never create a sibling with a similar name):\n' +
         input.folders.map((f) => `- ${f}`).join("\n") +
         "\nFor create_syllabus: if a selected folder is a top-level folder, its exact name MUST be args.subject (the areas are added inside it). For create_topic use a selected area folder as args.area; for set_practice_plan a selected topic folder as args.topic.",
+    );
+  }
+  if (input.files?.length) {
+    parts.push(
+      'Files selected by the user in the chat ("this file", "this canvas" and "the practice file" refer to them). Their content is below, so do not ask for it or search for it. The vault skills that fit each kind of file are already listed above. To change a selected file use edit_file (small find/replace edits, or append), never rewrite it whole unless asked; for a practice file\'s competencies use set_practice_plan with its topic folder.\n\n' +
+        input.files
+          .map((f) => `### ${f.path} — ${f.label}${f.truncated ? " (content cut)" : ""}\n\`\`\`\n${f.content}\n\`\`\``)
+          .join("\n\n"),
     );
   }
   if (input.matrix) parts.push(`Matrix context:\n${input.matrix}`);

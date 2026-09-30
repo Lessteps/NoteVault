@@ -19,7 +19,7 @@ import { createDefaultTopicManifest } from "./practice/topic.js";
 import { topicTypeFromName } from "./practice/topicType.js";
 import { frontmatterWithType, overviewFileText, practiceFileText, viewFileName } from "./practice/viewFiles.js";
 
-export const ACTION_NAMES = ["create_syllabus", "create_topic", "create_canvas", "write_skill", "create_note", "set_practice_plan"] as const;
+export const ACTION_NAMES = ["create_syllabus", "create_topic", "create_canvas", "write_skill", "create_note", "set_practice_plan", "edit_file"] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 
 export interface AssistantAction {
@@ -363,6 +363,61 @@ function planSkill(root: string, args: Record<string, any>): ActionPlan {
   };
 }
 
+/**
+ * A small change to a file that already exists: exact find/replace pairs (each `find`
+ * must occur exactly once, so nothing is changed by accident), text appended at the end,
+ * or the whole new content. Cheap in tokens: the model sends only what changes.
+ */
+function planEdit(root: string, args: Record<string, any>): ActionPlan {
+  const rel = safeRel(args.path);
+  if (!/\.(md|canvas)$/i.test(rel)) throw new ApiError("Solo se pueden modificar notas (.md) y canvas (.canvas).");
+  const abs = absOf(root, rel);
+  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw new ApiError(`El archivo «${rel}» no existe.`);
+  let content = fs.readFileSync(abs, "utf-8");
+  let changes = 0;
+  if (typeof args.content === "string" && args.content.trim()) {
+    content = args.content;
+    changes += 1;
+  }
+  for (const e of Array.isArray(args.edits) ? args.edits : []) {
+    const find = typeof e?.find === "string" ? e.find : "";
+    const replace = typeof e?.replace === "string" ? e.replace : "";
+    if (!find) throw new ApiError("Un cambio no indica qué texto sustituir.");
+    const count = content.split(find).length - 1;
+    if (count !== 1) {
+      throw new ApiError(
+        count === 0
+          ? `No encuentro el texto «${find.slice(0, 50)}» en ${rel}.`
+          : `El texto «${find.slice(0, 50)}» aparece ${count} veces en ${rel}; hace falta uno más específico.`,
+      );
+    }
+    content = content.replace(find, () => replace);
+    changes += 1;
+  }
+  if (typeof args.append === "string" && args.append.trim()) {
+    content = `${content.replace(/\s*$/, "")}\n\n${args.append.trim()}\n`;
+    changes += 1;
+  }
+  if (!changes) throw new ApiError("La modificación no cambia nada.");
+  if (content.length > MAX_TEXT) throw new ApiError("El archivo resultante es demasiado largo.");
+  if (/\.canvas$/i.test(rel)) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      throw new ApiError("El canvas resultante no es un JSON válido.");
+    }
+    validateCanvas(parsed);
+  }
+  return {
+    action: "edit_file",
+    title: `Modificar ${rel.split("/").pop()}`,
+    ops: [{ kind: "write", rel, content: content.endsWith("\n") ? content : `${content}\n`, overwrite: true, exists: true }],
+    open: rel,
+    warnings: [`Modifica el archivo existente (${changes} cambio(s)).`],
+  };
+}
+
 function planNote(root: string, args: Record<string, any>): ActionPlan {
   let rel = safeRel(args.path);
   if (!rel.toLowerCase().endsWith(".md")) rel += ".md";
@@ -392,6 +447,8 @@ export function planAssistantAction(root: string, action: AssistantAction): Acti
       return planMatrix(root, args);
     case "create_note":
       return planNote(root, args);
+    case "edit_file":
+      return planEdit(root, args);
     default:
       throw new ApiError(`Acción desconocida: ${String(action?.action)}`);
   }

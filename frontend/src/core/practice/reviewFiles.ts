@@ -21,6 +21,7 @@ import {
   type ReviewState,
 } from "./reviewSchedule.js";
 import { ApiError } from "../errors.js";
+import { rescheduleVocab } from "./vocabReviews.js";
 
 export const REVIEW_FOLDER = "Repaso";
 
@@ -43,6 +44,8 @@ export interface ReviewItem {
   practicedDays: number;
   /** the pending review and the ones after it, if each is done on its date */
   upcoming: PlannedReview[];
+  /** `vocab` for a word of the English word bank; absent (= topic) for topic reviews */
+  kind?: "topic" | "vocab";
 }
 
 function toItem(rootAbs: string, abs: string, subjectFolder: string, state: ReviewState, today: string): ReviewItem {
@@ -70,6 +73,11 @@ function toItem(rootAbs: string, abs: string, subjectFolder: string, state: Revi
  */
 export function rescheduleReview(rootAbs: string, relPath: string, date: string, today: string = isoDate(new Date())): ReviewItem {
   if (!isIsoDate(date)) throw new ApiError("La fecha no es válida.");
+  if (relPath.startsWith("vocab:")) {
+    const word = rescheduleVocab(rootAbs, relPath, date, today);
+    if (!word) throw new ApiError("Esa palabra ya no está en el banco.");
+    return word;
+  }
   const parts = relPath.replace(/\\/g, "/").split("/").filter(Boolean);
   if (parts.length !== 3 || parts[1] !== REVIEW_FOLDER || !parts[2]!.toLowerCase().endsWith(".md") || parts[0]!.startsWith(".") || parts.includes("..")) {
     throw new ApiError("Ese archivo no es una nota de repaso.");

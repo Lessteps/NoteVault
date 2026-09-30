@@ -70,7 +70,7 @@ describe("Repaso calendar", () => {
     const plus = [...document.querySelectorAll("button")].find((b) => b.textContent === "+1 d")!;
     await act(async () => plus.click());
     expect(invoke).toHaveBeenCalledWith("study_review_reschedule", "M/Repaso/1.1.md", "2026-10-01");
-    const input = document.querySelector('input[type="date"]') as HTMLInputElement;
+    const input = document.querySelector('input[aria-label^="Fecha del repaso"]') as HTMLInputElement;
     expect(input.value).toBe("2026-09-30");
   });
 

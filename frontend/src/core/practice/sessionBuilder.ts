@@ -5,6 +5,8 @@
  * requests specialized, concept-anchored AI exercises (never generic).
  */
 
+import { isEnglishSubject } from "./domain";
+import { buildEnglishExercisePrompt, formatEnglishExerciseNote } from "./englishExercises";
 import type { ExerciseRef } from "./exerciseIndex";
 import { type AssistanceLevel, type DifficultyLevel, difficultyLabel } from "./skills";
 import type { TopicManifest } from "./topic";
@@ -29,6 +31,10 @@ export interface SessionConfig {
    * most of the NEW exercises are written around them, the rest train the whole competency.
    */
   learning?: string[];
+  /** English vocabulary skills: the words of the shared bank the exercises are built around ("word — meaning"). */
+  words?: string[];
+  /** ids of those words: written into the exercises so their reviews follow the grade. */
+  wordIds?: string[];
 }
 
 export interface PlannedExercise {
@@ -107,7 +113,12 @@ export function buildExerciseGenerationPrompt(
   assistance: AssistanceLevel,
   countToGenerate: number,
   learning: string[] = [],
+  words: string[] = [],
 ): Array<{ role: "system" | "user"; content: string }> {
+  // English follows its own framing (branch, CEFR level, Spanish-speaker transfer, audio…).
+  if (isEnglishSubject(manifest.subject)) {
+    return buildEnglishExercisePrompt(manifest, theoryNotes, skill, difficulty, assistance, countToGenerate, learning, words);
+  }
   const diffName = difficultyLabel(difficulty);
   const isHelper = assistance === "helper";
 
@@ -173,8 +184,11 @@ export function formatExerciseNote(
     hints: string[];
     solution: string;
     rubric: string[];
+    audio_text?: string;
+    words?: string[];
   },
 ): string {
+  if (isEnglishSubject(manifest.subject)) return formatEnglishExerciseNote(manifest, skill, difficulty, assistance, ex);
   const astFm = assistance === "no_help" ? "nohelp" : "helper";
   const hintsList = ex.hints.map((h) => `- ${h.trim()}`).join("\n");
   const rubricList = ex.rubric.map((r) => `- [ ] ${r.trim()}`).join("\n");
@@ -211,6 +225,8 @@ export interface GeneratedExercise {
   hints: string[];
   solution: string;
   rubric: string[];
+  /** English listening: the text played aloud (hidden from the learner). */
+  audio_text?: string;
 }
 
 function normaliseExercise(raw: any): GeneratedExercise | null {
@@ -219,7 +235,8 @@ function normaliseExercise(raw: any): GeneratedExercise | null {
   const statement = String(raw.statement ?? "").trim();
   if (!title || !statement) return null;
   const list = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)).filter((x) => x.trim()) : []);
-  return { title, statement, hints: list(raw.hints), solution: String(raw.solution ?? ""), rubric: list(raw.rubric) };
+  const audio = String(raw.audio_text ?? "").trim();
+  return { title, statement, hints: list(raw.hints), solution: String(raw.solution ?? ""), rubric: list(raw.rubric), ...(audio ? { audio_text: audio } : {}) };
 }
 
 /** The top-level `{...}` chunks of a (possibly broken) JSON array text, string-aware. */
@@ -288,6 +305,7 @@ export interface SessionAIClient {
       hints: string[];
       solution: string;
       rubric: string[];
+      audio_text?: string;
     }>
   >;
 }
@@ -328,6 +346,7 @@ export async function buildTopicSession(
       config.assistance,
       needed,
       learning,
+      config.words ?? [],
     );
     try {
       const generated = await aiClient.generateExercises(messages);
@@ -343,7 +362,7 @@ export async function buildTopicSession(
           config.skill,
           config.difficulty,
           config.assistance,
-          item,
+          config.wordIds?.length ? { ...item, words: [...config.wordIds] } : item,
         );
 
         planned.push({

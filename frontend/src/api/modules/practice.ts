@@ -41,6 +41,10 @@ import {
 import { MODES, modeFor } from "../../core/practice/modes.js";
 import { attemptPassed } from "../../core/practice/ledger.js";
 import { recordTopicPractice } from "../../core/practice/reviewFiles.js";
+import { EnglishVocabularyManager } from "../../core/englishVocabularyManager.js";
+import { isEnglishSubject } from "../../core/practice/domain.js";
+import { isoDate } from "../../core/practice/reviewSchedule.js";
+import { isVocabularySkill } from "../../lib/englishSkillData.js";
 import { recordLearning } from "../../core/practice/learningLog.js";
 import { findAncestorTopicManifest } from "../../core/practice/topic.js";
 import { parseTimer } from "../../core/practice/timer.js";
@@ -172,6 +176,18 @@ function practiceApply(
   } catch {
     /* a review note that cannot be written must never break grading */
   }
+  // English vocabulary: the words the exercise was built around follow the grade in their own reviews.
+  try {
+    const wordIds = Array.isArray(ex.frontmatter.words) ? ex.frontmatter.words.map((w: unknown) => String(w)) : [];
+    if (wordIds.length && isEnglishSubject(ex.subject) && isVocabularySkill(ex.mode)) {
+      const bank = new EnglishVocabularyManager(app.root);
+      const passed = attemptPassed(attempt as Record<string, any>);
+      const today = isoDate(new Date());
+      for (const id of wordIds) bank.recordReview(id, passed, today);
+    }
+  } catch {
+    /* the word bank never breaks grading */
+  }
   // The mistakes of this attempt go to the competency's learning record, when its box is on.
   try {
     const found = findAncestorTopicManifest(p, app.root);
@@ -264,6 +280,7 @@ export function practiceApi(app: AppState) {
           break_seconds: spec.break_seconds,
         },
         statement: ex.statement,
+        audio_text: ex.audio_text,
         code: ex.code,
         code_lang: ex.code_lang,
         hints: ex.hints,

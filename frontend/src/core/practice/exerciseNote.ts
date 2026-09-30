@@ -21,6 +21,8 @@ const _SECTION_KEYS: Record<string, string> = {
   rubric: "rubric",
   "errores tipicos": "typical_errors",
   "typical errors": "typical_errors",
+  "texto del audio": "audio_text",
+  "audio text": "audio_text",
   "senal de dominio": "mastery_signal",
   "mastery signal": "mastery_signal",
 };
@@ -53,6 +55,8 @@ export class ExerciseNote {
   rubric: string[];
   typical_errors: [string, string][];
   mastery_signal: string;
+  /** English listening: the text the app plays aloud. It is never shown before the exercise is graded. */
+  audio_text: string;
   drill: string;
   items: number;
 
@@ -78,6 +82,7 @@ export class ExerciseNote {
     this.rubric = fields.rubric ?? [];
     this.typical_errors = fields.typical_errors ?? [];
     this.mastery_signal = fields.mastery_signal ?? "";
+    this.audio_text = fields.audio_text ?? "";
     this.drill = fields.drill ?? "";
     this.items = fields.items ?? 20;
   }
@@ -240,6 +245,7 @@ export function parseExercise(text: string, filePath?: string | null): ExerciseN
     rubric: _parseRubric(sections.rubric || ""),
     typical_errors: _parseTypicalErrors(sections.typical_errors || ""),
     mastery_signal: sections.mastery_signal || "",
+    audio_text: (sections.audio_text || "").trim(),
     drill: String(fm.drill || "").trim().toLowerCase(),
     items: Math.max(1, _int(fm.items, 20)),
   });

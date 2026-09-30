@@ -63,12 +63,14 @@ import {
   type PracticePlan,
 } from "../../core/practice/practicePlan.js";
 import { listReviews, rescheduleReview } from "../../core/practice/reviewFiles.js";
+import { listVocabReviews } from "../../core/practice/vocabReviews.js";
 import { loadReviewSettings, saveReviewSettings } from "../reviewSettings.js";
 import { runReviewTest } from "../reviewHooks.js";
 import { catalogFor } from "../../core/practice/skillSelection.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
-import { BRANCH_LABELS, classifyTopic, domainOfSubject, keyOf, type Classification } from "../../core/practice/domain.js";
-import { isEnglishBranch } from "../../lib/englishSkillData.js";
+import { BRANCH_LABELS, classifyTopic, domainOfSubject, isEnglishSubject, keyOf, type Classification } from "../../core/practice/domain.js";
+import { EnglishVocabularyManager } from "../../core/englishVocabularyManager.js";
+import { ENGLISH_VOCABULARY_FOLDER, isEnglishBranch, isVocabularySkill } from "../../lib/englishSkillData.js";
 import { listUnclassified, recordUnclassified, resolveUnclassified } from "../topicClassification.js";
 import {
   learningPromptLines,
@@ -420,6 +422,50 @@ export async function topicSkillOptions(app: AppState, folder: string) {
     summary: parsed.summary,
     skills: parsed.options.map((o) => ({ ...o, current: current.has(o.skill) })),
   };
+}
+
+/** The AI client the session builders share: two tries, then nothing (never a crash). */
+function makeSessionAiClient(): SessionAIClient {
+  return {
+    async generateExercises(messages) {
+      const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+      if (cfg.is_bridge) return [];
+      // A model now and then returns nothing usable: one more try before giving up.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const found = parseExerciseArray(await askStructured(cfg, messages as any));
+          if (found.length) return found;
+        } catch {
+          /* network or provider error: retry once */
+        }
+      }
+      return [];
+    },
+  };
+}
+
+/** English vocabulary skills are built around the shared word bank: the words due first, then the topic's own. */
+function vocabularyWords(app: AppState, subject: string, skill: string, topicTitle: string): { words?: string[]; wordIds?: string[] } {
+  if (!isEnglishSubject(subject) || !isVocabularySkill(skill)) return {};
+  const picked = new EnglishVocabularyManager(app.root).sessionWords(topicTitle, 10, isoDate(new Date())!);
+  return picked.length
+    ? { words: picked.map((w) => `${w.word} — ${w.meaning} (${w.part_of_speech}, ${w.level})`), wordIds: picked.map((w) => w.id) }
+    : {};
+}
+
+/** The first top-level folder whose overview says it is an English space; null when there is none. */
+export function englishSpaceFolder(app: AppState): string | null {
+  for (const d of fs.readdirSync(app.root, { withFileTypes: true })) {
+    if (!d.isDirectory() || d.name.startsWith(".") || d.name.startsWith("_")) continue;
+    try {
+      const head = fs.readFileSync(path.join(app.root, d.name, `${d.name}.resumen.md`), "utf-8").slice(0, 800);
+      const subject = /^subject:\s*["']?([^"'\n]+?)["']?\s*$/m.exec(head)?.[1];
+      if (subject && isEnglishSubject(subject)) return d.name;
+    } catch {
+      /* not a space */
+    }
+  }
+  return null;
 }
 
 export function studyApi(app: AppState) {
@@ -913,22 +959,7 @@ export function studyApi(app: AppState) {
       // is shaped, which exercise types exist) alongside the topic's own theory.
       theoryNotes.push(...skillTemplates(app, normFolder));
 
-      const aiClient: SessionAIClient = {
-        async generateExercises(messages) {
-          const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
-          if (cfg.is_bridge) return [];
-          // A model now and then returns nothing usable: one more try before giving up.
-          for (let attempt = 0; attempt < 2; attempt += 1) {
-            try {
-              const found = parseExerciseArray(await askStructured(cfg, messages as any));
-              if (found.length) return found;
-            } catch {
-              /* network or provider error: retry once */
-            }
-          }
-          return [];
-        },
-      };
+      const aiClient = makeSessionAiClient();
 
       const plan = await buildTopicSession(
         found.manifest,
@@ -940,6 +971,7 @@ export function studyApi(app: AppState) {
           assistance: ast,
           planCount: aiCount,
           learning: learningPromptLines(app.root, normFolder.replace(/\\/g, "/"), skill),
+          ...vocabularyWords(app, found.manifest.subject, skill, found.manifest.title),
         },
         scan.exercises,
         theoryNotes,
@@ -975,6 +1007,58 @@ export function studyApi(app: AppState) {
         })),
         first_exercise: plan.exercises[0]?.path ?? "",
       };
+    },
+
+    /**
+     * A vocabulary session from the shared word bank (no topic needed): exercises of one `vc_` skill built around
+     * the words due first, saved in `<English space>/Vocabulario/Ejercicios/<skill>/`. Their reviews follow the grade.
+     */
+    async study_vocab_session(skill = "vc_recall", quantity = "3-5") {
+      const sk = String(skill || "").trim().toLowerCase();
+      if (!isVocabularySkill(sk)) throw new ApiError("Elige una competencia de vocabulario (vc_recall, vc_recognition, vc_usage, vc_families o vc_collocations).");
+      const space = englishSpaceFolder(app);
+      if (!space) throw new ApiError("Todavía no hay un espacio de inglés: genera uno primero.");
+      const today = isoDate(new Date())!;
+      const words = new EnglishVocabularyManager(app.root).sessionWords("", 10, today);
+      if (!words.length) throw new ApiError("El banco de palabras está vacío: añade palabras al calendario de repasos o mínalas desde el reproductor.");
+      const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+      if (cfg.is_bridge) throw new ApiError("El proveedor de IA está en modo puente; no se puede generar automáticamente.");
+      const folder = `${space}/${ENGLISH_VOCABULARY_FOLDER}`;
+      const manifest: TopicManifest = {
+        type: "topic",
+        subject: "english",
+        title: "Vocabulario",
+        skills: [sk],
+        mastery: { min_per_skill: 6, target_difficulty: 3, exam: "none" },
+        folder,
+      };
+      const plan = await buildTopicSession(
+        manifest,
+        folder,
+        {
+          skill: sk,
+          difficulty: 2,
+          quantity: (quantity || "3-5") as QuantityOption,
+          assistance: "no_help",
+          words: words.map((w) => `${w.word} — ${w.meaning} (${w.part_of_speech}, ${w.level})`),
+          wordIds: words.map((w) => w.id),
+        },
+        vaultScan(app).exercises,
+        [],
+        makeSessionAiClient(),
+      );
+      for (const ex of plan.exercises) {
+        if (ex.isNew && ex.content) {
+          const abs = app.resolve(ex.path, { allowRoot: false, mustExist: false });
+          fs.mkdirSync(path.dirname(abs), { recursive: true });
+          fs.writeFileSync(abs, ex.content, "utf-8");
+        }
+      }
+      if (plan.generatedCount > 0) {
+        clearExerciseIndexCache();
+        clearStudySnapshotCache();
+      }
+      return { ok: true, skill: sk, exercises: plan.exercises.map((e) => ({ id: e.id, title: e.title, path: e.path, is_new: e.isNew })), first_exercise: plan.exercises[0]?.path ?? "" };
     },
 
     /** How a topic is classified: its type (maths, programming) or its branch (English), or why it is not. */
@@ -1033,7 +1117,9 @@ export function studyApi(app: AppState) {
     /** The topic review notes (spaced repetition), soonest first. */
     study_reviews_list() {
       const today = isoDate(new Date())!;
-      return { today, items: listReviews(app.root, today) };
+      // Topic reviews and, for English, the scheduled words of the shared word bank.
+      const items = [...listReviews(app.root, today), ...listVocabReviews(app.root, today)].sort((a, b) => a.next.localeCompare(b.next) || a.topic.localeCompare(b.topic, "es", { numeric: true }));
+      return { today, items };
     },
 
     /** Moves the pending review of a topic to another day. */

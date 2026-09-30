@@ -41,7 +41,9 @@ function when(inDays: number): string {
 }
 
 /** Short label for a topic chip: its number ("1.1") when it has one, else its first words. */
-function chipLabel(topic: string): string {
+function chipLabel(topic: string, kind?: string): string {
+  // A word of the bank is shown by the word itself (its meaning follows " — ").
+  if (kind === "vocab") return topic.split(" — ")[0] ?? topic;
   return /^(\d+(?:\.\d+)*)\s/.exec(topic)?.[1] ?? topic.split(/\s+/).slice(0, 2).join(" ");
 }
 
@@ -65,6 +67,7 @@ export function ReviewCalendar() {
   const [selected, setSelected] = useState<string | null>(null);
   const [projected, setProjected] = useState(true);
   const [reminders, setReminders] = useState<{ enabled: boolean; hour: number }>({ enabled: true, hour: 9 });
+  const [newWord, setNewWord] = useState({ word: "", meaning: "", date: "" });
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   // The month opens where the next review is, so the grid is never empty when the next one is a month away.
@@ -123,7 +126,35 @@ export function ReviewCalendar() {
     }
   };
 
+  /** Adds a word to the shared word bank and schedules its first review. */
+  const addWord = async () => {
+    const word = newWord.word.trim();
+    if (!word) return;
+    try {
+      await api.enVocabAdd(word, newWord.meaning.trim(), "B1", newWord.date || addDaysIso(today, 1));
+      setNewWord({ word: "", meaning: "", date: "" });
+      await refresh();
+      toast("info", `«${word}» se repasará el ${shortDate(newWord.date || addDaysIso(today, 1))}.`);
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
+
   const practice = async (item: ReviewItem) => {
+    if (item.kind === "vocab") {
+      // A word has no topic: its practice is a vocabulary session drawn from the shared bank.
+      try {
+        const res = await api.studyVocabSession("vc_recall", "3-5");
+        if (res.first_exercise) {
+          close(false);
+          await openNote(res.first_exercise);
+          useApp.getState().setMode("read");
+        }
+      } catch (e) {
+        toast("error", (e as Error).message);
+      }
+      return;
+    }
     try {
       const view = await api.studyViewEnsure(item.topicPath);
       if (view.ok && view.path) {
@@ -265,11 +296,15 @@ export function ReviewCalendar() {
                         className={cn(
                           "truncate rounded px-1 text-[10px] leading-4",
                           m.real
-                            ? iso <= today ? "cursor-grab bg-warn-soft font-semibold text-warn" : "cursor-grab bg-accent-soft font-semibold text-accent-text"
+                            ? iso <= today
+                              ? "cursor-grab bg-warn-soft font-semibold text-warn"
+                              : m.item.kind === "vocab"
+                                ? "cursor-grab bg-mint-soft font-semibold text-mint"
+                                : "cursor-grab bg-accent-soft font-semibold text-accent-text"
                             : "border border-dashed border-line text-faint",
                         )}
                       >
-                        {chipLabel(m.item.topic)}
+                        {chipLabel(m.item.topic, m.item.kind)}
                       </span>
                     ))}
                     {marks.length > 3 && <span className="px-1 text-[10px] text-faint">+{marks.length - 3} más</span>}
@@ -295,6 +330,36 @@ export function ReviewCalendar() {
             <span className="flex-1" />
             {selected && <button type="button" onClick={() => setSelected(null)} className="text-[11px] text-dim hover:text-text">Ver todos</button>}
           </div>
+          <details className="mb-2 rounded-lg border border-line bg-panel px-3 py-1.5">
+            <summary className="cursor-pointer text-[11.5px] font-semibold text-text">Añadir una palabra al repaso (vocabulario)</summary>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <input
+                aria-label="Palabra"
+                value={newWord.word}
+                onChange={(e) => setNewWord({ ...newWord, word: e.target.value })}
+                placeholder="reliable"
+                className="w-28 rounded-md border border-line bg-surface px-1.5 py-0.5 text-[12px] text-text"
+              />
+              <input
+                aria-label="Significado"
+                value={newWord.meaning}
+                onChange={(e) => setNewWord({ ...newWord, meaning: e.target.value })}
+                placeholder="fiable"
+                className="min-w-0 flex-1 rounded-md border border-line bg-surface px-1.5 py-0.5 text-[12px] text-text"
+              />
+              <input
+                type="date"
+                aria-label="Primer repaso"
+                value={newWord.date}
+                onChange={(e) => setNewWord({ ...newWord, date: e.target.value })}
+                className="rounded-md border border-line bg-surface px-1.5 py-0.5 font-mono text-[11px] text-text"
+              />
+              <button type="button" disabled={!newWord.word.trim()} onClick={() => void addWord()} className="rounded-md bg-accent px-2 py-0.5 text-[11.5px] font-semibold text-white disabled:opacity-40">
+                Añadir
+              </button>
+            </div>
+            <p className="mt-1 text-[10.5px] text-faint">Sin fecha se repasa mañana. El vocabulario es un banco común para todas las ramas.</p>
+          </details>
           <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
             {!items.length && (
               <p className="text-[12px] leading-relaxed text-faint">
@@ -305,10 +370,15 @@ export function ReviewCalendar() {
             {shown.map((it) => (
               <div key={it.path} className="rounded-lg border border-line bg-panel px-3 py-2">
                 <div className="flex items-start gap-2">
-                  <button type="button" onClick={() => void openNote(it.path)} title="Abrir la nota de repaso" className="min-w-0 flex-1 text-left">
-                    <div className="truncate text-[12.5px] font-semibold text-text">{it.topic}</div>
+                  <button type="button" onClick={() => it.kind !== "vocab" && void openNote(it.path)} title={it.kind === "vocab" ? "Palabra del banco de vocabulario" : "Abrir la nota de repaso"} className="min-w-0 flex-1 text-left">
+                    <div className="truncate text-[12.5px] font-semibold text-text">
+                      {it.kind === "vocab" && <span className="mr-1.5 rounded bg-mint-soft px-1 font-mono text-[9.5px] font-bold uppercase text-mint">palabra</span>}
+                      {it.topic}
+                    </div>
                     <div className="text-[10.5px] text-faint">
-                      nivel {it.level} · {it.practicedDays} día(s) practicado(s){it.last ? ` · último ${shortDate(it.last)}` : ""}
+                      {it.kind === "vocab"
+                        ? `racha ${it.level}${it.last ? ` · último ${shortDate(it.last)}` : ""}`
+                        : `nivel ${it.level} · ${it.practicedDays} día(s) practicado(s)${it.last ? ` · último ${shortDate(it.last)}` : ""}`}
                     </div>
                   </button>
                   <span className={cn("flex-none rounded-full px-2 py-0.5 font-mono text-[10px] font-bold", it.inDays <= 0 ? "bg-warn-soft text-warn" : "bg-accent-soft text-accent-text")}>

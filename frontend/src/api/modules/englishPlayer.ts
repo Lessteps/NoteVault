@@ -13,6 +13,8 @@ import {
   vaultRelative,
 } from "../../core/english/mediaLinks.js";
 import { CEFR_LEVELS, MiningError, writeMinedNote } from "../../core/english/mining.js";
+import { EnglishVocabularyManager } from "../../core/englishVocabularyManager.js";
+import { isIsoDate } from "../../core/practice/reviewSchedule.js";
 import {
   SUBTITLE_EXTS,
   findSiblingSubtitles,
@@ -152,6 +154,18 @@ export function englishPlayerApi(app: AppState) {
         if (e instanceof ApiError) throw e;
         throw new ApiError(`No se pudieron leer los subtítulos: ${e instanceof Error ? e.message : String(e)}`);
       }
+    },
+
+    /** Adds a word to the shared word bank, optionally scheduling its first review (what "add to the calendar" does). */
+    en_vocab_add(word: string, meaning = "", level = "B1", nextReview = ""): Record<string, unknown> {
+      const w = String(word ?? "").trim().slice(0, 80);
+      if (!w) throw new ApiError("Escribe la palabra.");
+      const lvl = String(level || "B1").toUpperCase();
+      if (!CEFR_LEVELS.includes(lvl)) throw new ApiError("Nivel inválido.");
+      const when = String(nextReview ?? "").trim();
+      if (when && !isIsoDate(when)) throw new ApiError("La fecha no es válida.");
+      const item = new EnglishVocabularyManager(app.root).addWord(w, String(meaning ?? "").trim().slice(0, 300), { level: lvl, next_review: when });
+      return { ok: true, id: item.id, word: item.word, next_review: item.next_review };
     },
 
     en_player_link(mediaId: string, seconds: number): Record<string, unknown> {

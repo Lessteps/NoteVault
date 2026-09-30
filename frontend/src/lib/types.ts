@@ -769,6 +769,8 @@ export interface PracticeExercise {
   assistance: "helper" | "nohelp";
   timer: import("./practiceTimer").TimerSpec;
   statement: string;
+  /** English listening: the text the app plays aloud (shown only after grading). */
+  audio_text?: string;
   code: string;
   code_lang: string;
   hints: string[];
@@ -1057,4 +1059,6 @@ export interface ReviewItem {
   practicedDays: number;
   /** the pending review and the ones after it, if each is done on its date */
   upcoming: Array<{ date: string; interval: number; level: number }>;
+  /** `vocab` for a word of the English word bank; absent for topic reviews */
+  kind?: "topic" | "vocab";
 }

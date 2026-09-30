@@ -14,6 +14,7 @@ import { setReviewTestHook } from "../src/api/reviewHooks";
 import { loadReviewSettings } from "../src/api/reviewSettings";
 import { listReviews } from "../src/core/practice/reviewFiles";
 import { reminderText, reviewsToAnnounce } from "../src/core/practice/reviewReminders";
+import { vocabDueGroup } from "../src/core/practice/vocabReviews";
 import { isoDate } from "../src/core/practice/reviewSchedule";
 
 const STATE_FILE = path.join(APP_DATA_DIR, "review-notified.json");
@@ -51,7 +52,10 @@ export function checkReviews(): void {
   if (!root || !Notification.isSupported()) return;
   const now = new Date();
   const notified = loadNotified();
-  const fresh = reviewsToAnnounce(listReviews(root, isoDate(now)), notified, loadReviewSettings(), now);
+  const today = isoDate(now);
+  const group = vocabDueGroup(root, today);
+  const items = [...listReviews(root, today), ...(group ? [group] : [])];
+  const fresh = reviewsToAnnounce(items, notified, loadReviewSettings(), now);
   if (!fresh.length) return;
 
   const note = new Notification(reminderText(fresh));

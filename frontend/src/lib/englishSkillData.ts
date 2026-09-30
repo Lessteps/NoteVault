@@ -264,3 +264,6 @@ export const ENGLISH_BRANCH_BRIEF: Record<EnglishBranch, { syllabus: string; the
     theory: "The note teaches the function or sound with model phrases and typical Spanish-speaker slips; the examples are short exchanges or phrases to say aloud.",
   },
 };
+
+/** Whether a skill id is one of the cross-cutting vocabulary skills (`vc_…`). */
+export const isVocabularySkill = (id: string): boolean => englishSkillSpec(id)?.area === "vocabulary";

@@ -484,6 +484,12 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studyReviewSettings: () => call<{ enabled: boolean; hour: number }>("study_review_settings"),
   studyReviewSettingsSet: (settings: { enabled: boolean; hour: number }) => call<{ enabled: boolean; hour: number }>("study_review_settings_set", settings),
   studyReviewNotifyTest: () => call<{ supported: boolean; due: number }>("study_review_notify_test"),
+  /** Adds a word to the English word bank; with a date it is scheduled for review that day. */
+  enVocabAdd: (word: string, meaning = "", level = "B1", nextReview = "") =>
+    call<{ ok: boolean; id: string; word: string; next_review: string }>("en_vocab_add", word, meaning, level, nextReview),
+  /** A vocabulary session from the shared word bank (vc_ skill). */
+  studyVocabSession: (skill = "vc_recall", quantity = "3-5") =>
+    call<{ ok: boolean; skill: string; first_exercise: string; exercises: Array<{ id: string; title: string; path: string; is_new: boolean }> }>("study_vocab_session", skill, quantity),
   studyReviewsList: () =>
     call<{ today: string; items: import("./types").ReviewItem[] }>("study_reviews_list"),
   /** The AI proposes areas and topics for a subject (nothing is written). */

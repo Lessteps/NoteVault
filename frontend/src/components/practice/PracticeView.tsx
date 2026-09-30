@@ -12,6 +12,7 @@ import type { PracticeExercise, PracticeGraded, PracticeWaiting } from "../../li
 import { useApp, type OpenNote } from "../../store/app";
 import { cn, confirmAction } from "../ui";
 import { useStudyVersion } from "../study/StudyPanel";
+import { AudioClip } from "./AudioClip";
 import { DrillPanel } from "./DrillPanel";
 import { openInkPad, registerAnswerTarget } from "./inkBridge";
 import { beep, md, ResultCard } from "./common";
@@ -336,6 +337,8 @@ export function PracticeView({ note }: { note: OpenNote }) {
             <div className="nv-prose rounded-xl border border-line bg-card px-5 py-4 text-[15px]" dangerouslySetInnerHTML={renderedStatement} />
           </section>
         )}
+
+        {ex.audio_text && <AudioClip text={ex.audio_text} revealed={graded} />}
 
         {ex.drill ? (
           <DrillPanel

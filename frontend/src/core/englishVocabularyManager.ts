@@ -24,7 +24,22 @@ export interface VocabItem {
   level: string;
   mastery: number;
   source_note: string;
+  /** spaced repetition: the day this word is due again (YYYY-MM-DD; empty = new, due now) */
+  next_review: string;
+  /** how many reviews in a row were passed (index into VOCAB_INTERVALS) */
+  srs_level: number;
+  last_review: string;
 }
+
+/** Days until the next review after each consecutive success. A failure sends the word back to tomorrow. */
+export const VOCAB_INTERVALS = [1, 3, 7, 14, 30, 60] as const;
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const addDaysIso = (iso: string, n: number): string => {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, (m ?? 1) - 1, (d ?? 1) + n));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+};
 
 function asList(v: unknown): string[] {
   if (typeof v === "string") return [v];
@@ -53,6 +68,9 @@ export function sanitizeVocabItem(raw: unknown, fallbackWord = ""): VocabItem {
     level,
     mastery,
     source_note: String(r.source_note ?? ""),
+    next_review: ISO_DAY.test(String(r.next_review ?? "")) ? String(r.next_review) : "",
+    srs_level: Math.max(0, Math.min(VOCAB_INTERVALS.length, Math.trunc(Number(r.srs_level ?? 0)) || 0)),
+    last_review: ISO_DAY.test(String(r.last_review ?? "")) ? String(r.last_review) : "",
   };
 }
 
@@ -117,6 +135,54 @@ export class EnglishVocabularyManager {
     return this._cache?.[slug(wordId)] ?? null;
   }
 
+  /** Words due on `today` or before (new words count as due), most overdue first. */
+  dueWords(today: string): VocabItem[] {
+    return this.allWords()
+      .filter((w) => !w.next_review || w.next_review <= today)
+      .sort((a, b) => (a.next_review || "0000").localeCompare(b.next_review || "0000") || a.mastery - b.mastery);
+  }
+
+  /**
+   * The words a vocabulary session is built around: the ones due first (lowest mastery first inside), and among
+   * equals the ones that belong to the topic (`topicHint` matches the word's topic or its source note).
+   */
+  sessionWords(topicHint: string, limit: number, today: string): VocabItem[] {
+    const hint = topicHint.toLowerCase();
+    const near = (w: VocabItem): number => (hint && (w.topic.includes(hint) || w.source_note.toLowerCase().includes(hint)) ? 0 : 1);
+    return this.allWords()
+      .map((w) => ({ w, due: !w.next_review || w.next_review <= today ? 0 : 1 }))
+      .sort((a, b) => a.due - b.due || near(a.w) - near(b.w) || a.w.mastery - b.w.mastery)
+      .slice(0, Math.max(0, limit))
+      .map((x) => x.w);
+  }
+
+  /** Records the result of practising a word: passing climbs the ladder, failing brings it back tomorrow. */
+  recordReview(wordId: string, correct: boolean, today: string): VocabItem | null {
+    const item = this.get(wordId);
+    if (!item) return null;
+    const level = correct ? Math.min(item.srs_level + 1, VOCAB_INTERVALS.length) : 0;
+    const next: VocabItem = {
+      ...item,
+      srs_level: level,
+      last_review: today,
+      next_review: addDaysIso(today, correct ? VOCAB_INTERVALS[level - 1]! : 1),
+      mastery: Math.round(Math.max(0, Math.min(1, item.mastery + (correct ? 0.15 : -0.1))) * 100) / 100,
+    };
+    writeJson(this._path(next.id), next);
+    this._cache = null;
+    return next;
+  }
+
+  /** Moves the next review of a word to another day (the calendar's drag and date box). */
+  setNextReview(wordId: string, date: string): VocabItem | null {
+    const item = this.get(wordId);
+    if (!item || !ISO_DAY.test(date)) return null;
+    const next = { ...item, next_review: date };
+    writeJson(this._path(next.id), next);
+    this._cache = null;
+    return next;
+  }
+
   addWord(word: string, meaning: string, opts: Partial<Omit<VocabItem, "id" | "word" | "meaning" | "mastery">> = {}): VocabItem {
     const clean = sanitizeVocabItem({
       word, meaning, mastery: 0,
@@ -128,6 +194,9 @@ export class EnglishVocabularyManager {
       collocations: opts.collocations ?? [],
       synonyms: opts.synonyms ?? [],
       source_note: opts.source_note ?? "",
+      next_review: opts.next_review ?? "",
+      srs_level: opts.srs_level ?? 0,
+      last_review: opts.last_review ?? "",
     }, word);
     writeJson(this._path(clean.id), clean);
     this._cache = null;

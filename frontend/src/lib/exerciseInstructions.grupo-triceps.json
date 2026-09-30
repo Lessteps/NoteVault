@@ -1,0 +1,229 @@
+[
+  {
+    "slug": "tricep-pushdown",
+    "name": "Tricep Pushdown",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ajusta la polea a la altura del pecho alta y engancha la barra a la cadena.",
+      "Ponte de pie frente a la máquina con los pies separados y sujeta la barra con agarre neutro, palmas enfrentadas.",
+      "Acopla los codos al torso y flexiona ligeramente las rodillas inclinando el torso unos grados hacia delante.",
+      "Extiende los codos hacia abajo hasta que la barra llegue a la altura de los muslos, apretando el tríceps un segundo.",
+      "Sube despacio hasta que los antebrazos queden paralelos al suelo y los codos junto a las costillas.",
+      "El movimiento es solo de codo: si los codos se separan hacia atrás, has cogido peso de más.",
+      "Mantén la columna quieta durante todo el recorrido."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "rope-tricep-pushdown",
+    "name": "Rope Tricep Pushdown",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca la polea a la altura del pecho y engancha la cuerda al final de la cadena.",
+      "Sujeta la cuerda con las palmas enfrentadas y los pies separados a la anchura de la cadera.",
+      "Con los codos pegados al torso, extiende los antebrazos hacia abajo separando ligeramente las puntas de la cuerda al final.",
+      "Aprieta el tríceps un segundo abajo, con las muñecas neutras.",
+      "Vuelve a subir hasta que los antebrazos estén horizontales, sin dejar que la cuerda se separe antes de tiempo.",
+      "La rotación de muñeca al final es opcional: añade trabajo, pero con las muñecas rectas también funciona.",
+      "Baja el peso si los codos se abren o si no puedes parar la barra a media carrera."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "overhead-tricep-extension",
+    "name": "Overhead Tricep Extension",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ajusta la polea a la altura de la cabeza y engancha una barra en cuerda o una mancuerna.",
+      "Ponte de pie de espaldas a la máquina, con los pies ligeramente adelantados y las rodillas suaves.",
+      "Sujeta el extremo con las dos manos, los codos flexionados y los brazos cerca de la cabeza.",
+      "Estira los codos hasta apuntar el peso al techo, con las muñecas rectas.",
+      "Baja despacio hasta devolver los codos a un ángulo de unos 90 grados, sin dejarlos abrir hacia los lados.",
+      "Si la lumbar se arquea al bajar, reduce el recorrido o hazlo sentado con apoyo.",
+      "Evita apnea: exhala al extender, inhala al bajar."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "skull-crusher",
+    "name": "Skull Crusher",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate en un banco plano y sujeta la barra EZ con un agarre cerrado, ligeramente por fuera de los hombros.",
+      "Estira los codos hasta poner la barra sobre el pecho, con las muñecas rectas.",
+      "Flexiona solo los codos bajando la barra hacia la frente o detrás de la cabeza, manteniendo los brazos en un ángulo fijo.",
+      "Baja de forma controlada hasta un ángulo de codos de unos 90 grados, sin que los codos se abran hacia los lados.",
+      "Estiende los codos hasta arriba apretando el tríceps un segundo.",
+      "El nombre asusta pero el recorrido es corto: si la barra se acerca a la cara, baja el peso o acorta el rango."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "single-dumbbell-skullcrusher",
+    "name": "Single Dumbbell Skullcrusher",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate en un banco plano y sujeta una mancuerna con las dos manos por el extremo superior.",
+      "Estira los codos con la mancuerna sobre el pecho, con las muñecas rectas.",
+      "Baja la mancuerna hacia el lado de la cabeza flexionando solo los codos, con los brazos en diagonal.",
+      "Extiende los codos hasta arriba apretando el tríceps un segundo.",
+      "El cruce de los dos brazos hace que el recorrido sea menor y la carga mayor por brazo: usa menos peso que en la versión con barra.",
+      "Si el codo dolorido se resiente más que el otro, suele ser señal de rotación interna: revisa la muñeca."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-overhead-tricep-extension",
+    "name": "Dumbbell Overhead Tricep Extension",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie o sentado con una mancuerna en las dos manos, los brazos extendidos por encima de la cabeza.",
+      "Asegúrate de que la mancuerna esté bien subjecta y de que las muñecas queden rectas.",
+      "Flexiona los codos bajando la mancuerna por detrás de la cabeza, sin abrir los codos hacia los lados.",
+      "Detente a unos 90 grados de codo o más arriba si la caja del hombro lo pide.",
+      "Extiende los codos hasta devolver los brazos arriba sin bloquearlos.",
+      "Si los codos se abren o la zona lumbar se arquea, la carga es alta o el rango es demasiado largo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "single-arm-dumbbell-tricep-extension",
+    "name": "Single Arm Dumbbell Tricep Extension",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie y sujeta una mancuerna con una mano, con el brazo extendido por encima de la cabeza.",
+      "Ponte en posición de tríceps: pie atrás, rodilla blanda, tronco inclinado para que la mano quede detrás de la cabeza.",
+      "Baja la mancuerna flexionando solo el codo, con la muñeca recta y el codo apuntando al techo.",
+      "Detente cuando el codo llegue a unos 90 grados o más, según tu movilidad.",
+      "Estiende el codo hasta devolver la mancuerna arriba sin bloquearlo.",
+      "Alterna lados en cada serie y controla bien la bajada: es un ejercicio con mucho riesgo de ELA si el peso es alto."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "tricep-kickback",
+    "name": "Tricep Kickback",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie, flexiona la cadera y apóyate la mano libre en el muslo o en una silla.",
+      "Sujeta una mancuerna con la otra mano y lleva el brazo atrás hasta que quede alineado con el torso, el codo a 90 grados.",
+      "Fija el codo contra el costado y estira el antebrazo hacia atrás sin mover el hombro.",
+      "Aprieta el tríceps un segundo arriba, con la muñeca recta.",
+      "Baja despacio hasta volver al ángulo de 90 grados.",
+      "El hombro no sube: si sube, la carga es demasiado pesada para una mancuerna de ese brazo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "close-grip-bench-press",
+    "name": "Close-Grip Bench Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate en el banco plano con los pies bien apoyados y el agarre de la barra cerrado, a la anchura de los hombros o algo menos.",
+      "Deja los pulgares por encima de la barra y las muñecas rectas sobre los codos.",
+      "Baja la barra hasta el pecho bajo o la parte alta del abdomen, muy cerca de los codos.",
+      "Empuja hacia arriba hasta extender los codos sin bloquearlos.",
+      "Los codos se mantienen cerca del torso: no los abras hacia los lados como en un press de banca normal.",
+      "Usa bastante menos carga que en el press abierto: aquí pesa la misma pero el tríceps recibe más."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "diamond-push-up",
+    "name": "Diamond Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca las manos bajo el pecho formando un rombo con los índices y pulgares juntos.",
+      "Sujétate en los dedos pulgares e índices, no en las palmas, y aparta ligeramente los pies para tener estabilidad.",
+      "Mantén el cuerpo en una línea recta con el abdomen apretado.",
+      "Baja el pecho hasta rozar las manos, con los codos cerca del torso.",
+      "Empuja hasta extender los brazos sin bloquear los codos.",
+      "Empieza con las rodillas apoyadas si todavía no dominas la posición de los pies separados."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dip",
+    "name": "Dip",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en las barras paralelas con los brazos extendidos y el cuerpo vertical, con las piernas atrás y las rodillas flexionadas.",
+      "Baja flexionando los codos hacia atrás hasta un ángulo de unos 90 grados, sintiendo el tríceps.",
+      "Empuja hasta extender los codos sin bloquearlos.",
+      "Con el torso vertical y las piernas atrás, la carga va al tríceps; con el torso inclinado, al pecho.",
+      "Si los pies están muy atrás, el ejercicio se parece más a una extensión de tríceps en prensa militar.",
+      "Baja la profundidad si el hombro se molesta antes que el tríceps."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "assisted-dip",
+    "name": "Assisted Dip",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en las paralelas usando el peso de la máquina como asistencia.",
+      "Deja que la máquina sostenga parte del peso al subir y te frene al bajar.",
+      "Baja hasta donde controles, con los codos hacia atrás y el torso cerca de la vertical.",
+      "Empuja con la ayuda mínima que necesites hasta extender los codos.",
+      "A medida que controles, sube el peso de la asistencia en cada serie.",
+      "Sirve para aprender el patrón de las paralelas antes de cargarlas."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "weighted-dip",
+    "name": "Weighted Dip",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca un cinto con discos entre las piernas, bien ajustado, y cuélgate de las barras con los brazos extendidos.",
+      "Con el torso ligeramente inclinado y las piernas atrás, baja hasta un ángulo de codos de unos 90 grados.",
+      "Empuja hasta extender los codos sin bloquearlos.",
+      "Empieza con muy poco peso: las paralelas toleran cargas que parecen moderadas solo hasta que aparece el dolor de hombro.",
+      "Baja el peso en cuanto notes molestia en la parte anterior del hombro."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "bench-dip",
+    "name": "Bench Dip",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en el borde de un banco y agarra el borde por fuera de las caderas.",
+      "Desliza los pies hacia delante, doblando las rodillas lo justo para que los talones o las puntas toquen el suelo.",
+      "Baja la cadera hasta un ángulo de codos de unos 90 grados, con los codos hacia atrás.",
+      "Empuja hasta extender los codos sin bloquearlos.",
+      "Los pies muy cerca de la banca hacen el ejercicio mucho más fácil; sepáralos para más carga.",
+      "Si el hombro molesta antes que el tríceps, no desciendas más: acorta el recorrido."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "chair-dip",
+    "name": "Chair Dip",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate con las manos en el asiento de una silla o banco firme, con los pies hacia delante.",
+      "Desliza el cuerpo hacia delante hasta que las rodillas queden casi a 90 grados y los talones en el suelo.",
+      "Baja las caderas hasta un ángulo de codos de unos 90 grados, con los hombros lejos de las orejas.",
+      "Empuja hasta extender los codos sin bloquearlos.",
+      "Comprueba que la silla no resbala antes de empezar: si es un taburete, mejor no usarlo.",
+      "Si es la primera vez, hazlo con las piernas estiradas para reducir la carga."
+    ],
+    "steps_en": []
+  }
+]

@@ -50,6 +50,12 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
+  test("grupo triceps redactado a mano (tricep-pushdown, diamond-push-up)", () => {
+    expect(getInstructions("tricep-pushdown")!.source).toBe("propia");
+    expect(getInstructions("diamond-push-up")!.steps_es.join(" ")).toMatch(/dedos|triceps/i);
+    expect(getInstructions("skull-crusher")!.steps_es.length).toBeGreaterThanOrEqual(4);
+  });
+
   test("grupo hombros redactado a mano (overhead-press, lateral-raise)", () => {
     expect(getInstructions("overhead-press")!.source).toBe("propia");
     expect(getInstructions("lateral-raise")!.steps_es.join(" ")).toMatch(/hombro|deltoide/i);

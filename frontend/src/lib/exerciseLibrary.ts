@@ -4,11 +4,7 @@
 // assets, ver CREDITS) y mapea su `primaryMuscle` a los ids locales de
 // `muscles.ts` para reutilizar el mapa corporal existente.
 
-import {
-  getAssetUrl,
-  searchExercises,
-  type Exercise as GuideExercise,
-} from "@bryllim/workout-guide";
+import { searchExercises, type Exercise as GuideExercise } from "@bryllim/workout-guide";
 
 /** Mapeo guía → músculos locales (`frontend/src/lib/muscles.ts`). */
 const GUIDE_TO_LOCAL: Record<string, string[]> = {
@@ -57,7 +53,9 @@ function toEntry(e: GuideExercise): LibraryEntry {
   const localSecondary = [...new Set(e.secondaryMuscles.flatMap(mapGuideMuscle))].filter(
     (m) => !localPrimary.includes(m),
   );
-  const frames = [1, 2, 3].map((i) => getAssetUrl(e.slug, i as 1 | 2 | 3)) as Array<string | null>;
+  // Local offline (public/workout-guide-assets, copiado en postinstall):
+  // relativo para que funcione con base './' en Electron y en vite dev.
+  const frames = [1, 2, 3].map((i) => `workout-guide-assets/${e.slug}/frame-${i}.png`);
   return {
     id: e.id,
     slug: e.slug,

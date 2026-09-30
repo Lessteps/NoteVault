@@ -62,3 +62,7 @@ frontend/coverage/
 # -- Git worktrees (local only)
 .worktrees/
 
+
+# -- Workout-guide assets (se regeneran con postinstall)
+frontend/public/workout-guide-assets/
+

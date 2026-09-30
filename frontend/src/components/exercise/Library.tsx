@@ -49,7 +49,7 @@ function Detail({ entry }: { entry: LibraryEntry }) {
           <dd>{entry.guideSecondary.join(", ") || "—"}</dd>
         </div>
       </dl>
-      <p className="text-[11px] text-faint">Ilustración: Bryl Lim / Everkinetic (CC BY-SA 4.0). Requiere internet (CDN).</p>
+      <p className="text-[11px] text-faint">Ilustración: Bryl Lim / Everkinetic (CC BY-SA 4.0) · offline.</p>
     </div>
   );
 }

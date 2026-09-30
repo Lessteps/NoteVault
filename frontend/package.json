@@ -9,6 +9,8 @@
   "repository": "https://github.com/camilolayos54-dotcom/NoteVault",
   "scripts": {
     "dev": "vite",
+    "postinstall": "node tools/copy-workout-assets.mjs",
+    "prebuild": "node tools/copy-workout-assets.mjs",
     "build": "npm run typecheck && vite build",
     "typecheck": "tsc -b",
     "test": "vitest run",

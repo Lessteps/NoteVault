@@ -23,6 +23,12 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(rows.every((r) => r.localPrimary.includes("pectoral"))).toBe(true);
   });
 
+  test("los frames son locales (offline, respetan el CSP)", () => {
+    const rows = searchLibrary("bench press");
+    expect(rows[0].frame1).toContain("workout-guide-assets/bench-press/frame-1.png");
+    expect(rows[0].frame1).not.toContain("http");
+  });
+
   test("estima 1RM con Epley", () => {
     expect(estimate1RM(100, 5)).toBeCloseTo(116.7, 1);
   });

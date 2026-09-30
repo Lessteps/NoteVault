@@ -50,6 +50,12 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
+  test("grupo hombros redactado a mano (overhead-press, lateral-raise)", () => {
+    expect(getInstructions("overhead-press")!.source).toBe("propia");
+    expect(getInstructions("lateral-raise")!.steps_es.join(" ")).toMatch(/hombro|deltoide/i);
+    expect(getInstructions("handstand-push-up")!.steps_es.length).toBeGreaterThanOrEqual(4);
+  });
+
   test("grupo pecho redactado a mano (bench-press, push-up)", () => {
     const press = getInstructions("bench-press");
     expect(press!.source).toBe("propia");

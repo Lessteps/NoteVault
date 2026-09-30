@@ -1,0 +1,258 @@
+[
+  {
+    "slug": "overhead-press",
+    "name": "Overhead Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies a la anchura de la cadera, la barra a la altura de la clavícula y el agarre por fuera de los hombros.",
+      "Aprieta los glúteos y el abdomen, e inclina ligeramente el torso hacia atrás para compensar la barra.",
+      "Empuja la barra hacia arriba pasando por la frente o junto a las orejas, con las muñecas rectas sobre los codos.",
+      "Bloquea los brazos arriba sin dejar que los codos se hiperextiendan y sin aplastar los omóplatos hacia abajo.",
+      "Baja la barra hasta la frente o la parte alta del pecho, manteniendo las costillas cerradas.",
+      "Si la hiperextensión lumbar aumenta al subir, usa una presa más estrecha o hazlo sentado.",
+      "Empieza con barra vacía: el techo lo marca la movilidad del hombro, no el ego."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "seated-dumbbell-press",
+    "name": "Dumbbell Seated Shoulder Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en un banco con la espalda apoyada y los pies bien plantados en el suelo.",
+      "Apoya las mancuernas en los muslos y llévalas a la altura de los hombros con las palmas hacia delante.",
+      "Empuja las mancuernas hacia arriba hasta extender los codos sin bloquearlos.",
+      "Baja de forma controlada hasta que los codos queden a la altura de las costillas, no más abajo.",
+      "El respaldo evita que te impulse con la zona lumbar: es la mejor versión para aprender el patrón.",
+      "Si las mancuernas se chocan arriba, baja un poco de carga o abre las manos en pronación."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "standing-dumbbell-press",
+    "name": "Standing Dumbbell Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies a la anchura de la cadera y las mancuernas a la altura de los hombros.",
+      "Aprieta el abdomen y los glúteos antes de empezar a empujar.",
+      "Empuja las mancuernas hacia arriba hasta extender los codos sin bloquearlos.",
+      "Baja de forma controlada a la posición inicial.",
+      "Sin respaldo, la zona lumbar ayuda: no uses más carga aquí que en la versión sentada.",
+      "Si el abdomen se relaja al bajar, hazlo sentado."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "arnold-press",
+    "name": "Arnold Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate con las mancuernas a la altura del pecho y las palmas mirando hacia ti, con los dedos hacia arriba.",
+      "Separa ligeramente las manos y empuja las mancuernas hacia arriba.",
+      "A mitad de camino, rota las manos hasta que las palmas queden hacia delante y los codos hacia delante.",
+      "Termina con los brazos extendidos y las palmas al frente, como en un press normal.",
+      "Vuelve a la posición inicial invirtiendo la rotación de forma controlada.",
+      "Empieza con cargas ligeras: la rotación se aprende sin peso encima."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "machine-shoulder-press",
+    "name": "Machine Shoulder Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ajusta el asiento para que los agarres queden a la altura de los hombros, no por debajo de las orejas.",
+      "Apoya la espalda en el respaldo, con los pies bien plantados y las costillas cerradas.",
+      "Sujeta los agarres con las palmas hacia dentro y las muñecas rectas.",
+      "Empuja hacia arriba hasta extender los codos sin bloquearlos.",
+      "Vuelve de forma controlada hasta que los codos queden a la altura de los hombros.",
+      "Es la opción más segura para empezar a trabajar el hombro por encima de la cabeza."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "lateral-raise",
+    "name": "Lateral Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con una mancuerna en cada mano y los brazos colgando a los lados.",
+      "Inclínate ligeramente hacia delante unos diez grados y mantén las rodillas muy poco flexionadas.",
+      "Sube las manos hacia los lados con los codos ligeramente flexionados, hasta que los brazos queden casi paralelos al suelo.",
+      "Aléjate de subir más: el deltoides lateral se trabaja en la horizontal, más arriba la responsabilidad pasa al trapecio.",
+      "Baja despacio, dejando que la mancuerna llegue casi al muslo.",
+      "Usa cargas muy ligeras: subir de más no es ganar, es repartir el trabajo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cable-lateral-raise",
+    "name": "Cable Lateral Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea baja y engancha un asa a la mano del lado contrario, pasando el cable por delante del cuerpo.",
+      "Con el torso ligeramente inclinado y las rodillas suaves, tira de la mano hacia un lado y un poco hacia delante.",
+      "Sube hasta la altura de los hombros, con el codo ligeramente por delante de la línea del cuerpo.",
+      "Baja de forma controlada hasta dejar el brazo cruzando la línea media.",
+      "La tensión constante de la polea permite un recorrido más largo que con mancuernas, pero no más carga.",
+      "Sustenta el tronco si tiendes a inclinarte hacia el lado que sube."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "machine-lateral-raise",
+    "name": "Machine Lateral Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate con la espalda apoyada, los hombros contra los apoyos y los pies bien plantados.",
+      "Sujeta los agarres y sube los brazos hacia los lados guiando el movimiento con los codos.",
+      "Detente cuando llegues a la altura de los hombros, sin encogerlos hacia las orejas.",
+      "Baja despacio hasta que los brazos queden por debajo de la horizontal.",
+      "El respaldo quita el balanceo del tronco: si puedes subir más, la máquina no es el problema.",
+      "Usa las piernas para sentarte antes de empezar; los muslos descansan."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "front-raise",
+    "name": "Front Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con una mancuerna en cada mano delante de los muslos, con las palmas mirando hacia dentro.",
+      "Con las rodillas ligeramente flexionadas y el abdomen firme, sube una mancuerna al frente.",
+      "Eleva el brazo hasta la altura del pecho, con el codo casi extendido y sin subir por encima de los ojos.",
+      "Baja despacio hasta la posición inicial y repite con la otra mano.",
+      "Es un ejercicio exigente para el manguito rotador: no lo uses con cargas pesadas.",
+      "Si lo sientes en el cuello, baja la altura de recorrido o hazlo sentado con apoyo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cable-front-raise",
+    "name": "Cable Front Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea baja y engancha el asa a una mano, con el cable por delante del cuerpo.",
+      "Ponte de pie con los pies a la anchura de la cadera y el abdomen firme.",
+      "Tira del asa hacia el frente elevando el brazo hasta la altura del pecho.",
+      "Baja de forma controlada dejando que el brazo vuelva a la línea media.",
+      "La polea da tensión constante en todo el recorrido: no hace falta balancear el tronco para bajar.",
+      "Alterna brazos cada serie."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "plate-front-raise",
+    "name": "Plate Front Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Sujeta un disco por el borde con cada mano, con las palmas mirando al frente y los brazos extendidos delante de los muslos.",
+      "Ponte de pie con los pies separados y el abdomen apretado.",
+      "Eleva los brazos hasta la altura del pecho, con los codos casi extendidos.",
+      "Baja despacio hasta la posición inicial.",
+      "El disco grande obliga a más recorrido y a un agarre más firme que una mancuerna.",
+      "Con un solo disco, la carga es simétrica; si notas un lado más alto, corrige con la mano del lado débil."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "upright-row",
+    "name": "Upright Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con la barra delante del muslo y el agarre por dentro de los muslos, con las palmas mirando al cuerpo.",
+      "Tira de la barra hacia arriba con los codos muy por delante del cuerpo, en una diagonal de unos 45 grados.",
+      "Sube hasta que los codos queden a la altura de las costillas y la barra a la del pecho.",
+      "Baja de forma controlada hasta que los brazos estén estirados.",
+      "Si el recorrido se acorta muy pronto, el agarre está demasiado cerrado: ábrelo un poco.",
+      "Es más un ejercicio de trapecio y de cara interna del hombro que de deltoides lateral."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "push-press",
+    "name": "Push Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con la barra a la altura de la clavícula y los pies a la anchura de la cadera.",
+      "Flexiona las rodillas y baja la barra un poco por debajo de esa altura, con los codos por delante del torso.",
+      "Con un golpe corto, extiende las piernas y empuja la barra hacia arriba en diagonal.",
+      "Termina con los brazos extendidos por encima de la cabeza, sin bloquear los codos.",
+      "Apoya la parte alta de la espalda, no la zona lumbar, y lleva la cabeza ligeramente hacia atrás al acelerar.",
+      "Es un ejercicio técnico: practica primero con barra vacía el movimiento y la cadencia."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "pike-push-up",
+    "name": "Pike Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca las manos en el suelo a la anchura de los hombros y sube la cadera con los pies hacia atrás hasta formar una V.",
+      "Baja la parte superior de la cabeza entre las manos, tocando con la frente o la coronilla.",
+      "Empuja hacia arriba hasta extender los brazos; si es necesario, deja los codos ligeramente flexionados.",
+      "Mantén las rodillas y los codos lo más rectos posible durante todo el recorrido.",
+      "Al bajar más, apoya suavemente la parte alta de la cabeza: es más fácil, pero no lo hagas con varias cervicales.",
+      "Es la progresión más directa hacia flexiones en pino y, después, hacia el handstand push-up."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "wall-handstand-push-up",
+    "name": "Wall Handstand Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate de frente a la pared y sube a mano armada: dedos hacia la pared, pies abajo y el cuerpo en línea recta.",
+      "Camina hacia la pared hasta que los talones la toquen, sin dejar que la cadera se arquee.",
+      "Baja la corona de la cabeza hasta tocar la pared muy ligeramente, con los codos a unos 45 grados.",
+      "Empuja hacia arriba hasta extender los brazos, manteniendo el abdomen apretado.",
+      "Respira con normalidad; si aguantas la respiración o tiemblas, baja la carga y el recorrido.",
+      "Empieza con las manos más cerca de la pared para un recorrido corto y ve alejándote cuando domines la técnica."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "handstand-push-up",
+    "name": "Handstand Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en mano armada contra la pared, con los pies abajo y el cuerpo en línea recta de hombro a talón.",
+      "Camina hasta la pared hasta que los talones la toquen y la cadera quede ligeramente por delante de los hombros.",
+      "Baja la cabeza hasta el suelo, con los codos a unos 45 grados del torso.",
+      "Empuja con fuerza hasta extender los brazos del todo, dejando los talones en la pared.",
+      "Baja la cadera y repite: la técnica se toma con repeticiones lentas, no con muchas series.",
+      "Es el ejercicio de hombro más exigente que existe: necesitas primero buena fuerza de hombro, no solo de brazo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "battle-ropes",
+    "name": "Battle Ropes",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate con los pies separados a la anchura de la cadera, las rodillas flexionadas y la cadera inclinada hacia delante.",
+      "Sujeta una cuerda en cada mano, con las palmas una contra otra.",
+      "Genera las ondas moviendo los brazos de lado a lado desde los hombros, no solo con las manos.",
+      "Mantén el abdomen apretado y el pecho abierto, con los pies quietos.",
+      "Progresa por tramos: primero la amplitud, luego la velocidad, y solo después los saltos.",
+      "Agota rápido: úsalo al final de la sesión o en series cortas con descansos completos."
+    ],
+    "steps_en": []
+  }
+]

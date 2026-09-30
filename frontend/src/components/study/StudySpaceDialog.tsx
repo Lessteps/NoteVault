@@ -31,7 +31,7 @@ type Area = { name: string; topics: Array<{ name: string }> };
 let follower: number | null = null;
 
 /** Keeps the chat conversation of a running job on screen and reports when it ends. */
-function followJob(jobId: string, conversationId: string): void {
+export function followJob(jobId: string, conversationId: string): void {
   if (follower) window.clearInterval(follower);
   const assistant = useAssistant.getState();
   assistant.setOpen(true);
@@ -230,4 +230,16 @@ export function StudySpaceDialog() {
       )}
     </Modal>
   );
+}
+
+/** Generates one topic (theory, map, competency matrix) from its folder and follows it in the chat. */
+export async function generateTopicFrom(folder: string): Promise<void> {
+  const app = useApp.getState();
+  try {
+    const res = await api.studyTopicGenerate(folder);
+    followJob(res.jobId, res.conversationId);
+    app.toast("info", "Generando el tema… lo verás paso a paso en el chat.");
+  } catch (e) {
+    app.toast("error", (e as Error).message);
+  }
 }

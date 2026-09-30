@@ -468,6 +468,7 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studySpacePropose: (subject: string, scope: string, objective: string, existingFolder = "") =>
     call<{ areas: Array<{ name: string; topics: Array<{ name: string }> }>; conversationId: string }>("study_space_propose", subject, scope, objective, existingFolder),
   studySpaceGenerate: (request: unknown) => call<{ jobId: string; conversationId: string }>("study_space_generate", request),
+  studyTopicGenerate: (folder: string, conversationId = "") => call<{ jobId: string; conversationId: string }>("study_topic_generate", folder, conversationId),
   studySpaceStatus: (jobId: string) =>
     call<{ id: string; folder: string; log: string[]; done: boolean; error: string; finished: number; total: number; conversationId: string }>("study_space_status", jobId),
   studySpaceList: () => call<string[]>("study_space_list"),

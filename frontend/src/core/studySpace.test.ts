@@ -101,3 +101,15 @@ describe("generator helpers", () => {
     expect(none).toContain("*Sin prerrequisitos.*");
   });
 });
+
+describe("generate one topic from its folder", () => {
+  it("only accepts a Space/Area/Topic folder", async () => {
+    const { studySpaceApi } = await import("../api/modules/studySpace");
+    const { AppState } = await import("../api/appState");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "nv_topic_"));
+    fs.mkdirSync(path.join(root, "Mat 1", "1 Area", "1.1 Tema"), { recursive: true });
+    const api = studySpaceApi(new AppState(root));
+    expect(() => api.study_topic_generate("Mat 1/1 Area")).toThrow(/carpeta de un tema/);
+    expect(() => api.study_topic_generate("Mat 1/1 Area/9.9 Nada")).toThrow(/no existe/);
+  });
+});

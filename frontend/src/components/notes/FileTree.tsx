@@ -5,6 +5,8 @@ import type { IndexEntry, TreeEntry } from "../../lib/types";
 import { useVirtualList } from "../../lib/useVirtualList";
 import { useApp } from "../../store/app";
 import { copyText } from "../../lib/clipboard";
+import { useAssistant } from "../../store/assistant";
+import { generateTopicFrom } from "../study/StudySpaceDialog";
 import { fileMenuItems, pathFlavors, type PathFlavor } from "./fileMenu";
 import { MoveEntryDialog } from "./MoveEntryDialog";
 import { VersionHistoryDialog } from "./VersionHistoryDialog";
@@ -281,6 +283,12 @@ export function FileTree({ filter }: { filter: string }) {
       newNoteHere: () => void newNoteIn(entry.path),
       newFolderHere: () => void newFolderIn(entry.path),
       newCanvasHere: () => void newCanvasIn(entry.path),
+      addToChat: () => {
+        const a = useAssistant.getState();
+        a.toggleFolder(entry.path);
+        a.setOpen(true);
+      },
+      generateTopic: () => void generateTopicFrom(entry.path),
     };
   };
 
@@ -289,7 +297,7 @@ export function FileTree({ filter }: { filter: string }) {
     openMenu(
       e,
       fileMenuItems(
-        { entry, bookmarked: known, canCopy: entry.type !== "folder" },
+        { entry, bookmarked: known, canCopy: entry.type !== "folder", inChat: useAssistant.getState().folders.includes(entry.path) },
         menuActions(entry),
       ),
     );

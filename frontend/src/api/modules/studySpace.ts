@@ -43,6 +43,8 @@ export interface SpaceRequest {
   steps: SpaceSteps;
   /** the chat conversation where this generation is being recorded */
   conversationId?: string;
+  /** Generate only this topic (theory, topic map, competency matrix); skips area and space maps. */
+  only?: string;
 }
 
 export interface SpaceJob {
@@ -230,7 +232,9 @@ export function studySpaceApi(app: AppState) {
     const folder = safeName(req.folder);
     const subjectId = subjectIdOf(req.subject, req.subjectId);
     const cfg = aiConfig();
-    const allTopics = req.areas.flatMap((a) => a.topics.map((t) => ({ area: a.name, topic: t.name })));
+    const allTopics = req.areas
+      .flatMap((a) => a.topics.map((t) => ({ area: a.name, topic: t.name })))
+      .filter((t) => !req.only || t.topic === req.only);
 
     say(`Creando «${folder}»: ${req.areas.length} área(s), ${allTopics.length} tema(s)…`);
     const made = applyAssistantAction(app.root, {
@@ -321,7 +325,7 @@ export function studySpaceApi(app: AppState) {
       }
     }
 
-    if (req.steps.map) {
+    if (req.steps.map && !req.only) {
       const spaceAreas: SpaceMapArea[] = [];
       for (const area of req.areas) {
         const topics: MapTopic[] = area.topics.map((t) => ({ name: t.name, file: `${folder}/${area.name}/${t.name}/${t.name}.md` }));
@@ -376,6 +380,27 @@ export function studySpaceApi(app: AppState) {
     say("Listo.");
   };
 
+  const startJob = (req: SpaceRequest, conversationId?: string): { jobId: string; conversationId: string } => {
+    const folder = safeName(req?.folder);
+    if (!folder) throw new ApiError("Indica el nombre de la carpeta del espacio.");
+    const n = req.only ? 1 : req.areas.reduce((c, a) => c + a.topics.length, 0);
+    const total = 1 + (req.steps?.theory ? n : 0) + (req.steps?.practice ? n : 0) + (req.steps?.map !== false && !req.only ? req.areas.length : 0);
+    const cfg = aiConfig();
+    const chat = new ChatLog(conversationId, req.only ? `Tema: ${req.only}` : `Espacio de estudio: ${folder}`, cfg.model);
+    const job: SpaceJob = { id: crypto.randomUUID(), folder, log: [], done: false, error: "", finished: 0, total, conversationId: chat.id };
+    jobs.set(job.id, job);
+    void run(job, { ...req, folder, steps: { theory: !!req.steps?.theory, practice: !!req.steps?.practice, map: req.steps?.map !== false } }, chat)
+      .catch((e) => {
+        job.error = (e as Error).message;
+        job.log.push(`✗ ${job.error}`);
+        chat.note(`✗ Se detuvo: ${job.error}`);
+      })
+      .finally(() => {
+        job.done = true;
+      });
+    return { jobId: job.id, conversationId: chat.id };
+  };
+
   return {
     /** The AI proposes areas and topics; the user then picks what to generate. */
     async study_space_propose(
@@ -415,25 +440,46 @@ export function studySpaceApi(app: AppState) {
     /** Starts generating the chosen areas; poll `study_space_status` with the returned id. */
     study_space_generate(request: unknown): { jobId: string; conversationId: string } {
       const req = request as SpaceRequest;
-      const folder = safeName(req?.folder);
-      if (!folder) throw new ApiError("Indica el nombre de la carpeta del espacio.");
-      if (!Array.isArray(req.areas) || !req.areas.length) throw new ApiError("Elige al menos un área.");
-      const n = req.areas.reduce((c, a) => c + a.topics.length, 0);
-      const total = 1 + (req.steps?.theory ? n : 0) + (req.steps?.practice ? n : 0) + (req.steps?.map !== false ? req.areas.length : 0);
-      const cfg = aiConfig();
-      const chat = new ChatLog(req.conversationId, `Espacio de estudio: ${folder}`, cfg.model);
-      const job: SpaceJob = { id: crypto.randomUUID(), folder, log: [], done: false, error: "", finished: 0, total, conversationId: chat.id };
-      jobs.set(job.id, job);
-      void run(job, { ...req, folder, steps: { theory: !!req.steps?.theory, practice: !!req.steps?.practice, map: req.steps?.map !== false } }, chat)
-        .catch((e) => {
-          job.error = (e as Error).message;
-          job.log.push(`✗ ${job.error}`);
-          chat.note(`✗ Se detuvo: ${job.error}`);
-        })
-        .finally(() => {
-          job.done = true;
-        });
-      return { jobId: job.id, conversationId: chat.id };
+      if (!Array.isArray(req?.areas) || !req.areas.length) throw new ApiError("Elige al menos un área.");
+      return startJob(req, req.conversationId);
+    },
+
+    /**
+     * Generates ONE topic from its folder (`Space/Area/Topic`): theory, topic map and the
+     * competency matrix the AI chooses for it. Missing view files are created too.
+     */
+    study_topic_generate(folderRel: string, conversationId = ""): { jobId: string; conversationId: string } {
+      const parts = String(folderRel ?? "").replace(/\\/g, "/").split("/").filter(Boolean);
+      const abs = path.join(app.root, ...parts);
+      const dir = fs.existsSync(abs) && fs.statSync(abs).isFile() ? parts.slice(0, -1) : parts;
+      if (dir.length !== 3) {
+        throw new ApiError("Selecciona la carpeta de un tema (Espacio / Área / Tema).");
+      }
+      const [space, area, topic] = dir as [string, string, string];
+      const areaAbs = path.join(app.root, space, area);
+      if (!fs.existsSync(path.join(areaAbs, topic))) throw new ApiError("Esa carpeta no existe.");
+      const siblings = fs
+        .readdirSync(areaAbs, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith("."))
+        .map((d) => d.name)
+        .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+      let subject = space.replace(/\s*\d+\s*$/, "").trim() || space;
+      try {
+        const head = fs.readFileSync(path.join(app.root, space, `${space}.resumen.md`), "utf-8").slice(0, 1500);
+        subject = /^subject:\s*["']?(.+?)["']?\s*$/m.exec(head)?.[1] ?? subject;
+      } catch {
+        /* a space without an overview: the folder name is the subject */
+      }
+      return startJob(
+        {
+          folder: space,
+          subject,
+          areas: [{ name: area, topics: siblings.map((name) => ({ name })) }],
+          steps: { theory: true, practice: true, map: true },
+          only: topic,
+        },
+        conversationId || undefined,
+      );
     },
 
     study_space_status(jobId: string): SpaceJob {

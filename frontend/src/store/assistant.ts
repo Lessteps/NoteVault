@@ -21,6 +21,8 @@ export interface ChatContext {
   end_line?: number;
   /** The exact text, sent as the priority context of the turn. */
   text: string;
+  /** A whole folder pointed at (path is the folder; text is empty). */
+  folder?: boolean;
 }
 
 export interface ChatMessage {
@@ -60,6 +62,10 @@ interface AssistantState {
   providerLabel: string;
   /** The vault mode in force ("" = a plain conversation). */
   mode: string;
+  /** Vault folders the user pointed the chat at; the model is told about them on every turn. */
+  folders: string[];
+  toggleFolder: (path: string) => void;
+  clearFolders: () => void;
 
   // ── The conversation being held, and the ones kept ────────────────────
   /** Id of the saved conversation; null until the first turn is stored. */
@@ -117,6 +123,9 @@ export const useAssistant = create<AssistantState>((set, get) => ({
   models: [],
   providerLabel: "",
   mode: "",
+  folders: [],
+  toggleFolder: (p) => set((s) => ({ folders: s.folders.includes(p) ? s.folders.filter((f) => f !== p) : [...s.folders, p] })),
+  clearFolders: () => set({ folders: [] }),
   conversationId: null,
   title: "",
   historyOpen: false,
@@ -160,8 +169,16 @@ export const useAssistant = create<AssistantState>((set, get) => ({
       role: "user",
       content: q,
       at: Date.now(),
-      contexts: sel ? [{ path: noteRel, text: sel }] : [],
+      contexts: [
+        ...get().folders.map((f) => ({ path: f, text: "", folder: true })),
+        ...(sel ? [{ path: noteRel, text: sel }] : []),
+      ],
     };
+    // The model is told which folders «esta carpeta» / «este tema» refer to; the chat only shows the chips.
+    const folders = get().folders;
+    const asked = folders.length
+      ? `[Carpetas seleccionadas por el usuario (rutas dentro de la bóveda):\n${folders.map((f) => `- ${f}`).join("\n")}\nCuando diga «esta carpeta», «este tema» o similar, se refiere a ellas.]\n\n${q}`
+      : q;
     const answerId = uid();
     const answer: ChatMessage = {
       id: answerId,
@@ -181,7 +198,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
 
     const started = Date.now();
     try {
-      const r = await api.aiChatStream(answerId, history, q, noteRel, sel, get().mode);
+      const r = await api.aiChatStream(answerId, history, asked, noteRel, sel, get().mode);
       if (r.bridge) {
         await copyText(r.prompt ?? "");
         if (r.url) await api.openExternal(r.url).catch(() => undefined);

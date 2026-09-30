@@ -21,7 +21,9 @@ import {
   HardDrive,
   LayoutDashboard,
   Link2,
+  MessageSquarePlus,
   Pencil,
+  Sparkles,
   SquareArrowOutUpRight,
   Trash2,
 } from "lucide-react";
@@ -68,6 +70,9 @@ export interface FileMenuActions {
   newNoteHere?: () => void;
   newFolderHere?: () => void;
   newCanvasHere?: () => void;
+  /** Folders only: point the AI chat at this folder / build the topic in it. */
+  addToChat?: () => void;
+  generateTopic?: () => void;
 }
 
 export interface FileMenuOptions {
@@ -76,6 +81,8 @@ export interface FileMenuOptions {
   bookmarked?: boolean;
   /** Whether the file can be copied (only files are duplicated). */
   canCopy?: boolean;
+  /** The folder is already selected in the chat. */
+  inChat?: boolean;
 }
 
 export function fileMenuItems(opts: FileMenuOptions, a: FileMenuActions): MenuItem[] {
@@ -87,7 +94,17 @@ export function fileMenuItems(opts: FileMenuOptions, a: FileMenuActions): MenuIt
       { label: "Nueva nota aquí", icon: <FilePlus />, onSelect: () => a.newNoteHere?.() },
       { label: "Nueva carpeta aquí", icon: <FolderPlus />, onSelect: () => a.newFolderHere?.() },
       { label: "Nuevo canvas aquí", icon: <LayoutDashboard />, onSelect: () => a.newCanvasHere?.() },
+      { separator: true },
+      {
+        label: opts.inChat ? "Quitar del chat de IA" : "Añadir al chat de IA",
+        icon: <MessageSquarePlus />,
+        onSelect: () => a.addToChat?.(),
+      },
     );
+    // Space / Area / Topic: only a topic folder can be built by the AI.
+    if (opts.entry.path.split("/").length === 3) {
+      items.push({ label: "Generar tema con IA (teoría, práctica y competencias)", icon: <Sparkles />, onSelect: () => a.generateTopic?.() });
+    }
   } else {
     items.push({ label: "Abrir en una pestaña nueva", icon: <SquareArrowOutUpRight />, onSelect: a.openInNewTab });
     // A canvas fills its pane, so it has no second half to show.

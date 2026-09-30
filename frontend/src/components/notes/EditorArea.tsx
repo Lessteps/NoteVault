@@ -39,11 +39,23 @@ function NoteHeader({ note }: { note: OpenNote }) {
   const parts = note.path.split("/");
   const { openSide } = useApp.getState();
   return (
-    <div className="flex h-11 flex-none items-center gap-2 border-b border-line bg-surface px-3">
-      <IconButton title="Explorador (Ctrl+\)" onClick={toggleExplorer} active={explorerOpen}>
-        <PanelLeft size={15} />
-      </IconButton>
-      <nav className="flex min-w-0 items-center gap-1 font-mono text-[11.5px]">
+    <div className="flex h-11 flex-none items-center gap-2 border-b border-line bg-surface pr-3">
+      {/* A full-height cell of the header: same height as the row, closed by a rule, so it
+          lines up with the tab strip above and never floats against the breadcrumb. */}
+      <button
+        type="button"
+        title="Explorador (Ctrl+\)"
+        aria-label="Mostrar u ocultar el explorador"
+        aria-pressed={explorerOpen}
+        onClick={toggleExplorer}
+        className={cn(
+          "grid h-full w-11 flex-none place-items-center border-r border-line transition-colors hover:bg-hover hover:text-text",
+          explorerOpen ? "text-accent-text" : "text-dim",
+        )}
+      >
+        <PanelLeft size={16} />
+      </button>
+      <nav className="flex min-w-0 items-center gap-1 pl-1 font-mono text-[11.5px]">
         {parts.map((p, i) => (
           <span key={i} className="flex min-w-0 items-center gap-1">
             {i > 0 && <span className="text-faint">/</span>}

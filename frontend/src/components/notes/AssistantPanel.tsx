@@ -4,7 +4,7 @@
 
 import {
   ArrowLeft, ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
-  FolderPlus, GitCompare, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
+  Folder, FolderPlus, GitCompare, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
   Square, ThumbsDown, ThumbsUp, Trash2, Wand2, X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
@@ -18,7 +18,7 @@ import { useApp } from "../../store/app";
 import { useAssistant, type ChatContext, type ChatMessage } from "../../store/assistant";
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
 import { askText, cn, confirmAction, IconButton, openMenu } from "../ui";
-import { useStudySpaceDialog } from "../study/StudySpaceDialog";
+import { generateTopicFrom, useStudySpaceDialog } from "../study/StudySpaceDialog";
 import { ActionCard } from "./ActionCard";
 import { editorSelection, insertAtCursor } from "./SourceEditor";
 
@@ -51,6 +51,22 @@ function useCodeCopy(root: RefObject<HTMLDivElement | null>) {
 }
 
 function ContextChip({ ctx, onRemove }: { ctx: ChatContext; onRemove?: () => void }) {
+  if (ctx.folder) {
+    return (
+      <span
+        title={`Carpeta seleccionada: ${ctx.path}`}
+        className="inline-flex max-w-full items-center gap-1 rounded-md border border-accent/40 bg-accent-soft px-1.5 py-0.5 text-[11px] text-accent-text"
+      >
+        <Folder size={11} className="flex-none" />
+        <span className="truncate">{ctx.path.split("/").pop()}</span>
+        {onRemove && (
+          <button type="button" aria-label="Quitar carpeta" onClick={onRemove} className="ml-0.5 rounded hover:text-text">
+            <X size={10} />
+          </button>
+        )}
+      </span>
+    );
+  }
   const name = ctx.path.split("/").pop() ?? ctx.text.slice(0, 24);
   const range = ctx.start_line ? `#L${ctx.start_line}${ctx.end_line ? `-${ctx.end_line}` : ""}` : "";
   const oneLine = ctx.text.trim().split("\n")[0] ?? "";
@@ -269,6 +285,8 @@ function Composer() {
   const mode = useAssistant((s) => s.mode);
   const setMode = useAssistant((s) => s.setMode);
   const modeInfo = vaultMode(mode);
+  const folders = useAssistant((s) => s.folders);
+  const toggleFolder = useAssistant((s) => s.toggleFolder);
   const [evaluating, setEvaluating] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
 
@@ -300,16 +318,23 @@ function Composer() {
     setPending((p) => [...p, { path: note?.path ?? "", text: sel }]);
   };
 
-  /** The AI re-reads the open topic's theory and rewrites its practice plan. */
-  const reevaluate = async () => {
+  /** The topic folder the actions work on: the one selected in the chat, else the open note's folder. */
+  const topicTarget = (): string => {
+    if (folders.length === 1) return folders[0]!;
     const active = useApp.getState().active;
-    if (!active || !active.includes("/")) {
-      toast("error", "Abre una nota de un tema para re-evaluar su práctica.");
+    return active && active.includes("/") ? active.slice(0, active.lastIndexOf("/")) : "";
+  };
+
+  /** The AI re-reads the topic's theory and rewrites its practice plan. */
+  const reevaluate = async () => {
+    const target = topicTarget();
+    if (!target) {
+      toast("error", "Selecciona la carpeta de un tema (clic derecho → Añadir al chat de IA) o abre una de sus notas.");
       return;
     }
     setEvaluating(true);
     try {
-      const res = await api.studyTopicReevaluate(active.slice(0, active.lastIndexOf("/")));
+      const res = await api.studyTopicReevaluate(target);
       toast("info", res.plan.summary || `Plan de práctica actualizado (${res.plan.skills.length} competencias).`);
     } catch (e) {
       toast("error", (e as Error).message);
@@ -318,22 +343,63 @@ function Composer() {
     }
   };
 
-  const openModes = (e: ReactMouseEvent<HTMLButtonElement>) =>
+  const generateTopic = () => {
+    const target = topicTarget();
+    if (!target) {
+      toast("error", "Selecciona la carpeta de un tema (clic derecho → Añadir al chat de IA) o abre una de sus notas.");
+      return;
+    }
+    void generateTopicFrom(target);
+  };
+
+  const openModes = (e: ReactMouseEvent<HTMLButtonElement>) => {
+    const target = topicTarget();
+    const shown = target ? target.split("/").pop() : "";
     openMenu(e, [
+      {
+        label: "Generar tema completo",
+        description: `Escribe la teoría, el mapa, la práctica y la matriz de competencias${shown ? ` de «${shown}»` : " de la carpeta seleccionada"}.`,
+        icon: <Sparkles size={13} />,
+        onSelect: generateTopic,
+      },
+      {
+        label: "Re-evaluar práctica del tema",
+        description: "La IA relee la teoría y vuelve a elegir competencias y cantidades.",
+        icon: <Wand2 size={13} />,
+        onSelect: () => void reevaluate(),
+      },
+      { separator: true },
       ...VAULT_MODES.map((m) => ({
         label: m.label,
-        hint: mode === m.id ? "activo" : m.hint,
-        icon: <Wand2 size={13} />,
+        description: m.hint,
+        hint: mode === m.id ? "activo" : "",
+        icon: <Layers size={13} />,
         onSelect: () => setMode(m.id),
       })),
-      { label: "Re-evaluar práctica del tema abierto", hint: "Elige competencias y cantidades", icon: <Sparkles size={13} />, onSelect: () => void reevaluate() },
-      ...(mode ? [{ label: "Salir del modo", icon: <X size={13} />, onSelect: () => setMode("") }] : []),
+      { separator: true },
+      {
+        label: "Generar espacio de estudio",
+        description: "Temario, teoría, práctica y mapas de una materia entera.",
+        icon: <GraduationCap size={13} />,
+        onSelect: () => useStudySpaceDialog.getState().openWith("space"),
+      },
+      {
+        label: "Crear área nueva",
+        description: "Añade un área (con sus temas) a un espacio que ya existe.",
+        icon: <FolderPlus size={13} />,
+        onSelect: () => useStudySpaceDialog.getState().openWith("area"),
+      },
+      ...(mode ? [{ separator: true }, { label: "Salir del modo", icon: <X size={13} />, onSelect: () => setMode("") }] : []),
     ]);
+  };
 
   return (
     <div className="flex-none p-2.5">
-      {!!pending.length && (
+      {(!!pending.length || !!folders.length) && (
         <div className="mb-1.5 flex flex-wrap gap-1">
+          {folders.map((f) => (
+            <ContextChip key={f} ctx={{ path: f, text: "", folder: true }} onRemove={() => toggleFolder(f)} />
+          ))}
           {pending.map((c, i) => (
             <ContextChip key={i} ctx={c} onRemove={() => setPending((p) => p.filter((_, j) => j !== i))} />
           ))}
@@ -372,6 +438,17 @@ function Composer() {
             onClick={(e) =>
               openMenu(e, [
                 { label: "Selección del editor", icon: <Paperclip size={13} />, onSelect: addSelection },
+                (() => {
+                  const active = useApp.getState().active;
+                  const dir = active && active.includes("/") ? active.slice(0, active.lastIndexOf("/")) : "";
+                  return {
+                    label: dir ? `Carpeta de la nota abierta` : "Carpeta de la nota abierta",
+                    description: dir ? (folders.includes(dir) ? `Quitar «${dir.split("/").pop()}» del chat` : `Añadir «${dir.split("/").pop()}» al chat`) : "Abre una nota dentro de una carpeta.",
+                    icon: <Folder size={13} />,
+                    disabled: !dir,
+                    onSelect: () => toggleFolder(dir),
+                  };
+                })(),
                 { label: "Menciones (@archivo)", hint: "Fase 5", disabled: true },
                 { label: "Media (imágenes)", hint: "Fase 5", disabled: true },
                 { label: "Acciones rápidas", hint: "Fase 5", disabled: true },
@@ -384,25 +461,7 @@ function Composer() {
           <ModelSelector />
           <button
             type="button"
-            title="Generar espacio de estudio (temario, teoría, práctica y mapas)"
-            aria-label="Generar espacio de estudio"
-            onClick={() => useStudySpaceDialog.getState().openWith("space")}
-            className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-hover hover:text-text"
-          >
-            <GraduationCap size={14} />
-          </button>
-          <button
-            type="button"
-            title="Crear un área nueva dentro de un espacio de estudio"
-            aria-label="Crear área"
-            onClick={() => useStudySpaceDialog.getState().openWith("area")}
-            className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-hover hover:text-text"
-          >
-            <FolderPlus size={14} />
-          </button>
-          <button
-            type="button"
-            title="Modos: temario, canvas, nuevo tema, re-evaluar práctica"
+            title="Modos y acciones de estudio"
             aria-label="Modos del asistente"
             disabled={evaluating}
             onClick={openModes}

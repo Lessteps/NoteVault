@@ -364,6 +364,9 @@ function Composer() {
     const name = target.split("/").pop();
     const chat = useAssistant.getState();
     await chat.addMessage("system", `Re-evaluando la práctica de «${name}»: la IA lee su teoría y prepara la lista de competencias…`);
+    // Name the conversation after what it is, instead of leaving it as "Nueva conversación".
+    const now = useAssistant.getState();
+    if (now.conversationId && !now.title) await now.renameConversation(now.conversationId, `Re-evaluar práctica: ${name}`);
     try {
       // Nothing is changed yet: the chat shows the checklist and the user decides.
       const options = await api.studyTopicSkillOptions(target);

@@ -43,10 +43,12 @@ export interface LibraryEntry {
   slug: string;
   name: string;
   equipment: string;
+  exerciseType: string;
   guidePrimary: string;
   guideSecondary: string[];
   localPrimary: string[];
   localSecondary: string[];
+  frames: Array<string | null>;
   frame1: string | null;
 }
 
@@ -55,16 +57,19 @@ function toEntry(e: GuideExercise): LibraryEntry {
   const localSecondary = [...new Set(e.secondaryMuscles.flatMap(mapGuideMuscle))].filter(
     (m) => !localPrimary.includes(m),
   );
+  const frames = [1, 2, 3].map((i) => getAssetUrl(e.slug, i as 1 | 2 | 3)) as Array<string | null>;
   return {
     id: e.id,
     slug: e.slug,
     name: e.name,
     equipment: e.equipment,
+    exerciseType: e.exerciseType,
     guidePrimary: e.primaryMuscle,
     guideSecondary: e.secondaryMuscles,
     localPrimary,
     localSecondary,
-    frame1: getAssetUrl(e.slug, 1),
+    frames,
+    frame1: frames[0] ?? null,
   };
 }
 

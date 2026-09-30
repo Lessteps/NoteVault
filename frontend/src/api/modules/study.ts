@@ -61,7 +61,9 @@ import {
   readPlanFromPractica,
   type PracticePlan,
 } from "../../core/practice/practicePlan.js";
-import { listReviews } from "../../core/practice/reviewFiles.js";
+import { listReviews, rescheduleReview } from "../../core/practice/reviewFiles.js";
+import { loadReviewSettings, saveReviewSettings } from "../reviewSettings.js";
+import { runReviewTest } from "../reviewHooks.js";
 import { catalogFor } from "../../core/practice/skillSelection.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
 import { detectTopicType } from "../../core/practice/topicType.js";
@@ -971,6 +973,25 @@ export function studyApi(app: AppState) {
     study_reviews_list() {
       const today = isoDate(new Date())!;
       return { today, items: listReviews(app.root, today) };
+    },
+
+    /** Moves the pending review of a topic to another day. */
+    study_review_reschedule(relPath: string, date: string) {
+      const item = rescheduleReview(app.root, String(relPath ?? ""), String(date ?? ""));
+      clearStudySnapshotCache();
+      return item;
+    },
+
+    /** The reminder preferences (on/off and the hour from which a due review is announced). */
+    study_review_settings() {
+      return loadReviewSettings();
+    },
+    study_review_settings_set(settings: unknown) {
+      return saveReviewSettings(settings);
+    },
+    /** Shows a real notification now, so the user can see that reminders work. */
+    study_review_notify_test() {
+      return runReviewTest();
     },
 
     /** Re-reads the topic's theory with the AI and rewrites its practice plan. */

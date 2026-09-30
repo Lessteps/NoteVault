@@ -1054,4 +1054,7 @@ export interface ReviewItem {
   level: number;
   inDays: number;
   skills: string[];
+  practicedDays: number;
+  /** the pending review and the ones after it, if each is done on its date */
+  upcoming: Array<{ date: string; interval: number; level: number }>;
 }

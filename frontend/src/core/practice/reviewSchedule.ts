@@ -90,6 +90,41 @@ export function addPractice(state: ReviewState, ev: PracticeEvent): ReviewState 
   return { ...state, days, level, next };
 }
 
+/** One future review: its date, how many days after the previous one, and the level it reaches. */
+export interface PlannedReview {
+  date: string;
+  interval: number;
+  level: number;
+}
+
+/**
+ * The reviews still to come if each one is done ON its due date: the pending one (`next`), then one
+ * every longer interval up the ladder (3, 7, 14, 30, 60, 120 days). It is what the calendar shows as
+ * "and after that…", so the whole path is visible, not only the next date.
+ */
+export function projectSchedule(next: string, level: number, count = 4): PlannedReview[] {
+  if (!next) return [];
+  const out: PlannedReview[] = [{ date: next, interval: intervalForLevel(level), level }];
+  let date = next;
+  for (let k = 1; k < count; k += 1) {
+    const interval = intervalForLevel(level + k);
+    date = addDays(date, interval);
+    out.push({ date, interval, level: level + k });
+  }
+  return out;
+}
+
+/** The same topic with its pending review moved to `date` (level and history are untouched). */
+export function moveReview(state: ReviewState, date: string): ReviewState {
+  return { ...state, next: date };
+}
+
+/** A valid `YYYY-MM-DD` calendar date. */
+export function isIsoDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return addDays(value, 0) === value;
+}
+
 // ── The review note ─────────────────────────────────────────────────────────
 
 const DATA_RE = /<!--\s*nv:review\s+([\s\S]*?)\s*-->/;

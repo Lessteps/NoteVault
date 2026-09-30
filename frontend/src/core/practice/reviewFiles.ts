@@ -7,7 +7,20 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { findAncestorTopicManifest } from "./topic.js";
-import { addPractice, daysUntil, isoDate, newReview, parseReview, serializeReview, type ReviewState } from "./reviewSchedule.js";
+import {
+  addPractice,
+  daysUntil,
+  isIsoDate,
+  isoDate,
+  moveReview,
+  newReview,
+  parseReview,
+  projectSchedule,
+  serializeReview,
+  type PlannedReview,
+  type ReviewState,
+} from "./reviewSchedule.js";
+import { ApiError } from "../errors.js";
 
 export const REVIEW_FOLDER = "Repaso";
 
@@ -26,6 +39,52 @@ export interface ReviewItem {
   inDays: number;
   /** distinct skills practised over the topic's history, most recent first */
   skills: string[];
+  /** how many different days the topic has been practised */
+  practicedDays: number;
+  /** the pending review and the ones after it, if each is done on its date */
+  upcoming: PlannedReview[];
+}
+
+function toItem(rootAbs: string, abs: string, subjectFolder: string, state: ReviewState, today: string): ReviewItem {
+  const skills: string[] = [];
+  for (const d of [...state.days].reverse()) for (const k of d.skills) if (!skills.includes(k)) skills.push(k);
+  return {
+    path: posix(path.relative(rootAbs, abs)),
+    topic: state.topic,
+    topicPath: state.topicPath,
+    subject: state.subject,
+    subjectFolder,
+    next: state.next,
+    last: state.days[state.days.length - 1]?.date ?? "",
+    level: state.level,
+    inDays: daysUntil(state.next, today),
+    skills,
+    practicedDays: state.days.length,
+    upcoming: projectSchedule(state.next, state.level, 4),
+  };
+}
+
+/**
+ * Moves the pending review of a topic to another day (what the calendar's drag and drop and date
+ * boxes do). Only a review note (`<Subject>/Repaso/<topic>.md`) inside the vault can be moved.
+ */
+export function rescheduleReview(rootAbs: string, relPath: string, date: string, today: string = isoDate(new Date())): ReviewItem {
+  if (!isIsoDate(date)) throw new ApiError("La fecha no es válida.");
+  const parts = relPath.replace(/\\/g, "/").split("/").filter(Boolean);
+  if (parts.length !== 3 || parts[1] !== REVIEW_FOLDER || !parts[2]!.toLowerCase().endsWith(".md") || parts[0]!.startsWith(".") || parts.includes("..")) {
+    throw new ApiError("Ese archivo no es una nota de repaso.");
+  }
+  const abs = path.join(rootAbs, ...parts);
+  let state: ReviewState | null = null;
+  try {
+    state = parseReview(fs.readFileSync(abs, "utf-8"));
+  } catch {
+    state = null;
+  }
+  if (!state) throw new ApiError("No se pudo leer esa nota de repaso.");
+  const moved = moveReview(state, date);
+  fs.writeFileSync(abs, serializeReview(moved, today), "utf-8");
+  return toItem(rootAbs, abs, parts[0]!, moved, today);
 }
 
 const posix = (p: string) => p.split(path.sep).join("/");
@@ -86,20 +145,7 @@ export function listReviews(rootAbs: string, today: string = isoDate(new Date())
         state = null;
       }
       if (!state || !state.next) continue;
-      const skills: string[] = [];
-      for (const d of [...state.days].reverse()) for (const k of d.skills) if (!skills.includes(k)) skills.push(k);
-      out.push({
-        path: posix(path.relative(rootAbs, abs)),
-        topic: state.topic,
-        topicPath: state.topicPath,
-        subject: state.subject,
-        subjectFolder: s.name,
-        next: state.next,
-        last: state.days[state.days.length - 1]?.date ?? "",
-        level: state.level,
-        inDays: daysUntil(state.next, today),
-        skills,
-      });
+      out.push(toItem(rootAbs, abs, s.name, state, today));
     }
   }
   return out.sort((a, b) => a.next.localeCompare(b.next) || a.topic.localeCompare(b.topic, "es", { numeric: true }));

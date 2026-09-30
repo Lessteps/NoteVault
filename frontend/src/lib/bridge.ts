@@ -18,6 +18,7 @@ declare global {
     pywebview?: { api: PyApi };
     nv?: {
       invoke: (method: string, args: unknown[]) => Promise<unknown>;
+      onOpenReview?: (cb: () => void) => () => void;
       onWatchEvent?: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void) => () => void;
       onBrowserState?: (cb: (data: BrowserState) => void) => () => void;
       onWindowState?: (cb: (data: { maximized: boolean }) => void) => () => void;
@@ -472,6 +473,11 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studyTopicReevaluate: (folder: string) =>
     call<{ ok: boolean; plan: import("./types").PracticePlan; path: string }>("study_topic_reevaluate", folder),
   /** The topic review notes: when each practised topic is due again. */
+  /** Moves the pending review of a topic to another day (YYYY-MM-DD). */
+  studyReviewReschedule: (path: string, date: string) => call<import("./types").ReviewItem>("study_review_reschedule", path, date),
+  studyReviewSettings: () => call<{ enabled: boolean; hour: number }>("study_review_settings"),
+  studyReviewSettingsSet: (settings: { enabled: boolean; hour: number }) => call<{ enabled: boolean; hour: number }>("study_review_settings_set", settings),
+  studyReviewNotifyTest: () => call<{ supported: boolean; due: number }>("study_review_notify_test"),
   studyReviewsList: () =>
     call<{ today: string; items: import("./types").ReviewItem[] }>("study_reviews_list"),
   /** The AI proposes areas and topics for a subject (nothing is written). */
@@ -532,6 +538,11 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   enPlayerMine: (id: string, fields: { sentence: string; seconds: number; mode: "translate" | "cloze"; target: string; level: string; reference_es: string }) =>
     call<{ path: string; stamp: string }>("en_player_mine", id, fields),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
+  /** A review notification was clicked: open the Repaso calendar. */
+  onOpenReview: (cb: () => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onOpenReview) return window.nv.onOpenReview(cb);
+    return () => undefined;
+  },
   onWatchEvent: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void): (() => void) => {
     if (typeof window !== "undefined" && window.nv?.onWatchEvent) {
       return window.nv.onWatchEvent(cb);

@@ -2,7 +2,7 @@
 // practised so far. Each topic has a review note (`<Subject>/Repaso/<topic>.md`)
 // that is updated automatically after every graded attempt, whatever the skill.
 
-import { CalendarClock, ChevronLeft, ChevronRight, Play, RefreshCw, X } from "lucide-react";
+import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Play, RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { create } from "zustand";
 import { api } from "../../lib/bridge";
@@ -10,6 +10,7 @@ import type { ReviewItem } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { cn, IconButton } from "../ui";
 import { useStudyVersion } from "./StudyPanel";
+import { useReviewCalendar } from "./ReviewCalendar";
 
 export const useReviewPanel = create<{ open: boolean; setOpen: (v: boolean) => void }>((set) => ({
   open: false,
@@ -127,6 +128,9 @@ export function ReviewPanel() {
         <span className="text-[12px] font-semibold text-text">Repaso</span>
         {dueCount > 0 && <span className="rounded-full bg-warn-soft px-1.5 font-mono text-[10px] font-bold text-warn">{dueCount}</span>}
         <div className="flex-1" />
+        <IconButton title="Calendario completo: cuándo es cada repaso, moverlos y recordatorios" onClick={() => useReviewCalendar.getState().set(true)}>
+          <CalendarDays size={14} />
+        </IconButton>
         <IconButton title="Recargar" onClick={() => void refresh()}>
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
         </IconButton>
@@ -137,6 +141,13 @@ export function ReviewPanel() {
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {data && <MonthGrid items={items} today={data.today} />}
+        <button
+          type="button"
+          onClick={() => useReviewCalendar.getState().set(true)}
+          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[12px] font-semibold text-text hover:border-accent"
+        >
+          <CalendarDays size={13} /> Abrir el calendario completo
+        </button>
 
         {data && items.length === 0 && (
           <p className="mt-3 text-[12px] leading-relaxed text-faint">

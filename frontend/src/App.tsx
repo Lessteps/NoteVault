@@ -6,6 +6,7 @@ import { ModuleHost } from "./components/ModuleHost";
 import { useTabDrag } from "./store/tabDrag";
 import { X } from "lucide-react";
 import { RightPanel } from "./components/notes/RightPanel";
+import { ReviewCalendar, useReviewCalendar } from "./components/study/ReviewCalendar";
 import { renameEntry } from "./components/notes/FileTree";
 import { DialogHost, MenuHost } from "./components/ui";
 import { VaultDialog } from "./components/VaultDialog";
@@ -243,6 +244,8 @@ export function App() {
   useShortcuts();
   useTaskReminders();
   useFileWatcherListener();
+  // Clicking a review notification opens the Repaso calendar.
+  useEffect(() => api.onOpenReview(() => useReviewCalendar.getState().set(true)), []);
   useWindowNoteParam();
   useEffect(() => {
     void init();
@@ -308,6 +311,7 @@ export function App() {
       <QuickSwitcher />
       <CommandPalette />
       <ShortcutsDialog />
+      <ReviewCalendar />
       <VaultDialog />
       <SettingsDialog />
       <DialogHost />

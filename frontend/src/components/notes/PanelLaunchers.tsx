@@ -4,13 +4,14 @@
 // El globo no es el modulo del navegador: muestra y oculta la lista de paginas
 // *dentro* del panel, sin moverte de donde estas.
 
-import { CalendarClock, Globe, Headphones, ListTree, Mic, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
+import { Bug, CalendarClock, Globe, Headphones, ListTree, Mic, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
 import { useEffect } from "react";
 import { toggleFace } from "../../lib/panelFaces";
 import { subjectUsesLatex, useActiveSubject } from "../../lib/useActiveSubject";
 import { useReviewPanel } from "../study/ReviewPanel";
 import { useSourcesPanel } from "../english/SourcesPanel";
 import { useRecordingsPanel } from "../english/RecordingsPanel";
+import { useCodePanel } from "../../store/codePanel";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
 import { useWebPages } from "../../store/webPages";
@@ -27,6 +28,7 @@ export function PanelLaunchers({ module }: { module: string }) {
   const inkOpen = useApp((s) => s.inkDraft !== null);
   const sourcesOpen = useSourcesPanel((s) => s.open);
   const recordingsOpen = useRecordingsPanel((s) => s.open);
+  const codeOpen = useCodePanel((s) => s.open);
   const subject = useActiveSubject();
   const latexTool = subjectUsesLatex(subject);
   // Moving to an English area closes a drawing pad that was left open in a maths one.
@@ -39,6 +41,11 @@ export function PanelLaunchers({ module }: { module: string }) {
     if (!englishTools && sourcesOpen) useSourcesPanel.getState().setOpen(false);
     if (!englishTools && recordingsOpen) useRecordingsPanel.getState().setOpen(false);
   }, [englishTools, sourcesOpen, recordingsOpen]);
+  // The debugger belongs to programming spaces.
+  const programmingTools = subject.toLowerCase() === "programming";
+  useEffect(() => {
+    if (!programmingTools && codeOpen) useCodePanel.getState().setOpen(false);
+  }, [programmingTools, codeOpen]);
 
   const cell = (on: boolean, enabled = true) =>
     cn(
@@ -128,6 +135,20 @@ export function PanelLaunchers({ module }: { module: string }) {
           className={cell(recordingsOpen)}
         >
           <Mic size={16} />
+        </button>
+      )}
+
+      {/* Programming tools: run the code of an exercise and step through it. */}
+      {module === "notas" && programmingTools && (
+        <button
+          type="button"
+          title={codeOpen ? "Cerrar el depurador" : "Depurar: ejecuta tu código y recórrelo línea a línea"}
+          aria-label="Depurar"
+          aria-pressed={codeOpen}
+          onClick={() => toggleFace("code")}
+          className={cell(codeOpen)}
+        >
+          <Bug size={16} />
         </button>
       )}
 

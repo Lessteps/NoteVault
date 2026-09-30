@@ -2,12 +2,14 @@
 // answer, hints, timer, AI grading and the attempt history.
 
 import {
-  ClipboardPaste, Eye, FileOutput, Lightbulb, Pause, Pencil, PenTool, Play, RotateCcw, Send, Timer, X,
+  Bug, ClipboardPaste, Eye, FileOutput, Lightbulb, Pause, Pencil, PenTool, Play, RotateCcw, Send, Timer, X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { copyText, readClipboard } from "../../lib/clipboard";
+import { answerAsCode, firstFencedCode, openCodePanel } from "../../lib/codeBridge";
 import { display, initialTimer, tick, type TimerState } from "../../lib/practiceTimer";
+import { DEFAULT_CODE, useCodePanel } from "../../store/codePanel";
 import type { PracticeExercise, PracticeGraded, PracticeWaiting } from "../../lib/types";
 import { useApp, type OpenNote } from "../../store/app";
 import { cn, confirmAction } from "../ui";
@@ -29,7 +31,7 @@ const PLACEHOLDERS: Record<string, string> = {
   refactor: "Escribe el código refactorizado y, debajo, qué mejoraste y por qué.",
   design: "Escribe tu diseño (tablas, tipos, restricciones o SQL) y justifica las decisiones.",
   commands: "Escribe la secuencia de comandos, uno por línea, con un comentario de por qué.",
-  implement: "Escribe tu código. No se ejecuta: el profesor lo lee y razona sobre él.",
+  implement: "Escribe tu código. Pruébalo con «Depurar código» (panel de la derecha); al entregarlo, el profesor lo lee y razona sobre él.",
   writing: "Write your text here.",
   rewrite: "Rewrite each sentence correctly, one per line.",
   translate: "Write your translation here.",
@@ -157,6 +159,20 @@ export function PracticeView({ note }: { note: OpenNote }) {
     return () => registerAnswerTarget(null);
   }, []);
 
+  // The debugger panel of the right column writes the code it was working on back into this answer.
+  const codeSink = useCallback((code: string) => answerRef.current.onAnswer(code), []);
+  useEffect(() => () => useCodePanel.getState().clearSink(codeSink), [codeSink]);
+
+  const debugCode = () => {
+    if (!ex) return;
+    const fromStatement = ex.code.trim() ? ex.code : firstFencedCode(ex.statement);
+    // Reading exercises start from the code they give you; writing ones from what you have already typed.
+    const readsCode = ["debug", "find_error", "review", "trace", "analyze"].includes(ex.mode.id);
+    const mine = answer.trim() ? answerAsCode(answer) : "";
+    const seed = (readsCode ? fromStatement || mine : mine || fromStatement) || DEFAULT_CODE[ex.run_language] || "";
+    openCodePanel({ code: seed, language: ex.run_language, label: ex.title, sink: codeSink });
+  };
+
   const submit = async (via = "") => {
     if (!ex || busy) return;
     if (!answer.trim()) {
@@ -281,6 +297,7 @@ export function PracticeView({ note }: { note: OpenNote }) {
 
   const graded = !!result;
   const code = ex.mode.answer_kind === "code";
+  const canRun = !!ex.run_language && !["explain", "decompose", "commands"].includes(ex.mode.id) && (ex.mode.id !== "design" || ex.run_language === "sql");
   const clock = display(ex.timer, timer);
   const best = ex.history.length ? Math.max(...ex.history.map((h) => h.score)) : null;
 
@@ -357,6 +374,16 @@ export function PracticeView({ note }: { note: OpenNote }) {
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <h2 className="font-mono text-[10.5px] uppercase tracking-wider text-faint">Tu respuesta</h2>
+              {canRun && (
+                <button
+                  type="button"
+                  onClick={debugCode}
+                  title="Abre el depurador en el panel derecho con el código de este ejercicio: ejecútalo y recórrelo línea a línea"
+                  className="flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1 text-[11.5px] font-semibold text-dim transition-colors hover:border-accent hover:text-ink"
+                >
+                  <Bug size={12} /> Depurar código
+                </button>
+              )}
               {(ex.subject === "mathematics" || ["prove", "solve", "process", "counterexample", "true_false", "find_error", "drill", "explain"].includes(ex.mode.id)) && !graded && (
                 <button
                   type="button"

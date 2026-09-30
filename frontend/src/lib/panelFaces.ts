@@ -10,8 +10,9 @@ import { useReviewPanel } from "../components/study/ReviewPanel";
 import { openInkPad } from "../components/practice/inkBridge";
 import { useSourcesPanel } from "../components/english/SourcesPanel";
 import { useRecordingsPanel } from "../components/english/RecordingsPanel";
+import { useCodePanel } from "../store/codePanel";
 
-export type Face = "assistant" | "pages" | "review" | "inspector" | "muscle" | "ink" | "sources" | "recordings";
+export type Face = "assistant" | "pages" | "review" | "inspector" | "muscle" | "ink" | "sources" | "recordings" | "code";
 
 export function isFaceOpen(face: Face): boolean {
   switch (face) {
@@ -23,6 +24,7 @@ export function isFaceOpen(face: Face): boolean {
     case "ink": return useApp.getState().inkDraft !== null;
     case "sources": return useSourcesPanel.getState().open;
     case "recordings": return useRecordingsPanel.getState().open;
+    case "code": return useCodePanel.getState().open;
   }
 }
 
@@ -36,10 +38,11 @@ export function closeFace(face: Face): void {
     case "ink": useApp.getState().setInkDraft(null); break;
     case "sources": useSourcesPanel.getState().setOpen(false); break;
     case "recordings": useRecordingsPanel.getState().setOpen(false); break;
+    case "code": useCodePanel.getState().setOpen(false); break;
   }
 }
 
-const ALL: Face[] = ["assistant", "pages", "review", "inspector", "muscle", "ink", "sources", "recordings"];
+const ALL: Face[] = ["assistant", "pages", "review", "inspector", "muscle", "ink", "sources", "recordings", "code"];
 
 /** Opens `face` (closing every other one), or closes it when it is already open. */
 export function toggleFace(face: Face): void {
@@ -57,5 +60,6 @@ export function toggleFace(face: Face): void {
     case "ink": openInkPad(); break;
     case "sources": useSourcesPanel.getState().setOpen(true); break;
     case "recordings": useRecordingsPanel.getState().setOpen(true); break;
+    case "code": useCodePanel.getState().setOpen(true); break;
   }
 }

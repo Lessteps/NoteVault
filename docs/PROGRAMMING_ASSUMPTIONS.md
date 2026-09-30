@@ -42,3 +42,22 @@ stay as they are.)
 15. `00 Temario.md` is written with `type: index`; the syllabus generator allows up to 120 topics per area and only lists as
     areas the folders that start with a number (so `FULLSTACK_*` is not part of the syllabus).
 16. The LaTeX drawing tool only appears in mathematics (and in notes outside a study space).
+
+## Debugger panel (right column)
+17. Programming spaces get a **Depurar** face in the right rail (bug icon, below the note outline). It runs the code of an
+    exercise and steps through it. It is opened from the rail, or from the **Depurar código** button that every exercise
+    with runnable code shows above «Tu respuesta». From an exercise it is seeded with the code the statement gives
+    (debug, find_error, review, trace, analyze) or with what the learner already typed (implement, refactor, test,
+    port, query, cloze…). **A mi respuesta** writes the panel's code back into the answer box. The language comes from the
+    discipline of the area (`runLanguageFor`); shell, architecture and explanation exercises get no button.
+18. Languages: **Python 3** (the interpreter of the machine, found through `py -3`, `python` or `python3`; if there is
+    none, the panel says so), **JavaScript** and **TypeScript** (Node itself: the Electron binary in `ELECTRON_RUN_AS_NODE`
+    mode, nothing to install) and **SQL** on the SQLite that ships with Node (`node:sqlite`, in memory; PostgreSQL-only
+    syntax fails there). Code runs in a temp folder with a 10 s timeout, capped output and stdin; there is **no sandbox**.
+19. **Step by step**: Python through `sys.settrace`, JavaScript/TypeScript through the V8 inspector (`stepInto` over the
+    learner's file only, node internals blackboxed). Every step records the line, the function, the call depth, up to 16
+    variables and how much had been printed. Limits: 400 steps (the program still finishes), no stepping for SQL, and none
+    for TypeScript that uses `enum`, `namespace` or constructor parameter properties (Node needs a real transform there and
+    it moves lines; such code still runs).
+20. The grader never sees the run: the answer is still judged by reasoning about the code. The panel is a tool for the learner
+    to test their own reasoning before handing the answer in.

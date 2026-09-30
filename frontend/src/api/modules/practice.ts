@@ -13,6 +13,7 @@ import {
   buildBridgePrompt,
   sendChat,
 } from "../../core/aiClient.js";
+import { runLanguageFor } from "../../core/codeDebugger.js";
 import { ApiError } from "../../core/errors.js";
 import { parseFrontmatter } from "../../core/frontmatter.js";
 import { PracticeAttemptStore } from "../../core/practice/attempts.js";
@@ -287,6 +288,7 @@ export function practiceApi(app: AppState) {
           : null,
         code: ex.code,
         code_lang: ex.code_lang,
+        run_language: runLanguageFor(ex.subject, disc?.id ?? "", ex.code_lang),
         hints: ex.hints,
         has_solution: Boolean(ex.solution.trim()),
         rubric: ex.rubric,

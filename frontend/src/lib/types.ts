@@ -775,6 +775,8 @@ export interface PracticeExercise {
   media?: { file: string; source?: string; start: number; end: number } | null;
   code: string;
   code_lang: string;
+  /** The language the code of this exercise can be run in from the debugger panel ("" when there is nothing to run). */
+  run_language: string;
   hints: string[];
   has_solution: boolean;
   rubric: string[];
@@ -897,6 +899,39 @@ export interface EnglishRecording {
   name: string;
   size: number;
   modified: number;
+}
+
+export interface CodeRun {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  exit_code: number | null;
+  ms: number;
+  timed_out: boolean;
+  truncated: boolean;
+  runtime: string;
+}
+
+export interface CodeStep {
+  line: number;
+  fn: string;
+  depth: number;
+  vars: Array<[string, string]>;
+  out: number;
+  ret?: string;
+  exc?: string;
+}
+
+export interface CodeTrace extends CodeRun {
+  steps: CodeStep[];
+  steps_truncated: boolean;
+}
+
+export interface CodeRuntime {
+  id: string;
+  label: string;
+  available: boolean;
+  runtime: string;
 }
 
 export interface PlayerMedia {

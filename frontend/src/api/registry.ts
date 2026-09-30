@@ -9,6 +9,7 @@ import { appApi } from "./modules/app.js";
 import { assistantApi } from "./modules/assistant.js";
 import { calendarApi } from "./modules/calendar.js";
 import { canvasApi } from "./modules/canvas.js";
+import { codeDebugApi } from "./modules/codeDebug.js";
 import { conversationsApi } from "./modules/conversations.js";
 import { englishPlayerApi } from "./modules/englishPlayer.js";
 import { exerciseApi } from "./modules/exercise.js";
@@ -43,6 +44,7 @@ export function buildRegistry(app: AppState): Registry {
     ...homeApi(app),
     ...filesApi(app),
     ...englishPlayerApi(app),
+    ...codeDebugApi(app),
     ...notesExtrasApi(app),
     ...vaultsApi(app),
     ...webApi(app),

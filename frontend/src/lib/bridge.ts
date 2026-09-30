@@ -550,6 +550,9 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   enSourcePaste: (kind: string, title: string, text: string, attachTo = "") =>
     call<{ ok: boolean; timed: boolean; source?: import("./types").EnglishSource }>("en_source_paste", kind, title, text, attachTo),
   enRecordingSave: (name: string, data: string, ext = "webm") => call<{ ok: boolean; id: string; size: number }>("en_recording_save", name, data, ext),
+  codeRuntimes: () => call<{ items: import("./types").CodeRuntime[] }>("code_runtimes"),
+  codeRun: (language: string, code: string, stdin = "") => call<import("./types").CodeRun>("code_run", language, code, stdin),
+  codeTrace: (language: string, code: string, stdin = "") => call<import("./types").CodeTrace>("code_trace", language, code, stdin),
   enRecordingList: () => call<{ items: import("./types").EnglishRecording[] }>("en_recording_list"),
   enRecordingUrl: (id: string) => call<{ url: string }>("en_recording_url", id),
   enRecordingRename: (id: string, name: string) => call<{ ok: boolean; id: string }>("en_recording_rename", id, name),

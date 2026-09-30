@@ -11,6 +11,7 @@ import * as path from "node:path";
 import { generateConcept } from "../../../tools/kb_canvas";
 import { AIConfig } from "../../core/aiClient.js";
 import { applyAssistantAction, safeName, subjectIdOf } from "../../core/assistantActions.js";
+import { buildTenseMapCanvas, buildWordFamilyCanvas, TENSE_MAP_FILE, WORD_FAMILY_MAP_FILE } from "../../core/english/conceptMaps.js";
 import { buildAreaMapCanvas, buildSpaceMapCanvas, type MapTopic, type SpaceMapArea, type TopicDependency } from "../../core/areaMap.js";
 import { ConversationStore, type StoredMessage } from "../../core/conversations.js";
 import { ensureDefaultSkills } from "../../core/defaultSkills.js";
@@ -142,9 +143,23 @@ const skillText = (app: AppState, spaceFolder: string, name: string, max = 6000)
  * `<space>/Vocabulario/`: the home of the ONE word bank the branches feed. It is not a branch (no syllabus,
  * no topics); the words themselves live in the private bank (`.notevault/estudio/vocabulario`).
  */
+/** Writes a canvas only when it is not there yet: a map the learner has edited is never overwritten. */
+function writeMapOnce(file: string, map: unknown): void {
+  if (fs.existsSync(file)) return;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(map, null, "\t") + "\n", "utf-8");
+}
+
+/** The English-only maps: verb tenses under grammar, word families under vocabulary. */
+export function ensureEnglishConceptMaps(root: string, space: string): void {
+  writeMapOnce(path.join(root, space, ENGLISH_BRANCHES[0]!.folder, TENSE_MAP_FILE), buildTenseMapCanvas());
+  writeMapOnce(path.join(root, space, ENGLISH_VOCABULARY_FOLDER, WORD_FAMILY_MAP_FILE), buildWordFamilyCanvas());
+}
+
 export function ensureVocabularyHome(root: string, space: string): void {
   const dir = path.join(root, space, ENGLISH_VOCABULARY_FOLDER);
   fs.mkdirSync(dir, { recursive: true });
+  ensureEnglishConceptMaps(root, space);
   const note = path.join(dir, "00 Banco de palabras.md");
   if (fs.existsSync(note)) return;
   fs.writeFileSync(

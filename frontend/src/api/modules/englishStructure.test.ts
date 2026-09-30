@@ -104,6 +104,18 @@ describe("creating the English structure", () => {
     expect(map.nodes.filter((n: { type: string }) => n.type === "group")).toHaveLength(3);
   });
 
+  it("draws the verb-tense map under grammar and the word-family map under vocabulary, without overwriting edits", () => {
+    applyAssistantAction(root, syllabus);
+    ensureVocabularyHome(root, "Inglés 1");
+    const tenses = "Inglés 1/1 Gramática/00 Mapa de tiempos verbales.canvas";
+    const families = "Inglés 1/Vocabulario/00 Mapa de familias de palabras.canvas";
+    expect(JSON.parse(read(tenses)).nodes.length).toBeGreaterThan(9);
+    expect(JSON.parse(read(families)).edges.every((e: { label: string }) => e.label.length > 0)).toBe(true);
+    fs.writeFileSync(path.join(root, tenses), '{"nodes":[],"edges":[]}', "utf-8");
+    ensureVocabularyHome(root, "Inglés 1");
+    expect(read(tenses)).toBe('{"nodes":[],"edges":[]}');
+  });
+
   it("a topic outside any branch folder is created UNCLASSIFIED (no branch, no skills), never defaulted", () => {
     const plan = planAssistantAction(root, { action: "create_syllabus", args: { subject: "Inglés 1", subject_id: "english", areas: [{ name: "Suelto", topics: [{ name: "Tema" }] }] } });
     const practica = plan.ops.find((o) => o.rel.endsWith(".practica.md"))!;

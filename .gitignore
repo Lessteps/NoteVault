@@ -58,3 +58,7 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/coverage/
 *.tsbuildinfo
+
+# -- Git worktrees (local only)
+.worktrees/
+

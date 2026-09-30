@@ -26,7 +26,8 @@ function Detail({ entry }: { entry: LibraryEntry }) {
                 src={src}
                 alt={`${entry.name} frame ${i + 1}`}
                 loading="lazy"
-                className="h-20 w-20 rounded-lg border border-line bg-white object-contain"
+                className="h-20 w-20 rounded-lg border border-line object-contain"
+                style={{ background: "#141414" }}
               />
             ),
         )}

@@ -72,4 +72,21 @@ describe("Biblioteca de Ejercicio", () => {
       cleanup();
     }
   });
+
+  it("muestra las ilustraciones locales sobre fondo oscuro (arte blanco)", async () => {
+    const { host, cleanup } = mount(<Library />);
+    try {
+      const imgs = [...host.querySelectorAll("img")] as HTMLImageElement[];
+      expect(imgs.length).toBeGreaterThan(0);
+      for (const img of imgs) {
+        // Local offline, nunca CDN (CSP img-src 'self').
+        expect(img.getAttribute("src")).toContain("workout-guide-assets/");
+        expect(img.getAttribute("src")).not.toContain("http");
+        // El arte es blanco monocromo: fondo claro lo vuelve invisible.
+        expect(img.className).not.toMatch(/bg-white/);
+      }
+    } finally {
+      cleanup();
+    }
+  });
 });

@@ -18,15 +18,15 @@ describe("programming default skills", () => {
 
   it("the theory skill keeps the contract the topic map parses", () => {
     const t = PROGRAMMING_DEFAULT_SKILLS.resumen_teorico_skill!;
-    for (const heading of ["## Requiere", "### Qué es", "### Modelo mental", "## Ejemplos", "## Errores comunes", "## Conexiones", "## Tarjetas"]) expect(t).toContain(heading);
-    for (const field of ["**Contexto:**", "**Caso:**", "**Resultado esperado:**", "**Por qué funciona:**", "**Error:**", "**Síntoma:**", "**Causa:**", "**Solución:**"]) expect(t).toContain(field);
+    for (const heading of ["## Requires", "### What it is", "### Mental model", "## Examples", "## Common mistakes", "## Connections", "## Cards"]) expect(t).toContain(heading);
+    for (const field of ["**Context:**", "**Case:**", "**Expected result:**", "**Why it works:**", "**Mistake:**", "**Symptom:**", "**Cause:**", "**Fix:**"]) expect(t).toContain(field);
   });
 
   it("the practice skill lists every competency of the catalogue and names every area", () => {
     const p = PROGRAMMING_DEFAULT_SKILLS.practica_skill!;
     for (const s of PROGRAMMING_SKILLS) expect(p, s.id).toContain(`\`${s.id}\``);
     const t = PROGRAMMING_DEFAULT_SKILLS.temario_skill!;
-    for (const area of ["1 Fundamentos", "2.1 Python", "2.2 JavaScript", "2.3 TypeScript", "3 Apps de escritorio (Electron)", "4 Backend", "5 Frontend", "6 Bases de datos", "7 Automatización", "8 Móvil", "9 Herramientas y calidad"]) expect(t, area).toContain(area);
+    for (const area of ["1 Fundamentals", "2.1 Python", "2.2 JavaScript", "2.3 TypeScript", "3 Desktop Apps (Electron)", "4 Backend", "5 Frontend", "6 Databases", "7 Automation", "8 Mobile", "9 Tooling and Quality"]) expect(t, area).toContain(area);
   });
 
   it("installs them in a programming space and only lends from a space of the same domain", () => {
@@ -42,7 +42,15 @@ describe("programming default skills", () => {
     const created = ensureDefaultSkills(root, "Programación", [], "programming");
     expect(created).toHaveLength(5);
     expect(fs.existsSync(path.join(root, "Programación", "_skills", "canvas_skill.md"))).toBe(false);
-    expect(fs.readFileSync(path.join(root, "Programación", "_skills", "temario_skill.md"), "utf-8")).toContain("apps de");
+    expect(fs.readFileSync(path.join(root, "Programación", "_skills", "temario_skill.md"), "utf-8")).toContain("Windows apps");
     fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+describe("everything in the programming skills is English", () => {
+  it("the notes and the exercise prompt carry no Spanish instructions", () => {
+    for (const [name, text] of Object.entries(PROGRAMMING_DEFAULT_SKILLS)) {
+      expect(text, name).not.toMatch(/\b(Requiere|Explicación|Ejemplos|Errores comunes|Tarjetas|Sin prerrequisitos|competencias)\b/);
+    }
   });
 });

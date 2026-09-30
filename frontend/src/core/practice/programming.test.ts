@@ -78,6 +78,7 @@ describe("programming exercises", () => {
     expect(system).toContain("N+1 queries");
     expect(system).not.toMatch(/theorem|LaTeX/i);
     expect(msgs[1]!.content).toContain("Skill: review");
+    expect(system).toContain("Write EVERYTHING in English");
     // mathematics keeps its own prompt
     const math = buildExerciseGenerationPrompt(createDefaultTopicManifest("Matemáticas/1 A/1.1 X", "X", "mathematics", []), [], "solve", 1, "helper", 2)[0]!.content;
     expect(math).toContain("theorems");
@@ -86,7 +87,7 @@ describe("programming exercises", () => {
   it("carry the language into the framing and the error record into the request", () => {
     expect(languageOfDiscipline("desktop")).toContain("Electron");
     const user = buildProgrammingExercisePrompt(topic("Programación/3 Apps de escritorio (Electron)/3.5 IPC", "IPC"), [], "debug", 3, "helper", 2, ["Fallo: confía en los argumentos"])[1]!.content;
-    expect(user).toContain("REGISTRO DE ERRORES");
+    expect(user).toContain("ERROR RECORD");
     expect(user).toContain("confía en los argumentos");
   });
 
@@ -96,6 +97,8 @@ describe("programming exercises", () => {
     expect(note).toContain("mode: trace");
     expect(note).toContain("discipline: python");
     expect(note).toContain("assistance: helper");
+    expect(note).toContain("## Statement");
+    expect(note).not.toContain("Enunciado");
     expect(disciplineFor({ subject: "programming", discipline: "python" }).id).toBe("python");
     expect(formatProgrammingExerciseNote(topic("Programación/6 Bases de datos/6.5 JOINs"), "query", 1, "no_help", { title: "t", statement: "s", hints: [], solution: "x", rubric: [] })).toContain("discipline: sql");
   });

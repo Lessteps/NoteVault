@@ -82,15 +82,17 @@ function cleanDeps(topics: readonly MapTopic[], deps: readonly TopicDependency[]
   return out;
 }
 
+export type MapLang = "es" | "en";
+
 /** When nothing is known about the dependencies, each topic follows the one before it. */
-export function chainDependencies(topics: readonly MapTopic[]): TopicDependency[] {
+export function chainDependencies(topics: readonly MapTopic[], lang: MapLang = "es"): TopicDependency[] {
   const sorted = [...topics].sort((a, b) => numeric(a.name, b.name));
-  return sorted.slice(1).map((t, i) => ({ from: sorted[i]!.name, to: t.name, label: "prepara para" }));
+  return sorted.slice(1).map((t, i) => ({ from: sorted[i]!.name, to: t.name, label: lang === "en" ? "prepares for" : "prepara para" }));
 }
 
-export function buildAreaMapCanvas(area: string, topicList: readonly MapTopic[], deps: readonly TopicDependency[] = []): AreaMap {
+export function buildAreaMapCanvas(area: string, topicList: readonly MapTopic[], deps: readonly TopicDependency[] = [], lang: MapLang = "es"): AreaMap {
   const topics = [...topicList].sort((a, b) => numeric(a.name, b.name));
-  const edgesIn = cleanDeps(topics, deps.length ? deps : chainDependencies(topics));
+  const edgesIn = cleanDeps(topics, deps.length ? deps : chainDependencies(topics, lang));
 
   // Column = longest chain of prerequisites before the topic.
   const layer = new Map<string, number>(topics.map((t) => [t.name, 0]));
@@ -148,7 +150,7 @@ const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"
 const BLOCK_STEP = 680;
 const BLOCK_W = 414;
 
-export function buildSpaceMapCanvas(areas: readonly SpaceMapArea[]): AreaMap {
+export function buildSpaceMapCanvas(areas: readonly SpaceMapArea[], lang: MapLang = "es"): AreaMap {
   const nodes: MapNode[] = [];
   const edges: MapEdge[] = [];
   areas.forEach((a, i) => {
@@ -163,13 +165,13 @@ export function buildSpaceMapCanvas(areas: readonly SpaceMapArea[]): AreaMap {
       y: 0,
       width: BLOCK_W,
       height: cardH + 2 * GROUP_TOP,
-      label: `Bloque ${ROMAN[i] ?? i + 1} — ${title}`,
+      label: `${lang === "en" ? "Block" : "Bloque"} ${ROMAN[i] ?? i + 1} — ${title}`,
       nv: { zIndex: -2 },
     });
     nodes.push({ id: `a${i + 1}`, type: "text", x: x + GROUP_PAD, y: GROUP_TOP, width: 360, height: cardH, text });
     if (i > 0) {
       const n = a.prerequisites ?? 1;
-      edges.push({ id: `e${i}`, fromNode: `a${i}`, toNode: `a${i + 1}`, fromSide: "right", toSide: "left", label: `${n} prerrequisito(s)` });
+      edges.push({ id: `e${i}`, fromNode: `a${i}`, toNode: `a${i + 1}`, fromSide: "right", toSide: "left", label: lang === "en" ? `${n} prerequisite(s)` : `${n} prerrequisito(s)` });
     }
   });
   return { nodes, edges };

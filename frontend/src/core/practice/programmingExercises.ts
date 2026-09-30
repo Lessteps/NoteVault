@@ -76,7 +76,7 @@ export function buildProgrammingExercisePrompt(
     "CRITICAL RULES:",
     "1. Every exercise is about the specific concepts of THIS topic, never generic filler; the topic's central mechanism must be what is being tested.",
     "2. Every exercise is real and applied (a script, a pipeline step, a business rule, concrete data). Never toy drills with names like data1 or valueA.",
-    "3. Write the statement in Spanish; code, identifiers and comments in English inside fenced code blocks (```python, ```ts, ```sql…). The statement is self-contained: it includes every piece of code and data the learner needs.",
+    "3. Write EVERYTHING in English: title, statement, hints, solution and rubric. Code goes in fenced code blocks (```python, ```ts, ```sql…). The statement is self-contained: it includes every piece of code and data the learner needs.",
     "4. The expected result must be verifiable by reasoning: give exact expected outputs for concrete inputs. Never ask for something that needs to run the code to know the answer.",
     "5. Bugs and problems must be found by reasoning about behaviour and output, never by spotting a syntax error or a style issue.",
     helper
@@ -85,9 +85,9 @@ export function buildProgrammingExercisePrompt(
     "7. Mastery signal only: the solution gives the expected result and a model answer; it never lectures a long derivation.",
     anchors ? `Realistic failure modes of this discipline (use them when the skill involves finding problems):\n${anchors}` : "",
     "OUTPUT: return ONLY a valid JSON array of exercise objects, no other text. Each object has:",
-    '  "title": string (short, in Spanish)',
-    '  "statement": string (Spanish, with fenced code blocks)',
-    '  "hints": array of strings (Spanish)',
+    '  "title": string (short, in English)',
+    '  "statement": string (English, with fenced code blocks)',
+    '  "hints": array of strings (English)',
     '  "solution": string (the model answer: code and, where useful, a short explanation)',
     '  "rubric": array of 3 to 5 strings (verifiable checklist criteria)',
   ]
@@ -101,9 +101,9 @@ export function buildProgrammingExercisePrompt(
     learning.length
       ? [
           "",
-          "REGISTRO DE ERRORES del estudiante en esta competencia (más recientes primero):",
+          "The student's ERROR RECORD for this competency (most recent first):",
           ...learning.map((l) => `- ${l}`),
-          "Escribe alrededor del 60 % de los ejercicios para atacar EXACTAMENTE estos errores (el mismo tipo de fallo, con otro código y otro contexto, sin repetir enunciados) y el resto para entrenar toda la competencia.",
+          "Write about 60% of the exercises to attack EXACTLY these mistakes (the same kind of failure, with other code and another context, never repeating a statement) and the rest to train the whole competency.",
         ].join("\n")
       : "",
     "",
@@ -140,16 +140,16 @@ topic: "${manifest.title.replace(/"/g, '\\"')}"
 
 # ${ex.title}
 
-## Enunciado
+## Statement
 ${ex.statement.trim()}
 
-## Pistas
-${hints || "- (Sin pistas para este ejercicio.)"}
+## Hints
+${hints || "- (No hints for this exercise.)"}
 
-## Solución
+## Solution
 ${ex.solution.trim()}
 
-## Rúbrica
-${rubric || "- [ ] Comportamiento correcto y casos límite cubiertos."}
+## Rubric
+${rubric || "- [ ] Correct behaviour and edge cases covered."}
 `;
 }

@@ -369,3 +369,77 @@ describe("code inside a concept note", () => {
     expect(verifyCanvas(buildConceptCanvas(concept))).toEqual([]);
   });
 });
+
+describe("English concept notes (programming)", () => {
+  const NOTE = [
+    "---",
+    "id: prog.fundamentals.loops",
+    "title: While loops",
+    'number: "1.19"',
+    'area: "1 Fundamentals"',
+    "subject: programming",
+    "---",
+    "",
+    "# 1.19 While loops",
+    "",
+    "## Requires",
+    "*No prerequisites.*",
+    "",
+    "## Explanation",
+    "",
+    "### What it is",
+    "A loop repeats a block while a condition holds.",
+    "",
+    "```python",
+    "# counts down",
+    "while n > 0:",
+    "    n -= 1",
+    "```",
+    "",
+    "### Mental model",
+    "A tape that keeps turning until the condition is false.",
+    "",
+    "## Examples",
+    "",
+    "### Example 1 — countdown",
+    "- **Context:** A retry counter.",
+    "- **Case:**",
+    "```python",
+    "n = 3",
+    "while n > 0:",
+    "    n -= 1",
+    "```",
+    "- **Expected result:** `n` is 0.",
+    "- **Why it works:** the condition is re-evaluated each turn.",
+    "",
+    "## Common mistakes",
+    "",
+    "### Error 1 — infinite loop",
+    "- **Mistake:** forgetting to update `n`.",
+    "- **Symptom:** the program never ends.",
+    "- **Cause:** the condition never becomes false.",
+    "- **Fix:** change the variable inside the loop.",
+    "",
+  ].join("\n");
+
+  it("reads English headings and fields and draws the panels in English", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "nv_kben_"));
+    tmpRoots.push(root);
+    fs.mkdirSync(path.join(root, ".notevault"), { recursive: true });
+    const folder = path.join(root, "Programación", "1 Fundamentals", "1.19 While loops");
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, "1.19 While loops.md"), NOTE, "utf-8");
+    const concept = readConcept(folder, root);
+    expect(concept.lang).toBe("en");
+    expect(concept.warnings).toEqual([]);
+    expect(concept.examples[0]!.fields.map((f) => f.label)).toEqual(["Context", "Case", "Expected result", "Why it works"]);
+    expect(concept.errors[0]!.fields.map((f) => f.label)).toEqual(["Mistake", "Symptom", "Cause", "Fix"]);
+    const doc = buildConceptCanvas(concept);
+    expect(verifyCanvas(doc)).toEqual([]);
+    const groups = doc.nodes.filter((n) => n.type === "group").map((n) => n.label);
+    expect(groups).toEqual(expect.arrayContaining(["Requires", "Explanation", "Examples", "Common mistakes"]));
+    const labels = doc.edges.map((e) => e.label);
+    expect(labels).toEqual(expect.arrayContaining(["is understood with", "applied in", "fails when", "the concrete case"]));
+    expect(JSON.stringify(doc)).not.toMatch(/Requiere|Explicación|se aplica en/);
+  });
+});

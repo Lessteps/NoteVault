@@ -146,6 +146,8 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
   const subject = safeName(args.subject);
   if (!subject) throw new ApiError("Falta el nombre de la materia.");
   const subjectId = subjectIdOf(subject, args.subject_id);
+  // Programming spaces are written in English (maps and outline included); mathematics and English keep Spanish.
+  const mapLang = domainOfSubject(subjectId) === "programming" ? "en" : "es";
   const areas = Array.isArray(args.areas) ? args.areas.slice(0, MAX_AREAS) : [];
   if (!areas.length) throw new ApiError("El temario no tiene áreas.");
 
@@ -187,7 +189,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
       ops.push({
         kind: "write",
         rel: mapRel,
-        content: JSON.stringify(buildAreaMapCanvas(areaLabel, mapTopics, deps), null, "\t") + "\n",
+        content: JSON.stringify(buildAreaMapCanvas(areaLabel, mapTopics, deps, mapLang), null, "\t") + "\n",
         exists: fs.existsSync(absOf(root, mapRel)),
       });
       spaceAreas.push({ name: areaLabel, topics: mapTopics.map((t) => t.name), prerequisites: Number(area?.prerequisites) || undefined });
@@ -229,7 +231,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
     ops.push({
       kind: "write",
       rel: spaceMapRel,
-      content: JSON.stringify(buildSpaceMapCanvas(everyArea), null, "\t") + "\n",
+      content: JSON.stringify(buildSpaceMapCanvas(everyArea, mapLang), null, "\t") + "\n",
       overwrite: generated,
       exists: existing,
     });
@@ -242,7 +244,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
     ops.push({
       kind: "write",
       rel: temarioRel,
-      content: `---\ntitle: Temario de ${subject}\nsubject: ${subjectId}\ntype: index\n---\n\n# Temario de ${subject}\n\n${GENERATED}\n\n${lines.join("\n").trimEnd()}\n`,
+      content: `---\ntitle: ${mapLang === "en" ? "Syllabus of" : "Temario de"} ${subject}\nsubject: ${subjectId}\ntype: index\n---\n\n# ${mapLang === "en" ? "Syllabus of" : "Temario de"} ${subject}\n\n${GENERATED}\n\n${lines.join("\n").trimEnd()}\n`,
       overwrite: generated,
       exists: existing,
     });

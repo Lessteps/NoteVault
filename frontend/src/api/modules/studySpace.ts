@@ -120,7 +120,7 @@ export function parseDependencies(reply: string, topics: readonly string[]): Top
 
 /** Drops `[[links]]` in `## Requiere` that point at topics that do not exist. */
 export function sanitizeRequires(body: string, known: ReadonlySet<string>): string {
-  return body.replace(/(^##\s*Requiere[^\n]*\n)([\s\S]*?)(?=^##\s)/im, (_all, head: string, block: string) => {
+  return body.replace(/(^##\s*(?:Requiere|Requires|Prerequisites)[^\n]*\n)([\s\S]*?)(?=^##\s)/im, (_all, head: string, block: string) => {
     const kept = block
       .split("\n")
       .filter((line) => {
@@ -128,7 +128,8 @@ export function sanitizeRequires(body: string, known: ReadonlySet<string>): stri
         return !link || known.has(link[1]!.trim());
       });
     const hasLink = kept.some((l) => /\[\[/.test(l));
-    return `${head}${hasLink ? kept.join("\n") : "*Sin prerrequisitos.*\n\n"}`;
+    const none = /requires|prerequisites/i.test(head) ? "*No prerequisites.*\n\n" : "*Sin prerrequisitos.*\n\n";
+    return `${head}${hasLink ? kept.join("\n") : none}`;
   });
 }
 
@@ -272,7 +273,23 @@ export function studySpaceApi(app: AppState) {
     areaName: string,
     topic: string,
     previous: string[],
-  ): Array<{ role: string; content: string }> => [
+  ): Array<{ role: string; content: string }> => domainOfSubject(subjectName) === "programming" ? [
+    {
+      role: "system",
+      content:
+        "You are a rigorous programming teacher writing NoteVault's theory notes, ALL IN ENGLISH (explanations, code comments and cards). Follow this vault skill TO THE LETTER: " +
+        "it is a contract (same headings, same fields), because the topic map is generated automatically from the note.\n\n" +
+        skillText(app, spaceFolder, "resumen_teorico_skill"),
+    },
+    {
+      role: "user",
+      content:
+        `Subject: ${subjectName}. Area: ${areaName}. Topic: ${topic}.\n` +
+        `Earlier topics you may use as prerequisites in "## Requires" (EXACT name between [[ ]]; only these): ${previous.length ? previous.join("; ") : "(none: write *No prerequisites.*)"}.\n\n` +
+        `Write the complete note in Markdown WITHOUT frontmatter (the app adds it). Start with "# ${topic}" and end with "## Cards". ` +
+        "Include 3 examples and 4-5 mistakes, each with its four exact fields, and real, runnable code in the examples.",
+    },
+  ] : [
     {
       role: "system",
       content:
@@ -438,9 +455,13 @@ export function studySpaceApi(app: AppState) {
             {
               role: "system",
               content:
-                "Diseñas el mapa de dependencias de un área de estudio. Responde SOLO con JSON: " +
-                '{"dependencies":[{"from":"<tema previo>","to":"<tema que lo necesita>","label":"<motivo en 2-6 palabras>"}]}. ' +
-                "Usa nombres EXACTOS de la lista, solo dependencias reales (un tema puede necesitar varios previos), siempre de un tema anterior a uno posterior. " +
+                (domainOfSubject(subjectId) === "programming"
+                  ? "You design the dependency map of a study area. Answer ONLY with JSON: " +
+                    '{"dependencies":[{"from":"<earlier topic>","to":"<topic that needs it>","label":"<reason in 2-6 English words>"}]}. ' +
+                    "Use EXACT names from the list, only real dependencies (a topic may need several earlier ones), always from an earlier topic to a later one. "
+                  : "Diseñas el mapa de dependencias de un área de estudio. Responde SOLO con JSON: " +
+                    '{"dependencies":[{"from":"<tema previo>","to":"<tema que lo necesita>","label":"<motivo en 2-6 palabras>"}]}. ' +
+                    "Usa nombres EXACTOS de la lista, solo dependencias reales (un tema puede necesitar varios previos), siempre de un tema anterior a uno posterior. ") +
                 skillText(app, folder, "mapa_skill", 2500),
             },
             { role: "user", content: `Área: ${area.name}\nTemas:\n${area.topics.map((t) => `- ${t.name}`).join("\n")}` },
@@ -451,7 +472,7 @@ export function studySpaceApi(app: AppState) {
           say(`  (sin dependencias de la IA: ${(e as Error).message}; se encadenan los temas)`);
         }
         const mapFile = path.join(app.root, folder, area.name, `00 Mapa — ${area.name}.canvas`);
-        fs.writeFileSync(mapFile, JSON.stringify(buildAreaMapCanvas(area.name, topics, deps), null, "\t") + "\n", "utf-8");
+        fs.writeFileSync(mapFile, JSON.stringify(buildAreaMapCanvas(area.name, topics, deps, domainOfSubject(subjectId) === "programming" ? "en" : "es"), null, "\t") + "\n", "utf-8");
         spaceAreas.push({ name: area.name, topics: area.topics.map((t) => t.name), prerequisites: Math.max(1, deps.length) });
         say(`  ✓ mapa del área con ${deps.length || area.topics.length - 1} flecha(s)`);
         tick();
@@ -472,7 +493,7 @@ export function studySpaceApi(app: AppState) {
           .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
         return { name, topics };
       });
-      fs.writeFileSync(path.join(app.root, folder, `00 Mapa de ${folder}.canvas`), JSON.stringify(buildSpaceMapCanvas(all), null, "\t") + "\n", "utf-8");
+      fs.writeFileSync(path.join(app.root, folder, `00 Mapa de ${folder}.canvas`), JSON.stringify(buildSpaceMapCanvas(all, domainOfSubject(subjectId) === "programming" ? "en" : "es"), null, "\t") + "\n", "utf-8");
       say(`Mapa de «${folder}» con ${all.length} bloque(s).`);
     }
     clearExerciseIndexCache();
@@ -552,7 +573,14 @@ export function studySpaceApi(app: AppState) {
         return { areas, conversationId: chat.id };
       }
       const skill = skillText(app, space || name, "temario_skill", 3000);
-      const system =
+      const programming = domainOfSubject(name) === "programming";
+      const system = programming
+        ? "You are a curriculum designer. You propose the syllabus of a programming area, in English. Answer ONLY with JSON: " +
+          '{"areas":[{"name":"1 Area name","topics":[{"name":"1.1 Topic name"}]}]}. ' +
+          "Numbered areas and topics in natural learning order, 12-20 topics per area, short names in English " +
+          'without / \\ : * ? " < > |. ' +
+          (skill ? `\nFollow this vault skill:\n${skill}` : "")
+        :
         "Eres un diseñador curricular. Propones el temario de una materia en español. Responde SOLO con JSON: " +
         '{"areas":[{"name":"1 Nombre del área","topics":[{"name":"1.1 Nombre del tema"}]}]}. ' +
         "Áreas y temas numerados en orden natural de aprendizaje (Fase 0 = área 0 si hace falta), 6–12 temas por área, " +

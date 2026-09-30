@@ -3,17 +3,26 @@
 // until the user presses "Aplicar".
 
 import { Check, FilePlus2, FolderPlus, Loader2, RefreshCw, Wand2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { ParsedAction } from "../../lib/assistantModes";
 import { useApp } from "../../store/app";
+import { useAssistant } from "../../store/assistant";
 import { cn } from "../ui";
 
 type Preview = Awaited<ReturnType<typeof api.assistantActionPreview>>;
 
 const MAX_ROWS = 14;
 
-export function ActionCard({ action }: { action: ParsedAction }) {
+export function ActionCard({ action: proposed }: { action: ParsedAction }) {
+  // A syllabus lands in the folder the user selected in the chat, whatever name the model wrote.
+  const chatFolders = useAssistant((s) => s.folders);
+  const target = proposed.action === "create_syllabus" ? chatFolders.filter((f) => !f.includes("/")) : [];
+  const forced = target.length === 1 ? target[0]! : "";
+  const action = useMemo<ParsedAction>(
+    () => (forced ? { ...proposed, args: { ...proposed.args, subject: forced } } : proposed),
+    [proposed, forced],
+  );
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
   const [state, setState] = useState<"idle" | "applying" | "applied" | "dismissed">("idle");
@@ -66,6 +75,7 @@ export function ActionCard({ action }: { action: ParsedAction }) {
         <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-text">
           {preview?.title ?? "Propuesta del asistente"}
         </span>
+        {forced && <span className="flex-none rounded border border-accent/40 px-1.5 text-[10px] text-accent-text">en «{forced}»</span>}
       </div>
 
       {error && <p className="mt-1.5 text-[11.5px] text-danger">{error}</p>}

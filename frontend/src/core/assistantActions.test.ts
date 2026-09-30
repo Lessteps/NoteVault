@@ -36,7 +36,8 @@ describe("create_syllabus", () => {
 
   it("plans without writing, then creates areas, overviews and topic practice files", () => {
     const plan = planAssistantAction(root, action);
-    expect(plan.ops.filter((o) => o.kind === "write").length).toBe(9);
+    expect(plan.ops.filter((o) => o.kind === "write").length).toBe(10);
+    expect(plan.ops.find((o) => o.rel === "JavaScript/00 Temario.md")?.content).toContain("- [[2.1 Promesas]]");
     expect(fs.existsSync(path.join(root, "JavaScript"))).toBe(false);
 
     const res = applyAssistantAction(root, action);

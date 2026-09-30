@@ -187,13 +187,16 @@ export function MenuHost() {
   useEffect(() => {
     if (!menu) return;
     const close = () => set(null);
+    // Only a click outside or Escape closes it. Any key used to: the Windows key (which also
+    // blurs the window) or a modifier pressed alone made the options vanish.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
     window.addEventListener("mousedown", close);
-    window.addEventListener("blur", close);
-    window.addEventListener("keydown", close);
+    window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("mousedown", close);
-      window.removeEventListener("blur", close);
-      window.removeEventListener("keydown", close);
+      window.removeEventListener("keydown", onKey);
     };
   }, [menu, set]);
   // Measured after layout: the menu is moved back inside the window whatever its size.

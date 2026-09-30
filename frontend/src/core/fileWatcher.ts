@@ -27,7 +27,8 @@ export class FileWatcherService {
     this.onModifiedCallback = (event: WatchEvent) => {
       if (typeof onModifiedCallback === "function") {
         try {
-          (onModifiedCallback as any)(event.fullPath, event);
+          // One call per event: it used to fire twice (path, then event), which doubled
+          // every IPC message and every tree refresh in the window.
           (onModifiedCallback as any)(event);
         } catch {
           // Ignore callback errors

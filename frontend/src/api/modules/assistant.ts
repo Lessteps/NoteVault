@@ -81,6 +81,7 @@ export function assistantApi(app: AppState) {
     noteRel: string,
     selection: string,
     mode = "",
+    folders: string[] = [],
   ): ChatMessage[] => {
     if (!Array.isArray(history)) throw new ApiError("Historial inválido.");
     const q = String(question || "").trim().slice(0, MAX_TEXT);
@@ -118,7 +119,7 @@ export function assistantApi(app: AppState) {
       note_title: title,
       note_body: body,
       selection: String(selection || "").slice(0, MAX_TEXT),
-      workspace_prompt: [wsPrompt, vaultMode ? modeContext(vaultMode, noteRel) : ""].filter(Boolean).join("\n\n"),
+      workspace_prompt: [wsPrompt, vaultMode ? modeContext(vaultMode, noteRel, folders) : foldersContext(folders)].filter(Boolean).join("\n\n"),
       ...(vaultMode ? { mode: vaultMode } : {}),
     });
   };
@@ -143,8 +144,27 @@ export function assistantApi(app: AppState) {
     ].join("\n");
   };
 
+  /** Folders the user pointed the chat at that really exist (vault-relative, POSIX). */
+  const existingFolders = (folders: string[]): string[] =>
+    folders
+      .slice(0, 8)
+      .map((f) => f.replace(/\\/g, "/").replace(/^\/+|\/+$/g, ""))
+      .filter((f) => {
+        try {
+          return !!f && fs.statSync(app.resolve(f, { allowRoot: true })).isDirectory();
+        } catch {
+          return false;
+        }
+      });
+
+  /** Plain (no mode) conversations still learn which folders "esta carpeta" means. */
+  const foldersContext = (folders: string[]): string => {
+    const list = existingFolders(folders);
+    return list.length ? buildModeContext({ skills: [], folders: list }) : "";
+  };
+
   /** The vault's skills and, for a new topic, the area being worked on. */
-  const modeContext = (mode: string, noteRel: string): string => {
+  const modeContext = (mode: string, noteRel: string, folders: string[] = []): string => {
     let areaFolder = "";
     let areaTopics: string[] = [];
     if (noteRel) {
@@ -170,7 +190,7 @@ export function assistantApi(app: AppState) {
       }
     }
     const noteFolder = noteRel.includes("/") ? noteRel.slice(0, noteRel.lastIndexOf("/")) : "";
-    return buildModeContext({ skills: readSkillTemplates(app.root, noteRel), areaFolder, areaTopics, noteFolder, matrix: mode === "matriz" ? matrixContext(noteRel) : undefined });
+    return buildModeContext({ skills: readSkillTemplates(app.root, noteRel), areaFolder, areaTopics, noteFolder, matrix: mode === "matriz" ? matrixContext(noteRel) : undefined, folders: existingFolders(folders) });
   };
 
   /** A structured reply (a whole syllabus as JSON) does not fit the chat's small token budget. */
@@ -305,10 +325,11 @@ export function assistantApi(app: AppState) {
       noteRel = "",
       selection = "",
       mode = "",
+      folders: unknown = [],
     ): Promise<Record<string, unknown>> {
       const id = String(streamId || "").slice(0, 64);
       if (!id) throw new ApiError("Falta el identificador del flujo.");
-      const messages = chatMessages(history, question, noteRel, selection, mode);
+      const messages = chatMessages(history, question, noteRel, selection, mode, Array.isArray(folders) ? folders.map(String) : []);
       const cfg = configFor(mode);
       if (cfg.is_bridge) {
         return {

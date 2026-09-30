@@ -169,24 +169,48 @@ function useWindowNoteParam() {
   }, []);
 }
 
+/** Quiet time after the last file event before the window reacts, and the longest it waits. */
+const WATCH_QUIET_MS = 350;
+const WATCH_MAX_MS = 1500;
+
+/**
+ * Creating a syllabus or a study space writes hundreds of files in a few seconds; each one
+ * used to reload the whole tree at once, which froze the window. Events are gathered and the
+ * window reacts ONCE per burst: one tree refresh, one reload per open file that changed.
+ */
 function useFileWatcherListener() {
   useEffect(() => {
-    return api.onWatchEvent((ev) => {
-      useApp.getState().refreshTree();
-      const rel = ev.relPath;
-      if (rel) {
-        const s = useApp.getState();
+    const changed = new Set<string>();
+    let quiet: number | null = null;
+    let first = 0;
+
+    const flush = () => {
+      quiet = null;
+      first = 0;
+      const rels = [...changed];
+      changed.clear();
+      const s = useApp.getState();
+      s.refreshTree();
+      for (const rel of rels) {
         // Our own save comes back as a file event: re-reading it would rebuild the
         // editor with what it already shows.
-        if (s.notes[rel] && !wasJustWritten(rel)) {
-          void s.reload(rel);
-        }
-        const canvas = useCanvas.getState();
-        if (canvas.path === rel) {
-          void canvas.reload();
-        }
+        if (s.notes[rel] && !wasJustWritten(rel)) void s.reload(rel);
       }
+      const canvas = useCanvas.getState();
+      if (canvas.path && rels.includes(canvas.path)) void canvas.reload();
+    };
+
+    const off = api.onWatchEvent((ev) => {
+      if (ev?.relPath) changed.add(ev.relPath);
+      const now = Date.now();
+      if (!first) first = now;
+      if (quiet !== null) window.clearTimeout(quiet);
+      quiet = window.setTimeout(flush, now - first >= WATCH_MAX_MS ? 0 : WATCH_QUIET_MS);
     });
+    return () => {
+      off();
+      if (quiet !== null) window.clearTimeout(quiet);
+    };
   }, []);
 }
 

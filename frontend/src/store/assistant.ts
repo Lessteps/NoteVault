@@ -174,11 +174,9 @@ export const useAssistant = create<AssistantState>((set, get) => ({
         ...(sel ? [{ path: noteRel, text: sel }] : []),
       ],
     };
-    // The model is told which folders «esta carpeta» / «este tema» refer to; the chat only shows the chips.
+    // The folders travel as real context (see ai_chat_stream), not inside the question.
     const folders = get().folders;
-    const asked = folders.length
-      ? `[Carpetas seleccionadas por el usuario (rutas dentro de la bóveda):\n${folders.map((f) => `- ${f}`).join("\n")}\nCuando diga «esta carpeta», «este tema» o similar, se refiere a ellas.]\n\n${q}`
-      : q;
+    const asked = q;
     const answerId = uid();
     const answer: ChatMessage = {
       id: answerId,
@@ -198,7 +196,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
 
     const started = Date.now();
     try {
-      const r = await api.aiChatStream(answerId, history, asked, noteRel, sel, get().mode);
+      const r = await api.aiChatStream(answerId, history, asked, noteRel, sel, get().mode, folders);
       if (r.bridge) {
         await copyText(r.prompt ?? "");
         if (r.url) await api.openExternal(r.url).catch(() => undefined);

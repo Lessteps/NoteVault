@@ -144,6 +144,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
     exists: fs.existsSync(absOf(root, rootOverview)),
   });
   const spaceAreas: SpaceMapArea[] = [];
+  const outline: string[] = [];
   for (const area of areas) {
     const areaName = safeName(area?.folder || area?.name);
     if (!areaName) continue;
@@ -165,6 +166,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
       const topicRel = `${areaRel}/${topicName}`;
       ops.push(mkdirOp(root, topicRel), ...topicFiles(root, topicRel, topicName, subjectId, topic?.skills));
     }
+    if (mapTopics.length) outline.push(`## ${safeName(area?.name) || areaName}`, ...mapTopics.map((t) => `- [[${t.name}]]`), "");
     // Every grouping area gets its map (canvas), built from its topics (see mapa_skill).
     if (args.map !== false && mapTopics.length) {
       const areaLabel = safeName(area?.name) || areaName;
@@ -186,6 +188,15 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
       rel: spaceMapRel,
       content: JSON.stringify(buildSpaceMapCanvas(spaceAreas), null, "\t") + "\n",
       exists: fs.existsSync(absOf(root, spaceMapRel)),
+    });
+  }
+  if (outline.length) {
+    const temarioRel = `${subject}/00 Temario.md`;
+    ops.push({
+      kind: "write",
+      rel: temarioRel,
+      content: `---\ntitle: Temario de ${subject}\nsubject: ${subjectId}\ntype: topic\n---\n\n# Temario de ${subject}\n\n${outline.join("\n").trimEnd()}\n`,
+      exists: fs.existsSync(absOf(root, temarioRel)),
     });
   }
   return { action: "create_syllabus", title: `Crear el temario de ${subject}`, ops, warnings: [] };

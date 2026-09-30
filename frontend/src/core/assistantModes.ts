@@ -35,6 +35,7 @@ const TEMARIO = [
   "5. FOCUS: ask what purpose the syllabus should serve inside the area (e.g. Backend). The focus steers selection and depth but must not stop you from adding complementary knowledge the objective needs.",
   "6. EXTENSIONS: from area, objective and focus detect complementary areas that could help (e.g. TypeScript, Testing, Node.js, Patrones de diseño) and offer them as a bulleted list; the user may accept, reject or ignore them.",
   '7. GENERATE: once extensions are settled, show the full syllabus as a compact outline (phases, areas, numbered topics like "1.1 …", ordered by learning dependencies) and ask "¿Lo creo?". Only when the user confirms, end with the create_syllabus action.',
+  'If the user selected a folder in the chat (see "Folders selected"), the syllabus goes INSIDE it: skip every step whose answer is already known from the message or from what that folder contains, and never propose areas it already has. create_syllabus itself also writes the space overview, "00 Temario.md" (the linked outline) and the space map canvas, so do not offer them separately.',
   'Conventions: area folders are "N Nombre" and topic folders "N.M Nombre" (natural numeric order; Fase 0 is area "0 …"); 6-12 topics per area; topic names must stay identical across theory, practice and canvas. Theory notes, practice plans and canvases are created afterwards, one topic at a time.',
 ].join("\n");
 
@@ -75,6 +76,8 @@ export function buildModeContext(input: {
   noteFolder?: string;
   /** the open topic's competency matrix and the catalogue, for the matrix mode */
   matrix?: string;
+  /** folders the user selected in the chat (vault-relative paths) */
+  folders?: readonly string[];
 }): string {
   const parts: string[] = [];
   if (input.skills.length) {
@@ -86,6 +89,13 @@ export function buildModeContext(input: {
   if (input.areaFolder) {
     parts.push(
       `Area context: folder "${input.areaFolder}". Existing topics: ${input.areaTopics?.length ? input.areaTopics.join("; ") : "(none)"}.`,
+    );
+  }
+  if (input.folders?.length) {
+    parts.push(
+      'Folders selected by the user in the chat ("this folder", "this topic" and "here" refer to them; work INSIDE them and never create a sibling with a similar name):\n' +
+        input.folders.map((f) => `- ${f}`).join("\n") +
+        "\nFor create_syllabus: if a selected folder is a top-level folder, its exact name MUST be args.subject (the areas are added inside it). For create_topic use a selected area folder as args.area; for set_practice_plan a selected topic folder as args.topic.",
     );
   }
   if (input.matrix) parts.push(`Matrix context:\n${input.matrix}`);

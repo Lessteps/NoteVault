@@ -363,9 +363,9 @@ export const api = {
   aiChat: (history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "") =>
     call<{ reply?: string; bridge?: boolean; prompt?: string; url?: string; label?: string }>("ai_chat", history, question, noteRel, selection),
   /** Streamed chat: the answer arrives over onAiStream, the promise holds it whole. */
-  aiChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "", mode = "") =>
+  aiChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "", mode = "", folders: string[] = []) =>
     call<{ reply?: string; stopped?: boolean; bridge?: boolean; prompt?: string; url?: string; label?: string }>(
-      "ai_chat_stream", id, history, question, noteRel, selection, mode,
+      "ai_chat_stream", id, history, question, noteRel, selection, mode, folders,
     ),
   /** What a chat action would create (nothing is written). */
   assistantActionPreview: (action: unknown) =>

@@ -51,6 +51,7 @@ if (vault) {
     const failures: string[] = [];
     const byType = new Map<string, number>();
     const started = Date.now();
+    const timings: Array<[number, string]> = [];
 
     for (const rel of paths) {
       let raw = "";
@@ -63,6 +64,7 @@ if (vault) {
       const type = /^\s*type:\s*(.+)$/m.exec(raw.slice(0, 2000))?.[1]?.trim() ?? "(sin type)";
       byType.set(type, (byType.get(type) ?? 0) + 1);
 
+      const t0 = Date.now();
       const host = document.createElement("div");
       document.body.appendChild(host);
       const root = createRoot(host);
@@ -88,6 +90,7 @@ if (vault) {
         window.removeEventListener("error", onError);
         await act(async () => root.unmount());
         host.remove();
+        timings.push([Date.now() - t0, rel]);
       }
       if (failures.length > 40) break;
     }
@@ -95,6 +98,8 @@ if (vault) {
     const seconds = Math.round((Date.now() - started) / 1000);
     process.stdout.write(`\nnotas abiertas: ${paths.length} en ${seconds} s · modo ${mode}\n`);
     process.stdout.write(`tipos: ${[...byType.entries()].sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t}=${n}`).join(" · ")}\n`);
+    process.stdout.write(`más lentas: ${timings.sort((a, b) => b[0] - a[0]).slice(0, 8).map(([ms, r]) => `${ms}ms ${r}`).join(" | ")}
+`);
     process.stdout.write(`fallos: ${failures.length}\n${failures.slice(0, 40).map((f) => `  ${f}`).join("\n")}\n`);
     expect(paths.length).toBeGreaterThan(0);
   }, 1_800_000);

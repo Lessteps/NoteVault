@@ -147,6 +147,7 @@ const SNAPSHOT_CACHE_TTL_MS = 30_000;
 
 /** The per-subject dashboard is expensive (it scans the whole vault), so it is memoed. */
 const _dashboardCache = new Map<string, { data: unknown; timestamp: number }>();
+const _dashboardRefreshing = new Set<string>();
 
 /**
  * One vault scan, shared by every study call that needs it.
@@ -1167,12 +1168,23 @@ export function studyApi(app: AppState) {
       return { ok: true, created, folders, plan };
     },
 
-    study_topic_dashboard: async (subjectFilter?: string) => {
+    study_topic_dashboard: async function dashboard(subjectFilter?: string, refreshing?: boolean): Promise<any> {
       const cacheKey = `${app.root}::${subjectFilter ?? ""}`;
       const cachedDashboard = _dashboardCache.get(cacheKey) as
         | { data: { subjects: string[]; areas: string[]; topics: unknown[] }; timestamp: number }
         | undefined;
-      if (cachedDashboard && Date.now() - cachedDashboard.timestamp < SNAPSHOT_CACHE_TTL_MS) {
+      if (cachedDashboard && !refreshing) {
+        if (Date.now() - cachedDashboard.timestamp >= SNAPSHOT_CACHE_TTL_MS && !_dashboardRefreshing.has(cacheKey)) {
+          // Only the TTL ran out (a write would have dropped the entry): opening the area
+          // note must not pay the ~0.5 s vault walk on the main process. Answer with the
+          // last payload now and rebuild it right after the reply is on its way.
+          _dashboardRefreshing.add(cacheKey);
+          setTimeout(() => {
+            void dashboard(subjectFilter, true)
+              .catch(() => undefined)
+              .finally(() => _dashboardRefreshing.delete(cacheKey));
+          }, 50);
+        }
         return cachedDashboard.data;
       }
       // A cold process would block the renderer for as long as it takes to read

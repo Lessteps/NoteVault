@@ -12,7 +12,7 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { TopicDashboardData, TopicDashboardItem, TopicManifest } from "../../lib/types";
 import { useApp } from "../../store/app";
@@ -46,14 +46,26 @@ export function TopicDashboardView() {
   // Expanded areas
   const [collapsedAreas, setCollapsedAreas] = useState<Record<string, boolean>>({});
 
+  const retryRef = useRef(0);
+  const retryTimer = useRef<number | null>(null);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.studyTopicDashboard();
+      if (res.loading) {
+        if (retryRef.current < 40) {
+          retryRef.current += 1;
+          if (retryTimer.current) window.clearTimeout(retryTimer.current);
+          retryTimer.current = window.setTimeout(() => void loadData(), 1500);
+        }
+        return;
+      }
+      retryRef.current = 0;
       setData(res);
+      setLoading(false);
     } catch (err: any) {
       toast("error", err?.message || "Error al cargar panel de temas");
-    } finally {
       setLoading(false);
     }
   }, [toast]);
@@ -61,6 +73,13 @@ export function TopicDashboardView() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(
+    () => () => {
+      if (retryTimer.current) window.clearTimeout(retryTimer.current);
+    },
+    [],
+  );
 
   // Derived unique skills across loaded topics
   const allSkills = useMemo(() => {

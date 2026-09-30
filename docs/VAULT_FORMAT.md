@@ -2,14 +2,16 @@
 
 > **Versión del formato: 4**
 >
-> Este documento es el contrato entre la app de escritorio (Python/PySide6) y
-> la app de Android (Dart/Flutter). Las dos leen y escriben los mismos
-> archivos; no hay servidor, base de datos ni protocolo entre ellas.
+> Este documento es el contrato de formato de la vault de NoteVault. La app de
+> escritorio (Electron + TypeScript + React) lo implementa en
+> `frontend/src/core/`; el cliente móvil (en otro repositorio) lee y escribe los
+> mismos archivos. No hay servidor, base de datos ni protocolo entre ellos.
 >
-> Si cambias el formato, actualiza este documento **y** los ficheros de
-> conformidad de `tests/conformance/`, y sube `FORMAT_VERSION` en
-> `notevault_app/core/vault_format.py`. La prueba `tests/test_vault_format.py`
-> falla si el código y este contrato dejan de coincidir.
+> Si cambias el formato, actualiza este documento **y** los tests de
+> `frontend/src/core/` que lo fijan, y sube `FORMAT_VERSION` en
+> `frontend/src/core/vaultFormat.ts`. `vaultFormat.test.ts` ata el código a este
+> contrato y falla si dejan de coincidir; `store.test.ts`, `recurrence.test.ts`,
+> `habitManager.test.ts` y `financeManager.test.ts` fijan el formato de cada entidad.
 
 ## Principios
 
@@ -66,7 +68,7 @@ explorador de notas sin necesitar ninguna regla extra.
 
 En la versión 1 las carpetas `habits`, `ejercicio`, `tareas` y `proyectos`
 vivían sueltas en la raíz. Las dos apps las mueven bajo `.notevault/` la primera
-vez que abren la vault (`migrate_vault()` en Python, `migrateVault()` en Dart).
+vez que abren la vault (`migrateVault()` en `frontend/src/core/vaultManager.ts` y su equivalente en el cliente móvil).
 
 La migración **nunca sobrescribe**: si el destino ya tiene ese archivo, gana el
 del destino y la copia vieja se queda en disco. Una vault a medio sincronizar no
@@ -212,7 +214,7 @@ Cuerpo markdown libre: el "archivo interno" de la tarea.
 - `reminder` vacío significa sin recordatorio.
 - `reminder_done` pasa a `true` cuando **algún** dispositivo ya avisó. Es la
   bandera que evita que el móvil y el escritorio notifiquen dos veces; ver
-  `reminder_scheduler.py`.
+  `reminderScheduler.ts`.
 - Los campos de fecha vacíos se escriben como la clave sin valor.
 - Opcionales, en este orden **después de `reminder_done`** y antes de cualquier
   clave desconocida (`TASK_OPTIONAL_KEYS`):
@@ -229,7 +231,7 @@ Cuerpo markdown libre: el "archivo interno" de la tarea.
 ## Repetición
 
 Hábitos, tareas y rutinas de Calendario comparten una regla escrita como una
-cadena corta (`core/recurrence.py`, `RECURRENCE_KINDS`):
+cadena corta (`frontend/src/core/recurrence.ts`, `RECURRENCE_KINDS`):
 
 | Regla | Cae en |
 |---|---|
@@ -239,9 +241,9 @@ cadena corta (`core/recurrence.py`, `RECURRENCE_KINDS`):
 | `monthly:1,15` | Esos días del mes. `31` (o `29`, `30`) cae en el último día de los meses más cortos. |
 
 Vacío, `none` o una regla ilegible significan "no se repite". Los números
-fuera de rango se descartan. `tests/conformance/EXPECTED.json`
-(`recurrence_rules`, `habit_rules`, `task.occurs`, `task.roll_forward`) fija
-los días exactos que debe devolver cada implementación.
+fuera de rango se descartan. `recurrence.test.ts` y `habitManager.test.ts`
+(reglas de recurrencia, reglas de hábitos, `occurs` y `roll_forward` de tareas)
+fijan los días exactos que debe devolver cada implementación.
 
 ## Proyectos (versión 4, tipo Jira)
 
@@ -323,7 +325,7 @@ checklist bajo `## Tareas`. Al abrir la vault (`migrate_projects()`):
 ## Frontmatter tipado (versión 4)
 
 Metas y Proyectos guardan sus entidades como markdown con un frontmatter de
-**claves tipadas** (`core/store.py`, `lib/core/store.dart`). Cada entidad
+**claves tipadas** (`frontend/src/core/store.ts`). Cada entidad
 declara su lista de `(clave, tipo)` en `vault_format` y se escribe así:
 
 1. `---`, una línea `clave: valor` por clave **en el orden de la lista**, y
@@ -346,7 +348,7 @@ Una clave **sin valor no se escribe** (None, texto vacío, lista vacía o
 | `list` | elementos separados por coma, entre comillas | `habit_links: "coding,math"` |
 
 Las claves desconocidas se reescriben siempre entre comillas.
-`EXPECTED.json` (`store_encoding`) fija la salida exacta.
+`store.test.ts` fija la salida exacta.
 
 Los JSON de la versión 4 (áreas, registro de metas, finanzas) se escriben con
 sangría de 2 espacios, sin escapar caracteres no ASCII y con `\n` final.
@@ -545,7 +547,7 @@ Id `fYYYYMMDD-xxxxxx`. Claves en el orden de `FINANCE_GOAL_KEYS`:
   primero el día nuevo y después el viejo.
 - Borrar un movimiento manda sus adjuntos a `.papelera/finanzas-adjuntos/`.
 
-`EXPECTED.json` (`finance`) fija totales, cadencias y bytes.
+`financeManager.test.ts` fija totales, cadencias y bytes.
 
 ## Marcadores
 

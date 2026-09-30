@@ -13,6 +13,10 @@ import {
   type DifficultyLevel,
   skillsForSubject,
 } from "./skills";
+import { branchFromPath, isEnglishBranch, type EnglishBranch } from "../../lib/englishSkillData";
+import { domainOfSubject } from "./domain";
+import { skillsForBranch } from "./skillSelection";
+import { type TopicType, normaliseTopicType } from "./topicType";
 
 export interface TopicMasteryConfig {
   min_per_skill: number;
@@ -26,7 +30,19 @@ export interface TopicManifest {
   title: string;
   skills: string[];
   mastery: TopicMasteryConfig;
+  /** Teórico · procedimental · mixto: decide qué skills se recomiendan (ver topicType.ts). */
+  topic_type?: TopicType;
+  /** English topics: gramática · escritura · lectura · escucha · habla. English has no topic type and no default branch. */
+  branch?: EnglishBranch;
+  /** English topics: the CEFR level of the topic (A1–C1); exercise difficulty is relative to it. */
+  level?: string;
   exam_group?: string;
+  /**
+   * The AI's plan for THIS topic: which competencies it trains and how many passed
+   * exercises each difficulty needs ([easy, medium, hard]; 0 = not practised there).
+   * When present it replaces the fixed `min_per_skill` / `target_difficulty` rule.
+   */
+  plan?: Record<string, [number, number, number]>;
   path?: string;
   folder?: string;
 }
@@ -37,6 +53,24 @@ export interface TopicCellProgress {
   attempts: number;
   passes: number;
   bestScore: number | null;
+  /** passes this cell needs according to the topic's plan; undefined without a plan */
+  required?: number;
+}
+
+/** `solve=3/4/2, process=2/3/0` ⇄ the plan map. Unknown or empty entries are dropped. */
+export function parsePlanString(text: unknown): Record<string, [number, number, number]> | undefined {
+  const out: Record<string, [number, number, number]> = {};
+  for (const part of String(text ?? "").split(",")) {
+    const m = /^\s*([a-z_]+)\s*=\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s*$/i.exec(part);
+    if (!m) continue;
+    const counts: [number, number, number] = [Number(m[2]), Number(m[3]), Number(m[4])];
+    if (counts[0] + counts[1] + counts[2] > 0) out[m[1]!.toLowerCase()] = counts;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+export function formatPlanString(plan: Record<string, [number, number, number]>): string {
+  return Object.entries(plan).map(([skill, c]) => `${skill}=${c[0]}/${c[1]}/${c[2]}`).join(", ");
 }
 
 export interface TopicSkillProgress {
@@ -235,8 +269,20 @@ export function parseTopicManifest(
     rawSkills = fm.skills.split(/[,\s]+/).map((s) => s.trim().toLowerCase());
   }
 
-  const validSkills = rawSkills.filter((s) => knownSkillIds.has(s));
-  const skills = validSkills.length > 0 ? validSkills : subjectSkills.map((s) => s.id);
+  const plan = parsePlanString(fm.plan);
+  const planned = plan ? Object.keys(plan).filter((s) => knownSkillIds.has(s)) : [];
+  const validSkills = (planned.length ? planned : rawSkills).filter((s) => knownSkillIds.has(s));
+  // No declared skills: mathematics/programming offer the whole subject (as always). English does NOT: it
+  // offers its branch's skills, and an unclassified topic (no `branch:`) offers none until it is classified.
+  const declaredBranch = String(fm.branch ?? "").trim().toLowerCase();
+  const skills =
+    validSkills.length > 0
+      ? validSkills
+      : domainOfSubject(subject) === "english"
+        ? isEnglishBranch(declaredBranch)
+          ? skillsForBranch(subject, declaredBranch)
+          : []
+        : subjectSkills.map((s) => s.id);
 
   // Mastery config: supports nested object or flat/indented keys from parseFrontmatter
   const rawMastery = fm.mastery && typeof fm.mastery === "object" ? fm.mastery : {};
@@ -266,6 +312,19 @@ export function parseTopicManifest(
 
   if (fm.exam_group) {
     manifest.exam_group = String(fm.exam_group).trim();
+  }
+
+  const topicType = normaliseTopicType(fm.topic_type);
+  if (topicType) {
+    manifest.topic_type = topicType;
+  }
+  const branch = String(fm.branch ?? "").trim().toLowerCase();
+  if (isEnglishBranch(branch)) manifest.branch = branch;
+  const level = String(fm.level ?? "").trim().toUpperCase();
+  if (/^(A1|A2|B1|B2|C1)$/.test(level)) manifest.level = level;
+
+  if (plan && planned.length) {
+    manifest.plan = Object.fromEntries(planned.map((sk) => [sk, plan[sk]!]));
   }
 
   return manifest;
@@ -308,6 +367,16 @@ export function serializeTopicManifest(manifest: TopicManifest): string {
     `  exam: ${manifest.mastery.exam}`,
   ];
 
+  if (manifest.topic_type) {
+    lines.push(`topic_type: ${manifest.topic_type}`);
+  }
+  if (manifest.branch) {
+    lines.push(`branch: ${manifest.branch}`);
+  }
+  if (manifest.level) {
+    lines.push(`level: ${manifest.level}`);
+  }
+
   if (manifest.exam_group) {
     lines.push(`exam_group: "${manifest.exam_group.replace(/"/g, '\\"')}"`);
   }
@@ -332,6 +401,21 @@ export function createDefaultTopicManifest(
   examGroup?: string,
 ): TopicManifest {
   const normSubject = subject.toLowerCase();
+  // English: the branch comes from the folder (Inglés/3 Lectura/…) and decides the skills. Outside a
+  // branch folder the topic is left UNCLASSIFIED (no branch, no skills) instead of getting a default.
+  if (domainOfSubject(normSubject) === "english") {
+    const branch = branchFromPath(folder);
+    return {
+      type: "topic",
+      subject: normSubject,
+      title: folderName,
+      skills: branch ? skillsForBranch(normSubject, branch) : [],
+      mastery: { ...DEFAULT_MASTERY_CONFIG },
+      exam_group: examGroup,
+      ...(branch ? { branch } : {}),
+      folder,
+    };
+  }
   const availableSkills = skillsForSubject(normSubject);
 
   // If there are existing exercises, gather which skills are already represented
@@ -377,10 +461,11 @@ export function computeTopicProgress(
   const skillsProgress: Record<string, TopicSkillProgress> = {};
 
   for (const skillId of topic.skills) {
+    const planned = topic.plan?.[skillId];
     const cells: Record<DifficultyLevel, TopicCellProgress> = {
-      1: { skill: skillId, difficulty: 1, attempts: 0, passes: 0, bestScore: null },
-      2: { skill: skillId, difficulty: 2, attempts: 0, passes: 0, bestScore: null },
-      3: { skill: skillId, difficulty: 3, attempts: 0, passes: 0, bestScore: null },
+      1: { skill: skillId, difficulty: 1, attempts: 0, passes: 0, bestScore: null, ...(planned ? { required: planned[0] } : {}) },
+      2: { skill: skillId, difficulty: 2, attempts: 0, passes: 0, bestScore: null, ...(planned ? { required: planned[1] } : {}) },
+      3: { skill: skillId, difficulty: 3, attempts: 0, passes: 0, bestScore: null, ...(planned ? { required: planned[2] } : {}) },
     };
 
     let totalAttempts = 0;
@@ -424,14 +509,25 @@ export function computeTopicProgress(
       }
     }
 
-    // Consolidated: >= min_per_skill passes and passed at least once at target or intermediate
-    const consolidated =
-      totalPasses >= topic.mastery.min_per_skill &&
-      (highestPassedDiff >= Math.min(2, topic.mastery.target_difficulty) ||
-        (bestScore !== null && bestScore >= 75));
-
-    // Mastered: consolidated AND reached target_difficulty
-    const mastered = consolidated && highestPassedDiff >= topic.mastery.target_difficulty;
+    let consolidated: boolean;
+    let mastered: boolean;
+    if (planned) {
+      // With the AI's plan the matrix cells ARE the requirement: mastered when every
+      // planned cell has its passes, consolidated from half of what is planned.
+      const needed = ([1, 2, 3] as const).filter((d) => (cells[d].required ?? 0) > 0);
+      mastered = needed.every((d) => cells[d].passes >= cells[d].required!);
+      const planTotal = needed.reduce((n, d) => n + cells[d].required!, 0);
+      const done = needed.reduce((n, d) => n + Math.min(cells[d].passes, cells[d].required!), 0);
+      consolidated = mastered || (planTotal > 0 && done * 2 >= planTotal);
+    } else {
+      // Consolidated: >= min_per_skill passes and passed at least once at target or intermediate
+      consolidated =
+        totalPasses >= topic.mastery.min_per_skill &&
+        (highestPassedDiff >= Math.min(2, topic.mastery.target_difficulty) ||
+          (bestScore !== null && bestScore >= 75));
+      // Mastered: consolidated AND reached target_difficulty
+      mastered = consolidated && highestPassedDiff >= topic.mastery.target_difficulty;
+    }
 
     const status: "not_started" | "practicing" | "consolidated" =
       totalAttempts === 0 ? "not_started" : consolidated ? "consolidated" : "practicing";
@@ -479,4 +575,56 @@ export function computeTopicProgress(
     theoryNotesCount,
     exerciseNotesCount: exercises.length,
   };
+}
+
+export interface NoteForManifest {
+  /** Vault-relative POSIX path of the note. */
+  rel: string;
+  /** Absolute path of the note. */
+  path: string;
+  frontmatter: Record<string, any>;
+}
+
+/** A manifest's file name: the new view file first, then the legacy names. */
+function manifestNameRank(base: string): number {
+  const low = base.toLowerCase();
+  if (low.endsWith(".practica.md")) return 0;
+  if (low === "_tema.md") return 1;
+  if (low === "tema.md") return 2;
+  return 3;
+}
+
+/**
+ * The vault's topic manifests, discovered from notes that have already been read.
+ *
+ * This replaces the per-folder climb for whole-vault sweeps:
+ * `findAncestorTopicManifest` re-reads every `.md` of every folder it walks
+ * (measured: 593 folders → a second full vault read, 2 680 ms warm), while this
+ * needs no I/O at all. Same rules as `parseTopicManifest`: a manifest is a note
+ * whose frontmatter parses as a topic (`type: topic`, `type: practica` — the
+ * `<folder>.practica.md` view file — or a `tema`/`topic` tag), and the topic is
+ * the folder the manifest lives in.
+ */
+export function manifestsFromNotes(notes: Iterable<NoteForManifest>): DiscoveredTopicManifest[] {
+  const best = new Map<string, { found: DiscoveredTopicManifest; rank: number }>();
+  for (const note of notes) {
+    const rel = note.rel.replace(/\\/g, "/");
+    const folderRel = path.posix.dirname(rel);
+    const folderName = path.posix.basename(folderRel) || path.posix.basename(path.posix.dirname(folderRel));
+    const manifest = parseTopicManifest(note.frontmatter, folderName || "Tema sin título");
+    if (!manifest) continue;
+    const rank = manifestNameRank(path.posix.basename(rel));
+    const prev = best.get(folderRel);
+    if (prev && prev.rank <= rank) continue;
+    const folderAbs = path.dirname(note.path);
+    best.set(folderRel, {
+      rank,
+      found: {
+        manifestPath: note.path,
+        topicFolder: folderAbs,
+        manifest: { ...manifest, path: note.path, folder: folderAbs },
+      },
+    });
+  }
+  return [...best.values()].map((entry) => entry.found);
 }

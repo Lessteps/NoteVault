@@ -184,7 +184,7 @@ export function Donut({ parts, size = 120, thickness = 16, label }: {
   const c = 2 * Math.PI * r;
   let offset = 0;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" className="flex-none">
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--nv-elevated)" strokeWidth={thickness} />
       {total > 0 && parts.map((p) => {
         const len = (p.value / total) * c;

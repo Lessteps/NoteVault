@@ -46,7 +46,32 @@ export const CODE_EXTS: Record<string, [string, string]> = {
   ".cmd": ["CMD", "#6b6b74"],
   ".sql": ["SQL", "#e38c00"],
   ".vb": ["VB", "#945db7"],
+  ".json": ["JSON", "#d4b106"],
+  ".yaml": ["YAML", "#cc342d"],
+  ".yml": ["YAML", "#cc342d"],
+  ".toml": ["TOML", "#9b59b6"],
+  ".xml": ["XML", "#e67e22"],
+  ".txt": ["TXT", "#6b6b74"],
+  ".csv": ["CSV", "#27ae60"],
+  ".env": ["ENV", "#e74c3c"],
+  ".ini": ["INI", "#95a5a6"],
+  ".cfg": ["CFG", "#95a5a6"],
+  ".dockerfile": ["DC", "#2496ed"],
+  ".makefile": ["MK", "#427819"],
 };
+
+/**
+ * Binary/media files the explorer keeps hidden: they have no useful text form
+ * and open in their own viewer, not the source editor.
+ */
+const BINARY_EXTS = new Set([
+  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".svg",
+  ".pdf", ".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac",
+  ".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi",
+  ".zip", ".gz", ".tar", ".rar", ".7z",
+  ".exe", ".dll", ".so", ".dylib", ".bin",
+  ".woff", ".woff2", ".ttf", ".otf",
+]);
 
 export type FileKind = "note" | "canvas" | "code" | "";
 
@@ -56,6 +81,9 @@ export function kindFor(filePath: string): FileKind {
   if (NOTE_EXTS.has(ext)) return "note";
   if (CANVAS_EXTS.has(ext)) return "canvas";
   if (ext in CODE_EXTS) return "code";
+  // Any other text-ish file (unknown extension) still shows up as generic code
+  // instead of being invisible; binary/media files stay out.
+  if (ext && ext !== "." && !BINARY_EXTS.has(ext)) return "code";
   return "";
 }
 

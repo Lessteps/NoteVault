@@ -11,6 +11,7 @@ import { LAYOUT } from "../vaultFormat.js";
 import { PracticeAttemptStore } from "./attempts.js";
 import { ExerciseNote } from "./exerciseNote.js";
 import { GradeResult, qualityFrom } from "./grading.js";
+import { countAttempt } from "./ledger.js";
 
 export const SUBJECT_ORDER = ["mathematics", "programming", "english", "general"] as const;
 const _EVIDENCE_MAX = 500;
@@ -165,9 +166,20 @@ export function applyResult(
     transport: string;
     result: GradeResult;
     entity_type?: string;
+    /** Se abandonó el ejercicio (fase 2: no cuenta). */
+    gave_up?: boolean;
   }
 ): Record<string, any> {
   const quality = qualityFrom(options.result, options.hints_used, options.solution_seen);
+  // Fase 2: el registro guarda si el intento cuenta y por qué, para que el progreso
+  // y los repasos no se muevan con práctica hecha con ayuda.
+  const counting = countAttempt({
+    verdict: (options.result as unknown as { verdict?: unknown })?.verdict,
+    score: (options.result as unknown as { score?: unknown })?.score,
+    hints_used: options.hints_used,
+    solution_seen: options.solution_seen,
+    gave_up: options.gave_up,
+  });
   const attempt = new PracticeAttemptStore(vaultRoot).record(ex, notePath, {
     answer: options.answer,
     hints_used: options.hints_used,
@@ -176,6 +188,8 @@ export function applyResult(
     transport: options.transport,
     result: options.result,
     quality,
+    counted: counting.counted,
+    ...(counting.counted ? {} : { no_count_reason: counting.reasons.join("; ") }),
   });
   recordGradeErrors(vaultRoot, ex, options.result, options.answer);
   writeErrorDigest(vaultRoot);
@@ -189,7 +203,9 @@ export function applyResult(
     notePath,
     ex.difficulty
   );
-  srs.review(item.id, quality);
+  // Solo se reprograma la revisión si el intento cuenta: con ayuda, el repaso
+  // sigue donde estaba hasta que el ejercicio se rehaga sin ella.
+  if (counting.counted) srs.review(item.id, quality);
   return attempt;
 }
 

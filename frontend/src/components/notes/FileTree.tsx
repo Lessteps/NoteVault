@@ -5,6 +5,8 @@ import type { IndexEntry, TreeEntry } from "../../lib/types";
 import { useVirtualList } from "../../lib/useVirtualList";
 import { useApp } from "../../store/app";
 import { copyText } from "../../lib/clipboard";
+import { useAssistant } from "../../store/assistant";
+import { generateTopicFrom } from "../study/StudySpaceDialog";
 import { fileMenuItems, pathFlavors, type PathFlavor } from "./fileMenu";
 import { MoveEntryDialog } from "./MoveEntryDialog";
 import { VersionHistoryDialog } from "./VersionHistoryDialog";
@@ -65,7 +67,7 @@ export async function newFolderIn(parent: string): Promise<void> {
   }
 }
 
-async function renameEntry(entry: TreeEntry) {
+export async function renameEntry(entry: TreeEntry) {
   const current = entry.type === "note" && entry.kind === "note" ? entry.name : entry.path.split("/").pop()!;
   const name = await askText("Renombrar", current, "Renombrar");
   if (!name || name === current) return;
@@ -281,6 +283,13 @@ export function FileTree({ filter }: { filter: string }) {
       newNoteHere: () => void newNoteIn(entry.path),
       newFolderHere: () => void newFolderIn(entry.path),
       newCanvasHere: () => void newCanvasIn(entry.path),
+      addToChat: () => {
+        const a = useAssistant.getState();
+        if (entry.type === "folder") a.toggleFolder(entry.path);
+        else a.toggleFile(entry.path);
+        a.setOpen(true);
+      },
+      generateTopic: () => void generateTopicFrom(entry.path),
     };
   };
 
@@ -289,7 +298,7 @@ export function FileTree({ filter }: { filter: string }) {
     openMenu(
       e,
       fileMenuItems(
-        { entry, bookmarked: known, canCopy: entry.type !== "folder" },
+        { entry, bookmarked: known, canCopy: entry.type !== "folder", inChat: useAssistant.getState().folders.includes(entry.path) || useAssistant.getState().files.includes(entry.path) },
         menuActions(entry),
       ),
     );

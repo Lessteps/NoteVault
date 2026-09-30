@@ -2,7 +2,8 @@ import { app, BrowserWindow, Menu, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerIpc } from "./ipc";
-import { getAppState, initRegistry } from "../src/api/registry";
+import { startReviewNotifier } from "./reviewNotifier";
+import { getAppState, initRegistry, warmStudyIndex } from "../src/api/registry";
 
 import fs from "node:fs";
 import { AppConfig } from "../src/api/appConfig";
@@ -106,6 +107,15 @@ app.whenReady().then(() => {
   initRegistry();
   registerIpc();
   createWindow();
+  startReviewNotifier();
+  // The first study view of a cold process used to wait ~30 s for the whole vault
+  // to be read (measured over 2 107 notes). Warming it here, in the background and
+  // in batches, takes that off the click; nothing is waiting for the result.
+  setTimeout(() => {
+    void warmStudyIndex()
+      .then((r) => console.log(`study index warm: ${r.notes} notes in ${r.ms} ms`))
+      .catch((e) => console.warn("study index warm failed:", e));
+  }, 4000);
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

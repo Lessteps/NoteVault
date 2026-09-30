@@ -78,6 +78,10 @@ export class PracticeAttemptStore {
       transport: string;
       result: GradeResult | null;
       quality: number;
+      /** Fase 2: si el intento cuenta para el progreso (ver `countAttempt`). */
+      counted?: boolean;
+      /** Por qué no cuenta, en palabras (vacío cuando cuenta). */
+      no_count_reason?: string;
     },
   ): Record<string, any> {
     const res = options.result;
@@ -93,6 +97,8 @@ export class PracticeAttemptStore {
       solution_seen: Boolean(options.solution_seen),
       transport: options.transport,
       score: res ? res.score : 0,
+      ...(typeof options.counted === "boolean" ? { counted: options.counted } : {}),
+      ...(options.counted === false && options.no_count_reason ? { no_count_reason: options.no_count_reason } : {}),
       quality: Math.trunc(options.quality),
       verdict: res ? res.verdict : "ungraded",
       rubric: res ? [...res.rubric] : [],

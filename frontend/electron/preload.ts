@@ -17,6 +17,14 @@ contextBridge.exposeInMainWorld("nv", {
       ipcRenderer.removeListener("nv-browser-state", handler);
     };
   },
+  /** A review notification was clicked: open the Repaso calendar (channel: nv-open-review). */
+  onOpenReview: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on("nv-open-review", handler);
+    return () => {
+      ipcRenderer.removeListener("nv-open-review", handler);
+    };
+  },
   onWindowState: (cb: (data: { maximized: boolean }) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: { maximized: boolean }) => cb(data);
     ipcRenderer.on("nv-window-state", handler);

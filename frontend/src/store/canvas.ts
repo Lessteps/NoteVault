@@ -63,8 +63,12 @@ export const useCanvas = create<CanvasState>((set, get) => {
     },
 
     close: async () => {
+      const closing = get().path;
       await get().save();
-      set({ path: null, doc: { nodes: [], edges: [] }, past: [], future: [] });
+      // A save that hit a conflict returns without clearing its pending mark; the canvas is gone
+      // now, so nothing is left to save and the "sin guardar" counter must not stay at 1.
+      if (closing) clearPending(`canvas:${closing}`);
+      set({ path: null, doc: { nodes: [], edges: [] }, past: [], future: [], dirty: false, conflict: false });
     },
 
     snapshot: () => set((s) => ({ past: [...s.past, s.doc].slice(-HISTORY), future: [] })),

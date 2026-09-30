@@ -5,11 +5,14 @@
  * requests specialized, concept-anchored AI exercises (never generic).
  */
 
+import { domainOfSubject, isEnglishSubject } from "./domain";
+import { buildProgrammingExercisePrompt, formatProgrammingExerciseNote } from "./programmingExercises";
+import { buildEnglishExercisePrompt, formatEnglishExerciseNote } from "./englishExercises";
 import type { ExerciseRef } from "./exerciseIndex";
 import { type AssistanceLevel, type DifficultyLevel, difficultyLabel } from "./skills";
 import type { TopicManifest } from "./topic";
 
-export type QuantityOption = "3-5" | "6-10" | "11+" | "all" | "auto";
+export type QuantityOption = "3-5" | "6-10" | "11+" | "all" | "auto" | "ai";
 
 export interface TheoryNoteContext {
   rel: string;
@@ -22,6 +25,17 @@ export interface SessionConfig {
   difficulty: DifficultyLevel;
   quantity: QuantityOption;
   assistance: AssistanceLevel;
+  /** What the topic's AI practice plan asks for this skill and difficulty (used by `"ai"`). */
+  planCount?: number | null;
+  /**
+   * The student's recorded mistakes in this competency (the "registro de errores" box):
+   * most of the NEW exercises are written around them, the rest train the whole competency.
+   */
+  learning?: string[];
+  /** English vocabulary skills: the words of the shared bank the exercises are built around ("word — meaning"). */
+  words?: string[];
+  /** ids of those words: written into the exercises so their reviews follow the grade. */
+  wordIds?: string[];
 }
 
 export interface PlannedExercise {
@@ -35,14 +49,18 @@ export interface PlannedExercise {
 export interface SessionPlanResult {
   skill: string;
   difficulty: DifficultyLevel;
+  /** Los tres mandos de la sesión: dificultad, cantidad y ayuda. */
+  quantity: QuantityOption;
   assistance: AssistanceLevel;
+  /** `true` cuando la sesión admite pistas o ayuda (se refleja en los ejercicios). */
+  hints: boolean;
   targetCount: number;
   exercises: PlannedExercise[];
   existingCount: number;
   generatedCount: number;
 }
 
-export function resolveTargetQuantity(quantity: QuantityOption, availableCount: number): number {
+export function resolveTargetQuantity(quantity: QuantityOption, availableCount: number, planCount?: number | null): number {
   switch (quantity) {
     case "3-5":
       return 4;
@@ -54,6 +72,8 @@ export function resolveTargetQuantity(quantity: QuantityOption, availableCount: 
       return Math.max(1, availableCount);
     case "auto":
       return 5;
+    case "ai":
+      return planCount && planCount > 0 ? planCount : 3;
   }
 }
 
@@ -93,7 +113,17 @@ export function buildExerciseGenerationPrompt(
   difficulty: DifficultyLevel,
   assistance: AssistanceLevel,
   countToGenerate: number,
+  learning: string[] = [],
+  words: string[] = [],
 ): Array<{ role: "system" | "user"; content: string }> {
+  // English follows its own framing (branch, CEFR level, Spanish-speaker transfer, audio…).
+  if (isEnglishSubject(manifest.subject)) {
+    return buildEnglishExercisePrompt(manifest, theoryNotes, skill, difficulty, assistance, countToGenerate, learning, words);
+  }
+  // Programming has its own framing (language by area, code in the statement, behaviour-based judging).
+  if (domainOfSubject(manifest.subject) === "programming") {
+    return buildProgrammingExercisePrompt(manifest, theoryNotes, skill, difficulty, assistance, countToGenerate, learning);
+  }
   const diffName = difficultyLabel(difficulty);
   const isHelper = assistance === "helper";
 
@@ -127,6 +157,14 @@ export function buildExerciseGenerationPrompt(
     `Required skill: ${skill}`,
     `Difficulty: ${difficulty} (${diffName})`,
     `Assistance: ${assistance}`,
+    learning.length
+      ? [
+          "",
+          "REGISTRO DE ERRORES del estudiante en esta competencia (más recientes primero):",
+          ...learning.map((l) => `- ${l}`),
+          "Escribe alrededor del 60 % de los ejercicios para atacar EXACTAMENTE estos errores (el mismo tipo de fallo, con otros números o contexto, sin repetir enunciados) y el resto para entrenar toda la competencia y mantener activo lo que ya domina.",
+        ].join("\n")
+      : "",
     "",
     "Return ONLY the JSON array of exercises.",
   ].join("\n");
@@ -151,8 +189,12 @@ export function formatExerciseNote(
     hints: string[];
     solution: string;
     rubric: string[];
+    audio_text?: string;
+    words?: string[];
   },
 ): string {
+  if (isEnglishSubject(manifest.subject)) return formatEnglishExerciseNote(manifest, skill, difficulty, assistance, ex);
+  if (domainOfSubject(manifest.subject) === "programming") return formatProgrammingExerciseNote(manifest, skill, difficulty, assistance, ex);
   const astFm = assistance === "no_help" ? "nohelp" : "helper";
   const hintsList = ex.hints.map((h) => `- ${h.trim()}`).join("\n");
   const rubricList = ex.rubric.map((r) => `- [ ] ${r.trim()}`).join("\n");
@@ -183,6 +225,82 @@ ${rubricList || "- [ ] Procedimiento y resultado correctos."}
 `;
 }
 
+export interface GeneratedExercise {
+  title: string;
+  statement: string;
+  hints: string[];
+  solution: string;
+  rubric: string[];
+  /** English listening: the text played aloud (hidden from the learner). */
+  audio_text?: string;
+}
+
+function normaliseExercise(raw: any): GeneratedExercise | null {
+  if (!raw || typeof raw !== "object") return null;
+  const title = String(raw.title ?? "").trim();
+  const statement = String(raw.statement ?? "").trim();
+  if (!title || !statement) return null;
+  const list = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)).filter((x) => x.trim()) : []);
+  const audio = String(raw.audio_text ?? "").trim();
+  return { title, statement, hints: list(raw.hints), solution: String(raw.solution ?? ""), rubric: list(raw.rubric), ...(audio ? { audio_text: audio } : {}) };
+}
+
+/** The top-level `{...}` chunks of a (possibly broken) JSON array text, string-aware. */
+function objectChunks(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i]!;
+    if (inString) {
+      if (c === "\\") i += 1;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') inString = true;
+    else if (c === "{") {
+      if (depth === 0) start = i;
+      depth += 1;
+    } else if (c === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start >= 0) out.push(text.slice(start, i + 1));
+    }
+  }
+  return out;
+}
+
+/**
+ * The exercises in an AI reply. Models sometimes return an array with one broken
+ * item (or a fence, or text around it): a strict parse is tried first, and when it
+ * fails every well-formed object is salvaged instead of losing the whole batch.
+ */
+export function parseExerciseArray(reply: string): GeneratedExercise[] {
+  let text = String(reply ?? "").trim();
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
+  if (fence) text = fence[1]!.trim();
+  const start = text.indexOf("[");
+  const end = text.lastIndexOf("]");
+  const body = start >= 0 ? text.slice(start, end > start ? end + 1 : undefined) : text;
+  try {
+    const parsed = JSON.parse(body);
+    const list = (Array.isArray(parsed) ? parsed : [parsed]).map(normaliseExercise).filter(Boolean);
+    if (list.length) return list as GeneratedExercise[];
+  } catch {
+    /* fall through to salvage */
+  }
+  const salvaged: GeneratedExercise[] = [];
+  for (const chunk of objectChunks(body)) {
+    try {
+      const ex = normaliseExercise(JSON.parse(chunk));
+      if (ex) salvaged.push(ex);
+    } catch {
+      /* this object is broken: skip it */
+    }
+  }
+  return salvaged;
+}
+
 export interface SessionAIClient {
   generateExercises(
     messages: Array<{ role: "system" | "user"; content: string }>,
@@ -193,6 +311,7 @@ export interface SessionAIClient {
       hints: string[];
       solution: string;
       rubric: string[];
+      audio_text?: string;
     }>
   >;
 }
@@ -210,9 +329,12 @@ export async function buildTopicSession(
   aiClient?: SessionAIClient,
 ): Promise<SessionPlanResult> {
   const matching = filterTopicExercises(allExercises, topicFolder, config.skill, config.difficulty);
-  const targetCount = resolveTargetQuantity(config.quantity, matching.length);
+  const targetCount = resolveTargetQuantity(config.quantity, matching.length, config.planCount);
 
-  const planned: PlannedExercise[] = matching.slice(0, targetCount).map((ex) => ({
+  // With a mistakes record, fresh exercises built around it take most of the session.
+  const learning = config.learning ?? [];
+  const focus = aiClient && learning.length ? Math.max(1, Math.ceil(targetCount * 0.6)) : 0;
+  const planned: PlannedExercise[] = matching.slice(0, targetCount - focus).map((ex) => ({
     id: ex.note_id,
     title: ex.title,
     path: ex.rel || ex.path,
@@ -229,6 +351,8 @@ export async function buildTopicSession(
       config.difficulty,
       config.assistance,
       needed,
+      learning,
+      config.words ?? [],
     );
     try {
       const generated = await aiClient.generateExercises(messages);
@@ -237,13 +361,14 @@ export async function buildTopicSession(
         const title = item.title || `Ejercicio ${config.skill} ${count}`;
         const filename = `ej_${config.skill}_d${config.difficulty}_${Date.now()}_${count}.md`;
         const folder = topicFolder ? topicFolder.replace(/\/$/, "") : "";
-        const relPath = folder ? `${folder}/ejercicios/${filename}` : `ejercicios/${filename}`;
+        const skillDir = `Ejercicios/${config.skill}`;
+        const relPath = folder ? `${folder}/${skillDir}/${filename}` : `${skillDir}/${filename}`;
         const content = formatExerciseNote(
           manifest,
           config.skill,
           config.difficulty,
           config.assistance,
-          item,
+          config.wordIds?.length ? { ...item, words: [...config.wordIds] } : item,
         );
 
         planned.push({
@@ -263,7 +388,9 @@ export async function buildTopicSession(
   return {
     skill: config.skill,
     difficulty: config.difficulty,
+    quantity: config.quantity,
     assistance: config.assistance,
+    hints: config.assistance === "helper",
     targetCount,
     exercises: planned,
     existingCount: matching.length,

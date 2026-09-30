@@ -769,8 +769,14 @@ export interface PracticeExercise {
   assistance: "helper" | "nohelp";
   timer: import("./practiceTimer").TimerSpec;
   statement: string;
+  /** English listening: the text the app plays aloud (shown only after grading). */
+  audio_text?: string;
+  /** English listening from the player: the stretch of a vault media file that is the audio (seconds). */
+  media?: { file: string; source?: string; start: number; end: number } | null;
   code: string;
   code_lang: string;
+  /** The language the code of this exercise can be run in from the debugger panel ("" when there is nothing to run). */
+  run_language: string;
   hints: string[];
   has_solution: boolean;
   rubric: string[];
@@ -874,6 +880,60 @@ export interface WebOverview {
   embedded: boolean;
 }
 
+/** A podcast, film or TED talk of the learner's library, with its transcript. */
+export interface EnglishSource {
+  id: string;
+  kind: "podcast" | "movie" | "ted";
+  title: string;
+  media: string;
+  transcript: string;
+  added: string;
+  has_media: boolean;
+  has_transcript: boolean;
+  /** the transcript has times (SRT/VTT); plain text is read sentence by sentence */
+  timed: boolean;
+}
+
+export interface EnglishRecording {
+  id: string;
+  name: string;
+  size: number;
+  modified: number;
+}
+
+export interface CodeRun {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  exit_code: number | null;
+  ms: number;
+  timed_out: boolean;
+  truncated: boolean;
+  runtime: string;
+}
+
+export interface CodeStep {
+  line: number;
+  fn: string;
+  depth: number;
+  vars: Array<[string, string]>;
+  out: number;
+  ret?: string;
+  exc?: string;
+}
+
+export interface CodeTrace extends CodeRun {
+  steps: CodeStep[];
+  steps_truncated: boolean;
+}
+
+export interface CodeRuntime {
+  id: string;
+  label: string;
+  available: boolean;
+  runtime: string;
+}
+
 export interface PlayerMedia {
   id: string;
   url: string;
@@ -897,6 +957,8 @@ export interface TopicManifest {
   skills: string[];
   mastery: TopicMasteryConfig;
   exam_group?: string;
+  /** The AI's plan for this topic: passes needed per skill at [easy, medium, hard]. */
+  plan?: Record<string, [number, number, number]>;
   path?: string;
   folder?: string;
 }
@@ -907,6 +969,8 @@ export interface TopicCellProgress {
   attempts: number;
   passes: number;
   bestScore: number | null;
+  /** passes this cell needs per the topic's plan (undefined without a plan) */
+  required?: number;
 }
 
 export interface TopicSkillProgress {
@@ -1021,6 +1085,38 @@ export interface TopicDashboardData {
   subjects: string[];
   areas: string[];
   topics: TopicDashboardItem[];
+  /** True when the vault index is still warming and the payload is provisional. */
+  loading?: boolean;
 }
 
 
+
+export interface PracticePlanSkill {
+  skill: string;
+  counts: Record<1 | 2 | 3, number>;
+  why: string;
+}
+
+export interface PracticePlan {
+  skills: PracticePlanSkill[];
+  summary: string;
+  topicType?: "theoretical" | "procedural" | "mixed";
+}
+
+export interface ReviewItem {
+  path: string;
+  topic: string;
+  topicPath: string;
+  subject: string;
+  subjectFolder: string;
+  next: string;
+  last: string;
+  level: number;
+  inDays: number;
+  skills: string[];
+  practicedDays: number;
+  /** the pending review and the ones after it, if each is done on its date */
+  upcoming: Array<{ date: string; interval: number; level: number }>;
+  /** `vocab` for a word of the English word bank; absent for topic reviews */
+  kind?: "topic" | "vocab";
+}

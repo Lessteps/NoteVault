@@ -114,7 +114,28 @@ export interface Prerequisite {
   note?: string;
 }
 
+export type Lang = "es" | "en";
+
+/** Words of each language the note parser accepts and the canvas draws. Programming notes are written in English. */
+export const LABELS: Record<Lang, {
+  requires: string; noPrereq: string; explanation: string; whatItIs: string; mental: string; examples: string; errors: string;
+  pending: string; baseConcept: string; priorConcept: string; understoodWith: string; appliedIn: string; failsWhen: string; anotherCase: string;
+  exampleFields: string[]; errorFields: string[]; follows: string;
+}> = {
+  es: {
+    requires: "Requiere", noPrereq: "Sin prerrequisitos.", explanation: "Explicación", whatItIs: "Qué es", mental: "Modelo mental", examples: "Ejemplos", errors: "Errores comunes",
+    pending: "(pendiente)", baseConcept: "concepto base", priorConcept: "concepto previo", understoodWith: "se entiende con", appliedIn: "se aplica en", failsWhen: "se falla cuando", anotherCase: "otro caso",
+    exampleFields: ["Contexto", "Caso", "Resultado esperado", "Por qué funciona"], errorFields: ["Error", "Síntoma", "Causa", "Solución"], follows: "sigue",
+  },
+  en: {
+    requires: "Requires", noPrereq: "No prerequisites.", explanation: "Explanation", whatItIs: "What it is", mental: "Mental model", examples: "Examples", errors: "Common mistakes",
+    pending: "(pending)", baseConcept: "base concept", priorConcept: "prior concept", understoodWith: "is understood with", appliedIn: "applied in", failsWhen: "fails when", anotherCase: "another case",
+    exampleFields: ["Context", "Case", "Expected result", "Why it works"], errorFields: ["Mistake", "Symptom", "Cause", "Fix"], follows: "follows",
+  },
+};
+
 export interface Concept {
+  lang: Lang;
   number: string;
   title: string;
   area: string;
@@ -136,8 +157,11 @@ const norm = (s: string): string =>
 export function sections(markdown: string): NoteSection[] {
   const out: NoteSection[] = [];
   let current: NoteSection | null = null;
+  let inFence = false;
   for (const line of markdown.split(/\r?\n/)) {
-    const m = /^(#{1,4})\s+(.*)$/.exec(line);
+    // A `#` inside a fenced code block is code (a Python comment, a shell prompt), never a heading.
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    const m = inFence ? null : /^(#{1,4})\s+(.*)$/.exec(line);
     if (m && m[1] && m[2]) {
       if (current) out.push(current);
       current = { title: m[2].trim(), level: m[1].length, body: "" };
@@ -171,8 +195,16 @@ function labeledFields(body: string, labels: string[]): Field[] {
   const byLabel = new Map<string, Field>();
   for (const label of labels) byLabel.set(norm(label), { label, text: "" });
   let last: Field | null = null;
+  let inFence = false;
   for (const raw of body.split(/\r?\n/)) {
     const line = raw.trim();
+    const isFence = /^(```|~~~)/.test(line);
+    // Inside a fenced code block every line is code: blank lines and line breaks are kept.
+    if (last && (inFence || isFence)) {
+      if (isFence) inFence = !inFence;
+      last.text = `${last.text}\n${raw.replace(/\s+$/, "")}`;
+      continue;
+    }
     if (!line) continue;
     const m = /^[-*]\s+\*\*(.+?)\:?\*\*\s*\:?\s*(.*)$/.exec(line);
     if (m && m[1]) {
@@ -193,8 +225,6 @@ function labeledFields(body: string, labels: string[]): Field[] {
   return out;
 }
 
-const EXAMPLE_FIELDS = ["Contexto", "Caso", "Resultado esperado", "Por qué funciona"];
-const ERROR_FIELDS = ["Error", "Síntoma", "Causa", "Solución"];
 
 function countFieldWarnings(kind: string, title: string, fields: Field[], expected: string[]): string[] {
   const missing = expected.filter((e) => !fields.some((f) => norm(f.label) === norm(e)));
@@ -210,17 +240,24 @@ export function readConcept(folder: string, vaultRoot: string): Concept {
   const [fm, body] = parseFrontmatter(raw);
   const warnings: string[] = [];
   const all = sections(body);
+  // Programming notes (and any note with English headings) are English; the rest keep Spanish.
+  const heads = all.filter((s) => s.level === 2).map((s) => norm(s.title));
+  const english = heads.some((h) => ["explanation", "examples", "example", "requires", "prerequisites", "common mistakes", "common errors"].includes(h));
+  const spanish = heads.some((h) => ["explicacion", "ejemplos", "ejemplo", "requiere", "prerrequisitos", "errores comunes"].includes(h));
+  // The headings decide; a note with none of them (yet) follows its subject: programming is written in English.
+  const lang: Lang = english ? "en" : spanish ? "es" : String(fm["subject"] ?? "").toLowerCase() === "programming" ? "en" : "es";
+  const L = LABELS[lang];
 
   const number = String(fm["number"] ?? base.split(" ")[0] ?? "");
   const title = String(fm["title"] ?? base.replace(/^\S+\s+/, ""));
   const area = String(fm["area"] ?? path.basename(path.dirname(path.resolve(folder))));
 
   /* 1. Requiere */
-  const requiere = top(all, ["requiere", "requisitos", "prerrequisitos"]);
-  if (!requiere) warnings.push('falta la sección "## Requiere" (es obligatoria)');
+  const requiere = top(all, ["requiere", "requisitos", "prerrequisitos", "requires", "prerequisites", "requirements"]);
+  if (!requiere) warnings.push(`falta la sección "## ${L.requires}" (es obligatoria)`);
   const prerequisites: Prerequisite[] = [];
   if (requiere) {
-    const noPrereq = /sin\s+prerrequisitos/i.test(requiere.body);
+    const noPrereq = /(sin\s+prerrequisitos|no\s+prerequisites)/i.test(requiere.body);
     for (const raw of requiere.body.split(/\r?\n/)) {
       const line = raw.trim();
       if (!line.startsWith("-") && !line.startsWith("*")) continue;
@@ -232,10 +269,10 @@ export function readConcept(folder: string, vaultRoot: string): Concept {
         .replace(/^[-*\s]+/, "")
         .replace(/^[—–-]\s*/, "")
         .trim();
-      prerequisites.push({ label, reason: reason || "concepto previo" });
+      prerequisites.push({ label, reason: reason || L.priorConcept });
     }
     if (!prerequisites.length && !noPrereq) {
-      warnings.push('"## Requiere" no tiene ningún `- [[Concepto previo]]` ni dice "Sin prerrequisitos"');
+      warnings.push(`"## ${L.requires}" no tiene ningún \`- [[Concepto previo]]\` ni dice "${L.noPrereq.replace(/\.$/, "")}"`);
     }
   }
   for (const p of prerequisites) {
@@ -245,34 +282,34 @@ export function readConcept(folder: string, vaultRoot: string): Concept {
   }
 
   /* 2. Explicación */
-  const explicacion = top(all, ["explicación", "explicacion"]);
-  const queEs = children(explicacion, all).find((s) => norm(s.title) === "que es");
-  const modelo = children(explicacion, all).find((s) => norm(s.title) === "modelo mental");
-  if (!explicacion) warnings.push('falta la sección "## Explicación"');
-  if (!queEs) warnings.push('falta "### Qué es" dentro de "## Explicación"');
-  if (!modelo) warnings.push('falta "### Modelo mental" dentro de "## Explicación"');
+  const explicacion = top(all, ["explicación", "explicacion", "explanation"]);
+  const queEs = children(explicacion, all).find((s) => ["que es", "what it is", "what is it"].includes(norm(s.title)));
+  const modelo = children(explicacion, all).find((s) => ["modelo mental", "mental model"].includes(norm(s.title)));
+  if (!explicacion) warnings.push(`falta la sección "## ${L.explanation}"`);
+  if (!queEs) warnings.push(`falta "### ${L.whatItIs}" dentro de "## ${L.explanation}"`);
+  if (!modelo) warnings.push(`falta "### ${L.mental}" dentro de "## ${L.explanation}"`);
 
   /* 3. Ejemplos */
-  const ejemplos = top(all, ["ejemplos", "ejemplo"]);
-  if (!ejemplos) warnings.push('falta la sección "## Ejemplos"');
+  const ejemplos = top(all, ["ejemplos", "ejemplo", "examples", "example"]);
+  if (!ejemplos) warnings.push(`falta la sección "## ${L.examples}"`);
   const examples: Example[] = children(ejemplos, all).map((s) => {
-    const fields = labeledFields(s.body, EXAMPLE_FIELDS);
-    warnings.push(...countFieldWarnings("Ejemplo", s.title, fields, EXAMPLE_FIELDS));
+    const fields = labeledFields(s.body, L.exampleFields);
+    warnings.push(...countFieldWarnings("Ejemplo", s.title, fields, L.exampleFields));
     return { title: s.title, fields };
   });
 
   /* 4. Errores comunes */
-  const errores = top(all, ["errores comunes", "errores frecuentes", "errores tipicos", "errores típicos"]);
-  if (!errores) warnings.push('falta la sección "## Errores comunes"');
+  const errores = top(all, ["errores comunes", "errores frecuentes", "errores tipicos", "errores típicos", "common mistakes", "common errors", "typical mistakes", "pitfalls"]);
+  if (!errores) warnings.push(`falta la sección "## ${L.errors}"`);
   const errors: CommonError[] = children(errores, all).map((s) => {
-    const fields = labeledFields(s.body, ERROR_FIELDS);
-    warnings.push(...countFieldWarnings("Error", s.title, fields, ERROR_FIELDS));
+    const fields = labeledFields(s.body, L.errorFields);
+    warnings.push(...countFieldWarnings("Error", s.title, fields, L.errorFields));
     return { title: s.title, fields };
   });
-  if (errores && !errors.length) warnings.push('"## Errores comunes" no tiene ningún `### Error N — …`');
+  if (errores && !errors.length) warnings.push(`"## ${L.errors}" no tiene ningún \`### Error N — …\``);
 
   return {
-    number, title, area,
+    lang, number, title, area,
     hasRequiereSection: Boolean(requiere),
     prerequisites,
     queEs: queEs?.body.trim() ?? "",
@@ -352,9 +389,13 @@ const ARROW_INTO: Record<string, string> = {
   caso: "el caso concreto",
   "resultado esperado": "da como resultado",
   "por que funciona": "funciona porque",
+  context: "is set up like this",
+  case: "the concrete case",
+  "expected result": "gives as a result",
+  "why it works": "works because",
 };
 
-const arrowInto = (fieldLabel: string): string => ARROW_INTO[norm(fieldLabel)] ?? "sigue";
+const arrowInto = (fieldLabel: string, lang: Lang): string => ARROW_INTO[norm(fieldLabel)] ?? LABELS[lang].follows;
 
 /** Horizontal gap wide enough for the longest label crossing it. */
 const gapFor = (labels: string[]): number =>
@@ -405,6 +446,7 @@ class Builder {
 /** The whole concept canvas: 4 panels, bottom-up, no overlap by construction. */
 export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
   const b = new Builder();
+  const L = LABELS[c.lang];
 
   /* ── Panel 1 — Requiere (mandatory, immune to changes) ─────────────────── */
   const prereqCards: cf.CanvasNode[] = [];
@@ -414,40 +456,40 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
       prereqCards.push(
         p.note
           ? b.link(0, y, p.note)
-          : b.text(0, y, LINK_W, `**${p.label}**\n\n*(pendiente)*`, C_ERROR),
+          : b.text(0, y, LINK_W, `**${p.label}**\n\n*${L.pending}*`, C_ERROR),
       );
     });
   } else {
-    const card = b.text(0, 0, LINK_W, "Sin prerrequisitos.", C_DEFINITION);
+    const card = b.text(0, 0, LINK_W, L.noPrereq, C_DEFINITION);
     card.nv = { role: ROLE_NO_PREREQ };
     prereqCards.push(card);
   }
-  const requiereGroup = b.add(group("Requiere", prereqCards, "", -2));
+  const requiereGroup = b.add(group(L.requires, prereqCards, "", -2));
 
   /* ── Panel 2 — Explicación: Qué es + Modelo mental ─────────────────────── */
   const toConceptLabels = c.prerequisites.length
     ? c.prerequisites.map((p) => p.reason)
-    : ["concepto base"];
+    : [L.baseConcept];
   const xEx = requiereGroup.x + requiereGroup.width + gapFor(toConceptLabels);
 
-  const que = b.text(xEx, 0, QUE_W, `## Qué es\n\n${c.queEs}`, C_DEFINITION);
+  const que = b.text(xEx, 0, QUE_W, `## ${L.whatItIs}\n\n${c.queEs}`, C_DEFINITION);
   const modelo = b.text(
     xEx, que.height + GAP_Y, QUE_W,
-    `## Modelo mental\n\n${c.modeloMental}`, C_CONCEPT,
+    `## ${L.mental}\n\n${c.modeloMental}`, C_CONCEPT,
   );
-  const explicacionGroup = b.add(group("Explicación", [que, modelo], C_CONCEPT, -2));
+  const explicacionGroup = b.add(group(L.explanation, [que, modelo], C_CONCEPT, -2));
 
   for (const p of c.prerequisites) {
     const card = prereqCards[c.prerequisites.indexOf(p)];
     if (card) b.edge(card, que, p.reason);
   }
-  b.edge(que, modelo, "se entiende con", "bottom", "top");
+  b.edge(que, modelo, L.understoodWith, "bottom", "top");
 
   /* ── Panels 3 and 4 — Ejemplos, and Errores comunes below them ─────────── */
   // Both hang from `Explicación`, so they share one column. An arrow from column
   // 2 to a fourth column would cross column 3 and drop its 180 px label on top
   // of column 3's labels: that is the defect the user reported on 2026-09-28.
-  const crossLabels = ["se aplica en", "se falla cuando", "otro caso"];
+  const crossLabels = [L.appliedIn, L.failsWhen, L.anotherCase];
   const x3 = explicacionGroup.x + explicacionGroup.width + gapFor(crossLabels);
 
   const exampleGroups: cf.CanvasNode[] = [];
@@ -467,7 +509,7 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
       const prev = cards[i - 1];
       const cur = cards[i];
       if (!prev || !cur) continue;
-      b.edge(prev.node, cur.node, arrowInto(cur.field.label), "bottom", "top");
+      b.edge(prev.node, cur.node, arrowInto(cur.field.label, c.lang), "bottom", "top");
     }
     const first = cards[0];
     const last = cards[cards.length - 1];
@@ -477,7 +519,7 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
     exampleGroups.push(b.add(group(ex.title, cards.map((c) => c.node), C_EXAMPLE, -2)));
     y3 = last.node.y + last.node.height + GROUP_GAP;
   }
-  if (exampleGroups.length) b.add(group("Ejemplos", exampleGroups, C_EXAMPLE, -10));
+  if (exampleGroups.length) b.add(group(L.examples, exampleGroups, C_EXAMPLE, -10));
 
   /* ── Panel 4 — Errores comunes: one panel per error, below the examples ── */
   const errorCards: cf.CanvasNode[] = [];
@@ -493,17 +535,17 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
     errorGroups.push(b.add(group(err.title, [card], C_ERROR, -2)));
     yErr = card.y + card.height + GROUP_GAP;
   }
-  if (errorGroups.length) b.add(group("Errores comunes", errorGroups, C_ERROR, -10));
+  if (errorGroups.length) b.add(group(L.errors, errorGroups, C_ERROR, -10));
 
   /* ── Arrows ────────────────────────────────────────────────────────────── */
   const firstExample = exampleFirst[0];
-  if (firstExample) b.edge(modelo, firstExample, "se aplica en");
+  if (firstExample) b.edge(modelo, firstExample, L.appliedIn);
   for (let i = 1; i < exampleFirst.length; i++) {
     const prev = exampleLast[i - 1];
     const cur = exampleFirst[i];
-    if (prev && cur) b.edge(prev, cur, "otro caso", "bottom", "top");
+    if (prev && cur) b.edge(prev, cur, L.anotherCase, "bottom", "top");
   }
-  for (const card of errorCards) b.edge(que, card, "se falla cuando");
+  for (const card of errorCards) b.edge(que, card, L.failsWhen);
 
   return b.doc;
 }

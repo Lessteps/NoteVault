@@ -167,6 +167,8 @@ export interface MenuItem {
   items?: MenuItem[];
   /** Right-edge hint (a shortcut, a date…). */
   hint?: string;
+  /** A second, wrapping line under the label: what the entry does. */
+  description?: string;
   onSelect?: () => void;
 }
 
@@ -185,23 +187,32 @@ export function MenuHost() {
   useEffect(() => {
     if (!menu) return;
     const close = () => set(null);
+    // Only a click outside or Escape closes it. Any key used to: the Windows key (which also
+    // blurs the window) or a modifier pressed alone made the options vanish.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
     window.addEventListener("mousedown", close);
-    window.addEventListener("blur", close);
-    window.addEventListener("keydown", close);
+    window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("mousedown", close);
-      window.removeEventListener("blur", close);
-      window.removeEventListener("keydown", close);
+      window.removeEventListener("keydown", onKey);
     };
   }, [menu, set]);
+  // Measured after layout: the menu is moved back inside the window whatever its size.
+  const place = (el: HTMLDivElement | null) => {
+    if (!el || !menu) return;
+    const r = el.getBoundingClientRect();
+    el.style.left = `${Math.max(8, Math.min(menu.x, window.innerWidth - r.width - 8))}px`;
+    el.style.top = `${Math.max(8, Math.min(menu.y, window.innerHeight - r.height - 8))}px`;
+  };
   if (!menu) return null;
-  const x = Math.min(menu.x, window.innerWidth - 240);
-  const y = Math.min(menu.y, window.innerHeight - menu.items.length * 32 - 16);
   return (
     <div
       role="menu"
-      className="fixed z-50 min-w-[220px] rounded-lg border border-line-strong bg-card p-1 shadow-2xl"
-      style={{ left: x, top: y }}
+      ref={place}
+      className="fixed z-50 max-h-[calc(100vh-16px)] min-w-[220px] max-w-[340px] overflow-y-auto rounded-lg border border-line-strong bg-card p-1 shadow-2xl"
+      style={{ left: menu.x, top: menu.y }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       <MenuItems items={menu.items} onDone={() => set(null)} />
@@ -235,7 +246,7 @@ function MenuItems({ items, onDone }: { items: MenuItem[]; onDone: () => void })
                 it.onSelect?.();
               }}
               className={cn(
-                "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px]",
+                "flex w-full items-start gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px]",
                 it.disabled
                   ? "cursor-default text-faint"
                   : it.danger
@@ -243,8 +254,11 @@ function MenuItems({ items, onDone }: { items: MenuItem[]; onDone: () => void })
                     : "text-text hover:bg-hover",
               )}
             >
-              <span className="text-dim [&>svg]:h-3.5 [&>svg]:w-3.5">{it.icon}</span>
-              <span className="flex-1 truncate">{it.label}</span>
+              <span className="mt-0.5 text-dim [&>svg]:h-3.5 [&>svg]:w-3.5">{it.icon}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{it.label}</span>
+                {it.description && <span className="mt-0.5 block whitespace-normal text-[11px] leading-snug text-faint">{it.description}</span>}
+              </span>
               {it.hint && <span className="text-[11px] text-faint">{it.hint}</span>}
               {nested && <ChevronRight size={13} className="text-faint" />}
             </button>

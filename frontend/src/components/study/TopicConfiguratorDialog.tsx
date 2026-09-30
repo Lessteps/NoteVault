@@ -1,5 +1,5 @@
 import { CheckCircle2, ChevronRight, Sparkles, X, Zap } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { TopicData } from "../../lib/types";
 import { useApp } from "../../store/app";
@@ -31,7 +31,7 @@ const QUANTITY_OPTIONS: Array<{ id: QuantityOption; label: string; desc: string 
   { id: "6-10", label: "6–10", desc: "Completo (8 ej.)" },
   { id: "11+", label: "11+", desc: "Saturación (12 ej.)" },
   { id: "all", label: "Todos", desc: "Sub-casos existentes" },
-  { id: "auto", label: "Decide tú", desc: "Adaptativo a maestría" },
+  { id: "ai", label: "IA", desc: "Lo que decidió la IA" },
 ];
 
 export function TopicConfiguratorDialog({
@@ -54,20 +54,14 @@ export function TopicConfiguratorDialog({
   const theoreticalOrder = ["prove", "explain", "true_false", "counterexample"];
   const practicalOrder = ["solve", "process", "drill", "implement", "debug", "refactor"];
 
-  // Skills list: start with skills declared in the manifest, then widen with remaining subject skills so all modes are accessible
+  // Only the skills this topic declares: with the AI's plan those are the ones it
+  // chose for THIS topic, and nothing else is offered to practise.
   const manifestSkillsSet = new Set((manifest.skills || []).map((s) => s.toLowerCase()));
-  const skillsToInclude: SkillDefinition[] = [];
-
-  for (const s of allSubjectSkills) {
-    if (manifestSkillsSet.has(s.id.toLowerCase())) {
-      skillsToInclude.push(s);
-    }
-  }
-  for (const s of allSubjectSkills) {
-    if (!manifestSkillsSet.has(s.id.toLowerCase())) {
-      skillsToInclude.push(s);
-    }
-  }
+  const plan = manifest.plan ?? null;
+  const skillsToInclude: SkillDefinition[] = allSubjectSkills.filter((s) => manifestSkillsSet.has(s.id.toLowerCase()));
+  /** Exercises the plan wants for a skill at a difficulty (null without a plan). */
+  const plannedCount = (skill: string, level: DifficultyLevel): number | null =>
+    plan ? (plan[skill]?.[level - 1] ?? 0) : null;
 
   const declaredSkills = skillsToInclude.sort((a, b) => {
     const aDeclared = manifestSkillsSet.has(a.id.toLowerCase()) ? 0 : 1;
@@ -89,12 +83,13 @@ export function TopicConfiguratorDialog({
 
   // Check if beginner allowed for selected skill
   const skillDef = allSubjectSkills.find((s) => s.id === selectedSkill);
-  const beginnerOk = isDifficultyAllowed(subject, selectedSkill, 1);
+  const levelOk = (skill: string, level: DifficultyLevel): boolean =>
+    isDifficultyAllowed(subject, skill, level) && (plannedCount(skill, level) ?? 1) > 0;
+  const firstLevel = (skill: string): DifficultyLevel =>
+    ([1, 2, 3] as const).find((l) => levelOk(skill, l)) ?? 2;
 
-  const [difficulty, setDifficulty] = useState<DifficultyLevel>(
-    beginnerOk ? 1 : 2,
-  );
-  const [quantity, setQuantity] = useState<QuantityOption>("3-5");
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>(firstLevel(selectedSkill));
+  const [quantity, setQuantity] = useState<QuantityOption>(plan ? "ai" : "3-5");
 
   const helperOk = isAssistanceAllowed(subject, selectedSkill, "helper");
   const [assistance, setAssistance] = useState<AssistanceLevel>(
@@ -102,12 +97,30 @@ export function TopicConfiguratorDialog({
   );
   const [loading, setLoading] = useState(false);
 
+  // "Activar registro de errores", one box per competency: while on, the mistakes of graded
+  // attempts are kept (private, in .notevault) and the next sessions are built around them.
+  const [learning, setLearning] = useState<Record<string, { enabled: boolean; entries: number }>>({});
+  useEffect(() => {
+    let live = true;
+    api.studyLearningStatus(topicData.folder).then((s) => live && setLearning(s)).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [topicData.folder]);
+  const toggleLearning = async (skill: string, enabled: boolean) => {
+    try {
+      const r = await api.studyLearningSet(topicData.folder, skill, enabled);
+      setLearning((l) => ({ ...l, [skill]: { enabled: r.enabled, entries: r.entries } }));
+      toast("info", r.enabled ? `Registro de errores activado${r.entries ? ` (${r.entries} errores previos)` : ""}.` : "Registro de errores desactivado (se conserva lo guardado).");
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
+
   // If user switches to a skill where beginner is not allowed, bump difficulty
   const handleSkillChange = (skillId: string) => {
     setSelectedSkill(skillId);
-    if (!isDifficultyAllowed(subject, skillId, 1) && difficulty === 1) {
-      setDifficulty(2);
-    }
+    if (!levelOk(skillId, difficulty)) setDifficulty(firstLevel(skillId));
     if (!isAssistanceAllowed(subject, skillId, "helper") && assistance === "helper") {
       setAssistance("no_help");
     }
@@ -230,6 +243,28 @@ export function TopicConfiguratorDialog({
             </div>
           </div>
 
+          {/* Mistakes record of the chosen competency */}
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line bg-panel p-3">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={learning[selectedSkill]?.enabled ?? false}
+              onChange={(e) => void toggleLearning(selectedSkill, e.target.checked)}
+            />
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-text">
+                Activar registro de errores{skillDef ? ` · ${skillDef.label}` : ""}
+                {(learning[selectedSkill]?.entries ?? 0) > 0 && (
+                  <span className="ml-2 font-mono text-[10.5px] font-normal text-warn">{learning[selectedSkill]!.entries} registrados</span>
+                )}
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-faint">
+                Guarda en privado cómo fallas en esta competencia de este tema. Las próximas sesiones se centran sobre todo en
+                esos errores (con ejercicios nuevos parecidos) y siguen entrenando la competencia completa.
+              </span>
+            </span>
+          </label>
+
           {/* 2. Difficulty */}
           <div>
             <label className="mb-2 block font-mono text-[11px] font-semibold uppercase tracking-wider text-faint">
@@ -237,7 +272,8 @@ export function TopicConfiguratorDialog({
             </label>
             <div className="grid grid-cols-3 gap-2">
               {DIFFICULTY_LEVELS.map((d) => {
-                const allowed = isDifficultyAllowed(subject, selectedSkill, d.level);
+                const allowed = levelOk(selectedSkill, d.level);
+                const unplanned = allowed === false && isDifficultyAllowed(subject, selectedSkill, d.level);
                 const isSelected = difficulty === d.level;
                 return (
                   <button
@@ -255,8 +291,11 @@ export function TopicConfiguratorDialog({
                   >
                     <span className="text-[13px]">{d.label}</span>
                     <span className="mt-0.5 text-[10px] text-warn">{"★".repeat(d.level)}</span>
+                    {plan && allowed && (
+                      <span className="mt-0.5 font-mono text-[9.5px] text-faint">{plannedCount(selectedSkill, d.level)} ej. planeados</span>
+                    )}
                     {!allowed && (
-                      <span className="mt-0.5 text-[9.5px] text-danger">No disponible</span>
+                      <span className={cn("mt-0.5 text-[9.5px]", unplanned ? "text-faint" : "text-danger")}>{unplanned ? "Fuera del plan" : "No disponible"}</span>
                     )}
                   </button>
                 );
@@ -292,6 +331,13 @@ export function TopicConfiguratorDialog({
                 );
               })}
             </div>
+            {quantity === "ai" && (
+              <p className="mt-1.5 text-[11px] text-faint">
+                {plan
+                  ? `La IA planeó ${plannedCount(selectedSkill, difficulty) ?? 0} ejercicios para esta competencia y dificultad.`
+                  : "Aún no hay plan: la IA lo decidirá leyendo la teoría al empezar."}
+              </p>
+            )}
           </div>
 
           {/* 4. Assistance */}

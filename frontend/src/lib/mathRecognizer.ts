@@ -4,6 +4,8 @@
  * Offline, fast, and deterministic — no vision model required.
  */
 
+import { classifyGlyph } from "./glyphRecognizer";
+
 export interface Point {
   x: number;
   y: number;
@@ -198,31 +200,6 @@ export function isPlusSign(stroke1: Stroke, stroke2: Stroke): boolean {
 }
 
 /**
- * Simple classification of a single glyph stroke into elementary characters.
- */
-function classifySingleStroke(stroke: Stroke): string {
-  if (isHorizontalBar(stroke)) return "-";
-  if (isVerticalBar(stroke)) return "|";
-  if (isRadicalStroke(stroke)) return "\\sqrt{}";
-
-  const bb = getBoundingBox(stroke);
-  // Small circle or dot
-  if (bb.width < 12 && bb.height < 12) return "\\cdot";
-
-  // Circle or 0
-  const ratio = bb.width / bb.height;
-  if (ratio > 0.6 && ratio < 1.4 && stroke.length >= 8) {
-    const start = stroke[0]!;
-    const end = stroke[stroke.length - 1]!;
-    const dist = Math.hypot(start.x - end.x, start.y - end.y);
-    if (dist < bb.width * 0.4) return "0";
-  }
-
-  // Fallback: placeholder character x
-  return "x";
-}
-
-/**
  * Recursively parses and recognizes a collection of drawn strokes into LaTeX.
  */
 export function recognizeStrokesToLatex(strokes: Stroke[]): RecognitionResult {
@@ -330,58 +307,113 @@ export function recognizeStrokesToLatex(strokes: Stroke[]): RecognitionResult {
     }
   }
 
-  // 4. Superscript / Exponent check
-  // Sort strokes horizontally left to right
-  const sorted = [...validStrokes].sort((a, b) => {
-    return getBoundingBox(a).minX - getBoundingBox(b).minX;
-  });
-
-  if (sorted.length >= 2) {
-    const firstBB = getBoundingBox(sorted[0]!);
-    const secondBB = getBoundingBox(sorted[1]!);
-
-    // If second stroke is noticeably higher and smaller to the right
-    const isHigher = secondBB.centerY < firstBB.minY + firstBB.height * 0.45;
-    const isSmaller = secondBB.height <= firstBB.height * 0.8;
-    const isRight = secondBB.minX >= firstBB.centerX;
-
-    if (isHigher && isSmaller && isRight) {
-      detected.push("superscript");
-      const baseLatex = classifySingleStroke(sorted[0]!);
-      const expLatex = classifySingleStroke(sorted[1]!);
-      const rest = sorted.slice(2);
-      const restLatex = rest.length > 0 ? " " + recognizeStrokesToLatex(rest).latex : "";
-      return {
-        latex: `${baseLatex}^{${expLatex}}${restLatex}`.trim(),
-        confidence: 0.85,
-        detectedStructures: detected,
-      };
-    }
-  }
-
-  // 5. Sequential glyph recognition
-  const pieces: string[] = [];
-  for (let i = 0; i < sorted.length; i++) {
-    // Check if current and next form an equals or plus
-    if (i < sorted.length - 1 && isEqualsSign(sorted[i]!, sorted[i + 1]!)) {
-      pieces.push("=");
-      detected.push("equals");
-      i++;
-      continue;
-    }
-    if (i < sorted.length - 1 && isPlusSign(sorted[i]!, sorted[i + 1]!)) {
-      pieces.push("+");
-      detected.push("plus");
-      i++;
-      continue;
-    }
-    const glyph = classifySingleStroke(sorted[i]!);
-    pieces.push(glyph);
-  }
-
+  // 4. Glyphs left to right, then super/subscripts by geometry.
+  const glyphs = groupIntoGlyphs(validStrokes).map(readGlyph);
+  const latex = layoutGlyphs(glyphs, detected);
+  const score = glyphs.length ? glyphs.reduce((a, g) => a + g.score, 0) / glyphs.length : 0;
   return {
-    latex: pieces.join(" "),
-    confidence: 0.75,
+    latex,
+    confidence: Math.min(0.95, Math.max(0.2, score)),
     detectedStructures: detected,
   };
+}
+
+interface Glyph {
+  latex: string;
+  bb: BoundingBox;
+  /** 0..1, how sure the recogniser is */
+  score: number;
+}
+
+/**
+ * Strokes that belong to one character: they overlap horizontally AND sit close
+ * vertically (a 5's bar and body, the two bars of =, the cross of + or x). An
+ * exponent written above-right of its base is far enough away to stay separate.
+ */
+export function groupIntoGlyphs(strokes: Stroke[]): Stroke[][] {
+  const sorted = [...strokes].sort((a, b) => getBoundingBox(a).minX - getBoundingBox(b).minX);
+  const groups: Stroke[][] = [];
+  for (const stroke of sorted) {
+    const last = groups[groups.length - 1];
+    if (last) {
+      const gb = getCombinedBoundingBox(last);
+      const sb = getBoundingBox(stroke);
+      // Intervals are inflated a little: a vertical stroke has no width at all.
+      const tol = 2;
+      const overlap = Math.min(gb.maxX, sb.maxX) + tol - (Math.max(gb.minX, sb.minX) - tol);
+      const narrow = Math.max(4, Math.min(gb.width, sb.width));
+      const gap = Math.max(0, Math.max(gb.minY, sb.minY) - Math.min(gb.maxY, sb.maxY));
+      const scale = Math.max(gb.height, sb.height, narrow * 0.6);
+      if (overlap >= 0.3 * narrow && gap <= 0.35 * scale) {
+        last.push(stroke);
+        continue;
+      }
+    }
+    groups.push([stroke]);
+  }
+  return groups;
+}
+
+/** The character a group of strokes stands for. */
+function readGlyph(strokes: Stroke[]): Glyph {
+  const bb = getCombinedBoundingBox(strokes);
+  if (strokes.length === 1) {
+    const only = strokes[0]!;
+    if (isHorizontalBar(only)) return { latex: "-", bb, score: 0.9 };
+    if (bb.width < 12 && bb.height < 12) return { latex: "\\cdot", bb, score: 0.7 };
+  }
+  if (strokes.length === 2) {
+    if (isEqualsSign(strokes[0]!, strokes[1]!)) return { latex: "=", bb, score: 0.95 };
+    if (isPlusSign(strokes[0]!, strokes[1]!)) return { latex: "+", bb, score: 0.95 };
+  }
+  const best = classifyGlyph(strokes, 1)[0];
+  if (!best || best.score < 0.45) return { latex: "?", bb, score: best?.score ?? 0 };
+  return { latex: best.latex, bb, score: best.score };
+}
+
+/** Glyphs that join terms or group them: they never begin an exponent or a subscript. */
+const OPERATORS = new Set(["+", "=", "<", ">", "/", "(", ")"]);
+/** A LaTeX command such as the centred dot also separates terms. */
+const isCommand = (latex: string): boolean => latex.charCodeAt(0) === 92;
+
+/** Lays glyphs out left to right; smaller, raised (or lowered) ones after a base become its script. */
+function layoutGlyphs(glyphs: Glyph[], detected: string[]): string {
+  let out = "";
+  let base: Glyph | null = null;
+  let scriptKind: "sup" | "sub" | null = null;
+  let script = "";
+  const flush = () => {
+    if (scriptKind && script) {
+      out += `${scriptKind === "sup" ? "^" : "_"}{${script}}`;
+      detected.push(scriptKind === "sup" ? "superscript" : "subscript");
+    }
+    scriptKind = null;
+    script = "";
+  };
+
+  for (const g of glyphs) {
+    if (base) {
+      const small = g.bb.height <= base.bb.height * 0.75;
+      const right = g.bb.minX >= base.bb.centerX;
+      // Clearly above (or below) the base: an operator written at mid-height is not a script.
+      const raised = g.bb.centerY < base.bb.minY + base.bb.height * 0.4 && g.bb.maxY < base.bb.minY + base.bb.height * 0.7;
+      const lowered = g.bb.centerY > base.bb.maxY - base.bb.height * 0.2;
+      const kind = small && right ? (raised ? "sup" : lowered ? "sub" : null) : null;
+      // Operators and brackets separate terms; only a script already under way can contain them.
+      const startsScript = !scriptKind && (OPERATORS.has(g.latex) || isCommand(g.latex));
+      if (kind && !startsScript) {
+        if (scriptKind && scriptKind !== kind) flush();
+        scriptKind = kind;
+        script += g.latex;
+        continue;
+      }
+    }
+    flush();
+    // Digits written one after another are one number, not "1 7".
+    const joins = /\d$/.test(out) && /^\d$/.test(g.latex);
+    out += (out && !joins ? " " : "") + g.latex;
+    base = g;
+  }
+  flush();
+  return out.trim();
 }

@@ -3,7 +3,8 @@
  * Ported from notevault_app/core/practice/grading.py.
  */
 
-import { DISCIPLINES, skill_of } from "./disciplineCatalog";
+import { DISCIPLINES, disciplineFor, skill_of } from "./disciplineCatalog";
+import { isEnglishSubject } from "./domain";
 import { ExerciseNote } from "./exerciseNote";
 import { MODES } from "./modes";
 
@@ -90,8 +91,12 @@ function _section(title: str, body: string): string {
 type str = string;
 
 function _systemMessage(ex: ExerciseNote): string {
+  // The maths fallbacks (solve, math_general) are for maths only: an English exercise that lacks its mode or
+  // discipline is an error to report, never something to grade as a maths problem.
+  const english = isEnglishSubject(ex.subject);
+  if (english && !MODES[ex.mode]) throw new Error(`Modo de práctica desconocido para inglés: «${ex.mode}».`);
   const mode = MODES[ex.mode] || MODES["solve"]!;
-  const discipline = DISCIPLINES[ex.discipline] || DISCIPLINES["math_general"]!;
+  const discipline = DISCIPLINES[ex.discipline] || (english ? disciplineFor({ subject: "english", mode: ex.mode }) : DISCIPLINES["math_general"]!);
   const skill = skill_of(discipline, ex.skill);
 
   const lines = [

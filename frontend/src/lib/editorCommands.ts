@@ -61,8 +61,8 @@ export function heading(view: EditorView, level: number): boolean {
   return mapLines(view, (t) => {
     // Drop the old heading and the old list marker alike: turning a list item
     // into a heading should keep its text, not render as "## - punto".
-    const body = t.replace(/^\s*#{1,6}\s+/, "").replace(LIST, "");
-    return level > 0 ? `${"#".repeat(level)} ${body}` : body;
+    const body = t.replace(/^\s*#{1,6}\s+/, "");
+    return level > 0 ? `${"#".repeat(level)} ${body.replace(LIST, "")}` : body;
   });
 }
 
@@ -74,8 +74,8 @@ export function togglePrefix(view: EditorView, prefix: string): boolean {
     const [ind] = t.match(INDENT)!;
     const rest = t.slice(ind.length);
     if (all) return ind + rest.slice(prefix.length);
-    // Not every line had it, so the command turns it on: the ones that already
-    // had it keep theirs instead of getting a second one.
+    // Not every line had it, so the command turns it on: a line that already
+    // carries the mark stays as it is (otherwise "> uno" became "> > uno").
     if (rest.startsWith(prefix)) return t;
     return ind + prefix + rest.replace(LIST, "");
   });

@@ -1,3 +1,5 @@
+import { ENGLISH_SKILL_IDS } from "../../lib/englishSkillData";
+import { PROGRAMMING_EXTRA_IDS } from "../../lib/programmingSkillData";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -79,7 +81,8 @@ function _result(
 
 describe("TestModes", () => {
   it("catalogue", () => {
-    expect(Object.keys(MODES).length).toBe(17);
+    // 17 first-generation modes + one per English skill (gr_/wr_/rd_/ls_/sp_/vc_) + the extra programming ones.
+    expect(Object.keys(MODES).length).toBe(17 + ENGLISH_SKILL_IDS.length + PROGRAMMING_EXTRA_IDS.length);
     for (const mode of Object.values(MODES)) {
       expect(["text", "code", "short", "drill"]).toContain(mode.answer_kind);
       const spec = parseTimer(undefined, 0, mode.timer);
@@ -103,7 +106,7 @@ describe("TestModes", () => {
 
 describe("TestDisciplines", () => {
   it("catalogue", () => {
-    expect(Object.keys(DISCIPLINES).length).toBe(10);
+    expect(Object.keys(DISCIPLINES).length).toBe(20); // + english reading, listening and speaking + programming by area (typescript, backend, frontend, desktop, automation, mobile, devtools)
     const expectedSkills: Record<string, number> = {
       python: 15,
       javascript: 14,
@@ -745,8 +748,11 @@ describe("TestApplyResult", () => {
     expect(items[0]!.entity_id).toBe(ex.note_id);
     expect(items[0]!.entity_type).toBe("exercise");
     expect(items[0]!.topic).toBe("math_general");
-    expect(items[0]!.repetitions).toBe(1);
-    expect(items[0]!.history[0]!.grade).toBe(4);
+    // Fase 2: el intento usó una pista, así que no cuenta: el ítem se registra pero
+    // la revisión no se reprograma (queda para cuando se rehaga sin ayuda).
+    expect(items[0]!.repetitions).toBe(0);
+    expect(items[0]!.history.length).toBe(0);
+    expect(attempt["counted"]).toBe(false);
 
     applyResult(vault, ex, "Mat/E01.md", {
       answer: "proof 2",
@@ -758,7 +764,9 @@ describe("TestApplyResult", () => {
     });
     items = new StudySRSManager(vault).allItems();
     expect(items.length).toBe(1);
-    expect(items[0]!.repetitions).toBe(2);
+    // Rehecho sin ayuda: ahora sí cuenta y reprograma la revisión.
+    expect(items[0]!.repetitions).toBe(1);
+    expect(items[0]!.history.length).toBe(1);
   });
 });
 

@@ -4,19 +4,23 @@
 
 import {
   ArrowLeft, ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
-  GitCompare, History, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
-  Square, ThumbsDown, ThumbsUp, Trash2, X,
+  Folder, FolderPlus, GitCompare, Loader2, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
+  Square, ThumbsDown, ThumbsUp, Trash2, Wand2, X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import { api } from "../../lib/bridge";
 import { copyText, readClipboard } from "../../lib/clipboard";
 import { groupByDate, matchesQuery, whenLabel } from "../../lib/conversationDates";
+import { splitAction, vaultMode, VAULT_MODES } from "../../lib/assistantModes";
 import { renderMarkdown } from "../../lib/markdown";
 import type { AiConfig, AiProvider, ConversationMeta } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useAssistant, type ChatContext, type ChatMessage } from "../../store/assistant";
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
 import { askText, cn, confirmAction, IconButton, openMenu } from "../ui";
+import { generateTopicFrom, useStudySpaceDialog } from "../study/StudySpaceDialog";
+import { ActionCard } from "./ActionCard";
+import { AskCard, SkillsCard } from "./ChatCards";
 import { editorSelection, insertAtCursor } from "./SourceEditor";
 
 const WIDTH_KEY = "nv.assistant.width";
@@ -48,6 +52,40 @@ function useCodeCopy(root: RefObject<HTMLDivElement | null>) {
 }
 
 function ContextChip({ ctx, onRemove }: { ctx: ChatContext; onRemove?: () => void }) {
+  if (ctx.file) {
+    const kind = ctx.path.toLowerCase().endsWith(".canvas") ? "canvas" : /\.practica\.md$/i.test(ctx.path) ? "práctica" : /\.resumen\.md$/i.test(ctx.path) ? "resumen" : "";
+    return (
+      <span
+        title={`Archivo seleccionado: ${ctx.path}`}
+        className="inline-flex max-w-full items-center gap-1 rounded-md border border-mint/40 bg-mint/10 px-1.5 py-0.5 text-[11px] text-text"
+      >
+        <FileCode2 size={11} className="flex-none text-mint" />
+        <span className="truncate">{ctx.path.split("/").pop()}</span>
+        {kind && <span className="flex-none text-[10px] text-faint">· {kind}</span>}
+        {onRemove && (
+          <button type="button" aria-label="Quitar archivo" onClick={onRemove} className="ml-0.5 rounded hover:text-text">
+            <X size={10} />
+          </button>
+        )}
+      </span>
+    );
+  }
+  if (ctx.folder) {
+    return (
+      <span
+        title={`Carpeta seleccionada: ${ctx.path}`}
+        className="inline-flex max-w-full items-center gap-1 rounded-md border border-accent/40 bg-accent-soft px-1.5 py-0.5 text-[11px] text-accent-text"
+      >
+        <Folder size={11} className="flex-none" />
+        <span className="truncate">{ctx.path.split("/").pop()}</span>
+        {onRemove && (
+          <button type="button" aria-label="Quitar carpeta" onClick={onRemove} className="ml-0.5 rounded hover:text-text">
+            <X size={10} />
+          </button>
+        )}
+      </span>
+    );
+  }
   const name = ctx.path.split("/").pop() ?? ctx.text.slice(0, 24);
   const range = ctx.start_line ? `#L${ctx.start_line}${ctx.end_line ? `-${ctx.end_line}` : ""}` : "";
   const oneLine = ctx.text.trim().split("\n")[0] ?? "";
@@ -73,9 +111,18 @@ function ContextChip({ ctx, onRemove }: { ctx: ChatContext; onRemove?: () => voi
 
 function AssistantBody({ m }: { m: ChatMessage }) {
   const ref = useRef<HTMLDivElement>(null);
-  const html = useMemo(() => renderMarkdown(m.content), [m.content]);
+  // The `nv-action` block is not shown as text: it becomes a card once complete.
+  const { text, action, ask, skills } = useMemo(() => splitAction(m.content), [m.content]);
+  const html = useMemo(() => renderMarkdown(text), [text]);
   useCodeCopy(ref);
-  return <div ref={ref} className="nv-chat-prose" dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <>
+      <div ref={ref} className="nv-chat-prose" dangerouslySetInnerHTML={{ __html: html }} />
+      {action && !m.streaming && <ActionCard action={action} />}
+      {ask && !m.streaming && <AskCard ask={ask} />}
+      {skills && !m.streaming && <SkillsCard data={skills} />}
+    </>
+  );
 }
 
 /** A live seconds counter while something is streaming. */
@@ -116,10 +163,13 @@ function Message({ m, live }: { m: ChatMessage; live: boolean }) {
 
   const asNote = async () => {
     const raw = m.content.split("\n")[0] ?? "";
-    const title = (/^#+\s*(.+)$/m.exec(m.content)?.[1] ?? raw).replace(/[\\/:*?"<>|#]/g, "").trim().slice(0, 60) || "Respuesta";
+    const suggested = (/^#+\s*(.+)$/m.exec(m.content)?.[1] ?? raw).replace(/[\\/:*?"<>|#]/g, "").trim().slice(0, 60) || "Respuesta";
+    const app = useApp.getState();
+    const title = await askText("Nombre de la nota", suggested, "Crear");
+    if (!title) return;
+    const folder = app.active?.includes("/") ? app.active.slice(0, app.active.lastIndexOf("/")) : "";
     try {
-      const r = await api.createNote(title, "");
-      const app = useApp.getState();
+      const r = await api.createNote(title, folder);
       app.refreshTree();
       await app.openNote(r.path);
       if (useApp.getState().notes[r.path]) useApp.getState().editRaw(r.path, `${m.content}\n`);
@@ -250,8 +300,17 @@ function Composer() {
   const stop = useAssistant((s) => s.stop);
   const busy = useAssistant((s) => s.busy);
   const streamingId = useAssistant((s) => s.streamingId);
+  const toast = useApp((s) => s.toast);
   const [text, setText] = useState("");
   const [pending, setPending] = useState<ChatContext[]>([]);
+  const mode = useAssistant((s) => s.mode);
+  const setMode = useAssistant((s) => s.setMode);
+  const modeInfo = vaultMode(mode);
+  const folders = useAssistant((s) => s.folders);
+  const toggleFolder = useAssistant((s) => s.toggleFolder);
+  const files = useAssistant((s) => s.files);
+  const toggleFile = useAssistant((s) => s.toggleFile);
+  const [evaluating, setEvaluating] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
 
   const grow = () => {
@@ -282,13 +341,125 @@ function Composer() {
     setPending((p) => [...p, { path: note?.path ?? "", text: sel }]);
   };
 
+  /** The topic folder the actions work on: the one selected in the chat, else the open note's folder. */
+  const topicTarget = (): string => {
+    // A selected file (typically the practice file) names its topic folder: nothing to search for.
+    if (files.length) {
+      const f = files[0]!;
+      return f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : "";
+    }
+    if (folders.length === 1) return folders[0]!;
+    const active = useApp.getState().active;
+    return active && active.includes("/") ? active.slice(0, active.lastIndexOf("/")) : "";
+  };
+
+  /** The AI re-reads the topic's theory and rewrites its practice plan. */
+  const reevaluate = async () => {
+    const target = topicTarget();
+    if (!target) {
+      toast("error", "Selecciona la carpeta de un tema (clic derecho → Añadir al chat de IA) o abre una de sus notas.");
+      return;
+    }
+    setEvaluating(true);
+    const name = target.split("/").pop();
+    const chat = useAssistant.getState();
+    await chat.addMessage("system", `Re-evaluando la práctica de «${name}»: la IA lee su teoría y prepara la lista de competencias…`);
+    // Name the conversation after what it is, instead of leaving it as "Nueva conversación".
+    const now = useAssistant.getState();
+    if (now.conversationId && !now.title) await now.renameConversation(now.conversationId, `Re-evaluar práctica: ${name}`);
+    try {
+      // Nothing is changed yet: the chat shows the checklist and the user decides.
+      const options = await api.studyTopicSkillOptions(target);
+      const block = "```nv-skills\n" + JSON.stringify(options) + "\n```";
+      await chat.addMessage("assistant", `Estas son las competencias para «${options.title}». Marqué las que recomiendo; debajo de cada una explico por qué y cómo se practicaría en este tema. Ajusta lo que quieras y pulsa **Aplicar**.\n\n${block}`);
+    } catch (e) {
+      await chat.addMessage("system", `✗ No pude preparar la lista: ${(e as Error).message}`);
+      toast("error", (e as Error).message);
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
+  const generateTopic = () => {
+    const target = topicTarget();
+    if (!target) {
+      toast("error", "Selecciona la carpeta de un tema (clic derecho → Añadir al chat de IA) o abre una de sus notas.");
+      return;
+    }
+    void generateTopicFrom(target);
+  };
+
+  const openModes = (e: ReactMouseEvent<HTMLButtonElement>) => {
+    const target = topicTarget();
+    const shown = target ? target.split("/").pop() : "";
+    openMenu(e, [
+      {
+        label: "Generar tema completo",
+        description: `Escribe la teoría, el mapa, la práctica y la matriz de competencias${shown ? ` de «${shown}»` : " de la carpeta seleccionada"}.`,
+        icon: <Sparkles size={13} />,
+        onSelect: generateTopic,
+      },
+      {
+        label: "Re-evaluar práctica del tema",
+        description: "La IA relee la teoría y vuelve a elegir competencias y cantidades.",
+        icon: <Wand2 size={13} />,
+        onSelect: () => void reevaluate(),
+      },
+      { separator: true },
+      ...VAULT_MODES.map((m) => ({
+        label: m.label,
+        description: m.hint,
+        hint: mode === m.id ? "activo" : "",
+        icon: <Layers size={13} />,
+        onSelect: () => setMode(m.id),
+      })),
+      { separator: true },
+      {
+        label: "Generar espacio de estudio",
+        description: "Temario, teoría, práctica y mapas de una materia entera.",
+        icon: <GraduationCap size={13} />,
+        onSelect: () => useStudySpaceDialog.getState().openWith("space"),
+      },
+      {
+        label: "Crear área nueva",
+        description: "Añade un área (con sus temas) a un espacio que ya existe.",
+        icon: <FolderPlus size={13} />,
+        onSelect: () => useStudySpaceDialog.getState().openWith("area"),
+      },
+      ...(mode ? [{ separator: true }, { label: "Salir del modo", icon: <X size={13} />, onSelect: () => setMode("") }] : []),
+    ]);
+  };
+
   return (
     <div className="flex-none p-2.5">
-      {!!pending.length && (
+      {(!!pending.length || !!folders.length || !!files.length) && (
         <div className="mb-1.5 flex flex-wrap gap-1">
+          {files.map((f) => (
+            <ContextChip key={`file:${f}`} ctx={{ path: f, text: "", file: true }} onRemove={() => toggleFile(f)} />
+          ))}
+          {folders.map((f) => (
+            <ContextChip key={f} ctx={{ path: f, text: "", folder: true }} onRemove={() => toggleFolder(f)} />
+          ))}
           {pending.map((c, i) => (
             <ContextChip key={i} ctx={c} onRemove={() => setPending((p) => p.filter((_, j) => j !== i))} />
           ))}
+        </div>
+      )}
+      {evaluating && (
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-semibold text-accent-text">
+            <Loader2 size={11} className="animate-spin" /> Re-evaluando práctica del tema…
+          </span>
+        </div>
+      )}
+      {modeInfo && (
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-2.5 py-0.5 text-[11px] font-semibold text-accent-text">
+            <Wand2 size={11} /> {modeInfo.label}
+            <button type="button" aria-label="Salir del modo" onClick={() => setMode("")} className="rounded hover:text-text">
+              <X size={11} />
+            </button>
+          </span>
         </div>
       )}
       <div className="rounded-xl border border-line bg-elevated px-2.5 py-2 focus-within:border-accent">
@@ -298,7 +469,7 @@ function Composer() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           aria-label="Pregunta al asistente"
-          placeholder="Pregunta algo sobre esta nota…"
+          placeholder={modeInfo?.placeholder ?? "Pregunta algo sobre esta nota…"}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -314,6 +485,30 @@ function Composer() {
             onClick={(e) =>
               openMenu(e, [
                 { label: "Selección del editor", icon: <Paperclip size={13} />, onSelect: addSelection },
+                (() => {
+                  // The tab on screen: a note or a canvas.
+                  const st = useApp.getState();
+                  const tab = st.openTabs.find((t) => t.tabId === st.activeTabId);
+                  const active = tab && (tab.kind === "note" || tab.kind === "canvas") ? tab.path : "";
+                  return {
+                    label: "Archivo abierto",
+                    description: !active ? "Abre un archivo primero." : files.includes(active) ? `Quitar «${active.split("/").pop()}» del chat` : `Añadir «${active.split("/").pop()}» al chat (con sus skills)`,
+                    icon: <FileCode2 size={13} />,
+                    disabled: !active,
+                    onSelect: () => toggleFile(active!),
+                  };
+                })(),
+                (() => {
+                  const active = useApp.getState().active;
+                  const dir = active && active.includes("/") ? active.slice(0, active.lastIndexOf("/")) : "";
+                  return {
+                    label: dir ? `Carpeta de la nota abierta` : "Carpeta de la nota abierta",
+                    description: dir ? (folders.includes(dir) ? `Quitar «${dir.split("/").pop()}» del chat` : `Añadir «${dir.split("/").pop()}» al chat`) : "Abre una nota dentro de una carpeta.",
+                    icon: <Folder size={13} />,
+                    disabled: !dir,
+                    onSelect: () => toggleFolder(dir),
+                  };
+                })(),
                 { label: "Menciones (@archivo)", hint: "Fase 5", disabled: true },
                 { label: "Media (imágenes)", hint: "Fase 5", disabled: true },
                 { label: "Acciones rápidas", hint: "Fase 5", disabled: true },
@@ -324,6 +519,19 @@ function Composer() {
             <Plus size={15} />
           </button>
           <ModelSelector />
+          <button
+            type="button"
+            title="Modos y acciones de estudio"
+            aria-label="Modos del asistente"
+            disabled={evaluating}
+            onClick={openModes}
+            className={cn(
+              "grid h-7 w-7 place-items-center rounded-md hover:bg-hover hover:text-text disabled:opacity-50",
+              mode ? "bg-accent-soft text-accent-text" : "text-dim",
+            )}
+          >
+            <Layers size={14} className={cn(evaluating && "animate-pulse")} />
+          </button>
           <span className="flex-1" />
           <IconButton title="Dictado por voz — fuera de alcance" disabled>
             <Mic size={14} />

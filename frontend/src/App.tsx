@@ -1,11 +1,14 @@
 import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { api } from "./lib/bridge";
 import { flushAll, useApp, wasJustWritten } from "./store/app";
+import { MiniPlayer } from "./components/english/MiniPlayer";
 import { ComingSoon, IconRail, MODULES as MODULE_LABELS, StatusBar, Toasts, TopBar, TAB_MIME } from "./components/Shell";
 import { ModuleHost } from "./components/ModuleHost";
 import { useTabDrag } from "./store/tabDrag";
 import { X } from "lucide-react";
 import { RightPanel } from "./components/notes/RightPanel";
+import { ReviewCalendar, useReviewCalendar } from "./components/study/ReviewCalendar";
+import { renameEntry } from "./components/notes/FileTree";
 import { DialogHost, MenuHost } from "./components/ui";
 import { VaultDialog } from "./components/VaultDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
@@ -86,6 +89,22 @@ function useNavigationGuard() {
 function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // F2 renames the file on screen, unless a text field is being edited.
+      if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const el = e.target as HTMLElement | null;
+        if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.closest(".cm-editor"))) return;
+        const st = useApp.getState();
+        const tab = st.openTabs.find((t) => t.tabId === st.activeTabId);
+        if (tab?.kind === "note") {
+          e.preventDefault();
+          const note = st.notes[tab.path];
+          void renameEntry({ type: "note", kind: note?.kind === "code" ? "code" : "note", name: note?.title ?? tab.path.split("/").pop()!, path: tab.path });
+        } else if (tab?.kind === "canvas") {
+          e.preventDefault();
+          void renameEntry({ type: "note", kind: "canvas", name: tab.path.split("/").pop()!, path: tab.path });
+        }
+        return;
+      }
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const s = useApp.getState();
@@ -169,24 +188,48 @@ function useWindowNoteParam() {
   }, []);
 }
 
+/** Quiet time after the last file event before the window reacts, and the longest it waits. */
+const WATCH_QUIET_MS = 350;
+const WATCH_MAX_MS = 1500;
+
+/**
+ * Creating a syllabus or a study space writes hundreds of files in a few seconds; each one
+ * used to reload the whole tree at once, which froze the window. Events are gathered and the
+ * window reacts ONCE per burst: one tree refresh, one reload per open file that changed.
+ */
 function useFileWatcherListener() {
   useEffect(() => {
-    return api.onWatchEvent((ev) => {
-      useApp.getState().refreshTree();
-      const rel = ev.relPath;
-      if (rel) {
-        const s = useApp.getState();
+    const changed = new Set<string>();
+    let quiet: number | null = null;
+    let first = 0;
+
+    const flush = () => {
+      quiet = null;
+      first = 0;
+      const rels = [...changed];
+      changed.clear();
+      const s = useApp.getState();
+      s.refreshTree();
+      for (const rel of rels) {
         // Our own save comes back as a file event: re-reading it would rebuild the
         // editor with what it already shows.
-        if (s.notes[rel] && !wasJustWritten(rel)) {
-          void s.reload(rel);
-        }
-        const canvas = useCanvas.getState();
-        if (canvas.path === rel) {
-          void canvas.reload();
-        }
+        if (s.notes[rel] && !wasJustWritten(rel)) void s.reload(rel);
       }
+      const canvas = useCanvas.getState();
+      if (canvas.path && rels.includes(canvas.path)) void canvas.reload();
+    };
+
+    const off = api.onWatchEvent((ev) => {
+      if (ev?.relPath) changed.add(ev.relPath);
+      const now = Date.now();
+      if (!first) first = now;
+      if (quiet !== null) window.clearTimeout(quiet);
+      quiet = window.setTimeout(flush, now - first >= WATCH_MAX_MS ? 0 : WATCH_QUIET_MS);
     });
+    return () => {
+      off();
+      if (quiet !== null) window.clearTimeout(quiet);
+    };
   }, []);
 }
 
@@ -195,13 +238,15 @@ export function App() {
   // The view to show is driven by the active tab's module id.
   const module = useApp((s) => s.module);
   const sideModule = useApp((s) => s.sideModule);
-  const canvasPath = useCanvas((s) => s.path);
+
   const draggingTabId = useTabDrag((s) => s.draggingTabId);
   const [dropReady, setDropReady] = useState(false);
   useNavigationGuard();
   useShortcuts();
   useTaskReminders();
   useFileWatcherListener();
+  // Clicking a review notification opens the Repaso calendar.
+  useEffect(() => api.onOpenReview(() => useReviewCalendar.getState().set(true)), []);
   useWindowNoteParam();
   useEffect(() => {
     void init();
@@ -258,7 +303,7 @@ export function App() {
         )}
         {/* Una sola columna derecha en toda la app: la tira de lanzadores o la
             cara que sus botones abran. */}
-        <RightPanel module={module} canvas={module === "notas" && !!canvasPath} />
+        <RightPanel module={module} />
         {dropReady && draggingTabId && (
           <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 border-l-2 border-accent bg-accent-soft/20" aria-hidden="true" />
         )}
@@ -267,11 +312,13 @@ export function App() {
       <QuickSwitcher />
       <CommandPalette />
       <ShortcutsDialog />
+      <ReviewCalendar />
       <VaultDialog />
       <SettingsDialog />
       <DialogHost />
       <MenuHost />
       <Toasts />
+      <MiniPlayer />
     </div>
   );
 }

@@ -37,6 +37,7 @@ describe("the file menu", () => {
       "Abrir en una pestaña nueva",
       "Abrir a la derecha",
       "Abrir en una ventana nueva",
+      "Añadir al chat de IA",
       "—",
       "Hacer una copia",
       "Mover a otra carpeta…",

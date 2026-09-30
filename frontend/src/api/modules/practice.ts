@@ -13,6 +13,7 @@ import {
   buildBridgePrompt,
   sendChat,
 } from "../../core/aiClient.js";
+import { runLanguageFor } from "../../core/codeDebugger.js";
 import { ApiError } from "../../core/errors.js";
 import { parseFrontmatter } from "../../core/frontmatter.js";
 import { PracticeAttemptStore } from "../../core/practice/attempts.js";
@@ -39,6 +40,15 @@ import {
   writeRequest,
 } from "../../core/practice/handoff.js";
 import { MODES, modeFor } from "../../core/practice/modes.js";
+import { attemptPassed } from "../../core/practice/ledger.js";
+import { recordTopicPractice } from "../../core/practice/reviewFiles.js";
+import { EnglishVocabularyManager } from "../../core/englishVocabularyManager.js";
+import { isEnglishSubject } from "../../core/practice/domain.js";
+import { isoDate } from "../../core/practice/reviewSchedule.js";
+import { isVocabularySkill } from "../../lib/englishSkillData.js";
+import { gradeDictation } from "../../core/english/dictationGrade.js";
+import { recordLearning } from "../../core/practice/learningLog.js";
+import { findAncestorTopicManifest } from "../../core/practice/topic.js";
 import { parseTimer } from "../../core/practice/timer.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
@@ -162,6 +172,40 @@ function practiceApply(
     result,
   });
   clearStudySnapshotCache();
+  // The topic's review note follows every graded attempt, whatever the skill.
+  try {
+    recordTopicPractice(app.root, p, { skill: String(ex.mode || ""), passed: attemptPassed(attempt as Record<string, any>) });
+  } catch {
+    /* a review note that cannot be written must never break grading */
+  }
+  // English vocabulary: the words the exercise was built around follow the grade in their own reviews.
+  try {
+    const wordIds = Array.isArray(ex.frontmatter.words) ? ex.frontmatter.words.map((w: unknown) => String(w)) : [];
+    if (wordIds.length && isEnglishSubject(ex.subject) && isVocabularySkill(ex.mode)) {
+      const bank = new EnglishVocabularyManager(app.root);
+      const passed = attemptPassed(attempt as Record<string, any>);
+      const today = isoDate(new Date());
+      for (const id of wordIds) bank.recordReview(id, passed, today);
+    }
+  } catch {
+    /* the word bank never breaks grading */
+  }
+  // The mistakes of this attempt go to the competency's learning record, when its box is on.
+  try {
+    const found = findAncestorTopicManifest(p, app.root);
+    if (found) {
+      const at = new Date().toISOString();
+      const base = { at, exercise: ex.note_id, title: ex.title, score: result.score };
+      const entries = result.errors.length
+        ? result.errors.map((e) => ({ ...base, category: e.category, description: e.description, evidence: e.evidence || answer, fix: e.fix }))
+        : result.score < 60
+          ? [{ ...base, category: "other", description: result.feedback, evidence: answer, fix: result.next_step }]
+          : [];
+      recordLearning(app.root, app.rel(found.topicFolder).replace(/\\/g, "/"), String(ex.mode || ""), entries);
+    }
+  } catch {
+    /* the learning record never breaks grading */
+  }
   const history = historyList(new PracticeAttemptStore(app.root).attempts(ex.note_id));
   return {
     graded: true,
@@ -238,8 +282,13 @@ export function practiceApi(app: AppState) {
           break_seconds: spec.break_seconds,
         },
         statement: ex.statement,
+        audio_text: ex.audio_text,
+        media: ex.frontmatter.media || ex.frontmatter.source
+          ? { file: String(ex.frontmatter.media ?? ""), source: String(ex.frontmatter.source ?? ""), start: Number(ex.frontmatter.media_start) || 0, end: Number(ex.frontmatter.media_end) || 0 }
+          : null,
         code: ex.code,
         code_lang: ex.code_lang,
+        run_language: runLanguageFor(ex.subject, disc?.id ?? "", ex.code_lang),
         hints: ex.hints,
         has_solution: Boolean(ex.solution.trim()),
         rubric: ex.rubric,
@@ -290,6 +339,10 @@ export function practiceApi(app: AppState) {
 
       const [p, ex] = getExercise(app, rel);
       new PracticeAttemptStore(app.root).saveDraft(ex.note_id, app.rel(p), ans);
+      // A dictation is graded by comparing it with its transcript: exact, instant, offline and with no AI at all.
+      if (isEnglishSubject(ex.subject) && ex.mode === "ls_dictation" && (ex.audio_text || "").trim()) {
+        return practiceApply(app, p, ex, gradeDictation(ex.audio_text!, ans, ex.rubric.length), "local", ans, hints, secs, seen);
+      }
       const messages = practiceMessages(app.root, ex, ans, hints, secs, seen);
       const cfg = aiCfg();
 

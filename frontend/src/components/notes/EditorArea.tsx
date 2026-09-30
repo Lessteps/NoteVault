@@ -1,17 +1,20 @@
 import {
   ArrowLeftRight,
-  AlertTriangle, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, FileText,
-  Link2, PanelLeft, PenLine, X,
+  AlertTriangle, ArrowUp, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, FileText, Folder,
+  Link2, PenLine, X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { Mentions, SearchHit } from "../../lib/types";
 import { useVirtualList } from "../../lib/useVirtualList";
 import { useApp, type OpenNote, type ViewMode } from "../../store/app";
-import { cn, IconButton, Kbd } from "../ui";
+import { cn, IconButton, Kbd, openMenu, type MenuItem } from "../ui";
+import { ErrorBoundary } from "../common/ErrorBoundary";
 import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
 import { PracticeView } from "../practice/PracticeView";
+import { ExerciseFolderView } from "../practice/ExerciseFolderView";
+import { InkPad } from "../practice/InkPad";
 import { ResumenView } from "../study/ResumenView";
 import { TeoricaView } from "../study/TeoricaView";
 import { TopicFileView } from "../study/TopicFileView";
@@ -27,24 +30,59 @@ const MODES: Array<{ id: ViewMode; label: string; icon: React.ReactNode }> = [
   { id: "split", label: "Dividido", icon: <Columns2 size={13} /> },
 ];
 
+/**
+ * The contents of a folder as a menu, like walking the file explorer from the path bar:
+ * a folder drills down, a file opens, and the first entry goes one level up.
+ */
+function browseFolder(dir: string, at: { clientX: number; clientY: number }): void {
+  void api.listDir(dir).then((entries) => {
+    const s = useApp.getState();
+    const parent = dir.includes("/") ? dir.slice(0, dir.lastIndexOf("/")) : "";
+    const items: MenuItem[] = [];
+    if (dir) {
+      items.push(
+        { label: `Subir a ${parent ? parent.split("/").pop() : "la raíz del vault"}`, icon: <ArrowUp />, onSelect: () => browseFolder(parent, at) },
+        { separator: true },
+      );
+    }
+    const sorted = [...entries].sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name, "es", { numeric: true }) : a.type === "folder" ? -1 : 1));
+    for (const e of sorted.slice(0, 80)) {
+      items.push(
+        e.type === "folder"
+          ? { label: e.name, icon: <Folder />, hint: "›", onSelect: () => browseFolder(e.path, at) }
+          : {
+              label: e.name,
+              icon: <FileText />,
+              onSelect: () => (e.kind === "canvas" ? s.openTab({ kind: "canvas", path: e.path }) : void s.openNote(e.path)),
+            },
+      );
+    }
+    if (!sorted.length) items.push({ label: "Carpeta vacía", disabled: true });
+    openMenu({ clientX: at.clientX, clientY: at.clientY, preventDefault: () => undefined }, items);
+  }).catch((e: Error) => useApp.getState().toast("error", e.message));
+}
+
 function NoteHeader({ note }: { note: OpenNote }) {
   const mode = useApp((s) => s.mode);
   const setMode = useApp((s) => s.setMode);
   const toggleBookmark = useApp((s) => s.toggleBookmark);
-  const toggleExplorer = useApp((s) => s.toggleExplorer);
-  const explorerOpen = useApp((s) => s.explorerOpen);
   const parts = note.path.split("/");
   const { openSide } = useApp.getState();
   return (
     <div className="flex h-11 flex-none items-center gap-2 border-b border-line bg-surface px-3">
-      <IconButton title="Explorador (Ctrl+\)" onClick={toggleExplorer} active={explorerOpen}>
-        <PanelLeft size={15} />
-      </IconButton>
-      <nav className="flex min-w-0 items-center gap-1 font-mono text-[11.5px]">
+      <nav className="flex min-w-0 items-center gap-1 font-mono text-[11.5px]" aria-label="Ruta del archivo">
         {parts.map((p, i) => (
           <span key={i} className="flex min-w-0 items-center gap-1">
             {i > 0 && <span className="text-faint">/</span>}
-            <span className={cn("truncate", i === parts.length - 1 ? "font-semibold text-text" : "text-dim")}>{p}</span>
+            {/* Every part of the path is a door: it lists that folder (the last one, its own) so you can walk back. */}
+            <button
+              type="button"
+              title={i === parts.length - 1 ? "Ver la carpeta de este archivo" : `Explorar ${p}`}
+              onClick={(e) => browseFolder(parts.slice(0, Math.min(i + 1, parts.length - 1)).join("/"), e)}
+              className={cn("truncate rounded px-0.5 hover:bg-hover hover:text-text", i === parts.length - 1 ? "font-semibold text-text" : "text-dim")}
+            >
+              {p}
+            </button>
           </span>
         ))}
       </nav>
@@ -242,15 +280,9 @@ function Editor({ note }: { note: OpenNote }) {
 }
 
 function EmptyState() {
-  const toggleExplorer = useApp((s) => s.toggleExplorer);
-  const explorerOpen = useApp((s) => s.explorerOpen);
-
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex h-11 flex-none items-center gap-2 border-b border-line bg-surface px-3">
-        <IconButton title="Explorador (Ctrl+\)" onClick={toggleExplorer} active={explorerOpen}>
-          <PanelLeft size={15} />
-        </IconButton>
         <span className="text-[12px] text-faint">Notas</span>
       </div>
       <div className="grid flex-1 place-items-center bg-surface">
@@ -289,6 +321,7 @@ function isViewFile(note: { kind: string; frontmatter: Record<string, unknown> }
 export function EditorArea() {
   const note = useApp((s) => (s.active ? s.notes[s.active] : undefined));
   const side = useApp((s) => (s.side && s.side !== s.active ? s.notes[s.side] : undefined));
+  const inkDraft = useApp((s) => s.inkDraft);
   const mode = useApp((s) => s.mode);
   const ladderOn = useLadder((s) => (note ? s.open.has(note.path) : false));
   return (
@@ -304,6 +337,9 @@ export function EditorArea() {
                   modo lectura no hay nada que formatear. */}
               {mode !== "read" && note.kind === "note" && <FormatBar />}
               {note.conflict && <ConflictBanner note={note} />}
+              {/* Una nota que rompe su vista no puede llevarse la ventana: la red
+                  muestra qué pasó y la nota se sigue pudiendo editar. */}
+              <ErrorBoundary key={note.path} path={note.path} what="La vista de la nota">
               <div className="flex min-h-0 flex-1">
                 {mode !== "read" && (
                   <div className={cn("min-h-0 min-w-0", mode === "split" ? "w-1/2 border-r border-line" : "flex-1")}>
@@ -315,6 +351,8 @@ export function EditorArea() {
                     {mode === "read" && isViewFile(note, "practica") ? <TopicFileView note={note} />
                       : mode === "read" && isViewFile(note, "teorica") ? <TeoricaView note={note} />
                         : mode === "read" && isViewFile(note, "resumen") ? <ResumenView note={note} />
+                        : mode === "read" && isViewFile(note, "ejercicios") ? <ExerciseFolderView note={note} />
+                        : mode === "read" && isViewFile(note, "dibujo") ? <InkPad note={note} />
                         : mode === "read" && isExercise(note) ? <PracticeView note={note} />
                       : mode === "read" && ladderOn ? <LadderView path={note.path} onExit={() => useLadder.getState().set(note.path, false)} />
                         : (
@@ -334,11 +372,21 @@ export function EditorArea() {
                   </div>
                 )}
               </div>
+              </ErrorBoundary>
               <BacklinksBar note={note} />
             </>
           )}
         </div>
-        {side && <SidePane note={side} />}
+        {side && (
+          <ErrorBoundary key={`side:${side.path}`} path={side.path} what="La vista del panel derecho">
+            <SidePane note={side} />
+          </ErrorBoundary>
+        )}
+        {inkDraft && (
+          <section aria-label="Dibujo LaTeX" className="flex w-1/2 min-w-0 flex-none flex-col border-l border-line-strong">
+            <InkPad folder={inkDraft.folder} />
+          </section>
+        )}
       </div>
     </main>
   );
@@ -365,7 +413,7 @@ function SidePane({ note }: { note: OpenNote }) {
         <IconButton title="Hacerla la nota principal" onClick={() => useApp.getState().setActive(note.path)}><ArrowLeftRight size={14} /></IconButton>
         <IconButton title="Cerrar panel derecho" onClick={() => void useApp.getState().openSide(null)}><X size={14} /></IconButton>
       </div>
-      <div className="min-h-0 flex-1">{editing ? <Editor note={note} /> : <ReadView note={note} />}</div>
+      <div className="min-h-0 flex-1">{editing ? <Editor note={note} /> : isViewFile(note, "dibujo") ? <InkPad note={note} /> : <ReadView note={note} />}</div>
     </section>
   );
 }

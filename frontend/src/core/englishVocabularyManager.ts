@@ -5,6 +5,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { loadJson, slug, writeJson } from "./store.js";
 import { isSyncConflict } from "./vaultFormat.js";
+import { wordClassOf, wordClassOfTopic, type WordClass } from "../lib/englishSkillData.js";
 
 export const PRACTICE_MODES = [
   "en_to_meaning", "meaning_to_en", "sentence_to_word", "ipa_to_word", "word_to_sentence", "cloze",
@@ -24,7 +25,22 @@ export interface VocabItem {
   level: string;
   mastery: number;
   source_note: string;
+  /** spaced repetition: the day this word is due again (YYYY-MM-DD; empty = new, due now) */
+  next_review: string;
+  /** how many reviews in a row were passed (index into VOCAB_INTERVALS) */
+  srs_level: number;
+  last_review: string;
 }
+
+/** Days until the next review after each consecutive success. A failure sends the word back to tomorrow. */
+export const VOCAB_INTERVALS = [1, 3, 7, 14, 30, 60] as const;
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const addDaysIso = (iso: string, n: number): string => {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, (m ?? 1) - 1, (d ?? 1) + n));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+};
 
 function asList(v: unknown): string[] {
   if (typeof v === "string") return [v];
@@ -53,6 +69,9 @@ export function sanitizeVocabItem(raw: unknown, fallbackWord = ""): VocabItem {
     level,
     mastery,
     source_note: String(r.source_note ?? ""),
+    next_review: ISO_DAY.test(String(r.next_review ?? "")) ? String(r.next_review) : "",
+    srs_level: Math.max(0, Math.min(VOCAB_INTERVALS.length, Math.trunc(Number(r.srs_level ?? 0)) || 0)),
+    last_review: ISO_DAY.test(String(r.last_review ?? "")) ? String(r.last_review) : "",
   };
 }
 
@@ -117,6 +136,66 @@ export class EnglishVocabularyManager {
     return this._cache?.[slug(wordId)] ?? null;
   }
 
+  /** Words due on `today` or before (new words count as due), most overdue first. */
+  dueWords(today: string): VocabItem[] {
+    return this.allWords()
+      .filter((w) => !w.next_review || w.next_review <= today)
+      .sort((a, b) => (a.next_review || "0000").localeCompare(b.next_review || "0000") || a.mastery - b.mastery);
+  }
+
+  /**
+   * The words a vocabulary session is built around: the ones due first (lowest mastery first inside), and among
+   * equals the ones that belong to the topic (`topicHint` matches the word's topic or its source note).
+   */
+  sessionWords(topicHint: string, limit: number, today: string, wordClass?: WordClass | null): VocabItem[] {
+    const hint = topicHint.toLowerCase();
+    const near = (w: VocabItem): number => (hint && (w.topic.includes(hint) || w.source_note.toLowerCase().includes(hint)) ? 0 : 1);
+    const ranked = this.allWords()
+      .map((w) => ({ w, due: !w.next_review || w.next_review <= today ? 0 : 1 }))
+      .sort((a, b) => a.due - b.due || near(a.w) - near(b.w) || a.w.mastery - b.w.mastery);
+    // A session works on ONE class of words (verbs with verbs, adjectives with adjectives…): the class asked for
+    // (or the topic's), otherwise the class with the most words due. If the bank has none of that class, the session falls back to the whole bank.
+    const classOf = (w: VocabItem): WordClass => wordClassOf(w.part_of_speech, w.word);
+    let cls: WordClass | null = wordClass ?? wordClassOfTopic(topicHint);
+    if (!cls && ranked.length) {
+      const counts = new Map<WordClass, number>();
+      for (const x of ranked) if (x.due === 0) counts.set(classOf(x.w), (counts.get(classOf(x.w)) ?? 0) + 1);
+      const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+      cls = best ? best[0] : classOf(ranked[0]!.w);
+    }
+    const same = cls ? ranked.filter((x) => classOf(x.w) === cls) : ranked;
+    return (same.length ? same : ranked)
+      .slice(0, Math.max(0, limit))
+      .map((x) => x.w);
+  }
+
+  /** Records the result of practising a word: passing climbs the ladder, failing brings it back tomorrow. */
+  recordReview(wordId: string, correct: boolean, today: string): VocabItem | null {
+    const item = this.get(wordId);
+    if (!item) return null;
+    const level = correct ? Math.min(item.srs_level + 1, VOCAB_INTERVALS.length) : 0;
+    const next: VocabItem = {
+      ...item,
+      srs_level: level,
+      last_review: today,
+      next_review: addDaysIso(today, correct ? VOCAB_INTERVALS[level - 1]! : 1),
+      mastery: Math.round(Math.max(0, Math.min(1, item.mastery + (correct ? 0.15 : -0.1))) * 100) / 100,
+    };
+    writeJson(this._path(next.id), next);
+    this._cache = null;
+    return next;
+  }
+
+  /** Moves the next review of a word to another day (the calendar's drag and date box). */
+  setNextReview(wordId: string, date: string): VocabItem | null {
+    const item = this.get(wordId);
+    if (!item || !ISO_DAY.test(date)) return null;
+    const next = { ...item, next_review: date };
+    writeJson(this._path(next.id), next);
+    this._cache = null;
+    return next;
+  }
+
   addWord(word: string, meaning: string, opts: Partial<Omit<VocabItem, "id" | "word" | "meaning" | "mastery">> = {}): VocabItem {
     const clean = sanitizeVocabItem({
       word, meaning, mastery: 0,
@@ -128,6 +207,9 @@ export class EnglishVocabularyManager {
       collocations: opts.collocations ?? [],
       synonyms: opts.synonyms ?? [],
       source_note: opts.source_note ?? "",
+      next_review: opts.next_review ?? "",
+      srs_level: opts.srs_level ?? 0,
+      last_review: opts.last_review ?? "",
     }, word);
     writeJson(this._path(clean.id), clean);
     this._cache = null;

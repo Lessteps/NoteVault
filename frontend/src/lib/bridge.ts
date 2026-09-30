@@ -18,6 +18,7 @@ declare global {
     pywebview?: { api: PyApi };
     nv?: {
       invoke: (method: string, args: unknown[]) => Promise<unknown>;
+      onOpenReview?: (cb: () => void) => () => void;
       onWatchEvent?: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void) => () => void;
       onBrowserState?: (cb: (data: BrowserState) => void) => () => void;
       onWindowState?: (cb: (data: { maximized: boolean }) => void) => () => void;
@@ -152,6 +153,9 @@ export const getRendering = () => call<RenderingSettings>("get_rendering");
 export const setRendering = (patch: Partial<RenderingSettings>) => call<RenderingSettings>("set_rendering", patch);
 export const gpuStatus = () => call<GpuStatus>("gpu_status");
 export const relaunchApp = () => call<{ ok: boolean }>("relaunch_app");
+
+/** An area the AI proposed for a study space, with its topics. */
+export type ProposedArea = { name: string; topics: Array<{ name: string }> };
 
 export const api = {
   appInfo: () => call<AppInfo>("app_info"),
@@ -363,10 +367,18 @@ export const api = {
   aiChat: (history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "") =>
     call<{ reply?: string; bridge?: boolean; prompt?: string; url?: string; label?: string }>("ai_chat", history, question, noteRel, selection),
   /** Streamed chat: the answer arrives over onAiStream, the promise holds it whole. */
-  aiChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "") =>
+  aiChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string, noteRel = "", selection = "", mode = "", folders: string[] = [], files: string[] = []) =>
     call<{ reply?: string; stopped?: boolean; bridge?: boolean; prompt?: string; url?: string; label?: string }>(
-      "ai_chat_stream", id, history, question, noteRel, selection,
+      "ai_chat_stream", id, history, question, noteRel, selection, mode, folders, files,
     ),
+  /** What a chat action would create (nothing is written). */
+  assistantActionPreview: (action: unknown) =>
+    call<{ title: string; warnings: string[]; open: string; ops: Array<{ kind: "mkdir" | "write"; rel: string; exists: boolean; overwrite: boolean }> }>(
+      "assistant_action_preview", action,
+    ),
+  /** Runs an action the user accepted. */
+  assistantActionApply: (action: unknown) =>
+    call<{ ok: boolean; written: string[]; skipped: string[]; open: string }>("assistant_action_apply", action),
   aiChatCancel: (id: string) => call<{ ok: boolean }>("ai_chat_cancel", id),
   onAiStream: (cb: (ev: AiStreamEvent) => void): (() => void) => {
     if (typeof window !== "undefined" && window.nv?.onAiStream) {
@@ -441,7 +453,7 @@ export const api = {
   /** The view file of a folder (created when missing): practica or resumen. */
 studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic_map", rel),
     studyViewEnsure: (rel: string) =>
-    call<{ ok: boolean; kind: "practica" | "resumen" | "none"; path: string; created: string[]; tagged: string[]; errors: string[] }>("study_view_ensure", rel),
+    call<{ ok: boolean; kind: "practica" | "resumen" | "ejercicios" | "none"; path: string; created: string[]; tagged?: string[]; errors: string[] }>("study_view_ensure", rel),
   studyTopicConvert: (folder: string) => call<{ ok: boolean; path: string; manifest: any }>("study_topic_convert", folder),
   studyTopicSessionBuild: (
     folder: string,
@@ -450,7 +462,51 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
     quantity: string,
     assistance: string,
   ) => call<import("./types").TopicSessionResult>("study_topic_session_build", folder, skill, difficulty, quantity, assistance),
+  /** AI reads the topic's theory and rewrites its practice plan (skills x difficulty counts). */
+  /** Mistakes record per competency of a topic: is the box on, how many mistakes it holds. */
+  studyLearningStatus: (folder: string) => call<Record<string, { enabled: boolean; entries: number }>>("study_learning_status", folder),
+  studyLearningSet: (folder: string, skill: string, enabled: boolean) =>
+    call<{ skill: string; enabled: boolean; entries: number }>("study_learning_set", folder, skill, enabled),
+  /** The competency checklist for the chat: recommended ones, and how every skill would be practised here. */
+  studyTopicSkillOptions: (folder: string) =>
+    call<import("../lib/assistantModes").ParsedSkills & { current?: boolean }>("study_topic_skill_options", folder),
+  /** How a topic is classified (type for maths/programming, branch for English) or why it is not. */
+  studyTopicClassification: (folder: string) =>
+    call<{ ok: boolean; domain: string; branch: string | null; topicType: string | null; via: string | null; reason?: string; suggestion?: string | null }>("study_topic_classification", folder),
+  /** Resolves an unclassified English topic explicitly by giving it a branch. */
+  studyTopicClassify: (folder: string, branch: string) => call<{ ok: boolean; branch: string }>("study_topic_classify", folder, branch),
+  studyUnclassifiedList: () => call<Array<{ folder: string; name: string; suggestion: string | null; reason: string }>>("study_unclassified_list"),
+  studyTopicReevaluate: (folder: string) =>
+    call<{ ok: boolean; plan: import("./types").PracticePlan; path: string }>("study_topic_reevaluate", folder),
+  /** The topic review notes: when each practised topic is due again. */
+  /** Moves the pending review of a topic to another day (YYYY-MM-DD). */
+  studyReviewReschedule: (path: string, date: string) => call<import("./types").ReviewItem>("study_review_reschedule", path, date),
+  studyReviewSettings: () => call<{ enabled: boolean; hour: number }>("study_review_settings"),
+  studyReviewSettingsSet: (settings: { enabled: boolean; hour: number }) => call<{ enabled: boolean; hour: number }>("study_review_settings_set", settings),
+  studyReviewNotifyTest: () => call<{ supported: boolean; due: number }>("study_review_notify_test"),
+  /** Adds a word to the English word bank; with a date it is scheduled for review that day. */
+  enVocabAdd: (word: string, meaning = "", level = "B1", nextReview = "") =>
+    call<{ ok: boolean; id: string; word: string; next_review: string }>("en_vocab_add", word, meaning, level, nextReview),
+  /** A vocabulary session from the shared word bank (vc_ skill): words of ONE class (verb, noun…; empty = the class with most words due). */
+  studyVocabSession: (skill = "vc_recall", quantity = "3-5", wordClass = "") =>
+    call<{ ok: boolean; skill: string; first_exercise: string; exercises: Array<{ id: string; title: string; path: string; is_new: boolean }> }>("study_vocab_session", skill, quantity, wordClass),
+  studyReviewsList: () =>
+    call<{ today: string; items: import("./types").ReviewItem[] }>("study_reviews_list"),
+  /** The AI proposes areas and topics for a subject (nothing is written). */
+  studySpacePropose: (subject: string, scope: string, objective: string, existingFolder = "") =>
+    call<{ areas: ProposedArea[]; conversationId: string }>("study_space_propose", subject, scope, objective, existingFolder),
+  studySpaceGenerate: (request: unknown) => call<{ jobId: string; conversationId: string }>("study_space_generate", request),
+  studyTopicGenerate: (folder: string, conversationId = "") => call<{ jobId: string; conversationId: string }>("study_topic_generate", folder, conversationId),
+  studySpaceStatus: (jobId: string) =>
+    call<{ id: string; folder: string; log: string[]; done: boolean; error: string; finished: number; total: number; conversationId: string }>("study_space_status", jobId),
+  studySpaceList: () => call<string[]>("study_space_list"),
+  studySpaceSubject: (rel: string) => call<string>("study_space_subject", rel),
+  studyTopicPlan: (folder: string) =>
+    call<{ plan: import("./types").PracticePlan | null }>("study_topic_plan", folder),
   studyTopicDashboard: (subject?: string) => call<import("./types").TopicDashboardData>("study_topic_dashboard", subject),
+  /** AI-drafts a subject's areas/topics and creates the folder tree + overviews. */
+  studyGenerateSyllabus: (subject: string) =>
+    call<{ ok: boolean; created: string[]; folders: string[]; plan: unknown }>("study_generate_syllabus", subject),
   /** A session drawn from every topic of an area (see `study_area_session_build`). */
   studyAreaSessionBuild: (
     folder: string,
@@ -488,13 +544,39 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studyFolders: () => call<Array<{ id: string; name: string; icon: string; exists: boolean; index: string }>>("study_folders"),
   studyFolderCreate: (id: string, structure: boolean) => call<{ path: string; created: boolean; index: string }>("study_folder_create", id, structure),
   enPlayerPick: () => call<import("./types").PlayerMedia & { ok: boolean }>("en_player_pick"),
+  enSourceList: () => call<{ items: import("./types").EnglishSource[]; kinds: { id: string; label: string }[]; folder: string }>("en_source_list"),
+  enSourceAdd: (kind: string, title = "", withTranscript = true, copy = true) =>
+    call<{ ok: boolean; source?: import("./types").EnglishSource }>("en_source_add", kind, title, withTranscript, copy),
+  enSourcePaste: (kind: string, title: string, text: string, attachTo = "") =>
+    call<{ ok: boolean; timed: boolean; source?: import("./types").EnglishSource }>("en_source_paste", kind, title, text, attachTo),
+  enRecordingSave: (name: string, data: string, ext = "webm") => call<{ ok: boolean; id: string; size: number }>("en_recording_save", name, data, ext),
+  codeRuntimes: () => call<{ items: import("./types").CodeRuntime[] }>("code_runtimes"),
+  codeRun: (language: string, code: string, stdin = "") => call<import("./types").CodeRun>("code_run", language, code, stdin),
+  codeTrace: (language: string, code: string, stdin = "") => call<import("./types").CodeTrace>("code_trace", language, code, stdin),
+  enRecordingList: () => call<{ items: import("./types").EnglishRecording[] }>("en_recording_list"),
+  enRecordingUrl: (id: string) => call<{ url: string }>("en_recording_url", id),
+  enRecordingRename: (id: string, name: string) => call<{ ok: boolean; id: string }>("en_recording_rename", id, name),
+  enRecordingRemove: (id: string) => call<{ ok: boolean }>("en_recording_remove", id),
+  enSourceTranscript: (id: string) => call<{ ok: boolean; source?: import("./types").EnglishSource }>("en_source_transcript", id),
+  enSourceRemove: (id: string) => call<{ ok: boolean }>("en_source_remove", id),
+  enSourceOpen: (id: string, seconds = 0) => call<import("./types").PlayerMedia & { ok: boolean; source: import("./types").EnglishSource; plain: string }>("en_source_open", id, seconds),
+  enSourceSession: (id: string, kind: "dictation" | "shadowing" | "podcast" = "dictation", count = 5) =>
+    call<{ ok: boolean; paths?: string[]; first?: string; count?: number; audio?: string; reason?: string; message?: string }>("en_source_session", id, kind, count),
   enPlayerOpen: (file: string, seconds = 0) => call<import("./types").PlayerMedia & { ok: boolean }>("en_player_open", file, seconds),
   enPlayerSubtitles: (id: string, track: "en" | "es") =>
     call<{ ok: boolean; pairs?: import("./player").Pair[]; en_file?: string; es_file?: string }>("en_player_subtitles", id, track),
+  /** A dictation exercise from the sentence being played (ok:false + message when it cannot be made). */
+  enPlayerDictation: (id: string, seconds: number, kind: "dictation" | "shadowing" | "podcast" = "dictation") =>
+    call<{ ok: boolean; message?: string; reason?: string; path?: string; text?: string; from_media?: boolean }>("en_player_dictation", id, seconds, kind),
   enPlayerLink: (id: string, seconds: number) => call<{ link: string }>("en_player_link", id, seconds),
   enPlayerMine: (id: string, fields: { sentence: string; seconds: number; mode: "translate" | "cloze"; target: string; level: string; reference_es: string }) =>
     call<{ path: string; stamp: string }>("en_player_mine", id, fields),
   saveTextAs: (name: string, text: string) => call<{ ok: boolean; fallback?: boolean; path?: string }>("save_text_as", name, text),
+  /** A review notification was clicked: open the Repaso calendar. */
+  onOpenReview: (cb: () => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onOpenReview) return window.nv.onOpenReview(cb);
+    return () => undefined;
+  },
   onWatchEvent: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void): (() => void) => {
     if (typeof window !== "undefined" && window.nv?.onWatchEvent) {
       return window.nv.onWatchEvent(cb);

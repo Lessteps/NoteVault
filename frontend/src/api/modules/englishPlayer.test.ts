@@ -3,6 +3,7 @@ import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { addSource } from "../../core/english/sources.js";
 import { ApiError } from "../../core/errors.js";
 import { AppState } from "../appState.js";
 import { englishPlayerApi } from "./englishPlayer.js";
@@ -74,5 +75,200 @@ describe("english player", () => {
     expect(text).toContain("How _____ you?");
     expect(() => api.en_player_mine(mid, { sentence: "  " })).toThrow(ApiError);
     expect(() => api.en_player_mine("nope", { sentence: "x" })).toThrow(ApiError);
+  });
+});
+
+describe("dictation from the player's subtitles", () => {
+  const makeSpace = () => {
+    fs.mkdirSync(path.join(dir, "Inglés 1"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "Inglés 1", "Inglés 1.resumen.md"), "---\nsubject: english\n---\n", "utf-8");
+  };
+
+  it("turns the sentence being played into a listening exercise that plays that stretch of the media", async () => {
+    makeSpace();
+    const media = (await api.en_player_open("Pelis/film.mp4", 4)) as { id: string };
+    const out = api.en_player_dictation(media.id, 4.5);
+    expect(out).toMatchObject({ ok: true, text: "How are you?", from_media: true });
+    const note = fs.readFileSync(path.join(dir, ...(out.path as string).split("/")), "utf-8");
+    expect(out.path).toContain("Inglés 1/4 Escucha/Dictados del reproductor/Ejercicios/ls_dictation/");
+    expect(note).toContain("mode: ls_dictation");
+    expect(note).toContain("discipline: english_listening");
+    expect(note).toContain('media: "Pelis/film.mp4"');
+    expect(note).toContain("media_start: 3.70");
+    expect(note).toContain("## Texto del audio\nHow are you?");
+    // the topic that collects them was created in the listening branch
+    const practica = fs.readFileSync(path.join(dir, "Inglés 1", "4 Escucha", "Dictados del reproductor", "Dictados del reproductor.practica.md"), "utf-8");
+    expect(practica).toContain("branch: listening");
+  });
+
+  it("puts shadowing and podcast exercises in the topics that train them (4.5 and 4.4) when the space has them", async () => {
+    makeSpace();
+    for (const t of ["4.4 Podcasts and interviews", "4.5 Shadowing to repeat what you hear"]) fs.mkdirSync(path.join(dir, "Inglés 1", "4 Escucha", t), { recursive: true });
+    const media = (await api.en_player_open("Pelis/film.mp4", 4)) as { id: string };
+    const shadow = api.en_player_dictation(media.id, 4.5, "shadowing");
+    expect(shadow.path).toContain("4 Escucha/4.5 Shadowing to repeat what you hear/Ejercicios/ls_shadowing/");
+    expect(fs.readFileSync(path.join(dir, ...(shadow.path as string).split("/")), "utf-8")).toContain("mode: ls_shadowing");
+    const pod = api.en_player_dictation(media.id, 4.5, "podcast");
+    expect(pod.path).toContain("4 Escucha/4.4 Podcasts and interviews/Ejercicios/ls_podcast/");
+    const note = fs.readFileSync(path.join(dir, ...(pod.path as string).split("/")), "utf-8");
+    expect(note).toContain("mode: ls_podcast");
+    expect(note).toContain("idea general");
+    expect(note).toContain("## Texto del audio");
+  });
+
+  it("with no English subtitles it explains why instead of failing", async () => {
+    makeSpace();
+    fs.rmSync(path.join(dir, "Pelis", "film.en.srt"));
+    fs.rmSync(path.join(dir, "Pelis", "film.es.srt"));
+    const media = (await api.en_player_open("Pelis/film.mp4")) as { id: string };
+    const out = api.en_player_dictation(media.id, 2);
+    expect(out).toMatchObject({ ok: false, reason: "no_subtitles" });
+    expect(String(out.message)).toContain("no tiene subtítulos en inglés");
+  });
+
+  it("without an English space it says so", async () => {
+    const media = (await api.en_player_open("Pelis/film.mp4")) as { id: string };
+    expect(api.en_player_dictation(media.id, 2)).toMatchObject({ ok: false, reason: "no_space" });
+  });
+});
+
+describe("library of sources", () => {
+  const makeSpace = () => {
+    fs.mkdirSync(path.join(dir, "Inglés 1", "4 Escucha", "4.5 Shadowing to repeat what you hear"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "Inglés 1", "Inglés 1.resumen.md"), "---\nsubject: english\n---\n", "utf-8");
+  };
+  const LONG = Array.from({ length: 12 }, (_, i) => `${i + 1}\n00:00:${String(i * 5).padStart(2, "0")},000 --> 00:00:${String(i * 5 + 3).padStart(2, "0")},500\nThis is the sentence number ${i} of the show.\n`).join("\n");
+
+  it("lists sources, opens one with ITS transcript (not the film's sibling subtitles) and keeps paths private", async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "nv_outside_"));
+    try {
+      fs.writeFileSync(path.join(outside, "ep1.mp3"), Buffer.alloc(1024));
+      fs.writeFileSync(path.join(outside, "ep1-transcript.srt"), LONG, "utf-8");
+      const s = addSource(dir, { kind: "podcast", title: "6 Minute English — ep 1", media: path.join(outside, "ep1.mp3"), transcript: path.join(outside, "ep1-transcript.srt") });
+      const list = api.en_source_list() as { items: Array<{ id: string; has_media: boolean; has_transcript: boolean; kind: string }> };
+      expect(list.items).toHaveLength(1);
+      expect(list.items[0]).toMatchObject({ id: s.id, kind: "podcast", has_media: true, has_transcript: true });
+      const opened = (await api.en_source_open(s.id, 0)) as { pairs: Array<{ en: string }>; url: string };
+      expect(opened.pairs).toHaveLength(12);
+      expect(opened.pairs[3]!.en).toContain("number 3");
+      expect(JSON.stringify(opened)).not.toContain(outside);
+      expect((await get(opened.url)).length).toBe(1024);
+      // a source whose file went away says so instead of failing obscurely
+      fs.rmSync(path.join(outside, "ep1.mp3"));
+      expect((api.en_source_list() as { items: Array<{ has_media: boolean }> }).items[0]!.has_media).toBe(false);
+      await expect(api.en_source_open(s.id)).rejects.toThrow(/No encuentro el archivo/);
+      expect(api.en_source_remove(s.id)).toEqual({ ok: true });
+      expect((api.en_source_list() as { items: unknown[] }).items).toEqual([]);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("builds a session of dictations spread along the episode, tied to the source, with no AI", async () => {
+    makeSpace();
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "nv_outside_"));
+    try {
+      fs.writeFileSync(path.join(outside, "ep.mp3"), Buffer.alloc(512));
+      fs.writeFileSync(path.join(outside, "ep.srt"), LONG, "utf-8");
+      const s = addSource(dir, { kind: "podcast", title: "Ep", media: path.join(outside, "ep.mp3"), transcript: path.join(outside, "ep.srt") });
+      const out = (await api.en_source_session(s.id, "dictation", 4)) as { ok: boolean; paths: string[]; count: number };
+      expect(out).toMatchObject({ ok: true, count: 4 });
+      const notes = out.paths.map((p) => fs.readFileSync(path.join(dir, ...p.split("/")), "utf-8"));
+      expect(out.paths[0]).toContain("4.5 Shadowing to repeat what you hear/Ejercicios/ls_dictation/");
+      expect(new Set(out.paths).size).toBe(4);
+      for (const n of notes) {
+        expect(n).toContain(`source: ${s.id}`);
+        expect(n).not.toContain("media: ");
+        expect(n).toContain("## Texto del audio\nThis is the sentence number");
+      }
+      // spread: not four neighbours
+      const starts = notes.map((n) => Number(/media_start: ([\d.]+)/.exec(n)![1]));
+      expect(starts[3]! - starts[0]!).toBeGreaterThan(20);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("explains when the source has no transcript yet", async () => {
+    makeSpace();
+    fs.writeFileSync(path.join(dir, "Pelis", "solo.mp3"), Buffer.alloc(64));
+    const s = addSource(dir, { kind: "ted", title: "Talk", media: path.join(dir, "Pelis", "solo.mp3") });
+    expect(s.media).toBe("Pelis/solo.mp3"); // inside the vault: stored relative to it
+    expect(await api.en_source_session(s.id)).toMatchObject({ ok: false, reason: "no_subtitles" });
+  });
+});
+
+describe("pasted transcripts and recordings", () => {
+  const makeSpace = () => {
+    fs.mkdirSync(path.join(dir, "Inglés 1", "4 Escucha", "4.5 Shadowing to repeat what you hear"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "Inglés 1", "Inglés 1.resumen.md"), "---\nsubject: english\n---\n", "utf-8");
+  };
+  const PLAIN = "Welcome to the show. Today we are talking about remote work and how it changes our days.\n\nMost companies now offer at least two days from home. However, some people feel lonely at home.\n\nSo the best solution might be a mix of both ways of working. Thanks for listening.";
+
+  it("saves a pasted plain transcript as a note in Fuentes/Transcripciones and makes a source with no audio", () => {
+    makeSpace();
+    const out = api.en_source_paste("podcast", "6 Minute English: ep 3", PLAIN) as { ok: boolean; timed: boolean; source: { transcript: string; media: string; title: string } };
+    expect(out).toMatchObject({ ok: true, timed: false });
+    expect(out.source.media).toBe("");
+    expect(out.source.transcript).toBe("Inglés 1/Fuentes/Transcripciones/6 Minute English ep 3.md");
+    const note = fs.readFileSync(path.join(dir, ...out.source.transcript.split("/")), "utf-8");
+    expect(note).toContain("type: transcript");
+    expect(note).toContain("Welcome to the show.");
+    const list = api.en_source_list() as { items: Array<{ has_media: boolean; has_transcript: boolean; timed: boolean }> };
+    expect(list.items[0]).toMatchObject({ has_media: false, has_transcript: true, timed: false });
+  });
+
+  it("detects a pasted subtitle file by its times and keeps it as .srt", () => {
+    makeSpace();
+    const out = api.en_source_paste("ted", "Talk", EN + "\n3\n00:00:07,000 --> 00:00:09,000\nA third line to be long enough.\n") as { timed: boolean; source: { transcript: string } };
+    expect(out.timed).toBe(true);
+    expect(out.source.transcript).toMatch(/\.srt$/);
+  });
+
+  it("refuses an empty paste and builds voice-read sessions from plain text without tying them to any audio", async () => {
+    makeSpace();
+    expect(() => api.en_source_paste("podcast", "x", "  hola ")).toThrow(ApiError);
+    const s = (api.en_source_paste("podcast", "Ep", PLAIN) as { source: { id: string } }).source;
+    const out = (await api.en_source_session(s.id, "dictation", 3)) as { ok: boolean; paths: string[]; audio: string };
+    expect(out).toMatchObject({ ok: true, audio: "voz" });
+    for (const p of out.paths) {
+      const note = fs.readFileSync(path.join(dir, ...p.split("/")), "utf-8");
+      expect(note).not.toContain("source:");
+      expect(note).not.toContain("media_start");
+      expect(note).toContain("## Texto del audio\n");
+    }
+  });
+
+  it("attaches a pasted transcript to an existing source", async () => {
+    makeSpace();
+    fs.writeFileSync(path.join(dir, "Pelis", "solo.mp3"), Buffer.alloc(64));
+    const s = addSource(dir, { kind: "podcast", title: "Ep", media: path.join(dir, "Pelis", "solo.mp3") });
+    const out = api.en_source_paste("podcast", "", PLAIN, s.id) as { source: { id: string; transcript: string; media: string } };
+    expect(out.source).toMatchObject({ id: s.id, media: "Pelis/solo.mp3" });
+    expect(out.source.transcript).toContain("Fuentes/Transcripciones/Ep.md");
+    const opened = (await api.en_source_open(s.id)) as { plain: string; pairs: unknown[] };
+    expect(opened.plain).toContain("Welcome to the show.");
+    expect(opened.pairs).toEqual([]);
+  });
+
+  it("saves, lists, plays, renames and removes voice recordings in Fuentes/Grabaciones", async () => {
+    makeSpace();
+    const bytes = Buffer.alloc(4096, 7);
+    const saved = api.en_recording_save("Mi práctica: th / v", bytes.toString("base64"), "webm") as { ok: boolean; id: string };
+    expect(saved.ok).toBe(true);
+    expect(saved.id).toMatch(/Mi práctica th v\.webm$/);
+    expect(fs.existsSync(path.join(dir, "Inglés 1", "Fuentes", "Grabaciones", saved.id))).toBe(true);
+    const list = (await api.en_recording_list()) as { items: Array<{ id: string; size: number }> };
+    expect(list.items).toHaveLength(1);
+    expect(list.items[0]!.size).toBe(4096);
+    const url = ((await api.en_recording_url(saved.id)) as { url: string }).url;
+    expect((await get(url)).length).toBe(4096);
+    expect(JSON.stringify(list)).not.toContain(dir);
+    const renamed = api.en_recording_rename(saved.id, "Vocales largas") as { id: string };
+    expect(renamed.id).toBe("Vocales largas.webm");
+    expect(() => api.en_recording_save("x", "AAAA")).toThrow(ApiError); // too short to be audio
+    expect(() => api.en_recording_remove("../../etc/passwd")).toThrow(ApiError); // never leaves the folder
+    expect(api.en_recording_remove(renamed.id)).toEqual({ ok: true });
+    expect(((await api.en_recording_list()) as { items: unknown[] }).items).toEqual([]);
   });
 });

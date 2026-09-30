@@ -73,6 +73,7 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
     .map((s) => progress.skills[s])
     .filter((s): s is NonNullable<typeof s> => s !== undefined);
   const notStarted = skillsList.filter((s) => s.status === "not_started");
+  const isEnglishTopic = manifest.skills.some((s) => /^(gr|wr|rd|ls|sp|vc)_/.test(s));
   const mastered = skillsList.filter((s) => s.mastered).length;
   const practicing = skillsList.filter((s) => s.status === "practicing").length;
   const pending = Math.max(0, skillsList.length - mastered - practicing);
@@ -104,8 +105,9 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
               </div>
               <h2 className="mt-0.5 text-[17px] font-bold leading-tight text-text">Dominio del Tema</h2>
               <p className="mt-1.5 max-w-[300px] text-[11.5px] leading-snug text-faint">
-                Completá las {skillsList.length} habilidades en dificultad {target === 3 ? "media y alta" : "media"} para
-                desbloquear la certificación.
+                {manifest.plan
+                  ? `Completa las casillas de las ${skillsList.length} competencias que la IA eligió para este tema.`
+                  : `Completá las ${skillsList.length} habilidades en dificultad ${target === 3 ? "media y alta" : "media"} para desbloquear la certificación.`}
               </p>
             </div>
           </div>
@@ -115,9 +117,21 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
               <div className="flex items-center gap-2 text-[11.5px] font-semibold text-text">
                 <Target size={13} className="text-accent-text" /> Meta por Skill
               </div>
-              <div className="mt-1.5 text-[15px] font-bold text-text">Dificultad {target}</div>
-              <div className="text-[12px] tracking-[0.2em] text-warn">{"★".repeat(target)}</div>
-              <div className="mt-1 text-[10.5px] text-faint">Mínimo {minPerSkill} ejercicios c/u</div>
+              {manifest.plan ? (
+                <>
+                  <div className="mt-1.5 text-[15px] font-bold text-text">Plan de la IA</div>
+                  <div className="text-[12px] tracking-[0.2em] text-warn">
+                    {Object.values(manifest.plan).reduce((n, c) => n + c[0] + c[1] + c[2], 0)} ejercicios
+                  </div>
+                  <div className="mt-1 text-[10.5px] text-faint">Los que marca cada casilla de la matriz</div>
+                </>
+              ) : (
+                <>
+                  <div className="mt-1.5 text-[15px] font-bold text-text">Dificultad {target}</div>
+                  <div className="text-[12px] tracking-[0.2em] text-warn">{"★".repeat(target)}</div>
+                  <div className="mt-1 text-[10.5px] text-faint">Mínimo {minPerSkill} ejercicios c/u</div>
+                </>
+              )}
             </div>
             <div className="flex-1 rounded-xl border border-line bg-panel p-3">
               <div className="flex items-center gap-2 text-[11.5px] font-semibold text-text">
@@ -163,8 +177,7 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-soft/50 px-3.5 py-2.5">
             <AlertTriangle size={15} className="flex-none text-warn" />
             <p className="min-w-0 flex-1 text-[11.5px] leading-snug text-dim">
-              <b className="text-warn">{notStarted.length} competencias sin iniciar:</b> Comienza practicando problemas
-              básicos o cálculo mental.
+              <b className="text-warn">{notStarted.length} competencias sin iniciar:</b> {isEnglishTopic ? "Empieza por la competencia más fácil de la matriz." : "Comienza practicando problemas básicos o cálculo mental."}
             </p>
             <div className="text-right">
               <div className="font-mono text-[14px] font-bold text-text">
@@ -247,6 +260,15 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
                     </td>
                     {([1, 2, 3] as const).map((d) => {
                       const cell = sp.cells[d];
+                      const required = cell.required ?? minPerSkill;
+                      // With the AI's plan a cell it did not plan is simply not part of this topic.
+                      if (manifest.plan && required === 0) {
+                        return (
+                          <td key={d} className="px-2 py-2.5">
+                            <div className="mx-auto flex h-7 w-[76px] items-center justify-center font-mono text-[11px] text-faint/50" title="El plan de la IA no incluye este nivel">—</div>
+                          </td>
+                        );
+                      }
                       return (
                         <td key={d} className="px-2 py-2.5">
                           <div
@@ -260,7 +282,7 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
                             )}
                             title={`${cell.passes} aprobados de ${cell.attempts} intentos. Mejor: ${cell.bestScore ?? "—"}`}
                           >
-                            {cell.passes} / {minPerSkill}
+                            {cell.passes} / {required}
                           </div>
                         </td>
                       );

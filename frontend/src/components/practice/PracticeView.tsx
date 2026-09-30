@@ -2,18 +2,21 @@
 // answer, hints, timer, AI grading and the attempt history.
 
 import {
-  ClipboardPaste, Eye, FileOutput, Lightbulb, Pause, Pencil, PenTool, Play, RotateCcw, Send, Timer, X,
+  Bug, ClipboardPaste, Eye, FileOutput, Lightbulb, Pause, Pencil, PenTool, Play, RotateCcw, Send, Timer, X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { copyText, readClipboard } from "../../lib/clipboard";
+import { answerAsCode, firstFencedCode, openCodePanel } from "../../lib/codeBridge";
 import { display, initialTimer, tick, type TimerState } from "../../lib/practiceTimer";
+import { DEFAULT_CODE, useCodePanel } from "../../store/codePanel";
 import type { PracticeExercise, PracticeGraded, PracticeWaiting } from "../../lib/types";
 import { useApp, type OpenNote } from "../../store/app";
 import { cn, confirmAction } from "../ui";
 import { useStudyVersion } from "../study/StudyPanel";
+import { AudioClip } from "./AudioClip";
 import { DrillPanel } from "./DrillPanel";
-import { MathDrawingInput } from "./MathDrawingInput";
+import { openInkPad, registerAnswerTarget } from "./inkBridge";
 import { beep, md, ResultCard } from "./common";
 
 const SUBJECTS: Record<string, string> = { mathematics: "Matemáticas", programming: "Programación", english: "Inglés", general: "General" };
@@ -28,7 +31,7 @@ const PLACEHOLDERS: Record<string, string> = {
   refactor: "Escribe el código refactorizado y, debajo, qué mejoraste y por qué.",
   design: "Escribe tu diseño (tablas, tipos, restricciones o SQL) y justifica las decisiones.",
   commands: "Escribe la secuencia de comandos, uno por línea, con un comentario de por qué.",
-  implement: "Escribe tu código. No se ejecuta: el profesor lo lee y razona sobre él.",
+  implement: "Escribe tu código. Pruébalo con «Depurar código» (panel de la derecha); al entregarlo, el profesor lo lee y razona sobre él.",
   writing: "Write your text here.",
   rewrite: "Rewrite each sentence correctly, one per line.",
   translate: "Write your translation here.",
@@ -49,7 +52,6 @@ export function PracticeView({ note }: { note: OpenNote }) {
   const [pending, setPending] = useState<PracticeWaiting | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ text: string; error?: boolean } | null>(null);
-  const [showDrawing, setShowDrawing] = useState(false);
   const [timer, setTimer] = useState<TimerState>(initialTimer);
   const [running, setRunning] = useState(false);
   const secondsOverride = useRef<number | null>(null);
@@ -143,6 +145,32 @@ export function PracticeView({ note }: { note: OpenNote }) {
     if (text.trim() && !running && timer.workElapsed === 0) setRunning(true);
     if (draftTimer.current) clearTimeout(draftTimer.current);
     draftTimer.current = setTimeout(() => void api.practiceSaveDraft(rel, text).catch(() => undefined), 800);
+  };
+
+  // The drawing pad (a split view) writes recognised maths into this answer.
+  const answerRef = useRef({ answer, onAnswer });
+  answerRef.current = { answer, onAnswer };
+  useEffect(() => {
+    registerAnswerTarget((latex, display) => {
+      const { answer: current, onAnswer: write } = answerRef.current;
+      const piece = display ? `$$${latex}$$` : `$${latex}$`;
+      write(current.trim() ? `${current.trimEnd()}\n${piece}` : piece);
+    });
+    return () => registerAnswerTarget(null);
+  }, []);
+
+  // The debugger panel of the right column writes the code it was working on back into this answer.
+  const codeSink = useCallback((code: string) => answerRef.current.onAnswer(code), []);
+  useEffect(() => () => useCodePanel.getState().clearSink(codeSink), [codeSink]);
+
+  const debugCode = () => {
+    if (!ex) return;
+    const fromStatement = ex.code.trim() ? ex.code : firstFencedCode(ex.statement);
+    // Reading exercises start from the code they give you; writing ones from what you have already typed.
+    const readsCode = ["debug", "find_error", "review", "trace", "analyze"].includes(ex.mode.id);
+    const mine = answer.trim() ? answerAsCode(answer) : "";
+    const seed = (readsCode ? fromStatement || mine : mine || fromStatement) || DEFAULT_CODE[ex.run_language] || "";
+    openCodePanel({ code: seed, language: ex.run_language, label: ex.title, sink: codeSink });
   };
 
   const submit = async (via = "") => {
@@ -269,15 +297,16 @@ export function PracticeView({ note }: { note: OpenNote }) {
 
   const graded = !!result;
   const code = ex.mode.answer_kind === "code";
+  const canRun = !!ex.run_language && !["explain", "decompose", "commands"].includes(ex.mode.id) && (ex.mode.id !== "design" || ex.run_language === "sql");
   const clock = display(ex.timer, timer);
   const best = ex.history.length ? Math.max(...ex.history.map((h) => h.score)) : null;
 
   return (
     <div className="h-full overflow-y-auto nv-practice-view">
       <div className="mx-auto flex max-w-[860px] flex-col gap-4 px-8 py-6">
-        <header className="flex items-start gap-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-[22px] font-bold tracking-tight text-text">{ex.title}</h1>
+        <header className="flex flex-wrap items-start gap-4">
+          <div className="min-w-[15rem] flex-1">
+            <h1 className="break-words text-[22px] font-bold tracking-tight text-text">{ex.title}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-dim">
               <span>{SUBJECTS[ex.subject] ?? ex.subject}</span>·
               <span>{ex.discipline}{ex.skill && ` · ${ex.skill}`}</span>·
@@ -326,6 +355,8 @@ export function PracticeView({ note }: { note: OpenNote }) {
           </section>
         )}
 
+        {ex.audio_text && <AudioClip text={ex.audio_text} media={ex.media ?? null} revealed={graded} />}
+
         {ex.drill ? (
           <DrillPanel
             rel={rel}
@@ -343,31 +374,27 @@ export function PracticeView({ note }: { note: OpenNote }) {
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <h2 className="font-mono text-[10.5px] uppercase tracking-wider text-faint">Tu respuesta</h2>
+              {canRun && (
+                <button
+                  type="button"
+                  onClick={debugCode}
+                  title="Abre el depurador en el panel derecho con el código de este ejercicio: ejecútalo y recórrelo línea a línea"
+                  className="flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1 text-[11.5px] font-semibold text-dim transition-colors hover:border-accent hover:text-ink"
+                >
+                  <Bug size={12} /> Depurar código
+                </button>
+              )}
               {(ex.subject === "mathematics" || ["prove", "solve", "process", "counterexample", "true_false", "find_error", "drill", "explain"].includes(ex.mode.id)) && !graded && (
                 <button
                   type="button"
-                  onClick={() => setShowDrawing(!showDrawing)}
-                  className={cn(
-                    "flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11.5px] font-semibold transition-colors",
-                    showDrawing
-                      ? "bg-accent text-white"
-                      : "border border-line bg-card text-dim hover:text-ink hover:border-accent",
-                  )}
+                  onClick={() => void openInkPad()}
+                  title="Abre un lienzo infinito en una vista dividida para escribir a mano"
+                  className="flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1 text-[11.5px] font-semibold text-dim transition-colors hover:border-accent hover:text-ink"
                 >
-                  <PenTool size={12} /> {showDrawing ? "Ocultar dibujo" : "✏️ Dibujar (LaTeX)"}
+                  <PenTool size={12} /> Dibujar (LaTeX)
                 </button>
               )}
             </div>
-
-            {showDrawing && !graded && (
-              <MathDrawingInput
-                onInsertLatex={(latex) => {
-                  const updated = answer ? `${answer.trimEnd()}\n${latex}` : latex;
-                  onAnswer(updated);
-                }}
-                onClose={() => setShowDrawing(false)}
-              />
-            )}
 
             <textarea
               aria-label="Tu respuesta"

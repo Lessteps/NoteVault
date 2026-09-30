@@ -10,7 +10,7 @@ import { parseFrontmatter } from "../../core/frontmatter.js";
 import { loadCard } from "../../core/practice/cards.js";
 import { DISCIPLINES, skillOf } from "../../core/practice/disciplineCatalog.js";
 import { writeErrorDigest } from "../../core/practice/errorLog.js";
-import type { ExerciseRef } from "../../core/practice/exerciseIndex.js";
+import type { ExerciseRef, VaultScan } from "../../core/practice/exerciseIndex.js";
 import { BANDS, attemptPassed } from "../../core/practice/ledger.js";
 import { MODES } from "../../core/practice/modes.js";
 import {
@@ -19,7 +19,7 @@ import {
   skillLabel,
 } from "../../core/practice/recommender.js";
 import { StudyArea, detectStudyArea } from "../../core/practice/studyArea.js";
-import { ensureOverviewFile, ensureTopicViewFiles, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf } from "../../core/practice/viewFiles.js";
+import { ensureExerciseSetFile, ensureOverviewFile, ensureTopicViewFiles, isExerciseFolder, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf, overviewFileText, viewFileName } from "../../core/practice/viewFiles.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { LAYOUT } from "../../core/vaultFormat.js";
@@ -29,12 +29,14 @@ import {
   computeTopicProgress,
   createDefaultTopicManifest,
   findAncestorTopicManifest,
+  manifestsFromNotes,
   serializeTopicManifest,
 } from "../../core/practice/topic.js";
 import {
   type QuantityOption,
   type TheoryNoteContext,
   buildTopicSession,
+  parseExerciseArray,
   type SessionAIClient,
 } from "../../core/practice/sessionBuilder.js";
 import {
@@ -47,8 +49,36 @@ import {
   loadExamRecordForTopic,
 } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
-import { clearExerciseIndexCache, scanVault } from "../../core/practice/exerciseIndex.js";
+import { clearExerciseIndexCache, scanVault, warmNoteCache } from "../../core/practice/exerciseIndex.js";
 import { AIConfig, sendChat } from "../../core/aiClient.js";
+import {
+  applyPlanToPractica,
+  buildReevaluationMessages,
+  buildSkillOptionsMessages,
+  parsePracticePlan,
+  parseSkillOptions,
+  planCount,
+  readPlanFromPractica,
+  setFrontmatterKey,
+  type PracticePlan,
+} from "../../core/practice/practicePlan.js";
+import { listReviews, rescheduleReview } from "../../core/practice/reviewFiles.js";
+import { listVocabReviews } from "../../core/practice/vocabReviews.js";
+import { loadReviewSettings, saveReviewSettings } from "../reviewSettings.js";
+import { runReviewTest } from "../reviewHooks.js";
+import { catalogFor } from "../../core/practice/skillSelection.js";
+import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
+import { BRANCH_LABELS, classifyTopic, domainOfSubject, isEnglishSubject, keyOf, type Classification } from "../../core/practice/domain.js";
+import { EnglishVocabularyManager } from "../../core/englishVocabularyManager.js";
+import { ENGLISH_VOCABULARY_FOLDER, isEnglishBranch, isVocabularySkill, WORD_CLASSES, type WordClass } from "../../lib/englishSkillData.js";
+import { listUnclassified, recordUnclassified, resolveUnclassified } from "../topicClassification.js";
+import {
+  learningPromptLines,
+  learningStatus,
+  readLearning,
+  seedFromErrorLog,
+  setLearningEnabled,
+} from "../../core/practice/learningLog.js";
 import { AppConfig } from "../appConfig.js";
 import type { DifficultyLevel } from "../../core/practice/skills.js";
 import type { AppState } from "../appState.js";
@@ -79,6 +109,11 @@ function studyRel(app: AppState, p: string | null | undefined): string {
   } catch {
     return "";
   }
+}
+
+/** The `_skills/` templates that guide the AI's exercise design (see core/practice/skillTemplates). */
+function skillTemplates(app: AppState, topicFolderRel: string): TheoryNoteContext[] {
+  return readSkillTemplates(app.root, topicFolderRel);
 }
 
 function getStudyArea(app: AppState, rel: string): StudyArea | null {
@@ -128,10 +163,66 @@ const SNAPSHOT_CACHE_TTL_MS = 30_000;
 
 /** The per-subject dashboard is expensive (it scans the whole vault), so it is memoed. */
 const _dashboardCache = new Map<string, { data: unknown; timestamp: number }>();
+const _dashboardRefreshing = new Set<string>();
+
+/**
+ * One vault scan, shared by every study call that needs it.
+ *
+ * Reading every note is the expensive part of the whole study API (six call sites
+ * used to do it independently, each paying the disk cost), so the scan is kept
+ * here and dropped whenever the vault changes — the same invalidation the
+ * snapshots use, plus the TTL as a safety net.
+ */
+const _scanCache = new Map<string, { data: VaultScan; timestamp: number }>();
+
+/**
+ * True once `warmStudyIndex` has read every note into the per-file cache, so a
+ * later `scanVault` is cheap. Until then, blocks like the topic dashboard must
+ * not pay the cold read themselves (see `study_topic_dashboard`).
+ */
+let _indexWarmed = false;
+/** Vaults whose background scan has already been kicked off. */
+const _scanKicked = new Set<string>();
+
+export function vaultScan(app: AppState): VaultScan {
+  const hit = _scanCache.get(app.root);
+  if (hit && Date.now() - hit.timestamp < SNAPSHOT_CACHE_TTL_MS) return hit.data;
+  const data = scanVault(app.root, app.vault.notePaths());
+  _scanCache.set(app.root, { data, timestamp: Date.now() });
+  return data;
+}
 
 export function clearStudySnapshotCache(): void {
   _snapshotCache.clear();
   _dashboardCache.clear();
+  _scanCache.clear();
+  _scanKicked.clear();
+}
+
+/**
+ * Read the vault into the per-file cache in the background, once the window is up.
+ *
+ * The first study view opened in a cold process used to wait for the whole vault to
+ * be read (measured: 30 s over 2 107 notes, with the main process blocked the whole
+ * time). Warming it here — in batches, yielding between them — moves that cost to
+ * right after launch, where nothing is waiting for it.
+ */
+export async function warmStudyIndex(): Promise<{ notes: number; ms: number }> {
+  const app = getWarmApp();
+  if (!app) return { notes: 0, ms: 0 };
+  const started = Date.now();
+  const notes = await warmNoteCache(app.vault.notePaths());
+  _indexWarmed = true;
+  return { notes, ms: Date.now() - started };
+}
+
+/** Set by the registry (the study module is built against an AppState). */
+let warmApp: AppState | null = null;
+function getWarmApp(): AppState | null {
+  return warmApp;
+}
+export function setWarmApp(app: AppState): void {
+  warmApp = app;
 }
 
 function resolveTopicDir(app: AppState, relPath: string): string {
@@ -172,8 +263,218 @@ function findTopicManifest(
   return null;
 }
 
+/**
+ * A reasoning model spends part of max_tokens thinking before it writes, so the
+ * chat's small budget (1500 by default) returns an EMPTY answer for anything
+ * structured (measured with deepseek: exercises and practice plans came back
+ * blank). Structured calls get a generous budget, and one bigger retry when the
+ * answer still comes back empty.
+ */
+const STRUCTURED_BUDGETS = [6000, 14000, 24000];
+/**
+ * `accept` lets a caller reject an answer that is not usable yet — typically one cut
+ * off by the token limit — and retry with the next, bigger budget.
+ */
+export async function askStructured(
+  cfg: AIConfig,
+  messages: Array<{ role: string; content: string }>,
+  accept: (reply: string) => boolean = () => true,
+): Promise<string> {
+  let reply = "";
+  for (const budget of STRUCTURED_BUDGETS) {
+    const wide = new AIConfig({ ...cfg.toDict(), max_tokens: Math.max(cfg.max_tokens, budget), include_note: false });
+    reply = await sendChat(wide, messages as any);
+    if (reply.trim() && accept(reply)) return reply;
+  }
+  return reply;
+}
+
+/** The topic's own theory notes (everything that is not a view file or the manifest). */
+function readTheoryNotes(app: AppState, absDir: string): TheoryNoteContext[] {
+  const out: TheoryNoteContext[] = [];
+  let files: fs.Dirent[] = [];
+  try {
+    files = fs.readdirSync(absDir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const f of files) {
+    if (!f.isFile() || !f.name.toLowerCase().endsWith(".md") || f.name.startsWith("_tema")) continue;
+    if (/\.(practica|resumen)\.md$/i.test(f.name)) continue;
+    try {
+      const full = path.join(absDir, f.name);
+      out.push({ rel: app.rel(full), title: f.name.replace(/\.md$/i, ""), content: fs.readFileSync(full, "utf-8") });
+    } catch {
+      /* unreadable note: skip it */
+    }
+  }
+  return out;
+}
+
+/**
+ * What a topic is classified by: its type (mathematics, programming) or its branch (English).
+ * An English topic with no branch is NOT given a default: it is logged as pending and this throws,
+ * so the user resolves it explicitly (`study_topic_classify`).
+ */
+function classifyForTopic(app: AppState, normFolder: string, manifest: TopicManifest): Classification {
+  const subject = manifest.subject || "mathematics";
+  const r = classifyTopic({
+    subject,
+    name: manifest.title,
+    folderRel: normFolder.replace(/\\/g, "/"),
+    manifestType: manifest.topic_type ?? null,
+    manifestBranch: manifest.branch ?? null,
+  });
+  if (r.ok) return r.value;
+  recordUnclassified(app.root, { folder: normFolder.replace(/\\/g, "/"), subject, name: manifest.title, suggestion: r.suggestion, reason: r.reason });
+  throw new ApiError(`${r.reason}${r.suggestion ? ` Sugerencia: ${BRANCH_LABELS[r.suggestion]}.` : ""} Elige la rama en «Clasificar tema».`);
+}
+
+/**
+ * Asks the AI which competencies a topic should train and how many exercises per
+ * difficulty, and stores the answer in the topic's `.practica.md`.
+ */
+export async function reevaluateTopic(app: AppState, folder: string): Promise<{ plan: PracticePlan; path: string; reply: string }> {
+  const normFolder = app.rel(app.resolve(folder, { allowRoot: true }));
+  const found = findTopicManifest(app, normFolder);
+  if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+  const manifest = found.manifest;
+  const topicAbs = app.resolve(manifest.folder || normFolder, { allowRoot: true });
+
+  const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+  if (cfg.is_bridge) {
+    throw new ApiError("El proveedor de IA está en modo puente; no se puede re-evaluar automáticamente.");
+  }
+
+  const subject = manifest.subject || "mathematics";
+  const cls = classifyForTopic(app, normFolder, manifest);
+  const topicType = cls.topicType;
+  const catalog = catalogFor(subject);
+  const messages = buildReevaluationMessages({
+    subject,
+    title: manifest.title,
+    topicType,
+    branch: cls.branch,
+    catalog,
+    theory: readTheoryNotes(app, topicAbs),
+    templates: skillTemplates(app, normFolder),
+    currentSkills: manifest.skills,
+  });
+
+  const reply = await askStructured(cfg, messages);
+  const plan = parsePracticePlan(reply, catalog, keyOf(cls));
+  if (!plan) {
+    const snippet = String(reply ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new ApiError(`La IA no devolvió un plan de práctica válido. Respuesta: «${snippet || "vacía"}»`);
+  }
+  if (cls.domain !== "english") plan.topicType = plan.topicType ?? topicType;
+
+  const practicaAbs = path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica"));
+  if (!fs.existsSync(practicaAbs)) ensureTopicViewFiles(app.root, topicAbs);
+  if (!fs.existsSync(practicaAbs)) throw new ApiError("No se pudo crear el archivo .practica del tema.");
+  const labels = Object.fromEntries(catalog.map((s) => [s.id, s.label]));
+  fs.writeFileSync(practicaAbs, applyPlanToPractica(fs.readFileSync(practicaAbs, "utf-8"), plan, labels), "utf-8");
+
+  clearExerciseIndexCache();
+  clearStudySnapshotCache();
+  return { plan, reply, path: app.rel(practicaAbs).split(path.sep).join("/") };
+}
+
+/**
+ * The competency checklist of a topic for the chat: which skills the AI recommends and, for every
+ * skill of the catalogue, why and how it would be practised here. Writes nothing: the user ticks
+ * and accepts in the chat, and only then is the matrix changed.
+ */
+export async function topicSkillOptions(app: AppState, folder: string) {
+  const normFolder = app.rel(app.resolve(folder, { allowRoot: true })).replace(/\\/g, "/");
+  const found = findTopicManifest(app, normFolder);
+  if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+  const manifest = found.manifest;
+  const topicAbs = app.resolve(manifest.folder || normFolder, { allowRoot: true });
+  const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+  if (cfg.is_bridge) throw new ApiError("El proveedor de IA está en modo puente; no se puede re-evaluar automáticamente.");
+
+  const subject = manifest.subject || "mathematics";
+  const cls = classifyForTopic(app, normFolder, manifest);
+  const topicType = cls.topicType;
+  const catalog = catalogFor(subject);
+  const messages = buildSkillOptionsMessages({
+    subject,
+    title: manifest.title,
+    topicType,
+    branch: cls.branch,
+    catalog,
+    theory: readTheoryNotes(app, topicAbs),
+    templates: skillTemplates(app, normFolder),
+    currentSkills: manifest.skills,
+  });
+  const reply = await askStructured(cfg, messages, (r) => parseSkillOptions(r, catalog, keyOf(cls)) !== null);
+  const parsed = parseSkillOptions(reply, catalog, keyOf(cls));
+  if (!parsed) {
+    const snippet = String(reply ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new ApiError(`La IA no devolvió la lista de competencias. Respuesta: «${snippet || "vacía"}»`);
+  }
+  const current = new Set((manifest.skills ?? []).map((s) => s.toLowerCase()));
+  return {
+    topic: normFolder,
+    title: manifest.title,
+    topicType: parsed.topicType ?? topicType,
+    summary: parsed.summary,
+    skills: parsed.options.map((o) => ({ ...o, current: current.has(o.skill) })),
+  };
+}
+
+/** The AI client the session builders share: two tries, then nothing (never a crash). */
+function makeSessionAiClient(): SessionAIClient {
+  return {
+    async generateExercises(messages) {
+      const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+      if (cfg.is_bridge) return [];
+      // A model now and then returns nothing usable: one more try before giving up.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const found = parseExerciseArray(await askStructured(cfg, messages as any));
+          if (found.length) return found;
+        } catch {
+          /* network or provider error: retry once */
+        }
+      }
+      return [];
+    },
+  };
+}
+
+/** English vocabulary skills are built around the shared word bank: the words due first, then the topic's own. */
+function vocabularyWords(app: AppState, subject: string, skill: string, topicTitle: string): { words?: string[]; wordIds?: string[] } {
+  if (!isEnglishSubject(subject) || !isVocabularySkill(skill)) return {};
+  const picked = new EnglishVocabularyManager(app.root).sessionWords(topicTitle, 10, isoDate(new Date())!);
+  return picked.length
+    ? { words: picked.map((w) => `${w.word} — ${w.meaning} (${w.part_of_speech}, ${w.level})`), wordIds: picked.map((w) => w.id) }
+    : {};
+}
+
+/** The first top-level folder whose overview says it is an English space; null when there is none. */
+export function englishSpaceFolder(app: AppState): string | null {
+  for (const d of fs.readdirSync(app.root, { withFileTypes: true })) {
+    if (!d.isDirectory() || d.name.startsWith(".") || d.name.startsWith("_")) continue;
+    try {
+      const head = fs.readFileSync(path.join(app.root, d.name, `${d.name}.resumen.md`), "utf-8").slice(0, 800);
+      const subject = /^subject:\s*["']?([^"'\n]+?)["']?\s*$/m.exec(head)?.[1];
+      if (subject && isEnglishSubject(subject)) return d.name;
+    } catch {
+      /* not a space */
+    }
+  }
+  return null;
+}
+
 export function studyApi(app: AppState) {
   return {
+    /** The competency checklist the chat shows when re-evaluating a topic's practice. */
+    async study_topic_skill_options(folder: string) {
+      return topicSkillOptions(app, folder);
+    },
+
     study_area(rel: string) {
       const area = getStudyArea(app, rel);
       if (!area) {
@@ -433,6 +734,18 @@ export function studyApi(app: AppState) {
       }
       // A file was passed: use the folder it lives in.
       const folderAbs = stat.isDirectory() ? abs : path.dirname(abs);
+      // `Ejercicios` and its per-skill folders open as a navigable set of exercises.
+      if (stat.isDirectory() && !isSubjectRoot(app.root, folderAbs) && isExerciseFolder(folderAbs)) {
+        const { file, created } = ensureExerciseSetFile(folderAbs);
+        if (created) clearExerciseIndexCache();
+        return {
+          ok: true,
+          kind: "ejercicios",
+          path: app.rel(file).split(path.sep).join("/"),
+          created: created ? [app.rel(file)] : [],
+          errors: [],
+        };
+      }
       // The subject root groups areas: it gets its overview and nothing else.
       const subjectRoot = isSubjectRoot(app.root, folderAbs);
       const topic = !subjectRoot && isTopicFolder(app.root, folderAbs);
@@ -494,7 +807,7 @@ export function studyApi(app: AppState) {
         }
       }
 
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const normFolder = topicFolder.replace(/\\/g, "/");
       const topicExercises = scan.exercises.filter((e) => {
         const p = (e.rel || e.path).replace(/\\/g, "/");
@@ -568,7 +881,7 @@ export function studyApi(app: AppState) {
       if (fs.existsSync(manifestPath)) {
         throw new ApiError("El tema ya tiene un archivo de manifiesto (_tema.md).");
       }
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const folderRel = app.rel(absDir);
       const topicExercises = scan.exercises.filter((e) =>
         (e.rel || e.path).replace(/\\/g, "/").startsWith(folderRel + "/"),
@@ -600,13 +913,29 @@ export function studyApi(app: AppState) {
       if (!found) {
         throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
       }
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const diff = Math.min(
         3,
         Math.max(1, parseInt(String(difficulty), 10) || 2),
       ) as DifficultyLevel;
       const ast = assistance === "helper" ? "helper" : "no_help";
       const qty = (quantity || "3-5") as QuantityOption;
+
+      // "ai": the count comes from the topic's practice plan; without one, ask the AI first.
+      let aiCount: number | null = null;
+      if (qty === "ai") {
+        const topicAbsForPlan = app.resolve(found.manifest.folder || normFolder, { allowRoot: true });
+        const practicaAbs = path.join(topicAbsForPlan, viewFileName(path.basename(topicAbsForPlan), "practica"));
+        const readPlan = () => {
+          try {
+            return readPlanFromPractica(fs.readFileSync(practicaAbs, "utf-8"));
+          } catch {
+            return null;
+          }
+        };
+        const plan = readPlan() ?? (await reevaluateTopic(app, normFolder)).plan;
+        aiCount = planCount(plan, skill, diff);
+      }
 
       // Extract theory notes
       const absDir = app.resolve(normFolder);
@@ -626,31 +955,24 @@ export function studyApi(app: AppState) {
         }
       } catch {}
 
-      const aiClient: SessionAIClient = {
-        async generateExercises(messages) {
-          try {
-            const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
-            if (cfg.is_bridge) return [];
-            const reply = await sendChat(cfg, messages as any);
-            let cleaned = reply.trim();
-            const match = /```(?:json)?\s*([\s\S]*?)```/i.exec(cleaned);
-            if (match) cleaned = match[1]!.trim();
-            const start = cleaned.indexOf("[");
-            const end = cleaned.lastIndexOf("]");
-            if (start !== -1 && end !== -1 && end > start) {
-              cleaned = cleaned.slice(start, end + 1);
-            }
-            return JSON.parse(cleaned);
-          } catch {
-            return [];
-          }
-        },
-      };
+      // The `_skills/` templates steer the prompt (how a concept/practice note
+      // is shaped, which exercise types exist) alongside the topic's own theory.
+      theoryNotes.push(...skillTemplates(app, normFolder));
+
+      const aiClient = makeSessionAiClient();
 
       const plan = await buildTopicSession(
         found.manifest,
         normFolder,
-        { skill, difficulty: diff, quantity: qty, assistance: ast },
+        {
+          skill,
+          difficulty: diff,
+          quantity: qty,
+          assistance: ast,
+          planCount: aiCount,
+          learning: learningPromptLines(app.root, normFolder.replace(/\\/g, "/"), skill),
+          ...vocabularyWords(app, found.manifest.subject, skill, found.manifest.title),
+        },
         scan.exercises,
         theoryNotes,
         aiClient,
@@ -688,6 +1010,159 @@ export function studyApi(app: AppState) {
     },
 
     /**
+     * A vocabulary session from the shared word bank (no topic needed): exercises of one `vc_` skill built around
+     * the words due first, saved in `<English space>/Vocabulario/Ejercicios/<skill>/`. Their reviews follow the grade.
+     */
+    async study_vocab_session(skill = "vc_recall", quantity = "3-5", wordClass = "") {
+      const sk = String(skill || "").trim().toLowerCase();
+      if (!isVocabularySkill(sk)) throw new ApiError("Elige una competencia de vocabulario (recuerdo, reconocimiento, uso, familias, colocaciones o sinónimos).");
+      const space = englishSpaceFolder(app);
+      if (!space) throw new ApiError("Todavía no hay un espacio de inglés: genera uno primero.");
+      const today = isoDate(new Date())!;
+      const cls = (WORD_CLASSES as readonly string[]).includes(wordClass) ? (wordClass as WordClass) : null;
+      const words = new EnglishVocabularyManager(app.root).sessionWords("", 10, today, cls);
+      if (!words.length) throw new ApiError("El banco de palabras está vacío: añade palabras al calendario de repasos o mínalas desde el reproductor.");
+      const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+      if (cfg.is_bridge) throw new ApiError("El proveedor de IA está en modo puente; no se puede generar automáticamente.");
+      const folder = `${space}/${ENGLISH_VOCABULARY_FOLDER}`;
+      const manifest: TopicManifest = {
+        type: "topic",
+        subject: "english",
+        title: "Vocabulario",
+        skills: [sk],
+        mastery: { min_per_skill: 6, target_difficulty: 3, exam: "none" },
+        folder,
+      };
+      const plan = await buildTopicSession(
+        manifest,
+        folder,
+        {
+          skill: sk,
+          difficulty: 2,
+          quantity: (quantity || "3-5") as QuantityOption,
+          assistance: "no_help",
+          words: words.map((w) => `${w.word} — ${w.meaning} (${w.part_of_speech}, ${w.level})`),
+          wordIds: words.map((w) => w.id),
+        },
+        vaultScan(app).exercises,
+        [],
+        makeSessionAiClient(),
+      );
+      for (const ex of plan.exercises) {
+        if (ex.isNew && ex.content) {
+          const abs = app.resolve(ex.path, { allowRoot: false, mustExist: false });
+          fs.mkdirSync(path.dirname(abs), { recursive: true });
+          fs.writeFileSync(abs, ex.content, "utf-8");
+        }
+      }
+      if (plan.generatedCount > 0) {
+        clearExerciseIndexCache();
+        clearStudySnapshotCache();
+      }
+      return { ok: true, skill: sk, exercises: plan.exercises.map((e) => ({ id: e.id, title: e.title, path: e.path, is_new: e.isNew })), first_exercise: plan.exercises[0]?.path ?? "" };
+    },
+
+    /** How a topic is classified: its type (maths, programming) or its branch (English), or why it is not. */
+    study_topic_classification(folder: string) {
+      const rel = app.rel(app.resolve(folder, { allowRoot: true })).replace(/\\/g, "/");
+      const found = findTopicManifest(app, rel);
+      if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+      const m = found.manifest;
+      const r = classifyTopic({ subject: m.subject || "mathematics", name: m.title, folderRel: rel, manifestType: m.topic_type ?? null, manifestBranch: m.branch ?? null });
+      return r.ok
+        ? { ok: true, domain: r.value.domain, branch: r.value.branch ?? null, topicType: r.value.topicType ?? null, via: r.value.via }
+        : { ok: false, domain: r.domain, reason: r.reason, suggestion: r.suggestion, branch: null, topicType: null, via: null };
+    },
+
+    /** Resolves an unclassified English topic EXPLICITLY: writes its branch into its practice file. */
+    study_topic_classify(folder: string, branch: string) {
+      const b = String(branch ?? "").trim().toLowerCase();
+      if (!isEnglishBranch(b)) throw new ApiError("Elige una rama: gramática, escritura, lectura, escucha o habla.");
+      const rel = app.rel(app.resolve(folder, { allowRoot: true })).replace(/\\/g, "/");
+      const found = findTopicManifest(app, rel);
+      if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+      if (domainOfSubject(found.manifest.subject || "") !== "english") throw new ApiError("Solo los temas de inglés se clasifican por rama.");
+      const topicAbs = app.resolve(found.manifest.folder || rel, { allowRoot: true });
+      const practicaAbs = path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica"));
+      if (!fs.existsSync(practicaAbs)) ensureTopicViewFiles(app.root, topicAbs);
+      fs.writeFileSync(practicaAbs, setFrontmatterKey(fs.readFileSync(practicaAbs, "utf-8"), "branch", b), "utf-8");
+      resolveUnclassified(app.root, rel);
+      clearExerciseIndexCache();
+      clearStudySnapshotCache();
+      return { ok: true, branch: b };
+    },
+
+    /** English topics still waiting to be classified. */
+    study_unclassified_list() {
+      return listUnclassified(app.root);
+    },
+
+    /** Per competency of a topic: is its mistakes record on, and how many mistakes it holds. */
+    study_learning_status(folder: string) {
+      const rel = app.rel(app.resolve(folder, { allowRoot: true })).replace(/\\/g, "/");
+      return learningStatus(app.root, rel);
+    },
+
+    /** The "Activar registro de errores" box of one competency of one topic. */
+    study_learning_set(folder: string, skill: string, enabled: boolean) {
+      const rel = app.rel(app.resolve(folder, { allowRoot: true })).replace(/\\/g, "/");
+      const found = findTopicManifest(app, rel);
+      if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+      const sk = String(skill || "").toLowerCase();
+      const existing = readLearning(app.root, rel, sk);
+      const seed = existing ? [] : seedFromErrorLog(app.root, rel, found.manifest.subject, sk);
+      const rec = setLearningEnabled(app.root, rel, found.manifest.title, sk, Boolean(enabled), seed);
+      return { skill: sk, enabled: rec.enabled, entries: rec.entries.length };
+    },
+
+    /** The topic review notes (spaced repetition), soonest first. */
+    study_reviews_list() {
+      const today = isoDate(new Date())!;
+      // Topic reviews and, for English, the scheduled words of the shared word bank.
+      const items = [...listReviews(app.root, today), ...listVocabReviews(app.root, today)].sort((a, b) => a.next.localeCompare(b.next) || a.topic.localeCompare(b.topic, "es", { numeric: true }));
+      return { today, items };
+    },
+
+    /** Moves the pending review of a topic to another day. */
+    study_review_reschedule(relPath: string, date: string) {
+      const item = rescheduleReview(app.root, String(relPath ?? ""), String(date ?? ""));
+      clearStudySnapshotCache();
+      return item;
+    },
+
+    /** The reminder preferences (on/off and the hour from which a due review is announced). */
+    study_review_settings() {
+      return loadReviewSettings();
+    },
+    study_review_settings_set(settings: unknown) {
+      return saveReviewSettings(settings);
+    },
+    /** Shows a real notification now, so the user can see that reminders work. */
+    study_review_notify_test() {
+      return runReviewTest();
+    },
+
+    /** Re-reads the topic's theory with the AI and rewrites its practice plan. */
+    async study_topic_reevaluate(folder: string) {
+      const { plan, path: practicePath } = await reevaluateTopic(app, folder);
+      return { ok: true, plan, path: practicePath };
+    },
+
+    /** The stored practice plan of a topic (null when it has none yet). */
+    study_topic_plan(folder: string) {
+      const normFolder = app.rel(app.resolve(folder, { allowRoot: true }));
+      const found = findTopicManifest(app, normFolder);
+      if (!found) return { plan: null };
+      const topicAbs = app.resolve(found.manifest.folder || normFolder, { allowRoot: true });
+      try {
+        const text = fs.readFileSync(path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica")), "utf-8");
+        return { plan: readPlanFromPractica(text) };
+      } catch {
+        return { plan: null };
+      }
+    },
+
+    /**
      * A session that draws from every topic of an area (or the whole subject),
      * instead of one topic: the exercises that already exist in the area's
      * topics are filtered by skill and difficulty. Nothing is generated here —
@@ -701,7 +1176,7 @@ export function studyApi(app: AppState) {
       assistance = "no_help",
     ) {
       const normFolder = app.rel(app.resolve(folder, { allowRoot: true })).split(path.sep).join("/").replace(/^\/+|\/+$/g, "");
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const prefix = normFolder ? `${normFolder}/` : "";
       const inArea = scan.exercises.filter((e) => String(e.rel || e.path || "").split(path.sep).join("/").startsWith(prefix));
 
@@ -744,7 +1219,7 @@ export function studyApi(app: AppState) {
       examGroup?: string,
       targetDifficulty?: number,
     ) => {
-      const scan = scanVault(app.root, app.vault.notePaths());
+      const scan = vaultScan(app);
       const allExercises = scan.exercises;
       const targetDiff = (targetDifficulty && targetDifficulty >= 1 && targetDifficulty <= 3
         ? targetDifficulty
@@ -830,7 +1305,7 @@ export function studyApi(app: AppState) {
             },
           ];
           try {
-            const reply = await sendChat(aiCfg, messages);
+            const reply = await askStructured(aiCfg, messages);
             const match = reply.match(/\{[\s\S]*\}/);
             if (match) {
               const parsed = JSON.parse(match[0]);
@@ -872,41 +1347,131 @@ export function studyApi(app: AppState) {
       };
     },
 
-    study_topic_dashboard: async (subjectFilter?: string) => {
+    /**
+     * Draft the whole syllabus of a subject with the AI and lay it out on disk:
+     * one folder per area (with its `.resumen.md` overview) and one folder per
+     * topic. Existing folders and overviews are left untouched.
+     */
+    study_generate_syllabus: async (subject: string) => {
+      const name = String(subject || "").trim();
+      if (!name) throw new ApiError("Indica el nombre de la materia.");
+      const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+      if (cfg.is_bridge) {
+        throw new ApiError("El proveedor de IA está en modo puente; no se puede generar automáticamente.");
+      }
+
+      const ask = (prompt: string): Promise<string> => askStructured(cfg, [{ role: "user", content: prompt }]);
+
+      const areasResponse = await ask(
+        `Eres un experto en diseño curricular. Dame las 8-12 áreas principales de «${name}» ` +
+          `numeradas (ej: "1 Aritmética", "2 Álgebra"). Solo la lista, sin explicaciones.`,
+      );
+      const topicsResponse = await ask(
+        `Dadas estas áreas de ${name}:\n${areasResponse}\n\n` +
+          `Para cada área, da de 6 a 12 temas numerados (ej: "1.1 Números naturales"). ` +
+          `Formato: AREA > temas. Sin explicaciones extra.`,
+      );
+      const structured = await ask(
+        `Convierte este temario en JSON. Solo JSON, sin comentarios:\n${topicsResponse}\n\n` +
+          `{"areas":[{"name":"1 Aritmética","folder":"1 Aritmética elemental y operativa",` +
+          `"topics":[{"name":"1.1 Números naturales","folder":"1.1 Números naturales enteros y recta numérica"}]}]}`,
+      );
+
+      const match = structured.match(/\{[\s\S]*\}/);
+      if (!match) throw new ApiError("La IA no pudo estructurar el temario.");
+      let plan: { areas?: Array<{ name?: string; folder?: string; topics?: Array<{ name?: string; folder?: string }> }> };
+      try {
+        plan = JSON.parse(match[0]);
+      } catch {
+        throw new ApiError("La IA devolvió un temario con formato inválido.");
+      }
+
+      const subjectDir = path.join(app.root, name);
+      fs.mkdirSync(subjectDir, { recursive: true });
+      const created: string[] = [];
+      const folders: string[] = [];
+
+      for (const area of plan.areas ?? []) {
+        const areaFolder = String(area.folder || area.name || "").trim().replace(/[\\/]+$/g, "");
+        if (!areaFolder) continue;
+        const areaDir = path.join(subjectDir, areaFolder);
+        fs.mkdirSync(areaDir, { recursive: true });
+        folders.push(app.rel(areaDir).replace(/\\/g, "/"));
+
+        const overview = path.join(areaDir, viewFileName(areaFolder, "resumen"));
+        if (!fs.existsSync(overview)) {
+          const scope = `${name}/${areaFolder}`.replace(/\\/g, "/");
+          fs.writeFileSync(overview, overviewFileText(String(area.name || areaFolder), name, scope), "utf-8");
+          created.push(app.rel(overview).replace(/\\/g, "/"));
+        }
+
+        for (const topic of area.topics ?? []) {
+          const topicFolder = String(topic.folder || topic.name || "").trim().replace(/[\\/]+$/g, "");
+          if (!topicFolder) continue;
+          const topicDir = path.join(areaDir, topicFolder);
+          fs.mkdirSync(topicDir, { recursive: true });
+          folders.push(app.rel(topicDir).replace(/\\/g, "/"));
+        }
+      }
+
+      clearStudySnapshotCache();
+      return { ok: true, created, folders, plan };
+    },
+
+    study_topic_dashboard: async function dashboard(subjectFilter?: string, refreshing?: boolean): Promise<any> {
       const cacheKey = `${app.root}::${subjectFilter ?? ""}`;
       const cachedDashboard = _dashboardCache.get(cacheKey) as
         | { data: { subjects: string[]; areas: string[]; topics: unknown[] }; timestamp: number }
         | undefined;
-      if (cachedDashboard && Date.now() - cachedDashboard.timestamp < SNAPSHOT_CACHE_TTL_MS) {
+      if (cachedDashboard && !refreshing) {
+        if (Date.now() - cachedDashboard.timestamp >= SNAPSHOT_CACHE_TTL_MS && !_dashboardRefreshing.has(cacheKey)) {
+          // Only the TTL ran out (a write would have dropped the entry): opening the area
+          // note must not pay the ~0.5 s vault walk on the main process. Answer with the
+          // last payload now and rebuild it right after the reply is on its way.
+          _dashboardRefreshing.add(cacheKey);
+          setTimeout(() => {
+            void dashboard(subjectFilter, true)
+              .catch(() => undefined)
+              .finally(() => _dashboardRefreshing.delete(cacheKey));
+          }, 50);
+        }
         return cachedDashboard.data;
       }
-      const scan = scanVault(app.root, app.vault.notePaths());
+      // A cold process would block the renderer for as long as it takes to read
+      // every note (measured: 30 s over 2 107 notes). Return a provisional empty
+      // payload instead and let the startup warm — or this background scan — fill
+      // the cache; the view retries until the real data arrives.
+      if (!_scanCache.has(app.root) && !_indexWarmed) {
+        if (!_scanKicked.has(app.root)) {
+          _scanKicked.add(app.root);
+          setImmediate(() => {
+            try {
+              vaultScan(app);
+            } catch {
+              /* the renderer's retry will surface any error */
+            } finally {
+              _scanKicked.delete(app.root);
+            }
+          });
+        }
+        return { subjects: [], areas: [], topics: [], loading: true };
+      }
+      const scan = vaultScan(app);
       const allExercises = scan.exercises;
       const attempts = loadAllAttempts(app.root);
 
-      // The vault walk yields absolute paths, but every lookup of the practice
-      // model speaks vault-relative ones: converting here is what makes the
-      // dashboard find the topics at all.
-      const folderSet = new Set<string>();
-      for (const np of app.vault.notePaths()) {
-        const rel = app.rel(np).replace(/\\/g, "/");
-        const dir = path.posix.dirname(rel);
-        if (!dir || dir === "." || dir === "/" || dir.startsWith("..")) continue;
-        folderSet.add(dir);
-        const parent = path.posix.dirname(dir);
-        if (parent && parent !== "." && parent !== "/" && !parent.startsWith("..")) folderSet.add(parent);
-      }
-
+      // The manifests come from the notes the scan already read: enumerating them by
+      // name and type costs nothing, while the per-folder climb re-read every note of
+      // the vault (measured on the real vault: 593 folders → 2 680 ms, for 42 topics).
       const foundMap = new Map<string, { folder: string; manifest: TopicManifest }>();
-
-      for (const folder of folderSet) {
-        const found = findTopicManifest(app, folder);
-        if (found) {
-          const key = found.manifest.title;
-          if (!foundMap.has(key)) {
-            foundMap.set(key, { folder, manifest: found.manifest });
-          }
-        }
+      for (const found of manifestsFromNotes(scan.notes)) {
+        const title = found.manifest.title;
+        if (foundMap.has(title)) continue;
+        const folder = app.rel(found.topicFolder).replace(/\\/g, "/");
+        foundMap.set(title, {
+          folder,
+          manifest: { ...found.manifest, path: app.rel(found.manifestPath), folder },
+        });
       }
 
       const items: Array<{

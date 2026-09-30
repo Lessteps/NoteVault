@@ -3,6 +3,8 @@
  * Ported from notevault_app/core/practice/discipline_catalog.py.
  */
 
+import { englishSkillSpec } from "../../lib/englishSkillData";
+
 import { mode_for } from "./modes";
 
 export interface Skill {
@@ -127,7 +129,7 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "programming_logic",
     subject: "programming",
     title: "Lógica de programación",
-    modes: ["implement", "find_error", "explain", "cloze"],
+    modes: ["implement", "find_error", "explain", "cloze", "trace", "decompose", "test", "analyze", "review", "debug"],
     framing:
       "Language-agnostic logic exercises (pseudocode or simple Python) set in small real " +
       "situations: processing a list of orders, validating form input, counting events in " +
@@ -165,7 +167,7 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "python",
     subject: "programming",
     title: "Python",
-    modes: ["implement", "debug", "refactor", "explain"],
+    modes: ["implement", "debug", "refactor", "explain", "trace", "review", "test", "analyze", "port"],
     framing:
       "Every exercise must be framed as an automation task, not a generic backend or " +
       "algorithm drill: a script reacting to a webhook, a batch job processing a CSV/JSON " +
@@ -285,7 +287,7 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "javascript",
     subject: "programming",
     title: "JavaScript",
-    modes: ["implement", "debug", "refactor", "explain"],
+    modes: ["implement", "debug", "refactor", "explain", "trace", "review", "test", "port"],
     framing:
       "Every exercise must be framed as a real frontend/automation task: a component " +
       "consuming a REST API, a form validation pipeline, a data transformation feeding a " +
@@ -392,7 +394,7 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "sql",
     subject: "programming",
     title: "SQL (PostgreSQL)",
-    modes: ["design", "implement", "debug", "refactor", "explain"],
+    modes: ["design", "implement", "debug", "refactor", "explain", "query", "analyze", "review"],
     framing:
       "Every exercise must be framed as a real database/automation task: a schema for a " +
       "webhook-driven pipeline, a query feeding an n8n workflow, a transaction wrapping a " +
@@ -564,9 +566,10 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "english_grammar",
     subject: "english",
     title: "Gramática inglesa",
-    modes: ["rewrite", "find_error", "cloze", "translate", "true_false"],
+    // The first-generation English modes stay valid so existing exercises keep working; they are no longer offered.
+    modes: ["gr_explain_rule", "gr_recognize", "gr_syntax", "gr_cloze", "gr_transform", "gr_correct", "gr_expressions", "gr_produce", "rewrite", "find_error", "cloze", "translate", "true_false"],
     framing:
-      "The learner is a native Spanish speaker (today A2, aiming for C1). Sentences come " +
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). Sentences come " +
       "from realistic contexts the learner meets: work emails and meetings in a tech/" +
       "automation job, travel and daily life. Target the errors a Spanish speaker " +
       "actually makes (transfer from Spanish) and calibrate vocabulary and structures to " +
@@ -633,9 +636,9 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "english_vocabulary",
     subject: "english",
     title: "Vocabulario inglés",
-    modes: ["cloze", "translate", "explain"],
+    modes: ["vc_recall", "vc_recognition", "vc_usage", "vc_families", "vc_collocations", "vc_synonyms", "cloze", "translate", "explain"],
     framing:
-      "The learner is a native Spanish speaker (today A2, aiming for C1). Vocabulary comes " +
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). Vocabulary comes " +
       "from realistic work (tech/automation) and daily-life contexts, always inside a " +
       "full sentence; target Spanish-speaker confusions and the CEFR level of the " +
       "exercise.",
@@ -673,9 +676,9 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "english_writing",
     subject: "english",
     title: "Redacción en inglés",
-    modes: ["writing", "rewrite"],
+    modes: ["wr_sentences", "wr_paragraph", "wr_free", "wr_paraphrase", "wr_register", "wr_review", "writing", "rewrite"],
     framing:
-      "The learner is a native Spanish speaker (today A2, aiming for C1). Tasks are real " +
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). Tasks are real " +
       "writing needs: a paragraph about work or study, an email to a colleague or client, " +
       "an opinion essay. State the word range and the CEFR level; judge with CEFR writing " +
       "criteria.",
@@ -701,11 +704,410 @@ const _CATALOGUE: readonly Discipline[] = [
       ],
     ),
   },
+  {
+    id: "english_reading",
+    subject: "english",
+    title: "Lectura en inglés",
+    modes: ["rd_literal", "rd_inference", "rd_vocab_context", "rd_summary", "rd_skim_scan", "rd_structure", "rd_paraphrase", "rd_translate"],
+    framing:
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). Every task comes with " +
+      "its own short text written at the target CEFR level about realistic work or daily-life " +
+      "content; questions are answerable from the text alone. State the CEFR level and the time limit.",
+    skills: _skills(
+      [
+        "Comprensión del texto",
+        "answers from prior knowledge instead of from the text",
+        "copies a phrase without understanding it",
+        "misses negation or a qualifier (not, hardly, only)",
+      ],
+      [
+        "Inferencia",
+        "takes the literal statement as the inferred one",
+        "over-infers something the text does not support",
+        "does not justify with evidence from the text",
+      ],
+      [
+        "Vocabulario en contexto",
+        "guesses from a Spanish look-alike (false friend) instead of the context",
+        "ignores the part of speech of the unknown word",
+        "gives the dictionary meaning that does not fit this context",
+      ],
+      [
+        "Síntesis y estructura",
+        "summarises with details instead of main ideas",
+        "copies sentences instead of paraphrasing",
+        "does not see the function of each paragraph or the linkers that mark it",
+      ],
+    ),
+  },
+  {
+    id: "english_listening",
+    subject: "english",
+    title: "Escucha en inglés",
+    modes: ["ls_dictation", "ls_gist", "ls_detail", "ls_gap", "ls_variation", "ls_podcast", "ls_shadowing"],
+    framing:
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). The audio text is played " +
+      "aloud by the app and stays hidden; write it at the target CEFR level from realistic work " +
+      "and daily-life situations, with natural rhythm. Keep the answer verifiable word by word.",
+    skills: _skills(
+      [
+        "Discriminación de sonidos",
+        "confuses similar sounds (ship/sheep, think/sink)",
+        "hears a homophone as the wrong word (their/there, to/too)",
+        "misses weak forms and contractions (he's / he was)",
+      ],
+      [
+        "Terminaciones y ortografía",
+        "drops the final -s, -ed or -ing that is pronounced weakly",
+        "misspells a word that was heard correctly",
+        "writes numbers or dates in the wrong form",
+      ],
+      [
+        "Comprensión global y de detalle",
+        "gets stuck on one unknown word and loses the rest",
+        "gives the main idea from one sentence only",
+        "mishears figures, names or times",
+      ],
+    ),
+  },
+  {
+    id: "english_speaking",
+    subject: "english",
+    title: "Habla en inglés",
+    modes: ["sp_read_aloud", "sp_shadowing", "sp_guided", "sp_monologue", "sp_roleplay", "sp_record_compare", "sp_phonemes", "sp_ipa", "sp_word_stress", "sp_sentence_stress", "sp_intonation", "sp_connected"],
+    framing:
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). There is no speech " +
+      "recognition: the learner speaks aloud and then types what they said (or a report of how it " +
+      "went), and that text is what is judged. Tasks are real situations (a meeting, a call, travel). " +
+      "State the CEFR level and how long to speak.",
+    skills: _skills(
+      [
+        "Pronunciación",
+        "pronounces final consonant clusters by adding a vowel (school as eschool)",
+        "does not reduce unstressed syllables",
+        "stress on the wrong syllable by transfer from Spanish",
+      ],
+      [
+        "Fluidez y organización",
+        "long pauses or abandoned sentences",
+        "no linkers between ideas",
+        "translates word by word from Spanish while speaking",
+      ],
+      [
+        "Interacción",
+        "answers with a single word instead of a full turn",
+        "does not use conversational formulas (Could you…? I see what you mean)",
+        "register too blunt or too formal for the situation",
+      ],
+    ),
+  },
+  // ── Programming, by area of the Programación space ────────────────────────
+  {
+    id: "typescript",
+    subject: "programming",
+    title: "TypeScript",
+    modes: ["implement", "debug", "refactor", "explain", "cloze", "trace", "review", "test", "port"],
+    framing:
+      "Every exercise is real TypeScript work: typing an API response, narrowing a union, a generic helper, a module " +
+      "shared by an Electron main process and its renderer, a Node script. Strict mode is on; `any` is never the answer. " +
+      _NO_TOY_NAMES +
+      " Bugs must be found by reasoning about types and behaviour, never by spotting a syntax error.",
+    skills: _skills(
+      [
+        "Sistema de tipos",
+        "uses `any` or a type assertion to silence the compiler instead of modelling the data",
+        "confuses a type (compile time) with a value (runtime)",
+        "widens a literal type by accident (string instead of a union of literals)",
+      ],
+      [
+        "Narrowing y uniones",
+        "accesses a property without narrowing the union first",
+        "forgets the exhaustive case in a switch over a discriminated union",
+        "trusts a type guard that does not actually check the value",
+      ],
+      [
+        "Genéricos",
+        "over-constrained or unconstrained generic parameters",
+        "a generic that loses the type of its argument",
+      ],
+      [
+        "Módulos y proyecto",
+        "circular imports; wrong module resolution in tsconfig",
+        "mixes CommonJS and ES modules",
+      ],
+      _DELIBERATE_DEBUGGING,
+    ),
+  },
+  {
+    id: "backend",
+    subject: "programming",
+    title: "Backend",
+    modes: ["implement", "design", "debug", "refactor", "explain", "review", "test", "trace", "decompose", "analyze", "port"],
+    framing:
+      "Every exercise is a real backend task in Python (FastAPI) or TypeScript (Node): an endpoint with its contract and " +
+      "status codes, a service layer rule, a webhook receiver that must be idempotent, an authentication check, a " +
+      "repository query, a background job. Requests, payloads and failures are concrete. " +
+      _NO_TOY_NAMES,
+    skills: _skills(
+      [
+        "Diseño de APIs",
+        "wrong HTTP status code or verb for the operation (200 with an error body, POST for a read)",
+        "endpoint that is not idempotent when a client retries it",
+        "leaks the internal model instead of a response contract",
+      ],
+      [
+        "Capas y responsabilidades",
+        "business rules inside the route handler",
+        "the service knows HTTP details (request objects, status codes)",
+        "the repository returns half-built objects that the caller must fix",
+      ],
+      [
+        "Autenticación y seguridad",
+        "authorises only by checking that a token exists, not what it allows",
+        "stores or logs secrets and passwords in plain text",
+        "trusts client-supplied ids (broken object-level authorisation)",
+      ],
+      [
+        "Errores y validación",
+        "validates format but not the business rule; catches everything and hides the failure",
+        "returns different error shapes from different endpoints",
+      ],
+      [
+        "Persistencia desde el backend",
+        "N+1 queries in a loop; a transaction that is too wide or missing",
+        "connection not released back to the pool on error",
+      ],
+      [
+        "Tareas en segundo plano e integración",
+        "a retry without backoff or limit; a job that is not safe to run twice",
+        "a webhook handler that does the slow work before answering",
+      ],
+      _DELIBERATE_DEBUGGING,
+    ),
+  },
+  {
+    id: "frontend",
+    subject: "programming",
+    title: "Frontend",
+    modes: ["implement", "debug", "refactor", "explain", "cloze", "review", "test", "trace", "decompose", "analyze"],
+    framing:
+      "Every exercise is a real UI task with React and TypeScript: a form with validation, a list fed by an API with its " +
+      "loading and error states, a component whose state is in the wrong place, an effect with a stale closure. State is " +
+      "always separated into UI state, server state and form state. " +
+      _NO_TOY_NAMES +
+      " Bugs must be found by reasoning about rendering and state, never by spotting a syntax error.",
+    skills: _skills(
+      [
+        "Componentes y estado",
+        "derived data stored in state and kept in sync by an effect",
+        "state lifted too high or duplicated in two components",
+        "mutates state directly instead of producing a new value",
+      ],
+      [
+        "Efectos y ciclo de vida",
+        "an effect with a missing dependency (stale closure)",
+        "a fetch without cancellation that sets state after unmount or out of order",
+        "an effect that runs on every render",
+      ],
+      [
+        "Datos del servidor",
+        "no loading or error state; the UI shows stale data as if it were fresh",
+        "server state copied into local state",
+      ],
+      [
+        "Formularios y validación",
+        "validates only on the client; error messages that do not say which field",
+        "the submit can be fired twice (no pending state), so the server receives duplicates",
+      ],
+      [
+        "Accesibilidad y rendimiento",
+        "a clickable div with no keyboard access or role",
+        "re-renders a huge list on every keystroke",
+      ],
+      _DELIBERATE_DEBUGGING,
+    ),
+  },
+  {
+    id: "desktop",
+    subject: "programming",
+    title: "Apps de escritorio (Electron)",
+    modes: ["implement", "design", "debug", "refactor", "explain", "review", "test", "trace", "decompose", "analyze"],
+    framing:
+      "Every exercise is real Electron + TypeScript work on a Windows desktop app: what runs in the main process and " +
+      "what in the renderer, a typed IPC call through a preload script, a native dialog, a file the app writes, a " +
+      "window lifecycle bug, packaging with electron-builder. Security defaults (context isolation, no Node in the " +
+      "renderer) are always on. " +
+      _NO_TOY_NAMES,
+    skills: _skills(
+      [
+        "Arquitectura main / preload / renderer",
+        "puts privileged work (files, processes) in the renderer",
+        "exposes the whole ipcRenderer to the page instead of narrow functions",
+        "blocks the main process with synchronous work so every window freezes",
+      ],
+      [
+        "IPC tipado",
+        "an IPC handler that trusts the arguments it receives from the renderer",
+        "channel names and payload types that drift apart between processes",
+      ],
+      [
+        "Seguridad",
+        "nodeIntegration on or contextIsolation off; loads remote content with privileges",
+        "path traversal: a renderer-supplied path is opened without confining it",
+      ],
+      [
+        "Ciclo de vida y ventanas",
+        "listeners registered on every window creation and never removed",
+        "app quits or keeps running when the last window closes on the wrong platform",
+      ],
+      [
+        "Empaquetado y distribución",
+        "a dependency or resource missing from the packaged app but present in dev",
+        "paths that work in dev and break inside the asar archive",
+      ],
+      _DELIBERATE_DEBUGGING,
+    ),
+  },
+  {
+    id: "automation",
+    subject: "programming",
+    title: "Automatización",
+    modes: ["implement", "design", "debug", "refactor", "explain", "review", "test", "trace", "decompose", "port"],
+    framing:
+      "Every exercise is an automation task: a script reacting to a webhook, a batch job over a CSV/JSON export, a " +
+      "pipeline step moving data between two systems, a scheduled job, an n8n workflow or Power Automate flow, a retry " +
+      "policy against a flaky API. Never an isolated puzzle without operational context. " +
+      _NO_TOY_NAMES,
+    skills: _skills(
+      [
+        "Idempotencia",
+        "running the job twice duplicates or corrupts the result",
+        "no key that identifies an event that was already processed",
+      ],
+      [
+        "Fallos parciales y reintentos",
+        "one bad record aborts the whole batch, or is silently skipped",
+        "retries with no backoff, no limit, or on errors that can never succeed",
+      ],
+      [
+        "Integración con APIs",
+        "ignores pagination, rate limits or expired tokens",
+        "hardcoded URLs, paths or credentials",
+      ],
+      [
+        "Programación y disparadores",
+        "a scheduled job that overlaps with its previous run",
+        "time zone and daylight-saving assumptions in schedules",
+      ],
+      [
+        "Observabilidad de procesos",
+        "no log line that says what was processed and what failed",
+        "logs whole payloads with personal data or secrets",
+      ],
+      _DELIBERATE_DEBUGGING,
+    ),
+  },
+  {
+    id: "mobile",
+    subject: "programming",
+    title: "Móvil",
+    modes: ["implement", "design", "debug", "refactor", "explain", "review", "test", "trace", "decompose", "analyze", "port"],
+    framing:
+      "Every exercise is real mobile work (TypeScript with React Native, and Kotlin for native modules): a list with " +
+      "thousands of rows, local storage and sync with the desktop vault, a permission flow, background limits, a bridge " +
+      "call that is too chatty. Performance, battery and the app lifecycle are always part of the answer. " +
+      _NO_TOY_NAMES,
+    skills: _skills(
+      [
+        "Rendimiento móvil",
+        "renders a huge list without virtualisation; heavy work on the UI thread",
+        "too many small bridge calls between JavaScript and native code",
+      ],
+      [
+        "Ciclo de vida y permisos",
+        "assumes the app keeps running in the background or that a permission stays granted",
+        "state lost when the OS kills the process",
+      ],
+      [
+        "Almacenamiento y sincronización",
+        "two devices edit the same file with no conflict strategy",
+        "reads the whole vault into memory instead of indexing it",
+      ],
+      _DELIBERATE_DEBUGGING,
+    ),
+  },
+  {
+    id: "devtools",
+    subject: "programming",
+    title: "Herramientas y calidad",
+    modes: ["commands", "implement", "debug", "find_error", "explain", "review", "test", "design"],
+    framing:
+      "Every exercise is real day-to-day tooling for a solo developer: a Dockerfile or compose file that must build and " +
+      "run, a CI pipeline step, a package manager and lockfile problem, a test setup, a shell or PowerShell script, a " +
+      "linter configuration. Commands and files are concrete. " +
+      _NO_TOY_NAMES,
+    skills: _skills(
+      [
+        "Contenedores",
+        "secrets baked into an image; runs as root; a bad layer order that defeats caching",
+        "data stored in the container filesystem and lost when it is replaced",
+      ],
+      [
+        "Integración continua",
+        "a pipeline that passes without running the tests it claims to run",
+        "secrets echoed in logs",
+      ],
+      [
+        "Dependencias y entornos",
+        "unpinned versions that make the build differ between machines",
+        "a global install that hides a missing dependency",
+      ],
+      [
+        "Scripts y terminal",
+        "a destructive command with an unquoted variable or path",
+        "assumes a POSIX shell on Windows or the other way round",
+      ],
+    ),
+  },
 ];
 
 export const DISCIPLINES: Record<string, Discipline> = Object.fromEntries(
   _CATALOGUE.map((d) => [d.id, d]),
 );
+
+/** The discipline (framing and error taxonomy) of each English area. */
+export const ENGLISH_DISCIPLINE_OF_AREA: Record<string, string> = {
+  grammar: "english_grammar",
+  writing: "english_writing",
+  reading: "english_reading",
+  listening: "english_listening",
+  speaking: "english_speaking",
+  vocabulary: "english_vocabulary",
+};
+
+/**
+ * The discipline of a programming exercise from where it lives in the Programación space: the area folder decides
+ * the framing (`2.1 Python` → python, `4 Backend` → backend…). Unknown places keep the language-agnostic one.
+ */
+export function programmingDisciplineOfPath(rel: string): string {
+  const parts = String(rel || "").split(/[\\/]/);
+  const area = parts.find((p) => /^\d+(?:\.\d+)?\s+\S/.test(p)) ?? "";
+  const n = /^(\d+(?:\.\d+)?)/.exec(area)?.[1] ?? "";
+  const byNumber: Record<string, string> = {
+    "1": "programming_logic",
+    "2.1": "python",
+    "2.2": "javascript",
+    "2.3": "typescript",
+    "3": "desktop",
+    "4": "backend",
+    "5": "frontend",
+    "6": "sql",
+    "7": "automation",
+    "8": "mobile",
+    "9": "devtools",
+  };
+  return byNumber[n] ?? "programming_logic";
+}
 
 export const DEFAULT_DISCIPLINE: Record<string, string> = {
   mathematics: "math_general",
@@ -719,10 +1121,15 @@ export function disciplineFor(frontmatter: Record<string, any>): Discipline {
   if (explicit in DISCIPLINES) {
     return DISCIPLINES[explicit]!;
   }
+  const subject = String(fm.subject || "").trim().toLowerCase();
+  // English: the discipline follows the skill (`gr_` grammar, `wr_` writing, `rd_` reading, …), never math.
+  if (subject === "english" || subject === "ingles" || subject === "inglés") {
+    const bySkill = ENGLISH_DISCIPLINE_OF_AREA[englishSkillSpec(String(fm.mode || ""))?.area ?? ""];
+    return DISCIPLINES[bySkill || DEFAULT_DISCIPLINE.english!]!;
+  }
   if (mode_for(fm).id === "drill") {
     return DISCIPLINES["math_drill"]!;
   }
-  const subject = String(fm.subject || "").trim().toLowerCase();
   return DISCIPLINES[DEFAULT_DISCIPLINE[subject] || "math_general"]!;
 }
 export const discipline_for = disciplineFor;

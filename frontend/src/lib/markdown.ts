@@ -298,7 +298,15 @@ const CACHE_MAX = 64;
 export function renderMarkdown(body: string): string {
   const hit = cache.get(body);
   if (hit !== undefined) return hit;
-  const html = String(DOMPurify.sanitize(md.render(body), PURIFY));
+  let html: string;
+  try {
+    html = String(DOMPurify.sanitize(md.render(body), PURIFY));
+  } catch (e) {
+    // Una nota que el parser no traga tiene que abrirse igual: se muestra en crudo
+    // en vez de tumbar la ventana (la vista de lectura pinta lo que se devuelva).
+    console.warn("[NoteVault] renderMarkdown falló; se muestra en texto plano:", e);
+    html = `<pre class="nv-render-fallback">${escapeHtml(body)}</pre>`;
+  }
   cache.set(body, html);
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
   return html;

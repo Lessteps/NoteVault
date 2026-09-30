@@ -3,12 +3,12 @@
 // and sentence mining. The app never searches for or downloads content.
 
 import {
-  Captions, Clipboard, FolderOpen, Mic, Pause, Pickaxe, Play, Repeat, SkipBack, SkipForward, Square, Volume2,
+  Captions, Clipboard, FolderOpen, Headphones, Mic, Pause, Pickaxe, Play, Repeat, SkipBack, SkipForward, Square, Volume2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { copyText } from "../../lib/clipboard";
-import { clock, cueAt, cueBefore, nextTarget, previousTarget, SPEEDS, type Pair } from "../../lib/player";
+import { clock, cueAt, cueBefore, durationMs, nextTarget, previousTarget, SPEEDS, type Pair } from "../../lib/player";
 import type { PlayerMedia } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { usePersistedNav } from "../../store/navState";
@@ -96,6 +96,9 @@ export function EnglishPlayer() {
     if (!el) return;
     const ms = el.currentTime * 1000;
     setPos(ms);
+    // The duration can arrive after the metadata event (or never as a number the first time): keep it in sync.
+    const d = durationMs(el);
+    if (d > 0) setDur((prev) => (Math.abs(prev - d) > 500 ? d : prev));
     const seg = segment.current;
     if (seg && ms >= seg.end) {
       segment.current = null;
@@ -141,6 +144,23 @@ export function EnglishPlayer() {
       setRecording(true);
     } catch {
       toast("error", "No se pudo usar el micrófono.");
+    }
+  };
+
+  /** A listening exercise from what is playing (dictation, shadowing or podcast); without English subtitles it says why. */
+  const makeDictation = async (kind: "dictation" | "shadowing" | "podcast" = "dictation") => {
+    if (!media) return;
+    try {
+      const r = await api.enPlayerDictation(media.id, pos / 1000, kind);
+      if (!r.ok || !r.path) {
+        toast("error", r.message ?? "No se pudo crear el ejercicio.");
+        return;
+      }
+      toast("info", "Ejercicio creado en la rama Escucha.");
+      await useApp.getState().openNote(r.path);
+      useApp.getState().setMode("read");
+    } catch (e) {
+      toast("error", (e as Error).message);
     }
   };
 
@@ -307,7 +327,8 @@ export function EnglishPlayer() {
             src={media.url}
             className="h-full w-full"
             onTimeUpdate={onTime}
-            onLoadedMetadata={(e) => setDur(e.currentTarget.duration * 1000)}
+            onLoadedMetadata={(e) => setDur(durationMs(e.currentTarget))}
+            onDurationChange={(e) => setDur(durationMs(e.currentTarget))}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
             onClick={toggle}
@@ -345,6 +366,12 @@ export function EnglishPlayer() {
             className={cn("flex items-center gap-1 rounded-lg px-2 py-1 text-[12px]", shadow ? "bg-accent text-white" : "text-dim hover:bg-hover")}>
             <Mic size={13} /> Sombra
           </button>
+          <button type="button" title="Crear un dictado con la frase que suena (usa sus subtítulos en inglés)" onClick={() => void makeDictation("dictation")}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Headphones size={13} /> Ej. dictado</button>
+          <button type="button" title="Crear un ejercicio de shadowing: escuchar la frase que suena y replicarla" onClick={() => void makeDictation("shadowing")}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Repeat size={13} /> Ej. shadowing</button>
+          <button type="button" title="Crear una comprensión de podcast con los siguientes 45 segundos" onClick={() => void makeDictation("podcast")}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Volume2 size={13} /> Ej. podcast</button>
           <button type="button" title="Minar la frase (M)" onClick={actions.mine}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Pickaxe size={13} /> Minar</button>
           <button type="button" title="Copiar enlace a este momento" onClick={() => void api.enPlayerLink(media.id, pos / 1000)

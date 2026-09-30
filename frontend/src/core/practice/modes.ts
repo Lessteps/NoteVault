@@ -3,6 +3,9 @@
  * Ported from notevault_app/core/practice/modes.py.
  */
 
+import { ENGLISH_SKILL_SPECS } from "../../lib/englishSkillData";
+import { PROGRAMMING_EXTRA_SKILLS } from "../../lib/programmingSkillData";
+
 export const MATH = "mathematics";
 export const PROG = "programming";
 export const EN = "english";
@@ -22,7 +25,7 @@ export interface PracticeMode {
   readonly min_difficulty?: number;
 }
 
-const _CATALOGUE: readonly PracticeMode[] = [
+const _BASE_CATALOGUE: readonly PracticeMode[] = [
   {
     id: "prove",
     label: "Demostración",
@@ -233,6 +236,34 @@ const _CATALOGUE: readonly PracticeMode[] = [
   },
 ];
 
+/** One practice mode per English skill (`gr_…`, `wr_…`, `rd_…`, `ls_…`, `sp_…`, `vc_…`). */
+const _ENGLISH_MODES: readonly PracticeMode[] = ENGLISH_SKILL_SPECS.map((sp) => ({
+  id: sp.id,
+  label: sp.label,
+  description: sp.description,
+  act: sp.act,
+  answer_kind: sp.answerKind,
+  timer: sp.timer,
+  judge_focus: sp.judge,
+  subjects: [EN],
+  ...(sp.noBeginner ? { min_difficulty: 2 } : {}),
+}));
+
+/** One practice mode per extra programming competency (trace, review, test, analyze, decompose, port, query). */
+const _PROGRAMMING_MODES: readonly PracticeMode[] = PROGRAMMING_EXTRA_SKILLS.map((sp) => ({
+  id: sp.id,
+  label: sp.label,
+  description: sp.description,
+  act: sp.act,
+  answer_kind: sp.answerKind,
+  timer: sp.timer,
+  judge_focus: sp.judge,
+  subjects: [PROG],
+  ...(sp.noBeginner ? { min_difficulty: 2 } : {}),
+}));
+
+const _CATALOGUE: readonly PracticeMode[] = [..._BASE_CATALOGUE, ..._ENGLISH_MODES, ..._PROGRAMMING_MODES];
+
 export const MODES: Record<string, PracticeMode> = Object.fromEntries(
   _CATALOGUE.map((m) => [m.id, m]),
 );
@@ -253,10 +284,22 @@ export const PRACTICE_ALIASES: Record<string, string> = {
 export function modeFor(frontmatter: Record<string, any>): PracticeMode {
   const fm = frontmatter && typeof frontmatter === "object" ? frontmatter : {};
   const mode = String(fm.mode || "").trim().toLowerCase();
+  const subject = String(fm.subject || "").trim().toLowerCase();
+  const english = subject === EN || subject === "ingles" || subject === "inglés";
   if (mode in MODES) {
-    return MODES[mode]!;
+    const found = MODES[mode]!;
+    // The domains do not mix: an English exercise takes an English mode, and an English-only mode is
+    // not accepted in another subject's exercise.
+    if (english && !found.subjects.includes(EN)) throw new Error(`«${mode}» no es un modo de inglés.`);
+    if (subject && !english && found.subjects.length === 1 && found.subjects[0] === EN) throw new Error(`«${mode}» es un modo de inglés y este ejercicio no lo es.`);
+    return found;
   }
   const alias = PRACTICE_ALIASES[String(fm.practice || "").trim().toLowerCase()];
+  // "solve" is the mathematics default. An English exercise never falls back to it: an unknown or
+  // missing mode there is an error to fix, not something to grade as a maths problem.
+  if (english) {
+    throw new Error(`Modo de práctica desconocido para inglés: «${mode || "(vacío)"}».`);
+  }
   return MODES[alias || "solve"]!;
 }
 export const mode_for = modeFor;

@@ -24,7 +24,7 @@ import {
   type TopicManifest,
 } from "./topic.js";
 
-export const VIEW_FILE_KINDS = ["teorica", "practica", "resumen"] as const;
+export const VIEW_FILE_KINDS = ["teorica", "practica", "resumen", "ejercicios", "dibujo"] as const;
 export type ViewFileKind = (typeof VIEW_FILE_KINDS)[number];
 
 /** The manifest file every `practica` view carries the topic inside of. */
@@ -147,6 +147,9 @@ export function practiceFileText(manifest: TopicManifest): string {
     type: "practica",
     subject: manifest.subject,
     title: manifest.title,
+    ...(manifest.topic_type ? { topic_type: manifest.topic_type } : {}),
+    ...(manifest.branch ? { branch: manifest.branch } : {}),
+    ...(manifest.level ? { level: manifest.level } : {}),
     skills: manifest.skills,
     min_per_skill: manifest.mastery.min_per_skill,
     target_difficulty: manifest.mastery.target_difficulty,
@@ -201,6 +204,38 @@ export function overviewFileText(title: string, subject: string, scopeRel: strin
     "",
   ].join("\n");
   return dumpFrontmatter({ type: "resumen", subject, title, scope: scopeRel }) + "\n" + body;
+}
+
+// ── Exercise folders ────────────────────────────────────────────────────────
+
+const EXERCISE_FOLDER_NAMES = new Set(["ejercicios", "exercises"]);
+
+/** `Ejercicios` itself, or one of its per-skill sub-folders (`Ejercicios/<skill>`). */
+export function isExerciseFolder(folderAbs: string): boolean {
+  const own = path.basename(folderAbs).toLowerCase();
+  const parent = path.basename(path.dirname(folderAbs)).toLowerCase();
+  return EXERCISE_FOLDER_NAMES.has(own) || EXERCISE_FOLDER_NAMES.has(parent);
+}
+
+/** Frontmatter + body of the `ejercicios` view of an exercise folder. */
+export function exerciseSetFileText(title: string): string {
+  const body = [
+    `# ${title}`,
+    "",
+    "Vista del conjunto de ejercicios de esta carpeta: recórrelos uno a uno",
+    "sin salir de la pestaña.",
+    "",
+  ].join("\n");
+  return dumpFrontmatter({ type: "ejercicios", title }) + "\n" + body;
+}
+
+/** Creates `<folder>.ejercicios.md` when it is missing; returns its absolute path. */
+export function ensureExerciseSetFile(folderAbs: string): { file: string; created: boolean } {
+  const name = path.basename(folderAbs);
+  const file = path.join(folderAbs, viewFileName(name, "ejercicios"));
+  if (fs.existsSync(file)) return { file, created: false };
+  fs.writeFileSync(file, exerciseSetFileText(name), "utf-8");
+  return { file, created: true };
 }
 
 // ── The concept (theory) note of a topic folder ─────────────────────────────

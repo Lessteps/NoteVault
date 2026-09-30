@@ -3,10 +3,13 @@
  * Pure definitions safe to import in React UI components.
  */
 
+import { ENGLISH_SKILL_SPECS } from "./englishSkillData";
+import { PROGRAMMING_EXTRA_SKILLS } from "./programmingSkillData";
+
 export type DifficultyLevel = 1 | 2 | 3;
 export type DifficultyId = "beginner" | "intermediate" | "advanced";
 export type AssistanceLevel = "no_help" | "helper";
-export type QuantityOption = "3-5" | "6-10" | "11+" | "all" | "auto";
+export type QuantityOption = "3-5" | "6-10" | "11+" | "all" | "auto" | "ai";
 
 export interface DifficultySpec {
   readonly level: DifficultyLevel;
@@ -176,7 +179,7 @@ export const MATHEMATICS_SKILLS: readonly SkillDefinition[] = [
   },
 ];
 
-export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [
+const _PROGRAMMING_BASE: readonly SkillDefinition[] = [
   {
     id: "implement",
     label: "Implementar",
@@ -276,92 +279,35 @@ export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [
   },
 ];
 
-export const ENGLISH_SKILLS: readonly SkillDefinition[] = [
-  {
-    id: "writing",
-    label: "Redacción libre",
-    act: "Escribir un texto original adecuado al nivel MCER.",
-    subject: "english",
-    description: "Redactar textos originales con precisión gramatical y adecuación al nivel MCER.",
-    allowedDifficulties: ALL_DIFFICULTIES,
-    allowedAssistance: DEFAULT_ASSISTANCE,
-    defaultDifficulty: 1,
-    defaultAssistance: "no_help",
-    beginnerAllowed: true,
-  },
-  {
-    id: "rewrite",
-    label: "Reescribir / corregir",
-    act: "Reescribir oraciones usando estructuras objetivo y corrigiendo errores.",
-    subject: "english",
-    description: "Transformar oraciones usando estructuras objetivo y corrigiendo errores.",
-    allowedDifficulties: ALL_DIFFICULTIES,
-    allowedAssistance: DEFAULT_ASSISTANCE,
-    defaultDifficulty: 1,
-    defaultAssistance: "no_help",
-    beginnerAllowed: true,
-  },
-  {
-    id: "translate",
-    label: "Traducir",
-    act: "Traducir fielmente preservando el sentido.",
-    subject: "english",
-    description: "Traducir fielmente preservando el sentido y evitando calcos literales.",
-    allowedDifficulties: ALL_DIFFICULTIES,
-    allowedAssistance: DEFAULT_ASSISTANCE,
-    defaultDifficulty: 1,
-    defaultAssistance: "no_help",
-    beginnerAllowed: true,
-  },
-  {
-    id: "cloze",
-    label: "Completar huecos",
-    act: "Completar palabras y colocaciones según contexto.",
-    subject: "english",
-    description: "Completar palabras y colocaciones según contexto y registro gramatical.",
-    allowedDifficulties: ALL_DIFFICULTIES,
-    allowedAssistance: DEFAULT_ASSISTANCE,
-    defaultDifficulty: 1,
-    defaultAssistance: "no_help",
-    beginnerAllowed: true,
-  },
-  {
-    id: "true_false",
-    label: "Verdadero o falso",
-    act: "Comprobar afirmaciones de comprensión lectora o reglas.",
-    subject: "english",
-    description: "Comprobar afirmaciones de comprensión lectora o reglas gramaticales.",
-    allowedDifficulties: ALL_DIFFICULTIES,
-    allowedAssistance: DEFAULT_ASSISTANCE,
-    defaultDifficulty: 1,
-    defaultAssistance: "no_help",
-    beginnerAllowed: true,
-  },
-  {
-    id: "explain",
-    label: "Explicar uso",
-    act: "Explicar la diferencia de uso o matiz gramatical.",
-    subject: "english",
-    description: "Explicar la diferencia de uso o matiz gramatical en inglés cotidiano.",
-    allowedDifficulties: ALL_DIFFICULTIES,
-    allowedAssistance: DEFAULT_ASSISTANCE,
-    defaultDifficulty: 1,
-    defaultAssistance: "no_help",
-    beginnerAllowed: true,
-  },
-  {
-    id: "find_error",
-    label: "Encontrar el error",
-    act: "Detectar incorrecciones gramaticales o léxicas.",
-    subject: "english",
-    description: "Detectar incorrecciones gramaticales o léxicas y proponer la forma natural.",
-    allowedDifficulties: NO_BEGINNER_DIFFICULTIES,
-    allowedAssistance: DEFAULT_ASSISTANCE,
-    defaultDifficulty: 2,
-    defaultAssistance: "no_help",
-    beginnerAllowed: false,
-  },
-];
+/** The extra programming skills, from the shared table (trace, review, test, analyze, decompose, port, query). */
+const PROGRAMMING_EXTRA: readonly SkillDefinition[] = PROGRAMMING_EXTRA_SKILLS.map((sp) => ({
+  id: sp.id,
+  label: sp.label,
+  act: sp.description,
+  subject: "programming",
+  description: sp.description,
+  allowedDifficulties: sp.noBeginner ? NO_BEGINNER_DIFFICULTIES : ALL_DIFFICULTIES,
+  allowedAssistance: DEFAULT_ASSISTANCE,
+  defaultDifficulty: sp.noBeginner ? 2 : 1,
+  defaultAssistance: "no_help",
+  beginnerAllowed: !sp.noBeginner,
+}));
+
+export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [..._PROGRAMMING_BASE, ...PROGRAMMING_EXTRA];
+
+/** The English skills (one per entry of the shared table, namespaced by branch). */
+export const ENGLISH_SKILLS: readonly SkillDefinition[] = ENGLISH_SKILL_SPECS.map((sp) => ({
+  id: sp.id,
+  label: sp.label,
+  act: sp.description,
+  subject: "english",
+  description: sp.description,
+  allowedDifficulties: sp.noBeginner ? NO_BEGINNER_DIFFICULTIES : ALL_DIFFICULTIES,
+  allowedAssistance: sp.noHelper ? (["no_help"] as const) : DEFAULT_ASSISTANCE,
+  defaultDifficulty: sp.noBeginner ? 2 : 1,
+  defaultAssistance: "no_help" as const,
+  beginnerAllowed: !sp.noBeginner,
+}));
 
 const SKILLS_BY_SUBJECT: Record<string, readonly SkillDefinition[]> = {
   mathematics: MATHEMATICS_SKILLS,

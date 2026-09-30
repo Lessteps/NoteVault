@@ -9,6 +9,7 @@ import { appApi } from "./modules/app.js";
 import { assistantApi } from "./modules/assistant.js";
 import { calendarApi } from "./modules/calendar.js";
 import { canvasApi } from "./modules/canvas.js";
+import { codeDebugApi } from "./modules/codeDebug.js";
 import { conversationsApi } from "./modules/conversations.js";
 import { englishPlayerApi } from "./modules/englishPlayer.js";
 import { exerciseApi } from "./modules/exercise.js";
@@ -24,7 +25,8 @@ import { notesExtrasApi } from "./modules/notes_extras.js";
 import { practiceApi } from "./modules/practice.js";
 import { projectsApi } from "./modules/projects.js";
 import { projectFoldersApi } from "./modules/projectFolders.js";
-import { studyApi } from "./modules/study.js";
+import { studyApi, setWarmApp, warmStudyIndex } from "./modules/study.js";
+import { studySpaceApi } from "./modules/studySpace.js";
 import { tasksApi } from "./modules/tasks.js";
 import { vaultsApi } from "./modules/vaults.js";
 import { webApi } from "./modules/web.js";
@@ -42,6 +44,7 @@ export function buildRegistry(app: AppState): Registry {
     ...homeApi(app),
     ...filesApi(app),
     ...englishPlayerApi(app),
+    ...codeDebugApi(app),
     ...notesExtrasApi(app),
     ...vaultsApi(app),
     ...webApi(app),
@@ -53,6 +56,7 @@ export function buildRegistry(app: AppState): Registry {
     ...projectFoldersApi(app),
     ...calendarApi(app),
     ...studyApi(app),
+    ...studySpaceApi(app),
     ...practiceApi(app),
     ...ladderApi(app),
     ...canvasApi(app),
@@ -70,8 +74,13 @@ let current: Registry = {};
 export function initRegistry(vaultPath?: string): AppState {
   appState = new AppState(vaultPath ?? AppConfig.get_active_vault());
   current = buildRegistry(appState);
+  // The study module warms its cache off-thread at startup (see warmStudyIndex).
+  setWarmApp(appState);
   return appState;
 }
+
+/** Read the vault into the study cache in the background. Called once on startup. */
+export { warmStudyIndex };
 
 /** The live registry used by the IPC handler. */
 export function getRegistry(): Registry {

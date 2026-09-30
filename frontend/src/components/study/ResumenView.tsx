@@ -7,14 +7,14 @@
 // engine's own progress (`studyTopicDashboard`).
 
 import { AlertTriangle, ChevronDown, ChevronRight, Play, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import {
   aggregateArea,
   folderInScope,
   groupTopics,
   missingOf,
-  skillRings,
+  skillMatrix,
   topicPct,
   type OverviewGroup,
 } from "../../lib/areaOverview";
@@ -40,11 +40,15 @@ export function ResumenView({ note }: { note: OpenNote }) {
   const openNote = useApp((s) => s.openNote);
   const version = useStudyVersion((s) => s.v);
   const [data, setData] = useState<TopicDashboardData | null>(null);
-  const [errors, setErrors] = useState("");
   const [loading, setLoading] = useState(true);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [openTopics, setOpenTopics] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
+  // The dashboard answers with a provisional empty payload while the vault index
+  // warms in the main process; keep the skeleton up and retry until the real data
+  // arrives instead of freezing on the cold read.
+  const retryRef = useRef(0);
+  const retryTimer = useRef<number | null>(null);
 
   const scope = String(note.frontmatter?.scope ?? "").trim();
   const subject = String(note.frontmatter?.subject ?? "").trim();
@@ -52,10 +56,20 @@ export function ResumenView({ note }: { note: OpenNote }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setData(await api.studyTopicDashboard(subject || undefined));
+      const result = await api.studyTopicDashboard(subject || undefined);
+      if (result.loading) {
+        if (retryRef.current < 40) {
+          retryRef.current += 1;
+          if (retryTimer.current) window.clearTimeout(retryTimer.current);
+          retryTimer.current = window.setTimeout(() => void refresh(), 1500);
+        }
+        return;
+      }
+      retryRef.current = 0;
+      setData(result);
+      setLoading(false);
     } catch (e) {
       toast("error", (e as Error).message);
-    } finally {
       setLoading(false);
     }
   }, [subject, toast]);
@@ -64,18 +78,12 @@ export function ResumenView({ note }: { note: OpenNote }) {
     void refresh();
   }, [refresh, version]);
 
-  useEffect(() => {
-    let live = true;
-    api
-      .studyErrorDigest()
-      .then((res) => {
-        if (live) setErrors(String(res?.text ?? ""));
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [subject, version]);
+  useEffect(
+    () => () => {
+      if (retryTimer.current) window.clearTimeout(retryTimer.current);
+    },
+    [],
+  );
 
   const topics = useMemo(
     () => (data?.topics ?? []).filter((t) => folderInScope(t.folder ?? "", scope)),
@@ -119,6 +127,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
   };
 
   return (
+    <div className="h-full min-h-0 overflow-y-auto">
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5 p-5">
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
@@ -149,7 +158,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
       </header>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(132px,1fr))] gap-3">
         <Kpi label="Temas" value={`${stats.started}/${stats.topics}`} hint="iniciados" />
         <Kpi label="Progreso" value={`${stats.pct}%`} hint="dominio medio" />
         <Kpi
@@ -178,7 +187,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
             Esta parte de la materia todavía no tiene temas con ejercicios registrados.
           </p>
         ) : (
-          <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,340px),1fr))] items-start gap-3">
             {groups.map((group) => (
               <GroupCard
                 key={group.key}
@@ -224,12 +233,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
         </section>
       )}
 
-      {errors.trim() && (
-        <section className="rounded-2xl border border-warn/30 bg-warn-soft/40 p-4">
-          <h2 className="text-[13px] font-bold uppercase tracking-wide text-warn">Errores frecuentes</h2>
-          <pre className="mt-2 whitespace-pre-wrap font-sans text-[11.5px] leading-snug text-dim">{errors}</pre>
-        </section>
-      )}
+    </div>
     </div>
   );
 }
@@ -237,7 +241,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
 function Kpi({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <div className="rounded-2xl border border-line-strong bg-card px-3.5 py-3">
-      <div className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-faint">{label}</div>
+      <div className="truncate font-mono text-[9.5px] font-semibold uppercase tracking-wider text-faint" title={label}>{label}</div>
       <div className="mt-1 text-[19px] font-bold leading-none text-text">{value}</div>
       <div className="mt-1 text-[10.5px] text-faint">{hint}</div>
     </div>
@@ -263,8 +267,8 @@ function GroupCard({
   const Chevron = open ? ChevronDown : ChevronRight;
   return (
     <div className="rounded-2xl border border-line-strong bg-card p-4">
-      <div className="flex w-full items-center gap-3">
-        <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-4 text-left">
+      <div className="flex w-full flex-wrap items-center gap-3">
+        <button type="button" onClick={onToggle} className="flex min-w-[220px] flex-1 items-center gap-4 text-left">
           <Donut
             size={92}
             thickness={10}
@@ -316,7 +320,12 @@ function GroupCard({
         )}
       </div>
 
-      {open && (
+      {open && group.isTopic && (
+        <div className="mt-3 border-t border-line pt-3">
+          <SkillMatrix item={group.topics[0]!} />
+        </div>
+      )}
+      {open && !group.isTopic && (
         <div className="mt-3 flex flex-col gap-2 border-t border-line pt-3">
           {group.topics.map((item) => (
             <TopicRow
@@ -346,7 +355,6 @@ function TopicRow({
   onOpenView: () => void;
 }) {
   const pct = topicPct(item);
-  const rings = skillRings(item);
   const missing = missingOf(item);
   const Chevron = open ? ChevronDown : ChevronRight;
 
@@ -384,25 +392,7 @@ function TopicRow({
 
       {open && (
         <div className="mt-2.5 border-t border-line pt-2.5">
-          <div className="flex flex-wrap gap-3">
-            {rings.map((ring) => (
-              <div key={ring.skill} className="flex w-[132px] flex-col items-center gap-1" title={ring.description}>
-                <Donut
-                  size={58}
-                  thickness={7}
-                  label={`${ring.pct}%`}
-                  parts={[
-                    { value: ring.pct, colour: ringColour(ring.pct), name: ring.label },
-                    { value: 100 - ring.pct, colour: "var(--nv-elevated)", name: "Pendiente" },
-                  ]}
-                />
-                <div className="w-full truncate text-center text-[10.5px] font-semibold text-text">{ring.label}</div>
-                <div className="text-center font-mono text-[9.5px] text-faint">
-                  {ring.done}/{ring.required}
-                </div>
-              </div>
-            ))}
-          </div>
+          <SkillMatrix item={item} />
           {missing.length > 0 && (
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               <AlertTriangle size={12} className="text-warn" />
@@ -418,6 +408,43 @@ function TopicRow({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Competencies × difficulty: passes against the required count, nothing else. */
+function SkillMatrix({ item }: { item: TopicDashboardItem }) {
+  const rows = skillMatrix(item);
+  if (rows.length === 0) {
+    return <p className="text-[11px] text-faint">Este tema todavía no tiene competencias definidas.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="grid grid-cols-[minmax(0,1fr)_repeat(3,72px)] items-center gap-2 font-mono text-[9.5px] uppercase tracking-wider text-faint">
+        <span>Competencia</span>
+        {DIFFICULTY_LABELS.map((l) => (
+          <span key={l} className="text-center">{l}</span>
+        ))}
+      </div>
+      {rows.map((row) => (
+        <div key={row.skill} className="grid grid-cols-[minmax(0,1fr)_repeat(3,72px)] items-center gap-2" title={row.description}>
+          <span className="truncate text-[11.5px] font-semibold text-text">{row.label}</span>
+          {row.cells.map((c, i) => {
+            if (c.required === 0) {
+              return <span key={c.difficulty} className="text-center font-mono text-[10px] text-faint/50">—</span>;
+            }
+            const pct = Math.min(100, Math.round((100 * c.passes) / c.required));
+            return (
+              <div key={c.difficulty} className={cn("flex flex-col gap-0.5", !c.counts && "opacity-50")}>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-panel">
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: DIFFICULTY_COLOURS[i] }} />
+                </div>
+                <span className="text-center font-mono text-[9.5px] text-faint">{c.passes}/{c.required}</span>
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

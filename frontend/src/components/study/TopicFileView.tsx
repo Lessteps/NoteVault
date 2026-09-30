@@ -7,7 +7,7 @@
 // The practice engine itself is untouched: a session is started exactly the way
 // the right panel used to start it (`studyTopicSessionBuild` → first exercise).
 
-import { AlertTriangle, BarChart3, CheckCircle2, Play, RefreshCw, Sparkles } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, Play, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { StudySnapshot, TopicData } from "../../lib/types";
@@ -15,6 +15,7 @@ import { useApp, type OpenNote } from "../../store/app";
 import { cn } from "../ui";
 import { useStudyVersion } from "./StudyPanel";
 import { TopicConfiguratorDialog } from "./TopicConfiguratorDialog";
+import { ClassifyBanner } from "./ClassifyBanner";
 import { TopicGeneralView } from "./TopicGeneralView";
 
 type Tab = "resumen" | "practicar";
@@ -30,6 +31,7 @@ export function TopicFileView({ note }: { note: OpenNote }) {
   const [snap, setSnap] = useState<StudySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [configSkill, setConfigSkill] = useState<string | undefined>(undefined);
+  const [evaluating, setEvaluating] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -50,6 +52,22 @@ export function TopicFileView({ note }: { note: OpenNote }) {
   useEffect(() => {
     void refresh();
   }, [refresh, version]);
+
+  /** The AI re-reads the theory and rewrites which competencies to practise, and how much. */
+  const reevaluate = async () => {
+    if (!topicData?.folder || evaluating) return;
+    setEvaluating(true);
+    try {
+      const res = await api.studyTopicReevaluate(topicData.folder);
+      toast("info", res.plan.summary || `Plan de práctica actualizado (${res.plan.skills.length} competencias).`);
+      useStudyVersion.getState().bump();
+      await refresh();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setEvaluating(false);
+    }
+  };
 
   /** Same contract as the old study panel: opening an exercise runs the session. */
   const practice = (rel: string) => {
@@ -139,6 +157,16 @@ export function TopicFileView({ note }: { note: OpenNote }) {
             </div>
             <button
               type="button"
+              title="Re-evaluar la práctica con IA: lee la teoría y elige competencias y cantidades"
+              aria-label="Re-evaluar práctica"
+              disabled={evaluating || !topicData?.is_topic}
+              onClick={() => void reevaluate()}
+              className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel text-faint transition-colors hover:text-text disabled:opacity-40"
+            >
+              <Wand2 size={13} className={cn(evaluating && "animate-pulse text-accent-text")} />
+            </button>
+            <button
+              type="button"
               title="Recargar"
               aria-label="Recargar"
               onClick={() => void refresh()}
@@ -162,6 +190,7 @@ export function TopicFileView({ note }: { note: OpenNote }) {
           </h1>
         </div>
       </header>
+      <ClassifyBanner folder={topicData?.folder} subject={topicData?.topic?.subject} onResolved={() => { useStudyVersion.getState().bump(); void refresh(); }} />
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
         {loading && !topicData ? (
@@ -170,12 +199,14 @@ export function TopicFileView({ note }: { note: OpenNote }) {
           <NoTopic folder={topicData?.folder || ""} onConverted={refresh} />
         ) : tab === "resumen" ? (
           snap && topicData ? (
-            <TopicGeneralView
-              topicData={topicData}
-              snap={snap}
-              onOpenConfigurator={openConfigurator}
-              onPractice={practice}
-            />
+            <>
+              <TopicGeneralView
+                topicData={topicData}
+                snap={snap}
+                onOpenConfigurator={openConfigurator}
+                onPractice={practice}
+              />
+            </>
           ) : (
             <p className="p-5 text-[13px] text-faint">No se pudo leer el progreso del tema.</p>
           )

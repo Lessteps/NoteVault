@@ -50,6 +50,15 @@ export interface AreaOverview {
 
 const DIFFICULTIES: Array<1 | 2 | 3> = [1, 2, 3];
 
+/**
+ * Natural order for titles with numeric prefixes: "1.2" before "1.10", which
+ * plain `localeCompare` gets backwards. (`core/notesService.compareNumeric`
+ * would do it too, but importing that here would drag `node:fs` into the
+ * renderer bundle.)
+ */
+const compareNatural = (a: string, b: string): number =>
+  a.localeCompare(b, "es", { numeric: true, sensitivity: "base" });
+
 /** `Matemáticas\1 Área/1.1 Tema` → `Matemáticas/1 Área/1.1 Tema`, without edges. */
 export function normFolder(folder: string): string {
   return String(folder ?? "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
@@ -113,7 +122,7 @@ export function aggregateArea(topics: TopicDashboardItem[]): AreaOverview {
     });
   }
 
-  topicRows.sort((a, b) => b.pct - a.pct || a.title.localeCompare(b.title));
+  topicRows.sort((a, b) => b.pct - a.pct || compareNatural(a.title, b.title));
   const skillRows = [...skills.values()].sort((a, b) => b.passes - a.passes || a.label.localeCompare(b.label));
 
   return {
@@ -178,12 +187,12 @@ export function groupTopics(topics: TopicDashboardItem[], scope: string): Overvi
         key,
         title: isTopic ? items[0]!.manifest.title : titleOf(key),
         isTopic,
-        topics: [...items].sort((a, b) => a.manifest.title.localeCompare(b.manifest.title)),
+        topics: [...items].sort((a, b) => compareNatural(a.manifest.title, b.manifest.title)),
         pct,
         mastered: items.filter((i) => i.progress?.isComplete || i.progress?.examPassed).length,
       };
     })
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .sort((a, b) => compareNatural(a.title, b.title));
 }
 
 export interface SkillRing {
@@ -228,6 +237,47 @@ export function skillRings(item: TopicDashboardItem): SkillRing[] {
       done,
       required,
       missing,
+    };
+  });
+}
+
+export interface SkillMatrixCell {
+  difficulty: 1 | 2 | 3;
+  passes: number;
+  attempts: number;
+  required: number;
+  /** false for difficulties below the topic's target: shown, but not required */
+  counts: boolean;
+}
+
+export interface SkillMatrixRow {
+  skill: string;
+  label: string;
+  description: string;
+  cells: SkillMatrixCell[];
+}
+
+/** One row per competency, one cell per difficulty: passes against what is required. */
+export function skillMatrix(item: TopicDashboardItem): SkillMatrixRow[] {
+  const min = Math.max(1, item.manifest.mastery?.min_per_skill ?? 6);
+  const target = Math.max(1, Math.min(3, item.manifest.mastery?.target_difficulty ?? 3));
+  return (item.manifest.skills ?? []).map((skill) => {
+    const progress = item.progress?.skills?.[skill];
+    return {
+      skill,
+      label: progress?.label ?? skill,
+      description: progress?.description ?? "",
+      cells: DIFFICULTIES.map((difficulty) => {
+        // The topic's own AI plan, when it has one, decides what each cell needs.
+        const planned = item.manifest.plan?.[skill]?.[difficulty - 1];
+        return {
+          difficulty,
+          passes: progress?.cells?.[difficulty]?.passes ?? 0,
+          attempts: progress?.cells?.[difficulty]?.attempts ?? 0,
+          required: planned ?? min,
+          counts: item.manifest.plan ? (planned ?? 0) > 0 : difficulty >= target,
+        };
+      }),
     };
   });
 }

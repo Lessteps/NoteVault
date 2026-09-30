@@ -33,6 +33,14 @@ export function nextTarget(pairs: Pair[], ms: number): number {
   return Math.min(pairs.length - 1, cueBefore(pairs, ms) + 1);
 }
 
+/** The duration of a media element in ms, whatever the browser reports (0 while unknown, never NaN or Infinity). */
+export function durationMs(el: { duration: number; seekable?: { length: number; end(i: number): number } }): number {
+  if (Number.isFinite(el.duration) && el.duration > 0) return el.duration * 1000;
+  const s = el.seekable;
+  if (s && s.length > 0 && Number.isFinite(s.end(s.length - 1))) return s.end(s.length - 1) * 1000;
+  return 0;
+}
+
 export function clock(ms: number): string {
   const t = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(t / 3600);

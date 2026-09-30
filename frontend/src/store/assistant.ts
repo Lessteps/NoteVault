@@ -10,6 +10,7 @@ import { create } from "zustand";
 import { api } from "../lib/bridge";
 import { copyText } from "../lib/clipboard";
 import type { ConversationMeta } from "../lib/types";
+import { vaultMode } from "../lib/assistantModes";
 import { bodyOf, useApp } from "./app";
 
 /** A piece of context attached to a user turn (Fase 3 fills these in). */
@@ -20,6 +21,10 @@ export interface ChatContext {
   end_line?: number;
   /** The exact text, sent as the priority context of the turn. */
   text: string;
+  /** A whole folder pointed at (path is the folder; text is empty). */
+  folder?: boolean;
+  /** A whole file pointed at (path is the file; the model receives its content). */
+  file?: boolean;
 }
 
 export interface ChatMessage {
@@ -57,6 +62,15 @@ interface AssistantState {
   /** Models of the active provider (live list, or the curated one). */
   models: string[];
   providerLabel: string;
+  /** The vault mode in force ("" = a plain conversation). */
+  mode: string;
+  /** Vault folders the user pointed the chat at; the model is told about them on every turn. */
+  folders: string[];
+  toggleFolder: (path: string) => void;
+  clearFolders: () => void;
+  /** Vault files (notes, practice files, canvases) pointed at: their content and matching skills reach the model. */
+  files: string[];
+  toggleFile: (path: string) => void;
 
   // ── The conversation being held, and the ones kept ────────────────────
   /** Id of the saved conversation; null until the first turn is stored. */
@@ -69,6 +83,10 @@ interface AssistantState {
   setOpen: (open: boolean) => void;
   setSettings: (open: boolean) => void;
   clear: () => void;
+  /** Switch a vault mode on or off; switching on greets the user in the chat. */
+  setMode: (mode: string) => void;
+  /** Adds a message the app itself writes (a status line, or an interactive card) and saves the conversation. */
+  addMessage: (role: "system" | "assistant", content: string) => Promise<void>;
   ask: (question: string, selection?: string) => Promise<void>;
   stop: () => Promise<void>;
   vote: (id: string, value: 1 | -1) => void;
@@ -111,6 +129,12 @@ export const useAssistant = create<AssistantState>((set, get) => ({
   model: "",
   models: [],
   providerLabel: "",
+  mode: "",
+  folders: [],
+  toggleFolder: (p) => set((s) => ({ folders: s.folders.includes(p) ? s.folders.filter((f) => f !== p) : [...s.folders, p] })),
+  clearFolders: () => set({ folders: [] }),
+  files: [],
+  toggleFile: (p) => set((s) => ({ files: s.files.includes(p) ? s.files.filter((f) => f !== p) : [...s.files, p].slice(-6) })),
   conversationId: null,
   title: "",
   historyOpen: false,
@@ -126,7 +150,22 @@ export const useAssistant = create<AssistantState>((set, get) => ({
     }
   },
   setSettings: (settingsOpen) => set({ settingsOpen }),
-  clear: () => set({ messages: [], awaitingPaste: false }),
+  clear: () => set({ messages: [], awaitingPaste: false, mode: "" }),
+  setMode: (mode) => {
+    const info = vaultMode(mode);
+    set((s) => ({
+      mode: info ? info.id : "",
+      messages: info
+        ? [...s.messages, { id: uid(), role: "system" as const, content: info.opener, at: Date.now() }]
+        : s.messages,
+    }));
+  },
+
+  addMessage: async (role, content) => {
+    if (!get().open) get().setOpen(true);
+    set((s) => ({ messages: [...s.messages, { id: uid(), role, content, at: Date.now() }] }));
+    await persist(set, get);
+  },
 
   ask: async (question, selection = "") => {
     const q = question.trim();
@@ -145,8 +184,15 @@ export const useAssistant = create<AssistantState>((set, get) => ({
       role: "user",
       content: q,
       at: Date.now(),
-      contexts: sel ? [{ path: noteRel, text: sel }] : [],
+      contexts: [
+        ...get().folders.map((f) => ({ path: f, text: "", folder: true })),
+        ...get().files.map((f) => ({ path: f, text: "", file: true })),
+        ...(sel ? [{ path: noteRel, text: sel }] : []),
+      ],
     };
+    // The folders travel as real context (see ai_chat_stream), not inside the question.
+    const folders = get().folders;
+    const asked = q;
     const answerId = uid();
     const answer: ChatMessage = {
       id: answerId,
@@ -166,7 +212,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
 
     const started = Date.now();
     try {
-      const r = await api.aiChatStream(answerId, history, q, noteRel, sel);
+      const r = await api.aiChatStream(answerId, history, asked, noteRel, sel, get().mode, folders, get().files);
       if (r.bridge) {
         await copyText(r.prompt ?? "");
         if (r.url) await api.openExternal(r.url).catch(() => undefined);
@@ -258,7 +304,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
   },
 
   newConversation: () => {
-    set({ messages: [], awaitingPaste: false, conversationId: null, title: "", historyOpen: false });
+    set({ messages: [], awaitingPaste: false, conversationId: null, title: "", historyOpen: false, mode: "" });
   },
 
   openConversation: async (id) => {
@@ -269,6 +315,7 @@ export const useAssistant = create<AssistantState>((set, get) => ({
       messages: conv.messages.map((m) => ({ ...m, id: uid(), streaming: false })),
       awaitingPaste: false,
       historyOpen: false,
+      mode: "",
       busy: false,
       streamingId: null,
     });

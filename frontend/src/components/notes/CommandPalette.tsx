@@ -39,6 +39,8 @@ export const SHORTCUTS: Array<[string, string]> = [
   ["Ctrl+W", "Cerrar pestaña"],
   ["Ctrl+E", "Lectura / edición"],
   ["Ctrl+\\", "Mostrar / ocultar explorador"],
+  ["F2", "Renombrar el archivo abierto"],
+  ["Ctrl+Z / Ctrl+Y", "Dibujo LaTeX: deshacer / rehacer (P lápiz, S seleccionar, T texto, E borrador, H mover, Supr borrar)"],
   ["Ctrl+Shift+D", "Nota diaria"],
   ["Ctrl+B", "Negrita"],
   ["Ctrl+I", "Cursiva"],

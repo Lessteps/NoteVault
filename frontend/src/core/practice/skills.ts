@@ -3,6 +3,8 @@
  * Extends and groups practice modes per subject for topic-level mastery.
  */
 
+import { ENGLISH_SKILL_SPECS } from "../../lib/englishSkillData";
+import { PROGRAMMING_EXTRA_SKILLS } from "../../lib/programmingSkillData";
 import { EN, MATH, MODES, PROG, type PracticeMode } from "./modes";
 
 export type DifficultyLevel = 1 | 2 | 3;
@@ -148,7 +150,7 @@ export const MATHEMATICS_SKILLS: readonly SkillDefinition[] = [
   }),
 ];
 
-export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [
+const _PROGRAMMING_BASE: readonly SkillDefinition[] = [
   createSkill(PROG, "implement", {
     labelOverride: "Implementar",
     description: "Escribir código desde cero que cumple la especificación y maneja casos de borde.",
@@ -188,37 +190,26 @@ export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [
   }),
 ];
 
-export const ENGLISH_SKILLS: readonly SkillDefinition[] = [
-  createSkill(EN, "writing", {
-    labelOverride: "Redacción libre",
-    description: "Redactar textos originales con precisión gramatical y adecuación al nivel MCER.",
+/** The extra programming skills (trace, review, test, analyze, decompose, port, query), from the shared table. */
+const PROGRAMMING_EXTRA: readonly SkillDefinition[] = PROGRAMMING_EXTRA_SKILLS.map((sp) =>
+  createSkill(PROG, sp.id, {
+    labelOverride: sp.label,
+    description: sp.description,
+    ...(sp.noBeginner ? { allowedDifficulties: NO_BEGINNER_DIFFICULTIES } : {}),
   }),
-  createSkill(EN, "rewrite", {
-    labelOverride: "Reescribir / corregir",
-    description: "Transformar oraciones usando estructuras objetivo y corrigiendo errores.",
+);
+
+export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [..._PROGRAMMING_BASE, ...PROGRAMMING_EXTRA];
+
+/** The English skills: one per entry of the shared table (`lib/englishSkillData.ts`), namespaced by branch. */
+export const ENGLISH_SKILLS: readonly SkillDefinition[] = ENGLISH_SKILL_SPECS.map((sp) =>
+  createSkill(EN, sp.id, {
+    labelOverride: sp.label,
+    description: sp.description,
+    ...(sp.noBeginner ? { allowedDifficulties: NO_BEGINNER_DIFFICULTIES } : {}),
+    ...(sp.noHelper ? { allowedAssistance: ["no_help"] as const } : {}),
   }),
-  createSkill(EN, "translate", {
-    labelOverride: "Traducir",
-    description: "Traducir fielmente preservando el sentido y evitando calcos literales.",
-  }),
-  createSkill(EN, "cloze", {
-    labelOverride: "Completar huecos",
-    description: "Completar palabras y colocaciones según contexto y registro gramatical.",
-  }),
-  createSkill(EN, "true_false", {
-    labelOverride: "Verdadero o falso",
-    description: "Comprobar afirmaciones de comprensión lectora o reglas gramaticales.",
-  }),
-  createSkill(EN, "explain", {
-    labelOverride: "Explicar uso",
-    description: "Explicar la diferencia de uso o matiz gramatical en inglés cotidiano.",
-  }),
-  createSkill(EN, "find_error", {
-    labelOverride: "Encontrar el error",
-    allowedDifficulties: NO_BEGINNER_DIFFICULTIES,
-    description: "Detectar incorrecciones gramaticales o léxicas y proponer la forma natural.",
-  }),
-];
+);
 
 const SKILLS_BY_SUBJECT: Record<string, readonly SkillDefinition[]> = {
   [MATH]: MATHEMATICS_SKILLS,

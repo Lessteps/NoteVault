@@ -103,7 +103,7 @@ export function fileMenuItems(opts: FileMenuOptions, a: FileMenuActions): MenuIt
     );
     // Space / Area / Topic: only a topic folder can be built by the AI.
     if (opts.entry.path.split("/").length === 3) {
-      items.push({ label: "Generar tema con IA (teoría, práctica y competencias)", icon: <Sparkles />, onSelect: () => a.generateTopic?.() });
+      items.push({ label: "Generar tema con IA", description: "Teoría, mapa, práctica y competencias", icon: <Sparkles />, onSelect: () => a.generateTopic?.() });
     }
   } else {
     items.push({ label: "Abrir en una pestaña nueva", icon: <SquareArrowOutUpRight />, onSelect: a.openInNewTab });

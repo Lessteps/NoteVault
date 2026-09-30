@@ -771,6 +771,8 @@ export interface PracticeExercise {
   statement: string;
   /** English listening: the text the app plays aloud (shown only after grading). */
   audio_text?: string;
+  /** English listening from the player: the stretch of a vault media file that is the audio (seconds). */
+  media?: { file: string; start: number; end: number } | null;
   code: string;
   code_lang: string;
   hints: string[];

@@ -76,3 +76,42 @@ describe("english player", () => {
     expect(() => api.en_player_mine("nope", { sentence: "x" })).toThrow(ApiError);
   });
 });
+
+describe("dictation from the player's subtitles", () => {
+  const makeSpace = () => {
+    fs.mkdirSync(path.join(dir, "Inglés 1"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "Inglés 1", "Inglés 1.resumen.md"), "---\nsubject: english\n---\n", "utf-8");
+  };
+
+  it("turns the sentence being played into a listening exercise that plays that stretch of the media", async () => {
+    makeSpace();
+    const media = (await api.en_player_open("Pelis/film.mp4", 4)) as { id: string };
+    const out = api.en_player_dictation(media.id, 4.5);
+    expect(out).toMatchObject({ ok: true, text: "How are you?", from_media: true });
+    const note = fs.readFileSync(path.join(dir, ...(out.path as string).split("/")), "utf-8");
+    expect(out.path).toContain("Inglés 1/4 Escucha/Dictados del reproductor/Ejercicios/ls_dictation/");
+    expect(note).toContain("mode: ls_dictation");
+    expect(note).toContain("discipline: english_listening");
+    expect(note).toContain('media: "Pelis/film.mp4"');
+    expect(note).toContain("media_start: 3.70");
+    expect(note).toContain("## Texto del audio\nHow are you?");
+    // the topic that collects them was created in the listening branch
+    const practica = fs.readFileSync(path.join(dir, "Inglés 1", "4 Escucha", "Dictados del reproductor", "Dictados del reproductor.practica.md"), "utf-8");
+    expect(practica).toContain("branch: listening");
+  });
+
+  it("with no English subtitles it explains why instead of failing", async () => {
+    makeSpace();
+    fs.rmSync(path.join(dir, "Pelis", "film.en.srt"));
+    fs.rmSync(path.join(dir, "Pelis", "film.es.srt"));
+    const media = (await api.en_player_open("Pelis/film.mp4")) as { id: string };
+    const out = api.en_player_dictation(media.id, 2);
+    expect(out).toMatchObject({ ok: false, reason: "no_subtitles" });
+    expect(String(out.message)).toContain("no tiene subtítulos en inglés");
+  });
+
+  it("without an English space it says so", async () => {
+    const media = (await api.en_player_open("Pelis/film.mp4")) as { id: string };
+    expect(api.en_player_dictation(media.id, 2)).toMatchObject({ ok: false, reason: "no_space" });
+  });
+});

@@ -1,28 +1,40 @@
-// The audio of a listening exercise (dictation, gist, detail, gap, speed variation). The app reads the text
-// aloud with the system's English voice and the text stays HIDDEN until the exercise is graded: the learner
-// works from what they hear. Speed can be changed and the clip replayed as often as the exercise allows.
+// The audio of a listening exercise (dictation, gist, detail, gap, speed variation). The text stays HIDDEN
+// until the exercise is graded: the learner works from what they hear.
+//
+// The audio is, in this order: the stretch of the vault's media file the exercise came from (a dictation made
+// in the player), or the app reading the text aloud with the system's English voice. Speed can be changed and
+// the clip replayed as often as wanted.
 
 import { Eye, Pause, Play, Repeat2, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "../../lib/bridge";
 import { cn } from "../ui";
 
 const SPEEDS: Array<[string, number]> = [["0.7×", 0.7], ["1×", 1], ["1.25×", 1.25]];
+
+export interface MediaClip {
+  file: string;
+  start: number;
+  end: number;
+}
 
 /** The system's English voice, if it has one (voices load asynchronously). */
 function englishVoice(): SpeechSynthesisVoice | null {
   return window.speechSynthesis?.getVoices().find((v) => /^en[-_]/i.test(v.lang)) ?? null;
 }
 
-export function AudioClip({ text, revealed }: { text: string; revealed: boolean }) {
-  const supported = typeof window !== "undefined" && "speechSynthesis" in window;
+export function AudioClip({ text, media = null, revealed }: { text: string; media?: MediaClip | null; revealed: boolean }) {
+  const speech = typeof window !== "undefined" && "speechSynthesis" in window;
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
   const [plays, setPlays] = useState(0);
-  const [voice, setVoice] = useState<boolean>(() => (supported ? englishVoice() !== null : false));
-  const utterance = useRef<SpeechSynthesisUtterance | null>(null);
+  const [voice, setVoice] = useState<boolean>(() => (speech ? englishVoice() !== null : false));
+  const [mediaOk, setMediaOk] = useState<boolean>(media !== null);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const url = useRef("");
 
   useEffect(() => {
-    if (!supported) return;
+    if (!speech) return;
     const update = () => setVoice(englishVoice() !== null);
     window.speechSynthesis.addEventListener?.("voiceschanged", update);
     update();
@@ -30,15 +42,23 @@ export function AudioClip({ text, revealed }: { text: string; revealed: boolean 
       window.speechSynthesis.removeEventListener?.("voiceschanged", update);
       window.speechSynthesis.cancel();
     };
-  }, [supported]);
+  }, [speech]);
+
+  useEffect(
+    () => () => {
+      audio.current?.pause();
+    },
+    [],
+  );
 
   const stop = useCallback(() => {
     window.speechSynthesis?.cancel();
+    audio.current?.pause();
     setPlaying(false);
   }, []);
 
-  const play = useCallback(() => {
-    if (!supported) return;
+  const speak = useCallback(() => {
+    if (!speech) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "en-US";
@@ -47,19 +67,47 @@ export function AudioClip({ text, revealed }: { text: string; revealed: boolean 
     u.rate = rate;
     u.onend = () => setPlaying(false);
     u.onerror = () => setPlaying(false);
-    utterance.current = u;
     setPlaying(true);
     setPlays((n) => n + 1);
     window.speechSynthesis.speak(u);
-  }, [supported, text, rate]);
+  }, [speech, text, rate]);
+
+  /** The stretch of the original media; when it cannot be played it falls back to the app's voice. */
+  const playMedia = useCallback(async () => {
+    if (!media) return;
+    try {
+      if (!url.current) url.current = (await api.enPlayerOpen(media.file, 0)).url;
+      const el = audio.current ?? new Audio();
+      audio.current = el;
+      el.src = url.current;
+      el.playbackRate = rate;
+      el.ontimeupdate = () => {
+        if (media.end > 0 && el.currentTime >= media.end) {
+          el.pause();
+          setPlaying(false);
+        }
+      };
+      el.onended = () => setPlaying(false);
+      el.currentTime = media.start;
+      await el.play();
+      setPlaying(true);
+      setPlays((n) => n + 1);
+    } catch {
+      setMediaOk(false);
+      speak();
+    }
+  }, [media, rate, speak]);
+
+  const play = mediaOk && media ? () => void playMedia() : speak;
+  const canPlay = (mediaOk && media !== null) || (speech && voice);
 
   return (
     <section aria-label="Audio del ejercicio">
       <h2 className="mb-1.5 font-mono text-[10.5px] uppercase tracking-wider text-faint">Audio</h2>
       <div className="rounded-xl border border-line bg-card px-4 py-3">
-        {!supported || !voice ? (
+        {!canPlay ? (
           <p className="text-[12.5px] text-warn">
-            {!supported
+            {!speech
               ? "Este sistema no puede leer texto en voz alta."
               : "No hay una voz en inglés instalada. Añádela en Windows: Configuración › Hora e idioma › Voz."}
           </p>
@@ -81,13 +129,19 @@ export function AudioClip({ text, revealed }: { text: string; revealed: boolean 
                 key={label}
                 type="button"
                 aria-pressed={rate === value}
-                onClick={() => setRate(value)}
+                onClick={() => {
+                  setRate(value);
+                  if (audio.current) audio.current.playbackRate = value;
+                }}
                 className={cn("rounded-md border px-2 py-0.5 font-mono text-[11px]", rate === value ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:text-text")}
               >
                 {label}
               </button>
             ))}
-            <span className="ml-auto font-mono text-[11px] text-faint">{plays ? `${plays} reproducción(es)` : "aún sin escuchar"}</span>
+            <span className="ml-auto font-mono text-[11px] text-faint">
+              {mediaOk && media ? "audio original · " : ""}
+              {plays ? `${plays} reproducción(es)` : "aún sin escuchar"}
+            </span>
           </div>
         )}
         {revealed ? (

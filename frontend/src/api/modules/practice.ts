@@ -281,6 +281,9 @@ export function practiceApi(app: AppState) {
         },
         statement: ex.statement,
         audio_text: ex.audio_text,
+        media: ex.frontmatter.media
+          ? { file: String(ex.frontmatter.media), start: Number(ex.frontmatter.media_start) || 0, end: Number(ex.frontmatter.media_end) || 0 }
+          : null,
         code: ex.code,
         code_lang: ex.code_lang,
         hints: ex.hints,

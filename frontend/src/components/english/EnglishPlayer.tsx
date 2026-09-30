@@ -3,7 +3,7 @@
 // and sentence mining. The app never searches for or downloads content.
 
 import {
-  Captions, Clipboard, FolderOpen, Mic, Pause, Pickaxe, Play, Repeat, SkipBack, SkipForward, Square, Volume2,
+  Captions, Clipboard, FolderOpen, Headphones, Mic, Pause, Pickaxe, Play, Repeat, SkipBack, SkipForward, Square, Volume2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
@@ -141,6 +141,23 @@ export function EnglishPlayer() {
       setRecording(true);
     } catch {
       toast("error", "No se pudo usar el micrófono.");
+    }
+  };
+
+  /** A dictation exercise from the sentence that is playing; without English subtitles it says why. */
+  const makeDictation = async () => {
+    if (!media) return;
+    try {
+      const r = await api.enPlayerDictation(media.id, pos / 1000);
+      if (!r.ok || !r.path) {
+        toast("error", r.message ?? "No se pudo crear el dictado.");
+        return;
+      }
+      toast("info", "Dictado creado en Escucha › Dictados del reproductor.");
+      await useApp.getState().openNote(r.path);
+      useApp.getState().setMode("read");
+    } catch (e) {
+      toast("error", (e as Error).message);
     }
   };
 
@@ -345,6 +362,8 @@ export function EnglishPlayer() {
             className={cn("flex items-center gap-1 rounded-lg px-2 py-1 text-[12px]", shadow ? "bg-accent text-white" : "text-dim hover:bg-hover")}>
             <Mic size={13} /> Sombra
           </button>
+          <button type="button" title="Crear un dictado con la frase que suena (usa sus subtítulos en inglés)" onClick={() => void makeDictation()}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Headphones size={13} /> Dictado</button>
           <button type="button" title="Minar la frase (M)" onClick={actions.mine}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Pickaxe size={13} /> Minar</button>
           <button type="button" title="Copiar enlace a este momento" onClick={() => void api.enPlayerLink(media.id, pos / 1000)

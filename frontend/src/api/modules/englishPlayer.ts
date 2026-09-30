@@ -13,7 +13,12 @@ import {
   vaultRelative,
 } from "../../core/english/mediaLinks.js";
 import { CEFR_LEVELS, MiningError, writeMinedNote } from "../../core/english/mining.js";
+import { NO_SUBTITLES_MESSAGE, pickDictationClip } from "../../core/english/dictation.js";
 import { EnglishVocabularyManager } from "../../core/englishVocabularyManager.js";
+import { formatEnglishExerciseNote } from "../../core/practice/englishExercises.js";
+import { createDefaultTopicManifest } from "../../core/practice/topic.js";
+import { practiceFileText, viewFileName } from "../../core/practice/viewFiles.js";
+import { englishSpaceFolder } from "./study.js";
 import { isIsoDate } from "../../core/practice/reviewSchedule.js";
 import {
   SUBTITLE_EXTS,
@@ -166,6 +171,56 @@ export function englishPlayerApi(app: AppState) {
       if (when && !isIsoDate(when)) throw new ApiError("La fecha no es válida.");
       const item = new EnglishVocabularyManager(app.root).addWord(w, String(meaning ?? "").trim().slice(0, 300), { level: lvl, next_review: when });
       return { ok: true, id: item.id, word: item.word, next_review: item.next_review };
+    },
+
+    /**
+     * A dictation exercise from the sentence being played: `ls_dictation`, in the listening branch, with that stretch of the
+     * media as its audio. With no English subtitles (or no English space) it answers `{ ok: false, message }`, never an error.
+     */
+    en_player_dictation(mediaId: string, seconds = 0): Record<string, unknown> {
+      const entry = entryOf(mediaId);
+      let cues: Array<{ start: number; end: number; en: string }> = [];
+      try {
+        cues = (pairsOf(entry).pairs as Array<{ start: number; end: number; en: string }>) ?? [];
+      } catch {
+        cues = [];
+      }
+      const clip = pickDictationClip(cues, toFloat(seconds) * 1000);
+      if (!clip) return { ok: false, reason: "no_subtitles", message: NO_SUBTITLES_MESSAGE };
+      const space = englishSpaceFolder(app);
+      if (!space) return { ok: false, reason: "no_space", message: "Todavía no hay un espacio de inglés: genera uno primero y vuelve a intentarlo." };
+
+      // The listening topic that collects the player's dictations (created once, in the listening branch).
+      const topicName = "Dictados del reproductor";
+      const topicRel = `${space}/4 Escucha/${topicName}`;
+      const topicAbs = path.join(app.root, ...topicRel.split("/"));
+      fs.mkdirSync(topicAbs, { recursive: true });
+      const manifest = createDefaultTopicManifest(topicRel, topicName, "english", []);
+      const practica = path.join(topicAbs, viewFileName(topicName, "practica"));
+      if (!fs.existsSync(practica)) fs.writeFileSync(practica, practiceFileText(manifest), "utf-8");
+
+      let media = "";
+      try {
+        media = vaultRelative(entry.path, app.root);
+      } catch {
+        media = ""; // outside the vault: the app's voice reads the subtitle instead
+      }
+      let note = formatEnglishExerciseNote(manifest, "ls_dictation", 2, "no_help", {
+        title: `Dictado: ${clip.text.split(" ").slice(0, 6).join(" ")}…`,
+        statement: "Escucha el fragmento (todas las veces que quieras) y escribe **exactamente** lo que oigas, con su puntuación.",
+        hints: [],
+        solution: clip.text,
+        rubric: ["Todas las palabras están y ninguna sobra", "Ortografía correcta", "Contracciones y terminaciones (-s, -ed) bien oídas"],
+        audio_text: clip.text,
+      });
+      if (media) {
+        note = note.replace("\ntopic:", `\nmedia: "${media.replace(/"/g, '\\"')}"\nmedia_start: ${clip.start.toFixed(2)}\nmedia_end: ${clip.end.toFixed(2)}\ntopic:`);
+      }
+      const dir = path.join(topicAbs, "Ejercicios", "ls_dictation");
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, `ej_ls_dictation_d2_${Date.now()}_player.md`);
+      fs.writeFileSync(file, note, "utf-8");
+      return { ok: true, path: app.rel(file).replace(/\\/g, "/"), text: clip.text, from_media: Boolean(media) };
     },
 
     en_player_link(mediaId: string, seconds: number): Record<string, unknown> {

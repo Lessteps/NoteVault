@@ -338,7 +338,7 @@ export function PracticeView({ note }: { note: OpenNote }) {
           </section>
         )}
 
-        {ex.audio_text && <AudioClip text={ex.audio_text} revealed={graded} />}
+        {ex.audio_text && <AudioClip text={ex.audio_text} media={ex.media ?? null} revealed={graded} />}
 
         {ex.drill ? (
           <DrillPanel

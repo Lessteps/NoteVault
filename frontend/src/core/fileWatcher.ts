@@ -15,6 +15,9 @@ export interface WatchEvent {
 
 export type WatchCallback = (event: WatchEvent) => void;
 
+/** The old Python signature took a bare path; kept for callers that still do. */
+export type LegacyWatchCallback = (path: string, event: WatchEvent) => void;
+
 export class FileWatcherService {
   private watchDir: string;
   private onModifiedCallback: WatchCallback;
@@ -22,13 +25,19 @@ export class FileWatcherService {
   private lastTriggerTimes = new Map<string, number>();
   isRunning = false;
 
-  constructor(watchDir: string, onModifiedCallback: WatchCallback | ((p: string) => void)) {
+  /**
+   * `onModifiedCallback` receives the whole event. The port from Python also
+   * fired a second call with the bare path, so an Electron listener that only
+   * wanted the event saw a string first and a string in `relPath`; only one call
+   * per change now. A listener that takes a path as its first argument still
+   * works: the event carries `fullPath`.
+   */
+  constructor(watchDir: string, onModifiedCallback: WatchCallback | LegacyWatchCallback) {
     this.watchDir = path.resolve(watchDir);
     this.onModifiedCallback = (event: WatchEvent) => {
       if (typeof onModifiedCallback === "function") {
         try {
-          (onModifiedCallback as any)(event.fullPath, event);
-          (onModifiedCallback as any)(event);
+          (onModifiedCallback as WatchCallback)(event);
         } catch {
           // Ignore callback errors
         }

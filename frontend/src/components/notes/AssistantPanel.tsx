@@ -4,7 +4,7 @@
 
 import {
   ArrowLeft, ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
-  GitCompare, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
+  FolderPlus, GitCompare, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
   Square, ThumbsDown, ThumbsUp, Trash2, Wand2, X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
@@ -386,10 +386,19 @@ function Composer() {
             type="button"
             title="Generar espacio de estudio (temario, teoría, práctica y mapas)"
             aria-label="Generar espacio de estudio"
-            onClick={() => useStudySpaceDialog.getState().setOpen(true)}
+            onClick={() => useStudySpaceDialog.getState().openWith("space")}
             className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-hover hover:text-text"
           >
             <GraduationCap size={14} />
+          </button>
+          <button
+            type="button"
+            title="Crear un área nueva dentro de un espacio de estudio"
+            aria-label="Crear área"
+            onClick={() => useStudySpaceDialog.getState().openWith("area")}
+            className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-hover hover:text-text"
+          >
+            <FolderPlus size={14} />
           </button>
           <button
             type="button"

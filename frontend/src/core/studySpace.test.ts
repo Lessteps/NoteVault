@@ -3,29 +3,56 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseProposal } from "../api/modules/studySpace";
-import { buildAreaMapCanvas } from "./areaMap";
+import { buildAreaMapCanvas, buildSpaceMapCanvas } from "./areaMap";
 import { DEFAULT_SKILLS, ensureDefaultSkills } from "./defaultSkills";
 
-describe("area map", () => {
-  const map = buildAreaMapCanvas("1 Aritmética", ["1.10 Potencias", "1.2 Suma", "1.1 Números"]);
+describe("area map (copied from the vault's own maps)", () => {
+  const topics = ["1.10 Potencias", "1.2 Suma", "1.1 Números", "1.3 Producto"].map((name) => ({ name, file: `A/${name}/${name}.md` }));
+  const deps = [
+    { from: "1.1 Números", to: "1.2 Suma", label: "orden y signo en la recta" },
+    { from: "1.2 Suma", to: "1.3 Producto", label: "suma repetida" },
+    { from: "1.2 Suma", to: "1.10 Potencias", label: "producto repetido" },
+    { from: "1.10 Potencias", to: "1.1 Números", label: "hacia atrás: se ignora" },
+  ];
+  const map = buildAreaMapCanvas("1 Aritmética", topics, deps);
+  const file = (name: string) => map.nodes.find((n) => n.file?.endsWith(`${name}.md`))!;
 
-  it("orders topics naturally and labels every arrow", () => {
-    expect(map.nodes.map((n) => n.text)).toEqual([
-      expect.stringContaining("1 Aritmética"),
-      "## 1.1 Números",
-      "## 1.2 Suma",
-      "## 1.10 Potencias",
-    ]);
-    expect(map.edges).toHaveLength(3);
-    expect(map.edges.every((e) => e.label.length > 0)).toBe(true);
-    expect(map.edges[0]).toMatchObject({ fromNode: "area", toNode: "t1" });
+  it("is one coloured group holding a file card per topic, in natural order", () => {
+    const group = map.nodes[0]!;
+    expect(group).toMatchObject({ type: "group", label: "1 Aritmética", color: "6", x: -24, y: -48 });
+    expect(map.nodes.filter((n) => n.type === "file")).toHaveLength(4);
+    expect(file("1.1 Números")).toMatchObject({ x: 0, y: 0, width: 300, height: 120 });
   });
 
-  it("snakes rows so consecutive topics are neighbours", () => {
-    const big = buildAreaMapCanvas("A", Array.from({ length: 6 }, (_, i) => `1.${i + 1} T`));
-    const byId = Object.fromEntries(big.nodes.map((n) => [n.id, n]));
-    expect(byId.t5!.x).toBe(byId.t4!.x); // the first of row 2 sits under the last of row 1
-    expect(byId.t5!.y).toBeGreaterThan(byId.t4!.y);
+  it("lays topics out in dependency columns, 640 px apart, 210 px per row", () => {
+    expect(file("1.2 Suma").x).toBe(640);
+    expect(file("1.3 Producto").x).toBe(1280);
+    expect(file("1.10 Potencias").x).toBe(1280);
+    expect(file("1.10 Potencias").y).toBe(210);
+    const group = map.nodes[0]!;
+    expect(group.width).toBe(1280 + 300 + 48);
+  });
+
+  it("draws right→left arrows with the reason as label and drops backwards dependencies", () => {
+    expect(map.edges).toHaveLength(3);
+    expect(map.edges.every((e) => e.fromSide === "right" && e.toSide === "left" && e.label.length > 0)).toBe(true);
+    expect(map.edges.map((e) => e.label)).toContain("suma repetida");
+  });
+
+  it("chains the topics when no dependencies are known", () => {
+    const chained = buildAreaMapCanvas("A", topics);
+    expect(chained.edges.map((e) => e.label)).toEqual(["prepara para", "prepara para", "prepara para"]);
+  });
+
+  it("subject map: one group per block with linked topics, arrows say how many prerequisites", () => {
+    const space = buildSpaceMapCanvas([
+      { name: "1 Aritmética", topics: ["1.1 A", "1.2 B"] },
+      { name: "2 Álgebra", topics: ["2.1 C"], prerequisites: 4 },
+    ]);
+    expect(space.nodes.filter((n) => n.type === "group").map((n) => n.label)).toEqual(["Bloque I — Aritmética", "Bloque II — Álgebra"]);
+    expect(space.nodes.find((n) => n.id === "a1")!.text).toBe("## 1 Aritmética\n\n- [[1.1 A]]\n- [[1.2 B]]");
+    expect(space.edges[0]!.label).toBe("4 prerrequisito(s)");
+    expect(space.nodes.find((n) => n.id === "g2")!.x).toBe(680);
   });
 });
 
@@ -40,7 +67,8 @@ describe("default skills", () => {
     for (const name of Object.keys(DEFAULT_SKILLS)) expect(created).toContain(`Matemáticas 1/_skills/${name}.md`);
     // Files the built-ins do not cover come from the sibling subject.
     expect(fs.readFileSync(path.join(root, "Matemáticas 1", "_skills", "canvas_skill.md"), "utf-8")).toBe("MI CANVAS");
-    expect(fs.readFileSync(path.join(root, "Matemáticas 1", "_skills", "practica_skill.md"), "utf-8")).toBe("MI PRACTICA");
+    // The built-in practice skill (with the type-fit table) wins over the sibling's thin one.
+    expect(fs.readFileSync(path.join(root, "Matemáticas 1", "_skills", "practica_skill.md"), "utf-8")).toContain("matriz de competencias");
 
     fs.writeFileSync(path.join(root, "Matemáticas 1", "_skills", "mapa_skill.md"), "EDITADA", "utf-8");
     expect(ensureDefaultSkills(root, "Matemáticas 1")).toEqual([]);
@@ -53,5 +81,23 @@ describe("syllabus proposal", () => {
     const reply = '```json\n{"areas":[{"name":"1 Base/Algo","topics":[{"name":"1.1 Uno: a"},"1.2 Dos",{"name":"1.1 Uno: a"}]},{"name":"2 Vacía","topics":[]}]}\n```';
     expect(parseProposal(reply)).toEqual([{ name: "1 Base Algo", topics: [{ name: "1.1 Uno a" }, { name: "1.2 Dos" }] }]);
     expect(() => parseProposal("nada")).toThrow();
+  });
+});
+
+describe("generator helpers", () => {
+  it("keeps only dependencies between known topics, with a short label", async () => {
+    const { parseDependencies } = await import("../api/modules/studySpace");
+    const reply = '{"dependencies":[{"from":"1.1 A","to":"1.2 B","label":"orden en la recta"},{"from":"1.1 A","to":"9.9 X","label":"no existe"},{"from":"1.2 B","to":"1.3 C","label":""}]}';
+    expect(parseDependencies(reply, ["1.1 A", "1.2 B", "1.3 C"])).toEqual([{ from: "1.1 A", to: "1.2 B", label: "orden en la recta" }]);
+  });
+
+  it("drops prerequisite links to topics that do not exist", async () => {
+    const { sanitizeRequires } = await import("../api/modules/studySpace");
+    const body = "# 1.2 B\n\n## Requiere\n\n- [[1.1 A]] — base\n- [[7.7 Fantasma]] — no existe\n\n## Explicación\n\nx";
+    const out = sanitizeRequires(body, new Set(["1.1 A"]));
+    expect(out).toContain("[[1.1 A]]");
+    expect(out).not.toContain("Fantasma");
+    const none = sanitizeRequires("## Requiere\n\n- [[7.7 Fantasma]] — x\n\n## Explicación\n", new Set());
+    expect(none).toContain("*Sin prerrequisitos.*");
   });
 });

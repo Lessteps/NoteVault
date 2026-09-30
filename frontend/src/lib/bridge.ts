@@ -465,11 +465,12 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   studyReviewsList: () =>
     call<{ today: string; items: import("./types").ReviewItem[] }>("study_reviews_list"),
   /** The AI proposes areas and topics for a subject (nothing is written). */
-  studySpacePropose: (subject: string, scope: string, objective: string) =>
-    call<{ areas: Array<{ name: string; topics: Array<{ name: string }> }> }>("study_space_propose", subject, scope, objective),
-  studySpaceGenerate: (request: unknown) => call<{ jobId: string }>("study_space_generate", request),
+  studySpacePropose: (subject: string, scope: string, objective: string, existingFolder = "") =>
+    call<{ areas: Array<{ name: string; topics: Array<{ name: string }> }>; conversationId: string }>("study_space_propose", subject, scope, objective, existingFolder),
+  studySpaceGenerate: (request: unknown) => call<{ jobId: string; conversationId: string }>("study_space_generate", request),
   studySpaceStatus: (jobId: string) =>
-    call<{ id: string; folder: string; log: string[]; done: boolean; error: string; finished: number; total: number }>("study_space_status", jobId),
+    call<{ id: string; folder: string; log: string[]; done: boolean; error: string; finished: number; total: number; conversationId: string }>("study_space_status", jobId),
+  studySpaceList: () => call<string[]>("study_space_list"),
   studyTopicPlan: (folder: string) =>
     call<{ plan: import("./types").PracticePlan | null }>("study_topic_plan", folder),
   studyTopicDashboard: (subject?: string) => call<import("./types").TopicDashboardData>("study_topic_dashboard", subject),

@@ -1,20 +1,25 @@
 // Study spaces: a whole subject laid out by the AI, step by step and chosen by the
-// user — the syllabus (areas and topics), the theory of each topic, the practice plan
-// of each topic and the map (canvas) of each area. Generation runs as a background
-// job that the panel polls, because a whole area takes minutes.
+// user — the syllabus (areas and topics), the theory of each topic, the map of each
+// topic, the practice plan (competency matrix) of each topic and the map of each area
+// and of the whole space. Generation runs as a background job the panel polls, and
+// EVERY exchange with the model is saved as a chat conversation, so the user can read
+// in the assistant exactly what DeepSeek was asked and what it answered.
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { generateConcept } from "../../../tools/kb_canvas";
 import { AIConfig } from "../../core/aiClient.js";
 import { applyAssistantAction, safeName, subjectIdOf } from "../../core/assistantActions.js";
+import { buildAreaMapCanvas, buildSpaceMapCanvas, type MapTopic, type SpaceMapArea, type TopicDependency } from "../../core/areaMap.js";
+import { ConversationStore, type StoredMessage } from "../../core/conversations.js";
 import { ensureDefaultSkills } from "../../core/defaultSkills.js";
 import { ApiError } from "../../core/errors.js";
+import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 import { askStructured, clearStudySnapshotCache, reevaluateTopic } from "./study.js";
-import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 
 export interface SpaceTopic {
   name: string;
@@ -29,13 +34,15 @@ export interface SpaceSteps {
   map: boolean;
 }
 export interface SpaceRequest {
-  /** the folder that will hold the space, e.g. "Matemáticas 1" */
+  /** the folder that holds the space, e.g. "Matemáticas 1" */
   folder: string;
   /** what is studied, e.g. "Matemáticas" */
   subject: string;
   subjectId?: string;
   areas: SpaceArea[];
   steps: SpaceSteps;
+  /** the chat conversation where this generation is being recorded */
+  conversationId?: string;
 }
 
 export interface SpaceJob {
@@ -44,20 +51,19 @@ export interface SpaceJob {
   log: string[];
   done: boolean;
   error: string;
-  /** steps finished / steps planned, for a progress bar */
   finished: number;
   total: number;
+  conversationId: string;
 }
 
 const jobs = new Map<string, SpaceJob>();
+const MAX_AREAS = 30;
+const MAX_TOPICS = 40;
 
 /** A theory note is complete when it reaches its last section; a cut-off one stops mid-way. */
 const isCompleteTheory = (text: string): boolean => /##\s*Tarjetas[\s\S]{80,}/.test(text);
-
 /** A note this generator wrote (status: draft) that never got its last section. */
 const isCutDraft = (text: string): boolean => /^status:\s*draft\s*$/m.test(text) && !isCompleteTheory(text);
-const MAX_AREAS = 30;
-const MAX_TOPICS = 40;
 
 function extractJson(reply: string): any {
   let text = String(reply ?? "").trim();
@@ -65,11 +71,11 @@ function extractJson(reply: string): any {
   if (fence) text = fence[1]!.trim();
   const a = text.indexOf("{");
   const b = text.lastIndexOf("}");
-  if (a < 0 || b <= a) throw new ApiError("La IA no devolvió un temario en JSON.");
+  if (a < 0 || b <= a) throw new ApiError("La IA no devolvió JSON.");
   try {
     return JSON.parse(text.slice(a, b + 1));
   } catch {
-    throw new ApiError("La IA devolvió un temario con formato inválido. Inténtalo de nuevo.");
+    throw new ApiError("La IA devolvió JSON inválido. Inténtalo de nuevo.");
   }
 }
 
@@ -91,63 +97,132 @@ export function parseProposal(reply: string): SpaceArea[] {
   return areas;
 }
 
+/** The dependencies the model returned, restricted to known topic names. */
+export function parseDependencies(reply: string, topics: readonly string[]): TopicDependency[] {
+  const known = new Set(topics);
+  const out: TopicDependency[] = [];
+  for (const d of Array.isArray(extractJson(reply)?.dependencies) ? extractJson(reply).dependencies : []) {
+    const from = safeName(d?.from);
+    const to = safeName(d?.to);
+    const label = String(d?.label ?? "").replace(/\s+/g, " ").trim().slice(0, 46);
+    if (known.has(from) && known.has(to) && label) out.push({ from, to, label });
+  }
+  return out;
+}
+
+/** Drops `[[links]]` in `## Requiere` that point at topics that do not exist. */
+export function sanitizeRequires(body: string, known: ReadonlySet<string>): string {
+  return body.replace(/(^##\s*Requiere[^\n]*\n)([\s\S]*?)(?=^##\s)/im, (_all, head: string, block: string) => {
+    const kept = block
+      .split("\n")
+      .filter((line) => {
+        const link = /\[\[([^\]|]+)/.exec(line);
+        return !link || known.has(link[1]!.trim());
+      });
+    const hasLink = kept.some((l) => /\[\[/.test(l));
+    return `${head}${hasLink ? kept.join("\n") : "*Sin prerrequisitos.*\n\n"}`;
+  });
+}
+
 function aiConfig(): AIConfig {
   const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
   if (cfg.is_bridge) throw new ApiError("El proveedor de IA está en modo puente; no se puede generar automáticamente.");
   return cfg;
 }
 
-function skillText(app: AppState, spaceFolder: string, name: string): string {
-  const found = readSkillTemplates(app.root, spaceFolder).find((s) => s.title === name);
-  return found ? found.content.slice(0, 4000) : "";
+const skillText = (app: AppState, spaceFolder: string, name: string, max = 6000): string =>
+  readSkillTemplates(app.root, spaceFolder).find((s) => s.title === name)?.content.slice(0, max) ?? "";
+
+/** Appends exchanges to one saved conversation, creating it on first use. */
+class ChatLog {
+  private store = new ConversationStore(AppConfig.get_conversations_dir());
+  private messages: StoredMessage[] = [];
+  id: string;
+
+  constructor(existingId: string | undefined, private title: string, private model: string) {
+    const existing = existingId ? this.store.get(existingId) : null;
+    if (existing) this.messages = existing.messages as StoredMessage[];
+    this.id = existing?.id ?? "";
+    this.flush();
+  }
+
+  private flush(): void {
+    const conv = this.store.save(this.id || null, { messages: this.messages, model: this.model, title: this.title });
+    this.id = conv.id;
+  }
+
+  /** One turn: what was asked and what the model answered. */
+  exchange(user: string, assistant: string, error = false): void {
+    const at = Date.now();
+    this.messages.push({ role: "user", content: user, at });
+    this.messages.push({ role: "assistant", content: assistant, at: Date.now(), ...(error ? { error: true } : {}) });
+    this.flush();
+  }
+
+  note(text: string): void {
+    this.messages.push({ role: "system", content: text, at: Date.now() });
+    this.flush();
+  }
 }
 
 export function studySpaceApi(app: AppState) {
-  /** Theory note of one topic, written by the AI following the space's theory skill. */
-  const writeTheory = async (
-    cfg: AIConfig,
+  const theoryMessages = (
     spaceFolder: string,
     subjectName: string,
-    subjectId: string,
     areaName: string,
     topic: string,
-    siblings: string[],
-  ): Promise<string> => {
-    const skill = skillText(app, spaceFolder, "resumen_teorico_skill");
+    previous: string[],
+  ): Array<{ role: string; content: string }> => [
+    {
+      role: "system",
+      content:
+        "Eres un profesor riguroso que escribe las notas de teoría de NoteVault, en español. Sigue AL PIE DE LA LETRA esta skill de la bóveda: " +
+        "es un contrato (mismos encabezados, mismos campos), porque de esa nota se genera automáticamente el mapa del tema.\n\n" +
+        skillText(app, spaceFolder, "resumen_teorico_skill"),
+    },
+    {
+      role: "user",
+      content:
+        `Materia: ${subjectName}. Área: ${areaName}. Tema: ${topic}.\n` +
+        `Temas anteriores que puedes usar como prerrequisito en «## Requiere» (nombre EXACTO entre [[ ]]; solo estos): ${previous.length ? previous.join("; ") : "(ninguno: escribe *Sin prerrequisitos.*)"}.\n\n` +
+        `Escribe la nota completa en Markdown SIN frontmatter (lo añade la app). Empieza con «# ${topic}» y termina con «## Tarjetas». ` +
+        "Incluye 3 ejemplos y 4–5 errores, cada uno con sus cuatro campos exactos.",
+    },
+  ];
+
+  const frontmatter = (subjectId: string, areaName: string, topic: string): string => {
     const number = /^(\d+(?:\.\d+)*)\s/.exec(topic)?.[1] ?? "";
-    const reply = await askStructured(cfg, [
-      {
-        role: "system",
-        content:
-          "Eres un profesor riguroso que escribe las notas de teoría de NoteVault, en español. " +
-          "Sigue estrictamente esta skill de la bóveda (estructura y reglas):\n\n" +
-          skill,
-      },
-      {
-        role: "user",
-        content:
-          `Materia: ${subjectName}. Área: ${areaName}. Tema: ${topic}.\n` +
-          `Otros temas del área (no los repitas, enlázalos con [[...]] cuando corresponda): ${siblings.filter((s) => s !== topic).join("; ")}.\n\n` +
-          `Escribe la nota completa del tema en Markdown SIN frontmatter (lo añade la app). Empieza con «# ${topic}» y termina con la sección «## Tarjetas».`,
-      },
-    ], isCompleteTheory);
-    const body = reply.replace(/^```(?:markdown|md)?\s*/i, "").replace(/```\s*$/, "").trim();
-    if (!isCompleteTheory(body)) throw new ApiError("La teoría llegó cortada (sin la sección Tarjetas).");
-    const fm = [
+    return [
       "---",
-      "type: teorica",
-      `subject: ${subjectId}`,
+      `id: ${subjectId}.${topic.replace(/[^\w]+/g, "-").toLowerCase().slice(0, 40)}`,
+      `title: "${topic.replace(/^\d+(?:\.\d+)*\s+/, "")}"`,
+      ...(number ? [`number: "${number}"`] : []),
       `area: "${areaName}"`,
       `topic: "${topic}"`,
-      ...(number ? [`number: "${number}"`] : []),
+      "type: teorica",
+      "difficulty: 1",
+      `subject: ${subjectId}`,
+      "prerequisites: []",
       "status: draft",
+      "verified: false",
+      "sources: []",
       "---",
       "",
+      "",
     ].join("\n");
-    return fm + body.replace(/^---[\s\S]*?\n---\s*/, "") + "\n";
   };
 
-  const run = async (job: SpaceJob, req: SpaceRequest): Promise<void> => {
+  /** The structural problems the map generator would hit (ignoring missing prerequisite notes). */
+  const mapProblems = (folderAbs: string): string[] => {
+    try {
+      const r = generateConcept(folderAbs, { dryRun: true });
+      return [...r.problems, ...r.warnings.filter((w) => !/prerrequisito/i.test(w))];
+    } catch (e) {
+      return [`no se pudo comprobar el mapa: ${(e as Error).message}`];
+    }
+  };
+
+  const run = async (job: SpaceJob, req: SpaceRequest, chat: ChatLog): Promise<void> => {
     const say = (line: string) => job.log.push(line);
     const tick = () => {
       job.finished += 1;
@@ -163,30 +238,66 @@ export function studySpaceApi(app: AppState) {
       args: {
         subject: folder,
         subject_id: subjectId,
-        map: req.steps.map,
+        map: false,
         areas: req.areas.map((a) => ({ name: a.name, folder: a.name, topics: a.topics.map((t) => ({ name: t.name })) })),
       },
     });
-    say(`Carpetas y vistas listas (${made.written.length} archivos${req.steps.map ? ", con el mapa de cada área" : ""}).`);
     const skills = ensureDefaultSkills(app.root, folder);
-    if (skills.length) say(`Skills por defecto instaladas en ${folder}/_skills (${skills.length}).`);
+    say(`Carpetas y vistas listas (${made.written.length} archivos); skills por defecto: ${skills.length} nuevas en ${folder}/_skills.`);
+    chat.note(
+      `Espacio «${folder}»: ${req.areas.length} área(s), ${allTopics.length} tema(s). ` +
+        `Voy a generar${req.steps.theory ? " la teoría y el mapa de cada tema," : ""}${req.steps.practice ? " la matriz de competencias de cada tema," : ""}${req.steps.map ? " y los mapas de cada área y del espacio" : ""}.`,
+    );
     tick();
 
     if (req.steps.theory) {
       for (const { area, topic } of allTopics) {
-        const file = path.join(app.root, folder, area, topic, `${topic}.md`);
+        const topicAbs = path.join(app.root, folder, area, topic);
+        const file = path.join(topicAbs, `${topic}.md`);
         if (fs.existsSync(file) && !isCutDraft(fs.readFileSync(file, "utf-8"))) {
           say(`Teoría de «${topic}»: ya existe, se deja como está.`);
-        } else {
-          say(`Escribiendo la teoría de «${topic}»…`);
-          try {
-            const siblings = req.areas.find((a) => a.name === area)?.topics.map((t) => t.name) ?? [];
-            const text = await writeTheory(cfg, folder, req.subject, subjectId, area, topic, siblings);
-            fs.mkdirSync(path.dirname(file), { recursive: true });
-            fs.writeFileSync(file, text, "utf-8");
-          } catch (e) {
-            say(`  ✗ «${topic}»: ${(e as Error).message}`);
+          tick();
+          continue;
+        }
+        say(`Escribiendo la teoría de «${topic}»…`);
+        const areaTopics = req.areas.find((a) => a.name === area)!.topics.map((t) => t.name);
+        const previous = areaTopics.slice(0, areaTopics.indexOf(topic));
+        const known = new Set(areaTopics);
+        const msgs = theoryMessages(folder, req.subject, area, topic, previous);
+        const asked = `Escribe la teoría de «${topic}» (${area}) siguiendo la skill de teoría de ${folder}/_skills.`;
+        try {
+          let reply = await askStructured(cfg, msgs, isCompleteTheory);
+          let body = sanitizeRequires(reply.replace(/^```(?:markdown|md)?\s*/i, "").replace(/```\s*$/, "").trim().replace(/^---[\s\S]*?\n---\s*/, ""), known);
+          fs.mkdirSync(topicAbs, { recursive: true });
+          fs.writeFileSync(file, frontmatter(subjectId, area, topic) + body + "\n", "utf-8");
+          chat.exchange(asked, reply);
+
+          // Self-repair: the note has to satisfy the very checks the map generator runs.
+          let problems = mapProblems(topicAbs);
+          if (problems.length) {
+            say(`  ↻ «${topic}»: la IA corrige ${problems.length} problema(s) de estructura`);
+            const fix = `La nota no cumple el contrato de la skill (el mapa del tema no se puede generar):\n- ${problems.join("\n- ")}\n\nDevuelve la nota COMPLETA corregida, sin frontmatter, empezando con «# ${topic}».`;
+            reply = await askStructured(cfg, [...msgs, { role: "assistant", content: reply }, { role: "user", content: fix }], isCompleteTheory);
+            body = sanitizeRequires(reply.replace(/^```(?:markdown|md)?\s*/i, "").replace(/```\s*$/, "").trim().replace(/^---[\s\S]*?\n---\s*/, ""), known);
+            fs.writeFileSync(file, frontmatter(subjectId, area, topic) + body + "\n", "utf-8");
+            chat.exchange(fix, reply);
+            problems = mapProblems(topicAbs);
           }
+          if (!isCompleteTheory(body)) throw new ApiError("la teoría llegó cortada (sin la sección Tarjetas)");
+
+          if (req.steps.map) {
+            try {
+              const r = generateConcept(topicAbs);
+              say(`  ✓ teoría y mapa del tema (${r.lines[3] ?? "mapa"})${problems.length ? ` — aviso: ${problems[0]}` : ""}`);
+            } catch (e) {
+              say(`  ✓ teoría escrita; mapa del tema no generado: ${(e as Error).message}`);
+            }
+          } else {
+            say("  ✓ teoría escrita");
+          }
+        } catch (e) {
+          say(`  ✗ «${topic}»: ${(e as Error).message}`);
+          chat.exchange(asked, `✗ ${(e as Error).message}`, true);
         }
         tick();
       }
@@ -196,76 +307,146 @@ export function studySpaceApi(app: AppState) {
       clearExerciseIndexCache();
       clearStudySnapshotCache();
       for (const { area, topic } of allTopics) {
-        say(`Eligiendo la práctica de «${topic}»…`);
+        say(`Eligiendo la matriz de competencias de «${topic}»…`);
+        const asked = `Lee la teoría de «${topic}» y decide su tipo y su matriz de competencias (skill × dificultad).`;
         try {
           const res = await reevaluateTopic(app, `${folder}/${area}/${topic}`);
-          say(`  ✓ ${res.plan.skills.length} competencias: ${res.plan.skills.map((s) => s.skill).join(", ")}`);
+          say(`  ✓ ${res.plan.topicType ?? "?"}: ${res.plan.skills.map((s) => s.skill).join(", ")}`);
+          chat.exchange(asked, res.reply);
         } catch (e) {
           say(`  ✗ «${topic}»: ${(e as Error).message}`);
+          chat.exchange(asked, `✗ ${(e as Error).message}`, true);
         }
         tick();
       }
     }
+
+    if (req.steps.map) {
+      const spaceAreas: SpaceMapArea[] = [];
+      for (const area of req.areas) {
+        const topics: MapTopic[] = area.topics.map((t) => ({ name: t.name, file: `${folder}/${area.name}/${t.name}/${t.name}.md` }));
+        say(`Dibujando el mapa del área «${area.name}»…`);
+        let deps: TopicDependency[] = [];
+        const asked = `¿Qué tema de «${area.name}» necesita a cuál? Dame las dependencias con una etiqueta corta del motivo.`;
+        try {
+          const reply = await askStructured(cfg, [
+            {
+              role: "system",
+              content:
+                "Diseñas el mapa de dependencias de un área de estudio. Responde SOLO con JSON: " +
+                '{"dependencies":[{"from":"<tema previo>","to":"<tema que lo necesita>","label":"<motivo en 2-6 palabras>"}]}. ' +
+                "Usa nombres EXACTOS de la lista, solo dependencias reales (un tema puede necesitar varios previos), siempre de un tema anterior a uno posterior. " +
+                skillText(app, folder, "mapa_skill", 2500),
+            },
+            { role: "user", content: `Área: ${area.name}\nTemas:\n${area.topics.map((t) => `- ${t.name}`).join("\n")}` },
+          ]);
+          deps = parseDependencies(reply, area.topics.map((t) => t.name));
+          chat.exchange(asked, reply);
+        } catch (e) {
+          say(`  (sin dependencias de la IA: ${(e as Error).message}; se encadenan los temas)`);
+        }
+        const mapFile = path.join(app.root, folder, area.name, `00 Mapa — ${area.name}.canvas`);
+        fs.writeFileSync(mapFile, JSON.stringify(buildAreaMapCanvas(area.name, topics, deps), null, "\t") + "\n", "utf-8");
+        spaceAreas.push({ name: area.name, topics: area.topics.map((t) => t.name), prerequisites: Math.max(1, deps.length) });
+        say(`  ✓ mapa del área con ${deps.length || area.topics.length - 1} flecha(s)`);
+        tick();
+      }
+      // The space map lists EVERY area on disk, so adding an area keeps the earlier ones.
+      const onDisk = fs
+        .readdirSync(path.join(app.root, folder), { withFileTypes: true })
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith("."))
+        .map((d) => d.name)
+        .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+      const all: SpaceMapArea[] = onDisk.map((name) => {
+        const fresh = spaceAreas.find((a) => a.name === name);
+        if (fresh) return fresh;
+        const topics = fs
+          .readdirSync(path.join(app.root, folder, name), { withFileTypes: true })
+          .filter((t) => t.isDirectory())
+          .map((t) => t.name)
+          .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+        return { name, topics };
+      });
+      fs.writeFileSync(path.join(app.root, folder, `00 Mapa de ${folder}.canvas`), JSON.stringify(buildSpaceMapCanvas(all), null, "\t") + "\n", "utf-8");
+      say(`Mapa de «${folder}» con ${all.length} bloque(s).`);
+    }
     clearExerciseIndexCache();
     clearStudySnapshotCache();
+    chat.note("Terminé. Todo está en el explorador; los cambios los puedes ajustar aquí en el chat.");
     say("Listo.");
   };
 
   return {
     /** The AI proposes areas and topics; the user then picks what to generate. */
-    async study_space_propose(subject: string, scope = "", objective = ""): Promise<{ areas: SpaceArea[] }> {
+    async study_space_propose(
+      subject: string,
+      scope = "",
+      objective = "",
+      existingFolder = "",
+    ): Promise<{ areas: SpaceArea[]; conversationId: string }> {
       const name = safeName(subject);
       if (!name) throw new ApiError("Indica la materia.");
       const cfg = aiConfig();
-      const skill = skillText(app, name, "temario_skill");
-      const reply = await askStructured(cfg, [
-        {
-          role: "system",
-          content:
-            "Eres un diseñador curricular. Propones el temario de una materia en español. Responde SOLO con JSON: " +
-            '{"areas":[{"name":"1 Nombre del área","topics":[{"name":"1.1 Nombre del tema"}]}]}. ' +
-            "Áreas y temas numerados en orden natural de aprendizaje (Fase 0 = área 0 si hace falta), 6–12 temas por área, " +
-            "nombres sin / \\ : * ? \" < > |. " +
-            (skill ? `\nSigue esta skill de la bóveda:\n${skill}` : ""),
-        },
-        {
-          role: "user",
-          content:
-            `Materia: ${name}.\n` +
-            (scope.trim() ? `Alcance: ${scope.trim()}.\n` : "Alcance: las áreas principales de la materia.\n") +
-            (objective.trim() ? `Objetivo del estudiante: ${objective.trim()}.\n` : ""),
-        },
-      ]);
-      return { areas: parseProposal(reply) };
+      const space = safeName(existingFolder);
+      const existing = space && fs.existsSync(path.join(app.root, space))
+        ? fs.readdirSync(path.join(app.root, space), { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".")).map((d) => d.name)
+        : [];
+      const skill = skillText(app, space || name, "temario_skill", 3000);
+      const system =
+        "Eres un diseñador curricular. Propones el temario de una materia en español. Responde SOLO con JSON: " +
+        '{"areas":[{"name":"1 Nombre del área","topics":[{"name":"1.1 Nombre del tema"}]}]}. ' +
+        "Áreas y temas numerados en orden natural de aprendizaje (Fase 0 = área 0 si hace falta), 6–12 temas por área, " +
+        'nombres sin / \\ : * ? " < > |. ' +
+        (skill ? `\nSigue esta skill de la bóveda:\n${skill}` : "");
+      const user =
+        `Materia: ${name}.\n` +
+        (scope.trim() ? `Alcance: ${scope.trim()}.\n` : "Alcance: las áreas principales de la materia.\n") +
+        (objective.trim() ? `Objetivo del estudiante: ${objective.trim()}.\n` : "") +
+        (existing.length ? `Áreas que YA existen en «${space}» (no las repitas; continúa la numeración): ${existing.join("; ")}.\n` : "");
+      const reply = await askStructured(cfg, [{ role: "system", content: system }, { role: "user", content: user }]);
+      const areas = parseProposal(reply);
+      const chat = new ChatLog(undefined, `Espacio de estudio: ${space || name}`, cfg.model);
+      chat.exchange(`Propón el temario. ${user.trim()}`, reply);
+      return { areas, conversationId: chat.id };
     },
 
     /** Starts generating the chosen areas; poll `study_space_status` with the returned id. */
-    study_space_generate(request: unknown): { jobId: string } {
+    study_space_generate(request: unknown): { jobId: string; conversationId: string } {
       const req = request as SpaceRequest;
       const folder = safeName(req?.folder);
       if (!folder) throw new ApiError("Indica el nombre de la carpeta del espacio.");
       if (!Array.isArray(req.areas) || !req.areas.length) throw new ApiError("Elige al menos un área.");
-      const total =
-        1 +
-        (req.steps?.theory ? req.areas.reduce((n, a) => n + a.topics.length, 0) : 0) +
-        (req.steps?.practice ? req.areas.reduce((n, a) => n + a.topics.length, 0) : 0);
-      const job: SpaceJob = { id: crypto.randomUUID(), folder, log: [], done: false, error: "", finished: 0, total };
+      const n = req.areas.reduce((c, a) => c + a.topics.length, 0);
+      const total = 1 + (req.steps?.theory ? n : 0) + (req.steps?.practice ? n : 0) + (req.steps?.map !== false ? req.areas.length : 0);
+      const cfg = aiConfig();
+      const chat = new ChatLog(req.conversationId, `Espacio de estudio: ${folder}`, cfg.model);
+      const job: SpaceJob = { id: crypto.randomUUID(), folder, log: [], done: false, error: "", finished: 0, total, conversationId: chat.id };
       jobs.set(job.id, job);
-      void run(job, { ...req, folder, steps: { theory: !!req.steps?.theory, practice: !!req.steps?.practice, map: req.steps?.map !== false } })
+      void run(job, { ...req, folder, steps: { theory: !!req.steps?.theory, practice: !!req.steps?.practice, map: req.steps?.map !== false } }, chat)
         .catch((e) => {
           job.error = (e as Error).message;
           job.log.push(`✗ ${job.error}`);
+          chat.note(`✗ Se detuvo: ${job.error}`);
         })
         .finally(() => {
           job.done = true;
         });
-      return { jobId: job.id };
+      return { jobId: job.id, conversationId: chat.id };
     },
 
     study_space_status(jobId: string): SpaceJob {
       const job = jobs.get(String(jobId));
       if (!job) throw new ApiError("Ese trabajo ya no existe.");
       return { ...job, log: [...job.log] };
+    },
+
+    /** Space folders (with an overview) that a new area can be added to. */
+    study_space_list(): string[] {
+      return fs
+        .readdirSync(app.root, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && !d.name.startsWith(".") && fs.existsSync(path.join(app.root, d.name, `${d.name}.resumen.md`)))
+        .map((d) => d.name)
+        .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
     },
   };
 }

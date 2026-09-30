@@ -1,12 +1,17 @@
 /**
  * The skills every study space starts with. They are plain notes in `<space>/_skills/`
  * that the AI reads when it creates content, so the user can edit them and the AI can
- * refine them ("write_skill" action). The three original ones (canvas, theory,
- * practice) are copied from a sibling subject when the vault already has them.
+ * refine them ("write_skill" action). Sibling-subject skills only fill files this list
+ * does not define (see ensureDefaultSkills).
+ *
+ * The theory skill is a CONTRACT: the topic-map generator (tools/kb_canvas.ts) parses
+ * exactly these sections and fields, so a note that follows it always yields a map.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+
+const FENCE = "```";
 
 export const DEFAULT_SKILLS: Record<string, string> = {
   resumen_teorico_skill: `---
@@ -15,65 +20,141 @@ skill: teoria_creation
 ---
 # Skill: nota de teoría de un tema
 
-Una nota por tema, en \`<tema>/<tema>.md\`. Español, riguroso y conciso; las fórmulas en LaTeX
-(\`$...$\` en línea, \`$$...$$\` en bloque).
+Una nota por tema, en \`<tema>/<tema>.md\`. Español, riguroso y conciso. Fórmulas en LaTeX
+(\`$...$\` en línea, \`$$...$$\` en bloque). **Esta estructura es un contrato**: el mapa del tema
+(\`<tema> — mapa.canvas\`) se genera leyendo estas secciones y estos campos, y si falta algo el mapa
+no se puede construir.
 
 ## Frontmatter
-\`\`\`yaml
+${FENCE}yaml
 ---
-type: teorica
-subject: <materia>
-area: <carpeta del área>
-topic: <carpeta del tema>
+id: mat.aritmetica.tema
+title: <título sin número>
 number: "1.1"
+area: "<carpeta del área>"
+topic: "<carpeta del tema>"
+type: teorica
 difficulty: 1
+subject: mathematics
+prerequisites: []
 status: draft
+verified: false
+sources: []
 tags: [materia, area, tema]
 ---
-\`\`\`
+${FENCE}
 
-## Estructura (en este orden)
+## Estructura (exactamente estos encabezados, en este orden)
+
 1. \`# <número> <título>\`
-2. \`## Requiere\`: los temas previos que hacen falta (enlaces \`[[...]]\`) o *Sin prerrequisitos.*
-3. \`## Explicación\`
-   - \`### Qué es\`: una frase (**En una frase.**) y luego cada definición formal en negrita
-     (**Concepto.** definición), con su notación.
-   - \`### Modelo mental\`: la imagen o analogía que hace intuitivo el tema.
-4. \`## Ejemplos\`: 3 ejemplos trabajados paso a paso (\`### Ejemplo 1 — título\`).
-5. \`## Errores comunes\`: 3–5 errores (\`### Error 1 — título\`) con por qué ocurre y cómo se corrige.
+2. \`## Requiere\`: una línea \`- [[Tema previo]] — por qué hace falta\` por cada prerrequisito (el nombre
+   entre corchetes es EXACTAMENTE el de otro tema ya existente), o \`*Sin prerrequisitos.*\`.
+3. \`## Explicación\` con dos subsecciones:
+   - \`### Qué es\`: una frase (**En una frase.** …), luego cada definición en negrita
+     (**Concepto.** definición formal) con su notación en LaTeX.
+   - \`### Modelo mental\`: la imagen o analogía que hace intuitivo el tema, y 3–5 viñetas con
+     **negrita** que la aplican.
+4. \`## Ejemplos\` con 3 ejemplos \`### Ejemplo N — título\`. Cada uno son EXACTAMENTE estas cuatro viñetas:
+   - \`- **Contexto:** …\`
+   - \`- **Caso:** …\`
+   - \`- **Resultado esperado:** …\`
+   - \`- **Por qué funciona:** …\`
+5. \`## Errores comunes\` con 4–5 errores \`### Error N — título\`. Cada uno son EXACTAMENTE cuatro viñetas:
+   - \`- **Error:** …\`
+   - \`- **Síntoma:** …\`
+   - \`- **Causa:** …\`
+   - \`- **Solución:** …\`
 6. \`## Conexiones\`: con qué otros temas se relaciona y para qué sirve.
-7. \`## Tarjetas\`: 6–9 tarjetas de repaso \`### T1 · definicion\` con **P:** y **R:** (tipos: definicion,
-   notacion, ejemplo, contraejemplo, error, conexion).
+7. \`## Tarjetas\`: 6–9 tarjetas \`### T1 · definicion\` con \`**P:**\` y \`**R:**\`
+   (tipos: definicion, notacion, ejemplo, contraejemplo, error, conexion).
 
 ## Reglas
 - No inventes resultados: si no estás seguro de algo, no lo afirmes.
 - Un tema = una idea; lo que sea de otro tema se enlaza, no se repite.
-- El título y el número deben coincidir exactamente con el nombre de la carpeta del tema.
+- El título y el número coinciden exactamente con el nombre de la carpeta del tema.
+- Cada viñeta de un ejemplo o error es un párrafo corto (una o dos frases): el mapa la dibuja en una tarjeta.
 `,
+
   mapa_skill: `---
 type: skill_template
 skill: mapa
 ---
-# Skill: mapa del área (canvas)
+# Skill: mapas (canvas) de una materia
 
-Cada **área agrupadora** (una carpeta que agrupa temas, con su \`.resumen\`) tiene un mapa:
-un canvas \`00 Mapa — <área>.canvas\` dentro de su carpeta. Se crea automáticamente al generar
-el temario; esta skill dice cómo debe ser si lo rehaces o lo mejoras.
+Hay TRES niveles de mapa. Todos cumplen: **toda flecha lleva etiqueta que explica la conexión**, nada
+se solapa y cada grupo envuelve a sus tarjetas. Los dos primeros se crean solos al generar el temario;
+el tercero se genera desde la nota de teoría.
 
-## Estructura
-1. **Nodo central**: el nombre del área y una frase de qué cubre.
-2. **Un nodo por tema**, en el orden del temario (numeración natural: 1.2 antes que 1.10),
-   con su número, su título y una línea de qué se aprende.
-3. Los temas en filas de cuatro, de izquierda a derecha, en serpiente.
+## 1. Mapa de la materia — \`<materia>/00 Mapa de <materia>.canvas\`
+Un **grupo por bloque** (\`Bloque I — Aritmética\`, uno cada 680 px, 414 de ancho) y dentro una tarjeta de
+texto (360 de ancho) con el área y sus temas como enlaces. Flechas entre áreas, etiqueta \`N prerrequisito(s)\`.
+${FENCE}json
+{"nodes":[
+ {"id":"g1","type":"group","x":0,"y":0,"width":414,"height":584,"label":"Bloque I — Aritmética","nv":{"zIndex":-2}},
+ {"id":"a1","type":"text","x":24,"y":48,"width":360,"height":506,"text":"## 1 Aritmética elemental y operativa\\n\\n- [[1.1 Números naturales]]\\n- [[1.2 Suma y resta]]"}],
+ "edges":[{"id":"e1","fromNode":"a1","fromSide":"right","toNode":"a2","toSide":"left","label":"4 prerrequisito(s)"}]}
+${FENCE}
 
-## Flechas (todas con etiqueta)
-- Central → primer tema: "empieza por".
-- Tema → siguiente: "prepara para" (o el motivo real si es otro: "necesita", "aplica").
-- Toda flecha explica la conexión; nunca hay una flecha sin etiqueta.
+## 2. Mapa del área — \`<área>/00 Mapa — <área>.canvas\`
+Un **grupo grande** (color \`6\`, con el nombre del área, en x −24 / y −48) con una tarjeta \`file\` de 300×120
+por tema. Columnas por dependencia (una cada 640 px; 210 px por fila): un tema va a la derecha de aquellos
+de los que depende. Flechas de derecha a izquierda (\`right\` → \`left\`) con el MOTIVO de la dependencia.
+${FENCE}json
+{"nodes":[
+ {"id":"area","type":"group","x":-24,"y":-48,"width":1348,"height":378,"color":"6","label":"1 Aritmética elemental y operativa","nv":{"zIndex":-2}},
+ {"id":"t1","type":"file","x":0,"y":0,"width":300,"height":120,"file":"Matemáticas/1 Aritmética/1.1 Números naturales/1.1 Números naturales.md"},
+ {"id":"t2","type":"file","x":640,"y":0,"width":300,"height":120,"file":"Matemáticas/1 Aritmética/1.2 Suma y resta/1.2 Suma y resta.md"}],
+ "edges":[{"id":"e1","fromNode":"t1","fromSide":"right","toNode":"t2","toSide":"left","label":"orden y signo en la recta numérica"}]}
+${FENCE}
 
-## Colores
-Un color por bloque de temas relacionados; el nodo central en el color de acento.
+## 3. Mapa del tema — \`<tema>/<tema> — mapa.canvas\`
+Se genera desde la nota de teoría (ver \`resumen_teorico_skill\`), con cuatro paneles de izquierda a derecha:
+- **Requiere** (grupo): una tarjeta enlace por prerrequisito, o "Sin prerrequisitos.".
+- **Explicación** (grupo, color 6): un panel \`## Qué es\` (color 5, el más ancho: 620) y un panel \`## Modelo mental\`
+  (color 6). Flecha \`se entiende con\`.
+- **Ejemplos** (grupo, color 4): un grupo por ejemplo con 4 paneles apilados: \`### Contexto\` → \`### Caso\` →
+  \`### Resultado esperado\` → \`### Por qué funciona\` (flechas \`el caso concreto\`, \`da como resultado\`,
+  \`funciona porque\`); entre ejemplos \`otro caso\`; desde Modelo mental \`se aplica en\`.
+- **Errores comunes** (grupo, color 3): un grupo por error con su panel; desde "Qué es" flechas \`se falla cuando\`.
+Cada panel tiene la altura de su texto (sin recortes) y 460 de ancho.
 `,
+
+  practica_skill: `---
+type: skill_template
+skill: practica
+---
+# Skill: qué se practica en cada tema (matriz de competencias)
+
+Cada tema tiene SU matriz: las competencias (skills) que entrena y, para cada una, cuántos ejercicios
+aprobados pide en dificultad fácil / media / difícil. La decide la IA leyendo la teoría, y solo se
+practica eso. Se guarda en el \`.practica.md\` del tema (\`plan: solve=3/4/2, …\`).
+
+## Primero: qué tipo de tema es
+- **teórico**: trata de definiciones, conceptos, representaciones, clasificaciones, propiedades o demostraciones
+  (qué es algo y cómo se relaciona). Ej.: naturales, enteros y recta numérica; qué es una fracción; conjuntos.
+- **procedimental**: el objetivo es ejecutar un método o un cálculo. Ej.: suma y resta de enteros, división,
+  simplificar fracciones, porcentajes.
+- **mixto**: las dos cosas pesan lo mismo. Ej.: mcd y mcm.
+
+## Qué skills encajan (matemáticas)
+| Skill | Entrena | Teórico | Procedimental | Mixto |
+|---|---|---|---|---|
+| \`explain\` Explicar | claridad conceptual, ejemplo propio | sí | no | sí |
+| \`true_false\` Verdadero o falso | discernir propiedades | sí | no | sí |
+| \`counterexample\` Contraejemplo | casos límite, refutar | sí | no | sí |
+| \`prove\` Demostración | rigor, cadena deductiva | sí | no | sí |
+| \`find_error\` Encontrar el error | detectar el paso fallido | sí | no | sí |
+| \`solve\` Problema | modelar y resolver | no | sí | sí |
+| \`process\` Procedimiento guiado | método paso a paso | no | sí | sí |
+| \`drill\` Cálculo rápido | agilidad y estimación | **nunca** | sí | no |
+
+## Reglas
+- Un tema teórico NUNCA lleva \`drill\`; uno procedimental no lleva demostraciones.
+- 3–6 skills por tema; total típico por skill 3–10; 0 en el nivel que no tenga sentido.
+- \`find_error\` no tiene nivel fácil; \`drill\` va siempre sin ayuda.
+- Los ejercicios se guardan en \`<tema>/Ejercicios/<skill>/\`.
+`,
+
   temario_skill: `---
 type: skill_template
 skill: temario
@@ -90,12 +171,15 @@ usuario decisiones técnicas: tú infieres nivel, alcance y profundidad.
    y deja que el usuario las acepte, rechace o ignore.
 5. **Propuesta**: áreas numeradas (\`1 Nombre\`) con 6–12 temas (\`1.1 Nombre\`), ordenados por
    dependencias de aprendizaje.
+6. **Dependencias**: para cada área, qué tema necesita a cuál y por qué (una etiqueta corta): alimenta el
+   mapa del área (\`mapa_skill\`).
 
 ## Reglas
 - Nombres de carpeta: \`N Nombre\` y \`N.M Nombre\`, sin \`/ \\ : * ? " < > |\`.
 - Ningún tema repetido; cada tema es una sola idea que se pueda practicar.
 - Los nombres deben ser idénticos en teoría, práctica y canvas.
 `,
+
   subtemas_skill: `---
 type: skill_template
 skill: subtemas
@@ -108,11 +192,11 @@ Cómo añadir un tema (o dividir uno) dentro de un área ya existente.
    (\`1.13\` va después de \`1.12\`; para insertar en medio, renumera solo si el usuario lo pide).
 2. Comprueba que no duplica un tema existente ni invade el de otro.
 3. Crea, dentro de la carpeta del tema: la nota de teoría \`<tema>.md\` (sigue
-   \`resumen_teorico_skill\`) y su vista de práctica \`<tema>.practica.md\`.
-4. Dile al usuario que use el botón de la varita del tema para que la IA elija las
-   competencias y cuántos ejercicios hacer de cada una.
+   \`resumen_teorico_skill\`, es un contrato), su vista de práctica \`<tema>.practica.md\` y su mapa.
+4. Elige la matriz de competencias del tema (\`practica_skill\`) con el botón de la varita.
 5. Si el tema es grande, propón dividirlo en subtemas con su propia carpeta y numeración
    (\`1.5.1\`, \`1.5.2\`).
+6. Añade el tema al mapa del área con su dependencia y su etiqueta.
 `,
 };
 
@@ -128,20 +212,24 @@ function siblingSkillsDir(rootAbs: string, spaceFolder: string): string | null {
   return null;
 }
 
-/** Makes sure `<space>/_skills` has every default skill; existing files are never touched. Returns what it created. */
-export function ensureDefaultSkills(rootAbs: string, spaceFolder: string): string[] {
+/**
+ * Makes sure `<space>/_skills` has every default skill; existing files are never touched.
+ * Returns what it created. `refresh` names default skills to REPLACE even if present
+ * (used once to upgrade the thin first-generation templates of an existing subject).
+ */
+export function ensureDefaultSkills(rootAbs: string, spaceFolder: string, refresh: readonly string[] = []): string[] {
   const dir = path.join(rootAbs, spaceFolder, "_skills");
   fs.mkdirSync(dir, { recursive: true });
   const created: string[] = [];
-  const put = (file: string, content: string) => {
+  const put = (file: string, content: string, force = false) => {
     const target = path.join(dir, file);
-    if (fs.existsSync(target)) return;
+    if (fs.existsSync(target) && !force) return;
     fs.writeFileSync(target, content, "utf-8");
     created.push(`${spaceFolder}/_skills/${file}`);
   };
   // The built-in skills first (they are the up-to-date ones); a sibling subject then
   // only contributes files this space does not have (its own canvas / practice notes).
-  for (const [name, content] of Object.entries(DEFAULT_SKILLS)) put(`${name}.md`, content);
+  for (const [name, content] of Object.entries(DEFAULT_SKILLS)) put(`${name}.md`, content, refresh.includes(name));
   const sibling = siblingSkillsDir(rootAbs, spaceFolder);
   if (sibling) {
     for (const f of fs.readdirSync(sibling)) {

@@ -11,7 +11,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ApiError } from "./errors.js";
-import { buildAreaMapCanvas } from "./areaMap.js";
+import { buildAreaMapCanvas, buildSpaceMapCanvas, type MapTopic, type SpaceMapArea, type TopicDependency } from "./areaMap.js";
 import { dumpFrontmatter } from "./frontmatter.js";
 import { applyPlanToPractica, parsePracticePlan } from "./practice/practicePlan.js";
 import { catalogFor, catalogSkill, deterministicSkillSelector } from "./practice/skillSelection.js";
@@ -143,6 +143,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
     content: overviewFileText(subject, subjectId, subject),
     exists: fs.existsSync(absOf(root, rootOverview)),
   });
+  const spaceAreas: SpaceMapArea[] = [];
   for (const area of areas) {
     const areaName = safeName(area?.folder || area?.name);
     if (!areaName) continue;
@@ -156,24 +157,36 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
       exists: fs.existsSync(absOf(root, overview)),
     });
     const topics = Array.isArray(area?.topics) ? area.topics.slice(0, MAX_TOPICS) : [];
-    const topicNames: string[] = [];
+    const mapTopics: MapTopic[] = [];
     for (const topic of topics) {
       const topicName = safeName(topic?.folder || topic?.name);
       if (!topicName) continue;
-      topicNames.push(topicName);
+      mapTopics.push({ name: topicName, file: `${areaRel}/${topicName}/${topicName}.md` });
       const topicRel = `${areaRel}/${topicName}`;
       ops.push(mkdirOp(root, topicRel), ...topicFiles(root, topicRel, topicName, subjectId, topic?.skills));
     }
     // Every grouping area gets its map (canvas), built from its topics (see mapa_skill).
-    if (args.map !== false && topicNames.length) {
+    if (args.map !== false && mapTopics.length) {
+      const areaLabel = safeName(area?.name) || areaName;
+      const deps: TopicDependency[] = Array.isArray(area?.dependencies) ? area.dependencies : [];
       const mapRel = `${areaRel}/00 Mapa — ${areaName}.canvas`;
       ops.push({
         kind: "write",
         rel: mapRel,
-        content: JSON.stringify(buildAreaMapCanvas(safeName(area?.name) || areaName, topicNames), null, "\t") + "\n",
+        content: JSON.stringify(buildAreaMapCanvas(areaLabel, mapTopics, deps), null, "\t") + "\n",
         exists: fs.existsSync(absOf(root, mapRel)),
       });
+      spaceAreas.push({ name: areaLabel, topics: mapTopics.map((t) => t.name), prerequisites: Number(area?.prerequisites) || undefined });
     }
+  }
+  if (args.map !== false && spaceAreas.length) {
+    const spaceMapRel = `${subject}/00 Mapa de ${subject}.canvas`;
+    ops.push({
+      kind: "write",
+      rel: spaceMapRel,
+      content: JSON.stringify(buildSpaceMapCanvas(spaceAreas), null, "\t") + "\n",
+      exists: fs.existsSync(absOf(root, spaceMapRel)),
+    });
   }
   return { action: "create_syllabus", title: `Crear el temario de ${subject}`, ops, warnings: [] };
 }

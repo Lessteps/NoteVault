@@ -298,7 +298,7 @@ function readTheoryNotes(app: AppState, absDir: string): TheoryNoteContext[] {
  * Asks the AI which competencies a topic should train and how many exercises per
  * difficulty, and stores the answer in the topic's `.practica.md`.
  */
-export async function reevaluateTopic(app: AppState, folder: string): Promise<{ plan: PracticePlan; path: string }> {
+export async function reevaluateTopic(app: AppState, folder: string): Promise<{ plan: PracticePlan; path: string; reply: string }> {
   const normFolder = app.rel(app.resolve(folder, { allowRoot: true }));
   const found = findTopicManifest(app, normFolder);
   if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
@@ -339,7 +339,7 @@ export async function reevaluateTopic(app: AppState, folder: string): Promise<{ 
 
   clearExerciseIndexCache();
   clearStudySnapshotCache();
-  return { plan, path: app.rel(practicaAbs).split(path.sep).join("/") };
+  return { plan, reply, path: app.rel(practicaAbs).split(path.sep).join("/") };
 }
 
 export function studyApi(app: AppState) {

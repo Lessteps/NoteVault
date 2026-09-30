@@ -50,13 +50,24 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
+  test("lote propio 3: bandas, core y movilidad (banded-row, bird-dog)", () => {
+    expect(getInstructions("banded-row")!.steps_es.length).toBeGreaterThanOrEqual(4);
+    expect(getInstructions("bird-dog")!.steps_es.join(" ")).toMatch(/columna|espina/i);
+  });
+
+  test("cobertura completa: los 302 de workout-guide tienen instrucciones ES", async () => {
+    const { exercises } = await import("@bryllim/workout-guide");
+    const gaps = exercises.filter((e) => !getInstructions(e.slug)?.steps_es.length);
+    expect(gaps.map((g) => g.slug)).toEqual([]);
+  });
+
   test("lote propio 2: tren inferior (hip-thrust, clamshell)", () => {
     expect(getInstructions("hip-thrust")!.steps_es.length).toBeGreaterThanOrEqual(4);
     expect(getInstructions("clamshell")!.steps_es.join(" ")).toMatch(/cadera|rodilla|clamshell/i);
   });
 
-  test("sin cobertura devuelve null (sprawl)", () => {
-    expect(getInstructions("sprawl")).toBeNull();
+  test("un slug fuera del catálogo devuelve null", () => {
+    expect(getInstructions("no-existe-en-workout-guide")).toBeNull();
   });
 
   test("estima 1RM con Epley", () => {

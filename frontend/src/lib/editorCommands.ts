@@ -59,7 +59,9 @@ const LIST = /^(\s*)([-*+]|\d+[.)])\s+(\[[ xX]\]\s+)?/;
 /** "# " … "###### ": set the heading level (0 removes it). */
 export function heading(view: EditorView, level: number): boolean {
   return mapLines(view, (t) => {
-    const body = t.replace(/^\s*#{1,6}\s+/, "");
+    // Drop the old heading and the old list marker alike: turning a list item
+    // into a heading should keep its text, not render as "## - punto".
+    const body = t.replace(/^\s*#{1,6}\s+/, "").replace(LIST, "");
     return level > 0 ? `${"#".repeat(level)} ${body}` : body;
   });
 }
@@ -72,6 +74,9 @@ export function togglePrefix(view: EditorView, prefix: string): boolean {
     const [ind] = t.match(INDENT)!;
     const rest = t.slice(ind.length);
     if (all) return ind + rest.slice(prefix.length);
+    // Not every line had it, so the command turns it on: the ones that already
+    // had it keep theirs instead of getting a second one.
+    if (rest.startsWith(prefix)) return t;
     return ind + prefix + rest.replace(LIST, "");
   });
 }

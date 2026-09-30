@@ -14,6 +14,7 @@ import grupoTriceps from "./exerciseInstructions.grupo-triceps.json";
 import grupoEspalda from "./exerciseInstructions.grupo-espalda.json";
 import grupoBiceps from "./exerciseInstructions.grupo-biceps.json";
 import grupoCuadriceps from "./exerciseInstructions.grupo-cuadriceps.json";
+import grupoGluteos from "./exerciseInstructions.grupo-gluteos.json";
 
 /** Mapeo guía → músculos locales (`frontend/src/lib/muscles.ts`). */
 const GUIDE_TO_LOCAL: Record<string, string[]> = {
@@ -117,6 +118,7 @@ const instructionsBySlug = new Map(
     ...(grupoEspalda as ExerciseInstructions[]),
     ...(grupoBiceps as ExerciseInstructions[]),
     ...(grupoCuadriceps as ExerciseInstructions[]),
+    ...(grupoGluteos as ExerciseInstructions[]),
   ].map((r) => [r.slug, r]),
 );
 

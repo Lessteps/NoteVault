@@ -50,6 +50,13 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
+  test("grupo gluteos/isbios redactado a mano (deadlift, leg-curl, kettlebell-swing)", () => {
+    expect(getInstructions("deadlift")!.source).toBe("propia");
+    // leg-curl antes venía de "biceps leg concentration curl": no era el mismo.
+    expect(getInstructions("leg-curl")!.steps_es.join(" ")).toMatch(/polea|curl|isquio/i);
+    expect(getInstructions("kettlebell-swing")!.steps_es.length).toBeGreaterThanOrEqual(5);
+  });
+
   test("grupo cuadriceps redactado a mano (squat, leg-press, leg-extension)", () => {
     expect(getInstructions("squat")!.source).toBe("propia");
     expect(getInstructions("leg-extension")!.steps_es.length).toBeGreaterThanOrEqual(4);

@@ -1,6 +1,7 @@
 import { WebContentsView, BrowserWindow, net, shell } from "electron";
 import { blockedPageHtml, hostOf, normalizeUrl, UsageMeter, WebStore } from "../src/core/webStore.js";
 import { getAppState } from "../src/api/registry.js";
+import { cleanRequestHeaders, cleanUserAgent } from "../src/core/webUserAgent.js";
 
 export interface BrowserBounds {
   x: number;
@@ -49,6 +50,15 @@ export class BrowserManager {
     });
 
     const wc = this.view.webContents;
+
+    // Present as a plain Chrome: WhatsApp Web and similar sites turn Electron away with
+    // "update your browser" because of the Electron/app tokens and the "Electron" client-hint brand.
+    const ua = cleanUserAgent(wc.getUserAgent());
+    wc.setUserAgent(ua);
+    wc.session.setUserAgent(ua);
+    wc.session.webRequest.onBeforeSendHeaders((details, callback) => {
+      callback({ requestHeaders: cleanRequestHeaders(details.requestHeaders) as Record<string, string> });
+    });
 
     wc.on("did-start-loading", () => {
       this.isLoading = true;

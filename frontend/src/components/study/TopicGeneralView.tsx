@@ -73,6 +73,7 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
     .map((s) => progress.skills[s])
     .filter((s): s is NonNullable<typeof s> => s !== undefined);
   const notStarted = skillsList.filter((s) => s.status === "not_started");
+  const isEnglishTopic = manifest.skills.some((s) => /^(gr|wr|rd|ls|sp|vc)_/.test(s));
   const mastered = skillsList.filter((s) => s.mastered).length;
   const practicing = skillsList.filter((s) => s.status === "practicing").length;
   const pending = Math.max(0, skillsList.length - mastered - practicing);
@@ -176,8 +177,7 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-soft/50 px-3.5 py-2.5">
             <AlertTriangle size={15} className="flex-none text-warn" />
             <p className="min-w-0 flex-1 text-[11.5px] leading-snug text-dim">
-              <b className="text-warn">{notStarted.length} competencias sin iniciar:</b> Comienza practicando problemas
-              básicos o cálculo mental.
+              <b className="text-warn">{notStarted.length} competencias sin iniciar:</b> {isEnglishTopic ? "Empieza por la competencia más fácil de la matriz." : "Comienza practicando problemas básicos o cálculo mental."}
             </p>
             <div className="text-right">
               <div className="font-mono text-[14px] font-bold text-text">

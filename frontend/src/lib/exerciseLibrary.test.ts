@@ -50,8 +50,13 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
-  test("sin match devuelve null (nordic-hamstring-curl)", () => {
-    expect(getInstructions("nordic-hamstring-curl")).toBeNull();
+  test("lote propio 2: tren inferior (hip-thrust, clamshell)", () => {
+    expect(getInstructions("hip-thrust")!.steps_es.length).toBeGreaterThanOrEqual(4);
+    expect(getInstructions("clamshell")!.steps_es.join(" ")).toMatch(/cadera|rodilla|clamshell/i);
+  });
+
+  test("sin cobertura devuelve null (sprawl)", () => {
+    expect(getInstructions("sprawl")).toBeNull();
   });
 
   test("estima 1RM con Epley", () => {

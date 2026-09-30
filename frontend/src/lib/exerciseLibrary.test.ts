@@ -50,6 +50,13 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
+  test("grupo cuadriceps redactado a mano (squat, leg-press, leg-extension)", () => {
+    expect(getInstructions("squat")!.source).toBe("propia");
+    expect(getInstructions("leg-extension")!.steps_es.length).toBeGreaterThanOrEqual(4);
+    // squat NO puede venir de la API: antes leía "band squat".
+    expect(getInstructions("squat")!.steps_es.join(" ")).toMatch(/barra|rack|profundidad/i);
+  });
+
   test("grupo biceps redactado a mano (bicep-curl, chin-up, ez-bar-curl)", () => {
     expect(getInstructions("bicep-curl")!.source).toBe("propia");
     expect(getInstructions("chin-up")!.steps_es.join(" ")).toMatch(/supin|palmas|bíceps/i);

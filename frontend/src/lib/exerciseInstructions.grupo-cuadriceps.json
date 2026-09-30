@@ -1,0 +1,319 @@
+[
+  {
+    "slug": "squat",
+    "name": "Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca la barra a la altura de las clavículas en un rack y colócate con los pies a la anchura de los hombros, con las puntas ligeramente hacia fuera.",
+      "Sujeta la barra con un agarre algo más ancho que los hombros y colócala en la horquilla del trapcio, no en el cuello.",
+      "Mira un punto fijo por delante y bájala del rack cerrando los omóplatos y apretando el abdomen.",
+      "Aprieta el aire con el pecho abierto y despacio: la profundidad la compras con los tobillos, la rodilla y la cadera.",
+      "Desciende hasta donde controles, idealmente con la cadera por debajo o al nivel de la rodilla; no fuerces más.",
+      "Las rodillas siguen la dirección de las puntas de los pies: se salen hacia dentro y la rodilla cobra la factura.",
+      "Empuja con el pie entero, con los talones más que con las puntas, hasta extender la cadera y las rodillas.",
+      "Si al subir notas la lumbar y no los glúteos, la profundidad o la carga son excesiva: empieza con menos barra."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "front-squat",
+    "name": "Front Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Sujeta la barra delante de los hombros, apoyada en la horquilla del deltoide, con los codos apuntando hacia delante y por encima de la barra.",
+      "Colócate con los pies algo más juntos que en el sentadilla trasero, con las puntas ligeramente abiertas.",
+      "Chin alto y pecho abierto: es la posición que hace que este ejercicio sea más técnico.",
+      "Baja manteniendo los codos arriba y el torso vertical; si los codos caen, la carga es demasiado pesada.",
+      "Vuelve a subir extendiendo el codo y las rodillas a la vez.",
+      "Empieza muy ligero: el Core trabaja mucho más que en el sentadilla trasero y el rango suele ser menor."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "hack-squat",
+    "name": "Hack Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca los pies en la plataforma a la anchura de los hombros, con la parte media o trasera del pie apoyada.",
+      "Apoya la espalda y los hombros en el respaldo, con las rodillas flexionadas y los muslos ligeramente por debajo de la horizontal.",
+      "Sujeta los agarres laterales y suelta los seguros de la máquina antes de empezar.",
+      "Desciende hasta un ángulo de rodilla cómodo, sin dejar que la cadera se despegue del respaldo.",
+      "Empuja con la planta del pie hasta extender las rodillas.",
+      "Este ejercicio perdona la técnica: si notas el estiramiento en la zona lumbar, baja la carga."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "leg-press",
+    "name": "Leg Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en la máquina con la espalda y los hombros bien apoyados en el respaldo.",
+      "Coloca los pies en la plataforma a la anchura de los hombros, en la parte media de la plataforma.",
+      "Suelta los seguros y baja la barra hasta un ángulo de rodilla cómodo, sin que la columna baja abandone el respaldo.",
+      "Si la cadera se despega del respaldo por el otro extremo o lumbar se arquea, has bajado demasiado.",
+      "Empuja hasta extender las rodillas sin bloquearlas del todo.",
+      "No bloquees las rodillas arriba: ese bloqueo cambia el trabajo a la articulación."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "leg-extension",
+    "name": "Leg Extension",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en la máquina con las rodillas alineadas con el eje de rotación de la máquina y el respaldo bien apoyado.",
+      "Coloca los tobillos bajo el rodillo y sujétalos por detrás de las piernas.",
+      "Estira las rodillas hasta que las piernas queden paralelas al suelo, sin bloquearlas.",
+      "Aprieta el cuádriceps un segundo arriba.",
+      "Baja despacio hasta un ángulo de rodilla cómodo, estirando el tríceps por completo.",
+      "Es el ejercicio que más carga la articulación de la rodilla en la posición alta: no uses cargas enormes."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "goblet-squat",
+    "name": "Goblet Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Sujeta una mancuerna o una pesa rusa con las dos manos delante del pecho, contra el esternón.",
+      "Colócate con los pies algo más anchos que la cadera y las puntas ligeramente abiertas.",
+      "Baja en sentadilla manteniendo los codos cerca del cuerpo y el pecho alto.",
+      "Deja que los codos pasen por dentro de las rodillas al bajar: ese es el objetivo.",
+      "Sube empujando con el suelo, sin despegar los talones.",
+      "Es la mejor forma de aprender el patrón del sentadilla: la carga delante te obliga a mantener el torso arriba."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "heel-elevated-goblet-squat",
+    "name": "Heel-Elevated Goblet Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca el talón de un pie sobre un disco o una cuña, dejando el resto del pie en el suelo.",
+      "Sujeta la mancuerna contra el pecho con las dos manos.",
+      "Baja en sentadilla, permitiendo que la rodilla de atrás se flexione más hacia delante y la cadera baje.",
+      "Aprieta el cuádriceps de la pierna apoyada al subir.",
+      "Con el talón elevado se permite un rango mayor de tobillo y más trabajo en el cuádriceps de la pierna que apoya.",
+      "Usa un disco de dos a tres centímetros y ve subiendo de altura cuando lo domines."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "smith-machine-squat",
+    "name": "Smith Machine Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca la barra a la altura de la cadera y colócate dentro de la máquina, con los pies en la línea del raíl.",
+      "Desbloquea la barra y colócala sobre los hombros o en la horquilla del trapcio, según el diseño.",
+      "Baja hasta la profundidad que controles, con las rodillas siguiendo la dirección de las puntas.",
+      "Empuja hasta extender las rodillas, manteniendo el torso firme y sin inclinarte hacia delante.",
+      "Bloquea la barra al terminar la serie.",
+      "La barra va por un raíl fijo: más estable que la libre, pero el patrón de la cadera cambia ligeramente. Útil para acumular volumen sin fatigar la espalda baja."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "bodyweight-squat",
+    "name": "Bodyweight Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate con los pies a la anchura de los hombros y los brazos extendidos al frente para equilibrarte.",
+      "Baja juntando las rodillas hacia fuera y el pecho ligeramente hacia delante, como si te sentaras en una silla.",
+      "Apoya los talones en el suelo durante todo el recorrido.",
+      "Sube empujando el suelo hasta extender las rodillas y los hombros atrás.",
+      "Si te levantas empujando con los talones y las puntas se despegan, baja la profundidad o añade carga en la espalda alta.",
+      "Buena progresión antes del sentadilla con barra, o para series largas al final de la sesión."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "jump-squat",
+    "name": "Jump Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate con los pies algo más juntos que en el sentadilla normal, con los brazos hacia atrás para cargar el impulso.",
+      "Baja hasta un cuarto o un tercio, sin llegar abajo del todo.",
+      "Salta con fuerza hacia arriba, extendiendo cadera, rodillas y tobillos a la vez.",
+      "Aterriza suave, con las rodillas flexionadas y sin dejar caer el peso en los talones.",
+      "Repite con el ritmo que puedas controlar, sin cansarte hasta fallar la técnica.",
+      "Con técnica: si las rodillas colapsan al aterrizar, el ejercicio es demasiado intenso para ese día."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "wall-sit",
+    "name": "Wall Sit",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Apoya la espalda contra la pared y deslízate hasta que las rodillas queden a 90 grados, con los pies a un paso de la pared.",
+      "Mantén las rodillas por encima de los tobillos, sin que se abran hacia dentro.",
+      "Cruza los brazos frente al pecho o pon las manos sobre los muslos.",
+      "Aprieta el cuádriceps y los glúteos durante todo el tiempo.",
+      "Respira con normalidad, sin aguantar la respiración.",
+      "Empieza en treinta segundos y progresa con el tiempo, no con la profundidad."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "pistol-squat",
+    "name": "Pistol Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie sobre una sola pierna, con la otra extendida hacia delante y los brazos adelante para equilibrarte.",
+      "Baja controlando la bajada, flexionando la rodilla de apoyo y lleviando el cuerpo hacia el talón.",
+      "Apoya la pierna que baja en la punta si necesitas ayuda, sin llegar a apoyar el pie entero.",
+      "Sube empujando con el talón de la pierna de apoyo hasta extender la rodilla.",
+      "Mantén el abdomen apretado y el torso ligeramente inclinado hacia delante.",
+      "Es de los ejercicios más demandantes con peso corporal: si no dominas el equilibrio, usa la versión asistida."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "assisted-pistol-squat",
+    "name": "Assisted Pistol Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate de pie junto a una puerta o una barra baja, con una mano o un brazo apoyados en ella.",
+      "Ponte sobre una pierna y lleva la otra hacia delante, extendida.",
+      "Baja de forma controlada usando el apoyo solo para equilibrarte, no para sujetar el peso.",
+      "Sube hasta extender la rodilla de apoyo.",
+      "A medida que ganes confianza, baja el peso del apoyo en cada serie.",
+      "Si el apoyo acaba siendo el que tira, todavía no estás listo para la versión libre."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "sissy-squat",
+    "name": "Sissy Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate junto a una barra o una puerta para tener apoyo, con los pies a la anchura de la cadera.",
+      "Ponte de puntillas, con el cuerpo erguido y los brazos hacia delante para equilibrarte.",
+      "Baja manteniendo los pies en la punta y la rodilla avanzando hacia los dedos, como si te sentaras hacia atrás.",
+      "Deja que los talones se despeguen si es necesario, pero no los apoyes hasta que controlas la bajada completa.",
+      "Sube de nuevo a la punta de los pies con control.",
+      "Mete la cadera debajo de las rodillas: si te sientas hacia atrás sin bajar las rodillas, es otra variante."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "split-squat",
+    "name": "Split Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con una pierna adelantada y la otra atrás, en una posición de zancada larga.",
+      "Sujeta mancuernas a los lados si quieres carga, con el torso erguido y el abdomen firme.",
+      "Baja hasta que la rodilla de atrás se acerque al suelo y la de delante quede a 90 grados.",
+      "La rodilla delantera apunta siempre a los dedos del pie y no pasa de la punta.",
+      "Empuja con el talón del pie delantero para subir, sin impulso.",
+      "Completa todas las repeticiones de una pierna antes de cambiar. Las manos libres en la cadera te obligan a más core."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "smith-machine-split-squat",
+    "name": "Smith Machine Split Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate dentro de la máquina Smith con una barra sobre los hombros o en la horquilla, según el diseño.",
+      "Adopta una posición de zancada con una pierna adelantada y la otra atrás.",
+      "Desbloquea la barra y baja hasta que la rodilla de atrás quede cerca del suelo.",
+      "Empuja con el talón del pie delantero para subir manteniendo la cadera nivelada.",
+      "Bloquea la barra al terminar la serie.",
+      "La barra fija quita el problema de equilibrio: es la forma más segura de empezar zancadas con carga."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "smith-machine-bulgarian-split-squat",
+    "name": "Smith Machine Bulgarian Split Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca el pie trasero elevado sobre un banco dentro de la máquina Smith.",
+      "Deja el pie delantero un paso largo hacia delante, con el total del peso sobre esa pierna.",
+      "Desbloquea la barra y bájala hasta un ángulo de rodilla cómodo en la pierna adelantada.",
+      "Empuja con el talón del pie delantero para subir, sin dejar que la rodilla de atrás asuma el peso.",
+      "La barra fija y el banco dan estabilidad: es la mejor forma de cargar zancadas con carga alta sin depender del equilibrio.",
+      "Completa todas las repeticiones de una pierna antes de cambiar."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "walking-lunge",
+    "name": "Walking Lunge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con mancuernas a los lados y el torso erguido.",
+      "Da un paso largo hacia delante con una pierna y baja hasta que ambas rodillas queden cerca de los 90 grados.",
+      "Empuja con el talón del pie delantero y da un paso con la pierna de atrás hasta llegar a la posición inicial.",
+      "Continúa caminando hacia delante alternando piernas, con el tronco vertical.",
+      "Pasos más largos y más abajo: eso es lo que reduce la carga en la rodilla de delante.",
+      "Si estás inestable, haz las zancadas hacia atrás, que suelen ser más estables que hacia delante."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "forward-lunge",
+    "name": "Forward Lunge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies juntos y el abdomen apretado, con las manos en las caderas o en el pecho.",
+      "Da un paso largo hacia delante y baja hasta que la rodilla de atrás quede cerca del suelo.",
+      "Mantén el torso vertical y el peso en el talón del pie delantero.",
+      "Empuja desde el pie delantero para volver a la posición inicial.",
+      "Alterna piernas o completa todas las repeticiones de un lado.",
+      "Si pierdes equilibrio, acorta el paso: el problema nunca es la fuerza, es el equilibrio."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "lateral-lunge",
+    "name": "Lateral Lunge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies algo más separados que la anchura de la cadera y las puntas ligeramente hacia dentro.",
+      "Da un paso lateral y desplaza la cadera hacia ese lado, manteniendo el otro pie plantado.",
+      "Baja hasta que la cadera se aproxime a la rodilla flexionada, sin que esa rodilla pase de la punta del pie.",
+      "Empuja con el talón de la pierna flexionada para volver al centro.",
+      "El pie que se aleja se queda apuntando al frente, no se gira hacia fuera.",
+      "Si el pecho se inclina hacia el lado, el peso está mal repartido: levanta la cadera y vuelve al centro."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "step-up",
+    "name": "Step-Up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate de frente a un banco o una caja, con un pie apoyado en la superficie y el otro en el suelo.",
+      "Empuja con el talón del pie de arriba para subir, sin impulsarte con el pie de abajo.",
+      "Sube hasta estar de pie sobre el banco, con el torso erguido y una rodilla dominante.",
+      "Baja de forma controlada dejando que el pie de abajo tome el peso.",
+      "La altura del banco y la distancia deciden si la pierna de arriba trabaja de verdad: si te impulsas desde abajo, baja la caja.",
+      "Alterna pies o completa todas las repeticiones de un lado."
+    ],
+    "steps_en": []
+  }
+]

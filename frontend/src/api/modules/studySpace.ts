@@ -50,6 +50,12 @@ export interface SpaceJob {
 }
 
 const jobs = new Map<string, SpaceJob>();
+
+/** A theory note is complete when it reaches its last section; a cut-off one stops mid-way. */
+const isCompleteTheory = (text: string): boolean => /##\s*Tarjetas[\s\S]{80,}/.test(text);
+
+/** A note this generator wrote (status: draft) that never got its last section. */
+const isCutDraft = (text: string): boolean => /^status:\s*draft\s*$/m.test(text) && !isCompleteTheory(text);
 const MAX_AREAS = 30;
 const MAX_TOPICS = 40;
 
@@ -122,11 +128,11 @@ export function studySpaceApi(app: AppState) {
         content:
           `Materia: ${subjectName}. Área: ${areaName}. Tema: ${topic}.\n` +
           `Otros temas del área (no los repitas, enlázalos con [[...]] cuando corresponda): ${siblings.filter((s) => s !== topic).join("; ")}.\n\n` +
-          `Escribe la nota completa del tema en Markdown SIN frontmatter (lo añade la app). Empieza con «# ${topic}».`,
+          `Escribe la nota completa del tema en Markdown SIN frontmatter (lo añade la app). Empieza con «# ${topic}» y termina con la sección «## Tarjetas».`,
       },
-    ]);
+    ], isCompleteTheory);
     const body = reply.replace(/^```(?:markdown|md)?\s*/i, "").replace(/```\s*$/, "").trim();
-    if (body.length < 300) throw new ApiError("La IA devolvió una teoría demasiado corta.");
+    if (!isCompleteTheory(body)) throw new ApiError("La teoría llegó cortada (sin la sección Tarjetas).");
     const fm = [
       "---",
       "type: teorica",
@@ -169,7 +175,7 @@ export function studySpaceApi(app: AppState) {
     if (req.steps.theory) {
       for (const { area, topic } of allTopics) {
         const file = path.join(app.root, folder, area, topic, `${topic}.md`);
-        if (fs.existsSync(file)) {
+        if (fs.existsSync(file) && !isCutDraft(fs.readFileSync(file, "utf-8"))) {
           say(`Teoría de «${topic}»: ya existe, se deja como está.`);
         } else {
           say(`Escribiendo la teoría de «${topic}»…`);

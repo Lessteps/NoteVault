@@ -253,13 +253,21 @@ function findTopicManifest(
  * blank). Structured calls get a generous budget, and one bigger retry when the
  * answer still comes back empty.
  */
-const STRUCTURED_BUDGETS = [6000, 12000];
-export async function askStructured(cfg: AIConfig, messages: Array<{ role: string; content: string }>): Promise<string> {
+const STRUCTURED_BUDGETS = [6000, 14000, 24000];
+/**
+ * `accept` lets a caller reject an answer that is not usable yet — typically one cut
+ * off by the token limit — and retry with the next, bigger budget.
+ */
+export async function askStructured(
+  cfg: AIConfig,
+  messages: Array<{ role: string; content: string }>,
+  accept: (reply: string) => boolean = () => true,
+): Promise<string> {
   let reply = "";
   for (const budget of STRUCTURED_BUDGETS) {
     const wide = new AIConfig({ ...cfg.toDict(), max_tokens: Math.max(cfg.max_tokens, budget), include_note: false });
     reply = await sendChat(wide, messages as any);
-    if (reply.trim()) return reply;
+    if (reply.trim() && accept(reply)) return reply;
   }
   return reply;
 }

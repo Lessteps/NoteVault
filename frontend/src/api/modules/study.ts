@@ -70,7 +70,7 @@ import { catalogFor } from "../../core/practice/skillSelection.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
 import { BRANCH_LABELS, classifyTopic, domainOfSubject, isEnglishSubject, keyOf, type Classification } from "../../core/practice/domain.js";
 import { EnglishVocabularyManager } from "../../core/englishVocabularyManager.js";
-import { ENGLISH_VOCABULARY_FOLDER, isEnglishBranch, isVocabularySkill } from "../../lib/englishSkillData.js";
+import { ENGLISH_VOCABULARY_FOLDER, isEnglishBranch, isVocabularySkill, WORD_CLASSES, type WordClass } from "../../lib/englishSkillData.js";
 import { listUnclassified, recordUnclassified, resolveUnclassified } from "../topicClassification.js";
 import {
   learningPromptLines,
@@ -1013,13 +1013,14 @@ export function studyApi(app: AppState) {
      * A vocabulary session from the shared word bank (no topic needed): exercises of one `vc_` skill built around
      * the words due first, saved in `<English space>/Vocabulario/Ejercicios/<skill>/`. Their reviews follow the grade.
      */
-    async study_vocab_session(skill = "vc_recall", quantity = "3-5") {
+    async study_vocab_session(skill = "vc_recall", quantity = "3-5", wordClass = "") {
       const sk = String(skill || "").trim().toLowerCase();
-      if (!isVocabularySkill(sk)) throw new ApiError("Elige una competencia de vocabulario (vc_recall, vc_recognition, vc_usage, vc_families o vc_collocations).");
+      if (!isVocabularySkill(sk)) throw new ApiError("Elige una competencia de vocabulario (recuerdo, reconocimiento, uso, familias, colocaciones o sinónimos).");
       const space = englishSpaceFolder(app);
       if (!space) throw new ApiError("Todavía no hay un espacio de inglés: genera uno primero.");
       const today = isoDate(new Date())!;
-      const words = new EnglishVocabularyManager(app.root).sessionWords("", 10, today);
+      const cls = (WORD_CLASSES as readonly string[]).includes(wordClass) ? (wordClass as WordClass) : null;
+      const words = new EnglishVocabularyManager(app.root).sessionWords("", 10, today, cls);
       if (!words.length) throw new ApiError("El banco de palabras está vacío: añade palabras al calendario de repasos o mínalas desde el reproductor.");
       const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
       if (cfg.is_bridge) throw new ApiError("El proveedor de IA está en modo puente; no se puede generar automáticamente.");

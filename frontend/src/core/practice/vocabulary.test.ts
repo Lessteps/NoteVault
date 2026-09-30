@@ -10,6 +10,7 @@ vi.mock("../../api/appConfig.js", () => ({
 
 import { AppState } from "../../api/appState";
 import { studyApi } from "../../api/modules/study";
+import { cefrForTopic, wordClassOf, wordClassOfTopic } from "../../lib/englishSkillData";
 import { EnglishVocabularyManager, VOCAB_INTERVALS } from "../englishVocabularyManager";
 import { parseExercise } from "./exerciseNote";
 import { rescheduleReview } from "./reviewFiles";
@@ -124,5 +125,41 @@ describe("vocabulary sessions", () => {
     fs.mkdirSync(path.join(root, "Inglés 1"), { recursive: true });
     fs.writeFileSync(path.join(root, "Inglés 1", "Inglés 1.resumen.md"), "---\nsubject: english\n---\n", "utf-8");
     await expect(api.study_vocab_session("vc_recall")).rejects.toThrow(/banco de palabras está vacío/);
+  });
+});
+
+describe("vocabulary by word class", () => {
+  it("normalises a part of speech into a class and reads the class of a topic from its name", () => {
+    expect(wordClassOf("noun")).toBe("noun");
+    expect(wordClassOf("verb", "give up")).toBe("phrasal verb");
+    expect(wordClassOf("verb", "borrow")).toBe("verb");
+    expect(wordClassOf("adjective")).toBe("adjective");
+    expect(wordClassOf("idiom", "break the ice")).toBe("expression");
+    expect(wordClassOf("", "a lot of")).toBe("expression");
+    expect(wordClassOfTopic("6.1 Common verbs")).toBe("verb");
+    expect(wordClassOfTopic("6.5 Phrasal verbs")).toBe("phrasal verb");
+    expect(wordClassOfTopic("6.6 Collocations")).toBe("expression");
+    expect(wordClassOfTopic("Something else")).toBeNull();
+  });
+
+  it("a session takes words of ONE class: the topic's, or the class with most words due", () => {
+    for (const w of ["borrow", "lend", "carry", "invite"]) bank.addWord(w, w, { part_of_speech: "verb" });
+    for (const w of ["shy", "polite"]) bank.addWord(w, w, { part_of_speech: "adjective" });
+    bank.addWord("bill", "cuenta", { part_of_speech: "noun" });
+    const today = "2026-09-30";
+    expect(bank.sessionWords("6.2 Adjectives to describe people", 5, today).map((w) => w.word).sort()).toEqual(["polite", "shy"]);
+    const auto = bank.sessionWords("", 10, today);
+    expect(new Set(auto.map((w) => w.part_of_speech))).toEqual(new Set(["verb"]));
+    expect(auto).toHaveLength(4);
+    // a class the bank does not have does not leave the session empty
+    expect(bank.sessionWords("", 3, today, "adverb").length).toBeGreaterThan(0);
+  });
+});
+
+describe("CEFR of an exercise is relative to its topic", () => {
+  it("the topic's level is the middle difficulty, never below A1", () => {
+    expect([1, 2, 3].map((d) => cefrForTopic(d as 1 | 2 | 3, "B1"))).toEqual(["A2", "B1", "B2"]);
+    expect([1, 2, 3].map((d) => cefrForTopic(d as 1 | 2 | 3, "A1"))).toEqual(["A1", "A1", "A2"]);
+    expect([1, 2, 3].map((d) => cefrForTopic(d as 1 | 2 | 3))).toEqual(["A2", "B1", "B2"]);
   });
 });

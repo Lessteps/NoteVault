@@ -5,6 +5,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { loadJson, slug, writeJson } from "./store.js";
 import { isSyncConflict } from "./vaultFormat.js";
+import { wordClassOf, wordClassOfTopic, type WordClass } from "../lib/englishSkillData.js";
 
 export const PRACTICE_MODES = [
   "en_to_meaning", "meaning_to_en", "sentence_to_word", "ipa_to_word", "word_to_sentence", "cloze",
@@ -146,12 +147,24 @@ export class EnglishVocabularyManager {
    * The words a vocabulary session is built around: the ones due first (lowest mastery first inside), and among
    * equals the ones that belong to the topic (`topicHint` matches the word's topic or its source note).
    */
-  sessionWords(topicHint: string, limit: number, today: string): VocabItem[] {
+  sessionWords(topicHint: string, limit: number, today: string, wordClass?: WordClass | null): VocabItem[] {
     const hint = topicHint.toLowerCase();
     const near = (w: VocabItem): number => (hint && (w.topic.includes(hint) || w.source_note.toLowerCase().includes(hint)) ? 0 : 1);
-    return this.allWords()
+    const ranked = this.allWords()
       .map((w) => ({ w, due: !w.next_review || w.next_review <= today ? 0 : 1 }))
-      .sort((a, b) => a.due - b.due || near(a.w) - near(b.w) || a.w.mastery - b.w.mastery)
+      .sort((a, b) => a.due - b.due || near(a.w) - near(b.w) || a.w.mastery - b.w.mastery);
+    // A session works on ONE class of words (verbs with verbs, adjectives with adjectives…): the class asked for
+    // (or the topic's), otherwise the class with the most words due. If the bank has none of that class, the session falls back to the whole bank.
+    const classOf = (w: VocabItem): WordClass => wordClassOf(w.part_of_speech, w.word);
+    let cls: WordClass | null = wordClass ?? wordClassOfTopic(topicHint);
+    if (!cls && ranked.length) {
+      const counts = new Map<WordClass, number>();
+      for (const x of ranked) if (x.due === 0) counts.set(classOf(x.w), (counts.get(classOf(x.w)) ?? 0) + 1);
+      const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+      cls = best ? best[0] : classOf(ranked[0]!.w);
+    }
+    const same = cls ? ranked.filter((x) => classOf(x.w) === cls) : ranked;
+    return (same.length ? same : ranked)
       .slice(0, Math.max(0, limit))
       .map((x) => x.w);
   }

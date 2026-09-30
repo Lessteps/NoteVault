@@ -5,7 +5,9 @@
 // *dentro* del panel, sin moverte de donde estas.
 
 import { CalendarClock, Globe, ListTree, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
+import { useEffect } from "react";
 import { toggleFace } from "../../lib/panelFaces";
+import { subjectUsesLatex, useActiveSubject } from "../../lib/useActiveSubject";
 import { useReviewPanel } from "../study/ReviewPanel";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
@@ -21,6 +23,12 @@ export function PanelLaunchers({ module }: { module: string }) {
   const pagesOpen = useWebPages((s) => s.open);
   const reviewOpen = useReviewPanel((s) => s.open);
   const inkOpen = useApp((s) => s.inkDraft !== null);
+  const subject = useActiveSubject();
+  const latexTool = subjectUsesLatex(subject);
+  // Moving to an English area closes a drawing pad that was left open in a maths one.
+  useEffect(() => {
+    if (!latexTool && inkOpen) useApp.getState().setInkDraft(null);
+  }, [latexTool, inkOpen]);
 
   const cell = (on: boolean, enabled = true) =>
     cn(
@@ -102,7 +110,7 @@ export function PanelLaunchers({ module }: { module: string }) {
       )}
 
       {/* A drawing pad in a split view; pressing it again closes it. */}
-      {module === "notas" && (
+      {module === "notas" && latexTool && (
         <button
           type="button"
           title={inkOpen ? "Cerrar el dibujo LaTeX" : "Dibujar LaTeX (lienzo infinito en vista dividida)"}

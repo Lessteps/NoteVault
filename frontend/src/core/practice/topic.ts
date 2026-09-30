@@ -34,6 +34,8 @@ export interface TopicManifest {
   topic_type?: TopicType;
   /** English topics: gramática · escritura · lectura · escucha · habla. English has no topic type and no default branch. */
   branch?: EnglishBranch;
+  /** English topics: the CEFR level of the topic (A1–C1); exercise difficulty is relative to it. */
+  level?: string;
   exam_group?: string;
   /**
    * The AI's plan for THIS topic: which competencies it trains and how many passed
@@ -318,6 +320,8 @@ export function parseTopicManifest(
   }
   const branch = String(fm.branch ?? "").trim().toLowerCase();
   if (isEnglishBranch(branch)) manifest.branch = branch;
+  const level = String(fm.level ?? "").trim().toUpperCase();
+  if (/^(A1|A2|B1|B2|C1)$/.test(level)) manifest.level = level;
 
   if (plan && planned.length) {
     manifest.plan = Object.fromEntries(planned.map((sk) => [sk, plan[sk]!]));
@@ -368,6 +372,9 @@ export function serializeTopicManifest(manifest: TopicManifest): string {
   }
   if (manifest.branch) {
     lines.push(`branch: ${manifest.branch}`);
+  }
+  if (manifest.level) {
+    lines.push(`level: ${manifest.level}`);
   }
 
   if (manifest.exam_group) {

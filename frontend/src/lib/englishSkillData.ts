@@ -3,13 +3,15 @@
 //
 // Every English skill has its own namespaced id (`gr_…`, `wr_…`, `rd_…`, `ls_…`, `sp_…`, `vc_…`), so
 // nothing is shared with the mathematics or programming skills — they cannot leak into each other.
-// A branch is a folder of the space with its own syllabus; vocabulary is NOT a branch: it is one
-// shared word bank that any branch feeds, practised with the `vc_` skills.
+// A branch is a folder of the space with its own syllabus. There are six: grammar, writing, reading,
+// listening, speaking and vocabulary. Vocabulary is the sixth area (`6 Vocabulario`): its topics are
+// classes of words (verbs, nouns, adjectives…), and it is practised with spaced repetition over ONE shared
+// word bank that the other branches also feed; a session always takes words of the SAME class.
 //
-// Difficulty 1 / 2 / 3 = CEFR A2 / B1 / B2 and above.
+// Difficulty 1 / 2 / 3 is relative to the level of the topic (see `cefrForTopic`).
 
-export type EnglishBranch = "grammar" | "writing" | "reading" | "listening" | "speaking";
-export type EnglishArea = EnglishBranch | "vocabulary";
+export type EnglishBranch = "grammar" | "writing" | "reading" | "listening" | "speaking" | "vocabulary";
+export type EnglishArea = EnglishBranch;
 
 export const ENGLISH_BRANCHES: ReadonlyArray<{ id: EnglishBranch; label: string; folder: string; words: readonly string[] }> = [
   { id: "grammar", label: "Gramática", folder: "1 Gramática", words: ["gramatica", "grammar"] },
@@ -17,10 +19,24 @@ export const ENGLISH_BRANCHES: ReadonlyArray<{ id: EnglishBranch; label: string;
   { id: "reading", label: "Lectura", folder: "3 Lectura", words: ["lectura", "reading"] },
   { id: "listening", label: "Escucha", folder: "4 Escucha", words: ["escucha", "listening"] },
   { id: "speaking", label: "Habla", folder: "5 Habla", words: ["habla", "speaking", "oral"] },
+  { id: "vocabulary", label: "Vocabulario", folder: "6 Vocabulario", words: ["vocabulario", "vocabulary"] },
 ];
 
-/** The folder of the shared word bank (not a branch and it has no syllabus). */
-export const ENGLISH_VOCABULARY_FOLDER = "Vocabulario";
+/** The folder of the vocabulary area (the sixth branch); it also holds the home note of the shared word bank. */
+export const ENGLISH_VOCABULARY_FOLDER = "6 Vocabulario";
+/** Where it used to live, before vocabulary became an area of its own. */
+export const LEGACY_VOCABULARY_FOLDER = "Vocabulario";
+
+const LEVELS = ["A1", "A2", "B1", "B2", "C1"] as const;
+/**
+ * The CEFR level of an exercise of difficulty 1 / 2 / 3 in a topic of `topicLevel`: the topic's level is the
+ * middle one (easy = a step below, hard = a step above), never below A1. Unknown topic level → B1.
+ */
+export function cefrForTopic(difficulty: 1 | 2 | 3, topicLevel?: string): string {
+  const i = LEVELS.indexOf(String(topicLevel ?? "").toUpperCase() as (typeof LEVELS)[number]);
+  const base = i < 0 ? 2 : i;
+  return LEVELS[Math.max(0, Math.min(LEVELS.length - 1, base + difficulty - 2))]!;
+}
 
 export interface EnglishSkillSpec {
   id: string;
@@ -71,6 +87,14 @@ export const ENGLISH_SKILL_SPECS: readonly EnglishSkillSpec[] = [
     competencies: ["Producción propia", "Uso natural"],
     act: "Describe a real situation and ask the learner to write sentences that use the target structure naturally.",
     judge: "The structure is used correctly and naturally in original sentences that fit the situation.", answerKind: "text", timer: "10m" }),
+  s({ id: "gr_syntax", area: "grammar", label: "Analizar la estructura sintáctica", description: "Descomponer una oración: sujeto, verbo, complementos y cláusulas.",
+    competencies: ["Análisis sintáctico", "Funciones de cada parte"],
+    act: "Give sentences (from simple to complex, according to the level) and ask the learner to split them into subject, verb, objects, complements and clauses, naming the function of each part.",
+    judge: "Every part is identified with the right function (subject, verb, direct/indirect object, adverbial, clause type) and no part is misassigned.", answerKind: "text", timer: "10m" }),
+  s({ id: "gr_expressions", area: "grammar", label: "Usar expresiones y estructuras", description: "Emplear las expresiones y estructuras fijas del punto gramatical.",
+    competencies: ["Expresiones fijas", "Estructuras características"],
+    act: "Give a communicative situation and a list of expressions or fixed structures of the target grammar point (e.g. used to, be going to, there is/are, have to) and ask the learner to use them correctly in sentences.",
+    judge: "Each expression is used with its correct form and meaning in a sentence that fits the situation.", answerKind: "text", timer: "10m" }),
   // ── Writing ───────────────────────────────────────────────────────────────
   s({ id: "wr_sentences", area: "writing", label: "Construir oraciones", description: "Armar oraciones correctas a partir de palabras o ideas dadas.",
     competencies: ["Orden de palabras", "Oraciones completas"],
@@ -121,6 +145,14 @@ export const ENGLISH_SKILL_SPECS: readonly EnglishSkillSpec[] = [
     competencies: ["Organización del texto", "Función de los párrafos"],
     act: "Give a text and ask for the function of each paragraph, the linkers that mark the structure and the type of text.",
     judge: "The organisation and the function of each part are identified correctly, with the linkers as evidence.", answerKind: "text", timer: "10m", noBeginner: true }),
+  s({ id: "rd_paraphrase", area: "reading", label: "Reescribir con otras palabras", description: "Decir lo que dice el texto con tus propias palabras y otra estructura.",
+    competencies: ["Paráfrasis", "Sinónimos y estructuras"],
+    act: "Give a passage (a few sentences) and ask the learner to rewrite it with different words and structures, keeping the meaning and the level.",
+    judge: "The meaning is kept, the wording really differs from the source (not just swapped words), and the result is correct English.", answerKind: "text", timer: "10m", noBeginner: true }),
+  s({ id: "rd_translate", area: "reading", label: "Traducir", description: "Traducir un fragmento al español, o del español al inglés, con naturalidad.",
+    competencies: ["Traducción", "Falsos amigos y estructuras"],
+    act: "Give a short passage in English to translate into Spanish (or a Spanish passage to translate into English), containing structures or false friends worth noticing.",
+    judge: "The translation keeps the meaning, sounds natural in the target language, and handles the tricky structures and false friends correctly; word-by-word calques are errors.", answerKind: "text", timer: "10m" }),
   // ── Listening (audio is played by the app; the text stays hidden) ─────────
   s({ id: "ls_dictation", area: "listening", label: "Dictado", description: "Escuchar una frase y escribirla exactamente.",
     competencies: ["Discriminación de sonidos", "Ortografía"],
@@ -142,6 +174,14 @@ export const ENGLISH_SKILL_SPECS: readonly EnglishSkillSpec[] = [
     competencies: ["Adaptación al ritmo", "Acentos"],
     act: "Provide an audio text to be played at different speeds or with a different English accent; the learner answers the same questions each time.",
     judge: "Comprehension is kept as speed or accent changes; the learner reports what became harder.", answerKind: "short", timer: "10m", audio: true, noBeginner: true }),
+  s({ id: "ls_podcast", area: "listening", label: "Comprensión de un podcast", description: "Entender un fragmento de podcast (o de un audio con transcripción pegada): idea, detalles y resumen.",
+    competencies: ["Comprensión de audio real", "Resumen oral"],
+    act: "Use a podcast or media excerpt (its transcript is provided) to be played aloud; ask for the gist, two or three specific details and a two-sentence summary.",
+    judge: "The gist is right, the details are exact and the summary is in the learner's own words and complete.", answerKind: "text", timer: "10m", audio: true }),
+  s({ id: "ls_shadowing", area: "listening", label: "Escuchar y replicar la frase (shadowing)", description: "Escuchar una frase del audio y repetirla igual: sonidos, ritmo y entonación.",
+    competencies: ["Réplica de la frase", "Ritmo y entonación"],
+    act: "Play a short phrase from the audio; the learner repeats it right after (shadowing), then types the phrase as they said it and notes which words or sounds they could not replicate.",
+    judge: "The typed phrase matches the original, and the notes on what was hard (weak forms, stress, linking) are specific and plausible.", answerKind: "text", timer: "5m", audio: true }),
   // ── Speaking (no speech recognition: the learner types what they said) ────
   s({ id: "sp_read_aloud", area: "speaking", label: "Lectura en voz alta", description: "Leer un texto en voz alta cuidando la pronunciación.",
     competencies: ["Pronunciación", "Entonación"],
@@ -167,6 +207,30 @@ export const ENGLISH_SKILL_SPECS: readonly EnglishSkillSpec[] = [
     competencies: ["Autoevaluación oral", "Comparación con un modelo"],
     act: "Give a model text; the learner records themself, compares with the model and lists differences (sounds, stress, pace) and a plan to improve.",
     judge: "The differences named are specific and plausible, and the improvement plan is concrete.", answerKind: "text", timer: "10m", noBeginner: true }),
+  s({ id: "sp_phonemes", area: "speaking", label: "Sonidos y pares mínimos", description: "Distinguir y producir sonidos difíciles con pares mínimos (ship/sheep, think/sink).",
+    competencies: ["Fonemas vocálicos y consonánticos", "Pares mínimos"],
+    act: "Give minimal pairs or a list of words with a problem sound for a Spanish speaker; the learner says which word is which, describes how the sound is produced (tongue, lips, voicing) and reports how they pronounced each.",
+    judge: "The sounds are discriminated correctly and the articulatory description is accurate for the sound.", answerKind: "short", timer: "5m" }),
+  s({ id: "sp_ipa", area: "speaking", label: "Leer y escribir IPA", description: "Pasar de la ortografía al alfabeto fonético y al revés.",
+    competencies: ["Alfabeto fonético", "Ortografía vs sonido"],
+    act: "Give words or short phrases in spelling to transcribe into IPA, or IPA to write in normal spelling, at the level of the sounds studied.",
+    judge: "Each transcription uses the correct symbols (vowel length, stress mark, schwa) or the correct word.", answerKind: "short", timer: "5m" }),
+  s({ id: "sp_word_stress", area: "speaking", label: "Acento de palabra", description: "Marcar la sílaba tónica y aplicar las reglas del acento.",
+    competencies: ["Sílaba tónica", "Reglas de acentuación"],
+    act: "Give words (including noun/verb pairs such as REcord/reCORD) and ask the learner to mark the stressed syllable, say the rule and pronounce them aloud, reporting how they said each.",
+    judge: "The stressed syllable is right for every word and the rule given is correct.", answerKind: "short", timer: "5m" }),
+  s({ id: "sp_sentence_stress", area: "speaking", label: "Acento de frase y ritmo", description: "Decidir qué palabras llevan énfasis y ritmo en una frase.",
+    competencies: ["Palabras de contenido y de función", "Ritmo del inglés"],
+    act: "Give sentences and ask which words carry the stress (content words) and which reduce, then to say them aloud with that rhythm and report which words they weakened.",
+    judge: "Stress falls on the right content words; function words are identified as weak; the rhythm explanation is correct.", answerKind: "short", timer: "5m" }),
+  s({ id: "sp_intonation", area: "speaking", label: "Entonación", description: "Elegir y producir la entonación adecuada (ascendente, descendente) según la función.",
+    competencies: ["Patrones de entonación", "Actitud del hablante"],
+    act: "Give sentences and situations (questions, lists, surprise, politeness) and ask for the intonation pattern of each, then to say them aloud and report the pattern used.",
+    judge: "The pattern matches the sentence type and the speaker's attitude, and the explanation is right.", answerKind: "short", timer: "5m", noBeginner: true }),
+  s({ id: "sp_connected", area: "speaking", label: "Habla conectada", description: "Enlazar sonidos: linking, formas débiles, elisión y asimilación.",
+    competencies: ["Linking", "Formas débiles y elisión"],
+    act: "Give phrases with linking, weak forms, elision or assimilation (want to → wanna, next day, an apple) and ask the learner to mark the connections and say them fluently, reporting which links they managed.",
+    judge: "The connections are marked correctly (where sounds join, reduce or disappear) and the fluent form is correct.", answerKind: "text", timer: "10m", noBeginner: true }),
   // ── Vocabulary (cross-cutting: one shared word bank) ──────────────────────
   s({ id: "vc_recall", area: "vocabulary", label: "Recuerdo de memoria", description: "Recordar la palabra o su significado sin ver la respuesta.",
     competencies: ["Recuerdo activo", "Rapidez"],
@@ -188,6 +252,10 @@ export const ENGLISH_SKILL_SPECS: readonly EnglishSkillSpec[] = [
     competencies: ["Colocaciones", "Naturalidad"],
     act: "Give sentences where the learner must choose or complete the natural collocation (make/do, heavy rain, take a decision…).",
     judge: "The collocations are the natural ones; calques from Spanish are errors.", answerKind: "short", timer: "5m" }),
+  s({ id: "vc_synonyms", area: "vocabulary", label: "Sinónimos, antónimos y matices", description: "Relacionar palabras de una misma clase por sentido: sinónimos, antónimos y matiz.",
+    competencies: ["Relaciones de sentido", "Matices de uso"],
+    act: "Give a group of words of the same class and ask for synonyms, antonyms or which one fits a sentence best, explaining the nuance.",
+    judge: "The relations are correct and the nuance or register difference given is accurate.", answerKind: "short", timer: "5m", noBeginner: true }),
 ];
 
 export const ENGLISH_SKILL_IDS: readonly string[] = ENGLISH_SKILL_SPECS.map((x) => x.id);
@@ -198,9 +266,9 @@ export function englishSkillSpec(id: string): EnglishSkillSpec | undefined {
 
 export const isEnglishSkill = (id: string): boolean => englishSkillSpec(id) !== undefined;
 
-/** The skills a topic of a branch can practise: its own branch plus the cross-cutting vocabulary ones. */
+/** The skills a topic of a branch can practise: its own, plus (outside vocabulary) the vocabulary ones for its new words. */
 export function englishSkillsForBranch(branch: EnglishBranch): EnglishSkillSpec[] {
-  return ENGLISH_SKILL_SPECS.filter((x) => x.area === branch || x.area === "vocabulary");
+  return ENGLISH_SKILL_SPECS.filter((x) => x.area === branch || (branch !== "vocabulary" && x.area === "vocabulary"));
 }
 
 const fold = (t: string): string => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -230,7 +298,8 @@ export function suggestBranch(name: string): EnglishBranch | null {
       "listening",
       /\b(escucha|listening|dictado|dictation|audio|podcast|acento|accent)\b/,
     ],
-    ["speaking", /\b(habla|speaking|pronunci|shadowing|roleplay|conversaci|oral)\b/],
+    ["vocabulary", /\b(vocabulario|vocabulary|palabras|words|phrasal|collocation|colocaci|idiom)\b/],
+    ["speaking", /\b(habla|speaking|pronunci|fonolog|phonolog|shadowing|roleplay|conversaci|oral)\b/],
     ["reading", /\b(lectura|reading|comprension|skimming|scanning)\b/],
     ["writing", /\b(escritura|writing|redaccion|email|correo|parrafo|paragraph|ensayo|essay)\b/],
     [
@@ -244,26 +313,58 @@ export function suggestBranch(name: string): EnglishBranch | null {
 /** What a syllabus and a theory note of each branch is about; the generators quote it. */
 export const ENGLISH_BRANCH_BRIEF: Record<EnglishBranch, { syllabus: string; theory: string }> = {
   grammar: {
-    syllabus: "Each topic is ONE grammar point (a tense, articles, prepositions, conditionals, the passive, relative clauses, reported speech…), ordered by CEFR level from A2 to C1 and by dependency.",
-    theory: "The note explains the rule (form, use, exceptions), contrasts it with Spanish and shows it in realistic work and daily-life sentences.",
+    syllabus: "Each topic is ONE grammar point (a tense, articles, prepositions, conditionals, the passive, relative clauses, reported speech…), ordered by CEFR level from A1 to B1 (about fifteen topics) and by dependency: the basics first (to be, articles, plurals, possessives, there is/are, can), then the tenses and comparisons, then present perfect, modals, conditionals, the passive and relative clauses.",
+    theory: "The note explains the concept and the rule (form, use, exceptions), lists its typical expressions and its syntactic structure, contrasts it with Spanish and shows it in realistic work and daily-life sentences.",
   },
   writing: {
     syllabus: "Each topic is ONE writing sub-skill or text type (building sentences, linkers, a paragraph, an email, an opinion text, register, self-review), from A2 to C1.",
     theory: "The note teaches the structure of that text or sub-skill and includes a model text; the examples are short pieces of writing with why they work.",
   },
   reading: {
-    syllabus: "Each topic is ONE reading strategy or text type (skimming and scanning, guessing words from context, inference, main ideas and summaries, text structure, articles, instructions, emails), from A2 to C1.",
+    syllabus: "Each topic is ONE reading strategy or text type (skimming and scanning, guessing words from context, inference, main ideas and summaries, paraphrasing, translation, text structure, articles, instructions, emails), from A2 to C1.",
     theory: "The note teaches the strategy step by step and uses short sample texts; the examples show the strategy applied to a text.",
   },
   listening: {
-    syllabus: "Each topic is ONE listening skill or sound pattern (weak forms and contractions, numbers and dates, stress and rhythm, accents, meetings, phone calls, instructions), from A2 to C1.",
+    syllabus: "Each topic is ONE listening skill or sound pattern (weak forms and contractions, numbers and dates, stress and rhythm, accents, podcasts and interviews, meetings, phone calls, instructions), from A2 to C1. Listening is practised with real audio: podcasts and films in the player, with subtitles or a pasted transcript, using dictation and shadowing.",
     theory: "The note explains the pattern or strategy and includes transcripts of sample audios; the examples are short transcripts with what to listen for.",
   },
   speaking: {
-    syllabus: "Each topic is ONE communicative function or pronunciation pattern (introducing yourself, asking and answering, giving opinions, meetings, presentations, phone calls, problem sounds), from A2 to C1.",
-    theory: "The note teaches the function or sound with model phrases and typical Spanish-speaker slips; the examples are short exchanges or phrases to say aloud.",
+    syllabus: "Speaking is mostly PHONOLOGY plus a few functions. Each topic is ONE sound or prosody pattern (vowel sounds and minimal pairs, consonants that are hard for Spanish speakers, the schwa, word stress, sentence stress and rhythm, intonation, linking and weak forms, the IPA) or ONE communicative function (introducing yourself, requests, opinions, meetings, presentations), from A2 to C1.",
+    theory: "The note teaches the sound or function with model words and phrases (IPA where it helps), how the sound is produced, and typical Spanish-speaker slips; the examples are short words or phrases to say aloud.",
+  },
+  vocabulary: {
+    syllabus: "Each topic is ONE CLASS of words (common verbs, everyday nouns, adjectives to describe people and things, adverbs, phrasal verbs, collocations, fixed expressions, linking words), ordered by CEFR level from A1 to B1. Words are practised with spaced repetition in groups of the same class.",
+    theory: "The note presents the class (what these words do), a list of the key words with meaning, example and collocations, how to learn them, and the typical Spanish-speaker traps (false friends, calques).",
   },
 };
 
 /** Whether a skill id is one of the cross-cutting vocabulary skills (`vc_…`). */
 export const isVocabularySkill = (id: string): boolean => englishSkillSpec(id)?.area === "vocabulary";
+
+/** The word classes a vocabulary session groups by (the `part_of_speech` of a word, normalised). */
+export const WORD_CLASSES = ["verb", "noun", "adjective", "adverb", "phrasal verb", "expression", "other"] as const;
+export type WordClass = (typeof WORD_CLASSES)[number];
+
+/** Normalises whatever a word's part of speech says into one of the classes. */
+export function wordClassOf(partOfSpeech: string, word = ""): WordClass {
+  const p = fold(partOfSpeech);
+  if (p.includes("phrasal")) return "phrasal verb";
+  if (/(idiom|expression|collocation|phrase|connector|linking)/.test(p)) return "expression";
+  if (p.startsWith("v")) return /\s(up|down|out|off|on|in|over|away|back|around|through)$/.test(fold(word).trim()) ? "phrasal verb" : "verb";
+  if (p.startsWith("n")) return "noun";
+  if (p.startsWith("adj")) return "adjective";
+  if (p.startsWith("adv")) return "adverb";
+  return word.trim().includes(" ") ? "expression" : "other";
+}
+
+/** The class a vocabulary topic is about, from its name ("6.1 Common verbs" → verb); null when it names none. */
+export function wordClassOfTopic(topicName: string): WordClass | null {
+  const n = fold(topicName);
+  if (n.includes("phrasal")) return "phrasal verb";
+  if (/(expression|idiom|collocation|linking|connector|fixed)/.test(n)) return "expression";
+  if (n.includes("verb")) return "verb";
+  if (/(noun|sustantiv)/.test(n)) return "noun";
+  if (/(adjective|adjetiv)/.test(n)) return "adjective";
+  if (n.includes("adverb")) return "adverb";
+  return null;
+}

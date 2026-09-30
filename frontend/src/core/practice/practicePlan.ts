@@ -193,6 +193,7 @@ const BRANCH_NAMES: Record<EnglishBranch, string> = {
   reading: "reading",
   listening: "listening",
   speaking: "speaking",
+  vocabulary: "vocabulary",
 };
 
 /**
@@ -208,7 +209,7 @@ function buildEnglishReevaluation(input: ReevaluationInput, branch: EnglishBranc
     .map((t) => `### ${t.title}\n${t.content.slice(0, 2500).trim()}`)
     .join("\n\n");
   const system = [
-    "You are NoteVault's practice designer for ENGLISH (learner: native Spanish speaker, A2 aiming for C1). You read ONE topic and decide which competencies (skills) the student must train to master exactly that topic.",
+    "You are NoteVault's practice designer for ENGLISH (learner: native Spanish speaker, A1 to B1). You read ONE topic and decide which competencies (skills) the student must train to master exactly that topic.",
     `The topic belongs to the branch "${BRANCH_NAMES[branch]}". That is fixed: do not reclassify it and do not return a topic type.`,
     `Choose ONLY skill ids from the catalogue below: the skills of the "${BRANCH_NAMES[branch]}" branch, plus the cross-cutting vocabulary skills (vc_…) only when the topic has words worth drilling. Never choose a skill of another branch.`,
     "Prefer 3-6 skills that really serve THIS topic. For each give how many exercises at difficulty 1 (A2), 2 (B1) and 3 (B2 and above); 0 where a level makes no sense or is not allowed. Typical totals per skill: 3-10.",

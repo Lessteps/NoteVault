@@ -53,10 +53,11 @@ describe("default skills per domain", () => {
 });
 
 describe("branch syllabi", () => {
-  it("names the branches asked for in the scope, or all five", () => {
+  it("names the branches asked for in the scope, or all six", () => {
     expect(branchesInScope("solo lectura y escucha")).toEqual(["reading", "listening"]);
     expect(branchesInScope("Grammar y speaking")).toEqual(["grammar", "speaking"]);
-    expect(branchesInScope("")).toHaveLength(5);
+    expect(branchesInScope("")).toHaveLength(6);
+    expect(branchesInScope("solo vocabulario")).toEqual(["vocabulary"]);
   });
 
   it("renumbers the model's topics itself and drops repeats", () => {
@@ -86,29 +87,42 @@ describe("creating the English structure", () => {
     const reading = parseTopicManifest(read("Inglés 1/3 Lectura/3.1 Skimming and scanning/3.1 Skimming and scanning.practica.md"), "3.1");
     expect(grammar).toMatchObject({ branch: "grammar", subject: "english" });
     expect(grammar!.topic_type).toBeUndefined();
-    expect(grammar!.skills).toEqual(["gr_explain_rule", "gr_recognize", "gr_cloze", "gr_transform", "gr_correct", "gr_produce"]);
+    expect(grammar!.skills).toEqual(["gr_explain_rule", "gr_recognize", "gr_cloze", "gr_transform", "gr_correct", "gr_produce", "gr_syntax", "gr_expressions"]);
     expect(reading!.skills.every((s) => s.startsWith("rd_"))).toBe(true);
   });
 
-  it("the space map and the outline list the branches, not the word bank folder", () => {
+  it("the space map and the outline list every area, vocabulary included", () => {
     applyAssistantAction(root, syllabus);
     ensureVocabularyHome(root, "Inglés 1");
-    expect(exists("Inglés 1/Vocabulario/00 Banco de palabras.md")).toBe(true);
+    expect(exists("Inglés 1/6 Vocabulario/00 Banco de palabras.md")).toBe(true);
     // adding another branch later redraws the indexes from what is on disk
-    applyAssistantAction(root, { action: "create_syllabus", args: { subject: "Inglés 1", subject_id: "english", areas: [{ name: "4 Escucha", topics: [{ name: "4.1 Weak forms" }] }] } });
+    applyAssistantAction(root, { action: "create_syllabus", args: { subject: "Inglés 1", subject_id: "english", areas: [{ name: "4 Escucha", topics: [{ name: "4.1 Weak forms" }] }, { name: "6 Vocabulario", topics: [{ name: "6.1 Common verbs", level: "A1" }] }] } });
     const temario = read("Inglés 1/00 Temario.md");
     expect(temario).toContain("## 1 Gramática");
     expect(temario).toContain("## 4 Escucha");
-    expect(temario).not.toContain("Vocabulario");
+    expect(temario).toContain("## 6 Vocabulario");
+    const verbs = read("Inglés 1/6 Vocabulario/6.1 Common verbs/6.1 Common verbs.practica.md");
+    expect(verbs).toContain("branch: vocabulary");
+    expect(verbs).toContain("level: A1");
+    expect(parseTopicManifest(verbs, "6.1")!.skills.every((s) => s.startsWith("vc_"))).toBe(true);
     const map = JSON.parse(read("Inglés 1/00 Mapa de Inglés 1.canvas"));
-    expect(map.nodes.filter((n: { type: string }) => n.type === "group")).toHaveLength(3);
+    expect(map.nodes.filter((n: { type: string }) => n.type === "group")).toHaveLength(4);
+  });
+
+  it("moves the old Vocabulario folder to 6 Vocabulario once, keeping its files", () => {
+    applyAssistantAction(root, syllabus);
+    fs.mkdirSync(path.join(root, "Inglés 1", "Vocabulario"), { recursive: true });
+    fs.writeFileSync(path.join(root, "Inglés 1", "Vocabulario", "mis-notas.md"), "hola", "utf-8");
+    ensureVocabularyHome(root, "Inglés 1");
+    expect(exists("Inglés 1/Vocabulario")).toBe(false);
+    expect(read("Inglés 1/6 Vocabulario/mis-notas.md")).toBe("hola");
   });
 
   it("draws the verb-tense map under grammar and the word-family map under vocabulary, without overwriting edits", () => {
     applyAssistantAction(root, syllabus);
     ensureVocabularyHome(root, "Inglés 1");
     const tenses = "Inglés 1/1 Gramática/00 Mapa de tiempos verbales.canvas";
-    const families = "Inglés 1/Vocabulario/00 Mapa de familias de palabras.canvas";
+    const families = "Inglés 1/6 Vocabulario/00 Mapa de familias de palabras.canvas";
     expect(JSON.parse(read(tenses)).nodes.length).toBeGreaterThan(9);
     expect(JSON.parse(read(families)).edges.every((e: { label: string }) => e.label.length > 0)).toBe(true);
     fs.writeFileSync(path.join(root, tenses), '{"nodes":[],"edges":[]}', "utf-8");

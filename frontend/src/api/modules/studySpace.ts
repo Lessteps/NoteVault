@@ -17,7 +17,7 @@ import { ConversationStore, type StoredMessage } from "../../core/conversations.
 import { ensureDefaultSkills } from "../../core/defaultSkills.js";
 import { ENGLISH_DEFAULT_SKILLS } from "../../core/englishDefaultSkills.js";
 import { domainOfSubject } from "../../core/practice/domain.js";
-import { branchFromPath, ENGLISH_BRANCH_BRIEF, ENGLISH_BRANCHES, ENGLISH_VOCABULARY_FOLDER, type EnglishBranch } from "../../lib/englishSkillData.js";
+import { branchFromPath, ENGLISH_BRANCH_BRIEF, ENGLISH_BRANCHES, ENGLISH_VOCABULARY_FOLDER, LEGACY_VOCABULARY_FOLDER, type EnglishBranch } from "../../lib/englishSkillData.js";
 import { ApiError } from "../../core/errors.js";
 import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
@@ -27,6 +27,8 @@ import { askStructured, clearStudySnapshotCache, reevaluateTopic } from "./study
 
 export interface SpaceTopic {
   name: string;
+  /** English: the CEFR level of the topic (A1–C1) */
+  level?: string;
 }
 export interface SpaceArea {
   name: string;
@@ -139,10 +141,6 @@ function aiConfig(): AIConfig {
 const skillText = (app: AppState, spaceFolder: string, name: string, max = 6000): string =>
   readSkillTemplates(app.root, spaceFolder).find((s) => s.title === name)?.content.slice(0, max) ?? "";
 
-/**
- * `<space>/Vocabulario/`: the home of the ONE word bank the branches feed. It is not a branch (no syllabus,
- * no topics); the words themselves live in the private bank (`.notevault/estudio/vocabulario`).
- */
 /** Writes a canvas only when it is not there yet: a map the learner has edited is never overwritten. */
 function writeMapOnce(file: string, map: unknown): void {
   if (fs.existsSync(file)) return;
@@ -156,8 +154,15 @@ export function ensureEnglishConceptMaps(root: string, space: string): void {
   writeMapOnce(path.join(root, space, ENGLISH_VOCABULARY_FOLDER, WORD_FAMILY_MAP_FILE), buildWordFamilyCanvas());
 }
 
+/**
+ * `<space>/6 Vocabulario/`: the sixth area. Its topics are classes of words; it also holds the home note of the ONE
+ * word bank that every branch feeds (the words themselves live in the private bank, `.notevault/estudio/vocabulario`).
+ * A vault made before vocabulary was an area keeps its old `Vocabulario/` folder: it is moved here, once.
+ */
 export function ensureVocabularyHome(root: string, space: string): void {
   const dir = path.join(root, space, ENGLISH_VOCABULARY_FOLDER);
+  const legacy = path.join(root, space, LEGACY_VOCABULARY_FOLDER);
+  if (!fs.existsSync(dir) && fs.existsSync(legacy)) fs.renameSync(legacy, dir);
   fs.mkdirSync(dir, { recursive: true });
   ensureEnglishConceptMaps(root, space);
   const note = path.join(dir, "00 Banco de palabras.md");
@@ -173,11 +178,13 @@ export function ensureVocabularyHome(root: string, space: string): void {
       "",
       "# Banco de palabras",
       "",
-      "El vocabulario **no es una rama**: es un único banco de palabras que alimentan todas las ramas (gramática, escritura,",
-      "lectura, escucha y habla) y que se practica con las competencias `vc_` (recuerdo, reconocimiento, uso en oraciones,",
-      "familias de palabras y colocaciones). Cada palabra tiene su propio repaso espaciado en el calendario.",
+      "El vocabulario es la sexta área. Sus temas son **clases de palabras** (verbos, sustantivos, adjetivos, phrasal verbs…) y se",
+      "estudian con **repetición espaciada**: cada palabra tiene su propio repaso en el calendario, y una sesión de práctica",
+      "toma siempre un **grupo de palabras de la misma clase** (recuerdo, reconocimiento, uso en oraciones, familias de palabras,",
+      "colocaciones, sinónimos y matices).",
       "",
-      "Se añaden palabras desde el reproductor (al minar subtítulos), desde la lista «Vocabulario nuevo» de cada tema y a mano.",
+      "El banco es único y lo alimentan todas las ramas: se añaden palabras desde el reproductor (al minar subtítulos), desde la lista",
+      "«Vocabulario nuevo» de cada tema y a mano.",
       "",
     ].join("\n"),
     "utf-8",
@@ -213,7 +220,8 @@ export function parseBranchTopics(reply: string, branchNumber: number): SpaceTop
     const title = safeName(typeof t === "string" ? t : (t?.name ?? t?.folder)).replace(/^\d+(?:\.\d+)*\s+/, "").trim();
     if (!title || seen.has(title.toLowerCase())) continue;
     seen.add(title.toLowerCase());
-    out.push({ name: `${branchNumber}.${out.length + 1} ${title}` });
+    const level = String(typeof t === "object" ? t?.level ?? "" : "").trim().toUpperCase();
+    out.push({ name: `${branchNumber}.${out.length + 1} ${title}`, ...(/^(A1|A2|B1|B2|C1)$/.test(level) ? { level } : {}) });
   }
   if (!out.length) throw new ApiError("La IA no propuso ningún tema para esa rama.");
   return out;
@@ -329,7 +337,7 @@ export function studySpaceApi(app: AppState) {
         subject: folder,
         subject_id: subjectId,
         map: false,
-        areas: req.areas.map((a) => ({ name: a.name, folder: a.name, topics: a.topics.map((t) => ({ name: t.name })) })),
+        areas: req.areas.map((a) => ({ name: a.name, folder: a.name, topics: a.topics.map((t) => ({ name: t.name, ...(t.level ? { level: t.level } : {}) })) })),
       },
     });
     const skills = ensureDefaultSkills(app.root, folder, [], subjectId);
@@ -445,8 +453,7 @@ export function studySpaceApi(app: AppState) {
       // The space map lists EVERY area on disk, so adding an area keeps the earlier ones.
       const onDisk = fs
         .readdirSync(path.join(app.root, folder), { withFileTypes: true })
-        // The word bank folder is not an area of the syllabus (vocabulary is not a branch).
-        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".") && d.name !== ENGLISH_VOCABULARY_FOLDER)
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".") && d.name !== LEGACY_VOCABULARY_FOLDER)
         .map((d) => d.name)
         .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
       const all: SpaceMapArea[] = onDisk.map((name) => {
@@ -514,8 +521,8 @@ export function studySpaceApi(app: AppState) {
           if (existing.includes(b.folder)) continue;
           const number = ENGLISH_BRANCHES.indexOf(b) + 1;
           const system =
-            "Eres un diseñador curricular de inglés para un hispanohablante (hoy A2, meta C1). Propones el temario de UNA rama. " +
-            'Responde SOLO con JSON: {"topics":[{"name":"Nombre del tema"}]}. ' +
+            "Eres un diseñador curricular de inglés para un hispanohablante (hoy principiante, meta B1). Propones el temario de UNA rama. " +
+            'Responde SOLO con JSON: {"topics":[{"name":"Nombre del tema","level":"A1|A2|B1"}]}. ' +
             `${ENGLISH_BRANCH_BRIEF[id].syllabus} ` +
             "6–12 temas, ordenados por nivel MCER y por dependencia; nombres cortos en inglés (sin numeración: la pone la app) " +
             'y sin / \\ : * ? " < > |.\n\nSigue esta skill de la bóveda:\n' + temario;
@@ -608,6 +615,18 @@ export function studySpaceApi(app: AppState) {
       const job = jobs.get(String(jobId));
       if (!job) throw new ApiError("Ese trabajo ya no existe.");
       return { ...job, log: [...job.log] };
+    },
+
+    /** The subject id of the study space that owns a vault path ("" when it is not inside a space). */
+    study_space_subject(rel: string): string {
+      const top = String(rel ?? "").split(/[\\/]/)[0] ?? "";
+      if (!top || top.startsWith(".")) return "";
+      try {
+        const head = fs.readFileSync(path.join(app.root, top, `${top}.resumen.md`), "utf-8").slice(0, 800);
+        return /^subject:\s*["']?([^"'\n]+?)["']?\s*$/m.exec(head)?.[1] ?? "";
+      } catch {
+        return "";
+      }
     },
 
     /** Space folders (with an overview) that a new area can be added to. */

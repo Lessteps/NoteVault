@@ -149,6 +149,7 @@ export function practiceFileText(manifest: TopicManifest): string {
     title: manifest.title,
     ...(manifest.topic_type ? { topic_type: manifest.topic_type } : {}),
     ...(manifest.branch ? { branch: manifest.branch } : {}),
+    ...(manifest.level ? { level: manifest.level } : {}),
     skills: manifest.skills,
     min_per_skill: manifest.mastery.min_per_skill,
     target_difficulty: manifest.mastery.target_difficulty,

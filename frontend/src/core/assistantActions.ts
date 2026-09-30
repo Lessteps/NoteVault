@@ -14,7 +14,7 @@ import { ApiError } from "./errors.js";
 import { buildAreaMapCanvas, buildSpaceMapCanvas, type MapTopic, type SpaceMapArea, type TopicDependency } from "./areaMap.js";
 import { dumpFrontmatter } from "./frontmatter.js";
 import { applyPlanToPractica, parsePracticePlan } from "./practice/practicePlan.js";
-import { branchFromPath, ENGLISH_VOCABULARY_FOLDER, isEnglishBranch, type EnglishBranch } from "../lib/englishSkillData.js";
+import { branchFromPath, isEnglishBranch, LEGACY_VOCABULARY_FOLDER, type EnglishBranch } from "../lib/englishSkillData.js";
 import { domainOfSubject } from "./practice/domain.js";
 import { catalogFor, catalogSkill, deterministicSkillSelector, skillsForBranch } from "./practice/skillSelection.js";
 import { createDefaultTopicManifest } from "./practice/topic.js";
@@ -115,7 +115,7 @@ export function subjectIdOf(name: string, given?: unknown): string {
   return "mathematics";
 }
 
-function topicFiles(root: string, topicRel: string, topicName: string, subject: string, skills?: unknown): PlannedOp[] {
+function topicFiles(root: string, topicRel: string, topicName: string, subject: string, skills?: unknown, level?: unknown): PlannedOp[] {
   const wanted = Array.isArray(skills) ? skills.map((s) => String(s).trim().toLowerCase()).filter((s) => catalogSkill(subject, s)) : [];
   if (domainOfSubject(subject) === "english") {
     // English: the branch comes from the folder and decides the skills. No branch → no skills and no
@@ -124,6 +124,8 @@ function topicFiles(root: string, topicRel: string, topicName: string, subject: 
     const manifest = createDefaultTopicManifest(topicRel, topicName, subject, []);
     manifest.skills = wanted.length ? wanted : branch ? skillsForBranch(subject, branch) : [];
     if (branch) manifest.branch = branch;
+    const cefr = String(level ?? "").trim().toUpperCase();
+    if (/^(A1|A2|B1|B2|C1)$/.test(cefr)) manifest.level = cefr;
     const englishRel = `${topicRel}/${viewFileName(topicName, "practica")}`;
     return [{ kind: "write", rel: englishRel, content: practiceFileText(manifest), exists: fs.existsSync(absOf(root, englishRel)) }];
   }
@@ -175,7 +177,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
       if (!topicName) continue;
       mapTopics.push({ name: topicName, file: `${areaRel}/${topicName}/${topicName}.md` });
       const topicRel = `${areaRel}/${topicName}`;
-      ops.push(mkdirOp(root, topicRel), ...topicFiles(root, topicRel, topicName, subjectId, topic?.skills));
+      ops.push(mkdirOp(root, topicRel), ...topicFiles(root, topicRel, topicName, subjectId, topic?.skills, topic?.level));
     }
     // Every grouping area gets its map (canvas), built from its topics (see mapa_skill).
     if (args.map !== false && mapTopics.length) {
@@ -198,7 +200,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
     try {
       return fs
         .readdirSync(absOf(root, rel), { withFileTypes: true })
-        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".") && d.name !== ENGLISH_VOCABULARY_FOLDER)
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".") && d.name !== LEGACY_VOCABULARY_FOLDER)
         .map((d) => d.name);
     } catch {
       return [];

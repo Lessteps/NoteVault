@@ -17,10 +17,10 @@ import { createDefaultTopicManifest, parseTopicManifest } from "./topic";
 import { practiceFileText } from "./viewFiles";
 
 describe("English skill catalogue", () => {
-  it("has the five branches plus the cross-cutting vocabulary layer, each skill namespaced", () => {
+  it("has six areas (vocabulary is the sixth), each skill namespaced", () => {
     const count = (area: string) => ENGLISH_SKILL_SPECS.filter((s) => s.area === area).length;
-    expect(ENGLISH_BRANCHES.map((b) => b.id)).toEqual(["grammar", "writing", "reading", "listening", "speaking"]);
-    expect([count("grammar"), count("writing"), count("reading"), count("listening"), count("speaking"), count("vocabulary")]).toEqual([6, 6, 6, 5, 6, 5]);
+    expect(ENGLISH_BRANCHES.map((b) => b.id)).toEqual(["grammar", "writing", "reading", "listening", "speaking", "vocabulary"]);
+    expect([count("grammar"), count("writing"), count("reading"), count("listening"), count("speaking"), count("vocabulary")]).toEqual([8, 6, 8, 7, 12, 6]);
     const prefix: Record<string, string> = { grammar: "gr_", writing: "wr_", reading: "rd_", listening: "ls_", speaking: "sp_", vocabulary: "vc_" };
     for (const s of ENGLISH_SKILL_SPECS) expect(s.id.startsWith(prefix[s.area]!)).toBe(true);
   });
@@ -42,7 +42,7 @@ describe("English skill catalogue", () => {
     const recall = catalog.find((s) => s.id === "vc_recall")!;
     expect(recall.branches).toEqual(ENGLISH_BRANCHES.map((b) => b.id));
     expect(catalog.find((s) => s.id === "gr_cloze")!.branches).toEqual(["grammar"]);
-    expect(englishSkillsForBranch("reading").map((s) => s.area)).toEqual(["reading", "reading", "reading", "reading", "reading", "reading", "vocabulary", "vocabulary", "vocabulary", "vocabulary", "vocabulary"]);
+    expect(englishSkillsForBranch("reading").map((s) => s.area)).toEqual([...Array(8).fill("reading"), ...Array(6).fill("vocabulary")]);
   });
 
   it("session rules apply to English like maths: no beginner level where it needs a base, no help where it would give the answer away", () => {
@@ -60,7 +60,8 @@ describe("branches", () => {
     expect(branchFromPath("Inglés 1/3 Lectura/3.1 Skimming")).toBe("reading");
     expect(branchFromPath("Inglés/1 Gramática/1.2 Present perfect/1.2 Present perfect.md")).toBe("grammar");
     expect(branchFromPath("English/Speaking/Tema")).toBe("speaking");
-    expect(branchFromPath("Inglés/Vocabulario/Words")).toBeNull();
+    expect(branchFromPath("Inglés/6 Vocabulario/6.1 Common verbs")).toBe("vocabulary");
+    expect(branchFromPath("Inglés/Vocabulario/Words")).toBe("vocabulary"); // the folder's old name
     expect(branchFromPath("Matemáticas/1 Aritmética/1.1 Números")).toBeNull();
   });
 
@@ -115,7 +116,7 @@ describe("English topic manifests and skill selection", () => {
   it("the selector needs a branch for English and offers only that branch's skills", () => {
     expect(() => deterministicSkillSelector.select({ subject: "english", topicType: "mixed" })).toThrow(/rama/);
     const r = deterministicSkillSelector.select({ subject: "english", branch: "listening" });
-    expect(r.skills).toEqual(["ls_dictation", "ls_gist", "ls_detail", "ls_gap", "ls_variation"]);
+    expect(r.skills).toEqual(["ls_dictation", "ls_gist", "ls_detail", "ls_gap", "ls_variation", "ls_podcast"]); // capped at MAX_RECOMMENDED_SKILLS
   });
 });
 

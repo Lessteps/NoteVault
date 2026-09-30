@@ -40,7 +40,6 @@ export function ResumenView({ note }: { note: OpenNote }) {
   const openNote = useApp((s) => s.openNote);
   const version = useStudyVersion((s) => s.v);
   const [data, setData] = useState<TopicDashboardData | null>(null);
-  const [errors, setErrors] = useState("");
   const [loading, setLoading] = useState(true);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [openTopics, setOpenTopics] = useState<Record<string, boolean>>({});
@@ -85,19 +84,6 @@ export function ResumenView({ note }: { note: OpenNote }) {
     },
     [],
   );
-
-  useEffect(() => {
-    let live = true;
-    api
-      .studyErrorDigest()
-      .then((res) => {
-        if (live) setErrors(String(res?.text ?? ""));
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [subject, version]);
 
   const topics = useMemo(
     () => (data?.topics ?? []).filter((t) => folderInScope(t.folder ?? "", scope)),
@@ -172,7 +158,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
       </header>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(132px,1fr))] gap-3">
         <Kpi label="Temas" value={`${stats.started}/${stats.topics}`} hint="iniciados" />
         <Kpi label="Progreso" value={`${stats.pct}%`} hint="dominio medio" />
         <Kpi
@@ -201,7 +187,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
             Esta parte de la materia todavía no tiene temas con ejercicios registrados.
           </p>
         ) : (
-          <div className="mt-3 grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
+          <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,340px),1fr))] items-start gap-3">
             {groups.map((group) => (
               <GroupCard
                 key={group.key}
@@ -247,12 +233,6 @@ export function ResumenView({ note }: { note: OpenNote }) {
         </section>
       )}
 
-      {errors.trim() && (
-        <section className="rounded-2xl border border-warn/30 bg-warn-soft/40 p-4">
-          <h2 className="text-[13px] font-bold uppercase tracking-wide text-warn">Errores frecuentes</h2>
-          <pre className="mt-2 whitespace-pre-wrap font-sans text-[11.5px] leading-snug text-dim">{errors}</pre>
-        </section>
-      )}
     </div>
     </div>
   );
@@ -261,7 +241,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
 function Kpi({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <div className="rounded-2xl border border-line-strong bg-card px-3.5 py-3">
-      <div className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-faint">{label}</div>
+      <div className="truncate font-mono text-[9.5px] font-semibold uppercase tracking-wider text-faint" title={label}>{label}</div>
       <div className="mt-1 text-[19px] font-bold leading-none text-text">{value}</div>
       <div className="mt-1 text-[10.5px] text-faint">{hint}</div>
     </div>
@@ -287,8 +267,8 @@ function GroupCard({
   const Chevron = open ? ChevronDown : ChevronRight;
   return (
     <div className="rounded-2xl border border-line-strong bg-card p-4">
-      <div className="flex w-full items-center gap-3">
-        <button type="button" onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-4 text-left">
+      <div className="flex w-full flex-wrap items-center gap-3">
+        <button type="button" onClick={onToggle} className="flex min-w-[220px] flex-1 items-center gap-4 text-left">
           <Donut
             size={92}
             thickness={10}

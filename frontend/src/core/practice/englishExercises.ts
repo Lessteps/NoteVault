@@ -4,14 +4,14 @@
  * branch (grammar, writing, reading, listening, speaking, or the vocabulary layer).
  */
 
-import { englishSkillSpec, type EnglishSkillSpec } from "../../lib/englishSkillData.js";
+import { cefrForTopic, englishSkillSpec, type EnglishSkillSpec } from "../../lib/englishSkillData.js";
 import { disciplineFor } from "./disciplineCatalog.js";
 import type { AssistanceLevel, DifficultyLevel } from "./skills.js";
 import type { TopicManifest } from "./topic.js";
 
 /** Difficulty 1 / 2 / 3 is the CEFR level of the exercise. */
-export const cefrOf = (difficulty: DifficultyLevel): string => (difficulty === 1 ? "A2" : difficulty === 2 ? "B1" : "B2");
-const cefrText = (difficulty: DifficultyLevel): string => (difficulty === 3 ? "B2 or above (up to C1)" : cefrOf(difficulty));
+export const cefrOf = (difficulty: DifficultyLevel, topicLevel?: string): string => cefrForTopic(difficulty, topicLevel);
+const cefrText = (difficulty: DifficultyLevel, topicLevel?: string): string => cefrOf(difficulty, topicLevel);
 
 export interface EnglishExerciseFields {
   title: string;
@@ -44,11 +44,11 @@ export function buildEnglishExercisePrompt(
 ): Array<{ role: "system" | "user"; content: string }> {
   const spec = skillSpecOf(skill);
   const discipline = disciplineFor({ subject: "english", mode: skill });
-  const level = cefrText(difficulty);
+  const level = cefrText(difficulty, manifest.level);
   const helper = assistance === "helper" && !spec.noHelper;
 
   const system = [
-    "You are NoteVault's expert exercise creator for ENGLISH. The learner is a native Spanish speaker (today A2, aiming for C1).",
+    "You are NoteVault's expert exercise creator for ENGLISH. The learner is a native Spanish speaker (a beginner-to-intermediate learner: A1 to B1 today).",
     `Topic: "${manifest.title}"${manifest.branch ? ` (branch: ${manifest.branch})` : ""}.`,
     `Skill to train: ${spec.id} — ${spec.label}. Target CEFR level: ${level}.`,
     `Discipline framing: ${discipline.framing}`,
@@ -125,7 +125,7 @@ title: "${ex.title.replace(/"/g, '\\"')}"
 mode: ${skill}
 discipline: ${discipline.id}
 ${manifest.branch ? `branch: ${manifest.branch}\n` : ""}${ex.words?.length ? `words: [${ex.words.join(", ")}]\n` : ""}difficulty: ${difficulty}
-level: ${cefrOf(difficulty)}
+level: ${cefrOf(difficulty, manifest.level)}
 assistance: ${noHelp ? "nohelp" : "helper"}
 topic: "${manifest.title.replace(/"/g, '\\"')}"
 ---

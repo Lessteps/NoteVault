@@ -567,9 +567,9 @@ const _CATALOGUE: readonly Discipline[] = [
     subject: "english",
     title: "Gramática inglesa",
     // The first-generation English modes stay valid so existing exercises keep working; they are no longer offered.
-    modes: ["gr_explain_rule", "gr_recognize", "gr_cloze", "gr_transform", "gr_correct", "gr_produce", "rewrite", "find_error", "cloze", "translate", "true_false"],
+    modes: ["gr_explain_rule", "gr_recognize", "gr_syntax", "gr_cloze", "gr_transform", "gr_correct", "gr_expressions", "gr_produce", "rewrite", "find_error", "cloze", "translate", "true_false"],
     framing:
-      "The learner is a native Spanish speaker (today A2, aiming for C1). Sentences come " +
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). Sentences come " +
       "from realistic contexts the learner meets: work emails and meetings in a tech/" +
       "automation job, travel and daily life. Target the errors a Spanish speaker " +
       "actually makes (transfer from Spanish) and calibrate vocabulary and structures to " +
@@ -636,9 +636,9 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "english_vocabulary",
     subject: "english",
     title: "Vocabulario inglés",
-    modes: ["vc_recall", "vc_recognition", "vc_usage", "vc_families", "vc_collocations", "cloze", "translate", "explain"],
+    modes: ["vc_recall", "vc_recognition", "vc_usage", "vc_families", "vc_collocations", "vc_synonyms", "cloze", "translate", "explain"],
     framing:
-      "The learner is a native Spanish speaker (today A2, aiming for C1). Vocabulary comes " +
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). Vocabulary comes " +
       "from realistic work (tech/automation) and daily-life contexts, always inside a " +
       "full sentence; target Spanish-speaker confusions and the CEFR level of the " +
       "exercise.",
@@ -678,7 +678,7 @@ const _CATALOGUE: readonly Discipline[] = [
     title: "Redacción en inglés",
     modes: ["wr_sentences", "wr_paragraph", "wr_free", "wr_paraphrase", "wr_register", "wr_review", "writing", "rewrite"],
     framing:
-      "The learner is a native Spanish speaker (today A2, aiming for C1). Tasks are real " +
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). Tasks are real " +
       "writing needs: a paragraph about work or study, an email to a colleague or client, " +
       "an opinion essay. State the word range and the CEFR level; judge with CEFR writing " +
       "criteria.",
@@ -708,9 +708,9 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "english_reading",
     subject: "english",
     title: "Lectura en inglés",
-    modes: ["rd_literal", "rd_inference", "rd_vocab_context", "rd_summary", "rd_skim_scan", "rd_structure"],
+    modes: ["rd_literal", "rd_inference", "rd_vocab_context", "rd_summary", "rd_skim_scan", "rd_structure", "rd_paraphrase", "rd_translate"],
     framing:
-      "The learner is a native Spanish speaker (today A2, aiming for C1). Every task comes with " +
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). Every task comes with " +
       "its own short text written at the target CEFR level about realistic work or daily-life " +
       "content; questions are answerable from the text alone. State the CEFR level and the time limit.",
     skills: _skills(
@@ -744,9 +744,9 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "english_listening",
     subject: "english",
     title: "Escucha en inglés",
-    modes: ["ls_dictation", "ls_gist", "ls_detail", "ls_gap", "ls_variation"],
+    modes: ["ls_dictation", "ls_gist", "ls_detail", "ls_gap", "ls_variation", "ls_podcast", "ls_shadowing"],
     framing:
-      "The learner is a native Spanish speaker (today A2, aiming for C1). The audio text is played " +
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). The audio text is played " +
       "aloud by the app and stays hidden; write it at the target CEFR level from realistic work " +
       "and daily-life situations, with natural rhythm. Keep the answer verifiable word by word.",
     skills: _skills(
@@ -774,9 +774,9 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "english_speaking",
     subject: "english",
     title: "Habla en inglés",
-    modes: ["sp_read_aloud", "sp_shadowing", "sp_guided", "sp_monologue", "sp_roleplay", "sp_record_compare"],
+    modes: ["sp_read_aloud", "sp_shadowing", "sp_guided", "sp_monologue", "sp_roleplay", "sp_record_compare", "sp_phonemes", "sp_ipa", "sp_word_stress", "sp_sentence_stress", "sp_intonation", "sp_connected"],
     framing:
-      "The learner is a native Spanish speaker (today A2, aiming for C1). There is no speech " +
+      "The learner is a native Spanish speaker (beginner to intermediate: A1 to B1 today). There is no speech " +
       "recognition: the learner speaks aloud and then types what they said (or a report of how it " +
       "went), and that text is what is judged. Tasks are real situations (a meeting, a call, travel). " +
       "State the CEFR level and how long to speak.",

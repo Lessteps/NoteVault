@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CalendarRange,
   ChevronLeft,
+  Dumbbell,
   ExternalLink,
   Film,
   LayoutGrid,
@@ -29,6 +30,7 @@ import { Field, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn, confirmAction, IconButton } from "../ui";
 import { Daily } from "./Daily";
 import { ExerciseMonth, ExerciseWeek } from "./Grids";
+import { Library } from "./Library";
 import { Overview } from "./Overview";
 import { ORANGE, SideStats, useFail } from "./parts";
 import { MuscleCount, MusclePicker } from "./MusclePicker";
@@ -213,6 +215,7 @@ export function ExerciseModule() {
           { id: "semanal", label: "Semanal", icon: <CalendarRange /> },
           { id: "mensual", label: "Mensual", icon: <CalendarDays /> },
           { id: "anual", label: "Anual", icon: <ListChecks /> },
+          { id: "biblioteca", label: "Biblioteca", hint: "302 ejercicios", icon: <Dumbbell /> },
           { id: "gestionar", label: "Gestionar ejercicios", hint: `${list.length} ejercicios`, icon: <Settings2 /> },
         ]}
       >
@@ -230,7 +233,8 @@ export function ExerciseModule() {
             : view === "semanal" ? <ExerciseWeek />
               : view === "mensual" ? <ExerciseMonth />
                 : view === "anual" ? <Yearly />
-                  : <Manage />}
+                  : view === "biblioteca" ? <Library />
+                    : <Manage />}
       </main>
     </div>
   );

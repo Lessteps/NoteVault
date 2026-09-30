@@ -78,7 +78,9 @@ export interface Toast {
   text: string;
 }
 
-const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+// An empty block (`---` straight followed by `---`) has no newline between the two fences, so it is
+// its own first alternative; otherwise the content runs to the first `---` line.
+const FRONTMATTER = /^---\r?\n(?:---[ \t]*(?:\r?\n|$)|([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$))/;
 
 /** The markdown after the YAML block (same split as the Python side). */
 export function bodyOf(raw: string): string {
@@ -739,17 +741,16 @@ export const useApp = create<State>((setState, get) => {
         }
         return t;
       });
-      // Remap the activeTabId if it pointed to a renamed note/canvas tab
-      let activeTabId = st.activeTabId;
-      if (activeTabId) {
-        const newActive = openTabs.find((t) => {
-          const old = st.openTabs.find((o) => o.tabId === activeTabId);
-          if (!old) return false;
-          if (old.kind === "note" || old.kind === "canvas") return t.kind === old.kind;
-          return t.tabId === activeTabId;
-        });
-        activeTabId = newActive?.tabId ?? activeTabId;
-      }
+      // Follow the tab that WAS active to its new path. (It used to pick the first tab of the same
+      // kind, so renaming anything threw you onto another note.) If the active tab was not under
+      // what was renamed, it stays exactly as it was.
+      const oldActive = st.openTabs.find((t) => t.tabId === st.activeTabId);
+      const remappedActive =
+        oldActive && (oldActive.kind === "note" || oldActive.kind === "canvas") ? remap(oldActive.path) : null;
+      const activeTabId =
+        remappedActive && remappedActive !== (oldActive as { path: string }).path
+          ? (openTabs.find((t) => (t.kind === "note" || t.kind === "canvas") && t.path === remappedActive)?.tabId ?? st.activeTabId)
+          : st.activeTabId;
       return {
         notes,
         openTabs,

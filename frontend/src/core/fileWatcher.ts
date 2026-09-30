@@ -29,7 +29,8 @@ export class FileWatcherService {
         try {
           // One call per event: it used to fire twice (path, then event), which doubled
           // every IPC message and every tree refresh in the window.
-          (onModifiedCallback as any)(event);
+          // A listener written for the old (path) signature still works: the event carries `fullPath`.
+          (onModifiedCallback as WatchCallback)(event);
         } catch {
           // Ignore callback errors
         }

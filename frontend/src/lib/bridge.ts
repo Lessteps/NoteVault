@@ -470,6 +470,12 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   /** The competency checklist for the chat: recommended ones, and how every skill would be practised here. */
   studyTopicSkillOptions: (folder: string) =>
     call<import("../lib/assistantModes").ParsedSkills & { current?: boolean }>("study_topic_skill_options", folder),
+  /** How a topic is classified (type for maths/programming, branch for English) or why it is not. */
+  studyTopicClassification: (folder: string) =>
+    call<{ ok: boolean; domain: string; branch: string | null; topicType: string | null; via: string | null; reason?: string; suggestion?: string | null }>("study_topic_classification", folder),
+  /** Resolves an unclassified English topic explicitly by giving it a branch. */
+  studyTopicClassify: (folder: string, branch: string) => call<{ ok: boolean; branch: string }>("study_topic_classify", folder, branch),
+  studyUnclassifiedList: () => call<Array<{ folder: string; name: string; suggestion: string | null; reason: string }>>("study_unclassified_list"),
   studyTopicReevaluate: (folder: string) =>
     call<{ ok: boolean; plan: import("./types").PracticePlan; path: string }>("study_topic_reevaluate", folder),
   /** The topic review notes: when each practised topic is due again. */

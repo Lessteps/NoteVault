@@ -59,6 +59,7 @@ import {
   parseSkillOptions,
   planCount,
   readPlanFromPractica,
+  setFrontmatterKey,
   type PracticePlan,
 } from "../../core/practice/practicePlan.js";
 import { listReviews, rescheduleReview } from "../../core/practice/reviewFiles.js";
@@ -66,7 +67,9 @@ import { loadReviewSettings, saveReviewSettings } from "../reviewSettings.js";
 import { runReviewTest } from "../reviewHooks.js";
 import { catalogFor } from "../../core/practice/skillSelection.js";
 import { readSkillTemplates } from "../../core/practice/skillTemplates.js";
-import { detectTopicType } from "../../core/practice/topicType.js";
+import { BRANCH_LABELS, classifyTopic, domainOfSubject, keyOf, type Classification } from "../../core/practice/domain.js";
+import { isEnglishBranch } from "../../lib/englishSkillData.js";
+import { listUnclassified, recordUnclassified, resolveUnclassified } from "../topicClassification.js";
 import {
   learningPromptLines,
   learningStatus,
@@ -307,6 +310,25 @@ function readTheoryNotes(app: AppState, absDir: string): TheoryNoteContext[] {
 }
 
 /**
+ * What a topic is classified by: its type (mathematics, programming) or its branch (English).
+ * An English topic with no branch is NOT given a default: it is logged as pending and this throws,
+ * so the user resolves it explicitly (`study_topic_classify`).
+ */
+function classifyForTopic(app: AppState, normFolder: string, manifest: TopicManifest): Classification {
+  const subject = manifest.subject || "mathematics";
+  const r = classifyTopic({
+    subject,
+    name: manifest.title,
+    folderRel: normFolder.replace(/\\/g, "/"),
+    manifestType: manifest.topic_type ?? null,
+    manifestBranch: manifest.branch ?? null,
+  });
+  if (r.ok) return r.value;
+  recordUnclassified(app.root, { folder: normFolder.replace(/\\/g, "/"), subject, name: manifest.title, suggestion: r.suggestion, reason: r.reason });
+  throw new ApiError(`${r.reason}${r.suggestion ? ` Sugerencia: ${BRANCH_LABELS[r.suggestion]}.` : ""} Elige la rama en «Clasificar tema».`);
+}
+
+/**
  * Asks the AI which competencies a topic should train and how many exercises per
  * difficulty, and stores the answer in the topic's `.practica.md`.
  */
@@ -323,12 +345,14 @@ export async function reevaluateTopic(app: AppState, folder: string): Promise<{ 
   }
 
   const subject = manifest.subject || "mathematics";
-  const topicType = manifest.topic_type ?? detectTopicType({ name: manifest.title }).type;
+  const cls = classifyForTopic(app, normFolder, manifest);
+  const topicType = cls.topicType;
   const catalog = catalogFor(subject);
   const messages = buildReevaluationMessages({
     subject,
     title: manifest.title,
     topicType,
+    branch: cls.branch,
     catalog,
     theory: readTheoryNotes(app, topicAbs),
     templates: skillTemplates(app, normFolder),
@@ -336,12 +360,12 @@ export async function reevaluateTopic(app: AppState, folder: string): Promise<{ 
   });
 
   const reply = await askStructured(cfg, messages);
-  const plan = parsePracticePlan(reply, catalog, topicType);
+  const plan = parsePracticePlan(reply, catalog, keyOf(cls));
   if (!plan) {
     const snippet = String(reply ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
     throw new ApiError(`La IA no devolvió un plan de práctica válido. Respuesta: «${snippet || "vacía"}»`);
   }
-  plan.topicType = plan.topicType ?? topicType;
+  if (cls.domain !== "english") plan.topicType = plan.topicType ?? topicType;
 
   const practicaAbs = path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica"));
   if (!fs.existsSync(practicaAbs)) ensureTopicViewFiles(app.root, topicAbs);
@@ -369,19 +393,21 @@ export async function topicSkillOptions(app: AppState, folder: string) {
   if (cfg.is_bridge) throw new ApiError("El proveedor de IA está en modo puente; no se puede re-evaluar automáticamente.");
 
   const subject = manifest.subject || "mathematics";
-  const topicType = manifest.topic_type ?? detectTopicType({ name: manifest.title }).type;
+  const cls = classifyForTopic(app, normFolder, manifest);
+  const topicType = cls.topicType;
   const catalog = catalogFor(subject);
   const messages = buildSkillOptionsMessages({
     subject,
     title: manifest.title,
     topicType,
+    branch: cls.branch,
     catalog,
     theory: readTheoryNotes(app, topicAbs),
     templates: skillTemplates(app, normFolder),
     currentSkills: manifest.skills,
   });
-  const reply = await askStructured(cfg, messages, (r) => parseSkillOptions(r, catalog, topicType) !== null);
-  const parsed = parseSkillOptions(reply, catalog, topicType);
+  const reply = await askStructured(cfg, messages, (r) => parseSkillOptions(r, catalog, keyOf(cls)) !== null);
+  const parsed = parseSkillOptions(reply, catalog, keyOf(cls));
   if (!parsed) {
     const snippet = String(reply ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
     throw new ApiError(`La IA no devolvió la lista de competencias. Respuesta: «${snippet || "vacía"}»`);
@@ -949,6 +975,41 @@ export function studyApi(app: AppState) {
         })),
         first_exercise: plan.exercises[0]?.path ?? "",
       };
+    },
+
+    /** How a topic is classified: its type (maths, programming) or its branch (English), or why it is not. */
+    study_topic_classification(folder: string) {
+      const rel = app.rel(app.resolve(folder, { allowRoot: true })).replace(/\\/g, "/");
+      const found = findTopicManifest(app, rel);
+      if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+      const m = found.manifest;
+      const r = classifyTopic({ subject: m.subject || "mathematics", name: m.title, folderRel: rel, manifestType: m.topic_type ?? null, manifestBranch: m.branch ?? null });
+      return r.ok
+        ? { ok: true, domain: r.value.domain, branch: r.value.branch ?? null, topicType: r.value.topicType ?? null, via: r.value.via }
+        : { ok: false, domain: r.domain, reason: r.reason, suggestion: r.suggestion, branch: null, topicType: null, via: null };
+    },
+
+    /** Resolves an unclassified English topic EXPLICITLY: writes its branch into its practice file. */
+    study_topic_classify(folder: string, branch: string) {
+      const b = String(branch ?? "").trim().toLowerCase();
+      if (!isEnglishBranch(b)) throw new ApiError("Elige una rama: gramática, escritura, lectura, escucha o habla.");
+      const rel = app.rel(app.resolve(folder, { allowRoot: true })).replace(/\\/g, "/");
+      const found = findTopicManifest(app, rel);
+      if (!found) throw new ApiError("Esta carpeta no tiene un manifiesto de tema.");
+      if (domainOfSubject(found.manifest.subject || "") !== "english") throw new ApiError("Solo los temas de inglés se clasifican por rama.");
+      const topicAbs = app.resolve(found.manifest.folder || rel, { allowRoot: true });
+      const practicaAbs = path.join(topicAbs, viewFileName(path.basename(topicAbs), "practica"));
+      if (!fs.existsSync(practicaAbs)) ensureTopicViewFiles(app.root, topicAbs);
+      fs.writeFileSync(practicaAbs, setFrontmatterKey(fs.readFileSync(practicaAbs, "utf-8"), "branch", b), "utf-8");
+      resolveUnclassified(app.root, rel);
+      clearExerciseIndexCache();
+      clearStudySnapshotCache();
+      return { ok: true, branch: b };
+    },
+
+    /** English topics still waiting to be classified. */
+    study_unclassified_list() {
+      return listUnclassified(app.root);
     },
 
     /** Per competency of a topic: is its mistakes record on, and how many mistakes it holds. */

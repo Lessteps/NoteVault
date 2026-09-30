@@ -148,7 +148,7 @@ export function assistantApi(app: AppState) {
       .join("\n");
     return [
       `Topic folder: ${app.rel(found.topicFolder)}`,
-      `Topic: ${m.title} (subject ${m.subject}${m.topic_type ? `, type ${m.topic_type}` : ""})`,
+      `Topic: ${m.title} (subject ${m.subject}${m.topic_type ? `, type ${m.topic_type}` : ""}${m.branch ? `, English branch ${m.branch}` : ""})`,
       `Current matrix (skill=easy/medium/hard): ${current}`,
       `Catalogue:\n${catalog}`,
     ].join("\n");

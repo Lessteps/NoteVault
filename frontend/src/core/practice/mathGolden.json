@@ -1,0 +1,795 @@
+{
+ "skillIds": [
+  "solve",
+  "process",
+  "prove",
+  "counterexample",
+  "true_false",
+  "find_error",
+  "drill",
+  "explain"
+ ],
+ "catalog": [
+  {
+   "id": "solve",
+   "label": "Problema",
+   "topicTypes": [
+    "procedural",
+    "mixed"
+   ],
+   "competencies": [
+    "Modelado",
+    "Traducción del enunciado"
+   ],
+   "d": [
+    1,
+    2,
+    3
+   ],
+   "a": [
+    "no_help",
+    "helper"
+   ]
+  },
+  {
+   "id": "process",
+   "label": "Procedimiento guiado",
+   "topicTypes": [
+    "procedural",
+    "mixed"
+   ],
+   "competencies": [
+    "Método paso a paso",
+    "Consolidación de la técnica"
+   ],
+   "d": [
+    1,
+    2,
+    3
+   ],
+   "a": [
+    "no_help",
+    "helper"
+   ]
+  },
+  {
+   "id": "prove",
+   "label": "Demostración",
+   "topicTypes": [
+    "theoretical",
+    "mixed"
+   ],
+   "competencies": [
+    "Rigor formal",
+    "Cadena deductiva completa"
+   ],
+   "d": [
+    1,
+    2,
+    3
+   ],
+   "a": [
+    "no_help",
+    "helper"
+   ]
+  },
+  {
+   "id": "counterexample",
+   "label": "Contraejemplo",
+   "topicTypes": [
+    "theoretical",
+    "mixed"
+   ],
+   "competencies": [
+    "Casos límite",
+    "Refutación de hipótesis"
+   ],
+   "d": [
+    1,
+    2,
+    3
+   ],
+   "a": [
+    "no_help",
+    "helper"
+   ]
+  },
+  {
+   "id": "true_false",
+   "label": "Verdadero o falso",
+   "topicTypes": [
+    "theoretical",
+    "mixed"
+   ],
+   "competencies": [
+    "Discernimiento de postulados",
+    "Justificación del veredicto"
+   ],
+   "d": [
+    1,
+    2,
+    3
+   ],
+   "a": [
+    "no_help",
+    "helper"
+   ]
+  },
+  {
+   "id": "find_error",
+   "label": "Encontrar el error",
+   "topicTypes": [
+    "theoretical",
+    "mixed"
+   ],
+   "competencies": [
+    "Detección de falacias",
+    "Localización del paso fallido"
+   ],
+   "d": [
+    2,
+    3
+   ],
+   "a": [
+    "no_help",
+    "helper"
+   ]
+  },
+  {
+   "id": "drill",
+   "label": "Cálculo rápido",
+   "topicTypes": [
+    "procedural"
+   ],
+   "competencies": [
+    "Cálculo mental",
+    "Estimación y agilidad"
+   ],
+   "d": [
+    1,
+    2,
+    3
+   ],
+   "a": [
+    "no_help"
+   ]
+  },
+  {
+   "id": "explain",
+   "label": "Explicar (Feynman)",
+   "topicTypes": [
+    "theoretical",
+    "mixed"
+   ],
+   "competencies": [
+    "Claridad conceptual",
+    "Ejemplo propio"
+   ],
+   "d": [
+    1,
+    2,
+    3
+   ],
+   "a": [
+    "no_help",
+    "helper"
+   ]
+  }
+ ],
+ "topicTypes": [
+  [
+   "1.1 Números naturales y enteros orden, valor absoluto y recta numérica",
+   "mixed",
+   null
+  ],
+  [
+   "1.2 Suma y resta de números naturales y enteros",
+   "procedural",
+   "procedural"
+  ],
+  [
+   "1.7 Máximo común divisor y mínimo común múltiplo",
+   "mixed",
+   null
+  ],
+  [
+   "Lógica proposicional y conectivos",
+   "theoretical",
+   "theoretical"
+  ],
+  [
+   "Inducción matemática",
+   "theoretical",
+   "theoretical"
+  ],
+  [
+   "Porcentajes",
+   "procedural",
+   "procedural"
+  ],
+  [
+   "Derivadas",
+   "theoretical",
+   "theoretical"
+  ],
+  [
+   "Conjuntos y notación",
+   "theoretical",
+   "theoretical"
+  ],
+  [
+   "Ecuaciones lineales",
+   "procedural",
+   "procedural"
+  ],
+  [
+   "Tema sin pistas de tipo",
+   "mixed",
+   null
+  ]
+ ],
+ "reevaluation": [
+  {
+   "role": "system",
+   "content": "You are NoteVault's practice designer. You read ONE topic and decide (1) what kind of topic it is and (2) which competencies (skills) a student must train to master exactly that topic.\nSTEP 1 - topic_type. Decide it from what the student has to DO with the topic:\n  \"theoretical\": the topic is about definitions, concepts, representations, classifications, properties or proofs (what things are and how they relate). Examples: natural numbers, integers and the number line; what a fraction is; sets and notation.\n  \"procedural\": the topic is about executing a method or a calculation (operations, algorithms, conversions). Examples: adding and subtracting integers; long division; simplifying fractions; percentages.\n  \"mixed\": both weigh about the same (a method that must also be justified), e.g. gcd and lcm.\nSTEP 2 - skills. Choose ONLY skill ids from the catalogue, and ONLY ones that suit the topic_type: each catalogue line says which types it suits. A skill that does not suit the type must NOT be chosen (for example `drill`, quick calculation, is never right for a theoretical topic).\nPrefer 3-6 skills that really serve THIS topic over covering the catalogue. For each give how many exercises at difficulty 1 (basic), 2 (intermediate) and 3 (advanced); 0 where a level makes no sense or is not allowed. Typical totals per skill: 3-10; central skills get more.\nAnswer with ONE JSON object and nothing else:\n{\"topic_type\":\"theoretical|procedural|mixed\",\"skills\":[{\"skill\":\"<id>\",\"difficulties\":{\"1\":n,\"2\":n,\"3\":n},\"why\":\"<one short sentence in Spanish>\"}],\"summary\":\"<one sentence in Spanish>\"}\n\nCatalogue for subject \"mathematics\":\n- solve: Problema — Resolución de problemas contextualizados y aplicados. [difficulties allowed: 1,2,3; suits: procedural/mixed]\n- process: Procedimiento guiado — Scaffolding paso a paso para consolidar la base. [difficulties allowed: 1,2,3; suits: procedural/mixed]\n- prove: Demostración — Rigor matemático, proporciones formales y álgebra. [difficulties allowed: 1,2,3; suits: theoretical/mixed]\n- counterexample: Contraejemplo — Identificación de casos límite y refutación de hipótesis. [difficulties allowed: 1,2,3; suits: theoretical/mixed]\n- true_false: Verdadero o falso — Discernimiento rápido de postulados y propiedades. [difficulties allowed: 1,2,3; suits: theoretical/mixed]\n- find_error: Encontrar el error — Detección analítica de falacias y pasos fallidos. [difficulties allowed: 2,3; suits: theoretical/mixed]\n- drill: Cálculo rápido — Agilidad aritmética, simplificación y estimación de porcentajes. [difficulties allowed: 1,2,3; suits: procedural]\n- explain: Explicar (Feynman) — Explicar conceptos complejos con tus propias palabras. [difficulties allowed: 1,2,3; suits: theoretical/mixed]"
+  },
+  {
+   "role": "user",
+   "content": "Topic: \"1.2 Suma y resta\" (subject: mathematics). Decide its topic_type yourself.\nCurrently declared skills: solve, process.\n\nTheory of the topic:\n### Teoría\nSuma con signo. Ejemplos: -3 + 5 = 2.\n\nReturn ONLY the JSON object."
+  }
+ ],
+ "skillOptions": [
+  {
+   "role": "system",
+   "content": "You are NoteVault's practice designer. You read ONE topic and decide (1) what kind of topic it is and (2) which competencies (skills) a student must train to master exactly that topic.\nSTEP 1 - topic_type. Decide it from what the student has to DO with the topic:\n  \"theoretical\": the topic is about definitions, concepts, representations, classifications, properties or proofs (what things are and how they relate). Examples: natural numbers, integers and the number line; what a fraction is; sets and notation.\n  \"procedural\": the topic is about executing a method or a calculation (operations, algorithms, conversions). Examples: adding and subtracting integers; long division; simplifying fractions; percentages.\n  \"mixed\": both weigh about the same (a method that must also be justified), e.g. gcd and lcm.\nSTEP 2 - skills. Choose ONLY skill ids from the catalogue, and ONLY ones that suit the topic_type: each catalogue line says which types it suits. A skill that does not suit the type must NOT be chosen (for example `drill`, quick calculation, is never right for a theoretical topic).\nPrefer 3-6 skills that really serve THIS topic over covering the catalogue. For each give how many exercises at difficulty 1 (basic), 2 (intermediate) and 3 (advanced); 0 where a level makes no sense or is not allowed. Typical totals per skill: 3-10; central skills get more.\nAnswer with ONE JSON object and nothing else:\n{\"topic_type\":\"theoretical|procedural|mixed\",\"skills\":[{\"skill\":\"<id>\",\"difficulties\":{\"1\":n,\"2\":n,\"3\":n},\"why\":\"<one short sentence in Spanish>\"}],\"summary\":\"<one sentence in Spanish>\"}\n\nCatalogue for subject \"mathematics\":\n- solve: Problema — Resolución de problemas contextualizados y aplicados. [difficulties allowed: 1,2,3; suits: procedural/mixed]\n- process: Procedimiento guiado — Scaffolding paso a paso para consolidar la base. [difficulties allowed: 1,2,3; suits: procedural/mixed]\n- prove: Demostración — Rigor matemático, proporciones formales y álgebra. [difficulties allowed: 1,2,3; suits: theoretical/mixed]\n- counterexample: Contraejemplo — Identificación de casos límite y refutación de hipótesis. [difficulties allowed: 1,2,3; suits: theoretical/mixed]\n- true_false: Verdadero o falso — Discernimiento rápido de postulados y propiedades. [difficulties allowed: 1,2,3; suits: theoretical/mixed]\n- find_error: Encontrar el error — Detección analítica de falacias y pasos fallidos. [difficulties allowed: 2,3; suits: theoretical/mixed]\n- drill: Cálculo rápido — Agilidad aritmética, simplificación y estimación de porcentajes. [difficulties allowed: 1,2,3; suits: procedural]\n- explain: Explicar (Feynman) — Explicar conceptos complejos con tus propias palabras. [difficulties allowed: 1,2,3; suits: theoretical/mixed]\nTHIS TIME the user will choose, so list EVERY skill of the catalogue (all of them), each once:\n  \"recommended\": true only for the 3-6 that serve this topic best (and suit its type), false for the rest;\n  \"difficulties\": how many exercises at 1/2/3 you would suggest (also for the not recommended ones, as a sensible default; 0 where a level is not allowed);\n  \"why\": ONE short Spanish sentence: why it is or is not recommended for THIS topic;\n  \"how\": ONE short Spanish sentence: how the student would probably practise this topic with this skill (a concrete example of exercise).\nFormat: {\"topic_type\":\"...\",\"skills\":[{\"skill\":\"<id>\",\"recommended\":true,\"difficulties\":{\"1\":n,\"2\":n,\"3\":n},\"why\":\"...\",\"how\":\"...\"}],\"summary\":\"<one sentence>\"}"
+  },
+  {
+   "role": "user",
+   "content": "Topic: \"1.2 Suma y resta\" (subject: mathematics). Decide its topic_type yourself.\nCurrently declared skills: solve, process.\n\nTheory of the topic:\n### Teoría\nSuma con signo. Ejemplos: -3 + 5 = 2.\n\nReturn ONLY the JSON object."
+  }
+ ],
+ "plan": [
+  {
+   "skills": [
+    {
+     "skill": "solve",
+     "counts": {
+      "1": 3,
+      "2": 4,
+      "3": 2
+     },
+     "why": "aplica"
+    },
+    {
+     "skill": "drill",
+     "counts": {
+      "1": 5,
+      "2": 3,
+      "3": 2
+     },
+     "why": "agilidad"
+    }
+   ],
+   "summary": "Tema de cálculo.",
+   "topicType": "procedural"
+  },
+  {
+   "skills": [
+    {
+     "skill": "solve",
+     "counts": {
+      "1": 3,
+      "2": 4,
+      "3": 2
+     },
+     "why": "aplica"
+    },
+    {
+     "skill": "drill",
+     "counts": {
+      "1": 5,
+      "2": 3,
+      "3": 2
+     },
+     "why": "agilidad"
+    }
+   ],
+   "summary": "Tema de cálculo.",
+   "topicType": "procedural"
+  },
+  {
+   "skills": [
+    {
+     "skill": "solve",
+     "counts": {
+      "1": 3,
+      "2": 4,
+      "3": 2
+     },
+     "why": "aplica"
+    },
+    {
+     "skill": "drill",
+     "counts": {
+      "1": 5,
+      "2": 3,
+      "3": 2
+     },
+     "why": "agilidad"
+    }
+   ],
+   "summary": "Tema de cálculo.",
+   "topicType": "procedural"
+  }
+ ],
+ "options": null,
+ "selector": [
+  {
+   "skills": [
+    "solve",
+    "process",
+    "drill"
+   ],
+   "topicType": "procedural",
+   "source": "catalogue",
+   "notes": [
+    "recomendados por tipo de tema (procedural)"
+   ],
+   "entries": [
+    {
+     "id": "solve",
+     "label": "Problema",
+     "act": "Solve the problem and justify the procedure.",
+     "subject": "mathematics",
+     "description": "Resolución de problemas contextualizados y aplicados.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "competencies": [
+      "Modelado",
+      "Traducción del enunciado"
+     ],
+     "topicTypes": [
+      "procedural",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "process",
+     "label": "Procedimiento guiado",
+     "act": "Work the problem step by step using the named study technique, showing every intermediate step.",
+     "subject": "mathematics",
+     "description": "Scaffolding paso a paso para consolidar la base.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "assistanceProtocol": "Pistas que señalan el siguiente paso o la técnica requerida, jamás el resultado directo.",
+     "competencies": [
+      "Método paso a paso",
+      "Consolidación de la técnica"
+     ],
+     "topicTypes": [
+      "procedural",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "drill",
+     "label": "Cálculo rápido",
+     "act": "Answer a timed series of short calculations.",
+     "subject": "mathematics",
+     "description": "Agilidad aritmética, simplificación y estimación de porcentajes.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "competencies": [
+      "Cálculo mental",
+      "Estimación y agilidad"
+     ],
+     "topicTypes": [
+      "procedural"
+     ],
+     "custom": false
+    }
+   ]
+  },
+  {
+   "skills": [
+    "prove",
+    "counterexample",
+    "true_false",
+    "find_error",
+    "explain"
+   ],
+   "topicType": "theoretical",
+   "source": "catalogue",
+   "notes": [
+    "recomendados por tipo de tema (theoretical)"
+   ],
+   "entries": [
+    {
+     "id": "prove",
+     "label": "Demostración",
+     "act": "Write a complete proof of the statement.",
+     "subject": "mathematics",
+     "description": "Rigor matemático, proporciones formales y álgebra.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "competencies": [
+      "Rigor formal",
+      "Cadena deductiva completa"
+     ],
+     "topicTypes": [
+      "theoretical",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "counterexample",
+     "label": "Contraejemplo",
+     "act": "Refute a general claim with a concrete counterexample.",
+     "subject": "mathematics",
+     "description": "Identificación de casos límite y refutación de hipótesis.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "competencies": [
+      "Casos límite",
+      "Refutación de hipótesis"
+     ],
+     "topicTypes": [
+      "theoretical",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "true_false",
+     "label": "Verdadero o falso",
+     "act": "Decide whether the statement is true or false and justify the verdict.",
+     "subject": "mathematics",
+     "description": "Discernimiento rápido de postulados y propiedades.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "competencies": [
+      "Discernimiento de postulados",
+      "Justificación del veredicto"
+     ],
+     "topicTypes": [
+      "theoretical",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "find_error",
+     "label": "Encontrar el error",
+     "act": "Locate the error in the given work, explain it and correct it.",
+     "subject": "mathematics",
+     "description": "Detección analítica de falacias y pasos fallidos.",
+     "allowedDifficulties": [
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 2,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": false,
+     "competencies": [
+      "Detección de falacias",
+      "Localización del paso fallido"
+     ],
+     "topicTypes": [
+      "theoretical",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "explain",
+     "label": "Explicar (Feynman)",
+     "act": "Explain the concept in plain words, as if teaching a beginner.",
+     "subject": "mathematics",
+     "description": "Explicar conceptos complejos con tus propias palabras.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "competencies": [
+      "Claridad conceptual",
+      "Ejemplo propio"
+     ],
+     "topicTypes": [
+      "theoretical",
+      "mixed"
+     ],
+     "custom": false
+    }
+   ]
+  },
+  {
+   "skills": [
+    "solve",
+    "process",
+    "prove",
+    "counterexample",
+    "true_false",
+    "find_error"
+   ],
+   "topicType": "mixed",
+   "source": "catalogue",
+   "notes": [
+    "recomendados por tipo de tema (mixed)"
+   ],
+   "entries": [
+    {
+     "id": "solve",
+     "label": "Problema",
+     "act": "Solve the problem and justify the procedure.",
+     "subject": "mathematics",
+     "description": "Resolución de problemas contextualizados y aplicados.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "competencies": [
+      "Modelado",
+      "Traducción del enunciado"
+     ],
+     "topicTypes": [
+      "procedural",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "process",
+     "label": "Procedimiento guiado",
+     "act": "Work the problem step by step using the named study technique, showing every intermediate step.",
+     "subject": "mathematics",
+     "description": "Scaffolding paso a paso para consolidar la base.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "assistanceProtocol": "Pistas que señalan el siguiente paso o la técnica requerida, jamás el resultado directo.",
+     "competencies": [
+      "Método paso a paso",
+      "Consolidación de la técnica"
+     ],
+     "topicTypes": [
+      "procedural",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "prove",
+     "label": "Demostración",
+     "act": "Write a complete proof of the statement.",
+     "subject": "mathematics",
+     "description": "Rigor matemático, proporciones formales y álgebra.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "competencies": [
+      "Rigor formal",
+      "Cadena deductiva completa"
+     ],
+     "topicTypes": [
+      "theoretical",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "counterexample",
+     "label": "Contraejemplo",
+     "act": "Refute a general claim with a concrete counterexample.",
+     "subject": "mathematics",
+     "description": "Identificación de casos límite y refutación de hipótesis.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "competencies": [
+      "Casos límite",
+      "Refutación de hipótesis"
+     ],
+     "topicTypes": [
+      "theoretical",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "true_false",
+     "label": "Verdadero o falso",
+     "act": "Decide whether the statement is true or false and justify the verdict.",
+     "subject": "mathematics",
+     "description": "Discernimiento rápido de postulados y propiedades.",
+     "allowedDifficulties": [
+      1,
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 1,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": true,
+     "competencies": [
+      "Discernimiento de postulados",
+      "Justificación del veredicto"
+     ],
+     "topicTypes": [
+      "theoretical",
+      "mixed"
+     ],
+     "custom": false
+    },
+    {
+     "id": "find_error",
+     "label": "Encontrar el error",
+     "act": "Locate the error in the given work, explain it and correct it.",
+     "subject": "mathematics",
+     "description": "Detección analítica de falacias y pasos fallidos.",
+     "allowedDifficulties": [
+      2,
+      3
+     ],
+     "allowedAssistance": [
+      "no_help",
+      "helper"
+     ],
+     "defaultDifficulty": 2,
+     "defaultAssistance": "no_help",
+     "beginnerAllowed": false,
+     "competencies": [
+      "Detección de falacias",
+      "Localización del paso fallido"
+     ],
+     "topicTypes": [
+      "theoretical",
+      "mixed"
+     ],
+     "custom": false
+    }
+   ]
+  }
+ ],
+ "exercisePrompt": [
+  [
+   {
+    "role": "system",
+    "content": "You are NoteVault's expert exercise creator. You specialize in generating deep, pedagogically rigorous exercises.\nSubject: mathematics. Topic title: \"1.2 Suma y resta\".\nCognitive skill to train: \"solve\". Difficulty level: 2 (Intermedio).\nCRITICAL RULES:\n1. Exercises MUST be specialized to the specific concepts, definitions, and theorems of this topic.\n2. Never produce generic textbook filler or boilerplate problems.\n3. Assistance mode is NO HELP: hints must be minimal or absent (naming only the general failure mode to watch out for).\n4. Output format: You must return a valid JSON array of exercise objects. No other markdown commentary.\nEach object must have:\n  \"title\": string (concise descriptive title in Spanish)\n  \"statement\": string (clear exercise statement in Spanish with LaTeX $...$ or code where appropriate)\n  \"hints\": array of strings (progressive hints in Spanish)\n  \"solution\": string (complete worked model solution in Spanish)\n  \"rubric\": array of strings (3 to 5 clear checklist verification criteria)"
+   },
+   {
+    "role": "user",
+    "content": "Generate 3 exercises for topic \"1.2 Suma y resta\".\n\nTheory context from the topic's notes:\n### Teoría\nContenido\n\nRequired skill: solve\nDifficulty: 2 (Intermedio)\nAssistance: no_help\n\n\nReturn ONLY the JSON array of exercises."
+   }
+  ],
+  [
+   {
+    "role": "system",
+    "content": "You are NoteVault's expert exercise creator. You specialize in generating deep, pedagogically rigorous exercises.\nSubject: mathematics. Topic title: \"1.2 Suma y resta\".\nCognitive skill to train: \"prove\". Difficulty level: 3 (Avanzado).\nCRITICAL RULES:\n1. Exercises MUST be specialized to the specific concepts, definitions, and theorems of this topic.\n2. Never produce generic textbook filler or boilerplate problems.\n3. Assistance mode is HELPER: hints MUST give progressive, step-by-step guidance on what technique to use and why, NEVER revealing the full final solution.\n4. Output format: You must return a valid JSON array of exercise objects. No other markdown commentary.\nEach object must have:\n  \"title\": string (concise descriptive title in Spanish)\n  \"statement\": string (clear exercise statement in Spanish with LaTeX $...$ or code where appropriate)\n  \"hints\": array of strings (progressive hints in Spanish)\n  \"solution\": string (complete worked model solution in Spanish)\n  \"rubric\": array of strings (3 to 5 clear checklist verification criteria)"
+   },
+   {
+    "role": "user",
+    "content": "Generate 2 exercises for topic \"1.2 Suma y resta\".\n\nRequired skill: prove\nDifficulty: 3 (Avanzado)\nAssistance: helper\n\nREGISTRO DE ERRORES del estudiante en esta competencia (más recientes primero):\n- Error de signo\nEscribe alrededor del 60 % de los ejercicios para atacar EXACTAMENTE estos errores (el mismo tipo de fallo, con otros números o contexto, sin repetir enunciados) y el resto para entrenar toda la competencia y mantener activo lo que ya domina.\n\nReturn ONLY the JSON array of exercises."
+   }
+  ]
+ ],
+ "exerciseNote": "---\ntype: exercise\nsubject: mathematics\ntitle: \"Ej\"\nmode: solve\ndifficulty: 2\nassistance: nohelp\ntopic: \"1.2 Suma y resta\"\n---\n\n# Ej\n\n## Enunciado\nCalcula.\n\n## Pistas\n- Pista\n\n## Solución\n2\n\n## Rúbrica\n- [ ] Correcto\n",
+ "defaultSkills": {
+  "resumen_teorico_skill": "---\ntype: skill_template\nskill: teoria_creation\n---\n# Skill: nota de teoría de un tema\n\nUna nota por tema, en `<tema>/<tema>.md`. Español, riguroso y conciso. Fórmulas en LaTeX\n(`$...$` en línea, `$$...$$` en bloque). **Esta estructura es un contrato**: el mapa del tema\n(`<tema> — mapa.canvas`) se genera leyendo estas secciones y estos campos, y si falta algo el mapa\nno se puede construir.\n\n## Frontmatter\n```yaml\n---\nid: mat.aritmetica.tema\ntitle: <título sin número>\nnumber: \"1.1\"\narea: \"<carpeta del área>\"\ntopic: \"<carpeta del tema>\"\ntype: teorica\ndifficulty: 1\nsubject: mathematics\nprerequisites: []\nstatus: draft\nverified: false\nsources: []\ntags: [materia, area, tema]\n---\n```\n\n## Estructura (exactamente estos encabezados, en este orden)\n\n1. `# <número> <título>`\n2. `## Requiere`: una línea `- [[Tema previo]] — por qué hace falta` por cada prerrequisito (el nombre\n   entre corchetes es EXACTAMENTE el de otro tema ya existente), o `*Sin prerrequisitos.*`.\n3. `## Explicación` con dos subsecciones:\n   - `### Qué es`: una frase (**En una frase.** …), luego cada definición en negrita\n     (**Concepto.** definición formal) con su notación en LaTeX.\n   - `### Modelo mental`: la imagen o analogía que hace intuitivo el tema, y 3–5 viñetas con\n     **negrita** que la aplican.\n4. `## Ejemplos` con 3 ejemplos `### Ejemplo N — título`. Cada uno son EXACTAMENTE estas cuatro viñetas:\n   - `- **Contexto:** …`\n   - `- **Caso:** …`\n   - `- **Resultado esperado:** …`\n   - `- **Por qué funciona:** …`\n5. `## Errores comunes` con 4–5 errores `### Error N — título`. Cada uno son EXACTAMENTE cuatro viñetas:\n   - `- **Error:** …`\n   - `- **Síntoma:** …`\n   - `- **Causa:** …`\n   - `- **Solución:** …`\n6. `## Conexiones`: con qué otros temas se relaciona y para qué sirve.\n7. `## Tarjetas`: 6–9 tarjetas `### T1 · definicion` con `**P:**` y `**R:**`\n   (tipos: definicion, notacion, ejemplo, contraejemplo, error, conexion).\n\n## Reglas\n- No inventes resultados: si no estás seguro de algo, no lo afirmes.\n- Un tema = una idea; lo que sea de otro tema se enlaza, no se repite.\n- El título y el número coinciden exactamente con el nombre de la carpeta del tema.\n- Cada viñeta de un ejemplo o error es un párrafo corto (una o dos frases): el mapa la dibuja en una tarjeta.\n",
+  "mapa_skill": "---\ntype: skill_template\nskill: mapa\n---\n# Skill: mapas (canvas) de una materia\n\nHay TRES niveles de mapa. Todos cumplen: **toda flecha lleva etiqueta que explica la conexión**, nada\nse solapa y cada grupo envuelve a sus tarjetas. Los dos primeros se crean solos al generar el temario;\nel tercero se genera desde la nota de teoría.\n\n## 1. Mapa de la materia — `<materia>/00 Mapa de <materia>.canvas`\nUn **grupo por bloque** (`Bloque I — Aritmética`, uno cada 680 px, 414 de ancho) y dentro una tarjeta de\ntexto (360 de ancho) con el área y sus temas como enlaces. Flechas entre áreas, etiqueta `N prerrequisito(s)`.\n```json\n{\"nodes\":[\n {\"id\":\"g1\",\"type\":\"group\",\"x\":0,\"y\":0,\"width\":414,\"height\":584,\"label\":\"Bloque I — Aritmética\",\"nv\":{\"zIndex\":-2}},\n {\"id\":\"a1\",\"type\":\"text\",\"x\":24,\"y\":48,\"width\":360,\"height\":506,\"text\":\"## 1 Aritmética elemental y operativa\\n\\n- [[1.1 Números naturales]]\\n- [[1.2 Suma y resta]]\"}],\n \"edges\":[{\"id\":\"e1\",\"fromNode\":\"a1\",\"fromSide\":\"right\",\"toNode\":\"a2\",\"toSide\":\"left\",\"label\":\"4 prerrequisito(s)\"}]}\n```\n\n## 2. Mapa del área — `<área>/00 Mapa — <área>.canvas`\nUn **grupo grande** (color `6`, con el nombre del área, en x −24 / y −48) con una tarjeta `file` de 300×120\npor tema. Columnas por dependencia (una cada 640 px; 210 px por fila): un tema va a la derecha de aquellos\nde los que depende. Flechas de derecha a izquierda (`right` → `left`) con el MOTIVO de la dependencia.\n```json\n{\"nodes\":[\n {\"id\":\"area\",\"type\":\"group\",\"x\":-24,\"y\":-48,\"width\":1348,\"height\":378,\"color\":\"6\",\"label\":\"1 Aritmética elemental y operativa\",\"nv\":{\"zIndex\":-2}},\n {\"id\":\"t1\",\"type\":\"file\",\"x\":0,\"y\":0,\"width\":300,\"height\":120,\"file\":\"Matemáticas/1 Aritmética/1.1 Números naturales/1.1 Números naturales.md\"},\n {\"id\":\"t2\",\"type\":\"file\",\"x\":640,\"y\":0,\"width\":300,\"height\":120,\"file\":\"Matemáticas/1 Aritmética/1.2 Suma y resta/1.2 Suma y resta.md\"}],\n \"edges\":[{\"id\":\"e1\",\"fromNode\":\"t1\",\"fromSide\":\"right\",\"toNode\":\"t2\",\"toSide\":\"left\",\"label\":\"orden y signo en la recta numérica\"}]}\n```\n\n## 3. Mapa del tema — `<tema>/<tema> — mapa.canvas`\nSe genera desde la nota de teoría (ver `resumen_teorico_skill`), con cuatro paneles de izquierda a derecha:\n- **Requiere** (grupo): una tarjeta enlace por prerrequisito, o \"Sin prerrequisitos.\".\n- **Explicación** (grupo, color 6): un panel `## Qué es` (color 5, el más ancho: 620) y un panel `## Modelo mental`\n  (color 6). Flecha `se entiende con`.\n- **Ejemplos** (grupo, color 4): un grupo por ejemplo con 4 paneles apilados: `### Contexto` → `### Caso` →\n  `### Resultado esperado` → `### Por qué funciona` (flechas `el caso concreto`, `da como resultado`,\n  `funciona porque`); entre ejemplos `otro caso`; desde Modelo mental `se aplica en`.\n- **Errores comunes** (grupo, color 3): un grupo por error con su panel; desde \"Qué es\" flechas `se falla cuando`.\nCada panel tiene la altura de su texto (sin recortes) y 460 de ancho.\n",
+  "practica_skill": "---\ntype: skill_template\nskill: practica\n---\n# Skill: qué se practica en cada tema (matriz de competencias)\n\nCada tema tiene SU matriz: las competencias (skills) que entrena y, para cada una, cuántos ejercicios\naprobados pide en dificultad fácil / media / difícil. La decide la IA leyendo la teoría, y solo se\npractica eso. Se guarda en el `.practica.md` del tema (`plan: solve=3/4/2, …`).\n\n## Primero: qué tipo de tema es\n- **teórico**: trata de definiciones, conceptos, representaciones, clasificaciones, propiedades o demostraciones\n  (qué es algo y cómo se relaciona). Ej.: naturales, enteros y recta numérica; qué es una fracción; conjuntos.\n- **procedimental**: el objetivo es ejecutar un método o un cálculo. Ej.: suma y resta de enteros, división,\n  simplificar fracciones, porcentajes.\n- **mixto**: las dos cosas pesan lo mismo. Ej.: mcd y mcm.\n\n## Qué skills encajan (matemáticas)\n| Skill | Entrena | Teórico | Procedimental | Mixto |\n|---|---|---|---|---|\n| `explain` Explicar | claridad conceptual, ejemplo propio | sí | no | sí |\n| `true_false` Verdadero o falso | discernir propiedades | sí | no | sí |\n| `counterexample` Contraejemplo | casos límite, refutar | sí | no | sí |\n| `prove` Demostración | rigor, cadena deductiva | sí | no | sí |\n| `find_error` Encontrar el error | detectar el paso fallido | sí | no | sí |\n| `solve` Problema | modelar y resolver | no | sí | sí |\n| `process` Procedimiento guiado | método paso a paso | no | sí | sí |\n| `drill` Cálculo rápido | agilidad y estimación | **nunca** | sí | no |\n\n## Reglas\n- Un tema teórico NUNCA lleva `drill`; uno procedimental no lleva demostraciones.\n- 3–6 skills por tema; total típico por skill 3–10; 0 en el nivel que no tenga sentido.\n- `find_error` no tiene nivel fácil; `drill` va siempre sin ayuda.\n- Los ejercicios se guardan en `<tema>/Ejercicios/<skill>/`.\n",
+  "temario_skill": "---\ntype: skill_template\nskill: temario\n---\n# Skill: generar el temario\n\nProceso para proponer las áreas y los temas de una materia. Se hace en pasos y sin exigirle al\nusuario decisiones técnicas: tú infieres nivel, alcance y profundidad.\n\n1. **Área y objetivo**: qué se estudia y qué resultado concreto se quiere.\n2. **Diagnóstico**: como máximo 5 preguntas cortas (qué sabe ya, qué ha hecho, tiempo).\n3. **Prerrequisitos**: qué conocimientos hacen falta; si faltan, una \"Fase 0\" (área `0 …`).\n4. **Foco y extensiones**: el foco orienta la selección; ofrece extensiones complementarias\n   y deja que el usuario las acepte, rechace o ignore.\n5. **Propuesta**: áreas numeradas (`1 Nombre`) con 6–12 temas (`1.1 Nombre`), ordenados por\n   dependencias de aprendizaje.\n6. **Dependencias**: para cada área, qué tema necesita a cuál y por qué (una etiqueta corta): alimenta el\n   mapa del área (`mapa_skill`).\n\n## Reglas\n- Nombres de carpeta: `N Nombre` y `N.M Nombre`, sin `/ \\ : * ? \" < > |`.\n- Ningún tema repetido; cada tema es una sola idea que se pueda practicar.\n- Los nombres deben ser idénticos en teoría, práctica y canvas.\n",
+  "subtemas_skill": "---\ntype: skill_template\nskill: subtemas\n---\n# Skill: generar subtemas y temas nuevos\n\nCómo añadir un tema (o dividir uno) dentro de un área ya existente.\n\n1. Lee los temas actuales del área y elige una numeración que respete el orden natural\n   (`1.13` va después de `1.12`; para insertar en medio, renumera solo si el usuario lo pide).\n2. Comprueba que no duplica un tema existente ni invade el de otro.\n3. Crea, dentro de la carpeta del tema: la nota de teoría `<tema>.md` (sigue\n   `resumen_teorico_skill`, es un contrato), su vista de práctica `<tema>.practica.md` y su mapa.\n4. Elige la matriz de competencias del tema (`practica_skill`) con el botón de la varita.\n5. Si el tema es grande, propón dividirlo en subtemas con su propia carpeta y numeración\n   (`1.5.1`, `1.5.2`).\n6. Añade el tema al mapa del área con su dependencia y su etiqueta.\n"
+ }
+}

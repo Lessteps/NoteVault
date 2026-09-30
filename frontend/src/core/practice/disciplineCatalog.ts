@@ -3,6 +3,8 @@
  * Ported from notevault_app/core/practice/discipline_catalog.py.
  */
 
+import { englishSkillSpec } from "../../lib/englishSkillData";
+
 import { mode_for } from "./modes";
 
 export interface Skill {
@@ -564,7 +566,8 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "english_grammar",
     subject: "english",
     title: "Gramática inglesa",
-    modes: ["rewrite", "find_error", "cloze", "translate", "true_false"],
+    // The first-generation English modes stay valid so existing exercises keep working; they are no longer offered.
+    modes: ["gr_explain_rule", "gr_recognize", "gr_cloze", "gr_transform", "gr_correct", "gr_produce", "rewrite", "find_error", "cloze", "translate", "true_false"],
     framing:
       "The learner is a native Spanish speaker (today A2, aiming for C1). Sentences come " +
       "from realistic contexts the learner meets: work emails and meetings in a tech/" +
@@ -633,7 +636,7 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "english_vocabulary",
     subject: "english",
     title: "Vocabulario inglés",
-    modes: ["cloze", "translate", "explain"],
+    modes: ["vc_recall", "vc_recognition", "vc_usage", "vc_families", "vc_collocations", "cloze", "translate", "explain"],
     framing:
       "The learner is a native Spanish speaker (today A2, aiming for C1). Vocabulary comes " +
       "from realistic work (tech/automation) and daily-life contexts, always inside a " +
@@ -673,7 +676,7 @@ const _CATALOGUE: readonly Discipline[] = [
     id: "english_writing",
     subject: "english",
     title: "Redacción en inglés",
-    modes: ["writing", "rewrite"],
+    modes: ["wr_sentences", "wr_paragraph", "wr_free", "wr_paraphrase", "wr_register", "wr_review", "writing", "rewrite"],
     framing:
       "The learner is a native Spanish speaker (today A2, aiming for C1). Tasks are real " +
       "writing needs: a paragraph about work or study, an email to a colleague or client, " +
@@ -701,11 +704,118 @@ const _CATALOGUE: readonly Discipline[] = [
       ],
     ),
   },
+  {
+    id: "english_reading",
+    subject: "english",
+    title: "Lectura en inglés",
+    modes: ["rd_literal", "rd_inference", "rd_vocab_context", "rd_summary", "rd_skim_scan", "rd_structure"],
+    framing:
+      "The learner is a native Spanish speaker (today A2, aiming for C1). Every task comes with " +
+      "its own short text written at the target CEFR level about realistic work or daily-life " +
+      "content; questions are answerable from the text alone. State the CEFR level and the time limit.",
+    skills: _skills(
+      [
+        "Comprensión del texto",
+        "answers from prior knowledge instead of from the text",
+        "copies a phrase without understanding it",
+        "misses negation or a qualifier (not, hardly, only)",
+      ],
+      [
+        "Inferencia",
+        "takes the literal statement as the inferred one",
+        "over-infers something the text does not support",
+        "does not justify with evidence from the text",
+      ],
+      [
+        "Vocabulario en contexto",
+        "guesses from a Spanish look-alike (false friend) instead of the context",
+        "ignores the part of speech of the unknown word",
+        "gives the dictionary meaning that does not fit this context",
+      ],
+      [
+        "Síntesis y estructura",
+        "summarises with details instead of main ideas",
+        "copies sentences instead of paraphrasing",
+        "does not see the function of each paragraph or the linkers that mark it",
+      ],
+    ),
+  },
+  {
+    id: "english_listening",
+    subject: "english",
+    title: "Escucha en inglés",
+    modes: ["ls_dictation", "ls_gist", "ls_detail", "ls_gap", "ls_variation"],
+    framing:
+      "The learner is a native Spanish speaker (today A2, aiming for C1). The audio text is played " +
+      "aloud by the app and stays hidden; write it at the target CEFR level from realistic work " +
+      "and daily-life situations, with natural rhythm. Keep the answer verifiable word by word.",
+    skills: _skills(
+      [
+        "Discriminación de sonidos",
+        "confuses similar sounds (ship/sheep, think/sink)",
+        "hears a homophone as the wrong word (their/there, to/too)",
+        "misses weak forms and contractions (he's / he was)",
+      ],
+      [
+        "Terminaciones y ortografía",
+        "drops the final -s, -ed or -ing that is pronounced weakly",
+        "misspells a word that was heard correctly",
+        "writes numbers or dates in the wrong form",
+      ],
+      [
+        "Comprensión global y de detalle",
+        "gets stuck on one unknown word and loses the rest",
+        "gives the main idea from one sentence only",
+        "mishears figures, names or times",
+      ],
+    ),
+  },
+  {
+    id: "english_speaking",
+    subject: "english",
+    title: "Habla en inglés",
+    modes: ["sp_read_aloud", "sp_shadowing", "sp_guided", "sp_monologue", "sp_roleplay", "sp_record_compare"],
+    framing:
+      "The learner is a native Spanish speaker (today A2, aiming for C1). There is no speech " +
+      "recognition: the learner speaks aloud and then types what they said (or a report of how it " +
+      "went), and that text is what is judged. Tasks are real situations (a meeting, a call, travel). " +
+      "State the CEFR level and how long to speak.",
+    skills: _skills(
+      [
+        "Pronunciación",
+        "pronounces final consonant clusters by adding a vowel (school as eschool)",
+        "does not reduce unstressed syllables",
+        "stress on the wrong syllable by transfer from Spanish",
+      ],
+      [
+        "Fluidez y organización",
+        "long pauses or abandoned sentences",
+        "no linkers between ideas",
+        "translates word by word from Spanish while speaking",
+      ],
+      [
+        "Interacción",
+        "answers with a single word instead of a full turn",
+        "does not use conversational formulas (Could you…? I see what you mean)",
+        "register too blunt or too formal for the situation",
+      ],
+    ),
+  },
 ];
 
 export const DISCIPLINES: Record<string, Discipline> = Object.fromEntries(
   _CATALOGUE.map((d) => [d.id, d]),
 );
+
+/** The discipline (framing and error taxonomy) of each English area. */
+export const ENGLISH_DISCIPLINE_OF_AREA: Record<string, string> = {
+  grammar: "english_grammar",
+  writing: "english_writing",
+  reading: "english_reading",
+  listening: "english_listening",
+  speaking: "english_speaking",
+  vocabulary: "english_vocabulary",
+};
 
 export const DEFAULT_DISCIPLINE: Record<string, string> = {
   mathematics: "math_general",
@@ -719,10 +829,15 @@ export function disciplineFor(frontmatter: Record<string, any>): Discipline {
   if (explicit in DISCIPLINES) {
     return DISCIPLINES[explicit]!;
   }
+  const subject = String(fm.subject || "").trim().toLowerCase();
+  // English: the discipline follows the skill (`gr_` grammar, `wr_` writing, `rd_` reading, …), never math.
+  if (subject === "english" || subject === "ingles" || subject === "inglés") {
+    const bySkill = ENGLISH_DISCIPLINE_OF_AREA[englishSkillSpec(String(fm.mode || ""))?.area ?? ""];
+    return DISCIPLINES[bySkill || DEFAULT_DISCIPLINE.english!]!;
+  }
   if (mode_for(fm).id === "drill") {
     return DISCIPLINES["math_drill"]!;
   }
-  const subject = String(fm.subject || "").trim().toLowerCase();
   return DISCIPLINES[DEFAULT_DISCIPLINE[subject] || "math_general"]!;
 }
 export const discipline_for = disciplineFor;

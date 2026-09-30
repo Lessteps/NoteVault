@@ -15,6 +15,7 @@ import { useApp, type OpenNote } from "../../store/app";
 import { cn } from "../ui";
 import { useStudyVersion } from "./StudyPanel";
 import { TopicConfiguratorDialog } from "./TopicConfiguratorDialog";
+import { ClassifyBanner } from "./ClassifyBanner";
 import { TopicGeneralView } from "./TopicGeneralView";
 
 type Tab = "resumen" | "practicar";
@@ -189,6 +190,7 @@ export function TopicFileView({ note }: { note: OpenNote }) {
           </h1>
         </div>
       </header>
+      <ClassifyBanner folder={topicData?.folder} subject={topicData?.topic?.subject} onResolved={() => { useStudyVersion.getState().bump(); void refresh(); }} />
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
         {loading && !topicData ? (

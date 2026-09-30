@@ -13,6 +13,8 @@
  * difficulties and assistance rules the rest of the app already reads.
  */
 
+import { ENGLISH_BRANCHES, englishSkillSpec, type EnglishArea, type EnglishBranch } from "../../lib/englishSkillData.js";
+import { domainOfSubject, type TopicKey } from "./domain.js";
 import { type SkillDefinition, skillsForSubject } from "./skills.js";
 import { type TopicType, normaliseTopicType } from "./topicType.js";
 
@@ -58,7 +60,12 @@ const DEFAULT_FIT: SkillCompetencies = { competencies: [], topicTypes: ["mixed"]
 /** A catalogue entry: the skill plus what it certifies and where it fits. */
 export interface CatalogSkill extends SkillDefinition {
   competencies: readonly string[];
+  /** Topic types it fits (mathematics, programming). Empty for English skills. */
   topicTypes: readonly TopicType[];
+  /** English only: the branches it can be practised in (vocabulary skills fit all of them). */
+  branches?: readonly EnglishBranch[];
+  /** English only: the branch it belongs to, or `vocabulary` for the cross-cutting layer. */
+  area?: EnglishArea;
   /** True when it comes from the vault's own catalogue, not from the shipped one. */
   custom: boolean;
 }
@@ -104,7 +111,20 @@ export function customSkillsFor(subject: string): readonly CatalogSkill[] {
 
 /** The subject's catalogue: the shipped skills enriched with their fit, plus any custom ones. */
 export function catalogFor(subject: string): CatalogSkill[] {
+  const english = domainOfSubject(subject) === "english";
   const shipped = skillsForSubject(subject).map((skill) => {
+    if (english) {
+      // English skills carry their own competencies and branches: they never read the maths fit table.
+      const spec = englishSkillSpec(skill.id);
+      return {
+        ...skill,
+        competencies: spec?.competencies ?? [],
+        topicTypes: [],
+        branches: spec ? (spec.area === "vocabulary" ? ENGLISH_BRANCHES.map((b) => b.id) : [spec.area as EnglishBranch]) : [],
+        ...(spec ? { area: spec.area } : {}),
+        custom: false,
+      } satisfies CatalogSkill;
+    }
     const fit = SKILL_FIT[skill.id] ?? DEFAULT_FIT;
     return {
       ...skill,
@@ -122,12 +142,27 @@ export function catalogSkill(subject: string, skillId: string): CatalogSkill | u
   return catalogFor(subject).find((s) => s.id === id);
 }
 
+/** Whether a skill fits a topic's classification: its type (maths, programming) or its branch (English). */
+export function fitsKey(skill: Pick<CatalogSkill, "topicTypes" | "branches">, key: string): boolean {
+  return skill.branches ? skill.branches.includes(key as EnglishBranch) : skill.topicTypes.includes(key as TopicType);
+}
+
 /** Skill ids that carry meaning for a topic type, in catalogue order. */
 export function skillsForTopicType(subject: string, topicType: TopicType): string[] {
   return catalogFor(subject)
-    .filter((s) => s.topicTypes.includes(topicType))
+    .filter((s) => fitsKey(s, topicType))
     .map((s) => s.id);
 }
+
+/** The skills a branch topic offers by default: its own branch's, in order (vocabulary is chosen, not assumed). */
+export function skillsForBranch(subject: string, branch: EnglishBranch): string[] {
+  return catalogFor(subject)
+    .filter((s) => s.area === branch)
+    .map((s) => s.id);
+}
+
+/** `TopicKey` re-export for callers that classify by type or by branch. */
+export type { TopicKey };
 
 /** Which skills of a subject are read as theory, for `detectTopicType`. */
 export function theoreticalSkills(subject: string): string[] {
@@ -142,8 +177,10 @@ export function theoreticalSkills(subject: string): string[] {
 
 export interface SkillSelectionRequest {
   subject: string;
-  /** The topic's type (`detectTopicType` or the manifest's own field). */
-  topicType: TopicType;
+  /** The topic's type (`detectTopicType` or the manifest's own field). Mathematics and programming. */
+  topicType?: TopicType;
+  /** The topic's branch. English (required there: an English topic has no default). */
+  branch?: EnglishBranch;
   /** The topic's title (context for a future AI selector; unused by the rule). */
   title?: string;
   /** The manifest's own `skills:`, when it declares them. */
@@ -159,13 +196,31 @@ export interface SkillSelectionRequest {
 export interface SkillSelectionResult {
   /** Skill ids, in the order they should be offered. */
   skills: string[];
-  topicType: TopicType;
+  topicType?: TopicType;
+  branch?: EnglishBranch;
   /** Where the list came from. */
   source: "declared" | "catalogue" | "custom";
   /** Why, in one line, for the UI and the logs. */
   notes: string[];
   /** Catalogue entries of `skills`, ready to render (descriptions included). */
   entries: CatalogSkill[];
+}
+
+/** English: the skills of the topic's branch. There is no default branch: without one it is an error. */
+function selectEnglish(request: SkillSelectionRequest, subject: string): SkillSelectionResult {
+  const branch = request.branch;
+  if (!branch) throw new Error("Un tema de inglés necesita su rama (gramática, escritura, lectura, escucha o habla) para elegir competencias.");
+  const declared = (request.declaredSkills ?? []).map((s) => String(s).trim().toLowerCase()).filter(Boolean);
+  const known = declared.filter((id) => catalogSkill(subject, id));
+  const max = Math.max(1, request.maxSkills ?? MAX_RECOMMENDED_SKILLS);
+  const skills = known.length ? known : skillsForBranch(subject, branch).slice(0, max);
+  return {
+    skills,
+    branch,
+    source: known.length ? "declared" : "catalogue",
+    notes: [known.length ? `los declara el propio tema (${known.length})` : `competencias de la rama ${branch}`],
+    entries: skills.map((id) => catalogSkill(subject, id)!),
+  };
 }
 
 /** The plug point: swap this implementation for an AI one and nothing else moves. */
@@ -184,6 +239,7 @@ export const deterministicSkillSelector: SkillSelector = {
   id: "catalogue-v1",
   select(request) {
     const subject = String(request.subject ?? "").trim().toLowerCase() || "mathematics";
+    if (domainOfSubject(subject) === "english") return selectEnglish(request, subject);
     const topicType = normaliseTopicType(request.topicType) ?? "mixed";
     const declared = (request.declaredSkills ?? []).map((s) => String(s).trim().toLowerCase()).filter(Boolean);
     const notes: string[] = [];

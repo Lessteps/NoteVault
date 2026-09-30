@@ -6,7 +6,8 @@
  * comment the app reads back). Pure: no I/O, no AI client.
  */
 
-import type { CatalogSkill } from "./skillSelection";
+import type { EnglishBranch } from "../../lib/englishSkillData";
+import { fitsKey, type CatalogSkill } from "./skillSelection";
 import type { DifficultyLevel } from "./skills";
 import type { TopicType } from "./topicType";
 
@@ -21,6 +22,8 @@ export interface PracticePlan {
   skills: PracticePlanSkill[];
   summary: string;
   topicType?: TopicType;
+  /** English topics: the branch the plan was made for (they have no topic type). */
+  branch?: EnglishBranch;
 }
 
 export const PLAN_START = "<!-- nv:plan:start -->";
@@ -32,7 +35,10 @@ const LEVELS: DifficultyLevel[] = [1, 2, 3];
 export interface ReevaluationInput {
   subject: string;
   title: string;
-  topicType: TopicType;
+  /** Mathematics / programming. */
+  topicType?: TopicType;
+  /** English: the topic's branch (fixed, decided by its folder or its `branch:`). */
+  branch?: EnglishBranch;
   catalog: readonly CatalogSkill[];
   theory: ReadonlyArray<{ title: string; content: string }>;
   /** The vault's `_skills/*.md` guidance (how exercises/notes are shaped). */
@@ -42,6 +48,7 @@ export interface ReevaluationInput {
 
 /** The prompt that asks the AI to choose competencies and quantities. */
 export function buildReevaluationMessages(input: ReevaluationInput): Array<{ role: "system" | "user"; content: string }> {
+  if (input.branch) return buildEnglishReevaluation(input, input.branch);
   const catalog = input.catalog
     .map((s) => {
       const diffs = s.allowedDifficulties.join(",");
@@ -95,6 +102,18 @@ export function buildReevaluationMessages(input: ReevaluationInput): Array<{ rol
  */
 export function buildSkillOptionsMessages(input: ReevaluationInput): Array<{ role: "system" | "user"; content: string }> {
   const [system, user] = buildReevaluationMessages(input);
+  if (input.branch) {
+    const englishExtra = [
+      "",
+      "THIS TIME the user will choose, so list EVERY skill of the catalogue (all of them), each once:",
+      '  "recommended": true only for the 3-6 that serve this topic best (skills of its branch, or vocabulary ones when the topic has words to drill), false for the rest;',
+      '  "difficulties": how many exercises at 1/2/3 you would suggest (also for the not recommended ones, as a default; 0 where a level is not allowed);',
+      '  "why": ONE short Spanish sentence: why it is or is not recommended for THIS topic;',
+      '  "how": ONE short Spanish sentence: how the student would probably practise this topic with this skill (a concrete example of exercise).',
+      'Format: {"skills":[{"skill":"<id>","recommended":true,"difficulties":{"1":n,"2":n,"3":n},"why":"...","how":"..."}],"summary":"<one sentence>"}',
+    ].join("\n");
+    return [{ role: "system", content: `${system!.content}${englishExtra}` }, user!];
+  }
   const extra = [
     "",
     "THIS TIME the user will choose, so list EVERY skill of the catalogue (all of them), each once:",
@@ -122,7 +141,7 @@ export interface SkillOption {
 export function parseSkillOptions(
   reply: string,
   catalog: readonly CatalogSkill[],
-  fallbackType?: TopicType,
+  fallbackType?: TopicType | EnglishBranch,
 ): { options: SkillOption[]; topicType?: TopicType; summary: string } | null {
   let text = String(reply ?? "").trim();
   const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
@@ -137,8 +156,9 @@ export function parseSkillOptions(
     return null;
   }
   if (!raw || !Array.isArray(raw.skills)) return null;
+  const english = catalog.some((s) => s.branches);
   const declared = String(raw.topic_type ?? "").trim().toLowerCase();
-  const topicType = (["theoretical", "procedural", "mixed"].includes(declared) ? declared : fallbackType) as TopicType | undefined;
+  const topicType = (english ? fallbackType : ["theoretical", "procedural", "mixed"].includes(declared) ? declared : fallbackType) as TopicType | undefined;
   const said = new Map<string, any>();
   for (const item of raw.skills) said.set(String(item?.skill ?? "").trim().toLowerCase(), item);
 
@@ -148,7 +168,7 @@ export function parseSkillOptions(
     const levels = LEVELS.map((level) =>
       def.allowedDifficulties.includes(level) ? clampCount(d[level] ?? d[String(level)] ?? (item ? 0 : 3)) : 0,
     ) as [number, number, number];
-    const fits = !topicType || def.topicTypes.includes(topicType);
+    const fits = !topicType || fitsKey(def, topicType);
     const recommended = Boolean(item?.recommended) && fits && levels.some((n) => n > 0);
     const why = String(item?.why ?? "").replace(/\s+/g, " ").trim();
     return {
@@ -156,13 +176,60 @@ export function parseSkillOptions(
       label: def.label,
       recommended,
       levels,
-      why: !fits ? `${why ? `${why} ` : ""}No suele encajar con un tema ${topicType === "theoretical" ? "teórico" : "de procedimiento"}.`.trim() : why,
+      why: !fits
+        ? `${why ? `${why} ` : ""}${english ? `No es una competencia de la rama de este tema (${topicType}).` : `No suele encajar con un tema ${topicType === "theoretical" ? "teórico" : "de procedimiento"}.`}`.trim()
+        : why,
       how: String(item?.how ?? "").replace(/\s+/g, " ").trim(),
       fits,
     };
   });
   if (!options.some((o) => o.recommended)) return null;
   return { options, summary: String(raw.summary ?? "").replace(/\s+/g, " ").trim(), ...(topicType ? { topicType } : {}) };
+}
+
+const BRANCH_NAMES: Record<EnglishBranch, string> = {
+  grammar: "grammar",
+  writing: "writing",
+  reading: "reading",
+  listening: "listening",
+  speaking: "speaking",
+};
+
+/**
+ * The prompt for an ENGLISH topic. Its branch is already decided (it is not the AI's job): the AI
+ * chooses which competencies of that branch, and which cross-cutting vocabulary ones, the topic needs.
+ */
+function buildEnglishReevaluation(input: ReevaluationInput, branch: EnglishBranch): Array<{ role: "system" | "user"; content: string }> {
+  const catalog = input.catalog
+    .map((s) => `- ${s.id}: ${s.label} — ${s.description} [difficulties allowed: ${s.allowedDifficulties.join(",")}; belongs to: ${s.area ?? "?"}]`)
+    .join("\n");
+  const theory = input.theory
+    .slice(0, 6)
+    .map((t) => `### ${t.title}\n${t.content.slice(0, 2500).trim()}`)
+    .join("\n\n");
+  const system = [
+    "You are NoteVault's practice designer for ENGLISH (learner: native Spanish speaker, A2 aiming for C1). You read ONE topic and decide which competencies (skills) the student must train to master exactly that topic.",
+    `The topic belongs to the branch "${BRANCH_NAMES[branch]}". That is fixed: do not reclassify it and do not return a topic type.`,
+    `Choose ONLY skill ids from the catalogue below: the skills of the "${BRANCH_NAMES[branch]}" branch, plus the cross-cutting vocabulary skills (vc_…) only when the topic has words worth drilling. Never choose a skill of another branch.`,
+    "Prefer 3-6 skills that really serve THIS topic. For each give how many exercises at difficulty 1 (A2), 2 (B1) and 3 (B2 and above); 0 where a level makes no sense or is not allowed. Typical totals per skill: 3-10.",
+    "Answer with ONE JSON object and nothing else:",
+    '{"skills":[{"skill":"<id>","difficulties":{"1":n,"2":n,"3":n},"why":"<one short sentence in Spanish>"}],"summary":"<one sentence in Spanish>"}',
+    "",
+    `Catalogue (English):`,
+    catalog,
+  ].join("\n");
+  const user = [
+    `Topic: "${input.title}" (branch: ${branch}).`,
+    input.currentSkills?.length ? `Currently declared skills: ${input.currentSkills.join(", ")}.` : "",
+    theory ? `\nTheory of the topic:\n${theory}\n` : "\n(The topic has no theory notes yet: decide from its title and branch.)\n",
+    "Return ONLY the JSON object.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return [
+    { role: "system", content: system },
+    { role: "user", content: user },
+  ];
 }
 
 function clampCount(value: unknown): number {
@@ -175,7 +242,7 @@ function clampCount(value: unknown): number {
 export function parsePracticePlan(
   reply: string,
   catalog: readonly CatalogSkill[],
-  fallbackType?: TopicType,
+  fallbackType?: TopicType | EnglishBranch,
   /** the user ticked it themselves: a skill that "does not suit" the topic type is kept */
   keepUnfit = false,
 ): PracticePlan | null {
@@ -193,8 +260,10 @@ export function parsePracticePlan(
   }
   if (!raw || !Array.isArray(raw.skills)) return null;
 
+  // English skills carry branches: the key is the topic's branch, decided by the caller, never the AI's.
+  const english = catalog.some((s) => s.branches);
   const declared = String(raw.topic_type ?? "").trim().toLowerCase();
-  const topicType = (["theoretical", "procedural", "mixed"].includes(declared) ? declared : fallbackType) as TopicType | undefined;
+  const topicType = (english ? fallbackType : ["theoretical", "procedural", "mixed"].includes(declared) ? declared : fallbackType) as TopicType | undefined;
   const byId = new Map(catalog.map((s) => [s.id.toLowerCase(), s]));
   const seen = new Set<string>();
   const skills: PracticePlanSkill[] = [];
@@ -203,7 +272,7 @@ export function parsePracticePlan(
     const def = byId.get(id);
     if (!def || seen.has(id)) continue;
     // A skill that does not suit the topic's nature is dropped, whatever the model said.
-    if (!keepUnfit && topicType && !def.topicTypes.includes(topicType)) continue;
+    if (!keepUnfit && topicType && !fitsKey(def, topicType)) continue;
     const d = item?.difficulties ?? item?.counts ?? {};
     const counts = { 1: 0, 2: 0, 3: 0 } as Record<DifficultyLevel, number>;
     for (const level of LEVELS) {
@@ -214,7 +283,11 @@ export function parsePracticePlan(
     skills.push({ skill: id, counts, why: String(item?.why ?? "").replace(/\s+/g, " ").trim() });
   }
   if (!skills.length) return null;
-  return { skills, summary: String(raw.summary ?? "").replace(/\s+/g, " ").trim(), ...(topicType ? { topicType } : {}) };
+  return {
+    skills,
+    summary: String(raw.summary ?? "").replace(/\s+/g, " ").trim(),
+    ...(topicType ? (english ? { branch: topicType as unknown as EnglishBranch } : { topicType }) : {}),
+  };
 }
 
 /** The plan as the `plan:` frontmatter value, e.g. `solve=3/4/2, process=2/3/0`. */
@@ -271,7 +344,7 @@ export function readPlanFromPractica(text: string): PracticePlan | null {
 }
 
 /** Replaces `key: value` inside the frontmatter, or inserts it right before the closing fence. */
-function setFrontmatterKey(text: string, key: string, value: string): string {
+export function setFrontmatterKey(text: string, key: string, value: string): string {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const m = /^(---\r?\n)([\s\S]*?)(\r?\n---)/.exec(text);
   if (!m) return text;
@@ -293,6 +366,7 @@ export function applyPlanToPractica(text: string, plan: PracticePlan, labels: Re
   // The competency matrix reads this line: rows are these skills, cells these counts.
   out = setFrontmatterKey(out, "plan", `"${planToString(plan)}"`);
   if (plan.topicType) out = setFrontmatterKey(out, "topic_type", plan.topicType);
+  if (plan.branch) out = setFrontmatterKey(out, "branch", plan.branch);
   const section = renderPlanSection(plan, labels);
   const a = out.indexOf(PLAN_START);
   const b = out.indexOf(PLAN_END);

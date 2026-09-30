@@ -13,6 +13,9 @@ import {
   type DifficultyLevel,
   skillsForSubject,
 } from "./skills";
+import { branchFromPath, isEnglishBranch, type EnglishBranch } from "../../lib/englishSkillData";
+import { domainOfSubject } from "./domain";
+import { skillsForBranch } from "./skillSelection";
 import { type TopicType, normaliseTopicType } from "./topicType";
 
 export interface TopicMasteryConfig {
@@ -29,6 +32,8 @@ export interface TopicManifest {
   mastery: TopicMasteryConfig;
   /** Teórico · procedimental · mixto: decide qué skills se recomiendan (ver topicType.ts). */
   topic_type?: TopicType;
+  /** English topics: gramática · escritura · lectura · escucha · habla. English has no topic type and no default branch. */
+  branch?: EnglishBranch;
   exam_group?: string;
   /**
    * The AI's plan for THIS topic: which competencies it trains and how many passed
@@ -301,6 +306,8 @@ export function parseTopicManifest(
   if (topicType) {
     manifest.topic_type = topicType;
   }
+  const branch = String(fm.branch ?? "").trim().toLowerCase();
+  if (isEnglishBranch(branch)) manifest.branch = branch;
 
   if (plan && planned.length) {
     manifest.plan = Object.fromEntries(planned.map((sk) => [sk, plan[sk]!]));
@@ -349,6 +356,9 @@ export function serializeTopicManifest(manifest: TopicManifest): string {
   if (manifest.topic_type) {
     lines.push(`topic_type: ${manifest.topic_type}`);
   }
+  if (manifest.branch) {
+    lines.push(`branch: ${manifest.branch}`);
+  }
 
   if (manifest.exam_group) {
     lines.push(`exam_group: "${manifest.exam_group.replace(/"/g, '\\"')}"`);
@@ -374,6 +384,21 @@ export function createDefaultTopicManifest(
   examGroup?: string,
 ): TopicManifest {
   const normSubject = subject.toLowerCase();
+  // English: the branch comes from the folder (Inglés/3 Lectura/…) and decides the skills. Outside a
+  // branch folder the topic is left UNCLASSIFIED (no branch, no skills) instead of getting a default.
+  if (domainOfSubject(normSubject) === "english") {
+    const branch = branchFromPath(folder);
+    return {
+      type: "topic",
+      subject: normSubject,
+      title: folderName,
+      skills: branch ? skillsForBranch(normSubject, branch) : [],
+      mastery: { ...DEFAULT_MASTERY_CONFIG },
+      exam_group: examGroup,
+      ...(branch ? { branch } : {}),
+      folder,
+    };
+  }
   const availableSkills = skillsForSubject(normSubject);
 
   // If there are existing exercises, gather which skills are already represented

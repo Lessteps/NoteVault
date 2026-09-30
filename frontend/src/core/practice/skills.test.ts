@@ -107,6 +107,6 @@ describe("Skills catalogue", () => {
   it("returns default skill for a subject", () => {
     expect(defaultSkillForSubject("mathematics").id).toBe("solve");
     expect(defaultSkillForSubject("programming").id).toBe("implement");
-    expect(defaultSkillForSubject("english").id).toBe("writing");
+    expect(defaultSkillForSubject("english").id).toBe("gr_explain_rule");
   });
 });

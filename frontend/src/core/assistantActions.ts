@@ -14,9 +14,11 @@ import { ApiError } from "./errors.js";
 import { buildAreaMapCanvas, buildSpaceMapCanvas, type MapTopic, type SpaceMapArea, type TopicDependency } from "./areaMap.js";
 import { dumpFrontmatter } from "./frontmatter.js";
 import { applyPlanToPractica, parsePracticePlan } from "./practice/practicePlan.js";
-import { catalogFor, catalogSkill, deterministicSkillSelector } from "./practice/skillSelection.js";
+import { branchFromPath, isEnglishBranch, type EnglishBranch } from "../lib/englishSkillData.js";
+import { domainOfSubject } from "./practice/domain.js";
+import { catalogFor, catalogSkill, deterministicSkillSelector, skillsForBranch } from "./practice/skillSelection.js";
 import { createDefaultTopicManifest } from "./practice/topic.js";
-import { topicTypeFromName } from "./practice/topicType.js";
+import { topicTypeFromName, type TopicType } from "./practice/topicType.js";
 import { frontmatterWithType, overviewFileText, practiceFileText, viewFileName } from "./practice/viewFiles.js";
 
 export const ACTION_NAMES = ["create_syllabus", "create_topic", "create_canvas", "write_skill", "create_note", "set_practice_plan", "edit_file"] as const;
@@ -114,8 +116,18 @@ export function subjectIdOf(name: string, given?: unknown): string {
 }
 
 function topicFiles(root: string, topicRel: string, topicName: string, subject: string, skills?: unknown): PlannedOp[] {
-  const type = topicTypeFromName(topicName) ?? "mixed";
   const wanted = Array.isArray(skills) ? skills.map((s) => String(s).trim().toLowerCase()).filter((s) => catalogSkill(subject, s)) : [];
+  if (domainOfSubject(subject) === "english") {
+    // English: the branch comes from the folder and decides the skills. No branch → no skills and no
+    // default: the topic stays unclassified until it is resolved explicitly.
+    const branch = branchFromPath(topicRel);
+    const manifest = createDefaultTopicManifest(topicRel, topicName, subject, []);
+    manifest.skills = wanted.length ? wanted : branch ? skillsForBranch(subject, branch) : [];
+    if (branch) manifest.branch = branch;
+    const englishRel = `${topicRel}/${viewFileName(topicName, "practica")}`;
+    return [{ kind: "write", rel: englishRel, content: practiceFileText(manifest), exists: fs.existsSync(absOf(root, englishRel)) }];
+  }
+  const type = topicTypeFromName(topicName) ?? "mixed";
   const chosen = wanted.length
     ? wanted
     : deterministicSkillSelector.select({ subject, topicType: type, title: topicName }).skills;
@@ -309,6 +321,14 @@ function planCanvas(root: string, args: Record<string, any>): ActionPlan {
  * passed exercises each difficulty needs. Skills that do not suit the topic's nature
  * are dropped (and reported), exactly as when the AI first plans the topic.
  */
+/** The classification the matrix is validated against: a topic type, or (English) the topic's branch. */
+function matrixKey(topicRel: string, name: string, subject: string, declaredBranch = ""): TopicType | EnglishBranch {
+  if (domainOfSubject(subject) !== "english") return topicTypeFromName(name) ?? "mixed";
+  const branch = isEnglishBranch(declaredBranch) ? declaredBranch : branchFromPath(topicRel);
+  if (!branch) throw new ApiError("Este tema de inglés no tiene rama (no está en una carpeta de rama): clasifícalo antes de cambiar su matriz.");
+  return branch;
+}
+
 function planMatrix(root: string, args: Record<string, any>): ActionPlan {
   const topicRel = safeRel(args.topic);
   const topicAbs = absOf(root, topicRel);
@@ -332,7 +352,7 @@ function planMatrix(root: string, args: Record<string, any>): ActionPlan {
   const plan = parsePracticePlan(
     JSON.stringify({ topic_type: args.topic_type, skills: requested, summary: args.summary ?? "" }),
     catalog,
-    topicTypeFromName(name) ?? "mixed",
+    matrixKey(topicRel, name, subject, /^branch:\s*(\w+)/m.exec(current)?.[1] ?? ""),
     // The chat's checklist: what the user ticked stays, even if it does not usually suit the topic.
     args.force === true,
   );

@@ -133,6 +133,22 @@ export const LIBRARY_EQUIPMENT: string[] = [...new Set(searchLibrary("").map((e)
 /** Los músculos guía del catálogo, para el filtro. */
 export const LIBRARY_MUSCLES: string[] = [...new Set(searchLibrary("").map((e) => e.guidePrimary))].sort();
 
+/** Los músculos locales (ids de `muscles.ts`) que el catálogo tiene de principal. */
+export function localMusclesInCatalog(): string[] {
+  const ids = new Set<string>();
+  for (const e of searchLibrary("")) for (const m of e.localPrimary) ids.add(m);
+  return [...ids].sort();
+}
+
+/** Como `filterLibrary`, pero por músculo local (el que pinta el cuerpo). */
+export function filterLibraryByLocalMuscle(localId: string, filters: Omit<LibraryFilters, "muscle"> = {}): LibraryEntry[] {
+  return searchLibrary(filters.query).filter(
+    (e) =>
+      e.localPrimary.includes(localId) &&
+      (!filters.equipment || e.equipment === filters.equipment),
+  );
+}
+
 export interface LibraryFilters {
   query?: string;
   equipment?: string;

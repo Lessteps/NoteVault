@@ -129,6 +129,120 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
+  it("filtra por músculo con el cuerpo de la columna izquierda", async () => {
+    const { host, cleanup } = mount(<Library />);
+    try {
+      const rows = () => host.querySelectorAll("[data-slug]").length;
+      const body = host.querySelector("[data-library-body]");
+      expect(body).not.toBeNull();
+
+      // El cuerpo ofrece los músculos como botones, no un desplegable suelto.
+      const pectoral = host.querySelector('[data-library-muscle="pectoral"]');
+      expect(pectoral).not.toBeNull();
+
+      await act(async () => {
+        pectoral!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(rows()).toBeGreaterThan(10);
+      expect(rows()).toBeLessThan(302);
+      // Solo pectoral como principal.
+      for (const row of host.querySelectorAll("[data-slug]")) {
+        expect(row.textContent).not.toContain("Back ·");
+      }
+
+      // Un segundo clic quita el filtro.
+      await act(async () => {
+        host.querySelector('[data-library-muscle="pectoral"]')!.dispatchEvent(
+          new MouseEvent("click", { bubbles: true }),
+        );
+        await Promise.resolve();
+      });
+      expect(rows()).toBe(302);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("el detalle tiene su propio botón de añadir y avisa si ya está en la rutina", async () => {
+    useExercise.setState({
+      list: [
+        {
+          id: "e1",
+          day: "lunes",
+          name: "Bench Press",
+          video: "",
+          video_path: "",
+          series_reps: "4×8",
+          rest: "90 s",
+          how_to: "",
+          has_video: false,
+          video_name: "",
+          muscles: { primary: ["pectoral"], secondary: ["triceps"] },
+        },
+        {
+          id: "e2",
+          day: "jueves",
+          name: "Bench Press",
+          video: "",
+          video_path: "",
+          series_reps: "4×6",
+          rest: "90 s",
+          how_to: "",
+          has_video: false,
+          video_name: "",
+          muscles: { primary: ["pectoral"], secondary: [] },
+        },
+      ],
+    });
+    const { host, cleanup } = mount(<Library />);
+    try {
+      // Con algo en la rutina pero nada seleccionado, el panel invita a elegir.
+      const idle = host.querySelector("[data-library-detail]")!;
+      expect(idle.textContent).toContain("Elige un ejercicio");
+
+      // Se elige el de press de banca y el panel avisa de que ya está.
+      const row = [...host.querySelectorAll("[data-slug]")].find((r) =>
+        r.textContent?.includes("Bench Press"),
+      )!;
+      await act(async () => {
+        row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      const detail = host.querySelector("[data-library-detail]")!;
+      expect(detail.textContent).toContain("Ya en tu rutina");
+      expect(detail.textContent).toContain("lunes");
+      expect(detail.textContent).toContain("jueves");
+
+      const add = detail!.querySelector("button");
+      expect(add!.textContent).toContain("Añadir a hoy");
+      await act(async () => {
+        add!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      const save = invoke.mock.calls.find((c) => c[0] === "ex_save");
+      expect(save).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("la lista y el detalle tienen scroll propio y la cabecera no se desplaza", () => {
+    const { host, cleanup } = mount(<Library />);
+    try {
+      expect(host.querySelector("[data-library-toolbar]")).not.toBeNull();
+      const scrollers = host.querySelectorAll("[data-library-scroll]");
+      expect(scrollers.length).toBe(2);
+      for (const s of scrollers) expect(s.className).toMatch(/overflow-y-auto/);
+      // El contenedor raíz ya no hace scroll: si lo hiciera, el detalle se
+      // iría de pantalla al bajar por la lista.
+      const root = host.firstElementChild as HTMLElement;
+      expect(root.className).not.toMatch(/overflow-y-auto/);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("muestra las ilustraciones locales sobre fondo oscuro (arte blanco)", async () => {
     const { host, cleanup } = mount(<Library />);
     try {

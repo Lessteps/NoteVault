@@ -6,6 +6,8 @@ export interface InkStroke {
   /** already inserted into a note: kept on the page, no longer recognised */
   done: boolean;
   points: Array<[number, number]>;
+  /** a typed formula (`5/5`) placed on the page: `points[0]` is where it sits */
+  text?: string;
 }
 
 const INK_RE = /<!--\s*nv:ink\s+([\s\S]*?)\s*-->/;
@@ -27,10 +29,14 @@ export function readInk(raw: string): InkStroke[] {
   const m = INK_RE.exec(raw);
   if (!m) return [];
   try {
-    const parsed = JSON.parse(m[1]!) as Array<{ d?: number; p?: Array<[number, number]> }>;
+    const parsed = JSON.parse(m[1]!) as Array<{ d?: number; p?: Array<[number, number]>; t?: string }>;
     return parsed
       .filter((s) => Array.isArray(s?.p) && s.p.length >= 2)
-      .map((s) => ({ done: s.d === 1, points: s.p!.map(([x, y]) => [Number(x), Number(y)] as [number, number]) }));
+      .map((s) => ({
+        done: s.d === 1,
+        points: s.p!.map(([x, y]) => [Number(x), Number(y)] as [number, number]),
+        ...(typeof s.t === "string" && s.t ? { text: s.t } : {}),
+      }));
   } catch {
     return [];
   }
@@ -38,7 +44,7 @@ export function readInk(raw: string): InkStroke[] {
 
 /** The note with its strokes and LaTeX replaced; everything else in the file is kept. */
 export function writeInk(raw: string, strokes: readonly InkStroke[], latex: string): string {
-  const data = JSON.stringify(strokes.map((s) => ({ d: s.done ? 1 : 0, p: s.points.map(([x, y]) => [round(x), round(y)]) })));
+  const data = JSON.stringify(strokes.map((s) => ({ d: s.done ? 1 : 0, p: s.points.map(([x, y]) => [round(x), round(y)]), ...(s.text ? { t: s.text } : {}) })));
   const comment = `<!-- nv:ink ${data} -->`;
   let out = INK_RE.test(raw) ? raw.replace(INK_RE, () => comment) : `${raw.replace(/\s*$/, "")}\n\n${comment}\n`;
   const a = out.indexOf(LATEX_START);

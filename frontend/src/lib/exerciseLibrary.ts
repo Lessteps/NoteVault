@@ -3,19 +3,51 @@
 // Envuelve `@bryllim/workout-guide` (302 ejercicios, MIT + CC BY-SA 4.0 en
 // assets, ver CREDITS) y mapea su `primaryMuscle` a los ids locales de
 // `muscles.ts` para reutilizar el mapa corporal existente.
+//
+// Las instrucciones son propias (exerciseInstructions.*.json), escritas para
+// NoteVault: no queda texto de terceros en el pipeline.
 
 import { searchExercises, type Exercise as GuideExercise } from "@bryllim/workout-guide";
-import instructionsData from "./exerciseInstructions.json";
-import customInstructions from "./exerciseInstructions.custom.json";
-import lote3Instructions from "./exerciseInstructions.lote3.json";
-import grupoPecho from "./exerciseInstructions.grupo-pecho.json";
-import grupoHombros from "./exerciseInstructions.grupo-hombros.json";
-import grupoTriceps from "./exerciseInstructions.grupo-triceps.json";
-import grupoEspalda from "./exerciseInstructions.grupo-espalda.json";
-import grupoBiceps from "./exerciseInstructions.grupo-biceps.json";
-import grupoCuadriceps from "./exerciseInstructions.grupo-cuadriceps.json";
-import grupoGluteos from "./exerciseInstructions.grupo-gluteos.json";
-import grupoCore from "./exerciseInstructions.grupo-core.json";
+
+import instruccionesPecho from "./exerciseInstructions.grupo-pecho.json";
+import instruccionesHombros from "./exerciseInstructions.grupo-hombros.json";
+import instruccionesTriceps from "./exerciseInstructions.grupo-triceps.json";
+import instruccionesEspalda from "./exerciseInstructions.grupo-espalda.json";
+import instruccionesBiceps from "./exerciseInstructions.grupo-biceps.json";
+import instruccionesCuadriceps from "./exerciseInstructions.grupo-cuadriceps.json";
+import instruccionesGluteos from "./exerciseInstructions.grupo-gluteos.json";
+import instruccionesCore from "./exerciseInstructions.grupo-core.json";
+import instruccionesLote1 from "./exerciseInstructions.custom.json";
+import instruccionesLote3 from "./exerciseInstructions.lote3.json";
+import instruccionesFinal from "./exerciseInstructions.grupo-final.json";
+
+export interface ExerciseInstructions {
+  slug: string;
+  name: string;
+  matched: string;
+  source: string;
+  steps_es: string[];
+  steps_en: string[];
+}
+
+/**
+ * Todas las redacciones propias. El orden es inverso al de escritura: el
+ * último grupo (los más antiguos) va primero, para que si un slug se repite
+ * gane la redacción más reciente.
+ */
+const INSTRUCCIONES: ExerciseInstructions[] = [
+  ...(instruccionesFinal as ExerciseInstructions[]),
+  ...(instruccionesCore as ExerciseInstructions[]),
+  ...(instruccionesGluteos as ExerciseInstructions[]),
+  ...(instruccionesCuadriceps as ExerciseInstructions[]),
+  ...(instruccionesBiceps as ExerciseInstructions[]),
+  ...(instruccionesEspalda as ExerciseInstructions[]),
+  ...(instruccionesTriceps as ExerciseInstructions[]),
+  ...(instruccionesHombros as ExerciseInstructions[]),
+  ...(instruccionesPecho as ExerciseInstructions[]),
+  ...(instruccionesLote3 as ExerciseInstructions[]),
+  ...(instruccionesLote1 as ExerciseInstructions[]),
+];
 
 /** Mapeo guía → músculos locales (`frontend/src/lib/muscles.ts`). */
 const GUIDE_TO_LOCAL: Record<string, string[]> = {
@@ -55,7 +87,8 @@ export interface LibraryEntry {
   guideSecondary: string[];
   localPrimary: string[];
   localSecondary: string[];
-  frames: Array<string | null>;
+  /** Rutas locales de los tres frames (public/workout-guide-assets). */
+  frames: string[];
   frame1: string | null;
 }
 
@@ -100,31 +133,9 @@ export function estimate1RM(weight: number, reps: number): number {
   return weight * (1 + reps / 30);
 }
 
-export interface ExerciseInstructions {
-  slug: string;
-  name: string;
-  matched: string;
-  steps_es: string[];
-  steps_en: string[];
-}
+const instructionsBySlug = new Map(INSTRUCCIONES.map((r) => [r.slug, r]));
 
-const instructionsBySlug = new Map(
-  [
-    ...(instructionsData as ExerciseInstructions[]),
-    ...(customInstructions as ExerciseInstructions[]),
-    ...(lote3Instructions as ExerciseInstructions[]),
-    ...(grupoPecho as ExerciseInstructions[]),
-    ...(grupoHombros as ExerciseInstructions[]),
-    ...(grupoTriceps as ExerciseInstructions[]),
-    ...(grupoEspalda as ExerciseInstructions[]),
-    ...(grupoBiceps as ExerciseInstructions[]),
-    ...(grupoCuadriceps as ExerciseInstructions[]),
-    ...(grupoGluteos as ExerciseInstructions[]),
-    ...(grupoCore as ExerciseInstructions[]),
-  ].map((r) => [r.slug, r]),
-);
-
-/** Pasos en español (respaldo inglés) o null si el dataset no lo cubre. */
+/** Pasos en español de la redacción propia, o null si no hay cobertura. */
 export function getInstructions(slug: string): ExerciseInstructions | null {
   return instructionsBySlug.get(slug) ?? null;
 }

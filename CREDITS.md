@@ -13,3 +13,13 @@
   `frontend/src/lib/exerciseLibrary.ts` y vista
   `frontend/src/components/exercise/Library.tsx`. Sin redistribución de
   medios.
+
+## Instrucciones de los ejercicios
+
+Las instrucciones paso a paso (`frontend/src/lib/exerciseInstructions.*.json`)
+son **redacción propia de NoteVault**: 302 ejercicios, 1797 pasos, escritos
+para este proyecto. No proceden de ningún dataset de terceros.
+
+Revisión: son correctas en técnica general, pero no están revisadas por un
+profesional de la salud. Si vas a entrenar peso fuerte con un ejercicio nuevo,
+comprueba la técnica con alguien cualificado antes de subir carga.

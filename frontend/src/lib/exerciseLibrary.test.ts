@@ -50,6 +50,18 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
+  test("grupo final (pantorrillas, cardio, movilidad) a mano", () => {
+    expect(getInstructions("calf-raise")!.source).toBe("propia");
+    expect(getInstructions("burpee")!.steps_es.length).toBeGreaterThanOrEqual(4);
+    expect(getInstructions("jump-rope")!.steps_es.join(" ")).toMatch(/cuerda|salt/i);
+  });
+
+  test("ninguna instrucción viene ya de la API", async () => {
+    const { exercises } = await import("@bryllim/workout-guide");
+    const sinRedaccion = exercises.filter((e) => getInstructions(e.slug)?.source !== "propia");
+    expect(sinRedaccion.map((e) => e.slug)).toEqual([]);
+  });
+
   test("grupo core redactado a mano (plank, russian-twist, v-up)", () => {
     expect(getInstructions("plank")!.source).toBe("propia");
     // plank antes venía de "power point plank", un variante distinto.

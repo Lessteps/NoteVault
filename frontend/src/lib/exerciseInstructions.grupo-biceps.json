@@ -1,0 +1,198 @@
+[
+  {
+    "slug": "bicep-curl",
+    "name": "Bicep Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con una mancuerna en cada mano y los brazos relajados a los lados, con las palmas hacia delante.",
+      "Gira las muñecas en supinación antes de empezar: palmas al frente es lo que activa el bíceps.",
+      "Sube las mancuernas flexionando los codos, manteniendo los codos pegados a las costillas.",
+      "Sube hasta que las manos estén a la altura de los hombros sin dejar que los codos se vayan hacia delante.",
+      "Baja despacio hasta estirar los brazos del todo.",
+      "Si balanceas el cuerpo para subir, la carga es pesada o estás tirando con los hombros: baja el peso.",
+      "Los codos no se mueven de sitio; lo que se mueve es el antebrazo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "hammer-curl",
+    "name": "Hammer Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con una mancuerna en cada mano con agarre neutro: palmas enfrentadas, como si sostuvieras un martillo.",
+      "Mantén los codos pegados al torso y los brazos estirados.",
+      "Sube las mancuernas flexionando solo los codos, sin rotar las muñecas.",
+      "Sube hasta la altura de los hombros sin dejar que los codos se desplacen hacia delante.",
+      "Baja despacio hasta estirar los brazos.",
+      "Este agarre trabaja sobre todo el braquial y el antebrazo, y molesta menos a la articulación del codo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "rope-hammer-curl",
+    "name": "Rope Hammer Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea baja y engancha la cuerda en el extremo de la cadena.",
+      "Sujeta la cuerda con las palmas enfrentadas y ponte de pie con los pies separados.",
+      "Sube cerrando los codos contra el torso, sin rotar las muñecas.",
+      "Al llegar arriba, separa ligeramente las puntas de la cuerda sin flexionar más el codo.",
+      "Baja despacio hasta los codos casi estirados.",
+      "La polea da tensión constante: no necesitas balancearte ni subir de peso para notar el trabajo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "incline-dumbbell-curl",
+    "name": "Incline Dumbbell Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en un banco inclinado a unos 45 grados con el respaldo apoyo toda la espalda, y deja las mancuernas sobre los muslos.",
+      "Gira las palmas hacia delante y sube las mancuernas a lo largo de los muslos.",
+      "Aprieta el bíceps un segundo arriba, con las muñecas rectas.",
+      "Baja despacio hasta estirar los brazos, manteniendo los codos quietos.",
+      "El respaldo inclinado estira el bíceps más en la posición baja: no uses cargas grandes al principio.",
+      "Apoya las mancuernas en los muslos para devolverlas sin balanceos."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "spider-curl",
+    "name": "Spider Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate boca abajo en un banco inclinado con el pecho apoyado en la parte alta y los brazos colgando.",
+      "Deja las palmas mirando al frente y los brazos colgando verticalmente.",
+      "Sube las mancuernas flexionando solo los codos, que se quedan en el mismo sitio.",
+      "Aprieta el bíceps dos segundos arriba.",
+      "Baja despacio hasta estirar los brazos.",
+      "No puedes balancearte: la posición tendida aísla el bíceps. Usa cargas muy ligeras."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "concentration-curl",
+    "name": "Concentration Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en una silla y apoya el dorso del brazo contra la cara interior del muslo, con el codo apoyado por dentro.",
+      "Sujeta la mancuerna con la palma hacia arriba y deja el brazo casi estirado hacia el suelo.",
+      "Flexiona el codo llevando la mancuerna hacia el hombro, sin apartar el codo del muslo.",
+      "Aprieta un segundo arriba.",
+      "Baja despacio hasta estirar del todo.",
+      "El tríceps tiene que estar totalmente estirado; si el brazo se acorta, no es una contracción completa."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "preacher-curl",
+    "name": "Preacher Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en la máquina con el pecho contra el apoyo y la parte interior de los brazos apoyada en la almohadilla.",
+      "Sujeta los agarres con las palmas hacia arriba y los pies bien plantados en el suelo.",
+      "Sube flexionando los codos hasta acercar las manos a los hombros.",
+      "Aprieta el bíceps un segundo arriba sin levantar los hombros.",
+      "Baja despacio hasta estirar los brazos del todo.",
+      "El apoyo quita el balanceo, pero también carga el hombro: si molesta, no fuerces la extensión abajo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cable-curl",
+    "name": "Cable Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea baja y engancha una barra recta a la cadena.",
+      "Ponte de pie frente a la máquina con los pies separados y sujeta la barra con las palmas hacia arriba.",
+      "Sube la barra flexionando los codos y manteniéndolos pegados a las costillas.",
+      "Aprieta el bíceps un segundo arriba.",
+      "Baja despacio hasta estirar los brazos del todo.",
+      "La tensión constante de la polea hace que la última parte del recorrido sea la más difícil: ahí es donde se trabaja."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "ez-bar-curl",
+    "name": "EZ-Bar Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con la barra EZ a la altura de la cadera, con agarre paralelo algo más ancho que los hombros.",
+      "Las zonas en zigzag de la barra reducen la tensión en las muñecas: úsala si el curl directo te molesta.",
+      "Sube la barra flexionando los codos, sin acercarlos al pecho ni levantarlos con los hombros.",
+      "Aprieta un segundo arriba.",
+      "Baja despacio hasta estirar los brazos.",
+      "El agarre semi-supinado es más cómodo para muchos antebrazos que la barra recta."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "drag-curl",
+    "name": "Drag Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con la barra recta a la altura de la cadera y el agarre por fuera de los muslos.",
+      "Sube la barra hacia arriba y hacia atrás, dejándola pasar muy cerca de las caderas, como si la arrastraras.",
+      "Los codos se quedan atrás y el torso se inclina muy ligeramente hacia delante.",
+      "Aprieta el bíceps un segundo arriba.",
+      "Suelta el peso hacia delante de nuevo con un movimiento controlado.",
+      "Es un ejercicio técnico: usa cargas moderadas y nada de impulso con la zona lumbar."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "chin-up",
+    "name": "Chin-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Sujeta la barra con agarre en supinación, a la anchura de los hombros o algo más cerrado, con las palmas hacia ti.",
+      "Colócate con las piernas cruzadas hacia atrás para no usar impulso, y cuélgate con los brazos estirados.",
+      "Inicia bajando los omóplatos y tirando de la barra hacia la parte baja del pecho.",
+      "Sube hasta que la barra llegue por debajo del pecho o la barbilla la supere.",
+      "Baja de forma controlada hasta estirar los brazos del todo.",
+      "El agarre supinado implica más bíceps; si el dorsal no es lo que sientes, el agarre está demasiado estrecho."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "assisted-chin-up",
+    "name": "Assisted Chin-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en la máquina de assistance, con las rodillas apoyadas en el soporte y el agarre en supinación a la anchura de los hombros.",
+      "Deja que la máquina compense parte de tu peso al subir.",
+      "Tira de la barra hacia la parte baja del pecho con los codos hacia abajo y atrás.",
+      "Baja despacio hasta estirar los brazos.",
+      "A medida que controles, reduce la asistencia en cada serie.",
+      "Sirve para aprender el patrón de la dominada con agarre cerrado antes de cargar con el peso corporal."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "weighted-chin-up",
+    "name": "Weighted Chin-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca un disco o un arnés de peso bien centrado y cuélgate con agarre en supinación.",
+      "Tira de la barra hacia el pecho con los codos hacia las costillas.",
+      "Sube hasta superar la barra con la barbilla y baja hasta estirar los brazos.",
+      "Empieza con cargas pequeñas y sube en pasos de uno o dos kilos.",
+      "Si la técnica se rompe en las últimas repeticiones, es demasiado peso para ese día.",
+      "Sin impulso: si te balanceas para subir, quítate el disco."
+    ],
+    "steps_en": []
+  }
+]

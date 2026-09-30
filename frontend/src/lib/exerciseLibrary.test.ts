@@ -50,6 +50,12 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
   });
 
+  test("grupo biceps redactado a mano (bicep-curl, chin-up, ez-bar-curl)", () => {
+    expect(getInstructions("bicep-curl")!.source).toBe("propia");
+    expect(getInstructions("chin-up")!.steps_es.join(" ")).toMatch(/supin|palmas|bíceps/i);
+    expect(getInstructions("ez-bar-curl")!.steps_es.length).toBeGreaterThanOrEqual(4);
+  });
+
   test("grupo espalda redactado a mano (barbell-row, lat-pulldown, pull-up)", () => {
     expect(getInstructions("barbell-row")!.source).toBe("propia");
     expect(getInstructions("lat-pulldown")!.steps_es.join(" ")).toMatch(/polea|agarre/i);

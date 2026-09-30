@@ -76,13 +76,13 @@ export function StudySpaceDialog() {
     if (!open) return;
     setAreas(null);
     setConversationId("");
-    if (mode === "area") {
-      void api.studySpaceList().then((list) => {
-        setSpaces(list);
+    void api.studySpaceList().then((list) => {
+      setSpaces(list);
+      if (mode === "area") {
         setFolder((f) => f || list[0] || "");
         setSubject((s) => s || (list[0] ?? "").replace(/\s*\d+\s*$/, ""));
-      });
-    }
+      }
+    });
   }, [open, mode]);
 
   if (!open) return null;
@@ -95,7 +95,13 @@ export function StudySpaceDialog() {
       setAreas(res.areas);
       setConversationId(res.conversationId);
       setPicked(new Set(res.areas.map((a) => a.name)));
-      if (!folder.trim()) setFolder(subject.trim());
+      // A NEW space never lands in an existing folder: "Matemáticas" is taken, so "Matemáticas 1".
+      if (mode === "space" && !folder.trim()) {
+        const base = subject.trim();
+        let n = 1;
+        while (spaces.includes(`${base} ${n}`)) n += 1;
+        setFolder(spaces.includes(base) ? `${base} ${n}` : base);
+      }
       // The proposal is already a chat: show it.
       useAssistant.getState().setOpen(true);
       void useAssistant.getState().openConversation(res.conversationId);

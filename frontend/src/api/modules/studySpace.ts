@@ -406,7 +406,9 @@ export function studySpaceApi(app: AppState) {
       const reply = await askStructured(cfg, [{ role: "system", content: system }, { role: "user", content: user }]);
       const areas = parseProposal(reply);
       const chat = new ChatLog(undefined, `Espacio de estudio: ${space || name}`, cfg.model);
-      chat.exchange(`Propón el temario. ${user.trim()}`, reply);
+      // DeepSeek answered JSON; the chat shows it as the outline it describes.
+      const outline = areas.map((a) => `**${a.name}**\n${a.topics.map((t) => `- ${t.name}`).join("\n")}`).join("\n\n");
+      chat.exchange(`Propón el temario. ${user.trim()}`, `Propuesta de DeepSeek (${areas.length} área(s)):\n\n${outline}`);
       return { areas, conversationId: chat.id };
     },
 

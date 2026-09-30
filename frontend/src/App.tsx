@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { api } from "./lib/bridge";
 import { flushAll, useApp, wasJustWritten } from "./store/app";
+import { MiniPlayer } from "./components/english/MiniPlayer";
 import { ComingSoon, IconRail, MODULES as MODULE_LABELS, StatusBar, Toasts, TopBar, TAB_MIME } from "./components/Shell";
 import { ModuleHost } from "./components/ModuleHost";
 import { useTabDrag } from "./store/tabDrag";
@@ -317,6 +318,7 @@ export function App() {
       <DialogHost />
       <MenuHost />
       <Toasts />
+      <MiniPlayer />
     </div>
   );
 }

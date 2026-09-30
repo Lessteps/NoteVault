@@ -14,12 +14,14 @@ import { AssistantPanel } from "./AssistantPanel";
 import { WebRail } from "../web/WebRail";
 import { ReviewPanel, useReviewPanel } from "../study/ReviewPanel";
 import { SourcesPanel, useSourcesPanel } from "../english/SourcesPanel";
+import { RecordingsPanel, useRecordingsPanel } from "../english/RecordingsPanel";
 
 export function RightPanel({ module }: { module: string }) {
   const assistantOpen = useAssistant((s) => s.open);
   const pagesOpen = useWebPages((s) => s.open);
   const reviewOpen = useReviewPanel((s) => s.open);
   const sourcesOpen = useSourcesPanel((s) => s.open);
+  const recordingsOpen = useRecordingsPanel((s) => s.open);
   const muscleOpen = useApp((s) => s.muscleOpen);
   const inspectorOpen = useApp((s) => s.inspectorOpen);
   const active = useApp((s) => s.active);
@@ -32,6 +34,8 @@ export function RightPanel({ module }: { module: string }) {
         ? <ReviewPanel />
         : sourcesOpen && module === "notas"
           ? <SourcesPanel />
+        : recordingsOpen && module === "notas"
+          ? <RecordingsPanel />
         : muscleOpen && module === "ejercicio"
           ? <MuscleSchemaPanel />
           : inspectorOpen && active

@@ -287,9 +287,9 @@ export function PracticeView({ note }: { note: OpenNote }) {
   return (
     <div className="h-full overflow-y-auto nv-practice-view">
       <div className="mx-auto flex max-w-[860px] flex-col gap-4 px-8 py-6">
-        <header className="flex items-start gap-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-[22px] font-bold tracking-tight text-text">{ex.title}</h1>
+        <header className="flex flex-wrap items-start gap-4">
+          <div className="min-w-[15rem] flex-1">
+            <h1 className="break-words text-[22px] font-bold tracking-tight text-text">{ex.title}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-dim">
               <span>{SUBJECTS[ex.subject] ?? ex.subject}</span>·
               <span>{ex.discipline}{ex.skill && ` · ${ex.skill}`}</span>·

@@ -197,3 +197,78 @@ describe("library of sources", () => {
     expect(await api.en_source_session(s.id)).toMatchObject({ ok: false, reason: "no_subtitles" });
   });
 });
+
+describe("pasted transcripts and recordings", () => {
+  const makeSpace = () => {
+    fs.mkdirSync(path.join(dir, "Inglés 1", "4 Escucha", "4.5 Shadowing to repeat what you hear"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "Inglés 1", "Inglés 1.resumen.md"), "---\nsubject: english\n---\n", "utf-8");
+  };
+  const PLAIN = "Welcome to the show. Today we are talking about remote work and how it changes our days.\n\nMost companies now offer at least two days from home. However, some people feel lonely at home.\n\nSo the best solution might be a mix of both ways of working. Thanks for listening.";
+
+  it("saves a pasted plain transcript as a note in Fuentes/Transcripciones and makes a source with no audio", () => {
+    makeSpace();
+    const out = api.en_source_paste("podcast", "6 Minute English: ep 3", PLAIN) as { ok: boolean; timed: boolean; source: { transcript: string; media: string; title: string } };
+    expect(out).toMatchObject({ ok: true, timed: false });
+    expect(out.source.media).toBe("");
+    expect(out.source.transcript).toBe("Inglés 1/Fuentes/Transcripciones/6 Minute English ep 3.md");
+    const note = fs.readFileSync(path.join(dir, ...out.source.transcript.split("/")), "utf-8");
+    expect(note).toContain("type: transcript");
+    expect(note).toContain("Welcome to the show.");
+    const list = api.en_source_list() as { items: Array<{ has_media: boolean; has_transcript: boolean; timed: boolean }> };
+    expect(list.items[0]).toMatchObject({ has_media: false, has_transcript: true, timed: false });
+  });
+
+  it("detects a pasted subtitle file by its times and keeps it as .srt", () => {
+    makeSpace();
+    const out = api.en_source_paste("ted", "Talk", EN + "\n3\n00:00:07,000 --> 00:00:09,000\nA third line to be long enough.\n") as { timed: boolean; source: { transcript: string } };
+    expect(out.timed).toBe(true);
+    expect(out.source.transcript).toMatch(/\.srt$/);
+  });
+
+  it("refuses an empty paste and builds voice-read sessions from plain text without tying them to any audio", async () => {
+    makeSpace();
+    expect(() => api.en_source_paste("podcast", "x", "  hola ")).toThrow(ApiError);
+    const s = (api.en_source_paste("podcast", "Ep", PLAIN) as { source: { id: string } }).source;
+    const out = (await api.en_source_session(s.id, "dictation", 3)) as { ok: boolean; paths: string[]; audio: string };
+    expect(out).toMatchObject({ ok: true, audio: "voz" });
+    for (const p of out.paths) {
+      const note = fs.readFileSync(path.join(dir, ...p.split("/")), "utf-8");
+      expect(note).not.toContain("source:");
+      expect(note).not.toContain("media_start");
+      expect(note).toContain("## Texto del audio\n");
+    }
+  });
+
+  it("attaches a pasted transcript to an existing source", async () => {
+    makeSpace();
+    fs.writeFileSync(path.join(dir, "Pelis", "solo.mp3"), Buffer.alloc(64));
+    const s = addSource(dir, { kind: "podcast", title: "Ep", media: path.join(dir, "Pelis", "solo.mp3") });
+    const out = api.en_source_paste("podcast", "", PLAIN, s.id) as { source: { id: string; transcript: string; media: string } };
+    expect(out.source).toMatchObject({ id: s.id, media: "Pelis/solo.mp3" });
+    expect(out.source.transcript).toContain("Fuentes/Transcripciones/Ep.md");
+    const opened = (await api.en_source_open(s.id)) as { plain: string; pairs: unknown[] };
+    expect(opened.plain).toContain("Welcome to the show.");
+    expect(opened.pairs).toEqual([]);
+  });
+
+  it("saves, lists, plays, renames and removes voice recordings in Fuentes/Grabaciones", async () => {
+    makeSpace();
+    const bytes = Buffer.alloc(4096, 7);
+    const saved = api.en_recording_save("Mi práctica: th / v", bytes.toString("base64"), "webm") as { ok: boolean; id: string };
+    expect(saved.ok).toBe(true);
+    expect(saved.id).toMatch(/Mi práctica th v\.webm$/);
+    expect(fs.existsSync(path.join(dir, "Inglés 1", "Fuentes", "Grabaciones", saved.id))).toBe(true);
+    const list = (await api.en_recording_list()) as { items: Array<{ id: string; size: number }> };
+    expect(list.items).toHaveLength(1);
+    expect(list.items[0]!.size).toBe(4096);
+    const url = ((await api.en_recording_url(saved.id)) as { url: string }).url;
+    expect((await get(url)).length).toBe(4096);
+    expect(JSON.stringify(list)).not.toContain(dir);
+    const renamed = api.en_recording_rename(saved.id, "Vocales largas") as { id: string };
+    expect(renamed.id).toBe("Vocales largas.webm");
+    expect(() => api.en_recording_save("x", "AAAA")).toThrow(ApiError); // too short to be audio
+    expect(() => api.en_recording_remove("../../etc/passwd")).toThrow(ApiError); // never leaves the folder
+    expect(api.en_recording_remove(renamed.id)).toEqual({ ok: true });
+    expect(((await api.en_recording_list()) as { items: unknown[] }).items).toEqual([]);
+  });
+});

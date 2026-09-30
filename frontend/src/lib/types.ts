@@ -888,6 +888,15 @@ export interface EnglishSource {
   added: string;
   has_media: boolean;
   has_transcript: boolean;
+  /** the transcript has times (SRT/VTT); plain text is read sentence by sentence */
+  timed: boolean;
+}
+
+export interface EnglishRecording {
+  id: string;
+  name: string;
+  size: number;
+  modified: number;
 }
 
 export interface PlayerMedia {

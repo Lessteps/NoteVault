@@ -24,3 +24,16 @@ Principio: **toda la práctica de escucha y habla nace de comparar lo que el alu
    diccionario no implica estar en repaso.
 6. **Habla con reconocimiento local (opcional, más adelante):** transcribir lo que dice el alumno y compararlo con el texto
    de referencia, igual que la escucha.
+
+## Añadido tras probar el paso 1 (2026-09-30)
+- **Micro reproductor** flotante (abajo a la derecha, minimizable) para podcasts; el reproductor completo queda para películas y TED.
+  Corrige el fallo de la duración en 00:00 (el `<video>` la conocía pero no llegaba al estado del componente: el deslizador se
+  quedaba con `max=1` y no dejaba avanzar/retroceder).
+- **Carpeta de la biblioteca:** `<espacio>/Fuentes/{Podcasts,Películas,TED,Transcripciones,Grabaciones}`. «Añadir» copia los
+  archivos ahí (o los deja donde están, a elección; por defecto las películas no se copian). Los archivos multimedia no deberían
+  ir a git: conviene ignorar `Inglés/Fuentes/**/*.{mp3,mp4,…}` en el repositorio del vault.
+- **Transcripciones pegadas** (con o sin tiempos) se guardan como archivo en `Fuentes/Transcripciones/` y pueden ser una fuente
+  por sí solas: sin audio, la voz de la app lee las frases en los ejercicios.
+- **Grabaciones de voz:** panel propio (icono de micrófono) con reproducción a 0.5×–2× y archivos en `Fuentes/Grabaciones/`.
+- Pendiente: sincronizar transcripciones sin tiempos pulsando una tecla al empezar cada frase; integrar las fuentes en la vista de
+  cada tema de escucha.

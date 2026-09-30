@@ -8,7 +8,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { copyText } from "../../lib/clipboard";
-import { clock, cueAt, cueBefore, nextTarget, previousTarget, SPEEDS, type Pair } from "../../lib/player";
+import { clock, cueAt, cueBefore, durationMs, nextTarget, previousTarget, SPEEDS, type Pair } from "../../lib/player";
 import type { PlayerMedia } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { usePersistedNav } from "../../store/navState";
@@ -96,6 +96,9 @@ export function EnglishPlayer() {
     if (!el) return;
     const ms = el.currentTime * 1000;
     setPos(ms);
+    // The duration can arrive after the metadata event (or never as a number the first time): keep it in sync.
+    const d = durationMs(el);
+    if (d > 0) setDur((prev) => (Math.abs(prev - d) > 500 ? d : prev));
     const seg = segment.current;
     if (seg && ms >= seg.end) {
       segment.current = null;
@@ -324,7 +327,8 @@ export function EnglishPlayer() {
             src={media.url}
             className="h-full w-full"
             onTimeUpdate={onTime}
-            onLoadedMetadata={(e) => setDur(e.currentTarget.duration * 1000)}
+            onLoadedMetadata={(e) => setDur(durationMs(e.currentTarget))}
+            onDurationChange={(e) => setDur(durationMs(e.currentTarget))}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
             onClick={toggle}

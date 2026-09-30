@@ -55,12 +55,12 @@ export function listSources(root: string): Source[] {
   for (const name of fs.readdirSync(dir)) {
     if (!name.endsWith(".json") || isSyncConflict(name)) continue;
     const raw = loadJson<Record<string, unknown>>(path.join(dir, name));
-    if (!raw || typeof raw !== "object" || !raw.media) continue;
+    if (!raw || typeof raw !== "object" || (!raw.media && !raw.transcript)) continue;
     out.push({
       id: String(raw.id ?? path.parse(name).name),
       kind: asKind(raw.kind),
-      title: String(raw.title ?? "").trim() || path.parse(String(raw.media)).name,
-      media: String(raw.media),
+      title: String(raw.title ?? "").trim() || path.parse(String(raw.media || raw.transcript)).name,
+      media: String(raw.media ?? ""),
       transcript: String(raw.transcript ?? ""),
       added: String(raw.added ?? ""),
     });
@@ -73,12 +73,13 @@ export function getSource(root: string, id: string): Source | null {
 }
 
 export function addSource(root: string, input: { kind: string; title: string; media: string; transcript?: string }): Source {
-  const media = path.resolve(input.media);
+  // A source can be a transcript alone (no audio file): the app's voice reads it.
+  const media = input.media ? path.resolve(input.media) : "";
   const source: Source = {
     id: newId("f"),
     kind: asKind(input.kind),
-    title: input.title.trim().slice(0, 120) || path.parse(media).name,
-    media: storedPath(root, media),
+    title: input.title.trim().slice(0, 120) || (media ? path.parse(media).name : path.parse(input.transcript ?? "").name) || "Fuente",
+    media: media ? storedPath(root, media) : "",
     transcript: input.transcript ? storedPath(root, input.transcript) : "",
     added: new Date().toISOString(),
   };

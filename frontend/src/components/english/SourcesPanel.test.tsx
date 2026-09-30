@@ -48,7 +48,24 @@ describe("SourcesPanel", () => {
     act(() => root.render(<SourcesPanel />));
     await flush();
     expect(container.querySelectorAll("button[title^='5 dictados']")).toHaveLength(1);
-    expect(container.textContent).toContain("Añadir transcripción");
+    expect(container.textContent).toContain("Pegar transcripción");
+    expect(container.textContent).toContain("Elegir .srt");
+  });
+
+  it("pastes a transcript for a source that has none and saves it through the API", async () => {
+    act(() => root.render(<SourcesPanel />));
+    await flush();
+    act(() => button(/Pegar transcripción/).click());
+    const area = container.querySelector("textarea[aria-label='Transcripción']") as HTMLTextAreaElement;
+    expect(area).toBeTruthy();
+    const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+    act(() => {
+      set.call(area, "Welcome to the show. Today we talk about remote work every day.");
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => button(/Guardar la transcripción/).click());
+    await flush();
+    expect(invoke).toHaveBeenCalledWith("en_source_paste", "podcast", "Una película", "Welcome to the show. Today we talk about remote work every day.", "f2");
   });
 
   it("builds a dictation session from the source and opens its first exercise", async () => {

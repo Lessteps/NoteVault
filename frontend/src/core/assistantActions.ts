@@ -55,7 +55,7 @@ export interface ApplyResult {
 }
 
 const MAX_AREAS = 40;
-const MAX_TOPICS = 60;
+const MAX_TOPICS = 120;
 const MAX_CANVAS_NODES = 400;
 const MAX_TEXT = 200_000;
 const ODD = /[\\/:*?"<>|\u0000-\u001f]/g;
@@ -242,7 +242,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
     ops.push({
       kind: "write",
       rel: temarioRel,
-      content: `---\ntitle: Temario de ${subject}\nsubject: ${subjectId}\ntype: topic\n---\n\n# Temario de ${subject}\n\n${GENERATED}\n\n${lines.join("\n").trimEnd()}\n`,
+      content: `---\ntitle: Temario de ${subject}\nsubject: ${subjectId}\ntype: index\n---\n\n# Temario de ${subject}\n\n${GENERATED}\n\n${lines.join("\n").trimEnd()}\n`,
       overwrite: generated,
       exists: existing,
     });

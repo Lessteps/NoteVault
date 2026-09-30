@@ -733,17 +733,22 @@ export const useApp = create<State>((setState, get) => {
         }
         return t;
       });
-      // Remap the activeTabId if it pointed to a renamed note/canvas tab
-      let activeTabId = st.activeTabId;
-      if (activeTabId) {
-        const newActive = openTabs.find((t) => {
-          const old = st.openTabs.find((o) => o.tabId === activeTabId);
-          if (!old) return false;
-          if (old.kind === "note" || old.kind === "canvas") return t.kind === old.kind;
-          return t.tabId === activeTabId;
-        });
-        activeTabId = newActive?.tabId ?? activeTabId;
-      }
+      // Remap the activeTabId: the renamed note keeps being the active one, and
+      // renaming anything else leaves the active tab exactly where it was.
+      // (Matching "any tab of the same kind" moved the user to the first note
+      // of the strip whenever a different file was renamed.)
+      const oldActive = st.openTabs.find((t) => t.tabId === st.activeTabId);
+      const remappedActive =
+        oldActive && (oldActive.kind === "note" || oldActive.kind === "canvas")
+          ? remap(oldActive.path)
+          : null;
+      const activeTabId = remappedActive
+        ? (openTabs.find(
+            (t) =>
+              (t.kind === "note" || t.kind === "canvas") &&
+              (t as { path: string }).path === remappedActive,
+          )?.tabId ?? st.activeTabId)
+        : st.activeTabId;
       return {
         notes,
         openTabs,

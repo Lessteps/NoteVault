@@ -6,6 +6,7 @@
 
 import { searchExercises, type Exercise as GuideExercise } from "@bryllim/workout-guide";
 import instructionsData from "./exerciseInstructions.json";
+import customInstructions from "./exerciseInstructions.custom.json";
 
 /** Mapeo guía → músculos locales (`frontend/src/lib/muscles.ts`). */
 const GUIDE_TO_LOCAL: Record<string, string[]> = {
@@ -99,7 +100,7 @@ export interface ExerciseInstructions {
 }
 
 const instructionsBySlug = new Map(
-  (instructionsData as ExerciseInstructions[]).map((r) => [r.slug, r]),
+  [...(instructionsData as ExerciseInstructions[]), ...(customInstructions as ExerciseInstructions[])].map((r) => [r.slug, r]),
 );
 
 /** Pasos en español (respaldo inglés) o null si el dataset no lo cubre. */

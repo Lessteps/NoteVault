@@ -43,8 +43,15 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.length).toBeGreaterThan(0);
   });
 
-  test("sin match devuelve null (face-pull)", () => {
-    expect(getInstructions("face-pull")).toBeNull();
+  test("lote propio: face-pull redactado en español", () => {
+    const ins = getInstructions("face-pull");
+    expect(ins).not.toBeNull();
+    expect(ins!.steps_es.length).toBeGreaterThanOrEqual(4);
+    expect(ins!.steps_es.join(" ")).toMatch(/cuerda|cara/i);
+  });
+
+  test("sin match devuelve null (nordic-hamstring-curl)", () => {
+    expect(getInstructions("nordic-hamstring-curl")).toBeNull();
   });
 
   test("estima 1RM con Epley", () => {

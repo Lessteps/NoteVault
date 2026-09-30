@@ -5,7 +5,7 @@
 // *dentro* del panel, sin moverte de donde estas.
 
 import { CalendarClock, Globe, ListTree, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
-import { openInkPad } from "../practice/inkBridge";
+import { toggleFace } from "../../lib/panelFaces";
 import { useReviewPanel } from "../study/ReviewPanel";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
@@ -20,20 +20,13 @@ export function PanelLaunchers({ module }: { module: string }) {
   const pages = useWebPages((s) => s.pages.length);
   const pagesOpen = useWebPages((s) => s.open);
   const reviewOpen = useReviewPanel((s) => s.open);
+  const inkOpen = useApp((s) => s.inkDraft !== null);
 
-  /** Una cara a la vez: la que se abre se lleva el panel. */
-  const soloMuscle = () => {
-    if (assistantOpen) useAssistant.getState().setOpen(false);
-    if (pagesOpen) useWebPages.getState().setOpen(false);
-    if (inspectorOpen) useApp.getState().toggleInspector();
-    if (reviewOpen) useReviewPanel.getState().setOpen(false);
-    useApp.getState().setMuscleOpen(true);
-  };
-  /** Y el ✕ de cada cara devuelve el hueco a la tira. */
-  const cierraMuscle = () => {
-    if (muscleOpen) useApp.getState().setMuscleOpen(false);
-    if (reviewOpen) useReviewPanel.getState().setOpen(false);
-  };
+  const cell = (on: boolean, enabled = true) =>
+    cn(
+      "relative grid h-8 w-8 place-items-center rounded-lg transition-colors",
+      !enabled ? "cursor-not-allowed text-faint/50" : on ? "bg-hover text-text" : "text-dim hover:bg-hover hover:text-text",
+    );
 
   return (
     <aside
@@ -47,17 +40,8 @@ export function PanelLaunchers({ module }: { module: string }) {
           title={muscleOpen ? "Ocultar el esquema muscular" : "Esquema muscular del día"}
           aria-label="Esquema muscular"
           aria-pressed={muscleOpen}
-          onClick={() => {
-            if (muscleOpen) {
-              useApp.getState().setMuscleOpen(false);
-              return;
-            }
-            soloMuscle();
-          }}
-          className={cn(
-            "grid h-8 w-8 place-items-center rounded-lg transition-colors",
-            muscleOpen ? "bg-hover text-text" : "text-dim hover:bg-hover hover:text-text",
-          )}
+          onClick={() => toggleFace("muscle")}
+          className={cell(muscleOpen)}
         >
           <MapIcon size={16} />
         </button>
@@ -65,14 +49,11 @@ export function PanelLaunchers({ module }: { module: string }) {
 
       <button
         type="button"
-        title="Abrir Asistente IA"
+        title={assistantOpen ? "Cerrar el Asistente IA" : "Abrir Asistente IA"}
         aria-label="Asistente IA"
-        onClick={() => {
-          cierraMuscle();
-          if (inspectorOpen) useApp.getState().toggleInspector();
-          useAssistant.getState().setOpen(true);
-        }}
-        className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
+        aria-pressed={assistantOpen}
+        onClick={() => toggleFace("assistant")}
+        className={cell(assistantOpen)}
       >
         <Sparkles size={16} />
       </button>
@@ -82,16 +63,8 @@ export function PanelLaunchers({ module }: { module: string }) {
         title={pagesOpen ? "Ocultar las páginas del navegador" : "Mostrar las páginas del navegador"}
         aria-label="Páginas del navegador"
         aria-pressed={pagesOpen}
-        onClick={() => {
-          cierraMuscle();
-          if (assistantOpen) useAssistant.getState().setOpen(false);
-          if (inspectorOpen) useApp.getState().toggleInspector();
-          useWebPages.getState().setOpen(!pagesOpen);
-        }}
-        className={cn(
-          "relative grid h-8 w-8 place-items-center rounded-lg transition-colors",
-          pagesOpen ? "bg-hover text-text" : "text-dim hover:bg-hover hover:text-text",
-        )}
+        onClick={() => toggleFace("pages")}
+        className={cell(pagesOpen)}
       >
         <Globe size={16} />
         {pages > 0 && (
@@ -106,17 +79,10 @@ export function PanelLaunchers({ module }: { module: string }) {
         type="button"
         title={active ? "Esquema de la nota" : "Esquema de la nota (abre una nota primero)"}
         aria-label="Esquema de la nota"
+        aria-pressed={inspectorOpen}
         disabled={!active}
-        onClick={() => {
-          cierraMuscle();
-          if (assistantOpen) useAssistant.getState().setOpen(false);
-          if (pagesOpen) useWebPages.getState().setOpen(false);
-          useApp.getState().toggleInspector();
-        }}
-        className={cn(
-          "grid h-8 w-8 place-items-center rounded-lg transition-colors",
-          active ? "text-dim hover:bg-hover hover:text-text" : "cursor-not-allowed text-faint/50",
-        )}
+        onClick={() => toggleFace("inspector")}
+        className={cell(inspectorOpen, !!active)}
       >
         <ListTree size={16} />
       </button>
@@ -128,34 +94,22 @@ export function PanelLaunchers({ module }: { module: string }) {
           title="Repaso espaciado"
           aria-label="Repaso"
           aria-pressed={reviewOpen}
-          onClick={() => {
-            if (reviewOpen) {
-              useReviewPanel.getState().setOpen(false);
-              return;
-            }
-            cierraMuscle();
-            if (assistantOpen) useAssistant.getState().setOpen(false);
-            if (pagesOpen) useWebPages.getState().setOpen(false);
-            if (inspectorOpen) useApp.getState().toggleInspector();
-            useReviewPanel.getState().setOpen(true);
-          }}
-          className={cn(
-            "grid h-8 w-8 place-items-center rounded-lg transition-colors",
-            reviewOpen ? "bg-hover text-text" : "text-dim hover:bg-hover hover:text-text",
-          )}
+          onClick={() => toggleFace("review")}
+          className={cell(reviewOpen)}
         >
           <CalendarClock size={16} />
         </button>
       )}
 
-      {/* A drawing pad in a split view, saved beside the open note. */}
+      {/* A drawing pad in a split view; pressing it again closes it. */}
       {module === "notas" && (
         <button
           type="button"
-          title="Dibujar LaTeX (lienzo infinito en vista dividida)"
+          title={inkOpen ? "Cerrar el dibujo LaTeX" : "Dibujar LaTeX (lienzo infinito en vista dividida)"}
           aria-label="Dibujar LaTeX"
-          onClick={() => void openInkPad()}
-          className="grid h-8 w-8 place-items-center rounded-lg text-dim transition-colors hover:bg-hover hover:text-text"
+          aria-pressed={inkOpen}
+          onClick={() => toggleFace("ink")}
+          className={cell(inkOpen)}
         >
           <PenTool size={16} />
         </button>

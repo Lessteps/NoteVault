@@ -110,7 +110,7 @@ function TabStrip() {
         if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
         strip.scrollLeft += e.deltaY;
       }}
-      className="nv-tabstrip flex min-w-0 flex-1 items-end overflow-x-auto"
+      className="nv-tabstrip flex min-w-0 flex-1 items-end overflow-x-auto pl-2"
       role="tablist"
       aria-label="Pestañas abiertas"
     >
@@ -250,8 +250,6 @@ export function TopBar() {
       {/* Tab strip takes the remaining space */}
       <TabStrip />
 
-      <div className="min-w-2 flex-1" />
-
       {/* Sync state + window controls on the right */}
       <div className="flex flex-none items-center gap-3 border-l border-line px-3">
         <SyncState />
@@ -272,21 +270,21 @@ function WorkspaceIcons() {
   // the strip gives that space back to the tabs. Only the panel toggle stays,
   // because it is the one thing that belongs to the window and not to a module.
   return (
-    <div className="flex flex-none items-center gap-0.5 pl-2 pr-1">
-      <button
-        type="button"
-        title="Panel lateral"
-        aria-label="Panel lateral"
-        aria-pressed={explorerOpen}
-        onClick={toggleExplorer}
-        className={cn(
-          "grid h-7 w-7 place-items-center rounded-md transition-colors",
-          explorerOpen ? "text-text hover:bg-hover" : "text-faint hover:bg-hover hover:text-text",
-        )}
-      >
-        <PanelLeft size={16} strokeWidth={1.8} />
-      </button>
-    </div>
+    // Exactly as wide as the icon rail below it (w-12), full height, closed by a rule: the
+    // toggle sits directly above the rail and the tabs start after a clear divider.
+    <button
+      type="button"
+      title="Panel lateral (Ctrl+\)"
+      aria-label="Panel lateral"
+      aria-pressed={explorerOpen}
+      onClick={toggleExplorer}
+      className={cn(
+        "grid w-12 flex-none place-items-center border-r border-line transition-colors hover:bg-hover",
+        explorerOpen ? "text-text" : "text-faint hover:text-text",
+      )}
+    >
+      <PanelLeft size={17} strokeWidth={1.8} />
+    </button>
   );
 }
 

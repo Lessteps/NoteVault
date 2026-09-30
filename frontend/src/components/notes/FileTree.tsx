@@ -67,7 +67,7 @@ export async function newFolderIn(parent: string): Promise<void> {
   }
 }
 
-async function renameEntry(entry: TreeEntry) {
+export async function renameEntry(entry: TreeEntry) {
   const current = entry.type === "note" && entry.kind === "note" ? entry.name : entry.path.split("/").pop()!;
   const name = await askText("Renombrar", current, "Renombrar");
   if (!name || name === current) return;

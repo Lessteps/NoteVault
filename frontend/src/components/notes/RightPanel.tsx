@@ -1,12 +1,8 @@
 // El panel derecho, uno solo para toda la app.
 //
-// No es una columna aparte ni algo exclusivo de Notas: es la misma columna en
-// cualquier funcionalidad (Ejercicio, Finanzas, el navegador…), y siempre tiene
-// una cara. Sus tres caras —el asistente, las páginas del navegador y el esquema
-// de la nota— las abre la tira de lanzadores, que es lo que se ve cuando no hay
-// ninguna abierta.
-//
-// Única excepción: el lienzo dentro de Notas ocupa la pantalla entera.
+// La tira de lanzadores está SIEMPRE en el borde derecho; junto a ella (a su izquierda)
+// se abre la cara que elijas: el asistente, las páginas del navegador, el esquema de la
+// nota, el repaso o el esquema muscular. Solo hay una cara a la vez (ver lib/panelFaces).
 
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
@@ -26,11 +22,22 @@ export function RightPanel({ module }: { module: string }) {
   const inspectorOpen = useApp((s) => s.inspectorOpen);
   const active = useApp((s) => s.active);
 
-  if (assistantOpen) return <AssistantPanel />;
-  if (pagesOpen) return <WebRail />;
-  if (reviewOpen && module === "notas") return <ReviewPanel />;
-  // El esquema muscular solo tiene sentido dentro de Ejercicio.
-  if (muscleOpen && module === "ejercicio") return <MuscleSchemaPanel />;
-  if (inspectorOpen && active) return <Inspector />;
-  return <PanelLaunchers module={module} />;
+  const face = assistantOpen
+    ? <AssistantPanel />
+    : pagesOpen
+      ? <WebRail />
+      : reviewOpen && module === "notas"
+        ? <ReviewPanel />
+        : muscleOpen && module === "ejercicio"
+          ? <MuscleSchemaPanel />
+          : inspectorOpen && active
+            ? <Inspector />
+            : null;
+
+  return (
+    <div className="flex min-h-0 flex-none">
+      {face}
+      <PanelLaunchers module={module} />
+    </div>
+  );
 }

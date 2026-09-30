@@ -1,0 +1,53 @@
+// The right column has ONE face at a time (assistant, browser pages, note outline,
+// review, muscle map) and the drawing pad, which sits in the editor area. Opening any
+// of them closes the rest, so nothing is left open behind another; opening the one
+// that is already open closes it. The launcher strip stays visible whatever happens.
+
+import { useApp } from "../store/app";
+import { useAssistant } from "../store/assistant";
+import { useWebPages } from "../store/webPages";
+import { useReviewPanel } from "../components/study/ReviewPanel";
+import { openInkPad } from "../components/practice/inkBridge";
+
+export type Face = "assistant" | "pages" | "review" | "inspector" | "muscle" | "ink";
+
+export function isFaceOpen(face: Face): boolean {
+  switch (face) {
+    case "assistant": return useAssistant.getState().open;
+    case "pages": return useWebPages.getState().open;
+    case "review": return useReviewPanel.getState().open;
+    case "inspector": return useApp.getState().inspectorOpen;
+    case "muscle": return useApp.getState().muscleOpen;
+    case "ink": return useApp.getState().inkDraft !== null;
+  }
+}
+
+export function closeFace(face: Face): void {
+  switch (face) {
+    case "assistant": useAssistant.getState().setOpen(false); break;
+    case "pages": useWebPages.getState().setOpen(false); break;
+    case "review": useReviewPanel.getState().setOpen(false); break;
+    case "inspector": if (useApp.getState().inspectorOpen) useApp.getState().toggleInspector(); break;
+    case "muscle": useApp.getState().setMuscleOpen(false); break;
+    case "ink": useApp.getState().setInkDraft(null); break;
+  }
+}
+
+const ALL: Face[] = ["assistant", "pages", "review", "inspector", "muscle", "ink"];
+
+/** Opens `face` (closing every other one), or closes it when it is already open. */
+export function toggleFace(face: Face): void {
+  if (isFaceOpen(face)) {
+    closeFace(face);
+    return;
+  }
+  for (const other of ALL) if (other !== face && isFaceOpen(other)) closeFace(other);
+  switch (face) {
+    case "assistant": useAssistant.getState().setOpen(true); break;
+    case "pages": useWebPages.getState().setOpen(true); break;
+    case "review": useReviewPanel.getState().setOpen(true); break;
+    case "inspector": useApp.getState().toggleInspector(); break;
+    case "muscle": useApp.getState().setMuscleOpen(true); break;
+    case "ink": openInkPad(); break;
+  }
+}

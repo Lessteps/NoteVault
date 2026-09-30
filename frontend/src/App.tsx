@@ -6,6 +6,7 @@ import { ModuleHost } from "./components/ModuleHost";
 import { useTabDrag } from "./store/tabDrag";
 import { X } from "lucide-react";
 import { RightPanel } from "./components/notes/RightPanel";
+import { renameEntry } from "./components/notes/FileTree";
 import { DialogHost, MenuHost } from "./components/ui";
 import { VaultDialog } from "./components/VaultDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
@@ -86,6 +87,22 @@ function useNavigationGuard() {
 function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // F2 renames the file on screen, unless a text field is being edited.
+      if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const el = e.target as HTMLElement | null;
+        if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.closest(".cm-editor"))) return;
+        const st = useApp.getState();
+        const tab = st.openTabs.find((t) => t.tabId === st.activeTabId);
+        if (tab?.kind === "note") {
+          e.preventDefault();
+          const note = st.notes[tab.path];
+          void renameEntry({ type: "note", kind: note?.kind === "code" ? "code" : "note", name: note?.title ?? tab.path.split("/").pop()!, path: tab.path });
+        } else if (tab?.kind === "canvas") {
+          e.preventDefault();
+          void renameEntry({ type: "note", kind: "canvas", name: tab.path.split("/").pop()!, path: tab.path });
+        }
+        return;
+      }
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const s = useApp.getState();

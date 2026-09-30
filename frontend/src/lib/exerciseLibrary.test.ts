@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   estimate1RM,
   filterByLocalMuscle,
+  filterLibrary,
   getInstructions,
   mapGuideMuscle,
   searchLibrary,
@@ -135,6 +136,32 @@ describe("exerciseLibrary (workout-guide)", () => {
 
   test("un slug fuera del catálogo devuelve null", () => {
     expect(getInstructions("no-existe-en-workout-guide")).toBeNull();
+  });
+
+  test("sin filtros devuelve los 302 del catálogo", () => {
+    expect(filterLibrary({}).length).toBe(302);
+  });
+
+  test("filtra por equipo", () => {
+    const rows = filterLibrary({ equipment: "Barbell" });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.equipment === "Barbell")).toBe(true);
+  });
+
+  test("filtra por músculo guía", () => {
+    const rows = filterLibrary({ muscle: "Chest" });
+    expect(rows.length).toBeGreaterThan(10);
+    expect(rows.every((r) => r.guidePrimary === "Chest")).toBe(true);
+  });
+
+  test("combina búsqueda con filtro", () => {
+    const rows = filterLibrary({ query: "press", equipment: "Dumbbell" });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.equipment === "Dumbbell" && /press/i.test(r.name))).toBe(true);
+  });
+
+  test("un filtro sin resultados devuelve lista vacía", () => {
+    expect(filterLibrary({ equipment: "Towel", muscle: "Calves" })).toEqual([]);
   });
 
   test("estima 1RM con Epley", () => {

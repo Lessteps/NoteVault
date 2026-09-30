@@ -75,11 +75,41 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
+  it("arranca mostrando los 302 y filtra por equipo", async () => {
+    const { host, cleanup } = mount(<Library />);
+    try {
+      const rows = () => host.querySelectorAll("[data-slug]").length;
+      expect(rows()).toBe(302);
+
+      const equipment = host.querySelector('select[aria-label="Filtrar por equipo"]') as HTMLSelectElement;
+      expect(equipment).not.toBeNull();
+      expect(equipment.options.length).toBeGreaterThan(5);
+      await act(async () => {
+        equipment.value = "Towel";
+        equipment.dispatchEvent(new Event("change", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(rows()).toBeGreaterThan(0);
+      expect(rows()).toBeLessThan(302);
+      // Todas las que quedan son de ese equipo.
+      expect(host.textContent).not.toContain("Bodyweight ·");
+
+      await act(async () => {
+        const clear = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Limpiar"));
+        clear!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(rows()).toBe(302);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("no ofrece elegir día: añade al día de hoy", async () => {
     const { host, cleanup } = mount(<Library />);
     try {
-      // Sin desplegable de días en la Biblioteca.
-      expect(host.querySelector("select")).toBeNull();
+      // Sin desplegable de días: los selects que hay son de filtros.
+      expect(host.querySelector('select[aria-label*="día" i]')).toBeNull();
 
       const add = [...host.querySelectorAll("button")].find((b) =>
         b.textContent?.includes("Añadir"),

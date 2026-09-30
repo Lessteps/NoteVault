@@ -9,7 +9,14 @@ import { weekdayKeyOf } from "../../lib/exercise";
 import { muscleName } from "../../lib/muscles";
 import { todayIso } from "../../lib/tasks";
 import { useExercise } from "../../store/exercise";
-import { getInstructions, searchLibrary, type LibraryEntry } from "../../lib/exerciseLibrary";
+import {
+  filterLibrary,
+  getInstructions,
+  LIBRARY_EQUIPMENT,
+  LIBRARY_MUSCLES,
+  searchLibrary,
+  type LibraryEntry,
+} from "../../lib/exerciseLibrary";
 import { GhostButton, input } from "../common/forms";
 import { cn } from "../ui";
 import { useFail } from "./parts";
@@ -75,14 +82,19 @@ function Detail({ entry }: { entry: LibraryEntry }) {
 export function Library() {
   const fail = useFail();
   const refresh = useExercise((s) => s.refresh);
-  const [q, setQ] = useState("bench press");
+  const [q, setQ] = useState("");
+  const [equipment, setEquipment] = useState("");
+  const [muscle, setMuscle] = useState("");
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<string>("bench-press");
   // La Biblioteca no pregunta el día: lo que se añade entra en la rutina del
   // día de hoy. Para moverlo de día, Gestionar ejercicios.
   const day = weekdayKeyOf(todayIso());
 
-  const rows = useMemo(() => searchLibrary(q).slice(0, 60), [q]);
+  const rows = useMemo(
+    () => filterLibrary({ query: q, equipment, muscle }),
+    [q, equipment, muscle],
+  );
   const current = rows.find((r) => r.slug === selected) ?? rows[0] ?? null;
 
   const add = async (slug: string) => {
@@ -112,15 +124,51 @@ export function Library() {
     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-6">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-[15px] font-semibold text-text">Biblioteca</h1>
-        <span className="text-[12px] text-faint">302 ejercicios · workout-guide (CC BY-SA 4.0)</span>
+        <span className="text-[12px] text-faint">
+          {rows.length} de 302 · workout-guide (CC BY-SA 4.0)
+        </span>
         <span className="flex-1" />
         <input
-          className={cn(input, "w-64")}
+          className={cn(input, "w-56")}
           placeholder="Buscar ejercicios…"
+          aria-label="Buscar ejercicios"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onInput={(e) => setQ((e.target as HTMLInputElement).value)}
         />
+        <select
+          className={cn(input, "w-36")}
+          value={equipment}
+          aria-label="Filtrar por equipo"
+          onChange={(e) => setEquipment(e.target.value)}
+        >
+          <option value="">Todo el equipo</option>
+          {LIBRARY_EQUIPMENT.map((x) => (
+            <option key={x} value={x}>{x}</option>
+          ))}
+        </select>
+        <select
+          className={cn(input, "w-36")}
+          value={muscle}
+          aria-label="Filtrar por músculo"
+          onChange={(e) => setMuscle(e.target.value)}
+        >
+          <option value="">Todos los músculos</option>
+          {LIBRARY_MUSCLES.map((x) => (
+            <option key={x} value={x}>{x}</option>
+          ))}
+        </select>
+        {(q || equipment || muscle) && (
+          <GhostButton
+            onClick={() => {
+              setQ("");
+              setEquipment("");
+              setMuscle("");
+            }}
+          >
+            Limpiar
+          </GhostButton>
+        )}
       </div>
       {status && <p className="text-[12px] text-dim">{status}</p>}
       <div className="grid items-start gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 340px" }}>
@@ -128,6 +176,7 @@ export function Library() {
           {rows.map((r) => (
             <div
               key={r.slug}
+              data-slug={r.slug}
               data-selected={selected === r.slug}
               className={cn(
                 "flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-card px-3 py-2",

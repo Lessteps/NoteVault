@@ -127,6 +127,29 @@ export function filterByLocalMuscle(localId: string): LibraryEntry[] {
     .filter((e) => e.localPrimary.includes(localId));
 }
 
+/** Los equipos del catálogo, para el desplegable de filtros. */
+export const LIBRARY_EQUIPMENT: string[] = [...new Set(searchLibrary("").map((e) => e.equipment))].sort();
+
+/** Los músculos guía del catálogo, para el filtro. */
+export const LIBRARY_MUSCLES: string[] = [...new Set(searchLibrary("").map((e) => e.guidePrimary))].sort();
+
+export interface LibraryFilters {
+  query?: string;
+  equipment?: string;
+  muscle?: string;
+}
+
+/**
+ * Búsqueda + filtros sobre el catálogo completo. Sin filtros devuelve los
+ * 302: la lista es corta para el navegador y así se ven de una vez.
+ */
+export function filterLibrary({ query = "", equipment = "", muscle = "" }: LibraryFilters = {}): LibraryEntry[] {
+  const byText = searchLibrary(query);
+  return byText.filter(
+    (e) => (!equipment || e.equipment === equipment) && (!muscle || e.guidePrimary === muscle),
+  );
+}
+
 /** 1RM estimado (Epley): w * (1 + r/30). Sin reps → peso tal cual. */
 export function estimate1RM(weight: number, reps: number): number {
   if (!reps || reps <= 1) return weight;

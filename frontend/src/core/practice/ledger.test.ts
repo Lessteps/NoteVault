@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudyErrorManager } from "../studyErrorManager.js";
 import { StudySRSManager } from "../studySrsManager.js";
 import { VaultManager } from "../vaultManager.js";
@@ -19,6 +19,13 @@ const MATH_AREA = "Matemáticas/1 Lógica y demostración";
 const CONCEPT_DIR = `${MATH_AREA}/1.10 Inducción matemática`;
 const EX_DIR = `${CONCEPT_DIR}/Ejercicios`;
 const TODAY = new Date(2026, 8, 24); // Sept 24, 2026
+
+// Attempts are stamped with the clock: pin it to TODAY so the tests do not age (they broke once the real date passed it).
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 8, 24, 12, 0, 0));
+});
+afterAll(() => vi.useRealTimers());
 
 function ev(
   daysAgo: number,

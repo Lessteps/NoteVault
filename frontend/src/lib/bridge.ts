@@ -153,6 +153,9 @@ export const setRendering = (patch: Partial<RenderingSettings>) => call<Renderin
 export const gpuStatus = () => call<GpuStatus>("gpu_status");
 export const relaunchApp = () => call<{ ok: boolean }>("relaunch_app");
 
+/** An area the AI proposed for a study space, with its topics. */
+export type ProposedArea = { name: string; topics: Array<{ name: string }> };
+
 export const api = {
   appInfo: () => call<AppInfo>("app_info"),
   stats: () => call<{ notes: number }>("stats"),
@@ -466,7 +469,7 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
     call<{ today: string; items: import("./types").ReviewItem[] }>("study_reviews_list"),
   /** The AI proposes areas and topics for a subject (nothing is written). */
   studySpacePropose: (subject: string, scope: string, objective: string, existingFolder = "") =>
-    call<{ areas: Array<{ name: string; topics: Array<{ name: string }> }>; conversationId: string }>("study_space_propose", subject, scope, objective, existingFolder),
+    call<{ areas: ProposedArea[]; conversationId: string }>("study_space_propose", subject, scope, objective, existingFolder),
   studySpaceGenerate: (request: unknown) => call<{ jobId: string; conversationId: string }>("study_space_generate", request),
   studyTopicGenerate: (folder: string, conversationId = "") => call<{ jobId: string; conversationId: string }>("study_topic_generate", folder, conversationId),
   studySpaceStatus: (jobId: string) =>

@@ -5,6 +5,7 @@
 // `muscles.ts` para reutilizar el mapa corporal existente.
 
 import { searchExercises, type Exercise as GuideExercise } from "@bryllim/workout-guide";
+import instructionsData from "./exerciseInstructions.json";
 
 /** Mapeo guía → músculos locales (`frontend/src/lib/muscles.ts`). */
 const GUIDE_TO_LOCAL: Record<string, string[]> = {
@@ -87,4 +88,21 @@ export function filterByLocalMuscle(localId: string): LibraryEntry[] {
 export function estimate1RM(weight: number, reps: number): number {
   if (!reps || reps <= 1) return weight;
   return weight * (1 + reps / 30);
+}
+
+export interface ExerciseInstructions {
+  slug: string;
+  name: string;
+  matched: string;
+  steps_es: string[];
+  steps_en: string[];
+}
+
+const instructionsBySlug = new Map(
+  (instructionsData as ExerciseInstructions[]).map((r) => [r.slug, r]),
+);
+
+/** Pasos en español (respaldo inglés) o null si el dataset no lo cubre. */
+export function getInstructions(slug: string): ExerciseInstructions | null {
+  return instructionsBySlug.get(slug) ?? null;
 }

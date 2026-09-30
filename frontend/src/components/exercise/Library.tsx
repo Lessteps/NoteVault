@@ -6,12 +6,14 @@ import { useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { muscleName } from "../../lib/muscles";
 import { useExercise } from "../../store/exercise";
-import { searchLibrary, type LibraryEntry } from "../../lib/exerciseLibrary";
+import { getInstructions, searchLibrary, type LibraryEntry } from "../../lib/exerciseLibrary";
 import { GhostButton, input } from "../common/forms";
 import { cn } from "../ui";
 import { useFail } from "./parts";
 
 function Detail({ entry }: { entry: LibraryEntry }) {
+  const ins = getInstructions(entry.slug);
+  const steps = ins?.steps_es.length ? ins.steps_es : (ins?.steps_en ?? []);
   return (
     <div className="space-y-2 rounded-xl border border-line bg-card p-3">
       <div className="text-[13px] font-semibold text-text">{entry.name}</div>
@@ -50,6 +52,18 @@ function Detail({ entry }: { entry: LibraryEntry }) {
           <dd>{entry.guideSecondary.join(", ") || "—"}</dd>
         </div>
       </dl>
+      {steps.length > 0 ? (
+        <div>
+          <div className="mb-1 text-[12px] font-semibold text-text">Cómo hacerlo</div>
+          <ol className="list-decimal space-y-1 pl-5 text-[12px] leading-relaxed text-dim">
+            {steps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
+        </div>
+      ) : (
+        <p className="text-[11.5px] text-faint">Sin instrucciones todavía para este ejercicio.</p>
+      )}
       <p className="text-[11px] text-faint">Ilustración: Bryl Lim / Everkinetic (CC BY-SA 4.0) · offline.</p>
     </div>
   );
@@ -70,11 +84,15 @@ export function Library() {
   const add = async (slug: string) => {
     const found = searchLibrary("").find((r) => r.slug === slug);
     if (!found) return;
+    const ins = getInstructions(slug);
+    const steps = ins?.steps_es.length ? ins.steps_es : (ins?.steps_en ?? []);
     try {
       await api.exSave("", {
         day,
         name: found.name,
-        how_to: `${found.equipment} · ${found.guidePrimary}`,
+        how_to: steps.length
+          ? steps.map((s, i) => `${i + 1}. ${s}`).join("\n")
+          : `${found.equipment} · ${found.guidePrimary}`,
         series_reps: "",
         rest: "",
         muscles: { primary: found.localPrimary, secondary: found.localSecondary },

@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   estimate1RM,
   filterByLocalMuscle,
+  getInstructions,
   mapGuideMuscle,
   searchLibrary,
 } from "./exerciseLibrary";
@@ -27,6 +28,13 @@ describe("exerciseLibrary (workout-guide)", () => {
     const rows = searchLibrary("bench press");
     expect(rows[0].frame1).toContain("workout-guide-assets/bench-press/frame-1.png");
     expect(rows[0].frame1).not.toContain("http");
+  });
+
+  test("bench-press tiene instrucciones en español", () => {
+    const ins = getInstructions("bench-press");
+    expect(ins).not.toBeNull();
+    expect(ins!.steps_es.length).toBeGreaterThan(0);
+    expect(ins!.steps_es.join(" ")).toMatch(/pecho|banco|barra/i);
   });
 
   test("estima 1RM con Epley", () => {

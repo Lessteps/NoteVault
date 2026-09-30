@@ -1,10 +1,13 @@
 // Biblioteca: el catálogo workout-guide (302) dentro del módulo Ejercicio.
 // Busca por texto, muestra detalle (frames, equipo, músculos guía → locales)
-// y añade a la rutina del día con los músculos ya mapeados.
+// y añade a la rutina del día de hoy, con los músculos ya mapeados y las
+// instrucciones propias como "cómo hacerlo".
 
 import { useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
+import { weekdayKeyOf } from "../../lib/exercise";
 import { muscleName } from "../../lib/muscles";
+import { todayIso } from "../../lib/tasks";
 import { useExercise } from "../../store/exercise";
 import { getInstructions, searchLibrary, type LibraryEntry } from "../../lib/exerciseLibrary";
 import { GhostButton, input } from "../common/forms";
@@ -71,12 +74,13 @@ function Detail({ entry }: { entry: LibraryEntry }) {
 
 export function Library() {
   const fail = useFail();
-  const days = useExercise((s) => s.days);
   const refresh = useExercise((s) => s.refresh);
   const [q, setQ] = useState("bench press");
-  const [day, setDay] = useState("lunes");
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<string>("bench-press");
+  // La Biblioteca no pregunta el día: lo que se añade entra en la rutina del
+  // día de hoy. Para moverlo de día, Gestionar ejercicios.
+  const day = weekdayKeyOf(todayIso());
 
   const rows = useMemo(() => searchLibrary(q).slice(0, 60), [q]);
   const current = rows.find((r) => r.slug === selected) ?? rows[0] ?? null;
@@ -110,11 +114,6 @@ export function Library() {
         <h1 className="text-[15px] font-semibold text-text">Biblioteca</h1>
         <span className="text-[12px] text-faint">302 ejercicios · workout-guide (CC BY-SA 4.0)</span>
         <span className="flex-1" />
-        <select className={cn(input, "w-36")} value={day} onChange={(e) => setDay(e.target.value)} aria-label="Día destino">
-          {days.map((d) => (
-            <option key={d.key} value={d.key}>{d.name}</option>
-          ))}
-        </select>
         <input
           className={cn(input, "w-64")}
           placeholder="Buscar ejercicios…"

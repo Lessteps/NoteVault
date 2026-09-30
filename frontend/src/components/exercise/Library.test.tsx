@@ -11,6 +11,8 @@ const invoke = vi.fn(async (method: string): Promise<unknown> => {
 (window as unknown as { nv: unknown }).nv = { invoke };
 
 import { useExercise } from "../../store/exercise";
+import { weekdayKeyOf } from "../../lib/exercise";
+import { todayIso } from "../../lib/tasks";
 import { Library } from "./Library";
 
 function mount(node: React.ReactElement) {
@@ -68,6 +70,30 @@ describe("Biblioteca de Ejercicio", () => {
           }),
         ],
       );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("no ofrece elegir día: añade al día de hoy", async () => {
+    const { host, cleanup } = mount(<Library />);
+    try {
+      // Sin desplegable de días en la Biblioteca.
+      expect(host.querySelector("select")).toBeNull();
+
+      const add = [...host.querySelectorAll("button")].find((b) =>
+        b.textContent?.includes("Añadir"),
+      );
+      await act(async () => {
+        add!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const save = invoke.mock.calls.find((c) => c[0] === "ex_save");
+      expect(save).toBeDefined();
+      // El día enviado es el de hoy, no un "lunes" fijo.
+      const args = (save as unknown as unknown[])[1] as Array<{ day: string }>;
+      expect(args[1]!.day).toBe(weekdayKeyOf(todayIso()));
     } finally {
       cleanup();
     }

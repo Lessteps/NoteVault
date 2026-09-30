@@ -12,6 +12,8 @@
     "build": "npm run typecheck && vite build",
     "typecheck": "tsc -b",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
     "preview": "vite preview",
     "electron:dev": "vite",
     "electron:build": "npm run typecheck && vite build && electron-builder"
@@ -54,6 +56,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/js-yaml": "^4.0.9",
     "@types/markdown-it": "^14.2.0",
@@ -61,10 +64,12 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^5.0.2",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
     "js-yaml": "^5.4.2",
     "jsdom": "^30.1.1",
+    "playwright": "^1.63.0",
     "tailwindcss": "^4.3.3",
     "typescript": "5.9",
     "vite": "^8.3.1",

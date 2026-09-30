@@ -37,6 +37,16 @@ describe("exerciseLibrary (workout-guide)", () => {
     expect(ins!.steps_es.join(" ")).toMatch(/pecho|banco|barra/i);
   });
 
+  test("un alias curado también resuelve (rope pushdown)", () => {
+    const ins = getInstructions("rope-tricep-pushdown");
+    expect(ins).not.toBeNull();
+    expect(ins!.steps_es.length).toBeGreaterThan(0);
+  });
+
+  test("sin match devuelve null (face-pull)", () => {
+    expect(getInstructions("face-pull")).toBeNull();
+  });
+
   test("estima 1RM con Epley", () => {
     expect(estimate1RM(100, 5)).toBeCloseTo(116.7, 1);
   });

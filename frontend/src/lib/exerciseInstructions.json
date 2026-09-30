@@ -295,6 +295,46 @@
   ]
  },
  {
+  "slug": "rear-delt-fly",
+  "name": "Rear Delt Fly",
+  "matched": "dumbbell rear fly",
+  "steps_es": [
+   "Ponte de pie con los pies separados a la altura de los hombros y sostén una mancuerna en cada mano.",
+   "Flexiona ligeramente las rodillas e inclínate hacia adelante desde las caderas, manteniendo la espalda recta.",
+   "Extiende los brazos rectos hacia el suelo, con las palmas mirándose entre sí.",
+   "Manteniendo una ligera flexión en los codos, levanta los brazos hacia los lados y aprieta los omóplatos entre sí.",
+   "Haz una pausa por un momento en la parte superior, luego baja lentamente los brazos de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Stand with your feet shoulder-width apart and hold a dumbbell in each hand.",
+   "Bend your knees slightly and hinge forward at the hips, keeping your back straight.",
+   "Extend your arms straight down towards the ground, palms facing each other.",
+   "Keeping a slight bend in your elbows, lift your arms out to the sides and squeeze your shoulder blades together.",
+   "Pause for a moment at the top, then slowly lower your arms back down to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "reverse-pec-deck",
+  "name": "Reverse Pec Deck",
+  "matched": "lever seated reverse fly",
+  "steps_es": [
+   "Ajusta la altura del asiento y colócate en la máquina con el pecho contra la almohadilla y los pies planos en el suelo.",
+   "Agarra las asas con un agarre prono y mantén los brazos ligeramente flexionados.",
+   "Exhala y junta las escápulas mientras llevas las asas hacia atrás y hacia afuera, alejándolas de tu cuerpo.",
+   "Haz una pausa breve en el punto máximo de contracción, luego inhala y vuelve lentamente a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Adjust the seat height and position yourself on the machine with your chest against the pad and your feet flat on the floor.",
+   "Grasp the handles with an overhand grip and keep your arms slightly bent.",
+   "Exhale and squeeze your shoulder blades together as you pull the handles back and outward, away from your body.",
+   "Pause for a moment at the peak contraction, then inhale and slowly return to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
   "slug": "upright-row",
   "name": "Upright Row",
   "matched": "barbell upright row",
@@ -465,6 +505,31 @@
   ]
  },
  {
+  "slug": "machine-row",
+  "name": "Machine Row",
+  "matched": "lever seated row",
+  "steps_es": [
+   "Ajusta la altura del asiento y los apoyapiés a una posición cómoda.",
+   "Siéntate en la máquina con el pecho apoyado en la almohadilla y los pies sobre los apoyapiés.",
+   "Agarra las asas con un agarre prono, con las manos separadas a la altura de los hombros.",
+   "Mantén la espalda recta y el core activado.",
+   "Jala las agarraderas hacia el cuerpo, apretando los omóplatos entre sí.",
+   "Haz una pausa breve en la parte alta del movimiento.",
+   "Suelta lentamente las asas y vuelve a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Adjust the seat height and footrests to a comfortable position.",
+   "Sit on the machine with your chest against the pad and your feet on the footrests.",
+   "Grasp the handles with an overhand grip, shoulder-width apart.",
+   "Keep your back straight and your core engaged.",
+   "Pull the handles towards your body, squeezing your shoulder blades together.",
+   "Pause for a moment at the peak of the movement.",
+   "Slowly release the handles and return to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
   "slug": "lat-pulldown",
   "name": "Lat Pulldown",
   "matched": "cable pulldown (pro lat bar)",
@@ -482,6 +547,31 @@
    "Sit down and lean back slightly, keeping your chest up and your back straight.",
    "Pull the bar down towards your chest, squeezing your shoulder blades together.",
    "Pause for a moment at the bottom of the movement, then slowly release the bar back up to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "close-grip-lat-pulldown",
+  "name": "Close-Grip Lat Pulldown",
+  "matched": "twin handle parallel grip lat pulldown",
+  "steps_es": [
+   "Ajusta la altura del asiento y colócate de frente a la máquina de cable.",
+   "Agarra las asas con un agarre prono, con las manos separadas a la altura de los hombros.",
+   "Siéntate y coloca los muslos debajo de las almohadillas para muslos, manteniendo los pies planos sobre el suelo.",
+   "Inclínate ligeramente hacia atrás y mantén el pecho elevado, conservando una columna neutral.",
+   "Tira de las asas hacia la parte superior del pecho, apretando los omóplatos entre sí.",
+   "Haz una pausa por un momento en la parte inferior del movimiento, sintiendo la contracción en los dorsales.",
+   "Suelta lentamente las asas y vuelve a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Adjust the seat height and position yourself facing the cable machine.",
+   "Grasp the handles with an overhand grip, hands shoulder-width apart.",
+   "Sit down and position your thighs under the thigh pads, keeping your feet flat on the floor.",
+   "Lean back slightly and keep your chest up, maintaining a neutral spine.",
+   "Pull the handles down towards your upper chest, squeezing your shoulder blades together.",
+   "Pause for a moment at the bottom of the movement, feeling the contraction in your lats.",
+   "Slowly release the handles and return to the starting position.",
    "Repeat for the desired number of repetitions."
   ]
  },
@@ -1207,6 +1297,27 @@
   ]
  },
  {
+  "slug": "ab-wheel",
+  "name": "Ab Wheel Rollout",
+  "matched": "wheel rollerout",
+  "steps_es": [
+   "Arrodíllate en el suelo y coloca el rodillo frente a ti.",
+   "Coloca las manos en las asas del rodillo y extiende los brazos rectos hacia adelante.",
+   "Activa los músculos del core y haz rodar lentamente el rodillo hacia adelante, manteniendo la espalda recta y el abdomen contraído.",
+   "Continúa rodando hacia delante hasta que el cuerpo esté completamente extendido y los brazos por encima de la cabeza.",
+   "Haz una pausa de un momento, luego haz rodar lentamente el rodillo de regreso hacia las rodillas, manteniendo el control y el abdomen activado.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Kneel on the floor and place the wheel roller in front of you.",
+   "Place your hands on the handles of the wheel roller and extend your arms straight out in front of you.",
+   "Engage your core muscles and slowly roll the wheel forward, keeping your back straight and your abs tight.",
+   "Continue rolling forward until your body is fully extended and your arms are overhead.",
+   "Pause for a moment, then slowly roll the wheel back towards your knees, maintaining control and keeping your abs engaged.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
   "slug": "walking",
   "name": "Walking",
   "matched": "walking lunge",
@@ -1346,6 +1457,25 @@
   ]
  },
  {
+  "slug": "machine-shoulder-press",
+  "name": "Machine Shoulder Press",
+  "matched": "lever shoulder press",
+  "steps_es": [
+   "Ajusta la altura del asiento y colócate en la máquina con la espalda apoyada en el respaldo.",
+   "Agarra las asas con un agarre prono y coloca las manos a la altura de los hombros.",
+   "Empuja las asas hacia arriba hasta que los brazos queden completamente extendidos, pero sin bloquear los codos.",
+   "Haz una pausa breve en lo alto, luego baja lentamente las asas de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Adjust the seat height and position yourself on the machine with your back against the backrest.",
+   "Grasp the handles with an overhand grip and position your hands at shoulder level.",
+   "Push the handles upward until your arms are fully extended, but do not lock your elbows.",
+   "Pause for a moment at the top, then slowly lower the handles back down to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
   "slug": "standing-dumbbell-press",
   "name": "Standing Dumbbell Press",
   "matched": "dumbbell standing overhead press",
@@ -1380,6 +1510,25 @@
   ]
  },
  {
+  "slug": "machine-lateral-raise",
+  "name": "Machine Lateral Raise",
+  "matched": "lever lateral raise",
+  "steps_es": [
+   "Ajusta la altura del asiento y colócate en la máquina con la espalda apoyada en la almohadilla.",
+   "Sujeta las asas con un agarre prono y mantén los brazos rectos.",
+   "Exhala y levanta los brazos hacia los lados hasta que queden paralelos al suelo.",
+   "Haz una pausa breve en lo alto, luego inhala y baja lentamente los brazos de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Adjust the seat height and position yourself on the machine with your back against the pad.",
+   "Grasp the handles with an overhand grip and keep your arms straight.",
+   "Exhale and raise your arms out to the sides until they are parallel to the floor.",
+   "Pause for a moment at the top, then inhale and slowly lower your arms back to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
   "slug": "cable-front-raise",
   "name": "Cable Front Raise",
   "matched": "cable front raise",
@@ -1397,6 +1546,42 @@
    "Raise the cable handle in front of you, keeping your arms straight and your palms facing down.",
    "Continue lifting until your arms are parallel to the floor.",
    "Pause for a moment at the top, then slowly lower the cable handle back to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "plate-front-raise",
+  "name": "Plate Front Raise",
+  "matched": "dumbbell front raise",
+  "steps_es": [
+   "Ponte de pie con los pies separados a la altura de los hombros, sosteniendo una mancuerna en cada mano con las palmas hacia los muslos.",
+   "Manteniendo los brazos rectos, exhala y levanta las mancuernas frente a ti hasta que queden a la altura de los hombros.",
+   "Haz una pausa por un momento en la parte superior, luego inhala y baja lentamente las mancuernas de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Stand with your feet shoulder-width apart, holding a dumbbell in each hand with your palms facing your thighs.",
+   "Keeping your arms straight, exhale and lift the dumbbells in front of you until they are at shoulder level.",
+   "Pause for a moment at the top, then inhale and slowly lower the dumbbells back down to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "bent-over-rear-delt-raise",
+  "name": "Bent-Over Rear Delt Raise",
+  "matched": "dumbbell rear delt raise",
+  "steps_es": [
+   "Ponte de pie con los pies separados a la altura de los hombros y sostén una mancuerna en cada mano, con las palmas hacia el cuerpo.",
+   "Flexiona ligeramente las rodillas e inclínate hacia adelante desde las caderas, manteniendo la espalda recta.",
+   "Levanta los brazos hacia los lados, manteniendo una ligera flexión en los codos, hasta que queden paralelos al suelo.",
+   "Haz una pausa por un momento en la parte superior, luego baja lentamente los brazos de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Stand with your feet shoulder-width apart and hold a dumbbell in each hand, palms facing your body.",
+   "Bend your knees slightly and hinge forward at the hips, keeping your back straight.",
+   "Raise your arms out to the sides, keeping a slight bend in your elbows, until they are parallel to the floor.",
+   "Pause for a moment at the top, then slowly lower your arms back down to the starting position.",
    "Repeat for the desired number of repetitions."
   ]
  },
@@ -1442,6 +1627,27 @@
    "Pull your chest towards the bar or handles, squeezing your shoulder blades together.",
    "Pause for a moment at the top, then slowly lower yourself back to the starting position.",
    "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "single-arm-cable-row",
+  "name": "Single-Arm Cable Row",
+  "matched": "cable one arm bent over row",
+  "steps_es": [
+   "Ponte de pie frente a una máquina de cable con los pies separados a la altura de los hombros.",
+   "Flexiona ligeramente las rodillas e inclínate hacia adelante desde las caderas, manteniendo la espalda recta.",
+   "Sujeta la agarradera del cable con una mano, con la palma hacia adentro, y extiende el brazo por completo.",
+   "Jala la agarradera del cable hacia el cuerpo, manteniendo el codo cerca del costado, hasta que la mano llegue a la parte baja del pecho.",
+   "Haz una pausa por un momento y luego extiende lentamente el brazo de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado, luego cambia de lado."
+  ],
+  "steps_en": [
+   "Stand facing a cable machine with your feet shoulder-width apart.",
+   "Bend your knees slightly and hinge forward at the hips, keeping your back straight.",
+   "Grasp the cable handle with one hand, palm facing inward, and extend your arm fully.",
+   "Pull the cable handle towards your body, keeping your elbow close to your side, until your hand reaches your lower chest.",
+   "Pause for a moment, then slowly extend your arm back to the starting position.",
+   "Repeat for the desired number of repetitions, then switch sides."
   ]
  },
  {
@@ -1592,6 +1798,33 @@
   ]
  },
  {
+  "slug": "smith-machine-squat",
+  "name": "Smith Machine Squat",
+  "matched": "smith squat",
+  "steps_es": [
+   "Configura la máquina Smith con la barra a una altura adecuada para tu sentadilla.",
+   "Ponte de pie con los pies separados a la altura de los hombros, con los dedos de los pies ligeramente hacia afuera.",
+   "Colócate debajo de la barra, apoyándola en la parte alta de los trapecios y los hombros.",
+   "Agarra la barra con un agarre amplio, un poco más ancho que la separación de los hombros.",
+   "Activa el core y suelta la barra del soporte, dando un paso atrás para alejarte del soporte.",
+   "Manteniendo el pecho elevado y la espalda recta, inicia la sentadilla doblando las caderas y las rodillas.",
+   "Baja el cuerpo hasta que los muslos queden paralelos al suelo o un poco por debajo.",
+   "Haz una pausa por un momento en la posición baja, luego empuja con los talones para volver a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Set up the smith machine with the barbell at an appropriate height for your squat.",
+   "Stand with your feet shoulder-width apart, toes slightly turned out.",
+   "Position yourself under the barbell, resting it on your upper traps and shoulders.",
+   "Grip the barbell with a wide grip, slightly wider than shoulder-width apart.",
+   "Engage your core and unrack the barbell, stepping back to clear the rack.",
+   "Keeping your chest up and back straight, initiate the squat by bending at the hips and knees.",
+   "Lower your body until your thighs are parallel to the ground or slightly below.",
+   "Pause for a moment at the bottom, then drive through your heels to return to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
   "slug": "sumo-deadlift",
   "name": "Sumo Deadlift",
   "matched": "barbell sumo deadlift",
@@ -1659,6 +1892,29 @@
   ]
  },
  {
+  "slug": "single-leg-romanian-deadlift",
+  "name": "Single-Leg Romanian Deadlift",
+  "matched": "dumbbell single leg deadlift",
+  "steps_es": [
+   "Ponte de pie con los pies separados a la altura de las caderas, sujetando una mancuerna con la mano derecha.",
+   "Traslada tu peso a la pierna izquierda y levanta el pie derecho ligeramente del suelo.",
+   "Manteniendo la espalda recta, inclínate hacia adelante desde las caderas y baja la mancuerna hacia el suelo.",
+   "Al mismo tiempo, extiende la pierna derecha recta hacia atrás, manteniendo una ligera flexión en la rodilla izquierda.",
+   "Baja la mancuerna hasta que tu torso y tu pierna derecha queden paralelos al suelo.",
+   "Haz una pausa por un momento, luego activa los glúteos y los isquiotibiales para volver a la posición inicial.",
+   "Repite el número de repeticiones deseado, luego cambia de lado."
+  ],
+  "steps_en": [
+   "Stand with your feet hip-width apart, holding a dumbbell in your right hand.",
+   "Shift your weight onto your left leg and lift your right foot slightly off the ground.",
+   "Keeping your back straight, hinge forward at the hips and lower the dumbbell towards the ground.",
+   "At the same time, extend your right leg straight behind you, maintaining a slight bend in your left knee.",
+   "Lower the dumbbell until your torso and right leg are parallel to the ground.",
+   "Pause for a moment, then engage your glutes and hamstrings to return to the starting position.",
+   "Repeat for the desired number of repetitions, then switch sides."
+  ]
+ },
+ {
   "slug": "split-squat",
   "name": "Split Squat",
   "matched": "suspended split squat",
@@ -1701,6 +1957,46 @@
   ]
  },
  {
+  "slug": "hip-abduction-machine",
+  "name": "Hip Abduction Machine",
+  "matched": "lever seated hip abduction",
+  "steps_es": [
+   "Ajusta la altura del asiento de modo que tus rodillas formen un ángulo de 90 grados.",
+   "Siéntate en la máquina con la espalda apoyada en el respaldo y los pies sobre los apoyapiés.",
+   "Coloca las manos en las asas laterales para mayor estabilidad.",
+   "Activa los abductores y empuja lentamente las piernas hacia afuera, alejándolas de la línea media del cuerpo.",
+   "Haz una pausa al final del movimiento y luego junta lentamente las piernas de nuevo hasta la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Adjust the seat height so that your knees are at a 90-degree angle.",
+   "Sit on the machine with your back against the backrest and your feet on the footrests.",
+   "Place your hands on the side handles for stability.",
+   "Engage your abductors and slowly push your legs apart, away from the midline of your body.",
+   "Pause for a moment at the end of the movement, then slowly bring your legs back together to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "single-leg-glute-bridge",
+  "name": "Single-Leg Glute Bridge",
+  "matched": "single leg bridge with outstretched leg",
+  "steps_es": [
+   "Túmbate sobre tu espalda con las rodillas flexionadas y los pies apoyados en el suelo.",
+   "Extiende una pierna recta hacia delante.",
+   "Activa los glúteos y levanta las caderas del suelo, formando una línea recta desde las rodillas hasta los hombros.",
+   "Mantén la posición alta por un momento, luego baja lentamente las caderas de nuevo a la posición inicial.",
+   "Repite el número de repeticiones deseado, luego cambia de pierna."
+  ],
+  "steps_en": [
+   "Lie on your back with your knees bent and feet flat on the ground.",
+   "Extend one leg straight out in front of you.",
+   "Engage your glutes and lift your hips off the ground, forming a straight line from your knees to your shoulders.",
+   "Hold for a moment at the top, then slowly lower your hips back down to the starting position.",
+   "Repeat for the desired number of repetitions, then switch legs."
+  ]
+ },
+ {
   "slug": "barbell-glute-bridge",
   "name": "Barbell Glute Bridge",
   "matched": "barbell glute bridge",
@@ -1718,6 +2014,27 @@
    "Engage your glutes and core muscles, then lift your hips off the ground until your body forms a straight line from your knees to your shoulders.",
    "Pause for a moment at the top, squeezing your glutes.",
    "Slowly lower your hips back down to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "smith-machine-hip-thrust",
+  "name": "Smith Machine Hip Thrust",
+  "matched": "smith hip raise",
+  "steps_es": [
+   "Colócate en la máquina Smith con la espalda contra la almohadilla y los pies separados a la altura de los hombros.",
+   "Coloca las manos en la barra, un poco más separadas que el ancho de los hombros.",
+   "Activa el core y los glúteos, luego empuja con los talones para levantar las caderas del suelo.",
+   "Continúa levantando hasta que el cuerpo forme una línea recta desde las rodillas hasta los hombros.",
+   "Mantén la posición alta por un momento, luego baja lentamente las caderas de nuevo a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Position yourself on the smith machine with your back against the pad and your feet shoulder-width apart.",
+   "Place your hands on the barbell, slightly wider than shoulder-width apart.",
+   "Engage your core and glutes, then push through your heels to raise your hips off the ground.",
+   "Continue lifting until your body forms a straight line from your knees to your shoulders.",
+   "Hold for a moment at the top, then slowly lower your hips back down to the starting position.",
    "Repeat for the desired number of repetitions."
   ]
  },
@@ -1754,6 +2071,107 @@
    "Grab the rope attachment with both hands and step forward, creating tension in the cable.",
    "Bend at the hips and lower your upper body until it is parallel to the ground, keeping your back straight.",
    "Engage your glutes and hamstrings to pull your body back up to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "cable-standing-hip-adduction",
+  "name": "Cable Standing Hip Adduction",
+  "matched": "cable hip adduction",
+  "steps_es": [
+   "Sujeta el manguito de tobillo a tu tobillo y ponte de pie frente a la máquina de cable.",
+   "Colócate lo suficientemente alejado de la máquina para que haya tensión en el cable.",
+   "Coloca las manos sobre la máquina para apoyarte.",
+   "Manteniendo la pierna recta, mueve lentamente la pierna por delante del cuerpo hacia la línea media.",
+   "Haz una pausa por un momento al final del movimiento, luego regresa lentamente a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Attach the ankle cuff to your ankle and stand facing the cable machine.",
+   "Position yourself far enough away from the machine so that there is tension on the cable.",
+   "Place your hands on the machine for support.",
+   "Keeping your leg straight, slowly move your leg across your body towards the midline.",
+   "Pause for a moment at the end of the movement, then slowly return to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "hip-adduction-machine",
+  "name": "Hip Adduction Machine",
+  "matched": "lever seated hip adduction",
+  "steps_es": [
+   "Ajusta la altura del asiento y colócate en la máquina con la espalda apoyada en el respaldo.",
+   "Coloca los pies sobre los apoyapiés y agarra las asas para mayor estabilidad.",
+   "Activa los aductores y junta lentamente las piernas, apretando la parte interna de los muslos.",
+   "Haz una pausa breve en el punto máximo de contracción, luego vuelve lentamente a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Adjust the seat height and position yourself on the machine with your back against the backrest.",
+   "Place your feet on the footrests and grasp the handles for stability.",
+   "Engage your adductor muscles and slowly bring your legs together, squeezing your inner thighs.",
+   "Pause for a moment at the peak contraction, then slowly return to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "smith-machine-bulgarian-split-squat",
+  "name": "Smith Machine Bulgarian Split Squat",
+  "matched": "smith single leg split squat",
+  "steps_es": [
+   "Ponte de pie frente a la máquina Smith con los pies separados a la altura de los hombros.",
+   "Coloca un pie detrás de ti sobre un banco o escalón, con los dedos del pie apuntando hacia delante.",
+   "Sujétate de la barra de la máquina Smith para mayor estabilidad.",
+   "Dobla la rodilla delantera y baja el cuerpo hacia una posición de zancada, manteniendo la espalda recta.",
+   "Haz una pausa por un momento en la posición baja, luego empuja con el talón delantero para volver a la posición inicial.",
+   "Repite el número de repeticiones deseado, luego cambia de pierna."
+  ],
+  "steps_en": [
+   "Stand in front of the smith machine with your feet shoulder-width apart.",
+   "Place one foot behind you on a bench or step, with your toes pointing forward.",
+   "Hold onto the smith machine bar for stability.",
+   "Bend your front knee and lower your body down into a lunge position, keeping your back straight.",
+   "Pause for a moment at the bottom, then push through your front heel to return to the starting position.",
+   "Repeat for the desired number of repetitions, then switch legs."
+  ]
+ },
+ {
+  "slug": "smith-machine-split-squat",
+  "name": "Smith Machine Split Squat",
+  "matched": "smith single leg split squat",
+  "steps_es": [
+   "Ponte de pie frente a la máquina Smith con los pies separados a la altura de los hombros.",
+   "Coloca un pie detrás de ti sobre un banco o escalón, con los dedos del pie apuntando hacia delante.",
+   "Sujétate de la barra de la máquina Smith para mayor estabilidad.",
+   "Dobla la rodilla delantera y baja el cuerpo hacia una posición de zancada, manteniendo la espalda recta.",
+   "Haz una pausa por un momento en la posición baja, luego empuja con el talón delantero para volver a la posición inicial.",
+   "Repite el número de repeticiones deseado, luego cambia de pierna."
+  ],
+  "steps_en": [
+   "Stand in front of the smith machine with your feet shoulder-width apart.",
+   "Place one foot behind you on a bench or step, with your toes pointing forward.",
+   "Hold onto the smith machine bar for stability.",
+   "Bend your front knee and lower your body down into a lunge position, keeping your back straight.",
+   "Pause for a moment at the bottom, then push through your front heel to return to the starting position.",
+   "Repeat for the desired number of repetitions, then switch legs."
+  ]
+ },
+ {
+  "slug": "heel-elevated-goblet-squat",
+  "name": "Heel-Elevated Goblet Squat",
+  "matched": "dumbbell goblet squat",
+  "steps_es": [
+   "Ponte de pie con los pies separados a la altura de los hombros, sosteniendo una mancuerna verticalmente contra el pecho con ambas manos.",
+   "Manteniendo el pecho erguido y el core activado, baja el cuerpo a una posición de sentadilla empujando las caderas hacia atrás y flexionando las rodillas.",
+   "Continúa bajando hasta que los muslos queden paralelos al suelo, o tan abajo como puedas hacerlo cómodamente.",
+   "Haz una pausa por un momento en la parte inferior, luego empuja con los talones para regresar a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Stand with your feet shoulder-width apart, holding a dumbbell vertically against your chest with both hands.",
+   "Keeping your chest up and core engaged, lower your body down into a squat position by pushing your hips back and bending your knees.",
+   "Continue lowering until your thighs are parallel to the ground, or as low as you can comfortably go.",
+   "Pause for a moment at the bottom, then push through your heels to return to the starting position.",
    "Repeat for the desired number of repetitions."
   ]
  },
@@ -2008,6 +2426,46 @@
   ]
  },
  {
+  "slug": "rope-tricep-pushdown",
+  "name": "Rope Tricep Pushdown",
+  "matched": "cable pushdown (with rope attachment)",
+  "steps_es": [
+   "Sujeta un accesorio de cuerda a una polea alta en una máquina de cable.",
+   "Ponte de pie frente a la máquina con los pies separados a la altura de los hombros y una ligera flexión en las rodillas.",
+   "Sujeta la cuerda con un agarre prono, con las palmas una frente a la otra.",
+   "Mantén los codos cerca de los costados y los brazos superiores quietos durante todo el ejercicio.",
+   "Exhala y empuja la cuerda hacia abajo extendiendo los codos hasta que los brazos queden completamente extendidos.",
+   "Haz una pausa por un momento, luego inhala y regresa lentamente a la posición inicial permitiendo que los codos se flexionen.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Attach a rope attachment to a high pulley on a cable machine.",
+   "Stand facing the machine with your feet shoulder-width apart and a slight bend in your knees.",
+   "Grasp the rope with an overhand grip, palms facing each other.",
+   "Keep your elbows close to your sides and your upper arms stationary throughout the exercise.",
+   "Exhale and push the rope downward by extending your elbows until your arms are fully extended.",
+   "Pause for a moment, then inhale and slowly return to the starting position by allowing your elbows to flex.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "single-dumbbell-skullcrusher",
+  "name": "Single Dumbbell Skullcrusher",
+  "matched": "dumbbell lying single extension",
+  "steps_es": [
+   "Túmbate boca arriba en un banco con una mancuerna en una mano y el brazo completamente extendido por encima del pecho.",
+   "Baja la mancuerna de manera controlada hacia la frente, manteniendo el brazo superior quieto.",
+   "Haz una breve pausa en la parte inferior del movimiento, luego extiende el brazo de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado, luego cambia de brazo."
+  ],
+  "steps_en": [
+   "Lie flat on a bench with a dumbbell in one hand and your arm fully extended above your chest.",
+   "Lower the dumbbell in a controlled manner towards your forehead, keeping your upper arm stationary.",
+   "Pause briefly at the bottom of the movement, then extend your arm back to the starting position.",
+   "Repeat for the desired number of repetitions, then switch arms."
+  ]
+ },
+ {
   "slug": "dumbbell-overhead-tricep-extension",
   "name": "Dumbbell Overhead Tricep Extension",
   "matched": "dumbbell seated reverse grip one arm overhead tricep extension",
@@ -2024,6 +2482,27 @@
    "Lower the dumbbell behind your head by bending your elbow, keeping your upper arm stationary.",
    "Pause for a moment, then extend your arm back up to the starting position.",
    "Repeat for the desired number of repetitions, then switch arms."
+  ]
+ },
+ {
+  "slug": "single-arm-dumbbell-tricep-extension",
+  "name": "Single Arm Dumbbell Tricep Extension",
+  "matched": "dumbbell standing one arm extension",
+  "steps_es": [
+   "Ponte de pie con los pies separados a la altura de los hombros, sujetando una mancuerna con una mano.",
+   "Levanta la mancuerna por encima de la cabeza, extendiendo completamente el brazo.",
+   "Mantén la parte superior del brazo cerca de la cabeza y perpendicular al suelo.",
+   "Baja lentamente la mancuerna detrás de la cabeza, flexionando el codo.",
+   "Haz una pausa por un momento, luego levanta la mancuerna de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Stand with your feet shoulder-width apart, holding a dumbbell in one hand.",
+   "Raise the dumbbell overhead, fully extending your arm.",
+   "Keep your upper arm close to your head and perpendicular to the ground.",
+   "Slowly lower the dumbbell behind your head, bending your elbow.",
+   "Pause for a moment, then raise the dumbbell back to the starting position.",
+   "Repeat for the desired number of repetitions."
   ]
  },
  {
@@ -2062,6 +2541,25 @@
    "Keeping your upper arms stationary, extend your forearms backwards until your arms are fully extended.",
    "Pause for a moment, then slowly return to the starting position.",
    "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "farmer-carry",
+  "name": "Farmer Carry",
+  "matched": "farmers walk",
+  "steps_es": [
+   "Ponte de pie con una mancuerna en cada mano, palmas hacia los costados.",
+   "Mantén la espalda recta y los hombros hacia atrás.",
+   "Da pasos pequeños y controlados hacia adelante, manteniendo una postura erguida.",
+   "Continúa caminando durante la distancia o el tiempo deseado.",
+   "Para terminar, deja de caminar y baja con cuidado las mancuernas a los costados."
+  ],
+  "steps_en": [
+   "Stand up straight with a dumbbell in each hand, palms facing your sides.",
+   "Keep your back straight and your shoulders back.",
+   "Take small, controlled steps forward, maintaining an upright posture.",
+   "Continue walking for the desired distance or time.",
+   "To finish, stop walking and carefully lower the dumbbells to your sides."
   ]
  },
  {
@@ -2351,6 +2849,65 @@
   ]
  },
  {
+  "slug": "assault-bike",
+  "name": "Assault Bike",
+  "matched": "air bike",
+  "steps_es": [
+   "Túmbate sobre tu espalda con las manos colocadas detrás de la cabeza.",
+   "Levanta las piernas del suelo y flexiona las rodillas formando un ángulo de 90 grados.",
+   "Lleva el codo derecho hacia la rodilla izquierda mientras simultáneamente estiras la pierna derecha.",
+   "Regresa a la posición inicial y repite el movimiento del lado opuesto, llevando el codo izquierdo hacia la rodilla derecha mientras estiras la pierna izquierda.",
+   "Continúa alternando lados con un movimiento de pedaleo durante el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Lie flat on your back with your hands placed behind your head.",
+   "Lift your legs off the ground and bend your knees at a 90-degree angle.",
+   "Bring your right elbow towards your left knee while simultaneously straightening your right leg.",
+   "Return to the starting position and repeat the movement on the opposite side, bringing your left elbow towards your right knee while straightening your left leg.",
+   "Continue alternating sides in a pedaling motion for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "treadmill-incline-walk",
+  "name": "Treadmill Incline Walk",
+  "matched": "walking on incline treadmill",
+  "steps_es": [
+   "Ajusta el nivel de inclinación de la cinta de correr a la intensidad deseada.",
+   "Ponte de pie sobre la cinta de correr con los pies separados a la altura de los hombros.",
+   "Comienza a caminar a un ritmo cómodo, asegurándote de mantener una forma correcta.",
+   "Activa los músculos del core y mantén la espalda recta durante todo el ejercicio.",
+   "Continúa caminando en la cinta inclinada durante la duración deseada de tu entrenamiento cardiovascular.",
+   "Disminuye gradualmente la inclinación y la velocidad de la cinta para enfriar antes de detenerte."
+  ],
+  "steps_en": [
+   "Adjust the incline level on the treadmill to your desired intensity.",
+   "Stand on the treadmill with your feet shoulder-width apart.",
+   "Start walking at a comfortable pace, ensuring that you maintain proper form.",
+   "Engage your core muscles and keep your back straight throughout the exercise.",
+   "Continue walking on the incline treadmill for the desired duration of your cardio workout.",
+   "Gradually decrease the incline and speed of the treadmill to cool down before stopping."
+  ]
+ },
+ {
+  "slug": "battle-ropes",
+  "name": "Battle Ropes",
+  "matched": "battling ropes",
+  "steps_es": [
+   "Ponte de pie con los pies separados a la altura de los hombros y las rodillas ligeramente flexionadas.",
+   "Sujeta un extremo de la cuerda en cada mano, con las palmas mirándose entre sí.",
+   "Levanta los brazos hasta la altura de los hombros, manteniendo los codos ligeramente flexionados.",
+   "Comienza a hacer ondas alternas con las cuerdas, levantando y bajando rápidamente cada brazo.",
+   "Continúa durante el tiempo o el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Stand with your feet shoulder-width apart and knees slightly bent.",
+   "Hold one end of the rope in each hand, with your palms facing each other.",
+   "Raise your arms to shoulder height, keeping your elbows slightly bent.",
+   "Begin making alternating waves with the ropes by rapidly raising and lowering each arm.",
+   "Continue for the desired duration or number of repetitions."
+  ]
+ },
+ {
   "slug": "incline-push-up",
   "name": "Incline Push-up",
   "matched": "incline push-up",
@@ -2532,6 +3089,25 @@
   ]
  },
  {
+  "slug": "wall-handstand-push-up",
+  "name": "Wall Handstand Push-up",
+  "matched": "handstand push-up",
+  "steps_es": [
+   "Busca una pared y colócate de espaldas a ella, de pie a unos pasos de distancia.",
+   "Coloca las manos en el suelo separadas a la altura de los hombros y lanza los pies hacia la pared, llegando a una posición de pino.",
+   "Dobla los codos y baja la cabeza hacia el suelo, manteniendo el cuerpo en línea recta.",
+   "Empuja con las manos y extiende los brazos para volver a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Find a wall and face away from it, standing a few feet away.",
+   "Place your hands on the ground shoulder-width apart and kick your feet up against the wall, coming into a handstand position.",
+   "Bend your elbows and lower your head towards the ground, keeping your body in a straight line.",
+   "Push through your hands and extend your arms to return to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
   "slug": "handstand-push-up",
   "name": "Handstand Push-up",
   "matched": "handstand push-up",
@@ -2547,6 +3123,25 @@
    "Place your hands on the ground shoulder-width apart and kick your feet up against the wall, coming into a handstand position.",
    "Bend your elbows and lower your head towards the ground, keeping your body in a straight line.",
    "Push through your hands and extend your arms to return to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "chair-dip",
+  "name": "Chair Dip",
+  "matched": "triceps dip",
+  "steps_es": [
+   "Siéntate en el borde de un banco o silla con las manos sujetando el borde, los dedos apuntando hacia adelante.",
+   "Desliza los glúteos fuera del banco, sosteniendo tu peso con las manos.",
+   "Flexiona los codos y baja el cuerpo hacia el suelo, manteniendo la espalda cerca del banco.",
+   "Haz una pausa por un momento en la parte inferior, luego empuja tu cuerpo de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Sit on the edge of a bench or chair with your hands gripping the edge, fingers pointing forward.",
+   "Slide your butt off the bench, supporting your weight with your hands.",
+   "Bend your elbows and lower your body towards the ground, keeping your back close to the bench.",
+   "Pause for a moment at the bottom, then push yourself back up to the starting position.",
    "Repeat for the desired number of repetitions."
   ]
  },
@@ -2612,6 +3207,27 @@
   ]
  },
  {
+  "slug": "l-sit-pull-up",
+  "name": "L-Sit Pull-up",
+  "matched": "l-pull-up",
+  "steps_es": [
+   "Sujeta la barra de dominadas con un agarre prono, un poco más ancho que la altura de los hombros.",
+   "Cuélgate con los brazos completamente extendidos y el cuerpo recto.",
+   "Activa los dorsales y los bíceps para llevar el cuerpo hacia arriba en dirección a la barra, manteniendo los codos cerca del cuerpo.",
+   "Continúa subiendo hasta que la barbilla quede por encima de la barra.",
+   "Haz una pausa por un momento en la parte superior, luego baja lentamente el cuerpo de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Grab the pull-up bar with an overhand grip, slightly wider than shoulder-width apart.",
+   "Hang with your arms fully extended and your body straight.",
+   "Engage your lats and biceps to pull your body up towards the bar, keeping your elbows close to your body.",
+   "Continue pulling until your chin is above the bar.",
+   "Pause for a moment at the top, then slowly lower your body back down to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
   "slug": "bodyweight-squat",
   "name": "Bodyweight Squat",
   "matched": "bodyweight drop jump squat",
@@ -2648,6 +3264,29 @@
    "Lift your left foot off the ground and extend it forward, keeping it parallel to the ground.",
    "Slowly lower your body down into a squat position, keeping your right foot flat on the ground and your left leg extended.",
    "Pause for a moment at the bottom of the squat, then push through your right heel to return to the starting position.",
+   "Repeat for the desired number of repetitions, then switch legs."
+  ]
+ },
+ {
+  "slug": "assisted-pistol-squat",
+  "name": "Assisted Pistol Squat",
+  "matched": "single leg squat (pistol) male",
+  "steps_es": [
+   "Ponte de pie con los pies separados a la altura de los hombros y los brazos extendidos frente a ti.",
+   "Levanta el pie derecho del suelo y extiéndelo hacia delante.",
+   "Baja lentamente el cuerpo doblando la rodilla izquierda y empujando las caderas hacia atrás.",
+   "Mantén el pecho elevado y la espalda recta mientras bajas el cuerpo.",
+   "Baja hasta que el muslo izquierdo quede paralelo al suelo, o lo más abajo que puedas llegar cómodamente.",
+   "Haz una pausa por un momento en la posición baja, luego empuja con el talón izquierdo para volver a la posición inicial.",
+   "Repite el número de repeticiones deseado, luego cambia de pierna."
+  ],
+  "steps_en": [
+   "Stand with your feet shoulder-width apart and arms extended in front of you.",
+   "Lift your right foot off the ground and extend it forward.",
+   "Slowly lower your body down by bending your left knee and pushing your hips back.",
+   "Keep your chest up and your back straight as you lower yourself down.",
+   "Lower until your left thigh is parallel to the ground, or as low as you can comfortably go.",
+   "Pause for a moment at the bottom, then push through your left heel to return to the starting position.",
    "Repeat for the desired number of repetitions, then switch legs."
   ]
  },
@@ -2787,6 +3426,23 @@
   ]
  },
  {
+  "slug": "flutter-kick",
+  "name": "Flutter Kick",
+  "matched": "flutter kicks",
+  "steps_es": [
+   "Túmbate boca arriba con las piernas extendidas y las manos a los costados.",
+   "Activa el core y levanta las piernas del suelo unos 15 centímetros.",
+   "Manteniendo las piernas rectas, alterna levantando una pierna ligeramente más alto que la otra.",
+   "Continúa este movimiento de aleteo durante el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Lie flat on your back with your legs extended and your hands by your sides.",
+   "Engage your core and lift your legs off the ground about 6 inches.",
+   "Keeping your legs straight, alternate lifting one leg slightly higher than the other.",
+   "Continue this fluttering motion for the desired number of repetitions."
+  ]
+ },
+ {
   "slug": "lying-leg-raise",
   "name": "Lying Leg Raise",
   "matched": "lying leg-hip raise",
@@ -2822,6 +3478,25 @@
    "Reach down towards your toes with your hands, keeping your legs as straight as possible.",
    "Pause for a moment at the bottom, then slowly return to the starting position.",
    "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "heel-tap",
+  "name": "Heel Tap",
+  "matched": "alternate heel touchers",
+  "steps_es": [
+   "Túmbate sobre tu espalda con las rodillas flexionadas y los pies apoyados en el suelo.",
+   "Extiende los brazos hacia los lados, paralelos al suelo.",
+   "Activando el abdomen, levanta los hombros del suelo y lleva la mano derecha hacia el talón derecho.",
+   "Regresa a la posición inicial y repite del lado izquierdo, llevando la mano izquierda hacia el talón izquierdo.",
+   "Continúa alternando lados durante el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Lie flat on your back with your knees bent and feet flat on the ground.",
+   "Extend your arms straight out to the sides, parallel to the ground.",
+   "Engaging your abs, lift your shoulders off the ground and reach your right hand towards your right heel.",
+   "Return to the starting position and repeat on the left side, reaching your left hand towards your left heel.",
+   "Continue alternating sides for the desired number of repetitions."
   ]
  },
  {
@@ -2886,6 +3561,48 @@
   ]
  },
  {
+  "slug": "l-sit-hold",
+  "name": "L-Sit Hold",
+  "matched": "l-sit on floor",
+  "steps_es": [
+   "Siéntate en el suelo con las piernas extendidas frente a ti.",
+   "Coloca las manos en el suelo junto a las caderas, con los dedos apuntando hacia adelante.",
+   "Activa el core y levanta las piernas del suelo, manteniéndolas rectas.",
+   "Intenta llevar las piernas paralelas al suelo, formando una 'L' con el cuerpo.",
+   "Mantén esta posición durante el mayor tiempo posible.",
+   "Baja lentamente las piernas de vuelta a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Sit on the floor with your legs extended in front of you.",
+   "Place your hands on the floor beside your hips, fingers pointing forward.",
+   "Engage your core and lift your legs off the ground, keeping them straight.",
+   "Try to bring your legs parallel to the floor, forming an 'L' shape with your body.",
+   "Hold this position for as long as you can.",
+   "Slowly lower your legs back down to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "seated-knee-tuck",
+  "name": "Seated Knee Tuck",
+  "matched": "tuck crunch",
+  "steps_es": [
+   "Túmbate sobre tu espalda con las rodillas flexionadas y los pies apoyados en el suelo.",
+   "Coloca las manos detrás de la cabeza con los codos apuntando hacia afuera.",
+   "Activando el abdomen, levanta los omóplatos del suelo y lleva las rodillas hacia el pecho, curvando al mismo tiempo la parte superior del cuerpo hacia las rodillas.",
+   "Haz una pausa de un momento en la parte superior, luego baja lentamente los omóplatos y extiende las piernas de nuevo a la posición inicial.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Lie flat on your back with your knees bent and feet flat on the ground.",
+   "Place your hands behind your head with your elbows pointing outwards.",
+   "Engaging your abs, lift your shoulder blades off the ground and bring your knees towards your chest, simultaneously curling your upper body towards your knees.",
+   "Pause for a moment at the top, then slowly lower your shoulder blades and extend your legs back to the starting position.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
   "slug": "burpee",
   "name": "Burpee",
   "matched": "burpee",
@@ -2932,6 +3649,67 @@
   ]
  },
  {
+  "slug": "skater-hop",
+  "name": "Skater Hop",
+  "matched": "skater hops",
+  "steps_es": [
+   "Ponte de pie con los pies separados a la altura de los hombros.",
+   "Dobla ligeramente las rodillas y salta hacia la derecha, aterrizando sobre el pie derecho.",
+   "Al aterrizar, balancea la pierna izquierda detrás de la pierna derecha y toca el suelo con los dedos del pie izquierdo.",
+   "Salta inmediatamente hacia la izquierda, aterrizando sobre el pie izquierdo.",
+   "Al aterrizar, balancea la pierna derecha detrás de la pierna izquierda y toca el suelo con los dedos del pie derecho.",
+   "Continúa alternando los lados, saltando y tocando el suelo con cada pierna.",
+   "Repite el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Stand with your feet shoulder-width apart.",
+   "Bend your knees slightly and jump to the right, landing on your right foot.",
+   "As you land, swing your left leg behind your right leg and tap the ground with your left toes.",
+   "Immediately jump to the left, landing on your left foot.",
+   "As you land, swing your right leg behind your left leg and tap the ground with your right toes.",
+   "Continue alternating sides, jumping and tapping the ground with each leg.",
+   "Repeat for the desired number of repetitions."
+  ]
+ },
+ {
+  "slug": "fast-feet",
+  "name": "Fast Feet",
+  "matched": "quick feet v. 2",
+  "steps_es": [
+   "Ponte de pie con los pies separados a la altura de los hombros y los brazos a los costados.",
+   "Comienza moviendo los pies rápidamente hacia arriba y hacia abajo, como si estuvieras corriendo en el sitio.",
+   "Mantén los movimientos rápidos y ligeros, concentrándote en quedarte sobre la punta de los pies.",
+   "Continúa durante el tiempo o el número de repeticiones deseado."
+  ],
+  "steps_en": [
+   "Stand with your feet shoulder-width apart and your arms by your sides.",
+   "Begin by rapidly moving your feet up and down, as if you were running in place.",
+   "Keep your movements quick and light, focusing on staying on the balls of your feet.",
+   "Continue for the desired duration or number of repetitions."
+  ]
+ },
+ {
+  "slug": "worlds-greatest-stretch",
+  "name": "World's Greatest Stretch",
+  "matched": "world greatest stretch",
+  "steps_es": [
+   "Comienza en posición de zancada con el pie derecho adelante y el pie izquierdo atrás.",
+   "Coloca las manos en el suelo a ambos lados de tu pie derecho.",
+   "Baja la rodilla izquierda hacia el suelo y extiende la pierna derecha, manteniendo el pie derecho plano sobre el suelo.",
+   "Gira el torso hacia la derecha, extendiendo el brazo derecho hacia el techo.",
+   "Mantén esta posición durante unos segundos, luego vuelve a la posición inicial.",
+   "Cambia de lado y repite el estiramiento con el pie izquierdo adelante."
+  ],
+  "steps_en": [
+   "Start in a lunge position with your right foot forward and your left foot back.",
+   "Place your hands on the ground on either side of your right foot.",
+   "Lower your left knee to the ground and extend your right leg, keeping your right foot flat on the ground.",
+   "Rotate your torso to the right, reaching your right arm up towards the ceiling.",
+   "Hold this position for a few seconds, then return to the starting position.",
+   "Switch sides and repeat the stretch with your left foot forward."
+  ]
+ },
+ {
   "slug": "hamstring-stretch",
   "name": "Hamstring Stretch",
   "matched": "hamstring stretch",
@@ -2969,6 +3747,29 @@
    "Bend your left knee and lean forward, keeping your back leg straight and your heel on the ground.",
    "Hold the stretch for 20-30 seconds.",
    "Switch legs and repeat the stretch."
+  ]
+ },
+ {
+  "slug": "butterfly-stretch",
+  "name": "Butterfly Stretch",
+  "matched": "butterfly yoga pose",
+  "steps_es": [
+   "Siéntate en el suelo con las piernas extendidas frente a ti.",
+   "Flexiona las rodillas y junta las plantas de los pies, dejando que las rodillas caigan hacia los lados.",
+   "Sujétate los tobillos o los pies con las manos.",
+   "Siéntate erguido y alarga la columna.",
+   "Presiona suavemente las rodillas hacia el suelo, sintiendo un estiramiento en la parte interna de los muslos.",
+   "Mantén esta posición durante unas cuantas respiraciones.",
+   "Para liberar, lleva lentamente las rodillas hacia arriba de nuevo y extiende las piernas."
+  ],
+  "steps_en": [
+   "Sit on the floor with your legs extended in front of you.",
+   "Bend your knees and bring the soles of your feet together, allowing your knees to fall out to the sides.",
+   "Hold onto your ankles or feet with your hands.",
+   "Sit up tall and lengthen your spine.",
+   "Gently press your knees down towards the floor, feeling a stretch in your inner thighs.",
+   "Hold this position for a few breaths.",
+   "To release, slowly bring your knees back up and extend your legs."
   ]
  }
 ]

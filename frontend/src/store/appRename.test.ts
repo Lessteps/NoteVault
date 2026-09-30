@@ -111,4 +111,19 @@ describe("tipos de pestaña", () => {
     app().pathRenamed("cualquier.md", "otro.md");
     expect(app().activeTabId).toBe("module:calendario");
   });
+
+  it("los pines siguen a la nota renombrada y se van con la borrada", async () => {
+    await app().openNote("a.md");
+    await app().openNote("curso/b.md");
+    app().pinTab("note:a.md");
+    app().pinTab("note:curso/b.md");
+
+    app().pathRenamed("curso", "2026");
+    expect(app().pinnedTabIds.has("note:2026/b.md")).toBe(true);
+    expect(app().pinnedTabIds.has("note:curso/b.md")).toBe(false);
+
+    app().pathDeleted("a.md");
+    expect(app().pinnedTabIds.has("note:a.md")).toBe(false);
+    expect(app().pinnedTabIds.has("note:2026/b.md")).toBe(true);
+  });
 });

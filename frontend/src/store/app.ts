@@ -717,6 +717,19 @@ export const useApp = create<State>((setState, get) => {
     set((st) => {
       const remap = (p: string) =>
         p === from ? to : p.startsWith(from + "/") ? to + p.slice(from.length) : p;
+      const remapTabId = (tabId: string) => {
+        if (tabId.startsWith("note:")) {
+          const p = tabId.slice("note:".length);
+          const np = remap(p);
+          return np === p ? tabId : `note:${np}`;
+        }
+        if (tabId.startsWith("canvas:")) {
+          const p = tabId.slice("canvas:".length);
+          const np = remap(p);
+          return np === p ? tabId : `canvas:${np}`;
+        }
+        return tabId;
+      };
       const notes: Record<string, OpenNote> = {};
       for (const [p, n] of Object.entries(st.notes)) {
         const np = remap(p);
@@ -749,20 +762,28 @@ export const useApp = create<State>((setState, get) => {
               (t as { path: string }).path === remappedActive,
           )?.tabId ?? st.activeTabId)
         : st.activeTabId;
+      const pinnedTabIds = new Set([...st.pinnedTabIds].map(remapTabId));
       return {
         notes,
         openTabs,
         activeTabId,
+        pinnedTabIds,
         side: st.side ? remap(st.side) : null,
         treeVersion: st.treeVersion + 1,
       };
     });
+    savePinned(get().vault, get().pinnedTabIds);
   },
 
   pathDeleted: (path) => {
     pathEvents.deleted.forEach((f) => f(path));
     set((st) => {
       const gone = (p: string) => p === path || p.startsWith(path + "/");
+      const pinnedGone = (tabId: string) => {
+        if (tabId.startsWith("note:")) return gone(tabId.slice("note:".length));
+        if (tabId.startsWith("canvas:")) return gone(tabId.slice("canvas:".length));
+        return false;
+      };
       const openTabs = st.openTabs.filter((t) => {
         if (t.kind === "note" || t.kind === "canvas") return !gone(t.path);
         return true;
@@ -774,15 +795,18 @@ export const useApp = create<State>((setState, get) => {
           : pickSurvivor(st.openTabs, openTabs, st.activeTabId)
         : null;
       const activeTab = activeTabId ? openTabs.find((t) => t.tabId === activeTabId) : null;
+      const pinnedTabIds = new Set([...st.pinnedTabIds].filter((id) => !pinnedGone(id)));
       return {
         openTabs,
         notes,
         activeTabId,
+        pinnedTabIds,
         module: activeTab ? tabModuleId(activeTab) : st.module,
         side: st.side && gone(st.side) ? null : st.side,
         treeVersion: st.treeVersion + 1,
       };
     });
+    savePinned(get().vault, get().pinnedTabIds);
   },
 
   refreshTree: () => set((st) => ({ treeVersion: st.treeVersion + 1 })),

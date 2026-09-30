@@ -296,7 +296,8 @@ export function InkPad({ note, folder = "" }: { note?: OpenNote; folder?: string
     if (e.button !== 0) return;
     const p = world(e);
     if (tool === "text") {
-      setEditing({ wx: p[0], wy: p[1], value: "" });
+      // After the click's own default focus change, or the browser takes focus back from the input.
+      window.setTimeout(() => setEditing({ wx: p[0], wy: p[1], value: "" }), 0);
       return;
     }
     if (tool === "erase") {

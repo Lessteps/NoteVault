@@ -94,3 +94,32 @@ here was asked back to the user; each entry can be reversed by changing the one 
     sp_guided) and loaded through `practice_load` in the real app (discipline, CEFR level, hidden audio text and
     `nohelp` for dictation confirmed). Grading was NOT exercised, because it calls the study AI.
 24. **Fixed while testing:** the topic view told English learners to practise «problemas básicos o cálculo mental».
+
+## Rethink: six areas, per-branch competencies (user feedback, 2026-09-30)
+
+25. **Vocabulary is now the sixth area** (`6 Vocabulario`, branch `vocabulary`), with its own syllabus of word classes
+    (common verbs, everyday nouns, adjectives, adverbs, phrasal verbs, collocations, fixed expressions). This reverses item 11
+    ("vocabulary is not a branch"). The old `Vocabulario/` folder is merged into `6 Vocabulario/` once (files that already exist
+    there are never overwritten). Vocabulary skills (`vc_`) are still offered to the other branches for their new words.
+26. **Vocabulary sessions take ONE word class** (`sessionWords`): the class named by the topic ("6.1 Common verbs" → verb), or
+    the class with most words due; if the bank has none of it, the whole bank. The class is the word's `part_of_speech`
+    normalised (`verb, noun, adjective, adverb, phrasal verb, expression, other`).
+27. **Grammar runs A1 → B1** (15 topics: to be … relative clauses). Exercise difficulty is now RELATIVE to the topic's level
+    (`level:` in the practice file): 2 = the topic's level, 1 = a step below, 3 = a step above, never below A1
+    (`cefrForTopic`). A topic with no level keeps the old A2/B1/B2.
+28. **New competencies (47 in total, was 34).** Grammar: `gr_syntax` (analyse the structure), `gr_expressions`. Reading:
+    `rd_paraphrase`, `rd_translate`. Listening: `ls_podcast`, `ls_shadowing`. Speaking, phonology: `sp_phonemes`, `sp_ipa`,
+    `sp_word_stress`, `sp_sentence_stress`, `sp_intonation`, `sp_connected`. Vocabulary: `vc_synonyms`. All still without speech
+    recognition: speaking exercises are typed self-reports.
+29. **A topic with no declared skills is offered the first 6 of its branch** by the deterministic selector (cap
+    `MAX_RECOMMENDED_SKILLS`); the real matrix comes from the plan (AI or hand-written), so branches with 8–12 skills need one.
+30. **Player exercises.** The player now makes three kinds: dictation, shadowing (`ls_shadowing`, repeat the phrase) and podcast
+    comprehension (`ls_podcast`, ~45 s, gist + details + summary). They go to the topics `4.5 Shadowing…` and `4.4 Podcasts…`
+    when the space has them (otherwise to `Dictados del reproductor`). Podcast/shadowing have no auto-graded answer key: the
+    transcript is the reference the grader compares with.
+31. **Hand-written content (Claude, not the study AI):** 45 topics with theory, practice plan and map (grammar 15, writing 3,
+    reading 5, listening 5, speaking 10 with `5.10` from the study AI, vocabulary 7) and ~150 words in the bank with classes.
+    Topics renamed to fit the new numbering (e.g. `1.1 Present simple vs present continuous` is now `1.6`); a backup of the
+    previous state is in `.trash/_respaldo_ingles_antes_de_6_areas_2026-09-30`.
+32. **UI:** the LaTeX drawing tool is hidden when the open note belongs to an English space (and closes if it was open); the
+    area/subject summary no longer shows the global "Errores frecuentes" log (the topic practice view keeps its own).

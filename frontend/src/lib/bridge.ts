@@ -548,8 +548,8 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   enPlayerSubtitles: (id: string, track: "en" | "es") =>
     call<{ ok: boolean; pairs?: import("./player").Pair[]; en_file?: string; es_file?: string }>("en_player_subtitles", id, track),
   /** A dictation exercise from the sentence being played (ok:false + message when it cannot be made). */
-  enPlayerDictation: (id: string, seconds: number) =>
-    call<{ ok: boolean; message?: string; reason?: string; path?: string; text?: string; from_media?: boolean }>("en_player_dictation", id, seconds),
+  enPlayerDictation: (id: string, seconds: number, kind: "dictation" | "shadowing" | "podcast" = "dictation") =>
+    call<{ ok: boolean; message?: string; reason?: string; path?: string; text?: string; from_media?: boolean }>("en_player_dictation", id, seconds, kind),
   enPlayerLink: (id: string, seconds: number) => call<{ link: string }>("en_player_link", id, seconds),
   enPlayerMine: (id: string, fields: { sentence: string; seconds: number; mode: "translate" | "cloze"; target: string; level: string; reference_es: string }) =>
     call<{ path: string; stamp: string }>("en_player_mine", id, fields),

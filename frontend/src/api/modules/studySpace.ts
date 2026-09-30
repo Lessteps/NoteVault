@@ -162,8 +162,14 @@ export function ensureEnglishConceptMaps(root: string, space: string): void {
 export function ensureVocabularyHome(root: string, space: string): void {
   const dir = path.join(root, space, ENGLISH_VOCABULARY_FOLDER);
   const legacy = path.join(root, space, LEGACY_VOCABULARY_FOLDER);
-  if (!fs.existsSync(dir) && fs.existsSync(legacy)) fs.renameSync(legacy, dir);
   fs.mkdirSync(dir, { recursive: true });
+  if (fs.existsSync(legacy)) {
+    // Moves what is there (never over a file that already exists) and drops the old folder once it is empty.
+    for (const name of fs.readdirSync(legacy)) {
+      if (!fs.existsSync(path.join(dir, name))) fs.renameSync(path.join(legacy, name), path.join(dir, name));
+    }
+    if (!fs.readdirSync(legacy).length) fs.rmdirSync(legacy);
+  }
   ensureEnglishConceptMaps(root, space);
   const note = path.join(dir, "00 Banco de palabras.md");
   if (fs.existsSync(note)) return;

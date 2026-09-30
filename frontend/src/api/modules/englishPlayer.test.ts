@@ -100,6 +100,21 @@ describe("dictation from the player's subtitles", () => {
     expect(practica).toContain("branch: listening");
   });
 
+  it("puts shadowing and podcast exercises in the topics that train them (4.5 and 4.4) when the space has them", async () => {
+    makeSpace();
+    for (const t of ["4.4 Podcasts and interviews", "4.5 Shadowing to repeat what you hear"]) fs.mkdirSync(path.join(dir, "Inglés 1", "4 Escucha", t), { recursive: true });
+    const media = (await api.en_player_open("Pelis/film.mp4", 4)) as { id: string };
+    const shadow = api.en_player_dictation(media.id, 4.5, "shadowing");
+    expect(shadow.path).toContain("4 Escucha/4.5 Shadowing to repeat what you hear/Ejercicios/ls_shadowing/");
+    expect(fs.readFileSync(path.join(dir, ...(shadow.path as string).split("/")), "utf-8")).toContain("mode: ls_shadowing");
+    const pod = api.en_player_dictation(media.id, 4.5, "podcast");
+    expect(pod.path).toContain("4 Escucha/4.4 Podcasts and interviews/Ejercicios/ls_podcast/");
+    const note = fs.readFileSync(path.join(dir, ...(pod.path as string).split("/")), "utf-8");
+    expect(note).toContain("mode: ls_podcast");
+    expect(note).toContain("idea general");
+    expect(note).toContain("## Texto del audio");
+  });
+
   it("with no English subtitles it explains why instead of failing", async () => {
     makeSpace();
     fs.rmSync(path.join(dir, "Pelis", "film.en.srt"));

@@ -144,16 +144,16 @@ export function EnglishPlayer() {
     }
   };
 
-  /** A dictation exercise from the sentence that is playing; without English subtitles it says why. */
-  const makeDictation = async () => {
+  /** A listening exercise from what is playing (dictation, shadowing or podcast); without English subtitles it says why. */
+  const makeDictation = async (kind: "dictation" | "shadowing" | "podcast" = "dictation") => {
     if (!media) return;
     try {
-      const r = await api.enPlayerDictation(media.id, pos / 1000);
+      const r = await api.enPlayerDictation(media.id, pos / 1000, kind);
       if (!r.ok || !r.path) {
-        toast("error", r.message ?? "No se pudo crear el dictado.");
+        toast("error", r.message ?? "No se pudo crear el ejercicio.");
         return;
       }
-      toast("info", "Dictado creado en Escucha › Dictados del reproductor.");
+      toast("info", "Ejercicio creado en la rama Escucha.");
       await useApp.getState().openNote(r.path);
       useApp.getState().setMode("read");
     } catch (e) {
@@ -362,8 +362,12 @@ export function EnglishPlayer() {
             className={cn("flex items-center gap-1 rounded-lg px-2 py-1 text-[12px]", shadow ? "bg-accent text-white" : "text-dim hover:bg-hover")}>
             <Mic size={13} /> Sombra
           </button>
-          <button type="button" title="Crear un dictado con la frase que suena (usa sus subtítulos en inglés)" onClick={() => void makeDictation()}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Headphones size={13} /> Dictado</button>
+          <button type="button" title="Crear un dictado con la frase que suena (usa sus subtítulos en inglés)" onClick={() => void makeDictation("dictation")}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Headphones size={13} /> Ej. dictado</button>
+          <button type="button" title="Crear un ejercicio de shadowing: escuchar la frase que suena y replicarla" onClick={() => void makeDictation("shadowing")}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Repeat size={13} /> Ej. shadowing</button>
+          <button type="button" title="Crear una comprensión de podcast con los siguientes 45 segundos" onClick={() => void makeDictation("podcast")}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Volume2 size={13} /> Ej. podcast</button>
           <button type="button" title="Minar la frase (M)" onClick={actions.mine}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text"><Pickaxe size={13} /> Minar</button>
           <button type="button" title="Copiar enlace a este momento" onClick={() => void api.enPlayerLink(media.id, pos / 1000)

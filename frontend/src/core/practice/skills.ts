@@ -4,6 +4,7 @@
  */
 
 import { ENGLISH_SKILL_SPECS } from "../../lib/englishSkillData";
+import { PROGRAMMING_EXTRA_SKILLS } from "../../lib/programmingSkillData";
 import { EN, MATH, MODES, PROG, type PracticeMode } from "./modes";
 
 export type DifficultyLevel = 1 | 2 | 3;
@@ -149,7 +150,7 @@ export const MATHEMATICS_SKILLS: readonly SkillDefinition[] = [
   }),
 ];
 
-export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [
+const _PROGRAMMING_BASE: readonly SkillDefinition[] = [
   createSkill(PROG, "implement", {
     labelOverride: "Implementar",
     description: "Escribir código desde cero que cumple la especificación y maneja casos de borde.",
@@ -188,6 +189,17 @@ export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [
     description: "Identificar y justificar dónde falla el código dado y cómo solventarlo.",
   }),
 ];
+
+/** The extra programming skills (trace, review, test, analyze, decompose, port, query), from the shared table. */
+const PROGRAMMING_EXTRA: readonly SkillDefinition[] = PROGRAMMING_EXTRA_SKILLS.map((sp) =>
+  createSkill(PROG, sp.id, {
+    labelOverride: sp.label,
+    description: sp.description,
+    ...(sp.noBeginner ? { allowedDifficulties: NO_BEGINNER_DIFFICULTIES } : {}),
+  }),
+);
+
+export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [..._PROGRAMMING_BASE, ...PROGRAMMING_EXTRA];
 
 /** The English skills: one per entry of the shared table (`lib/englishSkillData.ts`), namespaced by branch. */
 export const ENGLISH_SKILLS: readonly SkillDefinition[] = ENGLISH_SKILL_SPECS.map((sp) =>

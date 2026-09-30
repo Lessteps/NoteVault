@@ -11,6 +11,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ENGLISH_DEFAULT_SKILLS } from "./englishDefaultSkills.js";
+import { PROGRAMMING_DEFAULT_SKILLS } from "./programmingDefaultSkills.js";
 import { domainOfSubject, type Domain } from "./practice/domain.js";
 
 const FENCE = "```";
@@ -226,15 +227,15 @@ function siblingSkillsDir(rootAbs: string, spaceFolder: string, domain: Domain):
     const dir = path.join(rootAbs, name, "_skills");
     if (!fs.existsSync(dir)) continue;
     const theirs = spaceDomain(rootAbs, name);
-    if (domain === "english" ? theirs !== "english" : theirs === "english") continue;
+    if ((theirs ?? "math") !== domain) continue; // only a space of the SAME domain lends its skills (an unreadable overview counts as mathematics)
     return dir;
   }
   return null;
 }
 
-/** The default skill notes of a domain. The mathematics set is `DEFAULT_SKILLS`; nothing of it is used for English. */
+/** The default skill notes of a domain. The mathematics set is `DEFAULT_SKILLS`; nothing of it is used for English or programming. */
 export function defaultSkillsFor(domain: Domain): Record<string, string> {
-  return domain === "english" ? ENGLISH_DEFAULT_SKILLS : DEFAULT_SKILLS;
+  return domain === "english" ? ENGLISH_DEFAULT_SKILLS : domain === "programming" ? PROGRAMMING_DEFAULT_SKILLS : DEFAULT_SKILLS;
 }
 
 /**

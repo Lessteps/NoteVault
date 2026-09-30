@@ -136,8 +136,11 @@ const norm = (s: string): string =>
 export function sections(markdown: string): NoteSection[] {
   const out: NoteSection[] = [];
   let current: NoteSection | null = null;
+  let inFence = false;
   for (const line of markdown.split(/\r?\n/)) {
-    const m = /^(#{1,4})\s+(.*)$/.exec(line);
+    // A `#` inside a fenced code block is code (a Python comment, a shell prompt), never a heading.
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    const m = inFence ? null : /^(#{1,4})\s+(.*)$/.exec(line);
     if (m && m[1] && m[2]) {
       if (current) out.push(current);
       current = { title: m[2].trim(), level: m[1].length, body: "" };
@@ -171,8 +174,16 @@ function labeledFields(body: string, labels: string[]): Field[] {
   const byLabel = new Map<string, Field>();
   for (const label of labels) byLabel.set(norm(label), { label, text: "" });
   let last: Field | null = null;
+  let inFence = false;
   for (const raw of body.split(/\r?\n/)) {
     const line = raw.trim();
+    const isFence = /^(```|~~~)/.test(line);
+    // Inside a fenced code block every line is code: blank lines and line breaks are kept.
+    if (last && (inFence || isFence)) {
+      if (isFence) inFence = !inFence;
+      last.text = `${last.text}\n${raw.replace(/\s+$/, "")}`;
+      continue;
+    }
     if (!line) continue;
     const m = /^[-*]\s+\*\*(.+?)\:?\*\*\s*\:?\s*(.*)$/.exec(line);
     if (m && m[1]) {

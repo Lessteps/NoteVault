@@ -4,6 +4,7 @@
  */
 
 import { ENGLISH_SKILL_SPECS } from "../../lib/englishSkillData";
+import { PROGRAMMING_EXTRA_SKILLS } from "../../lib/programmingSkillData";
 
 export const MATH = "mathematics";
 export const PROG = "programming";
@@ -248,7 +249,20 @@ const _ENGLISH_MODES: readonly PracticeMode[] = ENGLISH_SKILL_SPECS.map((sp) => 
   ...(sp.noBeginner ? { min_difficulty: 2 } : {}),
 }));
 
-const _CATALOGUE: readonly PracticeMode[] = [..._BASE_CATALOGUE, ..._ENGLISH_MODES];
+/** One practice mode per extra programming competency (trace, review, test, analyze, decompose, port, query). */
+const _PROGRAMMING_MODES: readonly PracticeMode[] = PROGRAMMING_EXTRA_SKILLS.map((sp) => ({
+  id: sp.id,
+  label: sp.label,
+  description: sp.description,
+  act: sp.act,
+  answer_kind: sp.answerKind,
+  timer: sp.timer,
+  judge_focus: sp.judge,
+  subjects: [PROG],
+  ...(sp.noBeginner ? { min_difficulty: 2 } : {}),
+}));
+
+const _CATALOGUE: readonly PracticeMode[] = [..._BASE_CATALOGUE, ..._ENGLISH_MODES, ..._PROGRAMMING_MODES];
 
 export const MODES: Record<string, PracticeMode> = Object.fromEntries(
   _CATALOGUE.map((m) => [m.id, m]),

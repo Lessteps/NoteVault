@@ -5,7 +5,8 @@
  * requests specialized, concept-anchored AI exercises (never generic).
  */
 
-import { isEnglishSubject } from "./domain";
+import { domainOfSubject, isEnglishSubject } from "./domain";
+import { buildProgrammingExercisePrompt, formatProgrammingExerciseNote } from "./programmingExercises";
 import { buildEnglishExercisePrompt, formatEnglishExerciseNote } from "./englishExercises";
 import type { ExerciseRef } from "./exerciseIndex";
 import { type AssistanceLevel, type DifficultyLevel, difficultyLabel } from "./skills";
@@ -119,6 +120,10 @@ export function buildExerciseGenerationPrompt(
   if (isEnglishSubject(manifest.subject)) {
     return buildEnglishExercisePrompt(manifest, theoryNotes, skill, difficulty, assistance, countToGenerate, learning, words);
   }
+  // Programming has its own framing (language by area, code in the statement, behaviour-based judging).
+  if (domainOfSubject(manifest.subject) === "programming") {
+    return buildProgrammingExercisePrompt(manifest, theoryNotes, skill, difficulty, assistance, countToGenerate, learning);
+  }
   const diffName = difficultyLabel(difficulty);
   const isHelper = assistance === "helper";
 
@@ -189,6 +194,7 @@ export function formatExerciseNote(
   },
 ): string {
   if (isEnglishSubject(manifest.subject)) return formatEnglishExerciseNote(manifest, skill, difficulty, assistance, ex);
+  if (domainOfSubject(manifest.subject) === "programming") return formatProgrammingExerciseNote(manifest, skill, difficulty, assistance, ex);
   const astFm = assistance === "no_help" ? "nohelp" : "helper";
   const hintsList = ex.hints.map((h) => `- ${h.trim()}`).join("\n");
   const rubricList = ex.rubric.map((r) => `- [ ] ${r.trim()}`).join("\n");

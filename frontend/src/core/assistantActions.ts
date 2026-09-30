@@ -200,7 +200,7 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
     try {
       return fs
         .readdirSync(absOf(root, rel), { withFileTypes: true })
-        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".") && d.name !== LEGACY_VOCABULARY_FOLDER)
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".") && d.name !== LEGACY_VOCABULARY_FOLDER && /^\d/.test(d.name))
         .map((d) => d.name);
     } catch {
       return [];

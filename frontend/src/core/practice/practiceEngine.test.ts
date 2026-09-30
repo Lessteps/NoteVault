@@ -1,4 +1,5 @@
 import { ENGLISH_SKILL_IDS } from "../../lib/englishSkillData";
+import { PROGRAMMING_EXTRA_IDS } from "../../lib/programmingSkillData";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -80,8 +81,8 @@ function _result(
 
 describe("TestModes", () => {
   it("catalogue", () => {
-    // 17 first-generation modes + one per English skill (gr_/wr_/rd_/ls_/sp_/vc_).
-    expect(Object.keys(MODES).length).toBe(17 + ENGLISH_SKILL_IDS.length);
+    // 17 first-generation modes + one per English skill (gr_/wr_/rd_/ls_/sp_/vc_) + the extra programming ones.
+    expect(Object.keys(MODES).length).toBe(17 + ENGLISH_SKILL_IDS.length + PROGRAMMING_EXTRA_IDS.length);
     for (const mode of Object.values(MODES)) {
       expect(["text", "code", "short", "drill"]).toContain(mode.answer_kind);
       const spec = parseTimer(undefined, 0, mode.timer);
@@ -105,7 +106,7 @@ describe("TestModes", () => {
 
 describe("TestDisciplines", () => {
   it("catalogue", () => {
-    expect(Object.keys(DISCIPLINES).length).toBe(13); // + english reading, listening and speaking
+    expect(Object.keys(DISCIPLINES).length).toBe(20); // + english reading, listening and speaking + programming by area (typescript, backend, frontend, desktop, automation, mobile, devtools)
     const expectedSkills: Record<string, number> = {
       python: 15,
       javascript: 14,

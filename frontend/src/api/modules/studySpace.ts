@@ -459,7 +459,7 @@ export function studySpaceApi(app: AppState) {
       // The space map lists EVERY area on disk, so adding an area keeps the earlier ones.
       const onDisk = fs
         .readdirSync(path.join(app.root, folder), { withFileTypes: true })
-        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".") && d.name !== LEGACY_VOCABULARY_FOLDER)
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith(".") && d.name !== LEGACY_VOCABULARY_FOLDER && /^\d/.test(d.name))
         .map((d) => d.name)
         .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
       const all: SpaceMapArea[] = onDisk.map((name) => {

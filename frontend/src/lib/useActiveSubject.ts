@@ -42,5 +42,5 @@ export function useActiveSubject(): string {
   return subject;
 }
 
-/** Handwriting to LaTeX is a mathematics tool (and programming keeps it); English spaces do not offer it. */
-export const subjectUsesLatex = (subject: string): boolean => subject.toLowerCase() !== "english";
+/** Handwriting to LaTeX is a mathematics tool: English and programming spaces do not offer it (a plain note keeps it). */
+export const subjectUsesLatex = (subject: string): boolean => !["english", "programming"].includes(subject.toLowerCase());

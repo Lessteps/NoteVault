@@ -296,3 +296,76 @@ describe("findConceptFolders", () => {
     process.stdout.write(`carpetas de concepto: ${folders.length}\n`);
   });
 });
+
+describe("code inside a concept note", () => {
+  const NOTE = [
+    "---",
+    "id: prog.fundamentos.bucles",
+    'title: Bucles',
+    'number: "1.19"',
+    'area: "1 Fundamentos"',
+    "subject: programming",
+    "prerequisites: []",
+    "---",
+    "",
+    "# 1.19 Bucles",
+    "",
+    "## Requiere",
+    "*Sin prerrequisitos.*",
+    "",
+    "## Explicación",
+    "",
+    "### Qué es",
+    "Un bucle repite un bloque.",
+    "",
+    "```python",
+    "# esto es un comentario, no un encabezado",
+    "for i in range(3):",
+    "    print(i)",
+    "```",
+    "",
+    "### Modelo mental",
+    "Una cinta que da vueltas.",
+    "",
+    "## Ejemplos",
+    "",
+    "### Ejemplo 1 — contar",
+    "- **Contexto:** Contar tres veces.",
+    "- **Caso:**",
+    "```python",
+    "total = 0",
+    "",
+    "# suma",
+    "for n in [1, 2, 3]:",
+    "    total += n",
+    "```",
+    "- **Resultado esperado:** `total` vale 6.",
+    "- **Por qué funciona:** acumula en cada vuelta.",
+    "",
+    "## Errores comunes",
+    "",
+    "### Error 1 — off by one",
+    "- **Error:** range(1, 3).",
+    "- **Síntoma:** falta un elemento.",
+    "- **Causa:** el final es exclusivo.",
+    "- **Solución:** range(1, 4).",
+    "",
+  ].join("\n");
+
+  it("keeps a # line inside a fence out of the headings and keeps the code's line breaks", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "nv_kbcode_"));
+    tmpRoots.push(root);
+    fs.mkdirSync(path.join(root, ".notevault"), { recursive: true });
+    const folder = path.join(root, "Programación", "1 Fundamentos", "1.19 Bucles");
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, "1.19 Bucles.md"), NOTE, "utf-8");
+    const concept = readConcept(folder, root);
+    expect(concept.warnings).toEqual([]);
+    expect(concept.queEs).toContain("# esto es un comentario, no un encabezado");
+    expect(concept.queEs).toContain("for i in range(3):\n    print(i)");
+    const caso = concept.examples[0]!.fields.find((f) => f.label === "Caso")!.text;
+    expect(caso).toContain("total = 0\n\n# suma\nfor n in [1, 2, 3]:\n    total += n");
+    expect(concept.examples[0]!.fields.map((f) => f.label)).toEqual(["Contexto", "Caso", "Resultado esperado", "Por qué funciona"]);
+    expect(verifyCanvas(buildConceptCanvas(concept))).toEqual([]);
+  });
+});

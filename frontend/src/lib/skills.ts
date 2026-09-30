@@ -4,6 +4,7 @@
  */
 
 import { ENGLISH_SKILL_SPECS } from "./englishSkillData";
+import { PROGRAMMING_EXTRA_SKILLS } from "./programmingSkillData";
 
 export type DifficultyLevel = 1 | 2 | 3;
 export type DifficultyId = "beginner" | "intermediate" | "advanced";
@@ -178,7 +179,7 @@ export const MATHEMATICS_SKILLS: readonly SkillDefinition[] = [
   },
 ];
 
-export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [
+const _PROGRAMMING_BASE: readonly SkillDefinition[] = [
   {
     id: "implement",
     label: "Implementar",
@@ -277,6 +278,22 @@ export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [
     beginnerAllowed: false,
   },
 ];
+
+/** The extra programming skills, from the shared table (trace, review, test, analyze, decompose, port, query). */
+const PROGRAMMING_EXTRA: readonly SkillDefinition[] = PROGRAMMING_EXTRA_SKILLS.map((sp) => ({
+  id: sp.id,
+  label: sp.label,
+  act: sp.description,
+  subject: "programming",
+  description: sp.description,
+  allowedDifficulties: sp.noBeginner ? NO_BEGINNER_DIFFICULTIES : ALL_DIFFICULTIES,
+  allowedAssistance: DEFAULT_ASSISTANCE,
+  defaultDifficulty: sp.noBeginner ? 2 : 1,
+  defaultAssistance: "no_help",
+  beginnerAllowed: !sp.noBeginner,
+}));
+
+export const PROGRAMMING_SKILLS: readonly SkillDefinition[] = [..._PROGRAMMING_BASE, ...PROGRAMMING_EXTRA];
 
 /** The English skills (one per entry of the shared table, namespaced by branch). */
 export const ENGLISH_SKILLS: readonly SkillDefinition[] = ENGLISH_SKILL_SPECS.map((sp) => ({

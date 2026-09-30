@@ -152,3 +152,23 @@ describe("set_practice_plan", () => {
     expect(parseTopicManifest(text)!.plan).toEqual({ explain: [2, 2, 1] });
   });
 });
+
+describe("create_syllabus into a space that already has areas", () => {
+  const add = (area: string, topic: string) => ({
+    action: "create_syllabus",
+    args: { subject: "Mat 1", subject_id: "mathematics", areas: [{ name: area, topics: [{ name: topic }] }] },
+  });
+
+  it("indexes every area of the space, redraws the map it drew, and leaves hand-written ones alone", () => {
+    applyAssistantAction(root, add("1 Aritmética", "1.1 Números"));
+    applyAssistantAction(root, add("2 Álgebra", "2.1 Términos"));
+    expect(read("Mat 1/00 Temario.md")).toContain("## 1 Aritmética");
+    expect(read("Mat 1/00 Temario.md")).toContain("- [[2.1 Términos]]");
+    const groups = JSON.parse(read("Mat 1/00 Mapa de Mat 1.canvas")).nodes.filter((n: any) => n.type === "group");
+    expect(groups).toHaveLength(2);
+
+    fs.writeFileSync(path.join(root, "Mat 1", "00 Temario.md"), "# el mío\n", "utf-8");
+    applyAssistantAction(root, add("3 Geometría", "3.1 Puntos"));
+    expect(read("Mat 1/00 Temario.md")).toBe("# el mío\n");
+  });
+});

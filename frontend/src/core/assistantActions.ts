@@ -144,7 +144,6 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
     exists: fs.existsSync(absOf(root, rootOverview)),
   });
   const spaceAreas: SpaceMapArea[] = [];
-  const outline: string[] = [];
   for (const area of areas) {
     const areaName = safeName(area?.folder || area?.name);
     if (!areaName) continue;
@@ -166,7 +165,6 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
       const topicRel = `${areaRel}/${topicName}`;
       ops.push(mkdirOp(root, topicRel), ...topicFiles(root, topicRel, topicName, subjectId, topic?.skills));
     }
-    if (mapTopics.length) outline.push(`## ${safeName(area?.name) || areaName}`, ...mapTopics.map((t) => `- [[${t.name}]]`), "");
     // Every grouping area gets its map (canvas), built from its topics (see mapa_skill).
     if (args.map !== false && mapTopics.length) {
       const areaLabel = safeName(area?.name) || areaName;
@@ -181,22 +179,58 @@ function planSyllabus(root: string, args: Record<string, any>): ActionPlan {
       spaceAreas.push({ name: areaLabel, topics: mapTopics.map((t) => t.name), prerequisites: Number(area?.prerequisites) || undefined });
     }
   }
-  if (args.map !== false && spaceAreas.length) {
+  // The space map and the outline cover EVERY area of the space, not only the ones being added:
+  // areas already on disk (from an earlier syllabus or study space) are read from their folders.
+  const newNames = new Set(areas.map((a: any) => safeName(a?.folder || a?.name)).filter(Boolean));
+  const dirs = (rel: string): string[] => {
+    try {
+      return fs
+        .readdirSync(absOf(root, rel), { withFileTypes: true })
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_") && !d.name.startsWith("."))
+        .map((d) => d.name);
+    } catch {
+      return [];
+    }
+  };
+  const natural = (x: string, y: string) => x.localeCompare(y, "es", { numeric: true });
+  const existingAreas = dirs(subject).filter((n) => !newNames.has(n));
+  const everyArea: Array<{ name: string; topics: string[]; prerequisites?: number }> = [
+    ...spaceAreas.map((a) => ({ ...a })),
+    ...existingAreas.map((name) => ({ name, topics: dirs(`${subject}/${name}`).sort(natural) })),
+  ].sort((x, y) => natural(x.name, y.name));
+  const GENERATED = "<!-- nv:generated -->";
+  if (args.map !== false && everyArea.length) {
     const spaceMapRel = `${subject}/00 Mapa de ${subject}.canvas`;
+    const existing = fs.existsSync(absOf(root, spaceMapRel));
+    // A map this generator drew (its node ids are g1, a1…) is redrawn; a hand-edited one is left alone.
+    let generated = false;
+    if (existing) {
+      try {
+        const nodes = JSON.parse(fs.readFileSync(absOf(root, spaceMapRel), "utf-8"))?.nodes ?? [];
+        generated = nodes.length > 0 && nodes.every((n: any) => /^[ga]\d+$/.test(String(n?.id)));
+      } catch {
+        generated = false;
+      }
+    }
     ops.push({
       kind: "write",
       rel: spaceMapRel,
-      content: JSON.stringify(buildSpaceMapCanvas(spaceAreas), null, "\t") + "\n",
-      exists: fs.existsSync(absOf(root, spaceMapRel)),
+      content: JSON.stringify(buildSpaceMapCanvas(everyArea), null, "\t") + "\n",
+      overwrite: generated,
+      exists: existing,
     });
   }
-  if (outline.length) {
+  if (everyArea.length) {
     const temarioRel = `${subject}/00 Temario.md`;
+    const existing = fs.existsSync(absOf(root, temarioRel));
+    const generated = existing && fs.readFileSync(absOf(root, temarioRel), "utf-8").includes(GENERATED);
+    const lines = everyArea.flatMap((a) => [`## ${a.name}`, ...a.topics.map((t) => `- [[${t}]]`), ""]);
     ops.push({
       kind: "write",
       rel: temarioRel,
-      content: `---\ntitle: Temario de ${subject}\nsubject: ${subjectId}\ntype: topic\n---\n\n# Temario de ${subject}\n\n${outline.join("\n").trimEnd()}\n`,
-      exists: fs.existsSync(absOf(root, temarioRel)),
+      content: `---\ntitle: Temario de ${subject}\nsubject: ${subjectId}\ntype: topic\n---\n\n# Temario de ${subject}\n\n${GENERATED}\n\n${lines.join("\n").trimEnd()}\n`,
+      overwrite: generated,
+      exists: existing,
     });
   }
   return { action: "create_syllabus", title: `Crear el temario de ${subject}`, ops, warnings: [] };

@@ -1,4 +1,4 @@
-// Biblioteca de ejercicios (solo módulo Ejercicio).
+﻿// Biblioteca de ejercicios (solo módulo Ejercicio).
 //
 // Envuelve `@bryllim/workout-guide` (302 ejercicios, MIT + CC BY-SA 4.0 en
 // assets, ver CREDITS) y mapea su `primaryMuscle` a los ids locales de
@@ -8,6 +8,8 @@
 // NoteVault: no queda texto de terceros en el pipeline.
 
 import { searchExercises, type Exercise as GuideExercise } from "@bryllim/workout-guide";
+import type { LibraryUserEntry } from "./libraryTypes";
+import { muscleName } from "./muscles";
 
 import instruccionesPecho from "./exerciseInstructions.grupo-pecho.json";
 import instruccionesHombros from "./exerciseInstructions.grupo-hombros.json";
@@ -90,6 +92,13 @@ export interface LibraryEntry {
   /** Rutas locales de los tres frames (public/workout-guide-assets). */
   frames: string[];
   frame1: string | null;
+  /**
+   * Pasos escritos por la persona, en crudo y solo para las entradas propias.
+   * Vacío significa «déjalo como estaba»: la redacción del catálogo sigue viva.
+   */
+  how_toPropia?: string;
+  /** Marca que esta entrada la escribió la persona y no viene del paquete. */
+  own?: boolean;
 }
 
 function toEntry(e: GuideExercise): LibraryEntry {
@@ -115,13 +124,85 @@ function toEntry(e: GuideExercise): LibraryEntry {
   };
 }
 
-/** Búsqueda por texto sobre el catálogo de 302 (vacío = todo). */
-export function searchLibrary(query = ""): LibraryEntry[] {
-  return searchExercises(query || undefined).map(toEntry);
+/**
+ * Un campo propio gana solo si tiene algo. Vacío significa «déjalo como
+ * estaba», no «bórralo»: es lo que hace que editar Bench Press no te deje sin
+ * las instrucciones del catálogo ni sin sus imágenes.
+ */
+function propio(mio: string | undefined, suyo: string): string {
+  return mio && mio.trim() ? mio : suyo;
 }
 
-/** Un ejercicio del catálogo por su slug, o `null`. Para abrir uno concreto. */
-export function libraryEntry(slug: string): LibraryEntry | null {
+/**
+ * La biblioteca completa: el catálogo del paquete con las entradas propias
+ * encima, fusionadas por `slug`.
+ *
+ * Fusionar en vez de apilar es lo que hace imposible el duplicado: solo hay un
+ * `bench-press`, y si hay una entrada propia con ese slug, es **la misma**,
+ * editada. Una entrada con slug propio (`mia-…`) se añade al final.
+ */
+export function mergeLibrary(userEntries: LibraryUserEntry[] = []): LibraryEntry[] {
+  const bySlug = new Map(userEntries.filter((e) => e.slug).map((e) => [e.slug, e]));
+  const merged = searchExercises().map(toEntry).map((base) => {
+    const own = bySlug.get(base.slug);
+    if (!own) return base;
+    return {
+      ...base,
+      name: propio(own.name, base.name),
+      equipment: propio(own.equipment, base.equipment),
+      localPrimary: own.muscles.primary.length ? own.muscles.primary : base.localPrimary,
+      localSecondary: own.muscles.secondary.length ? own.muscles.secondary : base.localSecondary,
+      guidePrimary: own.muscles.primary.length
+        ? own.muscles.primary.map(muscleName).join(", ")
+        : base.guidePrimary,
+      how_toPropia: own.how_to,
+    };
+  });
+  const delPaquete = new Set(searchExercises().map((e) => e.slug));
+  const propias = userEntries
+    .filter((e) => e.slug && !delPaquete.has(e.slug))
+    .map(toOwnEntry);
+  return [...merged, ...propias];
+}
+
+/** Una entrada propia tal cual: sin imágenes, y con sus músculos ya locales. */
+function toOwnEntry(own: LibraryUserEntry): LibraryEntry {
+  return {
+    id: own.slug,
+    slug: own.slug,
+    name: own.name,
+    equipment: own.equipment,
+    exerciseType: "own",
+    guidePrimary: own.muscles.primary.map(muscleName).join(", "),
+    guideSecondary: [],
+    localPrimary: own.muscles.primary,
+    localSecondary: own.muscles.secondary,
+    frames: [],
+    frame1: null,
+    how_toPropia: own.how_to,
+    own: true,
+  };
+}
+
+/** Búsqueda por texto sobre el catálogo de 302 (vacío = todo). */
+export function searchLibrary(query = "", userEntries: LibraryUserEntry[] = []): LibraryEntry[] {
+  const all = mergeLibrary(userEntries);
+  if (!query) return all;
+  // El texto se busca sobre la lista ya mezclada: así una entrada propia se
+  // encuentra por su nombre, que es lo que se ha escrito.
+  const q = query.trim().toLowerCase();
+  return all.filter(
+    (e) =>
+      e.name.toLowerCase().includes(q) ||
+      e.equipment.toLowerCase().includes(q) ||
+      e.guidePrimary.toLowerCase().includes(q),
+  );
+}
+
+/** Un ejercicio de la biblioteca por su slug, propio o del paquete. */
+export function libraryEntry(slug: string, userEntries: LibraryUserEntry[] = []): LibraryEntry | null {
+  const own = userEntries.find((e) => e.slug === slug);
+  if (own) return mergeLibrary([own]).find((e) => e.slug === slug) ?? toOwnEntry(own);
   const raw = searchExercises(slug).find((e) => e.slug === slug);
   return raw ? toEntry(raw) : null;
 }
@@ -133,11 +214,19 @@ export function filterByLocalMuscle(localId: string): LibraryEntry[] {
     .filter((e) => e.localPrimary.includes(localId));
 }
 
-/** Los equipos del catálogo, para el desplegable de filtros. */
-export const LIBRARY_EQUIPMENT: string[] = [...new Set(searchLibrary("").map((e) => e.equipment))].sort();
+/**
+ * Los equipos, para el desplegable de filtros. Ya no es una constante: depende
+ * de lo que haya en el fichero del vault, así que un equipo que solo usen tus
+ * ejercicios también tiene que salir.
+ */
+export function libraryEquipment(userEntries: LibraryUserEntry[] = []): string[] {
+  return [...new Set(mergeLibrary(userEntries).map((e) => e.equipment).filter(Boolean))].sort();
+}
 
-/** Los músculos guía del catálogo, para el filtro. */
-export const LIBRARY_MUSCLES: string[] = [...new Set(searchLibrary("").map((e) => e.guidePrimary))].sort();
+/** Los músculos guía, para el filtro. */
+export function libraryMuscles(userEntries: LibraryUserEntry[] = []): string[] {
+  return [...new Set(mergeLibrary(userEntries).map((e) => e.guidePrimary).filter(Boolean))].sort();
+}
 
 /** Los músculos locales (ids de `muscles.ts`) que el catálogo tiene de principal. */
 export function localMusclesInCatalog(): string[] {
@@ -147,8 +236,12 @@ export function localMusclesInCatalog(): string[] {
 }
 
 /** Como `filterLibrary`, pero por músculo local (el que pinta el cuerpo). */
-export function filterLibraryByLocalMuscle(localId: string, filters: Omit<LibraryFilters, "muscle"> = {}): LibraryEntry[] {
-  return searchLibrary(filters.query).filter(
+export function filterLibraryByLocalMuscle(
+  localId: string,
+  filters: Omit<LibraryFilters, "muscle"> = {},
+  userEntries: LibraryUserEntry[] = [],
+): LibraryEntry[] {
+  return searchLibrary(filters.query, userEntries).filter(
     (e) =>
       e.localPrimary.includes(localId) &&
       (!filters.equipment || e.equipment === filters.equipment),
@@ -162,11 +255,14 @@ export interface LibraryFilters {
 }
 
 /**
- * Búsqueda + filtros sobre el catálogo completo. Sin filtros devuelve los
- * 302: la lista es corta para el navegador y así se ven de una vez.
+ * Búsqueda + filtros sobre la biblioteca completa. Sin filtros devuelve todo:
+ * la lista es corta para el navegador y así se ven de una vez.
  */
-export function filterLibrary({ query = "", equipment = "", muscle = "" }: LibraryFilters = {}): LibraryEntry[] {
-  const byText = searchLibrary(query);
+export function filterLibrary(
+  { query = "", equipment = "", muscle = "" }: LibraryFilters = {},
+  userEntries: LibraryUserEntry[] = [],
+): LibraryEntry[] {
+  const byText = searchLibrary(query, userEntries);
   return byText.filter(
     (e) => (!equipment || e.equipment === equipment) && (!muscle || e.guidePrimary === muscle),
   );
@@ -180,7 +276,60 @@ export function estimate1RM(weight: number, reps: number): number {
 
 const instructionsBySlug = new Map(INSTRUCCIONES.map((r) => [r.slug, r]));
 
-/** Pasos en español de la redacción propia, o null si no hay cobertura. */
-export function getInstructions(slug: string): ExerciseInstructions | null {
+/**
+ * Pasos en español: los de la persona si los escribió, los de la redacción
+ * propia si no. Un catálogo de 302 con los pasos متر一时 conserva los suyos.
+ */
+export function getInstructions(
+  slug: string,
+  userEntries: LibraryUserEntry[] = [],
+): ExerciseInstructions | null {
+  const own = userEntries.find((e) => e.slug === slug)?.how_to;
+  if (own && own.trim()) {
+    const entry = userEntries.find((e) => e.slug === slug)!;
+    return {
+      slug,
+      name: entry.name,
+      matched: "mia",
+      source: "mia",
+      steps_es: own.split("\n"),
+      steps_en: [],
+    };
+  }
   return instructionsBySlug.get(slug) ?? null;
+}
+
+/**
+ * Huella de lo que una entrada aporta desde la Biblioteca: nombre, pasos y
+ * músculos. Una copia del programa está desfasada cuando su huella ya no
+ * coincide con esta.
+ *
+ * No hay contador de revisiones: la huella **es** la versión. Así no hay
+ * relojes que se desincronicen, y si editas algo y luego lo dejas como estaba,
+ * deja de estar desfasado.
+ *
+ * Los músculos van **ordenados**: si no, el mismo ejercicio daría dos huellas
+ * según el orden en que se guardó, y todo el programa parecería desfasado.
+ */
+export function libraryFingerprint(e: {
+  slug: string;
+  name: string;
+  how_toPropia?: string;
+  localPrimary: string[];
+  localSecondary: string[];
+}): string {
+  const raw = [
+    e.slug,
+    e.name,
+    e.how_toPropia ?? "",
+    [...e.localPrimary].sort().join(","),
+    [...e.localSecondary].sort().join(","),
+  ].join("\u0000");
+  // FNV-1a de 32 bits: corto, determinista y sin dependencias.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < raw.length; i++) {
+    h ^= raw.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
 }

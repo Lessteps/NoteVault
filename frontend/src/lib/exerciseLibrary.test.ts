@@ -1,9 +1,14 @@
-import { describe, expect, test } from "vitest";
+﻿import { describe, expect, test } from "vitest";
+import type { LibraryUserEntry } from "./libraryTypes";
 import {
   estimate1RM,
   filterByLocalMuscle,
   filterLibrary,
   getInstructions,
+  libraryEntry,
+  libraryEquipment,
+  libraryFingerprint,
+  libraryMuscles,
   mapGuideMuscle,
   searchLibrary,
 } from "./exerciseLibrary";
@@ -166,5 +171,142 @@ describe("exerciseLibrary (workout-guide)", () => {
 
   test("estima 1RM con Epley", () => {
     expect(estimate1RM(100, 5)).toBeCloseTo(116.7, 1);
+  });
+});
+
+describe("la biblioteca como capa editable", () => {
+  const mia = (over: Partial<LibraryUserEntry> = {}): LibraryUserEntry => ({
+    slug: "mia-1",
+    name: "Mi press",
+    equipment: "Barra",
+    muscles: { primary: ["pectoral"], secondary: [] },
+    how_to: "Paso 1",
+    ...over,
+  });
+
+  test("sin entradas propias, el catálogo son 302", () => {
+    expect(searchLibrary("", []).length).toBe(302);
+    expect(searchLibrary("").length).toBe(302);
+  });
+
+  test("una entrada propia aparece junto al catálogo", () => {
+    expect(searchLibrary("", [mia()]).length).toBe(303);
+    expect(searchLibrary("mi press", [mia()])[0]!.slug).toBe("mia-1");
+  });
+
+  test("una entrada propia no tiene imágenes", () => {
+    const e = searchLibrary("", [mia()]).find((x) => x.slug === "mia-1")!;
+    expect(e.frames).toEqual([]);
+    expect(e.frame1).toBeNull();
+  });
+
+  test("un campo propio relleno gana al del catálogo", () => {
+    // Edita bench-press: gana el nombre, pero la imagen sigue siendo la del
+    // paquete, porque lo propio no la pisa.
+    const rows = searchLibrary(
+      "",
+      [mia({ slug: "bench-press", name: "Press banca", how_to: "Mío" })],
+    );
+    const e = rows.find((x) => x.slug === "bench-press")!;
+    expect(rows.length).toBe(302);
+    expect(e.name).toBe("Press banca");
+    expect(e.how_toPropia).toBe("Mío");
+    expect(e.frame1).toContain("bench-press");
+  });
+
+  test("un campo propio vacío deja el del catálogo", () => {
+    const base = searchLibrary("").find((x) => x.slug === "bench-press")!;
+    // Todos los campos propios vacíos: así ninguno debe pisar al catálogo.
+    const nada = mia({
+      slug: "bench-press",
+      name: "Press banca",
+      equipment: "",
+      muscles: { primary: [], secondary: [] },
+      how_to: "",
+    });
+    const e = searchLibrary("", [nada]).find((x) => x.slug === "bench-press")!;
+    expect(e.guidePrimary).toBe(base.guidePrimary);
+    expect(e.localPrimary).toEqual(base.localPrimary);
+    // Vacío significa "déjalo como estaba", no "bórralo".
+    expect(e.how_toPropia).toBe("");
+  });
+
+  test("los músculos propios sí pisan a los del catálogo", () => {
+    // El otro lado de la regla: un músculo tuyo manda sobre el del catálogo.
+    const e = searchLibrary(
+      "",
+      [mia({ slug: "bench-press", name: "Press banca", muscles: { primary: ["lats"], secondary: [] } })],
+    ).find((x) => x.slug === "bench-press")!;
+    expect(e.localPrimary).toEqual(["lats"]);
+    // Y en el desplegable sale el nombre, no el id crudo.
+    expect(e.guidePrimary).toBe("Dorsales");
+  });
+
+  test("las instrucciones propias se encuentran por slug", () => {
+    const ins = getInstructions("mia-1", [mia({ how_to: "1. Baja\n2. Empuja" })])!;
+    expect(ins.steps_es).toEqual(["1. Baja", "2. Empuja"]);
+  });
+
+  test("sin entrada propia, las instrucciones del paquete siguen ahí", () => {
+    expect(getInstructions("bench-press")!.source).toBe("propia");
+  });
+
+  test("una entrada propia sin músculos se lista y no desaparece", () => {
+    // Review Focus 2: sin músculos debe poder encontrarse, no desaparecer.
+    const vacia = mia({ equipment: "", muscles: { primary: [], secondary: [] } });
+    const e = searchLibrary("", [vacia]).find((x) => x.slug === "mia-1")!;
+    expect(e.localPrimary).toEqual([]);
+    expect(searchLibrary("", [mia()]).length).toBe(303);
+    expect(filterLibrary({}, [vacia]).length).toBe(303);
+  });
+
+  test("una entrada propia se encuentra por el filtro de equipo y de músculo", () => {
+    expect(filterLibrary({ equipment: "Barra" }, [mia()]).some((r) => r.slug === "mia-1")).toBe(true);
+    expect(filterLibrary({ muscle: "Pectoral" }, [mia()]).some((r) => r.slug === "mia-1")).toBe(true);
+  });
+
+  test("libraryEntry devuelve la propia si el slug es de una entrada tuya", () => {
+    expect(libraryEntry("mia-1", [mia()])!.name).toBe("Mi press");
+    expect(libraryEntry("mia-1")).toBeNull();
+  });
+
+  test("los desplegables de filtro incluyen lo que solo usan tus ejercicios", () => {
+    expect(libraryEquipment([mia({ equipment: "Yo" })])).toContain("Yo");
+    expect(libraryMuscles([mia()])).toContain("Pectoral");
+    // Sin entradas propias siguen siendo los del catálogo.
+    expect(libraryEquipment([])).toContain("Barbell");
+  });
+
+  test("la huella no depende del orden de los músculos", () => {
+    const a = libraryFingerprint({
+      slug: "mia-1",
+      name: "X",
+      how_toPropia: "y",
+      localPrimary: ["a", "b"],
+      localSecondary: [],
+    });
+    const b = libraryFingerprint({
+      slug: "mia-1",
+      name: "X",
+      how_toPropia: "y",
+      localPrimary: ["b", "a"],
+      localSecondary: [],
+    });
+    expect(a).toBe(b);
+  });
+
+  test("la huella cambia si cambia el nombre, los pasos o los músculos", () => {
+    const base = {
+      slug: "mia-1",
+      name: "X",
+      how_toPropia: "y",
+      localPrimary: ["pectoral"],
+      localSecondary: [] as string[],
+    };
+    const ref = libraryFingerprint(base);
+    expect(libraryFingerprint({ ...base, name: "Z" })).not.toBe(ref);
+    expect(libraryFingerprint({ ...base, how_toPropia: "z" })).not.toBe(ref);
+    expect(libraryFingerprint({ ...base, localPrimary: ["espalda"] })).not.toBe(ref);
+    expect(libraryFingerprint({ ...base, slug: "mia-2" })).not.toBe(ref);
   });
 });

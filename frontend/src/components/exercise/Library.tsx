@@ -14,14 +14,15 @@ import {
   filterLibrary,
   filterLibraryByLocalMuscle,
   getInstructions,
-  LIBRARY_EQUIPMENT,
-  LIBRARY_MUSCLES,
+  libraryEquipment,
+  libraryMuscles,
   localMusclesInCatalog,
   type LibraryEntry,
 } from "../../lib/exerciseLibrary";
 import { GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import type { Exercise } from "../../lib/types";
+import type { LibraryUserEntry } from "../../lib/libraryTypes";
 import { BodyPair } from "./BodyFigure";
 import { Detail } from "./LibraryDetail";
 import { ExerciseForm } from "./Routine";
@@ -40,6 +41,9 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  // Las entradas que ha escrito la persona. Vacío hasta que se conecte la
+  // biblioteca editable (Task 5); a partir de ahí la capa se mezcla sola.
+  const [userEntries] = useState<LibraryUserEntry[]>([]);
   // El ejercicio recién añadido: su formulario aparece en el detalle.
   const [added, setAdded] = useState<{ id: string; fields: Partial<Exercise> } | null>(null);
   const [editStatus, setEditStatus] = useState("");
@@ -260,6 +264,7 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
         dirty={Boolean(q || equipment || muscle || localMuscle)}
         onClear={clearAll}
         searchRef={searchRef}
+        userEntries={userEntries}
       />
       {status && <p className="flex-none px-6 pt-2 text-[12px] text-dim">{status}</p>}
       {body}
@@ -268,7 +273,7 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
 }
 
 function LibraryToolbar({
-  q, setQ, equipment, setEquipment, muscle, setMuscle, count, dirty, onClear, searchRef,
+  q, setQ, equipment, setEquipment, muscle, setMuscle, count, dirty, onClear, searchRef, userEntries,
 }: {
   q: string;
   setQ: (v: string) => void;
@@ -280,6 +285,8 @@ function LibraryToolbar({
   dirty: boolean;
   onClear: () => void;
   searchRef: React.RefObject<HTMLInputElement | null>;
+  /** Para que un equipo o músculo que solo usen tus ejercicios salga en el desplegable. */
+  userEntries: LibraryUserEntry[];
 }) {
   return (
     <div
@@ -313,7 +320,7 @@ function LibraryToolbar({
         onChange={(e) => setEquipment(e.target.value)}
       >
         <option value="">Todo el equipo</option>
-        {LIBRARY_EQUIPMENT.map((x) => (
+        {libraryEquipment(userEntries).map((x) => (
           <option key={x} value={x}>{x}</option>
         ))}
       </select>
@@ -324,7 +331,7 @@ function LibraryToolbar({
         onChange={(e) => setMuscle(e.target.value)}
       >
         <option value="">Todos los músculos</option>
-        {LIBRARY_MUSCLES.map((x) => (
+        {libraryMuscles(userEntries).map((x) => (
           <option key={x} value={x}>{x}</option>
         ))}
       </select>

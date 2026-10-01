@@ -1,4 +1,4 @@
-// La biblioteca propia: los ejercicios que la persona escribe, sobre el catálogo
+﻿// La biblioteca propia: los ejercicios que la persona escribe, sobre el catálogo
 // de 302 que trae el paquete.
 //
 // Aquí solo se guarda y se lee. No sabe nada del catálogo ni de cómo se mezclan
@@ -12,14 +12,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { LAYOUT } from "./vaultFormat";
+// El tipo vive en lib/types y no aquí: `lib/` es el renderer, y este fichero es
+// el proceso de Electron. Si el tipo estuviera aquí, `lib/exerciseLibrary.ts`
+// acabaría importando `node:fs` para el navegador.
+import type { LibraryUserEntry } from "../lib/libraryTypes.js";
 
-export interface LibraryUserEntry {
-  slug: string;
-  name: string;
-  equipment: string;
-  muscles: { primary: string[]; secondary: string[] };
-  how_to: string;
-}
+export type { LibraryUserEntry };
 
 function asString(v: unknown): string {
   return typeof v === "string" ? v : v == null ? "" : String(v);

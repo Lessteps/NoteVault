@@ -1,11 +1,11 @@
-// Diaria: la rutina de una fecha, con peso, reps y notas por ejercicio — y al
+﻿// Diaria: la rutina de una fecha, con peso, reps y notas por ejercicio — y al
 // lado el enfoque muscular de esa misma fecha: el cuerpo con las zonas que
 // trabaja, y al pasar el puntero por un músculo, el ejercicio que lo entrena.
 //
 // El cuerpo se sincroniza solo: relee el día cada vez que se marca algo.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Map as MapIcon } from "lucide-react";
+import { Map as MapIcon, Dumbbell } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { addDays } from "../../lib/habits";
 import { shortDate, todayIso } from "../../lib/tasks";
@@ -110,7 +110,7 @@ export function DayList({ date, day, onVideo, onChanged, compact }: {
   compact?: boolean;
 }) {
   if (!day || !day.exercises.length) {
-    return <p className="py-10 text-center text-[13px] text-faint">Día de descanso: no hay ejercicios. Añádelos en «Ejercicios · Tu rutina».</p>;
+    return <p className="py-10 text-center text-[13px] text-faint">Día de descanso: no hay ejercicios. Añádelos en «Ejercicios · Tu programa».</p>;
   }
   return (
     <div className="space-y-2">
@@ -121,7 +121,7 @@ export function DayList({ date, day, onVideo, onChanged, compact }: {
   );
 }
 
-export function Daily({ onVideo }: { onVideo: (ex: Exercise) => void }) {
+export function Daily({ onVideo, onGoProgram }: { onVideo: (ex: Exercise) => void; onGoProgram: () => void }) {
   const fail = useFail();
   const days = useExercise((s) => s.days);
   const list = useExercise((s) => s.list);
@@ -163,6 +163,10 @@ export function Daily({ onVideo }: { onVideo: (ex: Exercise) => void }) {
             className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">
             <MapIcon size={13} /> Mapa
           </button>
+          {/* El viaje de vuelta: editar el programa desde la sesión. */}
+          <GhostButton data-go-program onClick={onGoProgram} className="rounded-full px-2.5 py-1">
+            <Dumbbell size={13} /> Tu programa
+          </GhostButton>
           <NavButtons
             label={`${shortDate(date)}${isToday ? " · hoy" : ""}`}
             onPrev={() => setDate(addDays(date, -1))}

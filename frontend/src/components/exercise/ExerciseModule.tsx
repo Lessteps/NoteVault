@@ -108,6 +108,17 @@ export function ExerciseModule() {
 
   const pendingToday = stats ? Math.max(0, stats.today.total - stats.today.done) : 0;
 
+  // El programa es el molde y Diaria la sesión de un día. Estos dos atajos
+  // hacen el viaje entre ellas sin tener que pasar por el sidebar.
+  const goToday = () => {
+    setView("diaria");
+    setVideo(null);
+  };
+  const goProgram = () => {
+    setView("ejercicios");
+    setVideo(null);
+  };
+
   return (
     <div className="flex min-w-0 flex-1">
       <ModuleSidebar
@@ -136,11 +147,11 @@ export function ExerciseModule() {
         ) : view === "general" ? (
           <Overview onVideo={setVideo} />
         ) : view === "diaria" ? (
-          <Daily onVideo={setVideo} />
+          <Daily onVideo={setVideo} onGoProgram={goProgram} />
         ) : view === "progreso" ? (
           <Progress />
         ) : (
-          <Exercises />
+          <Exercises onGoToday={goToday} />
         )}
       </main>
     </div>

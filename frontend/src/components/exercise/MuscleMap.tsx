@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Muscle map · the modal.
  *
  * Reads the same state the daily checkboxes read (`ExerciseDay.log`), so a tick
@@ -280,7 +280,7 @@ export function MuscleMap({ date, day, onChanged, onClose, onVideo }: {
                     </span>
                   </div>
                   <p className="px-2 pb-1 text-[11px] text-faint">
-                    Estos ejercicios no tienen músculos, así que no pintan nada en el mapa. Asígnalos en «Ejercicios · Tu rutina».
+                    Estos ejercicios no tienen músculos, así que no pintan nada en el mapa. Asígnalos en «Ejercicios · Tu programa».
                   </p>
                   {data.unassigned.map((row) => (
                     <div key={`u-${row.id}`} data-unassigned={row.id}

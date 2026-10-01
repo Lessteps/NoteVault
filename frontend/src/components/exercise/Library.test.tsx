@@ -129,7 +129,7 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
-  it("Tu rutina tiene buscador de biblioteca y deja elegir el día", async () => {
+  it("Tu programa tiene buscador de biblioteca y deja elegir el día", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {
       await act(async () => {
@@ -217,6 +217,54 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
+  it("una pestaña guardada que ya no existe cae en Tu programa", async () => {
+    // Quien tenía guardada la pestaña vieja no debe quedarse en blanco.
+    useNavState.setState({ values: { "ejercicio.ejercicios": "rutina" } });
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Ejercicios"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(
+        host.querySelector('[data-exercises-tab="programa"]')?.getAttribute("aria-selected"),
+      ).toBe("true");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("Tu programa lleva a Diaria y Diaria vuelve al programa", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      // Desde Ejercicios, «Tu programa» salta a Diaria sin pasar por el sidebar.
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Ejercicios"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      const goToday = host.querySelector("[data-go-today]")!;
+      expect(goToday).not.toBeNull();
+      await act(async () => {
+        goToday.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      // En Diaria: el botón de vuelta solo existe ahí.
+      const back = host.querySelector("[data-go-program]")!;
+      expect(back).not.toBeNull();
+      await act(async () => {
+        back.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(host.querySelector('[data-exercises-tab="programa"]')).not.toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
   it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {
@@ -235,7 +283,7 @@ describe("Biblioteca de Ejercicio", () => {
       const tabs = [...host.querySelectorAll("[data-exercises-tab]")].map((t) =>
         t.textContent?.trim(),
       );
-      expect(tabs).toEqual(["Tu rutina", "Biblioteca"]);
+      expect(tabs).toEqual(["Tu programa", "Biblioteca"]);
     } finally {
       cleanup();
     }

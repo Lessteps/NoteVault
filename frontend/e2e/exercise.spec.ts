@@ -37,7 +37,7 @@ const side = () => win.locator("aside[class*='w-[260px]']");
 async function gotoDiaria() {
   await side().getByRole("button", { name: "Diaria" }).click();
   await expect(
-    win.getByText("Añádelos en «Tu rutina»").or(win.getByTitle("Mapa muscular del día")),
+    win.getByText("Añádelos en «Ejercicios · Tu programa»").or(win.getByTitle("Mapa muscular del día")),
   ).toBeVisible({ timeout: 15_000 });
 }
 
@@ -64,7 +64,7 @@ test("NV-X-001 la rutina por defecto existe en exercises.json", async () => {
   await expect(win.getByRole("heading", { name: "Ejercicios" })).toBeVisible({
     timeout: 15_000,
   });
-  await expect(win.getByRole("heading", { name: "Tu rutina" })).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByRole("heading", { name: "Tu programa" })).toBeVisible({ timeout: 15_000 });
   await expect.poll(() => existsSync(routinesFile())).toBe(true);
   const routine = JSON.parse(readFileSync(routinesFile(), "utf-8")) as Array<{ name: string }>;
   expect(routine.length).toBeGreaterThan(0);

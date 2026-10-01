@@ -125,7 +125,7 @@ describe("enfoque muscular · el puntero", () => {
 
 describe("enfoque muscular · en qué vistas", () => {
   it("la diaria lo lleva al lado de los ejercicios", async () => {
-    const host = mount(<Daily onVideo={() => undefined} />);
+    const host = mount(<Daily onVideo={() => undefined} onGoProgram={() => undefined} />);
     await settle();
     expect(host.querySelector("[data-muscle-focus]")).not.toBeNull();
   });

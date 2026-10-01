@@ -1,4 +1,4 @@
-import * as path from "node:path";
+﻿import * as path from "node:path";
 import { addDays, todayIso, weekday } from "../../core/dates.js";
 import { ApiError } from "../../core/errors.js";
 import {
@@ -131,7 +131,7 @@ export function exerciseApi(app: AppState) {
     const hit = m.resolveVideo(e);
     if (!hit) {
       throw new ApiError(
-        "No se encontró el video. Vincúlalo en «Ejercicios · Tu rutina»."
+        "No se encontró el video. Vincúlalo en «Ejercicios · Tu programa»."
       );
     }
     const ext = path.extname(hit).toLowerCase();

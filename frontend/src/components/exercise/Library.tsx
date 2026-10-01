@@ -1,4 +1,4 @@
-// La biblioteca de 302 ejercicios.
+﻿// La biblioteca de 302 ejercicios.
 //
 // A la derecha, el detalle: tres frames, los datos y "Cómo hacerlo". Y si el
 // ejercicio se acaba de añadir a la rutina, el mismo formulario de
@@ -45,7 +45,7 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
   const [editStatus, setEditStatus] = useState("");
 
   // La Biblioteca no pregunta el día: lo que se añade entra en la rutina del
-  // día de hoy. Para moverlo de día, «Tu rutina».
+  // día de hoy. Para moverlo de día, «Tu programa».
   const day = weekdayKeyOf(todayIso());
   const dayName = days.find((d) => d.key === day)?.name ?? day;
 

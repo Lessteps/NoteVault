@@ -1,11 +1,12 @@
-// Tu rutina: los ejercicios que tienes, agrupados por día, con el formulario de
-// edición al lado. Es la mitad "lo que ya está" del apartado Ejercicios.
+﻿// Tu programa: los ejercicios que tienes, agrupados por día, con el formulario
+// de edición al lado. Es la mitad "lo que ya está" del apartado Ejercicios.
 //
-// La otra mitad es la Biblioteca, que vive en `Library.tsx`. Aquí solo se
-// listan los ejercicios guardados y se editan.
+// Se llama programa y no rutina porque es el molde, no la sesión: aquí se decide
+// qué haces cada día; entrenarlo es la pantalla Diaria, a la que se va con el
+// botón «Ir a hoy». La otra mitad del apartado es la Biblioteca (`Library.tsx`).
 
 import { useMemo, useState } from "react";
-import { Film, Link2, Pencil, X } from "lucide-react";
+import { Film, Link2, Pencil, Sun, X } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { useApp } from "../../store/app";
 import { useExercise } from "../../store/exercise";
@@ -29,7 +30,7 @@ const EMPTY: Partial<Exercise> = {
   muscles: { primary: [], secondary: [] },
 };
 
-export function Routine() {
+export function Routine({ onGoToday }: { onGoToday: () => void }) {
   const fail = useFail();
   const toast = useApp((s) => s.toast);
   const days = useExercise((s) => s.days);
@@ -57,9 +58,14 @@ export function Routine() {
     <div className="flex min-h-0 flex-1 gap-4 overflow-hidden px-6 py-4">
       <div className="min-w-0 flex-1 space-y-3 overflow-y-auto pr-1">
         <div className="flex items-center gap-2">
-          <h1 className="text-[21px] font-semibold text-text">Tu rutina</h1>
+          <h1 className="text-[21px] font-semibold text-text">Tu programa</h1>
           <span className="text-[12px] text-faint">{list.length} ejercicios</span>
           <span className="flex-1" />
+          {/* El programa es el molde; aquí se entrena. El botón evita tener que
+              saber que Diaria existe para pasar de uno a otro. */}
+          <GhostButton data-go-today onClick={onGoToday}>
+            <Sun size={13} /> Ir a hoy
+          </GhostButton>
           {/* TEMPORAL: verificación visual del mapeo forma → músculo. Se borra
               cuando el mapeo esté aprobado (aquí y en MuscleMapDebug.tsx). */}
           <GhostButton onClick={() => setDebug(true)}>🔎 Verificación del mapeo</GhostButton>
@@ -181,7 +187,7 @@ export function Routine() {
  * para completar series y descanso justo después de añadir.
  */
 /**
- * Buscador sobre la biblioteca, dentro del formulario de "Tu rutina". Escribe,
+ * Buscador sobre la biblioteca, dentro del formulario del programa. Escribe,
  * elige uno y el formulario se rellena con su nombre, sus músculos y su
  * "cómo hacerlo"; el día lo elige quien añade.
  *

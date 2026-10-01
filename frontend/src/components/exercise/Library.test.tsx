@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const invoke = vi.fn(async (method: string): Promise<unknown> => {
+const BASE_INVOKE = async (method: string): Promise<unknown> => {
   if (method === "ex_list") return [];
   if (method === "ex_save") return { ok: true };
   if (method === "ex_meta") return { days: [{ key: "lunes", name: "Lunes", subtitle: "Pecho", glyph: "💪" }] };
@@ -22,7 +22,8 @@ const invoke = vi.fn(async (method: string): Promise<unknown> => {
   }
   if (method === "ex_days") return [];
   return { ok: true };
-});
+};
+const invoke = vi.fn(BASE_INVOKE);
 (window as unknown as { nv: unknown }).nv = { invoke };
 
 import { useExercise } from "../../store/exercise";
@@ -43,7 +44,8 @@ function mount(node: React.ReactElement) {
 }
 
 beforeEach(() => {
-  invoke.mockClear();
+  invoke.mockReset();
+  invoke.mockImplementation(BASE_INVOKE);
   // La navegación se recuerda en un store global; sin limpiarlo, una prueba
   // deja la vista de Progreso apuntando donde la anterior la puso.
   useNavState.setState({ values: {} });
@@ -122,6 +124,94 @@ describe("Biblioteca de Ejercicio", () => {
           }),
         ],
       );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("Tu rutina tiene buscador de biblioteca y deja elegir el día", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Ejercicios"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      // El buscador de la biblioteca vive dentro del formulario de tu rutina.
+      const picker = host.querySelector("[data-library-picker]")!;
+      expect(picker).not.toBeNull();
+      const search = picker.querySelector('input[aria-label="Buscar en la biblioteca"]') as HTMLInputElement;
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        setter?.call(search, "bench press");
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        search.dispatchEvent(new Event("change", { bubbles: true }));
+        await Promise.resolve();
+      });
+      const hit = picker.querySelector("[data-library-pick]")!;
+      expect(hit).not.toBeNull();
+
+      // Al elegirlo se rellena el formulario con su musculación.
+      await act(async () => {
+        hit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      const name = host.querySelector('input[aria-label="Nombre"]') as HTMLInputElement;
+      expect(name.value).toBe("Bench Press");
+
+      // Y el día lo elige quien añade, no la app.
+      const day = host.querySelector('select[aria-label="Día"]') as HTMLSelectElement;
+      expect(day).not.toBeNull();
+      expect(day.value).toBe("lunes");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("el buscador de la biblioteca marca lo que ya está en la rutina", async () => {
+    // "Bench Press" ya está en la rutina: lo dice el backend, no el store,
+    // porque al montar el módulo se recarga la lista.
+    invoke.mockImplementation(async (method: string) => {
+      if (method === "ex_list")
+        return [
+          {
+            id: "e1",
+            day: "lunes",
+            name: "Bench Press",
+            video: "",
+            video_path: "",
+            series_reps: "",
+            rest: "",
+            how_to: "",
+            has_video: false,
+            video_name: "",
+            muscles: { primary: ["pectoral"], secondary: [] },
+          },
+        ];
+      return BASE_INVOKE(method);
+    });
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Ejercicios"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      const picker = host.querySelector("[data-library-picker]")!;
+      const search = picker.querySelector('input[aria-label="Buscar en la biblioteca"]') as HTMLInputElement;
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        setter?.call(search, "bench press");
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        search.dispatchEvent(new Event("change", { bubbles: true }));
+        await Promise.resolve();
+      });
+      const hit = picker.querySelector('[data-library-pick="bench-press"]')!;
+      expect(hit.getAttribute("data-in-routine")).toBe("true");
+      expect(hit.textContent).toContain("ya en tu rutina");
     } finally {
       cleanup();
     }

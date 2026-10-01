@@ -120,6 +120,12 @@ export function searchLibrary(query = ""): LibraryEntry[] {
   return searchExercises(query || undefined).map(toEntry);
 }
 
+/** Un ejercicio del catálogo por su slug, o `null`. Para abrir uno concreto. */
+export function libraryEntry(slug: string): LibraryEntry | null {
+  const raw = searchExercises(slug).find((e) => e.slug === slug);
+  return raw ? toEntry(raw) : null;
+}
+
 /** Filtra por músculo local (id de `muscles.ts`, ej. `pectoral`). */
 export function filterByLocalMuscle(localId: string): LibraryEntry[] {
   return searchExercises()

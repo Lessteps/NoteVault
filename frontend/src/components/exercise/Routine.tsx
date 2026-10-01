@@ -4,11 +4,12 @@
 // La otra mitad es la Biblioteca, que vive en `Library.tsx`. Aquí solo se
 // listan los ejercicios guardados y se editan.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Film, Link2, Pencil, X } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { useApp } from "../../store/app";
 import { useExercise } from "../../store/exercise";
+import { getInstructions, libraryEntry, searchLibrary } from "../../lib/exerciseLibrary";
 import type { Exercise } from "../../lib/types";
 import { confirmAction, IconButton } from "../ui";
 import { Field, GhostButton, input, PrimaryButton } from "../common/forms";
@@ -179,6 +180,72 @@ export function Routine() {
  * El formulario de un ejercicio. Vive aparte porque la Biblioteca lo reutiliza
  * para completar series y descanso justo después de añadir.
  */
+/**
+ * Buscador sobre la biblioteca, dentro del formulario de "Tu rutina". Escribe,
+ * elige uno y el formulario se rellena con su nombre, sus músculos y su
+ * "cómo hacerlo"; el día lo elige quien añade.
+ *
+ * Lo que ya tienes en la rutina sale marcado: son duplicados, no candidatos.
+ */
+function LibraryPicker({
+  onPick,
+  routineNames,
+}: {
+  onPick: (slug: string) => void;
+  routineNames: Set<string>;
+}) {
+  const [q, setQ] = useState("");
+  const rows = useMemo(() => (q.trim() ? searchLibrary(q).slice(0, 8) : []), [q]);
+  return (
+    <div data-library-picker className="space-y-1.5">
+      <input
+        className={input}
+        placeholder="Buscar en la biblioteca…"
+        aria-label="Buscar en la biblioteca"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onInput={(e) => setQ((e.target as HTMLInputElement).value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            setQ("");
+          }
+        }}
+      />
+      {rows.length > 0 && (
+        <div className="max-h-[188px] space-y-0.5 overflow-y-auto">
+          {rows.map((r) => {
+            const already = routineNames.has(r.name.toLowerCase());
+            return (
+              <button
+                key={r.slug}
+                type="button"
+                data-library-pick={r.slug}
+                data-in-routine={already ? "true" : undefined}
+                onClick={() => onPick(r.slug)}
+                className={cn(
+                  "flex w-full items-center gap-1.5 rounded-lg border border-line px-2 py-1 text-left text-[12px]",
+                  "text-dim hover:border-accent hover:text-text",
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">
+                  {r.name}
+                  <span className="ml-1 text-[10.5px] text-faint">· {r.guidePrimary}</span>
+                </span>
+                {already && (
+                  <span className="flex-none text-[10px]" style={{ color: "var(--nv-mint)" }}>
+                    ya en tu rutina
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ExerciseForm({
   editing,
   f,
@@ -201,20 +268,64 @@ export function ExerciseForm({
   saveLabel?: string;
 }) {
   const days = useExercise((s) => s.days);
+  const routine = useExercise((s) => s.list);
+  const routineNames = useMemo(
+    () => new Set(routine.map((e) => e.name.toLowerCase())),
+    [routine],
+  );
+
+  /** Rellena el formulario desde la biblioteca: nombre, músculos e instrucción. */
+  const pickFromLibrary = (slug: string) => {
+    const found = libraryEntry(slug);
+    if (!found) return;
+    const steps = getInstructions(slug)?.steps_es ?? [];
+    setF({
+      ...f,
+      name: found.name,
+      muscles: { primary: found.localPrimary, secondary: found.localSecondary },
+      how_to: steps.length
+        ? steps.map((s, i) => `${i + 1}. ${s}`).join("\n")
+        : `${found.equipment} · ${found.guidePrimary}`,
+    });
+  };
+
   return (
     <aside className="w-[360px] flex-none space-y-3 overflow-y-auto rounded-xl border border-line bg-panel p-4">
       <div className="text-[14px] font-semibold text-text">
         {title ?? (editing ? "✎ Editar ejercicio" : "➕ Añadir ejercicio")}
       </div>
+      {!editing && (
+        <>
+          <div className="text-[11px] uppercase tracking-[0.12em] text-faint">
+            Desde la biblioteca
+          </div>
+          <LibraryPicker onPick={pickFromLibrary} routineNames={routineNames} />
+          <div className="flex items-center gap-2 py-0.5 text-[11px] uppercase tracking-[0.12em] text-faint">
+            <span className="h-px flex-1 bg-line" />
+            o a mano
+            <span className="h-px flex-1 bg-line" />
+          </div>
+        </>
+      )}
       <Field label="Día">
-        <select className={input} value={f.day} onChange={(e) => setF({ ...f, day: e.target.value })}>
+        <select
+          aria-label="Día"
+          className={input}
+          value={f.day}
+          onChange={(e) => setF({ ...f, day: e.target.value })}
+        >
           {days.map((d) => (
             <option key={d.key} value={d.key}>{d.name}</option>
           ))}
         </select>
       </Field>
       <Field label="Nombre">
-        <input className={input} value={f.name ?? ""} onChange={(e) => setF({ ...f, name: e.target.value })} />
+        <input
+          aria-label="Nombre"
+          className={input}
+          value={f.name ?? ""}
+          onChange={(e) => setF({ ...f, name: e.target.value })}
+        />
       </Field>
       <Field label="Video (ruta del archivo)">
         <input

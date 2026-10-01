@@ -1,7 +1,9 @@
-// `programming_practice`: the weekly project pipeline in one dialog — build (specification), construct (the folder),
-// defend (review + oral defence) and postmortem (the profile the next build reads). Opened from the assistant panel, and
-// only offered when the open note lives in the programming_practice area. Every exchange with the model is also written
-// to a chat conversation, so it can be read.
+// `programming_practice`: the weekly project pipeline — build (specification), construct (the folder), defend (review +
+// oral defence) and postmortem (the profile the next build reads).
+//
+// ONE workspace, two places: the full-screen view that opens when the learner clicks the `projects` folder (like the daily
+// kata opens its practice view), and a dialog reachable from the assistant panel. Every exchange with the model is also
+// written to a chat conversation, so it can be read.
 
 import { CheckCircle2, CircleDot, FolderPlus, Hammer, Loader2, ShieldCheck, Swords, Target } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -24,6 +26,12 @@ export const isPracticePath = (path: string | null | undefined): boolean => /(^|
 
 const FOCUSES = ["backend", "databases", "frontend", "desktop", "mobile", "automation"];
 const STATE_LABEL: Record<PpProject["state"], string> = { spec: "Especificado", building: "En construcción", defended: "Defendido", done: "Cerrado" };
+const PHASES: Array<{ key: PpProject["state"]; n: number; label: string; hint: string }> = [
+  { key: "spec", n: 1, label: "Especificar", hint: "pp_build" },
+  { key: "building", n: 2, label: "Construir", hint: "pp_construct" },
+  { key: "defended", n: 3, label: "Defender", hint: "pp_defend" },
+  { key: "done", n: 4, label: "Postmortem", hint: "pp_postmortem" },
+];
 
 const LAYER_LABEL: Record<string, string> = { database: "Base de datos", backend: "Backend", client: "Cliente" };
 const SEVERITY: Record<string, string> = { high: "text-danger", medium: "text-warn", low: "text-faint" };
@@ -34,9 +42,37 @@ function showChat(conversationId: string): void {
   void a.openConversation(conversationId);
 }
 
+/** The dialog opened from the assistant panel. */
 export function PracticeProjectDialog() {
   const open = usePracticeDialog((s) => s.open);
   const close = usePracticeDialog((s) => s.close);
+  if (!open) return null;
+  return (
+    <Modal title="Práctica de programación" width={760} onClose={close} footer={<><span className="flex-1" /><GhostButton onClick={close}>Cerrar</GhostButton></>}>
+      <ProjectsWorkspace onNavigate={close} />
+    </Modal>
+  );
+}
+
+/**
+ * The full-screen view of the `projects` folder (`projects.proyectos.md`). The note itself holds nothing to edit: it is
+ * the folder's entry point, the way `kata.practica.md` is the daily kata's.
+ */
+export function PracticeProjectsView() {
+  return (
+    <div className="h-full overflow-y-auto" data-testid="projects-view">
+      <div className="mx-auto max-w-[980px] px-8 py-7">
+        <ProjectsWorkspace page />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Profile, new project (ideas, plan, specification) and the list of projects with their phase.
+ * `page` is the full-screen version; otherwise it sits inside the dialog.
+ */
+export function ProjectsWorkspace({ page = false, onNavigate }: { page?: boolean; onNavigate?: () => void }) {
   const toast = useApp((s) => s.toast);
   const openNote = useApp((s) => s.openNote);
 
@@ -58,10 +94,8 @@ export function PracticeProjectDialog() {
   }, [toast]);
 
   useEffect(() => {
-    if (open) void refresh();
-  }, [open, refresh]);
-
-  if (!open) return null;
+    void refresh();
+  }, [refresh]);
 
   /** Runs one action with a busy label and a toast on failure. */
   const run = async <T,>(label: string, fn: () => Promise<T>, after?: (v: T) => void): Promise<void> => {
@@ -85,143 +119,179 @@ export function PracticeProjectDialog() {
       void openNote(r.rel);
     });
 
-  return (
-    <Modal
-      title="Práctica de programación"
-      width={760}
-      onClose={close}
-      footer={
+  const kata = (
+    <div className="flex flex-wrap items-center gap-2">
+      <GhostButton
+        onClick={() => {
+          onNavigate?.();
+          void openNote(`${status?.space}/programming_practice/kata/kata.practica.md`);
+        }}
+        title="Abre la vista de práctica del reto diario"
+      >
+        <Target size={13} /> Reto de lógica de hoy
+      </GhostButton>
+      <GhostButton
+        onClick={() => void run("kata-pm", () => api.ppKataPostmortem(), (r) => { toast("info", "Postmortem de los retos guardado en tu perfil."); showChat(r.conversationId); })}
+        title="Busca el patrón detrás de los retos que has fallado"
+      >
+        {busy === "kata-pm" && <Loader2 size={13} className="animate-spin" />} Postmortem de retos
+      </GhostButton>
+    </div>
+  );
+
+  if (!status) return <p className="text-[12px] text-faint">Cargando…</p>;
+  if (!status.space) return <p className="text-[12.5px] text-warn">No hay un espacio de Programación en esta bóveda.</p>;
+  if (!status.ready) {
+    return (
+      <div className="space-y-2">
+        <p className="text-[12.5px] leading-relaxed text-dim">
+          El área <b>programming_practice</b> todavía no existe. Se crea con sus skills (editables), el reto diario y la carpeta de proyectos.
+          No toca nada de lo que ya tienes.
+        </p>
+        <PrimaryButton onClick={() => void run("init", () => api.ppInit(), () => toast("info", "Área creada."))}>
+          {busy === "init" ? <Loader2 size={13} className="animate-spin" /> : <FolderPlus size={13} />} Crear el área
+        </PrimaryButton>
+      </div>
+    );
+  }
+  if (defending) return <DefendPanel folder={defending} onBack={() => { setDefending(null); void refresh(); }} />;
+
+  const count = (state: PpProject["state"]) => status.projects.filter((p) => p.state === state).length;
+
+  const profile = (
+    <section className="rounded-xl border border-line px-3 py-2.5">
+      <span className="font-mono text-[10.5px] uppercase tracking-wider text-faint">Tu perfil</span>
+      {status.weaknesses.length ? (
         <>
-          <GhostButton
-            onClick={() => {
-              close();
-              void openNote(`${status?.space}/programming_practice/kata/kata.practica.md`);
-            }}
-            title="Abre la vista de práctica del reto diario"
-          >
-            <Target size={13} /> Reto de lógica de hoy
-          </GhostButton>
-          <GhostButton
-            onClick={() => void run("kata-pm", () => api.ppKataPostmortem(), (r) => { toast("info", "Postmortem de los retos guardado en tu perfil."); showChat(r.conversationId); })}
-            title="Busca el patrón detrás de los retos que has fallado"
-          >
-            {busy === "kata-pm" && <Loader2 size={13} className="animate-spin" />} Postmortem de retos
-          </GhostButton>
-          <span className="flex-1" />
-          <GhostButton onClick={close}>Cerrar</GhostButton>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {status.weaknesses.map((w) => (
+              <span key={w.label} title={`${w.count}× · ${w.status}`} className="rounded-md border border-line bg-elevated px-1.5 py-0.5 text-[11px] text-dim">
+                <b className="text-faint">{w.layer}</b> {w.label}
+              </span>
+            ))}
+          </div>
+          {status.suggestedFocus && <p className="mt-1.5 text-[11.5px] text-dim">El próximo proyecto apuntará a <b className="text-text">{status.suggestedFocus}</b>.</p>}
         </>
-      }
-    >
-      {!status ? (
-        <p className="text-[12px] text-faint">Cargando…</p>
-      ) : !status.space ? (
-        <p className="text-[12.5px] text-warn">No hay un espacio de Programación en esta bóveda.</p>
-      ) : !status.ready ? (
-        <div className="space-y-2">
-          <p className="text-[12.5px] leading-relaxed text-dim">
-            El área <b>programming_practice</b> todavía no existe. Se crea con sus skills (editables), el reto diario y la carpeta de proyectos.
-            No toca nada de lo que ya tienes.
-          </p>
-          <PrimaryButton onClick={() => void run("init", () => api.ppInit(), () => toast("info", "Área creada."))}>
-            {busy === "init" ? <Loader2 size={13} className="animate-spin" /> : <FolderPlus size={13} />} Crear el área
-          </PrimaryButton>
-        </div>
-      ) : defending ? (
-        <DefendPanel folder={defending} onBack={() => { setDefending(null); void refresh(); }} />
       ) : (
-        <>
-          <section className="rounded-xl border border-line px-3 py-2.5">
-            <span className="font-mono text-[10.5px] uppercase tracking-wider text-faint">Tu perfil</span>
-            {status.weaknesses.length ? (
-              <>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {status.weaknesses.map((w) => (
-                    <span key={w.label} title={`${w.count}× · ${w.status}`} className="rounded-md border border-line bg-elevated px-1.5 py-0.5 text-[11px] text-dim">
-                      <b className="text-faint">{w.layer}</b> {w.label}
-                    </span>
-                  ))}
-                </div>
-                {status.suggestedFocus && <p className="mt-1.5 text-[11.5px] text-dim">El próximo proyecto apuntará a <b className="text-text">{status.suggestedFocus}</b>.</p>}
-              </>
-            ) : (
-              <p className="mt-1 text-[12px] text-faint">Aún sin historial: tras el primer postmortem, cada proyecto se adaptará a tus puntos débiles.</p>
-            )}
-          </section>
-
-          <section className="space-y-2">
-            <span className="font-mono text-[10.5px] uppercase tracking-wider text-faint">1 · Especificar (pp_build)</span>
-            <p className="text-[11.5px] leading-relaxed text-faint">
-              Todo proyecto lleva base de datos, backend y cliente; la automatización es un extra. La especificación se valida: si falta una capa, la IA la rehace.
-            </p>
-            <div className="grid grid-cols-[150px_1fr] gap-2">
-              <Field label="Foco">
-                <select className={input} value={focus} onChange={(e) => setFocus(e.target.value)}>
-                  <option value="">Automático{status.suggestedFocus ? ` (${status.suggestedFocus})` : ""}</option>
-                  {FOCUSES.map((f) => <option key={f} value={f}>{f}</option>)}
-                </select>
-              </Field>
-              <Field label="Qué quieres (opcional)">
-                <input className={input} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Una herramienta para…" />
-              </Field>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <PrimaryButton onClick={() => void run("ideas", () => api.ppIdeas({ focus, notes }), (r) => { setIdeas(r.ideas); showChat(r.conversationId); })} disabled={!!busy}>
-                {busy === "ideas" ? <Loader2 size={13} className="animate-spin" /> : <Hammer size={13} />} Proponer ideas
-              </PrimaryButton>
-              {notes.trim() && (
-                <GhostButton onClick={() => void specify({ title: "", problem: "", focus: focus || undefined })}>Especificar lo que escribí</GhostButton>
-              )}
-              <span className="flex-1" />
-              <input type="number" min={1} max={12} className={cn(input, "!w-16")} value={weeks} onChange={(e) => setWeeks(Number(e.target.value) || 1)} aria-label="Semanas" />
-              <GhostButton onClick={() => void run("plan", () => api.ppPlan({ weeks, notes }), (r) => { setPlan(r.plan); showChat(r.conversationId); toast("info", `Plan guardado en ${r.rel}`); })}>
-                {busy === "plan" && <Loader2 size={13} className="animate-spin" />} Planear semanas
-              </GhostButton>
-            </div>
-            {[...ideas.map((i) => ({ ...i, week: 0 })), ...plan].map((i) => (
-              <div key={`${i.week}:${i.title}`} className="rounded-lg border border-line px-3 py-2">
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <span className="block text-[12.5px] font-semibold text-text">{i.week ? `Semana ${i.week} · ` : ""}{i.title}</span>
-                    <span className="block text-[11.5px] text-dim">{i.problem}</span>
-                    <span className="block font-mono text-[10.5px] text-faint">{i.focus} · {i.client} · {i.hours} h</span>
-                  </div>
-                  <PrimaryButton onClick={() => void specify(i, i.week || undefined)} disabled={!!busy}>
-                    {busy === `build:${i.title}` && <Loader2 size={13} className="animate-spin" />} Especificar
-                  </PrimaryButton>
-                </div>
-              </div>
-            ))}
-          </section>
-
-          <section className="space-y-2">
-            <span className="font-mono text-[10.5px] uppercase tracking-wider text-faint">Proyectos</span>
-            {status.projects.length === 0 && <p className="text-[12px] text-faint">Ninguno todavía.</p>}
-            {status.projects.map((p) => (
-              <div key={p.folder} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2">
-                {p.state === "done" ? <CheckCircle2 size={14} className="flex-none text-mint" /> : <CircleDot size={14} className="flex-none text-faint" />}
-                <div className="min-w-0 flex-1">
-                  <span className="block truncate text-[12.5px] font-semibold text-text">{p.title}</span>
-                  <span className="block font-mono text-[10.5px] text-faint">{STATE_LABEL[p.state]} · {p.focus} · {p.client}{p.score !== undefined ? ` · ${p.score}/100` : ""}</span>
-                </div>
-                {p.state === "spec" ? (
-                  <>
-                    <GhostButton onClick={() => void openNote(`${status.space}/programming_practice/projects/_specs/${p.folder}.md`)}>Ver</GhostButton>
-                    <PrimaryButton onClick={() => void run(`construct:${p.folder}`, () => api.ppConstruct(p.folder), (r) => { toast("info", `Carpeta creada: ${r.rel}`); void openNote(`${r.rel}/SPEC.md`); })} disabled={!!busy}>
-                      {busy === `construct:${p.folder}` ? <Loader2 size={13} className="animate-spin" /> : <Hammer size={13} />} Construir
-                    </PrimaryButton>
-                  </>
-                ) : (
-                  <>
-                    <GhostButton onClick={() => void openNote(`${status.space}/programming_practice/projects/${p.folder}/SPEC.md`)}>Especificación</GhostButton>
-                    <PrimaryButton onClick={() => setDefending(p.folder)}><Swords size={13} /> {p.state === "building" ? "Defender" : "Abrir defensa"}</PrimaryButton>
-                  </>
-                )}
-              </div>
-            ))}
-          </section>
-        </>
+        <p className="mt-1 text-[12px] text-faint">Aún sin historial: tras el primer postmortem, cada proyecto se adaptará a tus puntos débiles.</p>
       )}
-    </Modal>
+    </section>
+  );
+
+  const creator = (
+    <section className="space-y-2">
+      <span className="font-mono text-[10.5px] uppercase tracking-wider text-faint">1 · Especificar (pp_build)</span>
+      <p className="text-[11.5px] leading-relaxed text-faint">
+        Todo proyecto lleva base de datos, backend y cliente; la automatización es un extra. La especificación se valida: si falta una capa, la IA la rehace.
+      </p>
+      <div className="grid grid-cols-[150px_1fr] gap-2">
+        <Field label="Foco">
+          <select className={input} value={focus} onChange={(e) => setFocus(e.target.value)}>
+            <option value="">Automático{status.suggestedFocus ? ` (${status.suggestedFocus})` : ""}</option>
+            {FOCUSES.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </Field>
+        <Field label="Qué quieres (opcional)">
+          <input className={input} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Una herramienta para…" />
+        </Field>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <PrimaryButton onClick={() => void run("ideas", () => api.ppIdeas({ focus, notes }), (r) => { setIdeas(r.ideas); showChat(r.conversationId); })} disabled={!!busy}>
+          {busy === "ideas" ? <Loader2 size={13} className="animate-spin" /> : <Hammer size={13} />} Proponer ideas
+        </PrimaryButton>
+        {notes.trim() && (
+          <GhostButton onClick={() => void specify({ title: "", problem: "", focus: focus || undefined })}>Especificar lo que escribí</GhostButton>
+        )}
+        <span className="flex-1" />
+        <input type="number" min={1} max={12} className={cn(input, "!w-16")} value={weeks} onChange={(e) => setWeeks(Number(e.target.value) || 1)} aria-label="Semanas" />
+        <GhostButton onClick={() => void run("plan", () => api.ppPlan({ weeks, notes }), (r) => { setPlan(r.plan); showChat(r.conversationId); toast("info", `Plan guardado en ${r.rel}`); })}>
+          {busy === "plan" && <Loader2 size={13} className="animate-spin" />} Planear semanas
+        </GhostButton>
+      </div>
+      {[...ideas.map((i) => ({ ...i, week: 0 })), ...plan].map((i) => (
+        <div key={`${i.week}:${i.title}`} className="rounded-lg border border-line px-3 py-2">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <span className="block text-[12.5px] font-semibold text-text">{i.week ? `Semana ${i.week} · ` : ""}{i.title}</span>
+              <span className="block text-[11.5px] text-dim">{i.problem}</span>
+              <span className="block font-mono text-[10.5px] text-faint">{i.focus} · {i.client} · {i.hours} h</span>
+            </div>
+            <PrimaryButton onClick={() => void specify(i, i.week || undefined)} disabled={!!busy}>
+              {busy === `build:${i.title}` && <Loader2 size={13} className="animate-spin" />} Especificar
+            </PrimaryButton>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+
+  const list = (
+    <section className="space-y-2">
+      <span className="font-mono text-[10.5px] uppercase tracking-wider text-faint">Proyectos</span>
+      {status.projects.length === 0 && <p className="text-[12px] text-faint">Ninguno todavía. Propón ideas y especifica la primera.</p>}
+      {status.projects.map((p) => (
+        <div key={p.folder} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2">
+          {p.state === "done" ? <CheckCircle2 size={14} className="flex-none text-mint" /> : <CircleDot size={14} className="flex-none text-faint" />}
+          <div className="min-w-0 flex-1">
+            <span className="block truncate text-[12.5px] font-semibold text-text">{p.title}</span>
+            <span className="block font-mono text-[10.5px] text-faint">{STATE_LABEL[p.state]} · {p.focus} · {p.client}{p.score !== undefined ? ` · ${p.score}/100` : ""}</span>
+          </div>
+          {p.state === "spec" ? (
+            <>
+              <GhostButton onClick={() => void openNote(`${status.space}/programming_practice/projects/_specs/${p.folder}.md`)}>Ver</GhostButton>
+              <PrimaryButton onClick={() => void run(`construct:${p.folder}`, () => api.ppConstruct(p.folder), (r) => { toast("info", `Carpeta creada: ${r.rel}`); void openNote(`${r.rel}/SPEC.md`); })} disabled={!!busy}>
+                {busy === `construct:${p.folder}` ? <Loader2 size={13} className="animate-spin" /> : <Hammer size={13} />} Construir
+              </PrimaryButton>
+            </>
+          ) : (
+            <>
+              <GhostButton onClick={() => void openNote(`${status.space}/programming_practice/projects/${p.folder}/SPEC.md`)}>Especificación</GhostButton>
+              <PrimaryButton onClick={() => setDefending(p.folder)}><Swords size={13} /> {p.state === "building" ? "Defender" : "Abrir defensa"}</PrimaryButton>
+            </>
+          )}
+        </div>
+      ))}
+      <p className="font-mono text-[10.5px] leading-relaxed text-faint">
+        Las especificaciones se guardan en projects/_specs · cada proyecto vive en su propia carpeta, projects/&lt;nombre&gt;.
+      </p>
+    </section>
+  );
+
+  if (!page) {
+    return (
+      <div className="space-y-4">
+        {kata}
+        {profile}
+        {creator}
+        {list}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <header className="space-y-1">
+        <h1 className="text-[22px] font-semibold tracking-tight text-text">Proyectos semanales</h1>
+        <p className="text-[13px] leading-relaxed text-dim">
+          Un proyecto full stack pequeño por semana: base de datos, backend y cliente siempre; la automatización suma como extra.
+        </p>
+      </header>
+
+      <ol className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2" aria-label="Fases">
+        {PHASES.map((ph) => (
+          <li key={ph.key} className="rounded-xl border border-line bg-card px-3 py-2.5">
+            <span className="block truncate font-mono text-[10.5px] uppercase tracking-wider text-faint" title={ph.hint}>{ph.n} · {ph.hint}</span>
+            <span className="mt-0.5 block text-[14px] font-semibold text-text">{ph.label}</span>
+            <span className="block text-[12px] text-dim">{count(ph.key)} {count(ph.key) === 1 ? "proyecto" : "proyectos"}</span>
+          </li>
+        ))}
+      </ol>
+
+      {kata}
+      {profile}
+      {creator}
+      {list}
+    </div>
   );
 }
 

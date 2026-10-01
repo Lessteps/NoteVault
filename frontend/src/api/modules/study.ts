@@ -19,7 +19,7 @@ import {
   skillLabel,
 } from "../../core/practice/recommender.js";
 import { StudyArea, detectStudyArea } from "../../core/practice/studyArea.js";
-import { ensureExerciseSetFile, ensureOverviewFile, ensureTopicViewFiles, isExerciseFolder, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf, overviewFileText, viewFileName } from "../../core/practice/viewFiles.js";
+import { ensureExerciseSetFile, ensureProjectsViewFile, projectsFolderOf, ensureOverviewFile, ensureTopicViewFiles, isExerciseFolder, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf, overviewFileText, viewFileName } from "../../core/practice/viewFiles.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { LAYOUT } from "../../core/vaultFormat.js";
@@ -745,6 +745,12 @@ export function studyApi(app: AppState) {
           created: created ? [app.rel(file)] : [],
           errors: [],
         };
+      }
+      // programming_practice/projects (and its _specs folder) open the weekly-project workspace.
+      const projectsAbs = stat.isDirectory() ? projectsFolderOf(folderAbs) : null;
+      if (projectsAbs) {
+        const { file, created } = ensureProjectsViewFile(projectsAbs);
+        return { ok: true, kind: "proyectos", path: app.rel(file).split(path.sep).join("/"), created: created ? [app.rel(file)] : [], errors: [] };
       }
       // The subject root groups areas: it gets its overview and nothing else.
       const subjectRoot = isSubjectRoot(app.root, folderAbs);

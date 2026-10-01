@@ -14,6 +14,7 @@ import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
 import { PracticeView } from "../practice/PracticeView";
 import { ExerciseFolderView } from "../practice/ExerciseFolderView";
+import { PracticeProjectsView } from "../practice/PracticeProjectDialog";
 import { InkPad } from "../practice/InkPad";
 import { ResumenView } from "../study/ResumenView";
 import { TeoricaView } from "../study/TeoricaView";
@@ -352,6 +353,7 @@ export function EditorArea() {
                       : mode === "read" && isViewFile(note, "teorica") ? <TeoricaView note={note} />
                         : mode === "read" && isViewFile(note, "resumen") ? <ResumenView note={note} />
                         : mode === "read" && isViewFile(note, "ejercicios") ? <ExerciseFolderView note={note} />
+                        : mode === "read" && isViewFile(note, "proyectos") ? <PracticeProjectsView />
                         : mode === "read" && isViewFile(note, "dibujo") ? <InkPad note={note} />
                         : mode === "read" && isExercise(note) ? <PracticeView note={note} />
                       : mode === "read" && ladderOn ? <LadderView path={note.path} onExit={() => useLadder.getState().set(note.path, false)} />

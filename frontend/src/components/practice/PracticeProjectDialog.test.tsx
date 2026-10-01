@@ -26,7 +26,7 @@ const invoke = vi.fn(async (method: string, ..._args: unknown[]) => {
 });
 (window as unknown as { nv: unknown }).nv = { invoke: (m: string, a: unknown[]) => invoke(m, ...(a ?? [])) };
 
-import { PracticeProjectDialog, isPracticePath, usePracticeDialog } from "./PracticeProjectDialog";
+import { PracticeProjectDialog, PracticeProjectsView, isPracticePath, usePracticeDialog } from "./PracticeProjectDialog";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -118,5 +118,41 @@ describe("PracticeProjectDialog", () => {
     expect(container.textContent).toContain("app/routes.py:41");
     expect(container.textContent).toContain("Why a repository layer?");
     expect(button(/Calificar mi defensa/)).toBeTruthy();
+  });
+});
+
+describe("PracticeProjectsView (the projects folder opens it, like the kata opens its practice view)", () => {
+  it("is a full page with the four phases and how many projects are in each", async () => {
+    status = {
+      ...baseStatus,
+      projects: [
+        { folder: "A", title: "Only a spec", state: "spec", focus: "backend", client: "web" },
+        { folder: "B", title: "Building", state: "building", focus: "desktop", client: "desktop" },
+        { folder: "C", title: "Also building", state: "building", focus: "frontend", client: "web" },
+        { folder: "D", title: "Closed", state: "done", focus: "databases", client: "web", score: 80 },
+      ],
+    };
+    act(() => root.render(<PracticeProjectsView />));
+    await flush();
+    expect(container.querySelector("[data-testid=projects-view]")).toBeTruthy();
+    expect(container.textContent).toContain("Proyectos semanales");
+    const phases = [...container.querySelectorAll("ol[aria-label=Fases] li")].map((li) => li.textContent);
+    expect(phases).toHaveLength(4);
+    expect(phases[0]).toContain("Especificar");
+    expect(phases[0]).toContain("1 proyecto");
+    expect(phases[1]).toContain("2 proyectos");
+    expect(phases[3]).toContain("Postmortem");
+    // the creation tools and the project list are on the page itself, not behind a dialog
+    expect(button(/Proponer ideas/)).toBeTruthy();
+    expect(button(/Construir/)).toBeTruthy();
+    expect(container.textContent).toContain("projects/_specs");
+    expect(container.querySelector("[role=dialog]")).toBeNull();
+  });
+
+  it("offers to create the area from the page when it is missing", async () => {
+    status = { ...baseStatus, ready: false, kataReady: false };
+    act(() => root.render(<PracticeProjectsView />));
+    await flush();
+    expect(button(/Crear el área/)).toBeTruthy();
   });
 });

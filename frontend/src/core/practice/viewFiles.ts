@@ -24,7 +24,7 @@ import {
   type TopicManifest,
 } from "./topic.js";
 
-export const VIEW_FILE_KINDS = ["teorica", "practica", "resumen", "ejercicios", "dibujo"] as const;
+export const VIEW_FILE_KINDS = ["teorica", "practica", "resumen", "ejercicios", "dibujo", "proyectos"] as const;
 export type ViewFileKind = (typeof VIEW_FILE_KINDS)[number];
 
 /** The manifest file every `practica` view carries the topic inside of. */
@@ -235,6 +235,43 @@ export function ensureExerciseSetFile(folderAbs: string): { file: string; create
   const file = path.join(folderAbs, viewFileName(name, "ejercicios"));
   if (fs.existsSync(file)) return { file, created: false };
   fs.writeFileSync(file, exerciseSetFileText(name), "utf-8");
+  return { file, created: true };
+}
+
+// ── programming_practice: the projects workspace ───────────────────────────
+
+/** The area folder that holds practice (it has no number, so the name is what identifies it). */
+export const PRACTICE_AREA_FOLDER = "programming_practice";
+export const PROJECTS_FOLDER = "projects";
+
+/**
+ * The `projects` folder of the practice area when `folderAbs` is it (or its `_specs` folder, where specifications are
+ * written): both open the same project workspace. Null for any other folder.
+ */
+export function projectsFolderOf(folderAbs: string): string | null {
+  const own = path.basename(folderAbs);
+  const parent = path.dirname(folderAbs);
+  if (own === PROJECTS_FOLDER && path.basename(parent) === PRACTICE_AREA_FOLDER) return folderAbs;
+  if (own === "_specs" && path.basename(parent) === PROJECTS_FOLDER && path.basename(path.dirname(parent)) === PRACTICE_AREA_FOLDER) return parent;
+  return null;
+}
+
+export function projectsViewFileText(title: string): string {
+  const body = [
+    `# ${title}`,
+    "",
+    "Espacio de proyectos semanales (full stack): especificar, construir, defender y cerrar con un postmortem.",
+    "Esta vista se abre sola al pulsar la carpeta; aquí no hay nada que editar.",
+    "",
+  ].join("\n");
+  return dumpFrontmatter({ type: "proyectos", title, subject: "programming" }) + "\n" + body;
+}
+
+/** Creates `projects.proyectos.md` when it is missing; returns its absolute path. */
+export function ensureProjectsViewFile(projectsAbs: string): { file: string; created: boolean } {
+  const file = path.join(projectsAbs, viewFileName(path.basename(projectsAbs), "proyectos"));
+  if (fs.existsSync(file)) return { file, created: false };
+  fs.writeFileSync(file, projectsViewFileText("Proyectos"), "utf-8");
   return { file, created: true };
 }
 

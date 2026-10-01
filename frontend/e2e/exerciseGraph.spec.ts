@@ -49,11 +49,9 @@ test("NV-X-010 la gráfica dibuja líneas cuando hay reps registradas", async ()
   await reps.press("Enter");
   await expect(reps).toHaveValue("12", { timeout: 15_000 });
 
-  // 2. La pestaña de la gráfica, dentro de Progreso.
+  // 2. La gráfica vive en Progreso → Músculos.
   await side().getByRole("button", { name: "Progreso" }).click();
-  const tab = win.getByRole("tab", { name: "Gráfica" });
-  await expect(tab).toBeVisible({ timeout: 15_000 });
-  await tab.click();
+  await win.locator('[data-progress-tab="musculos"]').click();
 
   const graph = win.locator("[data-progress-graph]");
   await expect(graph).toBeVisible({ timeout: 15_000 });
@@ -75,7 +73,7 @@ test("NV-X-010 la gráfica dibuja líneas cuando hay reps registradas", async ()
   await expect(reps2).toHaveValue("8", { timeout: 15_000 });
 
   await side().getByRole("button", { name: "Progreso" }).click();
-  await win.getByRole("tab", { name: "Gráfica" }).click();
+  await win.locator('[data-progress-tab="musculos"]').click();
   const graph2 = win.locator("[data-progress-graph]");
   await expect(graph2).toBeVisible({ timeout: 15_000 });
   await expect(graph2.locator("path")).not.toHaveCount(0, { timeout: 15_000 });
@@ -95,14 +93,14 @@ test("NV-X-010 la gráfica dibuja líneas cuando hay reps registradas", async ()
 
 test("NV-X-011 la pestaña Año no rompe con el límite de rango del backend", async () => {
   await side().getByRole("button", { name: "Progreso" }).click();
-  const tab = win.getByRole("tab", { name: "Gráfica" });
+  const tab = win.locator('[data-progress-tab="musculos"]');
   await expect(tab).toBeVisible({ timeout: 15_000 });
   await tab.click();
   await expect(win.locator("[data-progress-graph]")).toBeVisible({ timeout: 15_000 });
 
   // ex_days rechaza rangos de más de 31 días; el Año son 365.
-  await win.getByRole("tab", { name: "Año" }).click();
-  await win.getByRole("tab", { name: "Gráfica" }).click();
+  await win.locator('[data-progress-tab="anio"]').click();
+  await win.locator('[data-progress-tab="musculos"]').click();
 
   // Con el rango troceado no sale el toast de "Rango de fechas inválido" y la
   // gráfica sigue respondiendo.

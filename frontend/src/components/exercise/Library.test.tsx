@@ -26,6 +26,7 @@ const invoke = vi.fn(async (method: string): Promise<unknown> => {
 (window as unknown as { nv: unknown }).nv = { invoke };
 
 import { useExercise } from "../../store/exercise";
+import { useNavState } from "../../store/navState";
 import { weekdayKeyOf } from "../../lib/exercise";
 import { todayIso } from "../../lib/tasks";
 import { ExerciseModule } from "./ExerciseModule";
@@ -43,6 +44,9 @@ function mount(node: React.ReactElement) {
 
 beforeEach(() => {
   invoke.mockClear();
+  // La navegación se recuerda en un store global; sin limpiarlo, una prueba
+  // deja la vista de Progreso apuntando donde la anterior la puso.
+  useNavState.setState({ values: {} });
   useExercise.setState({
     days: [{ key: "lunes", name: "Lunes", subtitle: "Pecho", glyph: "💪" }],
     list: [],
@@ -70,16 +74,14 @@ describe("ejercicio", () => {
         await Promise.resolve();
       });
 
-      // Dentro, los tres periodos como conmutador.
+      // Dentro, Rejilla · Músculos · Año.
       const tabs = host.querySelector("[data-progress-tabs]")!;
-      expect(tabs).not.toBeNull();
-      expect(tabs.textContent).toContain("Semana");
-      expect(tabs.textContent).toContain("Mes");
+      expect(tabs.textContent).toContain("Rejilla");
+      expect(tabs.textContent).toContain("Músculos");
       expect(tabs.textContent).toContain("Año");
 
-      // Solo se ve un periodo a la vez.
+      // Solo se ve una vista a la vez.
       expect(host.querySelectorAll("[data-progress-view]")).toHaveLength(1);
-      expect(host.textContent).toContain("Semana");
     } finally {
       cleanup();
     }
@@ -125,6 +127,97 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
+  it("el progreso tiene tres pestañas, no cinco", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Progreso"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const tabs = [...host.querySelectorAll("[data-progress-tab]")].map((t) =>
+        t.textContent?.trim(),
+      );
+      // Semana y Mes viven en una; Mapa y Gráfica, en otra.
+      expect(tabs).toEqual(["Rejilla", "Músculos", "Año"]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("la pestaña Rejilla trae el selector de periodo y la rejilla", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Progreso"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      // El estado de navegación es global: se elige la pestaña explícitamente.
+      await act(async () => {
+        host.querySelector('[data-progress-tab="rejilla"]')!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const period = host.querySelector("[data-grid-period]")!;
+      expect(period).not.toBeNull();
+      expect(period.textContent).toContain("Semana");
+      expect(period.textContent).toContain("Mes");
+
+      await act(async () => {
+        host.querySelector('[data-grid-period="mes"]')!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(host.textContent).toContain("Mes");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("la pestaña Músculos alterna entre el mapa grande y la gráfica", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Progreso"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        host.querySelector('[data-progress-tab="musculos"]')!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        host.querySelector('[data-progress-tab="musculos"]')!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const sub = host.querySelector("[data-muscle-view]")!;
+      expect(sub).not.toBeNull();
+      expect(sub.textContent).toContain("Gráfica");
+      expect(sub.textContent).toContain("Cuerpo");
+
+      await act(async () => {
+        host.querySelector('[data-muscle-view="mapa"]')!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(host.querySelector("[data-progress-map]")).not.toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
   it("el progreso tiene una gráfica de líneas con un selector de grupos", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {
@@ -135,11 +228,9 @@ describe("Biblioteca de Ejercicio", () => {
         await Promise.resolve();
       });
 
-      // La gráfica es su propia pestaña dentro de Progreso.
-      const tabs = host.querySelector("[data-progress-tabs]")!;
-      expect(tabs.textContent).toContain("Gráfica");
+      // La gráfica vive en Músculos → Gráfica.
       await act(async () => {
-        host.querySelector('[data-progress-tab="grafica"]')!
+        host.querySelector('[data-progress-tab="musculos"]')!
           .dispatchEvent(new MouseEvent("click", { bubbles: true }));
         await Promise.resolve();
       });
@@ -190,10 +281,13 @@ describe("Biblioteca de Ejercicio", () => {
       });
 
       const tabs = host.querySelector("[data-progress-tabs]")!;
-      expect(tabs.textContent).toContain("Mapa");
+      expect(tabs.textContent).toContain("Músculos");
 
       await act(async () => {
-        host.querySelector('[data-progress-tab="mapa"]')!
+        host.querySelector('[data-progress-tab="musculos"]')!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+        host.querySelector('[data-muscle-view="mapa"]')!
           .dispatchEvent(new MouseEvent("click", { bubbles: true }));
         await Promise.resolve();
       });

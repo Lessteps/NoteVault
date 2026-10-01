@@ -89,15 +89,18 @@ test("NV-X-003 la vista general y el progreso cambian el panel", async () => {
   await side().getByRole("button", { name: "Vista general" }).click();
   await expect(win.getByRole("heading", { name: "Vista general" })).toBeVisible({ timeout: 15_000 });
 
-  // Semanal, mensual y anual viven ya dentro de Progreso.
+  // Las rejillas, el mapa y la gráfica viven dentro de Progreso.
   await side().getByRole("button", { name: "Progreso" }).click();
   await expect(win.getByRole("heading", { name: "Progreso" })).toBeVisible({ timeout: 15_000 });
-  for (const period of ["Mes", "Año", "Semana"]) {
-    await win.getByRole("tab", { name: period }).click();
-    await expect(win.getByRole("tab", { name: period })).toHaveAttribute("aria-selected", "true", {
-      timeout: 15_000,
-    });
-  }
+
+  await expect(win.getByRole("tab", { name: "Rejilla" })).toHaveCount(1);
+  await win.getByRole("tab", { name: "Músculos" }).click();
+  await expect(win.getByRole("tab", { name: "Músculos" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+    { timeout: 15_000 },
+  );
+  await expect(win.getByRole("tab", { name: "Gráfica" })).toBeVisible({ timeout: 15_000 });
 });
 
 test("NV-X-004 el mapa muscular del dia se abre y se cierra", async () => {

@@ -243,6 +243,43 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
+  it("enfoca el buscador al entrar y Esc limpia la búsqueda", async () => {
+    const { host, cleanup } = mount(<Library />);
+    try {
+      const search = host.querySelector<HTMLInputElement>('input[aria-label="Buscar ejercicios"]')!;
+      // Autofoco: se puede escribir sin clicar nada.
+      expect(search).toBe(document.activeElement);
+
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        setter?.call(search, "squat");
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        await Promise.resolve();
+      });
+      const filtered = host.querySelectorAll("[data-slug]").length;
+      expect(filtered).toBeGreaterThan(0);
+      expect(filtered).toBeLessThan(302);
+
+      // Esc vacía solo el texto, no los filtros de equipo/músculo.
+      const equipment = host.querySelector<HTMLSelectElement>(
+        'select[aria-label="Filtrar por equipo"]',
+      )!;
+      await act(async () => {
+        equipment.value = "Barbell";
+        equipment.dispatchEvent(new Event("change", { bubbles: true }));
+        await Promise.resolve();
+      });
+      await act(async () => {
+        search.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(search.value).toBe("");
+      expect(equipment.value).toBe("Barbell");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("muestra las ilustraciones locales sobre fondo oscuro (arte blanco)", async () => {
     const { host, cleanup } = mount(<Library />);
     try {

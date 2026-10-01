@@ -7,7 +7,7 @@
 // músculo), la lista y el detalle. La barra de arriba no se desplaza, así que
 // los filtros siguen a mano con 302 filas debajo.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { weekdayKeyOf } from "../../lib/exercise";
 import { todayIso } from "../../lib/tasks";
@@ -40,6 +40,11 @@ export function Library() {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  // Se entra aquí para escribir, no para tener que clicar el buscador.
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   // La Biblioteca no pregunta el día: lo que se añade entra en la rutina del
   // día de hoy. Para moverlo de día, Gestionar ejercicios.
@@ -103,12 +108,21 @@ export function Library() {
         <span className="font-mono text-[11.5px] text-faint">{rows.length} de 302</span>
         <span className="flex-1" />
         <input
+          ref={searchRef}
           className={cn(input, "w-56")}
           placeholder="Buscar ejercicios…"
           aria-label="Buscar ejercicios"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onInput={(e) => setQ((e.target as HTMLInputElement).value)}
+          // Esc limpia solo el texto: los filtros de equipo y músculo se
+          // conservan, porque suelen ser una decisión distinta.
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setQ("");
+            }
+          }}
         />
         <select
           className={cn(input, "w-36")}

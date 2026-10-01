@@ -131,7 +131,7 @@ export function exerciseApi(app: AppState) {
     const hit = m.resolveVideo(e);
     if (!hit) {
       throw new ApiError(
-        "No se encontró el video. Vincúlalo en «Gestionar ejercicios»."
+        "No se encontró el video. Vincúlalo en «Ejercicios · Tu rutina»."
       );
     }
     const ext = path.extname(hit).toLowerCase();

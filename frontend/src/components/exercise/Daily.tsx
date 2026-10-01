@@ -110,7 +110,7 @@ export function DayList({ date, day, onVideo, onChanged, compact }: {
   compact?: boolean;
 }) {
   if (!day || !day.exercises.length) {
-    return <p className="py-10 text-center text-[13px] text-faint">Día de descanso: no hay ejercicios. Añádelos en «Gestionar ejercicios».</p>;
+    return <p className="py-10 text-center text-[13px] text-faint">Día de descanso: no hay ejercicios. Añádelos en «Ejercicios · Tu rutina».</p>;
   }
   return (
     <div className="space-y-2">

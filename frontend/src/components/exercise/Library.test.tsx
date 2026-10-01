@@ -6,6 +6,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const invoke = vi.fn(async (method: string): Promise<unknown> => {
   if (method === "ex_list") return [];
   if (method === "ex_save") return { ok: true };
+  if (method === "ex_meta") return { days: [{ key: "lunes", name: "Lunes", subtitle: "Pecho", glyph: "💪" }] };
+  if (method === "ex_stats") {
+    return {
+      year: 2026,
+      today: { done: 0, total: 0, pct: 0 },
+      week: { done: 0, total: 0, pct: 0, trained: 0, due: 0 },
+      month: { done: 0, total: 0, pct: 0, trained: 0, due: 0 },
+      anual: { done: 0, total: 0, pct: 0, trained: 0, due: 0 },
+      streak: { current: 0, best: 0 },
+    };
+  }
+  if (method === "ex_overview") {
+    return { week: 0, month: 0, year: 2026, grid: {}, breakdown: [] };
+  }
+  if (method === "ex_days") return [];
   return { ok: true };
 });
 (window as unknown as { nv: unknown }).nv = { invoke };
@@ -13,6 +28,7 @@ const invoke = vi.fn(async (method: string): Promise<unknown> => {
 import { useExercise } from "../../store/exercise";
 import { weekdayKeyOf } from "../../lib/exercise";
 import { todayIso } from "../../lib/tasks";
+import { ExerciseModule } from "./ExerciseModule";
 import { Library } from "./Library";
 
 function mount(node: React.ReactElement) {
@@ -33,6 +49,40 @@ beforeEach(() => {
     stats: null,
     loaded: true,
     error: null,
+  });
+});
+
+describe("ejercicio", () => {
+  it("el progreso agrupa semanal, mensual y anual en una sola vista", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      // La barra lateral ya no ofrece Semanal, Mensual ni Anual sueltos.
+      const side = () => [...host.querySelectorAll("aside nav button")];
+      const labels = side().map((b) => b.textContent ?? "");
+      expect(labels.some((l) => l.includes("Semanal"))).toBe(false);
+      expect(labels.some((l) => l.includes("Mensual"))).toBe(false);
+      expect(labels.some((l) => l.includes("Anual"))).toBe(false);
+      expect(labels.some((l) => l.includes("Progreso"))).toBe(true);
+
+      await act(async () => {
+        side().find((b) => b.textContent?.includes("Progreso"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      // Dentro, los tres periodos como conmutador.
+      const tabs = host.querySelector("[data-progress-tabs]")!;
+      expect(tabs).not.toBeNull();
+      expect(tabs.textContent).toContain("Semana");
+      expect(tabs.textContent).toContain("Mes");
+      expect(tabs.textContent).toContain("Año");
+
+      // Solo se ve un periodo a la vez.
+      expect(host.querySelectorAll("[data-progress-view]")).toHaveLength(1);
+      expect(host.textContent).toContain("Semana");
+    } finally {
+      cleanup();
+    }
   });
 });
 

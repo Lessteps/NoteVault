@@ -85,10 +85,18 @@ test("NV-X-002 marcar un ejercicio persiste en el dia", async () => {
   expect(readdirSync(join(exerciseDir(), String(new Date().getFullYear()), p)).length).toBe(1);
 });
 
-test("NV-X-003 vistas general semanal mensual anual cambian el panel", async () => {
-  for (const view of ["Vista general", "Semanal", "Mensual", "Anual"]) {
-    await side().getByRole("button", { name: view }).click();
-    await expect(win.getByRole("heading", { name: view })).toBeVisible({ timeout: 15_000 });
+test("NV-X-003 la vista general y el progreso cambian el panel", async () => {
+  await side().getByRole("button", { name: "Vista general" }).click();
+  await expect(win.getByRole("heading", { name: "Vista general" })).toBeVisible({ timeout: 15_000 });
+
+  // Semanal, mensual y anual viven ya dentro de Progreso.
+  await side().getByRole("button", { name: "Progreso" }).click();
+  await expect(win.getByRole("heading", { name: "Progreso" })).toBeVisible({ timeout: 15_000 });
+  for (const period of ["Mes", "Año", "Semana"]) {
+    await win.getByRole("tab", { name: period }).click();
+    await expect(win.getByRole("tab", { name: period })).toHaveAttribute("aria-selected", "true", {
+      timeout: 15_000,
+    });
   }
 });
 

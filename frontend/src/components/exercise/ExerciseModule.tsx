@@ -5,14 +5,12 @@
 // lateral y los dashboards circulares en la vista general.
 
 import {
-  CalendarDays,
   CalendarRange,
   ChevronLeft,
   Dumbbell,
   ExternalLink,
   Film,
   LayoutGrid,
-  ListChecks,
   Link2,
   Pencil,
   Settings2,
@@ -29,13 +27,12 @@ import { ModuleSidebar } from "../ModuleSidebar";
 import { Field, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn, confirmAction, IconButton } from "../ui";
 import { Daily } from "./Daily";
-import { ExerciseMonth, ExerciseWeek } from "./Grids";
 import { Library } from "./Library";
+import { Progress } from "./Progress";
 import { Overview } from "./Overview";
 import { ORANGE, SideStats, useFail } from "./parts";
 import { MuscleCount, MusclePicker } from "./MusclePicker";
 import { MuscleMapDebug } from "./MuscleMapDebug";
-import { Yearly } from "./Yearly";
 
 const EMPTY: Partial<Exercise> = { day: "lunes", name: "", video_path: "", series_reps: "", rest: "", how_to: "", muscles: { primary: [], secondary: [] } };
 
@@ -191,8 +188,14 @@ export function ExerciseModule() {
   const list = useExercise((s) => s.list);
   const stats = useExercise((s) => s.stats);
   // Su vista interna (general / diaria / …) se recuerda entre pestañas.
-  const [view, setView] = usePersistedNav("ejercicio.view", "general");
+  const [storedView, setView] = usePersistedNav("ejercicio.view", "general");
   const [video, setVideo] = useState<Exercise | null>(null);
+
+  // Antes el módulo tenía semanal/mensual/anual sueltos; ahora viven dentro de
+  // Progreso. Quien los tuviera guardados cae en la vista general en vez de
+  // quedarse en una pantalla que ya no existe.
+  const VIEWS = ["general", "diaria", "progreso", "biblioteca", "gestionar"];
+  const view = VIEWS.includes(storedView) ? storedView : "general";
 
   useEffect(() => {
     void load();
@@ -212,9 +215,7 @@ export function ExerciseModule() {
         items={[
           { id: "general", label: "Vista general", hint: "Rachas y dashboards", icon: <LayoutGrid /> },
           { id: "diaria", label: "Diaria", hint: "Rutina del día", icon: <Sun />, badge: pendingToday },
-          { id: "semanal", label: "Semanal", icon: <CalendarRange /> },
-          { id: "mensual", label: "Mensual", icon: <CalendarDays /> },
-          { id: "anual", label: "Anual", icon: <ListChecks /> },
+          { id: "progreso", label: "Progreso", hint: "Semana · mes · año", icon: <CalendarRange /> },
           { id: "biblioteca", label: "Biblioteca", hint: "302 ejercicios", icon: <Dumbbell /> },
           { id: "gestionar", label: "Gestionar ejercicios", hint: `${list.length} ejercicios`, icon: <Settings2 /> },
         ]}
@@ -230,11 +231,9 @@ export function ExerciseModule() {
           <div className="grid flex-1 place-items-center text-[13px] text-danger">{error}</div>
         ) : view === "general" ? <Overview onVideo={setVideo} />
           : view === "diaria" ? <Daily onVideo={setVideo} />
-            : view === "semanal" ? <ExerciseWeek />
-              : view === "mensual" ? <ExerciseMonth />
-                : view === "anual" ? <Yearly />
-                  : view === "biblioteca" ? <Library />
-                    : <Manage />}
+            : view === "progreso" ? <Progress />
+              : view === "biblioteca" ? <Library />
+                : <Manage />}
       </main>
     </div>
   );

@@ -26,6 +26,41 @@ const PERIOD_TITLE: Record<ProgressPeriod, string> = {
   anio: "el año",
 };
 
+/**
+ * `ex_days` rechaza los rangos de más de 31 días (`Rango de fechas inválido`),
+ * así que un año entero se pide a trozos y se unen. Con 31 de salto, un año son
+ * 12 llamadas: pocas y en paralelo.
+ */
+const MAX_SPAN = 30;
+
+async function fetchRange(from: string, to: string): Promise<MetricDay[]> {
+  if (from >= to) return api.exDays(from, to);
+  const chunks: string[] = [];
+  let cursor = from;
+  for (let guard = 0; guard < 100 && cursor <= to; guard += 1) {
+    const d = new Date(cursor);
+    d.setDate(d.getDate() + MAX_SPAN);
+    const end = d > new Date(to) ? to : isoOf(d);
+    chunks.push(cursor, end);
+    if (end >= to) break;
+    cursor = addDaysIso(end, 1);
+  }
+  const out: MetricDay[] = [];
+  for (let i = 0; i < chunks.length; i += 2) {
+    out.push(...(await api.exDays(chunks[i]!, chunks[i + 1]!)));
+  }
+  return out;
+}
+
+const isoOf = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const addDaysIso = (iso: string, n: number) => {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  const date = new Date(y, m - 1, d + n);
+  return isoOf(date);
+};
+
 /** Un color por grupo, en el orden del catálogo, para que no cambien de sitio. */
 const COLOURS: Record<string, string> = {
   Pecho: "#f97316",
@@ -54,8 +89,7 @@ const [off, setOff] = usePersistedNav<string[]>("ejercicio.grafico.grupos", []);
     const now = new Date();
     const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const [from, to] = periodRange(period, iso);
-    api
-      .exDays(from, to)
+    fetchRange(from, to)
       .then((rows) => {
         if (alive) setDays(rows);
       })

@@ -11,6 +11,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseIsoDate, todayIso, weekday } from "./dates";
 import { DEFAULT_EXERCISES } from "./exerciseDefaults";
+import { routineMuscles } from "./routineMuscles";
 import { LAYOUT } from "./vaultFormat";
 
 export interface ExerciseEntry {
@@ -108,6 +109,12 @@ export class ExerciseManager {
       }
     }
     const defaults = DEFAULT_EXERCISES.map((e) => ({ ...e }));
+    // Los defaults nacean sin músculos: el mapa y la gráfica no tienen nada que
+    // pintar sin ellos. El mapeo está en `routineMuscles.ts`.
+    for (const e of defaults) {
+      const m = routineMuscles(e.id);
+      if (m) (e as unknown as { muscles: unknown }).muscles = m;
+    }
     this._exercises = defaults;
     this.saveExercises();
     return defaults;

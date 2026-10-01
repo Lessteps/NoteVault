@@ -6,6 +6,8 @@ import {
   VIDEO_EXTS,
 } from "../../core/exerciseManager.js";
 import { normalizeMuscles } from "../../core/exerciseMuscles.js";
+import { exercises as CATALOG } from "@bryllim/workout-guide";
+import type { LibraryUserEntry } from "../../lib/libraryTypes.js";
 import type { AppState } from "../appState.js";
 import { clampInt, oneLine, optDate } from "../common.js";
 import { MediaServer } from "../media.js";
@@ -109,8 +111,31 @@ function openWithSystem(filePath: string): void {
   }
 }
 
+/**
+ * La clave con la que se reconoce un ejercicio. Case-insensitive y con los
+ * espacios internos colapsados: es lo que hace que «  MI   PRESS » y
+ * «mi press» sean el mismo ejercicio y no dos.
+ */
+export function normalizeLibraryName(name: string): string {
+  return String(name ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * `nombre normalizado -> slug` del catálogo de 302.
+ *
+ * Se lee del paquete directamente y **no** de `lib/exerciseLibrary.ts`: ese
+ * fichero es del renderer y arrastrarlo aquí se traería el mapa corporal y sus
+ * dependencias al proceso de Electron sin necesitar nada de eso.
+ */
+function catalogSlugByName(): Map<string, string> {
+  return new Map(
+    CATALOG.map((e) => [normalizeLibraryName(e.name), e.slug]),
+  );
+}
+
 export function exerciseApi(app: AppState) {
   const mgr = () => app.mgrs().exercise;
+  const lib = () => app.mgrs().library;
   let media: MediaServer | null = null;
   const server = (): MediaServer => (media ??= new MediaServer());
 
@@ -219,9 +244,77 @@ export function exerciseApi(app: AppState) {
       return { ok: true, pct: m.dayPct(d) };
     },
 
+    ex_library_list(): LibraryUserEntry[] {
+      return lib().entries();
+    },
+
+    /**
+     * Guarda en la biblioteca propia.
+     *
+     * Si el nombre ya existe —en tus entradas o en el catálogo— **edita esa**,
+     * no crea otra. Esa es la garantía: no hay ruta en el código que produzca
+     * un duplicado. Si el nombre viene del catálogo, la entrada propia se crea
+     * con **su** slug, y en la biblioteca sigue habiendo un solo bench-press.
+     *
+     * Solo se escriben los campos que llegan con contenido: uno vacío
+     * significa «déjalo como estaba», no «bórralo».
+     */
+    ex_library_save(fields: unknown) {
+      const f = (fields ?? {}) as Record<string, unknown>;
+      const name = oneLine(f.name, 120);
+      if (!name) {
+        throw new ApiError("El ejercicio necesita un nombre.");
+      }
+      const howTo = String(f.how_to || "").slice(0, 4000).trim();
+      const equipment = oneLine(f.equipment, 60);
+      const muscles = normalizeMuscles(f.muscles);
+
+      const store = lib();
+      const entries = store.entries();
+      const key = normalizeLibraryName(name);
+
+      const propia = entries.find((e) => normalizeLibraryName(e.name) === key);
+      // ¿El nombre es uno del catálogo? Si lo es, la entrada propia que se crea
+      // usa **su** slug: así el ejercicio sigue siendo el mismo y no aparece
+      // dos veces con nombres parecidos.
+      const slugDelCatalogo = propia
+        ? null
+        : catalogSlugByName().get(key) ?? null;
+      const actual: Partial<LibraryUserEntry> & { slug?: string } | null = propia ?? (slugDelCatalogo
+        ? { slug: slugDelCatalogo, name, equipment: "", muscles: { primary: [], secondary: [] }, how_to: "" }
+        : null);
+
+      // Un campo llega si trae algo; si no, se conserva el que había.
+      const next: LibraryUserEntry = {
+        slug: actual?.slug ?? `mia-${Math.random().toString(36).slice(2, 10)}`,
+        name,
+        equipment: equipment || actual?.equipment || "",
+        muscles: muscles.primary.length || muscles.secondary.length
+          ? { primary: muscles.primary, secondary: muscles.secondary }
+          : actual?.muscles ?? { primary: [], secondary: [] },
+        how_to: howTo || actual?.how_to || "",
+      };
+
+      const resto = entries.filter((e) => e.slug !== next.slug);
+      store.save([...resto, next]);
+      return { entry: next, created: !actual, updatedFrom: actual?.slug };
+    },
+
+    /** Borra una entrada propia. El catálogo no se puede borrar. */
+    ex_library_remove(slug: string): boolean {
+      const s = String(slug ?? "");
+      // Los `mia-` son tuyos. Sin prefijo sería del paquete, y 302 ejercicios
+      // escritos no se borran porque alguien vacíe su fichero.
+      if (!s.startsWith("mia-")) return false;
+      const store = lib();
+      const entries = store.entries();
+      if (!entries.some((e) => e.slug === s)) return false;
+      store.save(entries.filter((e) => e.slug !== s));
+      return true;
+    },
+
     ex_overview(year = 0, exerciseId = "") {
-      const m = mgr();
-      const today = new Date();
+      const m = mgr();      const today = new Date();
       const y = clampInt(
         year || today.getFullYear(),
         1970,

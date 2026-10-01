@@ -9,6 +9,7 @@ import { ExerciseManager } from "../core/exerciseManager.js";
 import { FinanceCalendarSource, FinanceManager } from "../core/financeManager.js";
 import { GoalCalendarSource, GoalManager } from "../core/goalManager.js";
 import { HabitManager } from "../core/habitManager.js";
+import { LibraryStore } from "../core/libraryStore.js";
 import { ProjectCalendarSource, ProjectManager } from "../core/projectManager.js";
 import { ScheduleManager } from "../core/scheduleManager.js";
 import { TaskManager } from "../core/taskManager.js";
@@ -17,6 +18,9 @@ export class Managers {
   root: string;
   habits: HabitManager;
   exercise: ExerciseManager;
+  /** La biblioteca propia. Comparte vault y caché con el resto: vive aquí para
+   * que dos llamadas seguidas no relean el fichero. */
+  library: LibraryStore;
   tasks: TaskManager;
   projects: ProjectManager;
   areas: AreaManager;
@@ -28,6 +32,7 @@ export class Managers {
     this.root = root;
     this.habits = new HabitManager(root);
     this.exercise = new ExerciseManager(root);
+    this.library = new LibraryStore(root);
     this.tasks = new TaskManager(root);
     this.projects = new ProjectManager(root);
     this.areas = new AreaManager(root);

@@ -207,8 +207,7 @@ export function libraryEntry(slug: string, userEntries: LibraryUserEntry[] = [])
   return raw ? toEntry(raw) : null;
 }
 
-/** Filtra por músculo local (id de `muscles.ts`, ej. `pectoral`). */
-export function filterByLocalMuscle(localId: string): LibraryEntry[] {
+/** Filtra por músculo local (id de `muscles.ts`, ej. `pectoral`). */export function filterByLocalMuscle(localId: string): LibraryEntry[] {
   return searchExercises()
     .map(toEntry)
     .filter((e) => e.localPrimary.includes(localId));

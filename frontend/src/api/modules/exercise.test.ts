@@ -189,6 +189,78 @@ describe("exerciseApi", () => {
     expect(stats.anual.pct).toBeGreaterThan(0);
   });
 
+  it("guardar un nombre nuevo crea la entrada", () => {
+    const r = api.ex_library_save({
+      name: "Press banca",
+      how_to: "Baja",
+      muscles: { primary: ["pectoral"] },
+    });
+    expect(r.created).toBe(true);
+    expect(r.entry.slug.startsWith("mia-")).toBe(true);
+    expect(api.ex_library_list()).toHaveLength(1);
+    expect(api.ex_library_list()[0]!.name).toBe("Press banca");
+  });
+
+  it("guardar un nombre del catálogo edita, no añade", () => {
+    const r = api.ex_library_save({ name: "Bench Press", how_to: "Mío" });
+    expect(r.created).toBe(false);
+    // El slug es el del catálogo: es la misma entrada, editada.
+    expect(r.updatedFrom).toBe("bench-press");
+    expect(r.entry.slug).toBe("bench-press");
+    expect(api.ex_library_list()).toHaveLength(1);
+  });
+
+  it("guardar dos veces el mismo nombre no crea un duplicado", () => {
+    api.ex_library_save({ name: "Mi press" });
+    api.ex_library_save({ name: "Mi press", how_to: "otro" });
+    expect(api.ex_library_list()).toHaveLength(1);
+    expect(api.ex_library_list()[0]!.how_to).toBe("otro");
+  });
+
+  it("un campo vacío en una edición deja el anterior como estaba", () => {
+    // El heart del spec: vacío significa "déjalo", no "bórralo".
+    api.ex_library_save({ name: "Mi press", how_to: "el bueno", equipment: "Barra" });
+    api.ex_library_save({ name: "Mi press", how_to: "" });
+    const e = api.ex_library_list()[0]!;
+    expect(e.how_to).toBe("el bueno");
+    expect(e.equipment).toBe("Barra");
+  });
+
+  it("solo difiere en mayúsculas y espacios: edita, no duplica", () => {
+    // Review Focus 3.
+    api.ex_library_save({ name: "Mi press" });
+    api.ex_library_save({ name: "  MI   PRESS  ", how_to: "x" });
+    expect(api.ex_library_list()).toHaveLength(1);
+    expect(api.ex_library_list()[0]!.how_to).toBe("x");
+  });
+
+  it("un nombre vacío no crea una entrada fantasma", () => {
+    // Review Focus 1.
+    expect(() => api.ex_library_save({ name: "   " })).toThrow(ApiError);
+    expect(api.ex_library_list()).toEqual([]);
+  });
+
+  it("borrar solo quita entradas propias", () => {
+    const r = api.ex_library_save({ name: "Mío" });
+    expect(api.ex_library_remove(r.entry.slug)).toBe(true);
+    expect(api.ex_library_list()).toEqual([]);
+    // El catálogo no se toca: vaciar tu fichero no puede borrar los 302.
+    expect(api.ex_library_remove("bench-press")).toBe(false);
+  });
+
+  it("los nombres del catálogo se reconocen sin distinguir mayúsculas", () => {
+    expect(api.ex_library_save({ name: "bench press" }).updatedFrom).toBe("bench-press");
+    expect(api.ex_library_save({ name: "  BENCH   PRESS  " }).updatedFrom).toBe("bench-press");
+  });
+
+  it("lo que se guarda sobrevive a una escritura de la rutina", () => {
+    // La biblioteca y el programa son ficheros distintos: uno no pisa al otro.
+    api.ex_library_save({ name: "Mío", how_to: "pasos" });
+    api.ex_save("", { day: "lunes", name: "Otro", series_reps: "4×8" });
+    expect(api.ex_library_list()).toHaveLength(1);
+    expect(api.ex_library_list()[0]!.how_to).toBe("pasos");
+  });
+
   it("ex_overview counts the year it was asked for, not always this one", () => {
     seedWeek();
     const year = new Date().getFullYear();

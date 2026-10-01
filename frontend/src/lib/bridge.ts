@@ -10,6 +10,7 @@ import type {
   IndexEntry, Mentions, NoteData, Occurrence, SearchHit, Task, TaskFields, TasksMeta, TreeEntry, WriteResult,
   RenderingSettings, GpuStatus, Conversation, ConversationMeta,
 } from "./types";
+import type { LibraryUserEntry } from "./libraryTypes";
 
 type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
@@ -351,6 +352,10 @@ export const api = {
   exSave: (id: string, fields: Partial<Exercise>) => call<Exercise>("ex_save", id, fields),
   exRemove: (id: string) => call<{ ok: boolean }>("ex_remove", id),
   exLinkVideos: () => call<{ linked: string[]; already: string[]; missing: string[] }>("ex_link_videos"),
+  exLibraryList: () => call<LibraryUserEntry[]>("ex_library_list"),
+  exLibrarySave: (fields: { name: string; equipment?: string; muscles?: unknown; how_to?: string }) =>
+    call<{ entry: LibraryUserEntry; created: boolean; updatedFrom?: string }>("ex_library_save", fields),
+  exLibraryRemove: (slug: string) => call<boolean>("ex_library_remove", slug),
   exVideoUrl: (id: string) => call<{ url: string; name: string }>("ex_video_url", id),
   exOpenVideo: (id: string) => call<{ ok: boolean }>("ex_open_video", id),
   exPickVideo: (id: string) => call<{ ok: boolean }>("ex_pick_video", id),

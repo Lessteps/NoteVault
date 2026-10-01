@@ -5,12 +5,13 @@
 // qué haces cada día; entrenarlo es la pantalla Diaria, a la que se va con el
 // botón «Ir a hoy». La otra mitad del apartado es la Biblioteca (`Library.tsx`).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Film, Library, Link2, Pencil, Sun, X } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { useApp } from "../../store/app";
 import { useExercise } from "../../store/exercise";
 import { getInstructions, libraryEntry, searchLibrary } from "../../lib/exerciseLibrary";
+import { normalizeLibraryName, type LibraryUserEntry } from "../../lib/libraryTypes";
 import type { Exercise } from "../../lib/types";
 import { confirmAction, IconButton } from "../ui";
 import { Field, GhostButton, input, PrimaryButton } from "../common/forms";
@@ -39,7 +40,18 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
   const [editing, setEditing] = useState<string>("");
   const [f, setF] = useState<Partial<Exercise>>(EMPTY);
   const [status, setStatus] = useState("");
+  // El estado de la biblioteca va aparte del del programa: son dos destinos
+  // distintos y un fallo en uno no puede confirmar el otro.
+  const [libStatus, setLibStatus] = useState("");
+  const [libraryEntries, setLibraryEntries] = useState<LibraryUserEntry[]>([]);
   const [debug, setDebug] = useState(false);
+
+  /** Ya hay una entrada con ese nombre? Entonces el botón avisa antes de pisarla. */
+  const libraryExists = (name: string | undefined) => {
+    const key = normalizeLibraryName(name ?? "");
+    if (!key) return false;
+    return libraryEntries.some((e) => normalizeLibraryName(e.name) === key);
+  };
 
   const save = async () => {
     if (!f.name?.trim()) return setStatus("El ejercicio necesita un nombre.");
@@ -180,6 +192,25 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
         setF={setF}
         status={status}
         onSave={() => void save()}
+        libraryExists={libraryExists(f.name)}
+        libStatus={libStatus}
+        onSaveToLibrary={async () => {
+          try {
+            const r = await api.exLibrarySave({
+              name: f.name ?? "",
+              muscles: f.muscles,
+              how_to: f.how_to ?? "",
+            });
+            setLibStatus(
+              r.created
+                ? `«${r.entry.name}» guardado en la biblioteca ✓`
+                : `«${r.entry.name}» actualizado en la biblioteca ✓`,
+            );
+            setLibraryEntries(await api.exLibraryList().catch(() => []));
+          } catch (e) {
+            setLibStatus((e as Error).message);
+          }
+        }}
         onCancel={() => {
           setEditing("");
           setF({ ...EMPTY, day: f.day });
@@ -216,14 +247,20 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
 function LibraryPicker({
   onPick,
   usedSlugs,
+  userEntries,
 }: {
   onPick: (slug: string) => void;
   /** Slugs que ya usas. Dato, no comparación de nombres: «Mi press» con
    * `source: bench-press` cuenta como bench-press aunque el nombre no coincida. */
   usedSlugs: Set<string>;
+  /** Tus propias entradas: para que aparezcan al buscar. */
+  userEntries: LibraryUserEntry[];
 }) {
   const [q, setQ] = useState("");
-  const rows = useMemo(() => (q.trim() ? searchLibrary(q).slice(0, 8) : []), [q]);
+  const rows = useMemo(
+    () => (q.trim() ? searchLibrary(q, userEntries).slice(0, 8) : []),
+    [q, userEntries],
+  );
   return (
     <div data-library-picker className="space-y-1.5">
       <input
@@ -282,6 +319,9 @@ export function ExerciseForm({
   onSave,
   onCancel,
   onPickVideo,
+  onSaveToLibrary,
+  libraryExists = false,
+  libStatus = "",
   title,
   saveLabel = "Guardar ejercicio",
 }: {
@@ -292,17 +332,35 @@ export function ExerciseForm({
   onSave: () => void;
   onCancel: () => void;
   onPickVideo?: () => void;
+  /** Guarda en la biblioteca propia. Si no se pasa, el botón no aparece. */
+  onSaveToLibrary?: () => Promise<void>;
+  /** El nombre del formulario ya existe en la biblioteca: el botón avisa. */
+  libraryExists?: boolean;
+  libStatus?: string;
   title?: string;
   saveLabel?: string;
 }) {
   const days = useExercise((s) => s.days);
   const routine = useExercise((s) => s.list);
+  const [userEntries, setUserEntries] = useState<LibraryUserEntry[]>([]);
   // Los slugs ya en el programa. Vacío para lo escrito a mano: eso no viene
   // de la biblioteca y no debe marcarse como duplicado de nada.
   const usedSlugs = useMemo(
     () => new Set(routine.filter((e) => e.source).map((e) => e.source!)),
     [routine],
   );
+  // Las entradas propias, para que el buscador vea lo que has escrito tú.
+  useEffect(() => {
+    let alive = true;
+    void api.exLibraryList().then((e) => {
+      // El puente devuelve lo que venga; si no es una lista, se trata como
+      // vacía. Un ejercicios de biblioteca no puede impedir abrir el programa.
+      if (alive) setUserEntries(Array.isArray(e) ? e : []);
+    }).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [routine.length]);
 
   /** Rellena el formulario desde la biblioteca: nombre, músculos e instrucción. */
   const pickFromLibrary = (slug: string) => {
@@ -329,7 +387,7 @@ export function ExerciseForm({
           <div className="text-[11px] uppercase tracking-[0.12em] text-faint">
             Desde la biblioteca
           </div>
-          <LibraryPicker onPick={pickFromLibrary} usedSlugs={usedSlugs} />
+          <LibraryPicker onPick={pickFromLibrary} usedSlugs={usedSlugs} userEntries={userEntries} />
           <div className="flex items-center gap-2 py-0.5 text-[11px] uppercase tracking-[0.12em] text-faint">
             <span className="h-px flex-1 bg-line" />
             o a mano
@@ -405,7 +463,18 @@ export function ExerciseForm({
           <GhostButton onClick={onCancel} title={status ? undefined : "Cancelar"}>Cancelar</GhostButton>
         )}
       </div>
+      {/* Segundo destino, no otro nombre para el primero: guardar aquí deja el
+          ejercicio en tu biblioteca de 302 para usarlo cualquier día, y **no**
+          lo mete en el programa. */}
+      {onSaveToLibrary && (
+        <GhostButton data-library-save onClick={() => void onSaveToLibrary()}>
+          {libraryExists ? "Actualizar en la Biblioteca" : "Guardar en la Biblioteca"}
+        </GhostButton>
+      )}
       {status && <p className="text-[12px] text-dim">{status}</p>}
+      {/* El estado de la biblioteca va aparte: un fallo aquí no puede decir
+          «Ejercicio añadido ✓», que es del programa. */}
+      {libStatus && <p className="text-[12px] text-dim">{libStatus}</p>}
     </aside>
   );
 }

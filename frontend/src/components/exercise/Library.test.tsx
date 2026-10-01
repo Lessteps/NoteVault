@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const BASE_INVOKE = async (method: string): Promise<unknown> => {
   if (method === "ex_list") return [];
+  if (method === "ex_library_list") return [];
   if (method === "ex_save") return { ok: true };
   if (method === "ex_meta") return { days: [{ key: "lunes", name: "Lunes", subtitle: "Pecho", glyph: "💪" }] };
   if (method === "ex_stats") {
@@ -299,9 +300,12 @@ describe("Biblioteca de Ejercicio", () => {
   const { host, cleanup } = mount(<Library />);
   try {
     const saved: Array<Record<string, unknown>> = [];
-    invoke.mockImplementation(async (method: string, ...args: unknown[]) => {
+    // En Electron el puente llama invoke(método, [args...]): el segundo
+    // parámetro es el array de argumentos, no el primero de ellos.
+    invoke.mockImplementation(async (method: string, ...rest: unknown[]) => {
+      const argv = (rest[0] ?? []) as unknown[];
       if (method === "ex_save") {
-        saved.push((args[1] ?? {}) as Record<string, unknown>);
+        saved.push((argv[1] ?? {}) as Record<string, unknown>);
         return { ok: true, id: "nuevo" };
       }
       return BASE_INVOKE(method);
@@ -314,6 +318,8 @@ describe("Biblioteca de Ejercicio", () => {
     });
     expect(saved).toHaveLength(1);
     // El slug es de verdad uno del catálogo, no un marcador.
+    expect(typeof saved[0]!.source).toBe("string");
+    expect(String(saved[0]!.source)).not.toBe("undefined");
     expect(String(saved[0]!.source)).toMatch(/^[a-z0-9-]+$/);
     expect(String(saved[0]!.sourceFp).length).toBeGreaterThan(0);
   } finally {
@@ -362,6 +368,135 @@ it("el picker marca lo que ya usas por su origen, no por el nombre", async () =>
     });
     // Con nombres distintos, comparar por nombre fallaría: sale marcado igual.
     expect(picker.querySelector('[data-library-pick="bench-press"]')!.getAttribute("data-in-routine")).toBe("true");
+  } finally {
+    cleanup();
+  }
+});
+
+it("el formulario ofrece los dos botones, con nombres distintos", async () => {
+  const { host, cleanup } = mount(<ExerciseModule />);
+  try {
+    await act(async () => {
+      [...host.querySelectorAll("aside nav button")]
+        .find((b) => b.textContent?.includes("Ejercicios"))!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    const toProgram = [...host.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("Guardar ejercicio"),
+    )!;
+    const toLibrary = host.querySelector("[data-library-save]")!;
+    expect(toProgram).toBeTruthy();
+    expect(toLibrary.textContent).toContain("Biblioteca");
+    expect(toLibrary.textContent).not.toBe(toProgram.textContent);
+  } finally {
+    cleanup();
+  }
+});
+
+it("guardar en la biblioteca no escribe en el programa", async () => {
+  const calls: string[] = [];
+  invoke.mockImplementation(async (method: string) => {
+    calls.push(method);
+    if (method === "ex_library_save")
+      return { entry: { slug: "mia-1", name: "Mío", equipment: "", muscles: { primary: ["pectoral"], secondary: [] }, how_to: "" }, created: true };
+    return BASE_INVOKE(method);
+  });
+  const { host, cleanup } = mount(<ExerciseModule />);
+  try {
+    await act(async () => {
+      [...host.querySelectorAll("aside nav button")]
+        .find((b) => b.textContent?.includes("Ejercicios"))!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    // Un nombre primero: la biblioteca exige un nombre, el programa también.
+    const name = host.querySelector('input[aria-label="Nombre"]') as HTMLInputElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(name, "Mi ejercicio");
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector("[data-library-save]")!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(calls).toContain("ex_library_save");
+    // Lo importante: NO se escribió en el programa.
+    expect(calls).not.toContain("ex_save");
+  } finally {
+    cleanup();
+  }
+});
+
+it("el botón de la biblioteca no requiere día", async () => {
+  const seen: unknown[] = [];
+  invoke.mockImplementation(async (method: string, ...rest: unknown[]) => {
+    const argv = (rest[0] ?? []) as unknown[];
+    if (method === "ex_library_save") {
+      seen.push(argv[0]);
+      return { entry: { slug: "mia-1", name: "Mío", equipment: "", muscles: { primary: [], secondary: [] }, how_to: "" }, created: true };
+    }
+    return BASE_INVOKE(method);
+  });
+  const { host, cleanup } = mount(<ExerciseModule />);
+  try {
+    await act(async () => {
+      [...host.querySelectorAll("aside nav button")]
+        .find((b) => b.textContent?.includes("Ejercicios"))!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    const name = host.querySelector('input[aria-label="Nombre"]') as HTMLInputElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(name, "Solo biblioteca");
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector("[data-library-save]")!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const payload = seen[0] as Record<string, unknown>;
+    expect(payload).toBeTruthy();
+    // La biblioteca no guarda días: un ejercicio de la biblioteca sirve para
+    // cualquier día, y así lo añade quien lo usa.
+    expect(payload.day).toBeUndefined();
+    expect(payload.name).toBe("Solo biblioteca");
+  } finally {
+    cleanup();
+  }
+});
+
+it("un fallo al guardar en la biblioteca no dice que se añadió al programa", async () => {
+  invoke.mockImplementation(async (method: string) => {
+    if (method === "ex_library_save") throw new Error("El ejercicio necesita un nombre.");
+    return BASE_INVOKE(method);
+  });
+  const { host, cleanup } = mount(<ExerciseModule />);
+  try {
+    await act(async () => {
+      [...host.querySelectorAll("aside nav button")]
+        .find((b) => b.textContent?.includes("Ejercicios"))!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector("[data-library-save]")!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // El mensaje del programa y el de la biblioteca son cosas distintas: un
+    // fallo al guardar en la biblioteca no puede decir «Ejercicio añadido ✓».
+    const panel = host.querySelector("aside")!;
+    expect(panel.textContent).not.toContain("Ejercicio añadido");
   } finally {
     cleanup();
   }

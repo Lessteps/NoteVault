@@ -235,7 +235,7 @@ export function parseBranchTopics(reply: string, branchNumber: number): SpaceTop
 }
 
 /** Appends exchanges to one saved conversation, creating it on first use. */
-class ChatLog {
+export class ChatLog {
   private store = new ConversationStore(AppConfig.get_conversations_dir());
   private messages: StoredMessage[] = [];
   id: string;

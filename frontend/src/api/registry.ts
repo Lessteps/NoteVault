@@ -22,6 +22,7 @@ import { ladderApi } from "./modules/ladder.js";
 import { mediaApi } from "./modules/media.js";
 import { notesApi } from "./modules/notes.js";
 import { notesExtrasApi } from "./modules/notes_extras.js";
+import { ppApi } from "./modules/pp.js";
 import { practiceApi } from "./modules/practice.js";
 import { projectsApi } from "./modules/projects.js";
 import { projectFoldersApi } from "./modules/projectFolders.js";
@@ -45,6 +46,7 @@ export function buildRegistry(app: AppState): Registry {
     ...filesApi(app),
     ...englishPlayerApi(app),
     ...codeDebugApi(app),
+    ...ppApi(app),
     ...notesExtrasApi(app),
     ...vaultsApi(app),
     ...webApi(app),

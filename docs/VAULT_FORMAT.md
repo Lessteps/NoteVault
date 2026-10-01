@@ -613,6 +613,7 @@ nota. El cliente móvil conserva estos archivos sin tocarlos.
 | `study_handoff_response` | `.notevault/estudio/handoff/responses/<req-id>.json` |
 | `study_ledger` | `.notevault/estudio/ledger/<disciplina>.json` — estado por skill (fase 6) |
 | `study_exam` | `.notevault/estudio/exams/<slug>.json` — registros de exámenes rendidos (fase 5) |
+| `study_pp_profile` | `.notevault/estudio/pp/profile.json` — perfil de debilidades y estilo de `programming_practice` (lo escribe `pp_postmortem`, lo lee `pp_build`) |
 | `kb_canvas_manifest` | `.notevault/estudio/kb_canvas_manifest.json` — hashes de canvas generados |
 
 ### `.notevault/estudio/intentos/<att-id>.json`

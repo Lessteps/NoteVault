@@ -22,6 +22,7 @@ const LANGUAGE_OF: Record<string, string> = {
   automation: "Python 3.12, TypeScript, or the n8n / Power Automate node names when the topic is about them",
   mobile: "TypeScript with React Native (Kotlin for native modules)",
   devtools: "shell / PowerShell commands, Dockerfile, YAML and config files",
+  programming_practice: "Python 3.12 or TypeScript 5 (the learner picks; the statement must work in both)",
 };
 
 export const languageOfDiscipline = (id: string): string => LANGUAGE_OF[id] ?? LANGUAGE_OF.programming_logic!;
@@ -43,6 +44,7 @@ const SHAPE_OF_MODE: Record<string, string> = {
   decompose: "Give a real requirement. The learner writes the plan (inputs and outputs, edge cases, ordered steps or a module breakdown), not the code. The solution is a model plan.",
   port: "Give working code in one language and name the target language. The solution is the idiomatic equivalent and lists the language differences that matter.",
   query: "Give a schema with a few sample rows and a question. The solution is the query, the result on the sample and why edge cases (NULLs, ties, empty groups) are handled.",
+  pp_kata: "Give one self-contained logic problem built on a pattern (arrays and strings, hashing, recursion, sorting and searching, two pointers, stacks and queues, trees and graphs, dynamic programming) with a precise statement, a table of inputs and expected outputs including edge cases. The solution is a reference solution, the pattern it uses and its complexity. No trick questions and no memorised-puzzle names.",
   pg_true_false: "Give 4 to 6 short statements about the concept, about half of them false in a subtle way (a plausible misconception, a swapped cause, an absolute word such as 'always' or 'never'). The learner marks each true or false and justifies it. The solution lists every verdict, the reason, and the corrected statement for each false one. No code has to be written.",
   pg_classify: "Give 5 to 8 concrete cases (a snippet to read, a log line, a requirement) and the categories of the topic, including borderline cases. The learner places each case and names the deciding criterion. The solution gives the category and the criterion for each case.",
   pg_compare: "Name two or three easily confused concepts of this topic and give two small real situations. The learner states what is the same, what differs and which concept fits each situation and why. The solution gives the decisive difference and the assignment of each situation.",

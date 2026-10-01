@@ -1069,6 +1069,40 @@ const _CATALOGUE: readonly Discipline[] = [
       ],
     ),
   },
+  {
+    id: "programming_practice",
+    subject: "programming",
+    title: "Práctica de programación",
+    modes: ["pp_kata", "trace", "analyze", "debug", "explain"],
+    framing:
+      "Daily logic katas: one self-contained problem built on a recognised pattern, solvable in 20 to 30 minutes in Python or " +
+      "TypeScript. Statements are set in small real situations (deduplicating records, merging time ranges, matching brackets in a " +
+      "config, ranking search results) with exact inputs and outputs. " +
+      _NO_TOY_NAMES,
+    skills: _skills(
+      [
+        "Elección del patrón",
+        "uses brute force where a hash map or two pointers is the point of the problem",
+        "picks a pattern by the problem's name instead of by its constraints",
+      ],
+      [
+        "Casos límite",
+        "fails on empty input, a single element or all-equal values",
+        "off-by-one at the boundaries of a window or a range",
+        "assumes the input is sorted or has no duplicates",
+      ],
+      [
+        "Complejidad",
+        "states the complexity of the idea instead of the code as written",
+        "hides a linear operation inside a loop (slicing, in on a list, string concatenation)",
+      ],
+      [
+        "Corrección bajo presión",
+        "stops at the example that passes instead of testing another input",
+        "rewrites a working solution instead of fixing the failing case",
+      ],
+    ),
+  },
 ];
 
 export const DISCIPLINES: Record<string, Discipline> = Object.fromEntries(
@@ -1106,6 +1140,8 @@ export function programmingDisciplineOfPath(rel: string): string {
     "8": "mobile",
     "9": "devtools",
   };
+  // The practice area has no number: its folder name decides.
+  if (parts.some((p) => p.toLowerCase() === "programming_practice")) return "programming_practice";
   return byNumber[n] ?? "programming_logic";
 }
 

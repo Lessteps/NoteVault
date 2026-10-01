@@ -12,9 +12,9 @@ import { createDefaultTopicManifest } from "./topic";
 const topic = (folder: string, title = "Cola de trabajos") => ({ ...createDefaultTopicManifest(folder, title, "programming", []), folder });
 
 describe("programming competencies", () => {
-  it("has the original eight plus the ten new ones, in the core and in the client mirror", () => {
+  it("has the original eight plus the eleven new ones, in the core and in the client mirror", () => {
     expect(PROGRAMMING_SKILLS.map((s) => s.id)).toEqual(["implement", "debug", "refactor", "design", "commands", "explain", "cloze", "find_error", ...PROGRAMMING_EXTRA_IDS]);
-    expect(PROGRAMMING_EXTRA_IDS).toEqual(["trace", "review", "test", "analyze", "decompose", "port", "pg_true_false", "pg_classify", "pg_compare", "query"]);
+    expect(PROGRAMMING_EXTRA_IDS).toEqual(["trace", "review", "test", "analyze", "decompose", "port", "pg_true_false", "pg_classify", "pg_compare", "pp_kata", "query"]);
     expect(CLIENT_PROGRAMMING_SKILLS.map((s) => s.id)).toEqual(PROGRAMMING_SKILLS.map((s) => s.id));
     expect(skillsForSubject("programming")).toBe(PROGRAMMING_SKILLS);
   });

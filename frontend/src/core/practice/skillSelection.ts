@@ -55,6 +55,7 @@ export const SKILL_FIT: Record<string, SkillCompetencies> = {
   analyze: { competencies: ["Coste en tiempo y memoria", "Cuello de botella"], topicTypes: ["procedural", "mixed"] },
   decompose: { competencies: ["Entradas, salidas y casos límite", "Pasos en orden"], topicTypes: ["procedural", "mixed"] },
   port: { competencies: ["Mismo comportamiento en otro lenguaje", "Idioma del destino"], topicTypes: ["procedural", "mixed"] },
+  pp_kata: { competencies: ["Lógica bajo tiempo", "Patrón y complejidad"], topicTypes: ["procedural", "mixed"] },
   query: { competencies: ["Consulta correcta", "Casos límite en los datos"], topicTypes: ["procedural", "mixed"] },
   // Concept skills: what a theory topic is practised with (nothing to code, plenty to decide and justify).
   pg_true_false: { competencies: ["Discernir ideas correctas de incorrectas", "Justificar con el mecanismo"], topicTypes: ["theoretical", "mixed"] },

@@ -1120,3 +1120,41 @@ export interface ReviewItem {
   /** `vocab` for a word of the English word bank; absent for topic reviews */
   kind?: "topic" | "vocab";
 }
+
+// ── programming_practice (weekly projects in four phases) ─────────────────
+export type PpState = "spec" | "building" | "defended" | "done";
+export interface PpProject { folder: string; title: string; state: PpState; focus: string; client: string; score?: number }
+export interface PpStatus {
+  space: string;
+  ready: boolean;
+  projects: PpProject[];
+  kataReady: boolean;
+  weaknesses: Array<{ label: string; layer: string; count: number; status: string }>;
+  suggestedFocus: string | null;
+  summary: string;
+}
+export interface PpIdea { title: string; problem: string; client: string; focus: string; hours: number; why: string }
+export interface PpEstimate {
+  layers: Array<{ layer: string; files: number; left: number; tokens: number }>;
+  totalTokens: number;
+  skipped: number;
+  changed: number | null;
+  checks: Array<{ label: string; skip: string }>;
+  previousDefenses: number;
+}
+export interface PpIssue { severity: "high" | "medium" | "low"; file: string; line?: number; problem: string; why: string; fix: string }
+export interface PpDefense {
+  n: number;
+  rel: string;
+  final: { functional: boolean; score: number; summary: string; mustFix: string[]; questions: Array<{ id: string; question: string; why: string }> };
+  layers: Array<{ layer: string; verdict: string; issues: PpIssue[]; strengths: string[] }>;
+  checks: Array<{ label: string; status: string; ms: number }>;
+  conversationId: string;
+}
+export interface PpGrade { score: number; items: Array<{ id: string; verdict: string; feedback: string }>; summary: string; gaps: string[] }
+export interface PpPostmortem {
+  postmortem: { score: number; summary: string; weaknesses: Array<{ label: string; layer: string }>; strengths: string[]; styleNotes: string[]; nextFocus?: string };
+  rel?: string;
+  summary: string;
+  conversationId: string;
+}

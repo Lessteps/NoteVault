@@ -4,7 +4,7 @@
 
 import {
   ArrowLeft, ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
-  Folder, FolderPlus, GitCompare, Loader2, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
+  Folder, FolderPlus, GitCompare, Hammer, Loader2, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
   Square, ThumbsDown, ThumbsUp, Trash2, Wand2, X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
@@ -19,6 +19,7 @@ import { useAssistant, type ChatContext, type ChatMessage } from "../../store/as
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
 import { askText, cn, confirmAction, IconButton, openMenu } from "../ui";
 import { generateTopicFrom, useStudySpaceDialog } from "../study/StudySpaceDialog";
+import { isPracticePath, usePracticeDialog } from "../practice/PracticeProjectDialog";
 import { ActionCard } from "./ActionCard";
 import { AskCard, SkillsCard } from "./ChatCards";
 import { editorSelection, insertAtCursor } from "./SourceEditor";
@@ -414,6 +415,17 @@ function Composer() {
         onSelect: () => setMode(m.id),
       })),
       { separator: true },
+      ...(isPracticePath(useApp.getState().active)
+        ? [
+            {
+              label: "Práctica de programación",
+              description: "Especificar, construir, defender y cerrar un proyecto semanal, o el reto de lógica.",
+              icon: <Hammer size={13} />,
+              onSelect: () => usePracticeDialog.getState().show(),
+            },
+            { separator: true as const },
+          ]
+        : []),
       {
         label: "Generar espacio de estudio",
         description: "Temario, teoría, práctica y mapas de una materia entera.",
@@ -576,6 +588,8 @@ export function AssistantPanel() {
   const setHistory = useAssistant((s) => s.setHistory);
   const newConversation = useAssistant((s) => s.newConversation);
   const renameConversation = useAssistant((s) => s.renameConversation);
+  // Projects and daily katas belong to the programming_practice area only.
+  const inPractice = useApp((s) => isPracticePath(s.active));
   const [width, setWidth] = useState(() => {
     const stored = Number(localStorage.getItem(WIDTH_KEY));
     return stored >= MIN_WIDTH ? stored : 340;
@@ -646,6 +660,11 @@ export function AssistantPanel() {
         <span className="min-w-0 flex-1 truncate pl-1 text-[12.5px] font-medium text-text" title={heading}>
           {heading}
         </span>
+        {inPractice && (
+          <IconButton title="Práctica de programación: proyectos y retos" onClick={() => usePracticeDialog.getState().show()}>
+            <Hammer size={15} />
+          </IconButton>
+        )}
         <IconButton
           title="Nueva conversación"
           onClick={() => {

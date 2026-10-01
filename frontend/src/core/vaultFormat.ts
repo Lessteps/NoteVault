@@ -73,6 +73,8 @@ export const LAYOUT = {
   study_ledger: `${DATA_DIR}/estudio/ledger/{id}.json`,
   study_exams_dir: `${DATA_DIR}/estudio/exams`,
   study_exam: `${DATA_DIR}/estudio/exams/{id}.json`,
+  study_pp_dir: `${DATA_DIR}/estudio/pp`,
+  study_pp_profile: `${DATA_DIR}/estudio/pp/profile.json`,
   kb_canvas_manifest: `${DATA_DIR}/estudio/kb_canvas_manifest.json`,
   web_dir: `${DATA_DIR}/web`,
   web_bookmarks: `${DATA_DIR}/web/marcadores.json`,

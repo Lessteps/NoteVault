@@ -107,6 +107,16 @@ export const PROGRAMMING_EXTRA_SKILLS: readonly ProgrammingSkillSpec[] = [
     answerKind: "text",
     timer: "10m",
   },
+  // The daily logic exercise of the `programming_practice` area (a track apart from the weekly projects).
+  {
+    id: "pp_kata",
+    label: "Reto de lógica diario",
+    description: "Un problema corto de lógica por día: resolverlo, razonar el patrón y repetir los que fallaste.",
+    act: "Give ONE short logic problem (20 to 30 minutes) with a precise statement, exact inputs and expected outputs including edge cases (empty input, one element, duplicates, negatives). The learner writes the solution in Python or TypeScript and names the pattern used and its time complexity.",
+    judge: "The solution is correct on the normal cases AND on every edge case, the complexity stated matches the code, and the pattern named is the one that actually solves it (not a brute force presented as a pattern). A solution that works only on the shown example does not pass.",
+    answerKind: "code",
+    timer: "30m",
+  },
   {
     id: "query",
     label: "Consulta SQL",

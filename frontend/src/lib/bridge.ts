@@ -553,6 +553,22 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   codeRuntimes: () => call<{ items: import("./types").CodeRuntime[] }>("code_runtimes"),
   codeRun: (language: string, code: string, stdin = "") => call<import("./types").CodeRun>("code_run", language, code, stdin),
   codeTrace: (language: string, code: string, stdin = "") => call<import("./types").CodeTrace>("code_trace", language, code, stdin),
+  // programming_practice: the weekly project pipeline (build → construct → defend → postmortem)
+  ppStatus: () => call<import("./types").PpStatus>("pp_status"),
+  ppInit: () => call<{ ok: boolean; area: string; created: string[] }>("pp_init"),
+  ppProfile: () => call<{ weaknesses: Array<{ label: string; layer: string; count: number; status: string }>; strengths: Array<{ label: string; count: number }>; style: string[]; summary: string; suggestedFocus: string | null }>("pp_profile"),
+  ppIdeas: (opts: { focus?: string; client?: string; notes?: string } = {}) =>
+    call<{ ideas: import("./types").PpIdea[]; focus: string | null; conversationId: string }>("pp_ideas", opts),
+  ppBuild: (req: { idea?: Partial<import("./types").PpIdea>; focus?: string; client?: string; notes?: string; week?: number }) =>
+    call<{ folder: string; rel: string; conversationId: string }>("pp_build", req),
+  ppPlan: (opts: { weeks?: number; notes?: string } = {}) =>
+    call<{ plan: Array<import("./types").PpIdea & { week: number }>; rel: string; conversationId: string }>("pp_plan", opts),
+  ppConstruct: (folder: string) => call<{ ok: boolean; rel: string }>("pp_construct", folder),
+  ppDefendEstimate: (folder: string, onlyChanged = false) => call<import("./types").PpEstimate>("pp_defend_estimate", folder, onlyChanged),
+  ppDefend: (folder: string, opts: { runChecks?: boolean; onlyChanged?: boolean } = {}) => call<import("./types").PpDefense>("pp_defend", folder, opts),
+  ppDefendGrade: (folder: string, answers: Record<string, string>) => call<{ grade: import("./types").PpGrade; conversationId: string }>("pp_defend_grade", folder, answers),
+  ppPostmortem: (folder: string) => call<import("./types").PpPostmortem>("pp_postmortem", folder),
+  ppKataPostmortem: () => call<import("./types").PpPostmortem>("pp_kata_postmortem"),
   enRecordingList: () => call<{ items: import("./types").EnglishRecording[] }>("en_recording_list"),
   enRecordingUrl: (id: string) => call<{ url: string }>("en_recording_url", id),
   enRecordingRename: (id: string, name: string) => call<{ ok: boolean; id: string }>("en_recording_rename", id, name),

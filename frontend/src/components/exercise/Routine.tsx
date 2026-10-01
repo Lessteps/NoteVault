@@ -6,7 +6,7 @@
 // botón «Ir a hoy». La otra mitad del apartado es la Biblioteca (`Library.tsx`).
 
 import { useMemo, useState } from "react";
-import { Film, Link2, Pencil, Sun, X } from "lucide-react";
+import { Film, Library, Link2, Pencil, Sun, X } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { useApp } from "../../store/app";
 import { useExercise } from "../../store/exercise";
@@ -30,7 +30,7 @@ const EMPTY: Partial<Exercise> = {
   muscles: { primary: [], secondary: [] },
 };
 
-export function Routine({ onGoToday }: { onGoToday: () => void }) {
+export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; onGoBiblioteca: () => void }) {
   const fail = useFail();
   const toast = useApp((s) => s.toast);
   const days = useExercise((s) => s.days);
@@ -86,6 +86,26 @@ export function Routine({ onGoToday }: { onGoToday: () => void }) {
             <Link2 size={13} /> Vincular videos automáticamente
           </GhostButton>
         </div>
+        {/* El programa nace vacío. Con los siete días en «Sin ejercicios» al
+            prinicipio, no se entiende qué hay que hacer, y el formulario —que
+            sí sabe— queda enterrado abajo. */}
+        {!list.length && (
+          <div
+            data-program-empty
+            className="space-y-2 rounded-xl border border-line bg-card px-4 py-6 text-center"
+          >
+            <p className="text-[13.5px] text-text">
+              Todavía no hay ejercicios en tu programa. Elige los que quieras
+              de la biblioteca y colócalos en el día que te toque.
+            </p>
+            <p className="text-[12px] text-faint">
+              302 ejercicios de catálogo, con sus músculos y sus instrucciones.
+            </p>
+            <GhostButton data-go-biblioteca onClick={onGoBiblioteca} className="mt-1">
+              <Library size={13} /> Ir a la biblioteca
+            </GhostButton>
+          </div>
+        )}
         {days.map((d) => {
           const exs = list.filter((e) => e.day === d.key);
           return (

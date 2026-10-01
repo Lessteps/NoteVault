@@ -59,20 +59,36 @@ test.afterAll(async () => {
   await app?.close();
 });
 
-test("NV-X-001 la rutina por defecto existe en exercises.json", async () => {
+test("NV-X-001 el programa nace vacío y ofrece la biblioteca", async () => {
   await side().getByRole("button", { name: "Ejercicios" }).click();
   await expect(win.getByRole("heading", { name: "Ejercicios" })).toBeVisible({
     timeout: 15_000,
   });
   await expect(win.getByRole("heading", { name: "Tu programa" })).toBeVisible({ timeout: 15_000 });
+  // Ya no se siembran 50 ejercicios: el programa lo monta quien lo usa.
+  await expect(win.getByText("Todavía no hay ejercicios")).toBeVisible({ timeout: 15_000 });
   await expect.poll(() => existsSync(routinesFile())).toBe(true);
-  const routine = JSON.parse(readFileSync(routinesFile(), "utf-8")) as Array<{ name: string }>;
-  expect(routine.length).toBeGreaterThan(0);
-  // Toda rutina termina con estiramientos (regla de exercises.json).
-  expect(routine[routine.length - 1]!.name.startsWith("Estiramientos")).toBe(true);
+  const routine = JSON.parse(readFileSync(routinesFile(), "utf-8")) as unknown[];
+  expect(Array.isArray(routine)).toBe(true);
+  expect(routine.length).toBe(0);
 });
 
+/** Añade el primer ejercicio de la biblioteca al día de hoy. */
+async function addFirstFromLibrary(): Promise<string> {
+  await side().getByRole("button", { name: "Ejercicios" }).click();
+  await win.getByRole("tab", { name: "Biblioteca" }).click();
+  const row = win.locator("[data-slug]").first();
+  const name = ((await row.locator("div").first().innerText()) ?? "").trim();
+  await row.locator("[data-library-add]").click();
+  await expect(row.locator("[data-library-add]")).toHaveAttribute("data-library-added", "true", {
+    timeout: 15_000,
+  });
+  return name;
+}
+
 test("NV-X-002 marcar un ejercicio persiste en el dia", async () => {
+  // Con el programa vacío no hay casillas que marcar: primero se añade uno.
+  await addFirstFromLibrary();
   await gotoDiaria();
   const check = win.locator("input[type='checkbox'][aria-label^='Hecho:']").first();
   await expect(check).toBeVisible({ timeout: 15_000 });

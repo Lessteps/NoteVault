@@ -1,4 +1,4 @@
-import * as fs from "node:fs";
+﻿import * as fs from "node:fs";
 import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -37,6 +37,17 @@ describe("exerciseApi", () => {
   let api: ReturnType<typeof exerciseApi>;
   let today: string;
 
+  /**
+   * El programa nace vacío —antes se sembraban 50 ejercicios por defecto—, así
+   * que los tests que necesitan una rutina la montan aquí. Se siembra cada día
+   * de la semana porque el logging es por día de la semana, no por fecha.
+   */
+  function seedWeek(): void {
+    for (const day of ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]) {
+      api.ex_save("", { day, name: `Ejercicio de ${day}` });
+    }
+  }
+
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nv_ex_test_"));
     app = new AppState(tmpDir);
@@ -54,6 +65,7 @@ describe("exerciseApi", () => {
   });
 
   it("mark writes the same log", () => {
+    seedWeek();
     const day = api.ex_days(today, today)[0]!;
     const exs = day.exercises as Array<{ id: string }>;
     const ex = exs[0]!;
@@ -91,6 +103,7 @@ describe("exerciseApi", () => {
   });
 
   it("video is streamed with ranges", async () => {
+    seedWeek();
     const e = api.ex_list()[0] as { id: string; day: string; name: string };
     const mgr = new ExerciseManager(tmpDir);
     const videos = mgr.videosDir;
@@ -128,6 +141,7 @@ describe("exerciseApi", () => {
   });
 
   it("stats report the four periods, with nothing trained on an empty log", () => {
+    seedWeek();
     const stats = api.ex_stats();
     expect(stats.today.done).toBe(0);
     expect(stats.today.pct).toBe(0);
@@ -143,6 +157,7 @@ describe("exerciseApi", () => {
   });
 
   it("stats follow the ticks: one exercise is enough to train the day", () => {
+    seedWeek();
     const day = api.ex_days(today, today)[0]!;
     const exs = day.exercises as Array<{ id: string }>;
     const first = api.ex_stats();
@@ -162,6 +177,7 @@ describe("exerciseApi", () => {
   });
 
   it("stats count the whole routine of the period, not just today", () => {
+    seedWeek();
     const day = api.ex_days(today, today)[0]!;
     const exs = day.exercises as Array<{ id: string }>;
     for (const ex of exs) api.ex_mark(today, ex.id, true, 0, 0, "");
@@ -174,6 +190,7 @@ describe("exerciseApi", () => {
   });
 
   it("ex_overview counts the year it was asked for, not always this one", () => {
+    seedWeek();
     const year = new Date().getFullYear();
     const past = year - 1;
     // A Monday of the previous year, which the seeded routine covers.

@@ -17,28 +17,36 @@ describe("ExerciseManager", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("loads 50 default exercises and organizes by day", () => {
-    const all = em.exercises();
-    expect(all.length).toBe(50);
+  it("starts with an empty program and organizes by day", () => {
+    // Antes venían 50 ejercicios por defecto en el código. El programa lo
+    // monta quien lo usa, a partir de la Biblioteca.
+    expect(em.exercises().length).toBe(0);
+    expect(em.exercises_for_day("lunes")).toEqual([]);
+    expect(em.exercises_for_day("domingo")).toEqual([]);
 
-    const lunes = em.exercises_for_day("lunes");
-    expect(lunes.length).toBe(10);
-    expect(lunes[0]?.name).toBe("Calentamiento (Bench + OHP)");
-
-    const domingo = em.exercises_for_day("domingo");
-    expect(domingo.length).toBe(3);
+    // Y al añadir uno, ya solo él.
+    const ex = em.add_exercise("Press banca", "lunes", "", "4x5", "", "");
+    expect(em.exercises_for_day("lunes").map((e) => e.name)).toEqual(["Press banca"]);
+    expect(em.exercises_for_day("martes")).toEqual([]);
+    expect(ex.id).toBeTruthy();
   });
 
   it("logs workouts and computes day completion percentage", () => {
     const d = new Date(2026, 8, 14); // lunes
-    const lunes = em.exercises_for_day("lunes");
+    // El programa arranca vacío, así que el día se monta en el test.
+    const a = em.add_exercise("Press banca", "lunes", "", "", "", "");
+    const b = em.add_exercise("Pull-ups", "lunes", "", "", "", "");
+    em.add_exercise("Trote", "martes", "", "", "", "");
     expect(em.day_pct(d)).toBe(0.0);
 
-    em.set_entry(d, lunes[0]!.id, { done: true, reps: 10, weight: 80 });
+    em.set_entry(d, a.id, { done: true, reps: 10, weight: 80 });
     const log = em.day(d);
-    expect(log[lunes[0]!.id]?.done).toBe(true);
-    expect(log[lunes[0]!.id]?.weight).toBe(80);
-    expect(em.day_pct(d)).toBeCloseTo(1 / 10, 5);
+    expect(log[a.id]?.done).toBe(true);
+    expect(log[a.id]?.weight).toBe(80);
+    expect(em.day_pct(d)).toBeCloseTo(0.5, 5);
+
+    em.set_entry(d, b.id, { done: true, reps: 5, weight: 0 });
+    expect(em.day_pct(d)).toBeCloseTo(1.0, 5);
   });
 
   it("adds, updates and removes exercises", () => {

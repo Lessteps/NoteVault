@@ -217,6 +217,34 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
+  it("un programa vacío ofrece la Biblioteca en vez de decir que hoy descansas", async () => {
+    // El programa nace vacío. Decir «día de descanso» sería mentira, y
+    // mandaría a la pantalla equivocada.
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Ejercicios"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      const empty = host.querySelector("[data-program-empty]")!;
+      expect(empty).not.toBeNull();
+      expect(empty.textContent).toContain("no hay ejercicios");
+      expect(empty.textContent).not.toContain("Día de descanso");
+
+      // Y el atajo lleva a la Biblioteca, que es de donde se monta.
+      await act(async () => {
+        empty.querySelector("[data-go-biblioteca]")!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(host.querySelectorAll("[data-slug]").length).toBe(302);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("una pestaña guardada que ya no existe cae en Tu programa", async () => {
     // Quien tenía guardada la pestaña vieja no debe quedarse en blanco.
     useNavState.setState({ values: { "ejercicio.ejercicios": "rutina" } });

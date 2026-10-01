@@ -50,7 +50,11 @@ export function Exercises({ onGoToday }: { onGoToday: () => void }) {
           ))}
         </div>
       </Header>
-      {tab === "biblioteca" ? <Library embedded /> : <Routine onGoToday={onGoToday} />}
+      {tab === "biblioteca" ? (
+        <Library embedded />
+      ) : (
+        <Routine onGoToday={onGoToday} onGoBiblioteca={() => setTab("biblioteca")} />
+      )}
     </div>
   );
 }

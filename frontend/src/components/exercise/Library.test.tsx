@@ -125,6 +125,37 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
+  it("el progreso tiene una cuarta pestaña: el mapa con métricas", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Progreso"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const tabs = host.querySelector("[data-progress-tabs]")!;
+      expect(tabs.textContent).toContain("Mapa");
+
+      await act(async () => {
+        host.querySelector('[data-progress-tab="mapa"]')!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      // El mapa grande, con su cuerpo y las métricas por músculo.
+      const map = host.querySelector("[data-progress-map]")!;
+      expect(map).not.toBeNull();
+      expect(host.querySelectorAll("[data-progress-view]")).toHaveLength(1);
+      expect(host.textContent).toContain("En la semana");
+      expect(host.textContent).toContain("sesiones");
+      expect(host.textContent).toContain("reps");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("arranca mostrando los 302 y filtra por equipo", async () => {
     const { host, cleanup } = mount(<Library />);
     try {

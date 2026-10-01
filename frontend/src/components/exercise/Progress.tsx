@@ -4,8 +4,10 @@
 // su propio heatmap de solo lectura). El conmutador está arriba y el periodo
 // se recuerda entre visitas, como el resto de vistas del módulo.
 
+import { useState } from "react";
 import { Header } from "../habits/parts";
 import { ExerciseMonth, ExerciseWeek } from "./Grids";
+import { ProgressMap } from "./ProgressMap";
 import { Yearly } from "./Yearly";
 import { usePersistedNav } from "../../store/navState";
 import { cn } from "../ui";
@@ -14,12 +16,23 @@ const PERIODS = [
   { id: "semana", label: "Semana" },
   { id: "mes", label: "Mes" },
   { id: "anio", label: "Año" },
+  { id: "mapa", label: "Mapa" },
 ] as const;
 
 type PeriodId = (typeof PERIODS)[number]["id"];
+/** Los tres periodos de rejilla; `mapa` es la cuarta pantalla. */
+type GridPeriod = Exclude<PeriodId, "mapa">;
 
 export function Progress() {
-  const [period, setPeriod] = usePersistedNav("ejercicio.progreso", "semana");
+  const [period, setPeriod] = usePersistedNav("ejercicio.progreso", "semana") as [PeriodId, (v: PeriodId) => void];
+  // Al elegir Mapa se recuerda qué rejilla se estaba viendo, para que el mapa
+  // abra en ese periodo y no siempre en el mismo.
+  const [previous, setPrevious] = useState<GridPeriod>("semana");
+
+  const pick = (id: PeriodId) => {
+    if (id !== "mapa") setPrevious(id);
+    setPeriod(id);
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -32,7 +45,7 @@ export function Progress() {
               role="tab"
               aria-selected={period === p.id}
               data-progress-tab={p.id}
-              onClick={() => setPeriod(p.id as PeriodId)}
+              onClick={() => pick(p.id)}
               className={cn(
                 "rounded-lg px-2.5 py-1 text-[12.5px] transition-colors",
                 period === p.id
@@ -46,7 +59,17 @@ export function Progress() {
         </div>
       </Header>
       <div data-progress-view className="flex min-h-0 flex-1 flex-col">
-        {period === "semana" ? <ExerciseWeek /> : period === "mes" ? <ExerciseMonth /> : <Yearly />}
+        {period === "mapa" ? (
+          // El mapa sigue el periodo de las rejillas: si venías en Mes, el mapa
+          // enseña el mes. Para cambiarlo se vuelve a Semana/Mes/Año.
+          <ProgressMap period={previous as GridPeriod} />
+        ) : period === "semana" ? (
+          <ExerciseWeek />
+        ) : period === "mes" ? (
+          <ExerciseMonth />
+        ) : (
+          <Yearly />
+        )}
       </div>
     </div>
   );

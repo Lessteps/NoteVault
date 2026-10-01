@@ -10,6 +10,7 @@ import { AppConfig } from "../src/api/appConfig";
 import { readGpuStatus } from "../src/api/gpuStatus";
 import { browserManager } from "./browserManager";
 import { getPreloadPath } from "./windowFactory";
+import { installCrashLog, watchWindowHealth } from "./crashLog";
 
 // Allow HTML5 video and audio autoplay in embedded views
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -84,6 +85,7 @@ function createWindow() {
   const state = getAppState();
   if (state) state.window = win;
   browserManager.setWindow(win);
+  watchWindowHealth(win);
   restartFileWatcher();
   // The window must never navigate away; external links open in the OS browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -100,6 +102,8 @@ function createWindow() {
   if (DEV_URL) void win.loadURL(DEV_URL);
   else void win.loadFile(path.join(__dirname, "../dist/index.html"));
 }
+
+installCrashLog();
 
 app.whenReady().then(() => {
   // The app has its own custom top bar; drop Electron's native File/Edit/View menu.

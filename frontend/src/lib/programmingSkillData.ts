@@ -78,6 +78,35 @@ export const PROGRAMMING_EXTRA_SKILLS: readonly ProgrammingSkillSpec[] = [
     timer: "pomodoro",
     noBeginner: true,
   },
+  // ── Concept skills: for theory topics, where nothing is worth coding. The ids carry a `pg_` prefix because
+  // `true_false` already exists for mathematics and its generator talks about postulates.
+  {
+    id: "pg_true_false",
+    label: "Verdadero o falso (concepto)",
+    description: "Decidir si una afirmación sobre un concepto de programación es verdadera o falsa y justificarlo.",
+    act: "Give 4 to 6 short statements about the topic, each one either exactly true or false in a subtle way (a plausible misconception, a wrong cause, an absolute word such as 'always' or 'never', two concepts swapped). The learner marks each one true or false and justifies the verdict in one or two sentences. About half must be false. No code has to be written; a statement may quote one or two lines of code.",
+    judge: "Every verdict is right AND every justification names the actual reason (the mechanism or the rule), not a restatement of the statement. A correct verdict with a wrong or empty reason counts as wrong. False statements are corrected, not just rejected.",
+    answerKind: "text",
+    timer: "5m",
+  },
+  {
+    id: "pg_classify",
+    label: "Clasificar (concepto)",
+    description: "Ubicar casos, ejemplos o fragmentos en la categoría correcta de un concepto.",
+    act: "Give a short list of 5 to 8 concrete cases (a snippet, a log line, a requirement, a sentence about a system) and the categories of the topic (for example kinds of error, kinds of memory, HTTP method semantics, layers, types of test). The learner puts each case in its category and says in one sentence what decides it. Include borderline cases that look like one category but belong to another.",
+    judge: "Every case is in the right category and the deciding feature named for each one is the real criterion. Borderline cases are resolved by the definition of the category, not by surface appearance.",
+    answerKind: "text",
+    timer: "5m",
+  },
+  {
+    id: "pg_compare",
+    label: "Comparar conceptos",
+    description: "Distinguir dos conceptos parecidos y elegir cuál usar en una situación dada.",
+    act: "Name two or three concepts that are easy to confuse in this topic (for example process vs thread, authentication vs authorization, stack vs heap, unit vs integration test) and give two small real situations. The learner states what is the same, what differs, and which concept applies in each situation and why.",
+    judge: "The difference stated is the one that matters in practice (not a vague one), each situation is assigned to the right concept, and the reasoning shows the criterion for choosing. Definitions copied without applying them do not pass.",
+    answerKind: "text",
+    timer: "10m",
+  },
   {
     id: "query",
     label: "Consulta SQL",

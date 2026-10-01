@@ -49,6 +49,17 @@ export const SKILL_FIT: Record<string, SkillCompetencies> = {
   design: { competencies: ["Contratos y esquemas", "Compromisos justificados"], topicTypes: ["procedural", "mixed"] },
   commands: { competencies: ["Secuencia exacta", "Elección segura"], topicTypes: ["procedural", "mixed"] },
   cloze: { competencies: ["Reconstruir desde el contexto", "Sintaxis y tipos"], topicTypes: ["procedural", "mixed"] },
+  trace: { competencies: ["Predicción de la salida", "Estado paso a paso"], topicTypes: ["procedural", "mixed"] },
+  review: { competencies: ["Fallos silenciosos", "Severidad y evidencia"], topicTypes: ["procedural", "mixed"] },
+  test: { competencies: ["Casos normales, límites y errores", "Pruebas que fallan si el código falla"], topicTypes: ["procedural", "mixed"] },
+  analyze: { competencies: ["Coste en tiempo y memoria", "Cuello de botella"], topicTypes: ["procedural", "mixed"] },
+  decompose: { competencies: ["Entradas, salidas y casos límite", "Pasos en orden"], topicTypes: ["procedural", "mixed"] },
+  port: { competencies: ["Mismo comportamiento en otro lenguaje", "Idioma del destino"], topicTypes: ["procedural", "mixed"] },
+  query: { competencies: ["Consulta correcta", "Casos límite en los datos"], topicTypes: ["procedural", "mixed"] },
+  // Concept skills: what a theory topic is practised with (nothing to code, plenty to decide and justify).
+  pg_true_false: { competencies: ["Discernir ideas correctas de incorrectas", "Justificar con el mecanismo"], topicTypes: ["theoretical", "mixed"] },
+  pg_classify: { competencies: ["Ubicar casos en su categoría", "Criterio que decide"], topicTypes: ["theoretical", "mixed"] },
+  pg_compare: { competencies: ["Distinguir conceptos parecidos", "Elegir según la situación"], topicTypes: ["theoretical", "mixed"] },
   // ── english ─────────────────────────────────────────────────────────────
   writing: { competencies: ["Producción propia", "Cohesión y registro"], topicTypes: ["procedural", "mixed"] },
   rewrite: { competencies: ["Corrección del error", "Estructura objetivo"], topicTypes: ["procedural", "mixed"] },

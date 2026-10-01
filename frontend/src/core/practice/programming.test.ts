@@ -6,14 +6,15 @@ import { MODES, modeFor } from "./modes";
 import { buildProgrammingExercisePrompt, formatProgrammingExerciseNote, languageOfDiscipline } from "./programmingExercises";
 import { buildExerciseGenerationPrompt, formatExerciseNote } from "./sessionBuilder";
 import { PROGRAMMING_SKILLS, skillsForSubject } from "./skills";
+import { skillsForTopicType } from "./skillSelection";
 import { createDefaultTopicManifest } from "./topic";
 
 const topic = (folder: string, title = "Cola de trabajos") => ({ ...createDefaultTopicManifest(folder, title, "programming", []), folder });
 
 describe("programming competencies", () => {
-  it("has the original eight plus the seven new ones, in the core and in the client mirror", () => {
+  it("has the original eight plus the ten new ones, in the core and in the client mirror", () => {
     expect(PROGRAMMING_SKILLS.map((s) => s.id)).toEqual(["implement", "debug", "refactor", "design", "commands", "explain", "cloze", "find_error", ...PROGRAMMING_EXTRA_IDS]);
-    expect(PROGRAMMING_EXTRA_IDS).toEqual(["trace", "review", "test", "analyze", "decompose", "port", "query"]);
+    expect(PROGRAMMING_EXTRA_IDS).toEqual(["trace", "review", "test", "analyze", "decompose", "port", "pg_true_false", "pg_classify", "pg_compare", "query"]);
     expect(CLIENT_PROGRAMMING_SKILLS.map((s) => s.id)).toEqual(PROGRAMMING_SKILLS.map((s) => s.id));
     expect(skillsForSubject("programming")).toBe(PROGRAMMING_SKILLS);
   });
@@ -32,6 +33,25 @@ describe("programming competencies", () => {
     // never shared with mathematics or english
     expect(skillsForSubject("mathematics").some((s) => PROGRAMMING_EXTRA_IDS.includes(s.id))).toBe(false);
     expect(() => modeFor({ subject: "english", mode: "trace" })).toThrow();
+  });
+});
+
+describe("practice follows the nature of the topic", () => {
+  it("a theory topic is practised with concept skills and never with code skills", () => {
+    const skills = skillsForTopicType("programming", "theoretical");
+    expect(skills).toEqual(expect.arrayContaining(["pg_true_false", "pg_classify", "pg_compare", "explain", "find_error"]));
+    for (const code of ["implement", "debug", "refactor", "commands", "cloze", "trace", "test", "query"]) expect(skills).not.toContain(code);
+  });
+
+  it("a procedural topic is practised with code skills and no concept skills", () => {
+    const skills = skillsForTopicType("programming", "procedural");
+    expect(skills).toEqual(expect.arrayContaining(["implement", "trace", "debug"]));
+    for (const concept of ["pg_true_false", "pg_classify", "pg_compare"]) expect(skills).not.toContain(concept);
+  });
+
+  it("a mixed topic offers both families", () => {
+    const skills = skillsForTopicType("programming", "mixed");
+    expect(skills).toEqual(expect.arrayContaining(["pg_true_false", "implement", "explain"]));
   });
 });
 

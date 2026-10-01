@@ -354,8 +354,11 @@ export function ExerciseForm({
     let alive = true;
     void api.exLibraryList().then((e) => {
       // El puente devuelve lo que venga; si no es una lista, se trata como
-      // vacía. Un ejercicios de biblioteca no puede impedir abrir el programa.
-      if (alive) setUserEntries(Array.isArray(e) ? e : []);
+      // vacía. Un ejercicio de biblioteca no puede impedir abrir el programa.
+      const next = Array.isArray(e) ? e : [];
+      // Solo se repinta si hay algo que cambiar: un setState con el mismo array
+      // provocaba un render de más en cada montaje.
+      if (alive && next.length) setUserEntries(next);
     }).catch(() => undefined);
     return () => {
       alive = false;

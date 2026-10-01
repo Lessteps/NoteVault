@@ -127,6 +127,63 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
+  it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      const side = () => [...host.querySelectorAll("aside nav button")];
+      const labels = side().map((b) => b.textContent ?? "");
+      // Un solo item: ni "Biblioteca" ni "Gestionar ejercicios" sueltos.
+      expect(labels.some((l) => l.includes("Gestionar ejercicios"))).toBe(false);
+      expect(labels.filter((l) => l.includes("Ejercicios")).length).toBe(1);
+
+      await act(async () => {
+        side().find((b) => b.textContent?.includes("Ejercicios"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const tabs = [...host.querySelectorAll("[data-exercises-tab]")].map((t) =>
+        t.textContent?.trim(),
+      );
+      expect(tabs).toEqual(["Tu rutina", "Biblioteca"]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("añadir desde la Biblioteca deja el formulario a mano en el detalle", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Ejercicios"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      await act(async () => {
+        host.querySelector('[data-exercises-tab="biblioteca"]')!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const add = host.querySelector("[data-library-add]")!;
+      expect(add).not.toBeNull();
+      await act(async () => {
+        add.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // Ya en la rutina, el panel ofrece series y descanso sin salir.
+      const detail = host.querySelector("[data-library-detail]")!;
+      expect(detail.querySelector('input[aria-label="Series × reps"]')).not.toBeNull();
+      expect(detail.querySelector('input[aria-label="Descanso"]')).not.toBeNull();
+      expect(add.getAttribute("data-library-added")).toBe("true");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("el progreso tiene tres pestañas, no cinco", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {

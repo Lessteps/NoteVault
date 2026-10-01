@@ -66,11 +66,13 @@ export function PrimaryButton({ children, onClick, disabled, className, type = "
   );
 }
 
-export function GhostButton({ children, onClick, danger, className, title }: {
+export function GhostButton({ children, onClick, danger, className, title, ...rest }: {
   children: ReactNode; onClick?: () => void; danger?: boolean; className?: string; title?: string;
+  /** Para los `data-*` que usan los tests y el e2e. */
+  [key: `data-${string}`]: unknown;
 }) {
   return (
-    <button type="button" title={title} onClick={onClick}
+    <button type="button" title={title} onClick={onClick} {...rest}
       className={cn("flex flex-none items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-[12.5px]",
         danger ? "text-danger hover:bg-danger-soft" : "text-dim hover:bg-hover hover:text-text", className)}>
       {children}

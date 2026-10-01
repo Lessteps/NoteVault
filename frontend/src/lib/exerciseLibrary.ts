@@ -207,10 +207,12 @@ export function libraryEntry(slug: string, userEntries: LibraryUserEntry[] = [])
   return raw ? toEntry(raw) : null;
 }
 
-/** Filtra por músculo local (id de `muscles.ts`, ej. `pectoral`). */export function filterByLocalMuscle(localId: string): LibraryEntry[] {
-  return searchExercises()
-    .map(toEntry)
-    .filter((e) => e.localPrimary.includes(localId));
+/** Filtra por músculo local (id de `muscles.ts`, ej. `pectoral`). */
+export function filterByLocalMuscle(
+  localId: string,
+  userEntries: LibraryUserEntry[] = [],
+): LibraryEntry[] {
+  return mergeLibrary(userEntries).filter((e) => e.localPrimary.includes(localId));
 }
 
 /**
@@ -227,10 +229,10 @@ export function libraryMuscles(userEntries: LibraryUserEntry[] = []): string[] {
   return [...new Set(mergeLibrary(userEntries).map((e) => e.guidePrimary).filter(Boolean))].sort();
 }
 
-/** Los músculos locales (ids de `muscles.ts`) que el catálogo tiene de principal. */
-export function localMusclesInCatalog(): string[] {
+/** Los músculos locales (ids de `muscles.ts`) que la biblioteca tiene de principal. */
+export function localMusclesInCatalog(userEntries: LibraryUserEntry[] = []): string[] {
   const ids = new Set<string>();
-  for (const e of searchLibrary("")) for (const m of e.localPrimary) ids.add(m);
+  for (const e of mergeLibrary(userEntries)) for (const m of e.localPrimary) ids.add(m);
   return [...ids].sort();
 }
 

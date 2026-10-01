@@ -7,7 +7,7 @@ import {
 } from "../../core/exerciseManager.js";
 import { normalizeMuscles } from "../../core/exerciseMuscles.js";
 import { exercises as CATALOG } from "@bryllim/workout-guide";
-import type { LibraryUserEntry } from "../../lib/libraryTypes.js";
+import { normalizeLibraryName, type LibraryUserEntry } from "../../lib/libraryTypes.js";
 import type { AppState } from "../appState.js";
 import { clampInt, oneLine, optDate } from "../common.js";
 import { MediaServer } from "../media.js";
@@ -97,7 +97,10 @@ function exFields(fields: unknown) {
     source: oneLine(f.source, 120),
     // Huella de lo que se copió; la Task 6 la compara para avisar de copias viejas.
     sourceFp: oneLine(f.sourceFp, 40),
-    name: oneLine(f.name, 120) || "Ejercicio",
+    // Sin defecto aquí: quien llama decide. En una edición, el nombre que no
+    // viene se recupera del ejercicio que ya existe —si no, retocar las series
+    // renombraba el ejercicio a «Ejercicio» y se perdía el nombre.
+    name: oneLine(f.name, 120),
     video_path: videoPath,
     series_reps: oneLine(f.series_reps, 120),
     rest: oneLine(f.rest, 60),
@@ -119,15 +122,6 @@ function openWithSystem(filePath: string): void {
 }
 
 /**
- * La clave con la que se reconoce un ejercicio. Case-insensitive y con los
- * espacios internos colapsados: es lo que hace que «  MI   PRESS » y
- * «mi press» sean el mismo ejercicio y no dos.
- */
-export function normalizeLibraryName(name: string): string {
-  return String(name ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-/**
  * `nombre normalizado -> slug` del catálogo de 302.
  *
  * Se lee del paquete directamente y **no** de `lib/exerciseLibrary.ts`: ese
@@ -135,9 +129,7 @@ export function normalizeLibraryName(name: string): string {
  * dependencias al proceso de Electron sin necesitar nada de eso.
  */
 function catalogSlugByName(): Map<string, string> {
-  return new Map(
-    CATALOG.map((e) => [normalizeLibraryName(e.name), e.slug]),
-  );
+  return new Map(CATALOG.map((e) => [normalizeLibraryName(e.name), e.slug]));
 }
 
 export function exerciseApi(app: AppState) {
@@ -280,19 +272,28 @@ export function exerciseApi(app: AppState) {
       const entries = store.entries();
       const key = normalizeLibraryName(name);
 
-      const propia = entries.find((e) => normalizeLibraryName(e.name) === key);
-      // ¿El nombre es uno del catálogo? Si lo es, la entrada propia que se crea
-      // usa **su** slug: así el ejercicio sigue siendo el mismo y no aparece
-      // dos veces con nombres parecidos.
+      // Qué entrada se está editando, en este orden:
+      //
+      // 1. La que dice la interfaz (`slug`). Es lo que hace que **renombrar**
+      //    edite en vez de crear: sin esto, Bench Press renombrado a Press banca
+      //    dejaba la entrada vieja con los mismos pasos, y el duplicado que el
+      //    spec dice imposible aparecía solo.
+      // 2. Una propia con el mismo nombre, por si no se pasó slug.
+      // 3. Una del catálogo con el mismo nombre: se crea una entrada propia con
+      //    **su** slug, y así sigue habiendo un solo bench-press.
+      const slug = oneLine(f.slug, 120);
+      const porSlug = slug ? entries.find((e) => e.slug === slug) ?? null : null;
+      const propia = porSlug ?? entries.find((e) => normalizeLibraryName(e.name) === key) ?? null;
       const slugDelCatalogo = propia
         ? null
         : catalogSlugByName().get(key) ?? null;
-      const actual: Partial<LibraryUserEntry> & { slug?: string } | null = propia ?? (slugDelCatalogo
+      const actual: LibraryUserEntry | null = propia ?? (slugDelCatalogo
         ? { slug: slugDelCatalogo, name, equipment: "", muscles: { primary: [], secondary: [] }, how_to: "" }
         : null);
 
       // Un campo llega si trae algo; si no, se conserva el que había.
       const next: LibraryUserEntry = {
+        // Renombrar **no** cambia el slug: el ejercicio sigue siendo el mismo.
         slug: actual?.slug ?? `mia-${Math.random().toString(36).slice(2, 10)}`,
         name,
         equipment: equipment || actual?.equipment || "",
@@ -302,17 +303,35 @@ export function exerciseApi(app: AppState) {
         how_to: howTo || actual?.how_to || "",
       };
 
+      // Si el nombre nuevo ya era el de **otra** entrada, esa se va: sin esto,
+      // renombrar a un nombre existente dejaría las dos.
       const resto = entries.filter((e) => e.slug !== next.slug);
-      store.save([...resto, next]);
+      const zajada = resto.find((e) => normalizeLibraryName(e.name) === key);
+      // Si el nombre venía del catálogo y no has cambiado ni un campo tuyo, no hay
+      // nada que guardar: escribir una entrada que solo espeja el catálogo deja
+      // ruido en el fichero sin cambiar lo que se ve. Una entrada **nueva** con
+      // todos los campos vacíos sí se guarda: es tuya, aunque la llames igual
+      // que una del catálogo.
+      const espejoDelCatalogo =
+        slugDelCatalogo !== null &&
+        !next.how_to &&
+        !next.equipment &&
+        !next.muscles.primary.length &&
+        !next.muscles.secondary.length;
+      if (!espejoDelCatalogo) {
+        store.save(zajada ? [...resto.filter((e) => e.slug !== zajada.slug), next] : [...resto, next]);
+      }
       return { entry: next, created: !actual, updatedFrom: actual?.slug };
     },
 
-    /** Borra una entrada propia. El catálogo no se puede borrar. */
+    /**
+     * Quita una entrada **de tu fichero**, que es lo único que hay que quitar:
+     * el catálogo de 302 no se borra porque no está en el fichero. Si lo que
+     * quitaste era una edición de una entrada del catálogo, esto es también el
+     * botón de «deshacer» y el catálogo vuelve a mandar.
+     */
     ex_library_remove(slug: string): boolean {
       const s = String(slug ?? "");
-      // Los `mia-` son tuyos. Sin prefijo sería del paquete, y 302 ejercicios
-      // escritos no se borran porque alguien vacíe su fichero.
-      if (!s.startsWith("mia-")) return false;
       const store = lib();
       const entries = store.entries();
       if (!entries.some((e) => e.slug === s)) return false;
@@ -483,7 +502,7 @@ export function exerciseApi(app: AppState) {
       const m = mgr();
       if (!exerciseId) {
         const e = m.addExercise(
-          f.name,
+          f.name || "Ejercicio",
           f.day,
           f.video_path,
           f.series_reps,
@@ -511,6 +530,7 @@ export function exerciseApi(app: AppState) {
       // números.
       if (!f.source) updates.source = actual.source || "";
       if (!f.sourceFp) updates.sourceFp = actual.sourceFp || "";
+      if (!f.name) updates.name = actual.name || "Ejercicio";
       if (f.video_path) {
         updates.video = path.basename(f.video_path);
       }

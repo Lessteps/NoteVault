@@ -294,7 +294,51 @@ describe("exerciseApi", () => {
     expect(got.series_reps).toBe("4×8");
   });
 
-  it("ex_overview counts the year it was asked for, not always this one", () => {
+  it("renombrar una entrada no deja la anterior con lo mismo", () => {
+  // Revisión, hallazgo crítico: sin saber qué entrada se está editando,
+  // guardar un nombre nuevo creaba una segunda con los mismos pasos.
+  api.ex_library_save({ name: "Bench Press", how_to: "mios" });
+  const r = api.ex_library_save({ name: "Press banca", how_to: "mios", slug: "bench-press" });
+  expect(r.entry.slug).toBe("bench-press");
+  expect(api.ex_library_list()).toHaveLength(1);
+  expect(api.ex_library_list()[0]!.name).toBe("Press banca");
+});
+
+it("renombrar una entrada propia conserva su slug", () => {
+  const a = api.ex_library_save({ name: "Mi press" });
+  const b = api.ex_library_save({ name: "Press pesado", slug: a.entry.slug });
+  expect(b.entry.slug).toBe(a.entry.slug);
+  expect(api.ex_library_list()).toHaveLength(1);
+});
+
+it("se puede deshacer una edición del catálogo borrando tu entrada", () => {
+  // Revisión, hallazgo crítico: una edición del catálogo se guarda con el slug
+  // del catálogo, así que un «solo quito mia-» la dejaba pegada para siempre.
+  api.ex_library_save({ name: "Bench Press", how_to: "mío" });
+  expect(api.ex_library_remove("bench-press")).toBe(true);
+  expect(api.ex_library_list()).toEqual([]);
+  // Y ahora manda el catálogo otra vez: guardar sin cambiar nada no deja
+  // una entrada fantasma espejándolo.
+  const r = api.ex_library_save({ name: "Bench Press" });
+  expect(r.updatedFrom).toBe("bench-press");
+  expect(api.ex_library_list()).toEqual([]);
+});
+
+it("borrar un slug que no está en tu fichero no hace nada", () => {
+  expect(api.ex_library_remove("bench-press")).toBe(false);
+  expect(api.ex_library_remove("mia-nada")).toBe(false);
+});
+
+it("editar sin mandar el nombre no lo borra", () => {
+  // Revisión, hallazgo importante: ex_save，默认 «Ejercicio».
+  const ex = api.ex_save("", { day: "lunes", name: "Press banca" }) as { id: string };
+  api.ex_save(ex.id, { series_reps: "4×8" });
+  const got = api.ex_list().find((x) => x.id === ex.id)!;
+  expect(got.name).toBe("Press banca");
+  expect(got.series_reps).toBe("4×8");
+});
+
+it("ex_overview counts the year it was asked for, not always this one", () => {
     seedWeek();
     const year = new Date().getFullYear();
     const past = year - 1;

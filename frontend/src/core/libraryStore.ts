@@ -15,7 +15,7 @@ import { LAYOUT } from "./vaultFormat";
 // El tipo vive en lib/types y no aquí: `lib/` es el renderer, y este fichero es
 // el proceso de Electron. Si el tipo estuviera aquí, `lib/exerciseLibrary.ts`
 // acabaría importando `node:fs` para el navegador.
-import type { LibraryUserEntry } from "../lib/libraryTypes.js";
+import { normalizeLibraryName, type LibraryUserEntry } from "../lib/libraryTypes.js";
 
 export type { LibraryUserEntry };
 
@@ -84,11 +84,21 @@ export class LibraryStore {
     }
     const raw = (Array.isArray(parsed) ? parsed : (parsed as Record<string, unknown>)?.entries);
     if (!Array.isArray(raw)) return [];
+    // Se indexa por slug **y** por nombre normalizado. Un fichero editado a mano
+    // puede llevar el mismo ejercicio con dos slugs; si solo se mirara el slug,
+    // la biblioteca mostraría las dos y el duplicado sería real. Usa la misma
+    // clave que el guardado: si difieren, un nombre con espacios dobles crea
+    // una entrada que el guardado cree que ya existe.
     const bySlug = new Map<string, LibraryUserEntry>();
+    const byName = new Map<string, string>();
     for (const item of raw) {
       const entry = normalizeEntry(item);
       // Sin slug no se puede editar ni borrar más tarde, así que no entra.
-      if (entry.slug) bySlug.set(entry.slug, entry);
+      if (!entry.slug) continue;
+      const prev = byName.get(normalizeLibraryName(entry.name));
+      if (prev !== undefined) bySlug.delete(prev);
+      bySlug.set(entry.slug, entry);
+      byName.set(normalizeLibraryName(entry.name), entry.slug);
     }
     return [...bySlug.values()];
   }

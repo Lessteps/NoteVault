@@ -42,7 +42,25 @@ describe("LibraryStore", () => {
     expect(reread[0]!.name).toBe("Press banca");
   });
 
-  it("un fichero corrupto no rompe: vacío y sin lanzar", () => {
+  it("dos entradas con el mismo nombre, aunque el slug difiera, colapsan a una", () => {
+  // Revisión: un fichero editado a mano puede llevar el mismo ejercicio con dos
+  // slugs. Sin esto, la biblioteca muestra las dos y el duplicado es real.
+  const entry = (slug: string, name: string): LibraryUserEntry => ({
+    slug,
+    name,
+    equipment: "",
+    muscles: { primary: [], secondary: [] },
+    how_to: "",
+  });
+  write(
+    JSON.stringify({ entries: [entry("mia-a", "Mi press"), entry("mia-b", "  mi   PRESS ")] }),
+  );
+  const entries = new LibraryStore(tmpDir).entries();
+  expect(entries).toHaveLength(1);
+  expect(entries[0]!.slug).toBe("mia-b");
+});
+
+it("un fichero corrupto no rompe: vacío y sin lanzar", () => {
     write("{ roto");
     expect(() => new LibraryStore(tmpDir).entries()).not.toThrow();
     expect(new LibraryStore(tmpDir).entries()).toEqual([]);

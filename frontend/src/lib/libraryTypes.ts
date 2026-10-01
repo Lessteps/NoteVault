@@ -17,3 +17,19 @@ export interface LibraryUserEntry {
   muscles: { primary: string[]; secondary: string[] };
   how_to: string;
 }
+
+/**
+ * La clave con la que se reconoce un ejercicio: sin mayúsculas y con los
+ * espacios internos colapsados. Es lo que hace que «  MI   PRESS » y
+ * «mi press» sean el mismo ejercicio y no dos.
+ *
+ * Vive aquí y no en el módulo de la API porque **los dos** tienen que usar la
+ * misma: si el guardado normalizara de una manera y el store comprobara de
+ * otra, un nombre con espacios dobles crearía un duplicado.
+ */
+export function normalizeLibraryName(name: string): string {
+  return String(name ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}

@@ -170,7 +170,7 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
-  it("el buscador de la biblioteca marca lo que ya está en la rutina", async () => {
+  it("un ejercicio escrito a mano con el mismo nombre no se marca como duplicado", async () => {
     // "Bench Press" ya está en la rutina: lo dice el backend, no el store,
     // porque al montar el módulo se recarga la lista.
     invoke.mockImplementation(async (method: string) => {
@@ -210,8 +210,10 @@ describe("Biblioteca de Ejercicio", () => {
         await Promise.resolve();
       });
       const hit = picker.querySelector('[data-library-pick="bench-press"]')!;
-      expect(hit.getAttribute("data-in-routine")).toBe("true");
-      expect(hit.textContent).toContain("ya en tu rutina");
+      // Escrito a mano: mismo nombre, pero no vino de la biblioteca, así que no
+      // es un duplicado. Antes esto se decidía comparando nombres y salía mal.
+      expect(hit.getAttribute("data-in-routine")).toBeNull();
+      expect(hit.textContent).not.toContain("ya en tu rutina");
     } finally {
       cleanup();
     }
@@ -293,7 +295,79 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
-  it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
+  it("copiar de la biblioteca guarda el origen y su huella", async () => {
+  const { host, cleanup } = mount(<Library />);
+  try {
+    const saved: Array<Record<string, unknown>> = [];
+    invoke.mockImplementation(async (method: string, ...args: unknown[]) => {
+      if (method === "ex_save") {
+        saved.push((args[1] ?? {}) as Record<string, unknown>);
+        return { ok: true, id: "nuevo" };
+      }
+      return BASE_INVOKE(method);
+    });
+    const add = host.querySelector("[data-library-add]")!;
+    await act(async () => {
+      add.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(saved).toHaveLength(1);
+    // El slug es de verdad uno del catálogo, no un marcador.
+    expect(String(saved[0]!.source)).toMatch(/^[a-z0-9-]+$/);
+    expect(String(saved[0]!.sourceFp).length).toBeGreaterThan(0);
+  } finally {
+    cleanup();
+  }
+});
+
+it("el picker marca lo que ya usas por su origen, no por el nombre", async () => {
+  invoke.mockImplementation(async (method: string) => {
+    if (method === "ex_list")
+      return [
+        {
+          id: "e1",
+          day: "lunes",
+          // Nombre DISTINTO del de la biblioteca, pero el mismo origen.
+          name: "Mi press particular",
+          video: "",
+          video_path: "",
+          series_reps: "",
+          rest: "",
+          how_to: "",
+          has_video: false,
+          video_name: "",
+          muscles: { primary: [], secondary: [] },
+          source: "bench-press",
+          sourceFp: "x",
+        },
+      ];
+    return BASE_INVOKE(method);
+  });
+  const { host, cleanup } = mount(<ExerciseModule />);
+  try {
+    await act(async () => {
+      [...host.querySelectorAll("aside nav button")]
+        .find((b) => b.textContent?.includes("Ejercicios"))!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    const picker = host.querySelector("[data-library-picker]")!;
+    const search = picker.querySelector('input[aria-label="Buscar en la biblioteca"]') as HTMLInputElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(search, "bench press");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+      await Promise.resolve();
+    });
+    // Con nombres distintos, comparar por nombre fallaría: sale marcado igual.
+    expect(picker.querySelector('[data-library-pick="bench-press"]')!.getAttribute("data-in-routine")).toBe("true");
+  } finally {
+    cleanup();
+  }
+});
+
+it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {
       const side = () => [...host.querySelectorAll("aside nav button")];

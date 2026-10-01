@@ -261,6 +261,39 @@ describe("exerciseApi", () => {
     expect(api.ex_library_list()[0]!.how_to).toBe("pasos");
   });
 
+  it("ex_dict expone el origen de la copia", () => {
+    const e = api.ex_save("", {
+      day: "lunes",
+      name: "Press",
+      source: "bench-press",
+      sourceFp: "abc",
+    }) as { id: string };
+    const got = api.ex_list().find((x) => x.id === e.id)! as Record<string, unknown>;
+    expect(got.source).toBe("bench-press");
+    expect(got.sourceFp).toBe("abc");
+  });
+
+  it("un ejercicio escrito a mano no tiene origen", () => {
+    const e = api.ex_save("", { day: "lunes", name: "A mano" }) as { id: string };
+    const got = api.ex_list().find((x) => x.id === e.id)! as Record<string, unknown>;
+    expect(got.source).toBeFalsy();
+    expect(got.sourceFp).toBeFalsy();
+  });
+
+  it("source y sourceFp sobreviven a una edición posterior", () => {
+    const e = api.ex_save("", {
+      day: "lunes",
+      name: "Press",
+      source: "bench-press",
+      sourceFp: "abc",
+    }) as { id: string };
+    api.ex_save(e.id, { series_reps: "4×8" });
+    const got = api.ex_list().find((x) => x.id === e.id)! as Record<string, unknown>;
+    expect(got.source).toBe("bench-press");
+    expect(got.sourceFp).toBe("abc");
+    expect(got.series_reps).toBe("4×8");
+  });
+
   it("ex_overview counts the year it was asked for, not always this one", () => {
     seedWeek();
     const year = new Date().getFullYear();

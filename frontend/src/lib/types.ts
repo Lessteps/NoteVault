@@ -602,6 +602,18 @@ export interface Exercise {
   video_name: string;
   /** What the body map paints. Ids come from the muscle catalogue. */
   muscles: { primary: string[]; secondary: string[] };
+  /**
+   * Slug de la entrada de la biblioteca de la que se copió. Vacío si se
+   * escribió a mano. Con esto, «¿esto viene de la Biblioteca?» es un dato y no
+   * una comparación de nombres.
+   */
+  source?: string;
+  /**
+   * Huella de los campos que se copiaron (nombre, cómo hacerlo, músculos).
+   * Cuando la entrada de origen cambia, deja de coincidir y el ejercicio se
+   * marca como desfasado. Solo lo escribe la biblioteca, nunca tú.
+   */
+  sourceFp?: string;
 }
 
 export interface ExerciseEntry {

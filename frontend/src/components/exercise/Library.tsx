@@ -13,6 +13,7 @@ import { useExercise } from "../../store/exercise";
 import {
   filterLibrary,
   filterLibraryByLocalMuscle,
+  libraryFingerprint,
   getInstructions,
   libraryEquipment,
   libraryMuscles,
@@ -95,6 +96,10 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
       series_reps: "",
       rest: "",
       muscles: { primary: found.localPrimary, secondary: found.localSecondary },
+      // De qué entrada sale esta copia. Sin esto, «¿esto es de la Biblioteca?»
+      // no tiene respuesta y no se puede avisar de copias desfasadas.
+      source: found.slug,
+      sourceFp: libraryFingerprint(found),
     };
     try {
       const created = await api.exSave("", fields);

@@ -67,6 +67,8 @@ function exDict(mgr: ExerciseManager, e: Record<string, any>): Record<string, un
     has_video: videoFile !== null,
     video_name: videoFile ? path.basename(videoFile) : "",
     muscles: normalizeMuscles(e.muscles),
+    source: e.source || "",
+    sourceFp: e.sourceFp || "",
   };
 }
 
@@ -90,6 +92,11 @@ function exFields(fields: unknown) {
   }
   return {
     day,
+    // De qué entrada de la biblioteca salió esta copia, si salió de alguna.
+    // Vacío = escrito a mano, que es la respuesta a «¿esto es de la Biblioteca?».
+    source: oneLine(f.source, 120),
+    // Huella de lo que se copió; la Task 6 la compara para avisar de copias viejas.
+    sourceFp: oneLine(f.sourceFp, 40),
     name: oneLine(f.name, 120) || "Ejercicio",
     video_path: videoPath,
     series_reps: oneLine(f.series_reps, 120),
@@ -487,12 +494,23 @@ export function exerciseApi(app: AppState) {
         if (f.muscles.primary.length || f.muscles.secondary.length) {
           m.updateExercise(String(e.id), { muscles: f.muscles });
         }
+        // Y el origen, cuando la copia viene de la biblioteca.
+        if (f.source || f.sourceFp) {
+          m.updateExercise(String(e.id), { source: f.source, sourceFp: f.sourceFp });
+        }
         return exDict(m, m.exercises().find((x) => x.id === e.id)!);
       }
       if (!m.exercises().some((e) => e.id === exerciseId)) {
         throw new ApiError("Ese ejercicio ya no existe.");
       }
+      const actual = m.exercises().find((e) => e.id === exerciseId)!;
       const updates: Record<string, any> = { ...f };
+      // Editar «4×8» no puede borrar de dónde salió el ejercicio. Como `f` llega
+      // con "" cuando no se manda el campo, aquí se recupera el que había: el
+      // origen se actualiza solo desde la biblioteca, nunca al retocar tus
+      // números.
+      if (!f.source) updates.source = actual.source || "";
+      if (!f.sourceFp) updates.sourceFp = actual.sourceFp || "";
       if (f.video_path) {
         updates.video = path.basename(f.video_path);
       }

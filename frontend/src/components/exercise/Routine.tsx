@@ -215,10 +215,12 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
  */
 function LibraryPicker({
   onPick,
-  routineNames,
+  usedSlugs,
 }: {
   onPick: (slug: string) => void;
-  routineNames: Set<string>;
+  /** Slugs que ya usas. Dato, no comparación de nombres: «Mi press» con
+   * `source: bench-press` cuenta como bench-press aunque el nombre no coincida. */
+  usedSlugs: Set<string>;
 }) {
   const [q, setQ] = useState("");
   const rows = useMemo(() => (q.trim() ? searchLibrary(q).slice(0, 8) : []), [q]);
@@ -241,7 +243,7 @@ function LibraryPicker({
       {rows.length > 0 && (
         <div className="max-h-[188px] space-y-0.5 overflow-y-auto">
           {rows.map((r) => {
-            const already = routineNames.has(r.name.toLowerCase());
+            const already = usedSlugs.has(r.slug);
             return (
               <button
                 key={r.slug}
@@ -295,8 +297,10 @@ export function ExerciseForm({
 }) {
   const days = useExercise((s) => s.days);
   const routine = useExercise((s) => s.list);
-  const routineNames = useMemo(
-    () => new Set(routine.map((e) => e.name.toLowerCase())),
+  // Los slugs ya en el programa. Vacío para lo escrito a mano: eso no viene
+  // de la biblioteca y no debe marcarse como duplicado de nada.
+  const usedSlugs = useMemo(
+    () => new Set(routine.filter((e) => e.source).map((e) => e.source!)),
     [routine],
   );
 
@@ -325,7 +329,7 @@ export function ExerciseForm({
           <div className="text-[11px] uppercase tracking-[0.12em] text-faint">
             Desde la biblioteca
           </div>
-          <LibraryPicker onPick={pickFromLibrary} routineNames={routineNames} />
+          <LibraryPicker onPick={pickFromLibrary} usedSlugs={usedSlugs} />
           <div className="flex items-center gap-2 py-0.5 text-[11px] uppercase tracking-[0.12em] text-faint">
             <span className="h-px flex-1 bg-line" />
             o a mano

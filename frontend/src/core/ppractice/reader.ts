@@ -68,7 +68,7 @@ export function classify(rel: string): Group {
   if (ext === ".sql" || inDir("migrations", "migration", "db", "database", "schema", "prisma", "alembic", "seeds") || /^(schema|models)\.(sql|prisma)$/.test(name)) return "database";
   if (name === "readme.md" || ext === ".md") return "docs";
   if (/^(package\.json|tsconfig.*\.json|pyproject\.toml|requirements.*\.txt|dockerfile|docker-compose\.ya?ml|vite\.config\..*|eslint.*|\.eslintrc.*|\.prettierrc.*|pytest\.ini|setup\.cfg|\.gitignore|\.env\.example)$/.test(name) || /\.config\.[a-z]+$/.test(name)) return "config";
-  if ([".tsx", ".jsx", ".vue", ".svelte", ".css", ".scss", ".html"].includes(ext) || inDir("client", "frontend", "web", "renderer", "components", "pages", "screens", "ui", "public", "electron", "preload", "mobile", "android", "ios", "atoms", "molecules", "organisms", "templates", "hooks")) return "client";
+  if ([".tsx", ".jsx", ".vue", ".svelte", ".css", ".scss", ".html"].includes(ext) || inDir("client", "frontend", "web", "renderer", "components", "pages", "screens", "ui", "public", "electron", "preload", "desktop", "mobile", "android", "ios", "atoms", "molecules", "organisms", "templates", "hooks")) return "client";
   if ([".py", ".ts", ".js", ".mjs", ".cjs", ".kt", ".java", ".go", ".rs", ".cs"].includes(ext)) return "backend";
   return "other";
 }

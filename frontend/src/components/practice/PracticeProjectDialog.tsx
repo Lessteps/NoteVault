@@ -200,7 +200,9 @@ export function ProjectsWorkspace({ page = false, onNavigate }: { page?: boolean
           {busy === "ideas" ? <Loader2 size={13} className="animate-spin" /> : <Hammer size={13} />} Proponer ideas
         </PrimaryButton>
         {notes.trim() && (
-          <GhostButton onClick={() => void specify({ title: "", problem: "", focus: focus || undefined })}>Especificar lo que escribí</GhostButton>
+          <GhostButton onClick={() => void specify({ title: "", problem: "", focus: focus || undefined })}>
+            {busy === "build:" && <Loader2 size={13} className="animate-spin" />} Especificar lo que escribí
+          </GhostButton>
         )}
         <span className="flex-1" />
         <input type="number" min={1} max={12} className={cn(input, "!w-16")} value={weeks} onChange={(e) => setWeeks(Number(e.target.value) || 1)} aria-label="Semanas" />

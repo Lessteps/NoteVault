@@ -42,16 +42,11 @@ describe("automatic checks", () => {
     const root = tmp();
     const node = process.execPath;
     const plan = (id: string, args: string[], skip?: string): CheckPlan => ({ id, kind: "test", label: id, cwd: "", command: node, args, ...(skip ? { skip } : {}) });
-    const results = await runChecks(
-      root,
-      [
-        plan("ok", ["-e", "console.log('all good')"]),
-        plan("bad", ["-e", "console.error('boom'); process.exit(3)"]),
-        plan("slow", ["-e", "setTimeout(() => {}, 5000)"]),
-        plan("skipped", ["-e", "0"], "dependencies not installed"),
-      ],
-      700,
-    );
+    // Generous limit for the ones that must finish (starting Node is slow when the whole suite runs in parallel);
+    // a short one only for the check that is meant to hang.
+    const finishing = await runChecks(root, [plan("ok", ["-e", "console.log('all good')"]), plan("bad", ["-e", "console.error('boom'); process.exit(3)"]), plan("skipped", ["-e", "0"], "dependencies not installed")], 30_000);
+    const hanging = await runChecks(root, [plan("slow", ["-e", "setTimeout(() => {}, 20000)"])], 600);
+    const results = [finishing[0]!, finishing[1]!, hanging[0]!, finishing[2]!];
     expect(results.map((r) => r.status)).toEqual(["passed", "failed", "timeout", "skipped"]);
     expect(results[0]!.output).toContain("all good");
     expect(results[1]).toMatchObject({ exitCode: 3 });

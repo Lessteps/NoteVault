@@ -25,6 +25,7 @@ import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import * as store from "../../core/store.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
+import { finalText, gradeText, ideasText, planText, postmortemText, reviewText, specText } from "../../core/ppractice/chatText.js";
 import { ChatLog } from "./studySpace.js";
 import { askStructured } from "./study.js";
 
@@ -98,7 +99,7 @@ export function ppApi(app: AppState) {
   const skillText = (name: string): string => readText(path.join(areaAbs(), "_skills", `${name}.md`)) || PP_DEFAULT_SKILLS[name] || "";
 
   /** One structured call: validated by `parse`, retried with a bigger budget when the answer was cut off, and logged to the chat. */
-  const ask = async <T>(chat: ChatLog, cfg: AIConfig, label: string, messages: Msg[], parse: (reply: string) => T): Promise<T> => {
+  const ask = async <T>(chat: ChatLog, cfg: AIConfig, label: string, messages: Msg[], parse: (reply: string) => T, show?: (value: T) => string): Promise<T> => {
     const accept = (r: string): boolean => {
       try {
         parse(r);
@@ -111,7 +112,7 @@ export function ppApi(app: AppState) {
     try {
       reply = await askStructured(cfg, messages, accept);
       const value = parse(reply);
-      chat.exchange(`${label}\n\n${messages[1]?.content.slice(0, 1200) ?? ""}`, reply);
+      chat.exchange(`${label}\n\n${messages[1]?.content.slice(0, 1200) ?? ""}`, show ? show(value) : reply); // the chat shows what the answer MEANS, not the JSON
       return value;
     } catch (e: any) {
       chat.exchange(label, reply || String(e?.message ?? e), true);
@@ -290,7 +291,7 @@ export function ppApi(app: AppState) {
       const focus = (FOCUSES as readonly string[]).includes(String(opts.focus)) ? (opts.focus as Focus) : suggestFocus(profile) ?? undefined;
       const client = (CLIENTS as readonly string[]).includes(String(opts.client)) ? (opts.client as ClientKind) : focus ? clientForFocus(focus) : undefined;
       const chat = new ChatLog(undefined, "Práctica: ideas de proyecto", cfg.model);
-      const ideas = await ask(chat, cfg, "Ideas de proyecto", ideasMessages({ skill: skillText("pp_build_skill"), profile: profileSummary(profile), previous: previousProjects(), focus, client, notes: opts.notes }), parseIdeas);
+      const ideas = await ask(chat, cfg, "Ideas de proyecto", ideasMessages({ skill: skillText("pp_build_skill"), profile: profileSummary(profile), previous: previousProjects(), focus, client, notes: opts.notes }), parseIdeas, ideasText);
       return { ideas, focus: focus ?? null, conversationId: chat.id };
     },
 
@@ -311,8 +312,8 @@ export function ppApi(app: AppState) {
       let problems: string[] = [];
       for (let attempt = 1; attempt <= MAX_SPEC_ATTEMPTS; attempt++) {
         const msgs = specMessages({ skill: skillText("pp_build_skill"), profile: profileSummary(profile), focus, client, idea: ideaText, topics, previous: previousProjects(), fix });
-        const raw = await ask(chat, cfg, `Especificación (intento ${attempt})`, msgs, specFromReply);
-        const candidate = normalizeSpec(raw);
+        const raw = await ask(chat, cfg, `Especificación (intento ${attempt})`, msgs, (r) => normalizeSpec(specFromReply(r)), specText);
+        const candidate = raw;
         // The learner's choice of focus and client wins over whatever the model wrote.
         candidate.focus = focus;
         candidate.client = client;
@@ -341,7 +342,7 @@ export function ppApi(app: AppState) {
       const used = profile.history.filter((h) => h.kind === "project" && h.focus).map((h) => String(h.focus));
       const focuses = planFocuses(weeks, suggestFocus(profile), used);
       const chat = new ChatLog(undefined, `Práctica: plan de ${weeks} semanas`, cfg.model);
-      const plan = await ask(chat, cfg, `Plan de ${weeks} semanas`, planMessages({ skill: skillText("pp_build_skill"), profile: profileSummary(profile), focuses, previous: previousProjects(), notes: opts.notes }), parsePlan);
+      const plan = await ask(chat, cfg, `Plan de ${weeks} semanas`, planMessages({ skill: skillText("pp_build_skill"), profile: profileSummary(profile), focuses, previous: previousProjects(), notes: opts.notes }), parsePlan, planText);
       // The focus of each week is the one computed here, whatever the model wrote.
       const fixed = plan.slice(0, weeks).map((w, i) => ({ ...w, week: i + 1, focus: focuses[i]!, client: clientForFocus(focuses[i]!) }));
       fs.mkdirSync(specsAbs(), { recursive: true });
@@ -377,7 +378,20 @@ export function ppApi(app: AppState) {
         "",
       ].join("\n");
       store.writeText(path.join(dir, "CHECKLIST.md"), checklist);
-      store.writeText(path.join(dir, "README.md"), [`# ${spec.title}`, "", spec.problem, "", "## Run it", "", "_Write here how to install, run and test the project._", "", "## Decisions", "", "_Write here the design decisions and why (you will defend them)._", ""].join("\n"));
+      // The skeleton the learner builds in: one folder per layer, each with what it must satisfy.
+      const clientDir = spec.client === "web" ? "frontend" : spec.client;
+      const layerDirs: Array<{ dir: string; title: string; summary: string; items: string[]; criteria: string[] }> = [
+        { dir: "database", title: "Database", summary: spec.database.summary, items: spec.database.tables, criteria: spec.database.criteria },
+        { dir: "backend", title: "Backend", summary: spec.backend.summary, items: [...spec.backend.architecture.map((a) => `layer: ${a}`), ...spec.backend.endpoints], criteria: spec.backend.criteria },
+        { dir: clientDir, title: "Client", summary: spec.clientLayer.summary, items: [...spec.clientLayer.screens.map((s) => `screen: ${s}`), ...spec.clientLayer.patterns.map((p) => `pattern: ${p}`)], criteria: spec.clientLayer.criteria },
+        ...(spec.automation ? [{ dir: "automation", title: "Automation (extra)", summary: spec.automation.summary, items: [], criteria: spec.automation.criteria }] : []),
+      ];
+      for (const l of layerDirs) {
+        fs.mkdirSync(path.join(dir, l.dir), { recursive: true });
+        const readme = path.join(dir, l.dir, "README.md");
+        if (!fs.existsSync(readme)) store.writeText(readme, [`# ${l.title}`, "", l.summary, "", ...(l.items.length ? ["## Build", ...l.items.map((i) => `- ${i}`), ""] : []), "## Acceptance criteria", ...l.criteria.map((c) => `- [ ] ${c}`), ""].join("\n"));
+      }
+      store.writeText(path.join(dir, "README.md"), [`# ${spec.title}`, "", spec.problem, "", "## Structure", ...layerDirs.map((l) => `- \`${l.dir}/\` — ${l.title.toLowerCase()}`), "", "## Run it", "", "_Write here how to install, run and test the project._", "", "## Decisions", "", "_Write here the design decisions and why (you will defend them)._", ""].join("\n"));
       saveState(spec.folder, { version: 1, state: "building", spec, createdAt: new Date().toISOString() });
       return { ok: true, rel: app.rel(dir) };
     },
@@ -423,9 +437,9 @@ export function ppApi(app: AppState) {
       for (const layer of LAYERS) {
         const sel = selectFiles(pack, { groups: ["database", "backend", "client", "tests", "config"], budget: LAYER_BUDGET[layer], only: new Set([...layerFiles(pack, layer, only)]) });
         const msgs = reviewMessages({ skill: skillText("pp_defend_skill"), spec: specMd, layer, criteria: criteria[layer], focusCriteria: spec.focusCriteria, files: renderFiles(sel.files), checks: checksText, profile: profileSummary(profile, 700), previous: diff ? previousIssues(state) : undefined });
-        reports.push(await ask(chat, cfg, `Revisión: ${layer}`, msgs, (r) => parseReview(r, layer)));
+        reports.push(await ask(chat, cfg, `Revisión: ${layer}`, msgs, (r) => parseReview(r, layer), reviewText));
       }
-      const final = await ask(chat, cfg, "Veredicto final y preguntas", finalMessages(specMd, reports, checks, profileSummary(profile, 700)), parseFinal);
+      const final = await ask(chat, cfg, "Veredicto final y preguntas", finalMessages(specMd, reports, checks, profileSummary(profile, 700)), parseFinal, finalText);
       const n = (state.defense?.n ?? 0) + 1;
       state.defense = { n, at: new Date().toISOString(), final, layers: reports, checks, manifest: pack.manifest };
       state.state = "defended";
@@ -443,7 +457,7 @@ export function ppApi(app: AppState) {
       const qa = state.defense.final.questions.map((q) => ({ id: q.id, question: q.question, answer: String(answers?.[q.id] ?? "") }));
       if (!qa.some((q) => q.answer.trim())) throw new ApiError("Responde al menos una pregunta.");
       const chat = new ChatLog(undefined, `Práctica: defensa oral — ${state.spec.title}`, cfg.model);
-      const grade = await ask(chat, cfg, "Calificación de la defensa", gradeDefenseMessages(renderSpecMarkdown(state.spec, { created: "" }), state.defense.final, qa), parseDefenseGrade);
+      const grade = await ask(chat, cfg, "Calificación de la defensa", gradeDefenseMessages(renderSpecMarkdown(state.spec, { created: "" }), state.defense.final, qa), parseDefenseGrade, gradeText);
       state.defense.grade = grade;
       saveState(folder, state);
       store.writeText(path.join(projectAbs(folder), `DEFENSE-${state.defense.n}.md`), defenseMarkdown(state, state.defense.n));
@@ -464,6 +478,7 @@ export function ppApi(app: AppState) {
         "Postmortem",
         postmortemMessages({ kind: "project", project: state.spec.title, skill: skillText("pp_postmortem_skill"), spec: renderSpecMarkdown(state.spec, { created: "" }), reviewSummary: `${d.final.summary}\n\n${review}\n\nChecks:\n${summarizeChecks(d.checks)}`, defenseSummary: d.grade ? `${d.grade.summary}\nGaps: ${d.grade.gaps.join("; ")}` : "The oral defence was not answered.", profile: profileSummary(loadProfile(app.root), 900) }),
         (r) => parsePostmortem(r, { kind: "project", project: state.spec.title }),
+        postmortemText,
       );
       pm.focus = state.spec.focus;
       pm.score = d.grade ? Math.round((d.final.score + d.grade.score) / 2) : d.final.score;
@@ -484,7 +499,7 @@ export function ppApi(app: AppState) {
       if (!errors.length) throw new ApiError("Aún no hay retos de lógica fallados que analizar.");
       const evidence = errors.map((e) => `- ${e.topic || "kata"} [${e.category}] ${e.description_en || e.explanation} | wrong: ${String(e.wrong_answer).slice(0, 160)} | expected: ${String(e.expected).slice(0, 160)}`).join("\n");
       const chat = new ChatLog(undefined, "Práctica: postmortem de retos de lógica", cfg.model);
-      const pm = await ask(chat, cfg, "Postmortem de retos", postmortemMessages({ kind: "kata", project: "Daily logic katas", skill: skillText("pp_kata_skill"), spec: "", reviewSummary: "", defenseSummary: "", profile: profileSummary(loadProfile(app.root), 900), evidence }), (r) => parsePostmortem(r, { kind: "kata", project: "Daily logic katas" }));
+      const pm = await ask(chat, cfg, "Postmortem de retos", postmortemMessages({ kind: "kata", project: "Daily logic katas", skill: skillText("pp_kata_skill"), spec: "", reviewSummary: "", defenseSummary: "", profile: profileSummary(loadProfile(app.root), 900), evidence }), (r) => parsePostmortem(r, { kind: "kata", project: "Daily logic katas" }), postmortemText);
       pm.kind = "kata";
       const next = applyPostmortem(loadProfile(app.root), pm, new Date().toISOString());
       saveProfile(app.root, next);

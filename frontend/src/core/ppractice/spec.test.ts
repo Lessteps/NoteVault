@@ -63,6 +63,16 @@ describe("project specification rules", () => {
     ).toMatch(/database: the layer is MANDATORY/);
   });
 
+  it("follows the learner's stack: PostgreSQL for web and mobile, SQLite only for desktop", () => {
+    expect(problems((r) => { r.stack.database = "SQLite"; }).join("\n")).toMatch(/database of a web project is PostgreSQL/);
+    expect(problems((r) => { r.client = "mobile"; r.focus = "mobile"; r.stack.database = "SQLite"; }).join("\n")).toMatch(/database of a mobile project is PostgreSQL/);
+    expect(problems((r) => { r.stack.database = "MySQL"; }).join("\n")).toMatch(/PostgreSQL/);
+    expect(problems((r) => { r.stack.database = "postgresql 16 + pgbouncer"; })).toEqual([]);
+    // a desktop app keeps its data in SQLite, and PostgreSQL is refused there
+    expect(problems((r) => { r.client = "desktop"; r.focus = "desktop"; r.stack.database = "SQLite (better-sqlite3)"; })).toEqual([]);
+    expect(problems((r) => { r.client = "desktop"; r.focus = "desktop"; r.stack.database = "PostgreSQL"; }).join("\n")).toMatch(/desktop project stores its data in SQLite/);
+  });
+
   it("ties desktop and mobile focuses to their client", () => {
     expect(problems((r) => { r.focus = "desktop"; }).join("\n")).toMatch(/focus desktop requires client = desktop/);
     expect(problems((r) => { r.focus = "mobile"; r.client = "web"; }).join("\n")).toMatch(/focus mobile requires client = mobile/);

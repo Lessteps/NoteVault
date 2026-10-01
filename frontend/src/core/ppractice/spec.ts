@@ -112,6 +112,16 @@ export function isCheckable(criterion: string): boolean {
 
 const range = (n: number, r: { min: number; max: number }): boolean => n >= r.min && n <= r.max;
 
+/**
+ * The learner's stack: PostgreSQL is THE database; SQLite is only for desktop apps. The model proposes, this refuses.
+ * A desktop client keeps its data in SQLite; web and mobile projects (which have a server) use PostgreSQL.
+ */
+export function databaseStackProblems(spec: Pick<ProjectSpec, "client" | "stack">): string[] {
+  const db = spec.stack.database.toLowerCase();
+  if (spec.client === "desktop") return /sqlite/.test(db) ? [] : ["stack: a desktop project stores its data in SQLite (PostgreSQL is for web and mobile backends)."];
+  return /postgres/.test(db) ? [] : [`stack: the database of a ${spec.client} project is PostgreSQL (SQLite is only for desktop apps); got "${spec.stack.database}".`];
+}
+
 /** Every reason the specification breaks the rules. Empty means it is valid. */
 export function validateSpec(spec: ProjectSpec, knownTopics?: ReadonlySet<string>): string[] {
   const p: string[] = [];
@@ -119,6 +129,7 @@ export function validateSpec(spec: ProjectSpec, knownTopics?: ReadonlySet<string
   if (!spec.title) p.push("title: missing.");
   if (spec.problem.length < 40) p.push("problem: describe the problem in at least a couple of sentences.");
   if (!spec.stack.database || !spec.stack.backend || !spec.stack.client) p.push("stack: database, backend and client technologies must all be named.");
+  else p.push(...databaseStackProblems(spec));
   if (spec.hours < 4 || spec.hours > 16) p.push("hours: a weekly project is 4 to 16 hours.");
 
   // The three mandatory layers.

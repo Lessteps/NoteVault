@@ -6,7 +6,7 @@ export const validSpecRaw = () => ({
   client: "web",
   focus: "backend",
   hours: 10,
-  stack: { database: "SQLite", backend: "FastAPI", client: "React + TypeScript" },
+  stack: { database: "PostgreSQL 16", backend: "FastAPI", client: "React + TypeScript" },
   database: {
     summary: "Two tables: links and visits, with a unique code.",
     tables: ["links(id, code UNIQUE, url, created_at)", "visits(id, link_id, visited_on)"],

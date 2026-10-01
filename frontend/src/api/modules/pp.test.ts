@@ -132,6 +132,15 @@ describe("phase 1 — pp_build", () => {
     expect(out.conversationId).toMatch(/^c\d{14}-/);
   });
 
+  it("the chat shows readable text, never the JSON the model had to write", async () => {
+    const out = await api.pp_ideas({ focus: "backend" });
+    const conv = JSON.parse(fs.readFileSync(path.join(state.convDir, `${out.conversationId}.json`), "utf-8"));
+    const answer = conv.messages.find((m: { role: string }) => m.role === "assistant").content as string;
+    expect(answer).toContain("Ideas propuestas");
+    expect(answer).toContain("**Link shortener**");
+    expect(answer).not.toContain('{"ideas"');
+  });
+
   it("rejects a specification that misses a layer, tells the model why, and keeps the valid retry", async () => {
     const out = await api.pp_build({ idea: { title: "Link shortener", problem: "short codes", focus: "backend" } });
     expect(specAttempts).toBe(2);
@@ -170,6 +179,26 @@ describe("phases 2 to 4 — construct, defend, postmortem", () => {
     expect(read(`${PP}/projects/${folder}/CHECKLIST.md`)).toContain("- [ ] A migration script creates both tables from an empty database");
     expect(() => api.pp_construct(folder)).toThrow(/ya está en construcción/);
     expect(api.pp_status().projects.find((p) => p.folder === folder)?.state).toBe("building");
+  });
+
+  it("leaves a skeleton to build in: one folder per layer, each saying what it must satisfy", () => {
+    api.pp_construct(folder);
+    for (const layer of ["database", "backend", "frontend"]) expect(exists(`${PP}/projects/${folder}/${layer}/README.md`)).toBe(true);
+    expect(read(`${PP}/projects/${folder}/database/README.md`)).toContain("links(id, code UNIQUE, url, created_at)");
+    expect(read(`${PP}/projects/${folder}/backend/README.md`)).toContain("POST /links");
+    expect(read(`${PP}/projects/${folder}/frontend/README.md`)).toContain("pattern: custom hook useLinks");
+    expect(read(`${PP}/projects/${folder}/README.md`)).toContain("`database/`");
+    // an automation folder only when the spec has the extra
+    expect(exists(`${PP}/projects/${folder}/automation`)).toBe(false);
+  });
+
+  it("a desktop or mobile client gets its own folder name", () => {
+    const dir = path.join(root, ...`${PP}/projects/_specs`.split("/"));
+    const desktop: any = { ...JSON.parse(fs.readFileSync(path.join(dir, `${folder}.spec.json`), "utf-8")), folder: "Clipboard tool", client: "desktop", focus: "desktop" };
+    fs.writeFileSync(path.join(dir, "Clipboard tool.spec.json"), JSON.stringify(desktop), "utf-8");
+    api.pp_construct("Clipboard tool");
+    expect(exists(`${PP}/projects/Clipboard tool/desktop/README.md`)).toBe(true);
+    expect(exists(`${PP}/projects/Clipboard tool/frontend`)).toBe(false);
   });
 
   it("estimates the cost of a defence before spending anything", () => {

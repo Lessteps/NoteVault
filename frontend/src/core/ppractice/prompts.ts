@@ -42,6 +42,7 @@ const RULES = [
   `Size: ${SCOPE.tables.min}-${SCOPE.tables.max} tables, ${SCOPE.endpoints.min}-${SCOPE.endpoints.max} endpoints, ${SCOPE.screens.min}-${SCOPE.screens.max} screens, 4-16 hours.`,
   "The backend has a layered architecture. The client has an architecture, named design patterns and Atomic Design (atoms, molecules, organisms).",
   "Every acceptance criterion must be CHECKABLE (a status code, a command, an observable result).",
+  "THE LEARNER'S STACK: PostgreSQL is the database of every web and mobile project (stack.database must say PostgreSQL); SQLite is ONLY for desktop projects (client = desktop). Backend in Python (FastAPI) or TypeScript, client in TypeScript (React for web).",
 ].join("\n");
 
 const SPEC_SHAPE = `{

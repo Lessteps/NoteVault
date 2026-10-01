@@ -125,6 +125,60 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
+  it("el progreso tiene una gráfica de líneas con un selector de grupos", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Progreso"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      // La gráfica es su propia pestaña dentro de Progreso.
+      const tabs = host.querySelector("[data-progress-tabs]")!;
+      expect(tabs.textContent).toContain("Gráfica");
+      await act(async () => {
+        host.querySelector('[data-progress-tab="grafica"]')!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const graph = host.querySelector("[data-progress-graph]")!;
+      expect(graph).not.toBeNull();
+
+      // Un botón por grupo muscular: se encienden y apagan.
+      const toggles = graph.querySelectorAll("[data-group-toggle]");
+      expect(toggles.length).toBeGreaterThanOrEqual(6);
+      // Todos encendidos al entrar.
+      for (const t of toggles) expect(t.getAttribute("aria-pressed")).toBe("true");
+      const first = toggles[0]!;
+      const group = first.getAttribute("data-group-toggle");
+
+      await act(async () => {
+        first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      // Apagado: queda en false y su línea desaparece del SVG.
+      expect(first.getAttribute("aria-pressed")).toBe("false");
+      const legend = graph.textContent ?? "";
+      expect(legend).not.toContain(`${group}: `);
+
+      // Y se vuelve a encender.
+      await act(async () => {
+        host.querySelector(`[data-group-toggle="${group}"]`)!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(
+        host.querySelector(`[data-group-toggle="${group}"]`)!.getAttribute("aria-pressed"),
+      ).toBe("true");
+      expect(host.textContent).toContain("Volumen por grupo");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("el progreso tiene una cuarta pestaña: el mapa con métricas", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {

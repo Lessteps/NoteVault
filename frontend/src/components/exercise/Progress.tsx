@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { Header } from "../habits/parts";
 import { ExerciseMonth, ExerciseWeek } from "./Grids";
+import { ProgressGraph } from "./ProgressGraph";
 import { ProgressMap } from "./ProgressMap";
 import { Yearly } from "./Yearly";
 import { usePersistedNav } from "../../store/navState";
@@ -17,11 +18,12 @@ const PERIODS = [
   { id: "mes", label: "Mes" },
   { id: "anio", label: "Año" },
   { id: "mapa", label: "Mapa" },
+  { id: "grafica", label: "Gráfica" },
 ] as const;
 
 type PeriodId = (typeof PERIODS)[number]["id"];
-/** Los tres periodos de rejilla; `mapa` es la cuarta pantalla. */
-type GridPeriod = Exclude<PeriodId, "mapa">;
+/** Los tres periodos de rejilla; el resto son pantallas aparte. */
+type GridPeriod = Exclude<PeriodId, "mapa" | "grafica">;
 
 export function Progress() {
   const [period, setPeriod] = usePersistedNav("ejercicio.progreso", "semana") as [PeriodId, (v: PeriodId) => void];
@@ -30,7 +32,7 @@ export function Progress() {
   const [previous, setPrevious] = useState<GridPeriod>("semana");
 
   const pick = (id: PeriodId) => {
-    if (id !== "mapa") setPrevious(id);
+    if (id === "semana" || id === "mes" || id === "anio") setPrevious(id);
     setPeriod(id);
   };
 
@@ -60,9 +62,11 @@ export function Progress() {
       </Header>
       <div data-progress-view className="flex min-h-0 flex-1 flex-col">
         {period === "mapa" ? (
-          // El mapa sigue el periodo de las rejillas: si venías en Mes, el mapa
-          // enseña el mes. Para cambiarlo se vuelve a Semana/Mes/Año.
-          <ProgressMap period={previous as GridPeriod} />
+          // Mapa y gráfica siguen el periodo de la rejilla activa: si venías en
+          // Mes, enseñan el mes. Para cambiarlo se vuelve a Semana/Mes/Año.
+          <ProgressMap period={previous} />
+        ) : period === "grafica" ? (
+          <ProgressGraph period={previous} />
         ) : period === "semana" ? (
           <ExerciseWeek />
         ) : period === "mes" ? (

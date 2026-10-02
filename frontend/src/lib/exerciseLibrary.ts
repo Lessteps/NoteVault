@@ -141,7 +141,23 @@ function propio(mio: string | undefined, suyo: string): string {
  * `bench-press`, y si hay una entrada propia con ese slug, es **la misma**,
  * editada. Una entrada con slug propio (`mia-…`) se añade al final.
  */
+/**
+ * Fusionar son 302 entradas y varios filtros lo piden en el mismo render. Se
+ * guarda el resultado por la **referencia** del array de entradas propias: si no
+ * ha cambiado, la fusión no se repite. Sin esto, `libraryEquipment` y
+ * `libraryMuscles` rehacían las 302 en cada repintado.
+ */
+let cacheFor: LibraryUserEntry[] | null = null;
+let cacheOf: LibraryEntry[] = [];
+
 export function mergeLibrary(userEntries: LibraryUserEntry[] = []): LibraryEntry[] {
+  if (userEntries === cacheFor) return cacheOf;
+  cacheFor = userEntries;
+  cacheOf = mergeUncached(userEntries);
+  return cacheOf;
+}
+
+function mergeUncached(userEntries: LibraryUserEntry[]): LibraryEntry[] {
   const bySlug = new Map(userEntries.filter((e) => e.slug).map((e) => [e.slug, e]));
   const merged = searchExercises().map(toEntry).map((base) => {
     const own = bySlug.get(base.slug);

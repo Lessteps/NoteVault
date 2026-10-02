@@ -522,15 +522,15 @@ export function exerciseApi(app: AppState) {
       if (!m.exercises().some((e) => e.id === exerciseId)) {
         throw new ApiError("Ese ejercicio ya no existe.");
       }
-      const actual = m.exercises().find((e) => e.id === exerciseId)!;
-      const updates: Record<string, any> = { ...f };
-      // Editar «4×8» no puede borrar de dónde salió el ejercicio. Como `f` llega
-      // con "" cuando no se manda el campo, aquí se recupera el que había: el
-      // origen se actualiza solo desde la biblioteca, nunca al retocar tus
-      // números.
-      if (!f.source) updates.source = actual.source || "";
-      if (!f.sourceFp) updates.sourceFp = actual.sourceFp || "";
-      if (!f.name) updates.name = actual.name || "Ejercicio";
+      // **Solo** los campos que vienen de verdad en la petición. `exFields`
+      // rellena con "" los que faltan, y extenderlos todos sobre el registro
+      // borraba lo que no se había mandado: actualizar las instrucciones desde
+      // la biblioteca se llevaba por delante tus series y tu descanso.
+      const raw = (fields ?? {}) as Record<string, unknown>;
+      const updates: Record<string, any> = {};
+      for (const key of Object.keys(raw)) {
+        if (key in f) updates[key] = (f as Record<string, unknown>)[key];
+      }
       if (f.video_path) {
         updates.video = path.basename(f.video_path);
       }

@@ -435,9 +435,11 @@ export function ExerciseForm({
 
   /** Rellena el formulario desde la biblioteca: nombre, músculos e instrucción. */
   const pickFromLibrary = (slug: string) => {
-    const found = libraryEntry(slug);
+    // Sin `userEntries` un ejercicio **tuyo** no se encuentra y el clic no
+    // hace nada: el buscador sí lo lista, pero la búsqueda de detrás no lo conocía.
+    const found = libraryEntry(slug, userEntries);
     if (!found) return;
-    const steps = getInstructions(slug)?.steps_es ?? [];
+    const steps = getInstructions(slug, userEntries)?.steps_es ?? [];
     setF({
       ...f,
       name: found.name,
@@ -445,6 +447,9 @@ export function ExerciseForm({
       how_to: steps.length
         ? steps.map((s, i) => `${i + 1}. ${s}`).join("\n")
         : `${found.equipment} · ${found.guidePrimary}`,
+      // De qué entrada sale, para poder avisar si luego cambia.
+      source: found.slug,
+      sourceFp: libraryFingerprint(found),
     });
   };
 

@@ -42,6 +42,12 @@ import { Library } from "./Library";
  */
 const mounted: Array<() => void> = [];
 
+// Estas pruebas montan el módulo entero con los 302 ejercicios de la biblioteca
+// en el DOM, y hay más de una anécdota. Con el límite por defecto de 5 s, bajo
+// carga, alguna se pasa por poco y falla de forma intermitente. Mismo patrón que
+// `glyphRecognizer.test.ts`.
+vi.setConfig({ testTimeout: 30_000 });
+
 function mount(node: React.ReactElement) {
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -681,6 +687,60 @@ it("se puede descartar el aviso sin cambiar nada", async () => {
   }
 });
 
+it("una entrada propia muestra «Sin imágenes» en vez de recuadros vacíos", async () => {
+  invoke.mockImplementation(async (method: string) => {
+    if (method === "ex_library_list")
+      return [
+        {
+          slug: "mia-1",
+          name: "Mi press",
+          equipment: "Barra",
+          muscles: { primary: ["pectoral"], secondary: [] },
+          how_to: "1. Baja la barra\n2. Empuja",
+        },
+      ];
+    return BASE_INVOKE(method);
+  });
+  const { host, cleanup } = mount(<Library />);
+  try {
+    // Las entradas propias se cargan del vault: hay que dejar que resuelvan.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const row = host.querySelector('[data-slug="mia-1"]')!;
+    await act(async () => {
+      row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    const detail = host.querySelector("[data-library-detail]")!;
+    // Sin imágenes no se dibuja una tira de recuadros rotos.
+    expect(detail.querySelector("img")).toBeNull();
+    expect(detail.textContent).toContain("Sin imágenes");
+    // Y el resto del detalle sigue ahí: esto no es un ejercicio vacío.
+    expect(detail.textContent).toContain("Mi press");
+    expect(detail.textContent).toContain("Barra");
+  } finally {
+    cleanup();
+  }
+});
+
+it("un ejercicio del catálogo sigue mostrando sus tres imágenes", async () => {
+  const { host, cleanup } = mount(<Library />);
+  try {
+    const row = host.querySelector("[data-slug]")!;
+    await act(async () => {
+      row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    const detail = host.querySelector("[data-library-detail]")!;
+    expect(detail.querySelectorAll("img").length).toBeGreaterThan(0);
+    expect(detail.textContent).not.toContain("Sin imágenes");
+  } finally {
+    cleanup();
+  }
+});
+
 it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {
@@ -1019,6 +1079,9 @@ it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
           has_video: false,
           video_name: "",
           muscles: { primary: ["pectoral"], secondary: ["triceps"] },
+          // Vienen de la biblioteca: el aviso se decide por el origen.
+          source: "bench-press",
+          sourceFp: "x",
         },
         {
           id: "e2",
@@ -1032,6 +1095,8 @@ it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
           has_video: false,
           video_name: "",
           muscles: { primary: ["pectoral"], secondary: [] },
+          source: "bench-press",
+          sourceFp: "x",
         },
       ],
     });

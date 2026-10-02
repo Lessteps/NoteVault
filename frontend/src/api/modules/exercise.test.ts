@@ -329,6 +329,34 @@ it("borrar un slug que no está en tu fichero no hace nada", () => {
   expect(api.ex_library_remove("mia-nada")).toBe(false);
 });
 
+it("actualizar desde la biblioteca no borra tus números", () => {
+  // El aviso de copias desfasadas manda SOLO nombre, pasos y músculos. exFields
+  // rellena con "" lo que no llega, así que si la edición se apoyara en sus
+  // valores se llevaría por delante todo lo demás. Esto seMidió en el e2e: las
+  // series desaparecían.
+  const e = api.ex_save("", {
+    day: "lunes",
+    name: "Press banca",
+    series_reps: "4×6",
+    rest: "90 s",
+    source: "mia-1",
+    sourceFp: "vieja",
+  }) as { id: string };
+  api.ex_save(e.id, {
+    name: "Press banca",
+    how_to: "Pasos nuevos",
+    sourceFp: "nueva",
+  });
+  const got = api.ex_list().find((x) => x.id === e.id)! as Record<string, unknown>;
+  expect(got.series_reps).toBe("4×6");
+  expect(got.rest).toBe("90 s");
+  expect(got.day).toBe("lunes");
+  expect(got.name).toBe("Press banca");
+  expect(got.how_to).toBe("Pasos nuevos");
+  expect(got.sourceFp).toBe("nueva");
+  expect(got.source).toBe("mia-1");
+});
+
 it("editar sin mandar el nombre no lo borra", () => {
   // Revisión, hallazgo importante: ex_save，默认 «Ejercicio».
   const ex = api.ex_save("", { day: "lunes", name: "Press banca" }) as { id: string };

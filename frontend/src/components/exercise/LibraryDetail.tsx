@@ -5,14 +5,24 @@
 
 import { muscleName } from "../../lib/muscles";
 import { getInstructions, type LibraryEntry } from "../../lib/exerciseLibrary";
+import type { LibraryUserEntry } from "../../lib/libraryTypes";
 import { PrimaryButton } from "../common/forms";
 import type { Exercise } from "../../lib/types";
 
-/** Los días de la rutina en los que ya está un ejercicio con ese nombre. */
-export function daysAlreadyInRoutine(name: string, routine: Exercise[]): string[] {
+/**
+ * Los días de la rutina en los que ya usas esta entrada.
+ *
+ * Se decide por `source`, no por el nombre: dos ejercicios con el mismo nombre
+ * pero de entradas distintas **no** son el mismo, y al revés, uno tuyo con
+ * otro nombre sí lo es.
+ */
+export function daysAlreadyInRoutine(
+  entry: { slug: string },
+  routine: Exercise[],
+): string[] {
   const seen: string[] = [];
   for (const e of routine) {
-    if (e.name.toLowerCase() !== name.toLowerCase()) continue;
+    if (e.source !== entry.slug) continue;
     if (!seen.includes(e.day)) seen.push(e.day);
   }
   return seen;
@@ -24,6 +34,7 @@ export function Detail({
   dayName,
   busy,
   onAdd,
+  userEntries = [],
 }: {
   entry: LibraryEntry;
   /** La rutina actual, para avisar de lo que ya está dentro. */
@@ -32,10 +43,14 @@ export function Detail({
   dayName: string;
   busy?: boolean;
   onAdd: (slug: string) => void;
+  /** Tus entradas: sin ellas, un ejercicio tuyo se vería «sin instrucciones». */
+  userEntries?: LibraryUserEntry[];
 }) {
-  const ins = getInstructions(entry.slug);
+  const ins = getInstructions(entry.slug, userEntries);
   const steps = ins?.steps_es.length ? ins.steps_es : (ins?.steps_en ?? []);
-  const already = daysAlreadyInRoutine(entry.name, routine);
+  // «Ya en tu rutina» se decide por el origen, no por el nombre: un ejercicio
+  // tuyo con otro nombre sigue siendo el mismo.
+  const already = daysAlreadyInRoutine(entry, routine);
 
   return (
     <div className="flex flex-col gap-2.5 p-3">
@@ -56,21 +71,28 @@ export function Detail({
       )}
 
       {/* El arte es blanco monocromo: fondo oscuro o no se ve. */}
-      <div className="flex gap-2">
-        {entry.frames.map(
-          (src, i) =>
-            src && (
-              <img
-                key={i}
-                src={src}
-                alt={`${entry.name} frame ${i + 1}`}
-                loading="lazy"
-                className="h-20 w-20 rounded-lg border border-line object-contain"
-                style={{ background: "#141414" }}
-              />
-            ),
-        )}
-      </div>
+      {entry.frames.length > 0 ? (
+        <div className="flex gap-2">
+          {entry.frames.map(
+            (src, i) =>
+              src && (
+                <img
+                  key={i}
+                  src={src}
+                  alt={`${entry.name} frame ${i + 1}`}
+                  loading="lazy"
+                  className="h-20 w-20 rounded-lg border border-line object-contain"
+                  style={{ background: "#141414" }}
+                />
+              ),
+          )}
+        </div>
+      ) : (
+        // Los ejercicios que escribes tú no traen los tres frames del paquete.
+        // Una tira de recuadros vacíos parece un fallo de carga, así que se dice
+        // lo que pasa. El resto del detalle sigue igual.
+        <p className="text-[12px] text-faint">Sin imágenes</p>
+      )}
 
       <dl className="space-y-1 text-[12px] text-dim">
         <div className="flex gap-2">

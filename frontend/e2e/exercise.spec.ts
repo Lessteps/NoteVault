@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+﻿import { test, expect, type Page } from "@playwright/test";
 import { _electron as electron, type ElectronApplication } from "playwright";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -126,4 +126,75 @@ test("NV-X-004 el mapa muscular del dia se abre y se cierra", async () => {
   await expect(win.getByRole("dialog")).toBeVisible({ timeout: 15_000 });
   await win.keyboard.press("Escape");
   await expect(win.getByRole("dialog")).toHaveCount(0, { timeout: 15_000 });
+});
+
+test("NV-X-012 un ejercicio propio va a la biblioteca y avisa cuando lo cambias", async () => {
+  // 1. En Ejercicios → Tu programa, se escribe un nombre y se guarda en la
+  //    biblioteca. No debe tocar el programa.
+  await side().getByRole("button", { name: "Ejercicios" }).click();
+  // La pestaña activa se recuerda entre tests, y el anterior dejó la Biblioteca.
+  await win.getByRole("tab", { name: "Tu programa" }).click();
+  const name = win.locator('input[aria-label="Nombre"]');
+  await expect(name).toBeVisible({ timeout: 15_000 });
+  // Qué había en el programa antes: guardar en la biblioteca **no** debe tocarlo.
+  const programaAntes = (JSON.parse(readFileSync(routinesFile(), "utf-8")) as unknown[]).length;
+  await name.fill("Press banca propio");
+  await win.locator("textarea").first().fill("1. Baja la barra\n2. Empuja");
+  await win.locator("[data-library-save]").click();
+  await expect(win.getByText(/guardado en la biblioteca/)).toBeVisible({ timeout: 15_000 });
+  // Al programa no se le ha escrito nada.
+  expect((JSON.parse(readFileSync(routinesFile(), "utf-8")) as unknown[]).length).toBe(programaAntes);
+
+  // 2. En la Biblioteca aparece, sin imágenes pero con sus pasos.
+  await win.getByRole("tab", { name: "Biblioteca" }).click();
+  // `^=` porque los slugs propios llevan un sufijo: `mia-p21u9gpa`.
+  const row = win.locator('[data-slug^="mia-"]').first();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row.click();
+  const detail = win.locator("[data-library-detail]");
+  await expect(detail).toContainText("Sin imágenes", { timeout: 15_000 });
+  await expect(detail).toContainText("Baja la barra");
+
+  // 3. Se añade al programa y queda con series propias.
+  await row.locator("[data-library-add]").click();
+  await expect(row.locator("[data-library-add]")).toHaveAttribute("data-library-added", "true", {
+    timeout: 15_000,
+  });
+
+  // 4. Se le pone una serie, que es de la persona y no se toca después.
+  await side().getByRole("button", { name: "Ejercicios" }).click();
+  await win.getByRole("tab", { name: "Tu programa" }).click();
+  await win.locator('[data-library-picker] input').first().fill("Press banca propio");
+  const pick = win.locator("[data-library-pick]").first();
+  await expect(pick).toBeVisible({ timeout: 15_000 });
+  await pick.click();
+  const series = win.locator('input[aria-label="Series × reps"]');
+  await series.fill("4×6");
+  await win.getByRole("button", { name: "Guardar ejercicio" }).click();
+
+  // 5. Se cambia en la biblioteca: salta el aviso de copia desfasada.
+  //    Tras guardar en el programa el formulario queda vacío, así que se vuelve
+  //    a elegir la entrada —que rellena nombre y pasos— y luego se editan.
+  await win.locator('[data-library-picker] input').first().fill("Press banca propio");
+  await win.locator("[data-library-pick]").first().click();
+  await win.locator("textarea").first().fill("1. Baja la barra al pecho\n2. Empuja sin bloquear");
+  await win.locator("[data-library-save]").click();
+  await expect(win.locator("[data-stale-banner]")).toBeVisible({ timeout: 15_000 });
+
+  // 6. Al actualizar, cambian los pasos de la copia y las series siguen ahí.
+  await win.locator("[data-stale-update]").click();
+  await expect(win.locator("[data-stale-banner]")).toHaveCount(0, { timeout: 15_000 });
+  await win.getByRole("tab", { name: "Tu programa" }).click();
+// El test crea dos copias: la de la pestaña Biblioteca viene sin series —la
+  // biblioteca no tiene prescripción— y la del programa con 4x6. Se afirma sobre
+  // la que lleva números propios, que es la que tiene algo que perder.
+  // La fila del programa no enseña los pasos: se asserta sobre el fichero, que
+  // es donde vive la promesa del spec — los pasos nuevos entraron y **las
+  // series siguen ahí**.
+  const copia = (JSON.parse(readFileSync(routinesFile(), "utf-8")) as Array<{
+    name: string;
+    series_reps: string;
+    how_to: string;
+  }>).find((e) => e.series_reps === "4×6")!;
+  expect(copia.how_to).toContain("Empuja sin bloquear");
 });

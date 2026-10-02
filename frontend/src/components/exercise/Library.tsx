@@ -44,7 +44,20 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
   const [selected, setSelected] = useState<string | null>(null);
   // Las entradas que ha escrito la persona. Vacío hasta que se conecte la
   // biblioteca editable (Task 5); a partir de ahí la capa se mezcla sola.
-  const [userEntries] = useState<LibraryUserEntry[]>([]);
+  // Las entradas que ha escrito la persona. Se cargan del vault y se mezclan con
+  // el catálogo, así que un ejercicio tuyo sale en la lista como cualquier otro.
+  const [userEntries, setUserEntries] = useState<LibraryUserEntry[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void api.exLibraryList().then((e) => {
+      // El puente devuelve lo que venga; si no es una lista, biblioteca vacía.
+      const next = Array.isArray(e) ? e : [];
+      if (alive && next.length) setUserEntries(next);
+    }).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
   // El ejercicio recién añadido: su formulario aparece en el detalle.
   const [added, setAdded] = useState<{ id: string; fields: Partial<Exercise> } | null>(null);
   const [editStatus, setEditStatus] = useState("");
@@ -64,9 +77,9 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
   const rows = useMemo(
     () =>
       localMuscle
-        ? filterLibraryByLocalMuscle(localMuscle, { query: q, equipment })
-        : filterLibrary({ query: q, equipment, muscle }),
-    [q, equipment, muscle, localMuscle],
+        ? filterLibraryByLocalMuscle(localMuscle, { query: q, equipment }, userEntries)
+        : filterLibrary({ query: q, equipment, muscle }, userEntries),
+    [q, equipment, muscle, localMuscle, userEntries],
   );
   // Nada seleccionado al entrar: el panel muestra un aviso, no el primer
   // ejercicio de la lista por sorpresa.
@@ -147,7 +160,7 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
           />
         </div>
         <div className="mt-2 flex flex-wrap justify-center gap-1">
-          {localMusclesInCatalog().map((id) => (
+          {localMusclesInCatalog(userEntries).map((id) => (
             <button
               key={id}
               type="button"
@@ -243,6 +256,7 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
               dayName={dayName}
               busy={busy}
               onAdd={(slug) => void add(slug)}
+              userEntries={userEntries}
             />
           )
         ) : (

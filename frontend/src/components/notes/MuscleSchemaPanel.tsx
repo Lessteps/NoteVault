@@ -1,4 +1,4 @@
-/**
+﻿/**
  * El esquema muscular como cara del panel derecho, solo dentro de Ejercicio.
  *
  * La cara vive fuera del módulo (el panel es de la app), así que pide el día de
@@ -15,8 +15,8 @@ import type { ExerciseDay } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useExercise } from "../../store/exercise";
 import { IconButton } from "../ui";
-import { MuscleFocusCard, muscleRows } from "./MuscleFocus";
-import { useFail } from "./parts";
+import { MuscleFocusCard, muscleRows } from "../exercise/MuscleFocus";
+import { useFail } from "../exercise/parts";
 
 export function MuscleSchemaPanel() {
   const fail = useFail();

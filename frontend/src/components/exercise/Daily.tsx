@@ -94,8 +94,11 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
           onChange={(e) => { setWeight(e.target.value); change({ weight: e.target.value }); }} onBlur={() => void save()} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
         <input className={small} placeholder="reps" aria-label={`Reps: ${ex.name}`} value={reps} disabled={future}
           onChange={(e) => { setReps(e.target.value); change({ reps: e.target.value }); }} onBlur={() => void save()} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
-        <input className={cn(inputBase, "w-44 py-1 text-[12px]")} placeholder="Notas" aria-label={`Notas: ${ex.name}`} value={notes} disabled={future}
-          onChange={(e) => { setNotes(e.target.value); change({ notes: e.target.value }); }} onBlur={() => void save()} />
+        {/* Sin caja de notas a propósito. El dato existe en el modelo, el
+            backend lo guarda y esta fila lo envía, pero **nadie ha pedido poder
+            escribirlo** y el input ocupaba 176 px en la fila que más se usa.
+            Antes vivía detrás de `compact`, que nadie activaba, así que
+            nunca se vio. Ponerlo son tres líneas si algún día hace falta. */}
       </div>
       {ex.how_to && <p className="mt-1.5 pl-7 text-[12px] leading-relaxed text-faint">{ex.how_to}</p>}
     </div>

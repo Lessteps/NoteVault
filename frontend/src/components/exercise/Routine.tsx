@@ -25,7 +25,6 @@ import { Field, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { MuscleCount } from "./MusclePicker";
 import { MusclePicker } from "./MusclePicker";
-import { MuscleMapDebug } from "./MuscleMapDebug";
 import { ORANGE, useFail } from "./parts";
 
 const EMPTY: Partial<Exercise> = {
@@ -51,7 +50,6 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
   // distintos y un fallo en uno no puede confirmar el otro.
   const [libStatus, setLibStatus] = useState("");
   const [libraryEntries, setLibraryEntries] = useState<LibraryUserEntry[]>([]);
-  const [debug, setDebug] = useState(false);
 
   // Las entradas propias se cargan **aquí**, una sola vez, y se pasan al
   // formulario: el aviso de copias desfasadas y el buscador necesitan las
@@ -122,9 +120,6 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
           <GhostButton data-go-today onClick={onGoToday}>
             <Sun size={13} /> Ir a hoy
           </GhostButton>
-          {/* TEMPORAL: verificación visual del mapeo forma → músculo. Se borra
-              cuando el mapeo esté aprobado (aquí y en MuscleMapDebug.tsx). */}
-          <GhostButton onClick={() => setDebug(true)}>🔎 Verificación del mapeo</GhostButton>
           <GhostButton
             onClick={async () => {
               try {
@@ -332,7 +327,6 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
           }
         }}
       />
-      {debug && <MuscleMapDebug onClose={() => setDebug(false)} />}
     </div>
   );
 }

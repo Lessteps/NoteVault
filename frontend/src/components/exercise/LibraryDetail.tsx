@@ -1,9 +1,11 @@
-// El detalle de un ejercicio de la Biblioteca.
+﻿// El detalle de un ejercicio de la Biblioteca.
 //
 // Vive en su propio archivo porque lo consumen dos cosas —el panel derecho y
 // el botón grande— y porque crece: instrucción, rutina existente, avisos.
 
 import { muscleName } from "../../lib/muscles";
+import { Trash2 } from "lucide-react";
+import { GhostButton } from "../common/forms";
 import { getInstructions, type LibraryEntry } from "../../lib/exerciseLibrary";
 import type { LibraryUserEntry } from "../../lib/libraryTypes";
 import { PrimaryButton } from "../common/forms";
@@ -35,6 +37,7 @@ export function Detail({
   busy,
   onAdd,
   userEntries = [],
+  onRemove,
 }: {
   entry: LibraryEntry;
   /** La rutina actual, para avisar de lo que ya está dentro. */
@@ -45,7 +48,12 @@ export function Detail({
   onAdd: (slug: string) => void;
   /** Tus entradas: sin ellas, un ejercicio tuyo se vería «sin instrucciones». */
   userEntries?: LibraryUserEntry[];
+  /** Quita tu entrada de la biblioteca. Es el «deshacer» de una edición. */
+  onRemove?: () => void;
 }) {
+  // Solo hay entrada tuya si su slug está en tu fichero. Los 302 no: quitarlos
+  // no sería deshacer, sería borrar el catálogo.
+  const isOwn = userEntries.some((u) => u.slug === entry.slug);
   const ins = getInstructions(entry.slug, userEntries);
   const steps = ins?.steps_es.length ? ins.steps_es : (ins?.steps_en ?? []);
   // «Ya en tu rutina» se decide por el origen, no por el nombre: un ejercicio
@@ -129,6 +137,12 @@ export function Detail({
         </div>
       ) : (
         <p className="text-[11.5px] text-faint">Sin instrucciones todavía para este ejercicio.</p>
+      )}
+
+      {isOwn && onRemove && (
+        <GhostButton data-library-remove onClick={onRemove} className="mt-1 self-start">
+          <Trash2 size={13} /> Quitar de la biblioteca
+        </GhostButton>
       )}
 
       <p className="mt-auto pt-1 text-[11px] text-faint">

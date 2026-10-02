@@ -32,6 +32,7 @@ import { useNavState } from "../../store/navState";
 import { weekdayKeyOf } from "../../lib/exercise";
 import { todayIso } from "../../lib/tasks";
 import { libraryFingerprint } from "../../lib/exerciseLibrary";
+import { useDialog } from "../ui";
 import { ExerciseModule } from "./ExerciseModule";
 import { Library } from "./Library";
 
@@ -782,6 +783,75 @@ it("añadir a hoy desde la Biblioteca copia TUS pasos, no un texto de relleno", 
     expect(saved).toHaveLength(1);
     expect(String(saved[0]!.how_to)).toContain("Baja la barra");
     expect(String(saved[0]!.source)).toBe("mia-1");
+  } finally {
+    cleanup();
+  }
+});
+
+it("una entrada propia se puede quitar de la biblioteca", async () => {
+  // El «deshacer» de una edición: si escribiste encima de un ejercicio del
+  // catálogo y te arrepientes, sin esto habría que editar el fichero a mano.
+  const calls: string[] = [];
+  const MIA = {
+    slug: "mia-1",
+    name: "Mi press",
+    equipment: "Barra",
+    muscles: { primary: ["pectoral"], secondary: [] },
+    how_to: "1. Baja",
+  };
+  invoke.mockImplementation(async (method: string, ...rest: unknown[]) => {
+    const argv = (rest[0] ?? []) as unknown[];
+    if (method === "ex_library_list") return [MIA];
+    if (method === "ex_library_remove") {
+      calls.push(String(argv[0]));
+      return true;
+    }
+    return BASE_INVOKE(method);
+  });
+  const { host, cleanup } = mount(<Library />);
+  try {
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector('[data-slug="mia-1"]')!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    const quitar = host.querySelector("[data-library-remove]")!;
+    expect(quitar).not.toBeNull();
+    await act(async () => {
+      quitar.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // Pide confirmación antes de borrar: es el «deshacer» de una edición. El
+    // diálogo se pinta en DialogHost, en la raíz de la app, así que el test
+    // responde por el store.
+    expect(useDialog.getState().req?.title).toBe("Quitar de la biblioteca");
+    await act(async () => {
+      useDialog.getState().req?.resolve(true);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(calls).toContain("mia-1");
+  } finally {
+    cleanup();
+  }
+});
+
+it("un ejercicio del catálogo no ofrece quitarse", async () => {
+  const { host, cleanup } = mount(<Library />);
+  try {
+    const row = host.querySelector("[data-slug]")!;
+    await act(async () => {
+      row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    // Los 302 no se quitan: no están en tu fichero, y quitarlos no sería deshacer
+    // una edición sino borrar el catálogo.
+    expect(host.querySelector("[data-library-remove]")).toBeNull();
   } finally {
     cleanup();
   }

@@ -21,6 +21,7 @@ import {
   type LibraryEntry,
 } from "../../lib/exerciseLibrary";
 import { GhostButton, input, PrimaryButton } from "../common/forms";
+import { confirmAction } from "../ui";
 import { cn } from "../ui";
 import type { Exercise } from "../../lib/types";
 import type { LibraryUserEntry } from "../../lib/libraryTypes";
@@ -127,7 +128,33 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
     }
   };
 
-  const saveAdded = async (fields: Partial<Exercise>) => {
+  /**
+ * Quita tu entrada de la biblioteca. Es el «deshacer» de una edición: si
+ * escribiste encima de Bench Press y te arrepientes, quitando tu entrada vuelve
+ * a mandar el catálogo, con sus imágenes y su redacción.
+ *
+ * Los ejercicios del catálogo no ofrecen esto: no están en tu fichero, y
+ * borrarlos no sería deshacer.
+ */
+const removeFromLibrary = async (slug: string, name: string) => {
+  const ok = await confirmAction(
+    "Quitar de la biblioteca",
+    `¿Quitar «${name}» de tu biblioteca? Volverá a estar como está en el catálogo. Los ejercicios que ya lo usan en tu programa no se tocan.`,
+    "Quitar",
+    true,
+  );
+  if (!ok) return;
+  try {
+    await api.exLibraryRemove(slug);
+    setStatus(`«${name}» quitado de la biblioteca ✓`);
+    setUserEntries(await api.exLibraryList().catch(() => userEntries));
+    setSelected(null);
+  } catch (e) {
+    fail(e);
+  }
+};
+
+const saveAdded = async (fields: Partial<Exercise>) => {
     if (!added) return;
     setAdded({ ...added, fields });
     try {
@@ -257,6 +284,11 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
               busy={busy}
               onAdd={(slug) => void add(slug)}
               userEntries={userEntries}
+              onRemove={
+                current?.own
+                  ? () => void removeFromLibrary(current.slug, current.name)
+                  : undefined
+              }
             />
           )
         ) : (

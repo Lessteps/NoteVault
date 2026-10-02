@@ -58,7 +58,12 @@ interface DialogReq {
   resolve: (v: string | boolean | null) => void;
 }
 
-const useDialog = create<{ req: DialogReq | null; set: (r: DialogReq | null) => void }>((set) => ({
+/**
+ * El store del diálogo. Se exporta para que los tests puedan responder a una
+ * confirmación: `confirmAction` pinta en `DialogHost`, que vive en la raíz de la
+ * app y no dentro del contenedor que monta un test de componente.
+ */
+export const useDialog = create<{ req: DialogReq | null; set: (r: DialogReq | null) => void }>((set) => ({
   req: null,
   set: (req) => set({ req }),
 }));

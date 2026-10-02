@@ -1,54 +1,87 @@
 // Vista general: los cuatro dashboards circulares (hoy, semana, mes, año), la racha,
-// los días entrenados de cada periodo y, debajo, la sesión de hoy —con sus casillas,
-// kg y reps, para poder rellenarla sin salir de aquí— junto al enfoque muscular del
-// día: el cuerpo sobre un halo, y al pasar el puntero por un músculo, qué ejercicio
-// lo trabaja.
+// los días entrenados de cada periodo y, debajo, la sesión del día que tengas abierto
+// —con sus casillas, kg y reps— junto al enfoque muscular: el cuerpo sobre un halo, y
+// al pasar el puntero por un músculo, qué ejercicio lo entrena.
+//
+// Aquí viven las flechas de fecha, que antes eran la única razón de existir de la
+// pantalla «Diaria». Era una copia de la mitad inferior de esta con `date = hoy`: dos
+// sitios que arreglar cada vez que cambiara algo. Ahora es una sola, y se navega.
 
 import { useEffect, useMemo, useState } from "react";
-import { Map as MapIcon } from "lucide-react";
+import { Map as MapIcon, Dumbbell } from "lucide-react";
 import { api } from "../../lib/bridge";
+import { addDays } from "../../lib/habits";
+import { NavButtons } from "../habits/parts";
+import { shortDate, todayIso } from "../../lib/tasks";
 import { weekdayKeyOf } from "../../lib/exercise";
-import { todayIso } from "../../lib/tasks";
-import type { Exercise, ExerciseDay } from "../../lib/types";
 import { StatTile } from "../common/StatTile";
 import { Header } from "../habits/parts";
+import { GhostButton } from "../common/forms";
 import { useExercise } from "../../store/exercise";
-import { ExerciseRow } from "./Daily";
+import type { Exercise, ExerciseDay } from "../../lib/types";
+import { ExerciseRow } from "./ExerciseRow";
 import { MuscleFocusCard, muscleRows } from "./MuscleFocus";
 import { MuscleMap } from "./MuscleMap";
 import { ORANGE, PeriodRings, StreakLine, seriesOf, useFail } from "./parts";
 
-export function Overview({ onVideo }: { onVideo?: (ex: Exercise) => void }) {
+export function Overview({
+  date,
+  onDate,
+  onGoProgram,
+  onVideo,
+}: {
+  /** El día abierto. Vive en ExerciseModule para que las flechas sobrevivan a un
+   *  cambio de pantalla y para que «Ir a hoy» pueda volver a él. */
+  date: string;
+  onDate: (iso: string) => void;
+  onGoProgram: () => void;
+  onVideo?: (ex: Exercise) => void;
+}) {
   const fail = useFail();
   const stats = useExercise((s) => s.stats);
   const days = useExercise((s) => s.days);
   const list = useExercise((s) => s.list);
   const refreshStats = useExercise((s) => s.refreshStats);
 
-  const today = todayIso();
-  const meta = days.find((d) => d.key === weekdayKeyOf(today));
   const [day, setDay] = useState<ExerciseDay | null>(null);
   const [map, setMap] = useState(false);
 
-  const load = () => api.exDays(today, today).then((d) => setDay(d[0] ?? null)).catch(fail);
+  const key = weekdayKeyOf(date);
+  const meta = days.find((d) => d.key === key);
+  const isToday = date === todayIso();
+
+  const load = () => api.exDays(date, date).then((d) => setDay(d[0] ?? null)).catch(fail);
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [date]);
 
   const byId = useMemo(() => new Map(list.map((e) => [e.id, e])), [list]);
-  /** El día de hoy, con los identificadores que pinta el cuerpo. */
+  /** La fecha abierta, con los identificadores que pinta el cuerpo. */
   const rows = useMemo(() => muscleRows(day, list), [day, list]);
 
-  const done = day ? day.exercises.filter((e) => day.log[e.id]?.done).length : 0;
   const total = day?.exercises.length ?? 0;
+  const done = day ? day.exercises.filter((e) => day.log[e.id]?.done).length : 0;
   const series = (day?.exercises ?? []).reduce((sum, e) => sum + seriesOf(byId.get(e.id)?.series_reps), 0);
-  const reload = () => { void load(); void refreshStats(); };
+
+  const reload = () => {
+    void load();
+    void refreshStats();
+  };
 
   return (
     <>
       <Header title="Vista general">
         <span className="text-[11.5px] text-faint">Ejercicio</span>
+        <GhostButton data-go-program-view onClick={onGoProgram}>
+          <Dumbbell size={13} /> Tu programa
+        </GhostButton>
+        <NavButtons
+          label={`${shortDate(date)}${isToday ? " · hoy" : ""}`}
+          onPrev={() => onDate(addDays(date, -1))}
+          onNext={() => onDate(addDays(date, 1))}
+          onToday={() => onDate(todayIso())}
+        />
       </Header>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
         <PeriodRings />
@@ -68,7 +101,7 @@ export function Overview({ onVideo }: { onVideo?: (ex: Exercise) => void }) {
           <StatTile value={`${stats?.streak.best ?? 0}`} label="Mejor racha del año (días)" />
         </div>
 
-        {/* La sesión de hoy y, a la derecha, lo que trabaja. */}
+        {/* La sesión del día abierto y, a la derecha, lo que trabaja. */}
         <div className="grid items-start gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 372px" }}>
           <section className="rounded-xl border border-line bg-card">
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
@@ -93,13 +126,17 @@ export function Overview({ onVideo }: { onVideo?: (ex: Exercise) => void }) {
             <div className="space-y-2 p-3">
               {!day || !day.exercises.length ? (
                 <p className="py-8 text-center text-[13px] text-faint">
-                  Día de descanso: hoy no hay ejercicios programados.
+                  {total === 0 && !day
+                    ? "Cargando…"
+                    : isToday
+                      ? "Día de descanso: hoy no hay ejercicios programados."
+                      : "Ese día no hay ejercicios programados."}
                 </p>
               ) : (
                 day.exercises.map((ex) => {
                   const full = byId.get(ex.id);
                   return full ? (
-                    <ExerciseRow key={ex.id} day={today} ex={full} entry={day.log[ex.id] ?? {}}
+                    <ExerciseRow key={ex.id} day={date} ex={full} entry={day.log[ex.id] ?? {}}
                       onVideo={onVideo} onChanged={reload} />
                   ) : (
                     <div key={ex.id} className="rounded-2xl border border-line px-3 py-2 text-[13px] text-dim">
@@ -119,7 +156,7 @@ export function Overview({ onVideo }: { onVideo?: (ex: Exercise) => void }) {
 
       {map && (
         <MuscleMap
-          date={today}
+          date={date}
           day={day}
           onVideo={onVideo}
           onChanged={reload}

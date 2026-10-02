@@ -1,4 +1,4 @@
-// Ejercicio: la rutina por días, el registro diario y el catálogo.
+﻿// Ejercicio: la rutina por días, el registro diario y el catálogo.
 //
 // La estructura imita la de Hábitos a propósito: pestañas de periodo, el panel
 // de estadísticas al pie de la barra lateral y los dashboards circulares en la
@@ -11,16 +11,17 @@ import {
   Dumbbell,
   ExternalLink,
   LayoutGrid,
-  Sun,
+
   X,
 } from "lucide-react";
 import { api } from "../../lib/bridge";
+import { todayIso } from "../../lib/tasks";
 import { useExercise } from "../../store/exercise";
 import { usePersistedNav } from "../../store/navState";
 import type { Exercise } from "../../lib/types";
 import { ModuleSidebar } from "../ModuleSidebar";
 import { useFail } from "./parts";
-import { Daily } from "./Daily";
+
 import { Exercises } from "./Exercises";
 import { Overview } from "./Overview";
 import { Progress } from "./Progress";
@@ -93,13 +94,17 @@ export function ExerciseModule() {
   const list = useExercise((s) => s.list);
   const stats = useExercise((s) => s.stats);
   // Su vista interna (general / diaria / …) se recuerda entre pestañas.
-  const [storedView, setView] = usePersistedNav("ejercicio.view", "general");
+const [storedView, setView] = usePersistedNav("ejercicio.view", "general");
   const [video, setVideo] = useState<Exercise | null>(null);
+  // El día abierto en Vista general. Vive aquí y no en `Overview` para dos
+  // cosas: las flechas sobreviven a un cambio de pantalla, y «Ir a hoy» desde
+  // Tu programa puede volver a él.
+  const [date, setDate] = useState(() => todayIso());
 
   // Antes el módulo tenía semanal/mensual/anual sueltos y biblioteca y gestión
   // por separado. Quien tenga una de esas vistas guardadas cae en la general en
   // vez de quedarse en una pantalla que ya no existe.
-  const VIEWS = ["general", "diaria", "progreso", "ejercicios"];
+  const VIEWS = ["general", "progreso", "ejercicios"];
   const view = VIEWS.includes(storedView) ? storedView : "general";
 
   useEffect(() => {
@@ -108,10 +113,12 @@ export function ExerciseModule() {
 
   const pendingToday = stats ? Math.max(0, stats.today.total - stats.today.done) : 0;
 
-  // El programa es el molde y Diaria la sesión de un día. Estos dos atajos
-  // hacen el viaje entre ellas sin tener que pasar por el sidebar.
+  // El programa es el molde y Vista general la sesión del día que tengas
+  // abierto. Estos dos atajos hacen el viaje entre ellas sin pasar por el
+  // sidebar.
   const goToday = () => {
-    setView("diaria");
+    setDate(todayIso());
+    setView("general");
     setVideo(null);
   };
   const goProgram = () => {
@@ -129,8 +136,7 @@ export function ExerciseModule() {
           setVideo(null);
         }}
         items={[
-          { id: "general", label: "Vista general", hint: "Rachas y dashboards", icon: <LayoutGrid /> },
-          { id: "diaria", label: "Diaria", hint: "Rutina del día", icon: <Sun />, badge: pendingToday },
+          { id: "general", label: "Vista general", hint: "Rachas y la sesión del día", icon: <LayoutGrid />, badge: pendingToday },
           { id: "progreso", label: "Progreso", hint: "Rejilla · músculos · año", icon: <CalendarRange /> },
           { id: "ejercicios", label: "Ejercicios", hint: `${list.length} en la rutina · 302 en la biblioteca`, icon: <Dumbbell /> },
         ]}
@@ -145,9 +151,7 @@ export function ExerciseModule() {
         ) : error ? (
           <div className="grid flex-1 place-items-center text-[13px] text-danger">{error}</div>
         ) : view === "general" ? (
-          <Overview onVideo={setVideo} />
-        ) : view === "diaria" ? (
-          <Daily onVideo={setVideo} onGoProgram={goProgram} />
+          <Overview date={date} onDate={setDate} onGoProgram={goProgram} onVideo={setVideo} />
         ) : view === "progreso" ? (
           <Progress />
         ) : (

@@ -369,10 +369,10 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
-  it("Tu programa lleva a Diaria y Diaria vuelve al programa", async () => {
+  it("Tu programa lleva a la sesión del día y se vuelve", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {
-      // Desde Ejercicios, «Tu programa» salta a Diaria sin pasar por el sidebar.
+      // Desde Ejercicios, «Ir a hoy» salta a Vista general sin pasar por el sidebar.
       await act(async () => {
         [...host.querySelectorAll("aside nav button")]
           .find((b) => b.textContent?.includes("Ejercicios"))!
@@ -384,9 +384,10 @@ describe("Biblioteca de Ejercicio", () => {
       await act(async () => {
         goToday.dispatchEvent(new MouseEvent("click", { bubbles: true }));
         await Promise.resolve();
+        await Promise.resolve();
       });
-      // En Diaria: el botón de vuelta solo existe ahí.
-      const back = host.querySelector("[data-go-program]")!;
+      // En Vista general: el botón de vuelta al programa.
+      const back = host.querySelector("[data-go-program-view]")!;
       expect(back).not.toBeNull();
       await act(async () => {
         back.dispatchEvent(new MouseEvent("click", { bubbles: true }));

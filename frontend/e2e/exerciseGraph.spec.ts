@@ -1,4 +1,4 @@
-// La gráfica de Progreso contra la app real: se marca un ejercicio con reps y
+﻿// La gráfica de Progreso contra la app real: se marca un ejercicio con reps y
 // se comprueba que aparece una línea. Cierra el hueco que los tests de jsdom no
 // cubren — el backend real, su rango de fechas y el SVG en pantalla.
 
@@ -25,6 +25,12 @@ test.beforeAll(async () => {
     env,
   });
   win = await app.firstWindow();
+  // `sandboxEnv()` aísla el **vault**, no el `localStorage` de Electron: este
+  // vive en el perfil real de la app y sobrevive entre ejecuciones. Los grupos
+  // apagados de la gráfica se guardan ahí, así que hay que limpiarlos antes de
+  // que el store los lea al arrancar.
+  await win.evaluate(() => window.localStorage.removeItem("nv.navState"));
+  await win.reload();
   await win.waitForSelector("nav[aria-label='Módulos']", { timeout: 30_000 });
   await win.locator("nav[aria-label='Módulos']").getByRole("button", { name: "Ejercicio" }).click();
   await expect(side().getByRole("button", { name: "Progreso" })).toBeVisible({ timeout: 15_000 });
@@ -70,7 +76,7 @@ test("NV-X-010 la gráfica dibuja líneas cuando hay reps registradas", async ()
 
   // 1. Marcar con reps desde la vista Diaria: la rejilla solo marca, el número
   //    hay que escribirlo.
-  await side().getByRole("button", { name: "Diaria" }).click();
+  await side().getByRole("button", { name: "Vista general" }).click();
   const check = win.locator("input[type='checkbox'][aria-label^='Hecho:']").first();
   await expect(check).toBeVisible({ timeout: 15_000 });
   await check.click();
@@ -90,7 +96,7 @@ test("NV-X-010 la gráfica dibuja líneas cuando hay reps registradas", async ()
   await expect(graph).toBeVisible({ timeout: 15_000 });
 
   // 3. Con dos días registrados tiene que haber líneas.
-  await side().getByRole("button", { name: "Diaria" }).click();
+  await side().getByRole("button", { name: "Vista general" }).click();
   // "Anterior" también es el botón de vista del mapa; el de fecha es el primero.
   const nav = win.locator('button[aria-label="Anterior"]').first();
   await nav.click();
@@ -107,7 +113,6 @@ test("NV-X-010 la gráfica dibuja líneas cuando hay reps registradas", async ()
   await win.locator('[data-progress-tab="musculos"]').click();
   const graph2 = win.locator("[data-progress-graph]");
   await expect(graph2).toBeVisible({ timeout: 15_000 });
-  await expect(graph2.locator("path")).not.toHaveCount(0, { timeout: 15_000 });
 
   // 4. Y el resumen por grupo existe.
   expect(await graph.locator("[data-group-toggle]").count()).toBeGreaterThan(0);
@@ -117,9 +122,19 @@ test("NV-X-010 la gráfica dibuja líneas cuando hay reps registradas", async ()
   const toggles = graph2.locator("[data-group-toggle]");
   const count = await toggles.count();
   for (let i = 0; i < count; i += 1) {
-    await graph2.locator("[data-group-toggle]").nth(i).click();
+    await toggles.nth(i).click();
   }
   await expect(graph2.locator("path")).toHaveCount(0);
+
+  // Y se vuelven a encender. Sin esto el test se envenena: qué grupos están
+  // apagados vive en `localStorage` (`nv.navState`), que Electron **no** aísla
+  // con `NV_E2E_HOME` — solo se aísla el vault. La primera ejecución pasaba y
+  // todas las siguientes llegaban aquí con los seis grupos ya apagados, así que
+  // la gráfica no tenía ninguna línea y el paso 3 fallaba.
+  for (let i = 0; i < count; i += 1) {
+    await toggles.nth(i).click();
+  }
+  await expect(graph2.locator("path")).not.toHaveCount(0);
 });
 
 test("NV-X-011 la pestaña Año no rompe con el límite de rango del backend", async () => {

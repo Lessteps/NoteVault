@@ -57,7 +57,7 @@ const invoke = vi.fn(async (method: string): Promise<unknown> => {
 });
 (window as unknown as { nv: unknown }).nv = { invoke };
 
-import { ExerciseRow } from "./Daily";
+import { ExerciseRow } from "./ExerciseRow";
 import type { Exercise } from "../../lib/types";
 
 function render(node: React.ReactElement) {

@@ -40,7 +40,8 @@ const side = () => win.locator("aside[class*='w-[260px]']");
  * one thing every day has.
  */
 async function gotoDiaria() {
-  await side().getByRole("button", { name: "Diaria" }).click();
+  // La pantalla «Diaria» se fusionó dentro de Vista general: la sesión vive ahí.
+  await side().getByRole("button", { name: "Vista general" }).click();
   await expect(
     win.getByText("Añádelos en «Ejercicios · Tu programa»").or(win.getByTitle("Mapa muscular del día")),
   ).toBeVisible({ timeout: 15_000 });
@@ -57,7 +58,7 @@ test.beforeAll(async () => {
   win = await app.firstWindow();
   await win.waitForSelector("nav[aria-label='Módulos']", { timeout: 30_000 });
   await win.locator("nav[aria-label='Módulos']").getByRole("button", { name: "Ejercicio" }).click();
-  await expect(side().getByRole("button", { name: "Diaria" })).toBeVisible({ timeout: 15_000 });
+  await expect(side().getByRole("button", { name: "Vista general" })).toBeVisible({ timeout: 15_000 });
 });
 
 test.afterAll(async () => {

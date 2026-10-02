@@ -85,6 +85,39 @@ describe("Vista general con navegación de fechas", () => {
     }
   });
 
+  it("no repite las cifras que ya pintan los anillos", async () => {
+    // Debajo de los anillos había seis `StatTile` con «días entrenados» de
+    // semana/mes/año, «días con rutina» y «mejor racha». Los anillos ya dicen
+    // `entrenados/deuda` de los tres periodos y `StreakLine` dice la mejor
+    // racha: eran 96 px repitiendo lo de dos líneas más arriba, y empujaban
+    // la sesión —lo único que se hace aquí— por debajo del fold.
+    const { host, cleanup } = render(<ExerciseModule />);
+    try {
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const txt = host.textContent ?? "";
+      for (const muerta of [
+        "Esta semana · días entrenados",
+        "Este mes · días entrenados",
+        "Días con rutina esta semana",
+        "Días con rutina este mes",
+        "Mejor racha del año",
+      ]) {
+        expect(txt).not.toContain(muerta);
+      }
+      // Y los anillos y la racha siguen ahí: no se han llevado por delante los
+      // únicos que sobriamente informaban de algo.
+      expect(txt).toContain("Semana");
+      expect(txt).toContain("Mes");
+      expect(txt).toContain("Año");
+      expect(txt).toContain("Racha actual");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("pulsar anterior pide el día anterior", async () => {
     const { host, cleanup } = render(<ExerciseModule />);
     try {

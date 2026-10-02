@@ -14,7 +14,6 @@ import { addDays } from "../../lib/habits";
 import { NavButtons } from "../habits/parts";
 import { shortDate, todayIso } from "../../lib/tasks";
 import { weekdayKeyOf } from "../../lib/exercise";
-import { StatTile } from "../common/StatTile";
 import { Header } from "../habits/parts";
 import { GhostButton } from "../common/forms";
 import { useExercise } from "../../store/exercise";
@@ -38,7 +37,8 @@ export function Overview({
   onVideo?: (ex: Exercise) => void;
 }) {
   const fail = useFail();
-  const stats = useExercise((s) => s.stats);
+  // `stats` no se lee aquí: lo leen `PeriodRings` y `StreakLine` por su cuenta,
+  // y las cifras que esta vista pintaba se fueron con las seis `StatTile`.
   const days = useExercise((s) => s.days);
   const list = useExercise((s) => s.list);
   const refreshStats = useExercise((s) => s.refreshStats);
@@ -86,20 +86,12 @@ export function Overview({
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
         <PeriodRings />
         <StreakLine />
-        <div className="grid grid-cols-3 gap-3">
-          <StatTile value={stats?.week.trained ?? 0} label="Esta semana · días entrenados" colour={ORANGE} />
-          <StatTile value={stats?.month.trained ?? 0} label="Este mes · días entrenados" colour={ORANGE} />
-          <StatTile
-            value={stats?.anual.trained ?? 0}
-            label={`${stats?.year ?? new Date().getFullYear()} · días entrenados`}
-            colour={ORANGE}
-          />
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <StatTile value={`${stats?.week.due ?? 0}`} label="Días con rutina esta semana" />
-          <StatTile value={`${stats?.month.due ?? 0}`} label="Días con rutina este mes" />
-          <StatTile value={`${stats?.streak.best ?? 0}`} label="Mejor racha del año (días)" />
-        </div>
+        {/* Aquí hubo dos rejillas de seis cifras: días entrenados de semana,
+            mes y año, días con rutina, mejor racha. Todas repetían un número
+            que los anillos de justo arriba ya dicen en pequeño
+            (`3/5 días`), y `StreakLine` dice la mejor racha. Eran 96 px que
+            empujaban la sesión —lo único que se hace en esta pantalla— por
+            debajo del fold. Los anillos y la racha se quedan. */}
 
         {/* La sesión del día abierto y, a la derecha, lo que trabaja. */}
         <div className="grid items-start gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 372px" }}>

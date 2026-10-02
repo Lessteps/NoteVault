@@ -209,6 +209,65 @@ test("NV-X-012 un ejercicio propio va a la biblioteca y avisa cuando lo cambias"
   }>).find((e) => e.series_reps === "4×6")!;
   expect(copia.how_to).toContain("Empuja sin bloquear");
 });
+test("NV-X-014 las flechas de Vista general cambian el día de la sesión", async () => {
+  // Lo que la pantalla «Diaria» hacía con sus dos flechas, ahora en la cabecera
+  // de Vista general. Antes esto solo lo cubría jsdom: aquí se prueba contra el
+  // backend de verdad, que es quien decide qué ejercicios hay cada día.
+
+  await side().getByRole("button", { name: "Vista general" }).click();
+  const sesion = win.locator("[data-session-date]");
+  await expect(sesion).toBeVisible({ timeout: 15_000 });
+
+  // 1. Arranca en hoy.
+  const iso = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    const p = (x: number) => String(x).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+  await expect(sesion).toHaveAttribute("data-session-date", iso(0));
+
+  // 2. «Anterior» retrocede un día. Las flechas viven en la cabecera; el mapa
+  //    muscular tiene un «Anterior» propio, así que se toma el primero.
+  await win.locator('button[aria-label="Anterior"]').first().click();
+  await expect(sesion).toHaveAttribute("data-session-date", iso(-1));
+
+  // 3. Y dos veces más, dos días.
+  const prev = win.locator('button[aria-label="Anterior"]').first();
+  await prev.click();
+  await expect(sesion).toHaveAttribute("data-session-date", iso(-2));
+  await prev.click();
+  await expect(sesion).toHaveAttribute("data-session-date", iso(-3));
+
+  // 4. «Siguiente» vuelve hacia hoy y no se pasa de ahí.
+  const next = win.locator('button[aria-label="Siguiente"]').first();
+  await next.click();
+  await expect(sesion).toHaveAttribute("data-session-date", iso(-2));
+  await next.click();
+  await next.click();
+  await expect(sesion).toHaveAttribute("data-session-date", iso(0));
+
+  // 5. Un día futuro se pinta, pero sus ejercicios no se pueden marcar: aún no
+  //    ha llegado. Es lo que impide apuntarse el programa de mañana por error.
+  await next.click();
+  await expect(sesion).toHaveAttribute("data-session-date", iso(1));
+  const manana = win.locator("[data-session-date]").locator("input[type='checkbox']").first();
+  if (await manana.count()) await expect(manana).toBeDisabled();
+  await win.getByRole("button", { name: "Hoy" }).first().click();
+  await expect(sesion).toHaveAttribute("data-session-date", iso(0));
+
+  // 6. El día sobrevive a un cambio de pantalla. Antes vivía dentro de la
+  //    vista, así que al ir a Progreso y volver saltaba a hoy.
+  await prev.click();
+  await prev.click();
+  await expect(sesion).toHaveAttribute("data-session-date", iso(-2));
+  await side().getByRole("button", { name: "Progreso" }).click();
+  await expect(win.getByRole("heading", { name: "Progreso" })).toBeVisible({ timeout: 15_000 });
+  await side().getByRole("button", { name: "Vista general" }).click();
+  await expect(sesion).toHaveAttribute("data-session-date", iso(-2));
+  await win.getByRole("button", { name: "Hoy" }).first().click();
+});
+
 test("NV-X-013 quitar tu entrada deshace la edición de un ejercicio del catálogo", async () => {
   // El camino que antes no existía: si escribes encima de Bench Press y te
   // arrepientes, sin este botón había que editar biblioteca.json a mano.

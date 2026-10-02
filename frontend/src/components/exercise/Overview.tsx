@@ -1,4 +1,4 @@
-// Vista general: los cuatro dashboards circulares (hoy, semana, mes, año), la racha,
+﻿// Vista general: los cuatro dashboards circulares (hoy, semana, mes, año), la racha,
 // los días entrenados de cada periodo y, debajo, la sesión del día que tengas abierto
 // —con sus casillas, kg y reps— junto al enfoque muscular: el cuerpo sobre un halo, y
 // al pasar el puntero por un músculo, qué ejercicio lo entrena.
@@ -103,7 +103,7 @@ export function Overview({
 
         {/* La sesión del día abierto y, a la derecha, lo que trabaja. */}
         <div className="grid items-start gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 372px" }}>
-          <section className="rounded-xl border border-line bg-card">
+          <section className="rounded-xl border border-line bg-card" data-session-date={date}>
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
               <span className="text-[13.5px] font-semibold text-text">
                 {meta ? `${meta.glyph} ${meta.name}` : "Hoy"}

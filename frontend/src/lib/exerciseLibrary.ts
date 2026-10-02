@@ -354,6 +354,45 @@ export function getInstructions(
 }
 
 /**
+ * Los campos que un ejercicio hereda de una entrada de la biblioteca.
+ *
+ * Estaba escrito dos veces, idéntico, en dos sitios: al elegir uno del buscador
+ * del programa (`ExerciseForm`) y al añadirlo desde la Biblioteca (`Library`).
+ * Los dos montaban nombre, «cómo hacerlo», músculos, origen y huella. Un campo
+ * nuevo obligaba a acordarse de los dos, y el que se olvidara se quedaba corto
+ * sin que nada lo dijera.
+ *
+ * El día, las series y el descanso **no** entran aquí: son de quien añade, no
+ * de la biblioteca —que no tiene prescripción— y por eso `day` lo pone el
+ * llamante.
+ */
+export function fieldsFromLibrary(
+  entry: LibraryEntry,
+  userEntries: LibraryUserEntry[] = [],
+): {
+  name: string;
+  how_to: string;
+  muscles: { primary: string[]; secondary: string[] };
+  source: string;
+  sourceFp: string;
+} {
+  const steps = getInstructions(entry.slug, userEntries)?.steps_es ?? [];
+  // El plan B es «equipo · grupo», pero si no hay ninguno de los dos no se
+  // inventa texto: antes salía un " · " suelto en el formulario.
+  const planB = [entry.equipment, entry.guidePrimary].filter(Boolean).join(" · ");
+  return {
+    name: entry.name,
+    how_to: steps.length
+      ? steps.map((s, i) => `${i + 1}. ${s}`).join("\n")
+      : planB,
+    muscles: { primary: entry.localPrimary, secondary: entry.localSecondary },
+    // De qué entrada sale, para poder avisar si luego cambia.
+    source: entry.slug,
+    sourceFp: libraryFingerprint(entry),
+  };
+}
+
+/**
  * Huella de lo que una entrada aporta desde la Biblioteca: nombre, pasos y
  * músculos. Una copia del programa está desfasada cuando su huella ya no
  * coincide con esta.

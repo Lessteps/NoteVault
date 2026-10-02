@@ -1,4 +1,4 @@
-// El formulario de un ejercicio: día, nombre, video, series, descanso, cómo
+﻿// El formulario de un ejercicio: día, nombre, video, series, descanso, cómo
 // hacerlo y músculos.
 //
 // Vive en su propio fichero, y no dentro de `Routine.tsx` como estaba, por dos
@@ -12,7 +12,7 @@
 import { useMemo } from "react";
 import type { Exercise } from "../../lib/types";
 import type { LibraryUserEntry } from "../../lib/libraryTypes";
-import { getInstructions, libraryEntry, libraryFingerprint } from "../../lib/exerciseLibrary";
+import { fieldsFromLibrary, libraryEntry } from "../../lib/exerciseLibrary";
 import { useExercise } from "../../store/exercise";
 import { Field, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
@@ -75,18 +75,9 @@ export function ExerciseForm({
     // hace nada: el buscador sí lo lista, pero la búsqueda de detrás no lo conocía.
     const found = libraryEntry(slug, userEntries);
     if (!found) return;
-    const steps = getInstructions(slug, userEntries)?.steps_es ?? [];
-    setF({
-      ...f,
-      name: found.name,
-      muscles: { primary: found.localPrimary, secondary: found.localSecondary },
-      how_to: steps.length
-        ? steps.map((s, i) => `${i + 1}. ${s}`).join("\n")
-        : `${found.equipment} · ${found.guidePrimary}`,
-      // De qué entrada sale, para poder avisar si luego cambia.
-      source: found.slug,
-      sourceFp: libraryFingerprint(found),
-    });
+    // Los campos que hereda de la biblioteca los monta `fieldsFromLibrary`, que
+    // es el mismo que usa `Library` al añadir: estaban escritos dos veces.
+    setF({ ...f, ...fieldsFromLibrary(found, userEntries) });
   };
 
   return (

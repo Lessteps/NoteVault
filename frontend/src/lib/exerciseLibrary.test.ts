@@ -13,6 +13,7 @@ import {
   mergeLibrary,
   searchLibrary,
   staleCopies,
+  fieldsFromLibrary,
 } from "./exerciseLibrary";
 
 describe("exerciseLibrary (workout-guide)", () => {
@@ -419,5 +420,70 @@ describe("la biblioteca como capa editable", () => {
     expect(libraryFingerprint({ ...base, how_toPropia: "z" })).not.toBe(ref);
     expect(libraryFingerprint({ ...base, localPrimary: ["espalda"] })).not.toBe(ref);
     expect(libraryFingerprint({ ...base, slug: "mia-2" })).not.toBe(ref);
+  });
+
+  describe("fieldsFromLibrary", () => {
+    // Esta función sustituye a dos copias idénticas que estaban en
+    // `ExerciseForm` (al elegir del buscador) y `Library` (al añadir). Las dos
+    // montaban los mismos cinco campos, así que un campo nuevo obliga a
+    // acordarse de dos sitios y uno se queda corto.
+    test("rellena nombre, músculos, origen y huella desde la entrada", () => {
+      const entry = libraryEntry("bench-press")!;
+      const f = fieldsFromLibrary(entry);
+      expect(f.name).toBe(entry.name);
+      expect(f.source).toBe("bench-press");
+      expect(f.sourceFp).toBe(libraryFingerprint(entry));
+      expect(f.muscles).toEqual({
+        primary: entry.localPrimary,
+        secondary: entry.localSecondary,
+      });
+    });
+
+    test("los pasos salen numerados, como texto plano", () => {
+      const entry = libraryEntry("bench-press")!;
+      const pasos = getInstructions("bench-press")!.steps_es!;
+      expect(pasos.length).toBeGreaterThan(0);
+      expect(fieldsFromLibrary(entry).how_to).toBe(
+        pasos.map((s, i) => `${i + 1}. ${s}`).join("\n"),
+      );
+    });
+
+    test("sin pasos propios, «cómo hacerlo» dice el equipo y el grupo", () => {
+      // Sin pasos hay que decir algo: el nombre solo no ayuda a hacerlo.
+      const entry = libraryEntry("bench-press")!;
+      const vacio = fieldsFromLibrary({
+        ...entry,
+        localPrimary: [],
+        localSecondary: [],
+      });
+      expect(vacio.how_to.length).toBeGreaterThan(0);
+    });
+
+    test("sin pasos y sin equipo, no inventa texto", () => {
+      // Con un slug de catálogo los pasos salen igual aunque no haya músculos:
+      // vienen del workout-guide. Hace falta una entrada **propia** y mínima,
+      // que es el único caso donde no hay pasos que decir.
+      const entrada: LibraryUserEntry = {
+        slug: "mia-vacia",
+        name: "Mío sin nada",
+        how_toPropia: "",
+        localPrimary: [],
+        localSecondary: [],
+      };
+      const f = fieldsFromLibrary(
+        {
+          id: "x",
+          slug: "mia-vacia",
+          name: "Mío sin nada",
+          equipment: "",
+          guidePrimary: "",
+          guideSecondary: [],
+          localPrimary: [],
+          localSecondary: [],
+        } as Parameters<typeof fieldsFromLibrary>[0],
+        [entrada],
+      );
+      expect(f.how_to).toBe("");
+    });
   });
 });

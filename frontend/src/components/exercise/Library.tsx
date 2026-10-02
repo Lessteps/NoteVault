@@ -13,8 +13,7 @@ import { useExercise } from "../../store/exercise";
 import {
   filterLibrary,
   filterLibraryByLocalMuscle,
-  libraryFingerprint,
-  getInstructions,
+  fieldsFromLibrary,
   libraryEquipment,
   libraryMuscles,
   localMusclesInCatalog,
@@ -100,20 +99,16 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
     if (!found || busy) return;
     setBusy(true);
     setSelected(slug);
-    const steps = getInstructions(slug, userEntries)?.steps_es ?? [];
     const fields: Partial<Exercise> = {
+      // El día, las series y el descanso son de quien añade: la biblioteca no
+      // tiene prescripción. Los campos que sí heredan —nombre, instrucción,
+      // músculos, origen y huella— los monta `fieldsFromLibrary`, el mismo que
+      // usa el buscador del programa. Antes estaban escritos dos veces, y un
+      // campo nuevo obligaba a acordarse de los dos sitios.
       day,
-      name: found.name,
-      how_to: steps.length
-        ? steps.map((s, i) => `${i + 1}. ${s}`).join("\n")
-        : `${found.equipment} · ${found.guidePrimary}`,
+      ...fieldsFromLibrary(found, userEntries),
       series_reps: "",
       rest: "",
-      muscles: { primary: found.localPrimary, secondary: found.localSecondary },
-      // De qué entrada sale esta copia. Sin esto, «¿esto es de la Biblioteca?»
-      // no tiene respuesta y no se puede avisar de copias desfasadas.
-      source: found.slug,
-      sourceFp: libraryFingerprint(found),
     };
     try {
       const created = await api.exSave("", fields);

@@ -27,7 +27,7 @@ import type { Exercise } from "../../lib/types";
 import type { LibraryUserEntry } from "../../lib/libraryTypes";
 import { BodyPair } from "./BodyFigure";
 import { Detail } from "./LibraryDetail";
-import { ExerciseForm } from "./Routine";
+import { ExerciseForm } from "./ExerciseForm";
 import { useFail } from "./parts";
 
 export function Library({ embedded = false }: { embedded?: boolean }) {

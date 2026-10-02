@@ -11,6 +11,7 @@ import { api } from "../../lib/bridge";
 import { useApp } from "../../store/app";
 import { useExercise } from "../../store/exercise";
 import {
+  catalogNames,
   getInstructions,
   libraryEntry,
   libraryFingerprint,
@@ -61,20 +62,27 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
       // El puente devuelve lo que venga; si no es una lista, se trata como
       // vacía. Un ejercicio de biblioteca no puede impedir abrir el programa.
       const next = Array.isArray(e) ? e : [];
-      // Solo se repinta si hay algo que cambiar: un setState con el mismo array
-      // provocaba un render de más en cada montaje.
-      if (alive && next.length) setLibraryEntries(next);
+      // Se repinta también cuando **queda vacía**: si no, borrar la última
+      // entrada dejaría un fantasma en la lista, en los filtros y en el aviso.
+      if (alive && next.length !== libraryEntries.length) setLibraryEntries(next);
     }).catch(() => undefined);
     return () => {
       alive = false;
     };
   }, [list.length]);
 
-  /** Ya hay una entrada con ese nombre? Entonces el botón avisa antes de pisarla. */
+  /**
+   * Ya hay algo con ese nombre? Entonces el botón avisa antes de pisarlo.
+   *
+   * Se mira **también el catálogo**, no solo tus entradas: si escribes
+   * «Bench Press» estás a punto de editar uno de los 302, y eso hay que decirlo
+   * aunque todavía no tengas ninguna entrada propia con ese nombre.
+   */
   const libraryExists = (name: string | undefined) => {
     const key = normalizeLibraryName(name ?? "");
     if (!key) return false;
-    return libraryEntries.some((e) => normalizeLibraryName(e.name) === key);
+    if (libraryEntries.some((e) => normalizeLibraryName(e.name) === key)) return true;
+    return catalogNames().some((n) => normalizeLibraryName(n) === key);
   };
 
   /**
@@ -82,7 +90,10 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
    * reescribiste la instrucción en tu copia a propósito, un sincronizado
    * automático te lo pisaría sin preguntar.
    */
-  const stale = staleCopies(list, libraryEntries);
+  const stale = useMemo(
+    () => staleCopies(list, libraryEntries),
+    [list, libraryEntries],
+  );
   const [dismissed, setDismissed] = useState(false);
   const mostrarAviso = stale.length > 0 && !dismissed;
 
@@ -270,18 +281,36 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
         libStatus={libStatus}
         userEntriesProp={libraryEntries}
         onSaveToLibrary={async () => {
+          // Avisar **antes** de escribir encima de una entrada del catálogo o de
+          // una tuya: es la única red antes de pisar 302 ejercicios redactados.
+          if (libraryExists(f.name)) {
+            const ok = await confirmAction(
+              "Actualizar en la biblioteca",
+              `«${f.name}» ya está en la biblioteca. Se actualizará con lo que hayas escrito.`,
+              "Actualizar",
+              true,
+            );
+            if (!ok) return;
+          }
           try {
             const r = await api.exLibrarySave({
               name: f.name ?? "",
+              // El slug viaja para que renombrar edite en vez de crear. Sin él,
+              // escribir el nombre de otra entrada la duplicaría.
+              slug: f.source,
               muscles: f.muscles,
               how_to: f.how_to ?? "",
             });
             setLibStatus(
-              r.created
-                ? `«${r.entry.name}» guardado en la biblioteca ✓`
-                : `«${r.entry.name}» actualizado en la biblioteca ✓`,
+              !r.wrote
+                ? `«${r.entry.name}» no tenía cambios: se queda como está.`
+                : r.created
+                  ? `«${r.entry.name}» guardado en la biblioteca ✓`
+                  : `«${r.entry.name}» actualizado en la biblioteca ✓`,
             );
-            setLibraryEntries(await api.exLibraryList().catch(() => []));
+            // Un fallo al releer **no** puede vaciar tu biblioteca de la
+            // pantalla: se conserva lo que ya había.
+            setLibraryEntries(await api.exLibraryList().catch(() => libraryEntries));
           } catch (e) {
             setLibStatus((e as Error).message);
           }

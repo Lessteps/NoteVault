@@ -179,6 +179,11 @@ test("NV-X-012 un ejercicio propio va a la biblioteca y avisa cuando lo cambias"
   await win.locator("[data-library-pick]").first().click();
   await win.locator("textarea").first().fill("1. Baja la barra al pecho\n2. Empuja sin bloquear");
   await win.locator("[data-library-save]").click();
+  // El nombre ya existe en la biblioteca, así que hay que confirmar: es la red
+  // antes de pisar una entrada.
+  const avisar = win.getByRole("dialog", { name: "Actualizar en la biblioteca" });
+  await expect(avisar).toBeVisible({ timeout: 15_000 });
+  await avisar.getByRole("button", { name: "Actualizar" }).click();
   await expect(win.locator("[data-stale-banner]")).toBeVisible({ timeout: 15_000 });
 
   // 6. Al actualizar, cambian los pasos de la copia y las series siguen ahí.

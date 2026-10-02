@@ -7,7 +7,7 @@
 // Las instrucciones son propias (exerciseInstructions.*.json), escritas para
 // NoteVault: no queda texto de terceros en el pipeline.
 
-import { searchExercises, type Exercise as GuideExercise } from "@bryllim/workout-guide";
+import { searchExercises, exercises as CATALOG_EXERCISES, type Exercise as GuideExercise } from "@bryllim/workout-guide";
 import type { LibraryUserEntry } from "./libraryTypes";
 import { muscleName } from "./muscles";
 
@@ -215,12 +215,18 @@ export function searchLibrary(query = "", userEntries: LibraryUserEntry[] = []):
   );
 }
 
-/** Un ejercicio de la biblioteca por su slug, propio o del paquete. */
-export function libraryEntry(slug: string, userEntries: LibraryUserEntry[] = []): LibraryEntry | null {
-  const own = userEntries.find((e) => e.slug === slug);
-  if (own) return mergeLibrary([own]).find((e) => e.slug === slug) ?? toOwnEntry(own);
-  const raw = searchExercises(slug).find((e) => e.slug === slug);
-  return raw ? toEntry(raw) : null;
+/**
+ * Un ejercicio de la biblioteca por su slug, propio o del paquete.
+ *
+ * Busca **en la lista ya fusionada** en vez de fusionar un array nuevo con una
+ * sola entrada: eso rompía la caché por referencia y costaba rehacer las 302 en
+ * cada llamada, y `staleCopies` llama aquí una vez por copia.
+ */
+export function libraryEntry(
+  slug: string,
+  userEntries: LibraryUserEntry[] = [],
+): LibraryEntry | null {
+  return mergeLibrary(userEntries).find((e) => e.slug === slug) ?? null;
 }
 
 /**
@@ -247,6 +253,11 @@ export function staleCopies<T extends { source?: string; sourceFp?: string }>(
     if (libraryFingerprint(entry) !== (ex.sourceFp ?? "")) out.push(ex);
   }
   return out;
+}
+
+/** Los nombres del catálogo de 302, para preguntar «¿esto ya existe?» en la UI. */
+export function catalogNames(): string[] {
+  return CATALOG_EXERCISES.map((e) => e.name);
 }
 
 /** Filtra por músculo local (id de `muscles.ts`, ej. `pectoral`). */

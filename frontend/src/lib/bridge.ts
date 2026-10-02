@@ -353,8 +353,8 @@ export const api = {
   exRemove: (id: string) => call<{ ok: boolean }>("ex_remove", id),
   exLinkVideos: () => call<{ linked: string[]; already: string[]; missing: string[] }>("ex_link_videos"),
   exLibraryList: () => call<LibraryUserEntry[]>("ex_library_list"),
-  exLibrarySave: (fields: { name: string; equipment?: string; muscles?: unknown; how_to?: string }) =>
-    call<{ entry: LibraryUserEntry; created: boolean; updatedFrom?: string }>("ex_library_save", fields),
+  exLibrarySave: (fields: { name: string; slug?: string; equipment?: string; muscles?: unknown; how_to?: string }) =>
+    call<{ entry: LibraryUserEntry; wrote: boolean; created: boolean; updatedFrom?: string }>("ex_library_save", fields),
   exLibraryRemove: (slug: string) => call<boolean>("ex_library_remove", slug),
   exVideoUrl: (id: string) => call<{ url: string; name: string }>("ex_video_url", id),
   exOpenVideo: (id: string) => call<{ ok: boolean }>("ex_open_video", id),

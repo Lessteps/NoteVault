@@ -366,6 +366,26 @@ it("editar sin mandar el nombre no lo borra", () => {
   expect(got.series_reps).toBe("4×8");
 });
 
+it("renombrar una entrada propia al nombre de una del catálogo no duplica", () => {
+  // Revisión final, crítico: slugDelCatalogo solo se calculaba cuando no había
+  // entrada propia, así que renombrar «Mi press» a «Bench Press» dejaba las dos.
+  // El duplicado vive en la biblioteca mezclada, no en la lista del vault.
+  const a = api.ex_library_save({ name: "Mi press", how_to: "pasos" });
+  api.ex_library_save({ name: "Bench Press", how_to: "pasos", slug: a.entry.slug });
+  expect(api.ex_library_list()).toHaveLength(1);
+  expect(api.ex_library_list()[0]!.slug).toBe("bench-press");
+});
+
+it("ex_library_save dice si de verdad escribió algo", () => {
+  // Guardar el nombre de un ejercicio del catálogo sin cambiar ningún campo no
+  // escribe nada, y tampoco debe decir que sí.
+  const r = api.ex_library_save({ name: "Bench Press" });
+  expect(r.wrote).toBe(false);
+  expect(api.ex_library_list()).toEqual([]);
+  // Con un cambio real, sí escribe.
+  expect(api.ex_library_save({ name: "Bench Press", how_to: "mío" }).wrote).toBe(true);
+});
+
 it("ex_overview counts the year it was asked for, not always this one", () => {
     seedWeek();
     const year = new Date().getFullYear();

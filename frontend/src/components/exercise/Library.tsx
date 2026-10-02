@@ -99,7 +99,7 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
     if (!found || busy) return;
     setBusy(true);
     setSelected(slug);
-    const steps = getInstructions(slug)?.steps_es ?? [];
+    const steps = getInstructions(slug, userEntries)?.steps_es ?? [];
     const fields: Partial<Exercise> = {
       day,
       name: found.name,

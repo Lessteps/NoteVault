@@ -127,9 +127,15 @@ function openWithSystem(filePath: string): void {
  * Se lee del paquete directamente y **no** de `lib/exerciseLibrary.ts`: ese
  * fichero es del renderer y arrastrarlo aquí se traería el mapa corporal y sus
  * dependencias al proceso de Electron sin necesitar nada de eso.
+ *
+ * Se cachea: son 302 nombres y se consulta en cada guardado.
  */
+let catalogIndex: Map<string, string> | null = null;
 function catalogSlugByName(): Map<string, string> {
-  return new Map(CATALOG.map((e) => [normalizeLibraryName(e.name), e.slug]));
+  if (!catalogIndex) {
+    catalogIndex = new Map(CATALOG.map((e) => [normalizeLibraryName(e.name), e.slug]));
+  }
+  return catalogIndex;
 }
 
 export function exerciseApi(app: AppState) {
@@ -284,12 +290,26 @@ export function exerciseApi(app: AppState) {
       const slug = oneLine(f.slug, 120);
       const porSlug = slug ? entries.find((e) => e.slug === slug) ?? null : null;
       const propia = porSlug ?? entries.find((e) => normalizeLibraryName(e.name) === key) ?? null;
-      const slugDelCatalogo = propia
-        ? null
-        : catalogSlugByName().get(key) ?? null;
-      const actual: LibraryUserEntry | null = propia ?? (slugDelCatalogo
-        ? { slug: slugDelCatalogo, name, equipment: "", muscles: { primary: [], secondary: [] }, how_to: "" }
-        : null);
+      // El slug del catálogo se busca **siempre**, no solo cuando no hay entrada
+      // propia: si estás editando «Mi press» y le pones el nombre de una del
+      // catálogo, hay que adoptar su slug. Si no, la entrada se queda con el
+      // suyo, se apila encima de la del catálogo y aparecen dos ejercicios con
+      // el mismo nombre.
+      const slugDelCatalogo = catalogSlugByName().get(key) ?? null;
+      // Y solo se hereda de la entrada propia si su nombre no ha cambiado.
+      const mismaPropia =
+        propia && normalizeLibraryName(propia.name) === key ? propia : null;
+      const actual: LibraryUserEntry | null =
+        mismaPropia ??
+        (slugDelCatalogo
+          ? {
+              slug: slugDelCatalogo,
+              name,
+              equipment: "",
+              muscles: { primary: [], secondary: [] },
+              how_to: "",
+            }
+          : propia);
 
       // Un campo llega si trae algo; si no, se conserva el que había.
       const next: LibraryUserEntry = {
@@ -303,9 +323,12 @@ export function exerciseApi(app: AppState) {
         how_to: howTo || actual?.how_to || "",
       };
 
-      // Si el nombre nuevo ya era el de **otra** entrada, esa se va: sin esto,
-      // renombrar a un nombre existente dejaría las dos.
-      const resto = entries.filter((e) => e.slug !== next.slug);
+      // Se van dos: la que tenía el slug nuevo y **la que se estaba editando**, si al
+      // renombrar cambió de slug (de `mia-x` al del catálogo). Sin la segunda, la
+      // vieja se quedaba ahí con los mismos pasos.
+      const resto = entries.filter(
+        (e) => e.slug !== next.slug && e.slug !== propia?.slug,
+      );
       const zajada = resto.find((e) => normalizeLibraryName(e.name) === key);
       // Si el nombre venía del catálogo y no has cambiado ni un campo tuyo, no hay
       // nada que guardar: escribir una entrada que solo espeja el catálogo deja
@@ -321,7 +344,10 @@ export function exerciseApi(app: AppState) {
       if (!espejoDelCatalogo) {
         store.save(zajada ? [...resto.filter((e) => e.slug !== zajada.slug), next] : [...resto, next]);
       }
-      return { entry: next, created: !actual, updatedFrom: actual?.slug };
+      // `wrote` dice si de verdad se guardó algo. Sin esto, guardar el nombre de
+      // una entrada del catálogo sin tocar ningún campo devolvía un éxito que
+      // nunca pasó por el disco, y la interfaz lo confirmaba con un ✓.
+      return { entry: next, wrote: !espejoDelCatalogo, created: !actual, updatedFrom: actual?.slug };
     },
 
     /**

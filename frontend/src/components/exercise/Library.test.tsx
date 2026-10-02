@@ -741,6 +741,52 @@ it("un ejercicio del catálogo sigue mostrando sus tres imágenes", async () => 
   }
 });
 
+it("añadir a hoy desde la Biblioteca copia TUS pasos, no un texto de relleno", async () => {
+  // Revisión final, crítico: add() pedía las instrucciones sin tus entradas, así
+  // que un ejercicio tuyo llegaba al programa con «Barra · Pectoral» en vez de
+  // sus pasos. Es el camino del botón «Añadir».
+  invoke.mockImplementation(async (method: string) => {
+    if (method === "ex_library_list")
+      return [
+        {
+          slug: "mia-1",
+          name: "Mi press",
+          equipment: "Barra",
+          muscles: { primary: ["pectoral"], secondary: [] },
+          how_to: "1. Baja la barra\n2. Empuja",
+        },
+      ];
+    if (method === "ex_save") return { ok: true, id: "nuevo" };
+    return BASE_INVOKE(method);
+  });
+  const saved: Array<Record<string, unknown>> = [];
+  const inner = invoke.getMockImplementation()!;
+  invoke.mockImplementation(async (method: string, ...rest: unknown[]) => {
+    const argv = (rest[0] ?? []) as unknown[];
+    if (method === "ex_save") saved.push((argv[1] ?? {}) as Record<string, unknown>);
+    return (inner as (...a: unknown[]) => Promise<unknown>)(method, ...rest);
+  });
+  const { host, cleanup } = mount(<Library />);
+  try {
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const row = host.querySelector('[data-slug="mia-1"]')!;
+    await act(async () => {
+      row.querySelector("[data-library-add]")!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(saved).toHaveLength(1);
+    expect(String(saved[0]!.how_to)).toContain("Baja la barra");
+    expect(String(saved[0]!.source)).toBe("mia-1");
+  } finally {
+    cleanup();
+  }
+});
+
 it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {

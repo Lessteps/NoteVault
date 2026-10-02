@@ -95,10 +95,17 @@ export class LibraryStore {
       const entry = normalizeEntry(item);
       // Sin slug no se puede editar ni borrar más tarde, así que no entra.
       if (!entry.slug) continue;
-      const prev = byName.get(normalizeLibraryName(entry.name));
-      if (prev !== undefined) bySlug.delete(prev);
+      const key = normalizeLibraryName(entry.name);
+      const prev = byName.get(key);
+      // Un nombre que estaba en el slug que se va: se olvida, o seguiría
+      // apuntando a algo ya retirado y el siguiente con ese nombre borraría la
+      // entrada equivocada.
+      if (prev !== undefined && prev !== entry.slug) {
+        byName.delete(key);
+        bySlug.delete(prev);
+      }
       bySlug.set(entry.slug, entry);
-      byName.set(normalizeLibraryName(entry.name), entry.slug);
+      byName.set(key, entry.slug);
     }
     return [...bySlug.values()];
   }

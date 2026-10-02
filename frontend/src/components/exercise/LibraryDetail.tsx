@@ -51,8 +51,9 @@ export function Detail({
   /** Quita tu entrada de la biblioteca. Es el «deshacer» de una edición. */
   onRemove?: () => void;
 }) {
-  // Solo hay entrada tuya si su slug está en tu fichero. Los 302 no: quitarlos
-  // no sería deshacer, sería borrar el catálogo.
+  // Hay algo tuyo que deshacer si **este** slug está en tu fichero. No se mira
+  // `entry.own`: esa marca solo la llevan las entradas con slug propio, y aquí
+  // también cuenta editar un ejercicio del catálogo, que se guarda con su slug.
   const isOwn = userEntries.some((u) => u.slug === entry.slug);
   const ins = getInstructions(entry.slug, userEntries);
   const steps = ins?.steps_es.length ? ins.steps_es : (ins?.steps_en ?? []);

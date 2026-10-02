@@ -285,7 +285,7 @@ const saveAdded = async (fields: Partial<Exercise>) => {
               onAdd={(slug) => void add(slug)}
               userEntries={userEntries}
               onRemove={
-                current?.own
+                current && userEntries.some((u) => u.slug === current.slug)
                   ? () => void removeFromLibrary(current.slug, current.name)
                   : undefined
               }

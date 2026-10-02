@@ -26,6 +26,11 @@ function routinesFile(): string {
   return join(exerciseDir(), "exercises.json");
 }
 
+/** La biblioteca propia: el fichero que se crea al guardar el primer ejercicio tuyo. */
+function libraryFile(): string {
+  return join(exerciseDir(), "biblioteca.json");
+}
+
 const side = () => win.locator("aside[class*='w-[260px]']");
 
 /**
@@ -202,4 +207,54 @@ test("NV-X-012 un ejercicio propio va a la biblioteca y avisa cuando lo cambias"
     how_to: string;
   }>).find((e) => e.series_reps === "4×6")!;
   expect(copia.how_to).toContain("Empuja sin bloquear");
+});
+test("NV-X-013 quitar tu entrada deshace la edición de un ejercicio del catálogo", async () => {
+  // El camino que antes no existía: si escribes encima de Bench Press y te
+  // arrepientes, sin este botón había que editar biblioteca.json a mano.
+
+  const pasos = () => win.locator("[data-library-detail] ol li").count();
+
+  // 1. Se edita Bench Press en la biblioteca, poniéndole un solo paso.
+  await side().getByRole("button", { name: "Ejercicios" }).click();
+  await win.getByRole("tab", { name: "Tu programa" }).click();
+  await win.locator("[data-library-picker] input").first().fill("bench press");
+  await win.locator("[data-library-pick]").first().click();
+  await win.locator("textarea").first().fill("PASO MÍO ÚNICO");
+  await win.locator("[data-library-save]").click();
+  const avisar = win.getByRole("dialog", { name: "Actualizar en la biblioteca" });
+  await expect(avisar).toBeVisible({ timeout: 15_000 });
+  await avisar.getByRole("button", { name: "Actualizar" }).click();
+
+  // 2. En la Biblioteca, el detalle ya enseña MI paso y no los del catálogo.
+  await win.getByRole("tab", { name: "Biblioteca" }).click();
+  await win.locator('[data-slug="bench-press"]').click();
+  const detail = win.locator("[data-library-detail]");
+  await expect(detail).toContainText("PASO MÍO ÚNICO", { timeout: 15_000 });
+  expect(await pasos()).toBe(1);
+
+  // 3. Se quita la entrada propia. Es una edición de un ejercicio del catálogo,
+  //    así que el botón aparece igual: lo que se quita es lo tuyo, no el
+  //    ejercicio.
+  const quitar = win.locator("[data-library-remove]");
+  await expect(quitar).toBeVisible({ timeout: 15_000 });
+  await quitar.click();
+  const confirmar = win.getByRole("dialog", { name: "Quitar de la biblioteca" });
+  await expect(confirmar).toBeVisible({ timeout: 15_000 });
+  await confirmar.getByRole("button", { name: "Quitar" }).click();
+
+  // 4. Vuelve a mandar el catálogo. Tras quitar se deselecciona, así que hay
+  //    que volver a elegir el ejercicio para ver que manda el catálogo.
+  await expect(detail).toContainText("Elige un ejercicio", { timeout: 15_000 });
+  await win.locator('[data-slug="bench-press"]').click();
+  await expect(detail).not.toContainText("PASO MÍO ÚNICO", { timeout: 15_000 });
+  // Sus pasos, los del catálogo: son varios y no el único mío.
+  expect(await pasos()).toBeGreaterThan(1);
+  // Y el botón desaparece: ya no hay nada tuyo que deshacer.
+  await expect(win.locator("[data-library-remove]")).toHaveCount(0);
+
+  // 5. Y el fichero se queda sin la entrada, que es la verdad.
+  const biblio = JSON.parse(readFileSync(libraryFile(), "utf-8")) as {
+    entries: Array<{ slug: string }>;
+  };
+  expect(biblio.entries.some((b) => b.slug === "bench-press")).toBe(false);
 });

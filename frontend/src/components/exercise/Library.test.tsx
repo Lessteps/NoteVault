@@ -1,7 +1,7 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const BASE_INVOKE = async (method: string): Promise<unknown> => {
   if (method === "ex_list") return [];
@@ -31,8 +31,16 @@ import { useExercise } from "../../store/exercise";
 import { useNavState } from "../../store/navState";
 import { weekdayKeyOf } from "../../lib/exercise";
 import { todayIso } from "../../lib/tasks";
+import { libraryFingerprint } from "../../lib/exerciseLibrary";
 import { ExerciseModule } from "./ExerciseModule";
 import { Library } from "./Library";
+
+/**
+ * Todos los montajes vivos de la prueba. Un test que se olvida de desmontar
+ * deja un árbol entero escuchando en el store, y el siguiente falla de forma
+ * intermitente según el orden.
+ */
+const mounted: Array<() => void> = [];
 
 function mount(node: React.ReactElement) {
   const host = document.createElement("div");
@@ -41,10 +49,92 @@ function mount(node: React.ReactElement) {
   act(() => {
     root.render(node);
   });
-  return { host, cleanup: () => act(() => root.unmount()) };
+  const cleanup = () => {
+    act(() => root.unmount());
+    host.remove();
+  };
+  mounted.push(cleanup);
+  return { host, cleanup, banner: () => host.querySelector("[data-stale-banner]") };
+}
+
+// ── Aviso de copias desfasadas ────────────────────────────────────────────
+//
+// Una entrada propia en la biblioteca del vault, con sus pasos, y una copia en
+// el programa que puede estar vieja. La huella se calcula con la misma función
+// que la aplicación, así que el test no codifica un número mágico.
+
+const MIA_1 = {
+  slug: "mia-1",
+  name: "Mi press",
+  equipment: "Barra",
+  muscles: { primary: ["pectoral"], secondary: ["triceps"] },
+  how_to: "1. Baja\n2. Empuja",
+};
+
+/** La huella de `MIA_1` tal como la ve la aplicación ahora mismo. */
+const CURRENT_FP = libraryFingerprint({
+  slug: MIA_1.slug,
+  name: MIA_1.name,
+  how_toPropia: MIA_1.how_to,
+  localPrimary: MIA_1.muscles.primary,
+  localSecondary: MIA_1.muscles.secondary,
+});
+
+/** Las escrituras a ex_save que ha hecho el test, en orden. */
+let savedAt: (n: number) => [string, Record<string, unknown>];
+
+function seedRoutineCopy(over: Record<string, unknown>) {
+  invoke.mockImplementation(async (method: string) => {
+    if (method === "ex_save") return { ok: true, id: "e1" };
+    if (method === "ex_library_list") return [MIA_1];
+    if (method === "ex_list")
+      return [
+        {
+          id: "e1",
+          day: "lunes",
+          name: "Mi press",
+          video: "",
+          video_path: "",
+          series_reps: "",
+          rest: "",
+          how_to: "",
+          has_video: false,
+          video_name: "",
+          muscles: { primary: ["pectoral"], secondary: [] },
+          ...over,
+        },
+      ];
+    return BASE_INVOKE(method);
+  });
+}
+
+/** Monta el módulo, se queda en Ejercicios → Tu programa y deja que las
+ *  entradas propias carguen: el aviso de desfasados depende de ellas. */
+async function mountProgram() {
+  const seen: Array<[string, Record<string, unknown>]> = [];
+  const inner = invoke.getMockImplementation()!;
+  invoke.mockImplementation(async (method: string, ...rest: unknown[]) => {
+    const argv = (rest[0] ?? []) as unknown[];
+    if (method === "ex_save") {
+      seen.push([String(argv[0]), (argv[1] ?? {}) as Record<string, unknown>]);
+    }
+    return (inner as (...a: unknown[]) => Promise<unknown>)(method, ...rest);
+  });
+  // Índice negativo cuenta desde el final: savedAt(-1) es la última escritura.
+  savedAt = (n) => seen[n < 0 ? seen.length + n : n]!;
+  const view = mount(<ExerciseModule />);
+  await act(async () => {
+    [...view.host.querySelectorAll("aside nav button")]
+      .find((b) => b.textContent?.includes("Ejercicios"))!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return view;
 }
 
 beforeEach(() => {
+  mounted.length = 0;
   invoke.mockReset();
   invoke.mockImplementation(BASE_INVOKE);
   // La navegación se recuerda en un store global; sin limpiarlo, una prueba
@@ -57,6 +147,11 @@ beforeEach(() => {
     loaded: true,
     error: null,
   });
+});
+
+afterEach(() => {
+  // Cualquier montaje que el test no haya desmontado se desmonta aquí.
+  while (mounted.length) mounted.pop()!();
 });
 
 describe("ejercicio", () => {
@@ -497,6 +592,90 @@ it("un fallo al guardar en la biblioteca no dice que se añadió al programa", a
     // fallo al guardar en la biblioteca no puede decir «Ejercicio añadido ✓».
     const panel = host.querySelector("aside")!;
     expect(panel.textContent).not.toContain("Ejercicio añadido");
+  } finally {
+    cleanup();
+  }
+});
+
+it("avisa cuando una copia quedó desfasada", async () => {
+  seedRoutineCopy({ source: "mia-1", sourceFp: "huella-vieja" });
+  const { cleanup, banner } = await mountProgram();
+  try {
+    expect(banner()).not.toBeNull();
+    expect(banner()!.textContent).toContain("cambió en la Biblioteca");
+  } finally {
+    cleanup();
+  }
+});
+
+it("no avisa si nada ha cambiado", async () => {
+  // La huella guardada es la de la entrada tal y como está: no hay nada que
+  // actualizar.
+  seedRoutineCopy({ source: "mia-1", sourceFp: CURRENT_FP });
+  const { banner } = await mountProgram();
+  expect(banner()).toBeNull();
+});
+
+it("no avisa si el origen ya no está en la biblioteca", async () => {
+  // Review Focus 5: una entrada borrada a mano. Comparar su huella daría
+  // «desfasado» sobre algo que ya no existe, y el aviso sería mentira.
+  seedRoutineCopy({ source: "mia-borrada", sourceFp: "cualquiera" });
+  const { banner } = await mountProgram();
+  expect(banner()).toBeNull();
+});
+
+it("no avisa de los ejercicios escritos a mano", async () => {
+  seedRoutineCopy({ source: "", sourceFp: "" });
+  const { banner } = await mountProgram();
+  expect(banner()).toBeNull();
+});
+
+it("actualizar solo toca los campos de la biblioteca", async () => {
+  // El más importante del spec: tus números son tuyos.
+  seedRoutineCopy({
+    name: "Vieja copia",
+    how_to: "Pasos viejos",
+    muscles: { primary: ["pectoral"], secondary: [] },
+    series_reps: "4×8",
+    rest: "90 s",
+    video_path: "",
+    day: "martes",
+    source: "mia-1",
+    sourceFp: "huella-vieja",
+  });
+  const { banner } = await mountProgram();
+  await act(async () => {
+    banner()!.querySelector("[data-stale-update]")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    // El manejador encadena un exSave por copia y luego recarga la biblioteca:
+    // varias vueltas para que todo se resuelva dentro del act.
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+  });
+  const sent = savedAt(-1)[1] as Record<string, unknown>;
+  // Lo de la biblioteca entra.
+  expect(sent.name).toBe("Mi press");
+  expect(sent.how_to).toBe("1. Baja\n2. Empuja");
+  expect(sent.muscles).toEqual({ primary: ["pectoral"], secondary: ["triceps"] });
+  // Lo tuyo NO se manda, ni se toca: ex_save conserva lo que no llega.
+  expect(sent.series_reps).toBeUndefined();
+  expect(sent.rest).toBeUndefined();
+  expect(sent.video_path).toBeUndefined();
+  expect(sent.day).toBeUndefined();
+  // Y la huella se actualiza, que es lo que cierra el aviso.
+  expect(String(sent.sourceFp)).toBe(CURRENT_FP);
+});
+
+it("se puede descartar el aviso sin cambiar nada", async () => {
+  seedRoutineCopy({ source: "mia-1", sourceFp: "huella-vieja" });
+  const { cleanup, banner } = await mountProgram();
+  try {
+    await act(async () => {
+      banner()!.querySelector("[data-stale-dismiss]")!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(banner()).toBeNull();
+    expect(savedAt(-1)).toBeUndefined();
   } finally {
     cleanup();
   }

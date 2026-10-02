@@ -10,7 +10,13 @@ import { Film, Library, Link2, Pencil, Sun, X } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { useApp } from "../../store/app";
 import { useExercise } from "../../store/exercise";
-import { getInstructions, libraryEntry, searchLibrary } from "../../lib/exerciseLibrary";
+import {
+  getInstructions,
+  libraryEntry,
+  libraryFingerprint,
+  searchLibrary,
+  staleCopies,
+} from "../../lib/exerciseLibrary";
 import { normalizeLibraryName, type LibraryUserEntry } from "../../lib/libraryTypes";
 import type { Exercise } from "../../lib/types";
 import { confirmAction, IconButton } from "../ui";
@@ -46,12 +52,39 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
   const [libraryEntries, setLibraryEntries] = useState<LibraryUserEntry[]>([]);
   const [debug, setDebug] = useState(false);
 
+  // Las entradas propias se cargan **aquí**, una sola vez, y se pasan al
+  // formulario: el aviso de copias desfasadas y el buscador necesitan las
+  // mismas, y dos cargas distintas se desincronizan.
+  useEffect(() => {
+    let alive = true;
+    void api.exLibraryList().then((e) => {
+      // El puente devuelve lo que venga; si no es una lista, se trata como
+      // vacía. Un ejercicio de biblioteca no puede impedir abrir el programa.
+      const next = Array.isArray(e) ? e : [];
+      // Solo se repinta si hay algo que cambiar: un setState con el mismo array
+      // provocaba un render de más en cada montaje.
+      if (alive && next.length) setLibraryEntries(next);
+    }).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [list.length]);
+
   /** Ya hay una entrada con ese nombre? Entonces el botón avisa antes de pisarla. */
   const libraryExists = (name: string | undefined) => {
     const key = normalizeLibraryName(name ?? "");
     if (!key) return false;
     return libraryEntries.some((e) => normalizeLibraryName(e.name) === key);
   };
+
+  /**
+   * Las copias que se quedaron atrás. Solo avisa; **nunca** actualiza solo: si
+   * reescribiste la instrucción en tu copia a propósito, un sincronizado
+   * automático te lo pisaría sin preguntar.
+   */
+  const stale = staleCopies(list, libraryEntries);
+  const [dismissed, setDismissed] = useState(false);
+  const mostrarAviso = stale.length > 0 && !dismissed;
 
   const save = async () => {
     if (!f.name?.trim()) return setStatus("El ejercicio necesita un nombre.");
@@ -98,6 +131,47 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
             <Link2 size={13} /> Vincular videos automáticamente
           </GhostButton>
         </div>
+        {mostrarAviso && (
+          <div
+            data-stale-banner
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-[12.5px] text-dim"
+          >
+            <span>
+              «{stale[0]!.source}» cambió en la Biblioteca. Lo usas en{" "}
+              {stale.length === 1 ? "un día" : `${stale.length} días`}.
+            </span>
+            <span className="flex-1" />
+            <GhostButton
+              data-stale-update
+              onClick={async () => {
+                for (const ex of stale) {
+                  const entry = libraryEntry(ex.source!, libraryEntries);
+                  if (!entry) continue;
+                  // Solo los campos que vienen de la biblioteca. Tus series, tu
+                  // descanso y tu video no se mandan: ex_save conserva lo que no
+                  // llega, así que no se tocan.
+                  await api.exSave(ex.id, {
+                    name: entry.name,
+                    how_to: entry.how_toPropia ?? "",
+                    muscles: {
+                      primary: entry.localPrimary,
+                      secondary: entry.localSecondary,
+                    },
+                    sourceFp: libraryFingerprint(entry),
+                  });
+                }
+                setLibStatus(`${stale.length === 1 ? "Copia actualizada" : `${stale.length} copias actualizadas`} ✓`);
+                setLibraryEntries(await api.exLibraryList().catch(() => libraryEntries));
+                void refresh();
+              }}
+            >
+              Actualizar
+            </GhostButton>
+            <GhostButton data-stale-dismiss onClick={() => setDismissed(true)}>
+              Ahora no
+            </GhostButton>
+          </div>
+        )}
         {/* El programa nace vacío. Con los siete días en «Sin ejercicios» al
             prinicipio, no se entiende qué hay que hacer, y el formulario —que
             sí sabe— queda enterrado abajo. */}
@@ -194,6 +268,7 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
         onSave={() => void save()}
         libraryExists={libraryExists(f.name)}
         libStatus={libStatus}
+        userEntriesProp={libraryEntries}
         onSaveToLibrary={async () => {
           try {
             const r = await api.exLibrarySave({
@@ -322,6 +397,7 @@ export function ExerciseForm({
   onSaveToLibrary,
   libraryExists = false,
   libStatus = "",
+  userEntriesProp,
   title,
   saveLabel = "Guardar ejercicio",
 }: {
@@ -339,31 +415,23 @@ export function ExerciseForm({
   libStatus?: string;
   title?: string;
   saveLabel?: string;
+  /** Las entradas propias, bajadas desde `Routine`: el aviso de copias
+   *  desfasadas y el buscador necesitan las mismas, y dos cargas distintas se
+   *  desincronizan. */
+  userEntriesProp?: LibraryUserEntry[];
 }) {
   const days = useExercise((s) => s.days);
   const routine = useExercise((s) => s.list);
-  const [userEntries, setUserEntries] = useState<LibraryUserEntry[]>([]);
+  /** Las entradas propias, cargadas por `Routine` y bajadas hasta aquí: el
+   * aviso de copias desfasadas y el buscador necesitan las mismas, y dos
+   * cargas distintas se desincronizan. */
+  const userEntries = userEntriesProp ?? [];
   // Los slugs ya en el programa. Vacío para lo escrito a mano: eso no viene
   // de la biblioteca y no debe marcarse como duplicado de nada.
   const usedSlugs = useMemo(
     () => new Set(routine.filter((e) => e.source).map((e) => e.source!)),
     [routine],
   );
-  // Las entradas propias, para que el buscador vea lo que has escrito tú.
-  useEffect(() => {
-    let alive = true;
-    void api.exLibraryList().then((e) => {
-      // El puente devuelve lo que venga; si no es una lista, se trata como
-      // vacía. Un ejercicio de biblioteca no puede impedir abrir el programa.
-      const next = Array.isArray(e) ? e : [];
-      // Solo se repinta si hay algo que cambiar: un setState con el mismo array
-      // provocaba un render de más en cada montaje.
-      if (alive && next.length) setUserEntries(next);
-    }).catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [routine.length]);
 
   /** Rellena el formulario desde la biblioteca: nombre, músculos e instrucción. */
   const pickFromLibrary = (slug: string) => {

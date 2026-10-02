@@ -207,6 +207,32 @@ export function libraryEntry(slug: string, userEntries: LibraryUserEntry[] = [])
   return raw ? toEntry(raw) : null;
 }
 
+/**
+ * Las copias del programa que se quedaron atrás: su entrada de origen cambió
+ * desde que las copias.
+ *
+ * El orden importa: primero se localiza la entrada **entre las tuyas**, y solo
+ * después se hashea la forma ya mezclada. Al revés se compararía una entrada
+ * propia con una del catálogo y la huella no quadraría nunca.
+ *
+ * Un `source` que ya no está en la biblioteca se ignora: no hay con qué
+ * compararlo, y marcarlo de desfasado sería un aviso mentiroso.
+ */
+export function staleCopies<T extends { source?: string; sourceFp?: string }>(
+  list: T[],
+  userEntries: LibraryUserEntry[] = [],
+): T[] {
+  const out: T[] = [];
+  for (const ex of list) {
+    if (!ex.source) continue;
+    if (!userEntries.some((e) => e.slug === ex.source)) continue;
+    const entry = libraryEntry(ex.source, userEntries);
+    if (!entry) continue;
+    if (libraryFingerprint(entry) !== (ex.sourceFp ?? "")) out.push(ex);
+  }
+  return out;
+}
+
 /** Filtra por músculo local (id de `muscles.ts`, ej. `pectoral`). */
 export function filterByLocalMuscle(
   localId: string,

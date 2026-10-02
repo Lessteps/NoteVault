@@ -20,9 +20,9 @@ import { MuscleMap } from "./MuscleMap";
 import { ORANGE, seriesOf, useFail } from "./parts";
 
 /** One exercise row: tick, weight, reps, notes (saved on change / blur). */
-export function ExerciseRow({ day, ex, entry, onChanged, onVideo, compact }: {
+export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
   day: string; ex: Exercise; entry: { done?: boolean; weight?: number; reps?: number; notes?: string };
-  onChanged: () => void; onVideo?: (ex: Exercise) => void; compact?: boolean;
+  onChanged: () => void; onVideo?: (ex: Exercise) => void;
 }) {
   const fail = useFail();
   const [done, setDone] = useState(Boolean(entry.done));
@@ -63,15 +63,19 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo, compact }: {
     return queue.current;
   };
   const small = cn(inputBase, "w-16 py-1 text-right text-[12px]");
+  const hasVideo = Boolean(onVideo) && (ex.has_video || Boolean(ex.video_path));
   return (
-    <div className={cn("rounded-2xl border border-line bg-card px-3", compact ? "py-1.5" : "py-2.5")}>
+    <div className="rounded-2xl border border-line bg-card px-3 py-2.5">
       <div className="flex items-center gap-3">
         <input type="checkbox" aria-label={`Hecho: ${ex.name}`} checked={done} disabled={future} style={{ accentColor: ORANGE }}
           onChange={(e) => { setDone(e.target.checked); void save({ done: e.target.checked }); }} />
-        {onVideo && (ex.has_video || Boolean(ex.video_path)) ? (
+        {/* El nombre es el control del video: si tiene, se pulsa aquí. Antes
+            había además un botón «▶ Video» al final de la fila con la misma
+            acción, y se veían dos controles separados por los campos. */}
+        {hasVideo ? (
           <button
             type="button"
-            onClick={() => onVideo(ex)}
+            onClick={() => onVideo?.(ex)}
             title={`Ver video: ${ex.name}`}
             className={cn(
               "flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 truncate text-left text-[13px] hover:underline",
@@ -85,29 +89,25 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo, compact }: {
           <span className={cn("min-w-0 flex-1 truncate text-[13px]", done ? "text-faint line-through" : "text-text")}>{ex.name}</span>
         )}
         {ex.series_reps && <span className="text-[11.5px] text-dim">{ex.series_reps}</span>}
-        {!compact && ex.rest && <span className="text-[11px] text-faint">⏱ {ex.rest}</span>}
+        {ex.rest && <span className="text-[11px] text-faint">⏱ {ex.rest}</span>}
         <input className={small} placeholder="kg" aria-label={`Peso: ${ex.name}`} value={weight} disabled={future}
           onChange={(e) => { setWeight(e.target.value); change({ weight: e.target.value }); }} onBlur={() => void save()} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
         <input className={small} placeholder="reps" aria-label={`Reps: ${ex.name}`} value={reps} disabled={future}
           onChange={(e) => { setReps(e.target.value); change({ reps: e.target.value }); }} onBlur={() => void save()} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
-        {compact && (
-          <input className={cn(inputBase, "w-44 py-1 text-[12px]")} placeholder="Notas" value={notes} disabled={future}
-            onChange={(e) => { setNotes(e.target.value); change({ notes: e.target.value }); }} onBlur={() => void save()} />
-        )}
-        {onVideo && (ex.has_video || Boolean(ex.video_path)) && <GhostButton onClick={() => onVideo(ex)} className="py-1">▶ Video</GhostButton>}
+        <input className={cn(inputBase, "w-44 py-1 text-[12px]")} placeholder="Notas" aria-label={`Notas: ${ex.name}`} value={notes} disabled={future}
+          onChange={(e) => { setNotes(e.target.value); change({ notes: e.target.value }); }} onBlur={() => void save()} />
       </div>
-      {!compact && ex.how_to && <p className="mt-1.5 pl-7 text-[12px] leading-relaxed text-faint">{ex.how_to}</p>}
+      {ex.how_to && <p className="mt-1.5 pl-7 text-[12px] leading-relaxed text-faint">{ex.how_to}</p>}
     </div>
   );
 }
 
-/** The rows of one date; `compact` is for the week accordion. */
-export function DayList({ date, day, onVideo, onChanged, compact }: {
+/** The rows of one date. Solo la usa `Daily`, así que no sale de aquí. */
+function DayList({ date, day, onVideo, onChanged }: {
   date: string;
   day: ExerciseDay | null;
   onVideo: (ex: Exercise) => void;
   onChanged: () => void;
-  compact?: boolean;
 }) {
   if (!day || !day.exercises.length) {
     return <p className="py-10 text-center text-[13px] text-faint">Día de descanso: no hay ejercicios. Añádelos en «Ejercicios · Tu programa».</p>;
@@ -115,7 +115,7 @@ export function DayList({ date, day, onVideo, onChanged, compact }: {
   return (
     <div className="space-y-2">
       {day.exercises.map((ex) => (
-        <ExerciseRow key={ex.id} day={date} ex={ex} entry={day.log[ex.id] ?? {}} onChanged={onChanged} onVideo={onVideo} compact={compact} />
+        <ExerciseRow key={ex.id} day={date} ex={ex} entry={day.log[ex.id] ?? {}} onChanged={onChanged} onVideo={onVideo} />
       ))}
     </div>
   );

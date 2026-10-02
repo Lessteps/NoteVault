@@ -10,7 +10,9 @@ import {
   libraryFingerprint,
   libraryMuscles,
   mapGuideMuscle,
+  mergeLibrary,
   searchLibrary,
+  staleCopies,
 } from "./exerciseLibrary";
 
 describe("exerciseLibrary (workout-guide)", () => {
@@ -183,6 +185,8 @@ describe("la biblioteca como capa editable", () => {
     how_to: "Paso 1",
     ...over,
   });
+  /** La entrada propia de referencia, para los tests de desfasados y de caché. */
+  const MIA: LibraryUserEntry = mia();
 
   test("sin entradas propias, el catálogo son 302", () => {
     expect(searchLibrary("", []).length).toBe(302);
@@ -275,6 +279,113 @@ describe("la biblioteca como capa editable", () => {
     expect(libraryMuscles([mia()])).toContain("Pectoral");
     // Sin entradas propias siguen siendo los del catálogo.
     expect(libraryEquipment([])).toContain("Barbell");
+  });
+
+  // ── Cuándo avisa de copias desfasadas ──────────────────────────────────
+  //
+  // `staleCopies` decide si sale el banner «cambió en la biblioteca». Antes solo
+  // se cubría a través del componente, y es justo la función que puede mentir:
+  // decir que algo está viejo cuando el origen ya no existe.
+
+  const fpOf = (over: Partial<LibraryUserEntry> = {}) =>
+    libraryFingerprint({
+      slug: MIA.slug,
+      name: MIA.name,
+      how_toPropia: MIA.how_to,
+      localPrimary: MIA.muscles.primary,
+      localSecondary: MIA.muscles.secondary,
+      ...over,
+    });
+
+  test("una copia cuya huella ya no cuadra está desfasada", () => {
+    const ex = { source: "mia-1", sourceFp: "vieja" };
+    expect(staleCopies([ex], [MIA])).toEqual([ex]);
+  });
+
+  test("una copia con la huella al día no está desfasada", () => {
+    expect(staleCopies([{ source: "mia-1", sourceFp: fpOf() }], [MIA])).toEqual([]);
+  });
+
+  test("una copia sin origen no se marca", () => {
+    // Escrita a mano: no viene de la biblioteca y no hay nada que comparar.
+    expect(staleCopies([{ source: "", sourceFp: "" }], [MIA])).toEqual([]);
+    expect(staleCopies([{}], [MIA])).toEqual([]);
+  });
+
+  test("un origen que ya no existe en la biblioteca no avisa", () => {
+    // Review Focus 5: la entrada se borró a mano. Comparar su huella daría un
+    // aviso sobre algo que ya no está, y sería mentira.
+    expect(staleCopies([{ source: "mia-borrada", sourceFp: "lo-que-sea" }], [MIA])).toEqual([]);
+  });
+
+  test("solo avisa de las copias cuyo origen está en TU biblioteca", () => {
+    // Una entrada del catálogo no tiene por qué estar en tu fichero: si está,
+    // avisa; si no, no hay contra qué comparar.
+    const copia = { source: "bench-press", sourceFp: "vieja" };
+    expect(staleCopies([copia], [MIA])).toEqual([]);
+    expect(staleCopies([copia], [])).toEqual([]);
+  });
+
+  test("devuelve los mismos objetos, no copias: el que llama necesita su id", () => {
+    const ex = { id: "e1", source: "mia-1", sourceFp: "vieja" };
+    const [out] = staleCopies([ex], [MIA]);
+    expect(out).toBe(ex);
+  });
+
+  test("marca solo las desfasadas y en el orden del programa", () => {
+    const a = { id: "a", source: "mia-1", sourceFp: fpOf() };
+    const b = { id: "b", source: "mia-1", sourceFp: "vieja" };
+    const c = { id: "c", source: "mia-1", sourceFp: "más vieja" };
+    expect(staleCopies([a, b, c], [MIA]).map((x) => x.id)).toEqual(["b", "c"]);
+  });
+
+  test("cambiar los pasos de la entrada deja la copia desfasada", () => {
+    // El caso real: editas cómo hacerlo en la biblioteca y la copia se queda
+    // con el texto viejo.
+    const antes = fpOf();
+    const nuevo = "1. Baja\n2. Empuja\n3. Respira";
+    const entradaEditada = [{ ...MIA, how_to: nuevo }];
+    expect(fpOf({ how_toPropia: nuevo })).not.toBe(antes);
+    // La copia conserva la huella vieja → desfasada.
+    expect(staleCopies([{ source: "mia-1", sourceFp: antes }], entradaEditada)).toHaveLength(1);
+    // Actualizada a la nueva → al día.
+    expect(staleCopies([{ source: "mia-1", sourceFp: fpOf({ how_toPropia: nuevo }) }], entradaEditada)).toEqual([]);
+  });
+
+  test("sin entradas propias no hay nada desfasado", () => {
+    expect(staleCopies([{ source: "mia-1", sourceFp: "vieja" }], [])).toEqual([]);
+  });
+
+  // ── La fusión se cachea ────────────────────────────────────────────────
+  //
+  // Mezclar son 302 entradas y varios filtros lo piden en el mismo repintado.
+  // Si la fusión se repitiera, escribir en el programa se pondría pastoso; y
+  // cuando loarse rompió, un test dio timeout sin decir por qué.
+
+  test("fusionar dos veces con las mismas entradas devuelve lo mismo", () => {
+    const entries = [MIA];
+    expect(mergeLibrary(entries)).toBe(mergeLibrary(entries));
+  });
+
+  test("cambiar las entradas vuelve a fusionar", () => {
+    const antes = mergeLibrary([MIA]);
+    const despues = mergeLibrary([MIA, { ...MIA, slug: "mia-2", name: "Otro" }]);
+    expect(antes).not.toBe(despues);
+    expect(despues.length).toBe(antes.length + 1);
+  });
+
+  test("pedir una entrada no invalida la caché", () => {
+    // `libraryEntry` antes fusionaba un array nuevo con una sola entrada, así
+    // que invalidaba la caché en cada llamada — y `staleCopies` la llama por
+    // copia, en cada repintado.
+    //
+    // La comparación es con la fusión **de antes** de las llamadas: comparar dos
+    // `mergeLibrary` seguidas siempre daría igual y no detectaría nada.
+    const entries = [MIA];
+    const antes = mergeLibrary(entries);
+    libraryEntry("mia-1", entries);
+    libraryEntry("mia-1", entries);
+    expect(mergeLibrary(entries)).toBe(antes);
   });
 
   test("la huella no depende del orden de los músculos", () => {

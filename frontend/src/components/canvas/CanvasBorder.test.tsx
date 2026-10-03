@@ -66,7 +66,8 @@ describe("connecting from anywhere on a card's outline", () => {
     expect(marker).toBeTruthy();
     expect(marker.getAttribute("cx")).toBe("130");
     expect(marker.getAttribute("cy")).toBe("100");
-    expect(host().className).toContain("cursor-crosshair");
+    // the dot marks the spot; the pointer stays an arrow
+    expect(host().className).not.toContain("cursor-crosshair");
     // the marker follows the pointer along the outline, it does not jump to the middle
     fire("pointermove", 260, 99, host(), 0);
     expect(container.querySelector("[data-testid=border-marker]")!.getAttribute("cx")).toBe("260");

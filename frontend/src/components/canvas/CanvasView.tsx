@@ -66,7 +66,11 @@ export function CanvasView() {
   docRef.current = doc;
   /** The point of an outline the pointer is over (where a connection would start). */
   const [hoverBorder, setHoverBorder] = useState<{ id: string; x: number; y: number } | null>(null);
-  /** The card whose outline is under a world point. The smallest wins, so a card inside a group beats the group. */
+  /**
+   * The card whose outline is under a world point. The NEAREST outline wins: a card sitting a few pixels inside its group must not
+   * steal the group's own border (the groups of a map are covered by their cards, so the border is the only place to grab them).
+   * When two outlines are about equally near (a card flush against its group), the smaller one wins.
+   */
   const hitBorder = (wx: number, wy: number, exclude?: string): (BorderHit & { id: string }) | null => {
     const tol = BORDER_PX / viewRef.current.zoom;
     let best: (BorderHit & { id: string; area: number }) | null = null;
@@ -75,7 +79,10 @@ export function CanvasView() {
       const hit = borderHit(n, wx, wy, tol);
       if (!hit) continue;
       const area = n.width * n.height;
-      if (!best || area < best.area) best = { ...hit, id: n.id, area };
+      const same = 2 / viewRef.current.zoom; // "about equally near": two screen pixels
+      if (!best || hit.distance < best.distance - same || (Math.abs(hit.distance - best.distance) <= same && area < best.area)) {
+        best = { ...hit, id: n.id, area };
+      }
     }
     return best;
   };
@@ -298,9 +305,15 @@ export function CanvasView() {
     }
     // The WHOLE outline of a card is a handle: a drag that starts on it connects from exactly that point. The round ports and
     // the resize handles keep their own meaning, and a card being edited keeps its text.
+    // Touching a group's outline also selects it: cards usually cover a group's body, so the outline is often the only place left
+    // to grab it, and only a selected group shows the handles that resize it. A drag from there still connects.
     if (!t.closest("[data-port],[data-resize]")) {
       const hit = hitBorder(wx, wy);
       if (hit && editing !== hit.id) {
+        if (byId.get(hit.id)?.type === "group" && !sel.has(hit.id)) {
+          setSel(new Set([hit.id]));
+          setSelEdge(null);
+        }
         setHoverBorder(null);
         startDrag(e, { kind: "connect", from: hit.id, side: hit.side, t: hit.t, ox: wx, oy: wy, x: wx, y: wy });
         return;
@@ -655,7 +668,7 @@ export function CanvasView() {
         role="application"
         aria-label="Canvas"
         className={cn("nv-canvas relative min-h-0 flex-1 overflow-hidden outline-none",
-          drawMode || (hoverBorder && !drag) ? "cursor-crosshair" : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-default")}
+          drawMode ? "cursor-crosshair" : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-default")}
         style={{
           backgroundImage: showGrid ? "radial-gradient(circle, var(--nv-line-strong) 1px, transparent 1.2px)" : "none",
           backgroundSize: `${gridSize}px ${gridSize}px`,

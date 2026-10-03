@@ -105,13 +105,82 @@ export function shapePath(kind: string, w: number, h: number): string {
   }
 }
 
-export function portPoint(n: Rect, side: Side): [number, number] {
+const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
+
+/**
+ * Where an edge touches a side: `t` is the position along that side (0 = the start, 1 = the end, 0.5 = the middle, the
+ * default and the only place JSON Canvas itself knows). Always on the outline, never off it.
+ */
+export function portPoint(n: Rect, side: Side, t = 0.5): [number, number] {
+  const k = clamp01(t);
   switch (side) {
-    case "top": return [n.x + n.width / 2, n.y];
-    case "bottom": return [n.x + n.width / 2, n.y + n.height];
-    case "left": return [n.x, n.y + n.height / 2];
-    default: return [n.x + n.width, n.y + n.height / 2];
+    case "top": return [n.x + n.width * k, n.y];
+    case "bottom": return [n.x + n.width * k, n.y + n.height];
+    case "left": return [n.x, n.y + n.height * k];
+    default: return [n.x + n.width, n.y + n.height * k];
   }
+}
+
+/**
+ * The position along its side where an edge starts or ends. It lives in the edge's `nv` extras (`fromT` / `toT`), so the
+ * file stays a valid Obsidian canvas: another app simply draws the edge from the middle of the side.
+ */
+export function edgeT(edge: { nv?: Record<string, unknown> }, end: "from" | "to"): number {
+  const v = edge.nv?.[end === "from" ? "fromT" : "toT"];
+  return typeof v === "number" && Number.isFinite(v) ? clamp01(v) : 0.5;
+}
+
+/** The `nv` extras for a new edge, or undefined when both ends are in the middle (nothing to store). */
+export function anchorExtras(fromT: number, toT: number): { fromT?: number; toT?: number } | undefined {
+  const out: { fromT?: number; toT?: number } = {};
+  if (Math.abs(fromT - 0.5) > 1e-6) out.fromT = Math.round(clamp01(fromT) * 1000) / 1000;
+  if (Math.abs(toT - 0.5) > 1e-6) out.toT = Math.round(clamp01(toT) * 1000) / 1000;
+  return Object.keys(out).length ? out : undefined;
+}
+
+export interface BorderHit {
+  side: Side;
+  /** Position along that side, 0..1. */
+  t: number;
+  /** The point on the outline that was hit (what the connection starts from). */
+  x: number;
+  y: number;
+  /** How far the pointer is from the outline. */
+  distance: number;
+}
+
+/**
+ * Whether (x, y) is on the outline of `n`: within `tol` outside it, or inside it by at most `tol` (never more than a
+ * quarter of the smaller side, so a small card keeps a body to grab). Returns the nearest point of the outline, on which
+ * side and how far along it. Near the middle of a side the point sticks to the middle, so aligned lines are easy.
+ */
+export function borderHit(n: Rect, x: number, y: number, tol: number): BorderHit | null {
+  const inside = x >= n.x && x <= n.x + n.width && y >= n.y && y <= n.y + n.height;
+  const limit = inside ? Math.min(tol, Math.min(n.width, n.height) / 4) : tol;
+  const sides: Array<[Side, number]> = [
+    ["top", Math.abs(y - n.y)],
+    ["bottom", Math.abs(y - (n.y + n.height))],
+    ["left", Math.abs(x - n.x)],
+    ["right", Math.abs(x - (n.x + n.width))],
+  ];
+  let best: { side: Side; d: number } | null = null;
+  for (const [side, perpendicular] of sides) {
+    const horizontal = side === "top" || side === "bottom";
+    // Distance to the SEGMENT of that side: beyond its ends the distance grows with the overshoot.
+    const along = horizontal ? x : y;
+    const from = horizontal ? n.x : n.y;
+    const to = from + (horizontal ? n.width : n.height);
+    const overshoot = along < from ? from - along : along > to ? along - to : 0;
+    const d = Math.hypot(perpendicular, overshoot);
+    if (d <= limit && (!best || d < best.d)) best = { side, d };
+  }
+  if (!best) return null;
+  const horizontal = best.side === "top" || best.side === "bottom";
+  const length = horizontal ? n.width : n.height;
+  let t = clamp01(((horizontal ? x - n.x : y - n.y)) / Math.max(1, length));
+  if (Math.abs(t - 0.5) * length <= tol) t = 0.5;
+  const [px, py] = portPoint(n, best.side, t);
+  return { side: best.side, t, x: px, y: py, distance: best.d };
 }
 
 const NORMAL: Record<Side, [number, number]> = {
@@ -119,9 +188,9 @@ const NORMAL: Record<Side, [number, number]> = {
 };
 
 /** A cubic curve leaving each node straight out of its side. */
-export function edgePath(a: Rect, as: Side, b: Rect, bs: Side): { d: string; mid: [number, number] } {
-  const [x1, y1] = portPoint(a, as);
-  const [x2, y2] = portPoint(b, bs);
+export function edgePath(a: Rect, as: Side, b: Rect, bs: Side, at = 0.5, bt = 0.5): { d: string; mid: [number, number] } {
+  const [x1, y1] = portPoint(a, as, at);
+  const [x2, y2] = portPoint(b, bs, bt);
   const k = Math.max(40, Math.min(200, Math.hypot(x2 - x1, y2 - y1) / 2));
   const c1: [number, number] = [x1 + NORMAL[as][0] * k, y1 + NORMAL[as][1] * k];
   const c2: [number, number] = [x2 + NORMAL[bs][0] * k, y2 + NORMAL[bs][1] * k];

@@ -8,8 +8,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
 import {
-  bounds, cloneNodes, colorOf, contains, drawingNode, edgePath, intersects, nearestSide, newId, PRESET_COLORS,
-  pruneEdges, SHAPES, type CEdge, type CNode, type CanvasDoc, type Rect, type Side,
+  anchorExtras, borderHit, bounds, cloneNodes, colorOf, contains, drawingNode, edgePath, edgeT, intersects, nearestSide, newId, portPoint,
+  PRESET_COLORS, pruneEdges, SHAPES, type BorderHit, type CEdge, type CNode, type CanvasDoc, type Rect, type Side,
 } from "../../lib/canvas";
 import { readClipboard } from "../../lib/clipboard";
 import { inViewport, visibleCanvas, visibleWorldRect } from "../../lib/canvasViewport";
@@ -25,11 +25,13 @@ type Drag =
   | { kind: "pan"; sx: number; sy: number; vx: number; vy: number }
   | { kind: "move"; sx: number; sy: number; start: Map<string, [number, number]>; moved: boolean }
   | { kind: "resize"; id: string; sx: number; sy: number; w: number; h: number; x: number; y: number; handle: string }
-  | { kind: "connect"; from: string; side: Side; x: number; y: number }
+  | { kind: "connect"; from: string; side: Side; /** position along that side, 0..1 */ t: number; /** where the pointer went down */ ox: number; oy: number; x: number; y: number }
   | { kind: "box"; x0: number; y0: number; x: number; y: number; add: boolean }
   | { kind: "draw"; points: Array<[number, number]> };
 
 const GRID = 20;
+/** How close (in screen pixels) the pointer has to be to a card's outline to grab a connection from it. */
+const BORDER_PX = 8;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 3;
 const snapTo = (v: number, on: boolean) => (on ? Math.round(v / GRID) * GRID : v);
@@ -62,6 +64,21 @@ export function CanvasView() {
   const clip = useRef<CanvasDoc | null>(null);
   const docRef = useRef(doc);
   docRef.current = doc;
+  /** The point of an outline the pointer is over (where a connection would start). */
+  const [hoverBorder, setHoverBorder] = useState<{ id: string; x: number; y: number } | null>(null);
+  /** The card whose outline is under a world point. The smallest wins, so a card inside a group beats the group. */
+  const hitBorder = (wx: number, wy: number, exclude?: string): (BorderHit & { id: string }) | null => {
+    const tol = BORDER_PX / viewRef.current.zoom;
+    let best: (BorderHit & { id: string; area: number }) | null = null;
+    for (const n of docRef.current.nodes) {
+      if (n.id === exclude || n.type === "nv-drawing") continue;
+      const hit = borderHit(n, wx, wy, tol);
+      if (!hit) continue;
+      const area = n.width * n.height;
+      if (!best || area < best.area) best = { ...hit, id: n.id, area };
+    }
+    return best;
+  };
   // Host size for viewport culling — updated on resize
   const [hostSize, setHostSize] = useState({ w: 1200, h: 800 });
 
@@ -264,6 +281,16 @@ export function CanvasView() {
       setSel(new Set());
       return;
     }
+    // The WHOLE outline of a card is a handle: a drag that starts on it connects from exactly that point. The round ports and
+    // the resize handles keep their own meaning, and a card being edited keeps its text.
+    if (!t.closest("[data-port],[data-resize]")) {
+      const hit = hitBorder(wx, wy);
+      if (hit && editing !== hit.id) {
+        setHoverBorder(null);
+        startDrag(e, { kind: "connect", from: hit.id, side: hit.side, t: hit.t, ox: wx, oy: wy, x: wx, y: wy });
+        return;
+      }
+    }
     const nodeEl = t.closest("[data-node-id]");
     if (!nodeEl) {
       setSelEdge(null);
@@ -278,7 +305,7 @@ export function CanvasView() {
     if (editing === id) return;
     const port = t.closest("[data-port]");
     if (port) {
-      startDrag(e, { kind: "connect", from: id, side: port.getAttribute("data-port") as Side, x: wx, y: wy });
+      startDrag(e, { kind: "connect", from: id, side: port.getAttribute("data-port") as Side, t: 0.5, ox: wx, oy: wy, x: wx, y: wy });
       return;
     }
     if (t.closest("[data-resize]")) {
@@ -314,7 +341,18 @@ export function CanvasView() {
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
-    if (!d) return;
+    if (!d) {
+      if (e.buttons === 0 && !drawMode) {
+        const [hx, hy] = toWorld(e.clientX, e.clientY);
+        const onUi = (e.target as Element).closest("[data-canvas-ui],[data-port],[data-resize],[data-edge-id]");
+        const hit = onUi ? null : hitBorder(hx, hy);
+        setHoverBorder((prev) => {
+          if (!hit) return prev ? null : prev;
+          return prev && prev.id === hit.id && prev.x === hit.x && prev.y === hit.y ? prev : { id: hit.id, x: hit.x, y: hit.y };
+        });
+      }
+      return;
+    }
     if (d.kind === "pan") {
       setView((v) => ({ ...v, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy }));
       return;
@@ -381,16 +419,27 @@ export function CanvasView() {
       const cur = docRef.current;
       const from = byId.get(d.from)!;
       const [wx, wy] = toWorld(e.clientX, e.clientY);
-      if (toId && toId !== d.from) {
-        const to = byId.get(toId)!;
-        const edge: CEdge = { id: newId(), fromNode: d.from, fromSide: d.side, toNode: toId, toSide: nearestSide(to, ...portOf(from, d.side)), toEnd: "arrow" };
+      // A click on an outline (no drag) just selects the card, as a click on its body would.
+      if (Math.hypot(wx - d.ox, wy - d.oy) * viewRef.current.zoom < 3) {
+        setSelEdge(null);
+        setSel(new Set([d.from]));
+        return;
+      }
+      const [sx, sy] = portPoint(from, d.side, d.t);
+      // Dropped on an outline: end exactly there. Dropped on a card's body: the side that faces where the line started.
+      const end = hitBorder(wx, wy, d.from);
+      if (end || (toId && toId !== d.from)) {
+        const to = byId.get(end ? end.id : toId!)!;
+        const nv = anchorExtras(d.t, end ? end.t : 0.5);
+        const edge: CEdge = { id: newId(), fromNode: d.from, fromSide: d.side, toNode: to.id, toSide: end ? end.side : nearestSide(to, sx, sy), toEnd: "arrow", ...(nv ? { nv } : {}) };
         commit({ ...cur, edges: [...cur.edges, edge] });
         setSelEdge(edge.id);
         setSel(new Set());
-      } else if (!toId && Math.hypot(wx - portOf(from, d.side)[0], wy - portOf(from, d.side)[1]) > 40) {
+      } else if (!toId && Math.hypot(wx - sx, wy - sy) > 40) {
         // Dropped on empty board: a new card there, already connected.
         const node: CNode = { id: newId(), type: "text", x: snapTo(wx - 125, snap), y: snapTo(wy - 40, snap), width: 250, height: 80, text: "" };
-        const edge: CEdge = { id: newId(), fromNode: d.from, fromSide: d.side, toNode: node.id, toSide: nearestSide(node, ...portOf(from, d.side)), toEnd: "arrow" };
+        const nv = anchorExtras(d.t, 0.5);
+        const edge: CEdge = { id: newId(), fromNode: d.from, fromSide: d.side, toNode: node.id, toSide: nearestSide(node, sx, sy), toEnd: "arrow", ...(nv ? { nv } : {}) };
         commit({ nodes: [...cur.nodes, node], edges: [...cur.edges, edge] });
         setSel(new Set([node.id]));
         setEditing(node.id);
@@ -574,7 +623,7 @@ export function CanvasView() {
         role="application"
         aria-label="Canvas"
         className={cn("nv-canvas relative min-h-0 flex-1 overflow-hidden outline-none",
-          drawMode ? "cursor-crosshair" : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-default")}
+          drawMode || (hoverBorder && !drag) ? "cursor-crosshair" : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-default")}
         style={{
           backgroundImage: showGrid ? "radial-gradient(circle, var(--nv-line-strong) 1px, transparent 1.2px)" : "none",
           backgroundSize: `${gridSize}px ${gridSize}px`,
@@ -583,6 +632,7 @@ export function CanvasView() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerLeave={() => setHoverBorder(null)}
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
         onKeyDown={onKeyDown}
@@ -616,8 +666,11 @@ export function CanvasView() {
               return a && b ? <EdgeView key={e.id} edge={e} a={a} b={b} selected={selEdge === e.id} /> : null;
             })}
             {drag?.kind === "connect" && byId.get(drag.from) && (
-              <line x1={portOf(byId.get(drag.from)!, drag.side)[0]} y1={portOf(byId.get(drag.from)!, drag.side)[1]}
+              <line x1={portOf(byId.get(drag.from)!, drag.side, drag.t)[0]} y1={portOf(byId.get(drag.from)!, drag.side, drag.t)[1]}
                 x2={drag.x} y2={drag.y} stroke="var(--nv-accent)" strokeWidth={2 / view.zoom} strokeDasharray="6 4" />
+            )}
+            {hoverBorder && !drag && (
+              <circle cx={hoverBorder.x} cy={hoverBorder.y} r={5 / view.zoom} fill="var(--nv-accent)" data-testid="border-marker" />
             )}
             {drag?.kind === "draw" && (
               <polyline points={drag.points.map((p) => p.join(",")).join(" ")} fill="none"
@@ -720,19 +773,14 @@ export function CanvasView() {
   );
 }
 
-function portOf(n: Rect, side: Side): [number, number] {
-  switch (side) {
-    case "top": return [n.x + n.width / 2, n.y];
-    case "bottom": return [n.x + n.width / 2, n.y + n.height];
-    case "left": return [n.x, n.y + n.height / 2];
-    default: return [n.x + n.width, n.y + n.height / 2];
-  }
+function portOf(n: Rect, side: Side, t = 0.5): [number, number] {
+  return portPoint(n, side, t);
 }
 
 const INWARD: Record<Side, [number, number]> = { top: [0, 1], bottom: [0, -1], left: [1, 0], right: [-1, 0] };
 
-function arrowHead(n: Rect, side: Side, size: number): string {
-  const [x, y] = portOf(n, side);
+function arrowHead(n: Rect, side: Side, size: number, t = 0.5): string {
+  const [x, y] = portOf(n, side, t);
   const [dx, dy] = INWARD[side];
   // The tip touches the card; the base sits `size` outside it.
   const bx = x - dx * size;
@@ -743,15 +791,17 @@ function arrowHead(n: Rect, side: Side, size: number): string {
 }
 
 function EdgeView({ edge, a, b, selected }: { edge: CEdge; a: CNode; b: CNode; selected: boolean }) {
-  const { d, mid } = edgePath(a, edge.fromSide, b, edge.toSide);
+  const fromT = edgeT(edge, "from");
+  const toT = edgeT(edge, "to");
+  const { d, mid } = edgePath(a, edge.fromSide, b, edge.toSide, fromT, toT);
   const col = selected ? "var(--nv-accent)" : colorOf(edge.color, "var(--nv-dim)");
   const dash = edge.nv?.style === "dashed" ? "8 6" : edge.nv?.style === "dotted" ? "2 5" : undefined;
   return (
     <g>
       <path data-edge-id={edge.id} d={d} fill="none" stroke="transparent" strokeWidth={14} className="pointer-events-auto cursor-pointer" />
       <path d={d} fill="none" stroke={col} strokeWidth={selected ? 3 : 2} strokeDasharray={dash} />
-      {(edge.toEnd ?? "arrow") === "arrow" && <polygon points={arrowHead(b, edge.toSide, 12)} fill={col} />}
-      {edge.fromEnd === "arrow" && <polygon points={arrowHead(a, edge.fromSide, 12)} fill={col} />}
+      {(edge.toEnd ?? "arrow") === "arrow" && <polygon points={arrowHead(b, edge.toSide, 12, toT)} fill={col} />}
+      {edge.fromEnd === "arrow" && <polygon points={arrowHead(a, edge.fromSide, 12, fromT)} fill={col} />}
       {edge.label && (
         <foreignObject x={mid[0] - 90} y={mid[1] - 14} width={180} height={28} className="overflow-visible">
           <div className="mx-auto w-fit max-w-[180px] truncate rounded-md border border-line bg-card px-2 py-0.5 text-center text-[12px] text-text">

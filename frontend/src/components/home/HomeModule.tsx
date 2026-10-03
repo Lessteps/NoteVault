@@ -23,6 +23,7 @@ import type { HabitRangeDay, HabitStats, HomeOverview } from "../../lib/types";
 import { useApp, type ModuleId } from "../../store/app";
 import { useGoals } from "../../store/goals";
 import { SmoothSparkline } from "../common/charts";
+import { useModuleVisible } from "../ModuleHost";
 import { newNoteIn } from "../notes/FileTree";
 import { cn } from "../ui";
 
@@ -58,9 +59,13 @@ export function HomeModule() {
     }
   }, [toast]);
 
+  // ModuleHost deja este modulo montado para que no pierda su scroll ni sus
+  // filtros, asi que montar no es volver: sin esto, crear un habito en su
+  // modulo y volver aqui seguia enseñando los de antes.
+  const visible = useModuleVisible();
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (visible) void load();
+  }, [visible, load]);
 
   const act = async (fn: () => Promise<unknown>) => {
     try {

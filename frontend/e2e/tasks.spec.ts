@@ -24,6 +24,28 @@ function fileWithText(files: string[], text: string): string | null {
   return null;
 }
 
+const sidebar = () => win.locator("aside[class*='w-[260px]']");
+const taskRow = (name: string) => win.locator("div[class*='group/row']", { hasText: name });
+
+async function createTask(name: string) {
+  await win.getByRole("button", { name: "Nueva tarea" }).click();
+  const drawer = win.locator("aside[class*='w-[400px]']");
+  await expect(drawer).toBeVisible();
+  await drawer.locator("input").first().fill(name);
+  await win.keyboard.press("Enter");
+  await expect(taskRow(name)).toBeVisible({ timeout: 15_000 });
+}
+
+/** Deja la vista en Tabla y sin filtros (los tests comparten la app). */
+async function resetTabla() {
+  await sidebar().getByRole("button", { name: "Tabla" }).click();
+  const search = win.getByPlaceholder("Buscar tareas…");
+  await expect(search).toBeVisible({ timeout: 15_000 });
+  await search.fill("");
+  const limpiar = win.getByRole("button", { name: "Limpiar" });
+  if (await limpiar.count()) await limpiar.click();
+}
+
 test.beforeAll(async () => {
   const env = sandboxEnv();
   home = env.NV_E2E_HOME;
@@ -81,4 +103,69 @@ test("NV-T-003 eliminar tarea va a papelera, no se pierde", async () => {
   await expect(win.locator("div[class*='group/row']", { hasText: name })).toHaveCount(0, { timeout: 15_000 });
   // El archivo sale de tareas/ pero debe seguir existiendo (papelera, nunca borrado real).
   expect(existsSync(created)).toBe(false);
+});
+
+test("NV-T-004 buscar filtra la tabla y Limpiar restaura", async () => {
+  await resetTabla();
+  const uniq = Date.now();
+  const nameA = `E2E Filtro A ${uniq}`;
+  const nameB = `E2E Filtro B ${uniq}`;
+  await createTask(nameA);
+  await createTask(nameB);
+
+  const search = win.getByPlaceholder("Buscar tareas…");
+  await search.fill(`Filtro A ${uniq}`);
+  await expect(taskRow(nameA)).toBeVisible();
+  await expect(taskRow(nameB)).toHaveCount(0);
+  await expect(win.getByText(/de \d+ tareas/)).toBeVisible();
+
+  await resetTabla();
+  await expect(taskRow(nameA)).toBeVisible();
+  await expect(taskRow(nameB)).toBeVisible();
+});
+
+test("NV-T-005 vistas Tabla Calendario Recordatorios cambian el panel", async () => {
+  await sidebar().getByRole("button", { name: "Calendario" }).click();
+  await expect(win.getByRole("button", { name: "Hoy" })).toBeVisible({ timeout: 15_000 });
+
+  await sidebar().getByRole("button", { name: "Recordatorios" }).click();
+  await expect(win.getByRole("heading", { name: "Recordatorios" })).toBeVisible({ timeout: 15_000 });
+
+  await sidebar().getByRole("button", { name: "Tabla" }).click();
+  await expect(win.getByRole("button", { name: "Nueva tarea" })).toBeVisible({ timeout: 15_000 });
+});
+
+test("NV-T-006 renombrar con doble clic persiste en disco", async () => {
+  await resetTabla();
+  const name = `E2E Rename ${Date.now()}`;
+  const renamed = `${name} v2`;
+  await createTask(name);
+
+  const row = taskRow(name);
+  await row.getByTitle("Doble clic para renombrar").dblclick();
+  // En edición el nombre vive en el value del input (hasText ya no matchea la fila).
+  const edit = win.locator(`div[class*='group/row'] input[value="${name}"]`);
+  await expect(edit).toBeVisible();
+  await edit.fill(renamed);
+  await win.keyboard.press("Enter");
+  await expect(taskRow(renamed)).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => fileWithText(taskFiles(), renamed)).not.toBeNull();
+});
+
+test("NV-T-007 ocultar completadas esconde las hechas", async () => {
+  await resetTabla();
+  const uniq = Date.now();
+  const name = `E2E Ocultar ${uniq}`;
+  await createTask(name);
+
+  const row = taskRow(name);
+  await row.getByTitle("Marcar como completada").click();
+  await expect.poll(() => fileWithText(taskFiles(), name)).not.toBeNull();
+
+  await win.getByText("Ocultar completadas").click();
+  await expect(taskRow(name)).toHaveCount(0);
+  await expect(win.getByRole("button", { name: "Limpiar" })).toBeVisible();
+
+  await resetTabla();
+  await expect(taskRow(name)).toBeVisible();
 });

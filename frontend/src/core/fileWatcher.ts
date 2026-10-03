@@ -22,14 +22,15 @@ export class FileWatcherService {
   private lastTriggerTimes = new Map<string, number>();
   isRunning = false;
 
-  constructor(watchDir: string, onModifiedCallback: WatchCallback | ((p: string) => void)) {
+  /**
+   * `onModifiedCallback` receives the whole event — one call per change.
+   * The event carries `fullPath`, `relPath` and `eventType`.
+   */
+  constructor(watchDir: string, onModifiedCallback: WatchCallback) {
     this.watchDir = path.resolve(watchDir);
     this.onModifiedCallback = (event: WatchEvent) => {
       if (typeof onModifiedCallback === "function") {
         try {
-          // One call per event: it used to fire twice (path, then event), which doubled
-          // every IPC message and every tree refresh in the window.
-          // A listener written for the old (path) signature still works: the event carries `fullPath`.
           (onModifiedCallback as WatchCallback)(event);
         } catch {
           // Ignore callback errors

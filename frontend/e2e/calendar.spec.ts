@@ -68,3 +68,57 @@ test("NV-C-002 crear evento aparece en Agenda y en disco", async () => {
   expect(existsSync(file)).toBe(true);
   expect(readFileSync(file, "utf-8")).toContain(title);
 });
+
+const side = () => win.locator("aside[class*='w-[260px]']");
+const editor = () => win.getByRole("dialog", { name: "Editor de evento" });
+
+async function createEvent(title: string) {
+  await side().getByRole("button", { name: "Día" }).click();
+  await win.getByRole("button", { name: "Hoy" }).click();
+  await win.locator("main").getByRole("button", { name: "Crear", exact: true }).click();
+  await win.getByRole("menuitem", { name: "Evento" }).click();
+  await expect(editor()).toBeVisible();
+  await editor().getByPlaceholder("Añadir título").fill(title);
+  await editor().getByRole("button", { name: "Guardar" }).click();
+  await side().getByRole("button", { name: "Agenda", exact: true }).click();
+  await expect(win.getByText(title).first()).toBeVisible({ timeout: 15_000 });
+}
+
+async function openEditor(title: string) {
+  await side().getByRole("button", { name: "Agenda", exact: true }).click();
+  await win.getByText(title).first().click();
+  await expect(editor()).toBeVisible({ timeout: 15_000 });
+}
+
+test("NV-C-003 editar el título persiste en disco", async () => {
+  const title = `E2E Evento Edit ${Date.now()}`;
+  const renamed = `${title} v2`;
+  await createEvent(title);
+  await openEditor(title);
+  await editor().getByPlaceholder("Añadir título").fill(renamed);
+  await editor().getByRole("button", { name: "Guardar" }).click();
+  await expect(win.getByText(renamed).first()).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => readFileSync(eventFile(), "utf-8")).toContain(renamed);
+});
+
+test("NV-C-004 eliminar evento lo saca de la agenda y del disco", async () => {
+  const title = `E2E Evento Del ${Date.now()}`;
+  await createEvent(title);
+  await openEditor(title);
+  await editor().getByTitle("Eliminar").click();
+  const confirm = win.getByRole("dialog", { name: "Eliminar" });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "Eliminar" }).click();
+  await expect(win.getByText(title)).toHaveCount(0, { timeout: 15_000 });
+  await expect.poll(() => readFileSync(eventFile(), "utf-8")).not.toContain(title);
+});
+
+test("NV-C-005 el filtro Eventos oculta y restaura la agenda", async () => {
+  const title = `E2E Evento Filtro ${Date.now()}`;
+  await createEvent(title);
+  const box = side().getByText("Eventos");
+  await box.click();
+  await expect(win.getByText(title)).toHaveCount(0);
+  await box.click();
+  await expect(win.getByText(title).first()).toBeVisible({ timeout: 15_000 });
+});

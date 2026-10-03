@@ -1,11 +1,18 @@
-﻿// Vista general: los cuatro dashboards circulares (hoy, semana, mes, año), la racha,
-// los días entrenados de cada periodo y, debajo, la sesión del día que tengas abierto
-// —con sus casillas, kg y reps— junto al enfoque muscular: el cuerpo sobre un halo, y
-// al pasar el puntero por un músculo, qué ejercicio lo entrena.
+﻿// Vista general premium: héroe con la fecha, tira compacta de stats y la
+// sesión como protagonista.
 //
-// Aquí viven las flechas de fecha, que antes eran la única razón de existir de la
-// pantalla «Diaria». Era una copia de la mitad inferior de esta con `date = hoy`: dos
-// sitios que arreglar cada vez que cambiara algo. Ahora es una sola, y se navega.
+// La pantalla se lee de arriba abajo en el orden en que se usa: primero el
+// héroe (qué día tengo abierto y qué me queda), luego los anillos y la racha
+// en una sola tarjeta, y debajo la sesión del día —con sus casillas, kg y
+// reps— junto al enfoque muscular (qué ejercicio trabaja cada músculo).
+//
+// Las flechas de fecha viven en el héroe: antes eran la única razón de
+// existir de la pantalla «Diaria», que era una copia de la sesión con
+// `date = hoy`. Ahora es una sola pantalla y se navega.
+//
+// Sin cambios de comportamiento: los números los siguen pintando `PeriodRings`
+// y `StreakLine`, las filas son `ExerciseRow` y el cuerpo es `MuscleFocusCard`.
+// Esto es solo composición y relieve.
 
 import { useEffect, useMemo, useState } from "react";
 import { Map as MapIcon, Dumbbell } from "lucide-react";
@@ -37,8 +44,7 @@ export function Overview({
   onVideo?: (ex: Exercise) => void;
 }) {
   const fail = useFail();
-  // `stats` no se lee aquí: lo leen `PeriodRings` y `StreakLine` por su cuenta,
-  // y las cifras que esta vista pintaba se fueron con las seis `StatTile`.
+  // `stats` no se lee aquí: lo leen `PeriodRings` y `StreakLine` por su cuenta.
   const days = useExercise((s) => s.days);
   const list = useExercise((s) => s.list);
   const refreshStats = useExercise((s) => s.refreshStats);
@@ -62,6 +68,7 @@ export function Overview({
 
   const total = day?.exercises.length ?? 0;
   const done = day ? day.exercises.filter((e) => day.log[e.id]?.done).length : 0;
+  const pending = Math.max(0, total - done);
   const series = (day?.exercises ?? []).reduce((sum, e) => sum + seriesOf(byId.get(e.id)?.series_reps), 0);
 
   const reload = () => {
@@ -76,38 +83,67 @@ export function Overview({
         <GhostButton data-go-program-view onClick={onGoProgram}>
           <Dumbbell size={13} /> Tu programa
         </GhostButton>
-        <NavButtons
-          label={`${shortDate(date)}${isToday ? " · hoy" : ""}`}
-          onPrev={() => onDate(addDays(date, -1))}
-          onNext={() => onDate(addDays(date, 1))}
-          onToday={() => onDate(todayIso())}
-        />
       </Header>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
-        <PeriodRings />
-        <StreakLine />
-        {/* Aquí hubo dos rejillas de seis cifras: días entrenados de semana,
-            mes y año, días con rutina, mejor racha. Todas repetían un número
-            que los anillos de justo arriba ya dicen en pequeño
-            (`3/5 días`), y `StreakLine` dice la mejor racha. Eran 96 px que
-            empujaban la sesión —lo único que se hace en esta pantalla— por
-            debajo del fold. Los anillos y la racha se quedan. */}
+        {/* El héroe: qué día tengo abierto, cómo me muevo y qué me queda. La
+            fecha va grande; las flechas, integradas en ella y no como botones
+            sueltos; lo pendiente, como píldora naranja —o nada, si no hay. */}
+        <section
+          data-overview-hero
+          className="flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-card px-5 py-4"
+          style={{
+            backgroundImage: `linear-gradient(115deg, color-mix(in srgb, ${ORANGE} 16%, transparent), transparent 55%)`,
+          }}
+        >
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-dim">
+              {isToday ? "Hoy" : meta ? `${meta.glyph} ${meta.name}` : "Sesión"}
+              {meta?.subtitle && <span className="font-normal normal-case tracking-normal text-faint"> · {meta.subtitle}</span>}
+            </div>
+            <div className="text-[26px] font-bold leading-tight text-text">
+              {shortDate(date)}
+            </div>
+          </div>
+          {pending > 0 ? (
+            <span
+              data-pending-pill
+              className="rounded-full px-3 py-1 text-[12.5px] font-semibold"
+              style={{ background: `color-mix(in srgb, ${ORANGE} 22%, transparent)`, color: ORANGE }}
+            >
+              {pending === 1 ? "te queda 1" : `te quedan ${pending}`}
+            </span>
+          ) : total > 0 ? (
+            <span className="rounded-full border border-line px-3 py-1 text-[12.5px] font-semibold text-mint">
+              Día completado ✓
+            </span>
+          ) : null}
+          <span className="flex-1" />
+          <NavButtons
+            label={`${shortDate(date)}${isToday ? " · hoy" : ""}`}
+            onPrev={() => onDate(addDays(date, -1))}
+            onNext={() => onDate(addDays(date, 1))}
+            onToday={() => onDate(todayIso())}
+          />
+        </section>
+
+        {/* Una sola tarjeta oscura con todo lo de un vistazo: los cuatro
+            anillos en pequeño y la racha debajo. Antes eran dos bloques
+            separados; dicen exactamente lo mismo. */}
+        <section data-overview-stats className="space-y-3 rounded-2xl border border-line bg-panel px-5 py-4">
+          <PeriodRings size={68} thickness={8} />
+          <div className="h-px bg-line" />
+          <StreakLine />
+        </section>
 
         {/* La sesión del día abierto y, a la derecha, lo que trabaja. */}
         <div className="grid items-start gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 372px" }}>
-          <section className="rounded-xl border border-line bg-card" data-session-date={date}>
-            <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-              <span className="text-[13.5px] font-semibold text-text">
+          <section className="rounded-2xl border border-line bg-card" data-session-date={date}>
+            <div className="flex flex-wrap items-center gap-2 px-4 pb-1 pt-3">
+              <span className="text-[15px] font-semibold text-text">
                 {meta ? `${meta.glyph} ${meta.name}` : "Hoy"}
               </span>
               {meta?.subtitle && <span className="text-[12px] text-faint">· {meta.subtitle}</span>}
               <span className="flex-1" />
-              {total > 0 && (
-                <span className="rounded-full px-2.5 py-0.5 font-mono text-[12px]"
-                  style={{ background: `color-mix(in srgb, ${ORANGE} 18%, transparent)`, color: ORANGE }}>
-                  {done}/{total}
-                </span>
-              )}
               {total > 0 && (
                 <button type="button" onClick={() => setMap(true)} title="Mapa muscular del día"
                   className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">
@@ -115,6 +151,28 @@ export function Overview({
                 </button>
               )}
             </div>
+            {/* El avance del día como barra fina, no como píldora «1/2»: se ve
+                de un vistazo cuánto queda, con los números como valores. */}
+            {total > 0 && (
+              <div className="flex items-center gap-2 border-b border-line px-4 pb-3">
+                <div
+                  data-session-progress
+                  role="progressbar"
+                  aria-label="Progreso del día"
+                  aria-valuemin={0}
+                  aria-valuemax={total}
+                  aria-valuenow={done}
+                  className="h-1.5 flex-1 overflow-hidden rounded-full"
+                  style={{ background: "var(--nv-elevated)" }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${total ? Math.round((100 * done) / total) : 0}%`, background: ORANGE }}
+                  />
+                </div>
+                <span className="font-mono text-[12px] text-dim">{done}/{total}</span>
+              </div>
+            )}
             <div className="space-y-2 p-3">
               {!day || !day.exercises.length ? (
                 <p className="py-8 text-center text-[13px] text-faint">

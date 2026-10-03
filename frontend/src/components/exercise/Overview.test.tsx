@@ -9,6 +9,9 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const DAYS_VISTOS: string[] = [];
+// El día que devuelve el backend, configurable por test: por defecto vacío.
+let MOCK_EXERCISES: Array<{ id: string; name: string }> = [];
+let MOCK_LOG: Record<string, { done?: boolean }> = {};
 
 const invoke = vi.fn(async (method: string, ...rest: unknown[]): Promise<unknown> => {
   const argv = (rest[0] ?? []) as unknown[];
@@ -16,7 +19,7 @@ const invoke = vi.fn(async (method: string, ...rest: unknown[]): Promise<unknown
   if (method === "ex_days") {
     const date = String(argv[0] ?? "");
     DAYS_VISTOS.push(date);
-    return [{ date, day: "lunes", exercises: [], log: {}, pct: 0 }];
+    return [{ date, day: "lunes", exercises: MOCK_EXERCISES, log: MOCK_LOG, pct: 0 }];
   }
   if (method === "ex_meta")
     return { days: [{ key: "lunes", name: "Lunes", subtitle: "Top A", glyph: "x" }] };
@@ -49,6 +52,8 @@ function render(node: React.ReactElement) {
 describe("Vista general con navegación de fechas", () => {
   beforeEach(() => {
     DAYS_VISTOS.length = 0;
+    MOCK_EXERCISES = [];
+    MOCK_LOG = {};
     invoke.mockClear();
     useNavState.setState({ values: {} });
     useExercise.setState({
@@ -113,6 +118,83 @@ describe("Vista general con navegación de fechas", () => {
       expect(txt).toContain("Mes");
       expect(txt).toContain("Año");
       expect(txt).toContain("Racha actual");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("el héroe enseña la fecha y la píldora de pendientes del día abierto", async () => {
+    // Rediseño premium: la cabecera es un héroe con la fecha grande y lo que
+    // te queda, no una fila de botones sueltos. La píldora cuenta lo pendiente
+    // del día abierto —hechos/total de la sesión— y no existe si no hay nada.
+    MOCK_EXERCISES = [{ id: "a", name: "A" }, { id: "b", name: "B" }];
+    MOCK_LOG = { a: { done: true } };
+    const { host, cleanup } = render(<ExerciseModule />);
+    try {
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const hero = host.querySelector("[data-overview-hero]");
+      expect(hero).not.toBeNull();
+      expect(hero!.textContent).toContain("hoy");
+      const pill = host.querySelector("[data-pending-pill]");
+      expect(pill).not.toBeNull();
+      expect(pill!.textContent).toContain("1");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("sin pendientes no hay píldora en el héroe", async () => {
+    const { host, cleanup } = render(<ExerciseModule />);
+    try {
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(host.querySelector("[data-overview-hero]")).not.toBeNull();
+      expect(host.querySelector("[data-pending-pill]")).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("la sesión lleva barra de progreso con hechos y total", async () => {
+    // Antes era una píldora «1/2». Ahora es una barra fina con los mismos
+    // números como valores accesibles: se ve el avance, no solo la cifra.
+    MOCK_EXERCISES = [{ id: "a", name: "A" }, { id: "b", name: "B" }];
+    MOCK_LOG = { a: { done: true } };
+    const { host, cleanup } = render(<ExerciseModule />);
+    try {
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const bar = host.querySelector("[data-session-progress]");
+      expect(bar).not.toBeNull();
+      expect(bar!.getAttribute("aria-valuenow")).toBe("1");
+      expect(bar!.getAttribute("aria-valuemax")).toBe("2");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("los anillos y la racha viven en la tira compacta", async () => {
+    // El rediseño mete anillos y racha en una sola tarjeta oscura, no en dos
+    // bloques separados. Siguen diciendo lo mismo de siempre.
+    const { host, cleanup } = render(<ExerciseModule />);
+    try {
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const strip = host.querySelector("[data-overview-stats]");
+      expect(strip).not.toBeNull();
+      const txt = strip!.textContent ?? "";
+      for (const etiqueta of ["Hoy", "Semana", "Mes", "Año", "Racha actual"]) {
+        expect(txt).toContain(etiqueta);
+      }
     } finally {
       cleanup();
     }

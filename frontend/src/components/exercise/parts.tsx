@@ -63,8 +63,14 @@ export function Ring({
   );
 }
 
-/** The four dashboards, in the order of the periods. */
-export function PeriodRings() {
+/**
+ * The four dashboards, in the order of the periods.
+ *
+ * `size`/`thickness` los usa la tira compacta de Vista general (anillos de 68
+ * en una tarjeta). Por defecto son los grandes de siempre, así que nadie más
+ * cambia.
+ */
+export function PeriodRings({ size = 104, thickness = 10 }: { size?: number; thickness?: number }) {
   const stats = useExercise((s) => s.stats);
   const rings = [
     { label: "Hoy", value: stats?.today.pct ?? 0, sub: stats ? `${stats.today.done}/${stats.today.total}` : undefined },
@@ -75,7 +81,7 @@ export function PeriodRings() {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
       {rings.map((r) => (
-        <Ring key={r.label} value={r.value} label={r.label} sub={r.sub} size={104} thickness={10} />
+        <Ring key={r.label} value={r.value} label={r.label} sub={r.sub} size={size} thickness={thickness} />
       ))}
     </div>
   );

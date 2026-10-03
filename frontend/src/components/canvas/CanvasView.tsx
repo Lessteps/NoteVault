@@ -9,7 +9,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { api } from "../../lib/bridge";
 import {
   anchorExtras, borderHit, bounds, cloneNodes, colorOf, contains, drawingNode, edgePath, edgeT, intersects, nearestSide, newId, portPoint,
-  PRESET_COLORS, pruneEdges, SHAPES, type BorderHit, type CEdge, type CNode, type CanvasDoc, type Rect, type Side,
+  PRESET_COLORS, pruneEdges, resizeHandleAt, RESIZE_CURSOR, SHAPES, type BorderHit, type CEdge, type CNode, type CanvasDoc, type Rect,
+  type ResizeHandle, type Side,
 } from "../../lib/canvas";
 import { readClipboard } from "../../lib/clipboard";
 import { inViewport, visibleCanvas, visibleWorldRect } from "../../lib/canvasViewport";
@@ -30,8 +31,10 @@ type Drag =
   | { kind: "draw"; points: Array<[number, number]> };
 
 const GRID = 20;
-/** How close (in screen pixels) the pointer has to be to a card's outline to grab a connection from it. */
+/** How close (in screen pixels) the pointer has to be to a card's outline to grab it. */
 const BORDER_PX = 8;
+/** Within this many screen pixels of a corner, the outline resizes both ways. */
+const CORNER_PX = 14;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 3;
 const snapTo = (v: number, on: boolean) => (on ? Math.round(v / GRID) * GRID : v);
@@ -64,8 +67,8 @@ export function CanvasView() {
   const clip = useRef<CanvasDoc | null>(null);
   const docRef = useRef(doc);
   docRef.current = doc;
-  /** The point of an outline the pointer is over (where a connection would start). */
-  const [hoverBorder, setHoverBorder] = useState<{ id: string; x: number; y: number } | null>(null);
+  /** The outline the pointer is over and what dragging it would do (which handle). */
+  const [hoverBorder, setHoverBorder] = useState<{ id: string; handle: ResizeHandle } | null>(null);
   /**
    * The card whose outline is under a world point. The NEAREST outline wins: a card sitting a few pixels inside its group must not
    * steal the group's own border (the groups of a map are covered by their cards, so the border is the only place to grab them).
@@ -303,19 +306,25 @@ export function CanvasView() {
       setSel(new Set());
       return;
     }
-    // The WHOLE outline of a card is a handle: a drag that starts on it connects from exactly that point. The round ports and
-    // the resize handles keep their own meaning, and a card being edited keeps its text.
-    // Touching a group's outline also selects it: cards usually cover a group's body, so the outline is often the only place left
-    // to grab it, and only a selected group shows the handles that resize it. A drag from there still connects.
+    // The WHOLE outline of a card is a resize handle, wherever along it the pointer is: a drag from a side stretches that side,
+    // from near a corner both. (Cards cover their group's body, so the outline is also the place to grab a group.) The round
+    // ports connect, and Ctrl + drag from the outline connects from exactly that point. A card being edited keeps its text.
     if (!t.closest("[data-port],[data-resize]")) {
       const hit = hitBorder(wx, wy);
-      if (hit && editing !== hit.id) {
-        if (byId.get(hit.id)?.type === "group" && !sel.has(hit.id)) {
+      const target = hit ? byId.get(hit.id) : undefined;
+      if (hit && target && editing !== hit.id) {
+        setHoverBorder(null);
+        if (e.ctrlKey || e.metaKey) {
+          startDrag(e, { kind: "connect", from: hit.id, side: hit.side, t: hit.t, ox: wx, oy: wy, x: wx, y: wy });
+          return;
+        }
+        if (!sel.has(hit.id)) {
           setSel(new Set([hit.id]));
           setSelEdge(null);
         }
-        setHoverBorder(null);
-        startDrag(e, { kind: "connect", from: hit.id, side: hit.side, t: hit.t, ox: wx, oy: wy, x: wx, y: wy });
+        snapshot();
+        const handle = resizeHandleAt(target, hit, CORNER_PX / viewRef.current.zoom);
+        startDrag(e, { kind: "resize", id: hit.id, sx: wx, sy: wy, w: target.width, h: target.height, x: target.x, y: target.y, handle });
         return;
       }
     }
@@ -374,9 +383,11 @@ export function CanvasView() {
         const [hx, hy] = toWorld(e.clientX, e.clientY);
         const onUi = (e.target as Element).closest("[data-canvas-ui],[data-port],[data-resize],[data-edge-id]");
         const hit = onUi ? null : hitBorder(hx, hy);
+        const node = hit ? byId.get(hit.id) : undefined;
+        const handle = hit && node ? resizeHandleAt(node, hit, CORNER_PX / viewRef.current.zoom) : null;
         setHoverBorder((prev) => {
-          if (!hit) return prev ? null : prev;
-          return prev && prev.id === hit.id && prev.x === hit.x && prev.y === hit.y ? prev : { id: hit.id, x: hit.x, y: hit.y };
+          if (!hit || !handle) return prev ? null : prev;
+          return prev && prev.id === hit.id && prev.handle === handle ? prev : { id: hit.id, handle };
         });
       }
       return;
@@ -668,7 +679,10 @@ export function CanvasView() {
         role="application"
         aria-label="Canvas"
         className={cn("nv-canvas relative min-h-0 flex-1 overflow-hidden outline-none",
-          drawMode ? "cursor-crosshair" : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-default")}
+          drawMode ? "cursor-crosshair"
+            : drag?.kind === "resize" ? RESIZE_CURSOR[drag.handle as ResizeHandle] ?? "cursor-default"
+              : hoverBorder && !drag ? RESIZE_CURSOR[hoverBorder.handle]
+                : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-default")}
         style={{
           backgroundImage: showGrid ? "radial-gradient(circle, var(--nv-line-strong) 1px, transparent 1.2px)" : "none",
           backgroundSize: `${gridSize}px ${gridSize}px`,
@@ -713,9 +727,6 @@ export function CanvasView() {
             {drag?.kind === "connect" && byId.get(drag.from) && (
               <line x1={portOf(byId.get(drag.from)!, drag.side, drag.t)[0]} y1={portOf(byId.get(drag.from)!, drag.side, drag.t)[1]}
                 x2={drag.x} y2={drag.y} stroke="var(--nv-accent)" strokeWidth={2 / view.zoom} strokeDasharray="6 4" />
-            )}
-            {hoverBorder && !drag && (
-              <circle cx={hoverBorder.x} cy={hoverBorder.y} r={5 / view.zoom} fill="var(--nv-accent)" data-testid="border-marker" />
             )}
             {drag?.kind === "draw" && (
               <polyline points={drag.points.map((p) => p.join(",")).join(" ")} fill="none"

@@ -97,15 +97,26 @@ describe("an inner group whose cards sit right inside its outline", () => {
     expect(useCanvas.getState().doc.edges).toHaveLength(0);
   });
 
-  it("a drag that starts on the group's outline connects from the group (and does not move it)", () => {
-    fire("pointerdown", 41, 150);
+  it("a drag that starts on the group's outline stretches THAT group from that side, from any point of it", () => {
+    fire("pointerdown", 41, 90); // near the top of the left side, not the middle
+    fire("pointermove", 20, 90);
+    fire("pointermove", 0, 90);
+    fire("pointerup", 0, 90);
+    expect(node("g1").x).toBeLessThan(40);
+    expect(node("g1").width).toBeGreaterThan(300);
+    expect(node("g1").y).toBe(40);
+    expect(node("c1").x).toBe(46); // its card did not move
+    expect(node("outer").x).toBe(0);
+    expect(useCanvas.getState().doc.edges).toHaveLength(0);
+  });
+
+  it("Ctrl + drag from the group's outline connects from the group instead", () => {
+    act(() => { host().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 41, clientY: 150, button: 0, buttons: 1, ctrlKey: true })); });
     fire("pointermove", 80, 150);
     fire("pointermove", 450, 450);
     fire("pointerup", 450, 450);
     expect(node("g1").x).toBe(40);
-    const edge = useCanvas.getState().doc.edges[0];
-    expect(edge).toBeTruthy();
-    expect(edge!.fromNode).toBe("g1");
+    expect(useCanvas.getState().doc.edges[0]?.fromNode).toBe("g1");
   });
 
   it("when the outlines are about equally near (a card one pixel inside), the card still wins over its group", () => {

@@ -78,11 +78,15 @@ describe("nested groups", () => {
     expect(useCanvas.getState().doc.edges).toHaveLength(0);
   });
 
-  it("a drag from a group's outline still connects, and leaves the group where it was", () => {
-    fire("pointerdown", 100, 200);
-    fire("pointermove", 120, 200);
-    fire("pointermove", 150, 180);
-    fire("pointerup", 150, 180);
-    expect(node("inner").x).toBe(100);
+  it("a drag from a group's outline resizes it from that side (it does not connect or move it)", () => {
+    fire("pointerdown", 100, 200); // inner's left side, mid-height
+    fire("pointermove", 80, 200);
+    fire("pointermove", 40, 200);
+    fire("pointerup", 40, 200);
+    expect(node("inner").x).toBeLessThan(100);
+    expect(node("inner").width).toBeGreaterThan(300);
+    expect(node("inner").y).toBe(100);
+    expect(node("inner").height).toBe(200);
+    expect(useCanvas.getState().doc.edges).toHaveLength(0);
   });
 });

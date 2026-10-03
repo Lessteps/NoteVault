@@ -245,7 +245,7 @@ function Handles({ selected }: { selected: boolean }) {
           data-port={s}
           title="Arrastra para conectar"
           className={cn(
-            "nv-port absolute z-20 h-3.5 w-3.5 cursor-crosshair rounded-full border-2 border-accent bg-card",
+            "nv-port absolute z-20 h-3.5 w-3.5 cursor-pointer rounded-full border-2 border-accent bg-card",
             PORT_POS[s], selected ? "opacity-100" : "opacity-0",
           )}
         />

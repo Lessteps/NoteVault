@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anchorExtras, borderHit, edgePath, edgeT, portPoint } from "./canvas";
+import { anchorExtras, borderHit, edgePath, edgeT, portPoint, resizeHandleAt, RESIZE_CURSOR } from "./canvas";
 
 const card = { x: 100, y: 100, width: 200, height: 100 };
 
@@ -83,5 +83,41 @@ describe("edge anchors", () => {
     expect(middle.d.startsWith("M300,150 ")).toBe(true);
     expect(grabbed.d.startsWith("M300,120 ")).toBe(true);
     expect(grabbed.d.endsWith(" 500,180")).toBe(true);
+  });
+});
+
+describe("which handle a point of the outline stands for", () => {
+  const at = (x: number, y: number, tol = 8, corner = 14) => resizeHandleAt(card, borderHit(card, x, y, tol)!, corner);
+
+  it("the middle of a side is that side, wherever along it", () => {
+    expect(at(150, 100)).toBe("n");
+    expect(at(280, 100 + 1)).toBe("n");
+    expect(at(190, 200)).toBe("s");
+    expect(at(100, 130)).toBe("w");
+    expect(at(300, 170)).toBe("e");
+  });
+
+  it("within the corner zone it is the corner, on both of its sides", () => {
+    expect(at(102, 100)).toBe("nw");
+    expect(at(100, 102)).toBe("nw");
+    expect(at(298, 100)).toBe("ne");
+    expect(at(300, 103)).toBe("ne");
+    expect(at(299, 200)).toBe("se");
+    expect(at(101, 199)).toBe("sw");
+  });
+
+  it("the corner zone is limited to a third of the side, so a small card still has a middle", () => {
+    const small = { x: 0, y: 0, width: 30, height: 30 };
+    const hit = borderHit(small, 15, 0, 8)!;
+    expect(resizeHandleAt(small, hit, 14)).toBe("n");
+    expect(resizeHandleAt(small, { side: "top", t: 0.05 }, 14)).toBe("nw");
+  });
+
+  it("every handle has a pointer that shows how it stretches", () => {
+    expect(RESIZE_CURSOR).toEqual({
+      n: "cursor-ns-resize", s: "cursor-ns-resize", e: "cursor-ew-resize", w: "cursor-ew-resize",
+      ne: "cursor-nesw-resize", sw: "cursor-nesw-resize", nw: "cursor-nwse-resize", se: "cursor-nwse-resize",
+    });
+    for (const c of Object.values(RESIZE_CURSOR)) expect(c).not.toMatch(/crosshair/);
   });
 });

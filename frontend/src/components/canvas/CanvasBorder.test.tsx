@@ -29,18 +29,24 @@ let raf: typeof requestAnimationFrame;
 
 const host = () => container.querySelector<HTMLElement>("[aria-label=Canvas]")!;
 /** The view starts at (0, 0) with zoom 1, so a client coordinate IS a world coordinate. */
-const fire = (type: "pointerdown" | "pointermove" | "pointerup", x: number, y: number, target: Element = host(), buttons = type === "pointerup" ? 0 : 1) =>
+const fire = (type: "pointerdown" | "pointermove" | "pointerup", x: number, y: number, o: { target?: Element; buttons?: number; ctrl?: boolean } = {}) =>
   act(() => {
-    target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons }));
+    (o.target ?? host()).dispatchEvent(new MouseEvent(type, {
+      bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, ctrlKey: !!o.ctrl,
+      buttons: o.buttons ?? (type === "pointerup" ? 0 : 1),
+    }));
   });
-const drag = (from: [number, number], to: [number, number], target?: Element) => {
-  fire("pointerdown", ...from, target);
-  fire("pointermove", from[0] + 20, from[1] + 20);
+const drag = (from: [number, number], to: [number, number], o: { target?: Element; ctrl?: boolean } = {}) => {
+  fire("pointerdown", ...from, o);
+  fire("pointermove", (from[0] + to[0]) / 2, (from[1] + to[1]) / 2);
   fire("pointermove", ...to);
   fire("pointerup", ...to);
 };
+const hover = (x: number, y: number) => fire("pointermove", x, y, { buttons: 0 });
+const node = (id: string) => useCanvas.getState().doc.nodes.find((n) => n.id === id)!;
+const box = (id: string) => { const n = node(id); return [n.x, n.y, n.width, n.height]; };
 const edges = () => useCanvas.getState().doc.edges;
-const nodeA = () => useCanvas.getState().doc.nodes.find((n) => n.id === "a")!;
+const cursor = () => host().className;
 
 beforeEach(() => {
   raf = globalThis.requestAnimationFrame;
@@ -59,94 +65,149 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("connecting from anywhere on a card's outline", () => {
-  it("shows where the connection would start when the pointer is on the stroke, wherever along it", () => {
-    fire("pointermove", 130, 101, host(), 0);
-    const marker = container.querySelector("[data-testid=border-marker]")!;
-    expect(marker).toBeTruthy();
-    expect(marker.getAttribute("cx")).toBe("130");
-    expect(marker.getAttribute("cy")).toBe("100");
-    // the dot marks the spot; the pointer stays an arrow
-    expect(host().className).not.toContain("cursor-crosshair");
-    // the marker follows the pointer along the outline, it does not jump to the middle
-    fire("pointermove", 260, 99, host(), 0);
-    expect(container.querySelector("[data-testid=border-marker]")!.getAttribute("cx")).toBe("260");
-    // and leaves when the pointer is in the body or away from the card
-    fire("pointermove", 200, 150, host(), 0);
-    expect(container.querySelector("[data-testid=border-marker]")).toBeNull();
-    fire("pointermove", 400, 400, host(), 0);
-    expect(container.querySelector("[data-testid=border-marker]")).toBeNull();
-    expect(host().className).not.toContain("cursor-crosshair");
+describe("the outline of a card is a resize handle, wherever along it the pointer is", () => {
+  it("the pointer says which way it stretches: up/down on top and bottom, sideways on the sides, diagonal near a corner", () => {
+    hover(150, 101);
+    expect(cursor()).toContain("cursor-ns-resize");
+    hover(190, 199);
+    expect(cursor()).toContain("cursor-ns-resize");
+    hover(101, 150);
+    expect(cursor()).toContain("cursor-ew-resize");
+    hover(299, 170);
+    expect(cursor()).toContain("cursor-ew-resize");
+    hover(299, 199); // bottom-right corner
+    expect(cursor()).toContain("cursor-nwse-resize");
+    hover(101, 101); // top-left corner
+    expect(cursor()).toContain("cursor-nwse-resize");
+    hover(299, 101); // top-right corner
+    expect(cursor()).toContain("cursor-nesw-resize");
+    hover(101, 199); // bottom-left corner
+    expect(cursor()).toContain("cursor-nesw-resize");
   });
 
-  it("a drag that starts off-centre on the stroke connects from exactly that point", () => {
-    drag([130, 101], [520, 199]); // a's top edge at 15% → b's bottom edge at 10%
+  it("it is never a crosshair, and it goes back to the arrow in the body and away from the cards", () => {
+    hover(150, 101);
+    expect(cursor()).not.toContain("cursor-crosshair");
+    hover(200, 150); // the body
+    expect(cursor()).not.toMatch(/resize|crosshair/);
+    hover(400, 400); // empty board
+    expect(cursor()).not.toMatch(/resize|crosshair/);
+    expect(cursor()).toContain("cursor-default");
+  });
+
+  it("dragging the TOP side stretches it upward, from any point of it (not only the middle)", () => {
+    drag([130, 101], [130, 60]);
+    expect(box("a")).toEqual([100, 60, 200, 140]);
+  });
+
+  it("dragging the BOTTOM side, the LEFT side and the RIGHT side, each from off-centre points", () => {
+    drag([260, 199], [260, 240]); // bottom, far from the middle
+    expect(box("a")).toEqual([100, 100, 200, 140]);
+    drag([101, 120], [60, 120]); // left, near the top
+    expect(box("a")).toEqual([60, 100, 240, 140]);
+    drag([299, 180], [340, 180]); // right, near the bottom
+    expect(box("a")).toEqual([60, 100, 280, 140]);
+  });
+
+  it("near a corner it stretches both ways", () => {
+    drag([299, 199], [339, 239]);
+    expect(box("a")).toEqual([100, 100, 240, 140]);
+    drag([101, 101], [61, 61]);
+    expect(box("a")).toEqual([60, 60, 280, 180]);
+  });
+
+  it("the pointer stays a resize pointer during the drag", () => {
+    fire("pointerdown", 150, 101);
+    fire("pointermove", 150, 80);
+    expect(cursor()).toContain("cursor-ns-resize");
+    fire("pointerup", 150, 80);
+  });
+
+  it("a card cannot be made smaller than a minimum", () => {
+    drag([299, 150], [-200, 150]);
+    expect(node("a").width).toBeGreaterThanOrEqual(40);
+  });
+
+  it("a click on the outline selects the card and changes nothing", () => {
+    fire("pointerdown", 150, 101);
+    fire("pointerup", 150, 101);
+    expect(box("a")).toEqual([100, 100, 200, 100]);
+    expect(container.querySelector("[data-node-id=a]")!.className).toMatch(/ring-accent|outline-accent/);
+  });
+
+  it("a drag that starts in the body still moves the card, and edges are untouched", () => {
+    const before = node("a").x;
+    drag([200, 150], [260, 150], { target: container.querySelector("[data-node-id=a]")! });
+    expect(node("a").x).toBeGreaterThan(before);
+    expect(node("a").width).toBe(200);
+    expect(edges()).toHaveLength(0);
+  });
+
+  it("it works on a group too, from the middle of any side", () => {
+    act(() => useCanvas.setState({ doc: { nodes: [{ id: "g", type: "group", x: 100, y: 100, width: 300, height: 200, label: "G" }], edges: [] } }));
+    drag([101, 200], [60, 200]); // left side
+    expect(node("g").x).toBe(60);
+    expect(node("g").width).toBe(340);
+    drag([250, 299], [250, 360]); // bottom side
+    expect(node("g").height).toBe(260);
+  });
+});
+
+describe("connecting", () => {
+  it("the round ports still connect", () => {
+    const port = container.querySelector<HTMLElement>("[data-node-id=a] [data-port=right]")!;
+    drag([300, 150], [500, 150], { target: port });
+    expect(edges()[0]).toMatchObject({ fromNode: "a", fromSide: "right", toNode: "b", toSide: "left" });
+    expect(edges()[0]!.nv).toBeUndefined();
+    expect(box("a")).toEqual([100, 100, 200, 100]); // and nothing was resized
+  });
+
+  it("the ports show a plain pointer, not a crosshair", () => {
+    const port = container.querySelector<HTMLElement>("[data-node-id=a] [data-port=right]")!;
+    expect(port.className).toContain("cursor-pointer");
+    expect(port.className).not.toContain("crosshair");
+  });
+
+  it("Ctrl + drag from the outline connects from exactly that point (it does not resize)", () => {
+    drag([130, 101], [520, 199], { ctrl: true }); // a's top edge at 15% → b's bottom edge at 10%
     expect(edges()).toHaveLength(1);
     const e = edges()[0]!;
     expect(e).toMatchObject({ fromNode: "a", fromSide: "top", toNode: "b", toSide: "bottom" });
     expect(e.nv?.fromT).toBeCloseTo(0.15, 3);
     expect(e.nv?.toT).toBeCloseTo(0.1, 3);
+    expect(box("a")).toEqual([100, 100, 200, 100]);
   });
 
-  it("works from every side of the card, including the left and the right", () => {
-    drag([299, 120], [500, 130]); // a's right edge at 20% → b's left edge at 30%
-    expect(edges()[0]).toMatchObject({ fromNode: "a", fromSide: "right", toNode: "b", toSide: "left" });
-    expect(edges()[0]!.nv?.fromT).toBeCloseTo(0.2, 3);
-    expect(edges()[0]!.nv?.toT).toBeCloseTo(0.3, 3);
-  });
-
-  it("near the middle of a side it sticks to the middle and stores nothing extra", () => {
-    drag([203, 100], [602, 100]);
-    expect(edges()).toHaveLength(1);
+  it("Ctrl + drag from the middle of a side stores no extra anchor, and a drop on empty board makes a connected card", () => {
+    drag([203, 100], [602, 100], { ctrl: true });
     expect(edges()[0]!.nv).toBeUndefined();
-  });
-
-  it("the round ports at the middle keep working", () => {
-    const port = container.querySelector<HTMLElement>("[data-node-id=a] [data-port=right]")!;
-    drag([300, 150], [500, 150], port);
-    expect(edges()[0]).toMatchObject({ fromNode: "a", fromSide: "right", toNode: "b", toSide: "left" });
-    expect(edges()[0]!.nv).toBeUndefined();
-  });
-
-  it("a drag that starts in the body still moves the card instead of connecting", () => {
-    const before = nodeA().x;
-    drag([200, 150], [260, 150], container.querySelector("[data-node-id=a]")!);
-    expect(edges()).toHaveLength(0);
-    expect(nodeA().x).toBeGreaterThan(before);
-  });
-
-  it("a click on the outline without dragging connects nothing", () => {
-    fire("pointerdown", 130, 100);
-    fire("pointerup", 130, 100);
-    expect(edges()).toHaveLength(0);
-    expect(useCanvas.getState().doc.nodes).toHaveLength(2);
-  });
-
-  it("dropping on empty board from an outline point still makes a new connected card", () => {
-    drag([130, 101], [130, 400]);
+    act(() => useCanvas.setState({ doc: { ...doc(), edges: [] } }));
+    drag([130, 101], [130, 400], { ctrl: true });
     const s = useCanvas.getState().doc;
     expect(s.nodes).toHaveLength(3);
-    expect(s.edges[0]).toMatchObject({ fromNode: "a", fromSide: "top" });
     expect(s.edges[0]!.nv?.fromT).toBeCloseTo(0.15, 3);
   });
+});
 
-  it("a card inside a group wins over the group, and the group outline works too", () => {
+describe("nested shapes", () => {
+  it("a card inside a group wins over the group, and the group's own outline resizes the group", () => {
     act(() => {
       useCanvas.setState({
         doc: {
           nodes: [
             { id: "g", type: "group", x: 50, y: 50, width: 700, height: 300, label: "G" },
             { id: "c", type: "text", x: 100, y: 100, width: 200, height: 100, text: "C" },
-            { id: "z", type: "text", x: 500, y: 150, width: 200, height: 100, text: "Z" },
           ],
           edges: [],
         },
       });
     });
-    drag([130, 101], [520, 249]);
-    expect(edges()[0]).toMatchObject({ fromNode: "c", fromSide: "top" });
-    act(() => useCanvas.setState({ doc: { ...useCanvas.getState().doc, edges: [] } }));
-    drag([51, 300], [520, 249]);
-    expect(edges()[0]).toMatchObject({ fromNode: "g", fromSide: "left" });
+    drag([130, 101], [130, 60]); // the card's top
+    expect(box("c")).toEqual([100, 60, 200, 140]);
+    expect(box("g")).toEqual([50, 50, 700, 300]);
+    drag([51, 300], [20, 300]); // the group's left side
+    expect(node("g").x).toBeLessThan(50); // stretched to the left
+    expect(node("g").width).toBeGreaterThan(700);
+    expect(box("c")).toEqual([100, 60, 200, 140]); // the card did not move
   });
 });

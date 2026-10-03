@@ -187,6 +187,33 @@ const NORMAL: Record<Side, [number, number]> = {
   top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0],
 };
 
+export type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+/**
+ * Which resize handle a point of the outline stands for: the corner when it is within `corner` of one, otherwise the side.
+ * The whole outline resizes the card, so the handles a card draws are only a hint of where.
+ */
+export function resizeHandleAt(n: Rect, hit: Pick<BorderHit, "side" | "t">, corner: number): ResizeHandle {
+  const horizontal = hit.side === "top" || hit.side === "bottom";
+  const length = horizontal ? n.width : n.height;
+  const along = hit.t * length;
+  const c = Math.min(corner, length / 3);
+  const first = along <= c;
+  const last = along >= length - c;
+  if (horizontal) {
+    const v = hit.side === "top" ? "n" : "s";
+    return (first ? v + "w" : last ? v + "e" : v) as ResizeHandle;
+  }
+  const h = hit.side === "left" ? "w" : "e";
+  return (first ? "n" + h : last ? "s" + h : h) as ResizeHandle;
+}
+
+/** The pointer that shows what dragging each handle does (Tailwind classes). */
+export const RESIZE_CURSOR: Record<ResizeHandle, string> = {
+  n: "cursor-ns-resize", s: "cursor-ns-resize", e: "cursor-ew-resize", w: "cursor-ew-resize",
+  ne: "cursor-nesw-resize", sw: "cursor-nesw-resize", nw: "cursor-nwse-resize", se: "cursor-nwse-resize",
+};
+
 /** A cubic curve leaving each node straight out of its side. */
 export function edgePath(a: Rect, as: Side, b: Rect, bs: Side, at = 0.5, bt = 0.5): { d: string; mid: [number, number] } {
   const [x1, y1] = portPoint(a, as, at);

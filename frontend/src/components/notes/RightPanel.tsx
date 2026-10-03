@@ -7,7 +7,7 @@
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
 import { useWebPages } from "../../store/webPages";
-import { MuscleSchemaPanel } from "../exercise/MuscleSchemaPanel";
+import { MuscleSchemaPanel } from "./MuscleSchemaPanel";
 import { PanelLaunchers } from "./PanelLaunchers";
 import { Inspector } from "./Inspector";
 import { AssistantPanel } from "./AssistantPanel";

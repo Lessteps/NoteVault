@@ -22,6 +22,7 @@ export const LAYOUT = {
   habits_day: `${DATA_DIR}/habits/{year}/{month:02d}/{date}.md`,
   exercise_dir: `${DATA_DIR}/ejercicio`,
   exercises: `${DATA_DIR}/ejercicio/exercises.json`,
+  library: `${DATA_DIR}/ejercicio/biblioteca.json`,
   exercise_day: `${DATA_DIR}/ejercicio/{year}/{month:02d}/{date}.json`,
   exercise_videos_dir: `${DATA_DIR}/ejercicio/videos`,
   tasks_dir: `${DATA_DIR}/tareas`,

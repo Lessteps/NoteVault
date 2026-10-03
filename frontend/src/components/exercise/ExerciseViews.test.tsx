@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 //
 // Las dos reglas que el usuario pidió y que son fáciles de romper sin querer:
 // los cuatro dashboards circulares arriba en la vista general, y que la vista
@@ -17,6 +17,7 @@ const invoke = vi.fn(async (method: string): Promise<unknown> => {
 (window as unknown as { nv: unknown }).nv = { invoke };
 
 import { useExercise } from "../../store/exercise";
+import { todayIso } from "../../lib/tasks";
 import { Overview } from "./Overview";
 import { Yearly } from "./Yearly";
 
@@ -53,7 +54,9 @@ describe("vista general de Ejercicio", () => {
         streak: { current: 3, best: 7 },
       },
     });
-    const { host, cleanup } = mount(<Overview />);
+    const { host, cleanup } = mount(
+    <Overview date={todayIso()} onDate={() => undefined} onGoProgram={() => undefined} />,
+  );
     try {
       const rings = [...host.querySelectorAll('svg[role="img"]')]
         .map((s) => s.getAttribute("aria-label") ?? "")

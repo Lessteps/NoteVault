@@ -1,0 +1,896 @@
+[
+  {
+    "slug": "face-pull",
+    "name": "Face Pull",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca la polea a la altura de la cara y engancha la cuerda con agarre neutro, palmas enfrentadas.",
+      "Da un paso atrás con el torso recto y ligera inclinación, brazos extendidos al frente.",
+      "Tira de la cuerda hacia la frente abriendo los codos hacia los lados, hasta que los nudillos queden a la altura de las orejas.",
+      "Aprieta los omóplatos un segundo arriba, con los hombros lejos de las orejas.",
+      "Baja de forma controlada sin que la pila de peso toque el bloque entre repeticiones.",
+      "Exhala al tirar e inhala al extender; usa un peso que controles sin arquear la zona lumbar."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "pec-deck",
+    "name": "Pec Deck",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ajusta el asiento para que los agarres queden a la altura del pecho y los codos alineados con los hombros.",
+      "Apoya toda la espalda en el respaldo y los antebrazos en las almohadillas, con agarre firme pero sin apretar.",
+      "Junta los brazos delante del pecho apretando el pectoral, sin encoger los hombros.",
+      "Mantén un segundo la contracción máxima.",
+      "Abre de forma controlada hasta sentir el estiramiento del pecho, sin que el peso toque el bloque.",
+      "Exhala al cerrar e inhala al abrir."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "chest-supported-row",
+    "name": "Chest Supported Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Apoya el pecho en el banco inclinado, con los pies firmes en el suelo y la espalda neutra.",
+      "Sujeta las mancuernas o los agarres con los brazos colgando perpendiculares al suelo.",
+      "Rema llevando los codos hacia las caderas y aprieta los omóplatos al final del recorrido.",
+      "Pausa un segundo arriba, sin encoger los hombros hacia las orejas.",
+      "Baja de forma controlada hasta extender los brazos casi por completo.",
+      "El pecho no se despega del apoyo en ningún momento."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "meadows-row",
+    "name": "Meadows Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Encaja un extremo de la barra en el landmine y carga discos solo en el extremo libre.",
+      "Colócate de lado a la barra, con el pie más cercano ligeramente adelantado y la cadera flexionada.",
+      "Agarra el extremo libre con la mano alejada y rema el codo hacia la cadera, manteniendo el torso estable.",
+      "Aprieta el dorsal un segundo arriba, sin rotar el tronco para ayudarte.",
+      "Baja la barra de forma controlada hasta estirar el dorsal.",
+      "Completa todas las repeticiones de un lado antes de cambiar."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "wide-grip-lat-pulldown",
+    "name": "Wide-Grip Lat Pulldown",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate y fija los muslos bajo los rodillos, con agarre ancho en pronación, palmas al frente.",
+      "Inclina el torso unos diez grados hacia atrás, con el pecho abierto y la espalda neutra.",
+      "Tira de la barra hacia la parte alta del pecho llevando los codos hacia abajo y atrás.",
+      "Aprieta los dorsales un segundo abajo, deprimiendo los omóplatos.",
+      "Sube de forma controlada hasta extender los brazos sin encoger los hombros.",
+      "No te balancees para impulsarte."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cable-rear-delt-fly",
+    "name": "Cable Rear Delt Fly",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate entre dos poleas altas y cruza los agarres: mano derecha a polea izquierda y al revés.",
+      "Con ligera flexión de cadera y rodillas, abre los brazos en cruz hasta la altura de los hombros.",
+      "Lleva los codos hacia atrás, no las manos, apretando los deltoides posteriores.",
+      "Pausa un segundo en la apertura máxima.",
+      "Vuelve al centro de forma controlada, sin que las manos se crucen del todo.",
+      "Usa un peso que te permita no balancear el tronco."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-skull-crusher",
+    "name": "Two Dumbbell Skullcrusher",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate en un banco plano con una mancuerna en cada mano y los brazos extendidos sobre el pecho.",
+      "Flexiona solo los codos bajando las mancuernas hacia los lados de la cabeza, con los brazos quietos.",
+      "Mantén los codos apuntando al techo durante todo el recorrido, sin abrirlos.",
+      "Extiende los codos hasta arriba apretando el tríceps un segundo.",
+      "Baja despacio contando dos segundos: el movimiento lo hacen los antebrazos, no los hombros.",
+      "Elige un peso que controles por encima de la cara."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "wrist-extension",
+    "name": "Wrist Extension",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate y apoya los antebrazos en los muslos, con las palmas hacia abajo y las muñecas al borde de las rodillas.",
+      "Sujeta una mancuerna ligera en cada mano con agarre en pronación.",
+      "Eleva solo las manos hacia arriba flexionando las muñecas, sin mover los antebrazos.",
+      "Mantén un segundo la contracción arriba.",
+      "Baja despacio hasta la posición inicial.",
+      "Usa pesos muy ligeros y muchas repeticiones; para si aparece dolor articular."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "doorway-row",
+    "name": "Doorway Row",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Sujeta con firmeza ambos lados de un marco de puerta sólido, con los pies cerca del marco.",
+      "Inclínate hacia atrás con el cuerpo recto como una tabla y los brazos extendidos.",
+      "Tira del cuerpo hacia el marco llevando los codos hacia las costillas.",
+      "Aprieta los omóplatos un segundo arriba.",
+      "Baja de forma controlada hasta extender los brazos.",
+      "Asegúrate de que el marco aguante tu peso; cuanto más horizontales los pies, más difícil."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dead-hang",
+    "name": "Dead Hang",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Cuélgate de la barra con agarre en pronación a la anchura de los hombros y los brazos extendidos.",
+      "Relaja los hombros dejando que el cuerpo cuelgue con su peso, sin balancearte.",
+      "Activa ligeramente el abdomen para evitar arquear la zona lumbar.",
+      "Respira con normalidad mientras aguantas el tiempo objetivo.",
+      "Baja con control apoyando los pies; no saltes desde la barra.",
+      "Progresa sumando segundos cada semana y usa magnesia si el agarre falla antes que la espalda."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "active-hang",
+    "name": "Active Hang",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Cuélgate de la barra con agarre en pronación y los brazos extendidos.",
+      "Sin doblar los codos, tira de los omóplatos hacia abajo y atrás, alejando los hombros de las orejas.",
+      "Mantén esa depresión escapular activa durante todo el tiempo, con el abdomen firme.",
+      "El cuerpo sube unos centímetros solo por la acción de los omóplatos: esa es la posición.",
+      "Respira con normalidad y baja con control al terminar.",
+      "Domina treinta segundos de active hang antes de pasar a dominadas estrictas."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "negative-pull-up",
+    "name": "Negative Pull-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Sube con ayuda, desde un salto o un banco, hasta la posición alta con la barbilla sobre la barra.",
+      "Agarra en pronación a la anchura de los hombros con el abdomen firme.",
+      "Desciende lo más despacio posible, con un objetivo de tres a cinco segundos por repetición.",
+      "No te dejes caer en el último tramo: controla hasta la extensión completa.",
+      "Descansa entre sesenta y noventa segundos entre repeticiones.",
+      "Deja de hacerlas cuando ya no puedas frenar la bajada."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "commando-pull-up",
+    "name": "Commando Pull-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Agárrate a la barra de lado, con una mano delante de la otra en agarre mixto y el cuerpo perpendicular a la barra.",
+      "Cuélgate con los brazos extendidos y el abdomen firme.",
+      "Sube llevando la cabeza alternativamente a un lado de la barra en cada repetición.",
+      "Tira con ambos brazos por igual, sin girar las caderas.",
+      "Baja de forma controlada hasta la extensión completa.",
+      "Alterna el lado de la cabeza en cada serie para trabajar ambos lados por igual."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "towel-pull-up",
+    "name": "Towel Pull-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Pasa dos toallas resistentes o una gruesa doblada sobre la barra y agarra un extremo con cada mano.",
+      "Cuélgate con los brazos extendidos, apretando fuerte las toallas.",
+      "Sube hasta que la barbilla supere las manos, tirando con dorsales y bíceps.",
+      "Pausa un segundo arriba sin balancearte.",
+      "Baja de forma controlada hasta extender los brazos.",
+      "Comprueba que las toallas no resbalan antes de colgar todo tu peso."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "prone-y-raise",
+    "name": "Prone Y Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca abajo con la frente apoyada en el suelo y los brazos extendidos formando una Y.",
+      "Eleva los brazos unos centímetros despegando el pecho lo mínimo del suelo.",
+      "Aprieta los omóplatos y la parte baja del trapecio, sin encoger los hombros.",
+      "Mantén dos segundos arriba respirando con normalidad.",
+      "Baja despacio hasta apoyar las manos.",
+      "Usa solo tu peso corporal al principio: el rango es corto y controlado, nunca con impulso."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "prone-t-raise",
+    "name": "Prone T Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca abajo con los brazos abiertos en cruz formando una T y las palmas hacia abajo.",
+      "Eleva los brazos despegando ligeramente el pecho del suelo.",
+      "Lleva los pulgares hacia el techo mientras aprietas los omóplatos.",
+      "Mantén dos segundos arriba.",
+      "Baja de forma controlada hasta apoyar.",
+      "No arquees la zona lumbar para subir más: el movimiento sale de la espalda alta."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "reverse-snow-angel",
+    "name": "Reverse Snow Angel",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca abajo con los brazos pegados a los costados y la frente en el suelo.",
+      "Desliza los brazos por el suelo dibujando un arco amplio hasta llevarlos por encima de la cabeza.",
+      "Mantén los brazos extendidos y el pecho lo más pegado al suelo posible.",
+      "Aprieta la espalda alta en la posición final un segundo.",
+      "Vuelve por el mismo arco de forma controlada.",
+      "Muévete despacio; si la zona lumbar molesta, acorta el arco."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "wall-walk",
+    "name": "Wall Walk",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Empieza en plancha con los pies contra la pared y el abdomen muy firme.",
+      "Sube los pies por la pared dando pasos cortos mientras acercas las manos a la pared.",
+      "Mantén los brazos extendidos y el cuerpo alineado, sin arquear la zona lumbar.",
+      "Sube solo hasta donde controles la bajada con seguridad.",
+      "Desciende invirtiendo el camino con la misma calma.",
+      "Practica primero recorridos cortos y con el suelo despejado alrededor."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "knee-push-up",
+    "name": "Knee Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Apoya rodillas y manos en el suelo, con las manos bajo los hombros y el cuerpo recto de rodillas a cabeza.",
+      "Mantén el abdomen firme para no hundir la cadera.",
+      "Baja el pecho de forma controlada hasta casi rozar el suelo.",
+      "Mantén los codos a unos cuarenta y cinco grados del torso, sin abrirlos del todo.",
+      "Empuja hasta extender los brazos sin bloquear los codos.",
+      "Cuando completes tres series de doce, pasa a flexiones completas."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "scapular-push-up",
+    "name": "Scapular Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en plancha alta con los brazos extendidos y el cuerpo recto.",
+      "Sin doblar los codos, deja que el pecho se hunda entre los omóplatos.",
+      "Desde ahí, empuja el suelo separando los omóplatos.",
+      "El movimiento es corto: solo protracción y retracción escapular.",
+      "Mantén un segundo en cada extremo del recorrido.",
+      "Es un ejercicio de control, no de fuerza: hazlo despacio y sin aguantar la respiración."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "bulgarian-split-squat",
+    "name": "Bulgarian Split Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca el pie trasero elevado sobre un banco o silla estable.",
+      "Deja el pie delantero un paso largo hacia delante: más distancia, más peso en glúteo y cuádriceps.",
+      "Apoya la columna neutra y el abdomen firme; la rodilla delantera apunta a los dedos del pie.",
+      "Baja flexionando ambas rodillas hasta que la de atrás casi toque el suelo.",
+      "Sube apretando el glúteo de la pierna delantera hasta extender, sin empujar con el pie trasero.",
+      "Repete todas las repeticiones de una pierna antes de cambiar; si pierdes equilibrio, acorta el paso."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "hip-thrust",
+    "name": "Hip Thrust",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Apoya la espalda alta en el borde de un banco, con el banco a media pantorrilla y los pies plantados en el suelo.",
+      "Coloca la barra o la mancuerna sobre la pelvis, con las manos sosteniéndola y los codos apuntando atrás.",
+      "Manteniendo el abdomen firme y la barbilla ligeramente alta, empuja con los talones.",
+      "Eleva la cadera hasta formar una línea recta entre rodilla, cadera y hombro.",
+      "Aprieta los glúteos arriba un segundo.",
+      "Baja las caderas hasta tocar el suelo sin relajar la espalda baja.",
+      "Si notas la lumbar en vez de los glúteos, baja el banco y aligera la carga."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-hip-thrust",
+    "name": "Dumbbell Hip Thrust",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Misma posición que en el hip thrust, con una mancuerna apoyada sobre la pelvis y las manos sujetándola.",
+      "Empuja con los talones hasta llevar la cadera a la horizontal.",
+      "Aprieta los glúteos un segundo arriba, sin arquear la espalda baja.",
+      "Baja despacio hasta que la cadera toque el suelo.",
+      "Usa una carga que puedas exprimir sin subir la cadera por impulso."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-glute-bridge",
+    "name": "Dumbbell Glute Bridge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba, rodillas flexionadas y pies plantados a la anchura de la cadera.",
+      "Apoya una mancuerna sobre la pelvis o sujétala con las manos cruzadas sobre el vientre.",
+      "Empuja con los talones elevando la pelvis hasta la línea recta de rodilla, cadera y hombro.",
+      "Aprieta los glúteos arriba un segundo sin arquear la zona lumbar.",
+      "Baja la cadera de forma controlada hasta un centímetro del suelo.",
+      "Si la espalda baja se arquea, acorta el recorrido y aligera el peso."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "frog-pump",
+    "name": "Frog Pump",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con las plantas de los pies juntas y las rodillas abiertas hacia los lados.",
+      "Coloca la barra o una mancuerna sobre la pelvis y sujétala con ambas manos.",
+      "Con los talones apoyados, empuja las rodillas hacia fuera elevando la pelvis.",
+      "Aprieta los glúteos arriba un segundo, sintiendo la contracción en la parte alta.",
+      "Baja despacio manteniendo las rodillas separadas.",
+      "Mantente en un rango sin dolor en la ingle ni en las rodillas."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "donkey-kick",
+    "name": "Donkey Kick",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate a cuatro patas: manos bajo los hombros, rodillas bajo la cadera y espalda neutra.",
+      "Flexiona una rodilla llevándola hacia el pecho; para cargar, apoya esa rodilla sobre una almohadilla con peso.",
+      "Extiende la rodilla hacia atrás y arriba sin mover la pelvis.",
+      "Aprieta el glúteo arriba un segundo.",
+      "Vuelve llevando la rodilla hacia el pecho de forma controlada.",
+      "La cadera no debe girar hacia los lados: es un movimiento de cadera, no de rotación."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "fire-hydrant",
+    "name": "Fire Hydrant",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate a cuatro patas, con las manos bajo los hombros y las rodillas bajo la cadera.",
+      "Mantén una rodilla en el suelo y apoya el pie de la otra pierna en el suelo.",
+      "Abre esa rodilla hacia un lado hasta la altura de la cadera, sin dejar caer la pelvis.",
+      "Aprieta el glúteo medio un segundo arriba.",
+      "Vuelve a cerrar la rodilla despacio.",
+      "Un rango pequeño y lento funciona mejor que uno amplio y rápido."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "clamshell",
+    "name": "Clamshell",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate de lado, con las rodillas flexionadas a 45 grados y los pies apilados.",
+      "Alinea la columna en una línea recta entre la cadera y el hombro.",
+      "Coloca una banda elástica por encima de las rodillas si quieres más dificultad.",
+      "Sin separar los pies, abre la rodilla superior como una concha, manteniendo las caderas apiladas.",
+      "Aprieta el glúteo medio un segundo arriba.",
+      "Baja despacio hasta cerrar la rodilla sin dejar que los pies se separen.",
+      "Si la cadera se abre hacia el suelo, la pelvis está rotando: reduce el recorrido."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "hip-airplane",
+    "name": "Hip Airplane",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate a cuatro patas con las rodillas bajo la cadera.",
+      "Levanta una pierna hacia atrás extendiendo la rodilla y llevándola hacia arriba.",
+      "Sube hasta que el pie quede a la altura de la cadera opuesta, en una línea larga.",
+      "Aprieta el glúteo un segundo arriba con la pelvis nivelada.",
+      "Baja despacio la pierna sin apoyarla.",
+      "Si la pelvis se gira hacia arriba, acorta el recorrido: el trabajo es del glúteo, no de la rotación."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "side-lying-hip-abduction",
+    "name": "Side-Lying Hip Abduction",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate de lado apoyado en un codo, con el cuerpo en una línea recta y las piernas apiladas.",
+      "Coloca una banda por encima de las rodillas si quieres más dificultad.",
+      "Levanta la pierna superior sin flexionar la rodilla, abriendo la cadera unos 30 grados.",
+      "Aprieta el glúteo medio un segundo arriba, con el pie apuntando al frente.",
+      "Baja despacio sin dejar que la pierna caiga sobre la de abajo.",
+      "No gires la pelvis: el movimiento sale de la cadera."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "side-lying-leg-raise",
+    "name": "Side-Lying Leg Raise",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate de lado en una línea recta, con la mano superior en el suelo para darte estabilidad.",
+      "Lleva la pierna superior extendida y alineada con la otra, sin doblarla.",
+      "Súbela unos cinco centímetros por encima de la horizontal.",
+      "Aprieta el oblicuo y el glúteo un segundo arriba.",
+      "Baja despacio hasta quedar justo por encima de la otra pierna.",
+      "Cambia de lado al terminar la serie."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "lying-hamstring-walkout",
+    "name": "Lying Hamstring Walkout",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con las piernas extendidas y los brazos hacia el techo.",
+      "Activa el abdomen y levanta la pelvis unos centímetros.",
+      "Lleva los brazos hacia las rodillas y después desliza las manos por el suelo hasta la posición de plancha.",
+      "Mantén la cadera alta y la espalda plana durante todo el recorrido.",
+      "Deshaz el camino hasta la posición inicial.",
+      "Baja la cadera solo al final, con control; si la espalda baja se pandea, acorta el recorrido."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "towel-hamstring-curl",
+    "name": "Towel Hamstring Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con una toalla pasada por ambos pies y sujeta los extremos con las manos.",
+      "Estira las piernas hasta que los talones toquen el suelo, con la espalda baja pegada al suelo.",
+      "Empuja con los talones arrastrando la toalla hacia los glúteos y doblando las rodillas.",
+      "Aprieta el isquiotibial un segundo arriba.",
+      "Baja despacio estirando las piernas sin despegar la zona lumbar del suelo.",
+      "Aquí lo difícil es la espalda baja, no los brazos: no añadas peso innecesario."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "stability-ball-hamstring-curl",
+    "name": "Stability Ball Hamstring Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con los talones apoyados en una pelota de estabilidad y las manos en el suelo a los lados.",
+      "Levanta la cadera formando una línea recta entre rodillas y hombros.",
+      "Lleva los talones hacia los glúteos rodando la bola por debajo de las piernas.",
+      "Aprieta los isquiotibiales un segundo arriba sin despegar la cadera.",
+      "Desenrolla la bola hacia delante para estirar las piernas, manteniendo la cadera alta.",
+      "Acorta el recorrido si la cadera empieza a caer."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "nordic-hamstring-curl",
+    "name": "Nordic Hamstring Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate boca abajo con las rodillas en el suelo y los pies bloqueados bajo algo pesado, o pide a alguien que te sujete los tobillos.",
+      "Activa el abdomen y el glúteo para mantener el cuerpo en línea recta desde la cabeza hasta las rodillas.",
+      "Baja muy despacio, contando al menos tres segundos, con el torso alineado.",
+      "Apoya las manos en el suelo solo si lo necesitas; cuanto menos apoyo, mejor.",
+      "Empuja con el pie delantero para volver a la posición inicial, sin impulso.",
+      "Es el ejercicio de isquiotibiales más pequeño y más duro: técnica impecable y pocas repeticiones."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "reverse-lunge",
+    "name": "Reverse Lunge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies a la anchura de la cadera y mancuernas a los lados.",
+      "Da un paso hacia atrás con una pierna y baja hasta que ambas rodillas estén a 90 grados.",
+      "Mantén el torso vertical y el peso sobre el talón del pie delantero.",
+      "Empuja desde el pie delantero para volver al inicio, sin impulso.",
+      "Alterna piernas o completa todas las repeticiones de un lado.",
+      "Si pierdes equilibrio al bajar, acorta el paso."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "deficit-reverse-lunge",
+    "name": "Deficit Reverse Lunge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate de pie sobre una caja baja de 10 a 20 cm, con los pies en la parte delantera.",
+      "Da un paso hacia atrás hasta el suelo y baja con control, sin golpear con el pie trasero.",
+      "La esquina de la caja añade un tramo extra en el rango final de la pierna delantera.",
+      "Empuja desde el talón del pie delantero para volver arriba.",
+      "Controla también la bajada: el peso nunca debe caer de golpe sobre la rodilla."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-lateral-lunge",
+    "name": "Dumbbell Lateral Lunge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "De pie con los pies paralelos y más separados que la cadera, mancuernas colgando.",
+      "Da un paso lateral y baja la cadera hacia ese lado, con el otro pie plantado y la punta mirando al frente.",
+      "Baja hasta que la cadera se aproxime a la rodilla flexionada, sin que esa rodilla pase de la punta del pie.",
+      "Empuja con el talón de la pierna flexionada para volver al centro.",
+      "Alterna lados o completa un lado entero.",
+      "Si te inclinas hacia el lado al bajar, el peso está mal repartido."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-curtsy-lunge",
+    "name": "Dumbbell Curtsy Lunge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies a la anchura de la cadera y mancuernas a los lados.",
+      "Da un paso cruzando por detrás de la pierna de apoyo, en diagonal.",
+      "Baja hasta que ambas rodillas estén cerca de 90 grados, con el torso ligeramente inclinado hacia delante.",
+      "Mantén la cadera baja y el peso en la pierna delantera.",
+      "Empuja con esa pierna para volver, sin impulso.",
+      "Cambia de pierna en cada serie."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "curtsy-lunge",
+    "name": "Curtsy Lunge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies a la anchura de la cadera, con las manos en la cintura o en el pecho.",
+      "Da un paso en diagonal hacia atrás, cruzando por detrás de la pierna de apoyo.",
+      "Baja el cuerpo hasta que la rodilla de apoyo quede cerca del suelo.",
+      "Empuja desde el pie delantero para volver a la posición de pie.",
+      "El trabajo es del glúteo de la pierna que da el paso; si lo sientes en el cuádriceps de apoyo, reduce la profundidad.",
+      "Alterna lados cada serie."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "shrimp-squat",
+    "name": "Shrimp Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie y sujétate a una barra o a una puerta para tener equilibrio.",
+      "Apoya el empeine del pie trasero en el suelo y dobla esa rodilla para sentarte encima.",
+      "La pierna de apoyo queda hacia delante, con el pie entero en el suelo.",
+      "Baja controlando el peso hasta que la rodilla trasera toque el suelo.",
+      "Sube empujando con el talón del pie delantero, sin apoyarte en la mano si puedes evitarlo.",
+      "Empieza sentándote en una silla: el objetivo es levantarte sin ayuda."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cossack-squat",
+    "name": "Cossack Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies muy separados y las puntas hacia fuera.",
+      "Extiende una pierna hacia un lado y flexiona la otra, bajando la cadera sobre la pierna flexionada.",
+      "Mantén el torso erguido; el pie extendido se queda apoyado solo en la punta.",
+      "Baja hasta donde controles: no hace falta llegar al suelo.",
+      "Empuja con el talón de la pierna flexionada para volver al centro.",
+      "Alterna lados cada serie."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "skater-squat",
+    "name": "Skater Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies a la anchura de la cadera y las manos al pecho.",
+      "Salta lateralmente a una pierna, flexionando la rodilla para amortiguar la recepción.",
+      "Salta desde esa pierna hacia el otro lado, sin tocar el suelo entre saltos.",
+      "Mantén el tronco erguido y las rodillas alineadas con los pies en cada recepción.",
+      "Aterriza suave en cada salto.",
+      "Si el impacto molesta las rodillas, hazlo sin salto: paso lateral y agacharse."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "single-leg-box-squat",
+    "name": "Single-Leg Box Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate de pie a un paso de una caja o escalón bajo, con el peso sobre una pierna.",
+      "Baja la otra rodilla hacia el suelo buscando la caja con el talón, sin sentarte del todo.",
+      "Mantén el torso erguido y la rodilla de apoyo apuntando a los dedos del pie.",
+      "Empuja con el talón para subir de nuevo, sin impulso.",
+      "Completa primero el lado menos fuerte antes de igualar."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "step-down",
+    "name": "Step-Down",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie sobre un escalón o caja con todo el pie apoyado y la rodilla casi extendida.",
+      "Levanta la rodilla de la otra pierna y baja despacio la punta del pie hacia el suelo.",
+      "Apoya el talón ligeramente y baja el peso hasta que el pie contrario toque el suelo.",
+      "Sube de nuevo apoyando el pie en el escalón.",
+      "El pie que baja solo apoya: el trabajo es de la pierna del escalón.",
+      "Usa un escalón bajo, de 15 a 20 cm, al principio."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-sumo-squat",
+    "name": "Dumbbell Sumo Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies bastante separados y las puntas hacia fuera, con la mancuerna colgando entre las piernas.",
+      "Baja llevando las rodillas en la misma dirección que las puntas de los pies.",
+      "Mantén el torso erguido y el abdomen firme.",
+      "Sube empujando con el talón de ambos pies y apretando los aductores al final.",
+      "Usa un peso que te permita mantener los talones pegados al suelo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-sumo-deadlift",
+    "name": "Dumbbell Sumo Deadlift",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies anchos y las puntas hacia fuera, con una mancuerna entre los pies.",
+      "Flexiona la cadera y la rodilla y agarra la mancuerna entre ambas manos.",
+      "Con la espalda neutra, empuja el suelo y estira la cadera hasta quedar de pie.",
+      "Aprieta los glúteos arriba manteniendo la mancuerna cerca del cuerpo.",
+      "Baja la mancuerna haciendo una sentadilla, sin arrastrar la espalda.",
+      "Suma peso solo si mantienes la postura con mancuernas ligeras."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "kettlebell-romanian-deadlift",
+    "name": "Kettlebell Romanian Deadlift",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies a la anchura de la cadera sujetando una pesa rusa con ambas manos.",
+      "Con la espalda neutra y las rodillas apenas flexionadas, empuja la cadera hacia atrás dejando bajar la pesa.",
+      "Baja hasta sentir el estiramiento en los isquiotibiales, con el peso rozando las piernas.",
+      "Mantén la columna neutra en todo el recorrido; si se redondea, sube menos.",
+      "Empuja con los talones para subir apretando los glúteos.",
+      "La bajada es la parte importante: tres segundos mínimo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "smith-machine-romanian-deadlift",
+    "name": "Smith Machine Romanian Deadlift",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie en la máquina Smith con la barra a la altura de las caderas y el agarre por fuera de los hombros.",
+      "Desbloquea la barra y flexiona la cadera hacia atrás, dejando bajar la barra por delante de las piernas.",
+      "Baja hasta sentir el estiramiento en los isquiotibiales manteniendo la espalda recta.",
+      "Empuja con los talones para subir apretando los glúteos.",
+      "Bloquea la barra al terminar la serie."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "landmine-squat",
+    "name": "Landmine Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Encaja un extremo de la barra en el landmine y apóyala en el hombro como si fuera una mancuerna larga.",
+      "Ponte de pie con los pies a la anchura de los hombros y las manos en la barra.",
+      "Baja en sentadilla manteniendo la barra alineada con la espalda.",
+      "Empuja con el suelo para subir, sin perder el contacto de la barra con el hombro.",
+      "El landmine limita el arco de la barra: más estable que una barra libre y más fácil de controlar."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "landmine-romanian-deadlift",
+    "name": "Landmine Romanian Deadlift",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Con la barra apoyada en el hombro, ponte de pie con los pies a la anchura de la cadera.",
+      "Flexiona la cadera hacia atrás dejando que la barra descienda por delante del cuerpo.",
+      "Baja hasta sentir el estiramiento en los isquiotibiales manteniendo la espalda neutra.",
+      "Empuja con los talones para volver a subir apretando los glúteos.",
+      "Controla la bajada en tres segundos."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "landmine-press",
+    "name": "Landmine Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Saca la barra del landmine con un disco pequeño y apóyala en el hombro, como en las prensas.",
+      "Ponte de pie con los pies a la anchura de los hombros y la mano libre en la barra.",
+      "Estira el brazo hacia arriba siguiendo la trayectoria de la barra.",
+      "Baja de forma controlada hasta devolver el disco al hombro.",
+      "No fuerces el bloqueo final: la extensión completa es opcional si incomoda el hombro.",
+      "Alterna lados cada serie."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "belt-squat",
+    "name": "Belt Squat",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate bajo un soporte tipo prensa y pásate la correa de la cadera por detrás.",
+      "Queda de pie con la espalda contra el respaldo, los pies hacia delante y las rodillas ligeramente flexionadas.",
+      "Quita los pasadores de seguridad del soporte antes de bajar el peso.",
+      "Baja hasta los 90 grados de rodilla manteniendo el torso erguido y los pies plantados.",
+      "Sube apretando los glúteos.",
+      "Es la variante más segura para la espalda baja: no hay carga axial sobre la columna."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "machine-glute-kickback",
+    "name": "Machine Glute Kickback",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en la máquina con el pecho contra el apoyo, una pierna en la plataforma y la otra en el apoyo móvil.",
+      "Alinea la cadera con el hombro: la rodilla debe quedar a unos 90 grados.",
+      "Extiende la cadera llevando la pierna hacia atrás hasta alinearla con el torso.",
+      "Aprieta el glúteo un segundo arriba, sin arquear la zona lumbar.",
+      "Vuelve llevando la rodilla al pecho de forma controlada.",
+      "Si la cadera se levanta, baja el peso."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cable-standing-hip-abduction",
+    "name": "Cable Standing Hip Abduction",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea baja y engancha la cinta al tobillo de una pierna, con el cable por detrás de esa pierna.",
+      "Ponte de pie sujetándote con una mano a una máquina para mantener el equilibrio, con el abdomen firme.",
+      "Lleva la pierna hacia un lado hasta alinearla con la cadera, sin inclinar el torso.",
+      "Aprieta el glúteo medio un segundo arriba.",
+      "Baja despacio hasta el punto de partida sin dejar caer la pierna.",
+      "Cambia de lado al terminar la serie."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "smith-machine-reverse-lunge",
+    "name": "Smith Machine Reverse Lunge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie en la máquina Smith con la barra apoyada en la espalda o los hombros.",
+      "Da un paso hacia atrás de un pie de distancia y baja hasta 90 grados de rodilla.",
+      "Mantén la rodilla delantera apuntando a los dedos del pie.",
+      "Empuja desde el pie delantero para volver.",
+      "La barra fija reduce el problema de equilibrio: ideal para centrarse en los cuádriceps."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "running",
+    "name": "Running",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Calienta cinco minutos caminando antes de empezar.",
+      "Mantén un ritmo cómodo en el que puedas hablar, en vez de esprintar desde el principio.",
+      "Alterna un minuto de trote suave con dos de caminata, método de los treinta minutos de Jeff Galloway.",
+      "Deja caer el pie por debajo del centro de gravedad y rueda desde el talón hasta los dedos.",
+      "Progresa aumentando la proporción de trote, no la intensidad.",
+      "Se registra como cardio por tiempo y distancia."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cycling",
+    "name": "Cycling",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ajusta el sillín a una altura en la que la rodilla quede ligeramente flexionada con el pedal abajo.",
+      "Empieza con una cadencia cómoda, entre 60 y 80 revoluciones por minuto, no con el máximo de fuerza.",
+      "Mantén el torso relajado y pedalea con las dos piernas al mismo ritmo.",
+      "Si cuesta subir, baja la resistencia: el peso está en las manos y las piernas solo giran.",
+      "Progresa con el tiempo o con la cadencia, no con la resistencia máxima.",
+      "Se registra como cardio por tiempo y distancia."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "rowing",
+    "name": "Rowing",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate en la máquina con las piernas extendidas y los pies sujetados en las correas.",
+      "Secuencia de la tirada: primero las piernas, luego el torso y al final los brazos.",
+      "Al volver, dobla primero las rodillas y después los brazos, manteniéndolos alineados.",
+      "Mantén las muñecas planas y la espalda neutra en todo el recorrido.",
+      "Ritmo recomendado: entre 20 y 24 tiradas por minuto.",
+      "Se registra como cardio por tiempo y distancia."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "stair-climber",
+    "name": "Stair Climber",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte los dos pies sobre los peldaños y sujeta el manillar para mantener el equilibrio.",
+      "Empieza despacio, sin forzar, a un ritmo en el que puedas hablar.",
+      "Empuja con la pierna de cada lado alternativamente, como al caminar.",
+      "Mantén las rodillas siguiendo la dirección de la escalera, sin dejarlas caer hacia dentro.",
+      "Sube la resistencia solo cuando el ritmo sea fácil.",
+      "Se registra como cardio por tiempo."
+    ],
+    "steps_en": []
+  }
+]

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 //
 // Lo que el usuario pidió en esta ronda:
 //  1. pasar el puntero por un músculo dice cómo se llama y qué ejercicio lo
@@ -42,7 +42,8 @@ const invoke = vi.fn(async (method: string, args?: unknown[]): Promise<unknown> 
 (window as unknown as { nv: unknown }).nv = { invoke };
 
 import { useExercise } from "../../store/exercise";
-import { Daily } from "./Daily";
+import { Overview } from "./Overview";
+import { todayIso } from "../../lib/tasks";
 import { ExerciseMonth, ExerciseWeek } from "./Grids";
 import { MuscleFocusCard } from "./MuscleFocus";
 
@@ -124,8 +125,12 @@ describe("enfoque muscular · el puntero", () => {
 });
 
 describe("enfoque muscular · en qué vistas", () => {
-  it("la diaria lo lleva al lado de los ejercicios", async () => {
-    const host = mount(<Daily onVideo={() => undefined} />);
+  it("la vista general lo lleva al lado de los ejercicios", async () => {
+    // Antes lo llevaba la pantalla «Diaria», que era una copia de la mitad
+    // inferior de Vista general. Ahora vive solo en Vista general.
+    const host = mount(
+      <Overview date={todayIso()} onDate={() => undefined} onGoProgram={() => undefined} />,
+    );
     await settle();
     expect(host.querySelector("[data-muscle-focus]")).not.toBeNull();
   });

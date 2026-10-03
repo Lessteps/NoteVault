@@ -1,0 +1,364 @@
+[
+  {
+    "slug": "bench-press",
+    "name": "Bench Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate en el banco plano con la planta de los pies bien apoyadas en el suelo, a la anchura de la cadera o algo más.",
+      "Retrae y deprime los omóplatos contra el respaldo: así el pecho sale del banco y el hombro queda estable.",
+      "Sujeta la barra con un agarre ligeramente más ancho que los hombros, por encima de los pezones.",
+      "Saca la barra del soporte extendiendo los codos hacia los pies y llévala sobre las muñecas.",
+      "Baja la barra controlando hacia la parte baja del pecho, con los codos a unos 45 grados del torso, no abiertos a 90.",
+      "Toca el pecho de forma suave y empuja hacia arriba sin perder la retracción escapular.",
+      "Bloquea los codos arriba sin dejarlos hiperextendidos, y vuelve a bajar de forma controlada.",
+      "Si la placa es un problema para sujetar la barra, haz que alguien te la pase o pídesela al lado; no bajes la barra sobre la cabeza."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "incline-bench-press",
+    "name": "Incline Bench Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ajusta el respaldo a unos 30 grados. Entre 15 y 30 trabaja más el pectoral clavicular; a 45 y más, el hombro domina.",
+      "Siéntate, apoya la espalda contra el respaldo y tira de la barra del soporte con un agarre algo más ancho que los hombros.",
+      "Lleva la barra hacia la parte alta del pecho, por debajo de la clavícula.",
+      "Baja de forma controlada, con los codos a unos 45 grados y ligeramente por delante del torso para no forzar el hombro.",
+      "Empuja hacia arriba hasta extender los codos sin bloquearlos.",
+      "Si el pecho inferior se queda sin trabajo, estás bajando demasiado: baja a la mitad del pecho, no al abdomen.",
+      "Empieza con menos peso que en el press plano: el ángulo trabaja con menos recorrido seguro."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-bench-press",
+    "name": "Dumbbell Bench Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en el banco plano con las mancuernas apoyadas en los muslos y la espalda recta.",
+      "Tumbate hacia atrás usando el impulso de las piernas, extendiendo las mancuernas hacia arriba al tumbarte.",
+      "Coloca las mancuernas sobre las costillas bajas, con las muñecas rectas sobre los codos.",
+      "Baja las mancuernas hacia los lados del pecho controlando el movimiento, con los codos a unos 45 grados.",
+      "Empuja hacia arriba hasta extender los brazos, sin juntar las mancuernas entre sí.",
+      "El rango seguro depende de la caja de los hombros: baja hasta donde no notes molestia en el hombro.",
+      "Apoya las mancuernas en los muslos para sentarte y devolverlas sinbalanceos."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "incline-dumbbell-press",
+    "name": "Incline Dumbbell Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca el respaldo a unos 30 grados y siéntate con las mancuernas sobre los muslos.",
+      "Tumbate hacia atrás con las mancuernas extendidas hacia arriba y apóyalas en la parte alta del pecho.",
+      "Baja controlando hasta la altura de las nipples o un poco más, con los codos a unos 45 grados.",
+      "Empuja hacia arriba hasta extender los codos sin bloquearlos.",
+      "Apoya las mancuernas en los muslos para volver a sentarte.",
+      "Igual que en el press inclinado de barra, empieza con menos carga que en el plano."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "decline-bench-press",
+    "name": "Decline Bench Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca el respaldo en negativo, entre 15 y 30 grados, con los pies apoyados y algo elevados para fijar la posición.",
+      "Sujeta la barra y saca del soporte llevándola sobre las muñecas, con los codos ligeramente flexionados.",
+      "Baja la barra hasta la parte inferior del pecho, rozando el torso sin atravesar el banco.",
+      "Empuja hacia arriba hasta extender los codos sin hiperextenderlos.",
+      "Menos recorrido, más peso en el tríceps y en la parte baja del pectoral: no necesitas cargar tanto.",
+      "Para terminar, levanta un poco el torso y ayúdala a volver al soporte sin tirarla."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "decline-dumbbell-press",
+    "name": "Decline Dumbbell Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Tumbate en el banco ligeramente inclinado hacia abajo, con los pies apoyados en el suelo.",
+      "Coloca las mancuernas a la altura de las costillas bajas, con las muñecas rectas.",
+      "Baja las mancuernas hacia el pecho controlando el movimiento y sintiendo el estiramiento.",
+      "Empuja hacia arriba hasta extender los brazos sin bloquear los codos.",
+      "Usa un recorrido más corto que en el press plano: la inclinación ya aporta la LINE.",
+      "Devuelve las mancuernas a los muslos antes de sentarte."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "machine-chest-press",
+    "name": "Machine Chest Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ajusta el asiento para que los agarres queden a la altura media del pecho, no por debajo del ombligo.",
+      "Apoya la espalda contra el respaldo, con las escápulas apoyadas y los pies bien plantados en el suelo.",
+      "Sujeta los agarres con las palmas enfrentadas y las muñecas rectas.",
+      "Empuja hacia delante hasta extender los codos sin bloquearlos, apretando los pectorales un segundo.",
+      "Vuelve de forma controlada hasta que los codos queden por detrás de la línea del torso.",
+      "El recorrido lo marca la máquina: no te veas obligado a ir al tope si el hombro molesta."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "smith-machine-bench-press",
+    "name": "Smith Machine Bench Press",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca el banco en horizontal y sube a la barra hasta que puedas alargar los brazos hacia ella.",
+      "Tumbate y alinea la barra sobre las muñecas, con un agarre algo más ancho que los hombros.",
+      "Desbloquea la barra y bájala hasta la parte baja del pecho, con los codos a unos 45 grados.",
+      "Empuja hacia arriba hasta extender los codos sin bloquearlos.",
+      "Bloquea la barra arriba antes de sentarte.",
+      "La barra va por un raíl fijo: es más estable, pero el rango puede ser más corto que el de una barra libre."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cable-fly",
+    "name": "Cable Fly",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca las poleas por encima de la cabeza y sujeta un extremo en cada mano.",
+      "Da un paso adelante y estira los brazos hacia delante, con las manos ligeramente por encima y al lado.",
+      "Con los codos ligeramente flexionados, junta las manos siguiendo un arco hasta que se crucen delante del pecho.",
+      "Aprieta el pectoral un segundo con los codos casi fijos.",
+      "Vuelve abriendo de forma controlada, dejando que el pecho se estire.",
+      "Los codos nunca deben llegar a bloquearse ni a abrirse: el movimiento es de aducción del hombro, no de flexión."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "incline-cable-fly",
+    "name": "Incline Cable Fly",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Sitúa la máquina con los respaldos a unos 30 grados de inclinación y apóyate en el respaldo.",
+      "Con los pies bien apoyados, sujeta los agarres a la altura del pecho alto.",
+      "Junta las manos siguiendo un arco con los codos ligeramente flexionados.",
+      "Aprieta la parte alta del pectoral un segundo arriba.",
+      "Abre de forma controlada dejando que el pecho se estire.",
+      "Si la caja del hombro limita el recorrido, baja la altura de los agarres."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-fly",
+    "name": "Dumbbell Fly",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate en el banco plano con dos mancuernas lightly pinzadas entre el pulgar y el índice.",
+      "Lleva las mancuernas sobre las costillas bajas con los brazos casi verticales y los codos apenas flexionados.",
+      "Abre los brazos hacia los lados describiendo un arco, bajando hasta el nivel del pecho.",
+      "Vuelve a juntar las mancuernas sin dejar que se toquen, apretando el pectoral.",
+      "Con mancuernas, el rango se acorta rápido: si notas tirantez en el hombro, reduce la apertura.",
+      "Para muchos es más cómodo hacerlo en un banco inclinado ligeramente."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "push-up",
+    "name": "Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en plancha con las manos algo más anchas que los hombros y el cuerpo en línea recta desde la cabeza hasta los talones.",
+      "Aprieta el abdomen y los glúteos para que la cadera no se hunda.",
+      "Baja el pecho hasta casi tocar el suelo, con los codos a unos 45 grados del torso.",
+      "Empuja hacia arriba hasta extender los brazos, sin bloquear los codos ni dejar caer las caderas.",
+      "Mantén la cabeza en línea con el tronco: no mires al frente ni hundas el cuello.",
+      "Si te cuesta la alineación, hazlas con las manos en una superficie más alta para reducir la carga."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "weighted-push-up",
+    "name": "Weighted Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Haz una flexión normal y coloca la carga sobre la parte alta de la espalda, lejos del cuello.",
+      "Usa una superficie firme y cúbrela con una toalla si es rugosa.",
+      "Mantén el cuerpo en línea recta y el abdomen apretado durante todo el movimiento.",
+      "Baja el pecho controlando, con los codos a unos 45 grados.",
+      "Empuja hasta extender sin bloquear los codos.",
+      "Si la línea del cuerpo se rompe, la carga es demasiado alta: quítala."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "incline-push-up",
+    "name": "Incline Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Apoya las manos en una superficie elevada y firme: banco, mesa baja o pared.",
+      "Cuanto más alta sea la superficie, más fácil será el ejercicio y menos peso trabajarás.",
+      "Colócate en línea recta de la cabeza a los talones, con el abdomen apretado.",
+      "Baja el pecho hacia la superficie hasta donde controles, con los codos a unos 45 grados.",
+      "Empuja hasta extender los brazos.",
+      "Es el regresor natural cuando todavía no puedes hacer flexiones en el suelo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "wall-push-up",
+    "name": "Wall Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate frente a una pared con las manos apoyadas a la altura de los hombros y los pies algo retranqueados.",
+      "Cuanto más lejos de la pared pongas los pies, más difícil será.",
+      "Mantén el cuerpo en una línea recta, con el abdomen y los glúteos apretados.",
+      "Baja el pecho hacia la pared hasta acercar los hombros a ella.",
+      "Empuja de vuelta hasta extender los brazos.",
+      "Útil para empezar o como regreso tras una lesión: es la versión de menor carga de la flexión."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "decline-push-up",
+    "name": "Decline Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca los pies sobre un banco o una caja firme, a la altura de la cadera, y apoya las manos en el suelo.",
+      "Cuanto más alto el banco, más carga sobre el pecho y los hombros.",
+      "Mantén el cuerpo en línea recta desde los talones hasta la cabeza, con el abdomen apretado.",
+      "Baja el pecho hacia el suelo controlando, con los codos a unos 45 grados.",
+      "Empuja hasta extender los brazos sin bloquear los codos.",
+      "Si la cadera se hunde o sube, sobra banco: baja los pies."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "wide-push-up",
+    "name": "Wide Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca las manos bastante más abiertas que los hombros, con las palmas ligeramente giradas hacia fuera.",
+      "Mantén el cuerpo en línea recta y el abdomen apretado.",
+      "Baja el pecho con los codos algo más abiertos que en una flexión normal.",
+      "Empuja hasta extender los brazos.",
+      "Este ancho reduce la profundidad del movimiento, así que es más fácil que la versión normal: úsala como progresión."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "archer-push-up",
+    "name": "Archer Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca las manos más anchas que los hombros y los pies algo retranqueados para tener estabilidad.",
+      "Baja el pecho hasta el nivel más bajo, pasando cerca de la mano de apoyo principal.",
+      "Con el brazo dominante haz el empuje completo; el otro brazo queda extendido, pero sin llegar al tope si eso rompe la línea.",
+      "Vuelve al centro y repite, alternando el lado cada vez.",
+      "Si no llegas a la posición baja, haz el primer tramo y colócate en esa posición sin subir más.",
+      "Es una progresión directa hacia las flexiones con una sola mano."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "hindu-push-up",
+    "name": "Hindu Push-up",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte en pike con las manos en el suelo algo más abiertas que los hombros y los pies hacia atrás.",
+      "Baja el pecho casi rozando una mano, pasando la cabeza cerca del suelo.",
+      "Empuja y, al subir, lleva la cadera sobre las manos para llegar a la pike con un salto corto.",
+      "El salto de cadera es opcional al principio: basta con subir empujando.",
+      "Mantén los codos cerca del torso para no cargar los hombros.",
+      "Es una combinación de fuerza de hombro y cardio; auméntala poco a poco."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "chest-dip",
+    "name": "Chest Dip",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en las barras paralelas con los brazos extendidos y el cuerpo vertical, con los pies ligeramente hacia atrás.",
+      "Lleva el cuerpo hacia abajo flexionando los codos hacia atrás, con los codos a unos 45 grados del torso.",
+      "Baja hasta un ángulo de brazos de unos 90 grados, sintiendo el estiramiento en el pecho y el tríceps.",
+      "Empuja hacia arriba hasta extender los codos sin bloquearlos.",
+      "Cuanto más verticales los pies, más peso sobre el pecho y menos sobre el tríceps.",
+      "Si notas molestia en el hombro al bajar, no bajes más de lo que controle: la profundidad se gana con la movilidad del hombro, no forzando."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dip",
+    "name": "Dip",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en las barras paralelas con los brazos extendidos y el torso ligeramente inclinado hacia delante.",
+      "Baja flexionando los codos hacia atrás, con el torso cerca de la vertical.",
+      "Empuja hasta extender los codos sin bloquearlos.",
+      "El torso inclinado hacia delante y los pies atrás cargan más el pecho; vertical y con las piernas atrás, más el tríceps.",
+      "Si los hombros molestan, reduce el recorrido o haz primero flexiones."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "assisted-dip",
+    "name": "Assisted Dip",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en las barras de las paralelas usando el peso de la máquina como asistencia.",
+      "Deja que la máquina te sostenga una parte del peso al subir y te frene al bajar.",
+      "Baja hasta donde controles sin que el peso te empuje de forma brusca.",
+      "Empuja hacia arriba con la ayuda mínima que necesites.",
+      "A medida que controles, sube el peso de la asistencia.",
+      "Se usa para aprender el patrón antes de las paralelas libres."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "weighted-dip",
+    "name": "Weighted Dip",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca un cinto de peso con discos entre las piernas, bien ajustado y sin holgura.",
+      "Con las piernas juntas, para no balancearte, sujeta al soporte si es posible, cuélgate de las barras con los brazos extendidos.",
+      "Baja hasta un ángulo de brazos de unos 90 grados, con los codos hacia atrás.",
+      "Empuja hasta extender los codos sin bloquearlos.",
+      "Empieza con muy poco peso: las paralelas perdonan mucho hasta que dejan de perdonar nada.",
+      "Si el hombro protesta, baja el peso y el recorrido."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "bench-dip",
+    "name": "Bench Dip",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en el borde de un banco y agarra el borde justo por fuera de las caderas.",
+      "Desliza las piernas hacia delante dejando los talones en el suelo, o en el aire si dominas el ejercicio.",
+      "Con los codos hacia atrás, baja la cadera hasta un ángulo de brazos de unos 90 grados.",
+      "Empuja hasta extender los codos sin bloquearlos.",
+      "Los pies cerca de la banca hacen el ejercicio mucho más fácil que los pies alejados.",
+      "Mantén las muñecas rectas y no te deslices hacia delante con los hombros."
+    ],
+    "steps_en": []
+  }
+]

@@ -64,7 +64,7 @@ export function Ring({
 }
 
 /** The four dashboards, in the order of the periods. */
-export function PeriodRings({ compact }: { compact?: boolean }) {
+export function PeriodRings() {
   const stats = useExercise((s) => s.stats);
   const rings = [
     { label: "Hoy", value: stats?.today.pct ?? 0, sub: stats ? `${stats.today.done}/${stats.today.total}` : undefined },
@@ -73,15 +73,19 @@ export function PeriodRings({ compact }: { compact?: boolean }) {
     { label: "Año", value: stats?.anual.pct ?? 0, sub: stats ? `${stats.anual.trained}/${stats.anual.due} días` : undefined },
   ];
   return (
-    <div className={compact ? "grid grid-cols-4 gap-2" : "grid grid-cols-2 gap-4 sm:grid-cols-4"}>
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
       {rings.map((r) => (
-        <Ring key={r.label} value={r.value} label={r.label} sub={r.sub} size={compact ? 62 : 104} thickness={compact ? 7 : 10} />
+        <Ring key={r.label} value={r.value} label={r.label} sub={r.sub} size={104} thickness={10} />
       ))}
     </div>
   );
 }
 
 /** The streak, with the best one of the year for context. */
+/**
+ * La racha. `compact` sí lo usa alguien —`SideStats`, el panel del sidebar— y
+ * por eso se queda; el de `PeriodRings` no lo recibía nadie y se fue.
+ */
 export function StreakLine({ compact }: { compact?: boolean }) {
   const stats = useExercise((s) => s.stats);
   const current = stats?.streak.current ?? 0;

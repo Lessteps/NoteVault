@@ -1,4 +1,4 @@
-import * as path from "node:path";
+﻿import * as path from "node:path";
 import { addDays, todayIso, weekday } from "../../core/dates.js";
 import { ApiError } from "../../core/errors.js";
 import {
@@ -6,6 +6,8 @@ import {
   VIDEO_EXTS,
 } from "../../core/exerciseManager.js";
 import { normalizeMuscles } from "../../core/exerciseMuscles.js";
+import { exercises as CATALOG } from "@bryllim/workout-guide";
+import { normalizeLibraryName, type LibraryUserEntry } from "../../lib/libraryTypes.js";
 import type { AppState } from "../appState.js";
 import { clampInt, oneLine, optDate } from "../common.js";
 import { MediaServer } from "../media.js";
@@ -65,6 +67,8 @@ function exDict(mgr: ExerciseManager, e: Record<string, any>): Record<string, un
     has_video: videoFile !== null,
     video_name: videoFile ? path.basename(videoFile) : "",
     muscles: normalizeMuscles(e.muscles),
+    source: e.source || "",
+    sourceFp: e.sourceFp || "",
   };
 }
 
@@ -88,7 +92,15 @@ function exFields(fields: unknown) {
   }
   return {
     day,
-    name: oneLine(f.name, 120) || "Ejercicio",
+    // De qué entrada de la biblioteca salió esta copia, si salió de alguna.
+    // Vacío = escrito a mano, que es la respuesta a «¿esto es de la Biblioteca?».
+    source: oneLine(f.source, 120),
+    // Huella de lo que se copió; la Task 6 la compara para avisar de copias viejas.
+    sourceFp: oneLine(f.sourceFp, 40),
+    // Sin defecto aquí: quien llama decide. En una edición, el nombre que no
+    // viene se recupera del ejercicio que ya existe —si no, retocar las series
+    // renombraba el ejercicio a «Ejercicio» y se perdía el nombre.
+    name: oneLine(f.name, 120),
     video_path: videoPath,
     series_reps: oneLine(f.series_reps, 120),
     rest: oneLine(f.rest, 60),
@@ -109,8 +121,26 @@ function openWithSystem(filePath: string): void {
   }
 }
 
+/**
+ * `nombre normalizado -> slug` del catálogo de 302.
+ *
+ * Se lee del paquete directamente y **no** de `lib/exerciseLibrary.ts`: ese
+ * fichero es del renderer y arrastrarlo aquí se traería el mapa corporal y sus
+ * dependencias al proceso de Electron sin necesitar nada de eso.
+ *
+ * Se cachea: son 302 nombres y se consulta en cada guardado.
+ */
+let catalogIndex: Map<string, string> | null = null;
+function catalogSlugByName(): Map<string, string> {
+  if (!catalogIndex) {
+    catalogIndex = new Map(CATALOG.map((e) => [normalizeLibraryName(e.name), e.slug]));
+  }
+  return catalogIndex;
+}
+
 export function exerciseApi(app: AppState) {
   const mgr = () => app.mgrs().exercise;
+  const lib = () => app.mgrs().library;
   let media: MediaServer | null = null;
   const server = (): MediaServer => (media ??= new MediaServer());
 
@@ -131,7 +161,7 @@ export function exerciseApi(app: AppState) {
     const hit = m.resolveVideo(e);
     if (!hit) {
       throw new ApiError(
-        "No se encontró el video. Vincúlalo en «Gestionar ejercicios»."
+        "No se encontró el video. Vincúlalo en «Ejercicios · Tu programa»."
       );
     }
     const ext = path.extname(hit).toLowerCase();
@@ -219,9 +249,124 @@ export function exerciseApi(app: AppState) {
       return { ok: true, pct: m.dayPct(d) };
     },
 
+    ex_library_list(): LibraryUserEntry[] {
+      return lib().entries();
+    },
+
+    /**
+     * Guarda en la biblioteca propia.
+     *
+     * Si el nombre ya existe —en tus entradas o en el catálogo— **edita esa**,
+     * no crea otra. Esa es la garantía: no hay ruta en el código que produzca
+     * un duplicado. Si el nombre viene del catálogo, la entrada propia se crea
+     * con **su** slug, y en la biblioteca sigue habiendo un solo bench-press.
+     *
+     * Solo se escriben los campos que llegan con contenido: uno vacío
+     * significa «déjalo como estaba», no «bórralo».
+     */
+    ex_library_save(fields: unknown) {
+      const f = (fields ?? {}) as Record<string, unknown>;
+      const name = oneLine(f.name, 120);
+      if (!name) {
+        throw new ApiError("El ejercicio necesita un nombre.");
+      }
+      const howTo = String(f.how_to || "").slice(0, 4000).trim();
+      const equipment = oneLine(f.equipment, 60);
+      const muscles = normalizeMuscles(f.muscles);
+
+      const store = lib();
+      const entries = store.entries();
+      const key = normalizeLibraryName(name);
+
+      // Qué entrada se está editando, en este orden:
+      //
+      // 1. La que dice la interfaz (`slug`). Es lo que hace que **renombrar**
+      //    edite en vez de crear: sin esto, Bench Press renombrado a Press banca
+      //    dejaba la entrada vieja con los mismos pasos, y el duplicado que el
+      //    spec dice imposible aparecía solo.
+      // 2. Una propia con el mismo nombre, por si no se pasó slug.
+      // 3. Una del catálogo con el mismo nombre: se crea una entrada propia con
+      //    **su** slug, y así sigue habiendo un solo bench-press.
+      const slug = oneLine(f.slug, 120);
+      const porSlug = slug ? entries.find((e) => e.slug === slug) ?? null : null;
+      const propia = porSlug ?? entries.find((e) => normalizeLibraryName(e.name) === key) ?? null;
+      // El slug del catálogo se busca **siempre**, no solo cuando no hay entrada
+      // propia: si estás editando «Mi press» y le pones el nombre de una del
+      // catálogo, hay que adoptar su slug. Si no, la entrada se queda con el
+      // suyo, se apila encima de la del catálogo y aparecen dos ejercicios con
+      // el mismo nombre.
+      const slugDelCatalogo = catalogSlugByName().get(key) ?? null;
+      // Y solo se hereda de la entrada propia si su nombre no ha cambiado.
+      const mismaPropia =
+        propia && normalizeLibraryName(propia.name) === key ? propia : null;
+      const actual: LibraryUserEntry | null =
+        mismaPropia ??
+        (slugDelCatalogo
+          ? {
+              slug: slugDelCatalogo,
+              name,
+              equipment: "",
+              muscles: { primary: [], secondary: [] },
+              how_to: "",
+            }
+          : propia);
+
+      // Un campo llega si trae algo; si no, se conserva el que había.
+      const next: LibraryUserEntry = {
+        // Renombrar **no** cambia el slug: el ejercicio sigue siendo el mismo.
+        slug: actual?.slug ?? `mia-${Math.random().toString(36).slice(2, 10)}`,
+        name,
+        equipment: equipment || actual?.equipment || "",
+        muscles: muscles.primary.length || muscles.secondary.length
+          ? { primary: muscles.primary, secondary: muscles.secondary }
+          : actual?.muscles ?? { primary: [], secondary: [] },
+        how_to: howTo || actual?.how_to || "",
+      };
+
+      // Se van dos: la que tenía el slug nuevo y **la que se estaba editando**, si al
+      // renombrar cambió de slug (de `mia-x` al del catálogo). Sin la segunda, la
+      // vieja se quedaba ahí con los mismos pasos.
+      const resto = entries.filter(
+        (e) => e.slug !== next.slug && e.slug !== propia?.slug,
+      );
+      const zajada = resto.find((e) => normalizeLibraryName(e.name) === key);
+      // Si el nombre venía del catálogo y no has cambiado ni un campo tuyo, no hay
+      // nada que guardar: escribir una entrada que solo espeja el catálogo deja
+      // ruido en el fichero sin cambiar lo que se ve. Una entrada **nueva** con
+      // todos los campos vacíos sí se guarda: es tuya, aunque la llames igual
+      // que una del catálogo.
+      const espejoDelCatalogo =
+        slugDelCatalogo !== null &&
+        !next.how_to &&
+        !next.equipment &&
+        !next.muscles.primary.length &&
+        !next.muscles.secondary.length;
+      if (!espejoDelCatalogo) {
+        store.save(zajada ? [...resto.filter((e) => e.slug !== zajada.slug), next] : [...resto, next]);
+      }
+      // `wrote` dice si de verdad se guardó algo. Sin esto, guardar el nombre de
+      // una entrada del catálogo sin tocar ningún campo devolvía un éxito que
+      // nunca pasó por el disco, y la interfaz lo confirmaba con un ✓.
+      return { entry: next, wrote: !espejoDelCatalogo, created: !actual, updatedFrom: actual?.slug };
+    },
+
+    /**
+     * Quita una entrada **de tu fichero**, que es lo único que hay que quitar:
+     * el catálogo de 302 no se borra porque no está en el fichero. Si lo que
+     * quitaste era una edición de una entrada del catálogo, esto es también el
+     * botón de «deshacer» y el catálogo vuelve a mandar.
+     */
+    ex_library_remove(slug: string): boolean {
+      const s = String(slug ?? "");
+      const store = lib();
+      const entries = store.entries();
+      if (!entries.some((e) => e.slug === s)) return false;
+      store.save(entries.filter((e) => e.slug !== s));
+      return true;
+    },
+
     ex_overview(year = 0, exerciseId = "") {
-      const m = mgr();
-      const today = new Date();
+      const m = mgr();      const today = new Date();
       const y = clampInt(
         year || today.getFullYear(),
         1970,
@@ -383,7 +528,7 @@ export function exerciseApi(app: AppState) {
       const m = mgr();
       if (!exerciseId) {
         const e = m.addExercise(
-          f.name,
+          f.name || "Ejercicio",
           f.day,
           f.video_path,
           f.series_reps,
@@ -394,12 +539,24 @@ export function exerciseApi(app: AppState) {
         if (f.muscles.primary.length || f.muscles.secondary.length) {
           m.updateExercise(String(e.id), { muscles: f.muscles });
         }
+        // Y el origen, cuando la copia viene de la biblioteca.
+        if (f.source || f.sourceFp) {
+          m.updateExercise(String(e.id), { source: f.source, sourceFp: f.sourceFp });
+        }
         return exDict(m, m.exercises().find((x) => x.id === e.id)!);
       }
       if (!m.exercises().some((e) => e.id === exerciseId)) {
         throw new ApiError("Ese ejercicio ya no existe.");
       }
-      const updates: Record<string, any> = { ...f };
+      // **Solo** los campos que vienen de verdad en la petición. `exFields`
+      // rellena con "" los que faltan, y extenderlos todos sobre el registro
+      // borraba lo que no se había mandado: actualizar las instrucciones desde
+      // la biblioteca se llevaba por delante tus series y tu descanso.
+      const raw = (fields ?? {}) as Record<string, unknown>;
+      const updates: Record<string, any> = {};
+      for (const key of Object.keys(raw)) {
+        if (key in f) updates[key] = (f as Record<string, unknown>)[key];
+      }
       if (f.video_path) {
         updates.video = path.basename(f.video_path);
       }

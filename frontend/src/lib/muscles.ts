@@ -215,7 +215,10 @@ export const LEGACY_TO_GRANULAR: Record<string, string[]> = {
   "lower-back": ["lower-back"],
   glutes: ["glutes-max", "glutes-med"],
   hamstrings: ["hamstrings-biceps-femris", "hamstrings-semi"],
-  abductors: ["abductors"],
+  // El asset no tiene forma de abductor. El glúteo medio es el abductor de la
+  // cadera, así que es lo más cerca que se puede dibujar. Sin esta línea,
+  // elegir abductores no encendía nada y la app no decía nada.
+  abductors: ["glutes-med"],
   calves: ["calves-gastrocnemius", "soleus"],
 };
 

@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import { BODY_BACK_SHAPES, BODY_FRONT_SHAPES } from "./bodyAsset";
+import { LEGACY_TO_GRANULAR } from "./muscles";
 import {
-  MUSCLE_ALIAS, NON_INTERACTIVE, SHAPE_MUSCLE, mappingProblems, musclesWithShapes, resolveMuscle,
+  MUSCLE_ALIAS, NON_INTERACTIVE, SHAPE_MUSCLE, mappingProblems, musclesWithShapes,
   shapeMuscle, shapesForMuscle, unassignedShapes,
 } from "./bodyMuscleMap";
 
@@ -37,9 +38,18 @@ describe("mapa de formas → músculos", () => {
     expect(nonInteractive + mapped).toBe(total);
   });
 
+  // Un músculo de la lista revisada está «cubierto» si el asset dibuja su forma, o
+  // si algún puente lo manda a una forma que sí se dibuja. Hay dos puentes y
+  // ambos cuentan: `MUSCLE_ALIAS` para el vocabulario del catálogo y
+  // `LEGACY_TO_GRANULAR` para el tuyo, que es el que usa el mapa de verdad.
+  const cubiertos = (id: string, drawn: Set<string>) =>
+    drawn.has(id) ||
+    Boolean(MUSCLE_ALIAS[id]) ||
+    Boolean(LEGACY_TO_GRANULAR[id]);
+
   it("cada músculo de la lista revisada se puede pintar: forma propia o alias declarado", () => {
     const drawn = new Set(musclesWithShapes().map((m) => m.id));
-    const missing = REVIEW_IDS.filter((id) => !drawn.has(id) && !MUSCLE_ALIAS[id]);
+    const missing = REVIEW_IDS.filter((id) => !cubiertos(id, drawn));
     expect(missing).toEqual([]);
     // Y el alias apunta siempre a algo que sí existe.
     for (const [gap, target] of Object.entries(MUSCLE_ALIAS)) {
@@ -48,12 +58,24 @@ describe("mapa de formas → músculos", () => {
     }
   });
 
-  it("los huecos declarados son exactamente siete, ninguno inventado", () => {
+  it("estos siete músculos no tienen forma propia, y todos están cubiertos", () => {
+    // La lista de los que no se dibujan tal cual. El test de arriba comprueba que
+    // no queda ninguno sin cubrir; este fija cuáles son, para que un cambio en el
+    // asset se note.
+    //
+    // `abductors` está en la lista porque el asset no tiene forma de abductor, y
+    // eso **no** es un hueco: se pinta con el glúteo medio desde
+    // `LEGACY_TO_GRANULAR`. Antes estaba además en `MUSCLE_ALIAS`, que era una
+    // segunda fuente de verdad, y `resolveMuscle()` —la única función que leía
+    // esa tabla— no la usaba nadie.
     const drawn = new Set(musclesWithShapes().map((m) => m.id));
     expect(REVIEW_IDS.filter((id) => !drawn.has(id)).sort()).toEqual([
-      "abductors", "brachialis", "calves-front", "quads-vastus-lateralis", "quads-vastus-medialis",
-      "rotator-cuff", "teres",
+      "abductors", "brachialis", "calves-front", "quads-vastus-lateralis",
+      "quads-vastus-medialis", "rotator-cuff", "teres",
     ]);
+    for (const id of REVIEW_IDS.filter((x) => !drawn.has(x))) {
+      expect(cubiertos(id, drawn)).toBe(true);
+    }
   });
 
   it("las piernas están presentes y separables en la vista donde se ven", () => {
@@ -82,9 +104,13 @@ describe("mapa de formas → músculos", () => {
     expect(shapeMuscle("front", "chest-upper-left")).toBe("pectoral-upper");
   });
 
-  it("resuelve los alias hacia una forma real", () => {
-    expect(resolveMuscle("abductors")).toBe("glutes-med");
-    expect(resolveMuscle("quads-vastus-lateralis")).toBe("quads-rectus-femoris");
-    expect(resolveMuscle("biceps")).toBe("biceps");
+  it("cada alias apunta a un músculo que el asset dibuja", () => {
+    // La tabla en sí no enciende nada —eso lo hace `expandMuscles` en
+    // `muscles.ts`. Lo que sí tiene que cumplirse es que ningún alias apunte al
+    // vacío: apuntaría a un músculo que nadie dibujaría.
+    const huerfanos = Object.entries(MUSCLE_ALIAS).filter(
+      ([, target]) => !shapesForMuscle(target).length,
+    );
+    expect(huerfanos).toEqual([]);
   });
 });

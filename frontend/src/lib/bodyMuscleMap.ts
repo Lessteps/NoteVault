@@ -119,8 +119,12 @@ export const SHAPE_MUSCLE: Record<BodyView, Record<string, string>> = {
 };
 
 /**
- * Muscle ids with no shape of their own. Lighting these paints the shape on the
- * right: a declared compromise, reported as a gap in the review table.
+ * Muscle ids **del catálogo** con no forma propia. Se declara por qué se enciende
+ * otra: es un compromiso dicho, no un fallo silencioso.
+ *
+ * Ojo al vocabulario: estas claves vienen de `primaryMuscle` del catálogo, no de
+ * `muscles.ts`. Para los músculos que tú eliges en el selector, el puente es
+ * `LEGACY_TO_GRANULAR` en `muscles.ts`, que es lo que usa el mapa.
  */
 export const MUSCLE_ALIAS: Record<string, string> = {
   "brachialis": "biceps",              // sits under the biceps in this figure
@@ -129,7 +133,6 @@ export const MUSCLE_ALIAS: Record<string, string> = {
   "calves-front": "tibialis",          // anterior lower leg
   "rotator-cuff": "deltoid-rear",      // nearest shape drawn
   "teres": "lats",                     // nearest shape drawn
-  "abductors": "glutes-med",           // the medius is the hip abductor
 };
 
 const FRONT_IDS = new Set(BODY_FRONT_SHAPES.map((s) => s.id));
@@ -182,15 +185,6 @@ export function musclesWithShapes(): Array<{ id: string; shapes: number }> {
     }
   }
   return [...count.entries()].map(([id, shapes]) => ({ id, shapes })).sort((a, b) => a.id.localeCompare(b.id));
-}
-
-export function hasShape(muscleId: string): boolean {
-  return musclesWithShapes().some((m) => m.id === muscleId);
-}
-
-/** The id an exercise should light up: itself, or its declared alias. */
-export function resolveMuscle(muscleId: string): string {
-  return MUSCLE_ALIAS[muscleId] ?? muscleId;
 }
 
 /** Distinct colour per muscle, stable across renders (golden-angle hues). */

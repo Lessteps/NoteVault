@@ -58,3 +58,14 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/coverage/
 *.tsbuildinfo
+
+# -- Git worktrees (local only)
+.worktrees/
+
+# -- Scratch de ejecucion de planes (ledger, briefs, review packages)
+.superpowers/
+
+
+# -- Workout-guide assets (se regeneran con postinstall)
+frontend/public/workout-guide-assets/
+

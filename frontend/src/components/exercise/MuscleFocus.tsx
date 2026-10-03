@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Enfoque muscular · las piezas que comparten las vistas del módulo.
  *
  * Una sola regla: pasar el puntero por un músculo dice cómo se llama y qué
@@ -324,7 +324,7 @@ export function MuscleFocusCard({ rows, series, size = "card", footer, className
           style={{ background: "var(--nv-warn-soft)", color: "var(--nv-warn)" }}
         >
           Sin músculos asignados: {data.unassigned.map((r) => r.name).join(", ")}. Asígnalos en
-          «Gestionar ejercicios» para que pinten en el mapa.
+          «Ejercicios · Tu programa» para que pinten en el mapa.
         </div>
       )}
 

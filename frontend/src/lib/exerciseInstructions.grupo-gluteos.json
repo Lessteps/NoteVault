@@ -1,0 +1,332 @@
+[
+  {
+    "slug": "deadlift",
+    "name": "Deadlift",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca la barra en el suelo justo por fuera de los pies, a la anchura de la cadera o algo más, con los pies y la barra en la misma línea.",
+      "Agáchate agarrando la barra con un agarre Mixto: una mano en pronación y la otra en supinación, o la derecha sobre la izquierda.",
+      "Coloca las rodillas flexionadas y empuja la cadera hacia atrás como si fueras a sentarte, dejando el pecho alto.",
+      "Aprieta el abdomen con fuerza y consigue que la espalda neutra sea lo primero que se ve al flexionar la cadera.",
+      "Empuja el suelo con los pies: cuando la barra pasa por debajo de las rodillas, empuja la cadera hasta estar de pie.",
+      "No estires la zona lumbar al subir: termina apretando los glúteos, no levantando los hombros.",
+      "Baja la barra siguiendo el mismo recorrido, desplazando la cadera hacia atrás y dejándote guiar por el suelo.",
+      "Empieza con la barra vacía o con barras ligeras hasta que la técnica sea automática; no hay atajos aquí."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "sumo-deadlift",
+    "name": "Sumo Deadlift",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte con los pies bastante separados y las puntas ligeramente hacia fuera.",
+      "Agáchate y sujeta la barra por dentro de las rodillas con un agarre neutro, las dos palmas una contra otra.",
+      "Empuja la cadera hacia atrás, manteniendo el pecho abierto y la espalda neutra.",
+      "Empuja el suelo con los talones y la parte interna del pie hasta estar de pie, apretando los glúteos arriba.",
+      "La apertura de la cadera y las rodillas hacia fuera son la diferencia con el peso muerto clásico: no las cierres al subir.",
+      "La carga se nota más en la cadera y menos en la zona lumbar; no subas el torso inclinándote."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "trap-bar-deadlift",
+    "name": "Trap Bar Deadlift",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca el hexágono sobre la barra y párate dentro de él, con la carga alineada con tu centro de gravedad.",
+      "Agárrate en los lados del hexágono con las palmas hacia dentro y las rodillas por fuera de la barra.",
+      "Baja hasta hacer un agachamiento completo, con el pecho alto y la espalda neutra.",
+      "Empuja el suelo con el pie entero y estira la cadera hasta estar de pie con los glúteos apretados.",
+      "El agarre neutro reduce la carga en la muñeca y la zona lumbar puede ser más cómoda que en el peso muerto clásico.",
+      "Suele permitir más carga sin que la técnica se rompa: aprovecha ese margen sin pasarte."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "romanian-deadlift",
+    "name": "Romanian Deadlift",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con la barra a la altura de la cadera y el agarre por fuera de los muslos.",
+      "Con las rodillas apenas flexionadas, empuja la cadera hacia atrás dejando bajar la barra por delante de las piernas.",
+      "La espalda se queda recta y plana: el isquiotibial se estira porque la cadera va atrás, no porque te inclines.",
+      "Baja hasta donde sientas el estiramiento en la parte posterior del muslo, normalmente a media pantorrilla.",
+      "Empuja con los talones para subir apretando los glúteos arriba.",
+      "La bajada es la parte que cuenta: tres segundos, no más peso y más profundidad."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "dumbbell-romanian-deadlift",
+    "name": "Dumbbell Romanian Deadlift",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con una mancuerna en cada mano, con las palmas mirando hacia dentro.",
+      "Con las rodillas apenas flexionadas, empuja la cadera hacia atrás dejando bajar las mancuernas por delante de las piernas.",
+      "Mantén la espalda recta y los hombros sin tensar; la distancia entre la cadera y la barra no cambia.",
+      "Baja hasta sentir el estiramiento en los isquiotibiales, sin dejar que el torso se doblen hacia abajo.",
+      "Empuja con los talones para subir apretando los glúteos arriba.",
+      "Si la zona lumbar se cansa primero, las mancuernas son pesadas o el recorrido es demasiado largo."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "single-leg-romanian-deadlift",
+    "name": "Single-Leg Romanian Deadlift",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie sobre una pierna con una mancuerna en la mano del mismo lado o una en cada lado, y la rodilla de apoyo muy légèrement flexionada.",
+      "Con el tronco recto, empuja la cadera hacia atrás dejando bajar el peso de forma controlada.",
+      "Levanta la pierna libre hacia atrás para que el cuerpo forme una línea recta desde la cabeza hasta el talón.",
+      "El objetivo es mantener la cadera nivelada: si se abre hacia un lado, la carga es alta o te falta core.",
+      "Vuelve a subir apoyando la pierna libre sin tocar el suelo.",
+      "Buena forma de encontrar asimetrías entre ambos lados antes de usar cargas grandes."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "good-morning",
+    "name": "Good Morning",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca la barra a la altura de la cadera con un agarre por fuera de los muslos, o en un landmine si es tu primera vez.",
+      "Con las rodillas muy ligeramente flexionadas, empuja la cadera hacia atrás dejando bajar la barra.",
+      "El torso se inclina hacia delante con la espalda completamente recta; la cadera es la bisagra, no la espalda.",
+      "Baja hasta donde controles, con un peso que te permita mantener la línea recta.",
+      "Empuja con los talones para subir apretando los glúteos.",
+      "Es un ejercicio exigente para la zona lumbar: si sientes la espalda antes que el isquio, baja la carga."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "leg-curl",
+    "name": "Leg Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca abajo en la máquina de flexión lying, con la cadera y el apoyo justo por encima del rodillo.",
+      "Coloca el rodillo de la máquina sobre el tobillo, por encima del hueso, y sujeta los agarres.",
+      "Flexiona la rodilla llevando el talón hacia los glúteos.",
+      "Aprieta el isquiotibial un segundo arriba, sin levantar la cadera del respaldo.",
+      "Baja despacio hasta estirar la pierna del todo, sin dejar que la rodilla se bloquee.",
+      "Si la cadera se despega del respaldo al bajar, es la posición de la máquina: pide que la ajusten."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "lying-leg-curl",
+    "name": "Lying Leg Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca abajo en la máquina, con el muslo bien apoyado en el banco y el tobillo bajo el rodillo.",
+      "Alinea la rodilla con el eje de rotación del rodillo y sujeta los agarres para estabilizar el tronco.",
+      "Flexiona la rodilla llevando el talón hacia el glúteo.",
+      "Aprieta el isquio arriba un segundo, con la cadera quieta.",
+      "Baja de forma controlada hasta estirar la pierna por completo.",
+      "Comprueba que el rodillo está por encima del talón y no sobre el hueso: si no, molesta la rodilla."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "seated-leg-curl",
+    "name": "Seated Leg Curl",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en la máquina con las rodillas alineadas con el eje del rodillo y los pies bien apoyados en la plataforma.",
+      "Ajusta la posición para que el rodillo pase por encima del tobillo, nunca sobre la espinilla.",
+      "Flexiona la rodilla llevando los talones hacia debajo de la silla.",
+      "Aprieta el isquiotibial un segundo abajo.",
+      "Baja despacio hasta extender las piernas casi del todo, sin bloquear la rodilla.",
+      "En esta máquina los isquios trabajan acortados: tiene su ventaja, pero el recorrido suele ser menor que en la lying."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "glute-bridge",
+    "name": "Glute Bridge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba con las rodillas flexionadas y los pies plantados a la anchura de la cadera, cerca de los glúteos.",
+      "Apoya la zona lumbar contra el suelo y empuja con los talones elevando la pelvis.",
+      "Sube hasta formar una línea recta de rodilla a cadera a hombro, apretando los glúteos arriba.",
+      "Detente un segundo arriba sin arquear la espalda baja.",
+      "Baja de forma controlada hasta que la cadera quede a un centímetro del suelo.",
+      "Si sientes la lumbar y no los glúteos, acorta el recorrido o apoya más los pies."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "barbell-glute-bridge",
+    "name": "Barbell Glute Bridge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba, rodillas flexionadas y pies plantados, con la barra apoyada sobre la pelvis y las manos sujetándola.",
+      "Elige una almohadilla o una barra acolchada: la presión directa en la pelvis no es cómoda.",
+      "Empuja con los talones elevando la cadera hasta la línea recta.",
+      "Aprieta los glúteos arriba un segundo sin hiperextender la lumbar.",
+      "Baja despacio hasta dejar la cadera cerca del suelo.",
+      "Usa menos carga de la que usaría en un press: la linkages aquí es la cadera, no el pecho."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "single-leg-glute-bridge",
+    "name": "Single-Leg Glute Bridge",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Túmbate boca arriba y apoya un pie en el suelo con la rodilla flexionada; la otra pierna, extendida, en el aire.",
+      "Empuja con el talón del pie del suelo elevando la pelvis hasta la línea recta.",
+      "Aprieta el glúteo arriba un segundo y mantén la cadera nivelada.",
+      "Baja despacio sin que la pelvis gire hacia un lado.",
+      "Es una forma rápida de detectar y trabajar asimetrías entre ambos glúteos.",
+      "No hace falta carga externa: la propiaetimetría es lo que cuesta."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "glute-bridge-march",
+    "name": "Glute Bridge March",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Colócate en posición de puente con la cadera elevada y los pies plantados.",
+      "Mantén la pelvis nivelada y levanta una rodilla hacia el pecho sin dejar caer la cadera.",
+      "Baja ese pie y levanta la otra rodilla, alternando de forma lenta y controlada.",
+      "La cadera no se mueve de lado a lado: si se desplaza, baja la altura del puente.",
+      "Es el ejercicio de puente que más trabaja el core, porque el tronco tiene que quedarse quieto mientras las piernas se mueven."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "hip-thrust",
+    "name": "Hip Thrust",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Apoya la espalda alta en el borde de un banco, con los pies plantados y la barra sobre la pelvis.",
+      "Manteniendo la barbilla ligeramente alta y el abdomen firme, empuja con los talones hasta llevar la cadera a la horizontal.",
+      "Aprieta los glúteos arriba un segundo sin hiperextender la lumbar.",
+      "Baja las caderas hasta tocar el suelo, manteniendo la retroversión pélvica.",
+      "Si notas la lumbar en lugar de los glúteos, baja el banco y aligera la carga."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "smith-machine-hip-thrust",
+    "name": "Smith Machine Hip Thrust",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca un banco en el suelo de la máquina Smith y siéntate con la espalda contra el respaldo bajo de la máquina.",
+      "Coloca la barra sobre la pelvis con una almohadilla, con las manos sujetándola y los pies plantados.",
+      "Desbloquea la barra y empuja con los talones hasta llevar la cadera a la horizontal.",
+      "Aprieta los glúteos arriba un segundo y vuelve a bajar la cadera controlando.",
+      "La barra fija y la máquina te quitan el problema del equilibrio y de la barra: es la versión más segura para cargar fuerte.",
+      "Bloquea la barra al terminar la serie."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cable-kickback",
+    "name": "Cable Kickback",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea baja y engancha una cinta al tobillo de una pierna, con el cable por detrás de esa pierna.",
+      "Ponte de pie sujetándote a una máquina, con el abdomen firme y la cadera recta.",
+      "Lleva la pierna hacia atrás extendiendo la cadera hasta alinearla con el torso.",
+      "Aprieta el glúteo arriba un segundo sin inclinar el torso hacia delante.",
+      "Vuelve llevando la rodilla al pecho de forma controlada.",
+      "Si la cadera se levanta del sitio al ir atrás, el peso es excesivo: el cuerpo compensa."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cable-pull-through",
+    "name": "Cable Pull-Through",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea baja y engancha una barra o una cuerda a la cadena.",
+      "Ponte de pie de espaldas a la máquina, con los pies paralelos y a la anchura de la cadera.",
+      "Lleva la barra entre las piernas flexionando la cadera, con la espalda recta y el torso inclinándose hacia delante.",
+      "Empuja la cadera hasta estar de pie, apretando los glúteos arriba.",
+      "El movimiento es solo de cadera: si doblas la rodilla, has convertido la cadera en una sentadilla.",
+      "Mantén la barra cerca de las piernas en todo el recorrido."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "kettlebell-swing",
+    "name": "Kettlebell Swing",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Ponte de pie con los pies a la anchura de la cadera y sujeta la pesa rusa con las dos manos por los mangos.",
+      "Flexiona la cadera como si fueras a tirar de un Confirmador, con el peso entre las piernas y la espalda recta.",
+      "Da un impulso corto con las piernas, como si hicieras un salto de caja, y lleva la cadera hacia delante.",
+      "La pesa flota hasta la altura de los hombros porque la cadera se acelera; no la subes con los brazos.",
+      "Deja que la pesa vuelva entre las piernas y repite de forma fluida.",
+      "La técnica es todo: si la subes con los hombros o la doblas en la espalda, el ejercicio ya no es un swing."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "hip-abduction-machine",
+    "name": "Hip Abduction Machine",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate en la máquina con la espalda apoyada y los muslos contra los cojines laterales.",
+      "Ajusta el asiento de forma que el eje de la máquina coincida con la cadera, no con la rodilla.",
+      "Abre las piernas hacia los lados apretando los glúteos medios, sin tirar con los dedos de los pies.",
+      "Detente en la apertura máxima sin alzar la cadera del respaldo.",
+      "Vuelve despacio hasta casi juntar las piernas.",
+      "Coloca las piernas casi juntas al bajar: la apertura máxima la marca la máquina, no tú: la apertura máxima la marca la máquina, no tú."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "hip-adduction-machine",
+    "name": "Hip Adduction Machine",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Siéntate con la espalda apoyada y las piernas entre los cojines laterales.",
+      "Alinea el eje de la máquina con la cadera y sujeta los agarres o los mangos laterales.",
+      "Junta las piernas una contra otra apretando los aductores un segundo.",
+      "Detente sin inclinarte hacia delante.",
+      "Abre despacio hasta donde la máquina permita, sin forzar.",
+      "Si los pies se cruzan al subir, el eje de la máquina está mal alineado: pide que lo revisen."
+    ],
+    "steps_en": []
+  },
+  {
+    "slug": "cable-standing-hip-adduction",
+    "name": "Cable Standing Hip Adduction",
+    "matched": "redacción propia NoteVault",
+    "source": "propia",
+    "steps_es": [
+      "Coloca una polea baja y engancha la cinta al tobillo de una pierna, pasando el cable por delante de esa pierna.",
+      "Ponte de pie sujetándote a una máquina para mantener el equilibrio, con el torso recto.",
+      "Lleva la pierna hacia el otro lado cruzando la línea media, sin girar la cadera.",
+      "Aprieta el aductor arriba un segundo en la posición de cruce.",
+      "Vuelve despacio hasta una posición neutra.",
+      "Si no consigues cruzar la línea media, la carga es excesiva o la cinta está mal colocada."
+    ],
+    "steps_en": []
+  }
+]

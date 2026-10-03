@@ -180,21 +180,30 @@ describe("Vista general con navegación de fechas", () => {
     }
   });
 
-  it("los anillos y la racha viven en la tira compacta", async () => {
-    // El rediseño mete anillos y racha en una sola tarjeta oscura, no en dos
-    // bloques separados. Siguen diciendo lo mismo de siempre.
+  it("los anillos viven en el sidebar y la pantalla se queda con la racha", async () => {
+    // Los cuatro anillos (Hoy, Semana, Mes, Año) se mudaron al sidebar, donde
+    // están las estadísticas del módulo: ahí se ven desde cualquier pantalla,
+    // no solo desde Vista general. La pantalla se queda con la racha.
     const { host, cleanup } = render(<ExerciseModule />);
     try {
       await act(async () => {
         await Promise.resolve();
         await Promise.resolve();
       });
-      const strip = host.querySelector("[data-overview-stats]");
-      expect(strip).not.toBeNull();
-      const txt = strip!.textContent ?? "";
-      for (const etiqueta of ["Hoy", "Semana", "Mes", "Año", "Racha actual"]) {
-        expect(txt).toContain(etiqueta);
+      const side = host.querySelector("aside")!;
+      const main = host.querySelector("main")!;
+      for (const etiqueta of ["Hoy:", "Semana:", "Mes:", "Año:"]) {
+        // Un anillo en el sidebar…
+        const enSide = side.querySelector(`svg[aria-label^="${etiqueta}"]`);
+        expect(enSide).not.toBeNull();
+        // …y ninguno en la pantalla.
+        expect(main.querySelector(`svg[aria-label^="${etiqueta}"]`)).toBeNull();
       }
+      // La racha sigue en la pantalla.
+      expect(main.textContent).toContain("Racha actual");
+      // Y el sidebar ya no pinta las barras: eran los mismos cuatro números
+      // en otro formato, y ahora los dicen los anillos.
+      expect(side.querySelector('[data-side-bar]')).toBeNull();
     } finally {
       cleanup();
     }

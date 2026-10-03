@@ -28,7 +28,7 @@ import type { Exercise, ExerciseDay } from "../../lib/types";
 import { ExerciseRow } from "./ExerciseRow";
 import { MuscleFocusCard, muscleRows } from "./MuscleFocus";
 import { MuscleMap } from "./MuscleMap";
-import { ORANGE, PeriodRings, StreakLine, seriesOf, useFail } from "./parts";
+import { ORANGE, StreakLine, seriesOf, useFail } from "./parts";
 
 export function Overview({
   date,
@@ -126,14 +126,10 @@ export function Overview({
           />
         </section>
 
-        {/* Una sola tarjeta oscura con todo lo de un vistazo: los cuatro
-            anillos en pequeño y la racha debajo. Antes eran dos bloques
-            separados; dicen exactamente lo mismo. */}
-        <section data-overview-stats className="space-y-3 rounded-2xl border border-line bg-panel px-5 py-4">
-          <PeriodRings size={68} thickness={8} />
-          <div className="h-px bg-line" />
-          <StreakLine />
-        </section>
+        {/* La racha, sola en su tarjeta: los cuatro anillos se mudaron al
+            sidebar, donde se ven desde cualquier pantalla del módulo y no
+            solo desde esta. */}
+        <StreakLine />
 
         {/* La sesión del día abierto y, a la derecha, lo que trabaja. */}
         <div className="grid items-start gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 372px" }}>

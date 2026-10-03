@@ -2,8 +2,8 @@
 // .canvas files as the classic app (and Obsidian).
 
 import {
-  ArrowLeftRight, Diamond, FileText, Grid3x3, Hand, Image as ImageIcon, LayoutDashboard, Link2, Maximize,
-  Minus, PenLine, Plus, Redo2, SquareDashed, StickyNote, Trash2, Undo2,
+  ArrowLeftRight, Diamond, FileText, Grid3x3, Image as ImageIcon, LayoutDashboard, Link2, Magnet, Maximize,
+  Minus, MousePointer2, PenLine, Plus, Redo2, SquareDashed, StickyNote, Trash2, Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
@@ -146,7 +146,7 @@ export function CanvasView() {
     });
   }, []);
 
-  // Wheel: pan; Ctrl/pinch: zoom around the pointer. Non-passive to stop
+  // Wheel: moves up and down; Shift + wheel moves sideways; Ctrl/pinch: zoom around the pointer. Non-passive to stop
   // the page from scrolling.
   useEffect(() => {
     const el = host.current;
@@ -155,7 +155,11 @@ export function CanvasView() {
       if ((e.target as Element).closest("textarea")) return;
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.0022), e.clientX, e.clientY);
-      else setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
+      else if (e.shiftKey) {
+        // Chromium leaves the movement in deltaY when Shift is held; a touchpad may already send deltaX.
+        const dx = e.deltaX || e.deltaY;
+        setView((v) => ({ ...v, x: v.x - dx }));
+      } else setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -182,6 +186,17 @@ export function CanvasView() {
     const d = docRef.current;
     commit({ ...d, edges: d.edges.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
   }, [commit]);
+
+  /** Asks for the text of an arrow (empty removes it). */
+  const editEdgeLabel = useCallback(async (edge: CEdge) => {
+    const label = await askText("Etiqueta de la flecha", edge.label ?? "", "Guardar");
+    if (label !== null) patchEdge(edge.id, { label });
+  }, [patchEdge]);
+
+  const toggleGrid = useCallback(() => setShowGrid((v) => {
+    localStorage.setItem("nv.canvas.grid", v ? "0" : "1");
+    return !v;
+  }), []);
 
   const deleteSelection = useCallback(() => {
     const d = docRef.current;
@@ -459,6 +474,16 @@ export function CanvasView() {
 
   const onDoubleClick = (e: React.MouseEvent) => {
     if (drawMode || (e.target as Element).closest("[data-canvas-ui]")) return;
+    const edgeEl = (e.target as Element).closest("[data-edge-id]");
+    if (edgeEl) {
+      const found = docRef.current.edges.find((x) => x.id === edgeEl.getAttribute("data-edge-id"));
+      if (found) {
+        setSelEdge(found.id);
+        setSel(new Set());
+        void editEdgeLabel(found);
+      }
+      return;
+    }
     const nodeEl = (e.target as Element).closest("[data-node-id]");
     if (!nodeEl) {
       const [x, y] = toWorld(e.clientX, e.clientY);
@@ -567,7 +592,8 @@ export function CanvasView() {
     else if (k === "z") run(() => addText());
     else if (k === "x") run(() => setPicker("note"));
     else if (k === "c") run(() => setPicker("image"));
-    else if (k === "v") run(() => void addLink());
+    else if (k === "v") run(() => setDrawMode(false)); // the selector: cancels pen mode and any other tool
+    else if (k === "g") run(toggleGrid);
     else if (k === "b") run(groupSelection);
     else if (k === "n") run(() => setDrawMode((v) => !v));
     else if (k === "m") run(() => addShape("process"));
@@ -597,7 +623,13 @@ export function CanvasView() {
     // `viewport` is a fresh object per render: compare its numbers instead.
     [doc, viewport.x, viewport.y, viewport.width, viewport.height, sel],
   );
-  const groups = doc.nodes.filter((n) => n.type === "group" && inViewport(n, viewport));
+  // A group that contains another is its parent: it is drawn first, so the inner one stays on top and can be reached.
+  const groups = useMemo(() => {
+    const all = doc.nodes.filter((n) => n.type === "group");
+    const depth = (g: CNode) => all.filter((o) => o.id !== g.id && contains(o, g)).length;
+    return all.filter((g) => inViewport(g, viewport)).map((g) => ({ g, d: depth(g) })).sort((a, b) => a.d - b.d).map((x) => x.g);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc.nodes, viewport.x, viewport.y, viewport.width, viewport.height]);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-surface">
@@ -690,7 +722,7 @@ export function CanvasView() {
           <div className="pointer-events-none absolute inset-0 grid place-items-center text-center text-[13px] text-faint">
             <div>
               <p className="text-[15px] text-dim">Canvas vacío</p>
-              <p className="mt-1">Doble clic para crear una tarjeta · Z texto · X nota · N dibujar · clic derecho para más</p>
+              <p className="mt-1">Doble clic para crear una tarjeta · Z texto · X nota · N dibujar · V seleccionar · G cuadrícula · clic derecho para más</p>
             </div>
           </div>
         )}
@@ -704,20 +736,19 @@ export function CanvasView() {
             onDelete={deleteSelection}
             onEdit={single && ["text", "nv-shape", "group"].includes(single.type) ? () => setEditing(single.id) : undefined}
             onEdge={(p) => edge && patchEdge(edge.id, p)}
-            onEdgeLabel={async () => {
-              if (!edge) return;
-              const label = await askText("Etiqueta de la flecha", edge.label ?? "", "Guardar");
-              if (label !== null) patchEdge(edge.id, { label });
+            onEdgeLabel={() => {
+              if (edge) void editEdgeLabel(edge);
             }}
           />
         )}
 
         <Toolbar>
+          <Tool title="Seleccionar (V)" kbd="V" active={!drawMode} onClick={() => { setDrawMode(false); host.current?.focus(); }}><MousePointer2 size={16} /></Tool>
           <Tool title="Tarjeta de texto (Z)" kbd="Z" onClick={() => addText()}><StickyNote size={16} /></Tool>
           <Tool title="Nota de la vault (X)" kbd="X" onClick={() => setPicker("note")}><FileText size={16} /></Tool>
           <Tool title="Imagen de la vault (C)" kbd="C" onClick={() => setPicker("image")}><ImageIcon size={16} /></Tool>
           <Tool title="Canvas embebido (A)" onClick={() => setPicker("canvas")}><LayoutDashboard size={16} /></Tool>
-          <Tool title="Enlace web (V)" kbd="V" onClick={() => void addLink()}><Link2 size={16} /></Tool>
+          <Tool title="Enlace web (S)" kbd="S" onClick={() => void addLink()}><Link2 size={16} /></Tool>
           <Tool title="Forma de diagrama (M)" kbd="M" onClick={(e) => openMenu(e, SHAPES.map((s) => ({ label: s.name, onSelect: () => addShape(s.id) })))}>
             <Diamond size={16} />
           </Tool>
@@ -737,20 +768,16 @@ export function CanvasView() {
             </div>
           )}
           <Sep />
-          <Tool title="Cuadrícula" active={showGrid} onClick={() => setShowGrid((v) => {
-            localStorage.setItem("nv.canvas.grid", v ? "0" : "1");
-            return !v;
-          })}><Grid3x3 size={16} /></Tool>
+          <Tool title="Cuadrícula (G)" kbd="G" active={showGrid} onClick={toggleGrid}><Grid3x3 size={16} /></Tool>
           <Tool title="Ajustar a la cuadrícula" active={snap} onClick={() => setSnap((v) => {
             localStorage.setItem("nv.canvas.snap", v ? "0" : "1");
             return !v;
-          })}><Hand size={16} /></Tool>
+          })}><Magnet size={16} /></Tool>
           <Tool title="Alejar (Ctrl+−)" onClick={() => zoomAt(1 / 1.2)}><Minus size={16} /></Tool>
           <Tool title="Acercar (Ctrl++)" onClick={() => zoomAt(1.2)}><Plus size={16} /></Tool>
           <Tool title="Ver todo (Ctrl+0)" onClick={() => fit()}><Maximize size={16} /></Tool>
           <Tool title="Deshacer (Ctrl+Z)" disabled={!canUndo} onClick={undo}><Undo2 size={16} /></Tool>
           <Tool title="Rehacer (Ctrl+Y)" disabled={!canRedo} onClick={redo}><Redo2 size={16} /></Tool>
-          <Tool title="Mover: arrastra el fondo · Alt+arrastrar · rueda" onClick={() => setDrawMode(false)}><Hand size={16} /></Tool>
         </Toolbar>
       </div>
 
@@ -804,7 +831,7 @@ function EdgeView({ edge, a, b, selected }: { edge: CEdge; a: CNode; b: CNode; s
       {edge.fromEnd === "arrow" && <polygon points={arrowHead(a, edge.fromSide, 12, fromT)} fill={col} />}
       {edge.label && (
         <foreignObject x={mid[0] - 90} y={mid[1] - 14} width={180} height={28} className="overflow-visible">
-          <div className="mx-auto w-fit max-w-[180px] truncate rounded-md border border-line bg-card px-2 py-0.5 text-center text-[12px] text-text">
+          <div data-edge-id={edge.id} title="Doble clic para editar" className="pointer-events-auto mx-auto w-fit max-w-[180px] cursor-pointer truncate rounded-md border border-line bg-card px-2 py-0.5 text-center text-[12px] text-text">
             {edge.label}
           </div>
         </foreignObject>

@@ -44,10 +44,10 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); container.remove(); globalThis.requestAnimationFrame = raf; });
 
 describe("nested groups", () => {
-  it("an inner group can be selected from its body and resized from its corner handle", () => {
-    const innerEl = container.querySelector<HTMLElement>('[data-node-id="inner"]')!;
-    fire("pointerdown", 120, 120, innerEl); // body, away from every outline
-    fire("pointerup", 120, 120, innerEl);
+  it("an inner group can be selected from its label and resized from its corner handle", () => {
+    const label = container.querySelector<HTMLElement>('[data-node-id="inner"] [data-group-label]')!;
+    fire("pointerdown", 120, 80, label); // the label sits above the group's top edge
+    fire("pointerup", 120, 80, label);
     const se = container.querySelector<HTMLElement>('[data-node-id="inner"] [data-resize="se"]');
     expect(se).toBeTruthy();
     fire("pointerdown", 400, 300, se!);
@@ -59,9 +59,9 @@ describe("nested groups", () => {
   });
 
   it("the outer group is still resizable when it is selected", () => {
-    const outerEl = container.querySelector<HTMLElement>('[data-node-id="outer"]')!;
-    fire("pointerdown", 20, 20, outerEl);
-    fire("pointerup", 20, 20, outerEl);
+    const label = container.querySelector<HTMLElement>('[data-node-id="outer"] [data-group-label]')!;
+    fire("pointerdown", 20, -20, label);
+    fire("pointerup", 20, -20, label);
     const se = container.querySelector<HTMLElement>('[data-node-id="outer"] [data-resize="se"]')!;
     fire("pointerdown", 600, 400, se);
     fire("pointermove", 650, 450);

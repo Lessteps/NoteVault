@@ -8,9 +8,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
 import {
-  anchorExtras, borderHit, bounds, cloneNodes, colorOf, contains, drawingNode, edgePath, edgeT, intersects, nearestSide, newId, portPoint,
-  PRESET_COLORS, pruneEdges, resizeHandleAt, RESIZE_CURSOR, SHAPES, type BorderHit, type CEdge, type CNode, type CanvasDoc, type Rect,
-  type ResizeHandle, type Side,
+  anchorExtras, borderHit, bounds, cloneNodes, colorOf, contains, drawingNode, edgePath, edgeT, GRID, gridBackgroundOffset, intersects,
+  nearestSide, newId, portPoint, PRESET_COLORS, pruneEdges, resizeHandleAt, resizeRect, RESIZE_CURSOR, SHAPES, snappedDelta, snapRect,
+  snapTo, type BorderHit, type CEdge, type CNode, type CanvasDoc, type Rect, type ResizeHandle, type Side,
 } from "../../lib/canvas";
 import { readClipboard } from "../../lib/clipboard";
 import { inViewport, visibleCanvas, visibleWorldRect } from "../../lib/canvasViewport";
@@ -24,20 +24,18 @@ import { DRAG_MIME } from "../notes/FileTree";
 type View = { x: number; y: number; zoom: number };
 type Drag =
   | { kind: "pan"; sx: number; sy: number; vx: number; vy: number }
-  | { kind: "move"; sx: number; sy: number; start: Map<string, [number, number]>; moved: boolean }
+  | { kind: "move"; sx: number; sy: number; /** the card being dragged: it is the one that lands on the grid */ anchor: string; start: Map<string, [number, number]>; moved: boolean }
   | { kind: "resize"; id: string; sx: number; sy: number; w: number; h: number; x: number; y: number; handle: string }
   | { kind: "connect"; from: string; side: Side; /** position along that side, 0..1 */ t: number; /** where the pointer went down */ ox: number; oy: number; x: number; y: number }
   | { kind: "box"; x0: number; y0: number; x: number; y: number; add: boolean }
   | { kind: "draw"; points: Array<[number, number]> };
 
-const GRID = 20;
 /** How close (in screen pixels) the pointer has to be to a card's outline to grab it. */
 const BORDER_PX = 8;
 /** Within this many screen pixels of a corner, the outline resizes both ways. */
 const CORNER_PX = 14;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 3;
-const snapTo = (v: number, on: boolean) => (on ? Math.round(v / GRID) * GRID : v);
 
 export function CanvasView() {
   const path = useCanvas((s) => s.path)!;
@@ -287,6 +285,19 @@ export function CanvasView() {
   }, [patchNodes]);
 
   // ── pointer interactions ─────────────────────────────────────────────
+  /**
+   * The card element under a target, EXCEPT a group's empty interior: that is the board. Grabbing the inside of a group used to
+   * move the whole group (a big group is mostly interior), so now the interior pans, box-selects and creates cards like the
+   * rest of the board, and a group is moved by its label (or resized by its outline).
+   */
+  const cardElOf = (target: Element): Element | null => {
+    const el = target.closest("[data-node-id]");
+    if (!el) return null;
+    const n = byId.get(el.getAttribute("data-node-id")!);
+    if (n?.type === "group" && !target.closest("[data-group-label],[data-port],[data-resize]")) return null;
+    return el;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       startDrag(e, { kind: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y });
@@ -328,7 +339,7 @@ export function CanvasView() {
         return;
       }
     }
-    const nodeEl = t.closest("[data-node-id]");
+    const nodeEl = cardElOf(t);
     if (!nodeEl) {
       setSelEdge(null);
       if (e.shiftKey) startDrag(e, { kind: "box", x0: wx, y0: wy, x: wx, y: wy, add: true });
@@ -368,7 +379,7 @@ export function CanvasView() {
     for (const g of doc.nodes.filter((n) => next.has(n.id) && n.type === "group")) {
       for (const n of doc.nodes) if (n.id !== g.id && contains(g, n)) start.set(n.id, [n.x, n.y]);
     }
-    startDrag(e, { kind: "move", sx: wx, sy: wy, start, moved: false });
+    startDrag(e, { kind: "move", sx: wx, sy: wy, anchor: id, start, moved: false });
   };
 
   const startDrag = (e: React.PointerEvent, d: Drag) => {
@@ -406,37 +417,23 @@ export function CanvasView() {
         d.moved = true;
       }
       const cur = docRef.current;
+      // The dragged card lands on the grid and the others keep their place relative to it.
+      const anchor = d.start.get(d.anchor) ?? [...d.start.values()][0] ?? [0, 0];
+      const [mx, my] = snappedDelta(anchor, dx, dy, snap);
       commit({
         ...cur,
         nodes: cur.nodes.map((n) => {
           const s = d.start.get(n.id);
-          return s ? { ...n, x: snapTo(s[0] + dx, snap), y: snapTo(s[1] + dy, snap) } : n;
+          return s ? { ...n, x: s[0] + mx, y: s[1] + my } : n;
         }),
       }, false);
     } else if (d.kind === "resize") {
       const cur = docRef.current;
-      const dx = wx - d.sx;
-      const dy = wy - d.sy;
-      const h = d.handle;
-      const isW = h.includes("w");
-      const isN = h.includes("n");
-      const isE = h.includes("e");
-      const isS = h.includes("s");
-      // Horizontal
-      let newX = d.x;
-      let newW = d.w;
-      if (isE) newW = Math.max(40, snapTo(d.w + dx, snap));
-      if (isW) { newW = Math.max(40, snapTo(d.w - dx, snap)); newX = snapTo(d.x + d.w - newW, snap); }
-      // Vertical
-      let newY = d.y;
-      let newH = d.h;
-      if (isS) newH = Math.max(30, snapTo(d.h + dy, snap));
-      if (isN) { newH = Math.max(30, snapTo(d.h - dy, snap)); newY = snapTo(d.y + d.h - newH, snap); }
+      // The edges being dragged snap to the grid; the opposite ones do not move.
+      const r = resizeRect({ x: d.x, y: d.y, width: d.w, height: d.h }, d.handle, wx - d.sx, wy - d.sy, snap);
       commit({
         ...cur,
-        nodes: cur.nodes.map((n) => (n.id === d.id
-          ? { ...n, x: newX, y: newY, width: newW, height: newH }
-          : n)),
+        nodes: cur.nodes.map((n) => (n.id === d.id ? { ...n, x: r.x, y: r.y, width: r.width, height: r.height } : n)),
       }, false);
     } else if (d.kind === "connect" || d.kind === "box") {
       setDrag({ ...d, x: wx, y: wy });
@@ -508,7 +505,7 @@ export function CanvasView() {
       }
       return;
     }
-    const nodeEl = (e.target as Element).closest("[data-node-id]");
+    const nodeEl = cardElOf(e.target as Element);
     if (!nodeEl) {
       const [x, y] = toWorld(e.clientX, e.clientY);
       addText(x, y);
@@ -524,13 +521,14 @@ export function CanvasView() {
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     const [x, y] = toWorld(e.clientX, e.clientY);
-    const nodeEl = (e.target as Element).closest("[data-node-id]");
+    const nodeEl = cardElOf(e.target as Element);
     if (nodeEl) {
       const id = nodeEl.getAttribute("data-node-id")!;
       if (!sel.has(id)) setSel(new Set([id]));
       const ids = sel.has(id) ? sel : new Set([id]);
       openMenu(e, [
         { label: "Duplicar", onSelect: () => pasteDoc(docRef.current, ids, 30, 30) },
+        { label: "Alinear a la cuadrícula", onSelect: () => alignToGrid(ids) },
         { label: "Agrupar", onSelect: groupSelection },
         { label: "Grosor: Fino (1px)", onSelect: () => setThickness(ids, 1) },
         { label: "Grosor: Normal (2px)", onSelect: () => setThickness(ids, 2) },
@@ -553,7 +551,14 @@ export function CanvasView() {
         addNode({ type: "group", x: x - 200, y: y - 150, width: 400, height: 300, label: "Grupo" });
       }},
       { label: "Pegar", onSelect: () => void paste() },
+      { label: "Alinear todo a la cuadrícula", onSelect: () => alignToGrid(new Set(docRef.current.nodes.map((n) => n.id))) },
     ]);
+  };
+
+  /** Puts the four edges of the given cards on the grid (cards that were placed before, or by a generator, are often off it). */
+  const alignToGrid = (ids: Set<string>) => {
+    const d = docRef.current;
+    commit({ ...d, nodes: d.nodes.map((n) => (ids.has(n.id) && n.type !== "nv-drawing" ? { ...n, ...snapRect(n) } : n)) });
   };
 
   const setThickness = (ids: Set<string>, borderWidth: number) => {
@@ -629,7 +634,7 @@ export function CanvasView() {
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
         const d = docRef.current;
-        commit({ ...d, nodes: d.nodes.map((n) => (sel.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)) });
+        commit({ ...d, nodes: d.nodes.map((n) => (sel.has(n.id) ? { ...n, x: snapTo(n.x + dx, snap && !e.shiftKey), y: snapTo(n.y + dy, snap && !e.shiftKey) } : n)) });
       });
     }
   };
@@ -686,7 +691,7 @@ export function CanvasView() {
         style={{
           backgroundImage: showGrid ? "radial-gradient(circle, var(--nv-line-strong) 1px, transparent 1.2px)" : "none",
           backgroundSize: `${gridSize}px ${gridSize}px`,
-          backgroundPosition: `${view.x}px ${view.y}px`,
+          backgroundPosition: `${gridBackgroundOffset(view.x, gridSize)}px ${gridBackgroundOffset(view.y, gridSize)}px`,
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

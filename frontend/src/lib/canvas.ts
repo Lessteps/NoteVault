@@ -187,6 +187,55 @@ const NORMAL: Record<Side, [number, number]> = {
   top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0],
 };
 
+/** The grid: cards and edges snap to multiples of this many canvas units. */
+export const GRID = 20;
+export const MIN_WIDTH = 40;
+export const MIN_HEIGHT = 30;
+
+export const snapTo = (v: number, on: boolean): number => (on ? Math.round(v / GRID) * GRID : v);
+
+/**
+ * The offset to move a group of cards by when the pointer moved (dx, dy): it is chosen so that the ANCHOR card (the one being
+ * dragged) lands exactly on the grid, and every other card moves by the same amount, so the group keeps its shape. Snapping
+ * each card on its own would drag cards that sit off-grid to different places and scramble the layout.
+ */
+export function snappedDelta(anchor: readonly [number, number], dx: number, dy: number, on: boolean): [number, number] {
+  return [snapTo(anchor[0] + dx, on) - anchor[0], snapTo(anchor[1] + dy, on) - anchor[1]];
+}
+
+/**
+ * The rectangle after dragging `handle` by (dx, dy). The EDGES that move are the ones snapped to the grid, and the opposite
+ * edges do not move at all (snapping the width and the position separately made them drift).
+ */
+export function resizeRect(start: Rect, handle: string, dx: number, dy: number, snap: boolean): Rect {
+  const right0 = start.x + start.width;
+  const bottom0 = start.y + start.height;
+  let x = start.x;
+  let y = start.y;
+  let right = right0;
+  let bottom = bottom0;
+  if (handle.includes("e")) right = Math.max(start.x + MIN_WIDTH, snapTo(right0 + dx, snap));
+  if (handle.includes("w")) x = Math.min(right0 - MIN_WIDTH, snapTo(start.x + dx, snap));
+  if (handle.includes("s")) bottom = Math.max(start.y + MIN_HEIGHT, snapTo(bottom0 + dy, snap));
+  if (handle.includes("n")) y = Math.min(bottom0 - MIN_HEIGHT, snapTo(start.y + dy, snap));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+/** A rectangle with its four edges on the grid (the smallest size is kept). */
+export function snapRect(n: Rect): Rect {
+  const x = snapTo(n.x, true);
+  const y = snapTo(n.y, true);
+  const right = Math.max(x + MIN_WIDTH, snapTo(n.x + n.width, true));
+  const bottom = Math.max(y + MIN_HEIGHT, snapTo(n.y + n.height, true));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+/**
+ * Where the grid's background starts. The dots are drawn at the CENTRE of each tile of the background, so the tile has to
+ * start half a cell before the origin: that way a dot falls on every multiple of the grid, exactly where cards snap to.
+ */
+export const gridBackgroundOffset = (viewPos: number, cell: number): number => viewPos - cell / 2;
+
 export type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 /**

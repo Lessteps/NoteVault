@@ -209,18 +209,54 @@ describe("groups inside groups", () => {
     expect(el("g1").compareDocumentPosition(el("g2")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("the inner group can be selected by clicking its body", () => {
+  const label = (id: string) => el(id).querySelector<HTMLElement>("[data-group-label]")!;
+
+  it("the inner group is selected by its label, and the outer one is not", () => {
     render(nested());
-    pointer("pointerdown", el("inner"), 400, 320);
-    pointer("pointerup", el("inner"), 400, 320);
+    pointer("pointerdown", label("inner"), 200, 120);
+    pointer("pointerup", label("inner"), 200, 120);
     expect(el("inner").className).toContain("outline-accent");
     expect(el("outer").className).not.toContain("outline-accent");
   });
 
-  it("dragging the inner group moves it with its cards, and the outer group with everything inside", () => {
+  it("the INTERIOR of a group does not grab it: it is the board (a drag pans, a click selects nothing)", () => {
+    render(nested());
+    const move = () => /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec(host().firstElementChild!.getAttribute("style") ?? "")!;
+    const x0 = useCanvas.getState().doc.nodes.find((n) => n.id === "inner")!.x;
+    pointer("pointerdown", el("inner"), 400, 320); // empty part of the inner group
+    pointer("pointermove", host(), 440, 320);
+    pointer("pointermove", host(), 480, 320);
+    pointer("pointerup", host(), 480, 320);
+    const inner = useCanvas.getState().doc.nodes.find((n) => n.id === "inner")!;
+    expect(inner.x).toBe(x0); // the group did not move
+    expect(el("inner").className).not.toContain("outline-accent"); // and it was not selected
+    expect(move()[1]).toBe("80"); // the board panned instead (the view moved 80 px to the right)
+  });
+
+  it("a click on a group's interior clears the selection like a click on the board", () => {
+    render(nested());
+    pointer("pointerdown", label("inner"), 200, 120);
+    pointer("pointerup", label("inner"), 200, 120);
+    expect(el("inner").className).toContain("outline-accent");
+    pointer("pointerdown", el("outer"), 700, 500);
+    pointer("pointerup", host(), 700, 500);
+    expect(el("inner").className).not.toContain("outline-accent");
+  });
+
+  it("a double click on a group's interior creates a card there; on its label it renames the group", () => {
+    render(nested());
+    const dbl = (target: Element) => act(() => { target.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true, clientX: 400, clientY: 320 })); });
+    const before = useCanvas.getState().doc.nodes.length;
+    dbl(el("inner"));
+    expect(useCanvas.getState().doc.nodes.length).toBe(before + 1);
+    dbl(label("outer"));
+    expect(el("outer").querySelector("input")).toBeTruthy(); // the label turned into an editor
+  });
+
+  it("dragging a group's LABEL moves it with its cards, and the outer group's label moves everything inside", () => {
     render(nested());
     const x = (id: string) => useCanvas.getState().doc.nodes.find((n) => n.id === id)!.x;
-    pointer("pointerdown", el("inner"), 400, 320);
+    pointer("pointerdown", label("inner"), 200, 320); // only horizontally: the group stays inside its parent
     pointer("pointermove", host(), 440, 320);
     pointer("pointermove", host(), 460, 320);
     pointer("pointerup", host(), 460, 320);
@@ -228,10 +264,10 @@ describe("groups inside groups", () => {
     expect(x("card")).toBeGreaterThan(180);
     expect(x("outer")).toBe(50);
     const innerNow = x("inner");
-    pointer("pointerdown", el("outer"), 600, 500);
-    pointer("pointermove", host(), 630, 500);
-    pointer("pointermove", host(), 650, 500);
-    pointer("pointerup", host(), 650, 500);
+    pointer("pointerdown", label("outer"), 100, 20);
+    pointer("pointermove", host(), 130, 20);
+    pointer("pointermove", host(), 150, 20);
+    pointer("pointerup", host(), 150, 20);
     expect(x("outer")).toBeGreaterThan(50);
     expect(x("inner")).toBeGreaterThan(innerNow); // the subgroup travels with its parent
   });

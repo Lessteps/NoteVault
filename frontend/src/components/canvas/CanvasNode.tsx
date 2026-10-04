@@ -144,10 +144,10 @@ export const CanvasNodeView = memo(function CanvasNodeView({
     return (
       <div
         data-node-id={node.id}
-        className={cn("absolute rounded-2xl", selected && "outline outline-2 outline-offset-2 outline-accent")}
+        className={cn("pointer-events-none absolute rounded-2xl", selected && "outline outline-2 outline-offset-2 outline-accent")}
         style={{ ...style, borderColor: col, background: `color-mix(in srgb, ${colorOf(node.color, "var(--nv-dim)")} 7%, transparent)` }}
       >
-        <div className="absolute -top-8 left-0 flex h-7 max-w-full items-center rounded-lg px-2 text-[14px] font-semibold text-text"
+        <div data-group-label title="Arrastra para mover el grupo" className="pointer-events-auto absolute -top-8 left-0 flex h-7 max-w-full cursor-move items-center rounded-lg px-2 text-[14px] font-semibold text-text"
           style={{ background: `color-mix(in srgb, ${colorOf(node.color, "var(--nv-dim)")} 22%, var(--nv-surface))` }}>
           {editing
             ? <input autoFocus defaultValue={node.label ?? ""} onBlur={(e) => done(e.target.value)}
@@ -245,7 +245,7 @@ function Handles({ selected }: { selected: boolean }) {
           data-port={s}
           title="Arrastra para conectar"
           className={cn(
-            "nv-port absolute z-20 h-3.5 w-3.5 cursor-pointer rounded-full border-2 border-accent bg-card",
+            "nv-port pointer-events-auto absolute z-20 h-3.5 w-3.5 cursor-pointer rounded-full border-2 border-accent bg-card",
             PORT_POS[s], selected ? "opacity-100" : "opacity-0",
           )}
         />
@@ -256,7 +256,7 @@ function Handles({ selected }: { selected: boolean }) {
           data-resize={handle}
           title="Cambiar tamaño"
           className={cn(
-            "absolute z-10 rounded-sm border-2 border-accent bg-card",
+            "pointer-events-auto absolute z-10 rounded-sm border-2 border-accent bg-card",
             handle === "n" || handle === "s" ? "h-3.5 w-7" : handle === "w" || handle === "e" ? "h-7 w-3.5" : "h-3.5 w-3.5",
             pos,
           )}

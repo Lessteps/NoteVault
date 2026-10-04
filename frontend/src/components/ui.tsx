@@ -270,7 +270,19 @@ function MenuItems({ items, onDone }: { items: MenuItem[]; onDone: () => void })
             {nested && open === (it.label ?? String(i)) && (
               <div
                 role="menu"
-                className="absolute left-[calc(100%-4px)] top-[-4px] min-w-[210px] rounded-lg border border-line-strong bg-card p-1 shadow-2xl"
+                // Fixed, not absolute: the parent menu scrolls (overflow-y-auto), which clips any
+                // absolutely positioned child. Placed beside its row, flipped left if it won't fit.
+                ref={(el) => {
+                  const row = el?.parentElement;
+                  if (!el || !row) return;
+                  const p = row.getBoundingClientRect();
+                  const r = el.getBoundingClientRect();
+                  const fitsRight = p.right - 4 + r.width <= window.innerWidth - 8;
+                  const left = fitsRight ? p.right - 4 : Math.max(8, p.left - r.width + 4);
+                  el.style.left = `${left}px`;
+                  el.style.top = `${Math.max(8, Math.min(p.top - 4, window.innerHeight - r.height - 8))}px`;
+                }}
+                className="fixed z-[60] min-w-[210px] rounded-lg border border-line-strong bg-card p-1 shadow-2xl"
                 onMouseDown={(e) => e.stopPropagation()}
               >
                 <MenuItems items={it.items ?? []} onDone={onDone} />

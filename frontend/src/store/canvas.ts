@@ -117,7 +117,8 @@ export const useCanvas = create<CanvasState>((set, get) => {
       try {
         const r = await api.canvasWrite(path, doc, force ? null : modified);
         if (r.conflict) {
-          set({ conflict: true });
+          // Changed on disk by another app: the app's version wins, no banner and no reload.
+          await get().save(true);
           return;
         }
         // Edits made while the write was in flight stay dirty.

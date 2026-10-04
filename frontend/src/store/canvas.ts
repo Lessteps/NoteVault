@@ -136,10 +136,9 @@ export const useCanvas = create<CanvasState>((set, get) => {
     reload: async () => {
       const { path, dirty } = get();
       if (!path) return;
-      if (dirty) {
-        set({ conflict: true });
-        return;
-      }
+      // Unsaved edits win, as in save(): the disk change (often the echo of our own autosave) is neither reloaded nor announced,
+      // because a banner appearing mid-drag shifted the whole board.
+      if (dirty) return;
       try {
         const r = await api.canvasRead(path);
         set({

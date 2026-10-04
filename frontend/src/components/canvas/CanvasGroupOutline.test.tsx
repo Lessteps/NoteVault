@@ -97,18 +97,32 @@ describe("an inner group whose cards sit right inside its outline", () => {
     expect(useCanvas.getState().doc.edges).toHaveLength(0);
   });
 
-  it("a drag that starts on the group's outline MOVES that group, with its card, from any point of it", () => {
+  it("a drag that starts on the group's outline STRETCHES that group from any point of it", () => {
     fire("pointerdown", 41, 90); // near the top of the left side, not the middle
     fire("pointermove", 20, 90);
     fire("pointermove", 0, 90);
     fire("pointerup", 0, 90);
-    expect(node("g1").x).toBe(0);
-    expect(node("g1").width).toBe(300); // it did not stretch
+    expect(node("g1").x + 0).toBe(0);
+    expect(node("g1").width).toBe(340); // it stretched to the left
     expect(node("g1").y).toBe(40);
-    expect(node("c1").x).toBe(6); // its card went with it (46 - 40)
+    expect(node("c1").x).toBe(46); // its card stayed
     expect(node("outer").x).toBe(0); // its parent and its sibling stayed
     expect(node("g2").x).toBe(400);
     expect(useCanvas.getState().doc.edges).toHaveLength(0);
+  });
+
+  it("once the outline has selected the group, a drag inside it MOVES it with its card", () => {
+    fire("pointerdown", 41, 90);
+    fire("pointerup", 41, 90); // a click on the outline selects the group
+    const inside = host().querySelector("[data-node-id=g1]")!;
+    fire("pointerdown", 200, 250, inside);
+    fire("pointermove", 180, 250, inside);
+    fire("pointermove", 160, 250, inside);
+    fire("pointerup", 160, 250, inside);
+    expect(node("g1").x).toBe(0);
+    expect(node("g1").width).toBe(300); // it did not stretch
+    expect(node("c1").x).toBe(6); // its card went with it (46 - 40)
+    expect(node("g2").x).toBe(400);
   });
 
   it("Ctrl + drag from the group's outline connects from the group instead", () => {

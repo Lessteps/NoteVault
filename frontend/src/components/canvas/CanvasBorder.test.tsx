@@ -143,17 +143,21 @@ describe("the outline of a card is a resize handle, wherever along it the pointe
     expect(edges()).toHaveLength(0);
   });
 
-  it("a GROUP is different: its outline moves it (with what it holds) instead of stretching it", () => {
+  it("a GROUP is stretched by its outline too; it is moved from inside once selected", () => {
     act(() => useCanvas.setState({
       doc: { nodes: [{ id: "g", type: "group", x: 100, y: 100, width: 300, height: 200, label: "G" }, { id: "k", type: "text", x: 140, y: 140, width: 100, height: 60, text: "K" }], edges: [] },
     }));
-    hover(101, 200);
-    expect(cursor()).toContain("cursor-move");
-    drag([101, 200], [61, 200]); // its left side, from the middle
-    expect(box("g")).toEqual([60, 100, 300, 200]); // moved, same size
-    expect(node("k").x).toBe(100); // and the card inside went with it
+    hover(101, 150);
+    expect(cursor()).toContain("cursor-ew-resize");
+    drag([101, 150], [61, 150]); // its left side, off-centre (the middle and the corners are handles)
+    expect(box("g")).toEqual([60, 100, 340, 200]); // stretched to the left
+    expect(node("k").x).toBe(140); // the card inside stayed
     drag([250, 299], [250, 339]); // its bottom side, off-centre
-    expect(box("g")).toEqual([60, 140, 300, 200]);
+    expect(box("g")).toEqual([60, 100, 340, 240]);
+    // Now selected: a drag inside it (off its card) moves it, and the card goes along.
+    drag([350, 250], [390, 250], { target: container.querySelector("[data-node-id=g]")! });
+    expect(box("g")).toEqual([100, 100, 340, 240]);
+    expect(node("k").x).toBe(180);
   });
 });
 
@@ -194,7 +198,7 @@ describe("connecting", () => {
 });
 
 describe("nested shapes", () => {
-  it("a card inside a group wins over the group, and the group's own outline moves the group", () => {
+  it("a card inside a group wins over the group, and the group's own outline stretches the group", () => {
     act(() => {
       useCanvas.setState({
         doc: {
@@ -210,8 +214,8 @@ describe("nested shapes", () => {
     expect(box("c")).toEqual([100, 60, 200, 140]);
     expect(box("g")).toEqual([50, 50, 700, 300]);
     drag([51, 300], [-19, 300]); // the group's left side
-    expect(node("g").x).toBe(-20); // the whole group moved 70 to the left
-    expect(node("g").width).toBe(700); // it did not stretch
-    expect(node("c").x).toBe(30); // and the card went with it
+    expect(node("g").x).toBe(-20); // its left side moved 70 to the left
+    expect(node("g").width).toBe(770); // so it stretched
+    expect(node("c").x).toBe(100); // and the card stayed
   });
 });

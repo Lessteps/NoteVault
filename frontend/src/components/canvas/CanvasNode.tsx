@@ -6,6 +6,7 @@ import { memo, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { colorOf, shapePath, type CNode, type Side } from "../../lib/canvas";
 import { renderMarkdown } from "../../lib/markdown";
+import { SourceEditor } from "../notes/SourceEditor";
 import { cn } from "../ui";
 
 type FileInfo = { exists: boolean; kind?: string; title?: string; path?: string; text?: string; src?: string };
@@ -111,6 +112,28 @@ function TextEditor({ value, onDone, className }: { value: string; onDone: (v: s
   );
 }
 
+/**
+ * The editor of a text card: the same live-preview editor as a note (headings, bold and lists are drawn as you type, the
+ * Markdown markers hidden away from the cursor), never the raw source in a plain box.
+ */
+function CardEditor({ value, onDone }: { value: string; onDone: (v: string | null) => void }) {
+  const draft = useRef(value);
+  return (
+    <div
+      data-card-editor
+      className="nv-card-editor h-full min-h-0 overflow-hidden px-2.5 py-1.5 [&_.cm-content]:!max-w-none [&_.cm-scroller]:!p-0 [&_.cm-scroller]:!pb-2"
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onDone(draft.current); }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Escape") onDone(draft.current);
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <SourceEditor value={value} eol={"\n"} code={false} onChange={(raw) => { draft.current = raw; }} />
+    </div>
+  );
+}
+
 const SIDES: Side[] = ["top", "right", "bottom", "left"];
 const PORT_POS: Record<Side, string> = {
   // 12 px OUTSIDE the side: at the middle of the outline they sat on top of the side resize handles and hid them.
@@ -148,16 +171,17 @@ export const CanvasNodeView = memo(function CanvasNodeView({
         className={cn("pointer-events-none absolute rounded-2xl", selected && "outline outline-2 outline-offset-2 outline-accent")}
         style={{ ...style, borderColor: col, background: `color-mix(in srgb, ${colorOf(node.color, "var(--nv-dim)")} 7%, transparent)` }}
       >
-        <div data-group-label title="Arrastra para mover el grupo" className="pointer-events-auto absolute -top-8 left-0 flex h-7 max-w-full cursor-move items-center rounded-lg px-2 text-[14px] font-semibold text-text"
+        <div data-group-label title="Arrastra para mover el grupo" className={cn("pointer-events-auto absolute -top-8 left-0 flex h-7 cursor-move items-center whitespace-nowrap rounded-lg px-2 text-[14px] font-semibold text-text", !editing && "max-w-full")}
           style={{ background: `color-mix(in srgb, ${colorOf(node.color, "var(--nv-dim)")} 22%, var(--nv-surface))` }}>
           {editing
-            ? <input autoFocus defaultValue={node.label ?? ""} onBlur={(e) => done(e.target.value)}
+            ? <input autoFocus defaultValue={node.label ?? ""} size={Math.max(8, (node.label ?? "").length + 2)}
+              onInput={(e) => { e.currentTarget.size = Math.max(8, e.currentTarget.value.length + 2); }} onBlur={(e) => done(e.target.value)}
               onKeyDown={(e) => {
                 e.stopPropagation();
                 if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur();
               }}
               onPointerDown={(e) => e.stopPropagation()}
-              className="w-48 bg-transparent outline-none" />
+              className="min-w-0 bg-transparent outline-none" />
             : <span className="truncate">{node.label || "Grupo"}</span>}
         </div>
         <Handles selected={selected} />
@@ -207,7 +231,7 @@ export const CanvasNodeView = memo(function CanvasNodeView({
       style={{ ...style, borderColor: col, background: tint }}
     >
       {node.type === "text" && (editing
-        ? <TextEditor value={node.text ?? ""} onDone={done} />
+        ? <CardEditor value={node.text ?? ""} onDone={done} />
         : (
           <div className="nv-prose h-full px-3 py-2 text-[13.5px]"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(node.text ?? "") }} />

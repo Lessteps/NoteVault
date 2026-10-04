@@ -78,15 +78,15 @@ describe("nested groups", () => {
     expect(useCanvas.getState().doc.edges).toHaveLength(0);
   });
 
-  it("a drag from a group's outline moves it with its card (it does not connect or stretch it)", () => {
-    fire("pointerdown", 100, 200); // inner's left side, mid-height
-    fire("pointermove", 80, 200);
-    fire("pointermove", 40, 200);
-    fire("pointerup", 40, 200);
+  it("a drag from a group's outline stretches it (it does not connect or move it)", () => {
+    fire("pointerdown", 100, 150); // inner's left side, off-centre
+    fire("pointermove", 80, 150);
+    fire("pointermove", 40, 150);
+    fire("pointerup", 40, 150);
     expect(node("inner").x).toBe(40);
-    expect(node("inner").width).toBe(300);
+    expect(node("inner").width).toBe(360);
     expect(node("inner").y).toBe(100);
-    expect(node("card").x).toBe(90);
+    expect(node("card").x).toBe(150);
     expect(useCanvas.getState().doc.edges).toHaveLength(0);
   });
 });

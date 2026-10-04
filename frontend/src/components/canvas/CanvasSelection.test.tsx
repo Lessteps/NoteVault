@@ -141,7 +141,7 @@ describe("Space moves the view", () => {
 
   it("Space does not type into a card that is being edited", () => {
     act(() => { el("a").dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true })); });
-    const input = container.querySelector("textarea, input");
+    const input = container.querySelector("textarea, input, .cm-content");
     expect(input).toBeTruthy();
     const ev = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: " " });
     act(() => { input!.dispatchEvent(ev); });
@@ -157,19 +157,21 @@ describe("Space moves the view", () => {
 });
 
 describe("groups", () => {
-  it("the outline moves the group and what it holds; the interior does not", () => {
-    drag([41, 450], [81, 450]); // the group's left outline
+  it("the outline stretches the group; its interior moves it (with what it holds) only once it is selected", () => {
+    drag([300, 500], [340, 520], { target: el("g") }); // its interior, not selected yet: a box selection, nothing moves
+    expect(node("g").x).toBe(40);
+    drag([41, 380], [81, 380]); // the group's left outline
     expect(node("g").x).toBe(80);
+    expect(node("g").width).toBe(460); // stretched
+    expect(node("k").x).toBe(100); // K stayed
+    drag([300, 500], [340, 520], { target: el("g") }); // its interior, now that it is selected
+    expect(node("g").x).toBe(120);
     expect(node("k").x).toBe(140); // K went with it
-    const before = node("g").x;
-    drag([300, 500], [340, 520], { target: el("g") }); // its interior
-    expect(node("g").x).toBe(before);
   });
 
-  it("the pointer says so: a move cursor on a group's outline, not a resize one", () => {
-    fire("pointermove", 41, 450, { buttons: 0 });
-    expect(host().className).toContain("cursor-move");
-    expect(host().className).not.toMatch(/resize/);
+  it("the pointer says so: a resize cursor on a group's outline", () => {
+    fire("pointermove", 41, 380, { buttons: 0 });
+    expect(host().className).toContain("cursor-ew-resize");
   });
 
   it("a group is still resized by its handles once selected", () => {

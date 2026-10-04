@@ -179,10 +179,11 @@ describe("reload", () => {
     expect(useCanvas.getState().modified).toBe(3);
     expect(useCanvas.getState().conflict).toBe(false);
   });
-  it("a dirty canvas becomes a conflict instead of losing edits", async () => {
+  it("a dirty canvas keeps its edits: no reload and no conflict banner", async () => {
     useCanvas.setState({ path: "mapa.canvas", dirty: true, doc: doc(1) });
     await useCanvas.getState().reload();
-    expect(useCanvas.getState().conflict).toBe(true);
+    expect(useCanvas.getState().conflict).toBe(false);
+    expect(useCanvas.getState().doc).toEqual(doc(1));
     expect(apiMock.canvasRead).not.toHaveBeenCalled();
   });
   it("no path means nothing to reload", async () => {

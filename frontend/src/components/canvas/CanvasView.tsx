@@ -164,7 +164,8 @@ export function CanvasView() {
     const el = host.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if ((e.target as Element).closest("textarea")) return;
+      // A card being edited scrolls its own text; Ctrl + wheel still zooms the board.
+      if ((e.target as Element).closest("textarea") || (!(e.ctrlKey || e.metaKey) && (e.target as Element).closest("[data-card-editor]"))) return;
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.0022), e.clientX, e.clientY);
       else if (e.shiftKey) {
@@ -355,22 +356,27 @@ export function CanvasView() {
           startDrag(e, { kind: "connect", from: hit.id, side: hit.side, t: hit.t, ox: wx, oy: wy, x: wx, y: wy });
           return;
         }
-        if (target.type === "group") {
-          beginMove(e, hit.id, wx, wy);
-          return;
-        }
+        // The whole outline stretches the card, a group included: a group is moved from inside it once selected (below).
+        const handle = resizeHandleAt(target, hit, CORNER_PX / viewRef.current.zoom);
         if (!sel.has(hit.id)) {
           setSel(new Set([hit.id]));
           setSelEdge(null);
         }
         snapshot();
-        const handle = resizeHandleAt(target, hit, CORNER_PX / viewRef.current.zoom);
         startDrag(e, { kind: "resize", id: hit.id, sx: wx, sy: wy, w: target.width, h: target.height, x: target.x, y: target.y, handle });
         return;
       }
     }
     const nodeEl = cardElOf(t);
     if (!nodeEl) {
+      // The inside of a group that is already selected moves it (with what it holds): press its outline to select it, then drag inside.
+      const held = doc.nodes
+        .filter((n) => n.type === "group" && sel.has(n.id) && wx >= n.x && wx <= n.x + n.width && wy >= n.y && wy <= n.y + n.height)
+        .sort((a, b) => a.width * a.height - b.width * b.height)[0];
+      if (held && !e.shiftKey) {
+        beginMove(e, held.id, wx, wy);
+        return;
+      }
       // The default tool selects: a drag on the board (or inside a group) draws a selection box; Shift adds to the selection.
       setSelEdge(null);
       if (!e.shiftKey) setSel(new Set());
@@ -408,7 +414,7 @@ export function CanvasView() {
         const hit = onUi || spaceRef.current ? null : hitBorder(hx, hy);
         const node = hit ? byId.get(hit.id) : undefined;
         const handle = hit && node ? resizeHandleAt(node, hit, CORNER_PX / viewRef.current.zoom) : null;
-        const move = node?.type === "group";
+        const move = false;
         setHoverBorder((prev) => {
           if (!hit || !handle) return prev ? null : prev;
           return prev && prev.id === hit.id && prev.handle === handle && prev.move === move ? prev : { id: hit.id, handle, move };
@@ -509,8 +515,12 @@ export function CanvasView() {
   };
 
   const onDoubleClick = (e: React.MouseEvent) => {
-    if (drawMode || (e.target as Element).closest("[data-canvas-ui]")) return;
-    const edgeEl = (e.target as Element).closest("[data-edge-id]");
+    // The press that starts a drag captures the pointer on the board, so the browser reports the board as the target of the
+    // double click even when it landed on a group's label. Resolve the element under the pointer instead.
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const target = e.target === host.current && under && host.current?.contains(under) ? under : (e.target as Element);
+    if (drawMode || target.closest("[data-canvas-ui]")) return;
+    const edgeEl = target.closest("[data-edge-id]");
     if (edgeEl) {
       const found = docRef.current.edges.find((x) => x.id === edgeEl.getAttribute("data-edge-id"));
       if (found) {
@@ -520,7 +530,7 @@ export function CanvasView() {
       }
       return;
     }
-    const nodeEl = cardElOf(e.target as Element);
+    const nodeEl = cardElOf(target);
     if (!nodeEl) {
       const [x, y] = toWorld(e.clientX, e.clientY);
       addText(x, y);
@@ -683,7 +693,7 @@ export function CanvasView() {
   }, [doc.nodes, viewport.x, viewport.y, viewport.width, viewport.height]);
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col bg-surface">
+    <div className="relative flex min-w-0 flex-1 flex-col bg-surface">
       <div className="flex h-10 flex-none items-center gap-2 border-b border-line px-4">
         <LayoutDashboard size={15} className="text-warn" />
         <span className="truncate text-[13px] font-semibold text-text">{title}</span>
@@ -694,7 +704,7 @@ export function CanvasView() {
           className="rounded-md px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">Cerrar</button>
       </div>
       {conflict && (
-        <div className="flex flex-none items-center gap-3 border-b border-warn/40 bg-warn-soft px-4 py-2 text-[12.5px] text-text">
+        <div className="pointer-events-auto absolute left-1/2 top-12 z-30 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-warn/40 bg-warn-soft px-4 py-2 text-[12.5px] text-text shadow-lg">
           El canvas cambió en disco (otra app lo editó).
           <button type="button" className="font-semibold text-accent-text" onClick={() => void useCanvas.getState().open(path)}>Recargar</button>
           <button type="button" className="font-semibold text-warn" onClick={() => void useCanvas.getState().save(true)}>Sobrescribir</button>

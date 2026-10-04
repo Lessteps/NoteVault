@@ -135,6 +135,75 @@ describe("la fila de un ejercicio", () => {
     }
   });
 
+  it("letras o negativos en kg/reps avisan y no se guardan", async () => {
+    const { host, cleanup } = render(
+      <ExerciseRow day="2026-10-01" ex={SIN_VIDEO} entry={{}} onChanged={() => undefined} onVideo={() => undefined} />,
+    );
+    try {
+      const kg = host.querySelector('input[aria-label="Peso: Pull-ups"]') as HTMLInputElement;
+      await act(async () => {
+        kg.focus();
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        setter?.call(kg, "abc");
+        kg.dispatchEvent(new Event("input", { bubbles: true }));
+        kg.dispatchEvent(new Event("change", { bubbles: true }));
+        await Promise.resolve();
+      });
+      await act(async () => {
+        kg.blur();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const error = host.querySelector("[data-row-error]");
+      expect(error).not.toBeNull();
+      expect(error!.textContent).toContain("Solo números");
+      expect(invoke.mock.calls.some((c) => c[0] === "ex_mark")).toBe(false);
+      // Al corregirlo, el error se va y guarda.
+      await act(async () => {
+        kg.focus();
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        setter?.call(kg, "80");
+        kg.dispatchEvent(new Event("input", { bubbles: true }));
+        kg.dispatchEvent(new Event("change", { bubbles: true }));
+        await Promise.resolve();
+      });
+      await act(async () => {
+        kg.blur();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(host.querySelector("[data-row-error]")).toBeNull();
+      expect(invoke.mock.calls.some((c) => c[0] === "ex_mark")).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("tras un fallo al guardar ofrece reintentar en la fila", async () => {
+    invoke.mockRejectedValueOnce(new Error("Fallo de disco"));
+    const { host, cleanup } = render(
+      <ExerciseRow day="2026-10-01" ex={SIN_VIDEO} entry={{}} onChanged={() => undefined} onVideo={() => undefined} />,
+    );
+    try {
+      const check = host.querySelector('input[aria-label="Hecho: Pull-ups"]') as HTMLInputElement;
+      await act(async () => {
+        check.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const retry = host.querySelector("[data-row-retry]") as HTMLButtonElement | null;
+      expect(retry).not.toBeNull();
+      await act(async () => {
+        retry!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(host.querySelector("[data-row-status]")!.textContent).toContain("✓");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("el descanso y el «cómo hacerlo» se ven siempre", () => {
     // `compact` los ocultaba, pero nadie lo usaba: cuatro ramas muertas.
     const { host, cleanup } = render(
@@ -151,6 +220,74 @@ describe("la fila de un ejercicio", () => {
       expect(host.textContent).toContain("Escápulas retraídas");
     } finally {
       cleanup();
+    }
+  });
+
+  it("el descanso abre un temporizador con los segundos del texto", () => {
+    const { host, cleanup } = render(
+      <ExerciseRow day="2026-10-01" ex={CON_VIDEO} entry={{}} onChanged={() => undefined} onVideo={() => undefined} />,
+    );
+    try {
+      act(() => {
+        (host.querySelector("[data-rest-timer]") as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      // "2-3 min" → cota alta: 3:00.
+      expect(host.querySelector("[data-rest-countdown]")!.textContent).toContain("03:00");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("si el descanso no se entiende, pide segundos a mano", () => {
+    const { host, cleanup } = render(
+      <ExerciseRow
+        day="2026-10-01"
+        ex={{ ...CON_VIDEO, rest: "cuando puedas" } as Exercise}
+        entry={{}}
+        onChanged={() => undefined}
+        onVideo={() => undefined}
+      />,
+    );
+    try {
+      act(() => {
+        (host.querySelector("[data-rest-timer]") as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(host.querySelector("[data-rest-manual]")).not.toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("el temporizador suma 15 s y se puede cerrar", () => {
+    vi.useFakeTimers();
+    try {
+      const { host, cleanup } = render(
+        <ExerciseRow day="2026-10-01" ex={{ ...CON_VIDEO, rest: "90s" } as Exercise} entry={{}} onChanged={() => undefined} onVideo={() => undefined} />,
+      );
+      try {
+        act(() => {
+          (host.querySelector("[data-rest-timer]") as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+        act(() => {
+          (host.querySelector("[data-rest-start]") as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+        act(() => {
+          vi.advanceTimersByTime(10000);
+        });
+        expect(host.querySelector("[data-rest-remaining]")!.textContent).toContain("01:20");
+        act(() => {
+          (host.querySelector("[data-rest-add]") as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+        expect(host.querySelector("[data-rest-remaining]")!.textContent).toContain("01:35");
+        act(() => {
+          (host.querySelector("[data-rest-close]") as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+        expect(host.querySelector("[data-rest-countdown]")).toBeNull();
+      } finally {
+        cleanup();
+      }
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

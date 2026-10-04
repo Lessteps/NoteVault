@@ -38,6 +38,9 @@ export function Detail({
   onAdd,
   userEntries = [],
   onRemove,
+  videoUrl,
+  onPickVideo,
+  onRemoveVideo,
 }: {
   entry: LibraryEntry;
   /** La rutina actual, para avisar de lo que ya está dentro. */
@@ -50,6 +53,12 @@ export function Detail({
   userEntries?: LibraryUserEntry[];
   /** Quita tu entrada de la biblioteca. Es el «deshacer» de una edición. */
   onRemove?: () => void;
+  /** URL servida del video propio, si lo tiene y se resolvió. */
+  videoUrl?: string;
+  /** Elegir video para la entrada propia. */
+  onPickVideo?: () => void;
+  /** Quitar el video de la entrada propia. */
+  onRemoveVideo?: () => void;
 }) {
   // Hay algo tuyo que deshacer si **este** slug está en tu fichero. No se mira
   // `entry.own`: esa marca solo la llevan las entradas con slug propio, y aquí
@@ -96,11 +105,35 @@ export function Detail({
               ),
           )}
         </div>
+      ) : videoUrl ? (
+        <video
+          data-library-video
+          src={videoUrl}
+          controls
+          className="h-28 w-full rounded-lg border border-line object-contain"
+          style={{ background: "#141414" }}
+        />
+      ) : entry.video_path ? (
+        <p className="text-[12px] text-dim">Video: {entry.video_path.split(/[\\/]/).pop()}</p>
       ) : (
         // Los ejercicios que escribes tú no traen los tres frames del paquete.
         // Una tira de recuadros vacíos parece un fallo de carga, así que se dice
         // lo que pasa. El resto del detalle sigue igual.
         <p className="text-[12px] text-faint">Sin imágenes</p>
+      )}
+      {isOwn && (
+        <div className="flex flex-wrap gap-2">
+          {onPickVideo && (
+            <GhostButton data-library-pick-video onClick={onPickVideo} className="self-start">
+              Elegir video…
+            </GhostButton>
+          )}
+          {onRemoveVideo && (
+            <GhostButton data-library-remove-video onClick={onRemoveVideo} className="self-start">
+              Quitar video
+            </GhostButton>
+          )}
+        </div>
       )}
 
       <dl className="space-y-1 text-[12px] text-dim">

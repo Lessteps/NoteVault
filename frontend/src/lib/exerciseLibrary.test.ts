@@ -13,6 +13,7 @@ import {
   mergeLibrary,
   searchLibrary,
   staleCopies,
+  orphanCopies,
   fieldsFromLibrary,
 } from "./exerciseLibrary";
 
@@ -484,6 +485,48 @@ describe("la biblioteca como capa editable", () => {
         [entrada],
       );
       expect(f.how_to).toBe("");
+    });
+  });
+
+  describe("orphanCopies", () => {
+    test("una copia sin origen con nombre exacto se propone para vincular", () => {
+      const copia = { id: "e1", name: "Mi press", source: "", sourceFp: "" };
+      const [out] = orphanCopies([copia], [mia()]);
+      expect(out?.exercise).toBe(copia);
+      expect(out?.entry.slug).toBe("mia-1");
+    });
+
+    test("una copia con origen ya no es huérfana", () => {
+      const copia = { id: "e1", name: "Mi press", source: "mia-1", sourceFp: "x" };
+      expect(orphanCopies([copia], [mia()])).toEqual([]);
+    });
+
+    test("una copia marcada a mano no vuelve a proponerse", () => {
+      const copia = { id: "e1", name: "Mi press", source: "", sourceFp: "manual" };
+      expect(orphanCopies([copia], [mia()])).toEqual([]);
+    });
+
+    test("sin coincidencia no se propone nada", () => {
+      const copia = { id: "e1", name: "Otro que no existe xyz", source: "", sourceFp: "" };
+      expect(orphanCopies([copia], [mia()])).toEqual([]);
+    });
+
+    test("el nombre se compara normalizado", () => {
+      const copia = { id: "e1", name: "  MI   PRESS  ", source: "", sourceFp: "" };
+      expect(orphanCopies([copia], [mia()]).map((o) => o.entry.slug)).toEqual(["mia-1"]);
+    });
+  });
+
+  describe("video propio", () => {
+    test("fieldsFromLibrary hereda el video de la entrada", () => {
+      const entry = { ...libraryEntry("mia-1", [mia({ video_path: "ejercicio/videos/mio.mp4" })])! };
+      expect(fieldsFromLibrary(entry).video_path).toBe("ejercicio/videos/mio.mp4");
+    });
+
+    test("cambiar solo el video no deja la copia desfasada", () => {
+      const antes = fpOf();
+      const editada = [{ ...MIA, video_path: "ejercicio/videos/nuevo.mp4" }];
+      expect(staleCopies([{ source: "mia-1", sourceFp: antes }], editada)).toEqual([]);
     });
   });
 });

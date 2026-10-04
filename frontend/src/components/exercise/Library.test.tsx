@@ -140,6 +140,15 @@ async function mountProgram() {
   return view;
 }
 
+/** Abre el panel del formulario en Tu programa (cerrado por defecto). */
+async function openDrawer(host: { querySelector(s: string): Element | null }) {
+  await act(async () => {
+    (host.querySelector("[data-add-exercise]") as HTMLButtonElement)!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+  });
+}
+
 beforeEach(() => {
   mounted.length = 0;
   invoke.mockReset();
@@ -162,6 +171,39 @@ afterEach(() => {
 });
 
 describe("ejercicio", () => {
+  it("la barra lateral se colapsa a solo iconos y los anillos se apilan en vertical", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      const aside = () => host.querySelector("aside")!;
+      expect(aside().className).toMatch(/w-\[260px\]/);
+      const hide = host.querySelector('button[aria-label="Ocultar barra lateral"]') as HTMLButtonElement | null;
+      expect(hide).not.toBeNull();
+      await act(async () => {
+        hide!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      // Colapsada: estrecha, sin etiquetas, solo los tres iconos.
+      expect(aside().className).toMatch(/w-16/);
+      const labels = [...host.querySelectorAll("aside nav button")].map((b) => b.textContent ?? "");
+      expect(labels.every((l) => l.trim() === "")).toBe(true);
+      expect(host.querySelectorAll("aside nav button")).toHaveLength(3);
+      // Anillos en vertical.
+      expect(host.querySelector("[data-period-rings]")!.className).toMatch(/grid-cols-1/);
+      // Al ampliar vuelven a su posición original.
+      const show = host.querySelector('button[aria-label="Mostrar barra lateral"]') as HTMLButtonElement | null;
+      expect(show).not.toBeNull();
+      await act(async () => {
+        show!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(aside().className).toMatch(/w-\[260px\]/);
+      expect([...host.querySelectorAll("aside nav button")].map((b) => b.textContent ?? "").some((l) => l.includes("Ejercicios"))).toBe(true);
+      expect(host.querySelector("[data-period-rings]")!.className).toMatch(/grid-cols-2/);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("el progreso agrupa semanal, mensual y anual en una sola vista", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {
@@ -232,6 +274,71 @@ describe("Biblioteca de Ejercicio", () => {
     }
   });
 
+  it("los días vacíos colapsan y se expanden al pulsar", async () => {
+    invoke.mockImplementation(async (method: string) => {
+      if (method === "ex_meta")
+        return { days: [
+          { key: "lunes", name: "Lunes", subtitle: "Pecho", glyph: "💪" },
+          { key: "martes", name: "Martes", subtitle: "Espalda", glyph: "🦵" },
+        ] };
+      if (method === "ex_list")
+        return [
+          {
+            id: "e1", day: "lunes", name: "Press banca", video: "", video_path: "",
+            series_reps: "4×8", rest: "90 s", how_to: "", has_video: false,
+            video_name: "", muscles: { primary: ["pectoral"], secondary: [] },
+          },
+        ];
+      return BASE_INVOKE(method);
+    });
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Ejercicios"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      // Martes no tiene nada: plegado, sin filas.
+      const toggle = host.querySelector('[data-routine-day-toggle="martes"]');
+      expect(toggle).not.toBeNull();
+      expect(host.querySelector('[data-routine-day="martes"] [data-routine-exercise]')).toBeNull();
+      // Lunes sí tiene: abierto.
+      expect(host.querySelector('[data-routine-day="lunes"] [data-routine-exercise]')).not.toBeNull();
+      await act(async () => {
+        toggle!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(host.querySelector('[data-routine-day="martes"]')!.textContent).toContain("Sin ejercicios");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("el formulario abre en un panel solo al añadir o editar", async () => {
+    const { host, cleanup } = mount(<ExerciseModule />);
+    try {
+      await act(async () => {
+        [...host.querySelectorAll("aside nav button")]
+          .find((b) => b.textContent?.includes("Ejercicios"))!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      // Cerrado al entrar: la lista respira a ancho completo.
+      expect(host.querySelector('input[aria-label="Nombre"]')).toBeNull();
+      await act(async () => {
+        host.querySelector("[data-add-exercise]")!
+          .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(host.querySelector('input[aria-label="Nombre"]')).not.toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
   it("Tu programa tiene buscador de biblioteca y deja elegir el día", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {
@@ -243,6 +350,7 @@ describe("Biblioteca de Ejercicio", () => {
       });
 
       // El buscador de la biblioteca vive dentro del formulario de tu rutina.
+      await openDrawer(host);
       const picker = host.querySelector("[data-library-picker]")!;
       expect(picker).not.toBeNull();
       const search = picker.querySelector('input[aria-label="Buscar en la biblioteca"]') as HTMLInputElement;
@@ -303,6 +411,7 @@ describe("Biblioteca de Ejercicio", () => {
           .dispatchEvent(new MouseEvent("click", { bubbles: true }));
         await Promise.resolve();
       });
+      await openDrawer(host);
       const picker = host.querySelector("[data-library-picker]")!;
       const search = picker.querySelector('input[aria-label="Buscar en la biblioteca"]') as HTMLInputElement;
       await act(async () => {
@@ -461,6 +570,7 @@ it("el picker marca lo que ya usas por su origen, no por el nombre", async () =>
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
       await Promise.resolve();
     });
+    await openDrawer(host);
     const picker = host.querySelector("[data-library-picker]")!;
     const search = picker.querySelector('input[aria-label="Buscar en la biblioteca"]') as HTMLInputElement;
     await act(async () => {
@@ -485,6 +595,7 @@ it("el formulario ofrece los dos botones, con nombres distintos", async () => {
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
       await Promise.resolve();
     });
+    await openDrawer(host);
     const toProgram = [...host.querySelectorAll("button")].find((b) =>
       b.textContent?.includes("Guardar ejercicio"),
     )!;
@@ -514,6 +625,7 @@ it("guardar en la biblioteca no escribe en el programa", async () => {
       await Promise.resolve();
     });
     // Un nombre primero: la biblioteca exige un nombre, el programa también.
+    await openDrawer(host);
     const name = host.querySelector('input[aria-label="Nombre"]') as HTMLInputElement;
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -553,6 +665,7 @@ it("el botón de la biblioteca no requiere día", async () => {
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
       await Promise.resolve();
     });
+    await openDrawer(host);
     const name = host.querySelector('input[aria-label="Nombre"]') as HTMLInputElement;
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -590,6 +703,7 @@ it("un fallo al guardar en la biblioteca no dice que se añadió al programa", a
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
       await Promise.resolve();
     });
+    await openDrawer(host);
     await act(async () => {
       host.querySelector("[data-library-save]")!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -614,6 +728,34 @@ it("avisa cuando una copia quedó desfasada", async () => {
   } finally {
     cleanup();
   }
+});
+
+it("con auto-sync actualiza sola y no muestra el banner", async () => {
+  useNavState.setState({ values: { "ejercicio.sync-auto": true } });
+  seedRoutineCopy({
+    name: "Vieja copia",
+    series_reps: "4×8",
+    source: "mia-1",
+    sourceFp: "huella-vieja",
+  });
+  const { host } = await mountProgram();
+  await act(async () => {
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+  });
+  expect(host.querySelector("[data-stale-banner]")).toBeNull();
+  const sent = savedAt(-1)[1] as Record<string, unknown>;
+  expect(sent.name).toBe("Mi press");
+  expect(sent.series_reps).toBeUndefined();
+});
+
+it("apagado no escribe nada hasta pulsar Actualizar", async () => {
+  seedRoutineCopy({ source: "mia-1", sourceFp: "huella-vieja" });
+  const { host } = await mountProgram();
+  await act(async () => {
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+  });
+  expect(host.querySelector("[data-stale-banner]")).not.toBeNull();
+  expect(savedAt(-1)).toBeUndefined();
 });
 
 it("no avisa si nada ha cambiado", async () => {
@@ -689,6 +831,150 @@ it("se puede descartar el aviso sin cambiar nada", async () => {
   }
 });
 
+it("propone vincular una copia antigua sin origen", async () => {
+  seedRoutineCopy({ name: "Mi press", source: "", sourceFp: "" });
+  const { host } = await mountProgram();
+  const orphan = () => host.querySelector("[data-orphan-banner]");
+  expect(orphan()).not.toBeNull();
+  expect(orphan()!.textContent).toContain("de la Biblioteca");
+});
+
+it("vincular guarda origen y huella sin tocar tus números", async () => {
+  seedRoutineCopy({
+    name: "Mi press",
+    series_reps: "4×8",
+    rest: "90 s",
+    source: "",
+    sourceFp: "",
+  });
+  const { host } = await mountProgram();
+  await act(async () => {
+    host.querySelector("[data-orphan-link]")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+  });
+  const sent = savedAt(-1)[1] as Record<string, unknown>;
+  expect(sent.source).toBe("mia-1");
+  expect(String(sent.sourceFp)).toBe(CURRENT_FP);
+  expect(sent.series_reps).toBeUndefined();
+  expect(sent.rest).toBeUndefined();
+});
+
+it("mantener a mano no vuelve a proponer", async () => {
+  seedRoutineCopy({ name: "Mi press", source: "", sourceFp: "" });
+  const { host } = await mountProgram();
+  await act(async () => {
+    host.querySelector("[data-orphan-keep]")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+  });
+  const sent = savedAt(-1)[1] as Record<string, unknown>;
+  expect(sent.sourceFp).toBe("manual");
+  expect(host.querySelector("[data-orphan-banner]")).toBeNull();
+});
+
+it("el botón Historial abre la ficha del ejercicio", async () => {
+  seedRoutineCopy({ name: "Mi press", source: "", sourceFp: "" });
+  invoke.mockImplementation(async (method: string, ...rest: unknown[]) => {
+    if (method === "ex_history") return [];
+    const inner = BASE_INVOKE as (...a: unknown[]) => Promise<unknown>;
+    if (method === "ex_save") return { ok: true, id: "e1" };
+    if (method === "ex_library_list") return [MIA_1];
+    if (method === "ex_list")
+      return [
+        {
+          id: "e1", day: "lunes", name: "Mi press", video: "", video_path: "",
+          series_reps: "", rest: "", how_to: "", has_video: false, video_name: "",
+          muscles: { primary: ["pectoral"], secondary: [] }, source: "", sourceFp: "",
+        },
+      ];
+    return inner(method, ...rest);
+  });
+  const { host } = await mountProgram();
+  await act(async () => {
+    host.querySelector('[title="Historial"]')!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+  });
+  expect(host.querySelector("[data-history-panel]")).not.toBeNull();
+  expect(host.querySelector("[data-history-panel]")!.textContent).toContain("Mi press");
+});
+
+function seedTwoOnMonday() {
+  useExercise.setState({
+    days: ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"].map((k) => ({
+      key: k, name: k, subtitle: "", glyph: "💪",
+    })),
+  });  invoke.mockImplementation(async (method: string, ...rest: unknown[]) => {
+    if (method === "ex_meta") return { days: [{ key: "lunes", name: "Lunes", subtitle: "", glyph: "💪" }, { key: "martes", name: "Martes", subtitle: "", glyph: "🦵" }, { key: "miercoles", name: "Miércoles", subtitle: "", glyph: "💪" }, { key: "jueves", name: "Jueves", subtitle: "", glyph: "🦵" }, { key: "viernes", name: "Viernes", subtitle: "", glyph: "🔥" }, { key: "sabado", name: "Sábado", subtitle: "", glyph: "🚶" }, { key: "domingo", name: "Domingo", subtitle: "", glyph: "😴" }] };
+    if (method === "ex_library_list") return [MIA_1];
+    if (method === "ex_list")
+      return ["Press A", "Press B"].map((name, i) => ({
+        id: `e${i + 1}`, day: "lunes", name, video: "", video_path: "",
+        series_reps: "4×8", rest: "90 s", how_to: "", has_video: false, video_name: "",
+        muscles: { primary: ["pectoral"], secondary: [] }, source: "mia-1", sourceFp: CURRENT_FP,
+      }));
+    return (BASE_INVOKE as (...a: unknown[]) => Promise<unknown>)(method, ...rest);
+  });
+}
+
+it("duplicar día copia los ejercicios al destino con su origen", async () => {
+  seedTwoOnMonday();
+  const { host } = await mountProgram();
+  await act(async () => {
+    host.querySelector('[data-duplicate-day="lunes"]')!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+  });
+  const select = host.querySelector("[data-duplicate-target]") as HTMLSelectElement;
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    setter?.call(select, "martes");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    await Promise.resolve();
+  });
+  await act(async () => {
+    host.querySelector("[data-duplicate-confirm]")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+  });
+  const days = savedAt(-1) !== undefined
+    ? [savedAt(-2), savedAt(-1)].map(([, f]) => f)
+    : [];
+  expect(days).toHaveLength(2);
+  for (const f of days) {
+    expect(f.day).toBe("martes");
+    expect(f.source).toBe("mia-1");
+  }
+  expect((days[0] as Record<string, unknown>).series_reps).toBe("4×8");
+});
+
+it("mover cambia el día y conserva tus números", async () => {
+  seedTwoOnMonday();
+  const { host } = await mountProgram();
+  await act(async () => {
+    host.querySelector('[data-move-exercise="e1"]')!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+  });
+  const select = host.querySelector('[data-move-target="e1"]') as HTMLSelectElement;
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    setter?.call(select, "martes");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    await Promise.resolve();
+  });
+  await act(async () => {
+    host.querySelector('[data-move-confirm="e1"]')!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+  });
+  const [id, f] = savedAt(-1) as [string, Record<string, unknown>];
+  expect(id).toBe("e1");
+  expect(f.day).toBe("martes");
+  expect(f.series_reps).toBeUndefined();
+});
+
 it("una entrada propia muestra «Sin imágenes» en vez de recuadros vacíos", async () => {
   invoke.mockImplementation(async (method: string) => {
     if (method === "ex_library_list")
@@ -722,6 +1008,87 @@ it("una entrada propia muestra «Sin imágenes» en vez de recuadros vacíos", a
     // Y el resto del detalle sigue ahí: esto no es un ejercicio vacío.
     expect(detail.textContent).toContain("Mi press");
     expect(detail.textContent).toContain("Barra");
+  } finally {
+    cleanup();
+  }
+});
+
+it("una entrada propia con video lo muestra en el detalle", async () => {
+  invoke.mockImplementation(async (method: string, ...rest: unknown[]) => {
+    if (method === "ex_library_list")
+      return [
+        {
+          slug: "mia-1",
+          name: "Mi press",
+          equipment: "Barra",
+          muscles: { primary: ["pectoral"], secondary: [] },
+          how_to: "1. Baja\n2. Empuja",
+          video_path: "ejercicio/videos/mio.mp4",
+        },
+      ];
+    if (method === "ex_library_video_url") return { url: "http://video/mio.mp4", name: "mio.mp4" };
+    return (BASE_INVOKE as (...a: unknown[]) => Promise<unknown>)(method, ...rest);
+  });
+  const { host, cleanup } = mount(<Library />);
+  try {
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const row = host.querySelector('[data-slug="mia-1"]')!;
+    await act(async () => {
+      row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const detail = host.querySelector("[data-library-detail]")!;
+    expect(detail.querySelector("[data-library-video]")).not.toBeNull();
+  } finally {
+    cleanup();
+  }
+});
+
+it("añadir desde la biblioteca hereda el video propio", async () => {
+  const saved: Array<Record<string, unknown>> = [];
+  invoke.mockImplementation(async (method: string, ...rest: unknown[]) => {
+    const argv = (rest[0] ?? []) as unknown[];
+    if (method === "ex_library_list")
+      return [
+        {
+          slug: "mia-1",
+          name: "Mi press",
+          equipment: "Barra",
+          muscles: { primary: ["pectoral"], secondary: [] },
+          how_to: "1. Baja\n2. Empuja",
+          video_path: "ejercicio/videos/mio.mp4",
+        },
+      ];
+    if (method === "ex_library_video_url") return { url: "http://video/mio.mp4", name: "mio.mp4" };
+    if (method === "ex_save") {
+      saved.push((argv[1] ?? {}) as Record<string, unknown>);
+      return { ok: true, id: "nuevo" };
+    }
+    return (BASE_INVOKE as (...a: unknown[]) => Promise<unknown>)(method, ...rest);
+  });
+  const { host, cleanup } = mount(<Library />);
+  try {
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const row = host.querySelector('[data-slug="mia-1"]')!;
+    await act(async () => {
+      row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector('[data-library-add="mia-1"]')!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(saved.at(-1)!.video_path).toBe("ejercicio/videos/mio.mp4");
   } finally {
     cleanup();
   }
@@ -1297,6 +1664,100 @@ it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
       });
       expect(search.value).toBe("");
       expect(equipment.value).toBe("Barbell");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("embebida en Ejercicios también ofrece buscador de texto", async () => {
+    const { host, cleanup } = mount(<Library embedded />);
+    try {
+      const search = host.querySelector('input[aria-label="Buscar ejercicios"]') as HTMLInputElement | null;
+      expect(search).not.toBeNull();
+      const rows = () => host.querySelectorAll("[data-slug]").length;
+      expect(rows()).toBe(302);
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        setter?.call(search!, "bench press");
+        search!.dispatchEvent(new Event("input", { bubbles: true }));
+        search!.dispatchEvent(new Event("change", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(rows()).toBeGreaterThan(0);
+      expect(rows()).toBeLessThan(302);
+      expect(host.textContent).toContain("Bench Press");
+      // Sin botón "Limpiar": la X va dentro del buscador.
+      expect([...host.querySelectorAll("button")].some((b) => b.textContent === "Limpiar")).toBe(false);
+      const clear = host.querySelector('button[aria-label="Limpiar búsqueda"]') as HTMLButtonElement | null;
+      expect(clear).not.toBeNull();
+      await act(async () => {
+        clear!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(search!.value).toBe("");
+      expect(rows()).toBe(302);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("embebida también filtra por equipo", async () => {
+    const { host, cleanup } = mount(<Library embedded />);
+    try {
+      const equipment = host.querySelector('select[aria-label="Filtrar por equipo"]') as HTMLSelectElement | null;
+      expect(equipment).not.toBeNull();
+      const rows = () => host.querySelectorAll("[data-slug]").length;
+      expect(rows()).toBe(302);
+      await act(async () => {
+        equipment!.value = "Dumbbell";
+        equipment!.dispatchEvent(new Event("change", { bubbles: true }));
+        await Promise.resolve();
+      });
+      expect(rows()).toBeGreaterThan(0);
+      expect(rows()).toBeLessThan(302);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("embebida marca favoritos con estrella y los filtra", async () => {
+    const seen: string[] = [];
+    const inner = invoke.getMockImplementation()!;
+    invoke.mockImplementation(async (method: string, ...rest: unknown[]) => {
+      if (method === "ex_favorites") return [...seen];
+      if (method === "ex_favorite_toggle") {
+        const argv = (rest[0] ?? []) as unknown[];
+        const slug = String(argv[0] ?? "");
+        const i = seen.indexOf(slug);
+        if (i >= 0) seen.splice(i, 1);
+        else seen.push(slug);
+        return { slug, on: seen.includes(slug) };
+      }
+      return (inner as (...a: unknown[]) => Promise<unknown>)(method, ...rest);
+    });
+    const { host, cleanup } = mount(<Library embedded />);
+    try {
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      const star = host.querySelector('[data-favorite]') as HTMLButtonElement | null;
+      expect(star).not.toBeNull();
+      const slug = star!.getAttribute("data-favorite")!;
+      await act(async () => {
+        star!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(star!.getAttribute("aria-pressed")).toBe("true");
+      const only = host.querySelector('[data-favorites-only]') as HTMLButtonElement | null;
+      expect(only).not.toBeNull();
+      await act(async () => {
+        only!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+      const rows = [...host.querySelectorAll("[data-slug]")].map((r) => r.getAttribute("data-slug"));
+      expect(rows).toEqual([slug]);
     } finally {
       cleanup();
     }

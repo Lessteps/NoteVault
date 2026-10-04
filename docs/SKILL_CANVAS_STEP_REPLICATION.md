@@ -114,6 +114,72 @@ The spec format is documented at the top of `notevault_app/core/deliverable_canv
 `C:\PROGRAMMING\PROJECTS\NoteVault\docs\canvas_specs\<PHASE_X>\<N.Name>.json` so a canvas can be
 regenerated after corrections: fix the spec and rebuild; never hand-edit coordinates.
 
+## 5c. Micro-step chain: how the How-to becomes visible work (final template, 2026-10-04, from 1.1.1)
+
+Reference: `Programación/FULLSTACK_DEVELOPMENT/PHASE_0_PROBLEM_RECOGNITION/1.Problem_Statement/1.Problem_statement_h.canvas`,
+micro-step **1.1.1 — Segmentation into narrative units**. Every micro-step of every deliverable canvas is built like it.
+The point: the reader must see HOW the raw source becomes the example output, one How-to step at a time, and WHY each
+decision was taken, without already knowing the method.
+
+### Layout (left to right, inside the micro-step group)
+
+```
+[## 1.1.1 header] ─how to execute→ [How-to] ─step 1 of how to do it→ [Step 1] ─<what flows>→ [Step 2] … [Step K] ─produces (example)→ [Example output]
+                                                (one card per How-to step, same order as the How-to)
+```
+
+### The step card (one per How-to step)
+
+Title `### Step N · <verb phrase from the How-to>`, then, in this order:
+
+1. `**Starts from:**` what the card receives (the previous card's result, or the raw source for Step 1).
+2. `**Will do:**` the operation of this How-to step, in one sentence.
+3. `**Source (raw):**` the text it works on (verbatim).
+4. The work itself, one block per item the step decides on (`**✂ Piece N**` + `> quote`, `**[U3]**` + `> quote`,
+   a table row, a checklist item…), always followed by `↳ **Why:**` explaining THAT decision (why this cut / role / verdict).
+   The reason goes directly under each piece or decision, never in a block at the end.
+5. `**Selected:**` what the step picked, and `**Changed:**` what it changed (may be "nothing", and then say why).
+6. `**Result — what this step leaves:**` what exists after the step. Step 1 of 1.1.1 may say "nothing marked yet".
+
+The micro-step then ends with its **Example output** note (the filled table), which has:
+
+- a final **Why** column in every table, one reason per row, in row order;
+- under the table, only the general reasons that apply to the whole table (`↳ **Why …:**`);
+- a last line `**Result — what N.M.K leaves:**` (put it in the How-to note instead when the example is official
+  text that gets pasted into the deliverable, e.g. the front matter or the canonical paragraph).
+
+The next micro-step's How-to note opens with `**Starts from:** <what the previous micro-step left, and what this one
+does with it>`. Sub-steps already hand over through their `# INPUT` card.
+
+### Rules
+
+1. Cards are verbatim from the raw source; never a joined paragraph.
+2. A card shows its whole text without scrolling (about 66 characters per line at 520 px, 23 px per line, +30 px).
+3. All cards of a row share the same height and are centred on the group's other cards; 230–290 px between cards so each
+   arrow label reads; arrow labels say what flows (≤ 45 characters).
+4. Groups wrap their children: 40 px around the micro-step group, 30 px around the sub-step group.
+5. Every rewrite keeps a `.bak` copy (never overwrite one) and happens with the canvas closed in NoteVault.
+6. Everything is in English.
+
+### Re-flow after adding or growing cards (do not move things by hand)
+
+Notes grow and cards are inserted, so the whole canvas is re-laid out by script, always in this order:
+(1) grow each note to fit its text; (2) grow each group to wrap what it held; (3) horizontally, every micro-step that
+got wider pushes the micro-steps to its right, and a sub-step that got wider pushes the sub-step beside it;
+(4) vertically, every `Step N.M` row that got taller pushes the rows below it down (a row's shift is the largest
+shift + growth among the rows entirely above it); (5) `Step N` outer groups take the top shift of their first row and
+wrap the bottom of their last. Check afterwards that no card overlaps, no two groups cut each other and no card
+escapes its group (the scripts that did this for the Problem Statement live in the session that built it; the checks
+are `tools/check_canvas_groups.py` and a card/group overlap check).
+
+### Acceptance (add to section 7)
+
+- [ ] Every How-to step of the micro-step has its own card, in order, with Starts from / Will do / Source / the work /
+      Selected / Changed / Result.
+- [ ] Every piece, row or verdict has its reason directly under it (`↳ Why:`) or in the table's Why column.
+- [ ] Each micro-step ends with a Result line and the next one starts from it.
+- [ ] No card overlaps, no group cuts another, nothing needs scrolling.
+
 ## 6. Rules
 
 - **Tell the user to close that canvas in the app before you edit it** (autosave overwrites
@@ -135,3 +201,4 @@ regenerated after corrections: fix the spec and rebuild; never hand-edit coordin
 - [ ] `python tools/check_canvas_groups.py <file.canvas>` prints `0 problem(s)` (every group inside its numbered parent, no group cutting another).
 - [ ] No notes overlap (open the canvas; the 📑 index must list Steps → sub-steps → micro-steps in order).
 - [ ] Copies of issued artifacts are verbatim (compare the final deliverable against the artifact).
+- [ ] (Chain layout, section 5c) See the acceptance list at the end of section 5c.

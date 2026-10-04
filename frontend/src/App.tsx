@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { api } from "./lib/bridge";
+import { listenForCaptures } from "./lib/screenCapture";
 import { flushAll, useApp, wasJustWritten } from "./store/app";
 import { MiniPlayer } from "./components/english/MiniPlayer";
 import { ComingSoon, IconRail, MODULES as MODULE_LABELS, StatusBar, Toasts, TopBar, TAB_MIME } from "./components/Shell";
@@ -247,6 +248,8 @@ export function App() {
   useFileWatcherListener();
   // Clicking a review notification opens the Repaso calendar.
   useEffect(() => api.onOpenReview(() => useReviewCalendar.getState().set(true)), []);
+  // Screenshots: the global shortcut and the "saved" toast.
+  useEffect(() => listenForCaptures(), []);
   useWindowNoteParam();
   useEffect(() => {
     void init();

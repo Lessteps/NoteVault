@@ -4,9 +4,10 @@
 // El globo no es el modulo del navegador: muestra y oculta la lista de paginas
 // *dentro* del panel, sin moverte de donde estas.
 
-import { Bug, CalendarClock, Globe, Headphones, ListTree, Mic, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
+import { Bug, CalendarClock, Crop, Globe, Headphones, ListTree, Mic, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
 import { useEffect } from "react";
 import { toggleFace } from "../../lib/panelFaces";
+import { startScreenCapture } from "../../lib/screenCapture";
 import { subjectUsesLatex, useActiveSubject } from "../../lib/useActiveSubject";
 import { useReviewPanel } from "../study/ReviewPanel";
 import { useSourcesPanel } from "../english/SourcesPanel";
@@ -97,6 +98,17 @@ export function PanelLaunchers({ module }: { module: string }) {
             {pages}
           </span>
         )}
+      </button>
+
+      {/* Screenshot (also Ctrl+Alt+S): rectangle, stroke, window or full screen, saved in the attachments folder. */}
+      <button
+        type="button"
+        title="Captura de pantalla (Ctrl+Alt+S): rectángulo, trazo, ventana o pantalla completa"
+        aria-label="Captura de pantalla"
+        onClick={() => void startScreenCapture()}
+        className={cell(false)}
+      >
+        <Crop size={16} />
       </button>
 
       {/* Not "a panel": the note's outline, which needs a note. */}

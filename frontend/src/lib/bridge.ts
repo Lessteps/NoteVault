@@ -20,6 +20,8 @@ declare global {
     nv?: {
       invoke: (method: string, args: unknown[]) => Promise<unknown>;
       onOpenReview?: (cb: () => void) => () => void;
+      onCaptureRequest?: (cb: () => void) => () => void;
+      onCaptureDone?: (cb: (data: { rel: string; name: string }) => void) => () => void;
       onWatchEvent?: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void) => () => void;
       onBrowserState?: (cb: (data: BrowserState) => void) => () => void;
       onWindowState?: (cb: (data: { maximized: boolean }) => void) => () => void;
@@ -596,6 +598,15 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   /** A review notification was clicked: open the Repaso calendar. */
   onOpenReview: (cb: () => void): (() => void) => {
     if (typeof window !== "undefined" && window.nv?.onOpenReview) return window.nv.onOpenReview(cb);
+    return () => undefined;
+  },
+  captureStart: (folder: string) => call<{ ok: boolean }>("capture_start", folder),
+  onCaptureRequest: (cb: () => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onCaptureRequest) return window.nv.onCaptureRequest(cb);
+    return () => undefined;
+  },
+  onCaptureDone: (cb: (data: { rel: string; name: string }) => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onCaptureDone) return window.nv.onCaptureDone(cb);
     return () => undefined;
   },
   onWatchEvent: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void): (() => void) => {

@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, "..", "..");
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), "utf-8");
 
 /** Every file that opens a window or an embedded view. */
-const WINDOW_FILES = ["electron/windowFactory.ts", "electron/main.ts", "electron/browserManager.ts", "src/api/modules/web.ts"];
+const WINDOW_FILES = ["electron/windowFactory.ts", "electron/main.ts", "electron/browserManager.ts", "electron/screenCapture.ts", "src/api/modules/web.ts"];
 
 describe("window isolation flags", () => {
   for (const file of WINDOW_FILES) {

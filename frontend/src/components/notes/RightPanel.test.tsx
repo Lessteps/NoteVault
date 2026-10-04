@@ -48,9 +48,9 @@ describe("RightPanel", () => {
     useWebPages.setState({ open: false });
     mount("ejercicio");
     expect(labels()).toContain("Acceso panel lateral");
-    // Cuatro puertas en Ejercicio: la suya (el esquema muscular) y las tres de la app.
+    // Cinco puertas en Ejercicio: la suya (el esquema muscular) y las cuatro de la app (con la captura de pantalla).
     const strip = container.querySelector('aside[aria-label="Acceso panel lateral"]')!;
-    expect(strip.querySelectorAll("button")).toHaveLength(4);
+    expect(strip.querySelectorAll("button")).toHaveLength(5);
   });
 
   it("el esquema muscular abre su cara en Ejercicio, y solo ahí", () => {

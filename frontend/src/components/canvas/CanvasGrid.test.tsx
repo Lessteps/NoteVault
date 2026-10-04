@@ -95,7 +95,7 @@ describe("moving", () => {
 
 describe("resizing", () => {
   it("the edge being dragged lands on the grid and the opposite edge does not move, even if it was off the grid", () => {
-    render({ nodes: [{ id: "g", type: "group", x: 107, y: 93, width: 203, height: 97, label: "G" }], edges: [] }); // right edge 310, bottom edge 190
+    render({ nodes: [{ id: "g", type: "text", x: 107, y: 93, width: 203, height: 97, text: "G" }], edges: [] }); // right edge 310, bottom edge 190
     drag([108, 140], [78, 140]); // left side
     expect(onGrid(node("g").x)).toBe(true);
     expect(node("g").x + node("g").width).toBe(310);

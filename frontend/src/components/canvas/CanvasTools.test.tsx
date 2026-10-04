@@ -219,7 +219,7 @@ describe("groups inside groups", () => {
     expect(el("outer").className).not.toContain("outline-accent");
   });
 
-  it("the INTERIOR of a group does not grab it: it is the board (a drag pans, a click selects nothing)", () => {
+  it("the INTERIOR of a group does not grab it: it is the board (a drag draws a selection box, it neither moves the group nor the view)", () => {
     render(nested());
     const move = () => /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec(host().firstElementChild!.getAttribute("style") ?? "")!;
     const x0 = useCanvas.getState().doc.nodes.find((n) => n.id === "inner")!.x;
@@ -230,7 +230,7 @@ describe("groups inside groups", () => {
     const inner = useCanvas.getState().doc.nodes.find((n) => n.id === "inner")!;
     expect(inner.x).toBe(x0); // the group did not move
     expect(el("inner").className).not.toContain("outline-accent"); // and it was not selected
-    expect(move()[1]).toBe("80"); // the board panned instead (the view moved 80 px to the right)
+    expect(move()[1]).toBe("0"); // the view did not move either: a drag on the board selects now
   });
 
   it("a click on a group's interior clears the selection like a click on the board", () => {

@@ -65,8 +65,12 @@ export function CanvasView() {
   const clip = useRef<CanvasDoc | null>(null);
   const docRef = useRef(doc);
   docRef.current = doc;
-  /** The outline the pointer is over and what dragging it would do (which handle). */
-  const [hoverBorder, setHoverBorder] = useState<{ id: string; handle: ResizeHandle } | null>(null);
+  /** The outline the pointer is over and what dragging it would do: move it (a group) or stretch it (which handle). */
+  const [hoverBorder, setHoverBorder] = useState<{ id: string; handle: ResizeHandle; move: boolean } | null>(null);
+  /** Space held: dragging moves the view instead of selecting. */
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const spaceRef = useRef(false);
+  spaceRef.current = spaceHeld;
   /**
    * The card whose outline is under a world point. The NEAREST outline wins: a card sitting a few pixels inside its group must not
    * steal the group's own border (the groups of a map are covered by their cards, so the border is the only place to grab them).
@@ -298,8 +302,29 @@ export function CanvasView() {
     return el;
   };
 
+  /** Starts moving `id` and everything selected with it; moving a group carries the cards inside it. */
+  const beginMove = (e: React.PointerEvent, id: string, wx: number, wy: number) => {
+    setSelEdge(null);
+    let next = sel;
+    if (e.shiftKey) {
+      next = new Set(sel);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+    } else if (!sel.has(id)) next = new Set([id]);
+    setSel(next);
+    const start = new Map<string, [number, number]>();
+    for (const n of doc.nodes) {
+      if (next.has(n.id)) start.set(n.id, [n.x, n.y]);
+    }
+    for (const g of doc.nodes.filter((n) => next.has(n.id) && n.type === "group")) {
+      for (const n of doc.nodes) if (n.id !== g.id && contains(g, n)) start.set(n.id, [n.x, n.y]);
+    }
+    startDrag(e, { kind: "move", sx: wx, sy: wy, anchor: id, start, moved: false });
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    // The view moves with the middle button, Alt + drag, or Space + drag. A plain drag on the board selects (see below).
+    if (e.button === 1 || (e.button === 0 && (e.altKey || spaceRef.current))) {
       startDrag(e, { kind: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y });
       return;
     }
@@ -318,8 +343,9 @@ export function CanvasView() {
       return;
     }
     // The WHOLE outline of a card is a resize handle, wherever along it the pointer is: a drag from a side stretches that side,
-    // from near a corner both. (Cards cover their group's body, so the outline is also the place to grab a group.) The round
-    // ports connect, and Ctrl + drag from the outline connects from exactly that point. A card being edited keeps its text.
+    // from near a corner both. The outline of a GROUP is how you grab it: it moves the group (with what it holds); its handles
+    // resize it. The round ports connect, and Ctrl + drag from any outline connects from exactly that point. A card being edited
+    // keeps its text.
     if (!t.closest("[data-port],[data-resize]")) {
       const hit = hitBorder(wx, wy);
       const target = hit ? byId.get(hit.id) : undefined;
@@ -327,6 +353,10 @@ export function CanvasView() {
         setHoverBorder(null);
         if (e.ctrlKey || e.metaKey) {
           startDrag(e, { kind: "connect", from: hit.id, side: hit.side, t: hit.t, ox: wx, oy: wy, x: wx, y: wy });
+          return;
+        }
+        if (target.type === "group") {
+          beginMove(e, hit.id, wx, wy);
           return;
         }
         if (!sel.has(hit.id)) {
@@ -341,12 +371,10 @@ export function CanvasView() {
     }
     const nodeEl = cardElOf(t);
     if (!nodeEl) {
+      // The default tool selects: a drag on the board (or inside a group) draws a selection box; Shift adds to the selection.
       setSelEdge(null);
-      if (e.shiftKey) startDrag(e, { kind: "box", x0: wx, y0: wy, x: wx, y: wy, add: true });
-      else {
-        setSel(new Set());
-        startDrag(e, { kind: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y });
-      }
+      if (!e.shiftKey) setSel(new Set());
+      startDrag(e, { kind: "box", x0: wx, y0: wy, x: wx, y: wy, add: e.shiftKey });
       return;
     }
     const id = nodeEl.getAttribute("data-node-id")!;
@@ -363,23 +391,7 @@ export function CanvasView() {
       startDrag(e, { kind: "resize", id, sx: wx, sy: wy, w: n.width, h: n.height, x: n.x, y: n.y, handle });
       return;
     }
-    setSelEdge(null);
-    let next = sel;
-    if (e.shiftKey) {
-      next = new Set(sel);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-    } else if (!sel.has(id)) next = new Set([id]);
-    setSel(next);
-    // Moving a group carries the cards inside it.
-    const start = new Map<string, [number, number]>();
-    for (const n of doc.nodes) {
-      if (next.has(n.id)) start.set(n.id, [n.x, n.y]);
-    }
-    for (const g of doc.nodes.filter((n) => next.has(n.id) && n.type === "group")) {
-      for (const n of doc.nodes) if (n.id !== g.id && contains(g, n)) start.set(n.id, [n.x, n.y]);
-    }
-    startDrag(e, { kind: "move", sx: wx, sy: wy, anchor: id, start, moved: false });
+    beginMove(e, id, wx, wy);
   };
 
   const startDrag = (e: React.PointerEvent, d: Drag) => {
@@ -393,12 +405,13 @@ export function CanvasView() {
       if (e.buttons === 0 && !drawMode) {
         const [hx, hy] = toWorld(e.clientX, e.clientY);
         const onUi = (e.target as Element).closest("[data-canvas-ui],[data-port],[data-resize],[data-edge-id]");
-        const hit = onUi ? null : hitBorder(hx, hy);
+        const hit = onUi || spaceRef.current ? null : hitBorder(hx, hy);
         const node = hit ? byId.get(hit.id) : undefined;
         const handle = hit && node ? resizeHandleAt(node, hit, CORNER_PX / viewRef.current.zoom) : null;
+        const move = node?.type === "group";
         setHoverBorder((prev) => {
           if (!hit || !handle) return prev ? null : prev;
-          return prev && prev.id === hit.id && prev.handle === handle ? prev : { id: hit.id, handle };
+          return prev && prev.id === hit.id && prev.handle === handle && prev.move === move ? prev : { id: hit.id, handle, move };
         });
       }
       return;
@@ -482,7 +495,9 @@ export function CanvasView() {
       }
     } else if (d.kind === "box") {
       const r: Rect = { x: Math.min(d.x0, d.x), y: Math.min(d.y0, d.y), width: Math.abs(d.x - d.x0), height: Math.abs(d.y - d.y0) };
-      const hit = docRef.current.nodes.filter((n) => intersects(r, n)).map((n) => n.id);
+      // A click on the board (no real box) selects nothing new; a box takes the cards it touches and the groups it fully holds.
+      const real = r.width * viewRef.current.zoom >= 3 || r.height * viewRef.current.zoom >= 3;
+      const hit = real ? docRef.current.nodes.filter((n) => (n.type === "group" ? contains(r, n) : intersects(r, n))).map((n) => n.id) : [];
       setSel(new Set([...(d.add ? sel : []), ...hit]));
     } else if (d.kind === "draw") {
       const node = drawingNode(d.points, pen.color, pen.width);
@@ -591,6 +606,13 @@ export function CanvasView() {
   // ── keyboard ─────────────────────────────────────────────────────────
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (editing || (e.target as Element).closest("input, textarea")) return;
+    if (e.key === " ") {
+      // Held, it turns a drag into moving the view; it must not click a focused button or scroll the page.
+      e.preventDefault();
+      e.stopPropagation();
+      if (!e.repeat) setSpaceHeld(true);
+      return;
+    }
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     const run = (f: () => void) => {
@@ -685,9 +707,12 @@ export function CanvasView() {
         aria-label="Canvas"
         className={cn("nv-canvas relative min-h-0 flex-1 overflow-hidden outline-none",
           drawMode ? "cursor-crosshair"
-            : drag?.kind === "resize" ? RESIZE_CURSOR[drag.handle as ResizeHandle] ?? "cursor-default"
-              : hoverBorder && !drag ? RESIZE_CURSOR[hoverBorder.handle]
-                : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-default")}
+            : drag?.kind === "pan" ? "cursor-grabbing"
+              : spaceHeld ? "cursor-grab"
+                : drag?.kind === "resize" ? RESIZE_CURSOR[drag.handle as ResizeHandle] ?? "cursor-default"
+                  : drag?.kind === "move" ? "cursor-move"
+                    : hoverBorder && !drag ? (hoverBorder.move ? "cursor-move" : RESIZE_CURSOR[hoverBorder.handle])
+                      : "cursor-default")}
         style={{
           backgroundImage: showGrid ? "radial-gradient(circle, var(--nv-line-strong) 1px, transparent 1.2px)" : "none",
           backgroundSize: `${gridSize}px ${gridSize}px`,
@@ -700,6 +725,8 @@ export function CanvasView() {
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
         onKeyDown={onKeyDown}
+        onKeyUp={(e) => { if (e.key === " ") setSpaceHeld(false); }}
+        onBlur={() => setSpaceHeld(false)}
         data-dropzone
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes(DRAG_MIME)) {
@@ -751,7 +778,7 @@ export function CanvasView() {
           <div className="pointer-events-none absolute inset-0 grid place-items-center text-center text-[13px] text-faint">
             <div>
               <p className="text-[15px] text-dim">Canvas vacío</p>
-              <p className="mt-1">Doble clic para crear una tarjeta · Z texto · X nota · N dibujar · V seleccionar · G cuadrícula · clic derecho para más</p>
+              <p className="mt-1">Doble clic para crear una tarjeta · Z texto · X nota · N dibujar · V seleccionar · G cuadrícula · Espacio + arrastrar mueve la vista</p>
             </div>
           </div>
         )}
@@ -772,7 +799,7 @@ export function CanvasView() {
         )}
 
         <Toolbar>
-          <Tool title="Seleccionar (V)" kbd="V" active={!drawMode} onClick={() => { setDrawMode(false); host.current?.focus(); }}><MousePointer2 size={16} /></Tool>
+          <Tool title="Seleccionar (V) · Espacio + arrastrar mueve la vista" kbd="V" active={!drawMode} onClick={() => { setDrawMode(false); host.current?.focus(); }}><MousePointer2 size={16} /></Tool>
           <Tool title="Tarjeta de texto (Z)" kbd="Z" onClick={() => addText()}><StickyNote size={16} /></Tool>
           <Tool title="Nota de la vault (X)" kbd="X" onClick={() => setPicker("note")}><FileText size={16} /></Tool>
           <Tool title="Imagen de la vault (C)" kbd="C" onClick={() => setPicker("image")}><ImageIcon size={16} /></Tool>

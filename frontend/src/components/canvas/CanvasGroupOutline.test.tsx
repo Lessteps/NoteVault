@@ -97,16 +97,17 @@ describe("an inner group whose cards sit right inside its outline", () => {
     expect(useCanvas.getState().doc.edges).toHaveLength(0);
   });
 
-  it("a drag that starts on the group's outline stretches THAT group from that side, from any point of it", () => {
+  it("a drag that starts on the group's outline MOVES that group, with its card, from any point of it", () => {
     fire("pointerdown", 41, 90); // near the top of the left side, not the middle
     fire("pointermove", 20, 90);
     fire("pointermove", 0, 90);
     fire("pointerup", 0, 90);
-    expect(node("g1").x).toBeLessThan(40);
-    expect(node("g1").width).toBeGreaterThan(300);
+    expect(node("g1").x).toBe(0);
+    expect(node("g1").width).toBe(300); // it did not stretch
     expect(node("g1").y).toBe(40);
-    expect(node("c1").x).toBe(46); // its card did not move
-    expect(node("outer").x).toBe(0);
+    expect(node("c1").x).toBe(6); // its card went with it (46 - 40)
+    expect(node("outer").x).toBe(0); // its parent and its sibling stayed
+    expect(node("g2").x).toBe(400);
     expect(useCanvas.getState().doc.edges).toHaveLength(0);
   });
 

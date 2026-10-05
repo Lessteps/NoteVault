@@ -3,7 +3,7 @@
 import {
   Calendar, CircleCheck, Copy, Dumbbell, Flag, Globe, House, Kanban, Minus, Moon, PanelLeft,
   PenLine, Pin, PinOff, Plus, Square, SquareCheck, Sun, Wallet, X, Cloud, CloudUpload,
-  CircleAlert, Settings, FileCode2, FileText, LayoutDashboard,
+  CircleAlert, Settings, FileCode2, FileText, LayoutDashboard, GraduationCap,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -32,11 +32,11 @@ export const MODULES: Array<{ id: ModuleId; label: string; Icon: ComponentType<{
 
 export function moduleLabel(id: ModuleId): string {
   return MODULES.find((m) => m.id === id)?.label
-    ?? (id === "web" ? "Navegador Web" : id === "player" ? "Reproductor de inglés" : id);
+    ?? (id === "web" ? "Navegador Web" : id === "player" ? "Reproductor de inglés" : id === "mentor" ? "Mentor" : id);
 }
 
 function moduleIcon(id: ModuleId): ComponentType<{ size?: number; strokeWidth?: number }> {
-  return MODULES.find((m) => m.id === id)?.Icon ?? PenLine;
+  return MODULES.find((m) => m.id === id)?.Icon ?? (id === "mentor" ? GraduationCap : PenLine);
 }
 
 // ── Tab label / icon helpers ────────────────────────────────────────────────

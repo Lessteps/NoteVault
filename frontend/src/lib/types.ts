@@ -1242,6 +1242,7 @@ export interface MentorPlanBlock {
   topicFolder?: string;
   minutes: number;
   status: MentorBlockStatus;
+  reason?: string;
   note?: string;
 }
 export interface MentorSessionRecord {
@@ -1252,6 +1253,45 @@ export interface MentorSessionRecord {
   createdAt: string;
   acceptedAt?: string;
 }
+export interface MentorPlanRequest {
+  availableMinutes: number;
+  objective?: string;
+  userNote?: string;
+  excludeSubjects?: string[];
+  excludeCandidateIds?: string[];
+}
+export interface MentorProposedBlock {
+  candidateId: string;
+  minutes: number;
+  reason: string;
+  kind: MentorCandidateKind;
+  subject: string;
+  topicFolder?: string;
+  skills?: string[];
+}
+export interface MentorProposedPlan { summary: string; blocks: MentorProposedBlock[]; notes?: string }
+export type MentorProposeResult =
+  | { loading: true }
+  | {
+      loading: false;
+      availableMinutes: number;
+      plan: MentorProposedPlan;
+      source: "ai" | "fallback";
+      candidates: MentorCandidate[];
+      /** por qué se usó el plan automático */
+      error?: string;
+    };
+export type MentorOverview =
+  | { loading: true }
+  | {
+      loading: false;
+      date: string;
+      weekday: string;
+      sections: Array<{ id: string; title: string; summary: string; signals: string[] }>;
+      adherence: MentorAdherence;
+      today: MentorSessionRecord | null;
+      aiConfigured: boolean;
+    };
 export interface MentorAdherenceCounts {
   total: number; done: number; partial: number; skipped: number; planned: number;
   pct: number | null;

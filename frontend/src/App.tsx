@@ -35,6 +35,7 @@ const MODULES: Partial<Record<ModuleId, ComponentType>> = {
   finanzas: lazyModule(() => import("./components/finance/FinanceModule"), "FinanceModule"),
   web: lazyModule(() => import("./components/web/WebModule"), "WebModule"),
   player: lazyModule(() => import("./components/english/EnglishPlayer"), "EnglishPlayer"),
+  mentor: lazyModule(() => import("./components/mentor/MentorModule"), "MentorModule"),
 };
 
 /** The host renders one module at a time; this is how each of them is built. */

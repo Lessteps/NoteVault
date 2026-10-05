@@ -21,6 +21,8 @@ export interface PlanBlock {
   topicFolder?: string;
   minutes: number;
   status: BlockStatus;
+  /** por qué lo propuso el Mentor (una línea) */
+  reason?: string;
   note?: string;
 }
 
@@ -50,6 +52,7 @@ function cleanBlock(raw: any): PlanBlock | null {
     status,
   };
   if (raw.topicFolder) block.topicFolder = String(raw.topicFolder);
+  if (raw.reason) block.reason = String(raw.reason).slice(0, 300);
   if (raw.note) block.note = String(raw.note).slice(0, 500);
   return block;
 }

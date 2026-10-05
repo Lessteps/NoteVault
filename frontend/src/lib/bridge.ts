@@ -335,6 +335,13 @@ export const api = {
   mentorSessionMarkBlock: (date: string, candidateId: string, status: import("./types").MentorBlockStatus, note?: string) =>
     call<import("./types").MentorSessionRecord | null>("mentor_session_mark_block", date, candidateId, status, note),
   mentorAdherence: (n = 30) => call<import("./types").MentorAdherence>("mentor_adherence", n),
+  mentorOverview: () => call<import("./types").MentorOverview>("mentor_overview"),
+  mentorPlanPropose: (opts: import("./types").MentorPlanRequest) =>
+    call<import("./types").MentorProposeResult>("mentor_plan_propose", opts),
+  mentorPlanAccept: (opts: { date?: string; availableMinutes: number; objective?: string; blocks: import("./types").MentorProposedBlock[] }) =>
+    call<import("./types").MentorSessionRecord>("mentor_plan_accept", opts),
+  mentorBlockStatus: (date: string, candidateId: string, status: import("./types").MentorBlockStatus, note?: string) =>
+    call<import("./types").MentorSessionRecord>("mentor_block_status", date, candidateId, status, note),
 
   // Finanzas
   finMeta: () => call<FinMeta>("fin_meta"),

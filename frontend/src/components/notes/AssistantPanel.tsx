@@ -406,6 +406,12 @@ function Composer() {
         icon: <Wand2 size={13} />,
         onSelect: () => void reevaluate(),
       },
+      {
+        label: "Mentor — plan de hoy",
+        description: "Abre una pestaña donde la IA propone qué estudiar hoy según tu estado; tú lo aceptas o ajustas.",
+        icon: <GraduationCap size={13} />,
+        onSelect: () => useApp.getState().setModule("mentor"),
+      },
       { separator: true },
       ...VAULT_MODES.map((m) => ({
         label: m.label,

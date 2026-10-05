@@ -788,6 +788,9 @@ ignorarlo, y no sube `FORMAT_VERSION`.
 ```
 
 - `status` de un bloque: `planned` | `done` | `skipped` | `partial`.
+- `reason` (opcional): la razón de una línea con la que el Mentor propuso el bloque.
+- `acceptedAt` solo existe cuando el estudiante aceptó el plan; es la fuente de verdad del
+  plan de hoy (no se copia a la cola de estudio ni a la agenda).
 - El informe que ve la IA se calcula al vuelo y no se guarda.
 
 ## Contrato móvil (Mobile Contract)

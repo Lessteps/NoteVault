@@ -178,6 +178,28 @@ let _indexWarmed = false;
 /** Vaults whose background scan has already been kicked off. */
 const _scanKicked = new Set<string>();
 
+/**
+ * True while the vault index is still cold (nothing scanned yet and the background warm-up
+ * not finished); in that case it also starts the scan in the background. Callers that need
+ * the whole-vault scan (the Mentor) answer `loading` instead of blocking the main process.
+ */
+export function studyIndexCold(app: AppState): boolean {
+  if (hasVaultScan(app.root) || _indexWarmed) return false;
+  if (!_scanKicked.has(app.root)) {
+    _scanKicked.add(app.root);
+    setImmediate(() => {
+      try {
+        vaultScan(app);
+      } catch {
+        /* the renderer's retry will surface any error */
+      } finally {
+        _scanKicked.delete(app.root);
+      }
+    });
+  }
+  return true;
+}
+
 export function clearStudySnapshotCache(): void {
   _snapshotCache.clear();
   _dashboardCache.clear();

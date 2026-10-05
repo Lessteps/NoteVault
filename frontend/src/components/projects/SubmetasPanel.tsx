@@ -140,15 +140,26 @@ export function SubmetasPanel() {
   const [hideDone, setHideDone] = useState(false);
   const p = detail.project;
 
-  const all = useMemo<SubmetaRow[]>(() => detail.issues.filter((i) => i.type === "Submeta").sort((a, b) => a.order - b.order || a.number - b.number).map((i) => {
-    const n = submetaNumbers(tasksOf(detail, i.id));
-    return {
-      id: i.id, icon: i.icon, code: i.key, name: i.title, status: i.status,
-      statusColour: i.status === p.done_column ? "var(--nv-mint)" : undefined,
-      priority: i.priority, progress: n.total ? n.progress : i.done ? 1 : 0, done: n.done, total: n.total,
-      start: i.start, due: i.due, overdue: i.overdue, finished: i.done, colour: i.type_colour || p.colour,
+  const all = useMemo<SubmetaRow[]>(() => {
+    /** A submeta, with all its tasks and sub-tasks nested under it so the list can unfold them. */
+    const rowOf = (i: Issue, seen: Set<string>): SubmetaRow => {
+      const n = submetaNumbers(tasksOf(detail, i.id));
+      const kids = [...i.children]
+        .map((c) => issueById(detail, c))
+        .filter((k): k is Issue => Boolean(k) && !seen.has(k!.id))
+        .sort((a, b) => a.order - b.order || a.number - b.number)
+        .map((k) => rowOf(k, new Set([...seen, i.id])));
+      return {
+        id: i.id, icon: i.icon, code: i.key, name: i.title, status: i.status,
+        statusColour: i.status === p.done_column ? "var(--nv-mint)" : undefined,
+        priority: i.priority, progress: n.total ? n.progress : i.done ? 1 : 0, done: n.done, total: n.total,
+        start: i.start, due: i.due, overdue: i.overdue, finished: i.done, colour: i.type_colour || p.colour,
+        children: kids,
+      };
     };
-  }), [detail, p.colour, p.done_column]);
+    return detail.issues.filter((i) => i.type === "Submeta").sort((a, b) => a.order - b.order || a.number - b.number)
+      .map((i) => rowOf(i, new Set()));
+  }, [detail, p.colour, p.done_column]);
   const rows = filterRows(all, query, status, hideDone);
 
   if (submetaId) return <SubmetaStats id={submetaId} />;

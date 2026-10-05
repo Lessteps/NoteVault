@@ -3,11 +3,12 @@
 // saves what was edited.
 
 import {
-  Bell, Calendar, CalendarCheck, CalendarDays, CircleDot, Clock, Flag, Folder, Link2, Plus, Repeat,
+  Bell, Calendar, CalendarCheck, CalendarDays, ChevronLeft, CircleDot, Clock, Flag, Folder, Link2, Plus, Repeat,
   Ruler, Star, Tag, Target, Timer, Trash2, X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
+import { todayIso } from "../../lib/tasks";
 import { REMINDERS } from "../../lib/calendar";
 import type { GoalItem, Habit } from "../../lib/types";
 import { useApp } from "../../store/app";
@@ -43,6 +44,18 @@ export function HabitLinks({ value, onChange }: { value: string[]; onChange: (id
   );
 }
 
+/** A checklist tick, restyled: the same checkbox, no native widget look. */
+function Tick({ checked, ariaLabel, onChange }: { checked: boolean; ariaLabel: string; onChange: (v: boolean) => void }) {
+  return (
+    <label className="relative grid h-4 w-4 flex-none place-items-center">
+      <input type="checkbox" aria-label={ariaLabel} checked={checked} onChange={(e) => onChange(e.target.checked)}
+        className="peer absolute inset-0 cursor-pointer appearance-none rounded-[4px] border border-line-strong checked:border-accent checked:bg-accent" />
+      <svg viewBox="0 0 24 24" className="pointer-events-none hidden h-3 w-3 text-white peer-checked:block" fill="none"
+        stroke="currentColor" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+    </label>
+  );
+}
+
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section className="mt-6">
@@ -57,6 +70,11 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
   const meta = useGoals((s) => s.meta);
   const refresh = useGoals((s) => s.refreshAfterWrite);
   const openSubmeta = useGoals((s) => s.openSubmeta);
+  const openItem = useGoals((s) => s.openItem);
+  const [child, setChild] = useState("");
+  const [sub, setSub] = useState("");
+  /** Which submeta the inline "add a submeta" field sits under. */
+  const [addingFor, setAddingFor] = useState<string | null>(null);
   const toast = useApp((s) => s.toast);
   const [f, setF] = useState<Partial<GoalItem>>({});
   const [hint, setHint] = useState("");
@@ -67,6 +85,9 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
     setF({ ...item });
     initial.current = JSON.stringify(item);
     setHint("");
+    setChild("");
+    setSub("");
+    setAddingFor(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id]);
   const set = (patch: Partial<GoalItem>) => setF((x) => ({ ...x, ...patch }));
@@ -129,6 +150,36 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const dirty = () => JSON.stringify({ ...item, ...f }) !== initial.current;
+  /** Moves the peek to another submeta, saving what was edited here first. */
+  const go = async (id: string) => {
+    if (dirty() && !(await save())) return;
+    openItem(id);
+  };
+  const act = async (fn: () => Promise<unknown>) => {
+    try {
+      await fn();
+      await refresh();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
+  const addUnder = async (parentId: string, name: string) => {
+    const t = name.trim();
+    if (!t) return;
+    await act(() => api.goalItemCreate(g.id, t, parentId));
+  };
+  const tree: Array<{ k: GoalItem; depth: number }> = [];
+  const walk = (parent: string, depth: number) => {
+    for (const k of detail.items.filter((x) => x.parent === parent).sort((a, b) => a.order - b.order)) {
+      tree.push({ k, depth });
+      walk(k.id, depth + 1);
+    }
+  };
+  walk(item.id, 0);
+  const parentItem = item.parent ? detail.items.find((x) => x.id === item.parent) : undefined;
+  const today = todayIso();
+
   const statusOptions: PeekOption[] = (meta?.item_statuses ?? []).map((s) => ({
     value: s, label: s, colour: s === "Hecha" ? "#4ade80" : s === "En curso" ? "#2383e2" : undefined,
   }));
@@ -146,6 +197,12 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
         className="nv-peek flex flex-col overflow-hidden rounded-xl border border-line-strong shadow-2xl"
         style={{ width: "min(900px, 90vw)", height: "min(85vh, 780px)", background: "var(--nv-elevated)" }}>
         <div className="flex h-11 flex-none items-center gap-2 border-b border-line px-3">
+          {parentItem && (
+            <button type="button" title={`Volver a ${parentItem.name}`} onClick={() => void go(parentItem.id)}
+              className="flex max-w-[160px] flex-none items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] text-dim hover:bg-hover hover:text-text">
+              <ChevronLeft size={13} /> <span className="truncate">{parentItem.name}</span>
+            </button>
+          )}
           <span className="font-mono text-[12px] font-semibold text-faint">{f.is_priority ? "⭐" : "◆"} {item.is_leaf ? "Submeta" : "Submeta con hijas"}</span>
           <span className="truncate text-[10.5px] text-faint">{item.created ? `· Creada ${item.created}` : ""}</span>
           <span className="flex-1" />
@@ -234,6 +291,74 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
               </PeekRow>
             </div>
 
+            <hr className="my-6 border-line" />
+
+            <Section label={`Submetas${tree.length ? ` · ${tree.filter(({ k }) => k.status === "Hecha" || k.progress >= 1).length}/${tree.length}` : ""}`}>
+              <ul className="space-y-0.5">
+                {tree.map(({ k, depth }) => (
+                  <li key={k.id}>
+                    <div className="group flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-white/[0.04]">
+                      <span className="flex-none" style={{ width: depth * 18 }} />
+                      <Tick checked={k.is_leaf ? k.status === "Hecha" || k.done_today : k.progress >= 1} ariaLabel={`Hecha: ${k.name}`}
+                        onChange={(done) => {
+                          // A submeta with children is finished by them.
+                          if (!k.is_leaf) { void go(k.id); return; }
+                          void act(() => api.goalSetDone(g.id, k.id, today, done));
+                        }} />
+                      <button type="button" title={`Abrir ${k.name}`} onClick={() => void go(k.id)}
+                        className={cn("min-w-0 flex-1 truncate text-left text-[13px] hover:underline", k.status === "Hecha" ? "text-faint line-through" : "text-text")}>
+                        {k.name}
+                      </button>
+                      {k.is_leaf ? (
+                        <PeekMenu ariaLabel={`Estado de ${k.name}`} chip menuWidth={200} value={k.status} options={statusOptions}
+                          onChange={(status) => void act(() => api.goalItemUpdate(g.id, k.id, { status }))} />
+                      ) : (
+                        <span className="font-mono text-[11px] text-faint">{k.counts[0]}/{k.counts[1]}</span>
+                      )}
+                      <IconButton title={`Añadir submeta a ${k.name}`} className="opacity-0 group-hover:opacity-100"
+                        onClick={() => { setSub(""); setAddingFor(addingFor === k.id ? null : k.id); }}><Plus size={12} /></IconButton>
+                      <IconButton title="Eliminar submeta" className="opacity-0 group-hover:opacity-100 hover:text-danger"
+                        onClick={async () => {
+                          const n = detail.items.filter((x) => x.parent === k.id).length;
+                          if (!(await confirmAction("Eliminar submeta", `¿Eliminar «${k.name}»${n ? " y sus submetas" : ""}? Se mueve a la papelera.`, "Eliminar", true))) return;
+                          void act(() => api.goalItemDelete(g.id, k.id));
+                        }}><Trash2 size={12} /></IconButton>
+                    </div>
+                    {addingFor === k.id && (
+                      <div className="flex items-center gap-1.5 rounded-md px-1 py-0.5 text-[13px] focus-within:bg-white/[0.04]"
+                        style={{ paddingLeft: 4 + (depth + 1) * 18 }}>
+                        <span className="text-faint">↳</span>
+                        <input autoFocus className="min-w-0 flex-1 bg-transparent py-0.5 outline-none placeholder:text-faint" style={{ color: PEEK_TEXT }}
+                          value={sub} placeholder={`Añadir submeta a ${k.name}…`} aria-label={`Añadir submeta a ${k.name}`}
+                          onChange={(e) => setSub(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { const t = sub; setSub(""); setAddingFor(null); void addUnder(k.id, t); }
+                            if (e.key === "Escape") {
+                              // Esc cancels this field, it must not close the whole peek.
+                              e.nativeEvent.stopImmediatePropagation();
+                              setAddingFor(null);
+                            }
+                          }}
+                          onBlur={() => { if (!sub.trim()) setAddingFor(null); }} />
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-1 flex items-center gap-1.5 rounded-md px-1 py-0.5 text-[13px] focus-within:bg-white/[0.04] hover:bg-white/[0.04]">
+                <span className="text-faint">+</span>
+                <input className="min-w-0 flex-1 bg-transparent py-0.5 outline-none placeholder:text-faint" style={{ color: PEEK_TEXT }}
+                  value={child} placeholder={`Añadir submeta a «${item.name}»…`} aria-label="Añadir submeta"
+                  onChange={(e) => setChild(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" || !child.trim()) return;
+                    const t = child;
+                    setChild("");
+                    void addUnder(item.id, t);
+                  }} />
+              </div>
+            </Section>
+
             <Section label="Hábitos vinculados">
               <HabitLinks value={f.habit_links ?? []} onChange={(habit_links) => set({ habit_links })} />
             </Section>
@@ -262,14 +387,6 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
               toast("error", (e as Error).message);
             }
           }}><Trash2 size={13} /> Eliminar</GhostButton>
-          <GhostButton onClick={async () => {
-            try {
-              await api.goalItemCreate(g.id, "Nueva submeta", item.id);
-              await refresh();
-            } catch (e) {
-              toast("error", (e as Error).message);
-            }
-          }}><Plus size={13} /> Submeta hija</GhostButton>
           <GhostButton onClick={() => { onClose(); openSubmeta(item.id); }}>📊 Estadísticas ›</GhostButton>
           <span className="min-w-0 flex-1 truncate text-right text-[11px] text-faint">{hint}</span>
         </div>

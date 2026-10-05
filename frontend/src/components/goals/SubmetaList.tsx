@@ -22,7 +22,10 @@ export function SubmetaList() {
   const [status, setStatus] = useState("");
   const [hideDone, setHideDone] = useState(false);
 
-  const all = useMemo<SubmetaRow[]>(() => detail.items.filter((i) => !i.parent).sort((a, b) => a.order - b.order).map((it) => ({
+  const all = useMemo<SubmetaRow[]>(() => {
+    const byId = new Map(detail.items.map((i) => [i.id, i]));
+    /** A submeta with all its sub-submetas nested, so the list can unfold them. */
+    const rowOf = (it: GoalItem): SubmetaRow => ({
     id: it.id,
     icon: it.is_priority ? "⭐" : !it.is_leaf ? "📁" : "•",
     name: it.name,
@@ -38,7 +41,10 @@ export function SubmetaList() {
     statusLocked: !it.is_leaf,
     finished: it.is_leaf ? it.status === "Hecha" || it.done_today : it.progress >= 1,
     colour: it.category ? catColour(it.category) : detail.goal.colour,
-  })), [detail]);
+    children: it.children.map((c) => byId.get(c)).filter((k): k is GoalItem => Boolean(k)).sort((a, b) => a.order - b.order).map(rowOf),
+    });
+    return detail.items.filter((i) => !i.parent).sort((a, b) => a.order - b.order).map(rowOf);
+  }, [detail]);
   const rows = filterRows(all, query, status, hideDone);
   /** One field of one submeta, written in place; the reload brings the real numbers. */
   const edit = async (id: string, fields: Partial<GoalItem>) => {

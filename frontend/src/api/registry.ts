@@ -20,6 +20,7 @@ import { habitsApi } from "./modules/habits.js";
 import { homeApi } from "./modules/home.js";
 import { ladderApi } from "./modules/ladder.js";
 import { mediaApi } from "./modules/media.js";
+import { mentorApi } from "./modules/mentor.js";
 import { notesApi } from "./modules/notes.js";
 import { notesExtrasApi } from "./modules/notes_extras.js";
 import { ppApi } from "./modules/pp.js";
@@ -54,6 +55,7 @@ export function buildRegistry(app: AppState): Registry {
     ...exerciseApi(app),
     ...financeApi(app),
     ...goalsApi(app),
+    ...mentorApi(app),
     ...projectsApi(app),
     ...projectFoldersApi(app),
     ...calendarApi(app),

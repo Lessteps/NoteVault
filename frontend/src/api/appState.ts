@@ -15,6 +15,7 @@ import { dumpFrontmatter } from "../core/frontmatter.js";
 import { NotesService } from "../core/notesService.js";
 import { VaultManager } from "../core/vaultManager.js";
 import { Managers } from "./context.js";
+import { topicLookupFor } from "./topicLookup.js";
 
 export const MAX_WRITE_BYTES = 10 * 1024 * 1024;
 export const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
@@ -129,6 +130,9 @@ export class AppState {
     let m = this.managers;
     if (m === null || m.root !== this.root) {
       m = this.managers = new Managers(this.root);
+      // El cumplimiento de las submetas con `topic_links` sale del progreso de estudio:
+      // se inyecta aquí para que calendario/home lo deriven sin pasar antes por Metas.
+      m.goals.topicLookup = topicLookupFor(this);
       return m;
     }
     return m.fresh();

@@ -10,7 +10,7 @@ import { loadAllAttempts } from "../core/practice/ledger.js";
 import { computeTopicProgress, manifestsFromNotes, type TopicManifest, type TopicProgress } from "../core/practice/topic.js";
 import type { TopicLookup } from "../core/practice/topicLinks.js";
 import type { AppState } from "./appState.js";
-import { vaultScan } from "./modules/study.js";
+import { vaultScan } from "./vaultScan.js";
 
 const TTL_MS = 3000;
 

@@ -323,6 +323,19 @@ export const api = {
   goalSetDone: (gid: string, iid: string, day: string, done: boolean, value: number | string | null = null) =>
     call<{ ok: boolean }>("goals_set_done", gid, iid, day, done, value),
 
+  // Mentor
+  mentorBrief: (opts: { maxChars?: number; only?: string[]; exclude?: string[] } = {}) =>
+    call<import("./types").MentorBriefResult>("mentor_brief", opts),
+  mentorCandidates: (opts: { availableMinutes: number; maxSubjects?: number }) =>
+    call<import("./types").MentorCandidatesResult>("mentor_candidates", opts),
+  mentorSessionSave: (record: import("./types").MentorSessionRecord) =>
+    call<import("./types").MentorSessionRecord>("mentor_session_save", record),
+  mentorSessionLoad: (date: string) => call<import("./types").MentorSessionRecord | null>("mentor_session_load", date),
+  mentorSessionRecent: (n = 14) => call<import("./types").MentorSessionRecord[]>("mentor_session_recent", n),
+  mentorSessionMarkBlock: (date: string, candidateId: string, status: import("./types").MentorBlockStatus, note?: string) =>
+    call<import("./types").MentorSessionRecord | null>("mentor_session_mark_block", date, candidateId, status, note),
+  mentorAdherence: (n = 30) => call<import("./types").MentorAdherence>("mentor_adherence", n),
+
   // Finanzas
   finMeta: () => call<FinMeta>("fin_meta"),
   finSidebar: () => call<FinSidebar>("fin_sidebar"),

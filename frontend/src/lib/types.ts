@@ -1192,3 +1192,75 @@ export interface PpPostmortem {
   summary: string;
   conversationId: string;
 }
+
+// ── Mentor (informe, candidatos y registro de sesiones; ver core/mentor) ──
+export interface MentorBriefSection {
+  id: string;
+  title: string;
+  priority: number;
+  summary: string;
+  signals: string[];
+  lines: Array<{ text: string; weight: number }>;
+  /** datos tipados por proveedor; la UI no los necesita para pintar, solo `lines` */
+  data: unknown;
+}
+export interface MentorBrief {
+  version: 1;
+  date: string;
+  weekday: string;
+  sections: MentorBriefSection[];
+  skipped: string[];
+}
+export interface MentorBriefResult { brief: MentorBrief; text: string }
+export type MentorCandidateKind =
+  | "srs_review" | "error_fix" | "continue_topic" | "next_topic"
+  | "untreated_diagnostic" | "task_deadline" | "goal_item";
+export interface MentorCandidate {
+  id: string;
+  kind: MentorCandidateKind;
+  subject: string;
+  topicFolder?: string;
+  skills?: string[];
+  estMinutes: number;
+  score: number;
+  reasons: string[];
+  links: { goalId?: string; itemId?: string; topicFolder?: string };
+}
+export interface MentorCandidatesResult {
+  availableMinutes: number;
+  /** todos los candidatos que caben, mejor primero */
+  candidates: MentorCandidate[];
+  /** subconjunto repartido con presupuesto por materia */
+  plan: MentorCandidate[];
+  plannedMinutes: number;
+}
+export type MentorBlockStatus = "planned" | "done" | "skipped" | "partial";
+export interface MentorPlanBlock {
+  candidateId: string;
+  kind: string;
+  subject: string;
+  topicFolder?: string;
+  minutes: number;
+  status: MentorBlockStatus;
+  note?: string;
+}
+export interface MentorSessionRecord {
+  date: string;
+  availableMinutes: number;
+  objective?: string;
+  blocks: MentorPlanBlock[];
+  createdAt: string;
+  acceptedAt?: string;
+}
+export interface MentorAdherenceCounts {
+  total: number; done: number; partial: number; skipped: number; planned: number;
+  pct: number | null;
+}
+export interface MentorAdherence {
+  sessions: number;
+  overall: MentorAdherenceCounts;
+  bySubject: Record<string, MentorAdherenceCounts>;
+  byKind: Record<string, MentorAdherenceCounts>;
+  skippedSubjects: string[];
+  typicalSessionMinutes: number | null;
+}

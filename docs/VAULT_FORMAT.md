@@ -49,6 +49,8 @@ vault/
 │   │   ├── <goal-id>/items/<item-id>.md   una submeta por archivo
 │   │   └── registro/YYYY/MM/YYYY-MM-DD.json  checks del día
 │   ├── estudio/                           práctica: intentos, errores, repaso
+│   ├── mentor/                            opcional: registro de sesiones del Mentor
+│   │   └── sessions/YYYY-MM-DD.json       un plan de estudio por día
 │   ├── web/                               módulo WEB: marcadores, reglas, historial, uso
 │   │   ├── marcadores.json
 │   │   ├── restricciones.json
@@ -765,6 +767,28 @@ Resumen de conceptos y competencias del tema.
 - `skills`: lista de competencias requeridas para este tema.
 - Si una carpeta carece de `_tema.md`, NoteVault infiere dinámicamente el tema a
   partir de las etiquetas (`tags`) y la ubicación de las notas hijas.
+
+## Mentor (opcional, aditivo)
+
+El módulo Mentor propone un plan diario a partir de un informe del estudiante y
+guarda aquí lo que se planeó y lo que se cumplió. Es **opcional y aditivo**: una
+vault sin `.notevault/mentor/` es válida, un cliente que no lo conoce puede
+ignorarlo, y no sube `FORMAT_VERSION`.
+
+| Clave de `LAYOUT` | Ruta |
+|---|---|
+| `mentor_session` | `.notevault/mentor/sessions/AAAA-MM-DD.json` — el plan de un día |
+
+```json
+{"date": "2026-10-05", "availableMinutes": 90, "objective": "Cerrar la meta de álgebra",
+ "createdAt": "2026-10-05T08:00:00", "acceptedAt": "2026-10-05T08:02:10",
+ "blocks": [{"candidateId": "srs:mathematics", "kind": "srs_review", "subject": "mathematics",
+             "topicFolder": "Matemáticas/2 Álgebra", "minutes": 20, "status": "done",
+             "note": "opcional"}]}
+```
+
+- `status` de un bloque: `planned` | `done` | `skipped` | `partial`.
+- El informe que ve la IA se calcula al vuelo y no se guarda.
 
 ## Contrato móvil (Mobile Contract)
 

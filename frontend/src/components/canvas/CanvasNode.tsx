@@ -144,10 +144,12 @@ const PORT_POS: Record<Side, string> = {
 };
 
 export const CanvasNodeView = memo(function CanvasNodeView({
-  node, selected, editing, onEditDone,
+  node, selected, editing, onEditDone, boxed,
 }: {
   node: CNode;
   selected: boolean;
+  /** The selection came from a selection box: a drawing then shows its box as well (a click shows the stroke itself). */
+  boxed?: boolean;
   editing: boolean;
   onEditDone: (id: string, text: string | null) => void;
 }) {
@@ -192,14 +194,23 @@ export const CanvasNodeView = memo(function CanvasNodeView({
   if (node.type === "nv-drawing") {
     const strokes = node.nv?.strokes ?? [];
     return (
-      <div data-node-id={node.id} className={cn("absolute", selected && "rounded outline-dashed outline-1 outline-accent")} style={{ left: node.x, top: node.y, width: node.width, height: node.height }}>
+      // Only the stroke itself takes the pointer (never its box): a click on the line selects it, a click beside it is the board.
+      <div data-node-id={node.id} className={cn("pointer-events-none absolute", selected && boxed && "rounded outline-dashed outline-1 outline-accent")} style={{ left: node.x, top: node.y, width: node.width, height: node.height }}>
         <svg width={node.width} height={node.height} className="overflow-visible">
+          {selected && strokes.map((s, i) => (
+            <polyline key={"halo" + i} points={s.points.map((p) => p.join(",")).join(" ")} fill="none"
+              stroke="var(--nv-accent)" strokeOpacity={0.35} strokeWidth={s.width + 6} strokeLinecap="round" strokeLinejoin="round" />
+          ))}
           {strokes.map((s, i) => (
             <polyline key={i} points={s.points.map((p) => p.join(",")).join(" ")} fill="none"
               stroke={colorOf(s.color, "var(--nv-text)")} strokeWidth={s.width} strokeLinecap="round" strokeLinejoin="round" />
           ))}
+          {strokes.map((s, i) => (
+            <polyline key={"hit" + i} points={s.points.map((p) => p.join(",")).join(" ")} fill="none" stroke="transparent"
+              strokeWidth={Math.max(s.width, 10)} strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: "stroke" }} />
+          ))}
         </svg>
-        <Handles selected={selected} />
+        <Handles selected={selected} noPorts />
       </div>
     );
   }
@@ -261,10 +272,10 @@ const RESIZE_HANDLES = [
 ];
 
 /** Ports to drag connections from, and the 8 resize handles. */
-function Handles({ selected }: { selected: boolean }) {
+function Handles({ selected, noPorts }: { selected: boolean; noPorts?: boolean }) {
   return (
     <>
-      {SIDES.map((s) => (
+      {!noPorts && SIDES.map((s) => (
         <span
           key={s}
           data-port={s}

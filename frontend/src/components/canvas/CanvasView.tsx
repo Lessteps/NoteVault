@@ -54,6 +54,10 @@ export function CanvasView() {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [selEdge, setSelEdge] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  /** True while the selection is the result of a selection box (drawings then show their box; after a click on the stroke they do not). */
+  const [marquee, setMarquee] = useState(false);
+  /** The strokes a drawing had when a resize started: each move scales those, so no error builds up. */
+  const strokeBase = useRef(new WeakMap<object, unknown>());
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
   dragRef.current = drag;
@@ -330,6 +334,7 @@ export function CanvasView() {
       return;
     }
     if (e.button !== 0) return;
+    setMarquee(false);
     const t = e.target as Element;
     if (t.closest("[data-canvas-ui]")) return;
     const [wx, wy] = toWorld(e.clientX, e.clientY);
@@ -452,7 +457,16 @@ export function CanvasView() {
       const r = resizeRect({ x: d.x, y: d.y, width: d.w, height: d.h }, d.handle, wx - d.sx, wy - d.sy, snap);
       commit({
         ...cur,
-        nodes: cur.nodes.map((n) => (n.id === d.id ? { ...n, x: r.x, y: r.y, width: r.width, height: r.height } : n)),
+        nodes: cur.nodes.map((n) => {
+          if (n.id !== d.id) return n;
+          if (n.type !== "nv-drawing") return { ...n, x: r.x, y: r.y, width: r.width, height: r.height };
+          // A drawing scales its strokes with its box (their thickness stays).
+          if (!strokeBase.current.has(d)) strokeBase.current.set(d, structuredClone(n.nv?.strokes ?? []));
+          const base = strokeBase.current.get(d) as NonNullable<NonNullable<CNode["nv"]>["strokes"]>;
+          const fx = r.width / d.w, fy = r.height / d.h;
+          const strokes = base.map((s) => ({ ...s, points: s.points.map(([px, py]) => [Math.round(px * fx * 10) / 10, Math.round(py * fy * 10) / 10] as [number, number]) }));
+          return { ...n, x: r.x, y: r.y, width: r.width, height: r.height, nv: { ...n.nv, strokes } };
+        }),
       }, false);
     } else if (d.kind === "connect" || d.kind === "box") {
       setDrag({ ...d, x: wx, y: wy });
@@ -505,6 +519,7 @@ export function CanvasView() {
       const real = r.width * viewRef.current.zoom >= 3 || r.height * viewRef.current.zoom >= 3;
       const hit = real ? docRef.current.nodes.filter((n) => (n.type === "group" ? contains(r, n) : intersects(r, n))).map((n) => n.id) : [];
       setSel(new Set([...(d.add ? sel : []), ...hit]));
+      setMarquee(hit.length > 0);
     } else if (d.kind === "draw") {
       const node = drawingNode(d.points, pen.color, pen.width);
       if (node) {
@@ -766,7 +781,7 @@ export function CanvasView() {
         <div className="absolute left-0 top-0 origin-top-left"
           style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
           {groups.map((n) => (
-            <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} editing={editing === n.id} onEditDone={onEditDone} />
+            <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} boxed={marquee} editing={editing === n.id} onEditDone={onEditDone} />
           ))}
           <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={1} height={1}>
             {visible.edges.map((e) => {
@@ -788,7 +803,7 @@ export function CanvasView() {
             )}
           </svg>
           {visible.nodes.filter((n) => n.type !== "group").map((n) => (
-            <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} editing={editing === n.id} onEditDone={onEditDone} />
+            <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} boxed={marquee} editing={editing === n.id} onEditDone={onEditDone} />
           ))}
         </div>
 

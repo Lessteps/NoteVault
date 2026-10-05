@@ -671,6 +671,9 @@ export function AssistantPanel() {
             <Hammer size={15} />
           </IconButton>
         )}
+        <IconButton title="Mentor — plan de hoy" onClick={() => useApp.getState().setModule("mentor")}>
+          <GraduationCap size={15} />
+        </IconButton>
         <IconButton
           title="Nueva conversación"
           onClick={() => {
@@ -732,6 +735,17 @@ export function AssistantPanel() {
               <div className="rounded-xl border border-dashed border-line-strong p-3 text-[12.5px] leading-relaxed text-dim">
                 Pregunta sobre la nota abierta: explicar, resumir, generar ejercicios… Si seleccionas un fragmento en el
                 editor, se envía como contexto. Las acciones de estudio de la nota también llegan aquí.
+                <button
+                  type="button"
+                  onClick={() => useApp.getState().setModule("mentor")}
+                  className="mt-2.5 flex w-full items-center gap-2 rounded-lg border border-line-strong px-2.5 py-2 text-left text-text hover:bg-hover"
+                >
+                  <GraduationCap size={14} />
+                  <span>
+                    <span className="block font-medium">Mentor — plan de hoy</span>
+                    <span className="block text-[11.5px] text-dim">La IA propone qué estudiar según tu estado.</span>
+                  </span>
+                </button>
               </div>
             )}
             {messages.map((m, i) => (

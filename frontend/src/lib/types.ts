@@ -761,6 +761,9 @@ export interface AiConfig {
   max_tokens: number;
   include_note: boolean;
   is_bridge: boolean;
+  /** Claude Code: ruta opcional de claude.exe y timeout por llamada (s). */
+  claude_path?: string;
+  claude_timeout_s?: number;
 }
 
 export interface AiProvider {
@@ -1304,3 +1307,69 @@ export interface MentorAdherence {
   skippedSubjects: string[];
   typicalSessionMinutes: number | null;
 }
+
+// ── Mentor: conversación para crear metas y previsualizaciones (core/mentor/goalDraft.ts) ──
+export interface MentorScheduledItem {
+  name: string;
+  folders: string[];
+  topic_links: string[];
+  minutes: number;
+  start: string;
+  due: string;
+  weekFrom: number;
+  weekTo: number;
+}
+export interface MentorGoalSchedule {
+  start: string;
+  end: string;
+  weeks: number;
+  hoursPerWeek: number;
+  totalMinutes: number;
+  availableMinutes: number;
+  fits: boolean;
+  requiredHoursPerWeek: number;
+  items: MentorScheduledItem[];
+  warnings: string[];
+}
+export interface MentorGoalDraft {
+  name: string;
+  area: string;
+  description: string;
+  topics: Array<{ folder: string; title: string; subject: string; skills: string[]; why: string; estMinutes: number }>;
+  schedule: MentorGoalSchedule;
+  discarded: string[];
+}
+export interface MentorChatTurn {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  at: string;
+  draft?: MentorGoalDraft;
+  createdGoalId?: string;
+  discarded?: boolean;
+}
+export interface MentorChatState { turns: MentorChatTurn[]; pending: string | null }
+export type MentorChatResult =
+  | { loading: true }
+  | ({ loading: false; kind: "question" | "draft" | "error" | "no_ai"; text: string; draft?: MentorGoalDraft } & MentorChatState);
+export interface MentorGoalCreated { goalId: string; name: string; items: number; schedule: MentorGoalSchedule }
+export interface MentorGoalItemSlim {
+  id: string; parent: string; name: string; status: string; due: string | null; start: string | null;
+  is_leaf: boolean; progress: number; topic_links: string[]; topic_progress: TopicLinkProgress | null; late: boolean;
+}
+export interface MentorTopicRow {
+  folder: string; title: string; subject: string; completenessPct: number; lastAttemptDays: number | null; pendingSkills: string[];
+}
+export type MentorPanels =
+  | { loading: true }
+  | {
+      loading: false;
+      goals: Array<{ card: GoalCard; items: MentorGoalItemSlim[] }>;
+      areas: Array<{ id: string; name: string; icon: string }>;
+      projects: ProjectCard[];
+      study: {
+        topics: { total: number; inProgress: number; untreated: number; complete: number; inProgressList: MentorTopicRow[]; untreatedList: MentorTopicRow[]; recentList: MentorTopicRow[] };
+        srs: { dueTotal: number; bySubject: Array<{ subject: string; count: number; oldestOverdueDays: number; lapses: number }> };
+        errors: { unresolved: number; repeaters: Array<{ id: string; subject: string; topic: string; skill: string; category: string; repeatCount: number; lastSeenDays: number | null }> };
+      };
+    };

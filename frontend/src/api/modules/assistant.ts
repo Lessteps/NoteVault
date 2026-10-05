@@ -46,6 +46,8 @@ function publicCfg(cfg: AIConfig): Record<string, unknown> {
     max_tokens: cfg.max_tokens,
     include_note: cfg.include_note,
     is_bridge: cfg.is_bridge,
+    claude_path: cfg.claude_path,
+    claude_timeout_s: cfg.claude_timeout_s,
   };
 }
 
@@ -281,6 +283,11 @@ export function assistantApi(app: AppState) {
         const n = Number(f.max_tokens);
         if (!Number.isFinite(n)) throw new ApiError("Máximo de tokens inválido.");
         cfg.max_tokens = Math.max(64, Math.min(32_000, Math.trunc(n)));
+      }
+      if ("claude_path" in f) cfg.claude_path = oneLine(f.claude_path, 500);
+      if ("claude_timeout_s" in f) {
+        const n = Number(f.claude_timeout_s);
+        if (Number.isFinite(n)) cfg.claude_timeout_s = Math.max(10, Math.min(1800, Math.trunc(n)));
       }
       if ("include_note" in f) cfg.include_note = Boolean(f.include_note);
       AppConfig.set_ai_config(cfg.toDict());

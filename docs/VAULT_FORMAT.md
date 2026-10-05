@@ -51,6 +51,7 @@ vault/
 │   ├── estudio/                           práctica: intentos, errores, repaso
 │   ├── mentor/                            opcional: registro de sesiones del Mentor
 │   │   └── sessions/YYYY-MM-DD.json       un plan de estudio por día
+│   │   └── chat.json                      conversación del Mentor (crear metas)
 │   ├── web/                               módulo WEB: marcadores, reglas, historial, uso
 │   │   ├── marcadores.json
 │   │   ├── restricciones.json
@@ -778,6 +779,7 @@ ignorarlo, y no sube `FORMAT_VERSION`.
 | Clave de `LAYOUT` | Ruta |
 |---|---|
 | `mentor_session` | `.notevault/mentor/sessions/AAAA-MM-DD.json` — el plan de un día |
+| `mentor_chat` | `.notevault/mentor/chat.json` — la conversación con el Mentor |
 
 ```json
 {"date": "2026-10-05", "availableMinutes": 90, "objective": "Cerrar la meta de álgebra",
@@ -792,6 +794,30 @@ ignorarlo, y no sube `FORMAT_VERSION`.
 - `acceptedAt` solo existe cuando el estudiante aceptó el plan; es la fuente de verdad del
   plan de hoy (no se copia a la cola de estudio ni a la agenda).
 - El informe que ve la IA se calcula al vuelo y no se guarda.
+
+### Conversación del Mentor (`chat.json`)
+
+Un solo archivo con los últimos 60 turnos de la conversación en la que el Mentor ayuda a
+crear una meta. Es opcional y aditivo, como el resto de `mentor/`.
+
+```json
+{"version": 1, "turns": [
+  {"id": "t1", "role": "user", "content": "backend en Python en 3 meses", "at": "2026-10-05T10:00:00"},
+  {"id": "t2", "role": "assistant", "content": "¿Cuántas horas por semana tienes?", "at": "2026-10-05T10:00:03"},
+  {"id": "t3", "role": "assistant", "content": "Primero bases, luego APIs.", "at": "2026-10-05T10:01:10",
+   "draft": {"name": "Backend con Python", "area": "", "description": "…", "topics": [], "schedule": {}, "discarded": []},
+   "createdGoalId": "g…"}
+]}
+```
+
+- `draft` (solo turnos `assistant`): el borrador de meta con su calendario ya calculado. Es una
+  previsualización; **no existe como meta** hasta que el estudiante pulsa «Crear meta».
+- `createdGoalId`: id de la meta creada a partir de ese borrador; `discarded: true`: se descartó.
+- Al crear la meta, la app vuelve a calcular el calendario con los temas que existen entonces y
+  escribe una `Goal` normal (`.notevault/goals/…`) con una submeta por tema o bloque de temas, cada
+  una con `topic_links` (ver «Conexión con temas de estudio»). El Mentor no escribe nada más.
+- La IA solo recibe el informe, un catálogo compacto de temas (carpeta, título, materia, skills,
+  completitud, minutos estimados) y esta conversación; nunca el contenido de las notas.
 
 ## Contrato móvil (Mobile Contract)
 

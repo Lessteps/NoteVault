@@ -28,6 +28,8 @@ export interface TopicSnap {
   attemptCount: number;
   /** ISO del último intento en algún ejercicio del tema, o null */
   lastAttemptAt: string | null;
+  /** ejercicios que pide el plan del tema (suma de su plan por dificultad); ausente sin plan */
+  planExercises?: number;
 }
 
 export interface TopicSnapInput {
@@ -71,6 +73,9 @@ export function snapshotTopics(input: TopicSnapInput): TopicSnap[] {
       return !base.startsWith("_") && !base.startsWith(".") && !base.toLowerCase().endsWith(".practica.md");
     }).length;
 
+    const planExercises = manifest.plan
+      ? Object.values(manifest.plan).reduce((n, row) => n + (Array.isArray(row) ? row.reduce((a, b) => a + (Number(b) || 0), 0) : 0), 0)
+      : 0;
     out.push({
       folder,
       subject: manifest.subject,
@@ -80,6 +85,7 @@ export function snapshotTopics(input: TopicSnapInput): TopicSnap[] {
       theoryNotes,
       attemptCount,
       lastAttemptAt: last,
+      ...(planExercises > 0 ? { planExercises } : {}),
     });
   }
   return out;

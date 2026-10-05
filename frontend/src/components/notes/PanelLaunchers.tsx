@@ -4,7 +4,7 @@
 // El globo no es el modulo del navegador: muestra y oculta la lista de paginas
 // *dentro* del panel, sin moverte de donde estas.
 
-import { Bug, CalendarClock, Crop, Globe, Headphones, ListTree, Mic, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
+import { Bug, CalendarClock, Crop, Globe, GraduationCap, Headphones, ListTree, Mic, Map as MapIcon, PenTool, Sparkles } from "lucide-react";
 import { useEffect } from "react";
 import { toggleFace } from "../../lib/panelFaces";
 import { startScreenCapture } from "../../lib/screenCapture";
@@ -82,6 +82,17 @@ export function PanelLaunchers({ module }: { module: string }) {
         className={cell(assistantOpen)}
       >
         <Sparkles size={16} />
+      </button>
+
+      {/* Not a face of the panel: opens the Mentor tab (today's plan, goals, projects, notes and chat). */}
+      <button
+        type="button"
+        title="Mentor: plan de hoy, metas y conversación"
+        aria-label="Mentor"
+        onClick={() => useApp.getState().setModule("mentor")}
+        className={cell(false)}
+      >
+        <GraduationCap size={16} />
       </button>
 
       <button

@@ -80,6 +80,7 @@ export const LAYOUT = {
   mentor_dir: `${DATA_DIR}/mentor`,
   mentor_sessions_dir: `${DATA_DIR}/mentor/sessions`,
   mentor_session: `${DATA_DIR}/mentor/sessions/{date}.json`,
+  mentor_chat: `${DATA_DIR}/mentor/chat.json`,
   web_dir: `${DATA_DIR}/web`,
   web_bookmarks: `${DATA_DIR}/web/marcadores.json`,
   web_restrictions: `${DATA_DIR}/web/restricciones.json`,

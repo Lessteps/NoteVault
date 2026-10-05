@@ -406,12 +406,6 @@ function Composer() {
         icon: <Wand2 size={13} />,
         onSelect: () => void reevaluate(),
       },
-      {
-        label: "Mentor — plan de hoy",
-        description: "Abre una pestaña donde la IA propone qué estudiar hoy según tu estado; tú lo aceptas o ajustas.",
-        icon: <GraduationCap size={13} />,
-        onSelect: () => useApp.getState().setModule("mentor"),
-      },
       { separator: true },
       ...VAULT_MODES.map((m) => ({
         label: m.label,
@@ -671,9 +665,6 @@ export function AssistantPanel() {
             <Hammer size={15} />
           </IconButton>
         )}
-        <IconButton title="Mentor — plan de hoy" onClick={() => useApp.getState().setModule("mentor")}>
-          <GraduationCap size={15} />
-        </IconButton>
         <IconButton
           title="Nueva conversación"
           onClick={() => {
@@ -735,17 +726,6 @@ export function AssistantPanel() {
               <div className="rounded-xl border border-dashed border-line-strong p-3 text-[12.5px] leading-relaxed text-dim">
                 Pregunta sobre la nota abierta: explicar, resumir, generar ejercicios… Si seleccionas un fragmento en el
                 editor, se envía como contexto. Las acciones de estudio de la nota también llegan aquí.
-                <button
-                  type="button"
-                  onClick={() => useApp.getState().setModule("mentor")}
-                  className="mt-2.5 flex w-full items-center gap-2 rounded-lg border border-line-strong px-2.5 py-2 text-left text-text hover:bg-hover"
-                >
-                  <GraduationCap size={14} />
-                  <span>
-                    <span className="block font-medium">Mentor — plan de hoy</span>
-                    <span className="block text-[11.5px] text-dim">La IA propone qué estudiar según tu estado.</span>
-                  </span>
-                </button>
               </div>
             )}
             {messages.map((m, i) => (
@@ -927,6 +907,7 @@ export function AiSettingsDialog() {
   }, [open, toast]);
   if (!open || !cfg) return null;
   const info = providers.find((p) => p.key === cfg.provider);
+  const claudeCode = cfg.provider === "claude_code";
   const save = async (andTest = false) => {
     try {
       const saved = await api.aiSettingsSave({ ...cfg, ...(key ? { api_key: key } : {}) });
@@ -980,9 +961,11 @@ export function AiSettingsDialog() {
       {info && <p className="text-[12px] text-dim">{info.hint}</p>}
       {!info?.bridge && (
         <>
-          <Field label="URL del servidor">
-            <input className={input} value={cfg.base_url} onChange={(e) => setCfg({ ...cfg, base_url: e.target.value })} />
-          </Field>
+          {!claudeCode && (
+            <Field label="URL del servidor">
+              <input className={input} value={cfg.base_url} onChange={(e) => setCfg({ ...cfg, base_url: e.target.value })} />
+            </Field>
+          )}
           <div className="flex items-end gap-2">
             <Field label="Modelo" className="flex-1">
               <input
@@ -1012,6 +995,29 @@ export function AiSettingsDialog() {
               Buscar modelos
             </GhostButton>
           </div>
+          {claudeCode ? (
+            <>
+              <Field label="Ruta de Claude Code (opcional)">
+                <input
+                  className={input}
+                  value={cfg.claude_path ?? ""}
+                  placeholder="Vacío = autodetectar (PATH o %APPDATA%\npm)"
+                  onChange={(e) => setCfg({ ...cfg, claude_path: e.target.value })}
+                />
+              </Field>
+              <Field label="Tiempo máximo por respuesta (s)">
+                <input
+                  type="number"
+                  min={10}
+                  max={1800}
+                  className={input}
+                  value={cfg.claude_timeout_s ?? 180}
+                  onChange={(e) => setCfg({ ...cfg, claude_timeout_s: Number(e.target.value) })}
+                />
+              </Field>
+            </>
+          ) : (
+            <>
           <Field label={`API key${cfg.has_key ? " (guardada)" : ""}`}>
             <div className="flex gap-2">
               <input
@@ -1057,6 +1063,8 @@ export function AiSettingsDialog() {
               />
             </Field>
           </div>
+            </>
+          )}
         </>
       )}
       <label className="flex items-center gap-2 text-[12.5px] text-dim">

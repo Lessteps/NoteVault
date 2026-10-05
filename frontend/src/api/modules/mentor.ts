@@ -4,7 +4,7 @@
 // contexto con los managers de la vault y se validan las entradas de la UI. La IA
 // (fase siguiente) consume `mentor_brief().text`: nunca lee notas completas.
 
-import { AIConfig } from "../../core/aiClient.js";
+import { AIConfig, sendChat } from "../../core/aiClient.js";
 import { ApiError } from "../../core/errors.js";
 import { loadExamRecordForTopic } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
@@ -15,12 +15,27 @@ import { buildStudentBrief, toPromptText, type BriefContext, type QueueHint } fr
 import { adherence, BLOCK_STATUSES, sanitizeSession, SessionLog, type BlockStatus } from "../../core/mentor/sessionLog.js";
 import { aiUnavailableReason, planToBlocks, proposePlan, type ProposedBlock, type SendFn } from "../../core/mentor/planner.js";
 import { snapshotTopics, type TopicSnap } from "../../core/mentor/topics.js";
+import { ChatLog, pendingDraft, type ChatTurnRecord } from "../../core/mentor/chatLog.js";
+import {
+  buildGoalMessages,
+  buildTopicCatalog,
+  composeDraft,
+  estimateTopicMinutes,
+  fold,
+  parseGoalResponse,
+  scheduleGoal,
+  type ChatTurn,
+} from "../../core/mentor/goalDraft.js";
+import { topicsPanel } from "../../core/mentor/panels.js";
+import { sectionData, type StudyPendingData } from "../../core/mentor/brief.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 import { clampInt } from "../common.js";
 import { vaultScan } from "../vaultScan.js";
+import { goalsApi } from "./goals.js";
+import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
 
 const DEFAULT_BRIEF_CHARS = 6000;
@@ -85,9 +100,51 @@ export function briefContext(app: AppState, log: SessionLog): BriefContext {
 
 const localDate = (d = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+/** Historial para la IA: los borradores se resumen en JSON compacto para que sepa qué propuso. */
+function toHistory(turns: readonly ChatTurnRecord[]): ChatTurn[] {
+  return turns.slice(-20).map((t) => ({
+    role: t.role,
+    content: t.draft
+      ? JSON.stringify({
+          type: "goal_draft",
+          name: t.draft.name,
+          hoursPerWeek: t.draft.schedule.hoursPerWeek,
+          durationWeeks: Math.round((Date.parse(t.draft.schedule.end) - Date.parse(t.draft.schedule.start)) / (7 * 86400000)),
+          topics: t.draft.topics.map((x) => ({ folder: x.folder, skills: x.skills, why: x.why })),
+        })
+      : t.content,
+  }));
+}
+
+/** El id de un área real a partir de su id o su nombre; "" si no existe (nunca se crea un área). */
+function resolveArea(app: AppState, wanted: unknown): string {
+  const w = fold(String(wanted ?? "").trim());
+  if (!w) return "";
+  const hit = app.mgrs().areas.areas().find((a) => !a.archived && (fold(a.id) === w || fold(a.name) === w));
+  return hit ? hit.id : "";
+}
+
+/** Solo lo que pintan las previsualizaciones (sin historial ni adherencia). */
+function slimItem(i: any) {
+  return {
+    id: i.id,
+    parent: i.parent,
+    name: i.name,
+    status: i.status,
+    due: i.due,
+    start: i.start,
+    is_leaf: i.is_leaf,
+    progress: i.progress,
+    topic_links: i.topic_links,
+    topic_progress: i.topic_progress,
+    late: i.late,
+  };
+}
+
 /** `send` se inyecta solo en los tests; en la app es `sendChat`. */
 export function mentorApi(app: AppState, send?: SendFn) {
   const log = () => new SessionLog(app.root);
+  const chat = () => new ChatLog(app.root);
 
   function markBlock(date: unknown, candidateId: unknown, status: unknown, note?: unknown) {
     if (!(BLOCK_STATUSES as readonly string[]).includes(String(status))) throw new ApiError("Estado de bloque inválido.");
@@ -229,6 +286,169 @@ export function mentorApi(app: AppState, send?: SendFn) {
       });
       if (!clean || !clean.blocks.length) throw new ApiError("Plan inválido.");
       return log().save(clean);
+    },
+
+    // ── Conversación con el Mentor: crear metas con el estudiante ─────────
+
+    /** La conversación guardada y el borrador pendiente (si lo hay). */
+    mentor_chat_load() {
+      const turns = chat().load();
+      return { turns, pending: pendingDraft(turns)?.id ?? null };
+    },
+
+    mentor_chat_clear() {
+      chat().clear();
+      return { turns: [] as ChatTurnRecord[], pending: null };
+    },
+
+    /**
+     * Un turno de la conversación. La IA solo ve el informe, el catálogo de temas reales filtrado por
+     * el pedido y la conversación; responde con una pregunta o un borrador, y el calendario lo calcula
+     * la app. NUNCA escribe una meta: eso solo lo hace `mentor_goal_create` al confirmar.
+     */
+    async mentor_chat(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const message = String(o.message ?? "").trim().slice(0, 1500);
+      if (!message) throw new ApiError("Escribe un mensaje para el Mentor.");
+      if (studyIndexCold(app)) return { loading: true as const };
+      const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+      const unavailable = aiUnavailableReason(cfg);
+      const stored = chat().load();
+      if (unavailable) {
+        return { loading: false as const, kind: "no_ai" as const, text: unavailable, turns: stored, pending: pendingDraft(stored)?.id ?? null };
+      }
+
+      const history: ChatTurn[] = Array.isArray(o.history)
+        ? o.history
+            .filter((h: any) => h && (h.role === "user" || h.role === "assistant") && typeof h.content === "string")
+            .map((h: any) => ({ role: h.role as "user" | "assistant", content: String(h.content).slice(0, 3000) }))
+            .slice(-20)
+        : toHistory(stored);
+
+      const brief = buildStudentBrief(briefContext(app, log()));
+      const request = [...history.filter((h) => h.role === "user").map((h) => h.content), message].join(" ");
+      const catalog = buildTopicCatalog(topicSnaps(app), request);
+      const today = localDate();
+      const areas = app.mgrs().areas.areas().filter((a) => !a.archived);
+      const turns = chat().append({ role: "user", content: message });
+
+      let raw = "";
+      try {
+        raw = await (send ?? sendChat)(cfg, buildGoalMessages(message, brief, catalog, history, { today, areas: areas.map((a) => a.name) }));
+      } catch (e) {
+        return { loading: false as const, kind: "error" as const, text: `La IA falló: ${e instanceof Error ? e.message : String(e)}`.slice(0, 400), turns, pending: pendingDraft(turns)?.id ?? null };
+      }
+      const parsed = parseGoalResponse(raw, catalog);
+      if (!parsed.ok) {
+        return { loading: false as const, kind: "error" as const, text: `${parsed.error} Reformula o inténtalo de nuevo.`, turns, pending: pendingDraft(turns)?.id ?? null };
+      }
+      if (parsed.reply.type === "question") {
+        const next = chat().append({ role: "assistant", content: parsed.reply.text });
+        return { loading: false as const, kind: "question" as const, text: parsed.reply.text, turns: next, pending: pendingDraft(next)?.id ?? null };
+      }
+      const reply = parsed.reply;
+      const draft = composeDraft(reply, catalog, today, resolveArea(app, reply.area));
+      if ("missing" in draft) {
+        const text = `Antes de armar el calendario necesito saber ${draft.missing}.`;
+        const next = chat().append({ role: "assistant", content: text });
+        return { loading: false as const, kind: "question" as const, text, turns: next, pending: pendingDraft(next)?.id ?? null };
+      }
+      const text = reply.rationale || `Borrador: ${draft.name}`;
+      const next = chat().append({ role: "assistant", content: text, draft });
+      return { loading: false as const, kind: "draft" as const, text, draft, turns: next, pending: pendingDraft(next)?.id ?? null };
+    },
+
+    /** "Descartar": no escribe ninguna meta; solo marca el borrador. */
+    mentor_draft_discard(turnId: unknown) {
+      const turns = chat().patch(String(turnId ?? ""), { discarded: true });
+      if (!turns) throw new ApiError("Ese borrador ya no existe.");
+      return { turns, pending: pendingDraft(turns)?.id ?? null };
+    },
+
+    /**
+     * "Crear meta": el ÚNICO camino de escritura. No se fía del calendario que mande la UI: vuelve a
+     * calcularlo con los temas que existen AHORA (las carpetas inexistentes se descartan) y escribe la
+     * meta y sus submetas con `topic_links` mediante GoalManager.
+     */
+    mentor_goal_create(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const d = (o.draft && typeof o.draft === "object" ? o.draft : {}) as Record<string, any>;
+      const sch = (d.schedule && typeof d.schedule === "object" ? d.schedule : {}) as Record<string, any>;
+      const start = needDate(sch.start);
+      const end = needDate(sch.end);
+      const hoursPerWeek = Number(sch.hoursPerWeek);
+      if (!(hoursPerWeek > 0)) throw new ApiError("Horas por semana inválidas.");
+      if (!Array.isArray(d.topics) || !d.topics.length) throw new ApiError("El borrador no tiene temas.");
+
+      const snaps = new Map(topicSnaps(app).map((t) => [t.folder, t]));
+      const seen = new Set<string>();
+      const topics: Array<{ folder: string; title: string; skills: string[]; estMinutes: number; why: string }> = [];
+      for (const t of d.topics.slice(0, 40) as any[]) {
+        const folder = String(t?.folder ?? "").replace(/\\/g, "/");
+        const snap = snaps.get(folder);
+        if (!snap || seen.has(folder)) continue;
+        seen.add(folder);
+        const valid = new Set(Object.keys(snap.progress.skills));
+        const skills = Array.isArray(t.skills) ? t.skills.map((x: unknown) => String(x).toLowerCase()).filter((x: string) => valid.has(x)) : [];
+        topics.push({ folder, title: snap.title, skills, estMinutes: estimateTopicMinutes(snap), why: String(t?.why ?? "").replace(/\s+/g, " ").slice(0, 240) });
+      }
+      if (!topics.length) throw new ApiError("Ninguno de los temas del borrador existe ya en tu sistema.");
+      let schedule;
+      try {
+        schedule = scheduleGoal({ topics, start, end, hoursPerWeek });
+      } catch (e) {
+        throw new ApiError((e as Error).message);
+      }
+
+      const goals = app.mgrs().goals;
+      const name = String(d.name ?? "").replace(/\s+/g, " ").trim().slice(0, 120) || "Nueva meta de estudio";
+      const goal = goals.create_goal(name, {
+        area: resolveArea(app, d.area),
+        start,
+        end,
+        description: String(d.description ?? "").slice(0, 4000),
+        priority: 2,
+        in_overview: true,
+      });
+      const byFolder = new Map(topics.map((t) => [t.folder, t]));
+      for (const it of schedule.items) {
+        goals.create_item(goal.id, it.name, "", {
+          start: it.start,
+          due: it.due,
+          duration_min: Math.min(100000, it.minutes),
+          topic_links: it.topic_links,
+          notes: it.folders.map((f) => byFolder.get(f)?.why ?? "").filter(Boolean).join("\n"),
+        });
+      }
+      if (o.turnId) chat().patch(String(o.turnId), { createdGoalId: goal.id });
+      return { goalId: goal.id, name: goal.name, items: schedule.items.length, schedule };
+    },
+
+    /**
+     * Previsualizaciones de solo lectura para los paneles Metas / Proyectos / Notas. Todo sale de los
+     * mismos managers que sus módulos; aquí no se edita nada.
+     */
+    mentor_panels() {
+      if (studyIndexCold(app)) return { loading: true as const };
+      const g = goalsApi(app);
+      const goals = (g.goals_list("activas") as any[]).map((card) => {
+        const detail = g.goals_get(card.id) as any;
+        return { card, items: (detail.items as any[]).map(slimItem) };
+      });
+      const projects = (projectsApi(app).projects_list() as any[]).filter((p) => p.status === "En curso" || p.status === "Planeado");
+      const brief = buildStudentBrief(briefContext(app, log()));
+      const pending = sectionData<StudyPendingData>(brief, "study_pending");
+      return {
+        loading: false as const,
+        goals,
+        areas: app.mgrs().areas.areas().map((a) => ({ id: a.id, name: a.name, icon: a.icon })),
+        projects,
+        study: {
+          topics: topicsPanel(topicSnaps(app)),
+          srs: pending?.srs ?? { dueTotal: 0, bySubject: [] },
+          errors: pending ? { unresolved: pending.errors.unresolved, repeaters: pending.errors.repeaters.slice(0, 5) } : { unresolved: 0, repeaters: [] },
+        },
+      };
     },
 
     mentor_block_status: markBlock,

@@ -177,7 +177,7 @@ export interface MenuItem {
   onSelect?: () => void;
 }
 
-const useMenu = create<{
+export const useMenu = create<{
   menu: { x: number; y: number; items: MenuItem[] } | null;
   set: (m: { x: number; y: number; items: MenuItem[] } | null) => void;
 }>((set) => ({ menu: null, set: (menu) => set({ menu }) }));

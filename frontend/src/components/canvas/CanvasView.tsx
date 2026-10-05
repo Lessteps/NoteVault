@@ -653,11 +653,11 @@ export function CanvasView() {
     else if (k === "z") run(() => addText());
     else if (k === "x") run(() => setPicker("note"));
     else if (k === "c") run(() => setPicker("image"));
-    else if (k === "v") run(() => setDrawMode(false)); // the selector: cancels pen mode and any other tool
+    else if (k === "v") run(() => { setDrawMode(false); host.current?.focus(); }); // the selector: cancels pen mode and any other tool
     else if (k === "g") run(toggleGrid);
     else if (k === "b") run(groupSelection);
-    else if (k === "n") run(() => setDrawMode((v) => !v));
-    else if (k === "m") run(() => addShape("process"));
+    else if (k === "r") run(() => { setDrawMode((v) => !v); host.current?.focus(); }); // free drawing
+    else if (k === "f") run(openShapes); // the shapes menu, the same one the toolbar button opens
     else if (k === "a") run(() => setPicker("canvas"));
     else if (k === "s") run(() => void addLink());
     else if (e.key.startsWith("Arrow") && sel.size) {
@@ -669,6 +669,14 @@ export function CanvasView() {
         commit({ ...d, nodes: d.nodes.map((n) => (sel.has(n.id) ? { ...n, x: snapTo(n.x + dx, snap && !e.shiftKey), y: snapTo(n.y + dy, snap && !e.shiftKey) } : n)) });
       });
     }
+  };
+
+  const shapesBtn = useRef<HTMLButtonElement>(null);
+  /** Opens the shapes menu above the toolbar button (from the keyboard there is no click to place it). */
+  const openShapes = () => {
+    const r = shapesBtn.current?.getBoundingClientRect();
+    const at = { clientX: r ? r.left : 200, clientY: r ? r.top : 200, preventDefault: () => undefined };
+    openMenu(at, SHAPES.map((s) => ({ label: s.name, onSelect: () => addShape(s.id) })));
   };
 
   // ── render ───────────────────────────────────────────────────────────
@@ -815,11 +823,11 @@ export function CanvasView() {
           <Tool title="Imagen de la vault (C)" kbd="C" onClick={() => setPicker("image")}><ImageIcon size={16} /></Tool>
           <Tool title="Canvas embebido (A)" onClick={() => setPicker("canvas")}><LayoutDashboard size={16} /></Tool>
           <Tool title="Enlace web (S)" kbd="S" onClick={() => void addLink()}><Link2 size={16} /></Tool>
-          <Tool title="Forma de diagrama (M)" kbd="M" onClick={(e) => openMenu(e, SHAPES.map((s) => ({ label: s.name, onSelect: () => addShape(s.id) })))}>
+          <Tool title="Forma de diagrama (F)" kbd="F" btnRef={shapesBtn} onClick={(e) => openMenu(e, SHAPES.map((s) => ({ label: s.name, onSelect: () => addShape(s.id) })))}>
             <Diamond size={16} />
           </Tool>
           <Tool title="Grupo (B / Ctrl+G)" kbd="B" onClick={groupSelection}><SquareDashed size={16} /></Tool>
-          <Tool title="Dibujo libre (N)" kbd="N" active={drawMode} onClick={() => setDrawMode((v) => !v)}><PenLine size={16} /></Tool>
+          <Tool title="Dibujo libre (R)" kbd="R" active={drawMode} onClick={() => { setDrawMode((v) => !v); host.current?.focus(); }}><PenLine size={16} /></Tool>
           {drawMode && (
             <div className="flex items-center gap-1 px-1">
               {Object.keys(PRESET_COLORS).map((c) => (
@@ -918,11 +926,12 @@ function Sep() {
   return <span className="mx-1 h-5 w-px bg-line" />;
 }
 
-function Tool({ title, kbd, onClick, children, active, disabled }: {
+function Tool({ title, kbd, onClick, children, active, disabled, btnRef }: {
   title: string; kbd?: string; onClick: (e: React.MouseEvent) => void; children: ReactNode; active?: boolean; disabled?: boolean;
+  btnRef?: React.Ref<HTMLButtonElement>;
 }) {
   return (
-    <button type="button" title={title} aria-label={title} disabled={disabled} onClick={onClick}
+    <button ref={btnRef} type="button" title={title} aria-label={title} disabled={disabled} onClick={onClick}
       className={cn("relative grid h-8 place-items-center rounded-lg px-1.5 transition-colors disabled:opacity-35 min-w-[2rem]",
         active ? "bg-accent-soft text-accent-text" : "text-dim hover:bg-hover hover:text-text")}>
       {children}

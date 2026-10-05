@@ -97,9 +97,9 @@ describe("V selects", () => {
     expect(tool(/Enlace web \(S\)/)).toBeTruthy();
   });
 
-  it("cancels the pen mode (N) and goes back to selecting", () => {
+  it("cancels the pen mode (R) and goes back to selecting", () => {
     render();
-    key("n");
+    key("r");
     expect(tool(/Dibujo libre/)!.className).toContain("bg-accent-soft");
     expect(tool(/Seleccionar \(V\)/)!.className).not.toContain("bg-accent-soft");
     key("v");
@@ -107,9 +107,25 @@ describe("V selects", () => {
     expect(tool(/Seleccionar \(V\)/)!.className).toContain("bg-accent-soft");
   });
 
+  it("F opens the shapes menu and picking one creates the shape; the old M and N do nothing", async () => {
+    const { useMenu } = await import("../ui");
+    render();
+    key("m");
+    key("n");
+    expect(useMenu.getState().menu).toBeNull();
+    expect(tool(/Dibujo libre/)!.className).not.toContain("bg-accent-soft");
+    key("f");
+    const items = useMenu.getState().menu!.items;
+    expect(items.length).toBeGreaterThan(3);
+    const before = useCanvas.getState().doc.nodes.length;
+    act(() => { items[0]!.onSelect?.(); });
+    expect(useCanvas.getState().doc.nodes.length).toBe(before + 1);
+    expect(useCanvas.getState().doc.nodes.at(-1)!.type).toBe("nv-shape");
+  });
+
   it("clicking the Select tool does the same", () => {
     render();
-    key("n");
+    key("r");
     act(() => tool(/Seleccionar \(V\)/)!.click());
     expect(tool(/Dibujo libre/)!.className).not.toContain("bg-accent-soft");
   });

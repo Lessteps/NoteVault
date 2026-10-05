@@ -412,6 +412,11 @@ export function CanvasView() {
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
+    // The button (or the pen tip) is already up but its "up" never reached us: end the gesture instead of drawing on.
+    if (d && e.buttons === 0 && e.pointerType !== "touch") {
+      onPointerUp(e);
+      return;
+    }
     if (!d) {
       if (e.buttons === 0 && !drawMode) {
         const [hx, hy] = toWorld(e.clientX, e.clientY);
@@ -480,6 +485,8 @@ export function CanvasView() {
 
   const onPointerUp = (e: React.PointerEvent) => {
     const d = dragRef.current;
+    // Cleared at once: the same gesture can end through several events (up, cancel, lost capture) and must only count once.
+    dragRef.current = null;
     setDrag(null);
     if (!d) return;
     if (d.kind === "connect") {
@@ -526,6 +533,19 @@ export function CanvasView() {
         const cur = docRef.current;
         commit({ ...cur, nodes: [...cur.nodes, node] });
       }
+    }
+  };
+
+  /**
+   * A pen or a tablet may cancel the gesture (the system takes it for a scroll, or the pen leaves the sensing range) instead of
+   * sending "up". A stroke already drawn is kept; anything else is simply dropped.
+   */
+  const onPointerCancel = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (d?.kind === "draw") onPointerUp(e);
+    else {
+      dragRef.current = null;
+      setDrag(null);
     }
   };
 
@@ -738,7 +758,7 @@ export function CanvasView() {
         tabIndex={0}
         role="application"
         aria-label="Canvas"
-        className={cn("nv-canvas relative min-h-0 flex-1 overflow-hidden outline-none",
+        className={cn("nv-canvas relative min-h-0 flex-1 touch-none overflow-hidden outline-none",
           drawMode ? "cursor-crosshair"
             : drag?.kind === "pan" ? "cursor-grabbing"
               : spaceHeld ? "cursor-grab"
@@ -754,6 +774,8 @@ export function CanvasView() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onLostPointerCapture={onPointerCancel}
         onPointerLeave={() => setHoverBorder(null)}
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}

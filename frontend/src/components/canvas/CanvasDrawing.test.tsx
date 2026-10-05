@@ -113,3 +113,32 @@ describe("a drawing is its stroke, not its box", () => {
     expect(py).toBeCloseTo((90 * n.height) / 100, 0);
   });
 });
+
+describe("a pen or tablet that never sends 'up'", () => {
+  const penStroke = () => {
+    act(() => { [...document.querySelectorAll<HTMLButtonElement>("button")].find((b) => /Dibujo libre/.test(b.title))!.click(); });
+    fire("pointerdown", 400, 300);
+    fire("pointermove", 420, 320, host(), 1);
+    fire("pointermove", 450, 340, host(), 1);
+  };
+  const strokes = () => useCanvas.getState().doc.nodes.filter((n) => n.type === "nv-drawing").length;
+
+  it("pointercancel ends the stroke and keeps it (once)", () => {
+    penStroke();
+    act(() => { host().dispatchEvent(new MouseEvent("pointercancel", { bubbles: true })); });
+    act(() => { host().dispatchEvent(new MouseEvent("lostpointercapture", { bubbles: true })); });
+    expect(strokes()).toBe(2);
+  });
+
+  it("a move with no button down (the pen was lifted) ends the stroke instead of drawing on", () => {
+    penStroke();
+    fire("pointermove", 460, 345, host(), 0);
+    expect(strokes()).toBe(2);
+    fire("pointermove", 600, 450, host(), 0); // hovering afterwards adds nothing
+    expect(strokes()).toBe(2);
+  });
+
+  it("the canvas does not let the system turn pen strokes into scrolling", () => {
+    expect(host().className).toContain("touch-none");
+  });
+});

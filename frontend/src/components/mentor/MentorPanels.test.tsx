@@ -9,8 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { api } from "../../lib/bridge";
-import type { GoalCard, MentorChatResult, MentorChatTurn, MentorGoalDraft, MentorOverview, MentorPanels, ProjectCard } from "../../lib/types";
+import type { GoalCard, MentorChatTurn, MentorGoalDraft, MentorOverview, MentorPanels, MentorProjectCard } from "../../lib/types";
 import { useApp } from "../../store/app";
+import { useAssistant } from "../../store/assistant";
 import { useGoals } from "../../store/goals";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
@@ -46,26 +47,32 @@ const card = (over: Partial<GoalCard> = {}): GoalCard =>
     linked_folder: "", linked_notes: [], progress: 0.25, counts: [1, 4], adherence7: null, daily: [], next: null, overdue_items: 0, habits: [], ...over,
   }) as unknown as GoalCard;
 
-const project = (): ProjectCard =>
+const project = (): MentorProjectCard =>
   ({
     id: "p1", key: "APP", name: "Mi app", status: "En curso", status_colour: "#2383e2", area: "", colour: "#2383e2", icon: "", created: null, start: null,
     deadline: "2026-12-01", columns: [], done_column: "Hecho", in_calendar: false, description: "", days_left: 57, overdue: false, folders: [],
     summary: { total: 10, done: 4, open: 6, overdue: 1, progress: 0.4, estimate_min: 0, estimate_done_min: 0 }, throughput: [], next_due: { key: "APP-3", title: "Login", due: "2026-10-20" },
-  }) as unknown as ProjectCard;
+    issues: [
+      { id: "x1", key: "APP-3", title: "Login", status: "En curso", priority: 3, parent: "", due: "2026-10-20", overdue: false, icon: "●", type: "Tarea", type_colour: "#2383e2" },
+      { id: "x2", key: "APP-4", title: "Validar formulario", status: "Por hacer", priority: 2, parent: "x1", due: null, overdue: false, icon: "○", type: "Subtarea", type_colour: "#8b8b96" },
+    ],
+  }) as unknown as MentorProjectCard;
 
 const panels = (over: Partial<Extract<MentorPanels, { loading: false }>> = {}): MentorPanels => ({
   loading: false,
-  areas: [{ id: "estudio", name: "Estudio", icon: "📚" }],
+  areas: [{ id: "estudio", name: "Estudio", icon: "📚", colour: "#3f51b5" }],
   goals: [
     {
       card: card(),
       items: [
         {
-          id: "i1", parent: "", name: "1 Fundamentos", status: "todo", due: "2026-10-12", start: "2026-10-05", is_leaf: true, progress: 0.5, late: false, topic_links: [FUND],
+          id: "i1", parent: "", name: "1 Fundamentos", status: "En curso", due: "2026-10-12", start: "2026-10-05", is_leaf: true, progress: 0.5, late: false, topic_links: [FUND],
+          priority: 2, category: "", schedule: "", is_priority: false, counts: [0, 1], done_today: false,
           topic_progress: { done: false, pct: 50, broken: [], missing: [], links: [{ link: FUND, topic: FUND, title: "1 Fundamentos", skills: [], broken: false, done: false, pct: 50 }] },
         },
         {
-          id: "i2", parent: "", name: "Tema borrado", status: "todo", due: null, start: null, is_leaf: true, progress: 0, late: false, topic_links: ["X/Y"],
+          id: "i2", parent: "", name: "Tema borrado", status: "Pendiente", due: null, start: null, is_leaf: true, progress: 0, late: false, topic_links: ["X/Y"],
+          priority: 2, category: "", schedule: "", is_priority: false, counts: [0, 1], done_today: false,
           topic_progress: { done: false, pct: 0, broken: ["X/Y"], missing: [], links: [{ link: "X/Y", topic: "X/Y", title: "Y", skills: [], broken: true, done: false, pct: 0 }] },
         },
       ],
@@ -103,17 +110,11 @@ const click = async (el: Element | undefined) => {
   await flush();
 };
 const go = (label: string) => click([...host.querySelectorAll("aside nav button")].find((b) => b.textContent?.includes(label)));
-const type = async (el: HTMLTextAreaElement, value: string) => {
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(el, value);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-};
 
 beforeEach(() => {
   localStorage.clear();
   useNavState.setState({ values: {} });
-  useMentor.setState({ panels: null, turns: [], pending: null, chatLoaded: false, sending: false, notice: null, creating: false, createdGoalId: null, warming: false, panelsError: "" });
+  useMentor.setState({ panels: null, turns: [], pending: null, chatId: null, chatTitle: "Nueva conversación", chats: [], historyOpen: false, chatLoaded: false, sending: false, notice: null, creating: false, createdGoalId: null, warming: false, panelsError: "" });
   useApp.setState({ module: "mentor" });
   host = document.createElement("div");
   document.body.appendChild(host);
@@ -129,10 +130,11 @@ afterEach(() => {
 });
 
 describe("Mentor: espacio de paneles", () => {
-  it("navega entre Hoy, Metas, Proyectos, Notas y Conversación; arranca en Hoy", async () => {
+  it("navega entre Hoy, Metas, Proyectos y Notas; la Conversación ya no es un panel; arranca en Hoy", async () => {
     await mount();
     const nav = [...host.querySelectorAll("aside nav button")].map((b) => b.textContent ?? "");
-    expect(nav.map((t) => ["Hoy", "Metas", "Proyectos", "Notas y estudio", "Conversación"].find((l) => t.includes(l)))).toEqual(["Hoy", "Metas", "Proyectos", "Notas y estudio", "Conversación"]);
+    expect(nav.map((t) => ["Hoy", "Metas", "Proyectos", "Notas y estudio"].find((l) => t.includes(l)))).toEqual(["Hoy", "Metas", "Proyectos", "Notas y estudio"]);
+    expect(nav.some((t) => t.includes("Conversación"))).toBe(false);
     expect(host.textContent).toContain("Mentor — Hoy");
 
     await go("Metas");
@@ -141,52 +143,96 @@ describe("Mentor: espacio de paneles", () => {
     expect(host.textContent).toContain("Mentor — Proyectos");
     await go("Notas y estudio");
     expect(host.textContent).toContain("Mentor — Notas y estudio");
-    await go("Conversación");
-    expect(host.textContent).toContain("Mentor — Conversación");
     await go("Hoy");
     expect(host.textContent).toContain("Mentor — Hoy");
   });
 
-  it("Metas: previsualización de solo lectura con área, fechas, avance, submetas, temas enlazados y enlaces rotos", async () => {
+  it("Metas: tarjeta desplegable como en el módulo Metas; colapsada resume y expandida muestra submetas, temas y enlaces rotos", async () => {
     await mount();
     await go("Metas");
     const g = host.querySelector("[data-testid=goal-card]")!;
+    // colapsada: icono/nombre/área/fechas/avance/días restantes, pero ninguna submeta
     expect(g.textContent).toContain("Backend con Python");
-    expect(g.textContent).toContain("Estudio");
+    expect(host.textContent).toContain("Estudio");
     expect(g.textContent).toContain("25 %");
-    expect(g.textContent).toContain("91 d restantes");
+    expect(g.textContent).toContain("faltan 91 días");
     expect(g.textContent).toContain("1/4 submetas");
+    expect(g.querySelectorAll("[data-testid=goal-item]")).toHaveLength(0);
+    expect(g.querySelector("button[aria-expanded]")!.getAttribute("aria-expanded")).toBe("false");
+
+    // expandida: el árbol de submetas
+    await click(g.querySelector("button[aria-expanded]")!);
+    expect(g.querySelector("button[aria-expanded]")!.getAttribute("aria-expanded")).toBe("true");
     const items = g.querySelectorAll("[data-testid=goal-item]");
+    expect(items).toHaveLength(2);
     expect(items[0]!.textContent).toContain("📚 1 Fundamentos");
     expect(items[0]!.textContent).toContain("50 %");
+    expect(items[0]!.textContent).toContain("En curso");
     expect(items[1]!.textContent).toContain("enlace roto");
-    // sin controles de edición
+
+    // solo lectura: ni campos ni acciones de edición
     expect(host.querySelectorAll("input, textarea, select")).toHaveLength(0);
-    const labels = [...host.querySelectorAll("main button")].map((b) => b.textContent?.trim());
-    expect(labels).not.toContain("Editar");
-    expect(labels).not.toContain("Borrar");
+    const labels = [...host.querySelectorAll("main button")].map((b) => b.textContent?.trim() ?? "");
+    for (const forbidden of ["Editar", "Borrar", "Eliminar", "Nueva submeta"]) expect(labels.some((l) => l.includes(forbidden))).toBe(false);
+
+    // y se pliega otra vez
+    await click(g.querySelector("button[aria-expanded]")!);
+    expect(g.querySelectorAll("[data-testid=goal-item]")).toHaveLength(0);
+  });
+
+  it("'＋ Nueva meta con el Mentor' abre el asistente en contexto Mentor (arriba y en el estado vacío)", async () => {
+    useAssistant.setState({ open: false });
+    await mount();
+    await go("Metas");
+    expect(button("Nueva meta con el Mentor")).toBeTruthy();
+    await click(button("Nueva meta con el Mentor"));
+    expect(useAssistant.getState().open).toBe(true);
+    expect(useMentor.getState().focusSeq).toBeGreaterThan(0);
+
+    useAssistant.setState({ open: false });
+    vi.mocked(api.mentorPanels).mockResolvedValue(panels({ goals: [] }));
+    useMentor.setState({ panels: null });
+    await act(async () => { root.unmount(); });
+    root = createRoot(host);
+    await mount();
+    await go("Metas");
+    const empty = host.querySelector("[data-testid=goals-empty]")!;
+    expect(empty.textContent).toContain("No tienes metas activas");
+    await click(button("Nueva meta con el Mentor", empty));
+    expect(useAssistant.getState().open).toBe(true);
   });
 
   it("'Abrir en Metas' abre esa meta en su módulo", async () => {
     const open = vi.spyOn(useGoals.getState(), "open").mockResolvedValue();
     await mount();
     await go("Metas");
+    await click(host.querySelector("[data-testid=goal-card] button[aria-expanded]")!);
     await click(button("Abrir en Metas"));
     expect(open).toHaveBeenCalledWith("g1");
     expect(useApp.getState().module).toBe("metas");
   });
 
-  it("Proyectos: estado, plazo e issues abiertos, y 'Abrir en Proyectos'", async () => {
+  it("Proyectos: tarjeta desplegable de solo lectura con estado, plazo e issues abiertos, y 'Abrir en Proyectos'", async () => {
     const open = vi.spyOn(useProjects.getState(), "open").mockResolvedValue();
     await mount();
     await go("Proyectos");
     const p = host.querySelector("[data-testid=project-card]")!;
     expect(p.textContent).toContain("Mi app");
     expect(p.textContent).toContain("En curso");
-    expect(p.textContent).toContain("57 d restantes");
-    expect(p.textContent).toContain("6 issues abiertos de 10");
-    expect(p.textContent).toContain("1 vencidos");
+    expect(p.textContent).toContain("57 días a la entrega");
+    expect(p.textContent).toContain("4/10 issues");
+    expect(p.textContent).toContain("6 abiertas");
+    expect(p.textContent).toContain("1 vencidas");
+    expect(p.querySelectorAll("[data-testid=project-issue]")).toHaveLength(0);
+
+    await click(p.querySelector("button[aria-expanded]")!);
+    const issues = p.querySelectorAll("[data-testid=project-issue]");
+    expect(issues).toHaveLength(2);
+    expect(issues[0]!.textContent).toContain("APP-3");
+    expect(issues[0]!.textContent).toContain("Login");
+    expect(issues[1]!.textContent).toContain("Validar formulario");
     expect(host.querySelectorAll("input, textarea, select")).toHaveLength(0);
+
     await click(button("Abrir en Proyectos"));
     expect(open).toHaveBeenCalledWith("p1");
     expect(useApp.getState().module).toBe("proyectos");
@@ -222,41 +268,8 @@ describe("Mentor: espacio de paneles", () => {
   });
 });
 
-describe("Mentor: conversación -> borrador -> Crear meta", () => {
-  const turnsAfter = (replies: MentorChatTurn[]) => replies;
+describe("Mentor: borrador -> Crear meta (la conversación vive en el asistente)", () => {
   const user = (id: string, content: string): MentorChatTurn => ({ id, role: "user", content, at: "2026-10-05T10:00:00" });
-
-  it("la pregunta del Mentor aparece en el chat y la respuesta del usuario genera el borrador en Metas", async () => {
-    const q: MentorChatResult = {
-      loading: false, kind: "question", text: "¿Cuántas horas por semana tienes?", pending: null,
-      turns: turnsAfter([user("u1", "backend en Python en 3 meses"), { id: "a1", role: "assistant", content: "¿Cuántas horas por semana tienes?", at: "x" }]),
-    };
-    const d = draft();
-    const draftTurns = [...q.turns, user("u2", "6 horas"), { id: "a2", role: "assistant" as const, content: "Primero bases y luego APIs.", at: "x", draft: d }];
-    const chat = vi.spyOn(api, "mentorChat").mockResolvedValueOnce(q).mockResolvedValueOnce({ loading: false, kind: "draft", text: "Primero bases y luego APIs.", draft: d, turns: draftTurns, pending: "a2" });
-    await mount();
-    await go("Conversación");
-    const field = host.querySelector<HTMLTextAreaElement>("textarea[aria-label='Mensaje para el Mentor']")!;
-    await type(field, "backend en Python en 3 meses");
-    await click(button("Enviar"));
-    expect(chat).toHaveBeenLastCalledWith("backend en Python en 3 meses");
-    expect(host.textContent).toContain("¿Cuántas horas por semana tienes?");
-
-    await type(host.querySelector<HTMLTextAreaElement>("textarea[aria-label='Mensaje para el Mentor']")!, "6 horas");
-    await click(button("Enviar"));
-    expect(host.textContent).toContain("Borrador «Backend con Python»");
-
-    await click(button("Ver en Metas"));
-    expect(host.textContent).toContain("Borrador de meta");
-    const dr = host.querySelector("[data-testid=goal-draft]")!;
-    expect(dr.textContent).toContain("Backend con Python");
-    expect(dr.textContent).toContain("6 h/semana");
-    expect(dr.textContent).toContain("Semana 1");
-    expect(dr.textContent).toContain("1 Fundamentos");
-    expect(dr.textContent).toContain("Te sobra tiempo");
-    expect(dr.textContent).toContain("Programación/Django/Inventado");
-    expect(dr.textContent).toContain("Hasta que la crees no se escribe nada");
-  });
 
   it("'Crear meta' escribe vía mentor_goal_create y la tarjeta pasa a ser la real, con 'Abrir en Metas'", async () => {
     const d = draft();
@@ -290,15 +303,4 @@ describe("Mentor: conversación -> borrador -> Crear meta", () => {
     expect(host.querySelector("[data-testid=goal-draft]")).toBeNull();
   });
 
-  it("sin IA el chat lo dice con claridad y no hay borrador", async () => {
-    vi.spyOn(api, "mentorChat").mockResolvedValue({ loading: false, kind: "no_ai", text: "La IA no está configurada (falta la API key).", turns: [user("u1", "hola")], pending: null });
-    await mount();
-    await go("Conversación");
-    await type(host.querySelector<HTMLTextAreaElement>("textarea")!, "hola");
-    await click(button("Enviar"));
-    const notice = host.querySelector("[data-testid=chat-notice]")!;
-    expect(notice.textContent).toContain("Sin IA disponible no puedo proponerte una meta");
-    expect(notice.textContent).toContain("falta la API key");
-    expect(host.textContent).not.toContain("Borrador «");
-  });
 });

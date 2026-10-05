@@ -121,7 +121,7 @@ describe("mentor_chat", () => {
 
     // todo persistido en .notevault/mentor, y ninguna meta escrita
     expect(api.mentor_chat_load().turns).toHaveLength(4);
-    expect(fs.existsSync(path.join(dir, ".notevault", "mentor", "chat.json"))).toBe(true);
+    expect(fs.readdirSync(path.join(dir, ".notevault", "mentor", "chats")).filter((f) => f !== "index.json")).toHaveLength(1);
     expect(goalsOnDisk()).toEqual([]);
   });
 
@@ -242,5 +242,91 @@ describe("mentor_panels", () => {
     expect(p.study.topics.total).toBe(2);
     expect(p.study.topics.untreated).toBe(2);
     expect(Array.isArray(p.projects)).toBe(true);
+  });
+});
+
+describe("Historial del Mentor (conversaciones propias)", () => {
+  const chatsDir = () => path.join(dir, ".notevault", "mentor", "chats");
+  const files = () => (fs.existsSync(chatsDir()) ? fs.readdirSync(chatsDir()).filter((f) => f !== "index.json") : []);
+  const ask = (api: ReturnType<typeof mentorApi>, message: string) => api.mentor_chat({ message });
+  const question = () => vi.fn().mockResolvedValue(JSON.stringify({ type: "question", text: "¿Cuántas horas por semana?" }));
+
+  it("migra el chat.json anterior como primera conversación, sin tocar el original ni perder turnos", () => {
+    const legacy = {
+      version: 1,
+      turns: [
+        { id: "t1", role: "user", content: "backend con Python desde cero en tres meses, por favor y gracias", at: "2026-10-05T10:00:00" },
+        { id: "t2", role: "assistant", content: "Borrador", at: "2026-10-05T10:00:03", draft: { name: "Backend con Python desde cero", topics: [], schedule: { items: [] }, discarded: [] } },
+      ],
+    };
+    const legacyFile = path.join(dir, ".notevault", "mentor", "chat.json");
+    fs.mkdirSync(path.dirname(legacyFile), { recursive: true });
+    fs.writeFileSync(legacyFile, JSON.stringify(legacy), "utf-8");
+    const before = fs.readFileSync(legacyFile, "utf-8");
+
+    const api = mentorApi(app, question());
+    const list = api.mentor_chats_list();
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ count: 2, active: true });
+    expect(list[0]!.title).toContain("backend con Python desde cero");
+    const loaded = api.mentor_chat_load();
+    expect(loaded.turns.map((t) => t.id)).toEqual(["t1", "t2"]);
+    expect(loaded.pending).toBe("t2"); // el borrador pendiente sigue visible
+    expect(loaded.turns[1]!.draft).toMatchObject({ name: "Backend con Python desde cero" });
+    expect(fs.readFileSync(legacyFile, "utf-8")).toBe(before);
+
+    // migrar es de una vez: borrar la conversación no la resucita desde chat.json
+    api.mentor_chat_delete(loaded.id);
+    expect(api.mentor_chats_list()).toEqual([]);
+    expect(api.mentor_chat_load().turns).toEqual([]);
+  });
+
+  it("lista, abre, renombra, borra y crea conversaciones; el título sale del primer mensaje", async () => {
+    const api = mentorApi(app, question());
+    await ask(api, "quiero aprender backend con Python en tres meses");
+    const first = api.mentor_chat_load();
+    expect(first.title).toBe("quiero aprender backend con Python en tres meses");
+
+    const second = api.mentor_chat_new();
+    expect(second.id).not.toBe(first.id);
+    expect(second.turns).toEqual([]);
+    await ask(api, "necesito repasar álgebra lineal");
+
+    const list = api.mentor_chats_list();
+    expect(list.map((c) => c.title).sort()).toEqual(["necesito repasar álgebra lineal", "quiero aprender backend con Python en tres meses"]);
+    expect(list.find((c) => c.active)!.id).toBe(second.id);
+
+    // abrir cambia la activa y mentor_chat opera sobre ella
+    const opened = api.mentor_chat_open(first.id);
+    expect(opened.turns).toHaveLength(2);
+    await ask(api, "tres horas por semana");
+    expect(api.mentor_chat_load().turns).toHaveLength(4);
+    expect(api.mentor_chats_list().find((c) => c.id === second.id)!.count).toBe(2);
+
+    expect(api.mentor_chat_rename(first.id, "  Mi backend  ")).toEqual({ id: first.id, title: "Mi backend" });
+    expect(() => api.mentor_chat_rename(first.id, "  ")).toThrow(ApiError);
+    expect(api.mentor_chats_list().find((c) => c.id === first.id)!.title).toBe("Mi backend");
+
+    // borrar la activa deja activa otra
+    const after = api.mentor_chat_delete(first.id);
+    expect(after.id).toBe(second.id);
+    expect(api.mentor_chats_list()).toHaveLength(1);
+    expect(() => api.mentor_chat_open(first.id)).toThrow(ApiError);
+    expect(() => api.mentor_chat_delete("../../x")).toThrow(ApiError);
+  });
+
+  it("'nueva' reutiliza la conversación activa si está vacía y no lista conversaciones vacías", () => {
+    const api = mentorApi(app, question());
+    const a = api.mentor_chat_new();
+    const b = api.mentor_chat_new();
+    expect(b.id).toBe(a.id);
+    expect(api.mentor_chats_list()).toEqual([]);
+  });
+
+  it("el historial del Mentor no se mezcla con el del asistente (vive solo bajo .notevault/mentor/)", async () => {
+    const api = mentorApi(app, question());
+    await ask(api, "hola mentor");
+    expect(files()).toHaveLength(1);
+    expect(fs.existsSync(path.join(dir, ".notevault", "conversations"))).toBe(false);
   });
 });

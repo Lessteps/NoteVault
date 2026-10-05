@@ -3,25 +3,26 @@
 // Answers can go back into the note.
 
 import {
-  ArrowLeft, ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
-  Folder, FolderPlus, GitCompare, Hammer, Loader2, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Search, Settings2, Sparkles,
-  Square, ThumbsDown, ThumbsUp, Trash2, Wand2, X,
+  ArrowUp, ChevronDown, ClipboardPaste, Copy, CornerDownLeft, FileCode2, FilePlus,
+  Folder, FolderPlus, GitCompare, Hammer, Loader2, GraduationCap, History, Layers, Mic, MoreHorizontal, Paperclip, Pencil, Plus, Settings2, Sparkles,
+  Square, ThumbsDown, ThumbsUp, Wand2, X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import { api } from "../../lib/bridge";
 import { copyText, readClipboard } from "../../lib/clipboard";
-import { groupByDate, matchesQuery, whenLabel } from "../../lib/conversationDates";
 import { splitAction, vaultMode, VAULT_MODES } from "../../lib/assistantModes";
 import { renderMarkdown } from "../../lib/markdown";
-import type { AiConfig, AiProvider, ConversationMeta } from "../../lib/types";
+import type { AiConfig, AiProvider } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useAssistant, type ChatContext, type ChatMessage } from "../../store/assistant";
 import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
-import { askText, cn, confirmAction, IconButton, openMenu } from "../ui";
+import { askText, cn, IconButton, openMenu } from "../ui";
 import { generateTopicFrom, useStudySpaceDialog } from "../study/StudySpaceDialog";
 import { isPracticePath, usePracticeDialog } from "../practice/PracticeProjectDialog";
+import { MentorAssistant } from "../mentor/MentorAssistant";
 import { ActionCard } from "./ActionCard";
 import { AskCard, SkillsCard } from "./ChatCards";
+import { ConversationHistory } from "./ConversationHistory";
 import { editorSelection, insertAtCursor } from "./SourceEditor";
 
 const WIDTH_KEY = "nv.assistant.width";
@@ -574,7 +575,13 @@ function Composer() {
   );
 }
 
+/** El panel derecho es el mismo en toda la app, pero en la pestaña del Mentor conversa con el Mentor. */
 export function AssistantPanel() {
+  const inMentor = useApp((s) => s.module === "mentor");
+  return inMentor ? <MentorAssistant /> : <NotesAssistantPanel />;
+}
+
+function NotesAssistantPanel() {
   const messages = useAssistant((s) => s.messages);
   const busy = useAssistant((s) => s.busy);
   const setOpen = useAssistant((s) => s.setOpen);
@@ -762,124 +769,18 @@ function HistoryPanel() {
   const deleteConversation = useAssistant((s) => s.deleteConversation);
   const newConversation = useAssistant((s) => s.newConversation);
   const currentId = useAssistant((s) => s.conversationId);
-  const [error, setError] = useState("");
-  const toast = useApp((s) => s.toast);
-
-  const groups = useMemo(
-    () => groupByDate(history.filter((h) => matchesQuery(h.title, query))),
-    [history, query],
-  );
-
-  const rename = async (item: ConversationMeta) => {
-    const next = await askText("Renombrar conversación", item.title, "Guardar");
-    if (next === null || next.trim() === item.title) return;
-    try {
-      await renameConversation(item.id, next.trim());
-    } catch (e) {
-      toast("error", (e as Error).message);
-    }
-  };
-
-  const remove = async (item: ConversationMeta) => {
-    const ok = await confirmAction(
-      "Eliminar conversación",
-      `Se borrará «${item.title}» de este equipo. No se puede deshacer.`,
-      "Eliminar",
-      true,
-    );
-    if (!ok) return;
-    try {
-      await deleteConversation(item.id);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-
   return (
-    <div className="absolute inset-0 z-20 flex flex-col bg-panel" aria-label="Historial de conversaciones">
-      <div className="flex h-9 flex-none items-center gap-0.5 border-b border-line px-2">
-        <IconButton title="Volver al chat" onClick={() => setHistory(false)}>
-          <ArrowLeft size={15} />
-        </IconButton>
-        <span className="min-w-0 flex-1 truncate pl-1 text-[12.5px] font-medium text-text">Historial</span>
-        <IconButton title="Nueva conversación" onClick={newConversation}>
-          <Plus size={15} />
-        </IconButton>
-        <IconButton title="Cerrar" onClick={() => setHistory(false)}>
-          <X size={15} />
-        </IconButton>
-      </div>
-      <div className="flex-none px-2.5 pt-2">
-        <div className="flex items-center gap-1.5 rounded-lg border border-line bg-elevated px-2 focus-within:border-accent">
-          <Search size={12} className="flex-none text-faint" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Buscar conversación"
-            placeholder="Buscar conversación…"
-            className="w-full bg-transparent py-1.5 text-[12.5px] text-text outline-none placeholder:text-faint"
-          />
-          {query && (
-            <button type="button" title="Limpiar" onClick={() => setQuery("")} className="text-faint hover:text-text">
-              <X size={12} />
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        {error && <p className="px-1 pt-2 text-[11.5px] text-danger">⚠ {error}</p>}
-        {!groups.length && (
-          <p className="px-1 py-4 text-[12px] leading-relaxed text-faint">
-            {history.length
-              ? "Ninguna conversación coincide con la búsqueda."
-              : "Aún no hay conversaciones guardadas. Pregunta algo en el chat y aparecerá aquí."}
-          </p>
-        )}
-        {groups.map((group) => (
-          <div key={group.label}>
-            <div className="px-1 pb-1 pt-2.5 font-mono text-[10px] uppercase tracking-wider text-faint">
-              {group.label}
-            </div>
-            {group.items.map((item) => (
-              <div
-                key={item.id}
-                className={cn(
-                  "group flex items-center gap-0.5 rounded-lg px-2 py-1.5",
-                  item.id === currentId ? "bg-accent-soft" : "hover:bg-hover",
-                )}
-              >
-                <button
-                  type="button"
-                  onClick={() => void openConversation(item.id)}
-                  title={item.title}
-                  className="min-w-0 flex-1 text-left"
-                >
-                  <div className="truncate text-[12.5px] text-text">{item.title}</div>
-                  <div className="truncate text-[11px] text-faint">
-                    {whenLabel(item.updated_at)} · {item.count} mensaje{item.count === 1 ? "" : "s"}
-                    {item.model ? ` · ${item.model}` : ""}
-                  </div>
-                </button>
-                <IconButton
-                  title="Renombrar"
-                  className="opacity-0 group-hover:opacity-100"
-                  onClick={() => void rename(item)}
-                >
-                  <Pencil size={12} />
-                </IconButton>
-                <IconButton
-                  title="Eliminar"
-                  className="opacity-0 group-hover:opacity-100"
-                  onClick={() => void remove(item)}
-                >
-                  <Trash2 size={12} />
-                </IconButton>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
+    <ConversationHistory
+      items={history}
+      currentId={currentId}
+      query={query}
+      onQuery={setQuery}
+      onOpen={openConversation}
+      onRename={renameConversation}
+      onDelete={deleteConversation}
+      onNew={newConversation}
+      onClose={() => setHistory(false)}
+    />
   );
 }
 

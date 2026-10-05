@@ -42,7 +42,10 @@ const today = (): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-const dateLabel = (): string => new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
+const dateLabel = (): string => {
+  const t = new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
 
 const hm = (min: number): string => (min >= 60 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}` : `${min} min`);
 
@@ -196,15 +199,15 @@ export function MentorToday() {
   const aiOff = !!overview && !overview.loading && !overview.aiConfigured;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-surface text-text">
-      <div className="mx-auto grid w-full max-w-[1100px] gap-5 p-5 @3xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-surface text-text">
+      <div className="mx-auto grid w-full max-w-[1100px] grid-cols-[minmax(0,1fr)] gap-5 p-5 @3xl:grid-cols-[minmax(0,1fr)_320px]">
         <main className="min-w-0 space-y-4" aria-label="Plan de hoy">
           <header>
             <div className="flex items-center gap-2">
               <Bot size={18} className="text-accent-text" />
               <h1 className="text-[18px] font-semibold">Mentor — Hoy</h1>
             </div>
-            <p className="mt-0.5 text-[12.5px] capitalize text-faint">{dateLabel()}</p>
+            <p className="mt-0.5 text-[12.5px] text-faint">{dateLabel()}</p>
           </header>
 
           {aiOff && (

@@ -1348,7 +1348,7 @@ export interface MentorChatTurn {
   createdGoalId?: string;
   discarded?: boolean;
 }
-export interface MentorChatState { turns: MentorChatTurn[]; pending: string | null }
+export interface MentorChatState { id?: string | null; title?: string; turns: MentorChatTurn[]; pending: string | null }
 export type MentorChatResult =
   | { loading: true }
   | ({ loading: false; kind: "question" | "draft" | "error" | "no_ai"; text: string; draft?: MentorGoalDraft } & MentorChatState);
@@ -1356,7 +1356,14 @@ export interface MentorGoalCreated { goalId: string; name: string; items: number
 export interface MentorGoalItemSlim {
   id: string; parent: string; name: string; status: string; due: string | null; start: string | null;
   is_leaf: boolean; progress: number; topic_links: string[]; topic_progress: TopicLinkProgress | null; late: boolean;
+  priority: number; category: string; schedule: string; is_priority: boolean; counts: [number, number]; done_today: boolean;
 }
+export interface MentorIssueSlim {
+  id: string; key: string; title: string; status: string; priority: number; parent: string;
+  due: string | null; overdue: boolean; icon: string; type: string; type_colour: string;
+}
+export type MentorProjectCard = ProjectCard & { issues: MentorIssueSlim[] };
+export interface MentorChatMeta { id: string; title: string; createdAt: string; updatedAt: string; count: number; active: boolean }
 export interface MentorTopicRow {
   folder: string; title: string; subject: string; completenessPct: number; lastAttemptDays: number | null; pendingSkills: string[];
 }
@@ -1365,8 +1372,8 @@ export type MentorPanels =
   | {
       loading: false;
       goals: Array<{ card: GoalCard; items: MentorGoalItemSlim[] }>;
-      areas: Array<{ id: string; name: string; icon: string }>;
-      projects: ProjectCard[];
+      areas: Array<{ id: string; name: string; icon: string; colour: string }>;
+      projects: MentorProjectCard[];
       study: {
         topics: { total: number; inProgress: number; untreated: number; complete: number; inProgressList: MentorTopicRow[]; untreatedList: MentorTopicRow[]; recentList: MentorTopicRow[] };
         srs: { dueTotal: number; bySubject: Array<{ subject: string; count: number; oldestOverdueDays: number; lapses: number }> };

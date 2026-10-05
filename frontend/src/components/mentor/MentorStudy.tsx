@@ -2,6 +2,8 @@
 // repasos vencidos, errores) con enlace "ver tema". No repite los anillos del Resumen de estudio.
 
 import type { MentorTopicRow } from "../../lib/types";
+import { BlockProgress } from "../common/charts";
+import { Chip } from "../common/forms";
 import { Panel } from "../common/StatTile";
 import { openTopic } from "./openTopic";
 import { LoadState, PanelPage, useMentorPanels } from "./parts";
@@ -11,16 +13,20 @@ function TopicList({ rows, empty }: { rows: MentorTopicRow[]; empty: string }) {
   return (
     <ul className="divide-y divide-line">
       {rows.map((t) => (
-        <li key={t.folder} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5 text-[12.5px]" data-testid="topic-row">
-          <span className="min-w-0 flex-1">
-            <span className="font-medium text-text">{t.title}</span>
-            <span className="ml-2 text-faint">{t.subject} · {t.completenessPct} %</span>
-            {t.pendingSkills.length > 0 && <span className="ml-2 text-faint">pendiente: {t.pendingSkills.join(", ")}</span>}
-            {t.lastAttemptDays !== null && <span className="ml-2 text-faint">último intento {t.lastAttemptDays === 0 ? "hoy" : `hace ${t.lastAttemptDays} d`}</span>}
-          </span>
-          <button type="button" onClick={() => void openTopic(t.folder)} className="text-accent-text hover:underline">
-            ver tema
-          </button>
+        <li key={t.folder} className="py-2" data-testid="topic-row">
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-text" title={t.title}>{t.title}</span>
+            <Chip>{t.subject}</Chip>
+            <button type="button" onClick={() => void openTopic(t.folder)} className="flex-none text-[12px] text-accent-text hover:underline">
+              ver tema
+            </button>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-faint">
+            <BlockProgress value={t.completenessPct / 100} colour="var(--nv-accent)" blocks={8} />
+            <span className="whitespace-nowrap text-dim">{t.completenessPct} %</span>
+            {t.pendingSkills.length > 0 && <span className="min-w-0 break-words">pendiente: {t.pendingSkills.join(", ")}</span>}
+            {t.lastAttemptDays !== null && <span className="whitespace-nowrap">último intento {t.lastAttemptDays === 0 ? "hoy" : `hace ${t.lastAttemptDays} d`}</span>}
+          </div>
         </li>
       ))}
     </ul>
@@ -38,7 +44,7 @@ export function MentorStudy() {
           <p className="text-[13px] text-dim" data-testid="study-summary">
             {s.topics.total} temas: {s.topics.inProgress} a medias, {s.topics.untreated} sin tratar, {s.topics.complete} completos.
           </p>
-          <div className="grid gap-4 @3xl:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 @3xl:grid-cols-2">
             <Panel title="A medias">
               <TopicList rows={s.topics.inProgressList} empty="Ningún tema a medias." />
             </Panel>

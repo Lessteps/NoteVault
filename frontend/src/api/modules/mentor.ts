@@ -15,7 +15,7 @@ import { buildStudentBrief, toPromptText, type BriefContext, type QueueHint } fr
 import { adherence, BLOCK_STATUSES, sanitizeSession, SessionLog, type BlockStatus } from "../../core/mentor/sessionLog.js";
 import { aiUnavailableReason, planToBlocks, proposePlan, type ProposedBlock, type SendFn } from "../../core/mentor/planner.js";
 import { snapshotTopics, type TopicSnap } from "../../core/mentor/topics.js";
-import { ChatLog, pendingDraft, type ChatTurnRecord } from "../../core/mentor/chatLog.js";
+import { ChatStore, pendingDraft, type ChatLog, type ChatTurnRecord } from "../../core/mentor/chatLog.js";
 import {
   buildGoalMessages,
   buildTopicCatalog,
@@ -138,13 +138,43 @@ function slimItem(i: any) {
     topic_links: i.topic_links,
     topic_progress: i.topic_progress,
     late: i.late,
+    priority: i.priority,
+    category: i.category,
+    schedule: i.schedule,
+    is_priority: i.is_priority,
+    counts: i.counts,
+    done_today: i.done_today,
+  };
+}
+
+/** Lo que pinta el panel de proyectos de cada issue abierto. */
+function slimIssue(i: any) {
+  return {
+    id: i.id,
+    key: i.key,
+    title: i.title,
+    status: i.status,
+    priority: i.priority,
+    parent: i.parent,
+    due: i.due,
+    overdue: i.overdue,
+    icon: i.icon,
+    type: i.type,
+    type_colour: i.type_colour,
   };
 }
 
 /** `send` se inyecta solo en los tests; en la app es `sendChat`. */
 export function mentorApi(app: AppState, send?: SendFn) {
   const log = () => new SessionLog(app.root);
-  const chat = () => new ChatLog(app.root);
+  const chats = () => new ChatStore(app.root);
+  /** La conversación activa del Mentor, o la indicada (así un turno en vuelo no salta de conversación). */
+  const chatFor = (id?: unknown): ChatLog | null => (id ? chats().get(String(id)) : null) ?? chats().peek();
+  const stateOf = (c: ChatLog | null) => {
+    if (!c) return { id: null as string | null, title: "", turns: [] as ChatTurnRecord[], pending: null as string | null };
+    const rec = c.record();
+    return { id: rec.id as string | null, title: rec.title, turns: rec.turns, pending: pendingDraft(rec.turns)?.id ?? null };
+  };
 
   function markBlock(date: unknown, candidateId: unknown, status: unknown, note?: unknown) {
     if (!(BLOCK_STATUSES as readonly string[]).includes(String(status))) throw new ApiError("Estado de bloque inválido.");
@@ -290,15 +320,44 @@ export function mentorApi(app: AppState, send?: SendFn) {
 
     // ── Conversación con el Mentor: crear metas con el estudiante ─────────
 
-    /** La conversación guardada y el borrador pendiente (si lo hay). */
+    /** La conversación activa del Mentor y su borrador pendiente (si lo hay). */
     mentor_chat_load() {
-      const turns = chat().load();
-      return { turns, pending: pendingDraft(turns)?.id ?? null };
+      return stateOf(chatFor());
     },
 
+    /** Compatibilidad: "limpiar" es empezar una conversación nueva (la anterior queda en el historial). */
     mentor_chat_clear() {
-      chat().clear();
-      return { turns: [] as ChatTurnRecord[], pending: null };
+      return stateOf(chats().create());
+    },
+
+    // Historial del Mentor: conversaciones propias, aparte del historial del asistente.
+    mentor_chats_list() {
+      return chats().list();
+    },
+
+    mentor_chat_new() {
+      return stateOf(chats().create());
+    },
+
+    mentor_chat_open(id: unknown) {
+      const c = chats().open(String(id ?? ""));
+      if (!c) throw new ApiError("Esa conversación ya no existe.");
+      return stateOf(c);
+    },
+
+    mentor_chat_rename(id: unknown, title: unknown) {
+      const next = String(title ?? "").trim();
+      if (!next) throw new ApiError("Escribe un título.");
+      const rec = chats().rename(String(id ?? ""), next);
+      if (!rec) throw new ApiError("Esa conversación ya no existe.");
+      return { id: rec.id, title: rec.title };
+    },
+
+    /** Borra una conversación (a la papelera) y devuelve la conversación que queda activa. */
+    mentor_chat_delete(id: unknown) {
+      const store = chats();
+      if (!store.remove(String(id ?? ""))) throw new ApiError("Esa conversación ya no existe.");
+      return stateOf(store.peek());
     },
 
     /**
@@ -313,7 +372,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
       if (studyIndexCold(app)) return { loading: true as const };
       const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
       const unavailable = aiUnavailableReason(cfg);
-      const stored = chat().load();
+      const existing = chatFor(o.chatId);
+      const stored = existing?.load() ?? [];
       if (unavailable) {
         return { loading: false as const, kind: "no_ai" as const, text: unavailable, turns: stored, pending: pendingDraft(stored)?.id ?? null };
       }
@@ -330,7 +390,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const catalog = buildTopicCatalog(topicSnaps(app), request);
       const today = localDate();
       const areas = app.mgrs().areas.areas().filter((a) => !a.archived);
-      const turns = chat().append({ role: "user", content: message });
+      const chatLog = existing ?? chats().create();
+      const turns = chatLog.append({ role: "user", content: message });
 
       let raw = "";
       try {
@@ -343,24 +404,24 @@ export function mentorApi(app: AppState, send?: SendFn) {
         return { loading: false as const, kind: "error" as const, text: `${parsed.error} Reformula o inténtalo de nuevo.`, turns, pending: pendingDraft(turns)?.id ?? null };
       }
       if (parsed.reply.type === "question") {
-        const next = chat().append({ role: "assistant", content: parsed.reply.text });
+        const next = chatLog.append({ role: "assistant", content: parsed.reply.text });
         return { loading: false as const, kind: "question" as const, text: parsed.reply.text, turns: next, pending: pendingDraft(next)?.id ?? null };
       }
       const reply = parsed.reply;
       const draft = composeDraft(reply, catalog, today, resolveArea(app, reply.area));
       if ("missing" in draft) {
         const text = `Antes de armar el calendario necesito saber ${draft.missing}.`;
-        const next = chat().append({ role: "assistant", content: text });
+        const next = chatLog.append({ role: "assistant", content: text });
         return { loading: false as const, kind: "question" as const, text, turns: next, pending: pendingDraft(next)?.id ?? null };
       }
       const text = reply.rationale || `Borrador: ${draft.name}`;
-      const next = chat().append({ role: "assistant", content: text, draft });
+      const next = chatLog.append({ role: "assistant", content: text, draft });
       return { loading: false as const, kind: "draft" as const, text, draft, turns: next, pending: pendingDraft(next)?.id ?? null };
     },
 
     /** "Descartar": no escribe ninguna meta; solo marca el borrador. */
     mentor_draft_discard(turnId: unknown) {
-      const turns = chat().patch(String(turnId ?? ""), { discarded: true });
+      const turns = chatFor()?.patch(String(turnId ?? ""), { discarded: true });
       if (!turns) throw new ApiError("Ese borrador ya no existe.");
       return { turns, pending: pendingDraft(turns)?.id ?? null };
     },
@@ -420,7 +481,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
           notes: it.folders.map((f) => byFolder.get(f)?.why ?? "").filter(Boolean).join("\n"),
         });
       }
-      if (o.turnId) chat().patch(String(o.turnId), { createdGoalId: goal.id });
+      if (o.turnId) chatFor(o.chatId)?.patch(String(o.turnId), { createdGoalId: goal.id });
       return { goalId: goal.id, name: goal.name, items: schedule.items.length, schedule };
     },
 
@@ -435,13 +496,19 @@ export function mentorApi(app: AppState, send?: SendFn) {
         const detail = g.goals_get(card.id) as any;
         return { card, items: (detail.items as any[]).map(slimItem) };
       });
-      const projects = (projectsApi(app).projects_list() as any[]).filter((p) => p.status === "En curso" || p.status === "Planeado");
+      const pApi = projectsApi(app);
+      const projects = (pApi.projects_list() as any[])
+        .filter((p) => p.status === "En curso" || p.status === "Planeado")
+        .map((p) => {
+          const open = ((pApi.projects_get(p.id) as any).issues as any[]).filter((i) => !i.done);
+          return { ...p, issues: open.slice(0, 40).map(slimIssue) };
+        });
       const brief = buildStudentBrief(briefContext(app, log()));
       const pending = sectionData<StudyPendingData>(brief, "study_pending");
       return {
         loading: false as const,
         goals,
-        areas: app.mgrs().areas.areas().map((a) => ({ id: a.id, name: a.name, icon: a.icon })),
+        areas: app.mgrs().areas.areas().map((a) => ({ id: a.id, name: a.name, icon: a.icon, colour: a.colour })),
         projects,
         study: {
           topics: topicsPanel(topicSnaps(app)),

@@ -344,7 +344,12 @@ export const api = {
     call<import("./types").MentorSessionRecord>("mentor_block_status", date, candidateId, status, note),
   mentorChatLoad: () => call<import("./types").MentorChatState>("mentor_chat_load"),
   mentorChatClear: () => call<import("./types").MentorChatState>("mentor_chat_clear"),
-  mentorChat: (message: string) => call<import("./types").MentorChatResult>("mentor_chat", { message }),
+  mentorChat: (message: string, chatId?: string) => call<import("./types").MentorChatResult>("mentor_chat", { message, chatId }),
+  mentorChatsList: () => call<import("./types").MentorChatMeta[]>("mentor_chats_list"),
+  mentorChatNew: () => call<import("./types").MentorChatState>("mentor_chat_new"),
+  mentorChatOpen: (id: string) => call<import("./types").MentorChatState>("mentor_chat_open", id),
+  mentorChatRename: (id: string, title: string) => call<{ id: string; title: string }>("mentor_chat_rename", id, title),
+  mentorChatDelete: (id: string) => call<import("./types").MentorChatState>("mentor_chat_delete", id),
   mentorDraftDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_draft_discard", turnId),
   mentorGoalCreate: (draft: import("./types").MentorGoalDraft, turnId?: string) =>
     call<import("./types").MentorGoalCreated>("mentor_goal_create", { draft, turnId }),

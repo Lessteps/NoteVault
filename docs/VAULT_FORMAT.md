@@ -51,7 +51,8 @@ vault/
 │   ├── estudio/                           práctica: intentos, errores, repaso
 │   ├── mentor/                            opcional: registro de sesiones del Mentor
 │   │   └── sessions/YYYY-MM-DD.json       un plan de estudio por día
-│   │   └── chat.json                      conversación del Mentor (crear metas)
+│   │   ├── chat.json                      (antiguo) una sola conversación; se migra a chats/
+│   │   └── chats/<id>.json                una conversación del Mentor (crear metas) + index.json
 │   ├── web/                               módulo WEB: marcadores, reglas, historial, uso
 │   │   ├── marcadores.json
 │   │   ├── restricciones.json
@@ -779,7 +780,9 @@ ignorarlo, y no sube `FORMAT_VERSION`.
 | Clave de `LAYOUT` | Ruta |
 |---|---|
 | `mentor_session` | `.notevault/mentor/sessions/AAAA-MM-DD.json` — el plan de un día |
-| `mentor_chat` | `.notevault/mentor/chat.json` — la conversación con el Mentor |
+| `mentor_chat` | `.notevault/mentor/chat.json` — (antiguo) la única conversación con el Mentor; solo se lee para migrarla |
+| `mentor_chat_file` | `.notevault/mentor/chats/<id>.json` — una conversación con el Mentor |
+| `mentor_chats_index` | `.notevault/mentor/chats/index.json` — la conversación activa y la marca de migración |
 
 ```json
 {"date": "2026-10-05", "availableMinutes": 90, "objective": "Cerrar la meta de álgebra",
@@ -795,21 +798,40 @@ ignorarlo, y no sube `FORMAT_VERSION`.
   plan de hoy (no se copia a la cola de estudio ni a la agenda).
 - El informe que ve la IA se calcula al vuelo y no se guarda.
 
-### Conversación del Mentor (`chat.json`)
+### Conversaciones del Mentor (`chats/<id>.json`)
 
-Un solo archivo con los últimos 60 turnos de la conversación en la que el Mentor ayuda a
-crear una meta. Es opcional y aditivo, como el resto de `mentor/`.
+El Mentor tiene su **propio historial de conversaciones**, aparte del historial del asistente (que
+vive en la carpeta de datos de la app). Cada conversación en la que el Mentor ayuda a crear una meta es
+un archivo `.notevault/mentor/chats/<id>.json` (`<id>` = `[A-Za-z0-9_-]`, hasta 48 caracteres) con sus
+últimos 60 turnos. Es opcional y aditivo, como el resto de `mentor/`.
 
 ```json
-{"version": 1, "turns": [
+{"version": 1, "id": "cm1x2y3z", "title": "backend en Python en 3 meses",
+ "createdAt": "2026-10-05T10:00:00", "updatedAt": "2026-10-05T10:01:10",
+ "turns": [
   {"id": "t1", "role": "user", "content": "backend en Python en 3 meses", "at": "2026-10-05T10:00:00"},
   {"id": "t2", "role": "assistant", "content": "¿Cuántas horas por semana tienes?", "at": "2026-10-05T10:00:03"},
   {"id": "t3", "role": "assistant", "content": "Primero bases, luego APIs.", "at": "2026-10-05T10:01:10",
    "draft": {"name": "Backend con Python", "area": "", "description": "…", "topics": [], "schedule": {}, "discarded": []},
    "createdGoalId": "g…"}
-]}
+ ]}
 ```
 
+```json
+{"version": 1, "active": "cm1x2y3z", "migrated": true}
+```
+
+- `title`: se pone solo con el primer mensaje del estudiante (una línea, máx. 60 caracteres) y se puede
+  renombrar. `createdAt` / `updatedAt` son marcas locales sin zona (`AAAA-MM-DDTHH:MM:SS`), como las del
+  historial del asistente. No hay un índice con la lista: se lee la carpeta; las conversaciones sin
+  turnos no se listan.
+- `index.json` (`chats/index.json`) guarda solo la conversación activa (`active`) y `migrated`. Nunca es
+  una conversación: un cliente debe ignorarlo al listar `chats/`.
+- **Migración**: la primera vez que se abre el historial, si existe el antiguo `.notevault/mentor/chat.json`
+  (una sola conversación, `{"version": 1, "turns": [...]}`) con turnos y `chats/` no tiene conversaciones, se
+  copia como la primera (con su borrador pendiente) y queda activa. El `chat.json` original **no se
+  modifica ni se borra**; `migrated: true` evita importarlo otra vez.
+- Borrar una conversación la mueve a `.notevault/.papelera/mentor-chats/`.
 - `draft` (solo turnos `assistant`): el borrador de meta con su calendario ya calculado. Es una
   previsualización; **no existe como meta** hasta que el estudiante pulsa «Crear meta».
 - `createdGoalId`: id de la meta creada a partir de ese borrador; `discarded: true`: se descartó.

@@ -1,17 +1,20 @@
 // Piezas comunes de los paneles del Mentor (todos de solo previsualización).
 
-import { CircleAlert, Loader2 } from "lucide-react";
+import { ChevronRight, CircleAlert, Loader2 } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { useMentor } from "../../store/mentor";
 
 /** Cabecera + avisos de carga/errores + contenido; los paneles de datos la comparten. */
-export function PanelPage({ title, subtitle, children, wide }: { title: string; subtitle?: string; children: ReactNode; wide?: boolean }) {
+export function PanelPage({ title, subtitle, children, wide, action }: { title: string; subtitle?: string; children: ReactNode; wide?: boolean; action?: ReactNode }) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-surface text-text">
-      <div className={`mx-auto w-full space-y-4 p-5 ${wide ? "max-w-[1100px]" : "max-w-[900px]"}`}>
-        <header>
-          <h1 className="text-[18px] font-semibold">{title}</h1>
-          {subtitle && <p className="mt-0.5 text-[12.5px] text-faint">{subtitle}</p>}
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-surface text-text">
+      <div className={`mx-auto w-full min-w-0 space-y-4 p-5 ${wide ? "max-w-[1100px]" : "max-w-[900px]"}`}>
+        <header className="flex flex-wrap items-start gap-x-4 gap-y-2">
+          <div className="min-w-0 flex-1 basis-60">
+            <h1 className="text-[18px] font-semibold">{title}</h1>
+            {subtitle && <p className="mt-0.5 text-[12.5px] text-faint">{subtitle}</p>}
+          </div>
+          {action}
         </header>
         {children}
       </div>
@@ -71,5 +74,21 @@ export function ProgressBar({ pct, colour }: { pct: number; colour?: string }) {
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-hover" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
       <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: colour ?? "var(--nv-accent)" }} />
     </div>
+  );
+}
+
+/** Cabecera plegable de una tarjeta de previsualización: un botón que abre/cierra su detalle. */
+export function Disclosure({ open, onToggle, label, children }: { open: boolean; onToggle: () => void; label: string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-label={label}
+      className="flex w-full min-w-0 items-start gap-2 text-left"
+    >
+      <ChevronRight size={15} className={`mt-0.5 flex-none text-faint transition-transform ${open ? "rotate-90" : ""}`} />
+      <div className="min-w-0 flex-1">{children}</div>
+    </button>
   );
 }

@@ -10,24 +10,45 @@ import { loadExamRecordForTopic } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
 import { hubSnapshot } from "../../core/practice/recommender.js";
 import { manifestsFromNotes, type TopicManifest } from "../../core/practice/topic.js";
+import { FILTER_ACTIVE, ITEM_DONE } from "../../core/goalManager.js";
 import { allocate, buildCandidates } from "../../core/mentor/candidates.js";
+import { objectiveText, resolveObjective, sanitizeObjective, subjectLabel } from "../../core/mentor/objective.js";
+import {
+  buildPlan,
+  DELIVERABLE_STATUSES,
+  deriveView,
+  mergePlans,
+  MONTH_RE,
+  PlanStore,
+  planItemsFor,
+  refreshPlanProgress,
+  type DeliverableStatus,
+  type PlanItem,
+  type SubplanSeed,
+} from "../../core/mentor/plan.js";
+import {
+  buildChatMessages,
+  composePlanDraft,
+  parseChatResponse,
+  planDraftSummary,
+  planWindow,
+  type PlanContext,
+} from "../../core/mentor/planDraft.js";
 import { buildStudentBrief, toPromptText, type BriefContext, type QueueHint } from "../../core/mentor/brief.js";
 import { adherence, BLOCK_STATUSES, sanitizeSession, SessionLog, type BlockStatus } from "../../core/mentor/sessionLog.js";
 import { aiUnavailableReason, planToBlocks, proposePlan, type ProposedBlock, type SendFn } from "../../core/mentor/planner.js";
 import { snapshotTopics, type TopicSnap } from "../../core/mentor/topics.js";
 import { ChatStore, pendingDraft, type ChatLog, type ChatTurnRecord } from "../../core/mentor/chatLog.js";
 import {
-  buildGoalMessages,
   buildTopicCatalog,
   composeDraft,
   estimateTopicMinutes,
   fold,
-  parseGoalResponse,
   scheduleGoal,
   type ChatTurn,
 } from "../../core/mentor/goalDraft.js";
 import { studyAreas, topicsPanel } from "../../core/mentor/panels.js";
-import { sectionData, type StudyPendingData } from "../../core/mentor/brief.js";
+import { sectionData, type StudyPendingData, type TasksData, type TopicsData } from "../../core/mentor/brief.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { AppConfig } from "../appConfig.js";
@@ -104,7 +125,9 @@ const localDate = (d = new Date()): string => `${d.getFullYear()}-${String(d.get
 function toHistory(turns: readonly ChatTurnRecord[]): ChatTurn[] {
   return turns.slice(-20).map((t) => ({
     role: t.role,
-    content: t.draft
+    content: t.planDraft
+      ? planDraftSummary(t.planDraft)
+      : t.draft
       ? JSON.stringify({
           type: "goal_draft",
           name: t.draft.name,
@@ -114,6 +137,68 @@ function toHistory(turns: readonly ChatTurnRecord[]): ChatTurn[] {
         })
       : t.content,
   }));
+}
+
+/** Metas y proyectos reales que la IA puede referenciar en un plan del mes. */
+function planContext(app: AppState, today: string): PlanContext {
+  const m = app.mgrs();
+  return {
+    month: today.slice(0, 7),
+    today,
+    goals: m.goals.goals(FILTER_ACTIVE).map((g) => ({
+      id: g.id,
+      name: g.name,
+      items: m.goals.items(g.id).filter((i) => i.is_leaf && i.status !== ITEM_DONE).map((i) => ({ id: i.id, name: i.name })),
+    })),
+    projects: m.projects.projects().filter((p) => p.status === "En curso" || p.status === "Planeado").map((p) => ({ id: p.id, name: p.name })),
+  };
+}
+
+/** Lo que el plan del mes dice que toca hoy (solo lee el plan). */
+function todaysPlanItems(app: AppState, day: string = localDate()): PlanItem[] {
+  const plan = new PlanStore(app.root).load(day.slice(0, 7));
+  return plan ? planItemsFor(day, [plan]) : [];
+}
+
+const midnight = (d = new Date()): Date => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const DAY = 86400000;
+
+/** Opciones del selector "Objetivo de la sesión": metas que se cumplen a diario/semanalmente, materias y atajos. */
+function objectiveOptions(app: AppState, brief: ReturnType<typeof buildStudentBrief>) {
+  const m = app.mgrs();
+  const today = midnight();
+  const goals: Array<{ goalId: string; name: string; area: string; kind: "daily" | "weekly" | "due" | "topics"; itemIds: string[]; hint: string }> = [];
+  for (const g of m.goals.goals(FILTER_ACTIVE)) {
+    const leaves = m.goals.items(g.id).filter((i) => i.is_leaf && i.status !== ITEM_DONE);
+    const daily = leaves.filter((i) => i.repeating && i.rule.freq === "daily");
+    const weekly = leaves.filter((i) => i.repeating && i.rule.freq !== "daily");
+    const due = leaves.filter((i) => !i.repeating && i.due && (i.due.getTime() - today.getTime()) / DAY <= 7);
+    const topics = leaves.filter((i) => !i.repeating && i.topic_links.length > 0);
+    const kind = daily.length ? "daily" : weekly.length ? "weekly" : due.length ? "due" : topics.length ? "topics" : null;
+    if (!kind) continue;
+    const picked = [...new Set([...daily, ...weekly, ...due, ...topics].map((i) => i.id))];
+    const hint = kind === "daily" ? "a diario" : kind === "weekly" ? "semanal" : kind === "due" ? "vence esta semana" : "con temas de estudio";
+    goals.push({ goalId: g.id, name: g.name, area: g.area, kind, itemIds: picked, hint });
+  }
+  const topics = sectionData<TopicsData>(brief, "topics")?.topics ?? [];
+  const bySubject = new Map<string, { topics: number; open: number }>();
+  for (const t of topics) {
+    const e = bySubject.get(t.subject) ?? { topics: 0, open: 0 };
+    e.topics++;
+    if (t.status !== "complete") e.open++;
+    bySubject.set(t.subject, e);
+  }
+  const subjects = [...bySubject.entries()]
+    .map(([subject, v]) => ({ subject, label: subjectLabel(subject), topics: v.topics, open: v.open }))
+    .sort((a, b) => a.label.localeCompare(b.label, "es"));
+  const day = localDate();
+  const plan = new PlanStore(app.root).load(day.slice(0, 7));
+  return {
+    goals,
+    subjects,
+    tasksPending: sectionData<TasksData>(brief, "tasks")?.tasks.length ?? 0,
+    plan: plan ? { month: plan.month, items: planItemsFor(day, [plan]).length } : null,
+  };
 }
 
 /** El id de un área real a partir de su id o su nombre; "" si no existe (nunca se crea un área). */
@@ -202,7 +287,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
       const availableMinutes = clampInt(o.availableMinutes, 5, 720, 60);
       const brief = buildStudentBrief(briefContext(app, log()));
-      const candidates = buildCandidates(brief, { availableMinutes });
+      const objective = sanitizeObjective(o.objective) ?? undefined;
+      const candidates = buildCandidates(brief, { availableMinutes, objective, planItems: todaysPlanItems(app) });
       const plan = allocate(candidates, availableMinutes, {
         maxSubjects: o.maxSubjects === undefined ? undefined : clampInt(o.maxSubjects, 1, 10, 3),
       });
@@ -250,6 +336,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
         adherence: adherence(log().recent(30)),
         today: log().load(localDate()),
         aiConfigured: aiUnavailableReason(AIConfig.fromDict(AppConfig.get_ai_config())) === null,
+        objectives: objectiveOptions(app, brief),
       };
     },
 
@@ -263,15 +350,17 @@ export function mentorApi(app: AppState, send?: SendFn) {
       if (studyIndexCold(app)) return { loading: true as const };
       const strs = (v: unknown): string[] | undefined => (Array.isArray(v) ? v.map((x) => String(x)).slice(0, 50) : undefined);
       const brief = buildStudentBrief(briefContext(app, log()));
-      const candidates = buildCandidates(brief, { availableMinutes });
+      const spec = sanitizeObjective(o.objectiveSpec) ?? undefined;
+      const candidates = buildCandidates(brief, { availableMinutes, objective: spec, planItems: todaysPlanItems(app) });
       const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+      const objective = (spec ? objectiveText(resolveObjective(spec, brief), brief) : "") || (o.objective ? String(o.objective).slice(0, 500) : "");
       const res = await proposePlan(
         cfg,
         {
           brief,
           candidates,
           availableMinutes,
-          objective: o.objective ? String(o.objective).slice(0, 500) : undefined,
+          objective: objective || undefined,
           userNote: o.userNote ? String(o.userNote).slice(0, 500) : undefined,
           excludeSubjects: strs(o.excludeSubjects),
           excludeCandidateIds: strs(o.excludeCandidateIds),
@@ -281,6 +370,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       return {
         loading: false as const,
         availableMinutes,
+        objective,
         plan: res.plan,
         source: res.source,
         candidates: res.candidates,
@@ -387,25 +477,38 @@ export function mentorApi(app: AppState, send?: SendFn) {
 
       const brief = buildStudentBrief(briefContext(app, log()));
       const request = [...history.filter((h) => h.role === "user").map((h) => h.content), message].join(" ");
-      const catalog = buildTopicCatalog(topicSnaps(app), request);
+      const planMode = o.mode === "plan";
+      const catalog = buildTopicCatalog(topicSnaps(app), request, { max: planMode ? 80 : 60 });
       const today = localDate();
+      const planCtx = planContext(app, today);
       const areas = app.mgrs().areas.areas().filter((a) => !a.archived);
       const chatLog = existing ?? chats().create();
       const turns = chatLog.append({ role: "user", content: message });
 
       let raw = "";
       try {
-        raw = await (send ?? sendChat)(cfg, buildGoalMessages(message, brief, catalog, history, { today, areas: areas.map((a) => a.name) }));
+        raw = await (send ?? sendChat)(cfg, buildChatMessages(message, brief, catalog, history, { today, areas: areas.map((a) => a.name), plan: planCtx, planMode }));
       } catch (e) {
         return { loading: false as const, kind: "error" as const, text: `La IA falló: ${e instanceof Error ? e.message : String(e)}`.slice(0, 400), turns, pending: pendingDraft(turns)?.id ?? null };
       }
-      const parsed = parseGoalResponse(raw, catalog);
+      const parsed = parseChatResponse(raw, catalog, planCtx);
       if (!parsed.ok) {
         return { loading: false as const, kind: "error" as const, text: `${parsed.error} Reformula o inténtalo de nuevo.`, turns, pending: pendingDraft(turns)?.id ?? null };
       }
       if (parsed.reply.type === "question") {
         const next = chatLog.append({ role: "assistant", content: parsed.reply.text });
         return { loading: false as const, kind: "question" as const, text: parsed.reply.text, turns: next, pending: pendingDraft(next)?.id ?? null };
+      }
+      if (parsed.reply.type === "plan_draft") {
+        const planDraft = composePlanDraft(parsed.reply, catalog, planCtx);
+        if ("missing" in planDraft) {
+          const text = `Antes de armar el plan del mes necesito saber ${planDraft.missing}.`;
+          const next = chatLog.append({ role: "assistant", content: text });
+          return { loading: false as const, kind: "question" as const, text, turns: next, pending: pendingDraft(next)?.id ?? null };
+        }
+        const text = parsed.reply.rationale || `Plan de ${planDraft.month}: ${planDraft.subplans.length} subplanes`;
+        const next = chatLog.append({ role: "assistant", content: text, planDraft });
+        return { loading: false as const, kind: "plan_draft" as const, text, planDraft, turns: next, pending: pendingDraft(next)?.id ?? null };
       }
       const reply = parsed.reply;
       const draft = composeDraft(reply, catalog, today, resolveArea(app, reply.area));
@@ -526,5 +629,144 @@ export function mentorApi(app: AppState, send?: SendFn) {
     },
 
     mentor_block_status: markBlock,
+
+    // ── Plan mensual (core/mentor/plan.ts) ────────────────────────────────
+
+    /** Meses con plan y un resumen de cada uno. */
+    mentor_plan_list() {
+      const st = new PlanStore(app.root);
+      return st.months().map((month) => {
+        const p = st.load(month)!;
+        return { month, subplans: p.subplans.length, topics: p.subplans.reduce((n, s) => n + s.topics.length, 0), completed: p.subplans.reduce((n, s) => n + s.topics.filter((t) => t.completedAt).length, 0) };
+      });
+    },
+
+    /**
+     * El plan de un mes con el estado de práctica DERIVADO en vivo. Al leerlo anota (una sola vez) la fecha
+     * de los temas que ya están completos: es el registro de temas completados.
+     */
+    mentor_plan_get(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const today = localDate();
+      const month = o.month ? String(o.month) : today.slice(0, 7);
+      if (!MONTH_RE.test(month)) throw new ApiError("Mes inválido (AAAA-MM).");
+      if (studyIndexCold(app)) return { loading: true as const };
+      const st = new PlanStore(app.root);
+      const months = st.months();
+      const aiConfigured = aiUnavailableReason(AIConfig.fromDict(AppConfig.get_ai_config())) === null;
+      let plan = st.load(month);
+      if (!plan) return { loading: false as const, month, today, plan: null, derived: null, goals: {}, projects: {}, items: [] as PlanItem[], months, aiConfigured };
+
+      const snaps = new Map(topicSnaps(app).map((t) => [t.folder, t]));
+      const lookup = (folder: string) => snaps.get(folder);
+      const refreshed = refreshPlanProgress(plan, lookup, today);
+      if (refreshed.changed) plan = st.save(refreshed.plan);
+      const derived = deriveView(plan, lookup, today);
+
+      const m = app.mgrs();
+      const dayStart = midnight();
+      const goals: Record<string, { name: string; pct: number; items: Record<string, { name: string; pct: number }> }> = {};
+      for (const s of plan.subplans) {
+        for (const id of [s.goalId, ...s.requiredGoals.map((g) => g.goalId)]) {
+          if (!id || goals[id]) continue;
+          const g = m.goals.get_goal(id);
+          if (!g) continue;
+          const items: Record<string, { name: string; pct: number }> = {};
+          for (const it of m.goals.items(id)) items[it.id] = { name: it.name, pct: Math.round(Math.max(0, Math.min(1, m.goals.itemProgress(it, g, dayStart))) * 100) };
+          goals[id] = { name: g.name, pct: Math.round(Math.max(0, Math.min(1, m.goals.progress(g, dayStart))) * 100), items };
+        }
+      }
+      const projects: Record<string, { id: string; name: string; status: string }> = {};
+      for (const s of plan.subplans) {
+        const pid = s.deliverable?.projectId;
+        const p = pid ? m.projects.get(pid) : null;
+        if (pid && p) projects[pid] = { id: p.id, name: p.name, status: p.status };
+      }
+      const done = new Set(derived.subplans.flatMap((s) => s.topics.filter((t) => t.state === "completo").map((t) => t.folder)));
+      const items = month === today.slice(0, 7) ? planItemsFor(today, [plan], (f) => done.has(f)) : [];
+      return { loading: false as const, month, today, plan, derived, goals, projects, items, months, aiConfigured };
+    },
+
+    /**
+     * "Aceptar plan": el ÚNICO camino de escritura del plan mensual. No se fía del reparto que mande la UI:
+     * vuelve a validar los temas contra los que existen AHORA (los inventados se descartan), las metas y
+     * los proyectos, y recalcula el reparto semanal. Fusiona con el plan que ya hubiera ese mes.
+     */
+    mentor_plan_draft_accept(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const turn = o.turnId ? chatFor(o.chatId)?.load().find((t) => t.id === String(o.turnId)) : undefined;
+      const d = (turn?.planDraft ?? (o.draft && typeof o.draft === "object" ? o.draft : null)) as Record<string, any> | null;
+      if (!d || !Array.isArray(d.subplans) || !d.subplans.length) throw new ApiError("El borrador del plan no tiene subplanes.");
+      const hoursPerWeek = Number(d.hoursPerWeek);
+      if (!(hoursPerWeek > 0)) throw new ApiError("Horas por semana inválidas.");
+      const today = localDate();
+      const { month, from } = planWindow(typeof d.month === "string" ? d.month : undefined, today);
+      const ctx = planContext(app, today);
+      const goalById = new Map(ctx.goals.map((g) => [g.id, g]));
+      const projectIds = new Set(ctx.projects.map((p) => p.id));
+      const snaps = new Map(topicSnaps(app).map((t) => [t.folder, t]));
+
+      const seeds: SubplanSeed[] = [];
+      for (const s of d.subplans.slice(0, 12) as any[]) {
+        const seen = new Set<string>();
+        const topics: SubplanSeed["topics"] = [];
+        for (const t of (Array.isArray(s?.topics) ? s.topics : []).slice(0, 40) as any[]) {
+          const folder = String(t?.folder ?? "").replace(/\\/g, "/");
+          const snap = snaps.get(folder);
+          if (!snap || seen.has(folder)) continue;
+          seen.add(folder);
+          const valid = new Set(Object.keys(snap.progress.skills));
+          const skills = Array.isArray(t.skills) ? t.skills.map((x: unknown) => String(x).toLowerCase()).filter((x: string) => valid.has(x)) : [];
+          topics.push({ folder, title: snap.title, ...(skills.length ? { skills } : {}), estMinutes: estimateTopicMinutes(snap) });
+        }
+        const goalId = goalById.has(String(s?.goalId)) ? String(s.goalId) : undefined;
+        const requiredGoals = (Array.isArray(s?.requiredGoals) ? s.requiredGoals : [])
+          .filter((g: any) => goalById.has(String(g?.goalId)))
+          .map((g: any) => ({ goalId: String(g.goalId), ...(goalById.get(String(g.goalId))!.items.some((i) => i.id === String(g.itemId)) ? { itemId: String(g.itemId) } : {}), note: String(g.note ?? "") }));
+        const dv = s?.deliverable && typeof s.deliverable === "object" ? s.deliverable : null;
+        const deliverable = dv && String(dv.title ?? "").trim()
+          ? { title: String(dv.title), description: String(dv.description ?? ""), criteria: Array.isArray(dv.criteria) ? dv.criteria.map(String) : [], ...(projectIds.has(String(dv.projectId)) ? { projectId: String(dv.projectId) } : {}), status: "idea" as DeliverableStatus }
+          : undefined;
+        if (!topics.length && !deliverable) continue;
+        seeds.push({ area: String(s?.area ?? ""), objective: String(s?.objective ?? ""), ...(goalId ? { goalId } : {}), topics, requiredGoals, ...(deliverable ? { deliverable } : {}) });
+      }
+      if (!seeds.length) throw new ApiError("Ninguno de los temas del borrador existe ya en tu sistema.");
+
+      const st = new PlanStore(app.root);
+      const built = buildPlan(seeds, { month, hoursPerWeek, from });
+      const saved = st.save(mergePlans(st.load(month), built.plan));
+      if (turn) chatFor(o.chatId)?.patch(turn.id, { acceptedPlan: month });
+      return { month, subplans: saved.subplans.length, topics: saved.subplans.reduce((n, s) => n + s.topics.length, 0), warnings: built.warnings, fits: built.fits };
+    },
+
+    /** "Descartar" el borrador del plan: no escribe ningún plan; solo marca el borrador. */
+    mentor_plan_draft_discard(turnId: unknown) {
+      const turns = chatFor()?.patch(String(turnId ?? ""), { discarded: true });
+      if (!turns) throw new ApiError("Ese borrador ya no existe.");
+      return { turns, pending: pendingDraft(turns)?.id ?? null };
+    },
+
+    /** Lo único editable del plan desde el Mentor: el estado del entregable de un subplan (y su proyecto). */
+    mentor_plan_update_deliverable(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const month = String(o.month ?? "");
+      if (!MONTH_RE.test(month)) throw new ApiError("Mes inválido (AAAA-MM).");
+      if (!(DELIVERABLE_STATUSES as readonly string[]).includes(String(o.status))) throw new ApiError("Estado de entregable inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(month);
+      const sub = plan?.subplans.find((s) => s.id === String(o.subplanId ?? ""));
+      if (!plan || !sub) throw new ApiError("Ese subplan ya no existe.");
+      if (!sub.deliverable) throw new ApiError("Ese subplan no tiene entregable.");
+      let projectId = sub.deliverable.projectId;
+      if (o.projectId !== undefined) {
+        const wanted = o.projectId === null ? "" : String(o.projectId);
+        if (wanted && !app.mgrs().projects.get(wanted)) throw new ApiError("Ese proyecto no existe.");
+        projectId = wanted || undefined;
+      }
+      sub.deliverable = { ...sub.deliverable, status: o.status as DeliverableStatus, ...(projectId ? { projectId } : {}) };
+      if (!projectId) delete sub.deliverable.projectId;
+      plan.updatedAt = new Date().toISOString();
+      return st.save(plan);
+    },
   };
 }

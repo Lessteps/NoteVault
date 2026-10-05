@@ -1217,7 +1217,7 @@ export interface MentorBrief {
 export interface MentorBriefResult { brief: MentorBrief; text: string }
 export type MentorCandidateKind =
   | "srs_review" | "error_fix" | "continue_topic" | "next_topic"
-  | "untreated_diagnostic" | "task_deadline" | "goal_item";
+  | "untreated_diagnostic" | "task_deadline" | "goal_item" | "plan_item";
 export interface MentorCandidate {
   id: string;
   kind: MentorCandidateKind;
@@ -1227,7 +1227,7 @@ export interface MentorCandidate {
   estMinutes: number;
   score: number;
   reasons: string[];
-  links: { goalId?: string; itemId?: string; topicFolder?: string };
+  links: { goalId?: string; itemId?: string; topicFolder?: string; subplanId?: string; subplan?: string };
 }
 export interface MentorCandidatesResult {
   availableMinutes: number;
@@ -1247,6 +1247,8 @@ export interface MentorPlanBlock {
   status: MentorBlockStatus;
   reason?: string;
   note?: string;
+  /** subplan del plan mensual del que viene (chip "Plan: …") */
+  plan?: string;
 }
 export interface MentorSessionRecord {
   date: string;
@@ -1256,9 +1258,26 @@ export interface MentorSessionRecord {
   createdAt: string;
   acceptedAt?: string;
 }
+/** Objetivo de la sesión de Hoy (espejo de core/mentor/objective.ts). */
+export type MentorSessionObjective =
+  | { type: "none" }
+  | { type: "tasks" }
+  | { type: "review" }
+  | { type: "plan" }
+  | { type: "subject"; subject: string; label?: string }
+  | { type: "goal"; goalId: string; itemIds?: string[]; label?: string }
+  | { type: "custom"; text: string };
+export interface MentorObjectiveOptions {
+  goals: Array<{ goalId: string; name: string; area: string; kind: "daily" | "weekly" | "due" | "topics"; itemIds: string[]; hint: string }>;
+  subjects: Array<{ subject: string; label: string; topics: number; open: number }>;
+  tasksPending: number;
+  plan: { month: string; items: number } | null;
+}
 export interface MentorPlanRequest {
   availableMinutes: number;
   objective?: string;
+  /** objetivo estructurado: influye de forma determinista en los candidatos */
+  objectiveSpec?: MentorSessionObjective;
   userNote?: string;
   excludeSubjects?: string[];
   excludeCandidateIds?: string[];
@@ -1271,6 +1290,7 @@ export interface MentorProposedBlock {
   subject: string;
   topicFolder?: string;
   skills?: string[];
+  plan?: string;
 }
 export interface MentorProposedPlan { summary: string; blocks: MentorProposedBlock[]; notes?: string }
 export type MentorProposeResult =
@@ -1278,6 +1298,8 @@ export type MentorProposeResult =
   | {
       loading: false;
       availableMinutes: number;
+      /** texto del objetivo de la sesión ya resuelto (para registrarlo al aceptar) */
+      objective?: string;
       plan: MentorProposedPlan;
       source: "ai" | "fallback";
       candidates: MentorCandidate[];
@@ -1294,6 +1316,7 @@ export type MentorOverview =
       adherence: MentorAdherence;
       today: MentorSessionRecord | null;
       aiConfigured: boolean;
+      objectives?: MentorObjectiveOptions;
     };
 export interface MentorAdherenceCounts {
   total: number; done: number; partial: number; skipped: number; planned: number;
@@ -1347,11 +1370,53 @@ export interface MentorChatTurn {
   draft?: MentorGoalDraft;
   createdGoalId?: string;
   discarded?: boolean;
+  planDraft?: MentorPlanDraft;
+  acceptedPlan?: string;
 }
 export interface MentorChatState { id?: string | null; title?: string; turns: MentorChatTurn[]; pending: string | null }
 export type MentorChatResult =
   | { loading: true }
-  | ({ loading: false; kind: "question" | "draft" | "error" | "no_ai"; text: string; draft?: MentorGoalDraft } & MentorChatState);
+  | ({ loading: false; kind: "question" | "draft" | "plan_draft" | "error" | "no_ai"; text: string; draft?: MentorGoalDraft; planDraft?: MentorPlanDraft } & MentorChatState);
+
+// ── Mentor: plan mensual (core/mentor/plan.ts) ──
+export type MentorDeliverableStatus = "idea" | "en_curso" | "hecho";
+export type MentorTopicState = "sin_tratar" | "practicando" | "consolidado" | "completo" | "examen_pendiente" | "no_encontrado";
+export interface MentorPlannedTopic {
+  folder: string; title: string; skills?: string[]; targetWeek: number; estMinutes: number; completedAt?: string;
+}
+export interface MentorWeekSlice { week: number; start: string; end: string; topics: string[]; minutes: number; capacityMinutes: number }
+export interface MentorRequiredGoal { goalId: string; itemId?: string; note: string }
+export interface MentorDeliverable { title: string; description: string; criteria: string[]; projectId?: string; status: MentorDeliverableStatus }
+export interface MentorSubplan {
+  id: string; area: string; objective: string; goalId?: string; goalItemIds?: string[];
+  topics: MentorPlannedTopic[]; weeks: MentorWeekSlice[]; requiredGoals: MentorRequiredGoal[]; deliverable?: MentorDeliverable; notes?: string;
+}
+export interface MentorMonthlyPlan { month: string; createdAt: string; updatedAt: string; hoursPerWeek?: number; subplans: MentorSubplan[] }
+export interface MentorTopicView extends MentorPlannedTopic { state: MentorTopicState; pct: number; found: boolean }
+export interface MentorSubplanView { id: string; topics: MentorTopicView[]; total: number; done: number; pct: number; currentWeek: number }
+export interface MentorPlanDerived {
+  subplans: MentorSubplanView[];
+  summary: { subplans: number; topics: number; done: number; pct: number; currentWeek: number; weeks: number };
+}
+export interface MentorPlanItem {
+  kind: "topic" | "deliverable"; month: string; subplanId: string; label: string; area: string; title: string;
+  folder?: string; skills?: string[]; estMinutes: number; targetWeek: number; overdue: boolean;
+}
+export interface MentorPlanDraft {
+  month: string; hoursPerWeek: number; rationale: string; subplans: MentorSubplan[]; warnings: string[]; fits: boolean;
+  totalMinutes: number; availableMinutes: number; requiredHoursPerWeek: number | null; from: string; discarded: string[];
+  why: Record<string, string>;
+}
+export type MentorPlanGet =
+  | { loading: true }
+  | {
+      loading: false; month: string; today: string; plan: MentorMonthlyPlan | null; derived: MentorPlanDerived | null;
+      goals: Record<string, { name: string; pct: number; items: Record<string, { name: string; pct: number }> }>;
+      projects: Record<string, { id: string; name: string; status: string }>;
+      items: MentorPlanItem[]; months: string[]; aiConfigured: boolean;
+    };
+export interface MentorPlanListRow { month: string; subplans: number; topics: number; completed: number }
+export interface MentorPlanAccepted { month: string; subplans: number; topics: number; warnings: string[]; fits: boolean }
 export interface MentorGoalCreated { goalId: string; name: string; items: number; schedule: MentorGoalSchedule }
 export interface MentorGoalItemSlim {
   id: string; parent: string; name: string; status: string; due: string | null; start: string | null;

@@ -5,23 +5,37 @@
 // pinta lo que devuelven `mentor_plan_propose` / `mentor_plan_accept` / `mentor_block_status`.
 
 import { Bot, Check, CircleAlert, Loader2, RefreshCw, Shuffle, Sparkles, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
 import type {
   MentorBlockStatus,
   MentorCandidate,
   MentorOverview,
   MentorProposedBlock,
+  MentorObjectiveOptions,
   MentorProposedPlan,
+  MentorSessionObjective,
   MentorSessionRecord,
 } from "../../lib/types";
 import { useApp } from "../../store/app";
+import { useMentor } from "../../store/mentor";
 import { Chip, GhostButton, input, Label, PrimaryButton } from "../common/forms";
 import { Panel } from "../common/StatTile";
 import { cn } from "../ui";
 import { openTopic } from "./openTopic";
 
-const PRESETS = [60, 120, 180, 240];
+/** Chips de tiempo: de 1 h a 8 h. */
+export const PRESETS = [60, 120, 180, 240, 300, 360, 420, 480];
+const MINUTES_KEY = "nv.mentor.minutes";
+
+function savedMinutes(): number {
+  try {
+    const n = Math.round(Number(localStorage.getItem(MINUTES_KEY)));
+    return n >= 5 && n <= 720 ? n : 120;
+  } catch {
+    return 120;
+  }
+}
 const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
 
@@ -33,6 +47,7 @@ const KIND_LABEL: Record<string, string> = {
   untreated_diagnostic: "Diagnóstico",
   task_deadline: "Con plazo",
   goal_item: "Meta",
+  plan_item: "Plan del mes",
 };
 
 const STATUS_LABEL: Record<MentorBlockStatus, string> = { planned: "Pendiente", done: "Hecho", partial: "Parcial", skipped: "Saltado" };
@@ -49,13 +64,44 @@ const dateLabel = (): string => {
 
 const hm = (min: number): string => (min >= 60 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}` : `${min} min`);
 
-type Proposal = { plan: MentorProposedPlan; source: "ai" | "fallback"; error?: string; candidates: MentorCandidate[] };
+type Proposal = { plan: MentorProposedPlan; source: "ai" | "fallback"; error?: string; candidates: MentorCandidate[]; objective: string };
+
+const GOAL_KIND_HINT = { daily: "a diario", weekly: "semanal", due: "vence esta semana", topics: "con temas" } as const;
+
+const sameObjective = (a: MentorSessionObjective | null, b: MentorSessionObjective): boolean => {
+  if (!a || a.type !== b.type) return false;
+  if (a.type === "goal" && b.type === "goal") return a.goalId === b.goalId;
+  if (a.type === "subject" && b.type === "subject") return a.subject === b.subject;
+  return true;
+};
+
+/** Chip de una opción del selector de objetivo. */
+function ObjectiveChip({ active, onClick, children, title }: { active: boolean; onClick: () => void; children: ReactNode; title?: string }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      title={title}
+      onClick={onClick}
+      className={cn("rounded-md border px-2.5 py-1 text-left text-[12.5px]", active ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:bg-hover hover:text-text")}
+    >
+      {children}
+    </button>
+  );
+}
 
 export function MentorToday() {
   const toast = useApp((s) => s.toast);
-  const [minutes, setMinutes] = useState(120);
-  const [free, setFree] = useState("");
+  const [minutes, setMinutes] = useState(savedMinutes);
+  const [free, setFree] = useState(() => {
+    const m = savedMinutes();
+    return PRESETS.includes(m) ? "" : String(m);
+  });
+  /** objetivo elegido de la lista (o "none"); el campo libre manda cuando tiene texto */
+  const [spec, setSpec] = useState<MentorSessionObjective | null>(null);
   const [objective, setObjective] = useState("");
+  const pendingObjective = useMentor((st) => st.pendingObjective);
+  const setPendingObjective = useMentor((st) => st.setPendingObjective);
   const [adjust, setAdjust] = useState("");
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [blocks, setBlocks] = useState<MentorProposedBlock[]>([]);
@@ -92,6 +138,22 @@ export function MentorToday() {
     throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
   }, []);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(MINUTES_KEY, String(minutes));
+    } catch {
+      /* sin almacenamiento: no se recuerda */
+    }
+  }, [minutes]);
+
+  // "Planear mi día con esto" (panel Plan) deja un objetivo para este panel
+  useEffect(() => {
+    if (!pendingObjective) return;
+    setSpec(pendingObjective);
+    setObjective("");
+    setPendingObjective(null);
+  }, [pendingObjective, setPendingObjective]);
+
   const loadOverview = useCallback(async () => {
     try {
       const o = await untilReady(() => api.mentorOverview());
@@ -107,6 +169,8 @@ export function MentorToday() {
     void loadOverview();
   }, [loadOverview]);
 
+  const custom = objective.trim();
+
   const propose = useCallback(
     async (opts: { userNote?: string; excludeIds?: string[] } = {}): Promise<Proposal | null> => {
       setBusy(true);
@@ -116,12 +180,13 @@ export function MentorToday() {
           api.mentorPlanPropose({
             availableMinutes: minutes,
             objective: objective.trim() || undefined,
+            objectiveSpec: custom ? { type: "custom", text: custom } : spec ?? undefined,
             userNote: opts.userNote?.trim() || undefined,
             excludeCandidateIds: opts.excludeIds ?? excluded,
           }),
         );
         if (!r || !alive.current) return null;
-        return { plan: r.plan, source: r.source, error: r.error, candidates: r.candidates };
+        return { plan: r.plan, source: r.source, error: r.error, candidates: r.candidates, objective: r.objective ?? "" };
       } catch (e) {
         if (alive.current) setError((e as Error).message);
         return null;
@@ -129,7 +194,7 @@ export function MentorToday() {
         if (alive.current) setBusy(false);
       }
     },
-    [minutes, objective, excluded, untilReady],
+    [minutes, objective, custom, spec, excluded, untilReady],
   );
 
   const doPropose = async (userNote?: string) => {
@@ -171,7 +236,7 @@ export function MentorToday() {
     if (!blocks.length) return;
     setAccepting(true);
     try {
-      const rec = await api.mentorPlanAccept({ date: today(), availableMinutes: minutes, objective: objective.trim() || undefined, blocks });
+      const rec = await api.mentorPlanAccept({ date: today(), availableMinutes: minutes, objective: proposal?.objective || custom || undefined, blocks });
       setSession(rec);
       setReplanning(false);
       setProposal(null);
@@ -238,7 +303,7 @@ export function MentorToday() {
               <ul className="space-y-2">
                 {session!.blocks.map((b) => (
                   <li key={b.candidateId} className="rounded-lg border border-line p-3" data-testid="session-block">
-                    <BlockHead kind={b.kind} subject={b.subject} minutes={b.minutes} status={b.status} />
+                    <BlockHead kind={b.kind} subject={b.subject} minutes={b.minutes} status={b.status} plan={b.plan} />
                     {b.reason && <p className="mt-1 text-[12.5px] text-dim">{b.reason}</p>}
                     <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label={`Estado de ${b.subject}`}>
                       {(["done", "partial", "skipped"] as const).map((st) => (
@@ -292,10 +357,21 @@ export function MentorToday() {
                     />
                   </label>
                 </div>
-                <label className="mt-3 block">
+                <div className="mt-4">
                   <Label>Objetivo de la sesión (opcional)</Label>
-                  <input value={objective} onChange={(e) => setObjective(e.target.value)} placeholder="Ej.: cerrar el tema de límites" className={input} maxLength={200} />
-                </label>
+                  <ObjectiveSelector
+                    options={overview && !overview.loading ? overview.objectives : undefined}
+                    spec={custom ? null : spec}
+                    onPick={(o) => {
+                      setSpec(o.type === "none" ? null : o);
+                      setObjective("");
+                    }}
+                  />
+                  <label className="mt-2 block">
+                    <span className="text-[12px] text-dim">Proponer mi propio objetivo</span>
+                    <input value={objective} onChange={(e) => setObjective(e.target.value)} placeholder="Ej.: cerrar el tema de límites" className={input} maxLength={200} />
+                  </label>
+                </div>
                 <div className="mt-3">
                   <PrimaryButton onClick={() => void doPropose()} disabled={busy}>
                     {busy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} {proposal ? "Proponer de nuevo" : "Proponer plan"}
@@ -326,7 +402,7 @@ export function MentorToday() {
                     <ul className="mt-3 space-y-2" aria-live="polite">
                       {blocks.map((b) => (
                         <li key={b.candidateId} className="rounded-lg border border-line p-3" data-testid="plan-block">
-                          <BlockHead kind={b.kind} subject={b.subject} minutes={b.minutes} />
+                          <BlockHead kind={b.kind} subject={b.subject} minutes={b.minutes} plan={b.plan} />
                           <p className="mt-1 text-[12.5px] text-dim">{b.reason}</p>
                           <div className="mt-2 flex flex-wrap items-center gap-1.5">
                             {b.topicFolder && <GhostButton onClick={() => void openTopic(b.topicFolder!)}>Ver tema</GhostButton>}
@@ -383,11 +459,59 @@ export function MentorToday() {
   );
 }
 
-function BlockHead({ kind, subject, minutes, status }: { kind: string; subject: string; minutes: number; status?: MentorBlockStatus }) {
+/** Opciones reales: metas que se cumplen a diario/semanalmente, "Estudiar <materia>" y los atajos fijos. */
+function ObjectiveSelector({ options, spec, onPick }: { options?: MentorObjectiveOptions; spec: MentorSessionObjective | null; onPick: (o: MentorSessionObjective) => void }) {
+  const none: MentorSessionObjective = { type: "none" };
+  const active = (o: MentorSessionObjective) => (o.type === "none" ? spec === null : sameObjective(spec, o));
+  const fixed: Array<{ o: MentorSessionObjective; label: string; title?: string }> = [
+    { o: none, label: "Sin objetivo (que el Mentor decida)" },
+    { o: { type: "tasks" }, label: "Terminar todas mis tareas pendientes", title: options ? `${options.tasksPending} pendientes` : undefined },
+    ...(options?.plan ? [{ o: { type: "plan" } as MentorSessionObjective, label: `Lo que toca del plan del mes (${options.plan.items})` }] : []),
+    { o: { type: "review" }, label: "Repasar lo vencido (SRS y errores)" },
+  ];
+  return (
+    <div className="mt-1.5 space-y-2" role="group" aria-label="Objetivo de la sesión">
+      <div className="flex flex-wrap gap-1.5">
+        {fixed.map((f) => (
+          <ObjectiveChip key={f.o.type} active={active(f.o)} onClick={() => onPick(f.o)} title={f.title}>
+            {f.label}
+          </ObjectiveChip>
+        ))}
+      </div>
+      {!!options?.subjects.length && (
+        <div className="flex flex-wrap gap-1.5" aria-label="Materias">
+          {options.subjects.map((sub) => {
+            const o: MentorSessionObjective = { type: "subject", subject: sub.subject, label: sub.label };
+            return (
+              <ObjectiveChip key={sub.subject} active={active(o)} onClick={() => onPick(o)} title={`${sub.open} temas abiertos de ${sub.topics}`}>
+                Estudiar {sub.label}
+              </ObjectiveChip>
+            );
+          })}
+        </div>
+      )}
+      {!!options?.goals.length && (
+        <div className="flex flex-wrap gap-1.5" aria-label="Metas">
+          {options.goals.map((g) => {
+            const o: MentorSessionObjective = { type: "goal", goalId: g.goalId, itemIds: g.itemIds, label: g.name };
+            return (
+              <ObjectiveChip key={g.goalId} active={active(o)} onClick={() => onPick(o)} title={GOAL_KIND_HINT[g.kind]}>
+                Meta: {g.name} <span className="text-[11px] text-faint">· {GOAL_KIND_HINT[g.kind]}</span>
+              </ObjectiveChip>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BlockHead({ kind, subject, minutes, status, plan }: { kind: string; subject: string; minutes: number; status?: MentorBlockStatus; plan?: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-[13.5px] font-semibold capitalize">{subject}</span>
       <Chip>{KIND_LABEL[kind] ?? kind}</Chip>
+      {plan && <Chip colour="var(--nv-mint)">Plan: {plan}</Chip>}
       <span className="text-[12px] text-faint">{minutes} min</span>
       {status && status !== "planned" && (
         <Chip colour={status === "done" ? "var(--nv-mint)" : status === "partial" ? "var(--nv-accent)" : "var(--nv-warn)"}>{STATUS_LABEL[status]}</Chip>

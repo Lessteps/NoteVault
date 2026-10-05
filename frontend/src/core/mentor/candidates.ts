@@ -36,6 +36,8 @@ import {
   type TopicGoalLink,
   type TopicsData,
 } from "./brief.js";
+import { applyObjective, type SessionObjective } from "./objective.js";
+import type { PlanItem } from "./plan.js";
 import type { PlanBlock } from "./sessionLog.js";
 
 export type CandidateKind =
@@ -45,12 +47,17 @@ export type CandidateKind =
   | "next_topic"
   | "untreated_diagnostic"
   | "task_deadline"
-  | "goal_item";
+  | "goal_item"
+  | "plan_item";
 
 export interface CandidateLinks {
   goalId?: string;
   itemId?: string;
   topicFolder?: string;
+  /** subplan del plan mensual del que viene (plan_item) */
+  subplanId?: string;
+  /** texto corto del subplan, para el chip "Plan: …" */
+  subplan?: string;
 }
 
 export interface Candidate {
@@ -69,6 +76,10 @@ export interface Candidate {
 
 export interface CandidateOptions {
   availableMinutes: number;
+  /** objetivo de la sesión: empuja a lo que lo cumple y relega (sin quitar) lo demás */
+  objective?: SessionObjective;
+  /** lo que el plan del mes dice que toca hoy (ver plan.ts `planItemsFor`) */
+  planItems?: readonly PlanItem[];
 }
 
 export interface AllocateOptions {
@@ -88,13 +99,14 @@ export const EST_MINUTES = {
   untreated_diagnostic: 20,
   task_deadline: 30,
   goal_item: 25,
+  plan_item_deliverable: 45,
 } as const;
 
 /** Mínimo al que se puede recortar un bloque divisible para que quepa. */
 export const SPLIT_MIN_MINUTES = 10;
 /** Tipos cuyo bloque se puede acortar sin perder sentido. */
-const SPLITTABLE: ReadonlySet<CandidateKind> = new Set(["srs_review", "continue_topic", "next_topic", "goal_item"]);
-const KIND_ORDER: CandidateKind[] = ["srs_review", "error_fix", "goal_item", "continue_topic", "untreated_diagnostic", "task_deadline", "next_topic"];
+const SPLITTABLE: ReadonlySet<CandidateKind> = new Set(["srs_review", "continue_topic", "next_topic", "goal_item", "plan_item"]);
+const KIND_ORDER: CandidateKind[] = ["plan_item", "srs_review", "error_fix", "goal_item", "continue_topic", "untreated_diagnostic", "task_deadline", "next_topic"];
 
 function srsMinutes(count: number): number {
   return Math.min(30, Math.max(10, Math.ceil((count * 1.2) / 5) * 5));
@@ -289,8 +301,9 @@ export function buildCandidates(brief: StudentBrief, opts: CandidateOptions): Ca
   }
 
   // 6. Tareas e issues con plazo
+  const allTasks = opts.objective?.type === "tasks";
   for (const t of tasks?.tasks ?? []) {
-    if (t.daysLeft === null || t.daysLeft > 14) continue;
+    if (!allTasks && (t.daysLeft === null || t.daysLeft > 14)) continue;
     out.push({
       id: `task:${t.id}`,
       kind: "task_deadline",
@@ -315,7 +328,60 @@ export function buildCandidates(brief: StudentBrief, opts: CandidateOptions): Ca
     }
   }
 
-  return sortCandidates(fit(out, available));
+  // 7. Lo que el plan del mes dice que toca: sustituye al candidato de ese tema y sube al principio
+  let withPlan = out;
+  if (opts.planItems?.length) withPlan = addPlanItems(out, opts.planItems, topics);
+  const ranked = opts.objective ? applyObjective(withPlan, opts.objective, brief) : withPlan;
+  return sortCandidates(fit(ranked, available));
+}
+
+/** Empuje que da el plan del mes a lo que toca esta semana (por encima de repasos y errores corrientes). */
+const PLAN_BOOST = 45;
+
+function addPlanItems(list: Candidate[], items: readonly PlanItem[], topics: TopicsData | null): Candidate[] {
+  let out = [...list];
+  const taken = new Set<string>();
+  for (const it of items) {
+    const links: CandidateLinks = { subplanId: it.subplanId, subplan: it.label };
+    if (it.kind === "deliverable") {
+      const id = `plan:${it.subplanId}:deliverable`;
+      if (taken.has(id)) continue;
+      taken.add(id);
+      out.push({
+        id,
+        kind: "plan_item",
+        subject: it.area,
+        estMinutes: EST_MINUTES.plan_item_deliverable,
+        score: 90,
+        reasons: [`el plan del mes (${it.label}) pide avanzar el entregable: ${it.title}`],
+        links,
+      });
+      continue;
+    }
+    const folder = it.folder!;
+    const t = topics?.topics.find((x) => x.folder === folder);
+    if (!t || (t.status === "complete" && t.exam !== "required_pending")) continue; // enlace roto o ya hecho
+    if (taken.has(folder)) continue;
+    taken.add(folder);
+    const base = out.find((c) => c.topicFolder === folder && c.id === `topic:${folder}`);
+    out = out.filter((c) => c !== base);
+    const wanted = it.skills?.length ? it.skills : base?.skills;
+    out.push({
+      id: `plan:${it.subplanId}:${folder}`,
+      kind: "plan_item",
+      subject: t.subject,
+      topicFolder: folder,
+      ...(wanted?.length ? { skills: wanted } : {}),
+      estMinutes: Math.min(60, Math.max(20, base?.estMinutes ?? it.estMinutes)),
+      score: clamp100(Math.max(base?.score ?? 50, 50) + PLAN_BOOST + (it.overdue ? 5 : 0)),
+      reasons: [
+        `lo pide el plan del mes (${it.label}, semana ${it.targetWeek})${it.overdue ? " y va atrasado" : ""}`,
+        ...(base?.reasons ?? [`tema a medias (${t.completenessPct}%)`]),
+      ],
+      links: { ...(base?.links ?? {}), topicFolder: folder, ...links },
+    });
+  }
+  return out;
 }
 
 /** Descarta lo que no cabe; acorta los bloques divisibles hasta `available` si queda >= SPLIT_MIN. */
@@ -384,5 +450,6 @@ export function planBlocksFrom(candidates: readonly Candidate[]): PlanBlock[] {
     ...(c.topicFolder ? { topicFolder: c.topicFolder } : {}),
     minutes: c.estMinutes,
     status: "planned" as const,
+    ...(c.links.subplan ? { plan: c.links.subplan } : {}),
   }));
 }

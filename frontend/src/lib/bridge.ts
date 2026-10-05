@@ -326,7 +326,7 @@ export const api = {
   // Mentor
   mentorBrief: (opts: { maxChars?: number; only?: string[]; exclude?: string[] } = {}) =>
     call<import("./types").MentorBriefResult>("mentor_brief", opts),
-  mentorCandidates: (opts: { availableMinutes: number; maxSubjects?: number }) =>
+  mentorCandidates: (opts: { availableMinutes: number; maxSubjects?: number; objective?: import("./types").MentorSessionObjective }) =>
     call<import("./types").MentorCandidatesResult>("mentor_candidates", opts),
   mentorSessionSave: (record: import("./types").MentorSessionRecord) =>
     call<import("./types").MentorSessionRecord>("mentor_session_save", record),
@@ -344,7 +344,13 @@ export const api = {
     call<import("./types").MentorSessionRecord>("mentor_block_status", date, candidateId, status, note),
   mentorChatLoad: () => call<import("./types").MentorChatState>("mentor_chat_load"),
   mentorChatClear: () => call<import("./types").MentorChatState>("mentor_chat_clear"),
-  mentorChat: (message: string, chatId?: string) => call<import("./types").MentorChatResult>("mentor_chat", { message, chatId }),
+  mentorChat: (message: string, chatId?: string, mode?: "plan") => call<import("./types").MentorChatResult>("mentor_chat", { message, chatId, mode }),
+  mentorPlanList: () => call<import("./types").MentorPlanListRow[]>("mentor_plan_list"),
+  mentorPlanGet: (month?: string) => call<import("./types").MentorPlanGet>("mentor_plan_get", { month }),
+  mentorPlanDraftAccept: (turnId: string, chatId?: string) => call<import("./types").MentorPlanAccepted>("mentor_plan_draft_accept", { turnId, chatId }),
+  mentorPlanDraftDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_plan_draft_discard", turnId),
+  mentorPlanUpdateDeliverable: (opts: { month: string; subplanId: string; status: import("./types").MentorDeliverableStatus; projectId?: string | null }) =>
+    call<import("./types").MentorMonthlyPlan>("mentor_plan_update_deliverable", opts),
   mentorChatsList: () => call<import("./types").MentorChatMeta[]>("mentor_chats_list"),
   mentorChatNew: () => call<import("./types").MentorChatState>("mentor_chat_new"),
   mentorChatOpen: (id: string) => call<import("./types").MentorChatState>("mentor_chat_open", id),

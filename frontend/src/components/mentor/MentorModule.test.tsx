@@ -66,6 +66,7 @@ const click = async (el: Element | undefined) => {
 };
 
 beforeEach(() => {
+  localStorage.clear();
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
@@ -81,7 +82,7 @@ describe("MentorModule", () => {
   it("muestra la cabecera, el tiempo y 'Lo que sé de ti' en texto", async () => {
     await mount();
     expect(host.textContent).toContain("Mentor — Hoy");
-    for (const h of ["1 h", "2 h", "3 h", "4 h"]) expect(host.textContent).toContain(h);
+    for (const h of ["1 h", "2 h", "3 h", "4 h", "5 h", "6 h", "7 h", "8 h"]) expect(host.textContent).toContain(h);
     expect(host.textContent).toContain("Sueles saltarte: historia");
     expect(host.textContent).toContain("3 repasos vencidos");
     expect(host.querySelector("svg circle[stroke-dasharray]")).toBeNull(); // sin anillos
@@ -170,5 +171,107 @@ describe("MentorModule", () => {
     await flush();
     expect(host.textContent).toContain("No hay nada pendiente");
     expect(host.querySelector("[role=alert]")).toBeNull();
+  });
+});
+
+describe("MentorModule: tiempo y objetivo de la sesión", () => {
+  const withObjectives = (): MentorOverview =>
+    overview({
+      objectives: {
+        goals: [
+          { goalId: "g1", name: "Desarrollo Backend", area: "", kind: "daily", itemIds: ["i1"], hint: "a diario" },
+          { goalId: "g2", name: "Inglés B2", area: "", kind: "weekly", itemIds: ["i2"], hint: "semanal" },
+        ],
+        subjects: [{ subject: "programming", label: "Programación", topics: 4, open: 3 }],
+        tasksPending: 5,
+        plan: { month: "2026-10", items: 2 },
+      },
+    });
+  const typeInto = async (field: HTMLInputElement, value: string) => {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, value);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  };
+
+  it("ofrece de 1 h a 8 h y recuerda la última elección", async () => {
+    const propose = vi.spyOn(api, "mentorPlanPropose").mockResolvedValue(proposal());
+    await mount();
+    const group = host.querySelector("[aria-label='Tiempo disponible']")!;
+    expect([...group.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["1 h", "2 h", "3 h", "4 h", "5 h", "6 h", "7 h", "8 h"]);
+    await click(button("8 h", group));
+    await click(button("Proponer plan"));
+    expect(propose).toHaveBeenLastCalledWith(expect.objectContaining({ availableMinutes: 480 }));
+    // al volver a montar, 8 h sigue elegido
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount();
+    expect(button("8 h", host.querySelector("[aria-label='Tiempo disponible']")!).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("un tiempo libre que no es un chip también se recuerda", async () => {
+    await mount();
+    await typeInto(host.querySelector<HTMLInputElement>("input[type=number]")!, "90");
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount();
+    expect(host.querySelector<HTMLInputElement>("input[type=number]")!.value).toBe("90");
+  });
+
+  it("el selector ofrece tus metas, tus materias y los atajos; elegir uno viaja como objectiveSpec", async () => {
+    vi.mocked(api.mentorOverview).mockResolvedValue(withObjectives());
+    const propose = vi.spyOn(api, "mentorPlanPropose").mockResolvedValue({ ...proposal(), objective: "Meta: Desarrollo Backend" });
+    await mount();
+    const sel = host.querySelector("[aria-label='Objetivo de la sesión']")!;
+    for (const t of ["Sin objetivo", "Terminar todas mis tareas pendientes", "Repasar lo vencido", "Lo que toca del plan del mes", "Estudiar Programación", "Meta: Desarrollo Backend", "Meta: Inglés B2"]) {
+      expect(sel.textContent).toContain(t);
+    }
+    await click(button("Meta: Desarrollo Backend", sel));
+    expect(button("Meta: Desarrollo Backend", sel).getAttribute("aria-pressed")).toBe("true");
+    await click(button("Proponer plan"));
+    expect(propose).toHaveBeenLastCalledWith(expect.objectContaining({ objectiveSpec: { type: "goal", goalId: "g1", itemIds: ["i1"], label: "Desarrollo Backend" } }));
+
+    await click(button("Estudiar Programación", sel));
+    await click(button("Proponer de nuevo"));
+    expect(propose).toHaveBeenLastCalledWith(expect.objectContaining({ objectiveSpec: { type: "subject", subject: "programming", label: "Programación" } }));
+    await click(button("Terminar todas mis tareas pendientes", sel));
+    await click(button("Proponer de nuevo"));
+    expect(propose).toHaveBeenLastCalledWith(expect.objectContaining({ objectiveSpec: { type: "tasks" } }));
+    await click(button("Sin objetivo", sel));
+    await click(button("Proponer de nuevo"));
+    expect(propose.mock.calls.at(-1)![0].objectiveSpec).toBeUndefined();
+  });
+
+  it("el objetivo propio se envía como texto y como objetivo libre", async () => {
+    vi.mocked(api.mentorOverview).mockResolvedValue(withObjectives());
+    const propose = vi.spyOn(api, "mentorPlanPropose").mockResolvedValue(proposal());
+    await mount();
+    await click(button("Estudiar Programación"));
+    await typeInto(host.querySelector<HTMLInputElement>("input[placeholder^='Ej.:']")!, "cerrar el tema de límites");
+    await click(button("Proponer plan"));
+    expect(propose).toHaveBeenLastCalledWith(expect.objectContaining({ objective: "cerrar el tema de límites", objectiveSpec: { type: "custom", text: "cerrar el tema de límites" } }));
+    // escribir un objetivo propio deselecciona el de la lista
+    expect(button("Estudiar Programación").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("'Planear mi día con esto' del panel Plan deja el objetivo 'plan' elegido en Hoy", async () => {
+    vi.mocked(api.mentorOverview).mockResolvedValue(withObjectives());
+    const { useMentor } = await import("../../store/mentor");
+    useMentor.getState().setPendingObjective({ type: "plan" });
+    await mount();
+    await flush();
+    expect(button("Lo que toca del plan del mes").getAttribute("aria-pressed")).toBe("true");
+    expect(useMentor.getState().pendingObjective).toBeNull();
+  });
+
+  it("los bloques del plan indican de qué subplan del mes vienen", async () => {
+    const p = proposal();
+    p.plan.blocks[1] = { ...p.plan.blocks[1]!, kind: "plan_item", plan: "Programación: Backend" };
+    vi.spyOn(api, "mentorPlanPropose").mockResolvedValue(p);
+    await mount();
+    await click(button("Proponer plan"));
+    const blocks = host.querySelectorAll("[data-testid=plan-block]");
+    expect(blocks[1]!.textContent).toContain("Plan: Programación: Backend");
+    expect(blocks[0]!.textContent).not.toContain("Plan:");
   });
 });

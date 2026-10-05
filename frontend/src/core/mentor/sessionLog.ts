@@ -24,6 +24,8 @@ export interface PlanBlock {
   /** por qué lo propuso el Mentor (una línea) */
   reason?: string;
   note?: string;
+  /** subplan del plan mensual del que viene el bloque (chip "Plan: …") */
+  plan?: string;
 }
 
 export interface SessionRecord {
@@ -54,6 +56,7 @@ function cleanBlock(raw: any): PlanBlock | null {
   if (raw.topicFolder) block.topicFolder = String(raw.topicFolder);
   if (raw.reason) block.reason = String(raw.reason).slice(0, 300);
   if (raw.note) block.note = String(raw.note).slice(0, 500);
+  if (raw.plan) block.plan = String(raw.plan).slice(0, 80);
   return block;
 }
 

@@ -13,6 +13,7 @@ import * as path from "node:path";
 import * as store from "../store.js";
 import { formatLayout, LAYOUT } from "../vaultFormat.js";
 import type { GoalDraft } from "./goalDraft.js";
+import type { PlanDraft } from "./planDraft.js";
 
 export const MAX_CHAT_TURNS = 60;
 const MAX_CONTENT = 4000;
@@ -29,6 +30,10 @@ export interface ChatTurnRecord {
   /** id de la meta creada a partir de este borrador */
   createdGoalId?: string;
   discarded?: boolean;
+  /** borrador del plan del mes (tipo `plan_draft`); no existe como plan hasta aceptarlo */
+  planDraft?: PlanDraft;
+  /** mes (AAAA-MM) del plan creado al aceptar este borrador */
+  acceptedPlan?: string;
 }
 
 export interface ChatRecord {
@@ -62,6 +67,8 @@ function clean(raw: any): ChatTurnRecord | null {
     at: String(raw.at || new Date().toISOString()),
   };
   if (raw.role === "assistant" && raw.draft && typeof raw.draft === "object") turn.draft = raw.draft as GoalDraft;
+  if (raw.role === "assistant" && raw.planDraft && typeof raw.planDraft === "object") turn.planDraft = raw.planDraft as PlanDraft;
+  if (raw.acceptedPlan) turn.acceptedPlan = String(raw.acceptedPlan);
   if (raw.createdGoalId) turn.createdGoalId = String(raw.createdGoalId);
   if (raw.discarded) turn.discarded = true;
   return turn;
@@ -145,12 +152,13 @@ export class ChatLog {
   }
 
   /** Cambia un turno (marca de borrador creado o descartado); null si no existe. */
-  patch(id: string, fields: Partial<Pick<ChatTurnRecord, "createdGoalId" | "discarded">>): ChatTurnRecord[] | null {
+  patch(id: string, fields: Partial<Pick<ChatTurnRecord, "createdGoalId" | "discarded" | "acceptedPlan">>): ChatTurnRecord[] | null {
     const rec = this.record();
     const t = rec.turns.find((x) => x.id === id);
     if (!t) return null;
     if (fields.createdGoalId !== undefined) t.createdGoalId = fields.createdGoalId;
     if (fields.discarded !== undefined) t.discarded = fields.discarded;
+    if (fields.acceptedPlan !== undefined) t.acceptedPlan = fields.acceptedPlan;
     return this.write(rec).turns;
   }
 
@@ -302,7 +310,7 @@ export function pendingDraft(turns: readonly ChatTurnRecord[]): ChatTurnRecord |
   for (let i = turns.length - 1; i >= 0; i--) {
     const t = turns[i]!;
     if (t.role !== "assistant") continue;
-    return t.draft && !t.createdGoalId && !t.discarded ? t : null;
+    return (t.draft || t.planDraft) && !t.createdGoalId && !t.acceptedPlan && !t.discarded ? t : null;
   }
   return null;
 }

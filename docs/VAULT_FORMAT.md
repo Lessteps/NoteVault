@@ -53,6 +53,7 @@ vault/
 │   │   └── sessions/YYYY-MM-DD.json       un plan de estudio por día
 │   │   ├── chat.json                      (antiguo) una sola conversación; se migra a chats/
 │   │   └── chats/<id>.json                una conversación del Mentor (crear metas) + index.json
+│   │   └── plans/YYYY-MM.json             el plan mensual del Mentor (subplanes por área)
 │   ├── web/                               módulo WEB: marcadores, reglas, historial, uso
 │   │   ├── marcadores.json
 │   │   ├── restricciones.json
@@ -783,6 +784,7 @@ ignorarlo, y no sube `FORMAT_VERSION`.
 | `mentor_chat` | `.notevault/mentor/chat.json` — (antiguo) la única conversación con el Mentor; solo se lee para migrarla |
 | `mentor_chat_file` | `.notevault/mentor/chats/<id>.json` — una conversación con el Mentor |
 | `mentor_chats_index` | `.notevault/mentor/chats/index.json` — la conversación activa y la marca de migración |
+| `mentor_plan` | `.notevault/mentor/plans/AAAA-MM.json` — el plan mensual del Mentor (ver «Plan mensual del Mentor»); `mentor_plans_dir` es la carpeta |
 
 ```json
 {"date": "2026-10-05", "availableMinutes": 90, "objective": "Cerrar la meta de álgebra",
@@ -840,6 +842,40 @@ un archivo `.notevault/mentor/chats/<id>.json` (`<id>` = `[A-Za-z0-9_-]`, hasta 
   una con `topic_links` (ver «Conexión con temas de estudio»). El Mentor no escribe nada más.
 - La IA solo recibe el informe, un catálogo compacto de temas (carpeta, título, materia, skills,
   completitud, minutos estimados) y esta conversación; nunca el contenido de las notas.
+
+### Plan mensual del Mentor (`plans/<AAAA-MM>.json`)
+
+Un archivo por mes con los **subplanes** del mes (uno por área y objetivo). Es opcional y aditivo:
+un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`.
+
+```json
+{"month": "2026-10", "createdAt": "2026-10-05T09:00:00.000Z", "updatedAt": "2026-10-12T18:30:00.000Z",
+ "hoursPerWeek": 6,
+ "subplans": [{
+   "id": "s1-programacion", "area": "Programación", "objective": "Desarrollo Backend",
+   "goalId": "g20260914-a1b2c3", "goalItemIds": ["i20260914-abc123"],
+   "topics": [{"folder": "Programación/Python/1 Fundamentos", "title": "1 Fundamentos", "skills": ["debug"],
+               "targetWeek": 1, "estMinutes": 90, "completedAt": "2026-10-09"}],
+   "weeks": [{"week": 1, "start": "2026-10-01", "end": "2026-10-07", "topics": ["Programación/Python/1 Fundamentos"],
+              "minutes": 90, "capacityMinutes": 240}],
+   "requiredGoals": [{"goalId": "g20260914-a1b2c3", "itemId": "i20260914-abc123", "note": "submeta que lo pide"}],
+   "deliverable": {"title": "API de inventario", "description": "…", "criteria": ["CRUD", "tests"],
+                   "projectId": "p20260915-49887f", "status": "en_curso"},
+   "notes": "opcional"}]}
+```
+
+- Las semanas son trozos de 7 días desde el día 1 del mes (la última puede ser más corta).
+- `topics[].folder` es la carpeta del tema (el mismo id que usan los `topic_links` de las submetas). El
+  estado de práctica (sin tratar / practicando / consolidado / completo / examen pendiente) y el
+  porcentaje **no se guardan**: se derivan en vivo del motor de práctica.
+- `completedAt` (AAAA-MM-DD) es el **registro de temas completados**: se anota la primera vez que la
+  app observa el tema completo y no se vuelve a modificar.
+- `deliverable.status`: `idea` | `en_curso` | `hecho`; `projectId` enlaza un proyecto existente (nunca se
+  crean proyectos automáticamente). Es lo único que el Mentor edita después de aceptar el plan.
+- El plan diario sale del mensual: los temas cuya semana objetivo es la actual (o anterior) y siguen sin
+  completar se ofrecen primero en «Hoy».
+- La IA propone el plan (`plan_draft` en la conversación, con temas del catálogo real y metas existentes);
+  solo se escribe este archivo cuando el estudiante pulsa «Aceptar plan».
 
 ## Contrato móvil (Mobile Contract)
 

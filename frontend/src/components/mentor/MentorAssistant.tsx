@@ -6,7 +6,7 @@
 // y propone un borrador de meta con calendario; la IA solo ve el informe y un catálogo de temas, y
 // nunca escribe: crear la meta es un botón ("Crear meta").
 
-import { ArrowUp, Bot, Check, CircleAlert, History, Loader2, MoreHorizontal, Pencil, Plus, Target, Trash2, X } from "lucide-react";
+import { ArrowUp, Bot, CalendarRange, Check, CircleAlert, History, Loader2, MoreHorizontal, Pencil, Plus, Target, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { MentorChatTurn } from "../../lib/types";
 import { useAssistant } from "../../store/assistant";
@@ -24,6 +24,64 @@ const EXAMPLE = "Ej.: tengo que estudiar backend enfocado en Python y tengo 3 me
 /** Lleva al panel Metas del Mentor, donde el borrador se ve completo. */
 export function showDraftInMetas(): void {
   useNavState.getState().set("mentor.view", "metas");
+}
+
+/** Lleva al panel Plan del Mentor, donde el borrador del plan se ve completo. */
+export function showPlanDraftInPlan(): void {
+  useNavState.getState().set("mentor.view", "plan");
+}
+
+/** Borrador del plan del mes en el chat: resumen compacto con Ver en Plan / Aceptar plan / Descartar. */
+export function PlanDraftChatCard({ turn, current }: { turn: MentorChatTurn; current: boolean }) {
+  const accepting = useMentor((s) => s.acceptingPlan);
+  const acceptPlan = useMentor((s) => s.acceptPlan);
+  const discard = useMentor((s) => s.discard);
+  const draft = turn.planDraft;
+  if (!draft) return null;
+  const topics = draft.subplans.reduce((n, s) => n + s.topics.length, 0);
+  const open = current && !turn.acceptedPlan && !turn.discarded;
+  return (
+    <div className="mt-2 rounded-lg border border-line bg-surface p-2.5" data-testid="chat-plan-draft">
+      <div className="flex items-start gap-2">
+        <CalendarRange size={14} className="mt-0.5 flex-none text-accent-text" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[12.5px] font-semibold leading-snug text-text">Plan de {draft.month}</div>
+          <div className="text-[11px] text-faint">
+            {draft.subplans.length} subplanes · {topics} temas · {draft.hoursPerWeek} h/semana
+          </div>
+          <div className="mt-0.5 text-[11px] text-dim">{draft.subplans.map((s) => s.area).filter((a, i, l) => l.indexOf(a) === i).join(" · ")}</div>
+        </div>
+        {turn.acceptedPlan ? (
+          <span className="flex-none text-[11px] text-mint">Aceptado</span>
+        ) : turn.discarded ? (
+          <span className="flex-none text-[11px] text-faint">Descartado</span>
+        ) : null}
+      </div>
+      {open && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <button type="button" onClick={showPlanDraftInPlan} className="rounded-md border border-line px-2 py-1 text-[11.5px] text-dim hover:bg-hover hover:text-text">
+            Ver en Plan
+          </button>
+          <button
+            type="button"
+            onClick={() => void acceptPlan()}
+            disabled={accepting}
+            className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[11.5px] font-medium text-white hover:bg-accent-strong disabled:opacity-60"
+          >
+            <Check size={12} /> Aceptar plan
+          </button>
+          <button type="button" onClick={() => void discard()} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] text-danger hover:bg-danger-soft">
+            <Trash2 size={11} /> Descartar
+          </button>
+        </div>
+      )}
+      {turn.acceptedPlan && (
+        <button type="button" onClick={showPlanDraftInPlan} className="mt-1.5 text-[11.5px] text-accent-text hover:underline">
+          Ver en Plan
+        </button>
+      )}
+    </div>
+  );
 }
 
 /** Borrador de meta en el chat: resumen compacto con las mismas acciones que el panel Metas. */
@@ -93,6 +151,7 @@ function MentorMessage({ turn, current }: { turn: MentorChatTurn; current: boole
     <div data-testid="turn-assistant">
       <p className="whitespace-pre-line text-[12.5px] leading-relaxed text-text">{turn.content}</p>
       <DraftChatCard turn={turn} current={current} />
+      <PlanDraftChatCard turn={turn} current={current} />
     </div>
   );
 }
@@ -105,7 +164,11 @@ function MentorComposer() {
   const area = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (focusSeq) area.current?.focus();
+    if (!focusSeq) return;
+    // una conversación de plan arranca con un texto de partida que el estudiante completa
+    const seed = useMentor.getState().composerSeed;
+    if (seed) setText(seed);
+    area.current?.focus();
   }, [focusSeq]);
 
   const submit = () => {

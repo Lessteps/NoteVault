@@ -152,10 +152,10 @@ afterEach(() => {
 });
 
 describe("Mentor: espacio de paneles", () => {
-  it("navega entre Hoy, Metas, Proyectos y Notas; la Conversación ya no es un panel; arranca en Hoy", async () => {
+  it("navega entre Hoy, Plan, Metas, Proyectos y Notas; la Conversación ya no es un panel; arranca en Hoy", async () => {
     await mount();
     const nav = [...host.querySelectorAll("aside nav button")].map((b) => b.textContent ?? "");
-    expect(nav.map((t) => ["Hoy", "Metas", "Proyectos", "Notas y estudio"].find((l) => t.includes(l)))).toEqual(["Hoy", "Metas", "Proyectos", "Notas y estudio"]);
+    expect(nav.map((t) => ["Hoy", "Plan", "Metas", "Proyectos", "Notas y estudio"].find((l) => t.includes(l)))).toEqual(["Hoy", "Plan", "Metas", "Proyectos", "Notas y estudio"]);
     expect(nav.some((t) => t.includes("Conversación"))).toBe(false);
     expect(host.textContent).toContain("Mentor — Hoy");
 

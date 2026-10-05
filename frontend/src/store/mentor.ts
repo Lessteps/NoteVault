@@ -6,7 +6,7 @@
 
 import { create } from "zustand";
 import { api } from "../lib/bridge";
-import type { MentorChatMeta, MentorChatState, MentorChatTurn, MentorGoalCreated, MentorPanels } from "../lib/types";
+import type { MentorChatMeta, MentorChatState, MentorChatTurn, MentorGoalCreated, MentorPanels, MentorPlanAccepted, MentorSessionObjective } from "../lib/types";
 import { useApp } from "./app";
 import { useAssistant } from "./assistant";
 
@@ -36,6 +36,15 @@ interface MentorState {
   creating: boolean;
   /** meta recién creada, para resaltarla en Metas */
   createdGoalId: string | null;
+  /** la conversación activa se abrió desde "Generar plan del mes": el Mentor responde con un plan_draft */
+  planMode: boolean;
+  /** texto que el campo de mensaje del Mentor toma al abrirse una conversación de plan */
+  composerSeed: string;
+  acceptingPlan: boolean;
+  /** sube cada vez que se acepta un plan: el panel Plan se recarga */
+  planVersion: number;
+  /** objetivo que "Planear mi día con esto" deja para el panel Hoy */
+  pendingObjective: MentorSessionObjective | null;
 
   loadPanels: () => Promise<void>;
   loadChat: () => Promise<void>;
@@ -50,6 +59,10 @@ interface MentorState {
   deleteChat: (id: string) => Promise<void>;
   /** "Nueva meta con el Mentor": abre el asistente en el contexto del Mentor, con una conversación en limpio. */
   startGoalChat: () => Promise<void>;
+  /** "Generar plan del mes con el Mentor": como la meta nueva, pero el Mentor responde con un plan del mes. */
+  startPlanChat: () => Promise<void>;
+  acceptPlan: () => Promise<MentorPlanAccepted | null>;
+  setPendingObjective: (o: MentorSessionObjective | null) => void;
 }
 
 /** Igual que el título automático del servidor: el primer mensaje en una línea. */
@@ -86,6 +99,11 @@ export const useMentor = create<MentorState>((set, get) => ({
   notice: null,
   creating: false,
   createdGoalId: null,
+  planMode: false,
+  composerSeed: "",
+  acceptingPlan: false,
+  planVersion: 0,
+  pendingObjective: null,
 
   loadPanels: async () => {
     set({ panelsError: "" });
@@ -122,10 +140,10 @@ export const useMentor = create<MentorState>((set, get) => ({
     const optimistic: MentorChatTurn = { id: `tmp${Date.now()}`, role: "user", content: text, at: new Date().toISOString() };
     set((s) => ({ sending: true, notice: null, turns: [...s.turns, optimistic] }));
     try {
-      let r = await api.mentorChat(text, get().chatId ?? undefined);
+      let r = await (get().planMode ? api.mentorChat(text, get().chatId ?? undefined, "plan") : api.mentorChat(text, get().chatId ?? undefined));
       for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
         await sleep(COLD_RETRY_MS);
-        r = await api.mentorChat(text, get().chatId ?? undefined);
+        r = await (get().planMode ? api.mentorChat(text, get().chatId ?? undefined, "plan") : api.mentorChat(text, get().chatId ?? undefined));
       }
       if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
       set({
@@ -145,7 +163,8 @@ export const useMentor = create<MentorState>((set, get) => ({
     const id = get().pending;
     if (!id) return;
     try {
-      const s = await api.mentorDraftDiscard(id);
+      const isPlan = !!get().turns.find((t) => t.id === id)?.planDraft;
+      const s = isPlan ? await api.mentorPlanDraftDiscard(id) : await api.mentorDraftDiscard(id);
       set({ turns: s.turns, pending: s.pending });
     } catch (e) {
       fail(e);
@@ -174,7 +193,7 @@ export const useMentor = create<MentorState>((set, get) => ({
   newConversation: async () => {
     try {
       const s = await api.mentorChatNew();
-      set({ ...chatPatch(s), notice: null, historyOpen: false, chatLoaded: true });
+      set({ ...chatPatch(s), notice: null, historyOpen: false, chatLoaded: true, planMode: false, composerSeed: "" });
     } catch (e) {
       fail(e);
     }
@@ -227,6 +246,34 @@ export const useMentor = create<MentorState>((set, get) => ({
     // una meta nueva se conversa en limpio, salvo que la conversación activa aún esté vacía
     if (get().turns.length) await get().newConversation();
     else set({ historyOpen: false });
-    set((s) => ({ focusSeq: s.focusSeq + 1 }));
+    set((s) => ({ focusSeq: s.focusSeq + 1, planMode: false, composerSeed: "" }));
   },
+
+  startPlanChat: async () => {
+    useAssistant.getState().setOpen(true);
+    if (get().turns.length) await get().newConversation();
+    else set({ historyOpen: false });
+    set((s) => ({ focusSeq: s.focusSeq + 1, planMode: true, composerSeed: "Quiero un plan para este mes: " }));
+  },
+
+  acceptPlan: async () => {
+    const { pending, turns, chatId } = get();
+    const turn = turns.find((t) => t.id === pending);
+    if (!turn?.planDraft || get().acceptingPlan) return null;
+    set({ acceptingPlan: true });
+    try {
+      const out = await api.mentorPlanDraftAccept(turn.id, chatId ?? undefined);
+      useApp.getState().toast("info", `Plan de ${out.month} aceptado: ${out.subplans} subplanes, ${out.topics} temas.`);
+      await get().loadChat();
+      set((s) => ({ planVersion: s.planVersion + 1 }));
+      return out;
+    } catch (e) {
+      fail(e);
+      return null;
+    } finally {
+      set({ acceptingPlan: false });
+    }
+  },
+
+  setPendingObjective: (pendingObjective) => set({ pendingObjective }),
 }));

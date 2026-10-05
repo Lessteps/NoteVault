@@ -34,6 +34,8 @@ export interface ProposedBlock {
   subject: string;
   topicFolder?: string;
   skills?: string[];
+  /** subplan del plan mensual del que viene el bloque */
+  plan?: string;
 }
 
 export interface ProposedPlan {
@@ -78,6 +80,7 @@ export const PLANNER_SYSTEM_PROMPT = [
   "- Elige ÚNICAMENTE entre los candidatos dados, referenciándolos por su `id` exacto. No inventes tareas ni ids.",
   "- Reparte el tiempo disponible: la suma de `minutes` no puede pasar del total. Cada bloque dura entre 5 min y 1,5 veces su estimación.",
   "- Prioriza lo urgente (repasos vencidos, errores reincidentes, plazos) y no concentres todo en una sola materia.",
+  "- Los candidatos de tipo plan_item vienen del PLAN MENSUAL del estudiante (lo que toca esta semana): dales preferencia salvo que haya algo más urgente. Si hay OBJETIVO DE LA SESIÓN, ordena para cumplirlo primero.",
   "- El nivel declarado es una hipótesis: si un tema está sin tratar, propón su diagnóstico en vez de asumir dominio.",
   "- Cada bloque lleva `reason`: UNA línea, concreta, que cite el dato del informe que lo justifica.",
   "- Si el estudiante pide un ajuste (nota del usuario), respétalo: es una preferencia suya, no una pregunta.",
@@ -163,6 +166,7 @@ function toBlock(c: Candidate, minutes: number, reason: string): ProposedBlock {
     subject: c.subject,
     ...(c.topicFolder ? { topicFolder: c.topicFolder } : {}),
     ...(c.skills?.length ? { skills: c.skills } : {}),
+    ...(c.links.subplan ? { plan: c.links.subplan } : {}),
   };
 }
 
@@ -277,5 +281,6 @@ export function planToBlocks(plan: Pick<ProposedPlan, "blocks">): PlanBlock[] {
     minutes: b.minutes,
     status: "planned" as const,
     ...(b.reason ? { reason: b.reason } : {}),
+    ...(b.plan ? { plan: b.plan } : {}),
   }));
 }

@@ -42,6 +42,10 @@ function closeGone(path: string): void {
   app.toast("info", "El canvas ya no existe en disco: se cerró su pestaña.");
 }
 
+/** When this app last saved the open canvas: the file watcher echoes our own save, and re-reading a big canvas for it re-renders the whole board. */
+let wroteAt = 0;
+const WRITE_ECHO_MS = 2500;
+
 export const useCanvas = create<CanvasState>((set, get) => {
   const schedule = () => {
     if (timer) clearTimeout(timer);
@@ -115,6 +119,7 @@ export const useCanvas = create<CanvasState>((set, get) => {
       }
       if (!path || !dirty) return;
       try {
+        wroteAt = Date.now();
         const r = await api.canvasWrite(path, doc, force ? null : modified);
         if (r.conflict) {
           // Changed on disk by another app: the app's version wins, no banner and no reload.
@@ -139,6 +144,7 @@ export const useCanvas = create<CanvasState>((set, get) => {
       // Unsaved edits win, as in save(): the disk change (often the echo of our own autosave) is neither reloaded nor announced,
       // because a banner appearing mid-drag shifted the whole board.
       if (dirty) return;
+      if (Date.now() - wroteAt < WRITE_ECHO_MS) return;
       try {
         const r = await api.canvasRead(path);
         set({

@@ -32,6 +32,7 @@ describe("a canvas whose file disappears", () => {
   });
 
   it("does the same when a reload finds it gone", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 10_000); // past the echo window of an earlier save
     useCanvas.setState({ dirty: false });
     api.canvasRead.mockRejectedValue(new Error(GONE));
     await useCanvas.getState().reload();

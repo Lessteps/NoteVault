@@ -172,12 +172,21 @@ describe("save", () => {
 
 describe("reload", () => {
   it("re-reads a clean canvas", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 10_000); // past the echo window of an earlier save
     useCanvas.setState({ path: "mapa.canvas", modified: 1, dirty: false, conflict: true });
     apiMock.canvasRead.mockResolvedValueOnce(read({ doc: doc(5), modified: 3 }));
     await useCanvas.getState().reload();
     expect(useCanvas.getState().doc).toEqual(doc(5));
     expect(useCanvas.getState().modified).toBe(3);
     expect(useCanvas.getState().conflict).toBe(false);
+  });
+  it("ignores the watcher echo of its own save", async () => {
+    useCanvas.setState({ path: "mapa.canvas", modified: 1, dirty: true, doc: doc(1) });
+    apiMock.canvasWrite.mockResolvedValueOnce({ ok: true, modified: 2 });
+    await useCanvas.getState().save();
+    apiMock.canvasRead.mockClear();
+    await useCanvas.getState().reload();
+    expect(apiMock.canvasRead).not.toHaveBeenCalled();
   });
   it("a dirty canvas keeps its edits: no reload and no conflict banner", async () => {
     useCanvas.setState({ path: "mapa.canvas", dirty: true, doc: doc(1) });

@@ -172,7 +172,7 @@ function TabStrip() {
               },
             ])}
             className={cn(
-              "group relative flex h-full max-w-[176px] flex-none cursor-pointer items-center gap-1.5 border-r border-line px-2.5 text-[12px]",
+              "group relative flex h-full w-[148px] flex-none cursor-pointer items-center gap-1.5 border-r border-line px-2.5 text-[12px]",
               dragging === tab.tabId && "opacity-50",
               dropAt?.tabId === tab.tabId && (dropAt.side === "left"
                 ? "shadow-[inset_2px_0_0_var(--nv-accent)]"
@@ -183,7 +183,7 @@ function TabStrip() {
             )}
           >
             <TabIcon tab={tab} notes={notes as Record<string, { kind: string }>} />
-            <span className="truncate">{label}</span>
+            <span className="min-w-0 flex-1 truncate">{label}</span>
             {isPinned ? (
               <Pin size={11} className="flex-none text-accent-text" />
             ) : (

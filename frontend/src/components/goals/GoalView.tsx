@@ -1,6 +1,6 @@
 // An opened goal: header, tiles and the Submetas / Hoy / Historial / Notas tabs.
 
-import { ChevronLeft, List, Pencil, Plus, Trash2, LayoutGrid } from "lucide-react";
+import { ChevronLeft, List, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { shortDate } from "../../lib/tasks";
@@ -11,11 +11,15 @@ import { Chip, GhostButton, input, Label, PrimaryButton, PRIORITY_COLOURS, PRIOR
 import { LinkedNotes } from "../common/LinkedNotes";
 import { StatTile } from "../common/StatTile";
 import { cn, confirmAction } from "../ui";
+import { GoalSummary } from "./GoalSummary";
+import { ItemEditor } from "./ItemEditor";
+import { SubmetaList } from "./SubmetaList";
 import { SubmetaCards, SubmetaTree } from "./Submetas";
+import { ViewToggle } from "../common/SubmetaTable";
 import { SubmetaDetail } from "./SubmetaDetail";
 import { TodayList } from "./TodayList";
 
-const TABS: Array<[GoalTab, string]> = [["submetas", "Submetas"], ["hoy", "Hoy"], ["historial", "Historial"], ["notas", "Notas"]];
+const TABS: Array<[GoalTab, string]> = [["resumen", "Resumen"], ["submetas", "Submetas"], ["hoy", "Hoy"], ["historial", "Historial"], ["notas", "Notas"]];
 
 function History() {
   const d = useGoals((s) => s.detail)!;
@@ -125,6 +129,7 @@ export function GoalView() {
   const setChecklistFor = useGoals((s) => s.setChecklistFor);
   const refresh = useGoals((s) => s.refreshAfterWrite);
   const openItem = useGoals((s) => s.openItem);
+  const itemId = useGoals((s) => s.itemId);
   const areas = useGoals((s) => s.areas);
   const toast = useApp((s) => s.toast);
   const [name, setName] = useState("");
@@ -134,6 +139,7 @@ export function GoalView() {
   const g = detail.goal;
   const s = detail.stats;
   const area = areas.find((a) => a.id === g.area);
+  const editing = itemId ? detail.items.find((i) => i.id === itemId) : undefined;
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
@@ -188,13 +194,12 @@ export function GoalView() {
         ))}
         {tab === "submetas" && !submetaId && (
           <span className="ml-auto flex items-center gap-1.5 pb-1">
-            <GhostButton onClick={() => setSubView("tarjetas")} className={cn(subView === "tarjetas" && "bg-accent-soft text-text")}><LayoutGrid size={13} /> Tarjetas</GhostButton>
+            <ViewToggle value={subView === "tarjetas" ? "tarjetas" : "lista"} onChange={(v) => setSubView(v)} />
             <GhostButton onClick={() => setSubView("arbol")} className={cn(subView === "arbol" && "bg-accent-soft text-text")}><List size={13} /> Árbol</GhostButton>
             <GhostButton onClick={() => setChecklistFor("")}>📋 + Con checklist</GhostButton>
             <PrimaryButton onClick={async () => {
               try {
                 const it = await api.goalItemCreate(g.id, "Nueva submeta");
-                setSubView("arbol");
                 await refresh();
                 openItem(it.id);
               } catch (e) {
@@ -205,10 +210,12 @@ export function GoalView() {
         )}
       </div>
       <div className="py-4">
-        {tab === "submetas" ? (submetaId ? <SubmetaDetail /> : subView === "tarjetas" ? <SubmetaCards /> : <SubmetaTree />)
+        {tab === "resumen" ? <GoalSummary />
+          : tab === "submetas" ? (submetaId ? <SubmetaDetail /> : subView === "tarjetas" ? <SubmetaCards /> : subView === "lista" ? <SubmetaList /> : <SubmetaTree />)
           : tab === "hoy" ? <TodayList goalId={g.id} title={false} />
             : tab === "historial" ? <History /> : <Notes />}
       </div>
+      {itemId && editing && <ItemEditor item={editing} onClose={() => openItem(null)} />}
     </div>
   );
 }

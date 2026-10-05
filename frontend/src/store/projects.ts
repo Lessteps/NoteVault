@@ -5,7 +5,7 @@ import { api } from "../lib/bridge";
 import type { Area, Issue, ProjectCard, ProjectDetail, ProjectsMeta } from "../lib/types";
 import { useApp } from "./app";
 
-export type ProjectTab = "resumen" | "tablero" | "lista" | "calendario" | "notas";
+export type ProjectTab = "resumen" | "submetas" | "tablero" | "lista" | "calendario" | "notas";
 
 interface ProjectsState {
   cards: ProjectCard[];
@@ -16,6 +16,8 @@ interface ProjectsState {
   detail: ProjectDetail | null;
   tab: ProjectTab;
   issueId: string | null;
+  /** The submeta whose own statistics page is open (Submetas tab). */
+  submetaId: string | null;
   /** Dialogs: project editor ("" = new) and the create-issue form. */
   editing: string | null;
   creating: { status?: string; parent?: string; type?: string } | null;
@@ -26,6 +28,7 @@ interface ProjectsState {
   reload: () => Promise<void>;
   setTab: (t: ProjectTab) => void;
   openIssue: (xid: string | null) => void;
+  openSubmeta: (xid: string | null) => void;
   setEditing: (pid: string | null) => void;
   setCreating: (c: ProjectsState["creating"]) => void;
   setGoalFilter: (id: string) => void;
@@ -46,6 +49,7 @@ export const useProjects = create<ProjectsState>((set, get) => ({
   detail: null,
   tab: "resumen",
   issueId: null,
+  submetaId: null,
   editing: null,
   creating: null,
   goalFilter: "",
@@ -62,11 +66,11 @@ export const useProjects = create<ProjectsState>((set, get) => ({
 
   open: async (pid) => {
     if (!pid) {
-      set({ openId: null, detail: null, issueId: null });
+      set({ openId: null, detail: null, issueId: null, submetaId: null });
       void get().loadAll();
       return;
     }
-    if (pid !== get().openId) set({ tab: "resumen", issueId: null, goalFilter: "", detail: null });
+    if (pid !== get().openId) set({ tab: "resumen", issueId: null, submetaId: null, goalFilter: "", detail: null });
     set({ openId: pid });
     await get().reload();
   },
@@ -87,8 +91,9 @@ export const useProjects = create<ProjectsState>((set, get) => ({
     }
   },
 
-  setTab: (tab) => set({ tab }),
+  setTab: (tab) => set({ tab, submetaId: null }),
   openIssue: (issueId) => set({ issueId }),
+  openSubmeta: (submetaId) => set({ submetaId, tab: "submetas" }),
   setEditing: (editing) => set({ editing }),
   setCreating: (creating) => set({ creating }),
   setGoalFilter: (goalFilter) => set({ goalFilter }),

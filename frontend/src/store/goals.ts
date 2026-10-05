@@ -6,7 +6,8 @@ import type { Area, GoalCard, GoalDetail, GoalsMeta, GoalsSidebar } from "../lib
 import { useApp } from "./app";
 
 export type GoalsView = "tablero" | "hoy";
-export type GoalTab = "submetas" | "hoy" | "historial" | "notas";
+export type GoalTab = "resumen" | "submetas" | "hoy" | "historial" | "notas";
+export type SubView = "tarjetas" | "lista" | "arbol";
 
 interface GoalsState {
   view: GoalsView;
@@ -20,8 +21,8 @@ interface GoalsState {
   openId: string | null;
   detail: GoalDetail | null;
   tab: GoalTab;
-  subView: "tarjetas" | "arbol";
-  itemId: string | null;     // item editor (tree)
+  subView: SubView;
+  itemId: string | null;     // the sub-goal peek (all its properties)
   submetaId: string | null;  // full sub-goal view
   editing: string | null;    // goal dialog ("" = new)
   areaEditing: string | null;
@@ -35,7 +36,7 @@ interface GoalsState {
   open: (gid: string | null) => Promise<void>;
   reload: () => Promise<void>;
   setTab: (t: GoalTab) => void;
-  setSubView: (v: "tarjetas" | "arbol") => void;
+  setSubView: (v: SubView) => void;
   openItem: (id: string | null) => void;
   openSubmeta: (id: string | null) => void;
   setEditing: (id: string | null) => void;
@@ -59,8 +60,8 @@ export const useGoals = create<GoalsState>((set, get) => ({
   loaded: false,
   openId: null,
   detail: null,
-  tab: "submetas",
-  subView: "tarjetas",
+  tab: "resumen",
+  subView: "lista",
   itemId: null,
   submetaId: null,
   editing: null,
@@ -95,7 +96,7 @@ export const useGoals = create<GoalsState>((set, get) => ({
       void get().loadAll();
       return;
     }
-    if (gid !== get().openId) set({ tab: "submetas", itemId: null, submetaId: null, detail: null });
+    if (gid !== get().openId) set({ tab: "resumen", itemId: null, submetaId: null, detail: null });
     set({ openId: gid, view: "tablero" });
     await get().reload();
   },

@@ -18,9 +18,10 @@ import { Kanban } from "./Kanban";
 import { ProjectCalendar } from "./ProjectCalendar";
 import { ProjectNotes } from "./ProjectNotes";
 import { Resumen } from "./Resumen";
+import { SubmetasPanel } from "./SubmetasPanel";
 
 const TABS: Array<[ProjectTab, string]> = [
-  ["resumen", "Resumen"], ["tablero", "Tablero"], ["lista", "Lista"], ["calendario", "Calendario"], ["notas", "Notas"],
+  ["resumen", "Resumen"], ["submetas", "Submetas"], ["tablero", "Tablero"], ["lista", "Lista"], ["calendario", "Calendario"], ["notas", "Notas"],
 ];
 
 export function ProjectView() {
@@ -96,7 +97,7 @@ export function ProjectView() {
             ))}
           </nav>
         </div>
-        {tab === "resumen" ? <Resumen /> : tab === "tablero" ? <Kanban /> : tab === "lista" ? <IssueList />
+        {tab === "resumen" ? <Resumen /> : tab === "submetas" ? <SubmetasPanel /> : tab === "tablero" ? <Kanban /> : tab === "lista" ? <IssueList />
           : tab === "calendario" ? <ProjectCalendar /> : <ProjectNotes />}
       </div>
       {/* <IssueDetail /> — the old right panel, replaced by the centred peek. */}

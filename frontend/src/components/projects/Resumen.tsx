@@ -1,22 +1,17 @@
 // Resumen: stat tiles, charts and one row per Submeta.
 
-import { Plus } from "lucide-react";
 import { shortDate } from "../../lib/tasks";
-import type { Issue } from "../../lib/types";
-import { descendants, issueById, useProjects } from "../../store/projects";
+import { issueById, useProjects } from "../../store/projects";
 import { BarList, BlockProgress, Columns, Donut, LineChart } from "../common/charts";
 import { GhostButton, PRIORITY_COLOURS, PRIORITY_NAMES } from "../common/forms";
 import { Panel, StatTile } from "../common/StatTile";
-import { cn } from "../ui";
 
 const STATUS_COLOURS = ["#8b8b96", "#2383e2", "#a78bfa", "#ff9632", "#38bdf8", "#facc15"];
 
 export function Resumen() {
   const detail = useProjects((s) => s.detail)!;
-  const setCreating = useProjects((s) => s.setCreating);
-  const openIssue = useProjects((s) => s.openIssue);
+  const openSubmeta = useProjects((s) => s.openSubmeta);
   const setTab = useProjects((s) => s.setTab);
-  const setGoal = useProjects((s) => s.setGoalFilter);
   const { project: p, stats } = detail;
   const s = stats.summary;
 
@@ -36,39 +31,23 @@ export function Resumen() {
       </div>
 
       <Panel title="◆  Metas y Submetas del Proyecto"
-        action={<GhostButton onClick={() => setCreating({ type: "Submeta" })}><Plus size={13} /> Nueva Submeta</GhostButton>}>
+        action={<GhostButton onClick={() => setTab("submetas")}>Abrir panel de submetas ›</GhostButton>}>
         {!stats.submetas.length && <p className="text-[12.5px] text-faint">Sin submetas. Una submeta agrupa las tareas que llevan a un objetivo.</p>}
-        <div className="space-y-3">
+        <div className="space-y-2">
           {stats.submetas.map((g) => {
             const goal = issueById(detail, g.id);
             if (!goal) return null;
-            const kids = [...descendants(detail, g.id)].map((id) => issueById(detail, id)).filter((x): x is Issue => Boolean(x) && x!.parent === g.id);
             return (
-              <div key={g.id} className="rounded-lg border border-line p-3">
-                <div className="flex items-center gap-2">
-                  <span style={{ color: goal.type_colour }}>{goal.icon}</span>
-                  <button type="button" onClick={() => openIssue(goal.id)} className="min-w-0 truncate text-[13.5px] font-medium text-text hover:underline">
-                    <span className="mr-1.5 font-mono text-[11px] text-faint">{goal.key}</span>{goal.title}
-                  </button>
-                  {goal.due && <span className="text-[11.5px] text-faint">⏰ {shortDate(goal.due)}</span>}
-                  <span className="ml-auto flex items-center gap-2">
-                    <BlockProgress value={g.progress} colour={p.colour} />
-                    <span className="font-mono text-[11px] text-dim">{g.done}/{g.total}</span>
-                    <GhostButton onClick={() => setCreating({ parent: g.id, type: "Tarea" })} className="py-0.5">+ Tarea</GhostButton>
-                    <GhostButton onClick={() => { setGoal(g.id); setTab("tablero"); }} className="py-0.5">Ver en tablero</GhostButton>
-                  </span>
-                </div>
-                <ul className="mt-2 space-y-0.5 pl-6">
-                  {kids.map((k) => (
-                    <li key={k.id}>
-                      <button type="button" onClick={() => openIssue(k.id)} className={cn("flex w-full items-center gap-2 text-left text-[12.5px]", k.done ? "text-faint line-through" : "text-dim hover:text-text")}>
-                        <span>{k.done ? "✓" : "○"}</span><span className="font-mono text-[11px] text-faint">{k.key}</span><span className="truncate">{k.title}</span>
-                        <span className="ml-auto text-[11px] text-faint">{k.status}</span>
-                      </button>
-                    </li>
-                  ))}
-                  {!kids.length && <li className="text-[11.5px] text-faint">↳ Sin tareas asignadas aún. Usa «+ Tarea» para desglosarla.</li>}
-                </ul>
+              <div key={g.id} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2">
+                <span style={{ color: goal.type_colour }}>{goal.icon}</span>
+                <button type="button" onClick={() => openSubmeta(goal.id)} className="min-w-0 truncate text-[13.5px] font-medium text-text hover:underline">
+                  <span className="mr-1.5 font-mono text-[11px] text-faint">{goal.key}</span>{goal.title}
+                </button>
+                {goal.due && <span className="text-[11.5px] text-faint">⏰ {shortDate(goal.due)}</span>}
+                <span className="ml-auto flex items-center gap-2">
+                  <BlockProgress value={g.progress} colour={p.colour} />
+                  <span className="font-mono text-[11px] text-dim">{g.done}/{g.total}</span>
+                </span>
               </div>
             );
           })}

@@ -36,7 +36,7 @@ export function MentorModule() {
           { id: "chat", label: "Conversación", hint: "Crea metas con el Mentor", icon: <MessagesSquare /> },
         ]}
       />
-      <main className="flex min-w-0 flex-1 flex-col bg-surface" aria-label={`Mentor: ${view}`}>
+      <main className="@container flex min-w-0 flex-1 flex-col bg-surface" aria-label={`Mentor: ${view}`}>
         {view === "hoy" ? (
           <MentorToday />
         ) : view === "metas" ? (

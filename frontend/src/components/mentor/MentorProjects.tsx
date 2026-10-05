@@ -22,7 +22,7 @@ export function MentorProjects() {
         <p className="rounded-xl border border-dashed border-line p-4 text-center text-[12.5px] text-faint">No hay proyectos en curso ni planeados.</p>
       )}
       {panels && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 @3xl:grid-cols-2">
           {panels.projects.map((p) => (
             <section key={p.id} className="rounded-xl border border-line bg-card p-4" data-testid="project-card" aria-label={`Proyecto ${p.name}`}>
               <div className="flex flex-wrap items-center gap-2">

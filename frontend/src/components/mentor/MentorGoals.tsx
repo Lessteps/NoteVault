@@ -49,7 +49,7 @@ export function MentorGoals() {
       )}
 
       {panels && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 @3xl:grid-cols-2">
           {panels.goals.map(({ card, items }) => (
             <GoalPreview key={card.id} card={card} items={items} area={areaName(card.area)} fresh={card.id === createdId} />
           ))}

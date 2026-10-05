@@ -38,7 +38,7 @@ export function MentorStudy() {
           <p className="text-[13px] text-dim" data-testid="study-summary">
             {s.topics.total} temas: {s.topics.inProgress} a medias, {s.topics.untreated} sin tratar, {s.topics.complete} completos.
           </p>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 @3xl:grid-cols-2">
             <Panel title="A medias">
               <TopicList rows={s.topics.inProgressList} empty="Ningún tema a medias." />
             </Panel>

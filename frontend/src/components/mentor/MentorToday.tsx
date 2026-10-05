@@ -197,7 +197,7 @@ export function MentorToday() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-surface text-text">
-      <div className="mx-auto grid w-full max-w-[1100px] gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mx-auto grid w-full max-w-[1100px] gap-5 p-5 @3xl:grid-cols-[minmax(0,1fr)_320px]">
         <main className="min-w-0 space-y-4" aria-label="Plan de hoy">
           <header>
             <div className="flex items-center gap-2">

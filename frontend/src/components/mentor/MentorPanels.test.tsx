@@ -86,6 +86,28 @@ const panels = (over: Partial<Extract<MentorPanels, { loading: false }>> = {}): 
       untreatedList: [{ folder: "Mat/Límites", title: "Límites", subject: "mathematics", completenessPct: 0, lastAttemptDays: null, pendingSkills: [] }],
       recentList: [],
     },
+    areas: [
+      {
+        id: "Programación", name: "Programación", icon: "💻", colour: "#3f51b5", lifeArea: "programacion",
+        total: 3, inProgress: 1, untreated: 1, complete: 1, examPending: 1, avgPct: 47, srsDue: 2, errors: 1,
+        next: { kind: "continue", title: "1 Fundamentos", folder: FUND },
+        groups: [
+          {
+            key: "Python", title: "Python",
+            topics: [
+              { folder: FUND, title: "1 Fundamentos", group: "Python", status: "in_progress", examPending: false, completenessPct: 40, lastAttemptDays: 9, weakSkills: ["debug"] },
+              { folder: "Programación/Python/2 Funciones", title: "2 Funciones", group: "Python", status: "in_progress", examPending: true, completenessPct: 90, lastAttemptDays: 0, weakSkills: [] },
+              { folder: "Programación/Python/3 Clases", title: "3 Clases", group: "Python", status: "untreated", examPending: false, completenessPct: 0, lastAttemptDays: null, weakSkills: [] },
+            ],
+          },
+        ],
+      },
+      {
+        id: "Matemáticas", name: "Matemáticas", icon: "📚", colour: "#2383e2", lifeArea: "",
+        total: 1, inProgress: 0, untreated: 0, complete: 1, examPending: 0, avgPct: 100, srsDue: 0, errors: 0, next: null,
+        groups: [{ key: "", title: "General", topics: [{ folder: "Matemáticas/Límites", title: "Límites", group: "", status: "complete", examPending: false, completenessPct: 100, lastAttemptDays: 3, weakSkills: [] }] }],
+      },
+    ],
     srs: { dueTotal: 3, bySubject: [{ subject: "mathematics", count: 3, oldestOverdueDays: 4, lapses: 0 }] },
     errors: { unresolved: 1, repeaters: [{ id: "e1", subject: "mathematics", topic: "Límites", skill: "solve", category: "calc", repeatCount: 3, lastSeenDays: 2 }] },
   },
@@ -238,18 +260,93 @@ describe("Mentor: espacio de paneles", () => {
     expect(useApp.getState().module).toBe("proyectos");
   });
 
-  it("Notas y estudio: texto compacto, sin anillos, con 'ver tema'", async () => {
-    const ensure = vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ path: "" } as never);
-    await mount();
-    await go("Notas y estudio");
-    expect(host.querySelector("[data-testid=study-summary]")!.textContent).toContain("5 temas: 2 a medias, 1 sin tratar, 2 completos");
-    expect(host.textContent).toContain("pendiente: debug");
-    expect(host.textContent).toContain("último intento hace 9 d");
-    expect(host.textContent).toContain("mathematics: 3 (el más antiguo, 4 d de retraso)");
-    expect(host.textContent).toContain("repetido 3 veces");
-    expect(host.querySelector("svg circle[stroke-dasharray]")).toBeNull();
-    await click(button("ver tema", host.querySelectorAll("[data-testid=topic-row]")[0]!));
-    expect(ensure).toHaveBeenCalledWith(FUND);
+  describe("Notas y estudio", () => {
+    const enter = async () => { await mount(); await go("Notas y estudio"); };
+    const cards = () => [...host.querySelectorAll("[data-testid=area-card]")];
+    const type = async (el: HTMLInputElement, value: string) => {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    };
+
+    it("áreas como tarjetas colapsadas: color, chips, % medio, alertas y siguiente paso; sin temas hasta desplegar", async () => {
+      await enter();
+      expect(host.querySelector("[data-testid=study-summary]")!.textContent).toContain("5 temas");
+      expect(host.querySelector("[data-testid=study-summary]")!.textContent).toContain("3 repasos vencidos");
+      expect(cards()).toHaveLength(2);
+      const prog = cards()[0] as HTMLElement;
+      expect(prog.style.borderTop).toContain("3px solid");
+      expect(prog.textContent).toContain("💻");
+      expect(prog.textContent).toContain("Programación");
+      expect(prog.textContent).toContain("1 a medias");
+      expect(prog.textContent).toContain("1 sin tratar");
+      expect(prog.textContent).toContain("1 examen pendiente");
+      expect(prog.textContent).toContain("2 repasos vencidos");
+      expect(prog.textContent).toContain("1 error");
+      expect(prog.textContent).toContain("47 %");
+      expect(prog.textContent).toContain("Continúa: 1 Fundamentos");
+      expect(host.querySelectorAll("[data-testid=topic-row]")).toHaveLength(0);
+      expect(host.querySelector("svg circle[stroke-dasharray]")).toBeNull();
+    });
+
+    it("al desplegar muestra los grupos y los temas con estado, skills débiles y 'ver tema'; es de solo lectura", async () => {
+      const ensure = vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ path: "" } as never);
+      await enter();
+      await click(cards()[0]!.querySelector("button[aria-expanded]")!);
+      const rows = cards()[0]!.querySelectorAll("[data-testid=topic-row]");
+      expect(rows).toHaveLength(3);
+      expect(cards()[0]!.textContent).toContain("Python");
+      expect(rows[0]!.textContent).toContain("A medias");
+      expect(rows[0]!.textContent).toContain("debug");
+      expect(rows[0]!.textContent).toContain("último intento hace 9 d");
+      expect(rows[1]!.textContent).toContain("Examen pendiente");
+      expect(rows[1]!.textContent).toContain("último intento hoy");
+      expect(rows[2]!.textContent).toContain("Sin tratar");
+      expect(host.querySelectorAll("textarea, select")).toHaveLength(0);
+      expect(host.querySelectorAll("input")).toHaveLength(1); // solo el buscador
+      await click(button("ver tema", rows[0]!));
+      expect(ensure).toHaveBeenCalledWith(FUND);
+      await click(button("Abrir en Estudio", cards()[0]!));
+      expect(ensure).toHaveBeenCalledWith("Programación");
+    });
+
+    it("Expandir todas / Contraer todas", async () => {
+      await enter();
+      await click(button("Expandir todas"));
+      expect(host.querySelectorAll("[data-testid=topic-row]")).toHaveLength(4);
+      await click(button("Contraer todas"));
+      expect(host.querySelectorAll("[data-testid=topic-row]")).toHaveLength(0);
+    });
+
+    it("filtra por texto y por estado y desaparecen las áreas sin coincidencias", async () => {
+      await enter();
+      await type(host.querySelector("input[type=search]")!, "limites");
+      expect(cards()).toHaveLength(1);
+      expect(cards()[0]!.textContent).toContain("Matemáticas");
+      await type(host.querySelector("input[type=search]")!, "zzz");
+      expect(host.querySelector("[data-testid=study-no-match]")).toBeTruthy();
+      await type(host.querySelector("input[type=search]")!, "");
+
+      await click(button("Sin tratar", host.querySelector("[role=group]")!));
+      expect(cards()).toHaveLength(1);
+      await click(button("Expandir todas"));
+      expect([...host.querySelectorAll("[data-testid=topic-row]")].map((r) => r.textContent)).toEqual([expect.stringContaining("3 Clases")]);
+
+      await click(button("Examen pendiente", host.querySelector("[role=group]")!));
+      expect([...host.querySelectorAll("[data-testid=topic-row]")].map((r) => r.textContent)).toEqual([expect.stringContaining("2 Funciones")]);
+
+      await click(button("Completos", host.querySelector("[role=group]")!));
+      expect(cards()[0]!.textContent).toContain("Matemáticas");
+    });
+
+    it("estado vacío cuidado cuando no hay temas", async () => {
+      const p = panels();
+      vi.mocked(api.mentorPanels).mockResolvedValue({ ...p, study: { ...(p as any).study, areas: [], topics: { ...(p as any).study.topics, total: 0 } } } as MentorPanels);
+      await enter();
+      expect(host.querySelector("[data-testid=study-empty]")).toBeTruthy();
+      expect(host.querySelector("input")).toBeNull();
+    });
   });
 
   it("avisa de la vault fría y reintenta al cargar los paneles", async () => {

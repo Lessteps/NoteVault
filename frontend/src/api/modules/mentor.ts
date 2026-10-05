@@ -26,7 +26,7 @@ import {
   scheduleGoal,
   type ChatTurn,
 } from "../../core/mentor/goalDraft.js";
-import { topicsPanel } from "../../core/mentor/panels.js";
+import { studyAreas, topicsPanel } from "../../core/mentor/panels.js";
 import { sectionData, type StudyPendingData } from "../../core/mentor/brief.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
@@ -505,13 +505,20 @@ export function mentorApi(app: AppState, send?: SendFn) {
         });
       const brief = buildStudentBrief(briefContext(app, log()));
       const pending = sectionData<StudyPendingData>(brief, "study_pending");
+      const snaps = topicSnaps(app);
       return {
         loading: false as const,
         goals,
         areas: app.mgrs().areas.areas().map((a) => ({ id: a.id, name: a.name, icon: a.icon, colour: a.colour })),
         projects,
         study: {
-          topics: topicsPanel(topicSnaps(app)),
+          topics: topicsPanel(snaps),
+          areas: studyAreas(snaps, {
+            lifeAreas: app.mgrs().areas.areas().map((a) => ({ id: a.id, name: a.name, icon: a.icon, colour: a.colour })),
+            srsBySubject: pending?.srs.bySubject ?? [],
+            errorsBySubject: pending?.errors.bySubject ?? {},
+            queue: pending?.queue ?? [],
+          }),
           srs: pending?.srs ?? { dueTotal: 0, bySubject: [] },
           errors: pending ? { unresolved: pending.errors.unresolved, repeaters: pending.errors.repeaters.slice(0, 5) } : { unresolved: 0, repeaters: [] },
         },

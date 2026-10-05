@@ -1367,6 +1367,17 @@ export interface MentorChatMeta { id: string; title: string; createdAt: string; 
 export interface MentorTopicRow {
   folder: string; title: string; subject: string; completenessPct: number; lastAttemptDays: number | null; pendingSkills: string[];
 }
+export interface MentorAreaTopic {
+  folder: string; title: string; group: string; status: "complete" | "in_progress" | "untreated"; examPending: boolean;
+  completenessPct: number; lastAttemptDays: number | null; weakSkills: string[];
+}
+export interface MentorStudyArea {
+  id: string; name: string; icon: string; colour: string; lifeArea: string;
+  total: number; inProgress: number; untreated: number; complete: number; examPending: number; avgPct: number;
+  srsDue: number; errors: number;
+  next: { kind: string; title: string; folder?: string } | null;
+  groups: Array<{ key: string; title: string; topics: MentorAreaTopic[] }>;
+}
 export type MentorPanels =
   | { loading: true }
   | {
@@ -1376,6 +1387,7 @@ export type MentorPanels =
       projects: MentorProjectCard[];
       study: {
         topics: { total: number; inProgress: number; untreated: number; complete: number; inProgressList: MentorTopicRow[]; untreatedList: MentorTopicRow[]; recentList: MentorTopicRow[] };
+        areas: MentorStudyArea[];
         srs: { dueTotal: number; bySubject: Array<{ subject: string; count: number; oldestOverdueDays: number; lapses: number }> };
         errors: { unresolved: number; repeaters: Array<{ id: string; subject: string; topic: string; skill: string; category: string; repeatCount: number; lastSeenDays: number | null }> };
       };

@@ -241,6 +241,9 @@ describe("mentor_panels", () => {
     expect(p.goals[0].items[0].topic_progress.links[0].title).toBe("1 Fundamentos");
     expect(p.study.topics.total).toBe(2);
     expect(p.study.topics.untreated).toBe(2);
+    expect(p.study.areas).toHaveLength(1);
+    expect(p.study.areas[0]).toMatchObject({ id: "Programación", total: 2, untreated: 2, inProgress: 0, complete: 0, avgPct: 0, srsDue: 0, errors: 0 });
+    expect(p.study.areas[0].groups[0].topics.map((t: any) => t.status)).toEqual(["untreated", "untreated"]);
     expect(Array.isArray(p.projects)).toBe(true);
   });
 });

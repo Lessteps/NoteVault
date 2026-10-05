@@ -10,7 +10,7 @@ import { BlockProgress } from "../common/charts";
 import { Chip, GhostButton } from "../common/forms";
 import { cn } from "../ui";
 import { openTopic } from "./openTopic";
-import { Disclosure, LoadState, PanelPage, useMentorPanels } from "./parts";
+import { AreaRow, CARD_CLASS, Disclosure, LoadState, PanelPage, useMentorPanels } from "./parts";
 
 type StatusFilter = "all" | "in_progress" | "untreated" | "exam" | "complete";
 
@@ -138,11 +138,13 @@ export function MentorStudy() {
               Ningún tema coincide con el filtro.
             </p>
           )}
-          <div className="space-y-3">
-            {visible.map((v) => (
-              <AreaAccordion key={v.area.id} area={v.area} groups={v.groups} filtering={filtering} open={open.has(v.area.id)} onToggle={() => toggle(v.area.id)} />
-            ))}
-          </div>
+          {visible.length > 0 && (
+            <AreaRow title="📚 Áreas de estudio" colour="var(--nv-dim)" count={visible.length} noun={["área", "áreas"]}>
+              {visible.map((v) => (
+                <AreaAccordion key={v.area.id} area={v.area} groups={v.groups} filtering={filtering} open={open.has(v.area.id)} onToggle={() => toggle(v.area.id)} />
+              ))}
+            </AreaRow>
+          )}
         </>
       )}
     </PanelPage>
@@ -164,7 +166,7 @@ export function AreaAccordion({
 }) {
   const nextText = a.next ? `${a.next.kind === "continue" ? "Continúa" : "Recomendado"}: ${a.next.title}` : "";
   return (
-    <section className="rounded-xl border border-line bg-card p-4" style={{ borderTop: `3px solid ${a.colour}` }} data-testid="area-card" aria-label={`Área ${a.name}`}>
+    <section className={CARD_CLASS} style={{ borderTop: `3px solid ${a.colour}` }} data-testid="area-card" aria-label={`Área ${a.name}`}>
       <Disclosure open={open} onToggle={onToggle} label={`${open ? "Contraer" : "Expandir"} ${a.name}`}>
         <div className="flex items-start gap-2.5">
           <span className="text-[20px] leading-none">{a.icon}</span>

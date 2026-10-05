@@ -349,6 +349,68 @@ describe("Mentor: espacio de paneles", () => {
     });
   });
 
+  describe("filas horizontales de tarjetas compactas por área", () => {
+    const rows = () => [...host.querySelectorAll("[data-testid=card-row]")];
+
+    it("una sola área = una sola fila horizontal con sus tarjetas", async () => {
+      await mount();
+      await go("Metas");
+      expect(rows()).toHaveLength(1);
+      expect(rows()[0]!.querySelectorAll("[data-testid=goal-card]")).toHaveLength(1);
+      expect(rows()[0]!.querySelector("[role=group]")!.className).toContain("overflow-x-auto");
+      expect(rows()[0]!.querySelector("[data-testid=goal-card]")!.className).toContain("w-[300px]");
+    });
+
+    it("áreas distintas = una fila por área, cada una con su cabecera y su recuento; expandir no ensancha ni toca a las demás", async () => {
+      const p = panels() as Extract<MentorPanels, { loading: false }>;
+      const g0 = p.goals[0]!;
+      vi.mocked(api.mentorPanels).mockResolvedValue({
+        ...p,
+        areas: [...p.areas, { id: "salud", name: "Salud", icon: "💪", colour: "#33b679" }],
+        goals: [g0, { ...g0, card: card({ id: "g2", name: "Correr 10 km", area: "salud" }), items: [] }, { ...g0, card: card({ id: "g3", name: "Leer más", area: "estudio" }), items: [] }],
+      } as MentorPanels);
+      await mount();
+      await go("Metas");
+      expect(rows()).toHaveLength(2);
+      expect(rows()[0]!.querySelectorAll("[data-testid=goal-card]")).toHaveLength(2);
+      expect(rows()[1]!.querySelectorAll("[data-testid=goal-card]")).toHaveLength(1);
+      expect([...host.querySelectorAll("h2")].find((h) => h.textContent?.includes("Salud"))!.textContent).toContain("1 meta");
+      const first = rows()[0]!.querySelectorAll("[data-testid=goal-card]")[0]!;
+      await click(first.querySelector("button[aria-expanded]")!);
+      expect(first.querySelectorAll("[data-testid=goal-item]")).toHaveLength(2);
+      expect(rows()[0]!.querySelectorAll("[data-testid=goal-card]")[1]!.querySelectorAll("[data-testid=goal-item]")).toHaveLength(0);
+      expect(first.className).toContain("w-[300px]");
+      expect(host.querySelectorAll("input, textarea, select")).toHaveLength(0);
+    });
+
+    it("Proyectos agrupa por área y Notas y estudio pone las materias en una fila", async () => {
+      const p = panels() as Extract<MentorPanels, { loading: false }>;
+      vi.mocked(api.mentorPanels).mockResolvedValue({
+        ...p,
+        areas: [...p.areas, { id: "salud", name: "Salud", icon: "💪", colour: "#33b679" }],
+        projects: [{ ...project(), area: "estudio" }, { ...project(), id: "p2", key: "GYM", name: "Gimnasio", area: "salud" }],
+      } as MentorPanels);
+      await mount();
+      await go("Proyectos");
+      expect(rows()).toHaveLength(2);
+      await go("Notas");
+      expect(rows()).toHaveLength(1);
+      expect(rows()[0]!.querySelectorAll("[data-testid=area-card]")).toHaveLength(2);
+    });
+
+    it("el borrador sigue visible con su calendario desplegable y sus acciones", async () => {
+      useMentor.setState({ turns: [{ id: "t1", role: "assistant", text: "ok", draft: draft() } as unknown as MentorChatTurn], pending: "t1", chatLoaded: true });
+      await mount();
+      await go("Metas");
+      const d = host.querySelector("[data-testid=goal-draft]")!;
+      expect(d.querySelectorAll("[data-testid=draft-item]")).toHaveLength(0);
+      expect(button("Crear meta", d)).toBeTruthy();
+      expect(button("Descartar", d)).toBeTruthy();
+      await click(button("Calendario por semanas", d));
+      expect(d.querySelectorAll("[data-testid=draft-item]")).toHaveLength(1);
+    });
+  });
+
   it("avisa de la vault fría y reintenta al cargar los paneles", async () => {
     vi.useFakeTimers();
     try {

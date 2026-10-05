@@ -4,7 +4,7 @@
 // Aquí no se edita nada: las metas solo se editan en el módulo Metas (botón "Abrir en Metas"). Lo único
 // que escribe es "Crear meta" del borrador, que ejecuta código determinista (`mentor_goal_create`).
 
-import { Check, CheckCircle2, ChevronsUpDown, Circle, CircleAlert, ExternalLink, MessageSquarePlus, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, ChevronRight, ChevronsUpDown, Circle, CircleAlert, ExternalLink, MessageSquarePlus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { shortDate } from "../../lib/tasks";
 import type { GoalCard, MentorGoalDraft, MentorGoalItemSlim } from "../../lib/types";
@@ -17,7 +17,7 @@ import { dateLine } from "../goals/GoalsBoard";
 import { catColour } from "../goals/Submetas";
 import { cn } from "../ui";
 import { openTopic } from "./openTopic";
-import { dayText, Disclosure, hm, LoadState, PanelPage, useMentorPanels } from "./parts";
+import { AreaRow, CARD_CLASS, dayText, Disclosure, hm, LoadState, PanelPage, useMentorPanels } from "./parts";
 
 export async function openGoalInMetas(id: string): Promise<void> {
   await useGoals.getState().open(id);
@@ -116,17 +116,11 @@ export function MentorGoals() {
         {groups.map((g) => {
           const avg = g.goals.reduce((a, x) => a + x.card.progress, 0) / g.goals.length;
           return (
-            <section key={g.key} aria-label={g.title}>
-              <h2 className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px] font-semibold" style={{ color: g.colour }}>
-                {g.title} <BlockProgress value={avg} colour={g.colour} blocks={10} />
-                <span className="text-[11.5px] font-normal text-faint">{g.goals.length} meta{g.goals.length !== 1 ? "s" : ""}</span>
-              </h2>
-              <div className="space-y-3">
-                {g.goals.map(({ card, items }) => (
-                  <GoalAccordion key={card.id} card={card} items={items} open={open.has(card.id)} onToggle={() => toggle(card.id)} fresh={card.id === createdId} />
-                ))}
-              </div>
-            </section>
+            <AreaRow key={g.key} title={g.title} colour={g.colour} count={g.goals.length} noun={["meta", "metas"]} avg={avg}>
+              {g.goals.map(({ card, items }) => (
+                <GoalAccordion key={card.id} card={card} items={items} open={open.has(card.id)} onToggle={() => toggle(card.id)} fresh={card.id === createdId} />
+              ))}
+            </AreaRow>
           );
         })}
       </div>
@@ -152,7 +146,7 @@ export function GoalAccordion({
   const left = card.days_left;
   return (
     <section
-      className="rounded-xl border border-line bg-card p-4"
+      className={CARD_CLASS}
       style={{ borderTop: `3px solid ${card.colour}` }}
       data-testid="goal-card"
       aria-label={`Meta ${card.name}`}
@@ -220,7 +214,7 @@ function SubmetaOutline({ items, colour }: { items: MentorGoalItemSlim[]; colour
           const done = it.status === "Hecha";
           return (
             <li key={it.id} className="px-3 py-2" data-testid="goal-item">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px]" style={{ paddingLeft: depth * 16 }}>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px]" style={{ paddingLeft: depth * 12 }}>
                 {done ? <CheckCircle2 size={14} className="flex-none text-mint" aria-label="Hecha" /> : <Circle size={14} className="flex-none text-faint" aria-label="Pendiente" />}
                 <span className={cn("min-w-0 flex-1 basis-40", done ? "text-faint line-through" : "text-text")}>
                   {it.is_priority ? "⭐ " : ""}
@@ -235,7 +229,7 @@ function SubmetaOutline({ items, colour }: { items: MentorGoalItemSlim[]; colour
                 </span>
               </div>
               {it.topic_progress?.links.map((l) => (
-                <div key={l.link} className="mt-1 flex flex-wrap items-center gap-x-2 text-[11.5px]" style={{ paddingLeft: depth * 16 + 22 }}>
+                <div key={l.link} className="mt-1 flex flex-wrap items-center gap-x-2 text-[11.5px]" style={{ paddingLeft: depth * 12 + 22 }}>
                   <span className="text-dim">📚 {l.title}</span>
                   {l.broken ? (
                     <Chip colour="var(--nv-danger)">enlace roto</Chip>
@@ -262,11 +256,12 @@ function DraftCard({ draft }: { draft: MentorGoalDraft }) {
   const creating = useMentor((s) => s.creating);
   const createGoal = useMentor((s) => s.createGoal);
   const discard = useMentor((s) => s.discard);
+  const [cal, setCal] = useState(false);
   const s = draft.schedule;
   const byFolder = new Map(draft.topics.map((t) => [t.folder, t]));
   return (
     <section
-      className="rounded-xl border border-line bg-card p-4"
+      className="max-w-[760px] rounded-xl border border-line bg-card p-4"
       style={{ borderTop: "3px solid var(--nv-warn)" }}
       data-testid="goal-draft"
       aria-label={`Borrador de meta ${draft.name}`}
@@ -281,7 +276,7 @@ function DraftCard({ draft }: { draft: MentorGoalDraft }) {
           <p className="mt-1 text-[11.5px] text-faint">
             {dayText(s.start)} → {dayText(s.end)} · {s.weeks} semanas · {s.hoursPerWeek} h/semana · {hm(s.totalMinutes)} de estudio estimadas
           </p>
-          {draft.description && <p className="mt-1.5 whitespace-pre-line text-[12.5px] text-dim">{draft.description}</p>}
+          {draft.description && <p className="mt-1.5 max-h-28 overflow-y-auto whitespace-pre-line text-[12.5px] text-dim">{draft.description}</p>}
         </div>
 
         {s.warnings.map((w) => (
@@ -293,7 +288,16 @@ function DraftCard({ draft }: { draft: MentorGoalDraft }) {
           <p className="text-[12px] text-faint">Descartados por no existir en tu sistema de notas: {draft.discarded.join(", ")}.</p>
         )}
 
-        <ol className="overflow-hidden rounded-lg border border-line divide-y divide-line" aria-label="Calendario por semanas">
+        <button
+          type="button"
+          onClick={() => setCal((v) => !v)}
+          aria-expanded={cal}
+          className="flex items-center gap-1.5 text-[12px] font-medium text-dim hover:text-text"
+        >
+          <ChevronRight size={14} className={cal ? "rotate-90 transition-transform" : "transition-transform"} /> Calendario por semanas ({s.items.length})
+        </button>
+        {cal && (
+        <ol className="max-h-[320px] overflow-y-auto rounded-lg border border-line divide-y divide-line" aria-label="Calendario por semanas">
           {s.items.map((it) => (
             <li key={it.name + it.due} className="px-3 py-2" data-testid="draft-item">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px]">
@@ -315,6 +319,7 @@ function DraftCard({ draft }: { draft: MentorGoalDraft }) {
             </li>
           ))}
         </ol>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <PrimaryButton onClick={() => void createGoal()} disabled={creating}>

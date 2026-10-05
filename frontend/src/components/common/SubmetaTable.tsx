@@ -6,6 +6,7 @@
 import { ChevronRight, LayoutGrid, List, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { shortDate } from "../../lib/tasks";
+import { DateInput, StatusSelect } from "../tasks/controls";
 import { cn } from "../ui";
 import { BlockProgress } from "./charts";
 import { Chip, inputBase, PRIORITY_COLOURS, PRIORITY_GLYPHS, PRIORITY_NAMES } from "./forms";
@@ -30,6 +31,8 @@ export interface SubmetaRow {
   colour: string;
   /** A free line shown on the card (schedule, category…). */
   note?: string;
+  /** The status is worked out from its children, so it cannot be picked by hand. */
+  statusLocked?: boolean;
 }
 
 export type SubmetaView = "tarjetas" | "lista";
@@ -85,7 +88,27 @@ export function filterRows(rows: SubmetaRow[], query: string, status: string, hi
 
 const COLS = "grid-cols-[40px_minmax(220px,1fr)_130px_100px_150px_110px_130px_90px_36px]";
 
-export function SubmetaTable({ rows, selectedId, onOpen, onToggle, onDetail, empty }: {
+/** What the list can change in place; a callback left out makes that column read-only. */
+export interface SubmetaEdits {
+  statuses: string[];
+  onStatus?: (id: string, status: string) => void;
+  onPriority?: (id: string, priority: number) => void;
+  onStart?: (id: string, date: string | null) => void;
+  onDue?: (id: string, date: string | null) => void;
+}
+
+function PrioritySelect({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  return (
+    <select aria-label="Prioridad" value={value} onChange={(e) => onChange(Number(e.target.value))} onClick={(e) => e.stopPropagation()}
+      className="cursor-pointer appearance-none rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-[12px] outline-none hover:border-line"
+      style={{ color: PRIORITY_COLOURS[value] }}>
+      {[4, 3, 2, 1].map((n) => <option key={n} value={n} className="bg-card text-text">{PRIORITY_GLYPHS[n]} {PRIORITY_NAMES[n]}</option>)}
+    </select>
+  );
+}
+
+export function SubmetaTable({ rows, selectedId, onOpen, onToggle, onDetail, edits, empty }: {
+  edits?: SubmetaEdits;
   rows: SubmetaRow[];
   selectedId?: string | null;
   onOpen: (id: string) => void;
@@ -121,14 +144,24 @@ export function SubmetaTable({ rows, selectedId, onOpen, onToggle, onDetail, emp
             {r.code && <span className="flex-none font-mono text-[11px] text-faint">{r.code}</span>}
             <span className="truncate">{r.name}</span>
           </span>
-          <span><Chip colour={r.statusColour}>{r.status}</Chip></span>
-          <span className="text-[12px]" style={{ color: PRIORITY_COLOURS[r.priority] }}>{PRIORITY_GLYPHS[r.priority]} {PRIORITY_NAMES[r.priority]}</span>
+          <span>
+            {edits?.onStatus && !r.statusLocked
+              ? <StatusSelect value={r.status} statuses={edits.statuses} onChange={(v) => edits.onStatus!(r.id, v)} />
+              : <Chip colour={r.statusColour}>{r.status}</Chip>}
+          </span>
+          {edits?.onPriority
+            ? <span><PrioritySelect value={r.priority} onChange={(n) => edits.onPriority!(r.id, n)} /></span>
+            : <span className="text-[12px]" style={{ color: PRIORITY_COLOURS[r.priority] }}>{PRIORITY_GLYPHS[r.priority]} {PRIORITY_NAMES[r.priority]}</span>}
           <span className="flex items-center gap-2">
             <BlockProgress value={r.progress} colour={r.colour} blocks={8} />
             <span className="font-mono text-[10.5px] text-dim">{Math.round(r.progress * 100)}%</span>
           </span>
-          <span className="text-[12px] text-dim">{r.start ? shortDate(r.start) : "—"}</span>
-          <span className={cn("text-[12px]", r.overdue ? "text-danger" : "text-dim")}>{r.due ? shortDate(r.due) : "—"}</span>
+          {edits?.onStart
+            ? <span><DateInput title="Fecha de salida" value={r.start ?? null} onChange={(v) => edits.onStart!(r.id, v)} /></span>
+            : <span className="text-[12px] text-dim">{r.start ? shortDate(r.start) : "—"}</span>}
+          {edits?.onDue
+            ? <span><DateInput title="Fecha límite" value={r.due ?? null} onChange={(v) => edits.onDue!(r.id, v)} className={r.overdue ? "!text-danger" : ""} /></span>
+            : <span className={cn("text-[12px]", r.overdue ? "text-danger" : "text-dim")}>{r.due ? shortDate(r.due) : "—"}</span>}
           <span className="font-mono text-[11px] text-dim">{r.done}/{r.total}</span>
           <span onClick={(e) => e.stopPropagation()}>
             {onDetail && (

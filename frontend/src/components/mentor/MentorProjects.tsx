@@ -2,7 +2,7 @@
 // SOLO LECTURA. Se trabajan en el módulo Proyectos (botón "Abrir en Proyectos").
 
 import { ChevronsUpDown, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { shortDate, todayIso } from "../../lib/tasks";
 import type { MentorIssueSlim, MentorProjectCard } from "../../lib/types";
 import { useApp } from "../../store/app";
@@ -11,7 +11,7 @@ import { BlockProgress, Sparkline } from "../common/charts";
 import { Chip, GhostButton } from "../common/forms";
 import { PriorityMark } from "../projects/IssueBits";
 import { cn } from "../ui";
-import { Disclosure, LoadState, PanelPage, useMentorPanels } from "./parts";
+import { AreaRow, CARD_CLASS, Disclosure, LoadState, PanelPage, useMentorPanels } from "./parts";
 
 async function openProject(id: string): Promise<void> {
   await useProjects.getState().open(id);
@@ -21,6 +21,17 @@ async function openProject(id: string): Promise<void> {
 export function MentorProjects() {
   const { panels, warming, error, reload } = useMentorPanels();
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const groups = useMemo(() => {
+    if (!panels) return [];
+    const out: Array<{ key: string; title: string; colour: string; items: typeof panels.projects }> = [];
+    for (const a of panels.areas) {
+      const items = panels.projects.filter((p) => p.area === a.id);
+      if (items.length) out.push({ key: a.id, title: `${a.icon} ${a.name}`, colour: a.colour, items });
+    }
+    const rest = panels.projects.filter((p) => !panels.areas.some((a) => a.id === p.area));
+    if (rest.length) out.push({ key: "_", title: "Sin área", colour: "var(--nv-dim)", items: rest });
+    return out;
+  }, [panels]);
   const ids = panels?.projects.map((p) => p.id) ?? [];
   const allOpen = ids.length > 0 && ids.every((id) => open.has(id));
   const toggle = (id: string) =>
@@ -50,15 +61,13 @@ export function MentorProjects() {
         </div>
       )}
       {panels && (
-        <div className="space-y-3">
-          {panels.projects.map((p) => (
-            <ProjectAccordion
-              key={p.id}
-              project={p}
-              area={panels.areas.find((a) => a.id === p.area)}
-              open={open.has(p.id)}
-              onToggle={() => toggle(p.id)}
-            />
+        <div className="space-y-5">
+          {groups.map((g) => (
+            <AreaRow key={g.key} title={g.title} colour={g.colour} count={g.items.length} noun={["proyecto", "proyectos"]} avg={g.items.reduce((a, p) => a + p.summary.progress, 0) / g.items.length}>
+              {g.items.map((p) => (
+                <ProjectAccordion key={p.id} project={p} area={panels.areas.find((a) => a.id === p.area)} open={open.has(p.id)} onToggle={() => toggle(p.id)} />
+              ))}
+            </AreaRow>
           ))}
         </div>
       )}
@@ -80,7 +89,7 @@ export function ProjectAccordion({
   const s = p.summary;
   return (
     <section
-      className="rounded-xl border border-line bg-card p-4"
+      className={CARD_CLASS}
       style={{ borderTop: `3px solid ${p.colour}` }}
       data-testid="project-card"
       aria-label={`Proyecto ${p.name}`}
@@ -154,7 +163,7 @@ function IssueOutline({ issues, total }: { issues: MentorIssueSlim[]; total: num
     <div className="overflow-hidden rounded-lg border border-line">
       <ul className="divide-y divide-line" aria-label="Issues abiertos">
         {rows.map(([i, depth]) => (
-          <li key={i.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1.5" data-testid="project-issue" style={{ paddingLeft: 12 + depth * 16 }}>
+          <li key={i.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1.5" data-testid="project-issue" style={{ paddingLeft: 12 + depth * 12 }}>
             <span className="text-[12px]" style={{ color: i.type_colour }} title={i.type}>{i.icon}</span>
             <span className="w-14 flex-none font-mono text-[11px] text-faint">{i.key}</span>
             <span className="min-w-0 flex-1 basis-40 text-[12.5px] text-text">{i.title}</span>

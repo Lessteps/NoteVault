@@ -5,7 +5,7 @@ import { api } from "../lib/bridge";
 import type { Area, Issue, ProjectCard, ProjectDetail, ProjectsMeta } from "../lib/types";
 import { useApp } from "./app";
 
-export type ProjectTab = "resumen" | "submetas" | "tablero" | "lista" | "calendario" | "notas";
+export type ProjectTab = "resumen" | "hoy" | "submetas" | "tablero" | "lista" | "calendario" | "notas";
 
 interface ProjectsState {
   cards: ProjectCard[];

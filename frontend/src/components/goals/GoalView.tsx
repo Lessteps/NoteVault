@@ -13,13 +13,14 @@ import { StatTile } from "../common/StatTile";
 import { cn, confirmAction } from "../ui";
 import { GoalSummary } from "./GoalSummary";
 import { ItemEditor } from "./ItemEditor";
+import { SubmetaBoard } from "./SubmetaBoard";
 import { SubmetaList } from "./SubmetaList";
 import { SubmetaCards, SubmetaTree } from "./Submetas";
 import { ViewToggle } from "../common/SubmetaTable";
 import { SubmetaDetail } from "./SubmetaDetail";
 import { TodayList } from "./TodayList";
 
-const TABS: Array<[GoalTab, string]> = [["resumen", "Resumen"], ["submetas", "Submetas"], ["hoy", "Hoy"], ["historial", "Historial"], ["notas", "Notas"]];
+const TABS: Array<[GoalTab, string]> = [["resumen", "Resumen"], ["submetas", "Submetas"], ["tablero", "Tablero"], ["hoy", "Hoy"], ["historial", "Historial"], ["notas", "Notas"]];
 
 function History() {
   const d = useGoals((s) => s.detail)!;
@@ -212,6 +213,7 @@ export function GoalView() {
       <div className="py-4">
         {tab === "resumen" ? <GoalSummary />
           : tab === "submetas" ? (submetaId ? <SubmetaDetail /> : subView === "tarjetas" ? <SubmetaCards /> : subView === "lista" ? <SubmetaList /> : <SubmetaTree />)
+          : tab === "tablero" ? <SubmetaBoard />
           : tab === "hoy" ? <TodayList goalId={g.id} title={false} />
             : tab === "historial" ? <History /> : <Notes />}
       </div>

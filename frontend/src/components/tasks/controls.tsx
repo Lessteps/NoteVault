@@ -9,6 +9,9 @@ const STATUS_TONE: Record<string, string> = {
   "En progreso": "text-info bg-info-soft border-info/35",
   "Completado": "text-mint bg-mint-soft border-mint/35",
   "Bloqueado": "text-danger bg-danger-soft border-danger/35",
+  // Metas: the states of a submeta.
+  "En curso": "text-info bg-info-soft border-info/35",
+  "Hecha": "text-mint bg-mint-soft border-mint/35",
 };
 
 export function statusTone(status: string): string {

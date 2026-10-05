@@ -133,6 +133,7 @@ export function SubmetasPanel() {
   const openSubmeta = useProjects((s) => s.openSubmeta);
   const setCreating = useProjects((s) => s.setCreating);
   const moveIssue = useProjects((s) => s.moveIssue);
+  const updateIssue = useProjects((s) => s.updateIssue);
   const [view, setView] = useState<SubmetaView>("lista");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
@@ -164,6 +165,13 @@ export function SubmetasPanel() {
       {view === "lista" ? (
         <div className="overflow-x-auto">
           <SubmetaTable rows={rows} selectedId={issueId} onOpen={openIssue} onDetail={openSubmeta} empty={empty}
+            edits={{
+              statuses: p.columns,
+              onStatus: (id, st) => void moveIssue(id, st, 10 ** 6),
+              onPriority: (id, priority) => void updateIssue(id, { priority }),
+              onStart: (id, start) => void updateIssue(id, { start }),
+              onDue: (id, due) => void updateIssue(id, { due }),
+            }}
             onToggle={(id, done) => void moveIssue(id, done ? p.done_column : p.columns[0]!, 10 ** 6)} />
         </div>
       ) : (

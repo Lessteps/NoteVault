@@ -1,6 +1,9 @@
 // Submetas of a goal as a table, the same look as the task table.
 
 import { useMemo, useState } from "react";
+import { api } from "../../lib/bridge";
+import type { GoalItem } from "../../lib/types";
+import { useApp } from "../../store/app";
 import { useGoals } from "../../store/goals";
 import { filterRows, SubmetaFilters, SubmetaTable, type SubmetaRow } from "../common/SubmetaTable";
 import { catColour, useToggle } from "./Submetas";
@@ -12,6 +15,8 @@ export function SubmetaList() {
   const meta = useGoals((s) => s.meta);
   const itemId = useGoals((s) => s.itemId);
   const openItem = useGoals((s) => s.openItem);
+  const refresh = useGoals((s) => s.refreshAfterWrite);
+  const toast = useApp((s) => s.toast);
   const toggle = useToggle();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
@@ -30,10 +35,20 @@ export function SubmetaList() {
     start: it.start,
     due: it.due,
     overdue: it.late,
+    statusLocked: !it.is_leaf,
     finished: it.is_leaf ? it.status === "Hecha" || it.done_today : it.progress >= 1,
     colour: it.category ? catColour(it.category) : detail.goal.colour,
   })), [detail]);
   const rows = filterRows(all, query, status, hideDone);
+  /** One field of one submeta, written in place; the reload brings the real numbers. */
+  const edit = async (id: string, fields: Partial<GoalItem>) => {
+    try {
+      await api.goalItemUpdate(detail.goal.id, id, fields);
+      await refresh();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -49,6 +64,13 @@ export function SubmetaList() {
             else openItem(id);
           }}
           onDetail={(id) => useGoals.getState().openSubmeta(id)}
+          edits={{
+            statuses: meta?.item_statuses ?? [],
+            onStatus: (id, st) => void edit(id, { status: st }),
+            onPriority: (id, priority) => void edit(id, { priority }),
+            onStart: (id, start) => void edit(id, { start }),
+            onDue: (id, due) => void edit(id, { due }),
+          }}
           empty={all.length ? "No hay submetas que coincidan con los filtros." : "Sin submetas. Crea la primera con «+ Submeta»."} />
       </div>
       <div className="font-mono text-[10.5px] text-faint">{rows.length} de {all.length} submetas</div>

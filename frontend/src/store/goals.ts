@@ -6,7 +6,7 @@ import type { Area, GoalCard, GoalDetail, GoalsMeta, GoalsSidebar } from "../lib
 import { useApp } from "./app";
 
 export type GoalsView = "tablero" | "hoy";
-export type GoalTab = "resumen" | "submetas" | "hoy" | "historial" | "notas";
+export type GoalTab = "resumen" | "submetas" | "tablero" | "hoy" | "historial" | "notas";
 export type SubView = "tarjetas" | "lista" | "arbol";
 
 interface GoalsState {

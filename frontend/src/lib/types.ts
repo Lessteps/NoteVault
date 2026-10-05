@@ -414,6 +414,24 @@ export interface GoalCard extends Goal {
   habits: Array<{ id: string; name: string; icon: string }>;
 }
 
+/** Espejo de core/practice/topicLinks.ts (pct 0..100). */
+export interface TopicLinkItemProgress {
+  link: string;
+  topic: string;
+  title: string;
+  skills: string[];
+  broken: boolean;
+  done: boolean;
+  pct: number;
+}
+export interface TopicLinkProgress {
+  done: boolean;
+  pct: number;
+  links: TopicLinkItemProgress[];
+  missing: Array<{ topic: string; skill: string; reason: "not_mastered" | "exam" | "unknown_skill" | "broken" | "no_skills" }>;
+  broken: string[];
+}
+
 export interface GoalItem {
   id: string;
   goal: string;
@@ -434,6 +452,10 @@ export interface GoalItem {
   unit: string;
   value: number | null;
   habit_links: string[];
+  /** `<carpeta-del-tema>` o `<carpeta>#skill1+skill2`; con enlaces la submeta se cumple sola. */
+  topic_links: string[];
+  /** Avance calculado de los `topic_links`; null si no hay enlaces. */
+  topic_progress: TopicLinkProgress | null;
   done_at: string | null;
   created: string | null;
   notes: string;

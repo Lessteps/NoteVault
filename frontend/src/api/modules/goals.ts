@@ -13,12 +13,14 @@ import {
   GoalManager,
   ITEM_DONE,
 } from "../../core/goalManager.js";
+import { normalizeTopicLinks, topicLinkProgress } from "../../core/practice/topicLinks.js";
 import { Recurrence } from "../../core/recurrence.js";
 import {
   GOAL_ITEM_STATUSES,
   GOAL_STATUSES,
 } from "../../core/vaultFormat.js";
 import type { AppState } from "../appState.js";
+import { topicLookupFor } from "../topicLookup.js";
 import { clampInt, isoDate, oneLine, optDate, optTime } from "../common.js";
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -222,6 +224,14 @@ function itemFields(
       .filter((h) => knownHabits.has(h))
       .slice(0, 20);
   }
+  if ("topic_links" in f) {
+    const linksList = f.topic_links || [];
+    if (!Array.isArray(linksList)) {
+      throw new ApiError("Temas de estudio inválidos.");
+    }
+    // No se exige que el tema exista: un enlace roto se muestra y se puede reparar.
+    out.topic_links = normalizeTopicLinks(linksList.map((l) => oneLine(l, 400))).slice(0, 20);
+  }
   if ("notes" in f) {
     out.notes = String(f.notes || "").slice(0, 200000);
   }
@@ -246,7 +256,12 @@ function itemFields(
 }
 
 export function goalsApi(app: AppState) {
-  const gm = (): GoalManager => app.mgrs().goals;
+  // El cumplimiento de las submetas con `topic_links` sale del progreso de estudio.
+  const gm = (): GoalManager => {
+    const m = app.mgrs().goals;
+    if (!m.topicLookup) m.topicLookup = topicLookupFor(app);
+    return m;
+  };
 
   function needGoal(gid: unknown): Goal {
     const g = gm().getGoal(String(gid));
@@ -292,6 +307,8 @@ export function goalsApi(app: AppState) {
       unit: i.unit,
       value: i.value,
       habit_links: [...i.habit_links],
+      topic_links: [...i.topic_links],
+      topic_progress: m.topicProgress(i),
       done_at: isoDate(i.done_at),
       created: isoDate(i.created),
       notes: i.notes,
@@ -560,6 +577,14 @@ export function goalsApi(app: AppState) {
       const m = gm();
       m.updateItem(g.id, item.id, f);
       return itemDict(g, needItem(g.id, item.id), new Date());
+    },
+
+    /** Avance de una selección de enlaces a temas (aún sin guardar), para los chips del editor. */
+    goals_topic_links_progress(links: unknown) {
+      if (!Array.isArray(links)) {
+        throw new ApiError("Temas de estudio inválidos.");
+      }
+      return topicLinkProgress(normalizeTopicLinks(links), topicLookupFor(app));
     },
 
     goals_item_delete(gid: string, iid: string) {

@@ -155,6 +155,8 @@ export const GOAL_ITEM_FIELDS: readonly FieldDef[] = [
   ["repeat", "str"], ["repeat_until", "date"], ["in_calendar", "bool"],
   ["reminder_min", "int"], ["target", "num"], ["unit", "str"], ["value", "num"],
   ["habit_links", "list"], ["done_at", "date"], ["created", "date"],
+  // Opcional y aditivo (se omite si está vacío): temas de estudio que cumplen la submeta.
+  ["topic_links", "list"],
 ] as const;
 
 export const PROJECT_V4_STATUSES = PROJECT_STATUSES;

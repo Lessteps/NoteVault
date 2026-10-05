@@ -170,7 +170,7 @@ export function SubmetaTree() {
               <span className="text-[11.5px]" style={{ color: PRIORITY_COLOURS[it.priority] }}>{PRIORITY_GLYPHS[it.priority]} {PRIORITY_NAMES[it.priority]}</span>
               <span className="truncate text-[11.5px] text-dim">{it.schedule || "—"}</span>
               <span className="flex items-center gap-1"><BlockProgress value={it.progress} colour={g.colour} blocks={6} /></span>
-              <span className="truncate text-[11px] text-dim">{it.habit_links.map((h) => habitNames[h] ?? "").filter(Boolean).join(", ")}</span>
+              <span className="truncate text-[11px] text-dim">{[...it.habit_links.map((h) => habitNames[h] ?? ""), ...(it.topic_progress?.links.map((l) => `📚 ${l.title} ${l.broken ? "(roto)" : `${l.pct}%`}`) ?? [])].filter(Boolean).join(", ")}</span>
                 <span className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                   <IconButton title="Subir" disabled={n === 0} onClick={() => void act(() => api.goalItemMove(g.id, it.id, it.parent, n - 1))}><ArrowUp size={12} /></IconButton>
                   <IconButton title="Bajar" disabled={n === count - 1} onClick={() => void act(() => api.goalItemMove(g.id, it.id, it.parent, n + 1))}><ArrowDown size={12} /></IconButton>

@@ -77,6 +77,40 @@ describe("GoalManager", () => {
       expect(text).toContain('repeat: "weekly:0,2"\n');
       expect(text).toContain('habit_links: "coding,math"\n');
       expect(text).not.toContain("parent:");
+      expect(text).not.toContain("topic_links"); // optional: omitted when empty
+    });
+
+    it("topic_links round-trip and derived completion", () => {
+      const item = gm.create_item(goal.id, "Dominar álgebra", "", {
+        topic_links: ["Mates/Álgebra, I#solve+prove", "Mates/Geo", "Mates/Geo"],
+      });
+      const text = fs.readFileSync(gm.item_path(goal.id, item.id), "utf-8");
+      expect(text).toContain('topic_links: "Mates/Álgebra%2C I#solve+prove,Mates/Geo"\n');
+
+      const fresh = new GoalManager(tempDir);
+      expect(fresh.get_item(goal.id, item.id)!.topic_links).toEqual(["Mates/Álgebra%2C I#solve+prove", "Mates/Geo"]);
+
+      // Sin resolutor de temas el campo no afecta al cumplimiento.
+      expect(fresh.is_done_on(fresh.get_item(goal.id, item.id)!, D)).toBe(false);
+
+      const mastered = (v: boolean) => ({ mastered: v, consolidated: v }) as never;
+      fresh.topicLookup = (f) =>
+        f === "Mates/Geo"
+          ? ({ topic: { title: "Geo", skills: ["solve"], mastery: { exam: "none" } }, skills: { solve: mastered(true) }, examPassed: false } as never)
+          : f === "Mates/Álgebra, I"
+            ? ({ topic: { title: "Álgebra", skills: ["solve", "prove"], mastery: { exam: "none" } }, skills: { solve: mastered(true), prove: mastered(false) }, examPassed: false } as never)
+            : null;
+      const it = fresh.get_item(goal.id, item.id)!;
+      expect(fresh.is_done_on(it, D)).toBe(false);
+      expect(fresh.item_progress(it, goal, D)).toBeCloseTo(2 / 3, 1);
+
+      fresh.update_item(goal.id, item.id, { topic_links: ["Mates/Geo"] });
+      const done = fresh.get_item(goal.id, item.id)!;
+      expect(fresh.is_done_on(done, D)).toBe(true);
+      expect(fresh.item_progress(done, goal, D)).toBe(1);
+
+      fresh.update_item(goal.id, item.id, { topic_links: [] });
+      expect(fs.readFileSync(gm.item_path(goal.id, item.id), "utf-8")).not.toContain("topic_links");
     });
   });
 

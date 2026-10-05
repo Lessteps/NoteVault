@@ -10,6 +10,7 @@ import { useGoals } from "../../store/goals";
 import { Field, GhostButton, input, Label, PrimaryButton, PRIORITY_NAMES } from "../common/forms";
 import { RepeatPicker } from "../common/RepeatPicker";
 import { cn, confirmAction, IconButton } from "../ui";
+import { TopicLinks } from "./TopicLinks";
 
 export function HabitLinks({ value, onChange }: { value: string[]; onChange: (ids: string[]) => void }) {
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -60,7 +61,7 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
       duration_min: time ? f.duration_min ?? null : null, reminder_min: time ? f.reminder_min ?? null : null,
       in_calendar: Boolean(f.in_calendar) || Boolean(!repeating && f.due && time),
       target, unit: target ? f.unit ?? "" : "", value: !repeating && f.value !== null && f.value !== undefined && String(f.value) !== "" ? f.value : null,
-      habit_links: f.habit_links ?? [], notes: f.notes ?? "",
+      habit_links: f.habit_links ?? [], topic_links: f.topic_links ?? [], notes: f.notes ?? "",
     };
     if (item.is_leaf) fields.status = f.status;
     if (fields.in_calendar && !repeating && !fields.due) {
@@ -135,6 +136,11 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
           ) : null}
         </div>
         <div><Label>Hábitos vinculados</Label><HabitLinks value={f.habit_links ?? []} onChange={(habit_links) => set({ habit_links })} /></div>
+        <div>
+          <Label>Temas de estudio</Label>
+          <TopicLinks value={f.topic_links ?? []} onChange={(topic_links) => set({ topic_links })} />
+          {(f.topic_links ?? []).length > 0 && <p className="mt-1 text-[11px] text-faint">Se cumple sola cuando el estudio de esos temas está dominado.</p>}
+        </div>
         <Field label="Notas">
           <textarea rows={4} className={cn(input, "resize-y")} value={f.notes ?? ""} onChange={(e) => set({ notes: e.target.value })} />
         </Field>

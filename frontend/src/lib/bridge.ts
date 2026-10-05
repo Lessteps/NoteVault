@@ -314,6 +314,8 @@ export const api = {
   goalItemCreate: (gid: string, name: string, parent = "", fields: Partial<GoalItem> = {}, subtasks: string[] = []) =>
     call<GoalItem>("goals_item_create", gid, name, parent, fields, subtasks),
   goalItemUpdate: (gid: string, iid: string, fields: Partial<GoalItem>) => call<GoalItem>("goals_item_update", gid, iid, fields),
+  goalsTopicLinksProgress: (links: string[]) =>
+    call<import("./types").TopicLinkProgress>("goals_topic_links_progress", links),
   goalItemDelete: (gid: string, iid: string) => call<{ ok: boolean }>("goals_item_delete", gid, iid),
   goalItemMove: (gid: string, iid: string, parent: string, index: number) =>
     call<{ ok: boolean }>("goals_item_move", gid, iid, parent, index),

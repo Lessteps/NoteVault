@@ -17,6 +17,12 @@ import * as path from "node:path";
 import { AreaManager } from "./areaManager";
 import { addDays, formatDate, parseIsoDate, todayIso } from "./dates";
 import { HabitManager, habitActiveOn } from "./habitManager";
+import {
+  normalizeTopicLinks,
+  topicLinkProgress,
+  type TopicLinkProgress,
+  type TopicLookup,
+} from "./practice/topicLinks";
 import { Recurrence } from "./recurrence";
 import { Occurrence } from "./scheduleFormat";
 import {
@@ -170,6 +176,8 @@ export class GoalItem {
   unit: string;
   value: number | null;
   habit_links: string[];
+  /** Temas de estudio enlazados (ver core/practice/topicLinks.ts). Con enlaces, la submeta se cumple sola. */
+  topic_links: string[];
   done_at: Date | null;
   created: Date | null;
   notes: string;
@@ -213,6 +221,7 @@ export class GoalItem {
       links = splitList(values.habit_links);
     }
     this.habit_links = links;
+    this.topic_links = normalizeTopicLinks(values.topic_links);
 
     this.done_at = values.done_at ? parseIsoDate(values.done_at) : null;
     this.created = values.created ? parseIsoDate(values.created) : null;
@@ -333,6 +342,12 @@ export class GoalManager {
   dir: string;
   habitMgr: HabitManager | null;
   areaMgr: AreaManager | null;
+  /**
+   * Resuelve el progreso de un tema de estudio por su carpeta. Lo pone la capa API
+   * (el progreso sale del escaneo de la vault, que este módulo no conoce). Sin él,
+   * `topic_links` no afecta al cumplimiento.
+   */
+  topicLookup: TopicLookup | null = null;
 
   private _goalsCache: Goal[] | null = null;
   private _goalsStamp: string | null = null;
@@ -552,6 +567,8 @@ export class GoalManager {
           val = Recurrence.parse(val).toString();
         } else if (k === "habit_links") {
           val = Array.isArray(val) ? val.map(String) : splitList(val);
+        } else if (k === "topic_links") {
+          val = normalizeTopicLinks(val);
         } else if (k === "start" || k === "end" || k === "due" || k === "repeat_until" || k === "done_at" || k === "created") {
           val = val ? parseIsoDate(val) : null;
         }
@@ -946,7 +963,19 @@ export class GoalManager {
     return this.log(d).items[item.key] || {};
   }
 
+  /** Cumplimiento calculado de una submeta con `topic_links`; null si no aplica. */
+  topic_progress(item: GoalItem): TopicLinkProgress | null {
+    if (!this.topicLookup || !item.topic_links.length) return null;
+    return topicLinkProgress(item.topic_links, this.topicLookup);
+  }
+  topicProgress(item: GoalItem): TopicLinkProgress | null {
+    return this.topic_progress(item);
+  }
+
   is_done_on(item: GoalItem, d: Date): boolean {
+    // Una submeta enlazada a temas se cumple sola: no se marca a mano (ni repite).
+    const tp = this.topic_progress(item);
+    if (tp) return tp.done;
     if (item.repeating) {
       const e = this.entry(item, d);
       if (item.measurable && typeof e.value === "number") {
@@ -1198,6 +1227,9 @@ export class GoalManager {
       );
       return sum / current.children.length;
     }
+
+    const tp = this.topic_progress(current);
+    if (tp) return tp.pct / 100;
 
     if (current.repeating) {
       const days = this.scheduled_days(current, goal, t);

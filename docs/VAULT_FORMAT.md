@@ -426,6 +426,7 @@ formaría un ciclo, se muestra en el primer nivel. Claves (`GOAL_ITEM_FIELDS`):
 | `habit_links` | list | Hábitos que se marcan al completarla. |
 | `done_at` | date | Día en que una submeta única pasó a Hecha. |
 | `created` | date | |
+| `topic_links` | list | Opcional (se omite si está vacía). Temas de estudio que la cumplen; ver [Conexión con temas de estudio](#conexión-con-temas-de-estudio). |
 
 El cuerpo son las notas. Una submeta con hijas es una **rama**: no se marca a
 mano, está hecha cuando todas sus hijas lo están.
@@ -462,8 +463,33 @@ Al marcar una submeta con `habit_links`, para cada hábito activo ese día:
 Al desmarcar se quita la submeta de las fuentes y, si no queda ninguna, se
 desmarca el hábito. Una marca manual nunca se quita.
 
+### Conexión con temas de estudio
+
+`topic_links` es un campo **aditivo y opcional** (no cambia `FORMAT_VERSION`):
+un lector que no lo conoce lo conserva como clave extra sin tocarlo. Cada
+entrada de la lista (separada por comas, como `habit_links`) es:
+
+- `<carpeta-del-tema>`: todas las skills del tema;
+- `<carpeta-del-tema>#skill1+skill2`: solo esas skills.
+
+`<carpeta-del-tema>` es la ruta POSIX de la carpeta del tema (la del `_tema.md`
+/ `.practica.md`) relativa a la vault. En ella se escapan `%`, `,` y `#` como
+`%25`, `%2C` y `%23`. Las skills van en minúsculas, separadas por `+`.
+
+Una submeta con `topic_links` **no se marca a mano: se cumple sola** cuando
+cada tema enlazado cumple lo pedido: cada skill pedida (o todas las del tema)
+dominada (`mastered` en el progreso del tema) y, en un enlace al tema entero,
+el examen aprobado si el tema lo exige (`mastery.exam: required`). Su progreso
+es el porcentaje de esas unidades cumplidas. Una carpeta que ya no tiene tema
+es un **enlace roto**: se conserva, cuenta como no cumplido y no da error.
+
+> Pendiente para el cliente móvil (`notevault_mobile`): leer/conservar
+> `topic_links` y, si quiere mostrar el cumplimiento, calcularlo igual que la
+> app de escritorio (`frontend/src/core/practice/topicLinks.ts`).
+
 ### Progreso
 
+- Hoja con `topic_links`: el avance de sus temas (0–1), sin importar `repeat`.
 - Hoja única: 1 si está hecha; si es medible, `value / target` (máx. 1).
 - Hoja repetitiva: días cumplidos / días programados desde `start` (o el
   inicio de la meta, o `created`) hasta hoy, sin pasar de `repeat_until` ni

@@ -68,9 +68,11 @@ async function gotoDiario() {
 test("NV-F-003 ingreso con formulario aparece en tabla y en disco", async () => {
   await gotoDiario();
   const what = `E2E Salario ${Date.now()}`;
-  await win.getByRole("button", { name: "+ Ingreso" }).click();
-  const dialog = win.getByRole("dialog", { name: "Nuevo ingreso" });
+  await win.getByRole("button", { name: "+ Nuevo movimiento" }).click();
+  const dialog = win.getByRole("dialog", { name: "Nuevo gasto" });
   await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Ingreso" }).click();
+  await expect(win.getByRole("dialog", { name: "Nuevo ingreso" })).toBeVisible();
   await dialog.getByLabel("Importe").fill("50000");
   await dialog.getByPlaceholder("p. ej. Almuerzo").fill(what);
   await dialog.getByRole("button", { name: "Guardar" }).click();

@@ -6,12 +6,12 @@ import { api } from "../../lib/bridge";
 import { addDays } from "../../lib/habits";
 import { formatMoney } from "../../lib/money";
 import { shortDate, todayIso } from "../../lib/tasks";
-import type { FinCheck, Movement } from "../../lib/types";
+import type { FinCheck, Movement, MovementType } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
 import { GhostButton, inputBase } from "../common/forms";
 import { cn, confirmAction } from "../ui";
-import { MoneyInput, MovementTable, Tiles, totals, TYPE_COLOURS, type GroupedRow } from "./parts";
+import { MoneyInput, MovementTable, Tiles, totals, TYPE_LABELS, type GroupedRow } from "./parts";
 
 const WEEKDAY = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
@@ -24,8 +24,8 @@ export function Diario() {
   const [day, setDay] = useState(todayIso());
   const [list, setList] = useState<Movement[]>([]);
   const [checks, setChecks] = useState<FinCheck[]>([]);
-  const [q, setQ] = useState<{ amount: number | null; what: string; category: string; reason: string }>({ amount: null, what: "", category: "", reason: "" });
-  const [hint, setHint] = useState("Gasto: escribe el importe, en qué y Enter");
+  const [q, setQ] = useState<{ type: MovementType; amount: number | null; what: string; category: string; reason: string }>({ type: "gasto", amount: null, what: "", category: "", reason: "" });
+  const [hint, setHint] = useState("Escribe el importe, en qué y Enter");
 
   useEffect(() => {
     Promise.all([api.finRange(day, day), api.finDueChecks(day)])
@@ -39,9 +39,9 @@ export function Diario() {
       return;
     }
     try {
-      await api.finAdd(day, { type: "gasto", amount_cents: q.amount, what: q.what, category: q.category, reason: q.reason });
+      await api.finAdd(day, { type: q.type, amount_cents: q.amount, what: q.what, category: q.type === "gasto" || q.type === "ingreso" ? q.category : "", reason: q.reason });
       setHint(`Guardado: ${formatMoney(q.amount)}${q.what ? ` · ${q.what}` : ""}`);
-      setQ({ amount: null, what: "", category: q.category, reason: "" });
+      setQ({ type: q.type, amount: null, what: "", category: q.category, reason: "" });
       await changed();
     } catch (e) {
       setHint((e as Error).message);
@@ -69,6 +69,7 @@ export function Diario() {
   if (rows.length) rows.push({ kind: "total", label: "TOTAL DEL DÍA", amount: t.balance });
   const d = new Date(`${day}T12:00:00`);
   const expenseCats = (meta?.categories ?? []).filter((c) => c.kind === "gasto" && !c.archived);
+  const incomeCats = (meta?.categories ?? []).filter((c) => c.kind === "ingreso" && !c.archived);
   const sel = cn(inputBase, "py-1.5");
 
   return (
@@ -82,27 +83,31 @@ export function Diario() {
         <GhostButton onClick={() => setDay(addDays(day, 1))}>›</GhostButton>
       </div>
       <div className="flex gap-2.5">
-        {([["gasto", "+  Gasto"], ["ingreso", "+  Ingreso"], ["ahorro", "+  Ahorro"]] as const).map(([k, l]) => (
-          <button key={k} type="button" onClick={() => edit({ day, kind: k })}
-            className="rounded-xl border border-line bg-card px-6 py-2.5 text-[14px] font-semibold text-text hover:border-line-strong"
-            style={{ borderLeft: `4px solid ${TYPE_COLOURS[k]}` }}>{l}</button>
-        ))}
+        <button type="button" onClick={() => edit({ day, kind: q.type })}
+          className="rounded-xl border border-line bg-card px-6 py-2.5 text-[14px] font-semibold text-text hover:border-line-strong">
+          + Nuevo movimiento</button>
       </div>
       <div className="rounded-xl border border-line bg-card p-3">
         <div className="flex items-center gap-2">
           <span className="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Registro rápido</span>
+          <select aria-label="Tipo rápido" className={cn(sel, "w-auto")} value={q.type}
+            onChange={(e) => setQ({ ...q, type: e.target.value as MovementType, category: "" })}>
+            {(["gasto", "ingreso", "ahorro", "retiro"] as const).map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
+          </select>
           <MoneyInput label="Importe rápido" value={q.amount} onChange={(amount) => setQ({ ...q, amount })} className="w-32 py-1.5" onEnter={() => void quickSave()} />
           <input className={cn(sel, "min-w-0 flex-1")} placeholder="En qué" value={q.what} onChange={(e) => setQ({ ...q, what: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && void quickSave()} />
-          <select className={sel} value={q.category} onChange={(e) => setQ({ ...q, category: e.target.value })}>
-            <option value="">Sin categoría</option>
-            {expenseCats.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-          </select>
+          {(q.type === "gasto" || q.type === "ingreso") && (
+            <select className={sel} value={q.category} onChange={(e) => setQ({ ...q, category: e.target.value })}>
+              <option value="">Sin categoría</option>
+              {(q.type === "gasto" ? expenseCats : incomeCats).map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+            </select>
+          )}
           <input className={cn(sel, "w-48")} placeholder="Razón (opcional)" value={q.reason} onChange={(e) => setQ({ ...q, reason: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && void quickSave()} />
           <GhostButton title="Abrir el formulario completo para adjuntar la factura"
-            onClick={() => edit({ day, kind: "gasto", preset: { type: "gasto", amount_cents: q.amount ?? undefined, what: q.what, category: q.category, reason: q.reason },
-              onSaved: () => setQ({ amount: null, what: "", category: q.category, reason: "" }) })}><Paperclip size={13} /></GhostButton>
+            onClick={() => edit({ day, kind: q.type, preset: { type: q.type, amount_cents: q.amount ?? undefined, what: q.what, category: q.category, reason: q.reason },
+              onSaved: () => setQ({ type: q.type, amount: null, what: "", category: q.category, reason: "" }) })}><Paperclip size={13} /></GhostButton>
           <GhostButton onClick={() => void quickSave()}>Guardar ↵</GhostButton>
         </div>
         <p className="mt-1.5 text-[11px] text-faint">{hint}</p>

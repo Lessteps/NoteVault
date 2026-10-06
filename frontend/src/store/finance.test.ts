@@ -5,6 +5,7 @@ const { apiMock } = vi.hoisted(() => ({
   apiMock: {
     finMeta: vi.fn(),
     finSidebar: vi.fn(),
+    finRecurringRun: vi.fn(),
   },
 }));
 
@@ -48,6 +49,7 @@ function reset() {
   useFinance.setState({
     view: "diario", meta: null, sidebar: null, loaded: false, version: 0,
     editing: null, goalId: null, goalEditing: null, categoryEditing: null,
+    recurringEditing: null,
   });
   useApp.setState({ toasts: [] });
 }
@@ -78,6 +80,28 @@ describe("load", () => {
     expect(useFinance.getState().loaded).toBe(false);
     expect(useApp.getState().toasts.at(-1)?.text).toContain("caído");
   });
+  it("runs recurrents on load", async () => {
+    apiMock.finMeta.mockResolvedValue(meta());
+    apiMock.finSidebar.mockResolvedValue(sidebar());
+    apiMock.finRecurringRun.mockResolvedValue({ created: 2 });
+    const { todayIso } = await import("../lib/tasks");
+    await useFinance.getState().load();
+    expect(apiMock.finRecurringRun).toHaveBeenCalledWith(todayIso());
+    expect(useFinance.getState().loaded).toBe(true);
+  });
+  it("migrates legacy semanal/mensual/anual views to periodo", async () => {
+    apiMock.finMeta.mockResolvedValue(meta());
+    apiMock.finSidebar.mockResolvedValue(sidebar());
+    apiMock.finRecurringRun.mockResolvedValue({ created: 0 });
+    for (const legacy of ["semanal", "mensual", "anual"]) {
+      useFinance.setState({ view: legacy as "diario", loaded: false });
+      await useFinance.getState().load();
+      expect(useFinance.getState().view).toBe("periodo");
+    }
+    useFinance.setState({ view: "diario", loaded: false });
+    await useFinance.getState().load();
+    expect(useFinance.getState().view).toBe("diario");
+  });
 });
 
 describe("sync actions", () => {
@@ -96,8 +120,10 @@ describe("sync actions", () => {
     expect(useFinance.getState()).toMatchObject({ goalId: "f1", view: "metas" });
     s().setGoalEditing("");
     s().setCategoryEditing({ id: "comida", kind: "gasto" });
+    s().setRecurringEditing({ id: "" });
     expect(useFinance.getState()).toMatchObject({
       goalEditing: "", categoryEditing: { id: "comida", kind: "gasto" },
+      recurringEditing: { id: "" },
     });
   });
 });

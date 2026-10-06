@@ -148,4 +148,22 @@ describe("Diario", () => {
     });
     expect(finBudgetSet).toHaveBeenCalledWith(500000000);
   });
+
+  it("+ Nuevo abre el diálogo con el tipo del registro rápido", async () => {
+    const { useFinance } = await import("../../store/finance");
+    await mount();
+    const type = host!.querySelector('select[aria-label="Tipo rápido"]') as HTMLSelectElement;
+    await act(async () => {
+      setNative(type, "ingreso");
+      await Promise.resolve();
+    });
+    const add = [...host!.querySelectorAll("button")].find((b) => (b.textContent ?? "").includes("Nuevo movimiento"))!;
+    await act(async () => {
+      add.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(useFinance.getState().editing).toMatchObject({ kind: "ingreso" });
+    expect(useFinance.getState().editing?.day).toBe(todayIso());
+    expect("movement" in (useFinance.getState().editing ?? {})).toBe(false);
+  });
 });

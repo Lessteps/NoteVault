@@ -135,3 +135,23 @@ test("NV-F-006 crear meta en 2 pasos calcula el aporte y la muestra", async () =
   await dialog.getByRole("button", { name: "Crear meta" }).click();
   await expect(win.getByRole("button", { name: new RegExp(name) })).toBeVisible({ timeout: 15_000 });
 });
+
+test("NV-F-007 duplicar abre copia para hoy y la guarda", async () => {
+  await gotoDiario();
+  const what = `E2E Plantilla ${Date.now()}`;
+  await win.getByLabel("Importe rápido").fill("9000");
+  await win.getByPlaceholder("En qué").fill(what);
+  await win.getByRole("button", { name: /Guardar/ }).click();
+  const row = win.getByRole("button", { name: new RegExp(`Gasto.*${what}`) });
+  await expect(row).toBeVisible({ timeout: 15_000 });
+
+  await row.click();
+  await win.getByRole("button", { name: "Duplicar" }).click();
+  const dialog = win.getByRole("dialog", { name: "Nuevo gasto" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByPlaceholder("p. ej. Almuerzo")).toHaveValue(what);
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+  await expect(win.getByRole("button", { name: new RegExp(`Gasto.*${what}`) })).toHaveCount(2, {
+    timeout: 15_000,
+  });
+});

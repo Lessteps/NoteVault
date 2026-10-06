@@ -163,4 +163,20 @@ describe("financeApi", () => {
 
     expect(() => api.fin_assign_general("no-existe")).toThrow();
   });
+
+  it("materializes recurrents without duplicating", () => {
+    const r = api.fin_recurring_save("", {
+      type: "gasto", amount_cents: 100000, what: "Arriendo", rule: "daily", start: today,
+    }) as { id: string; rule: string };
+    expect(r.rule).toBe("daily");
+
+    expect((api.fin_recurring_run(today) as { created: number }).created).toBe(1);
+    expect((api.fin_recurring_run(today) as { created: number }).created).toBe(0);
+    const day = new FinanceManager(tmpDir).day(today);
+    expect(day.filter((m) => m.what === "Arriendo")).toHaveLength(1);
+    expect(day[0]!.reason).toBe("Automático");
+
+    expect(() => api.fin_recurring_save("", { type: "nope", amount_cents: 1 })).toThrow();
+    expect(() => api.fin_recurring_save("rc-no-existe", { type: "gasto", amount_cents: 1 })).toThrow();
+  });
 });

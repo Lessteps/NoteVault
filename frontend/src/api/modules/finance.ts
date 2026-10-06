@@ -446,5 +446,52 @@ export function financeApi(app: AppState) {
       }
       return { moved };
     },
+
+    fin_recurring_list() {
+      return getFm().recurrents();
+    },
+
+    fin_recurring_save(id: string, fields: unknown) {
+      const fm = getFm();
+      const rid = String(id || "");
+      if (rid && !fm.recurrents().some((r) => r.id === rid)) {
+        throw new ApiError("Ese recurrente ya no existe.");
+      }
+      const f = fields && typeof fields === "object" ? (fields as Record<string, unknown>) : {};
+      const type = String(f.type ?? GASTO);
+      if (!(MOVEMENT_TYPES as readonly string[]).includes(type)) {
+        throw new ApiError("Tipo inválido.");
+      }
+      const amount_cents = cents(f.amount_cents);
+      if (!amount_cents) throw new ApiError("Escribe un importe mayor que cero.");
+      const rule = Recurrence.parse(oneLine(f.rule, 60)).toString();
+      if (!rule) throw new ApiError("Regla de repetición inválida.");
+      const startD = optDate(f.start);
+      const endD = optDate(f.end);
+      const saved = fm.saveRecurrent({
+        id: rid,
+        type,
+        amount_cents,
+        what: oneLine(f.what, 120),
+        category: String(f.category || ""),
+        goal: String(f.goal || ""),
+        rule,
+        start: startD ? todayIso(startD) : todayIso(),
+        end: endD ? todayIso(endD) : "",
+        archived: Boolean(f.archived),
+      });
+      if (!saved) throw new ApiError("Ese recurrente ya no existe.");
+      return saved;
+    },
+
+    fin_recurring_delete(rid: string) {
+      getFm().deleteRecurrent(String(rid));
+      return { ok: true };
+    },
+
+    fin_recurring_run(today: string) {
+      const day = optDate(today);
+      return { created: getFm().runRecurrents(day ? todayIso(day) : todayIso()) };
+    },
   };
 }

@@ -574,8 +574,21 @@ export interface FinGoal {
   notes: string;
 }
 
-export interface FinPace {
-  saved: number;
+export interface FinRecurring {
+  id: string;
+  type: MovementType;
+  amount_cents: number;
+  what: string;
+  category: string;
+  goal: string;
+  rule: string;
+  start: string;
+  end: string;
+  archived: boolean;
+  last: string;
+}
+
+export interface FinPace {  saved: number;
   remaining: number;
   per_day: number | null;
   per_week: number | null;

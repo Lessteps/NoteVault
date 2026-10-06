@@ -175,6 +175,32 @@ export function sanitizeGoal(raw: Record<string, any>, fallbackId = ""): Record<
 }
 export const sanitize_goal = sanitizeGoal;
 
+/** 6 hex deterministas: el id del movimiento generado es estable e idempotente. */
+function hash6(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(16).padStart(8, "0").slice(0, 6);
+}
+
+export function sanitizeRecurrent(raw: Record<string, any>, fallbackId = ""): Record<string, any> {
+  const r = raw && typeof raw === "object" ? raw : {};
+  return {
+    id: String(r.id || fallbackId),
+    type: (MOVEMENT_TYPES as readonly string[]).includes(r.type) ? r.type : GASTO,
+    amount_cents: Math.abs(cleanInt(r.amount_cents)),
+    what: String(r.what || ""),
+    category: String(r.category || ""),
+    goal: String(r.goal || ""),
+    rule: Recurrence.parse(r.rule).toString() || "daily",
+    start: parseDay(r.start) || todayIso(),
+    end: parseDay(r.end) || "",
+    archived: Boolean(r.archived),
+    last: parseDay(r.last) || "",
+  };
+}
+
 export class FinanceManager {
   vaultRoot: string;
   dir: string;
@@ -732,6 +758,92 @@ export class FinanceManager {
   }
   delete_goal(gid: string): void {
     this.deleteGoal(gid);
+  }
+
+  // ── Recurrents ──────────────────────────────────────────────────────
+  // Gastos/ingresos que se materializan solos (arriendo, salario...).
+  // Un solo fichero: son pocos y viajan juntos por Syncthing.
+
+  recurrentsPath(): string {
+    return path.join(this.vaultRoot, LAYOUT.finance_recurring);
+  }
+
+  recurrents(): Record<string, any>[] {
+    const data = loadJson<{ recurrents?: unknown }>(this.recurrentsPath());
+    const raw = data && Array.isArray(data.recurrents) ? data.recurrents : [];
+    return raw.map((r) => sanitizeRecurrent(r as Record<string, any>));
+  }
+
+  _saveRecurrents(list: Record<string, any>[]): void {
+    writeJson(this.recurrentsPath(), { recurrents: list.map((r) => sanitizeRecurrent(r, r.id)) });
+  }
+
+  saveRecurrent(fields: Record<string, any>): Record<string, any> {
+    const list = this.recurrents();
+    const id = String(fields.id || "");
+    if (id) {
+      const i = list.findIndex((r) => r.id === id);
+      if (i === -1) return null as unknown as Record<string, any>;
+      list[i] = sanitizeRecurrent({ ...list[i], ...fields, id });
+      this._saveRecurrents(list);
+      return list[i]!;
+    }
+    const r = sanitizeRecurrent({ ...fields, id: newId("rc") });
+    list.push(r);
+    this._saveRecurrents(list);
+    return r;
+  }
+
+  deleteRecurrent(rid: string): void {
+    const list = this.recurrents().filter((r) => r.id !== String(rid));
+    this._saveRecurrents(list);
+  }
+
+  /**
+   * Crea los movimientos vencidos hasta hoy. Idempotente: el id deriva del
+   * recurrente y la fecha, así que repetir no duplica. `last` evita releer
+   * años; el primer run no resucita más de 62 días.
+   */
+  runRecurrents(todayStr: string): number {
+    const todayD = parseIsoDate(todayStr) ?? new Date();
+    const today = todayIso(todayD);
+    const backstop = todayIso(addDays(todayD, -62));
+    const list = this.recurrents();
+    let created = 0;
+    let touched = false;
+    for (const r of list) {
+      if (r.archived) continue;
+      const start: string = r.start > today ? today : r.start || today;
+      if (start > today) continue;
+      const floor = r.last && r.last >= start ? todayIso(addDays(parseIsoDate(r.last) ?? todayD, 1)) : start;
+      let d = floor < backstop ? backstop : floor;
+      if (d < start) d = start;
+      const end: string = r.end || "";
+      const rule = Recurrence.parse(r.rule);
+      const startD = parseIsoDate(start) ?? todayD;
+      const endD = end ? (parseIsoDate(end) ?? undefined) : undefined;
+      for (; d <= today; d = todayIso(addDays(parseIsoDate(d) ?? todayD, 1))) {
+        if (end && d > end) break;
+        const dd = parseIsoDate(d) ?? todayD;
+        if (!rule.occursOn(dd, startD, endD)) continue;
+        const id = `mv${d.replace(/-/g, "")}-${hash6(`${r.id}:${d}`)}`;
+        if (this.get(d, id)) continue;
+        this.add(d, r.type, r.amount_cents, {
+          id,
+          what: r.what,
+          category: r.category || undefined,
+          goal: r.goal || undefined,
+          reason: "Automático",
+        });
+        created++;
+      }
+      if (r.last !== today) {
+        r.last = today;
+        touched = true;
+      }
+    }
+    if (touched) this._saveRecurrents(list);
+    return created;
   }
 
   goalMovements(gid: string): [Date, Record<string, any>][] {

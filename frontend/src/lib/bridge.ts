@@ -413,6 +413,11 @@ export const api = {
   finGoalSave: (id: string, fields: Partial<FinGoal>) => call<FinGoal>("fin_goal_save", id, fields),
   finGoalDelete: (id: string) => call<{ ok: boolean }>("fin_goal_delete", id),
   finAssignGeneral: (goal: string) => call<{ moved: number }>("fin_assign_general", goal),
+  finRecurringList: () => call<Array<import("./types").FinRecurring>>("fin_recurring_list"),
+  finRecurringSave: (id: string, fields: Partial<import("./types").FinRecurring>) =>
+    call<import("./types").FinRecurring>("fin_recurring_save", id, fields),
+  finRecurringDelete: (id: string) => call<{ ok: boolean }>("fin_recurring_delete", id),
+  finRecurringRun: (today: string) => call<{ created: number }>("fin_recurring_run", today),
   // Ejercicio
   exMeta: () => call<{ days: Array<{ key: string; name: string; subtitle: string; glyph: string }> }>("ex_meta"),
   exList: () => call<Exercise[]>("ex_list"),

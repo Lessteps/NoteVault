@@ -1,4 +1,4 @@
-import { CalendarRange, Sun, Tag, Target } from "lucide-react";
+import { CalendarRange, Repeat, Sun, Tag, Target } from "lucide-react";
 import { useEffect } from "react";
 import { formatMoney } from "../../lib/money";
 import { useFinance, type FinView } from "../../store/finance";
@@ -7,6 +7,7 @@ import { Categories, CategoryDialog } from "./Categories";
 import { Diario } from "./Diario";
 import { FinGoalDialog, FinGoals } from "./Goals";
 import { MovementDialog } from "./MovementDialog";
+import { RecurringDialog, Recurrents } from "./Recurrents";
 import { Sheet } from "./Sheets";
 
 export function FinanceModule() {
@@ -28,6 +29,7 @@ export function FinanceModule() {
         items={[
           { id: "diario", label: "Diario", icon: <Sun />, badge: sidebar?.pending || "" },
           { id: "periodo", label: "Periodo", icon: <CalendarRange /> },
+          { id: "recurrentes", label: "Recurrentes", icon: <Repeat /> },
           { id: "metas", label: "Metas financieras", icon: <Target /> },
           { id: "categorias", label: "Categorías", icon: <Tag /> },
         ]}>
@@ -50,11 +52,13 @@ export function FinanceModule() {
         {!loaded ? <div className="grid flex-1 place-items-center text-[13px] text-faint">Cargando finanzas…</div>
           : view === "diario" ? <Diario />
             : view === "periodo" ? <Sheet />
+              : view === "recurrentes" ? <Recurrents />
               : view === "metas" ? <FinGoals /> : <Categories />}
       </main>
       <MovementDialog />
       <FinGoalDialog />
       <CategoryDialog />
+      <RecurringDialog />
     </div>
   );
 }

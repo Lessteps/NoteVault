@@ -46,6 +46,7 @@ export const LAYOUT = {
   finance_goal: `${DATA_DIR}/finanzas/metas/{id}.json`,
   finance_day: `${DATA_DIR}/finanzas/{year}/{month:02d}/{date}.json`,
   finance_attachments: `${DATA_DIR}/finanzas/adjuntos/{year}/{month:02d}`,
+  finance_recurring: `${DATA_DIR}/finanzas/recurrentes.json`,
   agenda_dir: `${DATA_DIR}/agenda`,
   agenda_routines: `${DATA_DIR}/agenda/routines.json`,
   agenda_events_dir: `${DATA_DIR}/agenda/events`,

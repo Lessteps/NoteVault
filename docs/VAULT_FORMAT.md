@@ -507,6 +507,7 @@ es un **enlace roto**: se conserva, cuenta como no cumplido y no da error.
 .notevault/finanzas/
 ├── categorias/<cat-id>.json          una categoría por archivo
 ├── metas/<fgoal-id>.json             una meta financiera por archivo
+├── recurrentes.json                  gastos/ingresos que se crean solos
 ├── AAAA/MM/AAAA-MM-DD.json           movimientos del día
 └── adjuntos/AAAA/MM/<mov-id>-<n>.png facturas y referencias
 ```
@@ -577,6 +578,23 @@ Id `fYYYYMMDD-xxxxxx`. Claves en el orden de `FINANCE_GOAL_KEYS`:
 - Un día sin movimientos no deja archivo. Mover un movimiento de día escribe
   primero el día nuevo y después el viejo.
 - Borrar un movimiento manda sus adjuntos a `.papelera/finanzas-adjuntos/`.
+
+### `recurrentes.json`
+
+```json
+{"recurrents": [{"id": "rc20261006-a1b2c3", "type": "gasto",
+  "amount_cents": 80000000, "what": "Arriendo", "category": "vivienda",
+  "rule": "monthly:1", "start": "2026-10-01", "end": "",
+  "archived": false, "last": "2026-10-06"}]}
+```
+
+- `rule` usa la misma gramática que las metas (`daily`, `weekly:2`,
+  `every:15`, `monthly:1`); `goal` en vez de `category` para ahorro/retiro.
+- Al abrir Finanzas se materializan los vencidos hasta hoy con id
+  determinista (`mv<fecha>-<hash>`): repetir no duplica. `last` evita releer
+  años y el primer run no resucita más de 62 días. Los generados dicen
+  «Automático» y `reason` no se hereda. Eliminar un recurrente no borra lo
+  ya creado, solo deja de generar.
 
 `financeManager.test.ts` fija totales, cadencias y bytes.
 

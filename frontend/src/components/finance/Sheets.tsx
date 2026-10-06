@@ -163,10 +163,55 @@ function MonthExtras({ first, list, cats }: { first: string; list: Movement[]; c
   );
 }
 
-export function Sheet({ kind }: { kind: Kind }) {
+/** Rango del periodo anterior (semana/año; el mes lo cubre MonthExtras). */
+function prevRange(kind: Kind, first: string): [string, string] | null {
+  if (kind === "semanal") return [addDays(first, -7), addDays(first, -1)];
+  if (kind === "anual") {
+    const y = parseIso(first).getFullYear();
+    return [`${y - 1}-01-01`, `${y - 1}-12-31`];
+  }
+  return null;
+}
+
+/** Comparación con el periodo anterior para semana y año. */
+function PrevCompare({ kind, first, current }: { kind: Kind; first: string; current: FinTotals }) {
+  const version = useFinance((s) => s.version);
+  const [prev, setPrev] = useState<FinTotals | null>(null);
+  useEffect(() => {
+    const b = prevRange(kind, first);
+    if (!b) return;
+    api.finRange(b[0], b[1]).then((ms) => setPrev(totals(ms))).catch(() => setPrev(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, first, version]);
+  if (!prev) return null;
+  const rows: Array<[keyof FinTotals, string]> = [["gasto", "Gastos"], ["ingreso", "Ingresos"], ["ahorro", "Ahorro"], ["balance", "Balance"]];
+  return (
+    <Panel title={`Comparación con ${kind === "semanal" ? "la semana anterior" : "el año anterior"}`}>
+      <div className="space-y-1.5">
+        {rows.map(([key, label]) => {
+          const a = current[key];
+          const b = prev[key];
+          const diff = a - b;
+          return (
+            <div key={key} className="flex items-center gap-2 text-[12.5px]">
+              <span className="w-20 text-dim">{label}</span>
+              <span className="font-mono text-text">{formatMoney(a)}</span>
+              <span className="text-[11px] text-faint">antes {formatMoney(b)}</span>
+              {b !== 0 && <span className="ml-auto font-mono text-[11px]" style={{ color: (key === "gasto" ? diff <= 0 : diff >= 0) ? "var(--nv-mint)" : "var(--nv-danger)" }}>
+                {diff >= 0 ? "+" : ""}{Math.round((diff / Math.abs(b)) * 100)} %</span>}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+export function Sheet() {
   const meta = useFinance((s) => s.meta);
   const version = useFinance((s) => s.version);
   const toast = useApp((s) => s.toast);
+  const [kind, setKind] = useState<Kind>("mensual");
   const [anchor, setAnchor] = useState(todayIso());
   const [all, setAll] = useState<Movement[]>([]);
   const [fKind, setFKind] = useState("");
@@ -183,7 +228,6 @@ export function Sheet({ kind }: { kind: Kind }) {
   const list = useMemo(() => all.filter((m) => (!fKind || m.type === fKind) && (!fCat || m.category === fCat)
     && (!q || `${m.what ?? ""} ${m.reason ?? ""}`.toLowerCase().includes(q.toLowerCase()))), [all, fKind, fCat, q]);
   const t = totals(list);
-  const title = kind === "semanal" ? "Semanal" : kind === "mensual" ? "Mensual" : "Anual";
   const sel = cn(inputBase, "py-1 text-[12px]");
 
   const csv = async () => {
@@ -203,7 +247,17 @@ export function Sheet({ kind }: { kind: Kind }) {
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-[21px] font-semibold text-text">{title}</h1>
+        <h1 className="text-[21px] font-semibold text-text">Periodo</h1>
+        <div className="flex gap-1" role="group" aria-label="Rango del periodo">
+          {(["semanal", "mensual", "anual"] as const).map((k) => (
+            <button key={k} type="button" aria-pressed={kind === k}
+              onClick={() => setKind(k)}
+              className={cn("rounded-lg border px-2.5 py-1 text-[12.5px]",
+                kind === k ? "border-line-strong bg-elevated text-text" : "border-line text-dim hover:bg-hover")}>
+              {k === "semanal" ? "Semana" : k === "mensual" ? "Mes" : "Año"}
+            </button>
+          ))}
+        </div>
         <span className="text-[15px] font-semibold text-dim">{periodLabel(kind, first, last)}</span>
         <span className="flex-1" />
         <GhostButton onClick={() => setAnchor(step(kind, anchor, -1))}>‹</GhostButton>
@@ -227,6 +281,7 @@ export function Sheet({ kind }: { kind: Kind }) {
         <GhostButton onClick={() => void csv()}>Exportar CSV</GhostButton>
       </div>
       {kind === "mensual" && <MonthExtras first={first} list={list} cats={cats} />}
+      {kind !== "mensual" && <PrevCompare kind={kind} first={first} current={totals(all)} />}
       {kind === "anual" ? (
         <>
           <Panel title="Gasto por mes">

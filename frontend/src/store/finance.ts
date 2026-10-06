@@ -6,7 +6,10 @@ import { api } from "../lib/bridge";
 import type { FinCategory, FinGoal, FinMeta, FinSidebar, Movement, MovementType } from "../lib/types";
 import { useApp } from "./app";
 
-export type FinView = "diario" | "semanal" | "mensual" | "anual" | "metas" | "categorias";
+export type FinView = "diario" | "periodo" | "metas" | "categorias";
+
+/** Vistas 2A: semanal/mensual/anual se fundieron en "periodo". */
+const LEGACY_VIEWS = new Set(["semanal", "mensual", "anual"]);
 
 export interface MovementEdit {
   day: string;
@@ -53,7 +56,8 @@ export const useFinance = create<FinState>((set, get) => ({
   load: async () => {
     try {
       const [meta, sidebar] = await Promise.all([api.finMeta(), api.finSidebar()]);
-      set((s) => ({ meta, sidebar, loaded: true, version: s.version + 1 }));
+      // Migra la vista guardada por versiones viejas (semanal/mensual/anual).
+      set((s) => ({ meta, sidebar, loaded: true, version: s.version + 1, view: LEGACY_VIEWS.has(s.view as string) ? "periodo" : s.view }));
     } catch (e) {
       useApp.getState().toast("error", (e as Error).message);
     }

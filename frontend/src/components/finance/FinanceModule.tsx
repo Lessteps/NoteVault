@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, CalendarRange, Sun, Tag, Target } from "lucide-react";
+import { CalendarRange, Sun, Tag, Target } from "lucide-react";
 import { useEffect } from "react";
 import { formatMoney } from "../../lib/money";
 import { useFinance, type FinView } from "../../store/finance";
@@ -27,9 +27,7 @@ export function FinanceModule() {
       <ModuleSidebar title="Finanzas" active={view} onSelect={(id) => setView(id as FinView)}
         items={[
           { id: "diario", label: "Diario", icon: <Sun />, badge: sidebar?.pending || "" },
-          { id: "semanal", label: "Semanal", icon: <CalendarRange /> },
-          { id: "mensual", label: "Mensual", icon: <CalendarDays /> },
-          { id: "anual", label: "Anual", icon: <BarChart3 /> },
+          { id: "periodo", label: "Periodo", icon: <CalendarRange /> },
           { id: "metas", label: "Metas financieras", icon: <Target /> },
           { id: "categorias", label: "Categorías", icon: <Tag /> },
         ]}>
@@ -51,7 +49,7 @@ export function FinanceModule() {
       <main className="flex min-w-0 flex-1 flex-col bg-surface">
         {!loaded ? <div className="grid flex-1 place-items-center text-[13px] text-faint">Cargando finanzas…</div>
           : view === "diario" ? <Diario />
-            : view === "semanal" || view === "mensual" || view === "anual" ? <Sheet key={view} kind={view} />
+            : view === "periodo" ? <Sheet />
               : view === "metas" ? <FinGoals /> : <Categories />}
       </main>
       <MovementDialog />

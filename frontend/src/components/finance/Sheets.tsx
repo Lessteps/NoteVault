@@ -61,43 +61,43 @@ function groupedRows(list: Movement[]): GroupedRow[] {
   return rows;
 }
 
-/** Expense categories × columns (days or months), with totals. */
-function CategoryMatrix({ list, columns, keyOf, cats }: {
+/** Categorías × columnas (días o meses), con totales. Respeta el filtro de tipo. */
+export function CategoryMatrix({ list, columns, keyOf, cats }: {
   list: Movement[]; columns: Array<[string, string]>; keyOf: (m: Movement) => string; cats: FinCategory[];
 }) {
-  const rows = new Map<string, Record<string, number>>();
+  const rows = new Map<string, { type: string; category: string; cells: Record<string, number> }>();
   for (const m of list) {
-    if (m.type !== "gasto") continue;
-    const r = rows.get(m.category ?? "") ?? {};
-    r[keyOf(m)] = (r[keyOf(m)] ?? 0) + m.amount_cents;
-    r._total = (r._total ?? 0) + m.amount_cents;
-    rows.set(m.category ?? "", r);
+    const k = `${m.type}:${m.category ?? ""}`;
+    const r = rows.get(k) ?? { type: m.type, category: m.category ?? "", cells: {} };
+    r.cells[keyOf(m)] = (r.cells[keyOf(m)] ?? 0) + m.amount_cents;
+    r.cells._total = (r.cells._total ?? 0) + m.amount_cents;
+    rows.set(k, r);
   }
-  const sorted = [...rows.entries()].sort((a, b) => (b[1]._total ?? 0) - (a[1]._total ?? 0));
+  const sorted = [...rows.entries()].sort((a, b) => (b[1].cells._total ?? 0) - (a[1].cells._total ?? 0));
   const tpl = `180px repeat(${columns.length}, minmax(76px, 1fr)) 110px`;
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-card">
       <div className="grid min-w-max border-b border-line px-3 py-1.5 font-mono text-[10px] uppercase text-faint" style={{ gridTemplateColumns: tpl }}>
         <span>Categoría</span>{columns.map(([k, l]) => <span key={k} className="text-right">{l}</span>)}<span className="text-right">Total</span>
       </div>
-      {sorted.map(([cid, r]) => {
-        const c = cats.find((x) => x.id === cid);
+      {sorted.map(([k, r]) => {
+        const c = cats.find((x) => x.id === r.category);
         return (
-          <div key={cid || "none"} className="grid min-w-max border-b border-line px-3 py-1.5 text-[12px]" style={{ gridTemplateColumns: tpl }}>
-            <span className="truncate text-dim">{c ? `${c.icon} ${c.name}` : "Sin categoría"}</span>
-            {columns.map(([k]) => <span key={k} className="text-right font-mono text-text">{r[k] ? formatMoney(r[k]) : ""}</span>)}
-            <span className="text-right font-mono font-semibold text-text">{formatMoney(r._total ?? 0)}</span>
+          <div key={k} className="grid min-w-max border-b border-line px-3 py-1.5 text-[12px]" style={{ gridTemplateColumns: tpl }}>
+            <span className="truncate text-dim">{c ? `${c.icon} ${c.name}` : "Sin categoría"} <span className="text-faint">· {TYPE_LABELS[r.type as keyof typeof TYPE_LABELS]}</span></span>
+            {columns.map(([col]) => <span key={col} className="text-right font-mono text-text">{r.cells[col] ? formatMoney(r.cells[col]) : ""}</span>)}
+            <span className="text-right font-mono font-semibold text-text">{formatMoney(r.cells._total ?? 0)}</span>
           </div>
         );
       })}
       {sorted.length > 0 && (
         <div className="grid min-w-max px-3 py-1.5 text-[12px] font-semibold" style={{ gridTemplateColumns: tpl }}>
-          <span>TOTAL GASTOS</span>
-          {columns.map(([k]) => <span key={k} className="text-right font-mono">{formatMoney(sorted.reduce((a, [, r]) => a + (r[k] ?? 0), 0))}</span>)}
-          <span className="text-right font-mono">{formatMoney(sorted.reduce((a, [, r]) => a + (r._total ?? 0), 0))}</span>
+          <span>TOTAL</span>
+          {columns.map(([k]) => <span key={k} className="text-right font-mono">{formatMoney(sorted.reduce((a, [, r]) => a + (r.cells[k] ?? 0), 0))}</span>)}
+          <span className="text-right font-mono">{formatMoney(sorted.reduce((a, [, r]) => a + (r.cells._total ?? 0), 0))}</span>
         </div>
       )}
-      {!sorted.length && <div className="p-6 text-center text-[13px] text-faint">Sin gastos en este periodo.</div>}
+      {!sorted.length && <div className="p-6 text-center text-[13px] text-faint">Sin movimientos en este periodo.</div>}
     </div>
   );
 }

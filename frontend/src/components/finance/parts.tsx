@@ -103,14 +103,19 @@ export function categoryText(m: Movement): string {
 
 export interface GroupedRow { kind: "group" | "data" | "subtotal" | "total"; label?: string; m?: Movement; amount?: number }
 
-/** Movement table; groups (days) with subtotals and a final total when asked. */
+/** Movement table; groups (days) with subtotals and a final total when asked.
+ * Cuatro columnas (Fecha·Detalle·Categoría·Importe): la hora y el tipo viven
+ * en el desplegable de la fila. */
 export function MovementTable({ rows, withDate }: { rows: GroupedRow[]; withDate?: boolean }) {
   const edit = useFinance((s) => s.edit);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const cols = withDate
+    ? "grid-cols-[88px_minmax(0,1fr)_150px_110px_30px_24px]"
+    : "grid-cols-[minmax(0,1fr)_150px_110px_30px_24px]";
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-card">
-      <div className={cn("grid border-b border-line px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-faint",
-        withDate ? "grid-cols-[90px_56px_76px_160px_1fr_180px_120px_30px_24px]" : "grid-cols-[56px_76px_160px_1fr_180px_120px_30px_24px]")}>
-        {withDate && <span>Día</span>}<span>Hora</span><span>Tipo</span><span>Categoría</span><span>En qué</span><span>Razón</span><span className="text-right">Importe</span><span>📎</span><span />
+      <div className={cn("grid border-b border-line px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-faint", cols)}>
+        {withDate && <span>Fecha</span>}<span>Detalle</span><span>Categoría</span><span className="text-right">Importe</span><span>📎</span><span />
       </div>
       {rows.map((r, i) => {
         if (r.kind === "group") return <div key={i} className="bg-elevated/60 px-3 py-1 text-[11.5px] font-semibold text-dim">{r.label}</div>;
@@ -123,22 +128,35 @@ export function MovementTable({ rows, withDate }: { rows: GroupedRow[]; withDate
           );
         }
         const m = r.m!;
+        const open = openId === m.id;
+        const detail = [m.what, m.reason].filter(Boolean).join(" — ");
         return (
-          <button key={m.id} type="button" onDoubleClick={() => edit({ day: m.date, kind: m.type, movement: m })}
-            onClick={() => edit({ day: m.date, kind: m.type, movement: m })}
-            title="Editar o adjuntar facturas"
-            className={cn("group grid w-full items-center border-b border-line px-3 py-1.5 text-left text-[12.5px] last:border-b-0 hover:bg-hover",
-              withDate ? "grid-cols-[90px_56px_76px_160px_1fr_180px_120px_30px_24px]" : "grid-cols-[56px_76px_160px_1fr_180px_120px_30px_24px]")}>
-            {withDate && <span className="text-[11.5px] text-faint">{m.date.slice(5)}</span>}
-            <span className="font-mono text-[11.5px] text-faint">{m.time ?? ""}</span>
-            <span style={{ color: TYPE_COLOURS[m.type] }}>{TYPE_LABELS[m.type]}</span>
-            <span className="truncate text-dim">{categoryText(m)}</span>
-            <span className="truncate text-text">{m.what ?? ""}</span>
-            <span className="truncate text-faint">{m.reason ?? ""}</span>
-            <span className="text-right font-mono" style={{ color: TYPE_COLOURS[m.type] }}>{formatMoney(signed(m), "COP", true)}</span>
-            <span className="text-faint">{m.attachments.length ? <span className="flex items-center gap-0.5 text-[11px]"><Paperclip size={11} />{m.attachments.length}</span> : ""}</span>
-            <span className="text-faint opacity-0 transition-opacity group-hover:opacity-100"><Pencil size={12} /></span>
-          </button>
+          <div key={m.id} className="border-b border-line last:border-b-0">
+            <button type="button" aria-expanded={open}
+              onClick={() => setOpenId(open ? null : m.id)}
+              title="Ver detalle"
+              className={cn("group grid w-full items-center px-3 py-1.5 text-left text-[12.5px] hover:bg-hover", cols)}>
+              {withDate && <span className="text-[11.5px] text-faint">{m.date.slice(5)}</span>}
+              <span className="truncate text-text"><span className="sr-only">{TYPE_LABELS[m.type]} </span>{detail || "—"}</span>
+              <span className="truncate text-dim">{categoryText(m)}</span>
+              <span className="text-right font-mono" style={{ color: TYPE_COLOURS[m.type] }}>{formatMoney(signed(m), "COP", true)}</span>
+              <span className="text-faint">{m.attachments.length ? <span className="flex items-center gap-0.5 text-[11px]"><Paperclip size={11} />{m.attachments.length}</span> : ""}</span>
+              <span className="text-faint opacity-0 transition-opacity group-hover:opacity-100"><Pencil size={12} /></span>
+            </button>
+            {open && (
+              <div className="space-y-1.5 px-3 pb-2.5 pt-0.5 text-[12px]">
+                <div className="flex items-center gap-3 text-dim">
+                  <span style={{ color: TYPE_COLOURS[m.type] }}>{TYPE_LABELS[m.type]}</span>
+                  {m.time && <span className="font-mono">{m.time}</span>}
+                  {m.reason && m.what && <span className="truncate text-faint">{m.what}</span>}
+                </div>
+                <button type="button" onClick={() => edit({ day: m.date, kind: m.type, movement: m })}
+                  className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-dim hover:bg-hover hover:text-text">
+                  Editar
+                </button>
+              </div>
+            )}
+          </div>
         );
       })}
       {!rows.length && <div className="p-6 text-center text-[13px] text-faint">Sin movimientos.</div>}

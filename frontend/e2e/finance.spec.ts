@@ -94,6 +94,7 @@ test("NV-F-004 eliminar movimiento lo saca de la tabla y del disco", async () =>
   await expect(row).toBeVisible({ timeout: 15_000 });
 
   await row.click();
+  await win.getByRole("button", { name: "Editar" }).click();
   const dialog = win.getByRole("dialog", { name: "Editar movimiento" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Eliminar" }).click();

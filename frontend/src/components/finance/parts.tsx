@@ -56,13 +56,25 @@ export function MoneyInput({ value, onChange, className, placeholder = "$ 0", au
   );
 }
 
-export function Tiles({ t, dayLabel }: { t: FinTotals; dayLabel?: string }) {
+export type TileKey = "gasto" | "ingreso" | "ahorro" | "balance";
+
+const TILE_COLS: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-4",
+};
+
+/** Cuatro cifras o un subconjunto (el Diario solo enseña Gastos + Ahorro). */
+export function Tiles({ t, daily, only }: { t: FinTotals; daily?: boolean; only?: TileKey[] }) {
+  const show = (k: TileKey) => !only || only.includes(k);
+  const n = (["gasto", "ingreso", "ahorro", "balance"] as const).filter(show).length;
   return (
-    <div className="grid grid-cols-4 gap-3">
-      <StatTile value={formatMoney(t.gasto)} label="Gastos" colour={TYPE_COLOURS.gasto} />
-      <StatTile value={formatMoney(t.ingreso)} label="Ingresos" colour={TYPE_COLOURS.ingreso} />
-      <StatTile value={formatMoney(t.ahorro - t.retiro)} label={dayLabel ? "Ahorro" : "Ahorro neto"} colour={TYPE_COLOURS.ahorro} />
-      <StatTile value={formatMoney(t.balance, "COP", true)} label={dayLabel ?? "Balance"} colour={t.balance >= 0 ? "var(--nv-mint)" : "var(--nv-danger)"} />
+    <div className={cn("grid gap-3", TILE_COLS[n] ?? "grid-cols-4")}>
+      {show("gasto") && <StatTile value={formatMoney(t.gasto)} label="Gastos" colour={TYPE_COLOURS.gasto} />}
+      {show("ingreso") && <StatTile value={formatMoney(t.ingreso)} label="Ingresos" colour={TYPE_COLOURS.ingreso} />}
+      {show("ahorro") && <StatTile value={formatMoney(t.ahorro - t.retiro)} label={daily ? "Ahorro" : "Ahorro neto"} colour={TYPE_COLOURS.ahorro} />}
+      {show("balance") && <StatTile value={formatMoney(t.balance, "COP", true)} label={daily ? "Balance del día" : "Balance"} colour={t.balance >= 0 ? "var(--nv-mint)" : "var(--nv-danger)"} />}
     </div>
   );
 }

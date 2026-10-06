@@ -112,7 +112,7 @@ export function Diario() {
         </div>
         <p className="mt-1.5 text-[11px] text-faint">{hint}</p>
       </div>
-      <Tiles t={t} dayLabel="Balance del día" />
+      <Tiles t={t} daily only={["gasto", "ahorro"]} />
       {checks.length > 0 && (
         <section className="rounded-xl border border-line bg-card p-3">
           <div className="mb-2 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Ahorros de hoy</div>

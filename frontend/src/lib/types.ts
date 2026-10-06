@@ -1,3 +1,4 @@
+import type { PlanPreconditions, ScopeTopic } from "./planTime";
 // Shapes returned by notevault_app/webapp/api.py. Keep in step with it.
 
 export type RenderingMode = "auto" | "hardware" | "software";
@@ -1271,7 +1272,7 @@ export interface MentorObjectiveOptions {
   goals: Array<{ goalId: string; name: string; area: string; kind: "daily" | "weekly" | "due" | "topics"; itemIds: string[]; hint: string }>;
   subjects: Array<{ subject: string; label: string; topics: number; open: number }>;
   tasksPending: number;
-  plan: { month: string; items: number } | null;
+  plan: { month: string; items: number; id?: string; start?: string; end?: string; minutesPerDay?: number | null } | null;
 }
 export interface MentorPlanRequest {
   availableMinutes: number;
@@ -1382,7 +1383,7 @@ export type MentorChatResult =
 export type MentorDeliverableStatus = "idea" | "en_curso" | "hecho";
 export type MentorTopicState = "sin_tratar" | "practicando" | "consolidado" | "completo" | "examen_pendiente" | "no_encontrado";
 export interface MentorPlannedTopic {
-  folder: string; title: string; skills?: string[]; targetWeek: number; estMinutes: number; completedAt?: string;
+  folder: string; title: string; skills?: string[]; targetWeek: number; estMinutes: number; completedAt?: string; diagnostic?: boolean;
 }
 export interface MentorWeekSlice { week: number; start: string; end: string; topics: string[]; minutes: number; capacityMinutes: number }
 export interface MentorRequiredGoal { goalId: string; itemId?: string; note: string }
@@ -1391,7 +1392,11 @@ export interface MentorSubplan {
   id: string; area: string; objective: string; goalId?: string; goalItemIds?: string[];
   topics: MentorPlannedTopic[]; weeks: MentorWeekSlice[]; requiredGoals: MentorRequiredGoal[]; deliverable?: MentorDeliverable; notes?: string;
 }
-export interface MentorMonthlyPlan { month: string; createdAt: string; updatedAt: string; hoursPerWeek?: number; subplans: MentorSubplan[] }
+export interface MentorPlan {
+  id: string; start: string; end: string; month?: string; name?: string; archived?: boolean; createdAt: string; updatedAt: string;
+  hoursPerWeek?: number; preconditions?: PlanPreconditions; auto?: boolean; rationale?: string; subplans: MentorSubplan[];
+}
+export type MentorMonthlyPlan = MentorPlan;
 export interface MentorTopicView extends MentorPlannedTopic { state: MentorTopicState; pct: number; found: boolean }
 export interface MentorSubplanView { id: string; topics: MentorTopicView[]; total: number; done: number; pct: number; currentWeek: number }
 export interface MentorPlanDerived {
@@ -1399,10 +1404,12 @@ export interface MentorPlanDerived {
   summary: { subplans: number; topics: number; done: number; pct: number; currentWeek: number; weeks: number };
 }
 export interface MentorPlanItem {
-  kind: "topic" | "deliverable"; month: string; subplanId: string; label: string; area: string; title: string;
+  kind: "topic" | "deliverable"; planId: string; subplanId: string; label: string; area: string; title: string;
   folder?: string; skills?: string[]; estMinutes: number; targetWeek: number; overdue: boolean;
 }
 export interface MentorPlanDraft {
+  id?: string; start?: string; end?: string;
+  preconditions?: PlanPreconditions; auto?: boolean; coverage?: string; fallbackReason?: string;
   month: string; hoursPerWeek: number; rationale: string; subplans: MentorSubplan[]; warnings: string[]; fits: boolean;
   totalMinutes: number; availableMinutes: number; requiredHoursPerWeek: number | null; from: string; discarded: string[];
   why: Record<string, string>;
@@ -1410,13 +1417,30 @@ export interface MentorPlanDraft {
 export type MentorPlanGet =
   | { loading: true }
   | {
-      loading: false; month: string; today: string; plan: MentorMonthlyPlan | null; derived: MentorPlanDerived | null;
+      loading: false; id: string | null; month: string; today: string; status?: MentorPlanStatus; plan: MentorPlan | null; derived: MentorPlanDerived | null;
       goals: Record<string, { name: string; pct: number; items: Record<string, { name: string; pct: number }> }>;
       projects: Record<string, { id: string; name: string; status: string }>;
-      items: MentorPlanItem[]; months: string[]; aiConfigured: boolean;
+      items: MentorPlanItem[]; months: string[]; plans: MentorPlanRow[]; aiConfigured: boolean;
     };
-export interface MentorPlanListRow { month: string; subplans: number; topics: number; completed: number }
-export interface MentorPlanAccepted { month: string; subplans: number; topics: number; warnings: string[]; fits: boolean }
+export type MentorPlanStatus = "activo" | "futuro" | "terminado";
+export interface MentorPlanRow {
+  id: string; start: string; end: string; month?: string; name: string; period: string; status: MentorPlanStatus; archived: boolean; auto: boolean;
+  subplans: number; topics: number; completed: number; pct: number; minutesPerDay: number | null;
+}
+/** Compatibilidad: antes solo había planes mensuales. */
+export type MentorPlanListRow = MentorPlanRow;
+export interface MentorPlanAccepted { id: string; month: string; start: string; end: string; subplans: number; topics: number; warnings: string[]; fits: boolean }
+export type MentorPlanOptions =
+  | { loading: true }
+  | {
+      loading: false; today: string; aiConfigured: boolean;
+      goals: Array<{ id: string; name: string; area: string; end: string | null; topics: number; minutes: number }>;
+      areas: Array<{ id: string; name: string; total: number; pending: number; minutes: number }>;
+      topics: ScopeTopic[];
+    };
+export type MentorPlanGenerateResult =
+  | { loading: true }
+  | ({ loading: false; kind: "plan_draft"; source: "ai" | "auto"; text: string; planDraft: MentorPlanDraft; chatId: string } & MentorChatState);
 export interface MentorGoalCreated { goalId: string; name: string; items: number; schedule: MentorGoalSchedule }
 export interface MentorGoalItemSlim {
   id: string; parent: string; name: string; status: string; due: string | null; start: string | null;

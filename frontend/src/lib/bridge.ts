@@ -346,11 +346,18 @@ export const api = {
   mentorChatClear: () => call<import("./types").MentorChatState>("mentor_chat_clear"),
   mentorChat: (message: string, chatId?: string, mode?: "plan") => call<import("./types").MentorChatResult>("mentor_chat", { message, chatId, mode }),
   mentorPlanList: () => call<import("./types").MentorPlanListRow[]>("mentor_plan_list"),
-  mentorPlanGet: (month?: string) => call<import("./types").MentorPlanGet>("mentor_plan_get", { month }),
+  mentorPlanGet: (id?: string) => call<import("./types").MentorPlanGet>("mentor_plan_get", { id }),
+  mentorPlanOptions: () => call<import("./types").MentorPlanOptions>("mentor_plan_options"),
+  mentorPlanGenerate: (preconditions: import("./planTime").PlanPreconditions) => call<import("./types").MentorPlanGenerateResult>("mentor_plan_generate", { preconditions }),
+  mentorPlanRename: (id: string, name: string) => call<import("./types").MentorPlan>("mentor_plan_rename", { id, name }),
+  mentorPlanArchive: (id: string, archived: boolean) => call<import("./types").MentorPlan>("mentor_plan_archive", { id, archived }),
+  mentorPlanDelete: (id: string) => call<{ id: string; plans: import("./types").MentorPlanRow[] }>("mentor_plan_delete", { id }),
   mentorPlanDraftAccept: (turnId: string, chatId?: string) => call<import("./types").MentorPlanAccepted>("mentor_plan_draft_accept", { turnId, chatId }),
   mentorPlanDraftDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_plan_draft_discard", turnId),
-  mentorPlanUpdateDeliverable: (opts: { month: string; subplanId: string; status: import("./types").MentorDeliverableStatus; projectId?: string | null }) =>
-    call<import("./types").MentorMonthlyPlan>("mentor_plan_update_deliverable", opts),
+  /** Mismo efecto que `mentorPlanDraftDiscard` (nombre corto del contrato). */
+  mentorPlanDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_plan_discard", turnId),
+  mentorPlanUpdateDeliverable: (opts: { id: string; subplanId: string; status: import("./types").MentorDeliverableStatus; projectId?: string | null }) =>
+    call<import("./types").MentorPlan>("mentor_plan_update_deliverable", opts),
   mentorChatsList: () => call<import("./types").MentorChatMeta[]>("mentor_chats_list"),
   mentorChatNew: () => call<import("./types").MentorChatState>("mentor_chat_new"),
   mentorChatOpen: (id: string) => call<import("./types").MentorChatState>("mentor_chat_open", id),

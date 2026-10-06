@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, CircleAlert, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useMentor } from "../../store/mentor";
 import { BlockProgress as BlockBar } from "../common/charts";
+import { cn } from "../ui";
 
 /** Cabecera + avisos de carga/errores + contenido; los paneles de datos la comparten. */
 export function PanelPage({ title, subtitle, children, wide, action }: { title: string; subtitle?: string; children: ReactNode; wide?: boolean; action?: ReactNode }) {
@@ -159,5 +160,21 @@ export function AreaRow({ title, colour, count, noun, avg, children }: { title: 
       </h2>
       <CardRow label={title}>{children}</CardRow>
     </section>
+  );
+}
+
+/** Chip seleccionable (con `aria-pressed`) de los formularios del Mentor: el mismo aspecto que los de «Hoy». */
+export function ChipToggle({ active, onClick, children, title, label }: { active: boolean; onClick: () => void; children: ReactNode; title?: string; label?: string }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      aria-label={label}
+      title={title}
+      onClick={onClick}
+      className={cn("rounded-md border px-2.5 py-1 text-left text-[12.5px]", active ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:bg-hover hover:text-text")}
+    >
+      {children}
+    </button>
   );
 }

@@ -784,7 +784,7 @@ ignorarlo, y no sube `FORMAT_VERSION`.
 | `mentor_chat` | `.notevault/mentor/chat.json` — (antiguo) la única conversación con el Mentor; solo se lee para migrarla |
 | `mentor_chat_file` | `.notevault/mentor/chats/<id>.json` — una conversación con el Mentor |
 | `mentor_chats_index` | `.notevault/mentor/chats/index.json` — la conversación activa y la marca de migración |
-| `mentor_plan` | `.notevault/mentor/plans/AAAA-MM.json` — el plan mensual del Mentor (ver «Plan mensual del Mentor»); `mentor_plans_dir` es la carpeta |
+| `mentor_plan` | `.notevault/mentor/plans/<id>.json` — un plan del Mentor sobre un periodo libre (ver «Plan del Mentor»); `<id>` es `<inicio>_<fin>` o, en los planes mensuales heredados, `AAAA-MM`; `mentor_plans_dir` es la carpeta |
 
 ```json
 {"date": "2026-10-05", "availableMinutes": 90, "objective": "Cerrar la meta de álgebra",
@@ -843,20 +843,26 @@ un archivo `.notevault/mentor/chats/<id>.json` (`<id>` = `[A-Za-z0-9_-]`, hasta 
 - La IA solo recibe el informe, un catálogo compacto de temas (carpeta, título, materia, skills,
   completitud, minutos estimados) y esta conversación; nunca el contenido de las notas.
 
-### Plan mensual del Mentor (`plans/<AAAA-MM>.json`)
+### Plan del Mentor (`plans/<id>.json`)
 
-Un archivo por mes con los **subplanes** del mes (uno por área y objetivo). Es opcional y aditivo:
-un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`.
+Un archivo por plan. Un plan cubre un **periodo libre** `[start, end]` (1 semana, 2 meses, fechas a medida…) y
+agrupa los **subplanes** (uno por área y objetivo). Varios planes pueden coexistir y solaparse. Es opcional y
+aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`.
 
 ```json
-{"month": "2026-10", "createdAt": "2026-10-05T09:00:00.000Z", "updatedAt": "2026-10-12T18:30:00.000Z",
- "hoursPerWeek": 6,
+{"id": "2026-10-06_2026-11-05", "start": "2026-10-06", "end": "2026-11-05",
+ "createdAt": "2026-10-05T09:00:00.000Z", "updatedAt": "2026-10-12T18:30:00.000Z",
+ "hoursPerWeek": 14.9, "auto": false, "rationale": "Primero bases y luego APIs.",
+ "preconditions": {"start": "2026-10-06", "end": "2026-11-05", "minutesPerDay": 240,
+                   "studyDays": [1,2,3,4,5,6], "blockedDates": ["2026-10-12"], "pace": "normal",
+                   "goalIds": ["g20260914-a1b2c3"], "subjects": ["Programación"], "freeObjective": "",
+                   "levels": {"Programación": "basico"}, "deliverables": true},
  "subplans": [{
    "id": "s1-programacion", "area": "Programación", "objective": "Desarrollo Backend",
    "goalId": "g20260914-a1b2c3", "goalItemIds": ["i20260914-abc123"],
    "topics": [{"folder": "Programación/Python/1 Fundamentos", "title": "1 Fundamentos", "skills": ["debug"],
-               "targetWeek": 1, "estMinutes": 90, "completedAt": "2026-10-09"}],
-   "weeks": [{"week": 1, "start": "2026-10-01", "end": "2026-10-07", "topics": ["Programación/Python/1 Fundamentos"],
+               "targetWeek": 1, "estMinutes": 90, "completedAt": "2026-10-09", "diagnostic": true}],
+   "weeks": [{"week": 1, "start": "2026-10-06", "end": "2026-10-12", "topics": ["Programación/Python/1 Fundamentos"],
               "minutes": 90, "capacityMinutes": 240}],
    "requiredGoals": [{"goalId": "g20260914-a1b2c3", "itemId": "i20260914-abc123", "note": "submeta que lo pide"}],
    "deliverable": {"title": "API de inventario", "description": "…", "criteria": ["CRUD", "tests"],
@@ -864,7 +870,20 @@ un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`.
    "notes": "opcional"}]}
 ```
 
-- Las semanas son trozos de 7 días desde el día 1 del mes (la última puede ser más corta).
+- `start`/`end` (AAAA-MM-DD, ambos incluidos) son el periodo. `id` es el nombre del archivo sin `.json`
+  (`<inicio>_<fin>`); la app manda el nombre del archivo si difiere.
+- **Planes mensuales heredados**: un archivo `AAAA-MM.json` con `"month": "2026-10"` y sin `start`/`end` se
+  lee como un plan de periodo (día 1 – último día del mes, id = el mes). No hay migración: el archivo no se
+  reescribe hasta que se modifica (p. ej. el estado del entregable) y entonces conserva `month`.
+- Las semanas son trozos de 7 días desde `start` (la última puede ser más corta); `targetWeek` cuenta desde 1
+  en el plan. `weeks[].capacityMinutes` es la capacidad real de esa semana para el subplan (solo los días de
+  estudio no bloqueados, desde hoy si el plan ya empezó).
+- `preconditions` (opcional) son los hechos con los que se armó el plan: `minutesPerDay` (tiempo diario),
+  `studyDays` (ISO: 1 = lunes … 7 = domingo), `blockedDates`, `pace` (`suave` 70 % / `normal` 85 % /
+  `intenso` 100 % del tiempo declarado), metas (`goalIds`) y materias (`subjects`) a cubrir, `levels` por
+  materia (`empezando` | `basico` | `intermedio` | `avanzado` | `no_se`: solo una hipótesis para el reparto) y
+  `deliverables`. `auto: true` marca un plan automático (sin IA). `topics[].diagnostic` marca el primer tema
+  de una materia de nivel «no sé» (se empieza con un diagnóstico corto).
 - `topics[].folder` es la carpeta del tema (el mismo id que usan los `topic_links` de las submetas). El
   estado de práctica (sin tratar / practicando / consolidado / completo / examen pendiente) y el
   porcentaje **no se guardan**: se derivan en vivo del motor de práctica.
@@ -872,10 +891,12 @@ un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`.
   app observa el tema completo y no se vuelve a modificar.
 - `deliverable.status`: `idea` | `en_curso` | `hecho`; `projectId` enlaza un proyecto existente (nunca se
   crean proyectos automáticamente). Es lo único que el Mentor edita después de aceptar el plan.
-- El plan diario sale del mensual: los temas cuya semana objetivo es la actual (o anterior) y siguen sin
-  completar se ofrecen primero en «Hoy».
-- La IA propone el plan (`plan_draft` en la conversación, con temas del catálogo real y metas existentes);
-  solo se escribe este archivo cuando el estudiante pulsa «Aceptar plan».
+- El plan diario sale de los planes **activos** (los que contienen la fecha de hoy): los temas cuya semana
+  objetivo es la actual (o anterior) y siguen sin completar se ofrecen primero en «Hoy»; con planes
+  solapados se combinan sin repetir un mismo tema. El `minutesPerDay` del plan activo sugiere el tiempo de «Hoy».
+- La IA propone el plan (`plan_draft` en la conversación o desde el formulario de precondiciones, con temas del
+  catálogo real y metas existentes; las precondiciones son hechos fijos que no puede cambiar); sin IA la app
+  genera un plan automático determinista. Solo se escribe este archivo cuando el estudiante pulsa «Aceptar plan».
 
 ## Contrato móvil (Mobile Contract)
 

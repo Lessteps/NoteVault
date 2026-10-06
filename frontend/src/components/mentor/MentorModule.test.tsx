@@ -223,7 +223,7 @@ describe("MentorModule: tiempo y objetivo de la sesión", () => {
     const propose = vi.spyOn(api, "mentorPlanPropose").mockResolvedValue({ ...proposal(), objective: "Meta: Desarrollo Backend" });
     await mount();
     const sel = host.querySelector("[aria-label='Objetivo de la sesión']")!;
-    for (const t of ["Sin objetivo", "Terminar todas mis tareas pendientes", "Repasar lo vencido", "Lo que toca del plan del mes", "Estudiar Programación", "Meta: Desarrollo Backend", "Meta: Inglés B2"]) {
+    for (const t of ["Sin objetivo", "Terminar todas mis tareas pendientes", "Repasar lo vencido", "Lo que toca de mis planes", "Estudiar Programación", "Meta: Desarrollo Backend", "Meta: Inglés B2"]) {
       expect(sel.textContent).toContain(t);
     }
     await click(button("Meta: Desarrollo Backend", sel));
@@ -260,7 +260,7 @@ describe("MentorModule: tiempo y objetivo de la sesión", () => {
     useMentor.getState().setPendingObjective({ type: "plan" });
     await mount();
     await flush();
-    expect(button("Lo que toca del plan del mes").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Lo que toca de mis planes").getAttribute("aria-pressed")).toBe("true");
     expect(useMentor.getState().pendingObjective).toBeNull();
   });
 

@@ -1,32 +1,38 @@
-// Mentor — Plan: el plan MENSUAL (y de ahí el diario) por subplanes de área y objetivo.
+// Mentor — Plan: una SUB-INTERFAZ por cada plan (en la barra lateral del Mentor) y un resumen de todos.
 //
-// SOLO LECTURA salvo el estado del entregable: los temas, las metas y los proyectos se editan en sus
-// módulos (cada bloque trae su botón "Abrir en …"). El estado de práctica y los porcentajes se derivan
-// en vivo del motor de práctica; el registro de temas completados (fecha) lo anota `mentor_plan_get` la
-// primera vez que ve un tema completo. El plan lo propone la IA en el chat del Mentor y solo se guarda
-// al pulsar "Aceptar plan" (código determinista).
+// Un plan cubre un periodo libre que decide el estudiante y se arma desde el formulario de precondiciones
+// (`PlanForm`). SOLO LECTURA salvo el estado del entregable y las acciones del plan (renombrar, archivar,
+// eliminar a la papelera): los temas, las metas y los proyectos se editan en sus módulos (cada bloque trae
+// su botón «Abrir en …»). El estado de práctica y los porcentajes se derivan en vivo del motor de práctica;
+// el registro de temas completados (fecha) lo anota `mentor_plan_get` la primera vez que ve un tema completo.
+// El borrador (de la IA o automático) solo se guarda al pulsar «Aceptar plan» (código determinista).
 
-import { CalendarDays, Check, ChevronLeft, ChevronRight, ExternalLink, MessageSquarePlus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, CalendarDays, Check, ExternalLink, MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
+import { periodLabel, shortWeekLabel, weeksLabel } from "../../lib/planTime";
 import type {
+  MentorDeliverableStatus,
+  MentorPlan as MentorPlanData,
   MentorPlanDraft,
   MentorPlanGet,
   MentorPlanItem,
+  MentorPlanRow,
+  MentorPlanStatus,
   MentorSubplan,
   MentorSubplanView,
   MentorTopicState,
-  MentorDeliverableStatus,
 } from "../../lib/types";
 import { useApp } from "../../store/app";
-import { useMentor } from "../../store/mentor";
+import { planViewId, useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { useProjects } from "../../store/projects";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
-import { cn } from "../ui";
+import { cn, askText, confirmAction } from "../ui";
 import { openGoalInMetas } from "./MentorGoals";
 import { openTopic } from "./openTopic";
 import { AreaRow, CARD_CLASS, dayText, Disclosure, hm, LoadState, PanelPage, ProgressBar } from "./parts";
+import { PACE_LABEL, PlanForm } from "./PlanForm";
 
 type Loaded = Extract<MentorPlanGet, { loading: false }>;
 
@@ -52,14 +58,11 @@ const STATE_COLOUR: Record<MentorTopicState, string> = {
 };
 export const DELIVERABLE_LABEL: Record<MentorDeliverableStatus, string> = { idea: "Idea", en_curso: "En curso", hecho: "Hecho" };
 const DELIVERABLE_COLOUR: Record<MentorDeliverableStatus, string> = { idea: "var(--nv-faint)", en_curso: "var(--nv-accent)", hecho: "var(--nv-mint)" };
+export const STATUS_LABEL: Record<MentorPlanStatus, string> = { activo: "Activo", futuro: "Futuro", terminado: "Terminado" };
+export const STATUS_COLOUR: Record<MentorPlanStatus, string> = { activo: "var(--nv-mint)", futuro: "var(--nv-accent)", terminado: "var(--nv-faint)" };
 
 export const monthNow = (): string => {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-};
-const shiftMonth = (m: string, delta: number): string => {
-  const [y, mm] = m.split("-").map(Number);
-  const d = new Date(y!, mm! - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 export const monthLabel = (m: string): string => {
@@ -67,15 +70,16 @@ export const monthLabel = (m: string): string => {
   const t = new Date(y!, mm! - 1, 1).toLocaleDateString("es", { month: "long", year: "numeric" });
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
-const shortRange = (start: string, end: string): string => `${Number(start.slice(8))}–${Number(end.slice(8))}`;
+const DAY_SHORT = ["L", "M", "X", "J", "V", "S", "D"];
+const num1 = (n: number): string => String(Math.round(n * 10) / 10).replace(".", ",");
 
 async function openProjectInProyectos(id: string): Promise<void> {
   await useProjects.getState().open(id);
   useApp.getState().setModule("proyectos");
 }
 
-/** Carga el plan del mes con el reintento de la vault fría (como el resto de paneles). */
-function usePlanData(month: string) {
+/** Carga un plan (o, sin id, el resumen: el plan por defecto con todos los planes) con el reintento de la vault fría. */
+function usePlanData(id: string | undefined) {
   const planVersion = useMentor((s) => s.planVersion);
   const [data, setData] = useState<Loaded | null>(null);
   const [warming, setWarming] = useState(false);
@@ -91,7 +95,7 @@ function usePlanData(month: string) {
     setError("");
     try {
       for (let i = 0; i < COLD_RETRY_MAX; i++) {
-        const r = await api.mentorPlanGet(month);
+        const r = await api.mentorPlanGet(id);
         if (!alive.current) return;
         if (!r.loading) {
           setData(r);
@@ -109,17 +113,23 @@ function usePlanData(month: string) {
         setError((e as Error).message);
       }
     }
-  }, [month]);
+  }, [id]);
   useEffect(() => {
     void load();
   }, [load, planVersion]);
   return { data, warming, error, reload: load, setData };
 }
 
-export function MentorPlan() {
-  const [month, setMonth] = useState(monthNow);
-  const [tab, setTab] = useState<"mes" | "semana">("mes");
-  const { data, warming, error, reload, setData } = usePlanData(month);
+/** El panel Plan del Mentor: `planId` = la sub-interfaz de ese plan; sin él, el resumen de todos los planes. */
+export function MentorPlan({ planId }: { planId?: string }) {
+  return planId ? <PlanView key={planId} planId={planId} /> : <PlansOverview />;
+}
+
+// ── Resumen de planes ────────────────────────────────────────────────────
+
+function PlansOverview() {
+  const { data, warming, error, reload } = usePlanData(undefined);
+  const [creating, setCreating] = useState(false);
   const chatLoaded = useMentor((s) => s.chatLoaded);
   const loadChat = useMentor((s) => s.loadChat);
   const turns = useMentor((s) => s.turns);
@@ -134,92 +144,91 @@ export function MentorPlan() {
   }, [chatLoaded, loadChat]);
 
   const draftTurn = turns.find((t) => t.id === pending && t.planDraft);
-  const plan = data?.plan ?? null;
-  const summary = data?.derived?.summary;
+  const plans = data?.plans ?? [];
 
   return (
     <PanelPage
-      title="Mentor — Plan"
-      subtitle="El plan del mes por áreas y objetivos, y de ahí el plan de cada día. El estado sale de tu práctica; solo el entregable se marca aquí."
+      title="Mentor — Planes"
+      subtitle="Cada plan cubre el periodo que tú decides y tiene su propia sub-interfaz. Aquí ves todos y lo que toca hoy y esta semana."
       wide
       action={
-        <PrimaryButton onClick={() => void startPlan()}>
-          <MessageSquarePlus size={14} /> ＋ Generar plan del mes con el Mentor
-        </PrimaryButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <GhostButton onClick={() => void startPlan()} title="Conversa con el Mentor para armar un plan">
+            <MessageSquarePlus size={13} /> Pedirlo al Mentor
+          </GhostButton>
+          <PrimaryButton onClick={() => setCreating((v) => !v)}>
+            ＋ Nuevo plan
+          </PrimaryButton>
+        </div>
       }
     >
-      <div className="flex flex-wrap items-center gap-2" aria-label="Mes del plan">
-        <button type="button" aria-label="Mes anterior" onClick={() => setMonth((m) => shiftMonth(m, -1))} className="grid h-7 w-7 place-items-center rounded-md border border-line text-dim hover:bg-hover hover:text-text">
-          <ChevronLeft size={15} />
-        </button>
-        <span className="min-w-[8.5rem] text-center text-[14px] font-semibold" data-testid="plan-month">{monthLabel(month)}</span>
-        <button type="button" aria-label="Mes siguiente" onClick={() => setMonth((m) => shiftMonth(m, 1))} className="grid h-7 w-7 place-items-center rounded-md border border-line text-dim hover:bg-hover hover:text-text">
-          <ChevronRight size={15} />
-        </button>
-        {month !== monthNow() && (
-          <button type="button" onClick={() => setMonth(monthNow())} className="rounded-md px-2 py-1 text-[12px] text-accent-text hover:underline">
-            Este mes
-          </button>
-        )}
-        <span className="flex-1" />
-        {plan && (
-          <div className="inline-flex rounded-lg border border-line p-0.5 text-[12.5px]" role="tablist" aria-label="Vista del plan">
-            {(["mes", "semana"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                aria-selected={tab === t}
-                onClick={() => setTab(t)}
-                className={cn("rounded-md px-2.5 py-1", tab === t ? "bg-accent-soft text-accent-text" : "text-dim hover:text-text")}
-              >
-                {t === "mes" ? "Plan del mes" : "Esta semana / Hoy"}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
       <LoadState warming={warming} error={error} empty={!data} onRetry={() => void reload()} />
 
+      {creating && <PlanForm onClose={() => setCreating(false)} />}
+
       {draftTurn?.planDraft && (
-        <PlanDraftCard
-          draft={draftTurn.planDraft}
-          accepting={accepting}
-          onAccept={() => void acceptPlan().then((r) => r && setMonth(r.month))}
-          onDiscard={() => void discard()}
-        />
+        <PlanDraftCard draft={draftTurn.planDraft} accepting={accepting} onAccept={() => void acceptPlan()} onDiscard={() => void discard()} />
       )}
 
-      {data && summary && plan && (
-        <p className="text-[12.5px] text-dim" data-testid="plan-summary">
-          {summary.subplans} {summary.subplans === 1 ? "subplan" : "subplanes"} · {summary.done}/{summary.topics} temas completados · {summary.pct}% global
-          {plan.hoursPerWeek ? ` · ${plan.hoursPerWeek} h/semana` : ""} · semana {summary.currentWeek} de {summary.weeks}
-        </p>
+      {data && plans.length === 0 && !draftTurn && !creating && <EmptyPlan aiConfigured={data.aiConfigured} onCreate={() => setCreating(true)} />}
+
+      {data && plans.length > 0 && (
+        <section aria-label="Todos los planes" data-testid="plans-grid">
+          <h2 className="mb-2 text-[13.5px] font-semibold">Tus planes <span className="text-[11.5px] font-normal text-faint">{plans.length}</span></h2>
+          <ul className="grid gap-3 @3xl:grid-cols-2 @6xl:grid-cols-3">
+            {plans.map((p) => (
+              <li key={p.id}>
+                <PlanCard plan={p} />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
-      {data && !plan && <EmptyPlan month={month} aiConfigured={data.aiConfigured} hasDraft={!!draftTurn} onGenerate={() => void startPlan()} />}
-
-      {data && plan && data.derived && tab === "mes" && <PlanBody data={data} onChanged={(p) => setData({ ...data, plan: p })} />}
-      {data && plan && data.derived && tab === "semana" && <ThisWeek items={data.items} month={data.month} today={data.today} weeks={data.derived.summary.weeks} week={data.derived.summary.currentWeek} />}
+      {data && plans.some((p) => p.status === "activo") && <ThisWeek items={data.items} activePlans={plans.filter((p) => p.status === "activo").length} />}
     </PanelPage>
   );
 }
 
-function EmptyPlan({ month, aiConfigured, hasDraft, onGenerate }: { month: string; aiConfigured: boolean; hasDraft: boolean; onGenerate: () => void }) {
-  if (hasDraft) return null;
+function PlanCard({ plan }: { plan: MentorPlanRow }) {
+  const open = () => useNavState.getState().set("mentor.view", planViewId(plan.id));
+  return (
+    <button type="button" onClick={open} aria-label={`Abrir plan ${plan.name}`} className="block w-full rounded-xl border border-line bg-card p-3.5 text-left hover:border-accent" data-testid="plan-card">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[14px] font-semibold">{plan.name}</div>
+          <div className="text-[11.5px] text-faint">{plan.period}</div>
+        </div>
+        <Chip colour={STATUS_COLOUR[plan.status]}>{STATUS_LABEL[plan.status]}</Chip>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <div className="flex-1"><ProgressBar pct={plan.pct} /></div>
+        <span className="text-[11.5px] font-medium">{plan.pct} %</span>
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-[11px] text-dim">
+        <span>{plan.subplans} {plan.subplans === 1 ? "subplan" : "subplanes"}</span>
+        <span>· {plan.completed}/{plan.topics} temas</span>
+        {plan.minutesPerDay ? <span>· {num1(plan.minutesPerDay / 60)} h/día</span> : null}
+        {plan.auto && <span>· automático</span>}
+      </div>
+    </button>
+  );
+}
+
+function EmptyPlan({ aiConfigured, onCreate }: { aiConfigured: boolean; onCreate: () => void }) {
   return (
     <div className="rounded-xl border border-dashed border-line p-6 text-center" data-testid="plan-empty">
       <CalendarDays size={22} className="mx-auto text-faint" />
-      <p className="mt-2 text-[13.5px] font-medium">Aún no hay plan para {monthLabel(month)}</p>
-      <p className="mx-auto mt-1 max-w-[520px] text-[12.5px] text-dim">
-        Un plan del mes reparte los temas que necesitas por semanas, agrupados en subplanes por área y objetivo, con las metas que debes cumplir y un entregable
-        (un proyecto) que demuestre que lo lograste. De él sale después tu plan de cada día en «Hoy».
+      <p className="mt-2 text-[13.5px] font-medium">Aún no tienes ningún plan</p>
+      <p className="mx-auto mt-1 max-w-[560px] text-[12.5px] text-dim">
+        Un plan reparte los temas que necesitas por semanas en el periodo que elijas (una semana, dos meses, fechas a medida), agrupados en subplanes por área y
+        objetivo, con las metas que debes cumplir y un entregable (un proyecto) que demuestre que lo lograste. Cada plan tendrá su propia sub-interfaz y de ellos
+        sale tu plan de cada día en «Hoy».
       </p>
-      {!aiConfigured && <p className="mx-auto mt-2 max-w-[520px] text-[12px] text-warn">La IA no está configurada: el Mentor no puede proponerte un plan sin ella. Configúrala en los ajustes del asistente.</p>}
+      {!aiConfigured && <p className="mx-auto mt-2 max-w-[520px] text-[12px] text-warn">La IA no está configurada: se generará un plan automático con tus metas y materias.</p>}
       <div className="mt-3 flex justify-center">
-        <PrimaryButton onClick={onGenerate}>
-          <MessageSquarePlus size={14} /> ＋ Generar plan del mes con el Mentor
+        <PrimaryButton onClick={onCreate}>
+          ＋ Crear mi primer plan
         </PrimaryButton>
       </div>
     </div>
@@ -228,23 +237,36 @@ function EmptyPlan({ month, aiConfigured, hasDraft, onGenerate }: { month: strin
 
 // ── Borrador pendiente ───────────────────────────────────────────────────
 
+export function draftPeriod(d: MentorPlanDraft): string {
+  return d.preconditions && d.start && d.end ? periodLabel(d.start, d.end) : monthLabel(d.month);
+}
+
 export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft: MentorPlanDraft; accepting: boolean; onAccept: () => void; onDiscard: () => void }) {
   const [cal, setCal] = useState(false);
   const topics = draft.subplans.reduce((n, s) => n + s.topics.length, 0);
   const weeks = draft.subplans[0]?.weeks ?? [];
+  const pre = draft.preconditions;
   return (
     <section className="rounded-xl border-2 border-accent/60 bg-card p-4" data-testid="plan-draft" aria-label="Borrador del plan">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-[14px] font-semibold">Borrador del plan de {monthLabel(draft.month)}</h2>
-        <Chip colour="var(--nv-accent)">Propuesto por el Mentor</Chip>
+        <h2 className="text-[14px] font-semibold">Borrador del plan {pre ? "del" : "de"} {draftPeriod(draft)}</h2>
+        {draft.auto ? <Chip colour="var(--nv-warn)">Plan automático</Chip> : <Chip colour="var(--nv-accent)">Propuesto por el Mentor</Chip>}
         <span className="text-[12px] text-faint">
           {draft.subplans.length} subplanes · {topics} temas · {draft.hoursPerWeek} h/semana · {hm(draft.totalMinutes)} de {hm(draft.availableMinutes)}
         </span>
       </div>
+      {pre && (
+        <p className="mt-1 text-[11.5px] text-faint" data-testid="draft-preconditions">
+          {num1(pre.minutesPerDay / 60)} h/día · {pre.studyDays.map((d) => DAY_SHORT[d - 1]).join("")} · ritmo {pre.pace}
+          {pre.blockedDates?.length ? ` · ${pre.blockedDates.length} fechas bloqueadas` : ""} · {pre.deliverables ? "con entregables" : "sin entregables"}
+        </p>
+      )}
       {draft.rationale && <p className="mt-1.5 text-[12.5px] text-dim">{draft.rationale}</p>}
+      {draft.coverage && <p role="status" className={cn("mt-1.5 text-[12px]", draft.fits ? "text-mint" : "text-warn")}>{draft.coverage}</p>}
       {draft.warnings.map((w) => (
         <p key={w} role="status" className="mt-1.5 text-[12px] text-warn">{w}</p>
       ))}
+      {draft.fallbackReason && <p className="mt-1.5 text-[11.5px] text-faint">Se usó el plan automático porque: {draft.fallbackReason}</p>}
       {draft.discarded.length > 0 && (
         <p className="mt-1.5 text-[11.5px] text-faint">Descartado por no existir en tu sistema: {draft.discarded.join(", ")}.</p>
       )}
@@ -253,9 +275,10 @@ export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft
           <li key={s.id} className="rounded-lg border border-line p-2.5 text-[12.5px]">
             <div className="font-semibold">{s.area}{s.objective ? <span className="font-normal text-dim"> · {s.objective}</span> : null}</div>
             <div className="text-[11.5px] text-faint">
-              {s.topics.length} temas{s.requiredGoals.length ? ` · ${s.requiredGoals.length} metas requeridas` : ""}
+              {s.topics.length} temas{s.requiredGoals.length ? ` · ${s.requiredGoals.length} ${s.requiredGoals.length === 1 ? "meta requerida" : "metas requeridas"}` : ""}
               {s.deliverable ? ` · entregable: ${s.deliverable.title}` : ""}
             </div>
+            {s.notes && <div className="mt-0.5 text-[11.5px] text-dim">{s.notes}</div>}
           </li>
         ))}
       </ul>
@@ -267,12 +290,12 @@ export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft
           <div className="mt-2 space-y-2" data-testid="draft-calendar">
             {weeks.map((w, i) => (
               <div key={w.week} className="rounded-lg border border-line p-2.5 text-[12px]">
-                <div className="font-medium">Semana {w.week} <span className="font-normal text-faint">· {shortRange(w.start, w.end)}</span></div>
+                <div className="font-medium">Semana {w.week} <span className="font-normal text-faint">· {shortWeekLabel(w.start, w.end)}</span></div>
                 <ul className="mt-1 space-y-0.5 text-dim">
                   {draft.subplans.flatMap((s) =>
                     s.topics.filter((t) => t.targetWeek === i + 1).map((t) => (
                       <li key={`${s.id}:${t.folder}`}>
-                        <span className="text-text">{t.title}</span> · {s.area} · {hm(t.estMinutes)}
+                        <span className="text-text">{t.title}</span> · {s.area} · {hm(t.estMinutes)}{t.diagnostic ? " · diagnóstico inicial" : ""}
                       </li>
                     )),
                   )}
@@ -295,7 +318,128 @@ export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft
   );
 }
 
-// ── Plan del mes: una fila por área, una tarjeta por subplan ─────────────
+// ── Sub-interfaz de un plan ──────────────────────────────────────────────
+
+function PlanView({ planId }: { planId: string }) {
+  const [tab, setTab] = useState<"plan" | "semana">("plan");
+  const { data, warming, error, reload, setData } = usePlanData(planId);
+  const renamePlan = useMentor((s) => s.renamePlan);
+  const archivePlan = useMentor((s) => s.archivePlan);
+  const deletePlan = useMentor((s) => s.deletePlan);
+  const plan = data?.plan ?? null;
+  const row = data?.plans.find((p) => p.id === planId);
+  const summary = data?.derived?.summary;
+
+  const rename = async () => {
+    if (!plan) return;
+    const next = await askText("Nombre del plan", row?.name ?? "", "Guardar");
+    if (next === null) return;
+    await renamePlan(plan.id, next);
+  };
+  const remove = async () => {
+    if (!plan) return;
+    const ok = await confirmAction("Eliminar plan", `«${row?.name ?? plan.id}» irá a la papelera de la vault (no se borra de forma definitiva). Tus temas, metas y proyectos no se tocan.`, "Eliminar", true);
+    if (ok) await deletePlan(plan.id);
+  };
+
+  return (
+    <PanelPage
+      title={row?.name ?? "Mentor — Plan"}
+      subtitle={plan ? `${periodLabel(plan.start, plan.end)} · ${weeksLabel(Math.round(((Date.parse(plan.end) - Date.parse(plan.start)) / 86400000 + 1) / 7 * 10) / 10)}` : "El plan por áreas y objetivos. El estado sale de tu práctica; solo el entregable se marca aquí."}
+      wide
+      action={
+        plan && (
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Acciones del plan">
+            <GhostButton onClick={() => void rename()}>
+              <Pencil size={13} /> Renombrar
+            </GhostButton>
+            <GhostButton onClick={() => void archivePlan(plan.id, !plan.archived)}>
+              {plan.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />} {plan.archived ? "Reactivar" : "Terminar / archivar"}
+            </GhostButton>
+            <GhostButton danger onClick={() => void remove()}>
+              <Trash2 size={13} /> Eliminar
+            </GhostButton>
+          </div>
+        )
+      }
+    >
+      <LoadState warming={warming} error={error} empty={!data} onRetry={() => void reload()} />
+
+      {data && !plan && (
+        <div className="rounded-xl border border-dashed border-line p-6 text-center text-[12.5px] text-faint" data-testid="plan-missing">
+          Este plan ya no existe.{" "}
+          <button type="button" className="text-accent-text hover:underline" onClick={() => useNavState.getState().set("mentor.view", "plan")}>
+            Volver al resumen de planes
+          </button>
+        </div>
+      )}
+
+      {data && plan && summary && (
+        <>
+          <PlanHeader plan={plan} status={data.status ?? "activo"} summary={summary} />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex-1" />
+            <div className="inline-flex rounded-lg border border-line p-0.5 text-[12.5px]" role="tablist" aria-label="Vista del plan">
+              {(["plan", "semana"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t}
+                  onClick={() => setTab(t)}
+                  className={cn("rounded-md px-2.5 py-1", tab === t ? "bg-accent-soft text-accent-text" : "text-dim hover:text-text")}
+                >
+                  {t === "plan" ? "Plan" : "Esta semana / Hoy"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {tab === "plan" && data.derived && <PlanBody data={data} onChanged={(p) => setData({ ...data, plan: p })} />}
+          {tab === "semana" && <ThisWeek items={data.items} activePlans={data.plans.filter((p) => p.status === "activo").length} />}
+        </>
+      )}
+    </PanelPage>
+  );
+}
+
+/** Cabecera compacta: estado, progreso y las precondiciones con las que se creó el plan. */
+function PlanHeader({ plan, status, summary }: { plan: MentorPlanData; status: MentorPlanStatus; summary: NonNullable<Loaded["derived"]>["summary"] }) {
+  const pre = plan.preconditions;
+  const state = plan.archived ? ("terminado" as const) : status;
+  const weeksText = state === "activo" ? `semana ${summary.currentWeek} de ${summary.weeks}` : state === "futuro" ? `empieza el ${dayText(plan.start)}` : `terminó el ${dayText(plan.end)}`;
+  return (
+    <section className="rounded-xl border border-line bg-card p-3.5" data-testid="plan-header" aria-label="Datos del plan">
+      <div className="flex flex-wrap items-center gap-2">
+        <Chip colour={STATUS_COLOUR[state]}>{plan.archived ? "Archivado" : STATUS_LABEL[state]}</Chip>
+        {plan.auto && <Chip colour="var(--nv-warn)">Plan automático</Chip>}
+        <span className="text-[12.5px] text-dim" data-testid="plan-summary">
+          {summary.subplans} {summary.subplans === 1 ? "subplan" : "subplanes"} · {summary.done}/{summary.topics} temas completados · {summary.pct}% global · {weeksText}
+        </span>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <div className="flex-1"><ProgressBar pct={summary.pct} /></div>
+        <span className="text-[11.5px] font-medium">{summary.pct} %</span>
+      </div>
+      <ul className="mt-2.5 flex flex-wrap gap-1.5 text-[11.5px] text-dim" data-testid="plan-preconditions" aria-label="Precondiciones del plan">
+        <li className="rounded-md border border-line px-2 py-0.5">Periodo: {periodLabel(plan.start, plan.end)}</li>
+        {pre ? (
+          <>
+            <li className="rounded-md border border-line px-2 py-0.5">{num1(pre.minutesPerDay / 60)} h/día</li>
+            <li className="rounded-md border border-line px-2 py-0.5">Días: {DAY_SHORT.filter((_, i) => pre.studyDays.includes(i + 1)).join(" ")}</li>
+            <li className="rounded-md border border-line px-2 py-0.5">Ritmo: {PACE_LABEL[pre.pace]}</li>
+            {pre.blockedDates?.length ? <li className="rounded-md border border-line px-2 py-0.5">{pre.blockedDates.length} fechas bloqueadas</li> : null}
+          </>
+        ) : plan.hoursPerWeek ? (
+          <li className="rounded-md border border-line px-2 py-0.5">{plan.hoursPerWeek} h/semana</li>
+        ) : null}
+        {plan.hoursPerWeek && pre ? <li className="rounded-md border border-line px-2 py-0.5">~{num1(plan.hoursPerWeek)} h/semana efectivas</li> : null}
+      </ul>
+      {plan.rationale && <p className="mt-2 text-[12px] text-dim">{plan.rationale}</p>}
+    </section>
+  );
+}
+
+// ── Plan: una fila por área, una tarjeta por subplan ─────────────────────
 
 function PlanBody({ data, onChanged }: { data: Loaded; onChanged: (p: Loaded["plan"]) => void }) {
   const plan = data.plan!;
@@ -318,7 +462,7 @@ function PlanBody({ data, onChanged }: { data: Loaded; onChanged: (p: Loaded["pl
         return (
           <AreaRow key={area} title={area} colour={PALETTE[idx % PALETTE.length]!} count={subs.length} noun={["subplan", "subplanes"]} avg={avg}>
             {subs.map((s, i) => (
-              <SubplanCard key={s.id} month={plan.month} sub={s} view={views[i]!} data={data} open={open.has(s.id)} onToggle={() => toggle(s.id)} onChanged={onChanged} colour={PALETTE[idx % PALETTE.length]!} />
+              <SubplanCard key={s.id} planId={plan.id} sub={s} view={views[i]!} data={data} open={open.has(s.id)} onToggle={() => toggle(s.id)} onChanged={onChanged} colour={PALETTE[idx % PALETTE.length]!} />
             ))}
           </AreaRow>
         );
@@ -328,9 +472,9 @@ function PlanBody({ data, onChanged }: { data: Loaded; onChanged: (p: Loaded["pl
 }
 
 export function SubplanCard({
-  month, sub, view, data, open, onToggle, onChanged, colour,
+  planId, sub, view, data, open, onToggle, onChanged, colour,
 }: {
-  month: string;
+  planId: string;
   sub: MentorSubplan;
   view: MentorSubplanView;
   data: Loaded;
@@ -345,7 +489,7 @@ export function SubplanCard({
   const project = d?.projectId ? data.projects[d.projectId] : undefined;
   const setStatus = async (status: MentorDeliverableStatus) => {
     try {
-      onChanged(await api.mentorPlanUpdateDeliverable({ month, subplanId: sub.id, status }));
+      onChanged(await api.mentorPlanUpdateDeliverable({ id: planId, subplanId: sub.id, status }));
     } catch (e) {
       toast("error", (e as Error).message);
     }
@@ -370,13 +514,14 @@ export function SubplanCard({
       {open && (
         <div className="mt-3 space-y-3.5 border-t border-line pt-3 text-[12px]" data-testid="subplan-detail">
           {sub.objective && sub.objective !== title && <p className="text-dim">{sub.objective}</p>}
+          {sub.notes && <p className="text-dim">{sub.notes}</p>}
 
           <section aria-label="Semanas">
             <h4 className="mb-1 font-mono text-[10.5px] uppercase tracking-wider text-faint">Semanas</h4>
             <ol className="space-y-1">
               {sub.weeks.map((w) => (
                 <li key={w.week} className={cn("rounded-md border px-2 py-1", w.week === view.currentWeek ? "border-accent bg-accent-soft" : "border-line")} data-testid="plan-week">
-                  <span className="font-medium">Sem. {w.week}</span> <span className="text-faint">{shortRange(w.start, w.end)}</span>
+                  <span className="font-medium">Sem. {w.week}</span> <span className="text-faint">{shortWeekLabel(w.start, w.end)}</span>
                   <div className="text-dim">{w.topics.length ? w.topics.map((f) => byFolder.get(f)?.title ?? f).join(" · ") : "—"}</div>
                 </li>
               ))}
@@ -390,6 +535,7 @@ export function SubplanCard({
                 <li key={t.folder} className="rounded-md border border-line p-2" data-testid="plan-topic">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="min-w-0 flex-1 truncate font-medium" title={t.folder}>{t.title}</span>
+                    {t.diagnostic && <Chip colour="var(--nv-accent)">Diagnóstico inicial</Chip>}
                     <Chip colour={STATE_COLOUR[t.state]}>{STATE_LABEL[t.state]}</Chip>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-dim">
@@ -474,33 +620,32 @@ export function SubplanCard({
   );
 }
 
-// ── Esta semana / Hoy ────────────────────────────────────────────────────
+// ── Esta semana / Hoy (todos los planes activos) ─────────────────────────
 
-export function ThisWeek({ items, month, today, weeks, week }: { items: MentorPlanItem[]; month: string; today: string; weeks: number; week: number }) {
+export function ThisWeek({ items, activePlans }: { items: MentorPlanItem[]; activePlans: number }) {
   const setPending = useMentor((s) => s.setPendingObjective);
-  const isCurrent = today.slice(0, 7) === month;
   const planDay = () => {
     setPending({ type: "plan" });
     useNavState.getState().set("mentor.view", "hoy");
   };
-  if (!isCurrent) {
-    return <p className="rounded-xl border border-dashed border-line p-4 text-center text-[12.5px] text-faint" data-testid="plan-week-empty">«Esta semana» solo existe para el mes en curso.</p>;
+  if (activePlans === 0) {
+    return <p className="rounded-xl border border-dashed border-line p-4 text-center text-[12.5px] text-faint" data-testid="plan-week-empty">«Esta semana» solo existe cuando hay un plan activo hoy.</p>;
   }
   return (
     <section className="rounded-xl border border-line bg-card p-4" data-testid="plan-this-week" aria-label="Esta semana">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-[14px] font-semibold">Esta semana (semana {week} de {weeks})</h2>
+        <h2 className="text-[14px] font-semibold">Esta semana y hoy <span className="text-[11.5px] font-normal text-faint">({activePlans} {activePlans === 1 ? "plan activo" : "planes activos"} combinados)</span></h2>
         <span className="flex-1" />
         <PrimaryButton onClick={planDay} disabled={!items.length}>
           Planear mi día con esto
         </PrimaryButton>
       </div>
       {items.length === 0 ? (
-        <p className="mt-3 text-[12.5px] text-faint">Nada pendiente del plan del mes para esta semana. Si quieres adelantar, pídele un plan de hoy al Mentor.</p>
+        <p className="mt-3 text-[12.5px] text-faint">Nada pendiente de tus planes para esta semana. Si quieres adelantar, pídele un plan de hoy al Mentor.</p>
       ) : (
         <ul className="mt-3 space-y-2">
           {items.map((it) => (
-            <li key={`${it.subplanId}:${it.folder ?? "deliverable"}`} className="rounded-lg border border-line p-2.5" data-testid="plan-week-item">
+            <li key={`${it.planId}:${it.subplanId}:${it.folder ?? "deliverable"}`} className="rounded-lg border border-line p-2.5" data-testid="plan-week-item">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[13px] font-semibold">{it.title}</span>
                 <Chip colour="var(--nv-mint)">Plan: {it.label}</Chip>

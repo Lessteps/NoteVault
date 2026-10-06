@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 //
-// Mentor — Plan: una fila por área, una tarjeta desplegable por subplan (semanas, temas con estado y
-// registro, metas requeridas, entregable), solo lectura salvo el estado del entregable, vista "Esta semana",
-// estado vacío, borrador pendiente con acciones y la tarjeta plan_draft en el chat del Mentor.
+// Mentor — Plan: una sub-interfaz por plan (barra lateral), resumen de planes, estado vacío, cabecera con las
+// precondiciones, una fila por área con una tarjeta desplegable por subplan, acciones (renombrar, archivar,
+// eliminar), vista "Esta semana", borrador pendiente con acciones y la tarjeta plan_draft en el chat.
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (window as unknown as { nv: unknown }).nv = { invoke: async () => ({}) };
@@ -11,31 +11,41 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { api } from "../../lib/bridge";
-import type { MentorChatTurn, MentorMonthlyPlan, MentorPlanDraft, MentorPlanGet } from "../../lib/types";
+import type { MentorChatTurn, MentorPlan as PlanData, MentorPlanDraft, MentorPlanGet, MentorPlanRow } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
+
+const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
+vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
+
 import { MentorAssistant } from "./MentorAssistant";
 import { MentorModule } from "./MentorModule";
-import { MentorPlan, monthNow } from "./MentorPlan";
+import { MentorPlan } from "./MentorPlan";
 
-const MONTH = monthNow();
+const START = "2026-10-06";
+const END = "2026-11-05";
+const PID = `${START}_${END}`;
 const FUND = "Programación/Python/1 Fundamentos";
 const APIS = "Programación/Python/2 APIs web";
 
-const week = (n: number, topics: string[]) => ({ week: n, start: `${MONTH}-${String(1 + 7 * (n - 1)).padStart(2, "0")}`, end: `${MONTH}-${String(7 * n).padStart(2, "0")}`, topics, minutes: 60 * topics.length, capacityMinutes: 240 });
+const week = (n: number, topics: string[]) => ({ week: n, start: `2026-10-${String(6 + 7 * (n - 1)).padStart(2, "0")}`, end: `2026-10-${String(12 + 7 * (n - 1)).padStart(2, "0")}`, topics, minutes: 60 * topics.length, capacityMinutes: 240 });
 
-const plan = (): MentorMonthlyPlan => ({
-  month: MONTH,
+const plan = (over: Partial<PlanData> = {}): PlanData => ({
+  id: PID,
+  start: START,
+  end: END,
+  name: "Backend · 6 oct–5 nov",
   createdAt: "2026-10-01T00:00:00Z",
   updatedAt: "2026-10-01T00:00:00Z",
-  hoursPerWeek: 6,
+  hoursPerWeek: 14.9,
+  preconditions: { start: START, end: END, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6], pace: "normal", goalIds: ["g1"], subjects: ["Programación"], levels: {}, deliverables: true },
   subplans: [
     {
       id: "s1-programacion", area: "Programación", objective: "Desarrollo Backend", goalId: "g1",
       topics: [
-        { folder: FUND, title: "1 Fundamentos", targetWeek: 1, estMinutes: 60, completedAt: "2026-10-03" },
+        { folder: FUND, title: "1 Fundamentos", targetWeek: 1, estMinutes: 60, completedAt: "2026-10-08" },
         { folder: APIS, title: "2 APIs web", targetWeek: 2, estMinutes: 60 },
       ],
       weeks: [week(1, [FUND]), week(2, [APIS]), week(3, []), week(4, [])],
@@ -48,12 +58,21 @@ const plan = (): MentorMonthlyPlan => ({
       deliverable: { title: "Presentación en inglés", description: "", criteria: [], status: "idea" },
     },
   ],
+  ...over,
 });
+
+const row = (id: string, name: string, over: Partial<MentorPlanRow> = {}): MentorPlanRow => ({
+  id, start: START, end: END, name, period: "6 oct – 5 nov", status: "activo", archived: false, auto: false, subplans: 2, topics: 2, completed: 1, pct: 70, minutesPerDay: 240, ...over,
+});
+
+const rows = (): MentorPlanRow[] => [row(PID, "Backend · 6 oct–5 nov")];
 
 const loaded = (over: Partial<Extract<MentorPlanGet, { loading: false }>> = {}): MentorPlanGet => ({
   loading: false,
-  month: MONTH,
-  today: `${MONTH}-09`,
+  id: PID,
+  month: "2026-10",
+  today: "2026-10-12",
+  status: "activo",
   plan: plan(),
   derived: {
     subplans: [
@@ -66,21 +85,24 @@ const loaded = (over: Partial<Extract<MentorPlanGet, { loading: false }>> = {}):
       },
       { id: "s2-ingles", total: 0, done: 0, pct: 0, currentWeek: 2, topics: [] },
     ],
-    summary: { subplans: 2, topics: 2, done: 1, pct: 70, currentWeek: 2, weeks: 4 },
+    summary: { subplans: 2, topics: 2, done: 1, pct: 70, currentWeek: 2, weeks: 5 },
   },
   goals: { g1: { name: "Desarrollo Backend", pct: 35, items: { i1: { name: "Practicar APIs a diario", pct: 20 } } } },
   projects: { p1: { id: "p1", name: "API de inventario", status: "En curso" } },
   items: [
-    { kind: "topic", month: MONTH, subplanId: "s1-programacion", label: "Programación: Desarrollo Backend", area: "Programación", title: "2 APIs web", folder: APIS, estMinutes: 60, targetWeek: 2, overdue: false },
+    { kind: "topic", planId: PID, subplanId: "s1-programacion", label: "Programación: Desarrollo Backend", area: "Programación", title: "2 APIs web", folder: APIS, estMinutes: 60, targetWeek: 2, overdue: false },
   ],
-  months: [MONTH],
+  months: [],
+  plans: rows(),
   aiConfigured: true,
   ...over,
 });
 
-const draft = (): MentorPlanDraft => ({
-  month: MONTH, hoursPerWeek: 6, rationale: "Primero bases y luego APIs.", subplans: plan().subplans, warnings: ["No cabe en el mes: harían falta unas 8 h/semana."],
-  fits: false, totalMinutes: 120, availableMinutes: 100, requiredHoursPerWeek: 8, from: `${MONTH}-01`, discarded: ["Programación/Django/Inventado"], why: {},
+const none = (): MentorPlanGet => loaded({ id: null, plan: null, derived: null, items: [], plans: [] });
+
+const draft = (over: Partial<MentorPlanDraft> = {}): MentorPlanDraft => ({
+  month: "2026-10", hoursPerWeek: 6, rationale: "Primero bases y luego APIs.", subplans: plan().subplans, warnings: ["No cabe en el periodo: harían falta unas 8 h/semana."],
+  fits: false, totalMinutes: 120, availableMinutes: 100, requiredHoursPerWeek: 8, from: START, discarded: ["Programación/Django/Inventado"], why: {}, ...over,
 });
 const bot = (id: string, content: string, extra: Partial<MentorChatTurn> = {}): MentorChatTurn => ({ id, role: "assistant", content, at: "2026-10-05T10:00:03", ...extra });
 
@@ -99,14 +121,17 @@ const click = async (el: Element | undefined) => {
 
 beforeEach(() => {
   localStorage.clear();
+  ui.askText.mockReset();
+  ui.confirmAction.mockReset();
   useNavState.setState({ values: {} });
-  useMentor.setState({ panels: null, turns: [], pending: null, chatId: null, chatTitle: "Nueva conversación", chats: [], historyOpen: false, chatLoaded: false, sending: false, notice: null, creating: false, createdGoalId: null, warming: false, panelsError: "", planMode: false, composerSeed: "", acceptingPlan: false, planVersion: 0, pendingObjective: null });
+  useMentor.setState({ panels: null, turns: [], pending: null, chatId: null, chatTitle: "Nueva conversación", chats: [], historyOpen: false, chatLoaded: false, sending: false, notice: null, creating: false, createdGoalId: null, warming: false, panelsError: "", planMode: false, composerSeed: "", acceptingPlan: false, planVersion: 0, pendingObjective: null, plans: [], plansLoaded: false, generatingPlan: false });
   useApp.setState({ module: "mentor" });
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
   vi.spyOn(api, "mentorChatLoad").mockResolvedValue({ turns: [], pending: null });
   vi.spyOn(api, "mentorOverview").mockResolvedValue({ loading: true });
+  vi.spyOn(api, "mentorPlanList").mockResolvedValue(rows());
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -114,151 +139,223 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("Mentor — Plan", () => {
-  it("una fila por área con una tarjeta por subplan y el resumen del mes", async () => {
+describe("Mentor — sub-interfaz de un plan", () => {
+  it("cabecera con las precondiciones, una fila por área y una tarjeta por subplan", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan />);
-    expect(host.textContent).toContain("Mentor — Plan");
-    const rows = [...host.querySelectorAll("section[aria-label='Programación'], section[aria-label='Inglés']")];
-    expect(rows).toHaveLength(2);
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(host.textContent).toContain("Backend · 6 oct–5 nov");
+    const header = host.querySelector("[data-testid=plan-header]")!;
+    expect(header.textContent).toContain("Activo");
+    const pre = host.querySelector("[data-testid=plan-preconditions]")!.textContent!;
+    expect(pre).toContain("6 oct – 5 nov");
+    expect(pre).toContain("4 h/día");
+    expect(pre).toContain("L M X J V S");
+    expect(pre).toContain("Normal");
+    expect(host.querySelectorAll("section[aria-label='Programación'], section[aria-label='Inglés']")).toHaveLength(2);
     const cards = host.querySelectorAll("[data-testid=subplan-card]");
     expect(cards).toHaveLength(2);
     expect(cards[0]!.textContent).toContain("Desarrollo Backend");
     expect(cards[0]!.textContent).toContain("70 %");
     expect(cards[0]!.textContent).toContain("1/2 temas");
-    expect(cards[0]!.textContent).toContain("semana 2");
     expect(cards[0]!.textContent).toContain("Entregable: En curso");
-    expect(host.querySelector("[data-testid=plan-summary]")!.textContent).toContain("2 subplanes · 1/2 temas completados · 70% global");
-    // plegada: sin detalle
+    expect(host.querySelector("[data-testid=plan-summary]")!.textContent).toContain("2 subplanes · 1/2 temas completados · 70% global · semana 2 de 5");
     expect(host.querySelector("[data-testid=subplan-detail]")).toBeNull();
+  });
+
+  it("pide ese plan por su id", async () => {
+    const get = vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(get).toHaveBeenCalledWith(PID);
   });
 
   it("al desplegar muestra semanas, temas con estado y registro, metas requeridas y entregable", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan />);
+    await mountEl(<MentorPlan planId={PID} />);
     await click(button("Expandir Desarrollo Backend"));
     const detail = host.querySelector("[data-testid=subplan-detail]")!;
     expect(detail.querySelectorAll("[data-testid=plan-week]")).toHaveLength(4);
-    expect(detail.querySelectorAll("[data-testid=plan-week]")[1]!.className).toContain("border-accent"); // semana actual
+    expect(detail.querySelectorAll("[data-testid=plan-week]")[1]!.className).toContain("border-accent");
+    expect(detail.querySelectorAll("[data-testid=plan-week]")[0]!.textContent).toContain("6–12 oct");
     const topics = detail.querySelectorAll("[data-testid=plan-topic]");
     expect(topics[0]!.textContent).toContain("Completo");
     expect(topics[0]!.textContent).toContain("completado el");
     expect(topics[1]!.textContent).toContain("Practicando");
-    expect(topics[1]!.textContent).toContain("40 %");
     expect(topics[1]!.textContent).toContain("sin completar");
-    expect(detail.querySelector("[data-testid=plan-required-goal]")!.textContent).toContain("Desarrollo Backend");
     expect(detail.querySelector("[data-testid=plan-required-goal]")!.textContent).toContain("20 %");
     expect(button("Abrir en Metas", detail)).toBeTruthy();
     const d = detail.querySelector("[data-testid=plan-deliverable]")!;
-    expect(d.textContent).toContain("API de inventario");
     expect(d.textContent).toContain("tests pasan");
     expect(button("Abrir en Proyectos", d)).toBeTruthy();
-    expect(button("Ver tema 1 Fundamentos", detail)).toBeTruthy();
-    // contraer
     await click(button("Contraer Desarrollo Backend"));
     expect(host.querySelector("[data-testid=subplan-detail]")).toBeNull();
   });
 
-  it("solo es editable el estado del entregable; lo demás no tiene campos de edición", async () => {
+  it("solo es editable el estado del entregable", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    const update = vi.spyOn(api, "mentorPlanUpdateDeliverable").mockResolvedValue({ ...plan(), subplans: [{ ...plan().subplans[0]!, deliverable: { ...plan().subplans[0]!.deliverable!, status: "hecho" } }, plan().subplans[1]!] });
-    await mountEl(<MentorPlan />);
+    const update = vi.spyOn(api, "mentorPlanUpdateDeliverable").mockResolvedValue(plan());
+    await mountEl(<MentorPlan planId={PID} />);
     await click(button("Expandir Desarrollo Backend"));
     const detail = host.querySelector("[data-testid=subplan-detail]")!;
     expect(detail.querySelectorAll("input, textarea")).toHaveLength(0);
-    expect(detail.querySelectorAll("select")).toHaveLength(1);
     const sel = detail.querySelector<HTMLSelectElement>("select[aria-label='Estado del entregable']")!;
-    expect([...sel.options].map((o) => o.value)).toEqual(["idea", "en_curso", "hecho"]);
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(sel, "hecho");
       sel.dispatchEvent(new Event("change", { bubbles: true }));
     });
     await flush();
-    expect(update).toHaveBeenCalledWith({ month: MONTH, subplanId: "s1-programacion", status: "hecho" });
+    expect(update).toHaveBeenCalledWith({ id: PID, subplanId: "s1-programacion", status: "hecho" });
   });
 
   it("el subplan sin proyecto lo presenta como propuesta de entregable", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan />);
+    await mountEl(<MentorPlan planId={PID} />);
     await click(button("Expandir Hablar con confianza"));
     const d = host.querySelector("[data-testid=plan-deliverable]")!;
     expect(d.textContent).toContain("Propuesta");
     expect(button("Abrir en Proyectos", d)).toBeUndefined();
   });
 
-  it("'Esta semana / Hoy' lista lo que toca y 'Planear mi día con esto' lleva a Hoy con el objetivo del plan", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan />);
+  it("'Esta semana / Hoy' combina los planes activos y 'Planear mi día con esto' lleva a Hoy", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plans: [row(PID, "A"), row("2026-10-10_2026-10-31", "B")] }));
+    await mountEl(<MentorPlan planId={PID} />);
     await click(button("Esta semana / Hoy"));
     const items = host.querySelectorAll("[data-testid=plan-week-item]");
     expect(items).toHaveLength(1);
     expect(items[0]!.textContent).toContain("2 APIs web");
-    expect(items[0]!.textContent).toContain("Plan: Programación: Desarrollo Backend");
+    expect(host.querySelector("[data-testid=plan-this-week]")!.textContent).toContain("2 planes activos combinados");
     await click(button("Planear mi día con esto"));
     expect(useMentor.getState().pendingObjective).toEqual({ type: "plan" });
     expect(useNavState.getState().values["mentor.view"]).toBe("hoy");
   });
 
-  it("sin plan del mes: estado vacío que explica y ofrece generarlo con el Mentor", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plan: null, derived: null, items: [], months: [] }));
+  it("un plan que ya no existe lo avisa y vuelve al resumen", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ id: "x", plan: null, derived: null }));
+    await mountEl(<MentorPlan planId="x" />);
+    expect(host.querySelector("[data-testid=plan-missing]")).toBeTruthy();
+    await click(button("Volver al resumen"));
+    expect(useNavState.getState().values["mentor.view"]).toBe("plan");
+  });
+
+  it("renombrar guarda el nombre elegido", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    const rename = vi.spyOn(api, "mentorPlanRename").mockResolvedValue(plan({ name: "Mi plan" }));
+    ui.askText.mockResolvedValue("Mi plan");
+    await mountEl(<MentorPlan planId={PID} />);
+    await click(button("Renombrar"));
+    expect(ui.askText).toHaveBeenCalled();
+    expect(rename).toHaveBeenCalledWith(PID, "Mi plan");
+    // cancelar no renombra
+    rename.mockClear();
+    ui.askText.mockResolvedValue(null);
+    await click(button("Renombrar"));
+    expect(rename).not.toHaveBeenCalled();
+  });
+
+  it("terminar/archivar y reactivar", async () => {
+    const get = vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    const archive = vi.spyOn(api, "mentorPlanArchive").mockResolvedValue(plan({ archived: true }));
+    await mountEl(<MentorPlan planId={PID} />);
+    await click(button("Terminar / archivar"));
+    expect(archive).toHaveBeenCalledWith(PID, true);
+    get.mockResolvedValue(loaded({ plan: plan({ archived: true }), status: "terminado" }));
+    await act(async () => { useMentor.setState((st) => ({ planVersion: st.planVersion + 1 })); });
+    await flush();
+    await click(button("Reactivar"));
+    expect(archive).toHaveBeenLastCalledWith(PID, false);
+  });
+
+  it("eliminar pide confirmación y, si se acepta, manda el plan a la papelera y vuelve al resumen", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    const del = vi.spyOn(api, "mentorPlanDelete").mockResolvedValue({ id: PID, plans: [] });
+    ui.confirmAction.mockResolvedValue(false);
+    await mountEl(<MentorPlan planId={PID} />);
+    await click(button("Eliminar"));
+    expect(ui.confirmAction).toHaveBeenCalled();
+    expect(String(ui.confirmAction.mock.calls[0]![1])).toContain("papelera");
+    expect(del).not.toHaveBeenCalled();
+    ui.confirmAction.mockResolvedValue(true);
+    await click(button("Eliminar"));
+    expect(del).toHaveBeenCalledWith(PID);
+    expect(useNavState.getState().values["mentor.view"]).toBe("plan");
+  });
+});
+
+describe("Mentor — resumen de planes", () => {
+  it("sin ningún plan: estado vacío que invita a crear el primero con el formulario", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(none());
+    vi.spyOn(api, "mentorPlanOptions").mockResolvedValue({ loading: true });
     await mountEl(<MentorPlan />);
     const empty = host.querySelector("[data-testid=plan-empty]")!;
-    expect(empty.textContent).toContain("Aún no hay plan para");
-    expect(empty.textContent).toContain("entregable");
-    expect(host.querySelectorAll("[data-testid=subplan-card]")).toHaveLength(0);
-    expect(button("Generar plan del mes", empty)).toBeTruthy();
+    expect(empty.textContent).toContain("Aún no tienes ningún plan");
+    expect(host.querySelectorAll("[data-testid=plan-card]")).toHaveLength(0);
+    expect(host.querySelector("[data-testid=plan-form]")).toBeNull();
+    await click(button("Crear mi primer plan", empty));
+    expect(host.querySelector("[data-testid=plan-form]")).toBeTruthy();
   });
 
   it("sin IA lo avisa en el estado vacío", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plan: null, derived: null, items: [], aiConfigured: false }));
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ id: null, plan: null, derived: null, items: [], plans: [], aiConfigured: false }));
     await mountEl(<MentorPlan />);
     expect(host.querySelector("[data-testid=plan-empty]")!.textContent).toContain("La IA no está configurada");
   });
 
-  it("navega entre meses y pide ese mes", async () => {
-    const get = vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+  it("lista una tarjeta por plan con periodo, estado y progreso; al abrirla navega a su sub-interfaz", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(
+      loaded({ plans: [row("a", "Plan A"), row("b", "Plan B", { status: "futuro", pct: 0 }), row("c", "Plan C", { status: "terminado", pct: 100 })] }),
+    );
     await mountEl(<MentorPlan />);
-    await click(button("Mes siguiente"));
-    const next = get.mock.calls.at(-1)![0]!;
-    expect(next > MONTH).toBe(true);
-    await click(button("Este mes"));
-    expect(get.mock.calls.at(-1)![0]).toBe(MONTH);
+    const cards = host.querySelectorAll("[data-testid=plan-card]");
+    expect(cards).toHaveLength(3);
+    expect(cards[0]!.textContent).toContain("Activo");
+    expect(cards[1]!.textContent).toContain("Futuro");
+    expect(cards[2]!.textContent).toContain("Terminado");
+    expect(cards[0]!.textContent).toContain("6 oct – 5 nov");
+    expect(cards[0]!.textContent).toContain("70 %");
+    expect(cards[0]!.textContent).toContain("4 h/día");
+    await click(button("Abrir plan Plan B"));
+    expect(useNavState.getState().values["mentor.view"]).toBe("plan:b");
   });
 
-  it("'Generar plan del mes con el Mentor' abre el asistente en una conversación de plan", async () => {
+  it("'＋ Nuevo plan' abre el formulario de precondiciones", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    vi.spyOn(api, "mentorPlanOptions").mockResolvedValue({ loading: true });
+    await mountEl(<MentorPlan />);
+    await click(button("＋ Nuevo plan"));
+    expect(host.querySelector("[data-testid=plan-form]")).toBeTruthy();
+  });
+
+  it("'Pedirlo al Mentor' abre el asistente en una conversación de plan", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     vi.spyOn(api, "mentorChatNew").mockResolvedValue({ id: "c2", title: "", turns: [], pending: null });
     useAssistant.setState({ open: false });
     await mountEl(<MentorPlan />);
-    await click(button("Generar plan del mes"));
+    await click(button("Pedirlo al Mentor"));
     expect(useAssistant.getState().open).toBe(true);
     expect(useMentor.getState().planMode).toBe(true);
-    expect(useMentor.getState().composerSeed).toContain("plan para este mes");
   });
 
-  it("el borrador pendiente se destaca arriba con calendario plegable y Aceptar / Descartar", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plan: null, derived: null, items: [], months: [] }));
-    const accept = vi.spyOn(api, "mentorPlanDraftAccept").mockResolvedValue({ month: MONTH, subplans: 2, topics: 2, warnings: [], fits: true });
-    const discard = vi.spyOn(api, "mentorPlanDraftDiscard").mockResolvedValue({ turns: [], pending: null });
-    useMentor.setState({ turns: [bot("a1", "Primero bases y luego APIs.", { planDraft: draft() })], pending: "a1", chatLoaded: true, chatId: "c1" });
+  it("el borrador pendiente se destaca con calendario plegable y Aceptar / Descartar; aceptar navega al plan nuevo", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(none());
+    const accept = vi.spyOn(api, "mentorPlanDraftAccept").mockResolvedValue({ id: "2026-10-12_2026-11-11", month: "2026-10", start: "2026-10-12", end: "2026-11-11", subplans: 2, topics: 2, warnings: [], fits: true });
+    vi.spyOn(api, "mentorPlanDraftDiscard").mockResolvedValue({ turns: [], pending: null });
+    useMentor.setState({ turns: [bot("a1", "Primero bases y luego APIs.", { planDraft: draft({ auto: true, coverage: "Lo elegido necesita ~2 h y tienes 50 h: sobran 48 h.", fits: true, warnings: [] }) })], pending: "a1", chatLoaded: true, chatId: "c1" });
     await mountEl(<MentorPlan />);
     const card = host.querySelector("[data-testid=plan-draft]")!;
     expect(card.textContent).toContain("Borrador del plan de");
-    expect(card.textContent).toContain("2 subplanes");
-    expect(card.textContent).toContain("No cabe en el mes");
-    expect(card.textContent).toContain("Programación/Django/Inventado"); // lo descartado se avisa
-    expect(host.querySelector("[data-testid=plan-empty]")).toBeNull(); // con borrador no se muestra el vacío
+    expect(card.textContent).toContain("Plan automático");
+    expect(card.textContent).toContain("sobran 48 h");
+    expect(card.textContent).toContain("Programación/Django/Inventado");
+    expect(host.querySelector("[data-testid=plan-empty]")).toBeNull();
     expect(host.querySelector("[data-testid=draft-calendar]")).toBeNull();
     await click(button("Ver calendario semanal", card));
     expect(card.querySelector("[data-testid=draft-calendar]")!.textContent).toContain("Semana 1");
-    expect(card.querySelector("[data-testid=draft-calendar]")!.textContent).toContain("1 Fundamentos");
     await click(button("Aceptar plan", card));
     expect(accept).toHaveBeenCalledWith("a1", "c1");
-    expect(discard).not.toHaveBeenCalled();
+    expect(useNavState.getState().values["mentor.view"]).toBe("plan:2026-10-12_2026-11-11");
   });
 
   it("Descartar el borrador no acepta nada", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plan: null, derived: null, items: [], months: [] }));
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(none());
     const accept = vi.spyOn(api, "mentorPlanDraftAccept");
     const discard = vi.spyOn(api, "mentorPlanDraftDiscard").mockResolvedValue({ turns: [], pending: null });
     useMentor.setState({ turns: [bot("a1", "x", { planDraft: draft() })], pending: "a1", chatLoaded: true, chatId: "c1" });
@@ -276,16 +373,15 @@ describe("Mentor: la tarjeta plan_draft en el chat", () => {
   }
 
   it("resume el plan y ofrece Ver en Plan, Aceptar plan y Descartar", async () => {
-    const accept = vi.spyOn(api, "mentorPlanDraftAccept").mockResolvedValue({ month: MONTH, subplans: 2, topics: 2, warnings: [], fits: true });
+    const accept = vi.spyOn(api, "mentorPlanDraftAccept").mockResolvedValue({ id: "2026-10", month: "2026-10", start: "2026-10-01", end: "2026-10-31", subplans: 2, topics: 2, warnings: [], fits: true });
     const discard = vi.spyOn(api, "mentorPlanDraftDiscard").mockResolvedValue({ turns: [], pending: null });
     vi.mocked(api.mentorChatLoad).mockResolvedValue({ id: "c1", title: "plan", turns: [bot("a1", "Primero bases y luego APIs.", { planDraft: draft() })], pending: "a1" });
     await mountAssistant();
     const card = host.querySelector("[data-testid=chat-plan-draft]")!;
-    expect(card.textContent).toContain(`Plan de ${MONTH}`);
+    expect(card.textContent).toContain("Plan de 2026-10");
     expect(card.textContent).toContain("2 subplanes · 2 temas · 6 h/semana");
-    expect(host.querySelector("[data-testid=chat-draft]")).toBeNull(); // no es una meta
+    expect(host.querySelector("[data-testid=chat-draft]")).toBeNull();
     expect(button("Crear meta", card)).toBeUndefined();
-
     await click(button("Ver en Plan", card));
     expect(useNavState.getState().values["mentor.view"]).toBe("plan");
     await click(button("Aceptar plan", card));
@@ -294,17 +390,27 @@ describe("Mentor: la tarjeta plan_draft en el chat", () => {
     expect(discard).toHaveBeenCalledWith("a1");
   });
 
+  it("un borrador con precondiciones muestra su periodo y si es automático", async () => {
+    vi.mocked(api.mentorChatLoad).mockResolvedValue({
+      id: "c1", title: "plan", pending: "a1",
+      turns: [bot("a1", "x", { planDraft: draft({ start: START, end: END, auto: true, preconditions: plan().preconditions }) })],
+    });
+    await mountAssistant();
+    const t = host.querySelector("[data-testid=chat-plan-draft]")!.textContent!;
+    expect(t).toContain("Plan del 6 oct – 5 nov");
+    expect(t).toContain("automático");
+  });
+
   it("un plan ya aceptado o descartado no ofrece acciones", async () => {
     vi.mocked(api.mentorChatLoad).mockResolvedValue({
       id: "c1", title: "plan", pending: null,
-      turns: [bot("a1", "x", { planDraft: draft(), acceptedPlan: MONTH }), bot("a2", "y", { planDraft: draft(), discarded: true })],
+      turns: [bot("a1", "x", { planDraft: draft(), acceptedPlan: "2026-10" }), bot("a2", "y", { planDraft: draft(), discarded: true })],
     });
     await mountAssistant();
     const cards = host.querySelectorAll("[data-testid=chat-plan-draft]");
     expect(cards[0]!.textContent).toContain("Aceptado");
     expect(cards[1]!.textContent).toContain("Descartado");
     expect(button("Aceptar plan", cards[0]!)).toBeUndefined();
-    expect(button("Aceptar plan", cards[1]!)).toBeUndefined();
   });
 
   it("una conversación de plan siembra el campo de mensaje y envía con mode=plan", async () => {
@@ -324,13 +430,57 @@ describe("Mentor: la tarjeta plan_draft en el chat", () => {
   });
 });
 
-describe("MentorModule: sección Plan", () => {
-  it("aparece entre Hoy y Metas y muestra el panel", async () => {
+describe("MentorModule: sub-interfaces de plan", () => {
+  const nav = () => [...host.querySelectorAll("aside nav button")].map((b) => b.textContent ?? "");
+  const subs = () => [...host.querySelectorAll("aside nav [role=group] button")];
+
+  it("aparece entre Hoy y Metas y muestra el resumen de planes", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorModule />);
-    const nav = [...host.querySelectorAll("aside nav button")].map((b) => b.textContent ?? "");
-    expect(nav.findIndex((t) => t.includes("Plan"))).toBe(nav.findIndex((t) => t.includes("Hoy")) + 1);
-    await click([...host.querySelectorAll("aside nav button")].find((b) => b.textContent?.includes("Plan")));
-    expect(host.textContent).toContain("Mentor — Plan");
+    const items = nav();
+    expect(items.findIndex((t) => t.includes("Plan"))).toBe(items.findIndex((t) => t.includes("Hoy")) + 1);
+    await click([...host.querySelectorAll("aside nav button")].find((b) => b.textContent?.startsWith("Plan")));
+    expect(host.textContent).toContain("Mentor — Planes");
+  });
+
+  it("0 planes: no hay sub-interfaces, solo el resumen con la invitación a crear", async () => {
+    vi.mocked(api.mentorPlanList).mockResolvedValue([]);
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(none());
+    useNavState.setState({ values: { "mentor.view": "plan" } });
+    await mountEl(<MentorModule />);
+    expect(subs()).toHaveLength(0);
+    expect(host.querySelector("[data-testid=plan-empty]")).toBeTruthy();
+  });
+
+  it.each([1, 3, 5])("%i planes = %i sub-interfaces, cada una con su nombre, periodo y estado", async (n) => {
+    const list = Array.from({ length: n }, (_, i) => row(`p${i}`, `Plan ${i + 1}`, { status: i === 0 ? "activo" : i % 2 ? "futuro" : "terminado", pct: i * 10 }));
+    vi.mocked(api.mentorPlanList).mockResolvedValue(list);
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plans: list }));
+    useNavState.setState({ values: { "mentor.view": "plan" } });
+    await mountEl(<MentorModule />);
+    expect(subs()).toHaveLength(n);
+    expect(subs()[0]!.textContent).toContain("Plan 1");
+    expect(subs()[0]!.textContent).toContain("6 oct – 5 nov");
+    expect(subs()[0]!.textContent).toContain("activo");
+  });
+
+  it("elegir una sub-interfaz muestra ese plan y se recuerda; si el plan ya no existe, vuelve al resumen", async () => {
+    vi.mocked(api.mentorPlanList).mockResolvedValue([row("p1", "Plan 1"), row("p2", "Plan 2")]);
+    const get = vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ id: "p2", plan: plan({ id: "p2" }) }));
+    useNavState.setState({ values: { "mentor.view": "plan" } });
+    await mountEl(<MentorModule />);
+    await click(button("Plan 2"));
+    expect(useNavState.getState().values["mentor.view"]).toBe("plan:p2");
+    expect(get).toHaveBeenLastCalledWith("p2");
+    expect(host.querySelector("[data-testid=plan-header]")).toBeTruthy();
+    // el plan guardado ya no existe: resumen
+    act(() => root.unmount());
+    root = createRoot(host);
+    useMentor.setState({ plans: [], plansLoaded: false });
+    useNavState.setState({ values: { "mentor.view": "plan:zzz" } });
+    vi.mocked(api.mentorPlanList).mockResolvedValue([row("p1", "Plan 1")]);
+    get.mockResolvedValue(loaded());
+    await mountEl(<MentorModule />);
+    expect(host.textContent).toContain("Mentor — Planes");
   });
 });

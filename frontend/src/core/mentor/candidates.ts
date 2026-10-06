@@ -344,7 +344,7 @@ function addPlanItems(list: Candidate[], items: readonly PlanItem[], topics: Top
   for (const it of items) {
     const links: CandidateLinks = { subplanId: it.subplanId, subplan: it.label };
     if (it.kind === "deliverable") {
-      const id = `plan:${it.subplanId}:deliverable`;
+      const id = `plan:${it.planId}:${it.subplanId}:deliverable`;
       if (taken.has(id)) continue;
       taken.add(id);
       out.push({
@@ -367,7 +367,7 @@ function addPlanItems(list: Candidate[], items: readonly PlanItem[], topics: Top
     out = out.filter((c) => c !== base);
     const wanted = it.skills?.length ? it.skills : base?.skills;
     out.push({
-      id: `plan:${it.subplanId}:${folder}`,
+      id: `plan:${it.planId}:${it.subplanId}:${folder}`,
       kind: "plan_item",
       subject: t.subject,
       topicFolder: folder,

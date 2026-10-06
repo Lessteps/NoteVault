@@ -8,6 +8,7 @@
 
 import { ArrowUp, Bot, CalendarRange, Check, CircleAlert, History, Loader2, MoreHorizontal, Pencil, Plus, Target, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { periodLabel } from "../../lib/planTime";
 import type { MentorChatTurn } from "../../lib/types";
 import { useAssistant } from "../../store/assistant";
 import { useMentor } from "../../store/mentor";
@@ -45,7 +46,7 @@ export function PlanDraftChatCard({ turn, current }: { turn: MentorChatTurn; cur
       <div className="flex items-start gap-2">
         <CalendarRange size={14} className="mt-0.5 flex-none text-accent-text" />
         <div className="min-w-0 flex-1">
-          <div className="text-[12.5px] font-semibold leading-snug text-text">Plan de {draft.month}</div>
+          <div className="text-[12.5px] font-semibold leading-snug text-text">{draft.preconditions && draft.start && draft.end ? `Plan del ${periodLabel(draft.start, draft.end)}` : `Plan de ${draft.month}`}{draft.auto ? " · automático" : ""}</div>
           <div className="text-[11px] text-faint">
             {draft.subplans.length} subplanes · {topics} temas · {draft.hoursPerWeek} h/semana
           </div>

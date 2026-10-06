@@ -6,9 +6,14 @@
 
 import { create } from "zustand";
 import { api } from "../lib/bridge";
-import type { MentorChatMeta, MentorChatState, MentorChatTurn, MentorGoalCreated, MentorPanels, MentorPlanAccepted, MentorSessionObjective } from "../lib/types";
+import type { PlanPreconditions } from "../lib/planTime";
+import type { MentorChatMeta, MentorChatState, MentorChatTurn, MentorGoalCreated, MentorPanels, MentorPlanAccepted, MentorPlanGenerateResult, MentorPlanRow, MentorSessionObjective } from "../lib/types";
 import { useApp } from "./app";
 import { useAssistant } from "./assistant";
+import { useNavState } from "./navState";
+
+/** Vista del módulo Mentor de un plan concreto: `plan:<id>` (`plan` = resumen de planes). */
+export const planViewId = (id: string): string => `plan:${id}`;
 
 const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
@@ -41,6 +46,10 @@ interface MentorState {
   /** texto que el campo de mensaje del Mentor toma al abrirse una conversación de plan */
   composerSeed: string;
   acceptingPlan: boolean;
+  /** los planes (para las sub-interfaces del Mentor) */
+  plans: MentorPlanRow[];
+  plansLoaded: boolean;
+  generatingPlan: boolean;
   /** sube cada vez que se acepta un plan: el panel Plan se recarga */
   planVersion: number;
   /** objetivo que "Planear mi día con esto" deja para el panel Hoy */
@@ -62,6 +71,12 @@ interface MentorState {
   /** "Generar plan del mes con el Mentor": como la meta nueva, pero el Mentor responde con un plan del mes. */
   startPlanChat: () => Promise<void>;
   acceptPlan: () => Promise<MentorPlanAccepted | null>;
+  loadPlans: () => Promise<void>;
+  /** "Generar plan" del formulario de precondiciones: deja un borrador pendiente (no escribe nada). */
+  generatePlan: (pre: PlanPreconditions) => Promise<Extract<MentorPlanGenerateResult, { loading: false }> | null>;
+  renamePlan: (id: string, name: string) => Promise<void>;
+  archivePlan: (id: string, archived: boolean) => Promise<void>;
+  deletePlan: (id: string) => Promise<boolean>;
   setPendingObjective: (o: MentorSessionObjective | null) => void;
 }
 
@@ -102,6 +117,9 @@ export const useMentor = create<MentorState>((set, get) => ({
   planMode: false,
   composerSeed: "",
   acceptingPlan: false,
+  plans: [],
+  plansLoaded: false,
+  generatingPlan: false,
   planVersion: 0,
   pendingObjective: null,
 
@@ -263,15 +281,75 @@ export const useMentor = create<MentorState>((set, get) => ({
     set({ acceptingPlan: true });
     try {
       const out = await api.mentorPlanDraftAccept(turn.id, chatId ?? undefined);
-      useApp.getState().toast("info", `Plan de ${out.month} aceptado: ${out.subplans} subplanes, ${out.topics} temas.`);
+      useApp.getState().toast("info", `Plan aceptado: ${out.subplans} subplanes, ${out.topics} temas.`);
       await get().loadChat();
       set((s) => ({ planVersion: s.planVersion + 1 }));
+      useNavState.getState().set("mentor.view", planViewId(out.id));
       return out;
     } catch (e) {
       fail(e);
       return null;
     } finally {
       set({ acceptingPlan: false });
+    }
+  },
+
+  loadPlans: async () => {
+    try {
+      set({ plans: await api.mentorPlanList(), plansLoaded: true });
+    } catch {
+      set({ plansLoaded: true });
+    }
+  },
+
+  generatePlan: async (pre) => {
+    if (get().generatingPlan) return null;
+    set({ generatingPlan: true });
+    try {
+      let r = await api.mentorPlanGenerate(pre);
+      for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
+        await sleep(COLD_RETRY_MS);
+        r = await api.mentorPlanGenerate(pre);
+      }
+      if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
+      set({ ...chatPatch({ id: r.chatId, title: "", turns: r.turns, pending: r.pending }), chatLoaded: true, notice: null, planMode: true, composerSeed: "" });
+      void get().loadChat();
+      return r;
+    } catch (e) {
+      fail(e);
+      return null;
+    } finally {
+      set({ generatingPlan: false });
+    }
+  },
+
+  renamePlan: async (id, name) => {
+    try {
+      await api.mentorPlanRename(id, name);
+      set((s) => ({ planVersion: s.planVersion + 1 }));
+    } catch (e) {
+      fail(e);
+    }
+  },
+
+  archivePlan: async (id, archived) => {
+    try {
+      await api.mentorPlanArchive(id, archived);
+      set((s) => ({ planVersion: s.planVersion + 1 }));
+    } catch (e) {
+      fail(e);
+    }
+  },
+
+  deletePlan: async (id) => {
+    try {
+      await api.mentorPlanDelete(id);
+      set((s) => ({ planVersion: s.planVersion + 1 }));
+      useNavState.getState().set("mentor.view", "plan");
+      return true;
+    } catch (e) {
+      fail(e);
+      return false;
     }
   },
 

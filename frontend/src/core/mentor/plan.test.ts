@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { LAYOUT } from "../vaultFormat.js";
 import {
   addMonths,
   buildPlan,
@@ -10,6 +11,8 @@ import {
   mergePlans,
   PlanStore,
   planItemsFor,
+  planName,
+  planStatus,
   refreshPlanProgress,
   sanitizePlan,
   topicState,
@@ -86,7 +89,7 @@ describe("distributeTopics: reparto semanal", () => {
     // 1 h/semana x ~4,4 semanas = ~264 min; 10 temas de 60 = 600
     const d = distributeTopics({ month: "2026-10", hoursPerWeek: 1, topics: Array.from({ length: 10 }, (_, i) => T(i + 1)) });
     expect(d.fits).toBe(false);
-    expect(d.warnings[0]).toContain("No cabe en el mes");
+    expect(d.warnings[0]).toContain("No cabe en el periodo");
     expect(d.requiredHoursPerWeek).toBeGreaterThan(2);
     expect(Math.max(...d.topics.map((t) => t.targetWeek))).toBe(5);
     expect(d.topics).toHaveLength(10);
@@ -222,12 +225,12 @@ describe("PlanStore / sanitizePlan", () => {
     expect(st.months()).toEqual([]);
     const plan = buildPlan([{ area: "A", objective: "o", topics: [T(1)] }], { month: "2026-10", hoursPerWeek: 3 }).plan;
     st.save(plan);
-    st.save({ ...plan, month: "2026-11" });
+    st.save(buildPlan([{ area: "A", objective: "o", topics: [T(1)] }], { month: "2026-11", hoursPerWeek: 3 }).plan);
     expect(fs.existsSync(path.join(dir, ".notevault", "mentor", "plans", "2026-10.json"))).toBe(true);
     expect(st.months()).toEqual(["2026-11", "2026-10"]);
     expect(st.load("2026-10")!.subplans[0]!.topics[0]!.folder).toBe("P/T1");
     expect(st.load("nope")).toBeNull();
-    expect(() => st.save({ ...plan, month: "oct" })).toThrow();
+    expect(() => st.save({ ...plan, month: undefined, start: "oct", end: "nov" })).toThrow();
   });
 
   it("sanea un archivo corrupto o editado a mano sin romperse", () => {
@@ -241,5 +244,156 @@ describe("PlanStore / sanitizePlan", () => {
     expect(p.subplans[0]).toMatchObject({ id: "s1", area: "General" });
     expect(p.subplans[0]!.topics).toEqual([{ folder: "P/T1", title: "T1", targetWeek: 5, estMinutes: 30 }]);
     expect(p.subplans[0]!.deliverable!.status).toBe("idea");
+  });
+});
+
+describe("planes de periodo libre", () => {
+  it("distributeTopics con un periodo, días de estudio y ritmo: 2 semanas, lunes a viernes, 2 h/día", () => {
+    // 2 semanas desde un lunes: 10 días de estudio × 120 min × 100 % = 1200 min
+    const d = distributeTopics({ start: "2026-10-05", end: "2026-10-18", minutesPerDay: 120, studyDays: [1, 2, 3, 4, 5], pace: "intenso", topics: Array.from({ length: 8 }, (_, i) => T(i + 1, 120)) });
+    expect(d.weeks).toHaveLength(2);
+    expect(d.weeks.map((w) => w.capacityMinutes)).toEqual([600, 600]);
+    expect(d.availableMinutes).toBe(1200);
+    expect(d.fits).toBe(true);
+    expect(d.weeks[0]!.topics.length).toBeGreaterThanOrEqual(4);
+    expect(d.topics.at(-1)!.targetWeek).toBe(2);
+  });
+
+  it("un periodo que empieza a mitad de semana y las fechas bloqueadas", () => {
+    const base = { start: "2026-10-07", end: "2026-10-13", minutesPerDay: 60, studyDays: [1, 2, 3, 4, 5, 6, 7], pace: "intenso" as const, topics: [T(1, 60)] };
+    expect(distributeTopics(base).availableMinutes).toBe(420);
+    expect(distributeTopics({ ...base, blockedDates: ["2026-10-08", "2026-10-09"] }).availableMinutes).toBe(300);
+    // desde hoy (10-10) la primera semana es parcial
+    expect(distributeTopics({ ...base, from: "2026-10-10" }).weeks[0]!.capacityMinutes).toBe(240);
+  });
+
+  it("avisa si no cabe en el periodo con la capacidad real", () => {
+    const d = distributeTopics({ start: "2026-10-05", end: "2026-10-11", minutesPerDay: 60, studyDays: [1, 2, 3], pace: "normal", topics: [T(1, 120), T(2, 120)] });
+    expect(d.fits).toBe(false);
+    expect(d.warnings[0]).toContain("No cabe en el periodo");
+    expect(() => distributeTopics({ start: "2026-10-05", end: "2026-10-01", minutesPerDay: 60, topics: [] })).toThrow();
+    expect(() => distributeTopics({ start: "2026-10-05", end: "2026-10-11", minutesPerDay: 0, topics: [] })).toThrow();
+  });
+
+  it("buildPlan de periodo libre: id <inicio>_<fin>, nombre autogenerado, horas efectivas y precondiciones", () => {
+    const pre = { start: "2026-10-06", end: "2026-11-05", minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6], pace: "normal" as const, goalIds: [], subjects: ["P"], levels: {}, deliverables: true };
+    const b = buildPlan([{ area: "P", objective: "Backend", topics: [T(1), T(2)] }], { id: "2026-10-06_2026-11-05", start: pre.start, end: pre.end, minutesPerDay: 240, studyDays: pre.studyDays, pace: "normal", preconditions: pre, auto: true });
+    expect(b.plan).toMatchObject({ id: "2026-10-06_2026-11-05", start: "2026-10-06", end: "2026-11-05", auto: true });
+    expect(b.plan.month).toBeUndefined();
+    expect(b.plan.name).toBe("Backend · 6 oct–5 nov");
+    expect(b.plan.subplans[0]!.weeks).toHaveLength(5);
+    expect(b.plan.hoursPerWeek).toBeGreaterThan(10);
+    expect(b.plan.preconditions!.minutesPerDay).toBe(240);
+  });
+
+  it("weekOf acepta un mes o un periodo", () => {
+    expect(weekOf("2026-10-14", { start: "2026-10-07", end: "2026-10-30" })).toBe(2);
+    expect(weekOf("2026-10-06", { start: "2026-10-07", end: "2026-10-30" })).toBe(0);
+  });
+});
+
+describe("compatibilidad de lectura de los planes mensuales", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "nv_plan_legacy_"));
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  const legacy = { month: "2026-10", createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-02T00:00:00Z", hoursPerWeek: 6, subplans: [{ id: "s1", area: "A", objective: "o", topics: [{ folder: "P/T1", title: "T1", targetWeek: 2, estMinutes: 60 }] }] };
+
+  it("un <AAAA-MM>.json sin start/end se lee como un plan de periodo (día 1 – último día)", () => {
+    fs.mkdirSync(path.join(dir, ".notevault", "mentor", "plans"), { recursive: true });
+    fs.writeFileSync(path.join(dir, ".notevault", "mentor", "plans", "2026-10.json"), JSON.stringify(legacy), "utf-8");
+    const st = new PlanStore(dir);
+    const p = st.load("2026-10")!;
+    expect(p).toMatchObject({ id: "2026-10", month: "2026-10", start: "2026-10-01", end: "2026-10-31", hoursPerWeek: 6 });
+    expect(p.subplans[0]!.weeks).toHaveLength(5);
+    expect(st.months()).toEqual(["2026-10"]);
+    expect(st.list().map((x) => x.id)).toEqual(["2026-10"]);
+    expect(planItemsFor("2026-10-09", [p]).map((i) => i.folder)).toEqual(["P/T1"]);
+    expect(planItemsFor("2026-11-02", [p])).toEqual([]);
+  });
+
+  it("sin migración destructiva: leerlo no reescribe el archivo y guardarlo conserva el mes", () => {
+    const file = path.join(dir, ".notevault", "mentor", "plans", "2026-10.json");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(legacy), "utf-8");
+    const before = fs.readFileSync(file, "utf-8");
+    const st = new PlanStore(dir);
+    st.load("2026-10");
+    st.list();
+    expect(fs.readFileSync(file, "utf-8")).toBe(before);
+    st.save({ ...st.load("2026-10")!, name: "Mi mes" });
+    const saved = JSON.parse(fs.readFileSync(file, "utf-8"));
+    expect(saved).toMatchObject({ id: "2026-10", month: "2026-10", start: "2026-10-01", end: "2026-10-31", name: "Mi mes" });
+  });
+
+  it("conviven con los planes de periodo libre", () => {
+    const st = new PlanStore(dir);
+    st.save(buildPlan([{ area: "A", objective: "o", topics: [T(1)] }], { month: "2026-10", hoursPerWeek: 3 }).plan);
+    st.save(buildPlan([{ area: "B", objective: "p", topics: [T(2)] }], { start: "2026-10-12", end: "2026-10-25", minutesPerDay: 60 }).plan);
+    expect(st.list().map((p) => p.id)).toEqual(["2026-10", "2026-10-12_2026-10-25"]);
+    expect(st.months()).toEqual(["2026-10"]);
+  });
+});
+
+describe("planes solapados, nombre, archivo y papelera", () => {
+  const mk = (start: string, end: string, folders: number[], over: Partial<MonthlyPlan> = {}): MonthlyPlan => ({
+    ...buildPlan([{ area: "A", objective: `o${start}`, topics: folders.map((n) => T(n)) }], { start, end, minutesPerDay: 120, now: "2026-10-01T00:00:00Z" }).plan,
+    ...over,
+  });
+
+  it("planItemsFor combina varios planes activos sin repetir un mismo tema", () => {
+    const a = mk("2026-10-05", "2026-10-25", [1, 2]);
+    const b = mk("2026-10-08", "2026-10-31", [2, 3]); // el tema 2 está en los dos
+    const items = planItemsFor("2026-10-20", [a, b]);
+    expect(items.map((i) => i.folder).sort()).toEqual(["P/T1", "P/T2", "P/T3"]);
+    expect(new Set(items.map((i) => i.planId))).toEqual(new Set([a.id, b.id]));
+  });
+
+  it("solo cuenta los planes que contienen la fecha y no los archivados", () => {
+    const a = mk("2026-10-05", "2026-10-11", [1]);
+    const b = mk("2026-10-20", "2026-10-31", [2]);
+    expect(planItemsFor("2026-10-08", [a, b]).map((i) => i.folder)).toEqual(["P/T1"]);
+    expect(planItemsFor("2026-10-15", [a, b])).toEqual([]);
+    expect(planItemsFor("2026-10-08", [{ ...a, archived: true }, b])).toEqual([]);
+  });
+
+  it("estado y nombre del plan", () => {
+    const a = mk("2026-10-05", "2026-10-11", [1]);
+    expect(planStatus(a, "2026-10-04")).toBe("futuro");
+    expect(planStatus(a, "2026-10-08")).toBe("activo");
+    expect(planStatus(a, "2026-10-12")).toBe("terminado");
+    expect(planStatus({ ...a, archived: true }, "2026-10-08")).toBe("terminado");
+    expect(planName(a)).toBe("o2026-10-05 · 5 oct–11 oct");
+    expect(planName({ ...a, name: "Mi plan" })).toBe("Mi plan");
+  });
+
+  it("trash manda el archivo a la papelera de la vault", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nv_plan_trash_"));
+    try {
+      const st = new PlanStore(dir);
+      const p = st.save(mk("2026-10-05", "2026-10-11", [1]));
+      expect(st.trash(p.id)).toBe(true);
+      expect(st.load(p.id)).toBeNull();
+      expect(st.trash(p.id)).toBe(false);
+      expect(fs.readdirSync(path.join(dir, LAYOUT.trash_dir, "mentor-plans"))).toHaveLength(1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("distributeTopics con spread (planes por precondiciones)", () => {
+  it("con holgura reparte los temas a partes iguales por las semanas en vez de llenar la primera", () => {
+    const base = { start: "2026-10-05", end: "2026-10-18", minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6], pace: "intenso" as const, topics: Array.from({ length: 6 }, (_, i) => T(i + 1, 60)) };
+    expect(distributeTopics(base).topics.map((t) => t.targetWeek)).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(distributeTopics({ ...base, spread: true }).topics.map((t) => t.targetWeek)).toEqual([1, 1, 1, 2, 2, 2]);
+  });
+
+  it("si no cabe, usa toda la capacidad (sin repartir a la baja)", () => {
+    const d = distributeTopics({ start: "2026-10-05", end: "2026-10-18", minutesPerDay: 60, studyDays: [1, 2, 3, 4, 5, 6], pace: "intenso", topics: Array.from({ length: 14 }, (_, i) => T(i + 1, 60)), spread: true });
+    expect(d.fits).toBe(false);
+    expect(d.weeks[0]!.topics.length).toBeGreaterThanOrEqual(5);
   });
 });

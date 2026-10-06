@@ -113,6 +113,9 @@ export function MentorToday() {
   const [session, setSession] = useState<MentorSessionRecord | null>(null);
   const [replanning, setReplanning] = useState(false);
   const [overview, setOverview] = useState<MentorOverview | null>(null);
+  /** el tiempo diario que declara el plan activo: se sugiere, sin forzarlo */
+  const [suggested, setSuggested] = useState<number | null>(null);
+  const touchedTime = useRef(false);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -159,6 +162,14 @@ export function MentorToday() {
       const o = await untilReady(() => api.mentorOverview());
       if (!o || !alive.current) return;
       setOverview(o);
+      const sug = o.objectives?.plan?.minutesPerDay;
+      if (sug && sug >= 5 && sug <= 720) {
+        setSuggested(sug);
+        if (!touchedTime.current) {
+          setMinutes(sug);
+          setFree(PRESETS.includes(sug) ? "" : String(sug));
+        }
+      }
       if (o.today?.acceptedAt) setSession(o.today);
     } catch (e) {
       if (alive.current) setError((e as Error).message);
@@ -333,6 +344,7 @@ export function MentorToday() {
                       type="button"
                       aria-pressed={minutes === m && !free}
                       onClick={() => {
+                        touchedTime.current = true;
                         setMinutes(m);
                         setFree("");
                       }}
@@ -349,6 +361,7 @@ export function MentorToday() {
                       max={720}
                       value={free}
                       onChange={(e) => {
+                        touchedTime.current = true;
                         setFree(e.target.value);
                         const n = Math.round(Number(e.target.value));
                         if (n >= 5 && n <= 720) setMinutes(n);
@@ -357,6 +370,11 @@ export function MentorToday() {
                     />
                   </label>
                 </div>
+                {suggested !== null && (
+                  <p className="mt-1.5 text-[11.5px] text-faint" data-testid="plan-time-hint">
+                    Tu plan activo declara {Math.round((suggested / 60) * 10) / 10} h/día{minutes === suggested ? ": lo dejé como sugerencia" : ""}. Cámbialo si hoy tienes otro tiempo.
+                  </p>
+                )}
                 <div className="mt-4">
                   <Label>Objetivo de la sesión (opcional)</Label>
                   <ObjectiveSelector
@@ -466,7 +484,7 @@ function ObjectiveSelector({ options, spec, onPick }: { options?: MentorObjectiv
   const fixed: Array<{ o: MentorSessionObjective; label: string; title?: string }> = [
     { o: none, label: "Sin objetivo (que el Mentor decida)" },
     { o: { type: "tasks" }, label: "Terminar todas mis tareas pendientes", title: options ? `${options.tasksPending} pendientes` : undefined },
-    ...(options?.plan ? [{ o: { type: "plan" } as MentorSessionObjective, label: `Lo que toca del plan del mes (${options.plan.items})` }] : []),
+    ...(options?.plan ? [{ o: { type: "plan" } as MentorSessionObjective, label: `Lo que toca de mis planes (${options.plan.items})` }] : []),
     { o: { type: "review" }, label: "Repasar lo vencido (SRS y errores)" },
   ];
   return (

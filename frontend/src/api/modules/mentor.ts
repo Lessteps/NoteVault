@@ -19,13 +19,38 @@ import {
   deriveView,
   mergePlans,
   MONTH_RE,
+  PLAN_ID_RE,
   PlanStore,
   planItemsFor,
+  planName,
+  planStatus,
   refreshPlanProgress,
+  topicState,
   type DeliverableStatus,
+  type Plan,
   type PlanItem,
   type SubplanSeed,
+  type TopicLiteLookup,
 } from "../../core/mentor/plan.js";
+import { periodLabel } from "../../lib/planTime.js";
+import {
+  areaOfFolder,
+  adjustedMinutes,
+  autoSeeds,
+  buildPlanMessages,
+  composeFromPreconditions,
+  markDiagnostics,
+  parsePreconditionReply,
+  planCatalog,
+  preconditionsProblem,
+  resolveScope,
+  sanitizePreconditions,
+  scopeTopics,
+  seedsFromReply,
+  preconditionsRequest,
+  type GoalScope,
+  type PlanPreconditions,
+} from "../../core/mentor/planSpec.js";
 import {
   buildChatMessages,
   composePlanDraft,
@@ -33,6 +58,7 @@ import {
   planDraftSummary,
   planWindow,
   type PlanContext,
+  type PlanDraft,
 } from "../../core/mentor/planDraft.js";
 import { buildStudentBrief, toPromptText, type BriefContext, type QueueHint } from "../../core/mentor/brief.js";
 import { adherence, BLOCK_STATUSES, sanitizeSession, SessionLog, type BlockStatus } from "../../core/mentor/sessionLog.js";
@@ -55,6 +81,7 @@ import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 import { clampInt } from "../common.js";
 import { vaultScan } from "../vaultScan.js";
+import { parseTopicLink } from "../../core/practice/topicLinks.js";
 import { goalsApi } from "./goals.js";
 import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
@@ -156,8 +183,70 @@ function planContext(app: AppState, today: string): PlanContext {
 
 /** Lo que el plan del mes dice que toca hoy (solo lee el plan). */
 function todaysPlanItems(app: AppState, day: string = localDate()): PlanItem[] {
-  const plan = new PlanStore(app.root).load(day.slice(0, 7));
-  return plan ? planItemsFor(day, [plan]) : [];
+  return planItemsFor(day, new PlanStore(app.root).list());
+}
+
+/** Planes que contienen el día `day` (varios pueden estar activos a la vez). */
+const activePlans = (plans: readonly Plan[], day: string): Plan[] => plans.filter((p) => planStatus(p, day) === "activo");
+
+const planRow = (p: Plan, today: string, lookup?: TopicLiteLookup) => {
+  const topics = p.subplans.reduce((n, s) => n + s.topics.length, 0);
+  const view = lookup ? deriveView(p, lookup, today) : null;
+  const completed = view ? view.summary.done : p.subplans.reduce((n, s) => n + s.topics.filter((t) => t.completedAt).length, 0);
+  return {
+    id: p.id,
+    start: p.start,
+    end: p.end,
+    ...(p.month ? { month: p.month } : {}),
+    name: planName(p),
+    period: periodLabel(p.start, p.end),
+    status: planStatus(p, today),
+    archived: !!p.archived,
+    auto: !!p.auto,
+    subplans: p.subplans.length,
+    topics,
+    completed,
+    pct: view ? view.summary.pct : topics ? Math.round((completed / topics) * 100) : 0,
+    minutesPerDay: p.preconditions?.minutesPerDay ?? null,
+  };
+};
+
+/** Activos primero (el más reciente arriba), luego futuros por fecha, luego terminados del más reciente al más antiguo. */
+function sortRows<T extends { status: string; start: string; end: string }>(rows: T[]): T[] {
+  const rank = { activo: 0, futuro: 1, terminado: 2 } as Record<string, number>;
+  return [...rows].sort((a, b) => rank[a.status]! - rank[b.status]! || (a.status === "terminado" ? b.end.localeCompare(a.end) : a.status === "activo" ? b.start.localeCompare(a.start) : a.start.localeCompare(b.start)));
+}
+
+/** El plan que se muestra por defecto: el activo hoy; si no, el siguiente futuro; si no, el último terminado. */
+function defaultPlan(plans: readonly Plan[], today: string): Plan | null {
+  const rows = sortRows(plans.map((p) => planRow(p, today)));
+  return plans.find((p) => p.id === rows[0]?.id) ?? null;
+}
+
+const toIso = (d: Date | null | undefined): string | null => (d ? localDate(d) : null);
+
+/** Metas activas con los temas que enlazan sus submetas (`topic_links`), para el alcance de un plan. */
+function goalScopes(app: AppState): GoalScope[] {
+  const m = app.mgrs();
+  const areaName = new Map(m.areas.areas().map((a) => [a.id, a.name]));
+  return m.goals.goals(FILTER_ACTIVE).map((g) => ({
+    id: g.id,
+    name: g.name,
+    area: areaName.get(g.area) ?? "",
+    end: toIso(g.end),
+    items: m.goals
+      .items(g.id)
+      .filter((i) => i.is_leaf && i.status !== ITEM_DONE && i.topic_links.length > 0)
+      .sort((a, b) => a.order - b.order || (a.start?.getTime() ?? Infinity) - (b.start?.getTime() ?? Infinity) || (a.due?.getTime() ?? Infinity) - (b.due?.getTime() ?? Infinity) || a.name.localeCompare(b.name, "es", { numeric: true, sensitivity: "base" }))
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        links: i.topic_links
+          .map((l: string) => parseTopicLink(l))
+          .filter((l: ReturnType<typeof parseTopicLink>): l is NonNullable<ReturnType<typeof parseTopicLink>> => l !== null)
+          .map((l: { topic: string; skills: string[] }) => ({ folder: l.topic, skills: l.skills })),
+      })),
+  }));
 }
 
 const midnight = (d = new Date()): Date => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -192,12 +281,22 @@ function objectiveOptions(app: AppState, brief: ReturnType<typeof buildStudentBr
     .map(([subject, v]) => ({ subject, label: subjectLabel(subject), topics: v.topics, open: v.open }))
     .sort((a, b) => a.label.localeCompare(b.label, "es"));
   const day = localDate();
-  const plan = new PlanStore(app.root).load(day.slice(0, 7));
+  const active = activePlans(new PlanStore(app.root).list(), day);
+  const lead = [...active].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).find((p) => p.preconditions?.minutesPerDay) ?? active[0];
   return {
     goals,
     subjects,
     tasksPending: sectionData<TasksData>(brief, "tasks")?.tasks.length ?? 0,
-    plan: plan ? { month: plan.month, items: planItemsFor(day, [plan]).length } : null,
+    plan: active.length
+      ? {
+          month: (lead ?? active[0]!).start.slice(0, 7),
+          id: (lead ?? active[0]!).id,
+          start: (lead ?? active[0]!).start,
+          end: (lead ?? active[0]!).end,
+          items: planItemsFor(day, active).length,
+          minutesPerDay: lead?.preconditions?.minutesPerDay ?? null,
+        }
+      : null,
   };
 }
 
@@ -271,6 +370,12 @@ export function mentorApi(app: AppState, send?: SendFn) {
     );
     if (!rec) throw new ApiError("Ese bloque ya no existe.");
     return rec;
+  }
+
+  function discardPlanDraft(turnId: unknown) {
+    const turns = chatFor()?.patch(String(turnId ?? ""), { discarded: true });
+    if (!turns) throw new ApiError("Ese borrador ya no existe.");
+    return { turns, pending: pendingDraft(turns)?.id ?? null };
   }
 
   return {
@@ -478,8 +583,13 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const brief = buildStudentBrief(briefContext(app, log()));
       const request = [...history.filter((h) => h.role === "user").map((h) => h.content), message].join(" ");
       const planMode = o.mode === "plan";
-      const catalog = buildTopicCatalog(topicSnaps(app), request, { max: planMode ? 80 : 60 });
       const today = localDate();
+      const snapsAll = topicSnaps(app);
+      // refinando un borrador que salió de precondiciones: siguen siendo hechos fijos
+      const prevPlan = pendingDraft(stored)?.planDraft;
+      const prePrev: PlanPreconditions | null = prevPlan?.preconditions ? sanitizePreconditions(prevPlan.preconditions, today) : null;
+      const scopePrev = prePrev ? resolveScope(prePrev, buildTopicCatalog(snapsAll, "", { max: 1_000_000 }), goalScopes(app)) : null;
+      const catalog = scopePrev ? planCatalog(scopePrev) : buildTopicCatalog(snapsAll, request, { max: planMode ? 80 : 60 });
       const planCtx = planContext(app, today);
       const areas = app.mgrs().areas.areas().filter((a) => !a.archived);
       const chatLog = existing ?? chats().create();
@@ -487,7 +597,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
 
       let raw = "";
       try {
-        raw = await (send ?? sendChat)(cfg, buildChatMessages(message, brief, catalog, history, { today, areas: areas.map((a) => a.name), plan: planCtx, planMode }));
+        const extras = { today, areas: areas.map((a) => a.name), plan: planCtx, planMode };
+        raw = await (send ?? sendChat)(cfg, prePrev && scopePrev ? buildPlanMessages(prePrev, brief, catalog, history, { ...extras, scope: scopePrev }, message) : buildChatMessages(message, brief, catalog, history, extras));
       } catch (e) {
         return { loading: false as const, kind: "error" as const, text: `La IA falló: ${e instanceof Error ? e.message : String(e)}`.slice(0, 400), turns, pending: pendingDraft(turns)?.id ?? null };
       }
@@ -500,7 +611,12 @@ export function mentorApi(app: AppState, send?: SendFn) {
         return { loading: false as const, kind: "question" as const, text: parsed.reply.text, turns: next, pending: pendingDraft(next)?.id ?? null };
       }
       if (parsed.reply.type === "plan_draft") {
-        const planDraft = composePlanDraft(parsed.reply, catalog, planCtx);
+        let planDraft: PlanDraft | { missing: string };
+        if (prePrev) {
+          const { seeds, why } = seedsFromReply(parsed.reply, catalog, prePrev, new Map(goalScopes(app).map((g) => [g.id, g.name])));
+          if (!seeds.length) return { loading: false as const, kind: "error" as const, text: "La IA no propuso ningún tema válido. Reformula o inténtalo de nuevo.", turns, pending: pendingDraft(turns)?.id ?? null };
+          planDraft = composeFromPreconditions(seeds, prePrev, { today, auto: false, rationale: parsed.reply.rationale, discarded: parsed.reply.discarded, why });
+        } else planDraft = composePlanDraft(parsed.reply, catalog, planCtx);
         if ("missing" in planDraft) {
           const text = `Antes de armar el plan del mes necesito saber ${planDraft.missing}.`;
           const next = chatLog.append({ role: "assistant", content: text });
@@ -630,35 +746,185 @@ export function mentorApi(app: AppState, send?: SendFn) {
 
     mentor_block_status: markBlock,
 
-    // ── Plan mensual (core/mentor/plan.ts) ────────────────────────────────
+    // ── Planes del Mentor sobre un periodo libre (core/mentor/plan.ts, planSpec.ts) ──
 
-    /** Meses con plan y un resumen de cada uno. */
+    /** Los planes con su periodo y estado (activo / futuro / terminado): activos primero. */
     mentor_plan_list() {
+      const today = localDate();
+      const snaps = studyIndexCold(app) ? null : new Map(topicSnaps(app).map((t) => [t.folder, t]));
+      const lookup = snaps ? (f: string) => snaps.get(f) : undefined;
+      return sortRows(new PlanStore(app.root).list().map((p) => planRow(p, today, lookup)));
+    },
+
+    /** Renombra un plan (el nombre se guarda en su archivo; vacío = volver al nombre autogenerado). */
+    mentor_plan_rename(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
       const st = new PlanStore(app.root);
-      return st.months().map((month) => {
-        const p = st.load(month)!;
-        return { month, subplans: p.subplans.length, topics: p.subplans.reduce((n, s) => n + s.topics.length, 0), completed: p.subplans.reduce((n, s) => n + s.topics.filter((t) => t.completedAt).length, 0) };
-      });
+      const plan = PLAN_ID_RE.test(String(o.id ?? "")) ? st.load(String(o.id)) : null;
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      const name = String(o.name ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+      const { name: _old, ...rest } = plan;
+      return st.save({ ...rest, ...(name ? { name } : {}), updatedAt: new Date().toISOString() });
+    },
+
+    /** Archiva (da por terminado) un plan o lo reactiva: deja de aportar a «Hoy» sin borrar nada. */
+    mentor_plan_archive(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const st = new PlanStore(app.root);
+      const plan = PLAN_ID_RE.test(String(o.id ?? "")) ? st.load(String(o.id)) : null;
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      const { archived: _a, ...rest } = plan;
+      return st.save({ ...rest, ...(o.archived === false ? {} : { archived: true }), updatedAt: new Date().toISOString() });
+    },
+
+    /** Elimina un plan: su archivo va a la papelera de la vault (`.notevault/.papelera/mentor-plans`), no se borra de forma dura. */
+    mentor_plan_delete(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      if (!st.load(id)) throw new ApiError("Ese plan ya no existe.");
+      if (!st.trash(id)) throw new ApiError("No se pudo eliminar el plan.");
+      return { id, plans: sortRows(st.list().map((p) => planRow(p, localDate()))) };
     },
 
     /**
-     * El plan de un mes con el estado de práctica DERIVADO en vivo. Al leerlo anota (una sola vez) la fecha
-     * de los temas que ya están completos: es el registro de temas completados.
+     * Lo que ofrece el formulario de precondiciones: metas activas con sus temas enlazados, materias con
+     * temas y, por tema pendiente, sus minutos y qué metas lo enlazan (el cliente calcula en vivo con eso).
+     */
+    mentor_plan_options() {
+      if (studyIndexCold(app)) return { loading: true as const };
+      const all = buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 });
+      const goals = goalScopes(app);
+      const topics = scopeTopics(all, goals);
+      const areas = new Map<string, { id: string; name: string; total: number; pending: number; minutes: number }>();
+      for (const t of all) {
+        const id = areaOfFolder(t.folder) || t.subject || "General";
+        const e = areas.get(id) ?? { id, name: id, total: 0, pending: 0, minutes: 0 };
+        e.total++;
+        if (t.completenessPct < 100) {
+          e.pending++;
+          e.minutes += t.estMinutes;
+        }
+        areas.set(id, e);
+      }
+      return {
+        loading: false as const,
+        today: localDate(),
+        aiConfigured: aiUnavailableReason(AIConfig.fromDict(AppConfig.get_ai_config())) === null,
+        goals: goals.map((g) => {
+          const mine = topics.filter((t) => t.goalIds.includes(g.id));
+          return { id: g.id, name: g.name, area: g.area, end: g.end, topics: mine.length, minutes: mine.reduce((n, t) => n + t.minutes, 0) };
+        }),
+        areas: [...areas.values()].sort((a, b) => a.name.localeCompare(b.name, "es", { numeric: true })),
+        topics,
+      };
+    },
+
+    /**
+     * Un plan a partir de las PRECONDICIONES (periodo, tiempo diario, días de estudio, qué cubrir, nivel…).
+     * Devuelve un BORRADOR (no escribe ningún plan): con IA, ella elige y ordena temas del catálogo real con las
+     * precondiciones como hechos fijos; sin IA, o si falla, un plan automático determinista. El borrador queda
+     * como turno pendiente del Mentor (se acepta o descarta igual que un `plan_draft`, y se puede refinar en el chat).
+     */
+    async mentor_plan_generate(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const today = localDate();
+      const pre = sanitizePreconditions(o.preconditions && typeof o.preconditions === "object" ? o.preconditions : o, today);
+      const problem = preconditionsProblem(pre, today);
+      if (problem) throw new ApiError(problem);
+      if (studyIndexCold(app)) return { loading: true as const };
+
+      const all = buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 });
+      const goals = goalScopes(app);
+      const scope = resolveScope(pre, all, goals);
+      const catalog = planCatalog(scope);
+      if (!catalog.length) {
+        throw new ApiError("No hay temas pendientes en lo que elegiste. Elige metas con temas enlazados o materias con temas sin completar.");
+      }
+
+      const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+      const unavailable = aiUnavailableReason(cfg);
+      const planCtx = planContext(app, today);
+      let draft: PlanDraft | null = null;
+      let fallbackReason: string | undefined = unavailable ?? undefined;
+      if (!unavailable) {
+        try {
+          const brief = buildStudentBrief(briefContext(app, log()));
+          const areaNames = app.mgrs().areas.areas().filter((a) => !a.archived).map((a) => a.name);
+          const raw = await (send ?? sendChat)(cfg, buildPlanMessages(pre, brief, catalog, [], { today, areas: areaNames, plan: planCtx, scope }));
+          const parsed = parsePreconditionReply(raw, catalog, planCtx);
+          if (parsed.ok) {
+            const { seeds, why } = seedsFromReply(parsed.reply, catalog, pre, new Map(goals.map((g) => [g.id, g.name])));
+            if (seeds.length) {
+              draft = composeFromPreconditions(seeds, pre, { today, auto: false, rationale: parsed.reply.rationale, discarded: parsed.reply.discarded, why });
+            } else fallbackReason = "La IA no propuso ningún tema válido.";
+          } else fallbackReason = parsed.reason;
+        } catch (e) {
+          fallbackReason = `La IA falló: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300);
+        }
+      }
+      if (!draft) {
+        const why = unavailable ? "La IA no está configurada" : `La IA no devolvió un plan válido (${fallbackReason ?? "sin detalle"})`;
+        draft = composeFromPreconditions(autoSeeds(pre, scope), pre, {
+          today,
+          auto: true,
+          rationale: `Plan automático con tus metas y materias elegidas, en su orden natural y sin lo ya completado. ${why}.`,
+          ...(fallbackReason && !unavailable ? { fallbackReason } : {}),
+        });
+      }
+
+      const active = chats().peek();
+      const chatLog = active && active.load().length === 0 ? active : chats().create();
+      chatLog.append({ role: "user", content: preconditionsRequest(pre, scope) });
+      const text = draft.rationale || `Plan del ${draft.start} al ${draft.end}: ${draft.subplans.length} subplanes`;
+      const next = chatLog.append({ role: "assistant", content: text, planDraft: draft });
+      return {
+        loading: false as const,
+        kind: "plan_draft" as const,
+        source: draft.auto ? ("auto" as const) : ("ai" as const),
+        text,
+        planDraft: draft,
+        turns: next,
+        pending: pendingDraft(next)?.id ?? null,
+        chatId: chatLog.record().id,
+      };
+    },
+
+    /**
+     * Un plan con el estado de práctica DERIVADO en vivo (por defecto, el activo hoy). Al leerlo anota (una sola
+     * vez) la fecha de los temas que ya están completos: es el registro de temas completados. `items` es lo que
+     * toca hoy en TODOS los planes activos.
      */
     mentor_plan_get(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
       const today = localDate();
-      const month = o.month ? String(o.month) : today.slice(0, 7);
-      if (!MONTH_RE.test(month)) throw new ApiError("Mes inválido (AAAA-MM).");
+      let wanted = "";
+      if (o.id) {
+        wanted = String(o.id);
+        if (!PLAN_ID_RE.test(wanted)) throw new ApiError("Plan inválido.");
+      } else if (o.month) {
+        wanted = String(o.month);
+        if (!MONTH_RE.test(wanted)) throw new ApiError("Mes inválido (AAAA-MM).");
+      }
       if (studyIndexCold(app)) return { loading: true as const };
       const st = new PlanStore(app.root);
-      const months = st.months();
+      const plans = st.list();
+      const snapMap = new Map(topicSnaps(app).map((t) => [t.folder, t]));
+      const rows = sortRows(plans.map((p) => planRow(p, today, (f) => snapMap.get(f))));
       const aiConfigured = aiUnavailableReason(AIConfig.fromDict(AppConfig.get_ai_config())) === null;
-      let plan = st.load(month);
-      if (!plan) return { loading: false as const, month, today, plan: null, derived: null, goals: {}, projects: {}, items: [] as PlanItem[], months, aiConfigured };
+      let plan = wanted ? st.load(wanted) : defaultPlan(plans, today);
 
-      const snaps = new Map(topicSnaps(app).map((t) => [t.folder, t]));
+      const snaps = snapMap;
       const lookup = (folder: string) => snaps.get(folder);
+      const active = activePlans(plans, today);
+      const done = new Set(active.flatMap((p) => p.subplans.flatMap((s) => s.topics.filter((t) => topicState(lookup(t.folder) ?? null) === "completo").map((t) => t.folder))));
+      const items = planItemsFor(today, active, (f) => done.has(f));
+      const months = st.months();
+      if (!plan) {
+        return { loading: false as const, id: wanted || null, month: wanted && MONTH_RE.test(wanted) ? wanted : today.slice(0, 7), today, plan: null, derived: null, goals: {}, projects: {}, items, months, plans: rows, aiConfigured };
+      }
+
       const refreshed = refreshPlanProgress(plan, lookup, today);
       if (refreshed.changed) plan = st.save(refreshed.plan);
       const derived = deriveView(plan, lookup, today);
@@ -671,9 +937,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
           if (!id || goals[id]) continue;
           const g = m.goals.get_goal(id);
           if (!g) continue;
-          const items: Record<string, { name: string; pct: number }> = {};
-          for (const it of m.goals.items(id)) items[it.id] = { name: it.name, pct: Math.round(Math.max(0, Math.min(1, m.goals.itemProgress(it, g, dayStart))) * 100) };
-          goals[id] = { name: g.name, pct: Math.round(Math.max(0, Math.min(1, m.goals.progress(g, dayStart))) * 100), items };
+          const goalItems: Record<string, { name: string; pct: number }> = {};
+          for (const it of m.goals.items(id)) goalItems[it.id] = { name: it.name, pct: Math.round(Math.max(0, Math.min(1, m.goals.itemProgress(it, g, dayStart))) * 100) };
+          goals[id] = { name: g.name, pct: Math.round(Math.max(0, Math.min(1, m.goals.progress(g, dayStart))) * 100), items: goalItems };
         }
       }
       const projects: Record<string, { id: string; name: string; status: string }> = {};
@@ -682,78 +948,121 @@ export function mentorApi(app: AppState, send?: SendFn) {
         const p = pid ? m.projects.get(pid) : null;
         if (pid && p) projects[pid] = { id: p.id, name: p.name, status: p.status };
       }
-      const done = new Set(derived.subplans.flatMap((s) => s.topics.filter((t) => t.state === "completo").map((t) => t.folder)));
-      const items = month === today.slice(0, 7) ? planItemsFor(today, [plan], (f) => done.has(f)) : [];
-      return { loading: false as const, month, today, plan, derived, goals, projects, items, months, aiConfigured };
+      return {
+        loading: false as const,
+        id: plan.id,
+        month: plan.month ?? plan.start.slice(0, 7),
+        today,
+        status: planStatus(plan, today),
+        plan,
+        derived,
+        goals,
+        projects,
+        items,
+        months,
+        plans: rows,
+        aiConfigured,
+      };
     },
 
     /**
-     * "Aceptar plan": el ÚNICO camino de escritura del plan mensual. No se fía del reparto que mande la UI:
+     * "Aceptar plan": el ÚNICO camino de escritura de los planes. No se fía del reparto que mande la UI:
      * vuelve a validar los temas contra los que existen AHORA (los inventados se descartan), las metas y
-     * los proyectos, y recalcula el reparto semanal. Fusiona con el plan que ya hubiera ese mes.
+     * los proyectos, y recalcula el reparto semanal (con la capacidad de las precondiciones, si las hay).
+     * Un borrador mensual (sin precondiciones) se fusiona con el plan que ya hubiera ese mes; uno con
+     * precondiciones crea el plan `<inicio>_<fin>` (o se fusiona con el de ese mismo periodo).
      */
     mentor_plan_draft_accept(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
       const turn = o.turnId ? chatFor(o.chatId)?.load().find((t) => t.id === String(o.turnId)) : undefined;
       const d = (turn?.planDraft ?? (o.draft && typeof o.draft === "object" ? o.draft : null)) as Record<string, any> | null;
       if (!d || !Array.isArray(d.subplans) || !d.subplans.length) throw new ApiError("El borrador del plan no tiene subplanes.");
-      const hoursPerWeek = Number(d.hoursPerWeek);
-      if (!(hoursPerWeek > 0)) throw new ApiError("Horas por semana inválidas.");
       const today = localDate();
-      const { month, from } = planWindow(typeof d.month === "string" ? d.month : undefined, today);
+      const pre: PlanPreconditions | null = d.preconditions && typeof d.preconditions === "object" ? sanitizePreconditions(d.preconditions, today) : null;
+      const hoursPerWeek = Number(d.hoursPerWeek);
+      if (!pre && !(hoursPerWeek > 0)) throw new ApiError("Horas por semana inválidas.");
+      if (pre) {
+        const problem = preconditionsProblem(pre, today);
+        if (problem) throw new ApiError(problem);
+      }
+      const win = planWindow(typeof d.month === "string" ? d.month : undefined, today);
       const ctx = planContext(app, today);
       const goalById = new Map(ctx.goals.map((g) => [g.id, g]));
       const projectIds = new Set(ctx.projects.map((p) => p.id));
       const snaps = new Map(topicSnaps(app).map((t) => [t.folder, t]));
 
-      const seeds: SubplanSeed[] = [];
+      let seeds: SubplanSeed[] = [];
       for (const s of d.subplans.slice(0, 12) as any[]) {
         const seen = new Set<string>();
         const topics: SubplanSeed["topics"] = [];
-        for (const t of (Array.isArray(s?.topics) ? s.topics : []).slice(0, 40) as any[]) {
+        for (const t of (Array.isArray(s?.topics) ? s.topics : []).slice(0, 60) as any[]) {
           const folder = String(t?.folder ?? "").replace(/\\/g, "/");
           const snap = snaps.get(folder);
           if (!snap || seen.has(folder)) continue;
           seen.add(folder);
           const valid = new Set(Object.keys(snap.progress.skills));
           const skills = Array.isArray(t.skills) ? t.skills.map((x: unknown) => String(x).toLowerCase()).filter((x: string) => valid.has(x)) : [];
-          topics.push({ folder, title: snap.title, ...(skills.length ? { skills } : {}), estMinutes: estimateTopicMinutes(snap) });
+          const base = estimateTopicMinutes(snap);
+          topics.push({ folder, title: snap.title, ...(skills.length ? { skills } : {}), estMinutes: pre ? adjustedMinutes(base, areaOfFolder(folder), pre.levels) : base });
         }
         const goalId = goalById.has(String(s?.goalId)) ? String(s.goalId) : undefined;
         const requiredGoals = (Array.isArray(s?.requiredGoals) ? s.requiredGoals : [])
           .filter((g: any) => goalById.has(String(g?.goalId)))
           .map((g: any) => ({ goalId: String(g.goalId), ...(goalById.get(String(g.goalId))!.items.some((i) => i.id === String(g.itemId)) ? { itemId: String(g.itemId) } : {}), note: String(g.note ?? "") }));
         const dv = s?.deliverable && typeof s.deliverable === "object" ? s.deliverable : null;
-        const deliverable = dv && String(dv.title ?? "").trim()
+        const deliverable = dv && String(dv.title ?? "").trim() && (!pre || pre.deliverables)
           ? { title: String(dv.title), description: String(dv.description ?? ""), criteria: Array.isArray(dv.criteria) ? dv.criteria.map(String) : [], ...(projectIds.has(String(dv.projectId)) ? { projectId: String(dv.projectId) } : {}), status: "idea" as DeliverableStatus }
           : undefined;
         if (!topics.length && !deliverable) continue;
         seeds.push({ area: String(s?.area ?? ""), objective: String(s?.objective ?? ""), ...(goalId ? { goalId } : {}), topics, requiredGoals, ...(deliverable ? { deliverable } : {}) });
       }
       if (!seeds.length) throw new ApiError("Ninguno de los temas del borrador existe ya en tu sistema.");
+      if (pre) seeds = markDiagnostics(seeds, pre);
 
       const st = new PlanStore(app.root);
-      const built = buildPlan(seeds, { month, hoursPerWeek, from });
-      const saved = st.save(mergePlans(st.load(month), built.plan));
-      if (turn) chatFor(o.chatId)?.patch(turn.id, { acceptedPlan: month });
-      return { month, subplans: saved.subplans.length, topics: saved.subplans.reduce((n, s) => n + s.topics.length, 0), warnings: built.warnings, fits: built.fits };
+      const from = pre ? (today > pre.start ? today : pre.start) : win.from;
+      const built = pre
+        ? buildPlan(seeds, {
+            id: `${pre.start}_${pre.end}`,
+            start: pre.start,
+            end: pre.end,
+            minutesPerDay: pre.minutesPerDay,
+            studyDays: pre.studyDays,
+            blockedDates: pre.blockedDates,
+            pace: pre.pace,
+            from,
+            preconditions: pre,
+            ...(d.auto ? { auto: true } : {}),
+            rationale: String(d.rationale ?? ""),
+          })
+        : buildPlan(seeds, { month: win.month, hoursPerWeek, from, rationale: String(d.rationale ?? "") });
+      const saved = st.save(mergePlans(st.load(built.plan.id), built.plan));
+      if (turn) chatFor(o.chatId)?.patch(turn.id, { acceptedPlan: saved.id });
+      return {
+        id: saved.id,
+        month: saved.month ?? saved.start.slice(0, 7),
+        start: saved.start,
+        end: saved.end,
+        subplans: saved.subplans.length,
+        topics: saved.subplans.reduce((n, s) => n + s.topics.length, 0),
+        warnings: built.warnings,
+        fits: built.fits,
+      };
     },
 
     /** "Descartar" el borrador del plan: no escribe ningún plan; solo marca el borrador. */
-    mentor_plan_draft_discard(turnId: unknown) {
-      const turns = chatFor()?.patch(String(turnId ?? ""), { discarded: true });
-      if (!turns) throw new ApiError("Ese borrador ya no existe.");
-      return { turns, pending: pendingDraft(turns)?.id ?? null };
-    },
+    mentor_plan_draft_discard: discardPlanDraft,
+    mentor_plan_discard: discardPlanDraft,
 
     /** Lo único editable del plan desde el Mentor: el estado del entregable de un subplan (y su proyecto). */
     mentor_plan_update_deliverable(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
-      const month = String(o.month ?? "");
-      if (!MONTH_RE.test(month)) throw new ApiError("Mes inválido (AAAA-MM).");
+      const id = String(o.id ?? o.month ?? "");
+      if (o.month && !o.id && !MONTH_RE.test(id)) throw new ApiError("Mes inválido (AAAA-MM).");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
       if (!(DELIVERABLE_STATUSES as readonly string[]).includes(String(o.status))) throw new ApiError("Estado de entregable inválido.");
       const st = new PlanStore(app.root);
-      const plan = st.load(month);
+      const plan = st.load(id);
       const sub = plan?.subplans.find((s) => s.id === String(o.subplanId ?? ""));
       if (!plan || !sub) throw new ApiError("Ese subplan ya no existe.");
       if (!sub.deliverable) throw new ApiError("Ese subplan no tiene entregable.");

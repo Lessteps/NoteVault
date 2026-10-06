@@ -208,7 +208,7 @@ describe("mentor_plan_draft_accept / discard", () => {
     expect(api.mentor_chat_load().pending).toBeNull();
     // no se creó nada más
     expect(app.mgrs().projects.projects()).toHaveLength(1);
-    expect(api.mentor_plan_list()).toEqual([{ month: monthNow(), subplans: 2, topics: 3, completed: 0 }]);
+    expect(api.mentor_plan_list()).toEqual([expect.objectContaining({ id: monthNow(), month: monthNow(), status: "activo", subplans: 2, topics: 3, completed: 0 })]);
   });
 
   it("re-aceptar el mismo subplan lo sustituye sin duplicar", async () => {

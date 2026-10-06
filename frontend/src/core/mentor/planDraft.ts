@@ -20,6 +20,7 @@ import {
   type QuestionReply,
   type GoalDraftReply,
 } from "./goalDraft.js";
+import type { PlanPreconditions } from "../../lib/planTime.js";
 import { buildPlan, MONTH_RE, type MonthlyPlan, type RequiredGoal, type SubplanSeed, type Subplan } from "./plan.js";
 
 // ── Contexto real: metas y proyectos existentes ──────────────────────────
@@ -254,6 +255,12 @@ export function parseChatResponse(text: string, catalog: readonly CatalogTopic[]
 // ── Borrador completo ────────────────────────────────────────────────────
 
 export interface PlanDraft {
+  /** id del plan que se escribirá al aceptar: `AAAA-MM` (borrador mensual) o `<inicio>_<fin>` (con precondiciones) */
+  id?: string;
+  /** periodo del plan (AAAA-MM-DD, ambos incluidos) */
+  start?: string;
+  end?: string;
+  /** AAAA-MM del inicio */
   month: string;
   hoursPerWeek: number;
   rationale: string;
@@ -268,6 +275,14 @@ export interface PlanDraft {
   discarded: string[];
   /** por qué hace falta cada tema (la razón de la IA), por carpeta */
   why: Record<string, string>;
+  /** presente cuando el borrador sale del formulario de precondiciones: hechos fijos del plan */
+  preconditions?: PlanPreconditions;
+  /** plan automático determinista (sin IA) */
+  auto?: boolean;
+  /** "lo elegido necesita ~X h y tienes Y h: sobra/falta" */
+  coverage?: string;
+  /** por qué se usó el plan automático teniendo IA configurada */
+  fallbackReason?: string;
 }
 
 /** Mes (AAAA-MM) y primer día del reparto: el mes en curso reparte desde hoy; uno futuro, desde el día 1. */
@@ -297,6 +312,9 @@ export function composePlanDraft(reply: PlanDraftReply, catalog: readonly Catalo
   }));
   const built = buildPlan(seeds, { month, hoursPerWeek: reply.hoursPerWeek, from });
   return {
+    id: built.plan.id,
+    start: built.plan.start,
+    end: built.plan.end,
     month,
     hoursPerWeek: reply.hoursPerWeek,
     rationale: reply.rationale,
@@ -317,6 +335,19 @@ export function planDraftSummary(d: PlanDraft): string {
   return JSON.stringify({
     type: "plan_draft",
     month: d.month,
+    ...(d.preconditions
+      ? {
+          start: d.start,
+          end: d.end,
+          minutesPerDay: d.preconditions.minutesPerDay,
+          studyDays: d.preconditions.studyDays,
+          pace: d.preconditions.pace,
+          goalIds: d.preconditions.goalIds,
+          subjects: d.preconditions.subjects,
+          deliverables: d.preconditions.deliverables,
+          note: "Las precondiciones son hechos fijos del plan.",
+        }
+      : {}),
     hoursPerWeek: d.hoursPerWeek,
     subplans: d.subplans.map((s) => ({
       area: s.area,

@@ -118,3 +118,20 @@ test("NV-F-005 categorías muestra Comida y vuelve al diario", async () => {
   await gotoDiario();
   await expect(win.getByLabel("Importe rápido")).toBeVisible({ timeout: 15_000 });
 });
+
+test("NV-F-006 crear meta en 2 pasos calcula el aporte y la muestra", async () => {
+  await side().getByRole("button", { name: "Metas financieras" }).click();
+  await expect(win.getByRole("heading", { name: /Metas financieras/ })).toBeVisible({ timeout: 15_000 });
+  const name = `E2E Moto ${Date.now()}`;
+  await win.getByRole("button", { name: "Nueva meta" }).click();
+  const dialog = win.getByRole("dialog", { name: /Nueva meta/ });
+  await expect(dialog).toBeVisible();
+  await dialog.getByPlaceholder("p. ej. Moto").fill(name);
+  await dialog.getByLabel("Objetivo").fill("5000000");
+  await dialog.getByRole("button", { name: "Siguiente" }).click();
+  await expect(dialog.getByLabel("Fecha límite")).toBeVisible();
+  await dialog.getByLabel("Fecha límite").fill("2026-12-31");
+  await expect(dialog.getByText(/Calculado del objetivo/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Crear meta" }).click();
+  await expect(win.getByRole("button", { name: new RegExp(name) })).toBeVisible({ timeout: 15_000 });
+});

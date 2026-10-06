@@ -3,6 +3,7 @@
 import { ChevronLeft, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
+import { daysBetween } from "../../lib/habits";
 import { formatMoney } from "../../lib/money";
 import { parseRepeat, shortDate, todayIso } from "../../lib/tasks";
 import type { FinGoal, FinPace, Movement } from "../../lib/types";
@@ -32,6 +33,13 @@ function paceLine(p: FinPace): string {
   return p.per_day ? `Ritmo necesario: ${formatMoney(p.per_day)}/día · ${formatMoney(p.per_week)}/semana · ${formatMoney(p.per_month)}/mes` : "";
 }
 
+/** Aporte diario para llegar: lo que falta / días hasta el límite. */
+export function suggestedFor(target_cents: number, start: string, deadline: string): number | null {
+  if (!target_cents || !deadline) return null;
+  const days = Math.max(1, daysBetween(start || todayIso(), deadline).length);
+  return Math.ceil(target_cents / days);
+}
+
 export function FinGoalDialog() {
   const editing = useFinance((s) => s.goalEditing);
   const setEditing = useFinance((s) => s.setGoalEditing);
@@ -39,20 +47,40 @@ export function FinGoalDialog() {
   const changed = useFinance((s) => s.changed);
   const toast = useApp((s) => s.toast);
   const [f, setF] = useState<Partial<FinGoal>>({});
+  // Asistente de 2 pasos solo al crear (editar conserva el formulario completo).
+  const [step, setStep] = useState(1);
+  const [touchedSuggested, setTouchedSuggested] = useState(false);
+  const isNew = !editing;
   useEffect(() => {
     if (editing === null) return;
     const g = editing ? meta?.goals.find((x) => x.id === editing) : undefined;
     setF(g ? { ...g } : { name: "", icon: "💰", target_cents: 0, suggested_cents: 0, start: todayIso(), deadline: "",
       colour: GOAL_COLOURS[0], show_in_daily: true, cadence: { mode: "rule", rule: "daily" }, status: "Activa", notes: "" });
+    setStep(1);
+    setTouchedSuggested(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
   if (editing === null) return null;
   const set = (p: Partial<FinGoal>) => setF((x) => ({ ...x, ...p }));
+  // Sin deadline no hay ritmo que calcular: el aporte lo pone la persona.
+  const autoSuggested = isNew && !touchedSuggested
+    ? suggestedFor(f.target_cents ?? 0, f.start ?? todayIso(), f.deadline ?? "")
+    : null;
+  const finalSuggested = autoSuggested ?? f.suggested_cents ?? 0;
   const save = async () => {
     if (!f.name?.trim()) return toast("error", "La meta necesita un nombre.");
     if (!f.target_cents) return toast("error", "Escribe el objetivo.");
     try {
-      await api.finGoalSave(editing, f);
+      if (isNew) {
+        await api.finGoalSave("", {
+          name: f.name.trim(), icon: f.icon || "💰", target_cents: f.target_cents, suggested_cents: finalSuggested,
+          start: f.start || todayIso(), deadline: f.deadline || "", colour: f.colour ?? GOAL_COLOURS[0]!,
+          show_in_daily: f.show_in_daily ?? true, cadence: f.cadence ?? { mode: "rule", rule: "daily" },
+          status: "Activa", notes: "",
+        });
+      } else {
+        await api.finGoalSave(editing, f);
+      }
       setEditing(null);
       await changed();
     } catch (e) {
@@ -60,6 +88,57 @@ export function FinGoalDialog() {
     }
   };
   const mode = f.cadence?.mode === "period" ? f.cadence.period : "rule";
+  if (isNew) {
+    return (
+      <Modal title={step === 1 ? "Nueva meta · qué y cuánto" : "Nueva meta · cuándo y ritmo"} onClose={() => setEditing(null)} width={520}
+        footer={<>
+          {step === 2 && <GhostButton onClick={() => setStep(1)}>Atrás</GhostButton>}
+          <span className="flex-1" /><GhostButton onClick={() => setEditing(null)}>Cancelar</GhostButton>
+          {step === 1
+            ? <PrimaryButton onClick={() => {
+              if (!f.name?.trim()) return toast("error", "La meta necesita un nombre.");
+              if (!f.target_cents) return toast("error", "Escribe el objetivo.");
+              setStep(2);
+            }}>Siguiente</PrimaryButton>
+            : <PrimaryButton onClick={() => void save()}>Crear meta</PrimaryButton>}</>}>
+        <p className="mb-3 font-mono text-[10.5px] uppercase tracking-wider text-faint">Paso {step} de 2</p>
+        {step === 1 ? (
+          <>
+            <div className="grid grid-cols-[70px_1fr] gap-3">
+              <Field label="Icono"><input className={input} value={f.icon ?? ""} onChange={(e) => set({ icon: e.target.value })} /></Field>
+              <Field label="Nombre"><input autoFocus className={input} value={f.name ?? ""} placeholder="p. ej. Moto" onChange={(e) => set({ name: e.target.value })} /></Field>
+            </div>
+            <Field label="Objetivo"><MoneyInput label="Objetivo" value={f.target_cents || null} onChange={(c) => set({ target_cents: c ?? 0 })} className="w-full" /></Field>
+            <Field label="Color"><ColourRow colours={GOAL_COLOURS} value={f.colour ?? GOAL_COLOURS[0]!} onChange={(colour) => set({ colour })} /></Field>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Inicio"><input type="date" aria-label="Inicio" className={input} value={f.start ?? ""} onChange={(e) => set({ start: e.target.value })} /></Field>
+              <Field label="Fecha límite"><input type="date" aria-label="Fecha límite" className={input} value={f.deadline ?? ""} onChange={(e) => set({ deadline: e.target.value })} /></Field>
+            </div>
+            <Field label="Aporte sugerido">
+              <MoneyInput label="Aporte sugerido" value={finalSuggested || null}
+                onChange={(c) => { setTouchedSuggested(true); set({ suggested_cents: c ?? 0 }); }} className="w-full" />
+            </Field>
+            {autoSuggested !== null && !touchedSuggested && (
+              <p className="text-[11.5px] text-faint">Calculado del objetivo y la fecha límite: edítalo si quieres otro ritmo.</p>
+            )}
+            <label className="flex items-center gap-2 text-[12.5px] text-dim">
+              <input type="checkbox" checked={f.show_in_daily ?? true} onChange={(e) => set({ show_in_daily: e.target.checked })} />
+              Mostrar en Diario (aparece «Ahorro …» con casilla)
+            </label>
+            <Field label="Casilla">
+              <select aria-label="Casilla" className={input} value={mode} onChange={(e) => set({ cadence: e.target.value === "rule" ? { mode: "rule", rule: "daily" } : { mode: "period", period: e.target.value as "week" | "month" } })}>
+                <option value="rule">Días concretos (regla)</option><option value="week">Una vez por semana</option><option value="month">Una vez por mes</option>
+              </select>
+            </Field>
+            {f.cadence?.mode === "rule" && <RepeatPicker value={f.cadence.rule} onChange={(rule) => set({ cadence: { mode: "rule", rule: rule || "daily" } })} />}
+          </>
+        )}
+      </Modal>
+    );
+  }
   return (
     <Modal title={editing ? "Editar meta de ahorro" : "Nueva meta de ahorro"} onClose={() => setEditing(null)} width={560}
       footer={<><span className="flex-1" /><GhostButton onClick={() => setEditing(null)}>Cancelar</GhostButton><PrimaryButton onClick={() => void save()}>Guardar</PrimaryButton></>}>

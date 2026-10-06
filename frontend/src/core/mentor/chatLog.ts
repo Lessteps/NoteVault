@@ -152,13 +152,14 @@ export class ChatLog {
   }
 
   /** Cambia un turno (marca de borrador creado o descartado); null si no existe. */
-  patch(id: string, fields: Partial<Pick<ChatTurnRecord, "createdGoalId" | "discarded" | "acceptedPlan">>): ChatTurnRecord[] | null {
+  patch(id: string, fields: Partial<Pick<ChatTurnRecord, "createdGoalId" | "discarded" | "acceptedPlan" | "planDraft">>): ChatTurnRecord[] | null {
     const rec = this.record();
     const t = rec.turns.find((x) => x.id === id);
     if (!t) return null;
     if (fields.createdGoalId !== undefined) t.createdGoalId = fields.createdGoalId;
     if (fields.discarded !== undefined) t.discarded = fields.discarded;
     if (fields.acceptedPlan !== undefined) t.acceptedPlan = fields.acceptedPlan;
+    if (fields.planDraft !== undefined) t.planDraft = fields.planDraft;
     return this.write(rec).turns;
   }
 

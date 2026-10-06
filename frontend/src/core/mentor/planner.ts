@@ -81,6 +81,7 @@ export const PLANNER_SYSTEM_PROMPT = [
   "- Reparte el tiempo disponible: la suma de `minutes` no puede pasar del total. Cada bloque dura entre 5 min y 1,5 veces su estimación.",
   "- Prioriza lo urgente (repasos vencidos, errores reincidentes, plazos) y no concentres todo en una sola materia.",
   "- Los candidatos de tipo plan_item vienen del PLAN MENSUAL del estudiante (lo que toca esta semana): dales preferencia salvo que haya algo más urgente. Si hay OBJETIVO DE LA SESIÓN, ordena para cumplirlo primero.",
+  "- Los candidatos programming_practice_kata y programming_practice_project vienen de la pista Programming practice del plan (reto de lógica diario y sesión del proyecto semanal full stack): también tienen preferencia y no los sustituyas por estudio de temas salvo que algo sea más urgente.",
   "- El nivel declarado es una hipótesis: si un tema está sin tratar, propón su diagnóstico en vez de asumir dominio.",
   "- Cada bloque lleva `reason`: UNA línea, concreta, que cite el dato del informe que lo justifica.",
   "- Si el estudiante pide un ajuste (nota del usuario), respétalo: es una preferencia suya, no una pregunta.",

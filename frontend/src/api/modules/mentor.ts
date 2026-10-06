@@ -12,6 +12,9 @@ import { hubSnapshot } from "../../core/practice/recommender.js";
 import { manifestsFromNotes, type TopicManifest } from "../../core/practice/topic.js";
 import { FILTER_ACTIVE, ITEM_DONE } from "../../core/goalManager.js";
 import { allocate, buildCandidates } from "../../core/mentor/candidates.js";
+import { buildPracticeTrack, practiceDayMinutes, practiceItemsFor, sanitizePracticeTrack, suggestionsOf, type PracticeItem } from "../../lib/practiceTrack.js";
+import { derivePracticeStatus, kataDates, manualPracticeOf, phasesDone, ppAreaDir, readPpProjects, type PracticeStatus } from "../../core/mentor/practiceState.js";
+import { loadProfile, suggestFocus } from "../../core/ppractice/profile.js";
 import { objectiveText, resolveObjective, sanitizeObjective, subjectLabel } from "../../core/mentor/objective.js";
 import {
   buildPlan,
@@ -37,6 +40,7 @@ import {
   areaOfFolder,
   adjustedMinutes,
   autoSeeds,
+  defaultDeliverable,
   buildPlanMessages,
   composeFromPreconditions,
   markDiagnostics,
@@ -186,6 +190,32 @@ function todaysPlanItems(app: AppState, day: string = localDate()): PlanItem[] {
   return planItemsFor(day, new PlanStore(app.root).list());
 }
 
+/** Estado derivado de la práctica de un plan (módulo `programming_practice` + registro manual de «Hoy»). */
+function practiceStatusOf(app: AppState, plan: Plan, today: string, log: SessionLog, shared?: { projects: ReturnType<typeof readPpProjects>; kata: Set<string> }): PracticeStatus | null {
+  if (!plan.programmingPractice) return null;
+  const projects = shared?.projects ?? readPpProjects(app.root);
+  const kata = shared?.kata ?? kataDates(loadAllAttempts(app.root));
+  return derivePracticeStatus({ plan, today, projects, kataDates: kata, manual: manualPracticeOf(plan.id, log.recent(60)), ppReady: !!ppAreaDir(app.root) });
+}
+
+/** Lo que la pista Programming practice de los planes activos pide hoy (kata del día y sesión del proyecto semanal). */
+function todaysPracticeItems(app: AppState, day: string = localDate()): PracticeItem[] {
+  const plans = new PlanStore(app.root).list().filter((p) => p.programmingPractice && planStatus(p, day) === "activo");
+  if (!plans.length) return [];
+  const sl = new SessionLog(app.root);
+  const shared = { projects: readPpProjects(app.root), kata: kataDates(loadAllAttempts(app.root)) };
+  const status = new Map(plans.map((p) => [p.id, practiceStatusOf(app, p, day, sl, shared)]));
+  return practiceItemsFor(
+    day,
+    plans,
+    {
+      kata: (id, d) => !!status.get(id)?.kata && d === day && status.get(id)!.kata!.todayDone,
+      project: (id, week, phases) => phasesDone(status.get(id) ?? null, week, phases),
+    },
+    (p) => planName(p as Plan),
+  );
+}
+
 /** Planes que contienen el día `day` (varios pueden estar activos a la vez). */
 const activePlans = (plans: readonly Plan[], day: string): Plan[] => plans.filter((p) => planStatus(p, day) === "activo");
 
@@ -208,6 +238,7 @@ const planRow = (p: Plan, today: string, lookup?: TopicLiteLookup) => {
     completed,
     pct: view ? view.summary.pct : topics ? Math.round((completed / topics) * 100) : 0,
     minutesPerDay: p.preconditions?.minutesPerDay ?? null,
+    programmingPractice: !!p.programmingPractice,
   };
 };
 
@@ -221,6 +252,15 @@ function sortRows<T extends { status: string; start: string; end: string }>(rows
 function defaultPlan(plans: readonly Plan[], today: string): Plan | null {
   const rows = sortRows(plans.map((p) => planRow(p, today)));
   return plans.find((p) => p.id === rows[0]?.id) ?? null;
+}
+
+/** Primer foco de la rotación de proyectos: el que sugiere el perfil de `programming_practice`, si lo hay. */
+function practiceStartFocus(app: AppState) {
+  try {
+    return suggestFocus(loadProfile(app.root)) ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const toIso = (d: Date | null | undefined): string | null => (d ? localDate(d) : null);
@@ -297,6 +337,7 @@ function objectiveOptions(app: AppState, brief: ReturnType<typeof buildStudentBr
           minutesPerDay: lead?.preconditions?.minutesPerDay ?? null,
         }
       : null,
+    programmingPractice: active.some((p) => p.programmingPractice) ? { items: todaysPracticeItems(app, day).length } : null,
   };
 }
 
@@ -393,7 +434,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const availableMinutes = clampInt(o.availableMinutes, 5, 720, 60);
       const brief = buildStudentBrief(briefContext(app, log()));
       const objective = sanitizeObjective(o.objective) ?? undefined;
-      const candidates = buildCandidates(brief, { availableMinutes, objective, planItems: todaysPlanItems(app) });
+      const candidates = buildCandidates(brief, { availableMinutes, objective, planItems: todaysPlanItems(app), practiceItems: todaysPracticeItems(app) });
       const plan = allocate(candidates, availableMinutes, {
         maxSubjects: o.maxSubjects === undefined ? undefined : clampInt(o.maxSubjects, 1, 10, 3),
       });
@@ -456,7 +497,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const strs = (v: unknown): string[] | undefined => (Array.isArray(v) ? v.map((x) => String(x)).slice(0, 50) : undefined);
       const brief = buildStudentBrief(briefContext(app, log()));
       const spec = sanitizeObjective(o.objectiveSpec) ?? undefined;
-      const candidates = buildCandidates(brief, { availableMinutes, objective: spec, planItems: todaysPlanItems(app) });
+      const candidates = buildCandidates(brief, { availableMinutes, objective: spec, planItems: todaysPlanItems(app), practiceItems: todaysPracticeItems(app) });
       const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
       const objective = (spec ? objectiveText(resolveObjective(spec, brief), brief) : "") || (o.objective ? String(o.objective).slice(0, 500) : "");
       const res = await proposePlan(
@@ -615,7 +656,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
         if (prePrev) {
           const { seeds, why } = seedsFromReply(parsed.reply, catalog, prePrev, new Map(goalScopes(app).map((g) => [g.id, g.name])));
           if (!seeds.length) return { loading: false as const, kind: "error" as const, text: "La IA no propuso ningún tema válido. Reformula o inténtalo de nuevo.", turns, pending: pendingDraft(turns)?.id ?? null };
-          planDraft = composeFromPreconditions(seeds, prePrev, { today, auto: false, rationale: parsed.reply.rationale, discarded: parsed.reply.discarded, why });
+          planDraft = composeFromPreconditions(seeds, prePrev, { today, auto: false, rationale: parsed.reply.rationale, discarded: parsed.reply.discarded, why, startFocus: practiceStartFocus(app), practiceSuggestions: parsed.reply.practice ?? suggestionsOf(prevPlan?.programmingPractice) });
         } else planDraft = composePlanDraft(parsed.reply, catalog, planCtx);
         if ("missing" in planDraft) {
           const text = `Antes de armar el plan del mes necesito saber ${planDraft.missing}.`;
@@ -857,7 +898,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
           if (parsed.ok) {
             const { seeds, why } = seedsFromReply(parsed.reply, catalog, pre, new Map(goals.map((g) => [g.id, g.name])));
             if (seeds.length) {
-              draft = composeFromPreconditions(seeds, pre, { today, auto: false, rationale: parsed.reply.rationale, discarded: parsed.reply.discarded, why });
+              draft = composeFromPreconditions(seeds, pre, { today, auto: false, rationale: parsed.reply.rationale, discarded: parsed.reply.discarded, why, startFocus: practiceStartFocus(app), practiceSuggestions: parsed.reply.practice });
             } else fallbackReason = "La IA no propuso ningún tema válido.";
           } else fallbackReason = parsed.reason;
         } catch (e) {
@@ -869,6 +910,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
         draft = composeFromPreconditions(autoSeeds(pre, scope), pre, {
           today,
           auto: true,
+          startFocus: practiceStartFocus(app),
           rationale: `Plan automático con tus metas y materias elegidas, en su orden natural y sin lo ya completado. ${why}.`,
           ...(fallbackReason && !unavailable ? { fallbackReason } : {}),
         });
@@ -920,13 +962,15 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const active = activePlans(plans, today);
       const done = new Set(active.flatMap((p) => p.subplans.flatMap((s) => s.topics.filter((t) => topicState(lookup(t.folder) ?? null) === "completo").map((t) => t.folder))));
       const items = planItemsFor(today, active, (f) => done.has(f));
+      const practiceItems = todaysPracticeItems(app, today);
       const months = st.months();
       if (!plan) {
-        return { loading: false as const, id: wanted || null, month: wanted && MONTH_RE.test(wanted) ? wanted : today.slice(0, 7), today, plan: null, derived: null, goals: {}, projects: {}, items, months, plans: rows, aiConfigured };
+        return { loading: false as const, id: wanted || null, month: wanted && MONTH_RE.test(wanted) ? wanted : today.slice(0, 7), today, plan: null, derived: null, goals: {}, projects: {}, items, practiceItems, practice: null, months, plans: rows, aiConfigured };
       }
 
       const refreshed = refreshPlanProgress(plan, lookup, today);
       if (refreshed.changed) plan = st.save(refreshed.plan);
+      const practice = practiceStatusOf(app, plan, today, log());
       const derived = deriveView(plan, lookup, today);
 
       const m = app.mgrs();
@@ -959,6 +1003,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
         goals,
         projects,
         items,
+        practiceItems,
+        practice,
         months,
         plans: rows,
         aiConfigured,
@@ -1010,17 +1056,19 @@ export function mentorApi(app: AppState, send?: SendFn) {
           .filter((g: any) => goalById.has(String(g?.goalId)))
           .map((g: any) => ({ goalId: String(g.goalId), ...(goalById.get(String(g.goalId))!.items.some((i) => i.id === String(g.itemId)) ? { itemId: String(g.itemId) } : {}), note: String(g.note ?? "") }));
         const dv = s?.deliverable && typeof s.deliverable === "object" ? s.deliverable : null;
-        const deliverable = dv && String(dv.title ?? "").trim() && (!pre || pre.deliverables)
+        const deliverable = dv && String(dv.title ?? "").trim() && (!pre || pre.deliverables !== "no")
           ? { title: String(dv.title), description: String(dv.description ?? ""), criteria: Array.isArray(dv.criteria) ? dv.criteria.map(String) : [], ...(projectIds.has(String(dv.projectId)) ? { projectId: String(dv.projectId) } : {}), status: "idea" as DeliverableStatus }
           : undefined;
         if (!topics.length && !deliverable) continue;
-        seeds.push({ area: String(s?.area ?? ""), objective: String(s?.objective ?? ""), ...(goalId ? { goalId } : {}), topics, requiredGoals, ...(deliverable ? { deliverable } : {}) });
+        seeds.push({ ...(/^[A-Za-z0-9_-]{1,40}$/.test(String(s?.id ?? "")) ? { id: String(s.id) } : {}), area: String(s?.area ?? ""), objective: String(s?.objective ?? ""), ...(goalId ? { goalId } : {}), topics, requiredGoals, ...(deliverable ? { deliverable } : {}) });
       }
       if (!seeds.length) throw new ApiError("Ninguno de los temas del borrador existe ya en tu sistema.");
       if (pre) seeds = markDiagnostics(seeds, pre);
 
       const st = new PlanStore(app.root);
       const from = pre ? (today > pre.start ? today : pre.start) : win.from;
+      // la pista de práctica se recalcula aquí (determinista): del borrador solo se aceptan temas y focos validados
+      const practice = pre?.practice ? buildPracticeTrack(pre, { from, startFocus: practiceStartFocus(app), suggestions: suggestionsOf(sanitizePracticeTrack(d.programmingPractice, pre.start, pre.end)) }) : undefined;
       const built = pre
         ? buildPlan(seeds, {
             id: `${pre.start}_${pre.end}`,
@@ -1032,6 +1080,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
             pace: pre.pace,
             from,
             preconditions: pre,
+            ...(practice ? { programmingPractice: practice, reservedMinutes: practiceDayMinutes(practice, { blockedDates: pre.blockedDates, from }) } : {}),
+            ...(Array.isArray(d.openQuestions) ? { openQuestions: d.openQuestions } : {}),
             ...(d.auto ? { auto: true } : {}),
             rationale: String(d.rationale ?? ""),
           })
@@ -1048,6 +1098,38 @@ export function mentorApi(app: AppState, send?: SendFn) {
         warnings: built.warnings,
         fits: built.fits,
       };
+    },
+
+    /**
+     * Responde una pregunta pendiente del BORRADOR (hoy: «¿quieres un entregable para <subplan>?»). Determinista y sin
+     * IA: `yes` añade la propuesta de entregable al subplan, `no` la descarta y `later` la deja pendiente. Solo edita
+     * el turno del borrador; el plan se escribe al aceptarlo. Es el punto de extensión de la construcción progresiva.
+     */
+    mentor_plan_draft_answer(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const chat = chatFor(o.chatId);
+      const turn = chat?.load().find((t) => t.id === String(o.turnId ?? ""));
+      const draft = turn?.planDraft;
+      if (!chat || !turn || !draft) throw new ApiError("Ese borrador ya no existe.");
+      if (turn.acceptedPlan || turn.discarded) throw new ApiError("Ese borrador ya se cerró.");
+      const questionId = String(o.questionId ?? "deliverables");
+      if (questionId !== "deliverables") throw new ApiError("Pregunta desconocida.");
+      const answer = String(o.answer ?? "");
+      if (!["yes", "no", "later"].includes(answer)) throw new ApiError("Respuesta inválida (yes, no o later).");
+      const subplanId = String(o.subplanId ?? "");
+      const sub = draft.subplans.find((s) => s.id === subplanId);
+      if (!sub) throw new ApiError("Ese subplan ya no existe en el borrador.");
+      let next = draft;
+      if (answer !== "later") {
+        const proposal = defaultDeliverable(sub.objective || sub.area);
+        const subplans = draft.subplans.map((s) =>
+          s.id === subplanId && answer === "yes" && !s.deliverable ? { ...s, deliverable: { title: proposal.title, description: proposal.description ?? "", criteria: proposal.criteria ?? [], status: "idea" as const } } : s,
+        );
+        next = { ...draft, subplans, openQuestions: (draft.openQuestions ?? []).filter((q) => !(q.id === questionId && q.subplanId === subplanId)) };
+        if (!next.openQuestions!.length) delete next.openQuestions;
+      }
+      const turns = chat.patch(turn.id, { planDraft: next });
+      return { turns, pending: pendingDraft(turns ?? [])?.id ?? null, planDraft: next };
     },
 
     /** "Descartar" el borrador del plan: no escribe ningún plan; solo marca el borrador. */

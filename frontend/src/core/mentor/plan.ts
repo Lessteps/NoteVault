@@ -29,6 +29,7 @@ import {
   type PlanPace,
   type PlanPreconditions,
 } from "../../lib/planTime.js";
+import { sanitizePracticeTrack, type PracticeTrack } from "../../lib/practiceTrack.js";
 import * as store from "../store.js";
 import { formatLayout, isSyncConflict, LAYOUT } from "../vaultFormat.js";
 import type { TopicProgressSnap } from "./topics.js";
@@ -93,6 +94,43 @@ export interface Subplan {
   notes?: string;
 }
 
+/**
+ * Pregunta pendiente de decidir al armar el plan (aditivo, sin subir FORMAT_VERSION). Hoy solo `deliverables`: «¿Quieres un
+ * entregable para <subplan>?» cuando las precondiciones dicen «a discutir». Es el punto de extensión de la construcción
+ * progresiva con preguntas: cada pregunta se responde con `mentor_plan_draft_answer` (hoy: Sí / No / Después).
+ */
+export interface OpenQuestion {
+  id: string;
+  /** subplan al que se refiere */
+  subplanId?: string;
+  text: string;
+  options: string[];
+}
+export const DELIVERABLE_QUESTION_ID = "deliverables";
+export const DELIVERABLE_QUESTION_OPTIONS = ["Sí", "No", "Después"] as const;
+
+export function deliverableQuestion(sub: Pick<Subplan, "id" | "area" | "objective">): OpenQuestion {
+  return { id: DELIVERABLE_QUESTION_ID, subplanId: sub.id, text: `¿Quieres un entregable (proyecto de demostración) para ${subplanLabel(sub)}?`, options: [...DELIVERABLE_QUESTION_OPTIONS] };
+}
+
+/** Preguntas válidas: de un subplan que existe y que aún no tiene entregable (si ya lo tiene, la pregunta está respondida). */
+export function sanitizeOpenQuestions(raw: unknown, subplans: readonly Subplan[]): OpenQuestion[] {
+  const out: OpenQuestion[] = [];
+  const seen = new Set<string>();
+  for (const q of Array.isArray(raw) ? raw : []) {
+    const id = oneLine(q?.id, 40);
+    const sub = subplans.find((s) => s.id === String(q?.subplanId ?? ""));
+    if (!id || (q?.subplanId !== undefined && !sub)) continue;
+    if (id === DELIVERABLE_QUESTION_ID && (!sub || sub.deliverable)) continue;
+    const key = `${id}:${sub?.id ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const options = (Array.isArray(q?.options) ? q.options : []).map((o: unknown) => oneLine(o, 40)).filter(Boolean).slice(0, 6);
+    out.push({ id, ...(sub ? { subplanId: sub.id } : {}), text: oneLine(q?.text, 300) || (sub ? deliverableQuestion(sub).text : id), options: options.length ? options : [...DELIVERABLE_QUESTION_OPTIONS] });
+  }
+  return out;
+}
+
 export interface Plan {
   /** nombre del archivo sin `.json`: `<AAAA-MM>` (plan mensual heredado) o `<inicio>_<fin>` */
   id: string;
@@ -114,6 +152,10 @@ export interface Plan {
   /** generado sin IA (plan automático determinista) */
   auto?: boolean;
   rationale?: string;
+  /** pista «Programming practice»: kata diario + proyecto semanal full stack (+ mensual); ver `lib/practiceTrack.ts` */
+  programmingPractice?: PracticeTrack;
+  /** decisiones que quedaron pendientes al armar el plan (p. ej. entregables «a discutir») */
+  openQuestions?: OpenQuestion[];
   subplans: Subplan[];
 }
 /** Nombre histórico: un plan mensual es un plan de periodo. */
@@ -224,6 +266,8 @@ export interface Capacity {
   studyDays?: number[];
   blockedDates?: string[];
   pace?: PlanPace;
+  /** minutos de cada día reservados a otra cosa (la práctica): se restan de lo que da el día antes de repartir temas */
+  reservedMinutes?: (date: string) => number;
 }
 
 export interface DistributeInput extends Capacity {
@@ -265,7 +309,9 @@ function periodOf(i: { month?: string; start?: string; end?: string }): { start:
 function dayMinutesOf(c: Capacity): (date: string) => number {
   if (c.minutesPerDay !== undefined) {
     if (!(c.minutesPerDay > 0)) throw new Error("El tiempo diario debe ser mayor que 0.");
-    return dayMinutes({ minutesPerDay: c.minutesPerDay, studyDays: c.studyDays ?? [1, 2, 3, 4, 5, 6, 7], blockedDates: c.blockedDates, pace: c.pace ?? "intenso" });
+    const base = dayMinutes({ minutesPerDay: c.minutesPerDay, studyDays: c.studyDays ?? [1, 2, 3, 4, 5, 6, 7], blockedDates: c.blockedDates, pace: c.pace ?? "intenso" });
+    const reserved = c.reservedMinutes;
+    return reserved ? (date) => (base(date) > 0 ? Math.max(0, base(date) - reserved(date)) : 0) : base;
   }
   if (!(Number(c.hoursPerWeek) > 0)) throw new Error("Las horas por semana deben ser mayores que 0.");
   const perDay = (Number(c.hoursPerWeek) * 60) / 7;
@@ -387,6 +433,8 @@ export interface BuildOpts extends Capacity {
   preconditions?: PlanPreconditions;
   auto?: boolean;
   rationale?: string;
+  programmingPractice?: PracticeTrack;
+  openQuestions?: OpenQuestion[];
 }
 
 /**
@@ -408,7 +456,13 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
     const share = total > 0 ? minutes / total : 1 / Math.max(1, seeds.length);
     // un subplan sin temas (solo entregable) no consume horas: se le da un mínimo simbólico para poder calcular
     const cap: Capacity = perDayMode
-      ? { minutesPerDay: Math.max(0.5, opts.minutesPerDay! * share), studyDays: opts.studyDays, blockedDates: opts.blockedDates, pace: opts.pace }
+      ? {
+          minutesPerDay: Math.max(0.5, opts.minutesPerDay! * share),
+          studyDays: opts.studyDays,
+          blockedDates: opts.blockedDates,
+          pace: opts.pace,
+          ...(opts.reservedMinutes ? { reservedMinutes: (d: string) => opts.reservedMinutes!(d) * share } : {}),
+        }
       : { hoursPerWeek: Math.max(0.1, Number(opts.hoursPerWeek) * share) };
     const dist = distributeTopics({ ...cap, start: period.start, end: period.end, topics: seed.topics, from: opts.from, spread: perDayMode });
     totalMinutes += dist.totalMinutes;
@@ -460,7 +514,9 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
       ...(opts.preconditions ? { preconditions: opts.preconditions } : {}),
       ...(opts.auto ? { auto: true } : {}),
       ...(opts.rationale ? { rationale: oneLine(opts.rationale, 600) } : {}),
+      ...(opts.programmingPractice ? { programmingPractice: opts.programmingPractice } : {}),
       subplans,
+      ...(sanitizeOpenQuestions(opts.openQuestions, subplans).length ? { openQuestions: sanitizeOpenQuestions(opts.openQuestions, subplans) } : {}),
     },
     warnings,
     fits,
@@ -481,6 +537,7 @@ export function mergePlans(existing: Plan | null, incoming: Plan, now: string = 
   const taken = new Set<string>();
   const merged: Subplan[] = [];
   const ids = new Set<string>();
+  const remap = new Map<string, string>();
   for (const s of incoming.subplans) {
     const old = byKey.get(subplanKey(s));
     if (old) taken.add(subplanKey(old));
@@ -488,6 +545,7 @@ export function mergePlans(existing: Plan | null, incoming: Plan, now: string = 
     let id = old?.id ?? s.id;
     while (ids.has(id)) id += "x";
     ids.add(id);
+    remap.set(s.id, id);
     merged.push({
       ...s,
       id,
@@ -504,9 +562,16 @@ export function mergePlans(existing: Plan | null, incoming: Plan, now: string = 
     ids.add(id);
     merged.push({ ...s, id });
   }
-  const { auto: _auto, ...rest } = existing;
+  const { auto: _auto, openQuestions: _oq, programmingPractice: _pp, ...rest } = existing;
+  const practice = incoming.programmingPractice ?? existing.programmingPractice;
+  const questions = sanitizeOpenQuestions(
+    [...(incoming.openQuestions ?? []).map((q) => ({ ...q, subplanId: remap.get(String(q.subplanId)) ?? q.subplanId })), ...(existing.openQuestions ?? [])],
+    merged,
+  );
   return {
     ...rest,
+    ...(practice ? { programmingPractice: practice } : {}),
+    ...(questions.length ? { openQuestions: questions } : {}),
     hoursPerWeek: incoming.hoursPerWeek ?? existing.hoursPerWeek,
     ...((incoming.preconditions ?? existing.preconditions) ? { preconditions: incoming.preconditions ?? existing.preconditions } : {}),
     ...(incoming.auto ? { auto: true } : {}),
@@ -742,6 +807,8 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
     });
   }
   const hours = Number(raw.hoursPerWeek);
+  const practice = sanitizePracticeTrack(raw.programmingPractice, start, end);
+  const questions = sanitizeOpenQuestions(raw.openQuestions, subplans);
   const pre = raw.preconditions && typeof raw.preconditions === "object" ? sanitizePreconditions({ ...raw.preconditions, start, end }, start) : undefined;
   return {
     id,
@@ -756,6 +823,8 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
     ...(raw.archived === true ? { archived: true } : {}),
     ...(raw.auto === true ? { auto: true } : {}),
     ...(raw.rationale ? { rationale: oneLine(raw.rationale, 600) } : {}),
+    ...(practice ? { programmingPractice: practice } : {}),
+    ...(questions.length ? { openQuestions: questions } : {}),
     subplans,
   };
 }

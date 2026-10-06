@@ -10,6 +10,7 @@ import { BookOpenCheck, CalendarCheck, CalendarRange, FolderKanban, Target } fro
 import { useEffect } from "react";
 import { usePersistedNav } from "../../store/navState";
 import { planViewId, useMentor } from "../../store/mentor";
+import { PracticeProjectDialog } from "../practice/PracticeProjectDialog";
 import { ModuleSidebar } from "../ModuleSidebar";
 import { MentorGoals } from "./MentorGoals";
 import { MentorPlan } from "./MentorPlan";
@@ -77,6 +78,7 @@ export function MentorModule() {
           <MentorStudy />
         )}
       </main>
+      <PracticeProjectDialog />
     </div>
   );
 }

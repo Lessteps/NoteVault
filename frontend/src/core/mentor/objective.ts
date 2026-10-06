@@ -18,6 +18,8 @@ export type SessionObjective =
   | { type: "review" }
   /** lo que el plan del mes dice que toca ahora */
   | { type: "plan" }
+  /** el kata diario y la sesión del proyecto semanal de Programming practice */
+  | { type: "programming_practice" }
   | { type: "subject"; subject: string; label?: string }
   | { type: "goal"; goalId: string; itemIds?: string[]; label?: string }
   /** texto libre del estudiante; se intenta casar con una meta o materia por palabras clave */
@@ -26,6 +28,7 @@ export type SessionObjective =
 /** Nombre en español de las materias que conoce el sistema de estudio. */
 export const SUBJECT_LABEL: Record<string, string> = {
   programming: "Programación",
+  programming_practice: "Programming practice",
   mathematics: "Matemáticas",
   english: "Inglés",
 };
@@ -43,6 +46,7 @@ export function sanitizeObjective(raw: unknown): SessionObjective | null {
     case "tasks":
     case "review":
     case "plan":
+    case "programming_practice":
       return { type: o.type };
     case "subject": {
       const subject = str(o.subject, 80);
@@ -75,6 +79,8 @@ export function objectiveText(o: SessionObjective | undefined | null, brief?: St
       return "Repasar lo vencido (SRS y errores)";
     case "plan":
       return "Avanzar lo que toca del plan del mes";
+    case "programming_practice":
+      return "Programming practice (kata + proyecto)";
     case "subject":
       return `Estudiar ${o.label || subjectLabel(o.subject)}`;
     case "goal": {
@@ -126,7 +132,9 @@ export function objectiveMatcher(o: SessionObjective, brief: StudentBrief): ((c:
     case "review":
       return (c) => c.kind === "srs_review" || c.kind === "error_fix";
     case "plan":
-      return (c) => c.kind === "plan_item";
+      return (c) => c.kind === "plan_item" || c.kind === "programming_practice_kata" || c.kind === "programming_practice_project";
+    case "programming_practice":
+      return (c) => c.kind === "programming_practice_kata" || c.kind === "programming_practice_project";
     case "subject": {
       const key = fold(r.subject);
       return (c) => fold(c.subject) === key;

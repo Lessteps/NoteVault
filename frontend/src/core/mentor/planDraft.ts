@@ -21,7 +21,8 @@ import {
   type GoalDraftReply,
 } from "./goalDraft.js";
 import type { PlanPreconditions } from "../../lib/planTime.js";
-import { buildPlan, MONTH_RE, type MonthlyPlan, type RequiredGoal, type SubplanSeed, type Subplan } from "./plan.js";
+import { PRACTICE_FOCUSES, type PracticeFocus, type PracticeSuggestions, type PracticeTrack } from "../../lib/practiceTrack.js";
+import { buildPlan, MONTH_RE, type MonthlyPlan, type OpenQuestion, type RequiredGoal, type SubplanSeed, type Subplan } from "./plan.js";
 
 // ── Contexto real: metas y proyectos existentes ──────────────────────────
 
@@ -53,7 +54,9 @@ export const PLAN_PROMPT_ADDENDUM = [
   "- Temas: SOLO `folder` exactos del catálogo. Metas (`goalId`, `itemId`): SOLO las de la lista METAS EXISTENTES. `projectId`: SOLO uno de PROYECTOS EXISTENTES si encaja; si no, omítelo (el entregable queda como propuesta; no se crean proyectos).",
   "- Cada entregable lleva `title`, `description` (una frase) y `criteria` (2-4 criterios comprobables).",
   "- No incluyas fechas ni minutos: la app reparte los temas por semanas. Ordena los temas de lo básico a lo avanzado.",
-  'Esquema: { "type": "plan_draft", "month"?: "AAAA-MM", "rationale": string, "hoursPerWeek": number, "subplans": [ { "area": string, "objective": string, "goalId"?: string, "topics": [ { "folder": string, "skills"?: string[], "why"?: string } ], "requiredGoals"?: [ { "goalId": string, "itemId"?: string, "note"?: string } ], "deliverable"?: { "title": string, "description": string, "criteria": string[], "projectId"?: string } } ] }',
+  "- Entregables: incluye `deliverable` SOLO si las precondiciones dicen que sí; si dicen «a discutir» o «no», no lo incluyas (la app pregunta después).",
+  "- Programming practice: SOLO si las precondiciones la incluyen puedes añadir `programmingPractice` con un `theme` corto por semana (y un `focus` solo si el foco rota). No cambies minutos ni fases: los fija la app.",
+  'Esquema: { "type": "plan_draft", "month"?: "AAAA-MM", "rationale": string, "hoursPerWeek": number, "subplans": [ { "area": string, "objective": string, "goalId"?: string, "topics": [ { "folder": string, "skills"?: string[], "why"?: string } ], "requiredGoals"?: [ { "goalId": string, "itemId"?: string, "note"?: string } ], "deliverable"?: { "title": string, "description": string, "criteria": string[], "projectId"?: string } } ], "programmingPractice"?: { "weeks": [ { "week": number, "theme": string, "focus"?: "backend"|"databases"|"frontend"|"desktop"|"mobile"|"automation" } ], "monthlyTheme"?: string } }',
 ].join("\n");
 
 export interface ChatPromptExtras extends GoalPromptExtras {
@@ -106,6 +109,8 @@ export interface PlanDraftReply {
   subplans: PlanReplySubplan[];
   /** carpetas / metas / proyectos pedidos por la IA que no existen (no se usan) */
   discarded: string[];
+  /** temas (y focos) que la IA sugiere para la pista Programming practice; la app los valida y nunca cambia minutos ni fases */
+  practice?: PracticeSuggestions;
 }
 
 export type ChatParse = { ok: true; reply: QuestionReply | GoalDraftReply | PlanDraftReply } | { ok: false; error: string; discarded?: string[] };
@@ -229,6 +234,7 @@ function parsePlanObject(obj: Record<string, unknown>, catalog: readonly Catalog
     return { ok: false, error: `La IA no propuso ningún subplan con temas que existan en tu sistema${discarded.length ? ` (descartados: ${discarded.join(", ")})` : ""}.`, discarded };
   }
   const month = typeof obj.month === "string" && MONTH_RE.test(obj.month.trim()) ? obj.month.trim() : undefined;
+  const practice = parsePracticeSuggestions(obj.programmingPractice ?? obj.programming_practice);
   return {
     ok: true,
     reply: {
@@ -238,8 +244,26 @@ function parsePlanObject(obj: Record<string, unknown>, catalog: readonly Catalog
       hoursPerWeek: num(obj.hoursPerWeek ?? obj.hours_per_week),
       subplans,
       discarded,
+      ...(practice ? { practice } : {}),
     },
   };
+}
+
+/** Sugerencias de la IA para la práctica: solo semanas válidas, temas cortos y focos del esquema. */
+function parsePracticeSuggestions(raw: unknown): PracticeSuggestions | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const weeks: NonNullable<PracticeSuggestions["weeks"]> = [];
+  for (const w of Array.isArray(o.weeks) ? o.weeks : []) {
+    const r = (w && typeof w === "object" ? w : {}) as Record<string, unknown>;
+    const week = Math.round(Number(r.week));
+    if (!Number.isFinite(week) || week < 1 || week > 80 || weeks.some((x) => x.week === week)) continue;
+    const theme = oneLine(r.theme, 80);
+    const focus = String(r.focus ?? "").trim().toLowerCase();
+    weeks.push({ week, ...(theme ? { theme } : {}), ...((PRACTICE_FOCUSES as readonly string[]).includes(focus) ? { focus: focus as PracticeFocus } : {}) });
+  }
+  const monthlyTheme = oneLine(o.monthlyTheme, 80);
+  return weeks.length || monthlyTheme ? { ...(weeks.length ? { weeks } : {}), ...(monthlyTheme ? { monthlyTheme } : {}) } : undefined;
 }
 
 /** Respuesta de la IA: `plan_draft` si lo es; si no, lo de siempre (pregunta o `goal_draft`). */
@@ -283,6 +307,10 @@ export interface PlanDraft {
   coverage?: string;
   /** por qué se usó el plan automático teniendo IA configurada */
   fallbackReason?: string;
+  /** pista Programming practice (kata diario + proyecto semanal full stack): ver `lib/practiceTrack.ts` */
+  programmingPractice?: PracticeTrack;
+  /** decisiones pendientes (hoy: entregables «a discutir»); se responden con `mentor_plan_draft_answer` */
+  openQuestions?: OpenQuestion[];
 }
 
 /** Mes (AAAA-MM) y primer día del reparto: el mes en curso reparte desde hoy; uno futuro, desde el día 1. */
@@ -345,6 +373,8 @@ export function planDraftSummary(d: PlanDraft): string {
           goalIds: d.preconditions.goalIds,
           subjects: d.preconditions.subjects,
           deliverables: d.preconditions.deliverables,
+          ...(d.preconditions.practice ? { programmingPractice: d.preconditions.practice } : {}),
+          ...(d.openQuestions?.length ? { openQuestionsPending: d.openQuestions.map((q) => q.subplanId ?? q.id) } : {}),
           note: "Las precondiciones son hechos fijos del plan.",
         }
       : {}),

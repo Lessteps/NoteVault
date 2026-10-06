@@ -77,3 +77,28 @@ describe("Hoy: tiempo sugerido por el plan activo", () => {
     expect(pressed(chip("2 h"))).toBe(true);
   });
 });
+
+describe("Hoy: objetivo «Programming practice (kata + proyecto)»", () => {
+  const withPractice = (items: number | null): MentorOverview => {
+    const o = overview(120) as Extract<MentorOverview, { loading: false }>;
+    return { ...o, objectives: { ...o.objectives!, programmingPractice: items === null ? null : { items } } };
+  };
+  const objectiveChip = (text: string) => [...host.querySelectorAll("[role=group][aria-label='Objetivo de la sesión'] button")].find((b) => b.textContent?.includes(text));
+
+  it("aparece cuando un plan activo tiene práctica y se puede elegir", async () => {
+    vi.spyOn(api, "mentorOverview").mockResolvedValue(withPractice(2));
+    await mount();
+    const c = objectiveChip("Programming practice (kata + proyecto)")!;
+    expect(c).toBeTruthy();
+    expect(c.getAttribute("title")).toContain("2 de hoy");
+    await act(async () => { c.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    expect(c.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("sin práctica en los planes activos no hay chip", async () => {
+    vi.spyOn(api, "mentorOverview").mockResolvedValue(withPractice(null));
+    await mount();
+    expect(objectiveChip("Programming practice")).toBeUndefined();
+    expect(objectiveChip("Lo que toca de mis planes")).toBeTruthy();
+  });
+});

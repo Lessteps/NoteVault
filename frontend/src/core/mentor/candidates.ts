@@ -37,6 +37,7 @@ import {
   type TopicsData,
 } from "./brief.js";
 import { applyObjective, type SessionObjective } from "./objective.js";
+import { PHASE_LABEL, FOCUS_LABEL, kataBlockId, projectBlockId, type PracticeItem } from "../../lib/practiceTrack.js";
 import type { PlanItem } from "./plan.js";
 import type { PlanBlock } from "./sessionLog.js";
 
@@ -48,7 +49,11 @@ export type CandidateKind =
   | "untreated_diagnostic"
   | "task_deadline"
   | "goal_item"
-  | "plan_item";
+  | "plan_item"
+  /** reto de lógica diario de la pista Programming practice del plan */
+  | "programming_practice_kata"
+  /** la sesión del proyecto semanal full stack que toca hoy (según las fases del plan) */
+  | "programming_practice_project";
 
 export interface CandidateLinks {
   goalId?: string;
@@ -80,6 +85,8 @@ export interface CandidateOptions {
   objective?: SessionObjective;
   /** lo que el plan del mes dice que toca hoy (ver plan.ts `planItemsFor`) */
   planItems?: readonly PlanItem[];
+  /** lo que la pista Programming practice de los planes activos pide hoy (ver `practiceTrack.ts` `practiceItemsFor`) */
+  practiceItems?: readonly PracticeItem[];
 }
 
 export interface AllocateOptions {
@@ -105,8 +112,8 @@ export const EST_MINUTES = {
 /** Mínimo al que se puede recortar un bloque divisible para que quepa. */
 export const SPLIT_MIN_MINUTES = 10;
 /** Tipos cuyo bloque se puede acortar sin perder sentido. */
-const SPLITTABLE: ReadonlySet<CandidateKind> = new Set(["srs_review", "continue_topic", "next_topic", "goal_item", "plan_item"]);
-const KIND_ORDER: CandidateKind[] = ["plan_item", "srs_review", "error_fix", "goal_item", "continue_topic", "untreated_diagnostic", "task_deadline", "next_topic"];
+const SPLITTABLE: ReadonlySet<CandidateKind> = new Set(["srs_review", "continue_topic", "next_topic", "goal_item", "plan_item", "programming_practice_kata", "programming_practice_project"]);
+const KIND_ORDER: CandidateKind[] = ["plan_item", "programming_practice_project", "programming_practice_kata", "srs_review", "error_fix", "goal_item", "continue_topic", "untreated_diagnostic", "task_deadline", "next_topic"];
 
 function srsMinutes(count: number): number {
   return Math.min(30, Math.max(10, Math.ceil((count * 1.2) / 5) * 5));
@@ -331,8 +338,45 @@ export function buildCandidates(brief: StudentBrief, opts: CandidateOptions): Ca
   // 7. Lo que el plan del mes dice que toca: sustituye al candidato de ese tema y sube al principio
   let withPlan = out;
   if (opts.planItems?.length) withPlan = addPlanItems(out, opts.planItems, topics);
+  if (opts.practiceItems?.length) withPlan = [...withPlan, ...practiceCandidates(opts.practiceItems)];
   const ranked = opts.objective ? applyObjective(withPlan, opts.objective, brief) : withPlan;
   return sortCandidates(fit(ranked, available));
+}
+
+/** Materia de los candidatos de práctica: coincide con la carpeta `programming_practice` y con su nombre en la interfaz. */
+export const PRACTICE_SUBJECT = "programming_practice";
+/** Puntuación de la práctica del plan: como un `plan_item`, por encima de repasos y errores corrientes. */
+const PRACTICE_SCORE = { kata: 88, project: 92 } as const;
+
+/** Candidatos de la pista Programming practice: el kata del día y la sesión del proyecto semanal que toca hoy. */
+function practiceCandidates(items: readonly PracticeItem[]): Candidate[] {
+  const out: Candidate[] = [];
+  const seen = new Set<string>();
+  for (const it of items) {
+    const links: CandidateLinks = { subplan: it.label.slice(0, 80) };
+    if (it.kind === "kata") {
+      const id = kataBlockId(it.planId);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push({ id, kind: "programming_practice_kata", subject: PRACTICE_SUBJECT, estMinutes: it.estMinutes, score: PRACTICE_SCORE.kata, reasons: [`Reto diario del plan (${it.label}): un problema de lógica con patrón`], links });
+      continue;
+    }
+    const phases = it.phases ?? [];
+    const id = projectBlockId(it.planId, it.week, phases);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const what = phases.length ? `fase ${phases.map((p) => PHASE_LABEL[p]).join(" + ")}` : "sesión";
+    out.push({
+      id,
+      kind: "programming_practice_project",
+      subject: PRACTICE_SUBJECT,
+      estMinutes: it.estMinutes,
+      score: PRACTICE_SCORE.project,
+      reasons: [`Proyecto semanal: ${what} (semana ${it.week}${it.focus ? ` · foco ${FOCUS_LABEL[it.focus]}` : ""}${it.theme ? ` · ${it.theme}` : ""}; plan ${it.label})`],
+      links,
+    });
+  }
+  return out;
 }
 
 /** Empuje que da el plan del mes a lo que toca esta semana (por encima de repasos y errores corrientes). */

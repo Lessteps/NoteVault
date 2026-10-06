@@ -16,16 +16,17 @@ import type { ChatMessage } from "../aiClient.js";
 import {
   adjustedMinutes,
   areaOfFolder,
-  capacityOf,
   coverage,
   weeksLabel,
+  PRACTICE_FOCUSES,
   type PlanLevel,
   type PlanPreconditions,
   type ScopeTopic,
 } from "../../lib/planTime.js";
 import type { StudentBrief } from "./brief.js";
 import { fold, keywordsOf, type CatalogTopic, type ChatTurn } from "./goalDraft.js";
-import { buildPlan, type SubplanSeed } from "./plan.js";
+import { capacityWithPractice, PHASE_LABEL, practiceDayMinutes, PRACTICE_NAME, type PracticeFocus, type PracticeSuggestions } from "../../lib/practiceTrack.js";
+import { buildPlan, deliverableQuestion, type SubplanSeed } from "./plan.js";
 import {
   buildChatMessages,
   parseChatResponse,
@@ -40,15 +41,19 @@ export {
   areaOfFolder,
   capacityOf,
   coverage,
+  DEFAULT_PRACTICE,
   DEFAULT_STUDY_DAYS,
+  DELIVERABLE_MODES,
+  KATA_CHOICES,
   LEVELS,
+  normalizeDeliverables,
   PACE_FACTOR,
   PACES,
   preconditionsProblem,
   sanitizePreconditions,
   selectionOf,
 } from "../../lib/planTime.js";
-export type { Capacity, PlanLevel, PlanPace, PlanPreconditions, ScopeTopic } from "../../lib/planTime.js";
+export type { Capacity, DeliverablesMode, PlanLevel, PlanPace, PlanPreconditions, PracticePrefs, ScopeTopic } from "../../lib/planTime.js";
 
 // ── Alcance: qué temas entran en lo elegido ──────────────────────────────
 
@@ -171,7 +176,7 @@ export function planCatalog(scope: ResolvedScope, max = 100, hint = ""): Catalog
 
 const minutesOf = (t: CatalogTopic, pre: PlanPreconditions): number => adjustedMinutes(t.estMinutes, areaOfFolder(t.folder), pre.levels);
 
-function defaultDeliverable(label: string): NonNullable<SubplanSeed["deliverable"]> {
+export function defaultDeliverable(label: string): NonNullable<SubplanSeed["deliverable"]> {
   return {
     title: `Proyecto de demostración: ${label}`,
     description: "Aplica lo que estudiaste en un proyecto pequeño que puedas enseñar. Propuesta: créalo en el módulo Proyectos cuando empieces.",
@@ -212,7 +217,7 @@ export function autoSeeds(pre: PlanPreconditions, scope: ResolvedScope): Subplan
         estMinutes: minutesOf(x.topic, pre),
       })),
       requiredGoals: [{ goalId: g.goal.id, note: "Meta que este subplan ayuda a cumplir" }],
-      ...(pre.deliverables ? { deliverable: defaultDeliverable(g.goal.name) } : {}),
+      ...(pre.deliverables === "yes" ? { deliverable: defaultDeliverable(g.goal.name) } : {}),
     });
   }
   for (const g of scope.areaGroups) {
@@ -220,7 +225,7 @@ export function autoSeeds(pre: PlanPreconditions, scope: ResolvedScope): Subplan
       area: g.area,
       objective: `Avanzar en ${g.area}`,
       topics: g.topics.map((t) => ({ folder: t.folder, title: t.title, estMinutes: minutesOf(t, pre) })),
-      ...(pre.deliverables ? { deliverable: defaultDeliverable(g.area) } : {}),
+      ...(pre.deliverables === "yes" ? { deliverable: defaultDeliverable(g.area) } : {}),
     });
   }
   if (scope.free.length) {
@@ -229,13 +234,13 @@ export function autoSeeds(pre: PlanPreconditions, scope: ResolvedScope): Subplan
       area: areaOfFolder(scope.free[0]!.folder) || "General",
       objective: label.slice(0, 120),
       topics: scope.free.map((t) => ({ folder: t.folder, title: t.title, estMinutes: minutesOf(t, pre) })),
-      ...(pre.deliverables ? { deliverable: defaultDeliverable(label.slice(0, 80)) } : {}),
+      ...(pre.deliverables === "yes" ? { deliverable: defaultDeliverable(label.slice(0, 80)) } : {}),
     });
   }
   return markDiagnostics(seeds, pre);
 }
 
-/** Semillas desde la respuesta de la IA: solo temas del catálogo; minutos ajustados por nivel; sin entregables si no se piden. */
+/** Semillas desde la respuesta de la IA: solo temas del catálogo; minutos ajustados por nivel; entregables solo con «yes» (con «ask» queda la pregunta pendiente). */
 export function seedsFromReply(reply: PlanDraftReply, catalog: readonly CatalogTopic[], pre: PlanPreconditions, goalNames: ReadonlyMap<string, string>): { seeds: SubplanSeed[]; why: Record<string, string> } {
   const byFolder = new Map(catalog.map((t) => [t.folder, t]));
   const why: Record<string, string> = {};
@@ -250,7 +255,7 @@ export function seedsFromReply(reply: PlanDraftReply, catalog: readonly CatalogT
         if (t.why) why[t.folder] = t.why;
         return { folder: c.folder, title: c.title, ...(t.skills.length ? { skills: t.skills } : {}), estMinutes: minutesOf(c, pre) };
       });
-    const deliverable = pre.deliverables && s.deliverable ? { ...s.deliverable, status: "idea" as const } : undefined;
+    const deliverable = pre.deliverables === "yes" && s.deliverable ? { ...s.deliverable, status: "idea" as const } : undefined;
     if (!topics.length && !deliverable) continue;
     seeds.push({
       area: s.area,
@@ -273,12 +278,19 @@ export interface PreDraftMeta {
   discarded?: string[];
   why?: Record<string, string>;
   fallbackReason?: string;
+  /** primer foco de la rotación de proyectos (p. ej. el que sugiere el perfil de práctica) */
+  startFocus?: PracticeFocus;
+  /** lo que la IA propuso para la pista de práctica (se valida contra el esquema fijo) */
+  practiceSuggestions?: PracticeSuggestions;
 }
 
 /** Une las semillas con las precondiciones y calcula el reparto semanal con la capacidad REAL. */
 export function composeFromPreconditions(seeds: readonly SubplanSeed[], pre: PlanPreconditions, meta: PreDraftMeta): PlanDraft {
   const from = meta.today > pre.start ? meta.today : pre.start;
   const id = `${pre.start}_${pre.end}`;
+  // la práctica reserva sus minutos día a día; el resto es para los temas
+  const capP = capacityWithPractice(pre, from, { startFocus: meta.startFocus, suggestions: meta.practiceSuggestions });
+  const track = capP.track;
   const built = buildPlan(seeds, {
     id,
     start: pre.start,
@@ -289,17 +301,22 @@ export function composeFromPreconditions(seeds: readonly SubplanSeed[], pre: Pla
     pace: pre.pace,
     from,
     preconditions: pre,
+    ...(track ? { reservedMinutes: practiceDayMinutes(track, { blockedDates: pre.blockedDates, from }), programmingPractice: track } : {}),
     ...(meta.auto ? { auto: true } : {}),
     rationale: meta.rationale,
   });
-  const cap = capacityOf(pre, from);
-  const cov = coverage(built.totalMinutes, cap.effectiveMinutes);
+  const cov = coverage(built.totalMinutes, capP.topicMinutes);
+  const practiceText = track
+    ? ` ${PRACTICE_NAME}: ~${hours(capP.practiceMinutes)} reservadas (kata ${hours(capP.kataMinutes)} + proyecto semanal ${hours(capP.projectMinutes)}), ${hours(capP.topicMinutes)} quedan para temas.${capP.overflowDays ? ` En ${capP.overflowDays} ${capP.overflowDays === 1 ? "día" : "días"} la práctica sola ya no cabe en el tiempo diario.` : ""}`
+    : "";
+  // «a discutir»: los subplanes quedan sin entregable y con una pregunta pendiente anotada
+  const openQuestions = pre.deliverables === "ask" ? built.plan.subplans.filter((s) => !s.deliverable).map(deliverableQuestion) : [];
   return {
     id,
     start: pre.start,
     end: pre.end,
     month: pre.start.slice(0, 7),
-    hoursPerWeek: built.plan.hoursPerWeek ?? cap.hoursPerWeek,
+    hoursPerWeek: built.plan.hoursPerWeek ?? capP.hoursPerWeek,
     rationale: meta.rationale,
     subplans: built.plan.subplans,
     warnings: built.warnings,
@@ -312,7 +329,9 @@ export function composeFromPreconditions(seeds: readonly SubplanSeed[], pre: Pla
     why: meta.why ?? {},
     preconditions: pre,
     ...(meta.auto ? { auto: true } : {}),
-    coverage: cov.text,
+    coverage: `${cov.text}${practiceText}`,
+    ...(track ? { programmingPractice: track } : {}),
+    ...(openQuestions.length ? { openQuestions } : {}),
     ...(meta.fallbackReason ? { fallbackReason: meta.fallbackReason } : {}),
   };
 }
@@ -330,17 +349,21 @@ const LEVEL_TEXT: Record<PlanLevel, string> = {
 export const PACE_TEXT = { suave: "suave (70 % del tiempo declarado)", normal: "normal (85 %)", intenso: "intenso (100 %)" } as const;
 
 const hours = (min: number): string => `${Math.round((min / 60) * 10) / 10} h`;
+const PRACTICE_PHASE_LIST = Object.values(PHASE_LABEL).join(", ");
 
 /** Las precondiciones como hechos fijos para el prompt de la IA. */
 export function preconditionsPrompt(pre: PlanPreconditions, scope: ResolvedScope, today: string): string {
   const from = today > pre.start ? today : pre.start;
-  const cap = capacityOf(pre, from);
+  const cap = capacityWithPractice(pre, from);
+  const topicHoursPerWeek = cap.weeks > 0 ? Math.round((cap.topicMinutes / 60 / cap.weeks) * 10) / 10 : 0;
   const lines = [
     "PRECONDICIONES DEL PLAN (HECHOS FIJOS del estudiante: NO las cambies, NO las discutas y NO preguntes por ellas; solo elige y ordena temas del catálogo):",
     `- Periodo: del ${pre.start} al ${pre.end} (${weeksLabel(cap.weeks)}).`,
     `- Tiempo diario: ${hours(pre.minutesPerDay)}; días de estudio: ${pre.studyDays.map((d) => DAY_NAMES[d - 1]).join(", ")}${pre.blockedDates?.length ? `; fechas bloqueadas: ${pre.blockedDates.slice(0, 20).join(", ")}${pre.blockedDates.length > 20 ? "…" : ""}` : ""}.`,
     `- Ritmo: ${PACE_TEXT[pre.pace]}.`,
-    `- Capacidad real: ~${hours(cap.effectiveMinutes)} en total (~${cap.hoursPerWeek} h/semana efectivas). El campo hoursPerWeek de tu respuesta debe ser ${cap.hoursPerWeek}.`,
+    cap.track
+      ? `- Capacidad real: ~${hours(cap.effectiveMinutes)} en total, de las que ${hours(cap.practiceMinutes)} están RESERVADAS a ${PRACTICE_NAME}; para temas quedan ~${hours(cap.topicMinutes)} (~${topicHoursPerWeek} h/semana). El campo hoursPerWeek de tu respuesta debe ser ${topicHoursPerWeek}.`
+      : `- Capacidad real: ~${hours(cap.effectiveMinutes)} en total (~${cap.hoursPerWeek} h/semana efectivas). El campo hoursPerWeek de tu respuesta debe ser ${cap.hoursPerWeek}.`,
   ];
   if (scope.goalGroups.length || scope.goalsWithoutTopics.length) {
     lines.push("- Metas a cubrir (usa su goalId):");
@@ -352,10 +375,28 @@ export function preconditionsPrompt(pre: PlanPreconditions, scope: ResolvedScope
   if (leveled.length) lines.push(`- Nivel declarado por área (solo una hipótesis del estudiante): ${leveled.map(([a, l]) => `${a} = ${LEVEL_TEXT[l]}`).join("; ")}.`);
   if (pre.freeObjective) lines.push(`- Otro objetivo del estudiante (texto libre): «${pre.freeObjective}».`);
   lines.push(
-    pre.deliverables
+    pre.deliverables === "yes"
       ? "- Entregables: SÍ. Cada subplan lleva un `deliverable` (proyecto de demostración con 2-4 criterios comprobables)."
-      : "- Entregables: NO. No incluyas `deliverable` en ningún subplan.",
+      : pre.deliverables === "no"
+        ? "- Entregables: NO. No incluyas `deliverable` en ningún subplan."
+        : "- Entregables: A DISCUTIR. No incluyas `deliverable` todavía en ningún subplan: la app dejará la pregunta pendiente y el estudiante decidirá después, subplan a subplan.",
   );
+  const pp = pre.practice;
+  if (pp && cap.track) {
+    const parts = [
+      pp.kataMinutes > 0 ? `reto de lógica diario de ${pp.kataMinutes} min en cada día de estudio` : "",
+      pp.sessionsPerWeek > 0 ? `un proyecto semanal full stack (frontend + backend + base de datos) en ${pp.sessionsPerWeek} ${pp.sessionsPerWeek === 1 ? "sesión" : "sesiones"} de ${pp.minutesPerSession} min por semana, con cuatro fases (${PRACTICE_PHASE_LIST})` : "",
+      pp.monthly ? "un proyecto mayor cada 4 semanas que integra los semanales" : "",
+    ].filter(Boolean);
+    lines.push(`- ${PRACTICE_NAME}: SÍ (HECHO FIJO). Incluye ${parts.join("; ")}. Esos minutos ya están reservados y descontados: no los metas como temas y no cambies minutos ni fases.`);
+    if (pp.sessionsPerWeek > 0) {
+      lines.push(
+        pp.focus === "rotate"
+          ? `  Foco de cada semana: rota por ${PRACTICE_FOCUSES.join(", ")} (la app lo calcula). Opcional: en \`programmingPractice.weeks\` sugiere, por semana, un \`theme\` corto (un proyecto pequeño y real, no una lista de tareas) y, si quieres, un \`focus\` de esa lista.`
+          : `  Foco fijo de todas las semanas: ${pp.focus} (no lo cambies). Opcional: en \`programmingPractice.weeks\` sugiere un \`theme\` corto por semana.`,
+      );
+    }
+  }
   lines.push(
     "El plan NO es necesariamente de un mes: usa el periodo de arriba. Responde con un plan_draft (type plan_draft) que cubra lo elegido, ordenando los temas de lo básico a lo avanzado y respetando el nivel declarado. No incluyas fechas ni minutos. No cambies las precondiciones.",
   );

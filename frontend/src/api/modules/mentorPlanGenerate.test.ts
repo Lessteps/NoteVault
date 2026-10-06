@@ -67,7 +67,7 @@ const pre = (over: Record<string, unknown> = {}) => ({
   goalIds: [goalId],
   subjects: [],
   levels: {},
-  deliverables: true,
+  deliverables: "yes",
   ...over,
 });
 
@@ -177,7 +177,7 @@ describe("mentor_plan_generate: con IA", () => {
 
   it("sin entregables en las precondiciones, no hay entregable aunque la IA lo proponga", async () => {
     const send = vi.fn().mockResolvedValueOnce(aiPlan());
-    const res: any = await mentorApi(app, send).mentor_plan_generate({ preconditions: pre({ deliverables: false }) });
+    const res: any = await mentorApi(app, send).mentor_plan_generate({ preconditions: pre({ deliverables: "no" }) });
     expect((send.mock.calls[0]![1] as any[])[0].content).toContain("Entregables: NO");
     expect(res.planDraft.subplans[0].deliverable).toBeUndefined();
   });

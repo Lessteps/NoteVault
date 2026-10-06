@@ -856,7 +856,8 @@ aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`
  "preconditions": {"start": "2026-10-06", "end": "2026-11-05", "minutesPerDay": 240,
                    "studyDays": [1,2,3,4,5,6], "blockedDates": ["2026-10-12"], "pace": "normal",
                    "goalIds": ["g20260914-a1b2c3"], "subjects": ["Programación"], "freeObjective": "", "notes": "tengo examen el 20; prefiero teoría por las mañanas",
-                   "levels": {"Programación": "basico"}, "deliverables": true},
+                   "levels": {"Programación": "basico"}, "deliverables": "ask",
+                   "practice": {"kataMinutes": 30, "sessionsPerWeek": 3, "minutesPerSession": 90, "monthly": false, "focus": "rotate"}},
  "subplans": [{
    "id": "s1-programacion", "area": "Programación", "objective": "Desarrollo Backend",
    "goalId": "g20260914-a1b2c3", "goalItemIds": ["i20260914-abc123"],
@@ -867,7 +868,18 @@ aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`
    "requiredGoals": [{"goalId": "g20260914-a1b2c3", "itemId": "i20260914-abc123", "note": "submeta que lo pide"}],
    "deliverable": {"title": "API de inventario", "description": "…", "criteria": ["CRUD", "tests"],
                    "projectId": "p20260915-49887f", "status": "en_curso"},
-   "notes": "opcional"}]}
+   "notes": "opcional"}],
+ "programmingPractice": {
+   "kata": {"minutesPerDay": 30, "days": [1,2,3,4,5,6]},
+   "weeklyProject": {"sessionsPerWeek": 3, "minutesPerSession": 90, "focusMode": "rotate",
+     "weeks": [{"week": 1, "start": "2026-10-06", "end": "2026-10-12", "focus": "backend", "theme": "Gestor de gastos",
+                "sessions": [{"date": "2026-10-06", "minutes": 90, "phases": ["build"]},
+                             {"date": "2026-10-08", "minutes": 90, "phases": ["construct"]},
+                             {"date": "2026-10-11", "minutes": 90, "phases": ["defend", "postmortem"]}]}]},
+   "monthlyProject": {"blocks": [{"fromWeek": 1, "toWeek": 4, "theme": "Portafolio"}]}},
+ "openQuestions": [{"id": "deliverables", "subplanId": "s1-programacion",
+                    "text": "¿Quieres un entregable (proyecto de demostración) para Programación: Desarrollo Backend?",
+                    "options": ["Sí", "No", "Después"]}]}
 ```
 
 - `start`/`end` (AAAA-MM-DD, ambos incluidos) son el periodo. `id` es el nombre del archivo sin `.json`
@@ -882,7 +894,12 @@ aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`
   `studyDays` (ISO: 1 = lunes … 7 = domingo), `blockedDates`, `pace` (`suave` 70 % / `normal` 85 % /
   `intenso` 100 % del tiempo declarado), metas (`goalIds`) y materias (`subjects`) a cubrir, `levels` por
   materia (`empezando` | `basico` | `intermedio` | `avanzado` | `no_se`: solo una hipótesis para el reparto) y
-  `deliverables`. `auto: true` marca un plan automático (sin IA). `topics[].diagnostic` marca el primer tema
+  `deliverables` (aditivo, sin subir `FORMAT_VERSION`): **`"ask"`** (por defecto: «a discutir», no se propone ningún
+  entregable en el primer borrador y queda una pregunta pendiente por subplan), `"yes"` (se propone uno por subplan) o
+  `"no"`; los planes antiguos con `true`/`false` se leen como `"yes"`/`"no"` y no se reescriben, y si falta es `"ask"`.
+  `practice` (opcional) son las preferencias de la pista *Programming practice*: `kataMinutes` (0 = sin kata),
+  `sessionsPerWeek` (0 = sin proyecto semanal) y `minutesPerSession`, `monthly` y `focus` (`"rotate"` o un foco fijo:
+  `backend` · `databases` · `frontend` · `desktop` · `mobile` · `automation`). `auto: true` marca un plan automático (sin IA). `topics[].diagnostic` marca el primer tema
   de una materia de nivel «no sé» (se empieza con un diagnóstico corto).
   `preconditions.notes` (opcional, aditivo: sin subir `FORMAT_VERSION`) son los comentarios libres del estudiante
   para la IA (hasta 1500 caracteres, saltos de línea conservados, sin caracteres de control). La IA los usa como
@@ -898,6 +915,29 @@ aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`
 - El plan diario sale de los planes **activos** (los que contienen la fecha de hoy): los temas cuya semana
   objetivo es la actual (o anterior) y siguen sin completar se ofrecen primero en «Hoy»; con planes
   solapados se combinan sin repetir un mismo tema. El `minutesPerDay` del plan activo sugiere el tiempo de «Hoy».
+- **Programming practice** (`programmingPractice`, opcional y aditivo): la rama de práctica de programación de la app
+  (carpeta `programming_practice` de la vault y su diálogo «Práctica de programación») planificada dentro del plan.
+  Es una pista aparte del plan y no un subplan, porque no tiene temas, se agenda en días del calendario y su estado sale de
+  otro módulo. `kata` = reto de lógica diario (`pp_kata`) en los `days` ISO (los de estudio por defecto). `weeklyProject` =
+  un proyecto **siempre full stack** (frontend + backend + base de datos) por semana: `weeks[]` lleva el `focus` de la semana
+  (rota por el stack, o el fijado; solo añade criterios, no quita capas), un `theme` opcional (lo puede sugerir la IA; el plan
+  automático lo deja vacío y se titula «Proyecto semanal N · foco X») y las `sessions[]` con fecha, minutos y las **fases**
+  del módulo de práctica que se trabajan ese día (`build` especificación · `construct` construcción · `defend` defensa ·
+  `postmortem`). Con 1 a 3 sesiones por semana las fases se funden (nunca se pierde ninguna); con más de 4, las sesiones
+  extra son de construcción. `monthlyProject.blocks[]` = un proyecto mayor cada 4 semanas que integra los semanales.
+  Los minutos de la práctica se **reservan** día a día de lo que da cada día de estudio (`minutesPerDay` × ritmo): el ritmo
+  no los recorta y el resto es para temas (de ahí salen `weeks[].capacityMinutes` y `hoursPerWeek`, que pasan a ser horas de
+  temas). La IA solo puede sugerir temas y, con foco rotativo, focos del esquema; nunca minutos ni fases, y al aceptar la
+  app recalcula la pista de forma determinista.
+  El **estado no se guarda**: se deriva del módulo `programming_practice` (kata del día = hay un intento con la skill
+  `pp_kata` ese día; fases = el `state` de `projects/<x>/.pp.json` —building / defended / done, y la nota de la defensa— del
+  proyecto cuya especificación o carpeta se creó esa semana) y de lo que el estudiante marca en los bloques de «Hoy»
+  (registro manual hecho/saltado: `practice:<plan>:kata` y `practice:<plan>:project:w<N>:<fases>`). Para «Hoy», los
+  candidatos son `programming_practice_kata` y `programming_practice_project`.
+- `openQuestions` (opcional, aditivo): decisiones que quedaron pendientes al armar el plan. Hoy solo `id: "deliverables"`
+  (entregable de un subplan, opciones Sí / No / Después). En el borrador se responden con `mentor_plan_draft_answer`
+  (yes añade la propuesta determinista, no la descarta, later la deja); al aceptar se conservan solo las de subplanes que siguen
+  sin entregable.
 - La IA propone el plan (`plan_draft` en la conversación o desde el formulario de precondiciones, con temas del
   catálogo real y metas existentes; las precondiciones son hechos fijos que no puede cambiar); sin IA la app
   genera un plan automático determinista. Solo se escribe este archivo cuando el estudiante pulsa «Aceptar plan».

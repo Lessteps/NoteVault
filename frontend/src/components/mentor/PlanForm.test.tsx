@@ -70,6 +70,7 @@ const setValue = async (el: HTMLInputElement, value: string) => {
 };
 const byLabel = (label: string) => host.querySelector<HTMLInputElement>(`input[aria-label='${label}']`)!;
 const capacity = () => host.querySelector("[data-testid=plan-capacity]")!.textContent!;
+const practiceSwitch = () => host.querySelector<HTMLButtonElement>("button[role=switch][aria-label='Incluir Programming practice']")!;
 const generateBtn = () => [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Generar plan"))! as HTMLButtonElement;
 
 beforeEach(() => {
@@ -112,7 +113,18 @@ describe("PlanForm — precondiciones", () => {
     expect(pressed(chip("Metas", "Meta sin temas"))).toBe(false);
     expect(chip("Metas", "Desarrollo Backend").textContent).toContain("3 temas");
     expect(pressed(chip("Ritmo", "Normal"))).toBe(true);
-    expect((host.querySelector("input[aria-label='Incluir entregables']") as HTMLInputElement).checked).toBe(true);
+    // entregables: tres estados, «a discutir» por defecto (ya no es un casi-obligatorio)
+    expect([...group("Entregables").querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Lo decidimos al armar el plan", "Sí, incluir entregables", "No por ahora"]);
+    expect(pressed(chip("Entregables", "Lo decidimos"))).toBe(true);
+    expect(pressed(chip("Entregables", "Sí, incluir"))).toBe(false);
+    expect(host.textContent).toContain("Es una opción a discutir");
+    // Programming practice: activada por defecto porque lo elegido incluye Programación
+    expect(practiceSwitch().getAttribute("aria-checked")).toBe("true");
+    expect(pressed(chip("Minutos del kata diario", "30 min"))).toBe(true);
+    expect(pressed(chip("Sesiones del proyecto semanal por semana", "3"))).toBe(true);
+    expect(pressed(chip("Foco del proyecto semanal", "Rotativo"))).toBe(true);
+    expect(pressed(chip("Proyecto mensual", "No"))).toBe(true);
+    expect(host.textContent).toContain("full stack");
     expect(generateBtn().disabled).toBe(false);
   });
 
@@ -188,6 +200,7 @@ describe("PlanForm — precondiciones", () => {
   it("qué cubrir: metas y materias; lo pendiente se cuenta sin repetir temas y avisa si sobra o falta tiempo", async () => {
     await mountForm();
     await click(chip("Periodo del plan", "1 semana"));
+    await click(practiceSwitch()); // sin práctica reservada
     // solo la meta: 3 temas, 3 h
     expect(capacity()).toContain("3 temas · ~3 h");
     expect(host.querySelector("[data-testid=plan-coverage]")!.textContent).toContain("sobran");
@@ -250,10 +263,11 @@ describe("PlanForm — precondiciones", () => {
       goalIds: ["g1"],
       subjects: ["Matemáticas"],
       levels: { Matemáticas: "basico" },
-      deliverables: true,
+      deliverables: "ask",
+      practice: { kataMinutes: 30, sessionsPerWeek: 3, minutesPerSession: 90, monthly: false, focus: "rotate" },
     });
     const saved = JSON.parse(localStorage.getItem(PLAN_PRE_KEY)!);
-    expect(saved).toMatchObject({ minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5], pace: "suave", preset: "2s", deliverables: true });
+    expect(saved).toMatchObject({ minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5], pace: "suave", preset: "2s", deliverables: "ask", practiceOn: true, kataMinutes: 30 });
     expect(onClose).toHaveBeenCalled();
     expect(useNavState.getState().values["mentor.view"]).toBe("plan");
   });
@@ -286,13 +300,78 @@ describe("PlanForm — precondiciones", () => {
   });
 
   it("recuerda los últimos valores al abrirlo otra vez", async () => {
-    localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: 90, studyDays: [2, 4], pace: "intenso", deliverables: false, preset: "3m" }));
+    localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: 90, studyDays: [2, 4], pace: "intenso", deliverables: false, preset: "3m" }));  // valor antiguo (booleano): no fija nada, vuelve a «a discutir»
     await mountForm();
     expect(pressed(chip("Periodo del plan", "3 meses"))).toBe(true);
     expect(pressed(chip("Ritmo", "Intenso"))).toBe(true);
     expect(byLabel("Tiempo diario libre en minutos").value).toBe("90");
     expect([...group("Días de estudio").querySelectorAll("button")].map(pressed)).toEqual([false, true, false, true, false, false, false]);
-    expect((host.querySelector("input[aria-label='Incluir entregables']") as HTMLInputElement).checked).toBe(false);
+    expect(pressed(chip("Entregables", "Lo decidimos"))).toBe(true);
+  });
+
+  it("entregables: los tres estados viajan en las precondiciones y un booleano recordado de antes no los fija", async () => {
+    const gen = vi.spyOn(api, "mentorPlanGenerate").mockResolvedValue({
+      loading: false, kind: "plan_draft", source: "auto", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
+      planDraft: { month: "2026-10", hoursPerWeek: 6, rationale: "", subplans: [], warnings: [], fits: true, totalMinutes: 0, availableMinutes: 0, requiredHoursPerWeek: null, from: TODAY, discarded: [], why: {} },
+    });
+    localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ deliverables: true }));
+    await mountForm();
+    expect(pressed(chip("Entregables", "Lo decidimos"))).toBe(true); // el «true» antiguo era el valor por defecto, no una elección
+    await click(chip("Entregables", "Sí, incluir"));
+    expect(pressed(chip("Entregables", "Sí, incluir"))).toBe(true);
+    await click(chip("Entregables", "No por ahora"));
+    expect(pressed(chip("Entregables", "No por ahora"))).toBe(true);
+    await click(chip("Entregables", "Lo decidimos"));
+    await click(generateBtn());
+    expect(gen.mock.calls[0]![0].deliverables).toBe("ask");
+  });
+
+  it("Programming practice: interruptor, opciones, cálculo en vivo con la práctica reservada y persistencia", async () => {
+    const gen = vi.spyOn(api, "mentorPlanGenerate").mockResolvedValue({
+      loading: false, kind: "plan_draft", source: "auto", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
+      planDraft: { month: "2026-10", hoursPerWeek: 6, rationale: "", subplans: [], warnings: [], fits: true, totalMinutes: 0, availableMinutes: 0, requiredHoursPerWeek: null, from: TODAY, discarded: [], why: {} },
+    });
+    await mountForm();
+    await click(chip("Periodo del plan", "1 semana"));
+    // sin práctica: no hay línea de reparto
+    await click(practiceSwitch());
+    expect(practiceSwitch().getAttribute("aria-checked")).toBe("false");
+    expect(host.querySelector("[data-testid=practice-options]")).toBeNull();
+    expect(host.querySelector("[data-testid=plan-capacity-split]")).toBeNull();
+    // con práctica: X h de estudio de temas + Y h de práctica
+    await click(practiceSwitch());
+    expect(host.querySelector("[data-testid=practice-options]")).toBeTruthy();
+    const split = host.querySelector("[data-testid=plan-capacity-split]")!.textContent!;
+    expect(split).toMatch(/de estudio de temas \+ .+ de práctica/);
+    await click(chip("Minutos del kata diario", "60 min"));
+    await click(chip("Sesiones del proyecto semanal por semana", "2"));
+    await click(chip("Foco del proyecto semanal", "Bases de datos"));
+    await click(chip("Proyecto mensual", "Sí"));
+    // 2 h/día × 85 % = 102 min por día: 4 días con solo kata dejan 42 min de temas y 2 días con kata + sesión (150 min) ninguno
+    expect(host.querySelector("[data-testid=plan-capacity-split]")!.textContent).toContain("2,8 h de estudio de temas + 9 h de práctica");
+    // tiempo diario muy corto: la práctica sola no cabe y avisa
+    await setValue(byLabel("Tiempo diario libre en minutos"), "60");
+    expect(host.querySelector("[data-testid=plan-practice-overflow]")!.textContent).toContain("No cabe");
+    await click(generateBtn());
+    expect(gen.mock.calls[0]![0].practice).toEqual({ kataMinutes: 60, sessionsPerWeek: 2, minutesPerSession: 90, monthly: true, focus: "databases" });
+    expect(JSON.parse(localStorage.getItem(PLAN_PRE_KEY)!)).toMatchObject({ practiceOn: true, kataMinutes: 60, sessionsPerWeek: 2, monthly: true, practiceFocus: "databases" });
+    // un formulario nuevo recuerda los valores
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mountForm();
+    expect(practiceSwitch().getAttribute("aria-checked")).toBe("true");
+    expect(pressed(chip("Minutos del kata diario", "60 min"))).toBe(true);
+  });
+
+  it("sin Programación entre lo que cubres, la práctica empieza desactivada; una elección explícita manda", async () => {
+    vi.spyOn(api, "mentorPlanOptions").mockResolvedValue(options({ goals: [{ id: "g9", name: "Cálculo", area: "", end: null, topics: 1, minutes: 60 }], topics: [{ folder: "Matemáticas/A", area: "Matemáticas", minutes: 60, goalIds: ["g9"] }] }));
+    await mountForm();
+    expect(practiceSwitch().getAttribute("aria-checked")).toBe("false");
+    await click(practiceSwitch());
+    await click(chip("Materias", "Programación"));
+    expect(practiceSwitch().getAttribute("aria-checked")).toBe("true"); // la activó el estudiante: no se toca
+    await click(chip("Materias", "Programación"));
+    expect(practiceSwitch().getAttribute("aria-checked")).toBe("true");
   });
 
   it("sin IA lo dice y sin metas ni materias sigue funcionando", async () => {

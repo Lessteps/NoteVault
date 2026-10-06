@@ -71,6 +71,8 @@ interface MentorState {
   /** "Generar plan del mes con el Mentor": como la meta nueva, pero el Mentor responde con un plan del mes. */
   startPlanChat: () => Promise<void>;
   acceptPlan: () => Promise<MentorPlanAccepted | null>;
+  /** Responde una pregunta pendiente del borrador (hoy: entregable de un subplan: Sí / No / Después). */
+  answerDraftQuestion: (subplanId: string, answer: "yes" | "no" | "later") => Promise<void>;
   loadPlans: () => Promise<void>;
   /** "Generar plan" del formulario de precondiciones: deja un borrador pendiente (no escribe nada). */
   generatePlan: (pre: PlanPreconditions) => Promise<Extract<MentorPlanGenerateResult, { loading: false }> | null>;
@@ -272,6 +274,18 @@ export const useMentor = create<MentorState>((set, get) => ({
     if (get().turns.length) await get().newConversation();
     else set({ historyOpen: false });
     set((s) => ({ focusSeq: s.focusSeq + 1, planMode: true, composerSeed: "Quiero un plan para este mes: " }));
+  },
+
+  answerDraftQuestion: async (subplanId, answer) => {
+    const { pending, turns, chatId } = get();
+    const turn = turns.find((t) => t.id === pending);
+    if (!turn?.planDraft) return;
+    try {
+      const r = await api.mentorPlanDraftAnswer({ turnId: turn.id, ...(chatId ? { chatId } : {}), subplanId, answer });
+      set({ turns: r.turns, pending: r.pending });
+    } catch (e) {
+      fail(e);
+    }
   },
 
   acceptPlan: async () => {

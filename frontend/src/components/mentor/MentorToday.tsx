@@ -48,6 +48,8 @@ const KIND_LABEL: Record<string, string> = {
   task_deadline: "Con plazo",
   goal_item: "Meta",
   plan_item: "Plan del mes",
+  programming_practice_kata: "Kata diario",
+  programming_practice_project: "Proyecto semanal",
 };
 
 const STATUS_LABEL: Record<MentorBlockStatus, string> = { planned: "Pendiente", done: "Hecho", partial: "Parcial", skipped: "Saltado" };
@@ -485,6 +487,7 @@ function ObjectiveSelector({ options, spec, onPick }: { options?: MentorObjectiv
     { o: none, label: "Sin objetivo (que el Mentor decida)" },
     { o: { type: "tasks" }, label: "Terminar todas mis tareas pendientes", title: options ? `${options.tasksPending} pendientes` : undefined },
     ...(options?.plan ? [{ o: { type: "plan" } as MentorSessionObjective, label: `Lo que toca de mis planes (${options.plan.items})` }] : []),
+    ...(options?.programmingPractice ? [{ o: { type: "programming_practice" } as MentorSessionObjective, label: "Programming practice (kata + proyecto)", title: `${options.programmingPractice.items} de hoy` }] : []),
     { o: { type: "review" }, label: "Repasar lo vencido (SRS y errores)" },
   ];
   return (
@@ -527,7 +530,7 @@ function ObjectiveSelector({ options, spec, onPick }: { options?: MentorObjectiv
 function BlockHead({ kind, subject, minutes, status, plan }: { kind: string; subject: string; minutes: number; status?: MentorBlockStatus; plan?: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-[13.5px] font-semibold capitalize">{subject}</span>
+      <span className={cn("text-[13.5px] font-semibold", subject !== "programming_practice" && "capitalize")}>{subject === "programming_practice" ? "Programming practice" : subject}</span>
       <Chip>{KIND_LABEL[kind] ?? kind}</Chip>
       {plan && <Chip colour="var(--nv-mint)">Plan: {plan}</Chip>}
       <span className="text-[12px] text-faint">{minutes} min</span>

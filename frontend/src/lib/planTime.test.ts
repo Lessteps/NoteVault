@@ -28,7 +28,7 @@ const pre = (over: Partial<PlanPreconditions> = {}): PlanPreconditions => ({
   goalIds: ["g1"],
   subjects: [],
   levels: {},
-  deliverables: true,
+  deliverables: "yes",
   ...over,
 });
 
@@ -136,7 +136,7 @@ describe("precondiciones", () => {
     expect(p.pace).toBe("normal");
     expect(p.levels).toEqual({ Mat: "avanzado" });
     expect(p.goalIds).toEqual(["g1"]);
-    expect(p.deliverables).toBe(true);
+    expect(p.deliverables).toBe("ask");
   });
 
   it("detecta lo que no sirve", () => {

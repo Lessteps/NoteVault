@@ -30,7 +30,7 @@ const GOALS: GoalScope[] = [
   { id: "g2", name: "Sin temas", area: "", end: null, items: [] },
 ];
 const pre = (over: Partial<PlanPreconditions> = {}): PlanPreconditions => ({
-  start: "2026-10-05", end: "2026-11-01", minutesPerDay: 120, studyDays: [1, 2, 3, 4, 5, 6], pace: "normal", goalIds: ["g1"], subjects: ["Prog"], levels: {}, deliverables: false, ...over,
+  start: "2026-10-05", end: "2026-11-01", minutesPerDay: 120, studyDays: [1, 2, 3, 4, 5, 6], pace: "normal", goalIds: ["g1"], subjects: ["Prog"], levels: {}, deliverables: "no", ...over,
 });
 
 describe("alcance", () => {
@@ -64,7 +64,7 @@ describe("alcance", () => {
 
 describe("plan automático", () => {
   it("semillas: una meta y una materia, sin repetir, con diagnóstico para «no sé»", () => {
-    const p = pre({ deliverables: true, levels: { Prog: "no_se" } });
+    const p = pre({ deliverables: "yes", levels: { Prog: "no_se" } });
     const seeds = autoSeeds(p, resolveScope(p, ALL, GOALS));
     expect(seeds.map((s) => s.objective)).toEqual(["Backend", "Avanzar en Prog"]);
     expect(seeds[0]!.deliverable).toBeTruthy();
@@ -97,10 +97,10 @@ describe("respuesta de la IA", () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.reply.discarded).toContain("Prog/Falso");
-    const noDeliv = seedsFromReply(parsed.reply, catalog, pre({ deliverables: false }), new Map());
+    const noDeliv = seedsFromReply(parsed.reply, catalog, pre({ deliverables: "no" }), new Map());
     expect(noDeliv.seeds[0]!.topics.map((t) => t.folder)).toEqual(["Prog/1 Base"]);
     expect(noDeliv.seeds[0]!.deliverable).toBeUndefined();
-    expect(seedsFromReply(parsed.reply, catalog, pre({ deliverables: true }), new Map()).seeds[0]!.deliverable).toBeTruthy();
+    expect(seedsFromReply(parsed.reply, catalog, pre({ deliverables: "yes" }), new Map()).seeds[0]!.deliverable).toBeTruthy();
     // un tema fuera del catálogo (aunque exista en la vault) no se acepta
     const out = seedsFromReply({ ...parsed.reply, subplans: [{ ...parsed.reply.subplans[0]!, topics: [{ folder: "Mat/1 Álgebra", skills: [], why: "" }] }] }, catalog, pre(), new Map());
     expect(out.seeds[0]?.topics ?? []).toEqual([]);
@@ -112,7 +112,7 @@ describe("respuesta de la IA", () => {
   });
 
   it("el prompt marca las precondiciones como hechos fijos con la capacidad calculada", () => {
-    const p = pre({ levels: { Prog: "avanzado" }, deliverables: true });
+    const p = pre({ levels: { Prog: "avanzado" }, deliverables: "yes" });
     const text = preconditionsPrompt(p, resolveScope(p, ALL, GOALS), "2026-10-05");
     expect(text).toContain("HECHOS FIJOS");
     expect(text).toContain("Capacidad real");

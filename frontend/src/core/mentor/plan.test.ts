@@ -276,7 +276,7 @@ describe("planes de periodo libre", () => {
   });
 
   it("buildPlan de periodo libre: id <inicio>_<fin>, nombre autogenerado, horas efectivas y precondiciones", () => {
-    const pre = { start: "2026-10-06", end: "2026-11-05", minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6], pace: "normal" as const, goalIds: [], subjects: ["P"], levels: {}, deliverables: true };
+    const pre = { start: "2026-10-06", end: "2026-11-05", minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6], pace: "normal" as const, goalIds: [], subjects: ["P"], levels: {}, deliverables: "yes" as const };
     const b = buildPlan([{ area: "P", objective: "Backend", topics: [T(1), T(2)] }], { id: "2026-10-06_2026-11-05", start: pre.start, end: pre.end, minutesPerDay: 240, studyDays: pre.studyDays, pace: "normal", preconditions: pre, auto: true });
     expect(b.plan).toMatchObject({ id: "2026-10-06_2026-11-05", start: "2026-10-06", end: "2026-11-05", auto: true });
     expect(b.plan.month).toBeUndefined();

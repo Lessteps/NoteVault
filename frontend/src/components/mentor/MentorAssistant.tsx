@@ -51,6 +51,11 @@ export function PlanDraftChatCard({ turn, current }: { turn: MentorChatTurn; cur
             {draft.subplans.length} subplanes · {topics} temas · {draft.hoursPerWeek} h/semana
           </div>
           <div className="mt-0.5 text-[11px] text-dim">{draft.subplans.map((s) => s.area).filter((a, i, l) => l.indexOf(a) === i).join(" · ")}</div>
+          {(draft.programmingPractice || draft.openQuestions?.length) && (
+            <div className="mt-0.5 text-[11px] text-dim" data-testid="chat-plan-draft-extras">
+              {[draft.programmingPractice ? "Programming practice incluida" : "", draft.openQuestions?.length ? `${draft.openQuestions.length} ${draft.openQuestions.length === 1 ? "entregable por decidir" : "entregables por decidir"} (en Plan)` : ""].filter(Boolean).join(" · ")}
+            </div>
+          )}
         </div>
         {turn.acceptedPlan ? (
           <span className="flex-none text-[11px] text-mint">Aceptado</span>

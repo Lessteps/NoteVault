@@ -124,6 +124,51 @@ export const PACE_FACTOR: Record<PlanPace, number> = { suave: 0.7, normal: 0.85,
 /** El nivel declarado ajusta los minutos estimados de un tema (hipótesis, no verdad). */
 export const LEVEL_FACTOR: Record<PlanLevel, number> = { empezando: 1.2, basico: 1.1, intermedio: 1, avanzado: 0.85, no_se: 1 };
 
+/** Entregables: «ask» (por defecto) = se deciden al armar el plan; «yes» = se proponen; «no» = ninguno. */
+export const DELIVERABLE_MODES = ["ask", "yes", "no"] as const;
+export type DeliverablesMode = (typeof DELIVERABLE_MODES)[number];
+/** Compatibilidad de lectura: `true` → «yes», `false` → «no», ausente o desconocido → «ask». Sin migración destructiva. */
+export function normalizeDeliverables(v: unknown): DeliverablesMode {
+  if (v === true || v === "true") return "yes";
+  if (v === false || v === "false") return "no";
+  return (DELIVERABLE_MODES as readonly string[]).includes(String(v)) ? (v as DeliverablesMode) : "ask";
+}
+
+/** Los focos del proyecto semanal de Programming practice (mismos que `core/ppractice/spec.ts`). */
+export const PRACTICE_FOCUSES = ["backend", "databases", "frontend", "desktop", "mobile", "automation"] as const;
+export type PracticeFocus = (typeof PRACTICE_FOCUSES)[number];
+
+/** Preferencias de la pista «Programming practice» dentro del plan (kata diario + proyecto semanal full stack). */
+export interface PracticePrefs {
+  /** minutos del reto de lógica diario (0 = sin kata) */
+  kataMinutes: number;
+  /** sesiones del proyecto semanal por semana (0 = sin proyecto semanal) */
+  sessionsPerWeek: number;
+  minutesPerSession: number;
+  /** un proyecto mayor cada 4 semanas que integra los semanales */
+  monthly: boolean;
+  /** «rotate» = el foco rota por las áreas del stack; o un foco fijo */
+  focus: "rotate" | PracticeFocus;
+}
+export const KATA_CHOICES = [15, 30, 45, 60] as const;
+export const DEFAULT_PRACTICE: PracticePrefs = { kataMinutes: 30, sessionsPerWeek: 3, minutesPerSession: 90, monthly: false, focus: "rotate" };
+
+/** Normaliza las preferencias de práctica; `undefined` si no hay (o si no hay nada que practicar). */
+export function sanitizePractice(raw: unknown): PracticePrefs | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const int = (v: unknown, lo: number, hi: number, d: number): number => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d;
+  };
+  const kataMinutes = o.kataMinutes === undefined ? DEFAULT_PRACTICE.kataMinutes : int(o.kataMinutes, 0, 180, DEFAULT_PRACTICE.kataMinutes);
+  const sessionsPerWeek = o.sessionsPerWeek === undefined ? DEFAULT_PRACTICE.sessionsPerWeek : int(o.sessionsPerWeek, 0, 7, DEFAULT_PRACTICE.sessionsPerWeek);
+  const minutesPerSession = int(o.minutesPerSession, 15, 480, DEFAULT_PRACTICE.minutesPerSession);
+  if (kataMinutes <= 0 && sessionsPerWeek <= 0) return undefined;
+  const focus = (PRACTICE_FOCUSES as readonly string[]).includes(String(o.focus)) ? (o.focus as PracticeFocus) : "rotate";
+  return { kataMinutes, sessionsPerWeek, minutesPerSession, monthly: o.monthly === true && sessionsPerWeek > 0, focus };
+}
+
 export interface PlanPreconditions {
   /** AAAA-MM-DD */
   start: string;
@@ -139,7 +184,9 @@ export interface PlanPreconditions {
   freeObjective?: string;
   /** nivel declarado por materia: solo una hipótesis para el reparto y la IA */
   levels: Record<string, PlanLevel>;
-  deliverables: boolean;
+  deliverables: DeliverablesMode;
+  /** pista «Programming practice» (kata diario + proyecto semanal full stack); ausente = sin práctica */
+  practice?: PracticePrefs;
   /** comentarios libres del estudiante para la IA (preferencias; no cambian los hechos fijos) */
   notes?: string;
 }
@@ -179,6 +226,7 @@ export function sanitizePreconditions(raw: unknown, today: string): PlanPrecondi
   }
   const free = String(o.freeObjective ?? "").replace(/\s+/g, " ").trim().slice(0, 300);
   const notes = sanitizeNotes(o.notes);
+  const practice = sanitizePractice(o.practice);
   return {
     start,
     end,
@@ -191,7 +239,8 @@ export function sanitizePreconditions(raw: unknown, today: string): PlanPrecondi
     ...(free ? { freeObjective: free } : {}),
     ...(notes ? { notes } : {}),
     levels,
-    deliverables: o.deliverables === undefined ? true : !!o.deliverables,
+    deliverables: normalizeDeliverables(o.deliverables),
+    ...(practice ? { practice } : {}),
   };
 }
 

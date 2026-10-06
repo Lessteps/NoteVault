@@ -353,6 +353,9 @@ export const api = {
   mentorPlanArchive: (id: string, archived: boolean) => call<import("./types").MentorPlan>("mentor_plan_archive", { id, archived }),
   mentorPlanDelete: (id: string) => call<{ id: string; plans: import("./types").MentorPlanRow[] }>("mentor_plan_delete", { id }),
   mentorPlanDraftAccept: (turnId: string, chatId?: string) => call<import("./types").MentorPlanAccepted>("mentor_plan_draft_accept", { turnId, chatId }),
+  /** Responde una pregunta pendiente del borrador (entregables): yes añade la propuesta, no la descarta, later la deja. */
+  mentorPlanDraftAnswer: (opts: { turnId: string; chatId?: string; subplanId: string; answer: "yes" | "no" | "later"; questionId?: string }) =>
+    call<{ turns: import("./types").MentorChatTurn[]; pending: string | null; planDraft: import("./types").MentorPlanDraft }>("mentor_plan_draft_answer", opts),
   mentorPlanDraftDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_plan_draft_discard", turnId),
   /** Mismo efecto que `mentorPlanDraftDiscard` (nombre corto del contrato). */
   mentorPlanDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_plan_discard", turnId),

@@ -11,6 +11,7 @@ import { Archive, ArchiveRestore, CalendarDays, Check, ExternalLink, MessageSqua
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { periodLabel, shortWeekLabel, weeksLabel } from "../../lib/planTime";
+import { FOCUS_LABEL as FOCUS_NAME, PRACTICE_NAME, phasesText, type PracticeItem } from "../../lib/practiceTrack";
 import type {
   MentorDeliverableStatus,
   MentorPlan as MentorPlanData,
@@ -33,6 +34,7 @@ import { openGoalInMetas } from "./MentorGoals";
 import { openTopic } from "./openTopic";
 import { AreaRow, CARD_CLASS, dayText, Disclosure, hm, LoadState, PanelPage, ProgressBar } from "./parts";
 import { PACE_LABEL, PlanForm } from "./PlanForm";
+import { openPractice, practiceSummary, PracticeRow, PracticeWeekLines } from "./PracticeCard";
 
 type Loaded = Extract<MentorPlanGet, { loading: false }>;
 
@@ -185,7 +187,7 @@ function PlansOverview() {
         </section>
       )}
 
-      {data && plans.some((p) => p.status === "activo") && <ThisWeek items={data.items} activePlans={plans.filter((p) => p.status === "activo").length} />}
+      {data && plans.some((p) => p.status === "activo") && <ThisWeek items={data.items} practiceItems={data.practiceItems} activePlans={plans.filter((p) => p.status === "activo").length} />}
     </PanelPage>
   );
 }
@@ -241,8 +243,12 @@ export function draftPeriod(d: MentorPlanDraft): string {
   return d.preconditions && d.start && d.end ? periodLabel(d.start, d.end) : monthLabel(d.month);
 }
 
+const DELIVERABLES_TEXT = { ask: "entregables a discutir", yes: "con entregables", no: "sin entregables" } as const;
+
 export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft: MentorPlanDraft; accepting: boolean; onAccept: () => void; onDiscard: () => void }) {
   const [cal, setCal] = useState(false);
+  const answer = useMentor((s) => s.answerDraftQuestion);
+  const questions = (draft.openQuestions ?? []).filter((q) => q.id === "deliverables");
   const topics = draft.subplans.reduce((n, s) => n + s.topics.length, 0);
   const weeks = draft.subplans[0]?.weeks ?? [];
   const pre = draft.preconditions;
@@ -258,7 +264,8 @@ export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft
       {pre && (
         <p className="mt-1 text-[11.5px] text-faint" data-testid="draft-preconditions">
           {num1(pre.minutesPerDay / 60)} h/día · {pre.studyDays.map((d) => DAY_SHORT[d - 1]).join("")} · ritmo {pre.pace}
-          {pre.blockedDates?.length ? ` · ${pre.blockedDates.length} fechas bloqueadas` : ""} · {pre.deliverables ? "con entregables" : "sin entregables"}
+          {pre.blockedDates?.length ? ` · ${pre.blockedDates.length} fechas bloqueadas` : ""} · {DELIVERABLES_TEXT[pre.deliverables]}
+          {pre.practice ? ` · ${PRACTICE_NAME}` : ""}
         </p>
       )}
       {pre?.notes && <PlanNotes notes={pre.notes} auto={!!draft.auto} testid="draft-notes" />}
@@ -283,6 +290,38 @@ export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft
           </li>
         ))}
       </ul>
+      {questions.length > 0 && (
+        <section className="mt-3 rounded-lg border border-dashed border-line p-2.5" data-testid="draft-open-questions" aria-label="Por decidir: entregables">
+          <h3 className="text-[12.5px] font-semibold">
+            Por decidir: entregables <Chip colour="var(--nv-warn)">Pendiente de decidir</Chip>
+          </h3>
+          <p className="mt-0.5 text-[11.5px] text-faint">El borrador no añade entregables todavía. Decide subplan a subplan; lo que dejes sin responder se queda pendiente en el plan.</p>
+          <ul className="mt-2 space-y-1.5">
+            {questions.map((q) => (
+              <li key={`${q.id}:${q.subplanId}`} className="flex flex-wrap items-center gap-2 text-[12.5px]" data-testid="draft-open-question">
+                <span className="min-w-0 flex-1">{q.text}</span>
+                <GhostButton onClick={() => void answer(q.subplanId ?? "", "yes")}>Añadir entregable</GhostButton>
+                <GhostButton onClick={() => void answer(q.subplanId ?? "", "no")}>No lo quiero</GhostButton>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {draft.programmingPractice && (
+        <section className="mt-3 rounded-lg border border-line p-2.5 text-[12.5px]" data-testid="draft-practice" aria-label={PRACTICE_NAME}>
+          <h3 className="font-semibold">{PRACTICE_NAME}</h3>
+          <p className="text-[11.5px] text-faint">{practiceSummary(draft.programmingPractice)}. Esos minutos ya están reservados: para temas quedan los del reparto.</p>
+          {draft.programmingPractice.weeklyProject && (
+            <ol className="mt-1 space-y-0.5 text-[11.5px] text-dim">
+              {draft.programmingPractice.weeklyProject.weeks.filter((w) => w.sessions.length).map((w) => (
+                <li key={w.week}>
+                  Sem. {w.week} · {w.theme ? `${w.theme} · ` : ""}foco {FOCUS_NAME[w.focus]}
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
       <div className="mt-3">
         <Disclosure open={cal} onToggle={() => setCal((v) => !v)} label={`${cal ? "Ocultar" : "Ver"} calendario semanal`}>
           <span className="text-[12.5px] font-medium">Calendario semanal</span>
@@ -300,6 +339,7 @@ export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft
                       </li>
                     )),
                   )}
+                  <PracticeWeekLines track={draft.programmingPractice} week={i + 1} />
                   {!draft.subplans.some((s) => s.topics.some((t) => t.targetWeek === i + 1)) && <li className="text-faint">Sin temas</li>}
                 </ul>
               </div>
@@ -396,7 +436,7 @@ function PlanView({ planId }: { planId: string }) {
             </div>
           </div>
           {tab === "plan" && data.derived && <PlanBody data={data} onChanged={(p) => setData({ ...data, plan: p })} />}
-          {tab === "semana" && <ThisWeek items={data.items} activePlans={data.plans.filter((p) => p.status === "activo").length} />}
+          {tab === "semana" && <ThisWeek items={data.items} practiceItems={data.practiceItems} activePlans={data.plans.filter((p) => p.status === "activo").length} />}
         </>
       )}
     </PanelPage>
@@ -457,7 +497,9 @@ function PlanHeader({ plan, status, summary }: { plan: MentorPlanData; status: M
         ) : plan.hoursPerWeek ? (
           <li className="rounded-md border border-line px-2 py-0.5">{plan.hoursPerWeek} h/semana</li>
         ) : null}
-        {plan.hoursPerWeek && pre ? <li className="rounded-md border border-line px-2 py-0.5">~{num1(plan.hoursPerWeek)} h/semana efectivas</li> : null}
+        {plan.hoursPerWeek && pre ? <li className="rounded-md border border-line px-2 py-0.5">~{num1(plan.hoursPerWeek)} h/semana {plan.programmingPractice ? "para temas" : "efectivas"}</li> : null}
+        {pre ? <li className="rounded-md border border-line px-2 py-0.5">Entregables: {pre.deliverables === "yes" ? "sí" : pre.deliverables === "no" ? "no" : "a discutir"}</li> : null}
+        {plan.programmingPractice ? <li className="rounded-md border border-line px-2 py-0.5" data-testid="plan-practice-chip">{PRACTICE_NAME}: {practiceSummary(plan.programmingPractice)}</li> : null}
       </ul>
       {pre?.notes && <PlanNotes notes={pre.notes} auto={!!plan.auto} testid="plan-notes" />}
       {plan.rationale && <p className="mt-2 text-[12px] text-dim">{plan.rationale}</p>}
@@ -479,8 +521,15 @@ function PlanBody({ data, onChanged }: { data: Loaded; onChanged: (p: Loaded["pl
       return n;
     });
   const areas = [...new Set(plan.subplans.map((s) => s.area))];
+  const pendingDeliverables = (plan.openQuestions ?? []).filter((q) => q.id === "deliverables");
   return (
     <div className="space-y-5">
+      {plan.programmingPractice && <PracticeRow track={plan.programmingPractice} status={data.practice} today={data.today} />}
+      {pendingDeliverables.length > 0 && (
+        <p className="rounded-xl border border-dashed border-line px-3 py-2 text-[12px] text-dim" data-testid="plan-open-questions">
+          Pendiente de decidir: entregables en {pendingDeliverables.length} {pendingDeliverables.length === 1 ? "subplan" : "subplanes"} ({pendingDeliverables.map((q) => plan.subplans.find((s) => s.id === q.subplanId)?.objective || plan.subplans.find((s) => s.id === q.subplanId)?.area).filter(Boolean).join(", ")}).
+        </p>
+      )}
       {areas.map((area, idx) => {
         const subs = plan.subplans.filter((s) => s.area === area);
         const views = subs.map((s) => derived.subplans.find((v) => v.id === s.id)!);
@@ -648,10 +697,10 @@ export function SubplanCard({
 
 // ── Esta semana / Hoy (todos los planes activos) ─────────────────────────
 
-export function ThisWeek({ items, activePlans }: { items: MentorPlanItem[]; activePlans: number }) {
+export function ThisWeek({ items, practiceItems = [], activePlans }: { items: MentorPlanItem[]; practiceItems?: PracticeItem[]; activePlans: number }) {
   const setPending = useMentor((s) => s.setPendingObjective);
-  const planDay = () => {
-    setPending({ type: "plan" });
+  const planDay = (type: "plan" | "programming_practice" = "plan") => {
+    setPending({ type });
     useNavState.getState().set("mentor.view", "hoy");
   };
   if (activePlans === 0) {
@@ -662,11 +711,32 @@ export function ThisWeek({ items, activePlans }: { items: MentorPlanItem[]; acti
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-[14px] font-semibold">Esta semana y hoy <span className="text-[11.5px] font-normal text-faint">({activePlans} {activePlans === 1 ? "plan activo" : "planes activos"} combinados)</span></h2>
         <span className="flex-1" />
-        <PrimaryButton onClick={planDay} disabled={!items.length}>
+        {practiceItems.length > 0 && (
+          <GhostButton onClick={() => planDay("programming_practice")} title="Solo el kata y el proyecto de hoy">
+            {PRACTICE_NAME} (kata + proyecto)
+          </GhostButton>
+        )}
+        <PrimaryButton onClick={() => planDay("plan")} disabled={!items.length && !practiceItems.length}>
           Planear mi día con esto
         </PrimaryButton>
       </div>
-      {items.length === 0 ? (
+      {practiceItems.length > 0 && (
+        <ul className="mt-3 space-y-2" aria-label={`${PRACTICE_NAME} de hoy`} data-testid="plan-week-practice">
+          {practiceItems.map((it) => (
+            <li key={`${it.planId}:${it.kind}`} className="rounded-lg border border-line p-2.5" data-testid="plan-week-practice-item">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[13px] font-semibold">{it.kind === "kata" ? "Reto diario (kata de lógica)" : `Proyecto semanal: ${it.phases?.length ? phasesText(it.phases) : "sesión"}`}</span>
+                <Chip colour="#8e24aa">{PRACTICE_NAME}</Chip>
+                <Chip colour="var(--nv-mint)">Plan: {it.label}</Chip>
+                {it.kind === "project" && it.focus && <Chip colour="var(--nv-accent)">Semana {it.week} · foco {FOCUS_NAME[it.focus]}</Chip>}
+                <span className="text-[11.5px] text-faint">{hm(it.estMinutes)}</span>
+                <GhostButton className="ml-auto" onClick={openPractice}>Abrir práctica</GhostButton>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {items.length === 0 && practiceItems.length === 0 ? (
         <p className="mt-3 text-[12.5px] text-faint">Nada pendiente de tus planes para esta semana. Si quieres adelantar, pídele un plan de hoy al Mentor.</p>
       ) : (
         <ul className="mt-3 space-y-2">

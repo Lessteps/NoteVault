@@ -40,7 +40,7 @@ const plan = (over: Partial<PlanData> = {}): PlanData => ({
   createdAt: "2026-10-01T00:00:00Z",
   updatedAt: "2026-10-01T00:00:00Z",
   hoursPerWeek: 14.9,
-  preconditions: { start: START, end: END, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6], pace: "normal", goalIds: ["g1"], subjects: ["Programación"], levels: {}, deliverables: true },
+  preconditions: { start: START, end: END, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6], pace: "normal", goalIds: ["g1"], subjects: ["Programación"], levels: {}, deliverables: "yes" },
   subplans: [
     {
       id: "s1-programacion", area: "Programación", objective: "Desarrollo Backend", goalId: "g1",

@@ -12,9 +12,12 @@ import {
   addDays,
   capacityOf,
   coverage,
+  DEFAULT_PRACTICE,
   isDate,
+  KATA_CHOICES,
   LEVELS,
   MAX_NOTES_CHARS,
+  normalizeDeliverables,
   PACES,
   PERIOD_PRESETS,
   periodLabel,
@@ -23,12 +26,14 @@ import {
   sanitizePreconditions,
   selectionOf,
   weeksLabel,
+  type DeliverablesMode,
   type PeriodPresetKey,
   type PlanLevel,
   type PlanPace,
   type PlanPreconditions,
 } from "../../lib/planTime";
 import { api } from "../../lib/bridge";
+import { capacityWithPractice, FOCUS_LABEL, PRACTICE_FOCUSES, PRACTICE_NAME, type PracticeFocus } from "../../lib/practiceTrack";
 import type { MentorPlanOptions } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
@@ -67,9 +72,34 @@ interface Remembered {
   minutesPerDay?: number;
   studyDays?: number[];
   pace?: PlanPace;
-  deliverables?: boolean;
+  /** tres estados; los valores antiguos (booleano) se leen con `normalizeDeliverables` */
+  deliverables?: DeliverablesMode | boolean;
   preset?: PeriodPresetKey;
+  /** última elección explícita del interruptor de Programming practice (si no, depende de lo que cubras) */
+  practiceOn?: boolean;
+  kataMinutes?: number;
+  sessionsPerWeek?: number;
+  minutesPerSession?: number;
+  monthly?: boolean;
+  practiceFocus?: "rotate" | PracticeFocus;
 }
+
+export const DELIVERABLE_OPTIONS: Array<{ mode: DeliverablesMode; label: string }> = [
+  { mode: "ask", label: "Lo decidimos al armar el plan" },
+  { mode: "yes", label: "Sí, incluir entregables" },
+  { mode: "no", label: "No por ahora" },
+];
+export const SESSION_CHOICES = [1, 2, 3, 4, 5] as const;
+export const SESSION_MINUTES = [45, 60, 90, 120] as const;
+/** El espacio de Programación (o su rama de práctica) entre lo que se cubre activa la práctica por defecto. */
+export const isProgrammingArea = (area: string): boolean => /programaci[oó]n|programming/i.test(area);
+
+/**
+ * Lo recordado entre formularios. El formulario antiguo guardaba un booleano en cada envío (y «sí» era el valor por
+ * defecto, no una elección), así que un booleano recordado NO fija nada: se vuelve a «a discutir». Solo se recuerdan
+ * los tres estados nuevos. (Los planes y preferencias en disco sí se leen con `normalizeDeliverables`: true → yes.)
+ */
+const rememberedDeliverables = (v: unknown): DeliverablesMode => (typeof v === "string" ? normalizeDeliverables(v) : "ask");
 
 function remembered(): Remembered {
   try {
@@ -120,7 +150,14 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   const [subjects, setSubjects] = useState<string[]>([]);
   const [freeObjective, setFreeObjective] = useState("");
   const [levels, setLevels] = useState<Record<string, PlanLevel>>({});
-  const [deliverables, setDeliverables] = useState(mem.deliverables ?? true);
+  const [deliverables, setDeliverables] = useState<DeliverablesMode>(rememberedDeliverables(mem.deliverables));
+  const [practiceOn, setPracticeOn] = useState(mem.practiceOn ?? false);
+  const [kataMinutes, setKataMinutes] = useState(mem.kataMinutes ?? DEFAULT_PRACTICE.kataMinutes);
+  const [sessionsPerWeek, setSessionsPerWeek] = useState(mem.sessionsPerWeek ?? DEFAULT_PRACTICE.sessionsPerWeek);
+  const [minutesPerSession, setMinutesPerSession] = useState(mem.minutesPerSession ?? DEFAULT_PRACTICE.minutesPerSession);
+  const [monthly, setMonthly] = useState(mem.monthly ?? DEFAULT_PRACTICE.monthly);
+  const [practiceFocus, setPracticeFocus] = useState<"rotate" | PracticeFocus>(mem.practiceFocus ?? "rotate");
+  const touchedPractice = useRef(mem.practiceOn !== undefined);
   // contexto de ESTE plan: no se recuerda entre formularios
   const [notes, setNotes] = useState("");
   const touchedGoals = useRef(false);
@@ -157,15 +194,23 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   }, []);
 
   const pre: PlanPreconditions = useMemo(
-    () => sanitizePreconditions({ start, end, minutesPerDay: minutes, studyDays: days, blockedDates: blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes }, t0),
-    [start, end, minutes, days, blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes, t0],
+    () =>
+      sanitizePreconditions(
+        {
+          start, end, minutesPerDay: minutes, studyDays: days, blockedDates: blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes,
+          ...(practiceOn ? { practice: { kataMinutes, sessionsPerWeek, minutesPerSession, monthly, focus: practiceFocus } } : {}),
+        },
+        t0,
+      ),
+    [start, end, minutes, days, blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, t0],
   );
   // sanitizePreconditions corrige lo inválido; para el aviso se mira lo que el estudiante escribió
   const rawProblem = !isDate(start) || !isDate(end) ? "Indica las fechas de inicio y fin del periodo." : end < start ? "La fecha de fin es anterior a la de inicio." : null;
   const problem = rawProblem ?? preconditionsProblem(pre, t0);
-  const cap = capacityOf(pre, t0 > pre.start ? t0 : pre.start);
+  const cap = capacityWithPractice(pre, t0 > pre.start ? t0 : pre.start);
   const sel = options ? selectionOf(pre, options.topics) : { folders: [], minutes: 0 };
-  const cov = coverage(sel.minutes, cap.effectiveMinutes);
+  // con práctica, para temas solo queda lo que no se reservó
+  const cov = coverage(sel.minutes, cap.topicMinutes);
   const scopeAreas = useMemo(() => {
     if (!options) return [] as string[];
     const set = new Set(subjects);
@@ -174,6 +219,11 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
     return [...set].filter(Boolean);
   }, [options, subjects, goalIds]);
   const nothingChosen = !goalIds.length && !subjects.length && !freeObjective.trim();
+  const hasProgramming = scopeAreas.some(isProgrammingArea);
+  // por defecto activada si lo que cubres incluye Programación; una elección explícita del estudiante manda
+  useEffect(() => {
+    if (!touchedPractice.current) setPracticeOn(hasProgramming);
+  }, [hasProgramming]);
 
   const pickPreset = (key: PeriodPresetKey) => {
     setPreset(key);
@@ -201,7 +251,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
     const r = await generatePlan(pre);
     if (!r) return;
     try {
-      localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: pre.minutesPerDay, studyDays: pre.studyDays, pace: pre.pace, deliverables: pre.deliverables, preset: preset === "custom" ? undefined : preset } satisfies Remembered));
+      localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: pre.minutesPerDay, studyDays: pre.studyDays, pace: pre.pace, deliverables: pre.deliverables, preset: preset === "custom" ? undefined : preset, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus } satisfies Remembered));
     } catch {
       /* sin almacenamiento: no se recuerda */
     }
@@ -437,11 +487,90 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
         </Panel>
       )}
 
-      <Panel title="Opciones">
-        <label className="flex items-center gap-2 text-[12.5px]">
-          <input type="checkbox" checked={deliverables} onChange={(e) => setDeliverables(e.target.checked)} aria-label="Incluir entregables" />
-          Incluir entregables (un proyecto de demostración por subplan)
-        </label>
+      <Panel title={PRACTICE_NAME}>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={practiceOn}
+            aria-label={`Incluir ${PRACTICE_NAME}`}
+            onClick={() => {
+              touchedPractice.current = true;
+              setPracticeOn((v) => !v);
+            }}
+            className={cn("inline-flex h-5 w-9 flex-none items-center rounded-full border px-0.5 transition-colors", practiceOn ? "border-accent bg-accent" : "border-line bg-hover")}
+          >
+            <span className={cn("h-3.5 w-3.5 rounded-full bg-card shadow transition-transform", practiceOn ? "translate-x-4" : "")} />
+          </button>
+          <span className="text-[12.5px]">{practiceOn ? "Incluida en el plan" : "No incluida"}</span>
+        </div>
+        <p className="mt-1.5 text-[12px] text-faint">
+          Tu rama de práctica de programación (la carpeta <code>programming_practice</code>): un reto de lógica diario y un proyecto semanal full stack (frontend + backend + base de datos) con cuatro fases: especificación, construcción, defensa y postmortem. Esos minutos se reservan del tiempo diario; el resto va a tus temas.
+        </p>
+        {practiceOn && (
+          <div className="mt-3 space-y-3" data-testid="practice-options">
+            <div>
+              <Label>Reto de lógica diario (kata)</Label>
+              <div className="mt-1 flex flex-wrap gap-1.5" role="group" aria-label="Minutos del kata diario">
+                <ChipToggle active={kataMinutes === 0} onClick={() => setKataMinutes(0)}>Sin kata</ChipToggle>
+                {KATA_CHOICES.map((m) => (
+                  <ChipToggle key={m} active={kataMinutes === m} onClick={() => setKataMinutes(m)}>{m} min</ChipToggle>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>Proyecto semanal: sesiones por semana</Label>
+              <div className="mt-1 flex flex-wrap gap-1.5" role="group" aria-label="Sesiones del proyecto semanal por semana">
+                <ChipToggle active={sessionsPerWeek === 0} onClick={() => setSessionsPerWeek(0)}>Sin proyecto semanal</ChipToggle>
+                {SESSION_CHOICES.map((n) => (
+                  <ChipToggle key={n} active={sessionsPerWeek === n} onClick={() => setSessionsPerWeek(n)}>{n}</ChipToggle>
+                ))}
+              </div>
+            </div>
+            {sessionsPerWeek > 0 && (
+              <>
+                <div>
+                  <Label>Minutos por sesión</Label>
+                  <div className="mt-1 flex flex-wrap gap-1.5" role="group" aria-label="Minutos por sesión del proyecto">
+                    {SESSION_MINUTES.map((m) => (
+                      <ChipToggle key={m} active={minutesPerSession === m} onClick={() => setMinutesPerSession(m)}>{m} min</ChipToggle>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label>Foco de cada semana</Label>
+                  <div className="mt-1 flex flex-wrap gap-1.5" role="group" aria-label="Foco del proyecto semanal">
+                    <ChipToggle active={practiceFocus === "rotate"} onClick={() => setPracticeFocus("rotate")} title="El foco rota por backend, bases de datos, frontend, desktop, mobile y automatización">Rotativo</ChipToggle>
+                    {PRACTICE_FOCUSES.map((f) => (
+                      <ChipToggle key={f} active={practiceFocus === f} onClick={() => setPracticeFocus(f)}>{FOCUS_LABEL[f]}</ChipToggle>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[11.5px] text-faint">Siempre es full stack: el foco solo añade criterios, no quita capas.</p>
+                </div>
+                <div>
+                  <Label>Proyecto mensual</Label>
+                  <div className="mt-1 flex flex-wrap gap-1.5" role="group" aria-label="Proyecto mensual">
+                    <ChipToggle active={!monthly} onClick={() => setMonthly(false)}>No</ChipToggle>
+                    <ChipToggle active={monthly} onClick={() => setMonthly(true)} title="Un proyecto mayor cada 4 semanas que integra los semanales">Sí, uno cada 4 semanas</ChipToggle>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Entregables">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Entregables">
+          {DELIVERABLE_OPTIONS.map((o) => (
+            <ChipToggle key={o.mode} active={deliverables === o.mode} onClick={() => setDeliverables(o.mode)}>
+              {o.label}
+            </ChipToggle>
+          ))}
+        </div>
+        <p className="mt-1.5 text-[12px] text-faint">
+          Un entregable es un proyecto de demostración por subplan. Es una opción a discutir: con «Lo decidimos al armar el plan» el borrador no los añade y te pregunta, subplan a subplan, si quieres uno.
+        </p>
       </Panel>
 
       <Panel title="Comentarios para la IA (opcional)">
@@ -473,6 +602,17 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
               <span className="text-text">Capacidad total: {hoursText(cap.effectiveMinutes)}</span> · {cap.studyDays} días de estudio × {hoursText(pre.minutesPerDay)} × {Math.round(cap.factor * 100)} %
               {cap.blockedDays > 0 ? ` (${cap.blockedDays} bloqueados)` : ""} · {weeksLabel(cap.weeks)} · ~{num1(cap.hoursPerWeek)} h/semana
             </li>
+            {cap.track && (
+              <li data-testid="plan-capacity-split">
+                <span className="text-text">{hoursText(cap.topicMinutes)} de estudio de temas + {hoursText(cap.practiceMinutes)} de práctica</span>
+                {" "}({PRACTICE_NAME}: kata {hoursText(cap.kataMinutes)} + proyecto semanal {hoursText(cap.projectMinutes)})
+              </li>
+            )}
+            {cap.overflowDays > 0 && (
+              <li role="status" className="text-warn" data-testid="plan-practice-overflow">
+                No cabe: en {cap.overflowDays} {cap.overflowDays === 1 ? "día" : "días"} la práctica sola supera el tiempo diario. Baja los minutos del kata o del proyecto, o sube el tiempo diario.
+              </li>
+            )}
             <li>
               Pendiente en lo elegido: {sel.folders.length} {sel.folders.length === 1 ? "tema" : "temas"} · ~{hoursText(sel.minutes)}
             </li>

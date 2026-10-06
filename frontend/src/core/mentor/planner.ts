@@ -8,7 +8,7 @@
  * entrada/salida es `sendChat`, inyectable.
  */
 
-import { AIConfig, sendChat, type ChatMessage } from "../aiClient.js";
+import { AIConfig, sendChat, type ChatMessage, type SendOpts } from "../aiClient.js";
 import { toPromptText, type StudentBrief } from "./brief.js";
 import { allocate, type Candidate, type CandidateKind } from "./candidates.js";
 import type { PlanBlock } from "./sessionLog.js";
@@ -237,7 +237,7 @@ export function aiUnavailableReason(cfg: AIConfig): string | null {
   return null;
 }
 
-export type SendFn = (cfg: AIConfig, messages: ChatMessage[]) => Promise<string>;
+export type SendFn = (cfg: AIConfig, messages: ChatMessage[], opts?: SendOpts) => Promise<string>;
 
 /**
  * Pide el plan a la IA, con exclusiones deterministas previas y plan automático si la IA

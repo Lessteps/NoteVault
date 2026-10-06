@@ -17,6 +17,9 @@ import {
   adjustedMinutes,
   branchAllowed,
   branchOfFolder,
+  classifyBranch,
+  detectBranchIntent,
+  presetBranches,
   areaOfFolder,
   coverage,
   weeksLabel,
@@ -187,6 +190,38 @@ export function withBranchInfo(pre: PlanPreconditions, all: readonly CatalogTopi
   return excluded.size ? { ...pre, branchExcluded: [...excluded].sort((a, b) => a.localeCompare(b, "es", { numeric: true })) } : pre;
 }
 
+/**
+ * Si las precondiciones NO traen ramas explícitas (API directa, builds antiguos, chat), las infiere en el servidor: «full stack» en el objetivo
+ * libre, el nombre de las metas o los comentarios aplica el preset «Full stack web» (sin Desktop, Mobile ni Automation); metas que son solo de
+ * Backend o solo de Frontend acotan las ramas. Mencionar móvil/escritorio de forma explícita las incluye. Una elección explícita (ramas o preset,
+ * incluido «Todo») nunca se toca.
+ */
+export function inferBranches(pre: PlanPreconditions, all: readonly CatalogTopic[], goalNames: readonly string[], extraText = ""): PlanPreconditions {
+  if ((pre.branches && Object.keys(pre.branches).length) || pre.branchPreset) return pre;
+  const intent = detectBranchIntent(`${pre.freeObjective ?? ""} ${goalNames.join(" ")} ${pre.notes ?? ""} ${extraText}`);
+  let preset = intent.preset;
+  if (!preset) {
+    const f = goalNames.join(" ").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const be = /back[\s-]?end|servidor/.test(f);
+    const fe = /front[\s-]?end/.test(f);
+    preset = be && fe ? "fullstack" : be ? "backend" : fe ? "frontend" : null;
+  }
+  if (!preset) return pre;
+  const branches: Record<string, string[]> = {};
+  for (const area of pre.subjects) {
+    const names = [...new Set(all.filter((t) => areaOfFolder(t.folder) === area).map((t) => branchOfFolder(t.folder)).filter(Boolean))];
+    if (names.length < 2) continue;
+    const list = presetBranches(preset, names, intent.extra);
+    if (list.length && list.length < names.length) branches[area] = list;
+  }
+  return Object.keys(branches).length ? { ...pre, branches, branchPreset: preset } : pre;
+}
+
+/** Ramas inferidas (si faltan) + la lista de las excluidas, listo para generar. */
+export function resolveBranches(pre: PlanPreconditions, all: readonly CatalogTopic[], goalNames: readonly string[], extraText = ""): PlanPreconditions {
+  return withBranchInfo(inferBranches(pre, all, goalNames, extraText), all);
+}
+
 export const CATALOG_MIN = 100;
 export const CATALOG_MAX = 300;
 
@@ -232,6 +267,34 @@ export function markDiagnostics(seeds: SubplanSeed[], pre: PlanPreconditions): S
 }
 
 /** Plan automático determinista a partir de lo elegido (sin IA). */
+const cleanBranchName = (n: string): string => n.replace(/^[\d.\s_-]+/, "").trim() || n;
+/** Cuántos temas de «Fundamentals» son realmente previos según el nivel declarado (sin tope si empieza de cero o no sabe). */
+const FUNDAMENTALS_CAP: Partial<Record<PlanLevel, number>> = { basico: 15, intermedio: 8, avanzado: 4 };
+
+/** Un subplan por RAMA principal cuando la materia tiene varias; si no, uno solo por materia (como siempre). */
+function branchSeeds(g: { area: string; topics: CatalogTopic[] }, pre: PlanPreconditions): SubplanSeed[] {
+  const names = [...new Set(g.topics.map((t) => branchOfFolder(t.folder)))];
+  const toSeed = (objective: string, topics: CatalogTopic[], label: string): SubplanSeed => ({
+    area: g.area,
+    objective,
+    topics: topics.map((t) => ({ folder: t.folder, title: t.title, estMinutes: minutesOf(t, pre) })),
+    ...(pre.deliverables === "yes" ? { deliverable: defaultDeliverable(label) } : {}),
+  });
+  if (names.filter(Boolean).length < 2) return [toSeed(`Avanzar en ${g.area}`, g.topics, g.area)];
+  const out: SubplanSeed[] = [];
+  for (const name of names.sort((a, b) => naturalCmp(a, b))) {
+    let topics = g.topics.filter((t) => branchOfFolder(t.folder) === name);
+    if (name && classifyBranch(name) === "fundamentals") {
+      const cap = FUNDAMENTALS_CAP[pre.levels[g.area] as PlanLevel];
+      if (cap) topics = topics.slice(0, cap);
+    }
+    if (!topics.length) continue;
+    const label = name ? cleanBranchName(name) : g.area;
+    out.push(toSeed(`Avanzar en ${label}`, topics, label));
+  }
+  return out;
+}
+
 export function autoSeeds(pre: PlanPreconditions, scope: ResolvedScope): SubplanSeed[] {
   const seeds: SubplanSeed[] = [];
   for (const g of scope.goalGroups) {
@@ -250,14 +313,7 @@ export function autoSeeds(pre: PlanPreconditions, scope: ResolvedScope): Subplan
       ...(pre.deliverables === "yes" ? { deliverable: defaultDeliverable(g.goal.name) } : {}),
     });
   }
-  for (const g of scope.areaGroups) {
-    seeds.push({
-      area: g.area,
-      objective: `Avanzar en ${g.area}`,
-      topics: g.topics.map((t) => ({ folder: t.folder, title: t.title, estMinutes: minutesOf(t, pre) })),
-      ...(pre.deliverables === "yes" ? { deliverable: defaultDeliverable(g.area) } : {}),
-    });
-  }
+  for (const g of scope.areaGroups) seeds.push(...branchSeeds(g, pre));
   if (scope.free.length) {
     const label = pre.freeObjective ?? "Otro objetivo";
     seeds.push({

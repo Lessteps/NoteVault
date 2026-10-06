@@ -255,7 +255,8 @@ export function sanitizePreconditions(raw: unknown, today: string): PlanPrecondi
     deliverables: normalizeDeliverables(o.deliverables),
     ...(practice ? { practice } : {}),
     ...(hasBranches ? { branches } : {}),
-    ...(preset && hasBranches ? { branchPreset: preset } : {}),
+    // «all» (Todo) es una elección explícita sin lista de ramas: evita que el servidor vuelva a inferir un preset
+    ...(preset && (hasBranches || preset === "all") ? { branchPreset: preset } : {}),
     ...(excluded.length && hasBranches ? { branchExcluded: excluded } : {}),
   };
 }

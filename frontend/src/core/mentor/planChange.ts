@@ -50,6 +50,7 @@ export type ChangeOp =
   | { op: "set_deliverable"; subplan: string; enabled: boolean }
   | { op: "set_practice"; off?: boolean; kataMinutes?: number; sessionsPerWeek?: number; minutesPerSession?: number }
   | { op: "set_note"; subplan: string; text: string }
+  | { op: "set_branches"; branches: Record<string, string[]>; preset: string; excluded: string[] }
   | { op: "lighter" }
   | { op: "trim_to_fit" }
   | { op: "extend_to"; date: string }
@@ -237,6 +238,16 @@ export function applyOps(plan: Plan, ops: readonly ChangeOp[], ctx: ChangeCtx): 
         const text = oneLine(op.text, 400);
         if (!sub || !text || sub.notes === text) break;
         sub.notes = text;
+        applied++;
+        break;
+      }
+      case "set_branches": {
+        if (!pre) break;
+        pre = { ...pre, branches: op.branches, branchPreset: op.preset, branchExcluded: op.excluded };
+        seeds = seeds
+          .map((s) => ({ ...s, topics: s.topics.filter((t) => branchAllowed(op.branches, areaOfFolder(t.folder), branchOfFolder(t.folder))) }))
+          .filter((s) => s.topics.length || s.deliverable);
+        for (const f of [...pins.keys()]) if (!seeds.some((s) => s.topics.some((t) => t.folder === f))) pins.delete(f);
         applied++;
         break;
       }

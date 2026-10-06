@@ -577,7 +577,7 @@ function PlanHeader({ plan, status, summary, onAddBranches }: { plan: MentorPlan
       {pre?.branchExcluded?.length ? (
         <p className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-dim" data-testid="plan-branch-note">
           <span>
-            {pre.branchPreset === "fullstack" ? `Excluí ${pre.branchExcluded.map(cleanBranch).join(" y ")} porque pediste full stack. Añádelos si los quieres.` : `Ramas fuera del plan: ${pre.branchExcluded.map(cleanBranch).join(", ")}.`}
+            {pre.branchPreset === "fullstack" ? `Excluí ${pre.branchExcluded.map(cleanBranch).join(" y ")} porque pediste full stack. Añádelos si los quieres.` : pre.branchPreset === "backend" || pre.branchPreset === "frontend" ? `Excluí ${pre.branchExcluded.map(cleanBranch).join(", ")} porque tu pedido es de ${pre.branchPreset === "backend" ? "Backend" : "Frontend"}. Añádelos si los quieres.` : `Ramas fuera del plan: ${pre.branchExcluded.map(cleanBranch).join(", ")}.`}
           </span>
           {onAddBranches && <GhostButton onClick={() => onAddBranches(pre.branchExcluded!.map(cleanBranch))}>Añadir {pre.branchExcluded.map(cleanBranch).join(" y ")}</GhostButton>}
         </p>

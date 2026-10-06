@@ -226,7 +226,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
       sanitizePreconditions(
         {
           start, end, minutesPerDay: minutes, studyDays: days, blockedDates: blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes,
-          ...(Object.keys(branches).length ? { branches, ...(branchPreset ? { branchPreset } : {}), branchExcluded: excludedBranches } : {}),
+          ...(Object.keys(branches).length ? { branches, ...(branchPreset ? { branchPreset } : {}), branchExcluded: excludedBranches } : branchPreset === "all" ? { branchPreset } : {}),
           ...(practiceOn ? { practice: { kataMinutes, sessionsPerWeek, minutesPerSession, monthly, focus: practiceFocus } } : {}),
         },
         t0,

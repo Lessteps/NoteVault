@@ -4,7 +4,7 @@
 // contexto con los managers de la vault y se validan las entradas de la UI. La IA
 // (fase siguiente) consume `mentor_brief().text`: nunca lee notas completas.
 
-import { AIConfig, sendChat, type ChatMessage } from "../../core/aiClient.js";
+import { AIConfig, sendChat, type ChatMessage, type SendOpts } from "../../core/aiClient.js";
 import { ApiError } from "../../core/errors.js";
 import { loadExamRecordForTopic } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
@@ -65,6 +65,7 @@ import {
   type ChangeEntry,
   type ChangeOp,
 } from "../../core/mentor/planChange.js";
+import { generateByParts, PipelineCancel } from "../../core/mentor/planPipeline.js";
 import { parseScopeReply, parseTopicsReply, scopeMessages, topicsMessages } from "../../core/mentor/planBuildAi.js";
 import {
   areaOfFolder,
@@ -74,7 +75,7 @@ import {
   buildPlanMessages,
   composeFromPreconditions,
   dynamicCatalogMax,
-  withBranchInfo,
+  resolveBranches,
   markDiagnostics,
   parsePreconditionReply,
   planCatalog,
@@ -136,6 +137,8 @@ interface Job {
   since: number;
   waiters: Set<(e: Error) => void>;
   cancelled?: "abort" | "auto";
+  /** al cancelar se aborta: las llamadas en vuelo MATAN su petición o su proceso de Claude Code */
+  controller: AbortController;
 }
 const JOBS = new WeakMap<AppState, Map<string, Job>>();
 function jobsOf(app: AppState): Map<string, Job> {
@@ -486,21 +489,24 @@ export function mentorApi(app: AppState, send?: SendFn) {
   // ── Llamadas largas a la IA: estado («pensando…»), progreso y cancelación ──
   const jobs = jobsOf(app);
   interface JobHandle {
-    send: (messages: ChatMessage[]) => Promise<string>;
+    send: (messages: ChatMessage[], o?: { signal?: AbortSignal; timeoutMs?: number }) => Promise<string>;
     setLabel: (label: string) => void;
+    cancelled: () => "abort" | "auto" | undefined;
   }
   async function withJob<T>(key: string, label: string, fn: (job: JobHandle) => Promise<T>): Promise<T> {
-    const job: Job = { key, label, since: Date.now(), waiters: new Set() };
+    const job: Job = { key, label, since: Date.now(), waiters: new Set(), controller: new AbortController() };
     jobs.set(key, job);
     const handle: JobHandle = {
+      cancelled: () => job.cancelled,
       setLabel: (l) => {
         job.label = l;
       },
-      send: (messages) => {
+      send: (messages, o) => {
         if (job.cancelled) return Promise.reject(new CancelError(job.cancelled));
+        const signal = o?.signal ? AbortSignal.any([job.controller.signal, o.signal]) : job.controller.signal;
         return new Promise<string>((resolve, reject) => {
           job.waiters.add(reject);
-          aiSendRaw(messages).then(resolve, reject).finally(() => job.waiters.delete(reject));
+          aiSendRaw(messages, { signal, ...(o?.timeoutMs ? { timeoutMs: o.timeoutMs } : {}) }).then(resolve, (e) => reject(job.cancelled ? new CancelError(job.cancelled) : e)).finally(() => job.waiters.delete(reject));
         });
       },
     };
@@ -510,7 +516,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       jobs.delete(key);
     }
   }
-  const aiSendRaw = async (messages: ChatMessage[]): Promise<string> => (send ?? sendChat)(AIConfig.fromDict(AppConfig.get_ai_config()), messages);
+  const aiSendRaw = async (messages: ChatMessage[], opts?: SendOpts): Promise<string> => (send ?? sendChat)(AIConfig.fromDict(AppConfig.get_ai_config()), messages, opts);
   const builds = () => new PlanBuildStore(app.root, localDate);
   const inflight = inflightOf(app);
   /** Una sola operación a la vez por plan en construcción: la misma (doble envío) comparte la llamada; otra distinta espera. */
@@ -548,7 +554,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
         job.setLabel("Leyendo tus comentarios y preparando las preguntas…");
         try {
           const brief = buildStudentBrief(briefContext(app, log()));
-          const parsed = parseScopeReply(await job.send(scopeMessages(brief, cur.pre, comp.info.areas, comp.info.rules, cur.answers)), comp.info.rules.map((r) => r.id));
+          const parsed = parseScopeReply(await job.send(scopeMessages(brief, cur.pre, comp.info.areas, comp.info.rules, cur.answers), { timeoutMs: 120_000 }), comp.info.rules.map((r) => r.id));
           if (parsed.ok) Object.assign(ai, { scopeOk: true, questions: parsed.questions, rewrites: { ...ai.rewrites, ...parsed.rewrites } });
           else ai.errors.push(parsed.reason ?? "La IA no devolvió nada útil.");
         } catch (e) {
@@ -567,7 +573,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
         try {
           const brief = buildStudentBrief(briefContext(app, log()));
           const candidates = new Map([[key, new Set(seed.topics.map((t) => t.folder))]]);
-          const parsed = parseTopicsReply(await job.send(topicsMessages(brief, cur.pre, [seed], cur.answers)), candidates);
+          const parsed = parseTopicsReply(await job.send(topicsMessages(brief, cur.pre, [seed], cur.answers), { timeoutMs: 120_000 }), candidates);
           if (parsed.ok) {
             Object.assign(ai, {
               topicsOk: true,
@@ -822,8 +828,11 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const snapsAll = topicSnaps(app);
       // refinando un borrador que salió de precondiciones: siguen siendo hechos fijos
       const prevPlan = pendingDraft(stored)?.planDraft;
-      const prePrev: PlanPreconditions | null = prevPlan?.preconditions ? sanitizePreconditions(prevPlan.preconditions, today) : null;
-      const scopePrev = prePrev ? resolveScope(prePrev, buildTopicCatalog(snapsAll, "", { max: 1_000_000 }), goalScopes(app)) : null;
+      const allTopics = buildTopicCatalog(snapsAll, "", { max: 1_000_000 });
+      const prePrev0: PlanPreconditions | null = prevPlan?.preconditions ? sanitizePreconditions(prevPlan.preconditions, today) : null;
+      // también en el chat: si el borrador no traía ramas, se infieren («full stack», metas solo Backend/Frontend) y se respetan las excluidas
+      const prePrev = prePrev0 ? resolveBranches(prePrev0, allTopics, goalScopes(app).filter((g) => prePrev0.goalIds.includes(g.id)).map((g) => g.name), message) : null;
+      const scopePrev = prePrev ? resolveScope(prePrev, allTopics, goalScopes(app)) : null;
       const catalog = scopePrev ? planCatalog(scopePrev, dynamicCatalogMax(prePrev!, scopePrev, today), `${prePrev?.freeObjective ?? ""} ${prePrev?.notes ?? ""} ${message}`) : buildTopicCatalog(snapsAll, request, { max: planMode ? 80 : 60 });
       const planCtx = planContext(app, today);
       const areas = app.mgrs().areas.areas().filter((a) => !a.archived);
@@ -1081,8 +1090,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
       if (jobs.has("generate")) throw new ApiError("Ya se está generando un plan. Espera a que termine o cancélalo.");
 
       const all = buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 });
-      const pre = withBranchInfo(pre0, all);
       const goals = goalScopes(app);
+      // ramas: si no vienen explícitas se infieren aquí («full stack», metas solo Backend/Frontend…); las excluidas no entran a nada
+      const pre = resolveBranches(pre0, all, goals.filter((g) => pre0.goalIds.includes(g.id)).map((g) => g.name));
       const scope = resolveScope(pre, all, goals);
       const catalog = planCatalog(scope, dynamicCatalogMax(pre, scope, today), `${pre.freeObjective ?? ""} ${pre.notes ?? ""}`);
       if (!catalog.length) {
@@ -1095,7 +1105,36 @@ export function mentorApi(app: AppState, send?: SendFn) {
       return withJob("generate", `Eligiendo temas de ${[...new Set(scope.goalGroups.map((g) => g.area).concat(scope.areaGroups.map((g) => g.area)))].slice(0, 3).join(", ") || "tus metas"}…`, async (job) => {
         let draft: PlanDraft | null = null;
         let fallbackReason: string | undefined = unavailable ?? undefined;
-        if (!unavailable) {
+        if (o.asDraft !== true) {
+          // camino principal: esqueleto + un bloque de temas por subplan (en paralelo, con tiempo por llamada); lo que falla cae a reglas SOLO en ese bloque
+          const brief = unavailable ? (null as never) : buildStudentBrief(briefContext(app, log()));
+          let res;
+          try {
+            res = await generateByParts(pre, autoSeeds(pre, scope), {
+              aiOn: !unavailable,
+              brief,
+              send: (m, so) => job.send(m, so),
+              cancelled: job.cancelled,
+              onProgress: (_p, l) => job.setLabel(l),
+              ...(o.concurrency ? { concurrency: clampInt(o.concurrency, 1, 6, 3) } : {}),
+              ...(o.callTimeoutMs ? { callTimeoutMs: clampInt(o.callTimeoutMs, 50, 300000, 120000) } : {}),
+              ...(o.budgetMs ? { budgetMs: clampInt(o.budgetMs, 100, 1800000, 480000) } : {}),
+            });
+          } catch (e) {
+            if (e instanceof PipelineCancel || e instanceof CancelError) throw new ApiError("Generación cancelada.");
+            throw e;
+          }
+          const why = unavailable ? (o.noAi === true ? "Lo pediste sin IA" : "La IA no está configurada") : `La IA no devolvió ningún tema válido (${res.warnings[0] ?? "sin detalle"})`;
+          draft = composeFromPreconditions(markDiagnostics(res.seeds, pre), pre, {
+            today,
+            auto: !res.aiUsed,
+            startFocus: practiceStartFocus(app),
+            discarded: res.discarded,
+            rationale: res.aiUsed ? res.rationale || "Plan armado por partes: esqueleto y temas de cada subplan elegidos por el Mentor." : `Plan automático con tus metas y materias elegidas, en su orden natural y sin lo ya completado. ${why}.`,
+            ...(!res.aiUsed && !unavailable && res.warnings[0] ? { fallbackReason: res.warnings[0] } : {}),
+          });
+          if (res.warnings.length) draft = { ...draft, warnings: [...draft.warnings, ...res.warnings] };
+        } else if (!unavailable) {
           try {
             const brief = buildStudentBrief(briefContext(app, log()));
             const areaNames = app.mgrs().areas.areas().filter((a) => !a.archived).map((a) => a.name);
@@ -1272,7 +1311,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
           : undefined;
         if (!topics.length && !deliverable) continue;
         const weight = Number(d.weights && typeof d.weights === "object" ? d.weights[String(s?.id)] : 0);
-        seeds.push({ ...(/^[A-Za-z0-9_-]{1,40}$/.test(String(s?.id ?? "")) ? { id: String(s.id) } : {}), area: String(s?.area ?? ""), objective: String(s?.objective ?? ""), ...(goalId ? { goalId } : {}), topics, requiredGoals, ...(deliverable ? { deliverable } : {}), ...(weight > 0 ? { weight } : {}) });
+        // las notas que ya trae el subplan (razón del Mentor, aviso de «completado con reglas»); la nota de diagnóstico se vuelve a derivar
+        const keepNote = String(s?.notes ?? "").replace(/Nivel «no sé» en [^:]+: empieza con un diagnóstico corto de «[^»]*» para calibrar el resto\.\s*/g, "").trim();
+        seeds.push({ ...(/^[A-Za-z0-9_-]{1,40}$/.test(String(s?.id ?? "")) ? { id: String(s.id) } : {}), area: String(s?.area ?? ""), objective: String(s?.objective ?? ""), ...(goalId ? { goalId } : {}), topics, requiredGoals, ...(deliverable ? { deliverable } : {}), ...(weight > 0 ? { weight } : {}), ...(keepNote ? { notes: keepNote.slice(0, 400) } : {}) });
       }
       if (!seeds.length) throw new ApiError("Ninguno de los temas del borrador existe ya en tu sistema.");
       if (pre) seeds = markDiagnostics(seeds, pre);
@@ -1424,7 +1465,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       if (problem) throw new ApiError(problem);
       const ctx = buildCtx();
       if (!ctx) return { loading: true as const };
-      const pre = withBranchInfo(pre0, ctx.all);
+      const pre = resolveBranches(pre0, ctx.all, ctx.goals.filter((g) => pre0.goalIds.includes(g.id)).map((g) => g.name));
       const wanted = o.id !== undefined ? String(o.id) : "";
       if (!planCatalog(resolveScope(pre, ctx.all, ctx.goals), 100).length) {
         throw new ApiError("No hay temas pendientes en lo que elegiste. Elige metas con temas enlazados o materias con temas sin completar.");
@@ -1540,6 +1581,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const j = jobs.get(String(o.key ?? ""));
       if (!j) return { cancelled: false };
       j.cancelled = o.mode === "auto" ? "auto" : "abort";
+      j.controller.abort();
       for (const w of [...j.waiters]) w(new CancelError(j.cancelled));
       return { cancelled: true };
     },
@@ -1632,6 +1674,12 @@ export function mentorApi(app: AppState, send?: SendFn) {
                 source = "rules";
               }
             }
+          }
+          // ramas: si el plan no las trae y el comentario (o el nombre de sus metas) dice «full stack», se aplican y se quitan los temas de las excluidas
+          if (plan.preconditions && !direct) {
+            const goalNames = plan.subplans.filter((sp) => sp.goalId).map((sp) => sp.objective);
+            const inf = resolveBranches(plan.preconditions, all, goalNames, comment);
+            if (inf.branches && !plan.preconditions.branches) ops = [{ op: "set_branches", branches: inf.branches, preset: inf.branchPreset ?? "fullstack", excluded: inf.branchExcluded ?? [] }, ...ops];
           }
           let res = ops.length ? applyOps(plan, ops, ctx) : null;
           if (res && !res.applied && source === "ai") {

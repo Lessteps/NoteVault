@@ -130,6 +130,8 @@ export function topicsMessages(brief: StudentBrief, pre: PlanPreconditions, seed
 export interface TopicsParse {
   ok: boolean;
   reason?: string;
+  /** UNA razón corta por subplan (formato compacto de la generación completa) */
+  reasons?: Record<string, string>;
   order: BuildAiState["order"];
   rewrites: BuildAiState["rewrites"];
   discarded: string[];
@@ -140,6 +142,7 @@ export function parseTopicsReply(raw: string, candidates: ReadonlyMap<string, Re
   const obj = objectsIn(String(raw ?? "")).find((o) => o && Array.isArray(o.subplans));
   if (!obj) return { ok: false, reason: "La IA no devolvió el JSON esperado.", order: {}, rewrites: {}, discarded: [] };
   const order: BuildAiState["order"] = {};
+  const reasons: Record<string, string> = {};
   const discarded: string[] = [];
   for (const sp of obj.subplans as any[]) {
     const key = typeof sp?.key === "string" ? sp.key.trim() : "";
@@ -150,8 +153,11 @@ export function parseTopicsReply(raw: string, candidates: ReadonlyMap<string, Re
     }
     const seen = new Set<string>();
     const topics: Array<{ folder: string; why: string }> = [];
+    const reason = oneLine(sp.reason, 240);
+    if (reason) reasons[key] = reason;
     for (const t of Array.isArray(sp.topics) ? sp.topics : []) {
-      const folder = typeof t?.folder === "string" ? t.folder.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "") : "";
+      const rawFolder = typeof t === "string" ? t : t?.folder;
+      const folder = typeof rawFolder === "string" ? rawFolder.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "") : "";
       if (!folder) continue;
       if (!allowed.has(folder)) {
         discarded.push(oneLine(folder, 120));
@@ -159,7 +165,7 @@ export function parseTopicsReply(raw: string, candidates: ReadonlyMap<string, Re
       }
       if (seen.has(folder)) continue;
       seen.add(folder);
-      topics.push({ folder, why: oneLine(t?.why, 200) });
+      topics.push({ folder, why: oneLine(typeof t === "string" ? "" : t?.why, 200) });
     }
     if (topics.length) order[key] = topics;
   }
@@ -168,5 +174,77 @@ export function parseTopicsReply(raw: string, candidates: ReadonlyMap<string, Re
   const w = obj.rewrites && typeof obj.rewrites === "object" ? (obj.rewrites as Record<string, any>).weight : undefined;
   const text = oneLine(w?.text, 200);
   if (text && text.endsWith("?")) rewrites.weight = { text, why: oneLine(w?.why, 180) };
-  return { ok: true, order, rewrites, discarded: [...new Set(discarded)].slice(0, 20) };
+  return { ok: true, order, reasons, rewrites, discarded: [...new Set(discarded)].slice(0, 20) };
+}
+
+// ── Generación completa por partes (esqueleto + un bloque de temas por subplan) ──
+
+export const SKELETON_SYSTEM = [
+  "Eres el Mentor de estudio: ayudas a un estudiante a armar un PLAN. Esta es la etapa ESQUELETO: decides qué subplanes entran, su orden, su peso y su objetivo, SIN elegir temas.",
+  "Solo ves el informe del estudiante y la lista de subplanes candidatos que da la app; no tienes acceso a sus notas.",
+  "Cada candidato lleva una `key` EXACTA. Devuelve los que deben entrar, en el orden en que conviene estudiarlos (lo básico antes), con un `weight` entero de 1 (poco) a 5 (mucho) para repartir las horas y, solo en los de materia (sin meta), un `objective` corto (<=100 caracteres). Puedes omitir un subplan que no encaje con lo que pidió el estudiante (sus comentarios y objetivo).",
+  "NO propongas ramas ni subplanes que no estén en la lista. No incluyas fechas ni minutos: la app reparte con la capacidad real.",
+  "Responde EXCLUSIVAMENTE con JSON válido, sin texto antes ni después:",
+  '{ "type": "skeleton", "rationale": string, "subplans": [ { "key": string, "weight"?: number, "objective"?: string } ] }',
+].join("\n");
+
+export function skeletonMessages(brief: StudentBrief, pre: PlanPreconditions, seeds: ReadonlyArray<Pick<SubplanSeed, "area" | "objective" | "goalId" | "topics">>, answers: readonly BuildAnswer[] = []): ChatMessage[] {
+  const lines = seeds.map((s) => {
+    const m = s.topics.reduce((n, t) => n + t.estMinutes, 0);
+    return `- key=${subplanKey(s)} | ${s.area} · ${s.objective}${s.goalId ? " (meta)" : ""} | ${s.topics.length} temas | ~${Math.round(m / 60)} h`;
+  });
+  const user = [toPromptText(brief, BRIEF_CHARS), factsText(pre, seeds.map((s) => s.area), answers), `SUBPLANES CANDIDATOS:\n${lines.join("\n")}`, "Responde con el JSON del ESQUELETO."].join("\n\n");
+  return [
+    { role: "system", content: SKELETON_SYSTEM },
+    { role: "user", content: user },
+  ];
+}
+
+export interface SkeletonParse {
+  ok: boolean;
+  reason?: string;
+  rationale: string;
+  /** en el orden de la IA; `weight` 1..5 */
+  items: Array<{ key: string; weight: number; objective?: string }>;
+  discarded: string[];
+}
+
+export function parseSkeletonReply(raw: string, keys: ReadonlySet<string>): SkeletonParse {
+  const obj = objectsIn(String(raw ?? "")).find((o) => o && Array.isArray(o.subplans));
+  if (!obj) return { ok: false, reason: "La IA no devolvió el esqueleto esperado.", rationale: "", items: [], discarded: [] };
+  const items: SkeletonParse["items"] = [];
+  const discarded: string[] = [];
+  for (const sp of obj.subplans as any[]) {
+    const key = typeof sp?.key === "string" ? sp.key.trim() : "";
+    if (!keys.has(key)) {
+      if (key) discarded.push(`subplan ${oneLine(key, 60)}`);
+      continue;
+    }
+    if (items.some((i) => i.key === key)) continue;
+    const w = Math.round(Number(sp.weight));
+    const objective = oneLine(sp.objective, 100);
+    items.push({ key, weight: Number.isFinite(w) ? Math.min(5, Math.max(1, w)) : 3, ...(objective ? { objective } : {}) });
+  }
+  if (!items.length) return { ok: false, reason: "La IA no eligió ningún subplan válido.", rationale: "", items: [], discarded };
+  return { ok: true, rationale: oneLine(obj.rationale, 400), items, discarded };
+}
+
+export const TOPICS_COMPACT_SYSTEM = [
+  "Eres el Mentor de estudio: ayudas a un estudiante a armar un PLAN. Esta es la etapa TEMAS de UN subplan.",
+  "Solo ves el informe, el alcance y los temas candidatos de ese subplan; no tienes acceso a sus notas.",
+  "Elige y ORDENA, de lo básico a lo avanzado y respetando el nivel y los comentarios del estudiante, los temas que entran. Usa SOLO las carpetas (`folder`) listadas. Puedes omitir un tema que no haga falta. Da UNA razón corta del conjunto (<=140 caracteres), no una por tema.",
+  "No incluyas fechas ni minutos: la app reparte los temas por semanas.",
+  "Responde EXCLUSIVAMENTE con JSON válido, sin texto antes ni después (los temas son solo las carpetas):",
+  '{ "type": "topic_order", "subplans": [ { "key": string, "reason": string, "topics": [ string ] } ] }',
+].join("\n");
+
+/** Un bloque de temas de un subplan (≤ TOPIC_BLOCK), en formato compacto: una línea por tema y la respuesta solo con carpetas. */
+export function topicsBlockMessages(brief: StudentBrief, pre: PlanPreconditions, seed: SubplanSeed, block: { index: number; count: number }, answers: readonly BuildAnswer[] = []): ChatMessage[] {
+  const lines = seed.topics.map((t) => `  - folder=${t.folder} | ~${t.estMinutes}m`).join("\n");
+  const part = block.count > 1 ? ` (bloque ${block.index + 1} de ${block.count} de ese subplan)` : "";
+  const user = [toPromptText(brief, 2500), factsText(pre, [seed.area], answers), `SUBPLAN key=${subplanKey(seed)} | ${seed.area} · ${seed.objective}${part}\n${lines}`, "Responde con el JSON de la etapa TEMAS."].join("\n\n");
+  return [
+    { role: "system", content: TOPICS_COMPACT_SYSTEM },
+    { role: "user", content: user },
+  ];
 }

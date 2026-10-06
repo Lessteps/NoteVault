@@ -87,7 +87,7 @@ export function Diario() {
   const sorted = [...list].sort((a, b) => (a.time ?? "99").localeCompare(b.time ?? "99") || (a.created ?? "").localeCompare(b.created ?? ""));
   const t = totals(list);
   const rows: GroupedRow[] = sorted.map((m) => ({ kind: "data", m }));
-  if (rows.length) rows.push({ kind: "total", label: "TOTAL DEL DÍA", amount: t.balance });
+  if (rows.length) rows.push({ kind: "total", label: "GASTOS DEL DÍA", amount: -t.gasto });
   const d = new Date(`${day}T12:00:00`);
   const expenseCats = (meta?.categories ?? []).filter((c) => c.kind === "gasto" && !c.archived);
   const incomeCats = (meta?.categories ?? []).filter((c) => c.kind === "ingreso" && !c.archived);

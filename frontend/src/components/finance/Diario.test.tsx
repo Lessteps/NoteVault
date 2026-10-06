@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const finAdd = vi.fn(async (_day: string, _fields: Record<string, unknown>) => ({}));
+const finRange = vi.fn(async () => [] as Array<Record<string, unknown>>);
 const finMeta = vi.fn(async () => ({ categories: [], goals: [], types: ["gasto", "ingreso", "ahorro", "retiro"] }));
 const finSidebar = vi.fn(async () => null);
 const finMonthExtras = vi.fn(async () => ({
@@ -16,7 +17,7 @@ const finBudgetSet = vi.fn(async (c: number) => ({ month_budget_cents: c }));
 
 vi.mock("../../lib/bridge", () => ({
   api: {
-    finRange: async () => [],
+    finRange: () => finRange(),
     finDueChecks: async () => [],
     finAdd: (day: string, fields: Record<string, unknown>) => finAdd(day, fields),
     finMeta: () => finMeta(),
@@ -165,5 +166,16 @@ describe("Diario", () => {
     expect(useFinance.getState().editing).toMatchObject({ kind: "ingreso" });
     expect(useFinance.getState().editing?.day).toBe(todayIso());
     expect("movement" in (useFinance.getState().editing ?? {})).toBe(false);
+  });
+
+  it("el total del día muestra gastos, no balance", async () => {
+    finRange.mockResolvedValueOnce([{
+      id: "m1", type: "gasto", amount_cents: 1250000, currency: "COP",
+      what: "Café", attachments: [], date: todayIso(),
+    }]);
+    await mount();
+    const text = host!.textContent ?? "";
+    expect(text).toContain("GASTOS DEL DÍA");
+    expect(text).not.toContain("TOTAL DEL DÍA");
   });
 });

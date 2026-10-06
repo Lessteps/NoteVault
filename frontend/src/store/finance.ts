@@ -60,11 +60,17 @@ export const useFinance = create<FinState>((set, get) => ({
     try {
       const [meta, sidebar] = await Promise.all([api.finMeta(), api.finSidebar()]);
       // Materializa recurrentes vencidos antes de pintar: el Diario los ve ya creados.
+      let auto = 0;
       try {
         const { todayIso } = await import("../lib/tasks");
-        await api.finRecurringRun(todayIso());
+        auto = (await api.finRecurringRun(todayIso()))?.created ?? 0;
       } catch {
         /* sin recurrentes no se rompe nada */
+      }
+      if (auto > 0) {
+        useApp.getState().toast("info", auto === 1
+          ? "Se creó 1 movimiento automático (recurrente)."
+          : `Se crearon ${auto} movimientos automáticos (recurrentes).`);
       }
       // Migra la vista guardada por versiones viejas (semanal/mensual/anual).
       set((s) => ({ meta, sidebar, loaded: true, version: s.version + 1, view: LEGACY_VIEWS.has(s.view as string) ? "periodo" : s.view }));

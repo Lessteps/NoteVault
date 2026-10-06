@@ -89,6 +89,17 @@ describe("load", () => {
     expect(apiMock.finRecurringRun).toHaveBeenCalledWith(todayIso());
     expect(useFinance.getState().loaded).toBe(true);
   });
+  it("toasts when recurrents materialize, silent when none", async () => {
+    apiMock.finMeta.mockResolvedValue(meta());
+    apiMock.finSidebar.mockResolvedValue(sidebar());
+    apiMock.finRecurringRun.mockResolvedValue({ created: 2 });
+    await useFinance.getState().load();
+    expect(useApp.getState().toasts.at(-1)?.text).toContain("2 movimientos automáticos");
+    useApp.setState({ toasts: [] });
+    apiMock.finRecurringRun.mockResolvedValue({ created: 0 });
+    await useFinance.getState().load();
+    expect(useApp.getState().toasts).toHaveLength(0);
+  });
   it("migrates legacy semanal/mensual/anual views to periodo", async () => {
     apiMock.finMeta.mockResolvedValue(meta());
     apiMock.finSidebar.mockResolvedValue(sidebar());

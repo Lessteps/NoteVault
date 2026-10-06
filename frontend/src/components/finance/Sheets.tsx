@@ -61,7 +61,9 @@ function groupedRows(list: Movement[]): GroupedRow[] {
   return rows;
 }
 
-/** Categorías × columnas (días o meses), con totales. Respeta el filtro de tipo. */
+/** Categorías × columnas (días o meses), con totales. Respeta el filtro de tipo.
+ * Las celdas guardan importe con signo (gasto/ahorro restan) para que el
+ * TOTAL sea neto y no una suma bruta de gastos + ingresos. */
 export function CategoryMatrix({ list, columns, keyOf, cats }: {
   list: Movement[]; columns: Array<[string, string]>; keyOf: (m: Movement) => string; cats: FinCategory[];
 }) {
@@ -69,11 +71,12 @@ export function CategoryMatrix({ list, columns, keyOf, cats }: {
   for (const m of list) {
     const k = `${m.type}:${m.category ?? ""}`;
     const r = rows.get(k) ?? { type: m.type, category: m.category ?? "", cells: {} };
-    r.cells[keyOf(m)] = (r.cells[keyOf(m)] ?? 0) + m.amount_cents;
-    r.cells._total = (r.cells._total ?? 0) + m.amount_cents;
+    const v = (m.type === "gasto" || m.type === "ahorro" ? -1 : 1) * m.amount_cents;
+    r.cells[keyOf(m)] = (r.cells[keyOf(m)] ?? 0) + v;
+    r.cells._total = (r.cells._total ?? 0) + v;
     rows.set(k, r);
   }
-  const sorted = [...rows.entries()].sort((a, b) => (b[1].cells._total ?? 0) - (a[1].cells._total ?? 0));
+  const sorted = [...rows.entries()].sort((a, b) => Math.abs(b[1].cells._total ?? 0) - Math.abs(a[1].cells._total ?? 0));
   const tpl = `180px repeat(${columns.length}, minmax(76px, 1fr)) 110px`;
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-card">
@@ -85,18 +88,25 @@ export function CategoryMatrix({ list, columns, keyOf, cats }: {
         return (
           <div key={k} className="grid min-w-max border-b border-line px-3 py-1.5 text-[12px]" style={{ gridTemplateColumns: tpl }}>
             <span className="truncate text-dim">{c ? `${c.icon} ${c.name}` : "Sin categoría"} <span className="text-faint">· {TYPE_LABELS[r.type as keyof typeof TYPE_LABELS]}</span></span>
-            {columns.map(([col]) => <span key={col} className="text-right font-mono text-text">{r.cells[col] ? formatMoney(r.cells[col]) : ""}</span>)}
-            <span className="text-right font-mono font-semibold text-text">{formatMoney(r.cells._total ?? 0)}</span>
+            {columns.map(([col]) => <span key={col} className="text-right font-mono text-text">{r.cells[col] ? formatMoney(Math.abs(r.cells[col]!)) : ""}</span>)}
+            <span className="text-right font-mono font-semibold text-text">{formatMoney(Math.abs(r.cells._total ?? 0))}</span>
           </div>
         );
       })}
-      {sorted.length > 0 && (
-        <div className="grid min-w-max px-3 py-1.5 text-[12px] font-semibold" style={{ gridTemplateColumns: tpl }}>
-          <span>TOTAL</span>
-          {columns.map(([k]) => <span key={k} className="text-right font-mono">{formatMoney(sorted.reduce((a, [, r]) => a + (r.cells[k] ?? 0), 0))}</span>)}
-          <span className="text-right font-mono">{formatMoney(sorted.reduce((a, [, r]) => a + (r.cells._total ?? 0), 0))}</span>
-        </div>
-      )}
+      {sorted.length > 0 && (() => {
+        const colNet = (col: string) => sorted.reduce((a, [, r]) => a + (r.cells[col] ?? 0), 0);
+        const grand = sorted.reduce((a, [, r]) => a + (r.cells._total ?? 0), 0);
+        return (
+          <div className="grid min-w-max px-3 py-1.5 text-[12px] font-semibold" style={{ gridTemplateColumns: tpl }}>
+            <span>NETO</span>
+            {columns.map(([k]) => {
+              const v = colNet(k);
+              return <span key={k} className="text-right font-mono" style={{ color: v >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(v, "COP", true)}</span>;
+            })}
+            <span className="text-right font-mono" style={{ color: grand >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(grand, "COP", true)}</span>
+          </div>
+        );
+      })()}
       {!sorted.length && <div className="p-6 text-center text-[13px] text-faint">Sin movimientos en este periodo.</div>}
     </div>
   );

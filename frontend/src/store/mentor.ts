@@ -7,7 +7,7 @@
 import { create } from "zustand";
 import { api } from "../lib/bridge";
 import type { PlanPreconditions } from "../lib/planTime";
-import type { MentorChatMeta, MentorChatState, MentorChatTurn, MentorGoalCreated, MentorPanels, MentorPlanAccepted, MentorPlanGenerateResult, MentorPlanRow, MentorSessionObjective } from "../lib/types";
+import type { MentorBuildSummary, MentorChatMeta, MentorChatState, MentorChatTurn, MentorGoalCreated, MentorPanels, MentorPlanAccepted, MentorPlanGenerateResult, MentorPlanRow, MentorSessionObjective } from "../lib/types";
 import { useApp } from "./app";
 import { useAssistant } from "./assistant";
 import { useNavState } from "./navState";
@@ -50,6 +50,8 @@ interface MentorState {
   plans: MentorPlanRow[];
   plansLoaded: boolean;
   generatingPlan: boolean;
+  /** los planes en construcción (constructor guiado): barra lateral, resumen y chat */
+  builds: MentorBuildSummary[];
   /** sube cada vez que se acepta un plan: el panel Plan se recarga */
   planVersion: number;
   /** objetivo que "Planear mi día con esto" deja para el panel Hoy */
@@ -74,6 +76,9 @@ interface MentorState {
   /** Responde una pregunta pendiente del borrador (hoy: entregable de un subplan: Sí / No / Después). */
   answerDraftQuestion: (subplanId: string, answer: "yes" | "no" | "later") => Promise<void>;
   loadPlans: () => Promise<void>;
+  loadBuilds: () => Promise<void>;
+  /** «Generar plan»: crea YA el plan propuesto (el plan completo en una sola generación); el chat recibe «Plan creado: …». */
+  createPlan: (pre: PlanPreconditions, noAi?: boolean) => Promise<Extract<MentorPlanGenerateResult, { kind: "plan_created" }> | null>;
   /** "Generar plan" del formulario de precondiciones: deja un borrador pendiente (no escribe nada). */
   generatePlan: (pre: PlanPreconditions) => Promise<Extract<MentorPlanGenerateResult, { loading: false }> | null>;
   renamePlan: (id: string, name: string) => Promise<void>;
@@ -122,6 +127,7 @@ export const useMentor = create<MentorState>((set, get) => ({
   plans: [],
   plansLoaded: false,
   generatingPlan: false,
+  builds: [],
   planVersion: 0,
   pendingObjective: null,
 
@@ -313,6 +319,38 @@ export const useMentor = create<MentorState>((set, get) => ({
       set({ plans: await api.mentorPlanList(), plansLoaded: true });
     } catch {
       set({ plansLoaded: true });
+    }
+  },
+
+  loadBuilds: async () => {
+    try {
+      const r = await api.mentorPlanBuildList();
+      set({ builds: Array.isArray(r) ? r : [] });
+    } catch {
+      set({ builds: [] });
+    }
+  },
+
+  createPlan: async (pre, noAi = false) => {
+    if (get().generatingPlan) return null;
+    set({ generatingPlan: true });
+    try {
+      let r = await api.mentorPlanGenerateNow(pre, noAi);
+      for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
+        await sleep(COLD_RETRY_MS);
+        r = await api.mentorPlanGenerateNow(pre, noAi);
+      }
+      if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
+      if (r.kind !== "plan_created") return null;
+      set({ ...chatPatch({ id: r.chatId, title: "", turns: r.turns, pending: r.pending }), chatLoaded: true, notice: null, planMode: false, composerSeed: "" });
+      set((s) => ({ planVersion: s.planVersion + 1 }));
+      void get().loadChat();
+      return r;
+    } catch (e) {
+      fail(e);
+      return null;
+    } finally {
+      set({ generatingPlan: false });
     }
   },
 

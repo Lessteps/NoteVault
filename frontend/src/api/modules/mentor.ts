@@ -4,7 +4,7 @@
 // contexto con los managers de la vault y se validan las entradas de la UI. La IA
 // (fase siguiente) consume `mentor_brief().text`: nunca lee notas completas.
 
-import { AIConfig, sendChat } from "../../core/aiClient.js";
+import { AIConfig, sendChat, type ChatMessage } from "../../core/aiClient.js";
 import { ApiError } from "../../core/errors.js";
 import { loadExamRecordForTopic } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
@@ -35,7 +35,37 @@ import {
   type SubplanSeed,
   type TopicLiteLookup,
 } from "../../core/mentor/plan.js";
-import { periodLabel } from "../../lib/planTime.js";
+import { branchAllowed, branchOfFolder, classifyBranch, detectBranchIntent, periodLabel, sanitizeNotes } from "../../lib/planTime.js";
+import {
+  BUILD_ID_RE,
+  computeBuild,
+  emptyAi,
+  isBuildStage,
+  makeAnswer,
+  MAX_BUILD_QUESTIONS,
+  newBuildId,
+  PlanBuildStore,
+  stageIndex,
+  summaryOf,
+  type AnswerInput,
+  type BuildAiState,
+  type BuildCtx,
+  type BuildStage,
+  type PlanBuild,
+} from "../../core/mentor/planBuild.js";
+import {
+  applyOps,
+  ChangeStore,
+  changeMessages,
+  deltaText,
+  MAX_COMMENT_CHARS,
+  opsFromText,
+  parseChangeReply,
+  viewOf,
+  type ChangeEntry,
+  type ChangeOp,
+} from "../../core/mentor/planChange.js";
+import { parseScopeReply, parseTopicsReply, scopeMessages, topicsMessages } from "../../core/mentor/planBuildAi.js";
 import {
   areaOfFolder,
   adjustedMinutes,
@@ -43,6 +73,8 @@ import {
   defaultDeliverable,
   buildPlanMessages,
   composeFromPreconditions,
+  dynamicCatalogMax,
+  withBranchInfo,
   markDiagnostics,
   parsePreconditionReply,
   planCatalog,
@@ -91,6 +123,34 @@ import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
 
 const DEFAULT_BRIEF_CHARS = 6000;
+
+/** Cancelación de una llamada larga de IA: `abort` = no hacer nada; `auto` = seguir con el plan automático (sin IA). */
+class CancelError extends Error {
+  constructor(readonly mode: "abort" | "auto") {
+    super(mode === "auto" ? "Seguir sin IA." : "Cancelado por ti.");
+  }
+}
+interface Job {
+  key: string;
+  label: string;
+  since: number;
+  waiters: Set<(e: Error) => void>;
+  cancelled?: "abort" | "auto";
+}
+const JOBS = new WeakMap<AppState, Map<string, Job>>();
+function jobsOf(app: AppState): Map<string, Job> {
+  let m = JOBS.get(app);
+  if (!m) JOBS.set(app, (m = new Map()));
+  return m;
+}
+
+/** Operaciones en vuelo del constructor guiado por vault (un plan en construcción hace una cosa a la vez). */
+const INFLIGHT = new WeakMap<AppState, Map<string, { key: string; p: Promise<unknown> }>>();
+function inflightOf(app: AppState): Map<string, { key: string; p: Promise<unknown> }> {
+  let m = INFLIGHT.get(app);
+  if (!m) INFLIGHT.set(app, (m = new Map()));
+  return m;
+}
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function needDate(value: unknown): string {
@@ -244,14 +304,17 @@ const planRow = (p: Plan, today: string, lookup?: TopicLiteLookup) => {
 
 /** Activos primero (el más reciente arriba), luego futuros por fecha, luego terminados del más reciente al más antiguo. */
 function sortRows<T extends { status: string; start: string; end: string }>(rows: T[]): T[] {
-  const rank = { activo: 0, futuro: 1, terminado: 2 } as Record<string, number>;
+  const rank = { propuesto: 0, activo: 1, futuro: 2, terminado: 3 } as Record<string, number>;
   return [...rows].sort((a, b) => rank[a.status]! - rank[b.status]! || (a.status === "terminado" ? b.end.localeCompare(a.end) : a.status === "activo" ? b.start.localeCompare(a.start) : a.start.localeCompare(b.start)));
 }
 
 /** El plan que se muestra por defecto: el activo hoy; si no, el siguiente futuro; si no, el último terminado. */
 function defaultPlan(plans: readonly Plan[], today: string): Plan | null {
-  const rows = sortRows(plans.map((p) => planRow(p, today)));
-  return plans.find((p) => p.id === rows[0]?.id) ?? null;
+  // un plan propuesto no es «el plan de hoy»: solo se ve si no hay otro
+  const real = plans.filter((p) => !p.proposed);
+  const pool = real.length ? real : plans;
+  const rows = sortRows(pool.map((p) => planRow(p, today)));
+  return pool.find((p) => p.id === rows[0]?.id) ?? null;
 }
 
 /** Primer foco de la rotación de proyectos: el que sugiere el perfil de `programming_practice`, si lo hay. */
@@ -419,7 +482,138 @@ export function mentorApi(app: AppState, send?: SendFn) {
     return { turns, pending: pendingDraft(turns)?.id ?? null };
   }
 
-  return {
+  // ── Constructor guiado del plan (core/mentor/planBuild.ts) ──
+  // ── Llamadas largas a la IA: estado («pensando…»), progreso y cancelación ──
+  const jobs = jobsOf(app);
+  interface JobHandle {
+    send: (messages: ChatMessage[]) => Promise<string>;
+    setLabel: (label: string) => void;
+  }
+  async function withJob<T>(key: string, label: string, fn: (job: JobHandle) => Promise<T>): Promise<T> {
+    const job: Job = { key, label, since: Date.now(), waiters: new Set() };
+    jobs.set(key, job);
+    const handle: JobHandle = {
+      setLabel: (l) => {
+        job.label = l;
+      },
+      send: (messages) => {
+        if (job.cancelled) return Promise.reject(new CancelError(job.cancelled));
+        return new Promise<string>((resolve, reject) => {
+          job.waiters.add(reject);
+          aiSendRaw(messages).then(resolve, reject).finally(() => job.waiters.delete(reject));
+        });
+      },
+    };
+    try {
+      return await fn(handle);
+    } finally {
+      jobs.delete(key);
+    }
+  }
+  const aiSendRaw = async (messages: ChatMessage[]): Promise<string> => (send ?? sendChat)(AIConfig.fromDict(AppConfig.get_ai_config()), messages);
+  const builds = () => new PlanBuildStore(app.root, localDate);
+  const inflight = inflightOf(app);
+  /** Una sola operación a la vez por plan en construcción: la misma (doble envío) comparte la llamada; otra distinta espera. */
+  function guarded<T>(id: string, key: string, fn: () => Promise<T>): Promise<T> {
+    const cur = inflight.get(id);
+    if (cur) {
+      if (cur.key === key) return cur.p as Promise<T>;
+      throw new ApiError("El Mentor sigue pensando en este plan. Espera un momento.");
+    }
+    const p = fn().finally(() => {
+      if (inflight.get(id)?.p === p) inflight.delete(id);
+    });
+    inflight.set(id, { key, p });
+    return p;
+  }
+  const buildCtx = (): BuildCtx | null => {
+    if (studyIndexCold(app)) return null;
+    return {
+      today: localDate(),
+      all: buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 }),
+      goals: goalScopes(app),
+      startFocus: practiceStartFocus(app),
+      aiOn: aiUnavailableReason(AIConfig.fromDict(AppConfig.get_ai_config())) === null,
+    };
+  };
+
+  /** Recalcula el plan en construcción y, si una etapa lo pide, hace UNA llamada pequeña a la IA (validada; si falla o se cancela, sigue por reglas). */
+  async function advance(b: PlanBuild, ctx: BuildCtx, finishing: boolean, job: JobHandle): Promise<PlanBuild> {
+    let cur = b;
+    for (let i = 0; i < 60; i++) {
+      const input = { pre: cur.pre, answers: cur.answers, ai: cur.ai, maxQuestions: cur.maxQuestions };
+      const comp = computeBuild(input, ctx, { finishing, noAi: i === 59 });
+      if (comp.needs === "ai_scope" && comp.info) {
+        const ai: BuildAiState = { ...cur.ai, scopeTried: true, errors: [...cur.ai.errors] };
+        job.setLabel("Leyendo tus comentarios y preparando las preguntas…");
+        try {
+          const brief = buildStudentBrief(briefContext(app, log()));
+          const parsed = parseScopeReply(await job.send(scopeMessages(brief, cur.pre, comp.info.areas, comp.info.rules, cur.answers)), comp.info.rules.map((r) => r.id));
+          if (parsed.ok) Object.assign(ai, { scopeOk: true, questions: parsed.questions, rewrites: { ...ai.rewrites, ...parsed.rewrites } });
+          else ai.errors.push(parsed.reason ?? "La IA no devolvió nada útil.");
+        } catch (e) {
+          if (e instanceof CancelError && e.mode === "abort") throw new ApiError("Cancelado.");
+          ai.errors.push(e instanceof CancelError ? "Pediste seguir sin IA." : `La IA falló: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300));
+        }
+        cur = { ...cur, ai };
+        continue;
+      }
+      if (comp.needs === "ai_topics" && comp.info?.block) {
+        const block = comp.info.block;
+        const key = block.slice(0, block.lastIndexOf("#"));
+        const seed = comp.info.seeds[0]!;
+        const ai: BuildAiState = { ...cur.ai, topicsDone: [...cur.ai.topicsDone, block], errors: [...cur.ai.errors].slice(-4) };
+        job.setLabel(`Eligiendo temas de ${seed.area}${seed.objective ? ` · ${seed.objective}` : ""}…`.slice(0, 120));
+        try {
+          const brief = buildStudentBrief(briefContext(app, log()));
+          const candidates = new Map([[key, new Set(seed.topics.map((t) => t.folder))]]);
+          const parsed = parseTopicsReply(await job.send(topicsMessages(brief, cur.pre, [seed], cur.answers)), candidates);
+          if (parsed.ok) {
+            Object.assign(ai, {
+              topicsOk: true,
+              topicsOkBlocks: [...ai.topicsOkBlocks, block],
+              order: { ...ai.order, [key]: [...(ai.order[key] ?? []), ...(parsed.order[key] ?? [])] },
+              rewrites: { ...ai.rewrites, ...parsed.rewrites },
+              discarded: [...new Set([...ai.discarded, ...parsed.discarded])].slice(0, 20),
+            });
+          } else ai.errors.push(parsed.reason ?? "La IA no devolvió nada útil.");
+        } catch (e) {
+          if (e instanceof CancelError && e.mode === "abort") throw new ApiError("Cancelado.");
+          ai.errors.push(e instanceof CancelError ? "Pediste seguir sin IA." : `La IA falló: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300));
+        }
+        cur = { ...cur, ai };
+        continue;
+      }
+      const { openQuestion: _old, ...rest } = cur;
+      return {
+        ...rest,
+        stage: comp.stage,
+        steps: comp.steps,
+        draft: comp.draft,
+        skeleton: comp.skeleton,
+        effective: comp.effective,
+        ...(comp.question ? { openQuestion: comp.question } : {}),
+        status: comp.status,
+        finishing,
+        questionCount: cur.answers.length,
+        source: cur.ai.scopeOk || cur.ai.topicsOk ? "ai" : "rules",
+        name: comp.name,
+      };
+    }
+    throw new ApiError("No se pudo calcular el plan en construcción.");
+  }
+  const loadBuild = (id: unknown): PlanBuild => {
+    const sid = String(id ?? "");
+    const b = BUILD_ID_RE.test(sid) ? builds().load(sid) : null;
+    if (!b || b.status === "abandoned") throw new ApiError("Ese plan en construcción ya no existe.");
+    return b;
+  };
+  const buildView = (b: PlanBuild) => ({ loading: false as const, build: b, summary: summaryOf(b) });
+  let acceptRef: (opts: unknown) => any = () => {
+    throw new ApiError("No disponible.");
+  };
+
+  const api = {
     mentor_brief(opts: unknown = {}) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
       const strs = (v: unknown): string[] | undefined =>
@@ -630,7 +824,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const prevPlan = pendingDraft(stored)?.planDraft;
       const prePrev: PlanPreconditions | null = prevPlan?.preconditions ? sanitizePreconditions(prevPlan.preconditions, today) : null;
       const scopePrev = prePrev ? resolveScope(prePrev, buildTopicCatalog(snapsAll, "", { max: 1_000_000 }), goalScopes(app)) : null;
-      const catalog = scopePrev ? planCatalog(scopePrev, 100, `${prePrev?.freeObjective ?? ""} ${prePrev?.notes ?? ""} ${message}`) : buildTopicCatalog(snapsAll, request, { max: planMode ? 80 : 60 });
+      const catalog = scopePrev ? planCatalog(scopePrev, dynamicCatalogMax(prePrev!, scopePrev, today), `${prePrev?.freeObjective ?? ""} ${prePrev?.notes ?? ""} ${message}`) : buildTopicCatalog(snapsAll, request, { max: planMode ? 80 : 60 });
       const planCtx = planContext(app, today);
       const areas = app.mgrs().areas.areas().filter((a) => !a.archived);
       const chatLog = existing ?? chats().create();
@@ -639,7 +833,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
       let raw = "";
       try {
         const extras = { today, areas: areas.map((a) => a.name), plan: planCtx, planMode };
-        raw = await (send ?? sendChat)(cfg, prePrev && scopePrev ? buildPlanMessages(prePrev, brief, catalog, history, { ...extras, scope: scopePrev }, message) : buildChatMessages(message, brief, catalog, history, extras));
+        const msgs = prePrev && scopePrev ? buildPlanMessages(prePrev, brief, catalog, history, { ...extras, scope: scopePrev }, message) : buildChatMessages(message, brief, catalog, history, extras);
+        raw = await withJob("chat", "El Mentor está pensando…", (job) => job.send(msgs));
       } catch (e) {
         return { loading: false as const, kind: "error" as const, text: `La IA falló: ${e instanceof Error ? e.message : String(e)}`.slice(0, 400), turns, pending: pendingDraft(turns)?.id ?? null };
       }
@@ -838,11 +1033,17 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const all = buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 });
       const goals = goalScopes(app);
       const topics = scopeTopics(all, goals);
-      const areas = new Map<string, { id: string; name: string; total: number; pending: number; minutes: number }>();
+      const areas = new Map<string, { id: string; name: string; total: number; pending: number; minutes: number; branches: Record<string, { total: number; pending: number }> }>();
       for (const t of all) {
         const id = areaOfFolder(t.folder) || t.subject || "General";
-        const e = areas.get(id) ?? { id, name: id, total: 0, pending: 0, minutes: 0 };
+        const e = areas.get(id) ?? { id, name: id, total: 0, pending: 0, minutes: 0, branches: {} };
         e.total++;
+        const br = branchOfFolder(t.folder);
+        if (br) {
+          const be = (e.branches[br] ??= { total: 0, pending: 0 });
+          be.total++;
+          if (t.completenessPct < 100) be.pending++;
+        }
         if (t.completenessPct < 100) {
           e.pending++;
           e.minutes += t.estMinutes;
@@ -857,7 +1058,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
           const mine = topics.filter((t) => t.goalIds.includes(g.id));
           return { id: g.id, name: g.name, area: g.area, end: g.end, topics: mine.length, minutes: mine.reduce((n, t) => n + t.minutes, 0) };
         }),
-        areas: [...areas.values()].sort((a, b) => a.name.localeCompare(b.name, "es", { numeric: true })),
+        areas: [...areas.values()]
+          .sort((a, b) => a.name.localeCompare(b.name, "es", { numeric: true }))
+          .map((a) => ({ ...a, branches: Object.entries(a.branches).sort((x, y) => x[0].localeCompare(y[0], "es", { numeric: true })).map(([name, v]) => ({ name, ...v, kind: classifyBranch(name) })) })),
         topics,
       };
     },
@@ -871,66 +1074,71 @@ export function mentorApi(app: AppState, send?: SendFn) {
     async mentor_plan_generate(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
       const today = localDate();
-      const pre = sanitizePreconditions(o.preconditions && typeof o.preconditions === "object" ? o.preconditions : o, today);
-      const problem = preconditionsProblem(pre, today);
+      const pre0 = sanitizePreconditions(o.preconditions && typeof o.preconditions === "object" ? o.preconditions : o, today);
+      const problem = preconditionsProblem(pre0, today);
       if (problem) throw new ApiError(problem);
       if (studyIndexCold(app)) return { loading: true as const };
+      if (jobs.has("generate")) throw new ApiError("Ya se está generando un plan. Espera a que termine o cancélalo.");
 
       const all = buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 });
+      const pre = withBranchInfo(pre0, all);
       const goals = goalScopes(app);
       const scope = resolveScope(pre, all, goals);
-      const catalog = planCatalog(scope, 100, `${pre.freeObjective ?? ""} ${pre.notes ?? ""}`);
+      const catalog = planCatalog(scope, dynamicCatalogMax(pre, scope, today), `${pre.freeObjective ?? ""} ${pre.notes ?? ""}`);
       if (!catalog.length) {
         throw new ApiError("No hay temas pendientes en lo que elegiste. Elige metas con temas enlazados o materias con temas sin completar.");
       }
 
       const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
-      const unavailable = aiUnavailableReason(cfg);
+      const unavailable = o.noAi === true ? "Pediste el plan automático (sin IA)" : aiUnavailableReason(cfg);
       const planCtx = planContext(app, today);
-      let draft: PlanDraft | null = null;
-      let fallbackReason: string | undefined = unavailable ?? undefined;
-      if (!unavailable) {
-        try {
-          const brief = buildStudentBrief(briefContext(app, log()));
-          const areaNames = app.mgrs().areas.areas().filter((a) => !a.archived).map((a) => a.name);
-          const raw = await (send ?? sendChat)(cfg, buildPlanMessages(pre, brief, catalog, [], { today, areas: areaNames, plan: planCtx, scope }));
-          const parsed = parsePreconditionReply(raw, catalog, planCtx);
-          if (parsed.ok) {
-            const { seeds, why } = seedsFromReply(parsed.reply, catalog, pre, new Map(goals.map((g) => [g.id, g.name])));
-            if (seeds.length) {
-              draft = composeFromPreconditions(seeds, pre, { today, auto: false, rationale: parsed.reply.rationale, discarded: parsed.reply.discarded, why, startFocus: practiceStartFocus(app), practiceSuggestions: parsed.reply.practice });
-            } else fallbackReason = "La IA no propuso ningún tema válido.";
-          } else fallbackReason = parsed.reason;
-        } catch (e) {
-          fallbackReason = `La IA falló: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300);
+      return withJob("generate", `Eligiendo temas de ${[...new Set(scope.goalGroups.map((g) => g.area).concat(scope.areaGroups.map((g) => g.area)))].slice(0, 3).join(", ") || "tus metas"}…`, async (job) => {
+        let draft: PlanDraft | null = null;
+        let fallbackReason: string | undefined = unavailable ?? undefined;
+        if (!unavailable) {
+          try {
+            const brief = buildStudentBrief(briefContext(app, log()));
+            const areaNames = app.mgrs().areas.areas().filter((a) => !a.archived).map((a) => a.name);
+            const raw = await job.send(buildPlanMessages(pre, brief, catalog, [], { today, areas: areaNames, plan: planCtx, scope }));
+            const parsed = parsePreconditionReply(raw, catalog, planCtx);
+            if (parsed.ok) {
+              const { seeds, why } = seedsFromReply(parsed.reply, catalog, pre, new Map(goals.map((g) => [g.id, g.name])));
+              if (seeds.length) {
+                draft = composeFromPreconditions(seeds, pre, { today, auto: false, rationale: parsed.reply.rationale, discarded: parsed.reply.discarded, why, startFocus: practiceStartFocus(app), practiceSuggestions: parsed.reply.practice });
+              } else fallbackReason = "La IA no propuso ningún tema válido.";
+            } else fallbackReason = parsed.reason;
+          } catch (e) {
+            if (e instanceof CancelError && e.mode === "abort") throw new ApiError("Generación cancelada.");
+            fallbackReason = e instanceof CancelError ? "Pediste el plan automático (sin IA)" : `La IA falló: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300);
+          }
         }
-      }
-      if (!draft) {
-        const why = unavailable ? "La IA no está configurada" : `La IA no devolvió un plan válido (${fallbackReason ?? "sin detalle"})`;
-        draft = composeFromPreconditions(autoSeeds(pre, scope), pre, {
-          today,
-          auto: true,
-          startFocus: practiceStartFocus(app),
-          rationale: `Plan automático con tus metas y materias elegidas, en su orden natural y sin lo ya completado. ${why}.`,
-          ...(fallbackReason && !unavailable ? { fallbackReason } : {}),
-        });
-      }
+        if (!draft) {
+          const why = unavailable ? (o.noAi === true ? "Lo pediste sin IA" : "La IA no está configurada") : `La IA no devolvió un plan válido (${fallbackReason ?? "sin detalle"})`;
+          draft = composeFromPreconditions(autoSeeds(pre, scope), pre, {
+            today,
+            auto: true,
+            startFocus: practiceStartFocus(app),
+            rationale: `Plan automático con tus metas y materias elegidas, en su orden natural y sin lo ya completado. ${why}.`,
+            ...(fallbackReason && !unavailable ? { fallbackReason } : {}),
+          });
+        }
 
-      const active = chats().peek();
-      const chatLog = active && active.load().length === 0 ? active : chats().create();
-      chatLog.append({ role: "user", content: preconditionsRequest(pre, scope) });
-      const text = draft.rationale || `Plan del ${draft.start} al ${draft.end}: ${draft.subplans.length} subplanes`;
-      const next = chatLog.append({ role: "assistant", content: text, planDraft: draft });
-      return {
-        loading: false as const,
-        kind: "plan_draft" as const,
-        source: draft.auto ? ("auto" as const) : ("ai" as const),
-        text,
-        planDraft: draft,
-        turns: next,
-        pending: pendingDraft(next)?.id ?? null,
-        chatId: chatLog.record().id,
-      };
+        const active = chats().peek();
+        const chatLog = active && active.load().length === 0 ? active : chats().create();
+        chatLog.append({ role: "user", content: preconditionsRequest(pre, scope) });
+        const text = draft.rationale || `Plan del ${draft.start} al ${draft.end}: ${draft.subplans.length} subplanes`;
+        const source = draft.auto ? ("auto" as const) : ("ai" as const);
+        if (o.asDraft === true) {
+          // compatibilidad: el borrador separado que se acepta con `mentor_plan_draft_accept`
+          const next = chatLog.append({ role: "assistant", content: text, planDraft: draft });
+          return { loading: false as const, kind: "plan_draft" as const, source, text, planDraft: draft, turns: next, pending: pendingDraft(next)?.id ?? null, chatId: chatLog.record().id };
+        }
+        // camino principal: el plan se crea YA como plan real «propuesto» (se mantiene o se borra desde su sub-interfaz)
+        const created = acceptRef({ draft, proposed: true }) as { id: string };
+        const planName_ = planName(new PlanStore(app.root).load(created.id)!);
+        const next = chatLog.append({ role: "assistant", content: `Plan creado: ${planName_}. ${draft.rationale}`.trim(), createdPlan: created.id });
+        return { loading: false as const, kind: "plan_created" as const, source, text, planId: created.id, planDraft: draft, turns: next, pending: pendingDraft(next)?.id ?? null, chatId: chatLog.record().id };
+      });
     },
 
     /**
@@ -1036,15 +1244,18 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const goalById = new Map(ctx.goals.map((g) => [g.id, g]));
       const projectIds = new Set(ctx.projects.map((p) => p.id));
       const snaps = new Map(topicSnaps(app).map((t) => [t.folder, t]));
+      // las ramas excluidas no entran aunque el borrador las traiga (salvo lo que enlaza una meta elegida)
+      const linked = new Set(pre?.branches ? goalScopes(app).filter((g) => pre.goalIds.includes(g.id)).flatMap((g) => g.items.flatMap((i) => i.links.map((l) => l.folder))) : []);
 
       let seeds: SubplanSeed[] = [];
       for (const s of d.subplans.slice(0, 12) as any[]) {
         const seen = new Set<string>();
         const topics: SubplanSeed["topics"] = [];
-        for (const t of (Array.isArray(s?.topics) ? s.topics : []).slice(0, 60) as any[]) {
+        for (const t of (Array.isArray(s?.topics) ? s.topics : []).slice(0, 400) as any[]) {
           const folder = String(t?.folder ?? "").replace(/\\/g, "/");
           const snap = snaps.get(folder);
           if (!snap || seen.has(folder)) continue;
+          if (pre && !branchAllowed(pre.branches, areaOfFolder(folder), branchOfFolder(folder)) && !linked.has(folder)) continue;
           seen.add(folder);
           const valid = new Set(Object.keys(snap.progress.skills));
           const skills = Array.isArray(t.skills) ? t.skills.map((x: unknown) => String(x).toLowerCase()).filter((x: string) => valid.has(x)) : [];
@@ -1060,7 +1271,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
           ? { title: String(dv.title), description: String(dv.description ?? ""), criteria: Array.isArray(dv.criteria) ? dv.criteria.map(String) : [], ...(projectIds.has(String(dv.projectId)) ? { projectId: String(dv.projectId) } : {}), status: "idea" as DeliverableStatus }
           : undefined;
         if (!topics.length && !deliverable) continue;
-        seeds.push({ ...(/^[A-Za-z0-9_-]{1,40}$/.test(String(s?.id ?? "")) ? { id: String(s.id) } : {}), area: String(s?.area ?? ""), objective: String(s?.objective ?? ""), ...(goalId ? { goalId } : {}), topics, requiredGoals, ...(deliverable ? { deliverable } : {}) });
+        const weight = Number(d.weights && typeof d.weights === "object" ? d.weights[String(s?.id)] : 0);
+        seeds.push({ ...(/^[A-Za-z0-9_-]{1,40}$/.test(String(s?.id ?? "")) ? { id: String(s.id) } : {}), area: String(s?.area ?? ""), objective: String(s?.objective ?? ""), ...(goalId ? { goalId } : {}), topics, requiredGoals, ...(deliverable ? { deliverable } : {}), ...(weight > 0 ? { weight } : {}) });
       }
       if (!seeds.length) throw new ApiError("Ninguno de los temas del borrador existe ya en tu sistema.");
       if (pre) seeds = markDiagnostics(seeds, pre);
@@ -1083,10 +1295,17 @@ export function mentorApi(app: AppState, send?: SendFn) {
             ...(practice ? { programmingPractice: practice, reservedMinutes: practiceDayMinutes(practice, { blockedDates: pre.blockedDates, from }) } : {}),
             ...(Array.isArray(d.openQuestions) ? { openQuestions: d.openQuestions } : {}),
             ...(d.auto ? { auto: true } : {}),
+            ...(d.compact === true ? { spread: false } : {}),
             rationale: String(d.rationale ?? ""),
           })
         : buildPlan(seeds, { month: win.month, hoursPerWeek, from, rationale: String(d.rationale ?? "") });
-      const saved = st.save(mergePlans(st.load(built.plan.id), built.plan));
+      let saved: Plan;
+      if (o.proposed === true) {
+        // plan real «propuesto»: nunca se fusiona con otro; si el id está ocupado, se le añade un sufijo
+        let pid = built.plan.id;
+        for (let n = 2; st.load(pid); n++) pid = `${built.plan.id}-${n}`;
+        saved = st.save({ ...built.plan, id: pid, proposed: true });
+      } else saved = st.save(mergePlans(st.load(built.plan.id), built.plan));
       if (turn) chatFor(o.chatId)?.patch(turn.id, { acceptedPlan: saved.id });
       return {
         id: saved.id,
@@ -1159,5 +1378,324 @@ export function mentorApi(app: AppState, send?: SendFn) {
       plan.updatedAt = new Date().toISOString();
       return st.save(plan);
     },
+
+    /**
+     * Responde, sobre el plan YA GUARDADO, una pregunta que quedó pendiente al armarlo (hoy: «¿quieres un entregable para <subplan>?»,
+     * la opción «Después»). `yes` añade la propuesta determinista de entregable (estado «idea»), `no` descarta la pregunta y `later`
+     * la deja. Es lo único que cambia: ni temas ni reparto.
+     */
+    mentor_plan_answer(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const questionId = String(o.questionId ?? "deliverables");
+      if (questionId !== "deliverables") throw new ApiError("Pregunta desconocida.");
+      const answer = String(o.answer ?? (o.deliverable === true ? "yes" : o.deliverable === false ? "no" : ""));
+      if (!["yes", "no", "later"].includes(answer)) throw new ApiError("Respuesta inválida (yes, no o later).");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      const subplanId = String(o.subplanId ?? "");
+      const sub = plan.subplans.find((s) => s.id === subplanId);
+      if (!sub) throw new ApiError("Ese subplan ya no existe en el plan.");
+      if (!(plan.openQuestions ?? []).some((q) => q.id === questionId && q.subplanId === subplanId)) throw new ApiError("Esa pregunta ya no está pendiente.");
+      if (answer === "later") return plan;
+      const proposal = defaultDeliverable(sub.objective || sub.area);
+      const subplans = plan.subplans.map((s) =>
+        s.id === subplanId && answer === "yes" && !s.deliverable ? { ...s, deliverable: { title: proposal.title, description: proposal.description ?? "", criteria: proposal.criteria ?? [], status: "idea" as const } } : s,
+      );
+      const rest = (plan.openQuestions ?? []).filter((q) => !(q.id === questionId && q.subplanId === subplanId));
+      const { openQuestions: _q, ...base } = plan;
+      return st.save({ ...base, subplans, ...(rest.length ? { openQuestions: rest } : {}), updatedAt: new Date().toISOString() });
+    },
+
+    // ── Constructor guiado: el plan se arma por etapas y se pregunta al estudiante conforme se arma ──
+
+    /**
+     * Empieza a armar un plan paso a paso con las precondiciones del formulario. Calcula la primera etapa (con IA, una llamada pequeña
+     * si hay comentarios o preguntas que mejorar; sin IA, por reglas) y deja el estado en \`.notevault/mentor/plans/_building/<id>.json\`.
+     * No escribe ningún plan.
+     */
+    async mentor_plan_build_start(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const today = localDate();
+      const pre0 = sanitizePreconditions(o.preconditions && typeof o.preconditions === "object" ? o.preconditions : o, today);
+      const problem = preconditionsProblem(pre0, today);
+      if (problem) throw new ApiError(problem);
+      const ctx = buildCtx();
+      if (!ctx) return { loading: true as const };
+      const pre = withBranchInfo(pre0, ctx.all);
+      const wanted = o.id !== undefined ? String(o.id) : "";
+      if (!planCatalog(resolveScope(pre, ctx.all, ctx.goals), 100).length) {
+        throw new ApiError("No hay temas pendientes en lo que elegiste. Elige metas con temas enlazados o materias con temas sin completar.");
+      }
+      const now = new Date().toISOString();
+      const id = BUILD_ID_RE.test(wanted) && !builds().load(wanted) ? wanted : newBuildId();
+      return guarded(id, "start", () => withJob(`build:${id}`, "Preparando el alcance de tu plan…", async (job) => {
+        const first: PlanBuild = {
+          id, createdAt: now, updatedAt: now, pre, effective: pre, stage: "alcance", steps: [], answers: [], draft: null, skeleton: null,
+          source: "rules", questionCount: 0, maxQuestions: MAX_BUILD_QUESTIONS, status: "building", finishing: false, ai: emptyAi(), name: "",
+        };
+        return buildView(builds().save(await advance(first, ctx, false, job)));
+      }));
+    },
+
+    /** El estado guardado de un plan en construcción (sin recalcular: funciona aunque el índice de la vault esté frío). */
+    mentor_plan_build_get(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      return buildView(loadBuild(o.id));
+    },
+
+    /** Los planes en construcción (el último tocado primero), en resumen para la barra lateral, el resumen y el chat. */
+    mentor_plan_build_list() {
+      return builds().list().map(summaryOf);
+    },
+
+    /**
+     * Responde la pregunta abierta: \`choice\` (id de una opción), \`text\` (se interpreta como una opción solo si es inequívoco; las
+     * preguntas de la IA admiten texto libre), \`skip\` (valor por defecto) o \`delegate\` («que decida el Mentor»). La respuesta la aplica
+     * código determinista al recalcular. Un doble envío no duplica la llamada.
+     */
+    async mentor_plan_build_answer(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const b = loadBuild(o.id);
+      if (b.status !== "building" || !b.openQuestion) throw new ApiError("Este plan no tiene ninguna pregunta abierta.");
+      const q = b.openQuestion;
+      if (String(o.questionId ?? q.id) !== q.id) throw new ApiError("Esa pregunta ya no está abierta.");
+      const input: AnswerInput = { choice: o.choice === undefined ? undefined : String(o.choice), text: o.answer !== undefined ? String(o.answer) : o.text !== undefined ? String(o.text) : undefined, skip: o.skip === true, delegate: o.delegate === true };
+      const ctx = buildCtx();
+      if (!ctx) return { loading: true as const };
+      return guarded(b.id, `answer:${q.id}:${input.choice ?? ""}:${input.text ?? ""}:${input.skip}:${input.delegate}`, () =>
+        withJob(`build:${b.id}`, "Aplicando tu respuesta y preparando lo siguiente…", async (job) => {
+          let ans;
+          try {
+            ans = makeAnswer(q, input, new Date().toISOString());
+          } catch (e) {
+            throw new ApiError((e as Error).message);
+          }
+          return buildView(builds().save(await advance({ ...b, answers: [...b.answers, ans] }, ctx, false, job)));
+        }),
+      );
+    },
+
+    /** «Volver a una etapa» / «Cambiar respuesta»: descarta las respuestas de esa etapa en adelante y rehace desde ahí. */
+    async mentor_plan_build_back(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const b = loadBuild(o.id);
+      if (!isBuildStage(o.stage)) throw new ApiError("Etapa inválida.");
+      const stage = o.stage as BuildStage;
+      const ctx = buildCtx();
+      if (!ctx) return { loading: true as const };
+      return guarded(b.id, `back:${stage}`, () => withJob(`build:${b.id}`, "Rehaciendo desde esa etapa…", async (job) => buildView(builds().save(await advance({ ...b, answers: b.answers.filter((a) => stageIndex(a.stage) < stageIndex(stage)) }, ctx, false, job)))));
+    },
+
+    /** «Generar ya con lo que hay»: completa lo que falta con valores razonables (una llamada a la IA para los temas, o determinista) y pasa a Revisión. */
+    async mentor_plan_build_finish_now(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const b = loadBuild(o.id);
+      const ctx = buildCtx();
+      if (!ctx) return { loading: true as const };
+      return guarded(b.id, "finish", () => withJob(`build:${b.id}`, "Completando lo que falta con valores razonables…", async (job) => buildView(builds().save(await advance({ ...b, finishing: true }, ctx, true, job)))));
+    },
+
+    /** «Abandonar»: el estado va a la papelera de la vault (`.notevault/.papelera/mentor-plans`). */
+    mentor_plan_build_abandon(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const b = loadBuild(o.id);
+      if (inflight.has(b.id)) throw new ApiError("El Mentor sigue pensando en este plan. Espera un momento.");
+      if (!builds().trash(b.id)) throw new ApiError("No se pudo abandonar el plan en construcción.");
+      return { id: b.id, builds: builds().list().map(summaryOf) };
+    },
+
+    /**
+     * «Aceptar plan» de un plan en construcción: recalcula TODO desde las precondiciones y las respuestas (no se fía del estado que
+     * mande la UI), exige estar en Revisión y escribe el plan por el camino de siempre (que vuelve a validar temas, metas, proyectos y
+     * capacidad). Después el estado de construcción se elimina.
+     */
+    mentor_plan_build_accept(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const b = loadBuild(o.id);
+      if (inflight.has(b.id)) throw new ApiError("El Mentor sigue pensando en este plan. Espera un momento.");
+      const ctx = buildCtx();
+      if (!ctx) return { loading: true as const };
+      const comp = computeBuild({ pre: b.pre, answers: b.answers, ai: b.ai, maxQuestions: b.maxQuestions }, ctx, { finishing: b.finishing, noAi: true });
+      if (comp.status !== "review" || !comp.draft) throw new ApiError("Al plan aún le faltan etapas: responde las preguntas o pulsa «Generar ya con lo que hay».");
+      const out = acceptRef({ draft: comp.draft, proposed: true });
+      builds().remove(b.id);
+      return out;
+    },
+
+    // ── Estado y cancelación de las llamadas largas de la IA (generar plan, constructor, chat, cambios) ──
+
+    /** ¿Sigue pensando la IA? Claves: `generate`, `chat`, `build:<id>`, `change:<id>`. `label` dice qué hace; `elapsed`, los segundos. */
+    mentor_ai_status(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const j = jobs.get(String(o.key ?? ""));
+      return j ? { busy: true as const, label: j.label, elapsed: Math.round((Date.now() - j.since) / 1000) } : { busy: false as const, label: "", elapsed: 0 };
+    },
+
+    /** Cancela una llamada larga: `mode: "abort"` (por defecto) la aborta sin efectos; `mode: "auto"` sigue con el plan automático (sin IA). */
+    mentor_ai_cancel(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const j = jobs.get(String(o.key ?? ""));
+      if (!j) return { cancelled: false };
+      j.cancelled = o.mode === "auto" ? "auto" : "abort";
+      for (const w of [...j.waiters]) w(new CancelError(j.cancelled));
+      return { cancelled: true };
+    },
+
+    // ── Plan propuesto: mantener / borrar, y pedir cambios con comentarios ──
+
+    /** «Mantener plan»: el plan propuesto deja de serlo (pasa a activo o futuro según sus fechas). «Borrar» es `mentor_plan_delete` (papelera). */
+    mentor_plan_keep(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (!plan.proposed) throw new ApiError("Ese plan ya está mantenido.");
+      const { proposed: _p, ...rest } = plan;
+      return st.save({ ...rest, updatedAt: new Date().toISOString() });
+    },
+
+    /** El historial de cambios pedidos a un plan (sin las instantáneas). */
+    mentor_plan_changes(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      return new ChangeStore(app.root).list(id).map(viewOf);
+    },
+
+    /**
+     * Pedir cambios al plan con un comentario (o con operaciones de ajuste calculadas por la app: `ops`). La IA lo traduce a un parche
+     * validado; sin IA, o si falla, hay un intérprete por palabras clave; lo que no se entiende queda como «pendiente» (el texto no se
+     * pierde). El reparto semanal se recalcula siempre con la capacidad real. Cada cambio guarda una instantánea para «Deshacer».
+     */
+    async mentor_plan_change(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      const comment = sanitizeNotes(o.comment, MAX_COMMENT_CHARS);
+      const direct: ChangeOp[] | null = Array.isArray(o.ops)
+        ? (o.ops as any[])
+            .filter((x) => x && ["trim_to_fit", "extend_to", "raise_minutes", "lighter"].includes(String(x.op)))
+            .map((x) => (x.op === "extend_to" ? { op: "extend_to" as const, date: String(x.date ?? "") } : x.op === "raise_minutes" ? { op: "raise_minutes" as const, minutes: Number(x.minutes) } : { op: x.op as "trim_to_fit" | "lighter" }))
+        : null;
+      if (!comment && !direct?.length) throw new ApiError("Escribe qué quieres cambiar en el plan.");
+      if (studyIndexCold(app)) return { loading: true as const };
+      return guarded(`plan:${id}`, `change:${comment}:${JSON.stringify(direct)}`, () =>
+        withJob(`change:${id}`, "Aplicando tu comentario al plan…", async (job) => {
+          const today = localDate();
+          const all = buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 });
+          const ctx = { today, all, startFocus: practiceStartFocus(app) };
+          const hist = new ChangeStore(app.root);
+          const label = comment || String(o.label ?? "Ajuste propuesto por la app").slice(0, 200);
+          let ops: ChangeOp[] = direct ?? [];
+          let summary = "";
+          let source: ChangeEntry["source"] = direct ? "rules" : "none";
+          let note = "";
+          if (!direct) {
+            const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+            if (o.noAi !== true && aiUnavailableReason(cfg) === null) {
+              try {
+                const pre = plan.preconditions;
+                const scope = pre ? resolveScope(pre, all, goalScopes(app)) : null;
+                const inPlan = new Set(plan.subplans.flatMap((s) => s.topics.map((t) => t.folder)));
+                const base = scope ? planCatalog(scope, dynamicCatalogMax(pre!, scope, today), comment) : buildTopicCatalog(topicSnaps(app), comment, { max: 120 });
+                // ramas excluidas que el comentario nombra de forma explícita (el estudiante manda)
+                const named = fold(comment);
+                const extraClasses = detectBranchIntent(comment).extra;
+                const extra = all.filter((t) => t.completenessPct < 100 && branchOfFolder(t.folder) && (extraClasses.includes(classifyBranch(branchOfFolder(t.folder)) as never) || named.includes(fold(branchOfFolder(t.folder)).replace(/^[\d.\s_-]+/, "")))).slice(0, 150);
+                const catalog = [...new Map([...base, ...extra].filter((t) => !inPlan.has(t.folder) && t.completenessPct < 100).map((t) => [t.folder, t])).values()].slice(0, 320);
+                const brief = buildStudentBrief(briefContext(app, log()));
+                const parsed = parseChangeReply(await job.send(changeMessages(brief, plan, comment, catalog, hist.list(id))), plan, catalog, comment);
+                if (parsed.ok && parsed.ops.length) {
+                  ops = parsed.ops;
+                  summary = parsed.summary;
+                  source = "ai";
+                } else note = parsed.ok ? parsed.summary || "La IA no propuso ningún cambio aplicable." : (parsed.reason ?? "La IA no devolvió un parche válido.");
+              } catch (e) {
+                if (e instanceof CancelError && e.mode === "abort") note = "Cancelaste la llamada: el comentario queda pendiente.";
+                else note = e instanceof CancelError ? "Pediste seguir sin IA." : `La IA falló: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200);
+                if (e instanceof CancelError && e.mode === "abort") ops = [];
+              }
+            } else note = o.noAi === true ? "Sin IA por petición tuya." : "La IA no está configurada.";
+            if (!ops.length && !note.startsWith("Cancelaste")) {
+              const r = opsFromText(comment, plan, ctx);
+              if (r.ops.length) {
+                ops = r.ops;
+                summary = r.summary;
+                source = "rules";
+              }
+            }
+          }
+          let res = ops.length ? applyOps(plan, ops, ctx) : null;
+          if (res && !res.applied && source === "ai") {
+            const r = opsFromText(comment, plan, ctx);
+            res = r.ops.length ? applyOps(plan, r.ops, ctx) : res;
+            if (res.applied) {
+              summary = r.summary;
+              source = "rules";
+            }
+          }
+          const now = new Date().toISOString();
+          if (!res || !res.applied) {
+            const entry = hist.append(id, {
+              at: now,
+              comment: label,
+              status: "pending",
+              source: "none",
+              summary: `${note ? `${note} ` : ""}${ops.length ? "Los cambios pedidos no modificaron nada." : "No pude aplicar este comentario: queda guardado como pendiente. Reescríbelo o usa frases como «quita desktop» o «pasa X a la semana 5»."}`.trim(),
+              delta: { added: 0, removed: 0, moved: 0, deliverables: 0 },
+              changed: [],
+              warnings: [],
+              fixOptions: [],
+            });
+            return { loading: false as const, plan, entry: viewOf(entry), history: hist.list(id).map(viewOf), applied: false };
+          }
+          const saved = st.save(res.plan);
+          const entry = hist.append(id, {
+            at: now,
+            comment: label,
+            status: "applied",
+            source,
+            summary: summary || deltaText(res.delta),
+            delta: res.delta,
+            changed: res.changed,
+            warnings: res.warnings,
+            fixOptions: res.fixOptions,
+            before: plan,
+          });
+          return { loading: false as const, plan: saved, entry: viewOf(entry), history: hist.list(id).map(viewOf), applied: true };
+        }),
+      );
+    },
+
+    /** «Deshacer» el último cambio aplicado: restaura la instantánea previa (conserva el nombre y si el plan está propuesto o mantenido). */
+    mentor_plan_change_undo(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const cur = st.load(id);
+      if (!cur) throw new ApiError("Ese plan ya no existe.");
+      const hist = new ChangeStore(app.root);
+      const last = [...hist.list(id)].reverse().find((e) => e.status === "applied" && e.before);
+      if (!last?.before) throw new ApiError("No hay ningún cambio que deshacer.");
+      const { proposed: _p, archived: _a, name: _n, ...base } = last.before;
+      const restored = st.save({ ...base, ...(cur.proposed ? { proposed: true } : {}), ...(cur.archived ? { archived: true } : {}), ...(cur.name ? { name: cur.name } : {}), updatedAt: new Date().toISOString() });
+      hist.save(id, { ...last, status: "undone" });
+      return { plan: restored, history: hist.list(id).map(viewOf) };
+    },
+  };
+  acceptRef = api.mentor_plan_draft_accept;
+  return {
+    ...api,
+    /** Compatibilidad: el flujo anterior (un BORRADOR en el chat que se acepta aparte); el camino principal crea el plan propuesto. */
+    mentor_plan_generate_draft: (opts: unknown) => api.mentor_plan_generate({ ...((opts && typeof opts === "object" ? opts : {}) as object), asDraft: true }),
   };
 }

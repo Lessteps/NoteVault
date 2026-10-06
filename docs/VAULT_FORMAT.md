@@ -784,6 +784,8 @@ ignorarlo, y no sube `FORMAT_VERSION`.
 | `mentor_chat` | `.notevault/mentor/chat.json` — (antiguo) la única conversación con el Mentor; solo se lee para migrarla |
 | `mentor_chat_file` | `.notevault/mentor/chats/<id>.json` — una conversación con el Mentor |
 | `mentor_chats_index` | `.notevault/mentor/chats/index.json` — la conversación activa y la marca de migración |
+| `mentor_plan_build` | `.notevault/mentor/plans/_building/<id>.json` — plan EN CONSTRUCCIÓN (constructor guiado, ver «Plan del Mentor»); `mentor_plan_builds_dir` es la carpeta |
+| `mentor_plan_history` | `.notevault/mentor/plans/_history/<plan>/<n>.json` — un cambio pedido al plan con comentarios; `mentor_plan_history_dir` es la carpeta |
 | `mentor_plan` | `.notevault/mentor/plans/<id>.json` — un plan del Mentor sobre un periodo libre (ver «Plan del Mentor»); `<id>` es `<inicio>_<fin>` o, en los planes mensuales heredados, `AAAA-MM`; `mentor_plans_dir` es la carpeta |
 
 ```json
@@ -941,6 +943,27 @@ aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`
 - La IA propone el plan (`plan_draft` en la conversación o desde el formulario de precondiciones, con temas del
   catálogo real y metas existentes; las precondiciones son hechos fijos que no puede cambiar); sin IA la app
   genera un plan automático determinista. Solo se escribe este archivo cuando el estudiante pulsa «Aceptar plan».
+
+#### Plan propuesto, comentarios y constructor guiado (aditivo; sin subir `FORMAT_VERSION`)
+
+- **`proposed: true`** (opcional) en `plans/<id>.json`: el plan lo creó el Mentor (generación completa o fin del constructor guiado) y el estudiante aún no lo
+  mantiene. Es un plan REAL con su sub-interfaz, pero no cuenta como activo: no alimenta «Hoy» ni «Esta semana» y no reserva tiempo.
+  «Mantener plan» quita el campo; «Borrar» manda el archivo a `.notevault/.papelera/mentor-plans/`. Los planes anteriores no lo tienen.
+- `preconditions.branches` (área → ramas incluidas; la rama es el 2.º segmento de la carpeta del tema, p. ej. `4 Backend`), `branchPreset`
+  (`fullstack` · `backend` · `frontend` · `desktop` · `mobile` · `all`) y `branchExcluded` (solo para explicarlo). Sin `branches` para un área entran todas
+  sus ramas. Las ramas excluidas no entran al catálogo que ve la IA, ni al plan automático, ni al aceptar.
+- `topics[].pinned: true`: el estudiante fijó la semana del tema con un comentario; el reparto no la mueve.
+- **Historial de cambios** `plans/_history/<plan>/<n>.json`: `{n, at, comment, status: "applied"|"pending"|"undone", source: "ai"|"rules"|"none", summary,
+  delta: {added, removed, moved, deliverables}, changed: [carpetas], warnings, fixOptions, before: <el plan antes del cambio>}`. «Deshacer» restaura `before`.
+  Un comentario que no se pudo aplicar queda como `pending` (el texto no se pierde). El parche que propone la IA (`add_topic`, `remove_topic`, `move_topic`,
+  `remove_subplan`, `add_subplan`, `set_deliverable`, `set_practice`, `set_note`, `lighter`) se valida contra el plan y el catálogo real, y el reparto semanal
+  se recalcula siempre de forma determinista; nada fuera del archivo del plan se toca.
+- **Plan en construcción** `plans/_building/<id>.json`: `{id, createdAt, updatedAt, pre (precondiciones del formulario), effective (tras las decisiones),
+  stage: alcance|esqueleto|temas|capacidad|practica|entregables|revision, steps, answers: [{questionId, stage, kind, question, choice, label, text?, skipped?, at}],
+  draft (parcial, completo en la revisión), skeleton, openQuestion, source: "ai"|"rules", questionCount, maxQuestions (6), status: "building"|"review"|"abandoned",
+  finishing, ai: {lo que la IA aportó y la app validó}, name}`. El estado se REPRODUCE desde `pre` + `answers`; al crear el plan se recalcula todo y el archivo se
+  elimina; «Abandonar» lo manda a `.notevault/.papelera/mentor-plans/`. `plans/` solo lee los `*.json` de primer nivel, así que `_building` y `_history` no son planes.
+- `openQuestions` pendientes («Después») se responden también sobre el plan ya guardado con `mentor_plan_answer` (yes añade la propuesta de entregable, no la descarta).
 
 ## Contrato móvil (Mobile Contract)
 

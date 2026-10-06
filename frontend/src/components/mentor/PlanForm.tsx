@@ -6,13 +6,15 @@
 // «Generar plan» deja un BORRADOR (la IA elige y ordena temas; sin IA, un plan automático): no escribe nada
 // hasta «Aceptar plan».
 
-import { CalendarRange, Loader2, Sparkles, X } from "lucide-react";
+import { CalendarRange, ListChecks, Loader2, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
+  BRANCH_PRESETS,
   capacityOf,
   coverage,
   DEFAULT_PRACTICE,
+  detectBranchIntent,
   isDate,
   KATA_CHOICES,
   LEVELS,
@@ -21,11 +23,13 @@ import {
   PACES,
   PERIOD_PRESETS,
   periodLabel,
+  presetBranches,
   presetEnd,
   preconditionsProblem,
   sanitizePreconditions,
   selectionOf,
   weeksLabel,
+  type BranchPresetKey,
   type DeliverablesMode,
   type PeriodPresetKey,
   type PlanLevel,
@@ -33,16 +37,17 @@ import {
   type PlanPreconditions,
 } from "../../lib/planTime";
 import { api } from "../../lib/bridge";
+import { newBuildId } from "../../lib/planBuild";
 import { capacityWithPractice, FOCUS_LABEL, PRACTICE_FOCUSES, PRACTICE_NAME, type PracticeFocus } from "../../lib/practiceTrack";
 import type { MentorPlanOptions } from "../../lib/types";
 import { useApp } from "../../store/app";
-import { useMentor } from "../../store/mentor";
+import { planViewId, useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { GhostButton, input, Label, PrimaryButton } from "../common/forms";
 import { Panel } from "../common/StatTile";
 import { cn } from "../ui";
 import { PRESETS } from "./MentorToday";
-import { ChipToggle } from "./parts";
+import { ChipToggle, ThinkingStatus, useAiStatus } from "./parts";
 
 type Loaded = Extract<MentorPlanOptions, { loading: false }>;
 
@@ -82,6 +87,8 @@ interface Remembered {
   minutesPerSession?: number;
   monthly?: boolean;
   practiceFocus?: "rotate" | PracticeFocus;
+  /** último preset de ramas elegido (full stack, backend…) */
+  branchPreset?: BranchPresetKey;
 }
 
 export const DELIVERABLE_OPTIONS: Array<{ mode: DeliverablesMode; label: string }> = [
@@ -120,14 +127,19 @@ function savedMinutesFromToday(): number | undefined {
   }
 }
 
+/** «4 Backend» → «Backend»: el nombre de una rama sin su número de orden. */
+const cleanBranch = (n: string): string => n.replace(/^[\d.\s_-]+/, "");
+
 /** "4 h" / "2 h 30 min" para el resumen. */
 const num1 = (n: number): string => String(Math.round(n * 10) / 10).replace(".", ",");
 const hoursText = (min: number): string => `${num1(min / 60)} h`;
 
 export function PlanForm({ onClose }: { onClose: () => void }) {
   const toast = useApp((s) => s.toast);
-  const generatePlan = useMentor((s) => s.generatePlan);
+  const createPlan = useMentor((s) => s.createPlan);
+  const loadBuilds = useMentor((s) => s.loadBuilds);
   const generating = useMentor((s) => s.generatingPlan);
+  const [startingBuild, setStartingBuild] = useState<string | null>(null);
   const mem = useMemo(remembered, []);
   const t0 = today();
 
@@ -162,6 +174,10 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   const [notes, setNotes] = useState("");
   const touchedGoals = useRef(false);
   const alive = useRef(true);
+  // ramas de las materias elegidas (área → ramas incluidas); sin entrada = todas
+  const [branchSel, setBranchSel] = useState<Record<string, string[]>>({});
+  const [branchPreset, setBranchPreset] = useState<BranchPresetKey | undefined>(mem.branchPreset);
+  const touchedBranches = useRef(false);
 
   useEffect(() => {
     alive.current = true;
@@ -193,16 +209,29 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
+  // materias elegidas con ramas (carpetas de primer nivel dentro de la materia)
+  const branchAreas = useMemo(() => (options?.areas ?? []).filter((a) => subjects.includes(a.id) && (a.branches?.length ?? 0) >= 2), [options, subjects]);
+  const branches = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    for (const a of branchAreas) {
+      const names = a.branches!.map((b) => b.name);
+      const list = (branchSel[a.id] ?? names).filter((n) => names.includes(n));
+      if (list.length && list.length < names.length) out[a.id] = list;
+    }
+    return out;
+  }, [branchAreas, branchSel]);
+  const excludedBranches = useMemo(() => branchAreas.flatMap((a) => (branches[a.id] ? a.branches!.map((b) => b.name).filter((n) => !branches[a.id]!.includes(n)) : [])), [branchAreas, branches]);
   const pre: PlanPreconditions = useMemo(
     () =>
       sanitizePreconditions(
         {
           start, end, minutesPerDay: minutes, studyDays: days, blockedDates: blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes,
+          ...(Object.keys(branches).length ? { branches, ...(branchPreset ? { branchPreset } : {}), branchExcluded: excludedBranches } : {}),
           ...(practiceOn ? { practice: { kataMinutes, sessionsPerWeek, minutesPerSession, monthly, focus: practiceFocus } } : {}),
         },
         t0,
       ),
-    [start, end, minutes, days, blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, t0],
+    [start, end, minutes, days, blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes, branches, branchPreset, excludedBranches, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, t0],
   );
   // sanitizePreconditions corrige lo inválido; para el aviso se mira lo que el estudiante escribió
   const rawProblem = !isDate(start) || !isDate(end) ? "Indica las fechas de inicio y fin del periodo." : end < start ? "La fecha de fin es anterior a la de inicio." : null;
@@ -224,6 +253,37 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!touchedPractice.current) setPracticeOn(hasProgramming);
   }, [hasProgramming]);
+
+  // detección automática: «full stack» preselecciona ese preset; si nombras móvil/escritorio, esa rama entra (el estudiante manda)
+  useEffect(() => {
+    if (touchedBranches.current || !options) return;
+    const goalNames = options.goals.filter((g) => goalIds.includes(g.id)).map((g) => g.name).join(" ");
+    const found = detectBranchIntent(`${freeObjective} ${goalNames} ${notes}`);
+    const key = found.preset ?? (mem.branchPreset && mem.branchPreset !== "all" ? mem.branchPreset : null);
+    const next: Record<string, string[]> = {};
+    if (key) for (const a of branchAreas) next[a.id] = presetBranches(key, a.branches!.map((b) => b.name), found.extra);
+    setBranchSel(next);
+    setBranchPreset(key ?? undefined);
+  }, [options, branchAreas, goalIds, freeObjective, notes, mem.branchPreset]);
+  const pickBranchPreset = (key: BranchPresetKey) => {
+    touchedBranches.current = true;
+    setBranchPreset(key);
+    setBranchSel(Object.fromEntries(branchAreas.map((a) => [a.id, presetBranches(key, a.branches!.map((b) => b.name))])));
+  };
+  const toggleBranch = (area: string, name: string, all: string[]) => {
+    touchedBranches.current = true;
+    setBranchPreset(undefined);
+    setBranchSel((cur) => {
+      const list = cur[area] ?? all;
+      const next = list.includes(name) ? list.filter((x) => x !== name) : [...list, name];
+      return next.length ? { ...cur, [area]: next } : cur;
+    });
+  };
+  const addExcludedBranches = () => {
+    touchedBranches.current = true;
+    setBranchSel({});
+    setBranchPreset("all");
+  };
 
   const pickPreset = (key: PeriodPresetKey) => {
     setPreset(key);
@@ -248,17 +308,50 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   const submit = async () => {
     if (problem) return toast("error", problem);
     if (nothingChosen) return toast("error", "Elige qué quieres cubrir: una meta, una materia o escribe otro objetivo.");
-    const r = await generatePlan(pre);
+    remember();
+    const r = await createPlan(pre);
     if (!r) return;
+    toast("info", r.source === "auto" ? "Plan propuesto creado (automático). Revísalo y mantenlo o bórralo." : "Plan propuesto creado. Revísalo y mantenlo o bórralo.");
+    if (alive.current) {
+      useNavState.getState().set("mentor.view", planViewId(r.planId));
+      onClose();
+    }
+  };
+  const remember = () => {
     try {
-      localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: pre.minutesPerDay, studyDays: pre.studyDays, pace: pre.pace, deliverables: pre.deliverables, preset: preset === "custom" ? undefined : preset, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus } satisfies Remembered));
+      localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: pre.minutesPerDay, studyDays: pre.studyDays, pace: pre.pace, deliverables: pre.deliverables, preset: preset === "custom" ? undefined : preset, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, ...(branchAreas.length && branchPreset ? { branchPreset } : {}) } satisfies Remembered));
     } catch {
       /* sin almacenamiento: no se recuerda */
     }
-    toast("info", r.source === "auto" ? "Borrador listo (plan automático). Revísalo y acéptalo." : "Borrador listo. Revísalo y acéptalo.");
-    useNavState.getState().set("mentor.view", "plan");
-    onClose();
   };
+  /** «Armar paso a paso»: el plan se va construyendo con preguntas; no escribe ningún plan hasta crearlo en la revisión. */
+  const startGuided = async () => {
+    if (generating || startingBuild) return;
+    if (problem) return toast("error", problem);
+    if (nothingChosen) return toast("error", "Elige qué quieres cubrir: una meta, una materia o escribe otro objetivo.");
+    remember();
+    const id = newBuildId();
+    setStartingBuild(id);
+    try {
+      let r = await api.mentorPlanBuildStart(pre, id);
+      for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
+        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        r = await api.mentorPlanBuildStart(pre, id);
+      }
+      if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
+      await loadBuilds();
+      if (alive.current) {
+        useNavState.getState().set("mentor.view", `build:${r.build.id}`);
+        onClose();
+      }
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      if (alive.current) setStartingBuild(null);
+    }
+  };
+  const gen = useAiStatus("generate", generating);
+  const guided = useAiStatus(startingBuild ? `build:${startingBuild}` : "build:", !!startingBuild);
 
   const goalsWithEnd = (options?.goals ?? []).filter((g) => goalIds.includes(g.id) && g.end && g.end >= t0).slice(0, 4);
 
@@ -449,6 +542,37 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
                   <p className="mt-1 text-[12px] text-faint">Aún no hay temas de estudio en tu vault.</p>
                 )}
               </div>
+              {branchAreas.map((a) => {
+                const names = a.branches!.map((b) => b.name);
+                const current = branchSel[a.id] ?? names;
+                return (
+                  <div key={a.id} data-testid="branch-picker" className="space-y-1.5 rounded-lg border border-line p-2">
+                    <Label>Ramas de {a.name}</Label>
+                    <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Preset de ramas de ${a.name}`}>
+                      {BRANCH_PRESETS.map((p) => (
+                        <ChipToggle key={p.key} active={JSON.stringify([...current].sort()) === JSON.stringify([...presetBranches(p.key, names)].sort())} onClick={() => pickBranchPreset(p.key)} title={p.key === "fullstack" ? "Fundamentos + lenguajes + Backend + Frontend + Databases + Tooling (sin Desktop ni Mobile)" : undefined}>
+                          {p.label}
+                        </ChipToggle>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Ramas de ${a.name}`}>
+                      {a.branches!.map((b) => (
+                        <ChipToggle key={b.name} active={current.includes(b.name)} onClick={() => toggleBranch(a.id, b.name, names)} title={`${b.pending} temas pendientes de ${b.total}`}>
+                          {b.name} <span className="text-[11px] text-faint">· {b.pending}</span>
+                        </ChipToggle>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {excludedBranches.length > 0 && (
+                <p className="flex flex-wrap items-center gap-2 text-[12px] text-dim" data-testid="branch-note">
+                  <span>
+                    {branchPreset === "fullstack" ? `Excluí ${excludedBranches.map(cleanBranch).join(" y ")} porque pediste full stack. Añádelos si los quieres.` : `Ramas fuera del plan: ${excludedBranches.map(cleanBranch).join(", ")}.`}
+                  </span>
+                  <GhostButton onClick={addExcludedBranches}>Añadir {excludedBranches.map(cleanBranch).join(" y ")}</GhostButton>
+                </p>
+              )}
               <label className="block">
                 <span className="text-[12px] text-dim">Otro objetivo (opcional)</span>
                 <input value={freeObjective} onChange={(e) => setFreeObjective(e.target.value)} placeholder="Ej.: cerrar el tema de límites" className={input} maxLength={300} />
@@ -627,14 +751,19 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <PrimaryButton onClick={() => void submit()} disabled={generating || !!problem || nothingChosen}>
+        <PrimaryButton onClick={() => void submit()} disabled={generating || !!startingBuild || !!problem || nothingChosen}>
           {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Generar plan
         </PrimaryButton>
+        <GhostButton onClick={() => void startGuided()} className={generating || !!startingBuild || !!problem || nothingChosen ? "opacity-50" : ""} title="El Mentor va armando el plan por etapas y te pregunta lo que haga falta">
+          {startingBuild ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />} Armar paso a paso (con preguntas)
+        </GhostButton>
         <GhostButton onClick={onClose}>Cancelar</GhostButton>
         <span className="text-[11.5px] text-faint">
-          {options && !options.aiConfigured ? "La IA no está configurada: se generará un plan automático con lo que elegiste." : "No se escribe nada hasta que aceptes el borrador."}
+          {options && !options.aiConfigured ? "La IA no está configurada: se generará un plan automático con lo que elegiste." : "Se crea el plan completo, propuesto: lo mantienes o lo borras, y puedes pedirle cambios con comentarios."}
         </span>
       </div>
+      {generating && <ThinkingStatus label={gen.label || "Generando el plan completo…"} elapsed={gen.elapsed} onCancel={() => void api.mentorAiCancel("generate", "abort")} onAuto={() => void api.mentorAiCancel("generate", "auto")} autoLabel="Generar con plan automático (sin IA)" />}
+      {startingBuild && <ThinkingStatus label={guided.label || "Preparando el alcance de tu plan…"} elapsed={guided.elapsed} onCancel={() => void api.mentorAiCancel(`build:${startingBuild}`, "abort")} onAuto={() => void api.mentorAiCancel(`build:${startingBuild}`, "auto")} />}
     </section>
   );
 }

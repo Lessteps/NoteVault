@@ -1,4 +1,5 @@
 import type { PlanPreconditions, ScopeTopic } from "./planTime";
+import type { BuildAnswer, BuildQuestion, BuildStage } from "./planBuild";
 import type { PracticeItem, PracticeTrack, PhaseStatus, PracticePhase } from "./practiceTrack";
 // Shapes returned by notevault_app/webapp/api.py. Keep in step with it.
 
@@ -1378,6 +1379,8 @@ export interface MentorChatTurn {
   discarded?: boolean;
   planDraft?: MentorPlanDraft;
   acceptedPlan?: string;
+  /** plan propuesto que el Mentor creó en este turno */
+  createdPlan?: string;
 }
 export interface MentorChatState { id?: string | null; title?: string; turns: MentorChatTurn[]; pending: string | null }
 export type MentorChatResult =
@@ -1388,7 +1391,7 @@ export type MentorChatResult =
 export type MentorDeliverableStatus = "idea" | "en_curso" | "hecho";
 export type MentorTopicState = "sin_tratar" | "practicando" | "consolidado" | "completo" | "examen_pendiente" | "no_encontrado";
 export interface MentorPlannedTopic {
-  folder: string; title: string; skills?: string[]; targetWeek: number; estMinutes: number; completedAt?: string; diagnostic?: boolean;
+  folder: string; title: string; skills?: string[]; targetWeek: number; estMinutes: number; completedAt?: string; diagnostic?: boolean; pinned?: boolean;
 }
 export interface MentorWeekSlice { week: number; start: string; end: string; topics: string[]; minutes: number; capacityMinutes: number }
 export interface MentorRequiredGoal { goalId: string; itemId?: string; note: string }
@@ -1400,7 +1403,7 @@ export interface MentorSubplan {
 /** Decisión pendiente al armar el plan (hoy: entregables «a discutir»). */
 export interface MentorOpenQuestion { id: string; subplanId?: string; text: string; options: string[] }
 export interface MentorPlan {
-  id: string; start: string; end: string; month?: string; name?: string; archived?: boolean; createdAt: string; updatedAt: string;
+  id: string; start: string; end: string; month?: string; name?: string; archived?: boolean; proposed?: boolean; createdAt: string; updatedAt: string;
   hoursPerWeek?: number; preconditions?: PlanPreconditions; auto?: boolean; rationale?: string; subplans: MentorSubplan[];
   /** pista Programming practice: kata diario + proyecto semanal full stack (+ mensual) */
   programmingPractice?: PracticeTrack;
@@ -1425,6 +1428,8 @@ export interface MentorPlanDraft {
   why: Record<string, string>;
   programmingPractice?: PracticeTrack;
   openQuestions?: MentorOpenQuestion[];
+  weights?: Record<string, number>;
+  compact?: boolean;
 }
 /** Estado derivado de la práctica de un plan (módulo `programming_practice` + registro manual de «Hoy»). */
 export interface MentorPracticeStatus {
@@ -1447,7 +1452,7 @@ export type MentorPlanGet =
       items: MentorPlanItem[]; practiceItems?: PracticeItem[]; practice?: MentorPracticeStatus | null;
       months: string[]; plans: MentorPlanRow[]; aiConfigured: boolean;
     };
-export type MentorPlanStatus = "activo" | "futuro" | "terminado";
+export type MentorPlanStatus = "activo" | "futuro" | "terminado" | "propuesto";
 export interface MentorPlanRow {
   id: string; start: string; end: string; month?: string; name: string; period: string; status: MentorPlanStatus; archived: boolean; auto: boolean;
   subplans: number; topics: number; completed: number; pct: number; minutesPerDay: number | null; programmingPractice?: boolean;
@@ -1460,12 +1465,36 @@ export type MentorPlanOptions =
   | {
       loading: false; today: string; aiConfigured: boolean;
       goals: Array<{ id: string; name: string; area: string; end: string | null; topics: number; minutes: number }>;
-      areas: Array<{ id: string; name: string; total: number; pending: number; minutes: number }>;
+      areas: Array<{ id: string; name: string; total: number; pending: number; minutes: number; branches?: Array<{ name: string; total: number; pending: number; kind: string }> }>;
       topics: ScopeTopic[];
     };
 export type MentorPlanGenerateResult =
   | { loading: true }
-  | ({ loading: false; kind: "plan_draft"; source: "ai" | "auto"; text: string; planDraft: MentorPlanDraft; chatId: string } & MentorChatState);
+  | ({ loading: false; kind: "plan_draft"; source: "ai" | "auto"; text: string; planDraft: MentorPlanDraft; chatId: string } & MentorChatState)
+  | ({ loading: false; kind: "plan_created"; source: "ai" | "auto"; text: string; planId: string; planDraft: MentorPlanDraft; chatId: string } & MentorChatState);
+
+// ── Constructor guiado del plan (core/mentor/planBuild.ts) ──
+export interface MentorBuildStep { stage: BuildStage; state: "done" | "current" | "pending"; summary: string }
+export interface MentorSkeletonRow { key: string; area: string; objective: string; topics: number; minutes: number; hours: number; sharePct: number }
+export interface MentorPlanBuild {
+  id: string; createdAt: string; updatedAt: string; pre: PlanPreconditions; effective: PlanPreconditions; stage: BuildStage; steps: MentorBuildStep[];
+  answers: BuildAnswer[]; draft: MentorPlanDraft | null; skeleton: MentorSkeletonRow[] | null; openQuestion?: BuildQuestion; source: "ai" | "rules";
+  questionCount: number; maxQuestions: number; status: "building" | "review" | "abandoned"; finishing: boolean; name: string;
+}
+export interface MentorBuildSummary {
+  id: string; name: string; period: string; stage: BuildStage; stageNumber: number; stages: number; status: "building" | "review" | "abandoned";
+  question: string | null; questionId?: string; options?: Array<{ id: string; label: string }>; allowText?: boolean; updatedAt: string; source: "ai" | "rules";
+}
+export type MentorBuildResult = { loading: true } | { loading: false; build: MentorPlanBuild; summary: MentorBuildSummary };
+/** Estado de una llamada larga de la IA («pensando…»). */
+export interface MentorAiStatus { busy: boolean; label: string; elapsed: number }
+export interface MentorChangeDelta { added: number; removed: number; moved: number; deliverables: number }
+export interface MentorFixOption { id: string; label: string; op: Record<string, unknown> }
+export interface MentorChangeEntry {
+  n: number; at: string; comment: string; status: "applied" | "pending" | "undone"; source: "ai" | "rules" | "none"; summary: string;
+  delta: MentorChangeDelta; changed: string[]; warnings: string[]; fixOptions: MentorFixOption[];
+}
+export type MentorChangeResult = { loading: true } | { loading: false; plan: MentorPlan; entry: MentorChangeEntry; history: MentorChangeEntry[]; applied: boolean };
 export interface MentorGoalCreated { goalId: string; name: string; items: number; schedule: MentorGoalSchedule }
 export interface MentorGoalItemSlim {
   id: string; parent: string; name: string; status: string; due: string | null; start: string | null;

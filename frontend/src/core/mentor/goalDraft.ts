@@ -131,10 +131,9 @@ export const GOAL_SYSTEM_PROMPT = [
   '{ "type": "goal_draft", "name": string, "area"?: string, "rationale": string, "hoursPerWeek": number, "durationWeeks": number, "topics": [ { "folder": string, "skills"?: string[], "why": string } ], "milestones"?: string[] }',
 ].join("\n");
 
-const hm = (min: number): string => (min >= 60 ? `${Math.round((min / 60) * 10) / 10} h` : `${min} min`);
 
 function catalogLine(t: CatalogTopic): string {
-  return `- folder=${t.folder} | ${t.title} | materia: ${t.subject} | skills: ${t.skills.join(", ") || "-"} | completo: ${t.completenessPct}% | est: ${hm(t.estMinutes)}`;
+  return `- folder=${t.folder} | ${t.estMinutes}m | ${t.skills.map((k) => k.slice(0, 5)).join(",") || "-"}`;
 }
 
 export interface GoalPromptExtras {

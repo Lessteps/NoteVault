@@ -65,7 +65,7 @@ afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 async function generate(over: Record<string, unknown> = {}, send?: any) {
   const api = mentorApi(app, send ?? vi.fn());
-  const res: any = await api.mentor_plan_generate({ preconditions: pre(over) });
+  const res: any = await api.mentor_plan_generate_draft({ preconditions: pre(over) });
   return { api, res, draft: res.planDraft };
 }
 

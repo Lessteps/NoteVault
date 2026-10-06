@@ -6,15 +6,18 @@
 // y propone un borrador de meta con calendario; la IA solo ve el informe y un catálogo de temas, y
 // nunca escribe: crear la meta es un botón ("Crear meta").
 
-import { ArrowUp, Bot, CalendarRange, Check, CircleAlert, History, Loader2, MoreHorizontal, Pencil, Plus, Target, Trash2, X } from "lucide-react";
+import { ArrowUp, Bot, CalendarRange, Check, CircleAlert, History, ListChecks, MoreHorizontal, Pencil, Plus, Target, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { api } from "../../lib/bridge";
+import { matchOption } from "../../lib/planBuild";
 import { periodLabel } from "../../lib/planTime";
 import type { MentorChatTurn } from "../../lib/types";
 import { useAssistant } from "../../store/assistant";
-import { useMentor } from "../../store/mentor";
+import { planViewId, useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { ConversationHistory } from "../notes/ConversationHistory";
 import { askText, cn, IconButton, openMenu } from "../ui";
+import { ThinkingStatus, useAiStatus } from "./parts";
 
 const WIDTH_KEY = "nv.assistant.width";
 const MIN_WIDTH = 320;
@@ -145,6 +148,50 @@ export function DraftChatCard({ turn, current }: { turn: MentorChatTurn; current
   );
 }
 
+/** «Plan creado: <nombre> — ver plan»: el plan propuesto que el Mentor creó en este turno. */
+export function PlanCreatedChatCard({ turn }: { turn: MentorChatTurn }) {
+  const plans = useMentor((s) => s.plans);
+  if (!turn.createdPlan) return null;
+  const plan = plans.find((p) => p.id === turn.createdPlan);
+  return (
+    <div className="mt-2 rounded-lg border border-line bg-surface p-2.5" data-testid="chat-plan-created">
+      <div className="flex items-start gap-2">
+        <CalendarRange size={14} className="mt-0.5 flex-none text-accent-text" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[12.5px] font-semibold leading-snug text-text">Plan creado: {plan?.name ?? turn.createdPlan}</div>
+          <div className="text-[11px] text-faint">{plan ? (plan.status === "propuesto" ? "Propuesto: lo mantienes o lo borras desde su sub-interfaz" : `${plan.period} · ${plan.status}`) : "Ya no existe"}</div>
+        </div>
+      </div>
+      {plan && (
+        <button type="button" onClick={() => useNavState.getState().set("mentor.view", planViewId(plan.id))} className="mt-1.5 rounded-md border border-line px-2 py-1 text-[11.5px] text-dim hover:bg-hover hover:text-text">
+          Ver plan
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Plan en construcción (constructor guiado): resumen compacto con la pregunta abierta y «Ir al plan». */
+export function BuildChatCard() {
+  const builds = useMentor((s) => s.builds);
+  const b = builds.find((x) => x.status === "building") ?? builds[0];
+  if (!b) return null;
+  return (
+    <div className="mx-3 mb-1 flex-none rounded-lg border border-line bg-surface p-2.5" data-testid="chat-build-card" aria-label="Plan en construcción">
+      <div className="flex items-start gap-2">
+        <ListChecks size={14} className="mt-0.5 flex-none text-accent-text" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[12.5px] font-semibold leading-snug text-text">Construyendo «{b.name}» · etapa {b.stageNumber}/{b.stages}</div>
+          {b.question ? <div className="text-[11.5px] text-dim">Te pregunto: {b.question}</div> : <div className="text-[11.5px] text-faint">{b.status === "review" ? "Lista para revisar y crear." : "Sin preguntas abiertas."}</div>}
+        </div>
+      </div>
+      <button type="button" onClick={() => useNavState.getState().set("mentor.view", `build:${b.id}`)} className="mt-1.5 rounded-md border border-line px-2 py-1 text-[11.5px] text-dim hover:bg-hover hover:text-text">
+        Ir al plan
+      </button>
+    </div>
+  );
+}
+
 function MentorMessage({ turn, current }: { turn: MentorChatTurn; current: boolean }) {
   if (turn.role === "user") {
     return (
@@ -158,6 +205,7 @@ function MentorMessage({ turn, current }: { turn: MentorChatTurn; current: boole
       <p className="whitespace-pre-line text-[12.5px] leading-relaxed text-text">{turn.content}</p>
       <DraftChatCard turn={turn} current={current} />
       <PlanDraftChatCard turn={turn} current={current} />
+      <PlanCreatedChatCard turn={turn} />
     </div>
   );
 }
@@ -168,6 +216,21 @@ function MentorComposer() {
   const focusSeq = useMentor((s) => s.focusSeq);
   const [text, setText] = useState("");
   const area = useRef<HTMLTextAreaElement>(null);
+  // con un plan en construcción y una pregunta abierta, lo escrito puede ser la respuesta (solo si es claro; nunca en silencio)
+  const builds = useMentor((s) => s.builds);
+  const loadBuilds = useMentor((s) => s.loadBuilds);
+  const open = builds.find((b) => b.status === "building" && b.questionId);
+  const hit = open && text.trim() ? (matchOption({ options: (open.options ?? []).map((o) => ({ id: o.id, label: o.label })) }, text.trim()) ?? (open.allowText ? "text" : null)) : null;
+  const useAsAnswer = async () => {
+    if (!open?.questionId || !hit) return;
+    try {
+      await api.mentorPlanBuildAnswer({ id: open.id, questionId: open.questionId, ...(hit === "text" ? { answer: text.trim() } : { choice: hit }) });
+      setText("");
+      await loadBuilds();
+    } catch (e) {
+      useMentor.setState({ notice: { kind: "error", text: (e as Error).message } });
+    }
+  };
 
   useEffect(() => {
     if (!focusSeq) return;
@@ -203,6 +266,11 @@ function MentorComposer() {
           }}
           className="max-h-40 w-full resize-none bg-transparent text-[12.5px] leading-relaxed text-text outline-none placeholder:text-faint"
         />
+        {open && hit && (
+          <button type="button" onClick={() => void useAsAnswer()} className="mt-1 w-full rounded-md border border-accent/60 bg-accent-soft px-2 py-1 text-left text-[11.5px] text-accent-text hover:bg-hover" data-testid="chat-use-as-answer">
+            Usar como respuesta a «{open.question}»
+          </button>
+        )}
         <div className="mt-1 flex items-center">
           <span className="flex-1 text-[10.5px] text-faint">Enter envía · Mayús+Enter salta de línea</span>
           <button
@@ -238,6 +306,11 @@ export function MentorAssistant() {
   const renameChat = useMentor((s) => s.renameChat);
   const deleteChat = useMentor((s) => s.deleteChat);
   const setOpen = useAssistant((s) => s.setOpen);
+  const chatStatus = useAiStatus("chat", sending);
+  const loadBuildsList = useMentor((s) => s.loadBuilds);
+  useEffect(() => {
+    void loadBuildsList();
+  }, [loadBuildsList]);
   const [query, setQuery] = useState("");
   const [width, setWidth] = useState(() => {
     const stored = Number(localStorage.getItem(WIDTH_KEY));
@@ -352,11 +425,7 @@ export function MentorAssistant() {
             {turns.map((t) => (
               <MentorMessage key={t.id} turn={t} current={t.id === pending} />
             ))}
-            {sending && (
-              <div role="status" className="flex items-center gap-2 text-[12px] text-faint">
-                <Loader2 size={13} className="animate-spin" /> El Mentor está pensando…
-              </div>
-            )}
+            {sending && <ThinkingStatus label={chatStatus.label || "El Mentor está pensando…"} elapsed={chatStatus.elapsed} onCancel={() => void api.mentorAiCancel("chat", "abort")} />}
           </div>
 
           {notice && (
@@ -374,6 +443,7 @@ export function MentorAssistant() {
             </div>
           )}
 
+          <BuildChatCard />
           <MentorComposer />
         </>
       )}

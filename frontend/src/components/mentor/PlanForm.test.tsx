@@ -239,9 +239,9 @@ describe("PlanForm — precondiciones", () => {
     expect(generateBtn().disabled).toBe(false);
   });
 
-  it("Generar plan manda las precondiciones, guarda las últimas y deja el borrador en el resumen", async () => {
-    const gen = vi.spyOn(api, "mentorPlanGenerate").mockResolvedValue({
-      loading: false, kind: "plan_draft", source: "auto", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
+  it("Generar plan manda las precondiciones, guarda las últimas y lleva al plan propuesto", async () => {
+    const gen = vi.spyOn(api, "mentorPlanGenerateNow").mockResolvedValue({
+      loading: false, kind: "plan_created", planId: "p1", source: "auto", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
       planDraft: { month: "2026-10", hoursPerWeek: 6, rationale: "", subplans: [], warnings: [], fits: true, totalMinutes: 0, availableMinutes: 0, requiredHoursPerWeek: null, from: TODAY, discarded: [], why: {} },
     });
     await mountForm();
@@ -269,12 +269,12 @@ describe("PlanForm — precondiciones", () => {
     const saved = JSON.parse(localStorage.getItem(PLAN_PRE_KEY)!);
     expect(saved).toMatchObject({ minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5], pace: "suave", preset: "2s", deliverables: "ask", practiceOn: true, kataMinutes: 30 });
     expect(onClose).toHaveBeenCalled();
-    expect(useNavState.getState().values["mentor.view"]).toBe("plan");
+    expect(useNavState.getState().values["mentor.view"]).toBe("plan:p1");
   });
 
   it("comentarios para la IA: textarea con contador, viajan en las precondiciones y no se recuerdan en el siguiente formulario", async () => {
-    const gen = vi.spyOn(api, "mentorPlanGenerate").mockResolvedValue({
-      loading: false, kind: "plan_draft", source: "ai", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
+    const gen = vi.spyOn(api, "mentorPlanGenerateNow").mockResolvedValue({
+      loading: false, kind: "plan_created", planId: "p1", source: "ai", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
       planDraft: { month: "2026-10", hoursPerWeek: 6, rationale: "", subplans: [], warnings: [], fits: true, totalMinutes: 0, availableMinutes: 0, requiredHoursPerWeek: null, from: TODAY, discarded: [], why: {} },
     });
     await mountForm();
@@ -310,8 +310,8 @@ describe("PlanForm — precondiciones", () => {
   });
 
   it("entregables: los tres estados viajan en las precondiciones y un booleano recordado de antes no los fija", async () => {
-    const gen = vi.spyOn(api, "mentorPlanGenerate").mockResolvedValue({
-      loading: false, kind: "plan_draft", source: "auto", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
+    const gen = vi.spyOn(api, "mentorPlanGenerateNow").mockResolvedValue({
+      loading: false, kind: "plan_created", planId: "p1", source: "auto", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
       planDraft: { month: "2026-10", hoursPerWeek: 6, rationale: "", subplans: [], warnings: [], fits: true, totalMinutes: 0, availableMinutes: 0, requiredHoursPerWeek: null, from: TODAY, discarded: [], why: {} },
     });
     localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ deliverables: true }));
@@ -327,8 +327,8 @@ describe("PlanForm — precondiciones", () => {
   });
 
   it("Programming practice: interruptor, opciones, cálculo en vivo con la práctica reservada y persistencia", async () => {
-    const gen = vi.spyOn(api, "mentorPlanGenerate").mockResolvedValue({
-      loading: false, kind: "plan_draft", source: "auto", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
+    const gen = vi.spyOn(api, "mentorPlanGenerateNow").mockResolvedValue({
+      loading: false, kind: "plan_created", planId: "p1", source: "auto", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
       planDraft: { month: "2026-10", hoursPerWeek: 6, rationale: "", subplans: [], warnings: [], fits: true, totalMinutes: 0, availableMinutes: 0, requiredHoursPerWeek: null, from: TODAY, discarded: [], why: {} },
     });
     await mountForm();

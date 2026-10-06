@@ -7,7 +7,7 @@
 // el registro de temas completados (fecha) lo anota `mentor_plan_get` la primera vez que ve un tema completo.
 // El borrador (de la IA o automático) solo se guarda al pulsar «Aceptar plan» (código determinista).
 
-import { Archive, ArchiveRestore, CalendarDays, Check, ExternalLink, MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, CalendarDays, Check, ExternalLink, ListChecks, MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { periodLabel, shortWeekLabel, weeksLabel } from "../../lib/planTime";
@@ -32,7 +32,8 @@ import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn, askText, confirmAction } from "../ui";
 import { openGoalInMetas } from "./MentorGoals";
 import { openTopic } from "./openTopic";
-import { AreaRow, CARD_CLASS, dayText, Disclosure, hm, LoadState, PanelPage, ProgressBar } from "./parts";
+import { AreaRow, CARD_CLASS, dayText, Disclosure, hm, LoadState, PanelPage, ProgressBar, ThinkingStatus, useAiStatus } from "./parts";
+import { PlanChanges } from "./PlanChanges";
 import { PACE_LABEL, PlanForm } from "./PlanForm";
 import { openPractice, practiceSummary, PracticeRow, PracticeWeekLines } from "./PracticeCard";
 
@@ -60,8 +61,8 @@ const STATE_COLOUR: Record<MentorTopicState, string> = {
 };
 export const DELIVERABLE_LABEL: Record<MentorDeliverableStatus, string> = { idea: "Idea", en_curso: "En curso", hecho: "Hecho" };
 const DELIVERABLE_COLOUR: Record<MentorDeliverableStatus, string> = { idea: "var(--nv-faint)", en_curso: "var(--nv-accent)", hecho: "var(--nv-mint)" };
-export const STATUS_LABEL: Record<MentorPlanStatus, string> = { activo: "Activo", futuro: "Futuro", terminado: "Terminado" };
-export const STATUS_COLOUR: Record<MentorPlanStatus, string> = { activo: "var(--nv-mint)", futuro: "var(--nv-accent)", terminado: "var(--nv-faint)" };
+export const STATUS_LABEL: Record<MentorPlanStatus, string> = { activo: "Activo", futuro: "Futuro", terminado: "Terminado", propuesto: "Propuesto" };
+export const STATUS_COLOUR: Record<MentorPlanStatus, string> = { activo: "var(--nv-mint)", futuro: "var(--nv-accent)", terminado: "var(--nv-faint)", propuesto: "var(--nv-warn)" };
 
 export const monthNow = (): string => {
   const d = new Date();
@@ -140,6 +141,9 @@ function PlansOverview() {
   const acceptPlan = useMentor((s) => s.acceptPlan);
   const accepting = useMentor((s) => s.acceptingPlan);
   const discard = useMentor((s) => s.discard);
+  const builds = useMentor((s) => s.builds);
+  const generatingPlan = useMentor((s) => s.generatingPlan);
+  const gen = useAiStatus("generate", generatingPlan);
 
   useEffect(() => {
     if (!chatLoaded) void loadChat();
@@ -168,11 +172,38 @@ function PlansOverview() {
 
       {creating && <PlanForm onClose={() => setCreating(false)} />}
 
+      {generatingPlan && !creating && (
+        <ThinkingStatus label={gen.label || "Generando el plan completo…"} elapsed={gen.elapsed} onCancel={() => void api.mentorAiCancel("generate", "abort")} onAuto={() => void api.mentorAiCancel("generate", "auto")} autoLabel="Generar con plan automático (sin IA)" />
+      )}
+
+      {builds.length > 0 && (
+        <section aria-label="Planes en construcción" data-testid="plan-builds" className="space-y-2">
+          {builds.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => useNavState.getState().set("mentor.view", `build:${b.id}`)}
+              className="flex w-full flex-wrap items-center gap-3 rounded-xl border-2 border-accent/60 bg-card p-3.5 text-left hover:border-accent"
+              data-testid="plan-build-card"
+              aria-label={`Continuar plan en construcción ${b.name}`}
+            >
+              <ListChecks size={18} className="flex-none text-accent-text" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-semibold">{b.name}</span>
+                <span className="block text-[11.5px] text-faint">En construcción · etapa {b.stageNumber}/{b.stages} · {b.period}</span>
+                {b.question && <span className="block truncate text-[12px] text-dim">Te pregunto: {b.question}</span>}
+              </span>
+              <Chip colour="var(--nv-accent)">Continuar</Chip>
+            </button>
+          ))}
+        </section>
+      )}
+
       {draftTurn?.planDraft && (
         <PlanDraftCard draft={draftTurn.planDraft} accepting={accepting} onAccept={() => void acceptPlan()} onDiscard={() => void discard()} />
       )}
 
-      {data && plans.length === 0 && !draftTurn && !creating && <EmptyPlan aiConfigured={data.aiConfigured} onCreate={() => setCreating(true)} />}
+      {data && plans.length === 0 && builds.length === 0 && !draftTurn && !creating && <EmptyPlan aiConfigured={data.aiConfigured} onCreate={() => setCreating(true)} />}
 
       {data && plans.length > 0 && (
         <section aria-label="Todos los planes" data-testid="plans-grid">
@@ -364,6 +395,10 @@ export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft
 function PlanView({ planId }: { planId: string }) {
   const [tab, setTab] = useState<"plan" | "semana">("plan");
   const { data, warming, error, reload, setData } = usePlanData(planId);
+  const [highlight, setHighlight] = useState<Set<string>>(new Set());
+  const [autoSend, setAutoSend] = useState<{ text: string; n: number } | undefined>();
+  const hlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toast = useApp((s) => s.toast);
   const renamePlan = useMentor((s) => s.renamePlan);
   const archivePlan = useMentor((s) => s.archivePlan);
   const deletePlan = useMentor((s) => s.deletePlan);
@@ -376,6 +411,25 @@ function PlanView({ planId }: { planId: string }) {
     const next = await askText("Nombre del plan", row?.name ?? "", "Guardar");
     if (next === null) return;
     await renamePlan(plan.id, next);
+  };
+  const applied = useCallback((_p: MentorPlanData, changed: string[]) => {
+    useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }));
+    setHighlight(new Set(changed));
+    if (hlTimer.current) clearTimeout(hlTimer.current);
+    hlTimer.current = setTimeout(() => setHighlight(new Set()), 9000);
+  }, []);
+  useEffect(() => () => {
+    if (hlTimer.current) clearTimeout(hlTimer.current);
+  }, []);
+  const keep = async () => {
+    if (!plan) return;
+    try {
+      await api.mentorPlanKeep(plan.id);
+      toast("info", "Plan mantenido.");
+      useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }));
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
   };
   const remove = async () => {
     if (!plan) return;
@@ -417,7 +471,24 @@ function PlanView({ planId }: { planId: string }) {
 
       {data && plan && summary && (
         <>
-          <PlanHeader plan={plan} status={data.status ?? "activo"} summary={summary} />
+          {plan.proposed && (
+            <section role="region" aria-label="Plan propuesto" data-testid="plan-proposed-bar" className="rounded-xl border-2 border-warn/60 bg-card p-3.5">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1 basis-64">
+                  <h2 className="text-[14px] font-semibold">Plan propuesto por el Mentor — ¿lo mantienes?</h2>
+                  <p className="text-[12px] text-dim">Mientras esté propuesto no alimenta «Hoy» ni «Esta semana» y no reserva tiempo. Pídele cambios aquí abajo las veces que quieras: es el mismo plan que se va refinando.</p>
+                </div>
+                <PrimaryButton onClick={() => void keep()}>
+                  <Check size={14} /> Mantener plan
+                </PrimaryButton>
+                <GhostButton danger onClick={() => void remove()}>
+                  <Trash2 size={13} /> Borrar
+                </GhostButton>
+              </div>
+            </section>
+          )}
+          <PlanHeader plan={plan} status={data.status ?? "activo"} summary={summary} onAddBranches={(names) => setAutoSend({ text: `Añade las ramas excluidas: ${names.join(", ")}`, n: (autoSend?.n ?? 0) + 1 })} />
+          <PlanChanges planId={plan.id} onApplied={applied} autoSend={autoSend} />
           <div className="flex flex-wrap items-center gap-2">
             <span className="flex-1" />
             <div className="inline-flex rounded-lg border border-line p-0.5 text-[12.5px]" role="tablist" aria-label="Vista del plan">
@@ -435,7 +506,7 @@ function PlanView({ planId }: { planId: string }) {
               ))}
             </div>
           </div>
-          {tab === "plan" && data.derived && <PlanBody data={data} onChanged={(p) => setData({ ...data, plan: p })} />}
+          {tab === "plan" && data.derived && <PlanBody data={data} highlight={highlight} onChanged={(p) => setData({ ...data, plan: p })} />}
           {tab === "semana" && <ThisWeek items={data.items} practiceItems={data.practiceItems} activePlans={data.plans.filter((p) => p.status === "activo").length} />}
         </>
       )}
@@ -468,14 +539,16 @@ function PlanNotes({ notes, auto, testid }: { notes: string; auto: boolean; test
 }
 
 /** Cabecera compacta: estado, progreso y las precondiciones con las que se creó el plan. */
-function PlanHeader({ plan, status, summary }: { plan: MentorPlanData; status: MentorPlanStatus; summary: NonNullable<Loaded["derived"]>["summary"] }) {
+const cleanBranch = (n: string): string => n.replace(/^[\d.\s_-]+/, "");
+
+function PlanHeader({ plan, status, summary, onAddBranches }: { plan: MentorPlanData; status: MentorPlanStatus; summary: NonNullable<Loaded["derived"]>["summary"]; onAddBranches?: (names: string[]) => void }) {
   const pre = plan.preconditions;
-  const state = plan.archived ? ("terminado" as const) : status;
-  const weeksText = state === "activo" ? `semana ${summary.currentWeek} de ${summary.weeks}` : state === "futuro" ? `empieza el ${dayText(plan.start)}` : `terminó el ${dayText(plan.end)}`;
+  const state = plan.proposed ? ("propuesto" as const) : plan.archived ? ("terminado" as const) : status;
+  const weeksText = state === "propuesto" ? `del ${dayText(plan.start)} al ${dayText(plan.end)}` : state === "activo" ? `semana ${summary.currentWeek} de ${summary.weeks}` : state === "futuro" ? `empieza el ${dayText(plan.start)}` : `terminó el ${dayText(plan.end)}`;
   return (
     <section className="rounded-xl border border-line bg-card p-3.5" data-testid="plan-header" aria-label="Datos del plan">
       <div className="flex flex-wrap items-center gap-2">
-        <Chip colour={STATUS_COLOUR[state]}>{plan.archived ? "Archivado" : STATUS_LABEL[state]}</Chip>
+        <Chip colour={STATUS_COLOUR[state]}>{plan.proposed ? "Propuesto" : plan.archived ? "Archivado" : STATUS_LABEL[state]}</Chip>
         {plan.auto && <Chip colour="var(--nv-warn)">Plan automático</Chip>}
         <span className="text-[12.5px] text-dim" data-testid="plan-summary">
           {summary.subplans} {summary.subplans === 1 ? "subplan" : "subplanes"} · {summary.done}/{summary.topics} temas completados · {summary.pct}% global · {weeksText}
@@ -501,6 +574,14 @@ function PlanHeader({ plan, status, summary }: { plan: MentorPlanData; status: M
         {pre ? <li className="rounded-md border border-line px-2 py-0.5">Entregables: {pre.deliverables === "yes" ? "sí" : pre.deliverables === "no" ? "no" : "a discutir"}</li> : null}
         {plan.programmingPractice ? <li className="rounded-md border border-line px-2 py-0.5" data-testid="plan-practice-chip">{PRACTICE_NAME}: {practiceSummary(plan.programmingPractice)}</li> : null}
       </ul>
+      {pre?.branchExcluded?.length ? (
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-dim" data-testid="plan-branch-note">
+          <span>
+            {pre.branchPreset === "fullstack" ? `Excluí ${pre.branchExcluded.map(cleanBranch).join(" y ")} porque pediste full stack. Añádelos si los quieres.` : `Ramas fuera del plan: ${pre.branchExcluded.map(cleanBranch).join(", ")}.`}
+          </span>
+          {onAddBranches && <GhostButton onClick={() => onAddBranches(pre.branchExcluded!.map(cleanBranch))}>Añadir {pre.branchExcluded.map(cleanBranch).join(" y ")}</GhostButton>}
+        </p>
+      ) : null}
       {pre?.notes && <PlanNotes notes={pre.notes} auto={!!plan.auto} testid="plan-notes" />}
       {plan.rationale && <p className="mt-2 text-[12px] text-dim">{plan.rationale}</p>}
     </section>
@@ -509,7 +590,8 @@ function PlanHeader({ plan, status, summary }: { plan: MentorPlanData; status: M
 
 // ── Plan: una fila por área, una tarjeta por subplan ─────────────────────
 
-function PlanBody({ data, onChanged }: { data: Loaded; onChanged: (p: Loaded["plan"]) => void }) {
+function PlanBody({ data, highlight, onChanged }: { data: Loaded; highlight: Set<string>; onChanged: (p: Loaded["plan"]) => void }) {
+  const toast = useApp((s) => s.toast);
   const plan = data.plan!;
   const derived = data.derived!;
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -522,13 +604,30 @@ function PlanBody({ data, onChanged }: { data: Loaded; onChanged: (p: Loaded["pl
     });
   const areas = [...new Set(plan.subplans.map((s) => s.area))];
   const pendingDeliverables = (plan.openQuestions ?? []).filter((q) => q.id === "deliverables");
+  const answerPending = async (subplanId: string, answer: "yes" | "no") => {
+    try {
+      onChanged(await api.mentorPlanAnswer({ id: plan.id, subplanId, answer }));
+      useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }));
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
   return (
     <div className="space-y-5">
       {plan.programmingPractice && <PracticeRow track={plan.programmingPractice} status={data.practice} today={data.today} />}
       {pendingDeliverables.length > 0 && (
-        <p className="rounded-xl border border-dashed border-line px-3 py-2 text-[12px] text-dim" data-testid="plan-open-questions">
-          Pendiente de decidir: entregables en {pendingDeliverables.length} {pendingDeliverables.length === 1 ? "subplan" : "subplanes"} ({pendingDeliverables.map((q) => plan.subplans.find((s) => s.id === q.subplanId)?.objective || plan.subplans.find((s) => s.id === q.subplanId)?.area).filter(Boolean).join(", ")}).
-        </p>
+        <section className="rounded-xl border border-dashed border-line px-3 py-2 text-[12px] text-dim" data-testid="plan-open-questions" aria-label="Entregables por decidir">
+          <p>Pendiente de decidir: entregables en {pendingDeliverables.length} {pendingDeliverables.length === 1 ? "subplan" : "subplanes"}.</p>
+          <ul className="mt-1.5 space-y-1.5">
+            {pendingDeliverables.map((q) => (
+              <li key={q.subplanId} className="flex flex-wrap items-center gap-2" data-testid="plan-open-question">
+                <span className="min-w-0 flex-1">{q.text}</span>
+                <GhostButton onClick={() => void answerPending(q.subplanId ?? "", "yes")}>Añadir entregable</GhostButton>
+                <GhostButton onClick={() => void answerPending(q.subplanId ?? "", "no")}>No lo quiero</GhostButton>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       {areas.map((area, idx) => {
         const subs = plan.subplans.filter((s) => s.area === area);
@@ -537,7 +636,7 @@ function PlanBody({ data, onChanged }: { data: Loaded; onChanged: (p: Loaded["pl
         return (
           <AreaRow key={area} title={area} colour={PALETTE[idx % PALETTE.length]!} count={subs.length} noun={["subplan", "subplanes"]} avg={avg}>
             {subs.map((s, i) => (
-              <SubplanCard key={s.id} planId={plan.id} sub={s} view={views[i]!} data={data} open={open.has(s.id)} onToggle={() => toggle(s.id)} onChanged={onChanged} colour={PALETTE[idx % PALETTE.length]!} />
+              <SubplanCard key={s.id} planId={plan.id} sub={s} view={views[i]!} data={data} open={open.has(s.id) || s.topics.some((t) => highlight.has(t.folder))} highlight={highlight} onToggle={() => toggle(s.id)} onChanged={onChanged} colour={PALETTE[idx % PALETTE.length]!} />
             ))}
           </AreaRow>
         );
@@ -547,13 +646,14 @@ function PlanBody({ data, onChanged }: { data: Loaded; onChanged: (p: Loaded["pl
 }
 
 export function SubplanCard({
-  planId, sub, view, data, open, onToggle, onChanged, colour,
+  planId, sub, view, data, open, highlight, onToggle, onChanged, colour,
 }: {
   planId: string;
   sub: MentorSubplan;
   view: MentorSubplanView;
   data: Loaded;
   open: boolean;
+  highlight?: Set<string>;
   onToggle: () => void;
   onChanged: (p: Loaded["plan"]) => void;
   colour: string;
@@ -607,7 +707,7 @@ export function SubplanCard({
             <h4 className="mb-1 font-mono text-[10.5px] uppercase tracking-wider text-faint">Temas y registro</h4>
             <ul className="space-y-1.5">
               {view.topics.map((t) => (
-                <li key={t.folder} className="rounded-md border border-line p-2" data-testid="plan-topic">
+                <li key={t.folder} className={cn("rounded-md border p-2", highlight?.has(t.folder) ? "border-accent bg-accent-soft" : "border-line")} data-testid="plan-topic" data-changed={highlight?.has(t.folder) ? "true" : undefined}>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="min-w-0 flex-1 truncate font-medium" title={t.folder}>{t.title}</span>
                     {t.diagnostic && <Chip colour="var(--nv-accent)">Diagnóstico inicial</Chip>}

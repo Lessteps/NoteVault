@@ -189,6 +189,12 @@ export interface PlanPreconditions {
   practice?: PracticePrefs;
   /** comentarios libres del estudiante para la IA (preferencias; no cambian los hechos fijos) */
   notes?: string;
+  /** ramas incluidas por materia (área → nombres de rama = 2.º segmento de la carpeta); una materia sin entrada incluye todas sus ramas */
+  branches?: Record<string, string[]>;
+  /** el preset con el que se eligieron las ramas (`fullstack`, `backend`…), para explicarlo */
+  branchPreset?: string;
+  /** ramas que quedaron fuera al aplicar `branches`: solo para mostrar «Excluí X porque pediste full stack» */
+  branchExcluded?: string[];
 }
 
 export const MAX_NOTES_CHARS = 1500;
@@ -227,6 +233,13 @@ export function sanitizePreconditions(raw: unknown, today: string): PlanPrecondi
   const free = String(o.freeObjective ?? "").replace(/\s+/g, " ").trim().slice(0, 300);
   const notes = sanitizeNotes(o.notes);
   const practice = sanitizePractice(o.practice);
+  const branches: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(o.branches && typeof o.branches === "object" ? o.branches : {})) {
+    if (k.trim() && Array.isArray(v)) branches[k.trim().slice(0, 120)] = strList(v, 60, 120);
+  }
+  const hasBranches = Object.keys(branches).length > 0;
+  const preset = String(o.branchPreset ?? "").trim().slice(0, 20);
+  const excluded = strList(o.branchExcluded, 60, 120);
   return {
     start,
     end,
@@ -241,6 +254,9 @@ export function sanitizePreconditions(raw: unknown, today: string): PlanPrecondi
     levels,
     deliverables: normalizeDeliverables(o.deliverables),
     ...(practice ? { practice } : {}),
+    ...(hasBranches ? { branches } : {}),
+    ...(preset && hasBranches ? { branchPreset: preset } : {}),
+    ...(excluded.length && hasBranches ? { branchExcluded: excluded } : {}),
   };
 }
 
@@ -321,9 +337,73 @@ export interface ScopeTopic {
   minutes: number;
   /** metas activas que lo enlazan */
   goalIds: string[];
+  /** rama de la materia (2.º segmento de la carpeta; "" si el tema cuelga directamente de la materia) */
+  branch?: string;
 }
 
 export const areaOfFolder = (folder: string): string => folder.split("/").filter(Boolean)[0] ?? "";
+/** Rama de un tema: el 2.º segmento de su carpeta cuando hay al menos 3 («Programación/4 Backend/Tema»); "" si no tiene. */
+export const branchOfFolder = (folder: string): string => {
+  const segs = folder.split("/").filter(Boolean);
+  return segs.length >= 3 ? segs[1]! : "";
+};
+/** ¿Entra un tema de `area`/`branch` según las ramas elegidas? Sin selección para la materia, o sin rama, entra. */
+export const branchAllowed = (branches: PlanPreconditions["branches"], area: string, branch: string): boolean => {
+  const list = branches?.[area];
+  return !list || !branch || list.includes(branch);
+};
+
+// ── Ramas de una materia: presets «Full stack web», «Backend»… (clasificación por nombre, tratada como datos) ──
+
+export type BranchClass = "fundamentals" | "language" | "backend" | "frontend" | "databases" | "desktop" | "mobile" | "automation" | "tooling" | "other";
+const foldText = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const CLASS_RULES: Array<[BranchClass, RegExp]> = [
+  ["desktop", /desktop|electron|escritorio/],
+  ["mobile", /mobile|movil|android|\bios\b|flutter|react native/],
+  ["automation", /automat/],
+  ["databases", /database|base de datos|bases de datos|\bsql\b/],
+  ["backend", /backend|back end|servidor|\bapis?\b/],
+  ["frontend", /frontend|front end/],
+  ["tooling", /tooling|quality|calidad|\bgit\b|testing|herramientas/],
+  ["fundamentals", /fundament|fundamento|basics?\b|basico/],
+  ["language", /python|javascript|typescript|\bjs\b|\bts\b|\bjava\b|golang|\brust\b|c\+\+|c#|kotlin|swift|lenguaje|language/],
+];
+/** La clase de una rama según su nombre (los números de orden iniciales no cuentan). */
+export function classifyBranch(name: string): BranchClass {
+  const n = foldText(name).replace(/^[\d.\s_-]+/, "");
+  return CLASS_RULES.find(([, re]) => re.test(n))?.[0] ?? "other";
+}
+
+export const BRANCH_PRESETS = [
+  { key: "fullstack", label: "Full stack web", classes: ["fundamentals", "language", "backend", "frontend", "databases", "tooling"] },
+  { key: "backend", label: "Backend", classes: ["fundamentals", "language", "backend", "databases", "tooling"] },
+  { key: "frontend", label: "Frontend", classes: ["fundamentals", "language", "frontend", "tooling"] },
+  { key: "desktop", label: "Desktop", classes: ["fundamentals", "language", "desktop", "tooling"] },
+  { key: "mobile", label: "Mobile", classes: ["fundamentals", "language", "mobile", "tooling"] },
+  { key: "all", label: "Todo", classes: null },
+] as const;
+export type BranchPresetKey = (typeof BRANCH_PRESETS)[number]["key"];
+
+/** Las ramas que incluye un preset entre las de la materia (`all` = todas; las no clasificadas solo entran con «Todo»). */
+export function presetBranches(key: BranchPresetKey, names: readonly string[], extraClasses: readonly BranchClass[] = []): string[] {
+  const p = BRANCH_PRESETS.find((x) => x.key === key);
+  if (!p || !p.classes) return [...names];
+  const ok = new Set<BranchClass>([...(p.classes as readonly BranchClass[]), ...extraClasses]);
+  return names.filter((n) => ok.has(classifyBranch(n)));
+}
+
+/**
+ * Detecta en el texto (objetivo libre, nombres de metas, comentarios) qué quiere el estudiante: «full stack» preselecciona ese preset,
+ * y si además nombra móvil o escritorio de forma explícita, esa rama se incluye (el estudiante manda).
+ */
+export function detectBranchIntent(text: string): { preset: BranchPresetKey | null; extra: BranchClass[] } {
+  const t = foldText(text);
+  const extra: BranchClass[] = [];
+  if (/(movil|mobile|android|\bios\b|flutter|react native)/.test(t)) extra.push("mobile");
+  if (/(escritorio|desktop|electron|apps? de pc)/.test(t)) extra.push("desktop");
+  if (/full[\s-]?stack/.test(t)) return { preset: "fullstack", extra };
+  return { preset: null, extra };
+}
 
 /** Minutos de un tema con el ajuste por el nivel declarado de su materia. */
 export function adjustedMinutes(minutes: number, area: string, levels: Record<string, PlanLevel>): number {
@@ -331,10 +411,10 @@ export function adjustedMinutes(minutes: number, area: string, levels: Record<st
 }
 
 /** Temas (únicos) dentro de lo elegido y sus minutos ajustados por nivel. */
-export function selectionOf(pre: Pick<PlanPreconditions, "goalIds" | "subjects" | "levels">, topics: readonly ScopeTopic[]): { folders: string[]; minutes: number } {
+export function selectionOf(pre: Pick<PlanPreconditions, "goalIds" | "subjects" | "levels" | "branches">, topics: readonly ScopeTopic[]): { folders: string[]; minutes: number } {
   const goals = new Set(pre.goalIds);
   const areas = new Set(pre.subjects);
-  const picked = topics.filter((t) => areas.has(t.area) || t.goalIds.some((g) => goals.has(g)));
+  const picked = topics.filter((t) => (areas.has(t.area) && branchAllowed(pre.branches, t.area, t.branch ?? "")) || t.goalIds.some((g) => goals.has(g)));
   return { folders: picked.map((t) => t.folder), minutes: picked.reduce((n, t) => n + adjustedMinutes(t.minutes, t.area, pre.levels), 0) };
 }
 

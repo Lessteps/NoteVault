@@ -34,6 +34,8 @@ export interface ChatTurnRecord {
   planDraft?: PlanDraft;
   /** mes (AAAA-MM) del plan creado al aceptar este borrador */
   acceptedPlan?: string;
+  /** plan propuesto que el Mentor creó en este turno (el chat muestra «Plan creado: … — ver plan») */
+  createdPlan?: string;
 }
 
 export interface ChatRecord {
@@ -69,6 +71,7 @@ function clean(raw: any): ChatTurnRecord | null {
   if (raw.role === "assistant" && raw.draft && typeof raw.draft === "object") turn.draft = raw.draft as GoalDraft;
   if (raw.role === "assistant" && raw.planDraft && typeof raw.planDraft === "object") turn.planDraft = raw.planDraft as PlanDraft;
   if (raw.acceptedPlan) turn.acceptedPlan = String(raw.acceptedPlan);
+  if (raw.createdPlan && /^[A-Za-z0-9_-]{1,40}$/.test(String(raw.createdPlan))) turn.createdPlan = String(raw.createdPlan);
   if (raw.createdGoalId) turn.createdGoalId = String(raw.createdGoalId);
   if (raw.discarded) turn.discarded = true;
   return turn;

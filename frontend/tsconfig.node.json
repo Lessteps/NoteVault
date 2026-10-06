@@ -15,5 +15,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["electron", "src/core", "src/api", "src/lib/canvas.ts", "src/lib/englishSkillData.ts", "src/lib/libraryTypes.ts", "src/lib/planTime.ts", "src/lib/practiceTrack.ts", "src/lib/programmingSkillData.ts", "src/lib/skills.ts", "vite.config.ts", "tools"]
+  "include": ["electron", "src/core", "src/api", "src/lib/canvas.ts", "src/lib/englishSkillData.ts", "src/lib/libraryTypes.ts", "src/lib/planBuild.ts", "src/lib/planTime.ts", "src/lib/practiceTrack.ts", "src/lib/programmingSkillData.ts", "src/lib/skills.ts", "vite.config.ts", "tools"]
 }

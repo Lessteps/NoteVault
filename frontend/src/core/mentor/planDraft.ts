@@ -115,7 +115,7 @@ export interface PlanDraftReply {
 
 export type ChatParse = { ok: true; reply: QuestionReply | GoalDraftReply | PlanDraftReply } | { ok: false; error: string; discarded?: string[] };
 
-function objectsIn(text: string): Record<string, unknown>[] {
+export function objectsIn(text: string): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
   const tryParse = (raw: string) => {
     try {
@@ -311,6 +311,10 @@ export interface PlanDraft {
   programmingPractice?: PracticeTrack;
   /** decisiones pendientes (hoy: entregables «a discutir»); se responden con `mentor_plan_draft_answer` */
   openQuestions?: OpenQuestion[];
+  /** pesos del reparto de capacidad por subplan (id → peso): los fija el constructor guiado y la aceptación los respeta */
+  weights?: Record<string, number>;
+  /** reparto compacto (llena primero las primeras semanas): lo elige el constructor guiado con «más intenso» */
+  compact?: boolean;
 }
 
 /** Mes (AAAA-MM) y primer día del reparto: el mes en curso reparte desde hoy; uno futuro, desde el día 1. */

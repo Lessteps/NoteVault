@@ -1,7 +1,8 @@
 // Piezas comunes de los paneles del Mentor (todos de solo previsualización).
 
-import { ChevronLeft, ChevronRight, CircleAlert, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleAlert, Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { api } from "../../lib/bridge";
 import { useMentor } from "../../store/mentor";
 import { BlockProgress as BlockBar } from "../common/charts";
 import { cn } from "../ui";
@@ -176,5 +177,64 @@ export function ChipToggle({ active, onClick, children, title, label }: { active
     >
       {children}
     </button>
+  );
+}
+
+/** A partir de cuántos segundos de espera se sugiere seguir sin IA. */
+export const SLOW_AI_SECONDS = 90;
+
+/**
+ * El estado de una llamada larga de la IA del Mentor (`generate`, `chat`, `build:<id>`, `change:<id>`): mientras `active`, consulta cada
+ * ~1,5 s qué está haciendo («Eligiendo temas de Programación…») y cuánto lleva; el contador sigue corriendo cada segundo.
+ */
+export function useAiStatus(key: string, active: boolean): { label: string; elapsed: number } {
+  const [snap, setSnap] = useState({ label: "", base: 0, at: Date.now() });
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    let alive = true;
+    setSnap({ label: "", base: 0, at: Date.now() });
+    const poll = async () => {
+      try {
+        const s = await api.mentorAiStatus(key);
+        if (alive && s.busy) setSnap({ label: s.label, base: s.elapsed, at: Date.now() });
+      } catch {
+        /* sin estado: se queda el contador local */
+      }
+    };
+    void poll();
+    const p = setInterval(() => void poll(), 1500);
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => {
+      alive = false;
+      clearInterval(p);
+      clearInterval(t);
+    };
+  }, [key, active]);
+  return { label: snap.label, elapsed: Math.max(0, snap.base + Math.floor((Date.now() - snap.at) / 1000)) };
+}
+
+/** «Pensando…» claro y persistente: qué hace, segundos transcurridos, «Cancelar» y, tras ~90 s, la salida «plan automático (sin IA)». */
+export function ThinkingStatus({ label, elapsed, onCancel, onAuto, autoLabel = "Seguir con el plan automático (sin IA)" }: { label: string; elapsed: number; onCancel?: () => void; onAuto?: () => void; autoLabel?: string }) {
+  return (
+    <div role="status" aria-live="polite" data-testid="ai-thinking" className="rounded-xl border border-line bg-surface px-3 py-2 text-[12.5px]">
+      <div className="flex flex-wrap items-center gap-2">
+        <Loader2 size={14} className="animate-spin text-accent-text" />
+        <span className="font-medium text-text">Pensando…</span>
+        <span className="min-w-0 flex-1 text-dim">{label || "El Mentor está trabajando en ello"}</span>
+        <span className="font-mono text-[11.5px] text-faint" data-testid="ai-elapsed">{elapsed} s</span>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-0.5 text-[11.5px] text-dim hover:bg-hover hover:text-text">
+            <X size={11} /> Cancelar
+          </button>
+        )}
+      </div>
+      {elapsed >= SLOW_AI_SECONDS && onAuto && (
+        <p className="mt-1.5 text-[11.5px] text-faint" data-testid="ai-slow">
+          Está tardando más de lo normal.{" "}
+          <button type="button" onClick={onAuto} className="text-accent-text hover:underline">{autoLabel}</button>
+        </p>
+      )}
+    </div>
   );
 }

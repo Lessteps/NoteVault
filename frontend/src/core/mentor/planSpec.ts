@@ -15,6 +15,8 @@
 import type { ChatMessage } from "../aiClient.js";
 import {
   adjustedMinutes,
+  branchAllowed,
+  branchOfFolder,
   areaOfFolder,
   coverage,
   weeksLabel,
@@ -92,7 +94,7 @@ export function scopeTopics(all: readonly CatalogTopic[], goals: readonly GoalSc
   const byFolder = new Map(all.map((t) => [t.folder, t]));
   const goalsOf = new Map<string, string[]>();
   for (const g of goals) for (const { topic } of goalTopics(g, byFolder)) goalsOf.set(topic.folder, [...(goalsOf.get(topic.folder) ?? []), g.id]);
-  return all.filter(pending).map((t) => ({ folder: t.folder, area: areaOfFolder(t.folder), minutes: t.estMinutes, goalIds: goalsOf.get(t.folder) ?? [] }));
+  return all.filter(pending).map((t) => ({ folder: t.folder, area: areaOfFolder(t.folder), branch: branchOfFolder(t.folder), minutes: t.estMinutes, goalIds: goalsOf.get(t.folder) ?? [] }));
 }
 
 export interface ResolvedScope {
@@ -142,11 +144,11 @@ export function resolveScope(pre: PlanPreconditions, all: readonly CatalogTopic[
   }
   const areaGroups: ResolvedScope["areaGroups"] = [];
   for (const area of pre.subjects) {
-    const topics = all.filter((t) => pending(t) && areaOfFolder(t.folder) === area && !used.has(t.folder)).sort((a, b) => naturalCmp(a.folder, b.folder));
+    const topics = all.filter((t) => pending(t) && areaOfFolder(t.folder) === area && branchAllowed(pre.branches, area, branchOfFolder(t.folder)) && !used.has(t.folder)).sort((a, b) => naturalCmp(a.folder, b.folder));
     for (const t of topics) used.add(t.folder);
     if (topics.length) areaGroups.push({ area, topics });
   }
-  const free = !pre.goalIds.length && !pre.subjects.length && pre.freeObjective ? topicsByText(all, pre.freeObjective).filter((t) => !used.has(t.folder)) : [];
+  const free = !pre.goalIds.length && !pre.subjects.length && pre.freeObjective ? topicsByText(all, pre.freeObjective).filter((t) => !used.has(t.folder) && branchAllowed(pre.branches, areaOfFolder(t.folder), branchOfFolder(t.folder))) : [];
   return { goalGroups, areaGroups, free, goalsWithoutTopics };
 }
 
@@ -170,6 +172,34 @@ export function planCatalog(scope: ResolvedScope, max = 100, hint = ""): Catalog
   for (const g of scope.areaGroups) for (const t of ranked(g.topics)) add(t);
   for (const t of scope.free) add(t);
   return out;
+}
+
+/** Anota en las precondiciones qué ramas quedaron fuera (para explicarlo: «Excluí Desktop y Mobile porque pediste full stack»). */
+export function withBranchInfo(pre: PlanPreconditions, all: readonly CatalogTopic[]): PlanPreconditions {
+  if (!pre.branches) return pre;
+  const excluded = new Set<string>();
+  for (const [area, list] of Object.entries(pre.branches)) {
+    for (const t of all) {
+      const b = branchOfFolder(t.folder);
+      if (areaOfFolder(t.folder) === area && b && !list.includes(b)) excluded.add(b);
+    }
+  }
+  return excluded.size ? { ...pre, branchExcluded: [...excluded].sort((a, b) => a.localeCompare(b, "es", { numeric: true })) } : pre;
+}
+
+export const CATALOG_MIN = 100;
+export const CATALOG_MAX = 300;
+
+/**
+ * Tope DINÁMICO del catálogo que ve la IA: lo que cabe en la capacidad del periodo (temas que caben × 1,3 de margen), entre 100 y 300.
+ * Con un tope fijo de 100, un periodo largo con mucha capacidad dejaba temas fuera y el plan salía holgado.
+ */
+export function dynamicCatalogMax(pre: PlanPreconditions, scope: ResolvedScope, today: string): number {
+  const topics = [...scope.goalGroups.flatMap((g) => g.topics.map((x) => x.topic)), ...scope.areaGroups.flatMap((g) => g.topics), ...scope.free];
+  if (!topics.length) return CATALOG_MIN;
+  const avg = topics.reduce((n, t) => n + minutesOf(t, pre), 0) / topics.length;
+  const cap = capacityWithPractice(pre, today > pre.start ? today : pre.start).topicMinutes;
+  return Math.min(CATALOG_MAX, Math.max(CATALOG_MIN, Math.ceil((cap / Math.max(5, avg)) * 1.3)));
 }
 
 // ── Semillas de los subplanes ────────────────────────────────────────────
@@ -282,6 +312,8 @@ export interface PreDraftMeta {
   startFocus?: PracticeFocus;
   /** lo que la IA propuso para la pista de práctica (se valida contra el esquema fijo) */
   practiceSuggestions?: PracticeSuggestions;
+  /** reparto compacto: llena primero las primeras semanas (constructor guiado, «más intenso») */
+  compact?: boolean;
 }
 
 /** Une las semillas con las precondiciones y calcula el reparto semanal con la capacidad REAL. */
@@ -304,7 +336,9 @@ export function composeFromPreconditions(seeds: readonly SubplanSeed[], pre: Pla
     ...(track ? { reservedMinutes: practiceDayMinutes(track, { blockedDates: pre.blockedDates, from }), programmingPractice: track } : {}),
     ...(meta.auto ? { auto: true } : {}),
     rationale: meta.rationale,
+    ...(meta.compact ? { spread: false } : {}),
   });
+  const weights = seeds.some((x) => x.weight !== undefined) ? Object.fromEntries(built.plan.subplans.map((s, i) => [s.id, Math.max(1, Math.round(seeds[i]?.weight ?? 0))])) : undefined;
   const cov = coverage(built.totalMinutes, capP.topicMinutes);
   const practiceText = track
     ? ` ${PRACTICE_NAME}: ~${hours(capP.practiceMinutes)} reservadas (kata ${hours(capP.kataMinutes)} + proyecto semanal ${hours(capP.projectMinutes)}), ${hours(capP.topicMinutes)} quedan para temas.${capP.overflowDays ? ` En ${capP.overflowDays} ${capP.overflowDays === 1 ? "día" : "días"} la práctica sola ya no cabe en el tiempo diario.` : ""}`
@@ -333,6 +367,8 @@ export function composeFromPreconditions(seeds: readonly SubplanSeed[], pre: Pla
     ...(track ? { programmingPractice: track } : {}),
     ...(openQuestions.length ? { openQuestions } : {}),
     ...(meta.fallbackReason ? { fallbackReason: meta.fallbackReason } : {}),
+    ...(weights ? { weights } : {}),
+    ...(meta.compact ? { compact: true } : {}),
   };
 }
 
@@ -371,6 +407,7 @@ export function preconditionsPrompt(pre: PlanPreconditions, scope: ResolvedScope
     for (const g of scope.goalsWithoutTopics) lines.push(`  · goalId=${g.id} | ${g.name} | sin temas enlazados pendientes (úsala como objetivo/requiredGoals)`);
   }
   if (pre.subjects.length) lines.push(`- Materias / áreas a cubrir: ${pre.subjects.join("; ")}.`);
+  if (pre.branchExcluded?.length) lines.push(`- Ramas EXCLUIDAS del alcance (NO propongas temas de ellas): ${pre.branchExcluded.join("; ")}.`);
   const leveled = Object.entries(pre.levels);
   if (leveled.length) lines.push(`- Nivel declarado por área (solo una hipótesis del estudiante): ${leveled.map(([a, l]) => `${a} = ${LEVEL_TEXT[l]}`).join("; ")}.`);
   if (pre.freeObjective) lines.push(`- Otro objetivo del estudiante (texto libre): «${pre.freeObjective}».`);

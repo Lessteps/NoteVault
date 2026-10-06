@@ -51,6 +51,8 @@ export interface PlannedTopic {
   completedAt?: string;
   /** primer tema de una materia de nivel «no sé»: empieza con un diagnóstico corto para calibrar */
   diagnostic?: boolean;
+  /** el estudiante fijó su semana con un comentario («pasa X a la semana 5»): el reparto no la mueve */
+  pinned?: boolean;
 }
 
 export interface WeekSlice {
@@ -149,6 +151,8 @@ export interface Plan {
   name?: string;
   /** terminado/archivado a mano: deja de estar activo aunque su periodo no haya acabado */
   archived?: boolean;
+  /** propuesto por el Mentor y aún sin mantener: se ve y se puede refinar, pero no alimenta «Hoy» ni cuenta como plan activo */
+  proposed?: boolean;
   /** generado sin IA (plan automático determinista) */
   auto?: boolean;
   rationale?: string;
@@ -203,8 +207,9 @@ export function weekOf(date: string, period: string | { start: string; end: stri
   return weekIndex(date, p.start, p.end);
 }
 
-export type PlanStatus = "activo" | "futuro" | "terminado";
-export function planStatus(plan: Pick<Plan, "start" | "end" | "archived">, today: string): PlanStatus {
+export type PlanStatus = "activo" | "futuro" | "terminado" | "propuesto";
+export function planStatus(plan: Pick<Plan, "start" | "end" | "archived" | "proposed">, today: string): PlanStatus {
+  if (plan.proposed) return "propuesto";
   if (plan.archived) return "terminado";
   return today < plan.start ? "futuro" : today > plan.end ? "terminado" : "activo";
 }
@@ -383,6 +388,8 @@ export interface SubplanSeed {
   requiredGoals?: RequiredGoal[];
   deliverable?: Partial<Deliverable> & { title: string };
   notes?: string;
+  /** peso para repartir la capacidad entre subplanes (por defecto, sus minutos): el constructor guiado lo usa para «más tiempo a…» */
+  weight?: number;
 }
 
 const fold = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -435,6 +442,8 @@ export interface BuildOpts extends Capacity {
   rationale?: string;
   programmingPractice?: PracticeTrack;
   openQuestions?: OpenQuestion[];
+  /** false = llena primero las primeras semanas (más intenso) en vez de repartir parejo; por defecto, parejo con tiempo diario */
+  spread?: boolean;
 }
 
 /**
@@ -445,6 +454,8 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
   const now = opts.now ?? new Date().toISOString();
   const period = periodOf(opts);
   const total = seeds.reduce((n, s) => n + s.topics.reduce((m, t) => m + t.estMinutes, 0), 0);
+  const weightOf = (s: SubplanSeed): number => (s.weight !== undefined && s.weight > 0 ? s.weight : s.topics.reduce((n, t) => n + t.estMinutes, 0));
+  const weightTotal = seeds.reduce((n, s) => n + weightOf(s), 0);
   const warnings: string[] = [];
   const used = new Set<string>();
   const subplans: Subplan[] = [];
@@ -452,8 +463,7 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
   let availableMinutes = 0;
   const perDayMode = opts.minutesPerDay !== undefined;
   seeds.forEach((seed, i) => {
-    const minutes = seed.topics.reduce((n, t) => n + t.estMinutes, 0);
-    const share = total > 0 ? minutes / total : 1 / Math.max(1, seeds.length);
+    const share = total > 0 && weightTotal > 0 ? weightOf(seed) / weightTotal : 1 / Math.max(1, seeds.length);
     // un subplan sin temas (solo entregable) no consume horas: se le da un mínimo simbólico para poder calcular
     const cap: Capacity = perDayMode
       ? {
@@ -464,7 +474,7 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
           ...(opts.reservedMinutes ? { reservedMinutes: (d: string) => opts.reservedMinutes!(d) * share } : {}),
         }
       : { hoursPerWeek: Math.max(0.1, Number(opts.hoursPerWeek) * share) };
-    const dist = distributeTopics({ ...cap, start: period.start, end: period.end, topics: seed.topics, from: opts.from, spread: perDayMode });
+    const dist = distributeTopics({ ...cap, start: period.start, end: period.end, topics: seed.topics, from: opts.from, spread: opts.spread ?? perDayMode });
     totalMinutes += dist.totalMinutes;
     availableMinutes += total > 0 ? dist.availableMinutes : 0;
     let id = seed.id && /^[A-Za-z0-9_-]{1,40}$/.test(seed.id) ? seed.id : `s${i + 1}-${slugOf(seed.area)}`;
@@ -696,7 +706,7 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
   const seenTopics = new Set<string>();
   const ordered = [...plans].sort((a, b) => a.start.localeCompare(b.start) || a.createdAt.localeCompare(b.createdAt));
   for (const plan of ordered) {
-    if (plan.archived || date < plan.start || date > plan.end) continue;
+    if (plan.archived || plan.proposed || date < plan.start || date > plan.end) continue;
     const weeks = weekRangesOf(plan.start, plan.end).length;
     const cur = weekIndex(date, plan.start, plan.end);
     if (cur < 1) continue;
@@ -747,6 +757,7 @@ function cleanTopic(raw: any): PlannedTopic | null {
   if (skills.length) t.skills = skills;
   if (DATE_RE.test(String(raw.completedAt ?? ""))) t.completedAt = String(raw.completedAt);
   if (raw.diagnostic === true) t.diagnostic = true;
+  if (raw.pinned === true) t.pinned = true;
   return t;
 }
 
@@ -821,6 +832,7 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
     ...(pre ? { preconditions: pre } : {}),
     ...(oneLine(raw.name, 80) ? { name: oneLine(raw.name, 80) } : {}),
     ...(raw.archived === true ? { archived: true } : {}),
+    ...(raw.proposed === true ? { proposed: true } : {}),
     ...(raw.auto === true ? { auto: true } : {}),
     ...(raw.rationale ? { rationale: oneLine(raw.rationale, 600) } : {}),
     ...(practice ? { programmingPractice: practice } : {}),

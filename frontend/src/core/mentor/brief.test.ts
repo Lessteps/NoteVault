@@ -194,9 +194,11 @@ describe("study_pending provider", () => {
   it("summarises overdue SRS reviews, repeat errors and the recommender queue", () => {
     const srs = new StudySRSManager(dir);
     const a = srs.registerItem("c1", "concept", "mathematics", "limits");
-    srs.registerItem("c2", "concept", "mathematics", "limits");
+    const b = srs.registerItem("c2", "concept", "mathematics", "limits");
     const future = srs.registerItem("c3", "concept", "english", "verbs");
     store.writeJson(path.join(srs.dir, `${a.id}.json`), { ...a, next_review: "2026-09-25", lapses: 2 });
+    // `registerItem` fecha el repaso con el día real: se fija para que el test no dependa de qué día se ejecute
+    store.writeJson(path.join(srs.dir, `${b.id}.json`), { ...b, next_review: "2026-10-05" });
     store.writeJson(path.join(srs.dir, `${future.id}.json`), { ...future, next_review: "2026-10-20" });
 
     const errs = new StudyErrorManager(dir);

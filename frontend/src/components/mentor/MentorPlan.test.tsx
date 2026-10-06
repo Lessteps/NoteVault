@@ -401,6 +401,26 @@ describe("Mentor: la tarjeta plan_draft en el chat", () => {
     expect(t).toContain("automático");
   });
 
+  it("el borrador muestra los comentarios (y avisa que solo la IA los usa si es automático)", async () => {
+    const withNotes = { ...plan().preconditions!, notes: "tengo examen el 20" };
+    useMentor.setState({ turns: [bot("a1", "x", { planDraft: draft({ start: START, end: END, auto: true, preconditions: withNotes }) })], pending: "a1", chatLoaded: true, chatId: "c1" });
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(none());
+    await mountEl(<MentorPlan />);
+    const n = host.querySelector("[data-testid=draft-notes]")!;
+    expect(n.textContent).toContain("tengo examen el 20");
+    expect(n.textContent).toContain("Los comentarios solo los usa la IA; este plan se generó automáticamente");
+  });
+
+  it("la cabecera del plan muestra los comentarios, plegables si son largos", async () => {
+    const long = `${"quiero terminar primero lo de APIs. ".repeat(8)}\nsegunda línea`;
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plan: { ...plan(), preconditions: { ...plan().preconditions!, notes: long } } } as any));
+    await mountEl(<MentorPlan planId={PID} />);
+    const n = host.querySelector("[data-testid=plan-notes]")!;
+    expect(n.textContent).not.toContain("segunda línea");
+    await click(button("Ver todo", n));
+    expect(host.querySelector("[data-testid=plan-notes]")!.textContent).toContain("segunda línea");
+  });
+
   it("un plan ya aceptado o descartado no ofrece acciones", async () => {
     vi.mocked(api.mentorChatLoad).mockResolvedValue({
       id: "c1", title: "plan", pending: null,

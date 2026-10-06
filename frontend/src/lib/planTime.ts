@@ -140,6 +140,22 @@ export interface PlanPreconditions {
   /** nivel declarado por materia: solo una hipótesis para el reparto y la IA */
   levels: Record<string, PlanLevel>;
   deliverables: boolean;
+  /** comentarios libres del estudiante para la IA (preferencias; no cambian los hechos fijos) */
+  notes?: string;
+}
+
+export const MAX_NOTES_CHARS = 1500;
+/** Texto libre: una cadena, sin caracteres de control (se conservan los saltos de línea), recortada a su máximo. */
+export function sanitizeNotes(v: unknown, max = MAX_NOTES_CHARS): string {
+  if (typeof v !== "string") return "";
+  return v
+    .replace(/\r\n?/g, "\n")
+    .replace(/[^\P{Cc}\n\t]|\p{Zl}|\p{Zp}/gu, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, max)
+    .trim();
 }
 
 export const DEFAULT_STUDY_DAYS = [1, 2, 3, 4, 5, 6];
@@ -162,6 +178,7 @@ export function sanitizePreconditions(raw: unknown, today: string): PlanPrecondi
     if ((LEVELS as readonly string[]).includes(String(v)) && k.trim()) levels[k.trim().slice(0, 120)] = v as PlanLevel;
   }
   const free = String(o.freeObjective ?? "").replace(/\s+/g, " ").trim().slice(0, 300);
+  const notes = sanitizeNotes(o.notes);
   return {
     start,
     end,
@@ -172,6 +189,7 @@ export function sanitizePreconditions(raw: unknown, today: string): PlanPrecondi
     goalIds: strList(o.goalIds, 40, 80),
     subjects: strList(o.subjects, 40, 120),
     ...(free ? { freeObjective: free } : {}),
+    ...(notes ? { notes } : {}),
     levels,
     deliverables: o.deliverables === undefined ? true : !!o.deliverables,
   };

@@ -14,6 +14,7 @@ import {
   coverage,
   isDate,
   LEVELS,
+  MAX_NOTES_CHARS,
   PACES,
   PERIOD_PRESETS,
   periodLabel,
@@ -120,6 +121,8 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   const [freeObjective, setFreeObjective] = useState("");
   const [levels, setLevels] = useState<Record<string, PlanLevel>>({});
   const [deliverables, setDeliverables] = useState(mem.deliverables ?? true);
+  // contexto de ESTE plan: no se recuerda entre formularios
+  const [notes, setNotes] = useState("");
   const touchedGoals = useRef(false);
   const alive = useRef(true);
 
@@ -154,8 +157,8 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   }, []);
 
   const pre: PlanPreconditions = useMemo(
-    () => sanitizePreconditions({ start, end, minutesPerDay: minutes, studyDays: days, blockedDates: blocked, pace, goalIds, subjects, freeObjective, levels, deliverables }, t0),
-    [start, end, minutes, days, blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, t0],
+    () => sanitizePreconditions({ start, end, minutesPerDay: minutes, studyDays: days, blockedDates: blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes }, t0),
+    [start, end, minutes, days, blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes, t0],
   );
   // sanitizePreconditions corrige lo inválido; para el aviso se mira lo que el estudiante escribió
   const rawProblem = !isDate(start) || !isDate(end) ? "Indica las fechas de inicio y fin del periodo." : end < start ? "La fecha de fin es anterior a la de inicio." : null;
@@ -439,6 +442,25 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
           <input type="checkbox" checked={deliverables} onChange={(e) => setDeliverables(e.target.checked)} aria-label="Incluir entregables" />
           Incluir entregables (un proyecto de demostración por subplan)
         </label>
+      </Panel>
+
+      <Panel title="Comentarios para la IA (opcional)">
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value.slice(0, MAX_NOTES_CHARS))}
+          maxLength={MAX_NOTES_CHARS}
+          rows={4}
+          aria-label="Comentarios para la IA"
+          placeholder="Ej.: tengo examen el 20; prefiero teoría por las mañanas y práctica por las noches; quiero terminar primero lo de APIs; no me pongas diagnósticos largos."
+          className={cn(input, "min-h-24 resize-y leading-relaxed")}
+        />
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-faint">
+          <span>La IA los tiene en cuenta al elegir y ordenar los temas; no cambian el tiempo ni el periodo que fijaste arriba.</span>
+          <span className="flex-1" />
+          <span data-testid="plan-notes-count">
+            {notes.length} / {MAX_NOTES_CHARS}
+          </span>
+        </div>
       </Panel>
 
       <div className="rounded-xl border border-line bg-surface p-3 text-[12.5px]" data-testid="plan-capacity" aria-live="polite">

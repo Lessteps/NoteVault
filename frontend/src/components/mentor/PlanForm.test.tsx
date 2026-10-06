@@ -258,6 +258,33 @@ describe("PlanForm — precondiciones", () => {
     expect(useNavState.getState().values["mentor.view"]).toBe("plan");
   });
 
+  it("comentarios para la IA: textarea con contador, viajan en las precondiciones y no se recuerdan en el siguiente formulario", async () => {
+    const gen = vi.spyOn(api, "mentorPlanGenerate").mockResolvedValue({
+      loading: false, kind: "plan_draft", source: "ai", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
+      planDraft: { month: "2026-10", hoursPerWeek: 6, rationale: "", subplans: [], warnings: [], fits: true, totalMinutes: 0, availableMinutes: 0, requiredHoursPerWeek: null, from: TODAY, discarded: [], why: {} },
+    });
+    await mountForm();
+    const ta = () => host.querySelector<HTMLTextAreaElement>("textarea[aria-label='Comentarios para la IA']")!;
+    expect(ta()).toBeTruthy();
+    expect(host.textContent).toContain("no cambian el tiempo ni el periodo que fijaste arriba");
+    expect(host.querySelector("[data-testid=plan-notes-count]")!.textContent).toBe("0 / 1500");
+    const text = "tengo examen el 20\nprefiero teoría por las mañanas";
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(ta(), text);
+      ta().dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await flush();
+    expect(host.querySelector("[data-testid=plan-notes-count]")!.textContent).toBe(`${text.length} / 1500`);
+    await click(generateBtn());
+    expect(gen.mock.calls[0]![0].notes).toBe(text);
+    expect(localStorage.getItem(PLAN_PRE_KEY)).not.toContain("examen");
+    // un formulario nuevo empieza sin comentarios
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mountForm();
+    expect(ta().value).toBe("");
+  });
+
   it("recuerda los últimos valores al abrirlo otra vez", async () => {
     localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: 90, studyDays: [2, 4], pace: "intenso", deliverables: false, preset: "3m" }));
     await mountForm();

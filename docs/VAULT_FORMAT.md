@@ -855,7 +855,7 @@ aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`
  "hoursPerWeek": 14.9, "auto": false, "rationale": "Primero bases y luego APIs.",
  "preconditions": {"start": "2026-10-06", "end": "2026-11-05", "minutesPerDay": 240,
                    "studyDays": [1,2,3,4,5,6], "blockedDates": ["2026-10-12"], "pace": "normal",
-                   "goalIds": ["g20260914-a1b2c3"], "subjects": ["Programación"], "freeObjective": "",
+                   "goalIds": ["g20260914-a1b2c3"], "subjects": ["Programación"], "freeObjective": "", "notes": "tengo examen el 20; prefiero teoría por las mañanas",
                    "levels": {"Programación": "basico"}, "deliverables": true},
  "subplans": [{
    "id": "s1-programacion", "area": "Programación", "objective": "Desarrollo Backend",
@@ -884,6 +884,10 @@ aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`
   materia (`empezando` | `basico` | `intermedio` | `avanzado` | `no_se`: solo una hipótesis para el reparto) y
   `deliverables`. `auto: true` marca un plan automático (sin IA). `topics[].diagnostic` marca el primer tema
   de una materia de nivel «no sé» (se empieza con un diagnóstico corto).
+  `preconditions.notes` (opcional, aditivo: sin subir `FORMAT_VERSION`) son los comentarios libres del estudiante
+  para la IA (hasta 1500 caracteres, saltos de línea conservados, sin caracteres de control). La IA los usa como
+  preferencias al elegir y ordenar temas, nunca para cambiar periodo, tiempo ni días; un plan automático (sin IA)
+  no los interpreta pero los conserva y los muestra.
 - `topics[].folder` es la carpeta del tema (el mismo id que usan los `topic_links` de las submetas). El
   estado de práctica (sin tratar / practicando / consolidado / completo / examen pendiente) y el
   porcentaje **no se guardan**: se derivan en vivo del motor de práctica.

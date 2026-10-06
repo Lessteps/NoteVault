@@ -10,6 +10,7 @@ import {
   periodLabel,
   presetEnd,
   preconditionsProblem,
+  MAX_NOTES_CHARS,
   sanitizePreconditions,
   selectionOf,
   shortWeekLabel,
@@ -174,5 +175,17 @@ describe("lo que hay que cubrir", () => {
     expect(coverage(1200, 600).fits).toBe(false);
     expect(coverage(1200, 600).text).toContain("faltan 10 h");
     expect(coverage(600, 0).text).toContain("no tienes horas");
+  });
+});
+
+describe("notes (comentarios para la IA)", () => {
+  it("se sanea: una cadena, sin caracteres de control, saltos de línea conservados y con tope", () => {
+    const n = (v: unknown) => sanitizePreconditions({ notes: v }, "2026-10-05").notes;
+    expect(n("  hola\r\nmundo\u0000\u0007 \n\n\n\nfin  ")).toBe("hola\nmundo\n\nfin");
+    expect(n(123)).toBeUndefined();
+    expect(n("   ")).toBeUndefined();
+    expect(n({ a: 1 })).toBeUndefined();
+    expect(n("x".repeat(MAX_NOTES_CHARS + 500))!.length).toBe(MAX_NOTES_CHARS);
+    expect("notes" in sanitizePreconditions({}, "2026-10-05")).toBe(false);
   });
 });

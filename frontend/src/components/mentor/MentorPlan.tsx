@@ -261,6 +261,7 @@ export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft
           {pre.blockedDates?.length ? ` · ${pre.blockedDates.length} fechas bloqueadas` : ""} · {pre.deliverables ? "con entregables" : "sin entregables"}
         </p>
       )}
+      {pre?.notes && <PlanNotes notes={pre.notes} auto={!!draft.auto} testid="draft-notes" />}
       {draft.rationale && <p className="mt-1.5 text-[12.5px] text-dim">{draft.rationale}</p>}
       {draft.coverage && <p role="status" className={cn("mt-1.5 text-[12px]", draft.fits ? "text-mint" : "text-warn")}>{draft.coverage}</p>}
       {draft.warnings.map((w) => (
@@ -402,6 +403,30 @@ function PlanView({ planId }: { planId: string }) {
   );
 }
 
+const NOTES_FOLD = 160;
+
+/** Los comentarios que el estudiante dio para armar el plan: compactos, plegables si son largos. */
+function PlanNotes({ notes, auto, testid }: { notes: string; auto: boolean; testid: string }) {
+  const [open, setOpen] = useState(false);
+  const long = notes.length > NOTES_FOLD || notes.includes("\n");
+  const shown = long && !open ? `${notes.split("\n")[0]!.slice(0, NOTES_FOLD).trim()}…` : notes;
+  return (
+    <div className="mt-2 rounded-md border border-line px-2.5 py-1.5 text-[12px]" data-testid={testid}>
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-[10.5px] uppercase tracking-wider text-faint">Comentarios</span>
+        <span className="flex-1" />
+        {long && (
+          <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="text-[11.5px] text-accent-text hover:underline">
+            {open ? "Ver menos" : "Ver todo"}
+          </button>
+        )}
+      </div>
+      <p className="mt-0.5 whitespace-pre-wrap text-dim">{shown}</p>
+      {auto && <p className="mt-0.5 text-[11.5px] text-faint">Los comentarios solo los usa la IA; este plan se generó automáticamente.</p>}
+    </div>
+  );
+}
+
 /** Cabecera compacta: estado, progreso y las precondiciones con las que se creó el plan. */
 function PlanHeader({ plan, status, summary }: { plan: MentorPlanData; status: MentorPlanStatus; summary: NonNullable<Loaded["derived"]>["summary"] }) {
   const pre = plan.preconditions;
@@ -434,6 +459,7 @@ function PlanHeader({ plan, status, summary }: { plan: MentorPlanData; status: M
         ) : null}
         {plan.hoursPerWeek && pre ? <li className="rounded-md border border-line px-2 py-0.5">~{num1(plan.hoursPerWeek)} h/semana efectivas</li> : null}
       </ul>
+      {pre?.notes && <PlanNotes notes={pre.notes} auto={!!plan.auto} testid="plan-notes" />}
       {plan.rationale && <p className="mt-2 text-[12px] text-dim">{plan.rationale}</p>}
     </section>
   );

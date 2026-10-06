@@ -186,4 +186,20 @@ describe("financeApi", () => {
     expect((api.fin_budget_get() as { month_budget_cents: number }).month_budget_cents).toBe(500000000);
     expect((api.fin_budget_set(0) as { month_budget_cents: number }).month_budget_cents).toBe(0);
   });
+
+  it("searches the whole history", () => {
+    api.fin_add("2025-03-04", { type: "gasto", amount_cents: 80000000, what: "Arriendo marzo", category: "vivienda" });
+    api.fin_add("2026-01-02", { type: "gasto", amount_cents: 85000000, what: "Arriendo enero", category: "vivienda" });
+    api.fin_add("2026-01-03", { type: "ingreso", amount_cents: 300000000, what: "Salario", category: "salario" });
+
+    const all = api.fin_search("arriendo", "", "") as { total: number; movements: Array<{ what: string }> };
+    expect(all.total).toBe(2);
+    expect(all.movements.map((m) => m.what).sort()).toEqual(["Arriendo enero", "Arriendo marzo"]);
+
+    const filtered = api.fin_search("", "ingreso", "") as { total: number };
+    expect(filtered.total).toBe(1);
+
+    expect((api.fin_search("", "", "") as { total: number }).total).toBe(0);
+    expect(() => api.fin_search("x", "nope", "")).toThrow();
+  });
 });

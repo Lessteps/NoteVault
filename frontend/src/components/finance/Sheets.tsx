@@ -9,7 +9,7 @@ import { isoDate, todayIso } from "../../lib/tasks";
 import type { FinCategory, FinTotals, Movement } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
-import { BarList, Columns, Donut } from "../common/charts";
+import { BarList, Columns, Donut, LineChart } from "../common/charts";
 import { GhostButton, inputBase } from "../common/forms";
 import { Panel } from "../common/StatTile";
 import { cn } from "../ui";
@@ -217,6 +217,77 @@ function PrevCompare({ kind, first, current }: { kind: Kind; first: string; curr
   );
 }
 
+/** Balance acumulado mes a mes (la primera gráfica del módulo que no es de gastos). */
+export function BalanceAccumulated({ yearRows }: { yearRows: FinTotals[] }) {
+  let acc = 0;
+  const cumulative = yearRows.map((r) => (acc += r.balance));
+  const last = cumulative[cumulative.length - 1] ?? 0;
+  return (
+    <Panel title="Balance acumulado">
+      <LineChart
+        labels={MONTHS_ES.map((m) => m.slice(0, 3))}
+        series={[{ name: "Balance", values: cumulative, colour: last >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }]}
+        format={formatMoney}
+      />
+    </Panel>
+  );
+}
+
+/** Proyección simple a 3 meses por promedio de los últimos 3 meses cerrados. */
+export function Projection3m() {
+  const version = useFinance((s) => s.version);
+  const [avg, setAvg] = useState<{ gasto: number; ingreso: number } | null>(null);
+  useEffect(() => {
+    const t = new Date();
+    const first = isoDate(new Date(t.getFullYear(), t.getMonth() - 3, 1));
+    const last = isoDate(new Date(t.getFullYear(), t.getMonth(), 0));
+    api.finRange(first, last)
+      .then((ms) => {
+        const byMonth = new Map<string, FinTotals>();
+        for (const m of ms) {
+          const k = m.date.slice(0, 7);
+          const acc = byMonth.get(k) ?? { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 };
+          const tt = totals([m]);
+          acc.gasto += tt.gasto;
+          acc.ingreso += tt.ingreso;
+          byMonth.set(k, acc);
+        }
+        const months = [...byMonth.values()];
+        const n = 3;
+        setAvg({
+          gasto: Math.round(months.reduce((a, r) => a + r.gasto, 0) / n),
+          ingreso: Math.round(months.reduce((a, r) => a + r.ingreso, 0) / n),
+        });
+      })
+      .catch(() => setAvg(null));
+  }, [version]);
+  const t = new Date();
+  const next = [1, 2, 3].map((i) => new Date(t.getFullYear(), t.getMonth() + i, 1));
+  return (
+    <Panel title="Proyección 3 meses">
+      {!avg || (avg.gasto === 0 && avg.ingreso === 0) ? (
+        <p className="text-[12px] text-faint">Sin datos suficientes para proyectar.</p>
+      ) : (
+        <>
+          <div className="space-y-1.5">
+            {next.map((d) => {
+              const net = avg.ingreso - avg.gasto;
+              return (
+                <div key={d.toISOString()} className="flex items-center gap-2 text-[12.5px]">
+                  <span className="w-24 capitalize text-dim">{MONTHS_ES[d.getMonth()]}</span>
+                  <span className="font-mono text-text">{formatMoney(net, "COP", true)}</span>
+                  <span className="text-[11px] text-faint">≈ {formatMoney(avg.ingreso)} − {formatMoney(avg.gasto)}</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[11px] text-faint">Promedio de los últimos 3 meses cerrados.</p>
+        </>
+      )}
+    </Panel>
+  );
+}
+
 export function Sheet() {
   const meta = useFinance((s) => s.meta);
   const version = useFinance((s) => s.version);
@@ -228,12 +299,28 @@ export function Sheet() {
   const [fCat, setFCat] = useState("");
   const [q, setQ] = useState("");
   const [mode, setMode] = useState<"mov" | "cat">("mov");
+  const [history, setHistory] = useState(false);
+  const [found, setFound] = useState<{ total: number; movements: Movement[] } | null>(null);
   const [first, last] = bounds(kind, anchor);
   const cats = meta?.categories ?? [];
 
   useEffect(() => {
     api.finRange(first, last).then(setAll).catch((e) => toast("error", (e as Error).message));
   }, [first, last, version, toast]);
+
+  // Búsqueda global: el filtro local solo ve el rango cargado.
+  useEffect(() => {
+    if (!history || !q.trim()) {
+      setFound(null);
+      return;
+    }
+    api.finSearch(q.trim(), fKind, fCat)
+      .then(setFound)
+      .catch((e) => {
+        toast("error", (e as Error).message);
+        setFound(null);
+      });
+  }, [history, q, fKind, fCat, version, toast]);
 
   const list = useMemo(() => all.filter((m) => (!fKind || m.type === fKind) && (!fCat || m.category === fCat)
     && (!q || `${m.what ?? ""} ${m.reason ?? ""}`.toLowerCase().includes(q.toLowerCase()))), [all, fKind, fCat, q]);
@@ -287,42 +374,61 @@ export function Sheet() {
           <option value="">Categoría: todas</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
         </select>
         <input className={cn(sel, "w-60")} placeholder="🔎 Buscar en qué o razón…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <button type="button" aria-pressed={history} title="Buscar en todo el historial, no solo este periodo"
+          onClick={() => setHistory((v) => !v)}
+          className={cn("rounded-lg border px-2.5 py-1 text-[12px]",
+            history ? "border-line-strong bg-elevated text-text" : "border-line text-dim hover:bg-hover")}>
+          Historial
+        </button>
         <span className="flex-1" />
         <GhostButton onClick={() => void csv()}>Exportar CSV</GhostButton>
       </div>
-      {kind === "mensual" && <MonthExtras first={first} list={list} cats={cats} />}
-      {kind !== "mensual" && <PrevCompare kind={kind} first={first} current={totals(all)} />}
-      {kind === "anual" ? (
+      {history && q.trim() ? (
         <>
-          <Panel title="Gasto por mes">
-            <Columns values={yearRows.map((r) => r.gasto)} labels={MONTHS_ES.map((m) => m.slice(0, 3))} colour={TYPE_COLOURS.gasto} format={formatMoney} />
-          </Panel>
-          <div className="overflow-hidden rounded-xl border border-line bg-card">
-            <div className="grid grid-cols-[140px_repeat(5,1fr)] border-b border-line px-3 py-1.5 font-mono text-[10px] uppercase text-faint">
-              <span>Mes</span><span className="text-right">Gastos</span><span className="text-right">Ingresos</span><span className="text-right">Ahorro</span><span className="text-right">Retiros</span><span className="text-right">Balance</span>
-            </div>
-            {[...yearRows, t].map((r, i) => (
-              <div key={i} className={cn("grid grid-cols-[140px_repeat(5,1fr)] border-b border-line px-3 py-1.5 text-[12.5px] last:border-b-0", i === 12 && "font-semibold")}>
-                <span className="capitalize text-dim">{i === 12 ? `TOTAL ${parseIso(first).getFullYear()}` : MONTHS_ES[i]}</span>
-                <span className="text-right font-mono" style={{ color: TYPE_COLOURS.gasto }}>{formatMoney(r.gasto)}</span>
-                <span className="text-right font-mono" style={{ color: TYPE_COLOURS.ingreso }}>{formatMoney(r.ingreso)}</span>
-                <span className="text-right font-mono" style={{ color: TYPE_COLOURS.ahorro }}>{formatMoney(r.ahorro)}</span>
-                <span className="text-right font-mono" style={{ color: TYPE_COLOURS.retiro }}>{formatMoney(r.retiro)}</span>
-                <span className="text-right font-mono" style={{ color: r.balance >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(r.balance, "COP", true)}</span>
-              </div>
-            ))}
-          </div>
+          <p className="text-[12.5px] text-dim">
+            {found ? <><b className="font-mono text-text">{found.total}</b> resultados en todo el historial{found.total > found.movements.length ? " (primeros 100)" : ""}</> : "Buscando…"}
+          </p>
+          <MovementTable withDate rows={groupedRows(found?.movements ?? [])} />
         </>
-      ) : mode === "cat" ? (
-        <CategoryMatrix list={list} cats={cats}
-          columns={kind === "semanal"
-            ? daysBetween(first, last).map((d) => [d, `${WEEKDAYS_ES[(parseIso(d).getDay() + 6) % 7]!.slice(0, 3)} ${Number(d.slice(8))}`])
-            : daysBetween(first, last).map((d) => [d, String(Number(d.slice(8)))])}
-          keyOf={(m) => m.date} />
       ) : (
-        <MovementTable rows={groupedRows(list)} />
+        <>
+          {kind === "mensual" && <MonthExtras first={first} list={list} cats={cats} />}
+          {kind !== "mensual" && <PrevCompare kind={kind} first={first} current={totals(all)} />}
+          {kind === "anual" ? (
+            <>
+              <Panel title="Gasto por mes">
+                <Columns values={yearRows.map((r) => r.gasto)} labels={MONTHS_ES.map((m) => m.slice(0, 3))} colour={TYPE_COLOURS.gasto} format={formatMoney} />
+              </Panel>
+              <BalanceAccumulated yearRows={yearRows} />
+              <Projection3m />
+              <div className="overflow-hidden rounded-xl border border-line bg-card">
+                <div className="grid grid-cols-[140px_repeat(5,1fr)] border-b border-line px-3 py-1.5 font-mono text-[10px] uppercase text-faint">
+                  <span>Mes</span><span className="text-right">Gastos</span><span className="text-right">Ingresos</span><span className="text-right">Ahorro</span><span className="text-right">Retiros</span><span className="text-right">Balance</span>
+                </div>
+                {[...yearRows, t].map((r, i) => (
+                  <div key={i} className={cn("grid grid-cols-[140px_repeat(5,1fr)] border-b border-line px-3 py-1.5 text-[12.5px] last:border-b-0", i === 12 && "font-semibold")}>
+                    <span className="capitalize text-dim">{i === 12 ? `TOTAL ${parseIso(first).getFullYear()}` : MONTHS_ES[i]}</span>
+                    <span className="text-right font-mono" style={{ color: TYPE_COLOURS.gasto }}>{formatMoney(r.gasto)}</span>
+                    <span className="text-right font-mono" style={{ color: TYPE_COLOURS.ingreso }}>{formatMoney(r.ingreso)}</span>
+                    <span className="text-right font-mono" style={{ color: TYPE_COLOURS.ahorro }}>{formatMoney(r.ahorro)}</span>
+                    <span className="text-right font-mono" style={{ color: TYPE_COLOURS.retiro }}>{formatMoney(r.retiro)}</span>
+                    <span className="text-right font-mono" style={{ color: r.balance >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(r.balance, "COP", true)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : mode === "cat" ? (
+            <CategoryMatrix list={list} cats={cats}
+              columns={kind === "semanal"
+                ? daysBetween(first, last).map((d) => [d, `${WEEKDAYS_ES[(parseIso(d).getDay() + 6) % 7]!.slice(0, 3)} ${Number(d.slice(8))}`])
+                : daysBetween(first, last).map((d) => [d, String(Number(d.slice(8)))])}
+              keyOf={(m) => m.date} />
+          ) : (
+            <MovementTable rows={groupedRows(list)} />
+          )}
+          <Tiles t={t} />
+        </>
       )}
-      <Tiles t={t} />
     </div>
   );
 }

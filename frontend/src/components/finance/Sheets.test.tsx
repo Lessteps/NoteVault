@@ -9,11 +9,13 @@ const finMonthExtras = vi.fn(async (_y: number, _m: number) => ({
   prev: { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 },
   budgets: [] as Array<Record<string, unknown>>,
 }));
+const finSearch = vi.fn(async (_q: string, _k: string, _c: string): Promise<{ total: number; movements: Array<Record<string, unknown>> }> => ({ total: 0, movements: [] }));
 
 vi.mock("../../lib/bridge", () => ({
   api: {
     finRange: (a: string, b: string) => finRange(a, b),
     finMonthExtras: (y: number, m: number) => finMonthExtras(y, m),
+    finSearch: (q: string, k: string, c: string) => finSearch(q, k, c),
   },
 }));
 
@@ -82,5 +84,38 @@ describe("Sheet (Periodo)", () => {
     await mount();
     await click("Semana");
     expect(host!.textContent ?? "").toContain("Comparación con la semana anterior");
+  });
+
+  it("Año muestra balance acumulado y proyección a 3 meses", async () => {
+    await mount();
+    await click("Año");
+    const text = host!.textContent ?? "";
+    expect(text).toContain("Balance acumulado");
+    expect(text).toContain("Proyección 3 meses");
+  });
+
+  it("Historial busca en todo el historial, no solo el periodo", async () => {
+    finSearch.mockResolvedValueOnce({
+      total: 2,
+      movements: [{
+        id: "m9", type: "gasto", amount_cents: 80000000, currency: "COP",
+        what: "Arriendo viejo", attachments: [], date: "2024-02-03",
+      }],
+    });
+    await mount();
+    const search = [...host!.querySelectorAll("input")].find((i) =>
+      (i.getAttribute("placeholder") ?? "").includes("Buscar")) as HTMLInputElement;
+    expect(search).toBeTruthy();
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    await act(async () => {
+      setter.call(search, "arriendo");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await click("Historial");
+    expect(finSearch).toHaveBeenCalledWith("arriendo", "", "");
+    expect(host!.textContent ?? "").toContain("2");
+    expect(host!.textContent ?? "").toContain("Arriendo viejo");
   });
 });

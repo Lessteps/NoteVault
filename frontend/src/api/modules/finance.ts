@@ -501,5 +501,25 @@ export function financeApi(app: AppState) {
     fin_budget_set(amount: unknown) {
       return { month_budget_cents: getFm().setBudgetMonth(cents(amount, true)) };
     },
+
+    /**
+     * Búsqueda en todo el historial (el buscador de Periodo solo ve el rango
+     * cargado). Devuelve los 100 primeros + total.
+     */
+    fin_search(query: string, kind = "", category = "") {
+      const fm = getFm();
+      const q = String(query ?? "").trim();
+      const k = String(kind || "");
+      if (k && !(MOVEMENT_TYPES as readonly string[]).includes(k)) {
+        throw new ApiError("Tipo inválido.");
+      }
+      if (!q && !k && !category) return { total: 0, movements: [] as Array<Record<string, unknown>> };
+      const all: Array<[Date, Record<string, any>]> = [];
+      for (const d of fm.allDays()) {
+        for (const m of fm.day(d)) all.push([d, m]);
+      }
+      const found = fm.search(all, q, k, String(category || ""));
+      return { total: found.length, movements: pairs(found.slice(0, 100)) };
+    },
   };
 }

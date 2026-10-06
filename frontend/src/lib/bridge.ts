@@ -420,6 +420,8 @@ export const api = {
   finRecurringRun: (today: string) => call<{ created: number }>("fin_recurring_run", today),
   finBudgetGet: () => call<{ month_budget_cents: number }>("fin_budget_get"),
   finBudgetSet: (cents: number) => call<{ month_budget_cents: number }>("fin_budget_set", cents),
+  finSearch: (query: string, kind = "", category = "") =>
+    call<{ total: number; movements: Array<import("./types").Movement> }>("fin_search", query, kind, category),
   // Ejercicio
   exMeta: () => call<{ days: Array<{ key: string; name: string; subtitle: string; glyph: string }> }>("ex_meta"),
   exList: () => call<Exercise[]>("ex_list"),

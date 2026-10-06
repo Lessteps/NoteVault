@@ -493,5 +493,13 @@ export function financeApi(app: AppState) {
       const day = optDate(today);
       return { created: getFm().runRecurrents(day ? todayIso(day) : todayIso()) };
     },
+
+    fin_budget_get() {
+      return { month_budget_cents: getFm().budgetMonth() };
+    },
+
+    fin_budget_set(amount: unknown) {
+      return { month_budget_cents: getFm().setBudgetMonth(cents(amount, true)) };
+    },
   };
 }

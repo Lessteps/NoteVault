@@ -6,6 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const finAdd = vi.fn(async (_day: string, _fields: Record<string, unknown>) => ({}));
 const finMeta = vi.fn(async () => ({ categories: [], goals: [], types: ["gasto", "ingreso", "ahorro", "retiro"] }));
 const finSidebar = vi.fn(async () => null);
+const finMonthExtras = vi.fn(async () => ({
+  this: { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 },
+  prev: { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 },
+  budgets: [],
+}));
+const finBudgetGet = vi.fn(async () => ({ month_budget_cents: 0 }));
+const finBudgetSet = vi.fn(async (c: number) => ({ month_budget_cents: c }));
 
 vi.mock("../../lib/bridge", () => ({
   api: {
@@ -14,6 +21,9 @@ vi.mock("../../lib/bridge", () => ({
     finAdd: (day: string, fields: Record<string, unknown>) => finAdd(day, fields),
     finMeta: () => finMeta(),
     finSidebar: () => finSidebar(),
+    finMonthExtras: () => finMonthExtras(),
+    finBudgetGet: () => finBudgetGet(),
+    finBudgetSet: (c: number) => finBudgetSet(c),
   },
 }));
 
@@ -104,5 +114,38 @@ describe("Diario", () => {
     });
     expect(finAdd).toHaveBeenCalledOnce();
     expect(finAdd.mock.calls[0]![1]).toMatchObject({ type: "gasto", what: "Café" });
+  });
+
+  it("muestra la barra del presupuesto cuando vas en 85 %", async () => {
+    finMonthExtras.mockResolvedValueOnce({
+      this: { gasto: 425000000, ingreso: 0, ahorro: 0, retiro: 0, balance: -425000000 },
+      prev: { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 },
+      budgets: [],
+    });
+    finBudgetGet.mockResolvedValueOnce({ month_budget_cents: 500000000 });
+    await mount();
+    expect(host!.textContent ?? "").toContain("85 %");
+  });
+
+  it("sin presupuesto invita a definirlo y lo guarda", async () => {
+    await mount();
+    const define = [...host!.querySelectorAll("button")].find((b) => (b.textContent ?? "").includes("Define tu presupuesto"))!;
+    expect(define).toBeTruthy();
+    await act(async () => {
+      define.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    const input = host!.querySelector('input[aria-label="Presupuesto mensual"]') as HTMLInputElement;
+    await act(async () => {
+      setNative(input, "5000000");
+      await Promise.resolve();
+    });
+    const save = [...host!.querySelectorAll("button")].find((b) => b.textContent === "Guardar")!;
+    await act(async () => {
+      save.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(finBudgetSet).toHaveBeenCalledWith(500000000);
   });
 });

@@ -81,6 +81,21 @@ describe("MovementTable", () => {
     });
     expect(useFinance.getState().editing?.movement?.id).toBe("m1");
   });
+
+  it("Duplicar abre el formulario con copia para hoy", async () => {
+    const { todayIso } = await import("../../lib/tasks");
+    await mount(<MovementTable withDate rows={[{ kind: "data", m: mov() }]} />);
+    await clickRow(/Almuerzo/);
+    const dup = [...host!.querySelectorAll("button")].find((x) => x.textContent === "Duplicar")!;
+    await act(async () => {
+      dup.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    const editing = useFinance.getState().editing;
+    expect(editing?.movement).toBeUndefined();
+    expect(editing?.day).toBe(todayIso());
+    expect(editing?.preset).toMatchObject({ type: "gasto", amount_cents: 1250000, what: "Almuerzo" });
+  });
 });
 
 describe("CategoryMatrix", () => {

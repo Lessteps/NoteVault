@@ -764,6 +764,24 @@ export class FinanceManager {
   // Gastos/ingresos que se materializan solos (arriendo, salario...).
   // Un solo fichero: son pocos y viajan juntos por Syncthing.
 
+  // ── Presupuesto global mensual ──────────────────────────────────────
+
+  settingsPath(): string {
+    return path.join(this.vaultRoot, LAYOUT.finance_settings);
+  }
+
+  /** Tope mensual de gasto. 0 = sin definir. */
+  budgetMonth(): number {
+    const data = loadJson<{ month_budget_cents?: unknown }>(this.settingsPath());
+    return Math.abs(cleanInt(data?.month_budget_cents));
+  }
+
+  setBudgetMonth(cents: number): number {
+    const v = Math.abs(cleanInt(cents));
+    writeJson(this.settingsPath(), { month_budget_cents: v });
+    return v;
+  }
+
   recurrentsPath(): string {
     return path.join(this.vaultRoot, LAYOUT.finance_recurring);
   }

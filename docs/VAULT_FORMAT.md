@@ -508,6 +508,7 @@ es un **enlace roto**: se conserva, cuenta como no cumplido y no da error.
 ├── categorias/<cat-id>.json          una categoría por archivo
 ├── metas/<fgoal-id>.json             una meta financiera por archivo
 ├── recurrentes.json                  gastos/ingresos que se crean solos
+├── ajustes.json                       {month_budget_cents} (0 = sin definir)
 ├── AAAA/MM/AAAA-MM-DD.json           movimientos del día
 └── adjuntos/AAAA/MM/<mov-id>-<n>.png facturas y referencias
 ```

@@ -418,6 +418,8 @@ export const api = {
     call<import("./types").FinRecurring>("fin_recurring_save", id, fields),
   finRecurringDelete: (id: string) => call<{ ok: boolean }>("fin_recurring_delete", id),
   finRecurringRun: (today: string) => call<{ created: number }>("fin_recurring_run", today),
+  finBudgetGet: () => call<{ month_budget_cents: number }>("fin_budget_get"),
+  finBudgetSet: (cents: number) => call<{ month_budget_cents: number }>("fin_budget_set", cents),
   // Ejercicio
   exMeta: () => call<{ days: Array<{ key: string; name: string; subtitle: string; glyph: string }> }>("ex_meta"),
   exList: () => call<Exercise[]>("ex_list"),

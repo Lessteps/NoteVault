@@ -179,4 +179,11 @@ describe("financeApi", () => {
     expect(() => api.fin_recurring_save("", { type: "nope", amount_cents: 1 })).toThrow();
     expect(() => api.fin_recurring_save("rc-no-existe", { type: "gasto", amount_cents: 1 })).toThrow();
   });
+
+  it("round-trips the monthly budget", () => {
+    expect((api.fin_budget_get() as { month_budget_cents: number }).month_budget_cents).toBe(0);
+    expect((api.fin_budget_set(500000000) as { month_budget_cents: number }).month_budget_cents).toBe(500000000);
+    expect((api.fin_budget_get() as { month_budget_cents: number }).month_budget_cents).toBe(500000000);
+    expect((api.fin_budget_set(0) as { month_budget_cents: number }).month_budget_cents).toBe(0);
+  });
 });

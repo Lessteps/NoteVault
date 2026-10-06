@@ -9,6 +9,7 @@ import { shortDate, todayIso } from "../../lib/tasks";
 import type { FinCheck, Movement, MovementType } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
+import { BlockProgress } from "../common/charts";
 import { GhostButton, inputBase } from "../common/forms";
 import { cn, confirmAction } from "../ui";
 import { MoneyInput, MovementTable, Tiles, totals, TYPE_LABELS, type GroupedRow } from "./parts";
@@ -26,6 +27,9 @@ export function Diario() {
   const [checks, setChecks] = useState<FinCheck[]>([]);
   const [q, setQ] = useState<{ type: MovementType; amount: number | null; what: string; category: string; reason: string }>({ type: "gasto", amount: null, what: "", category: "", reason: "" });
   const [hint, setHint] = useState("Escribe el importe, en qué y Enter");
+  const [month, setMonth] = useState<{ spent: number; budget: number } | null>(null);
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [budgetDraft, setBudgetDraft] = useState<number | null>(null);
 
   useEffect(() => {
     Promise.all([api.finRange(day, day), api.finDueChecks(day)])
@@ -33,8 +37,14 @@ export function Diario() {
       .catch((e) => toast("error", (e as Error).message));
   }, [day, version, toast]);
 
-  const quickSave = async () => {
-    if (!q.amount) {
+  useEffect(() => {
+    const d = new Date(`${day}T12:00:00`);
+    Promise.all([api.finMonthExtras(d.getFullYear(), d.getMonth() + 1), api.finBudgetGet()])
+      .then(([ex, b]) => setMonth({ spent: ex.this.gasto, budget: b.month_budget_cents }))
+      .catch(() => setMonth(null));
+  }, [day, version, toast]);
+
+  const quickSave = async () => {    if (!q.amount) {
       setHint("Escribe un importe: 12.500, 12500 o 12,5k");
       return;
     }
@@ -45,6 +55,17 @@ export function Diario() {
       await changed();
     } catch (e) {
       setHint((e as Error).message);
+    }
+  };
+
+  const saveBudget = async () => {
+    try {
+      await api.finBudgetSet(budgetDraft ?? 0);
+      setBudgetOpen(false);
+      setBudgetDraft(null);
+      await changed();
+    } catch (e) {
+      toast("error", (e as Error).message);
     }
   };
 
@@ -82,6 +103,37 @@ export function Diario() {
         <GhostButton onClick={() => setDay(todayIso())}>Hoy</GhostButton>
         <GhostButton onClick={() => setDay(addDays(day, 1))}>›</GhostButton>
       </div>
+      {month && month.budget > 0 && (() => {
+        const pct = month.spent / month.budget;
+        const over = pct >= 1;
+        const hot = pct >= 0.8;
+        return (
+          <div className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-2.5">
+            <span className="text-[12px] text-dim">Mes: <b className="font-mono text-text">{formatMoney(month.spent)}</b> de {formatMoney(month.budget)}</span>
+            <BlockProgress value={pct} colour={over ? "var(--nv-danger)" : hot ? "#ff9632" : "var(--nv-mint)"} blocks={20} className="flex-1" />
+            <span className="font-mono text-[12px]" style={{ color: over ? "var(--nv-danger)" : hot ? "#ff9632" : "var(--nv-dim)" }}>
+              {Math.round(pct * 100)} %
+            </span>
+            <button type="button" onClick={() => { setBudgetDraft(month.budget); setBudgetOpen(true); }}
+              className="text-[11px] text-faint hover:text-text">cambiar</button>
+          </div>
+        );
+      })()}
+      {month && month.budget <= 0 && !budgetOpen && (
+        <div>
+          <button type="button" onClick={() => setBudgetOpen(true)} className="text-[12px] text-faint hover:text-text">
+            Define tu presupuesto mensual →
+          </button>
+        </div>
+      )}
+      {budgetOpen && (
+        <div className="flex items-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5">
+          <span className="text-[12px] text-dim">Tope mensual de gasto</span>
+          <MoneyInput label="Presupuesto mensual" value={budgetDraft} onChange={setBudgetDraft} className="w-40 py-1.5" onEnter={() => void saveBudget()} />
+          <GhostButton onClick={() => void saveBudget()}>Guardar</GhostButton>
+          <GhostButton onClick={() => setBudgetOpen(false)}>Cancelar</GhostButton>
+        </div>
+      )}
       <div className="flex gap-2.5">
         <button type="button" onClick={() => edit({ day, kind: q.type })}
           className="rounded-xl border border-line bg-card px-6 py-2.5 text-[14px] font-semibold text-text hover:border-line-strong">

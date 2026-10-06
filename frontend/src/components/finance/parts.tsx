@@ -3,6 +3,7 @@
 import { Paperclip, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 import { formatMoney, parseMoney } from "../../lib/money";
+import { todayIso } from "../../lib/tasks";
 import type { FinTotals, Movement } from "../../lib/types";
 import { categoryOf, goalOf, useFinance } from "../../store/finance";
 import { StatTile } from "../common/StatTile";
@@ -150,10 +151,23 @@ export function MovementTable({ rows, withDate }: { rows: GroupedRow[]; withDate
                   {m.time && <span className="font-mono">{m.time}</span>}
                   {m.reason && m.what && <span className="truncate text-faint">{m.what}</span>}
                 </div>
-                <button type="button" onClick={() => edit({ day: m.date, kind: m.type, movement: m })}
-                  className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-dim hover:bg-hover hover:text-text">
-                  Editar
-                </button>
+                <div className="flex gap-1.5">
+                  <button type="button" onClick={() => edit({ day: m.date, kind: m.type, movement: m })}
+                    className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-dim hover:bg-hover hover:text-text">
+                    Editar
+                  </button>
+                  <button type="button" title="Abrir una copia para hoy en el formulario"
+                    onClick={() => edit({
+                      day: todayIso(), kind: m.type,
+                      preset: {
+                        type: m.type, amount_cents: m.amount_cents, what: m.what, category: m.category,
+                        goal: m.goal, reason: m.reason, time: m.time,
+                      },
+                    })}
+                    className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-dim hover:bg-hover hover:text-text">
+                    Duplicar
+                  </button>
+                </div>
               </div>
             )}
           </div>

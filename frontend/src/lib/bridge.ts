@@ -412,6 +412,7 @@ export const api = {
   }>("fin_goal", id),
   finGoalSave: (id: string, fields: Partial<FinGoal>) => call<FinGoal>("fin_goal_save", id, fields),
   finGoalDelete: (id: string) => call<{ ok: boolean }>("fin_goal_delete", id),
+  finAssignGeneral: (goal: string) => call<{ moved: number }>("fin_assign_general", goal),
   // Ejercicio
   exMeta: () => call<{ days: Array<{ key: string; name: string; subtitle: string; glyph: string }> }>("ex_meta"),
   exList: () => call<Exercise[]>("ex_list"),

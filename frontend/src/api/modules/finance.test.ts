@@ -141,4 +141,26 @@ describe("financeApi", () => {
     expect(row.used).toBe(6000000);
     expect(row.budget).toBe(5000000);
   });
+
+  it("assigns general savings to a goal", () => {
+    const g = api.fin_goal_save("", {
+      name: "Moto",
+      target_cents: 1000000,
+      suggested_cents: 500000,
+      cadence: { mode: "period", period: "week" },
+      show_in_daily: true,
+    }) as { id: string };
+
+    api.fin_add(today, { type: "ahorro", amount_cents: 200000, what: "Ahorro suelto" });
+    api.fin_add(today, { type: "retiro", amount_cents: 50000, what: "Retiro suelto" });
+    api.fin_add(today, { type: "gasto", amount_cents: 900000, what: "Nada que ver", category: "comida" });
+    expect(api.fin_goals().general).toBe(150000);
+
+    const r = api.fin_assign_general(g.id) as { moved: number };
+    expect(r.moved).toBe(2);
+    expect(api.fin_goals().general).toBe(0);
+    expect(api.fin_goal(g.id).pace.saved).toBe(150000);
+
+    expect(() => api.fin_assign_general("no-existe")).toThrow();
+  });
 });

@@ -4,10 +4,14 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const finGoalSave = vi.fn(async (_id: string, _g: unknown) => ({}));
+const finGoals = vi.fn(async () => ({ goals: [], general: 0 }) as never);
+const finAssignGeneral = vi.fn(async (_goal: string) => ({ moved: 1 }));
 
 vi.mock("../../lib/bridge", () => ({
   api: {
     finGoalSave: (id: string, g: unknown) => finGoalSave(id, g),
+    finGoals: () => finGoals(),
+    finAssignGeneral: (goal: string) => finAssignGeneral(goal),
     finMeta: async () => ({ categories: [], goals: [], types: ["gasto", "ingreso", "ahorro", "retiro"] }),
     finSidebar: async () => null,
   },
@@ -16,7 +20,8 @@ vi.mock("../../lib/bridge", () => ({
 import { daysBetween } from "../../lib/habits";
 import { todayIso } from "../../lib/tasks";
 import { useFinance } from "../../store/finance";
-import { FinGoalDialog, suggestedFor } from "./Goals";
+import { useDialog } from "../ui";
+import { FinGoalDialog, FinGoals, suggestedFor } from "./Goals";
 
 let host: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
@@ -121,5 +126,69 @@ describe("FinGoalDialog wizard", () => {
       suggested_cents: Math.ceil(targetCents / days),
       status: "Activa",
     });
+  });
+});
+
+describe("FinGoals banner sin asignar", () => {
+  const goal = {
+    id: "g1", icon: "🏍", name: "Moto", status: "Activa", colour: "#33b679",
+    target_cents: 1000000, deadline: "", cadence: { mode: "rule", rule: "daily" },
+    pace: { saved: 0, remaining: 1000000, per_day: 0, per_week: 0, per_month: 0, days_left: null },
+    projection: null,
+  };
+
+  async function mountList() {
+    useFinance.setState({ goalEditing: null, goalId: null });
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(<FinGoals />);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  function setSelect(el: HTMLSelectElement, value: string) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!;
+    setter.call(el, value);
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  it("asigna todo a la meta elegida tras confirmar", async () => {
+    finGoals.mockResolvedValueOnce({ goals: [goal], general: 200000 } as never);
+    await mountList();
+    expect(host!.textContent ?? "").toContain("Sin asignar");
+    const assign = [...host!.querySelectorAll("button")].find((b) => b.textContent === "Asignar todo") as HTMLButtonElement;
+    expect(assign.disabled).toBe(true);
+    const select = host!.querySelector('select[aria-label="Meta destino"]') as HTMLSelectElement;
+    await act(async () => {
+      setSelect(select, "g1");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      assign.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    // Confirma en el diálogo global.
+    await act(async () => {
+      useDialog.getState().req?.resolve(true);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(finAssignGeneral).toHaveBeenCalledWith("g1");
+  });
+
+  it("sin metas pide crear una", async () => {
+    finGoals.mockResolvedValueOnce({ goals: [], general: 200000 } as never);
+    await mountList();
+    expect(host!.textContent ?? "").toContain("Crea una meta para asignarlo.");
+  });
+
+  it("sin general no hay banner", async () => {
+    finGoals.mockResolvedValueOnce({ goals: [goal], general: 0 } as never);
+    await mountList();
+    expect(host!.textContent ?? "").not.toContain("Sin asignar");
   });
 });

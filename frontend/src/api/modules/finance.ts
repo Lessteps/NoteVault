@@ -425,5 +425,26 @@ export function financeApi(app: AppState) {
       fm.deleteGoal(String(gid));
       return { ok: true };
     },
+
+    /**
+     * Mueve todo el ahorro general (ahorros y retiros sin meta) a una meta.
+     * Después el general queda en cero; deshacer es editar cada movimiento.
+     */
+    fin_assign_general(gid: string) {
+      const fm = getFm();
+      if (!fm.getGoal(String(gid))) {
+        throw new ApiError("Esa meta de ahorro ya no existe.");
+      }
+      let moved = 0;
+      for (const d of fm.allDays()) {
+        for (const m of fm.day(d)) {
+          if (!m.goal && (m.type === "ahorro" || m.type === "retiro")) {
+            fm.update(d, m.id, { goal: String(gid) });
+            moved++;
+          }
+        }
+      }
+      return { moved };
+    },
   };
 }

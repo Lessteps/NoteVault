@@ -240,13 +240,30 @@ export function FinGoals() {
   const goalId = useFinance((s) => s.goalId);
   const openGoal = useFinance((s) => s.openGoal);
   const setEditing = useFinance((s) => s.setGoalEditing);
+  const changed = useFinance((s) => s.changed);
   const version = useFinance((s) => s.version);
   const toast = useApp((s) => s.toast);
   const [data, setData] = useState<Awaited<ReturnType<typeof api.finGoals>> | null>(null);
+  const [assignGoal, setAssignGoal] = useState("");
   useEffect(() => {
     api.finGoals().then(setData).catch((e) => toast("error", (e as Error).message));
   }, [version, toast]);
   if (goalId) return <GoalDetail id={goalId} />;
+  const assignAll = async () => {
+    if (!data || !assignGoal) return;
+    const g = data.goals.find((x) => x.id === assignGoal);
+    if (!g) return;
+    if (!(await confirmAction("Asignar ahorro general",
+      `¿Mover ${formatMoney(data.general)} sin asignar a «${g.name}»? El general queda en cero; para deshacer edita cada movimiento.`,
+      "Asignar", false))) return;
+    try {
+      await api.finAssignGeneral(assignGoal);
+      setAssignGoal("");
+      await changed();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
       <div className="flex items-center gap-3">
@@ -273,7 +290,22 @@ export function FinGoals() {
           </button>
         ))}
       </div>
-      {data && <p className="text-[12.5px] text-dim">Ahorro general (sin meta): {formatMoney(data.general)}</p>}
+      {data && data.general > 0 && (
+        <section aria-label="Ahorro sin asignar" className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-card px-4 py-3">
+          <span className="text-[13px] text-text">Sin asignar: <b className="font-mono">{formatMoney(data.general)}</b></span>
+          {data.goals.length > 0 ? (
+            <>
+              <select aria-label="Meta destino" className={input} value={assignGoal} onChange={(e) => setAssignGoal(e.target.value)}>
+                <option value="">Elige meta…</option>
+                {data.goals.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
+              </select>
+              <PrimaryButton disabled={!assignGoal} onClick={() => void assignAll()}>Asignar todo</PrimaryButton>
+            </>
+          ) : (
+            <span className="text-[12px] text-faint">Crea una meta para asignarlo.</span>
+          )}
+        </section>
+      )}
     </div>
   );
 }

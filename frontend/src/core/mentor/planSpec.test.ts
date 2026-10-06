@@ -42,6 +42,16 @@ describe("alcance", () => {
     expect(planCatalog(s).map((t) => t.folder)).toEqual(["Prog/2 Medio", "Prog/1 Base", "Prog/10 Final"]);
   });
 
+  it("si la materia no cabe en el tope, pasan primero los temas que casan con el objetivo y los comentarios", () => {
+    const many = [...Array.from({ length: 12 }, (_, i) => cat(`Prog/1 Base/1.${i + 1} Tema ${i + 1}`)), cat("Prog/4 Backend/4.2 HTTP in depth"), cat("Prog/4 Backend/4.3 REST API design")];
+    const s = resolveScope(pre({ goalIds: [], subjects: ["Prog"] }), many, []);
+    const sinPista = planCatalog(s, 5).map((t) => t.folder);
+    expect(sinPista.some((f) => f.includes("Backend"))).toBe(false); // orden natural: el tope los deja fuera
+    const conPista = planCatalog(s, 5, "Backend con Python. Quiero HTTP y REST").map((t) => t.folder);
+    expect(conPista.slice(0, 2).sort()).toEqual(["Prog/4 Backend/4.2 HTTP in depth", "Prog/4 Backend/4.3 REST API design"]);
+    expect(conPista).toHaveLength(5);
+  });
+
   it("una meta sin temas pendientes se anota aparte", () => {
     expect(resolveScope(pre({ goalIds: ["g2"], subjects: [] }), ALL, GOALS).goalsWithoutTopics.map((g) => g.id)).toEqual(["g2"]);
   });

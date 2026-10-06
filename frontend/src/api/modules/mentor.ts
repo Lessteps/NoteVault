@@ -589,7 +589,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const prevPlan = pendingDraft(stored)?.planDraft;
       const prePrev: PlanPreconditions | null = prevPlan?.preconditions ? sanitizePreconditions(prevPlan.preconditions, today) : null;
       const scopePrev = prePrev ? resolveScope(prePrev, buildTopicCatalog(snapsAll, "", { max: 1_000_000 }), goalScopes(app)) : null;
-      const catalog = scopePrev ? planCatalog(scopePrev) : buildTopicCatalog(snapsAll, request, { max: planMode ? 80 : 60 });
+      const catalog = scopePrev ? planCatalog(scopePrev, 100, `${prePrev?.freeObjective ?? ""} ${prePrev?.notes ?? ""} ${message}`) : buildTopicCatalog(snapsAll, request, { max: planMode ? 80 : 60 });
       const planCtx = planContext(app, today);
       const areas = app.mgrs().areas.areas().filter((a) => !a.archived);
       const chatLog = existing ?? chats().create();
@@ -838,7 +838,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const all = buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 });
       const goals = goalScopes(app);
       const scope = resolveScope(pre, all, goals);
-      const catalog = planCatalog(scope);
+      const catalog = planCatalog(scope, 100, `${pre.freeObjective ?? ""} ${pre.notes ?? ""}`);
       if (!catalog.length) {
         throw new ApiError("No hay temas pendientes en lo que elegiste. Elige metas con temas enlazados o materias con temas sin completar.");
       }

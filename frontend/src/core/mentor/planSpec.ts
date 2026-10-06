@@ -146,7 +146,7 @@ export function resolveScope(pre: PlanPreconditions, all: readonly CatalogTopic[
 }
 
 /** Catálogo que ve la IA: lo elegido primero (metas, materias, texto libre), con un tope. */
-export function planCatalog(scope: ResolvedScope, max = 100): CatalogTopic[] {
+export function planCatalog(scope: ResolvedScope, max = 100, hint = ""): CatalogTopic[] {
   const out: CatalogTopic[] = [];
   const seen = new Set<string>();
   const add = (t: CatalogTopic) => {
@@ -155,8 +155,14 @@ export function planCatalog(scope: ResolvedScope, max = 100): CatalogTopic[] {
       out.push(t);
     }
   };
+  // Si una materia no cabe entera en el tope, pasan primero los temas que casan con el objetivo y los comentarios
+  // (sin esto, con 243 temas solo llegaban los primeros por orden de carpeta y «Backend» se quedaba fuera).
+  const words = keywordsOf(hint);
+  const score = (t: CatalogTopic): number => words.filter((w) => fold(t.folder).includes(w)).length;
+  const ranked = (ts: readonly CatalogTopic[]): readonly CatalogTopic[] =>
+    words.length && out.length + ts.length > max ? [...ts].sort((a, b) => score(b) - score(a)) : ts;
   for (const g of scope.goalGroups) for (const x of g.topics) add(x.topic);
-  for (const g of scope.areaGroups) for (const t of g.topics) add(t);
+  for (const g of scope.areaGroups) for (const t of ranked(g.topics)) add(t);
   for (const t of scope.free) add(t);
   return out;
 }

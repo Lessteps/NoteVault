@@ -8,14 +8,14 @@ import { BlockProgress as BlockBar } from "../common/charts";
 import { cn } from "../ui";
 
 /** Cabecera + avisos de carga/errores + contenido; los paneles de datos la comparten. */
-export function PanelPage({ title, subtitle, children, wide, action }: { title: string; subtitle?: string; children: ReactNode; wide?: boolean; action?: ReactNode }) {
+export function PanelPage({ title, subtitle, children, wide, action, a11y }: { title: string; subtitle?: string; children: ReactNode; wide?: boolean; action?: ReactNode; /** tipografía y contraste reforzados (vistas accesibles del Mentor) */ a11y?: boolean }) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-surface text-text">
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-surface text-text", a11y && "nv-a11y")}>
       <div className={`mx-auto w-full min-w-0 space-y-4 p-5 ${wide ? "max-w-[1800px]" : "max-w-[900px]"}`}>
         <header className="flex flex-wrap items-start gap-x-4 gap-y-2">
           <div className="min-w-0 flex-1 basis-60">
-            <h1 className="text-[18px] font-semibold">{title}</h1>
-            {subtitle && <p className="mt-0.5 text-[12.5px] text-faint">{subtitle}</p>}
+            <h1 className={a11y ? "text-[22px] font-semibold leading-tight" : "text-[18px] font-semibold"}>{title}</h1>
+            {subtitle && <p className={cn("mt-0.5 text-faint", a11y ? "text-[14px]" : "text-[12.5px]")}>{subtitle}</p>}
           </div>
           {action}
         </header>
@@ -41,18 +41,18 @@ export function LoadState({ warming, error, empty, onRetry }: { warming: boolean
   return (
     <>
       {warming && (
-        <div role="status" className="flex items-center gap-2 text-[12.5px] text-faint">
-          <Loader2 size={14} className="animate-spin" /> Leyendo tu vault por primera vez, un momento…
+        <div role="status" className="flex items-center gap-2 text-[14px] text-faint">
+          <Loader2 size={14} aria-hidden className="animate-spin" /> Leyendo tu vault por primera vez, un momento…
         </div>
       )}
       {error && (
-        <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger/40 bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
-          <CircleAlert size={14} className="mt-0.5 flex-none" />
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger/40 bg-danger-soft px-3 py-2 text-[14px] text-danger">
+          <CircleAlert size={15} aria-hidden className="mt-0.5 flex-none" />
           <span className="flex-1">{error}</span>
-          <button type="button" onClick={onRetry} className="underline">Reintentar</button>
+          <button type="button" onClick={onRetry} className="min-h-8 px-2 underline">Reintentar</button>
         </div>
       )}
-      {empty && !warming && !error && <p className="text-[12.5px] text-faint">Cargando…</p>}
+      {empty && !warming && !error && <p role="status" className="text-[14px] text-faint">Cargando…</p>}
     </>
   );
 }
@@ -72,25 +72,26 @@ export function daysLeftText(days: number | null | undefined): string {
 
 export const hm = (min: number): string => (min >= 60 ? `${Math.round((min / 60) * 10) / 10} h` : `${min} min`);
 
-export function ProgressBar({ pct, colour }: { pct: number; colour?: string }) {
+export function ProgressBar({ pct, colour, label, thick }: { pct: number; colour?: string; /** nombre accesible de la barra */ label?: string; thick?: boolean }) {
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-hover" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+    <div className={cn("w-full overflow-hidden rounded-full bg-hover", thick ? "h-2.5" : "h-1.5")} role="progressbar" aria-label={label ?? "Progreso"} aria-valuetext={`${Math.round(pct)} %`} aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
       <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: colour ?? "var(--nv-accent)" }} />
     </div>
   );
 }
 
 /** Cabecera plegable de una tarjeta de previsualización: un botón que abre/cierra su detalle. */
-export function Disclosure({ open, onToggle, label, children }: { open: boolean; onToggle: () => void; label: string; children: ReactNode }) {
+export function Disclosure({ open, onToggle, label, children, controls }: { open: boolean; onToggle: () => void; label: string; children: ReactNode; /** id del contenido que abre/cierra */ controls?: string }) {
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-expanded={open}
+      aria-controls={controls}
       aria-label={label}
       className="flex w-full min-w-0 items-start gap-2 text-left"
     >
-      <ChevronRight size={15} className={`mt-0.5 flex-none text-faint transition-transform ${open ? "rotate-90" : ""}`} />
+      <ChevronRight size={16} aria-hidden className={`mt-0.5 flex-none text-faint transition-transform ${open ? "rotate-90" : ""}`} />
       <div className="min-w-0 flex-1">{children}</div>
     </button>
   );
@@ -122,7 +123,7 @@ export function CardRow({ children, label }: { children: ReactNode; label: strin
     return () => ro.disconnect();
   }, [update, children]);
   const go = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * Math.max(240, (ref.current?.clientWidth ?? 0) * 0.8), behavior: "smooth" });
-  const arrow = "absolute top-14 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-line bg-card text-dim shadow hover:text-text";
+  const arrow = "absolute top-14 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card text-dim shadow hover:text-text";
   return (
     <div className="relative" data-testid="card-row">
       <div
@@ -173,7 +174,7 @@ export function ChipToggle({ active, onClick, children, title, label }: { active
       aria-label={label}
       title={title}
       onClick={onClick}
-      className={cn("rounded-md border px-2.5 py-1 text-left text-[12.5px]", active ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:bg-hover hover:text-text")}
+      className={cn("min-h-8 min-w-8 rounded-md border px-2.5 py-1 text-left text-[13px]", active ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:bg-hover hover:text-text")}
     >
       {children}
     </button>
@@ -217,22 +218,25 @@ export function useAiStatus(key: string, active: boolean): { label: string; elap
 /** «Pensando…» claro y persistente: qué hace, segundos transcurridos, «Cancelar» y, tras ~90 s, la salida «plan automático (sin IA)». */
 export function ThinkingStatus({ label, elapsed, onCancel, onAuto, autoLabel = "Seguir con el plan automático (sin IA)" }: { label: string; elapsed: number; onCancel?: () => void; onAuto?: () => void; autoLabel?: string }) {
   return (
-    <div role="status" aria-live="polite" data-testid="ai-thinking" className="rounded-xl border border-line bg-surface px-3 py-2 text-[12.5px]">
+    <div data-testid="ai-thinking" className="nv-a11y rounded-xl border border-line bg-surface px-3 py-2.5 text-[14px]">
       <div className="flex flex-wrap items-center gap-2">
-        <Loader2 size={14} className="animate-spin text-accent-text" />
-        <span className="font-medium text-text">Pensando…</span>
-        <span className="min-w-0 flex-1 text-dim">{label || "El Mentor está trabajando en ello"}</span>
-        <span className="font-mono text-[11.5px] text-faint" data-testid="ai-elapsed">{elapsed} s</span>
+        {/* solo esto se anuncia (una vez): el contador de segundos va aparte, sin aria-live, para no repetirse cada segundo */}
+        <span role="status" aria-live="polite" className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <Loader2 size={15} aria-hidden className="animate-spin text-accent-text" />
+          <span className="font-medium text-text">Pensando…</span>
+          <span className="min-w-0 text-dim">{label || "El Mentor está trabajando en ello"}</span>
+        </span>
+        <span className="font-mono text-[13px] text-faint" data-testid="ai-elapsed">{elapsed} s</span>
         {onCancel && (
-          <button type="button" onClick={onCancel} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-0.5 text-[11.5px] text-dim hover:bg-hover hover:text-text">
-            <X size={11} /> Cancelar
+          <button type="button" onClick={onCancel} className="nv-ghost inline-flex min-h-8 items-center gap-1 rounded-md border border-line px-3 py-1 text-[13px] text-dim hover:bg-hover hover:text-text">
+            <X size={13} aria-hidden /> Cancelar
           </button>
         )}
       </div>
       {elapsed >= SLOW_AI_SECONDS && onAuto && (
-        <p className="mt-1.5 text-[11.5px] text-faint" data-testid="ai-slow">
+        <p className="mt-1.5 text-[13px] text-faint" data-testid="ai-slow">
           Está tardando más de lo normal.{" "}
-          <button type="button" onClick={onAuto} className="text-accent-text hover:underline">{autoLabel}</button>
+          <button type="button" onClick={onAuto} className="inline-flex min-h-8 items-center text-accent-text underline-offset-2 hover:underline">{autoLabel}</button>
         </p>
       )}
     </div>

@@ -156,6 +156,68 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   Vistas con accesibilidad reforzada (.nv-a11y: la sub-interfaz de un plan y el resumen de
+   planes). Solo ahí se suben los grises tenues del tema a ≥4,5:1 sobre sus fondos, se da a los
+   controles un borde de ≥3:1 y un anillo de foco más marcado, y se respeta
+   prefers-reduced-motion. Los tokens se redefinen DENTRO del contenedor: el resto de pantallas
+   no cambia.
+   ───────────────────────────────────────────────────────────────────────── */
+.nv-a11y {
+  --nv-dim: #b4b4c8;
+  --nv-faint: #9494ab;
+  --color-dim: #b4b4c8;
+  --color-faint: #9494ab;
+  --nv-btn: #5b49d6;
+  --nv-btn-hover: #4f3ec9;
+  --nv-ctl-border: #77778f;
+  --nv-focus: #c4bcff;
+  --nv-practice: #c58be0;
+}
+[data-theme="light"] .nv-a11y {
+  --nv-dim: #4f4838;
+  --nv-faint: #675e4a;
+  --color-dim: #4f4838;
+  --color-faint: #675e4a;
+  --nv-mint: #1f6f2c;
+  --color-mint: #1f6f2c;
+  --nv-warn: #86590a;
+  --color-warn: #86590a;
+  --nv-info: #14589f;
+  --color-info: #14589f;
+  --nv-danger: #b12e33;
+  --color-danger: #b12e33;
+  --nv-accent-text: #4f35b8;
+  --color-accent-text: #4f35b8;
+  --nv-btn: #5a3ec6;
+  --nv-btn-hover: #4a30ad;
+  --nv-ctl-border: #85795f;
+  --nv-focus: #3b25a8;
+  --nv-practice: #7b1f93;
+}
+.nv-a11y :focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.nv-a11y :is(textarea, select, input:not([type="checkbox"]):not([type="radio"])),
+.nv-a11y .nv-ghost {
+  border-color: var(--nv-ctl-border);
+}
+.nv-a11y .nv-label {
+  font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-a11y *,
+  .nv-a11y *::before,
+  .nv-a11y *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    Rendered note (.nv-prose). The markdown renderer (lib/markdown.ts)
    produces plain HTML; everything visual about a note lives here.
    ───────────────────────────────────────────────────────────────────────── */

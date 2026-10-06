@@ -8,7 +8,7 @@ export const inputBase = "rounded-lg border border-line bg-surface px-2.5 py-1.5
 export const input = `${inputBase} w-full`;
 
 export function Label({ children }: { children: ReactNode }) {
-  return <span className="mb-1 block font-mono text-[10.5px] uppercase tracking-wider text-faint">{children}</span>;
+  return <span className="nv-label mb-1 block font-mono text-[10.5px] uppercase tracking-wider text-faint">{children}</span>;
 }
 
 export function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
@@ -20,11 +20,13 @@ export function Field({ label, children, className }: { label: string; children:
   );
 }
 
-export function Chip({ children, colour, className }: { children: ReactNode; colour?: string; className?: string }) {
+/** `large`: la versión legible (13 px, con el texto acercado al color del tema para llegar a ≥4,5:1) de las vistas accesibles. */
+export function Chip({ children, colour, className, large }: { children: ReactNode; colour?: string; className?: string; large?: boolean }) {
+  const c = colour ?? "var(--nv-dim)";
   return (
     <span
-      className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-medium", className)}
-      style={{ color: colour ?? "var(--nv-dim)", background: `color-mix(in srgb, ${colour ?? "var(--nv-dim)"} 16%, transparent)` }}
+      className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-md font-medium", large ? "px-2 py-0.5 text-[13px]" : "px-1.5 py-0.5 text-[11px]", className)}
+      style={{ color: large ? `color-mix(in srgb, ${c} 75%, var(--nv-text))` : c, background: `color-mix(in srgb, ${c} 16%, transparent)` }}
     >
       {children}
     </span>
@@ -55,25 +57,31 @@ export function Modal({ title, onClose, children, footer, width = 520 }: {
   );
 }
 
-export function PrimaryButton({ children, onClick, disabled, className, type = "button" }: {
-  children: ReactNode; onClick?: () => void; disabled?: boolean; className?: string; type?: "button" | "submit";
+/** `large`: acción principal de las vistas accesibles (objetivo de ≥44 px y texto de 14 px). */
+export function PrimaryButton({ children, onClick, disabled, className, type = "button", large, ...rest }: {
+  children: ReactNode; onClick?: () => void; disabled?: boolean; className?: string; type?: "button" | "submit"; large?: boolean;
+  [key: `data-${string}`]: unknown;
 }) {
   return (
-    <button type={type} disabled={disabled} onClick={onClick}
-      className={cn("flex flex-none items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-1.5 text-[12.5px] font-medium text-white hover:bg-accent-strong disabled:opacity-50", className)}>
+    <button type={type} disabled={disabled} onClick={onClick} {...rest}
+      className={cn("flex flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[var(--nv-btn,var(--nv-accent))] font-medium text-white hover:bg-[var(--nv-btn-hover,var(--nv-accent-strong))] disabled:opacity-50",
+        large ? "min-h-11 px-4 py-2 text-[14px]" : "min-h-8 px-3 py-1.5 text-[13px]", className)}>
       {children}
     </button>
   );
 }
 
-export function GhostButton({ children, onClick, danger, className, title, ...rest }: {
-  children: ReactNode; onClick?: () => void; danger?: boolean; className?: string; title?: string;
+/** `large`: objetivo de ≥44 px y texto de 14 px (acciones de las vistas accesibles); sin él, ≥32 px. */
+export function GhostButton({ children, onClick, danger, className, title, large, disabled, ...rest }: {
+  children: ReactNode; onClick?: () => void; danger?: boolean; className?: string; title?: string; large?: boolean | "md"; disabled?: boolean;
+  "aria-label"?: string; "aria-expanded"?: boolean; "aria-pressed"?: boolean;
   /** Para los `data-*` que usan los tests y el e2e. */
   [key: `data-${string}`]: unknown;
 }) {
   return (
-    <button type="button" title={title} onClick={onClick} {...rest}
-      className={cn("flex flex-none items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-[12.5px]",
+    <button type="button" title={title} onClick={onClick} disabled={disabled} {...rest}
+      className={cn("nv-ghost flex flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-line disabled:opacity-50",
+        large === "md" ? "min-h-10 px-3 py-1.5 text-[14px]" : large ? "min-h-11 px-3.5 py-2 text-[14px]" : "min-h-8 px-2.5 py-1.5 text-[13px]",
         danger ? "text-danger hover:bg-danger-soft" : "text-dim hover:bg-hover hover:text-text", className)}>
       {children}
     </button>

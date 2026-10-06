@@ -154,8 +154,8 @@ export function PlanBuilder({ buildId }: { buildId: string }) {
 
   if (missing) {
     return (
-      <PanelPage title="Plan en construcción" wide>
-        <div className="rounded-xl border border-dashed border-line p-6 text-center text-[12.5px] text-faint" data-testid="build-missing">
+      <PanelPage a11y title="Plan en construcción" wide>
+        <div className="rounded-xl border border-dashed border-line p-6 text-center text-[14px] text-faint" data-testid="build-missing">
           Este plan en construcción ya no existe.{" "}
           <button type="button" className="text-accent-text hover:underline" onClick={() => useNavState.getState().set("mentor.view", "plan")}>Volver al resumen de planes</button>
         </div>
@@ -169,6 +169,7 @@ export function PlanBuilder({ buildId }: { buildId: string }) {
 
   return (
     <PanelPage
+      a11y
       title={build?.name ?? "Plan en construcción"}
       subtitle={build ? `Armando paso a paso · etapa ${stageNo} de ${BUILD_STAGES.length} · ${periodLabel(build.effective.start, build.effective.end)} · ${build.source === "ai" ? "con el criterio del Mentor" : "por reglas (sin IA)"}` : "Cargando…"}
       wide
@@ -203,18 +204,18 @@ export function PlanBuilder({ buildId }: { buildId: string }) {
 
           {!busy && q && build.status === "building" && (
             <section className="rounded-xl border-2 border-accent/60 bg-card p-4" aria-label="Pregunta actual" aria-live="polite" data-testid="build-question">
-              <div className="flex flex-wrap items-center gap-2 text-[11.5px] text-faint">
+              <div className="flex flex-wrap items-center gap-2 text-[13px] text-faint">
                 <span className="font-mono uppercase tracking-wider">Etapa {STAGE_LABEL[q.stage]}</span>
                 <span>· pregunta {build.answers.length + 1} (tope {build.maxQuestions})</span>
                 {q.by === "ai" && <Chip colour="var(--nv-accent)">Redactada con el Mentor</Chip>}
               </div>
               <h2 className="mt-1 text-[15px] font-semibold leading-snug">{q.text}</h2>
-              {q.why && <p className="mt-1 text-[12.5px] text-dim">{q.why}</p>}
+              {q.why && <p className="mt-1 text-[14px] text-dim">{q.why}</p>}
               <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Opciones de respuesta">
                 {q.options.map((o) => (
                   <ChipToggle key={o.id} active={false} onClick={() => answer({ choice: o.id })} title={o.hint}>
                     {o.label}
-                    {o.hint ? <span className="text-[11px] text-faint"> · {o.hint}</span> : null}
+                    {o.hint ? <span className="text-[13px] text-faint"> · {o.hint}</span> : null}
                   </ChipToggle>
                 ))}
               </div>
@@ -243,19 +244,19 @@ export function PlanBuilder({ buildId }: { buildId: string }) {
           {!busy && review && (
             <section className="rounded-xl border-2 border-accent/60 bg-card p-4" aria-label="Revisión" data-testid="build-review" aria-live="polite">
               <h2 className="text-[15px] font-semibold">Revisión: el plan está completo</h2>
-              <p className="mt-1 text-[12.5px] text-dim">
+              <p className="mt-1 text-[14px] text-dim">
                 {build.draft ? `${build.draft.subplans.length} subplanes · ${build.draft.subplans.reduce((n, s) => n + s.topics.length, 0)} temas · ${build.draft.hoursPerWeek} h/semana · ${hm(build.draft.totalMinutes)} de ${hm(build.draft.availableMinutes)}` : ""}
               </p>
-              {build.draft?.coverage && <p role="status" className={cn("mt-1 text-[12px]", build.draft.fits ? "text-mint" : "text-warn")}>{build.draft.coverage}</p>}
-              {build.draft?.warnings.map((w) => <p key={w} className="mt-1 text-[12px] text-warn">{w}</p>)}
+              {build.draft?.coverage && <p role="status" className={cn("mt-1 text-[14px]", build.draft.fits ? "text-mint" : "text-warn")}>{build.draft.coverage}</p>}
+              {build.draft?.warnings.map((w) => <p key={w} className="mt-1 text-[14px] text-warn">{w}</p>)}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <PrimaryButton onClick={() => void create()}>
                   <Check size={14} /> Crear plan
                 </PrimaryButton>
-                <span className="text-[11.5px] text-faint">Se crea como plan propuesto: lo mantienes o lo borras, y puedes pedirle cambios con comentarios.</span>
+                <span className="text-[13px] text-faint">Se crea como plan propuesto: lo mantienes o lo borras, y puedes pedirle cambios con comentarios.</span>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Volver a una etapa">
-                <span className="text-[12px] text-dim">Volver a una etapa:</span>
+                <span className="text-[14px] text-dim">Volver a una etapa:</span>
                 {BUILD_STAGES.filter((s) => s !== "revision").map((s) => (
                   <ChipToggle key={s} active={false} onClick={() => void back(s)}>{STAGE_LABEL[s]}</ChipToggle>
                 ))}
@@ -268,12 +269,12 @@ export function PlanBuilder({ buildId }: { buildId: string }) {
           {build.answers.length > 0 && (
             <section className="rounded-xl border border-line bg-card p-3" aria-label="Respuestas dadas" data-testid="build-history">
               <Disclosure open={historyOpen} onToggle={() => setHistoryOpen((v) => !v)} label={`${historyOpen ? "Ocultar" : "Ver"} las respuestas dadas`}>
-                <span className="text-[13px] font-semibold">Respuestas dadas <span className="text-[11.5px] font-normal text-faint">{build.answers.length}</span></span>
+                <span className="text-[14px] font-semibold">Respuestas dadas <span className="text-[13px] font-normal text-faint">{build.answers.length}</span></span>
               </Disclosure>
               {historyOpen && (
                 <ol className="mt-2 space-y-1.5">
                   {build.answers.map((a, i) => (
-                    <li key={`${a.questionId}:${i}`} className="flex flex-wrap items-center gap-2 text-[12.5px]" data-testid="build-answer">
+                    <li key={`${a.questionId}:${i}`} className="flex flex-wrap items-center gap-2 text-[14px]" data-testid="build-answer">
                       <span className="min-w-0 flex-1">
                         <span className="text-dim">{STAGE_LABEL[a.stage]} · {a.question}</span>
                         <span className="block font-medium">{a.label}</span>
@@ -303,7 +304,7 @@ function StageLine({ build }: { build: MentorPlanBuild }) {
           aria-current={st.state === "current" ? "step" : undefined}
           data-state={st.state}
           className={cn(
-            "min-w-[7.5rem] flex-1 rounded-lg border px-2.5 py-1.5 text-[12px]",
+            "min-w-[7.5rem] flex-1 rounded-lg border px-2.5 py-1.5 text-[14px]",
             st.state === "current" ? "border-accent bg-accent-soft text-text" : st.state === "done" ? "border-line bg-card text-dim" : "border-dashed border-line text-faint",
           )}
         >
@@ -313,7 +314,7 @@ function StageLine({ build }: { build: MentorPlanBuild }) {
             </span>
             {STAGE_LABEL[st.stage]}
           </div>
-          {st.summary && st.state !== "pending" && <div className="mt-0.5 truncate text-[11px] text-faint" title={st.summary}>{st.summary}</div>}
+          {st.summary && st.state !== "pending" && <div className="mt-0.5 truncate text-[13px] text-faint" title={st.summary}>{st.summary}</div>}
         </li>
       ))}
     </ol>
@@ -324,7 +325,7 @@ const PENDING_IN: Record<string, BuildStage> = { esqueleto: "esqueleto", temas: 
 
 function Pending({ stage, children }: { stage: keyof typeof PENDING_IN; children?: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-line px-3 py-2 text-[12px] text-faint" data-testid="build-pending">
+    <div className="rounded-xl border border-dashed border-line px-3 py-2 text-[14px] text-faint" data-testid="build-pending">
       {children ?? `Se decidirá en la etapa ${STAGE_LABEL[PENDING_IN[stage]!]}.`}
     </div>
   );
@@ -340,8 +341,8 @@ function GrowingDraft({ build }: { build: MentorPlanBuild }) {
   const levels = Object.entries(eff.levels);
   return (
     <section className="space-y-4" aria-label="Borrador del plan" data-testid="build-draft">
-      <h2 className="text-[13.5px] font-semibold">Borrador <span className="text-[11.5px] font-normal text-faint">crece con cada etapa</span></h2>
-      <ul className="flex flex-wrap gap-1.5 text-[11.5px] text-dim" aria-label="Alcance" data-testid="build-scope">
+      <h2 className="text-[13.5px] font-semibold">Borrador <span className="text-[13px] font-normal text-faint">crece con cada etapa</span></h2>
+      <ul className="flex flex-wrap gap-1.5 text-[13px] text-dim" aria-label="Alcance" data-testid="build-scope">
         <li className="rounded-md border border-line px-2 py-0.5">Periodo: {periodLabel(eff.start, eff.end)}</li>
         <li className="rounded-md border border-line px-2 py-0.5">{Math.round((eff.minutesPerDay / 60) * 10) / 10} h/día</li>
         {levels.map(([a, l]) => <li key={a} className="rounded-md border border-line px-2 py-0.5">{a}: {l.replace("_", " ")}</li>)}
@@ -360,7 +361,7 @@ function GrowingDraft({ build }: { build: MentorPlanBuild }) {
 
       {idx < 2 && rows && <Pending stage="temas" />}
       {draft ? (
-        <div className="space-y-1.5 text-[12.5px]">
+        <div className="space-y-1.5 text-[14px]">
           {draft.coverage && <p role="status" className={cn(draft.fits ? "text-mint" : "text-warn")} data-testid="build-coverage">{draft.coverage}</p>}
           {draft.warnings.map((w) => <p key={w} className="text-warn">{w}</p>)}
           {draft.programmingPractice ? (
@@ -369,7 +370,7 @@ function GrowingDraft({ build }: { build: MentorPlanBuild }) {
             <p className="text-faint">{PRACTICE_NAME}: no incluida.</p>
           )}
           {draft.openQuestions?.length ? <p className="text-dim" data-testid="build-open-deliverables">Entregables por decidir: {draft.openQuestions.length} (se podrán responder después de crear el plan).</p> : null}
-          {draft.discarded.length > 0 && <p className="text-[11.5px] text-faint">Descartado por no existir en tu sistema: {draft.discarded.join(", ")}.</p>}
+          {draft.discarded.length > 0 && <p className="text-[13px] text-faint">Descartado por no existir en tu sistema: {draft.discarded.join(", ")}.</p>}
         </div>
       ) : (
         idx >= 1 && (
@@ -388,26 +389,26 @@ function SkeletonCard({ row, sub, colour }: { row: MentorSkeletonRow; sub?: NonN
   const lastWeek = sub?.weeks.filter((w) => w.topics.length).at(-1);
   return (
     <section className={CARD_CLASS} style={{ borderTop: `3px solid ${colour}` }} data-testid="build-subplan" aria-label={`Subplan ${row.objective || row.area}`}>
-      <div className="text-[11px] font-medium uppercase tracking-wide text-faint">{row.area}</div>
+      <div className="text-[13px] font-medium uppercase tracking-wide text-faint">{row.area}</div>
       <div className="text-[14px] font-semibold leading-snug">{row.objective || row.area}</div>
       <div className="mt-2 flex items-center gap-2">
         <div className="flex-1"><ProgressBar pct={row.sharePct} colour={colour} /></div>
-        <span className="text-[11.5px] font-medium">{row.sharePct} %</span>
+        <span className="text-[13px] font-medium">{row.sharePct} %</span>
       </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-[11px] text-dim">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-[13px] text-dim">
         <span>~{row.hours} h para temas</span>
         <span>· {sub ? sub.topics.length : row.topics} temas</span>
         {sub?.deliverable && <Chip colour="var(--nv-accent)">Entregable</Chip>}
       </div>
       {sub ? (
-        <ul className="mt-2 space-y-0.5 text-[11.5px] text-dim">
+        <ul className="mt-2 space-y-0.5 text-[13px] text-dim">
           {sub.topics.slice(0, 4).map((t) => (
             <li key={t.folder} className="truncate" title={t.folder}>Sem. {t.targetWeek} · {t.title}</li>
           ))}
           {sub.topics.length > 4 && <li className="text-faint">+{sub.topics.length - 4} más{lastWeek ? ` · hasta ${shortWeekLabel(lastWeek.start, lastWeek.end)}` : ""}</li>}
         </ul>
       ) : (
-        <p className="mt-2 text-[11.5px] text-faint">Los temas se eligen en la etapa Temas.</p>
+        <p className="mt-2 text-[13px] text-faint">Los temas se eligen en la etapa Temas.</p>
       )}
     </section>
   );

@@ -361,18 +361,18 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
         <CalendarRange size={16} className="text-accent-text" />
         <h2 className="text-[14px] font-semibold">Nuevo plan: tus precondiciones</h2>
         <span className="flex-1" />
-        <button type="button" aria-label="Cerrar formulario" onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-hover hover:text-text">
+        <button type="button" aria-label="Cerrar formulario" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-md text-dim hover:bg-hover hover:text-text">
           <X size={15} />
         </button>
       </div>
-      <p className="text-[12.5px] text-dim">Son hechos fijos: el Mentor no los cambia, solo elige y ordena los temas que caben en ellos.</p>
+      <p className="text-[14px] text-dim">Son hechos fijos: el Mentor no los cambia, solo elige y ordena los temas que caben en ellos.</p>
 
       {warming && (
-        <div role="status" className="flex items-center gap-2 text-[12.5px] text-faint">
+        <div role="status" className="flex items-center gap-2 text-[14px] text-faint">
           <Loader2 size={14} className="animate-spin" /> Leyendo tu vault por primera vez, un momento…
         </div>
       )}
-      {loadError && <p role="alert" className="text-[12.5px] text-danger">{loadError}</p>}
+      {loadError && <p role="alert" className="text-[14px] text-danger">{loadError}</p>}
 
       <div className="grid gap-3 @3xl:grid-cols-2">
         <Panel title="¿Para qué periodo?">
@@ -387,7 +387,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
             </ChipToggle>
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-3">
-            <label className="text-[12px] text-dim">
+            <label className="text-[14px] text-dim">
               <span className="block">Desde</span>
               <input
                 type="date"
@@ -400,7 +400,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
                 className={cn(input, "!w-40")}
               />
             </label>
-            <label className="text-[12px] text-dim">
+            <label className="text-[14px] text-dim">
               <span className="block">Hasta</span>
               <input
                 type="date"
@@ -431,7 +431,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           )}
-          <p className="mt-2 text-[12.5px] text-dim" data-testid="plan-period-summary">
+          <p className="mt-2 text-[14px] text-dim" data-testid="plan-period-summary">
             {isDate(start) && isDate(end) && end >= start ? `Del ${periodLabel(start, end)} · ${weeksLabel(capacityOf(pre).weeks)}` : "Elige un inicio y un fin válidos."}
           </p>
         </Panel>
@@ -443,7 +443,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
                 {m / 60} h
               </ChipToggle>
             ))}
-            <label className="flex items-center gap-1.5 text-[12.5px] text-dim">
+            <label className="flex items-center gap-1.5 text-[14px] text-dim">
               <span>Libre (min)</span>
               <input
                 type="number"
@@ -469,7 +469,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
                 </ChipToggle>
               ))}
             </div>
-            <p className="mt-1 text-[11.5px] text-faint">La capacidad efectiva es ese porcentaje del tiempo declarado.</p>
+            <p className="mt-1 text-[13px] text-faint">La capacidad efectiva es ese porcentaje del tiempo declarado.</p>
           </div>
         </Panel>
 
@@ -491,11 +491,11 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
             {blocked.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Fechas bloqueadas">
                 {blocked.slice(0, 40).map((d) => (
-                  <button key={d} type="button" aria-label={`Quitar ${d}`} onClick={() => setBlocked((cur) => cur.filter((x) => x !== d))} className="inline-flex items-center gap-1 rounded-md border border-line px-1.5 py-0.5 text-[11.5px] text-dim hover:bg-hover">
+                  <button key={d} type="button" aria-label={`Quitar ${d}`} onClick={() => setBlocked((cur) => cur.filter((x) => x !== d))} className="inline-flex items-center gap-1 rounded-md border border-line px-1.5 py-0.5 text-[13px] text-dim hover:bg-hover">
                     {d} <X size={10} />
                   </button>
                 ))}
-                {blocked.length > 40 && <span className="text-[11.5px] text-faint">+{blocked.length - 40} más</span>}
+                {blocked.length > 40 && <span className="text-[13px] text-faint">+{blocked.length - 40} más</span>}
               </div>
             )}
           </div>
@@ -503,7 +503,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
 
         <Panel title="¿Qué quieres cubrir?">
           {!options ? (
-            <p className="text-[12.5px] text-faint">{loadError ? "No se pudieron cargar tus metas y materias." : "Cargando tus metas y materias…"}</p>
+            <p className="text-[14px] text-faint">{loadError ? "No se pudieron cargar tus metas y materias." : "Cargando tus metas y materias…"}</p>
           ) : (
             <div className="space-y-2.5">
               <div>
@@ -520,12 +520,12 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
                         }}
                         title={g.topics ? `${g.topics} temas pendientes · ~${hoursText(g.minutes)}` : "Sin temas enlazados pendientes"}
                       >
-                        {g.name} <span className="text-[11px] text-faint">· {g.topics} {g.topics === 1 ? "tema" : "temas"}{g.topics ? ` · ${hoursText(g.minutes)}` : ""}</span>
+                        {g.name} <span className="text-[13px] text-faint">· {g.topics} {g.topics === 1 ? "tema" : "temas"}{g.topics ? ` · ${hoursText(g.minutes)}` : ""}</span>
                       </ChipToggle>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-1 text-[12px] text-faint">No tienes metas activas con temas enlazados.</p>
+                  <p className="mt-1 text-[14px] text-faint">No tienes metas activas con temas enlazados.</p>
                 )}
               </div>
               <div>
@@ -534,12 +534,12 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
                   <div className="mt-1 flex flex-wrap gap-1.5" role="group" aria-label="Materias">
                     {options.areas.map((a) => (
                       <ChipToggle key={a.id} active={subjects.includes(a.id)} onClick={() => setSubjects((cur) => toggle(cur, a.id))} title={`${a.pending} temas pendientes de ${a.total}`}>
-                        {a.name} <span className="text-[11px] text-faint">· {a.pending}/{a.total}</span>
+                        {a.name} <span className="text-[13px] text-faint">· {a.pending}/{a.total}</span>
                       </ChipToggle>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-1 text-[12px] text-faint">Aún no hay temas de estudio en tu vault.</p>
+                  <p className="mt-1 text-[14px] text-faint">Aún no hay temas de estudio en tu vault.</p>
                 )}
               </div>
               {branchAreas.map((a) => {
@@ -558,7 +558,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
                     <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Ramas de ${a.name}`}>
                       {a.branches!.map((b) => (
                         <ChipToggle key={b.name} active={current.includes(b.name)} onClick={() => toggleBranch(a.id, b.name, names)} title={`${b.pending} temas pendientes de ${b.total}`}>
-                          {b.name} <span className="text-[11px] text-faint">· {b.pending}</span>
+                          {b.name} <span className="text-[13px] text-faint">· {b.pending}</span>
                         </ChipToggle>
                       ))}
                     </div>
@@ -566,7 +566,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
                 );
               })}
               {excludedBranches.length > 0 && (
-                <p className="flex flex-wrap items-center gap-2 text-[12px] text-dim" data-testid="branch-note">
+                <p className="flex flex-wrap items-center gap-2 text-[14px] text-dim" data-testid="branch-note">
                   <span>
                     {branchPreset === "fullstack" ? `Excluí ${excludedBranches.map(cleanBranch).join(" y ")} porque pediste full stack. Añádelos si los quieres.` : `Ramas fuera del plan: ${excludedBranches.map(cleanBranch).join(", ")}.`}
                   </span>
@@ -574,7 +574,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
                 </p>
               )}
               <label className="block">
-                <span className="text-[12px] text-dim">Otro objetivo (opcional)</span>
+                <span className="text-[14px] text-dim">Otro objetivo (opcional)</span>
                 <input value={freeObjective} onChange={(e) => setFreeObjective(e.target.value)} placeholder="Ej.: cerrar el tema de límites" className={input} maxLength={300} />
               </label>
             </div>
@@ -584,11 +584,11 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
 
       {scopeAreas.length > 0 && (
         <Panel title="Tu nivel en cada área (opcional)">
-          <p className="mb-2 text-[12px] text-faint">Es solo una hipótesis para el reparto y la IA. «No sé» añade un diagnóstico corto al inicio.</p>
+          <p className="mb-2 text-[14px] text-faint">Es solo una hipótesis para el reparto y la IA. «No sé» añade un diagnóstico corto al inicio.</p>
           <div className="space-y-2">
             {scopeAreas.map((area) => (
               <div key={area} className="flex flex-wrap items-center gap-1.5" role="group" aria-label={`Nivel en ${area}`}>
-                <span className="min-w-[7rem] text-[12.5px] font-medium">{area}</span>
+                <span className="min-w-[7rem] text-[14px] font-medium">{area}</span>
                 {LEVELS.map((lv) => (
                   <ChipToggle
                     key={lv}
@@ -622,13 +622,13 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
               touchedPractice.current = true;
               setPracticeOn((v) => !v);
             }}
-            className={cn("inline-flex h-5 w-9 flex-none items-center rounded-full border px-0.5 transition-colors", practiceOn ? "border-accent bg-accent" : "border-line bg-hover")}
+            className={cn("inline-flex h-8 w-14 flex-none items-center rounded-full border px-1 transition-colors", practiceOn ? "border-transparent bg-[var(--nv-btn,var(--nv-accent))]" : "border-[var(--nv-ctl-border,var(--nv-line))] bg-hover")}
           >
-            <span className={cn("h-3.5 w-3.5 rounded-full bg-card shadow transition-transform", practiceOn ? "translate-x-4" : "")} />
+            <span className={cn("h-5 w-5 rounded-full bg-white shadow transition-transform", practiceOn ? "translate-x-6" : "")} />
           </button>
-          <span className="text-[12.5px]">{practiceOn ? "Incluida en el plan" : "No incluida"}</span>
+          <span className="text-[14px]">{practiceOn ? "Incluida en el plan" : "No incluida"}</span>
         </div>
-        <p className="mt-1.5 text-[12px] text-faint">
+        <p className="mt-1.5 text-[14px] text-faint">
           Tu rama de práctica de programación (la carpeta <code>programming_practice</code>): un reto de lógica diario y un proyecto semanal full stack (frontend + backend + base de datos) con cuatro fases: especificación, construcción, defensa y postmortem. Esos minutos se reservan del tiempo diario; el resto va a tus temas.
         </p>
         {practiceOn && (
@@ -669,7 +669,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
                       <ChipToggle key={f} active={practiceFocus === f} onClick={() => setPracticeFocus(f)}>{FOCUS_LABEL[f]}</ChipToggle>
                     ))}
                   </div>
-                  <p className="mt-1 text-[11.5px] text-faint">Siempre es full stack: el foco solo añade criterios, no quita capas.</p>
+                  <p className="mt-1 text-[13px] text-faint">Siempre es full stack: el foco solo añade criterios, no quita capas.</p>
                 </div>
                 <div>
                   <Label>Proyecto mensual</Label>
@@ -692,7 +692,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
             </ChipToggle>
           ))}
         </div>
-        <p className="mt-1.5 text-[12px] text-faint">
+        <p className="mt-1.5 text-[14px] text-faint">
           Un entregable es un proyecto de demostración por subplan. Es una opción a discutir: con «Lo decidimos al armar el plan» el borrador no los añade y te pregunta, subplan a subplan, si quieres uno.
         </p>
       </Panel>
@@ -707,7 +707,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
           placeholder="Ej.: tengo examen el 20; prefiero teoría por las mañanas y práctica por las noches; quiero terminar primero lo de APIs; no me pongas diagnósticos largos."
           className={cn(input, "min-h-24 resize-y leading-relaxed")}
         />
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-faint">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-faint">
           <span>La IA los tiene en cuenta al elegir y ordenar los temas; no cambian el tiempo ni el periodo que fijaste arriba.</span>
           <span className="flex-1" />
           <span data-testid="plan-notes-count">
@@ -716,8 +716,8 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
         </div>
       </Panel>
 
-      <div className="rounded-xl border border-line bg-surface p-3 text-[12.5px]" data-testid="plan-capacity" aria-live="polite">
-        <h3 className="mb-1 font-mono text-[10.5px] uppercase tracking-wider text-faint">Cálculo en vivo</h3>
+      <div className="rounded-xl border border-line bg-surface p-3 text-[14px]" data-testid="plan-capacity" aria-live="polite">
+        <h3 className="mb-1 font-mono text-[13px] uppercase tracking-wider text-faint">Cálculo en vivo</h3>
         {problem ? (
           <p className="text-warn">{problem}</p>
         ) : (
@@ -758,7 +758,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
           {startingBuild ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />} Armar paso a paso (con preguntas)
         </GhostButton>
         <GhostButton onClick={onClose}>Cancelar</GhostButton>
-        <span className="text-[11.5px] text-faint">
+        <span className="text-[13px] text-faint">
           {options && !options.aiConfigured ? "La IA no está configurada: se generará un plan automático con lo que elegiste." : "Se crea el plan completo, propuesto: lo mantienes o lo borras, y puedes pedirle cambios con comentarios."}
         </span>
       </div>

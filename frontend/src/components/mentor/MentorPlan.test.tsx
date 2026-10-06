@@ -118,6 +118,7 @@ const click = async (el: Element | undefined) => {
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   await flush();
 };
+const openTab = (id: string) => click(host.querySelector(`#plan-tabs-tab-${id}`)!);
 
 beforeEach(() => {
   localStorage.clear();
@@ -149,7 +150,8 @@ describe("Mentor — sub-interfaz de un plan", () => {
     const pre = host.querySelector("[data-testid=plan-preconditions]")!.textContent!;
     expect(pre).toContain("6 oct – 5 nov");
     expect(pre).toContain("4 h/día");
-    expect(pre).toContain("L M X J V S");
+    const days = [...host.querySelectorAll("[data-testid=plan-days] li")].map((li) => li.textContent);
+    expect(days).toEqual(["Llunes, activo", "Mmartes, activo", "Xmiércoles, activo", "Jjueves, activo", "Vviernes, activo", "Ssábado, activo", "Ddomingo, sin estudio"]);
     expect(pre).toContain("Normal");
     expect(host.querySelectorAll("section[aria-label='Programación'], section[aria-label='Inglés']")).toHaveLength(2);
     const cards = host.querySelectorAll("[data-testid=subplan-card]");
@@ -158,7 +160,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
     expect(cards[0]!.textContent).toContain("70 %");
     expect(cards[0]!.textContent).toContain("1/2 temas");
     expect(cards[0]!.textContent).toContain("Entregable: En curso");
-    expect(host.querySelector("[data-testid=plan-summary]")!.textContent).toContain("2 subplanes · 1/2 temas completados · 70% global · semana 2 de 5");
+    expect(host.querySelector("[data-testid=plan-summary]")!.textContent).toContain("2 subplanes · 1/2 temas completados · 70 % global · semana 2 de 5");
     expect(host.querySelector("[data-testid=subplan-detail]")).toBeNull();
   });
 
@@ -171,8 +173,15 @@ describe("Mentor — sub-interfaz de un plan", () => {
   it("al desplegar muestra semanas, temas con estado y registro, metas requeridas y entregable", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    await click(button("Expandir Desarrollo Backend"));
+    const toggle = button("Desarrollo Backend")!;
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    await click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.getAttribute("aria-controls")).toBe(host.querySelector("[data-testid=subplan-detail]")!.id);
     const detail = host.querySelector("[data-testid=subplan-detail]")!;
+    // las semanas se pintan solo al abrir su desplegable
+    expect(detail.querySelectorAll("[data-testid=plan-week]")).toHaveLength(0);
+    await click(button("Semanas (4)", detail));
     expect(detail.querySelectorAll("[data-testid=plan-week]")).toHaveLength(4);
     expect(detail.querySelectorAll("[data-testid=plan-week]")[1]!.className).toContain("border-accent");
     expect(detail.querySelectorAll("[data-testid=plan-week]")[0]!.textContent).toContain("6–12 oct");
@@ -186,7 +195,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
     const d = detail.querySelector("[data-testid=plan-deliverable]")!;
     expect(d.textContent).toContain("tests pasan");
     expect(button("Abrir en Proyectos", d)).toBeTruthy();
-    await click(button("Contraer Desarrollo Backend"));
+    await click(toggle);
     expect(host.querySelector("[data-testid=subplan-detail]")).toBeNull();
   });
 
@@ -194,7 +203,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const update = vi.spyOn(api, "mentorPlanUpdateDeliverable").mockResolvedValue(plan());
     await mountEl(<MentorPlan planId={PID} />);
-    await click(button("Expandir Desarrollo Backend"));
+    await click(button("Desarrollo Backend"));
     const detail = host.querySelector("[data-testid=subplan-detail]")!;
     expect(detail.querySelectorAll("input, textarea")).toHaveLength(0);
     const sel = detail.querySelector<HTMLSelectElement>("select[aria-label='Estado del entregable']")!;
@@ -209,7 +218,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
   it("el subplan sin proyecto lo presenta como propuesta de entregable", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    await click(button("Expandir Hablar con confianza"));
+    await click(button("Hablar con confianza"));
     const d = host.querySelector("[data-testid=plan-deliverable]")!;
     expect(d.textContent).toContain("Propuesta");
     expect(button("Abrir en Proyectos", d)).toBeUndefined();
@@ -218,7 +227,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
   it("'Esta semana / Hoy' combina los planes activos y 'Planear mi día con esto' lleva a Hoy", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plans: [row(PID, "A"), row("2026-10-10_2026-10-31", "B")] }));
     await mountEl(<MentorPlan planId={PID} />);
-    await click(button("Esta semana / Hoy"));
+    await openTab("semana");
     const items = host.querySelectorAll("[data-testid=plan-week-item]");
     expect(items).toHaveLength(1);
     expect(items[0]!.textContent).toContain("2 APIs web");

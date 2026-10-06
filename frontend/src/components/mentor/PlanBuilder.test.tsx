@@ -244,7 +244,9 @@ describe("estado de espera: pensando, contador, cancelar y reanudar", () => {
     await click(button("Básico"));
     await flush();
     const th = host.querySelector("[data-testid=ai-thinking]")!;
-    expect(th.getAttribute("aria-live")).toBe("polite");
+    // solo «Pensando… + qué hace» se anuncia (aria-live); el contador de segundos va aparte para no repetirse cada segundo
+    expect(th.querySelector("[role=status][aria-live=polite]")!.textContent).toContain("Pensando…");
+    expect(host.querySelector("[data-testid=ai-elapsed]")!.closest("[aria-live]")).toBeNull();
     expect(th.textContent).toContain("Pensando…");
     expect(th.textContent).toContain("Eligiendo temas de Programación…");
     expect(host.querySelector("[data-testid=ai-elapsed]")!.textContent).toMatch(/^9[5-9] s$/);
@@ -390,9 +392,11 @@ describe("«Pedir cambios al plan»", () => {
     const change = vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, applied: true, plan: planData, history: [entry()], entry: entry({ changed: ["P/A"] }) });
     await mountEl(<MentorPlan planId={PID} />);
     const box = host.querySelector("[data-testid=plan-changes]")!;
-    const ta = box.querySelector<HTMLTextAreaElement>("textarea[aria-label='Pedir cambios al plan']")!;
-    expect(ta.placeholder).toContain("Quita lo de desktop");
-    expect(ta.placeholder).toContain("Pasa la semana 3 a la 5");
+    const ta = box.querySelector<HTMLTextAreaElement>("textarea")!;
+    // el cuadro tiene una etiqueta visible asociada y los ejemplos son chips clicables
+    expect(box.querySelector(`label[for='${ta.id}']`)!.textContent).toContain("Tu comentario para el Mentor");
+    expect(ta.placeholder).toContain("Ej.:");
+    expect([...box.querySelectorAll("[data-testid=change-suggestions] button")].map((b) => b.textContent)).toContain("Pasa la semana 3 a la 5");
     expect(button("Aplicar cambios", box).hasAttribute("disabled")).toBe(true);
     await type(ta, "Quita lo de desktop");
     await act(async () => { ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })); });
@@ -427,7 +431,7 @@ describe("«Pedir cambios al plan»", () => {
       .mockResolvedValueOnce({ loading: false, applied: true, plan: planData, history: [], entry: entry({ warnings: ["El cambio no cabe del todo: necesitas 90 h y hay 70 h de capacidad."], fixOptions: [fix] }) })
       .mockResolvedValueOnce({ loading: false, applied: true, plan: planData, history: [], entry: entry({ n: 2, comment: fix.label }) });
     await mountEl(<MentorPlan planId={PID} />);
-    await type(host.querySelector<HTMLTextAreaElement>("textarea[aria-label='Pedir cambios al plan']")!, "añade todo lo de tooling");
+    await type(host.querySelector<HTMLTextAreaElement>("[data-testid=plan-changes] textarea")!, "añade todo lo de tooling");
     await click(button("Aplicar cambios"));
     expect(host.querySelector("[data-testid=change-notice]")!.textContent).toContain("no cabe del todo");
     await click(button("Recortar los últimos temas", host.querySelector("[aria-label='Cómo ajustarlo']")!));
@@ -440,7 +444,7 @@ describe("«Pedir cambios al plan»", () => {
     const cancel = vi.spyOn(api, "mentorAiCancel").mockResolvedValue({ cancelled: true });
     const change = vi.spyOn(api, "mentorPlanChange").mockImplementation(() => new Promise(() => undefined));
     await mountEl(<MentorPlan planId={PID} />);
-    await type(host.querySelector<HTMLTextAreaElement>("textarea[aria-label='Pedir cambios al plan']")!, "hazlo más ligero");
+    await type(host.querySelector<HTMLTextAreaElement>("[data-testid=plan-changes] textarea")!, "hazlo más ligero");
     const apply = button("Aplicar cambios");
     await click(apply);
     await click(apply);

@@ -68,6 +68,7 @@ const click = async (el: Element | undefined) => {
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   await flush();
 };
+const openTab = (id: string) => click(host.querySelector(`#plan-tabs-tab-${id}`)!);
 
 beforeEach(() => {
   localStorage.clear();
@@ -150,9 +151,14 @@ describe("plan aceptado: tarjeta Programming practice", () => {
   it("fila con kata, proyecto de esta semana con sus 4 fases y estado, semanas y mensual", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
+    // cabecera (pestaña «Mi plan»): chip de la práctica y entregables a discutir pendientes
+    expect(host.querySelector("[data-testid=plan-practice-chip]")!.textContent).toContain("Programming practice");
+    expect(host.querySelector("[data-testid=plan-preconditions]")!.textContent).toContain("A discutir");
+    await openTab("practica");
     const row = host.querySelector("[data-testid=practice-row]")!;
     expect(row).toBeTruthy();
-    expect(row.querySelector("section[aria-label='Programming practice']")).toBeTruthy();
+    expect(row.querySelector("#pr-title")!.textContent).toBe("Programming practice");
+    expect(row.getAttribute("aria-labelledby")).toBe("pr-title");
     const kata = row.querySelector("[data-testid=practice-kata]")!.textContent!;
     expect(kata).toContain("Kata de lógica · 30 min");
     expect(kata).toContain("5/7 días hechos");
@@ -162,28 +168,30 @@ describe("plan aceptado: tarjeta Programming practice", () => {
     expect(proj).toContain("Proyecto de la semana 2");
     expect(proj).toContain("Proyecto semanal 2 · foco Databases");
     expect(proj).toContain("Full stack: frontend + backend + base de datos");
-    for (const t of ["Especificación: Hecho", "Construcción: En curso", "Defensa: Pendiente", "Postmortem: Pendiente"]) expect(proj).toContain(t);
+    for (const [fase, estado] of [["Especificación", "Hecho"], ["Construcción", "En curso"], ["Defensa", "Pendiente"], ["Postmortem", "Pendiente"]]) expect(proj).toMatch(new RegExp(`${fase}.*${estado}`));
     expect(row.querySelector("[data-testid=practice-project-linked]")!.textContent).toContain("«Agenda» (en construcción)");
     const weeks = row.querySelector("[data-testid=practice-weeks]")!.textContent!;
     expect(weeks).toContain("foco Backend");
     expect(weeks).toContain("4/4 fases");
     expect(row.querySelector("[data-testid=practice-monthly]")!.textContent).toContain("Semanas 1–4");
-    // cabecera: chip de la práctica y entregables a discutir pendientes
-    expect(host.querySelector("[data-testid=plan-practice-chip]")!.textContent).toContain("Programming practice");
-    expect(host.querySelector("[data-testid=plan-preconditions]")!.textContent).toContain("Entregables: a discutir");
-    expect(host.querySelector("[data-testid=plan-open-questions]")!.textContent).toContain("Pendiente de decidir: entregables en 1 subplan");
+    // el kata muestra su semana de lunes a domingo
+    expect([...row.querySelectorAll("[data-testid=practice-kata] ul[aria-label^='Días del kata'] li")]).toHaveLength(7);
+    await openTab("entregables");
+    expect(host.querySelector("[data-testid=plan-open-questions]")!.textContent).toContain("1 pendiente");
   });
 
   it("«Abrir práctica» abre el diálogo de práctica de programación", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    await click(button("Abrir práctica", host.querySelector("[data-testid=practice-project]")!));
+    await openTab("practica");
+    await click(button("Abrir práctica", host.querySelector("[data-testid=practice-row]")!));
     expect(usePracticeDialog.getState().open).toBe(true);
   });
 
   it("sin el módulo programming_practice lo dice y el estado es manual; sin pista no hay tarjeta", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ practice: status({ ppReady: false, weeks: [] }) }));
     await mountEl(<MentorPlan planId={PID} />);
+    await openTab("practica");
     expect(host.querySelector("[data-testid=practice-kata]")!.textContent).toContain("se anota a mano en los bloques de «Hoy»");
     act(() => root.unmount());
     root = createRoot(host);
@@ -191,6 +199,8 @@ describe("plan aceptado: tarjeta Programming practice", () => {
     await mountEl(<MentorPlan planId={PID} />);
     expect(host.querySelector("[data-testid=practice-row]")).toBeNull();
     expect(host.querySelector("[data-testid=plan-practice-chip]")).toBeNull();
+    // sin pista no hay pestaña «Práctica diaria»
+    expect(host.querySelector("#plan-tabs-tab-practica")).toBeNull();
   });
 
   it("un plan anterior (sin pista ni práctica en las precondiciones) se lee y se pinta igual", async () => {
@@ -205,7 +215,7 @@ describe("esta semana y hoy: la práctica del día", () => {
   it("lista el kata y la sesión del proyecto; «Planear mi día con esto» y el atajo de práctica dejan el objetivo", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    await click(button("Esta semana / Hoy"));
+    await openTab("semana");
     const items = host.querySelectorAll("[data-testid=plan-week-practice-item]");
     expect(items.length).toBeGreaterThanOrEqual(1);
     expect(items[0]!.textContent).toContain("Reto diario");

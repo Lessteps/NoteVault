@@ -90,15 +90,25 @@ export function DialogHost() {
   const { req, set } = useDialog();
   const [value, setValue] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (req) {
-      setValue(req.value ?? "");
-      setTimeout(() => {
-        input.current?.focus();
-        input.current?.select();
-      }, 0);
-    }
+    if (!req) return;
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setValue(req.value ?? "");
+    const t = setTimeout(() => {
+      if (input.current) {
+        input.current.focus();
+        input.current.select();
+      } else box.current?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      // al cerrar, el foco vuelve a quien abrió el diálogo
+      const o = opener.current;
+      if (o && document.contains(o)) o.focus();
+    };
   }, [req]);
 
   if (!req) return null;
@@ -107,48 +117,72 @@ export function DialogHost() {
     set(null);
   };
   const submit = () => close(req.kind === "prompt" ? value.trim() || null : true);
+  // Escape cierra y Tab / Mayús+Tab quedan atrapados dentro del diálogo
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      close(null);
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const items = [...(box.current?.querySelectorAll<HTMLElement>("input, button:not([disabled])") ?? [])];
+    if (!items.length) return;
+    const first = items[0]!;
+    const last = items[items.length - 1]!;
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || !box.current?.contains(active))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (active === last || !box.current?.contains(active))) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-start justify-center bg-black/50 pt-[18vh]"
+      className="nv-a11y fixed inset-0 z-50 grid place-items-start justify-center bg-black/50 pt-[18vh]"
       onMouseDown={() => close(null)}
     >
       <div
-        role="dialog"
-        aria-label={req.title}
-        className="w-[420px] rounded-xl border border-line-strong bg-card p-4 shadow-2xl"
+        ref={box}
+        role={req.kind === "confirm" ? "alertdialog" : "dialog"}
+        aria-modal="true"
+        aria-labelledby="nv-dialog-title"
+        aria-describedby={req.message ? "nv-dialog-message" : undefined}
+        className="w-[420px] max-w-[calc(100vw-2rem)] rounded-xl border border-line-strong bg-card p-4 shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={onKeyDown}
       >
-        <div className="text-sm font-semibold text-text">{req.title}</div>
-        {req.message && <p className="mt-2 text-[13px] text-dim">{req.message}</p>}
+        <div id="nv-dialog-title" className="text-[15px] font-semibold text-text">{req.title}</div>
+        {req.message && <p id="nv-dialog-message" className="mt-2 text-[14px] text-dim">{req.message}</p>}
         {req.kind === "prompt" && (
           <input
             ref={input}
             value={value}
+            aria-labelledby="nv-dialog-title"
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();
-              if (e.key === "Escape") close(null);
             }}
-            className="mt-3 w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-text outline-none focus:border-accent"
+            className="mt-3 w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-text outline-none"
           />
         )}
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
             onClick={() => close(null)}
-            className="rounded-lg px-3 py-1.5 text-[12px] text-dim hover:bg-hover hover:text-text"
+            className="min-h-10 rounded-lg px-4 py-2 text-[14px] text-dim hover:bg-hover hover:text-text"
           >
             Cancelar
           </button>
           <button
             type="button"
             onClick={submit}
-            onKeyDown={(e) => e.key === "Escape" && close(null)}
-            autoFocus={req.kind === "confirm"}
+            data-autofocus
             className={cn(
-              "rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white",
-              req.danger ? "bg-danger hover:opacity-90" : "bg-accent hover:bg-accent-strong",
+              "min-h-10 rounded-lg px-4 py-2 text-[14px] font-semibold text-white",
+              req.danger ? "bg-[var(--nv-danger-btn,#b8353a)] hover:opacity-90" : "bg-[var(--nv-btn,var(--nv-accent))] hover:bg-[var(--nv-btn-hover,var(--nv-accent-strong))]",
             )}
           >
             {req.confirmLabel ?? "Aceptar"}

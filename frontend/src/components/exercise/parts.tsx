@@ -84,11 +84,15 @@ function periodRingDefs(stats: ExerciseStats): Array<{ label: string; value: num
  * en fila no caben—.
  */
 export function PeriodRings({ size = 104, thickness = 10, columns = "auto" }: {
-  size?: number; thickness?: number; columns?: "auto" | "two";
+  size?: number; thickness?: number; columns?: "auto" | "two" | "one";
 }) {
   const stats = useExercise((s) => s.stats);
   return (
-    <div className={columns === "two" ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-4 sm:grid-cols-4"}>
+    <div
+      data-period-rings
+      className={columns === "one"
+        ? "grid grid-cols-1 gap-3"
+        : columns === "two" ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-4 sm:grid-cols-4"}>
       {periodRingDefs(stats).map((r) => (
         <Ring key={r.label} value={r.value} label={r.label} sub={r.sub} size={size} thickness={thickness} />
       ))}
@@ -133,12 +137,14 @@ export function StreakLine({ compact }: { compact?: boolean }) {
  * formato; ahora los dicen los anillos, que se ven desde cualquier pantalla
  * del módulo y no solo desde Vista general.
  */
-export function SideStats() {
+export function SideStats({ collapsed }: { collapsed?: boolean }) {
   return (
     <div className="space-y-3 px-4 pt-4">
-      <div className="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Estadísticas</div>
-      <PeriodRings size={60} thickness={7} columns="two" />
-      <StreakLine compact />
+      {!collapsed && (
+        <div className="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Estadísticas</div>
+      )}
+      <PeriodRings size={collapsed ? 40 : 60} thickness={7} columns={collapsed ? "one" : "two"} />
+      {!collapsed && <StreakLine compact />}
     </div>
   );
 }

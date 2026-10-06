@@ -45,39 +45,40 @@ export function RoutineDaySection({
   const [moveTarget, setMoveTarget] = useState("");
   return (
     <section data-routine-day={day.key}>
-      <button
-        type="button"
-        data-routine-day-toggle={day.key}
-        aria-expanded={expanded}
-        onClick={onToggle}
-        className="mb-1 flex w-full items-center gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-hover"
-      >
-        <ChevronDown
-          size={13}
-          className={cn("flex-none text-faint transition-transform", !expanded && "-rotate-90")}
-        />
-        <span className="text-[12.5px] font-semibold" style={{ color: ORANGE }}>
-          {day.glyph} {day.name}
-        </span>
-        <span className="text-[11px] font-normal text-faint">· {day.subtitle}</span>
-        <span className="ml-auto rounded-full bg-elevated px-2 py-0.5 font-mono text-[10.5px] text-dim">
-          {exercises.length}
-        </span>
-        {onDuplicate && exercises.length > 0 && (
-          <span onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              data-duplicate-day={day.key}
-              title={`Duplicar ${day.name}`}
-              aria-label={`Duplicar ${day.name}`}
-              onClick={() => { setDupOpen((v) => !v); setDupTarget(""); }}
-              className="grid h-7 w-7 place-items-center rounded-md text-dim transition-colors hover:bg-hover hover:text-text"
-            >
-              <Copy size={12} />
-            </button>
+      <div className="mb-1 flex w-full items-center gap-2 rounded-lg px-1 py-0.5 hover:bg-hover">
+        <button
+          type="button"
+          data-routine-day-toggle={day.key}
+          aria-expanded={expanded}
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          <ChevronDown
+            size={13}
+            className={cn("flex-none text-faint transition-transform", !expanded && "-rotate-90")}
+          />
+          <span className="text-[12.5px] font-semibold" style={{ color: ORANGE }}>
+            {day.glyph} {day.name}
           </span>
+          <span className="text-[11px] font-normal text-faint">· {day.subtitle}</span>
+          <span className="ml-auto rounded-full bg-elevated px-2 py-0.5 font-mono text-[10.5px] text-dim">
+            {exercises.length}
+          </span>
+        </button>
+        {onDuplicate && exercises.length > 0 && (
+          <button
+            type="button"
+            data-duplicate-day={day.key}
+            title={`Duplicar ${day.name}`}
+            aria-label={`Duplicar ${day.name}`}
+            aria-expanded={dupOpen}
+            onClick={() => { setDupOpen((v) => !v); setDupTarget(""); }}
+            className="grid h-7 w-7 flex-none place-items-center rounded-md text-dim transition-colors hover:bg-hover hover:text-text"
+          >
+            <Copy size={12} />
+          </button>
         )}
-      </button>
+      </div>
       {dupOpen && (
         <div className="mb-1 flex items-center gap-2 rounded-lg border border-line bg-card px-3 py-1.5 text-[12px]">
           <span className="text-faint">Duplicar a</span>

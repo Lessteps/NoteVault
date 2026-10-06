@@ -705,8 +705,14 @@ export function exerciseApi(app: AppState) {
       if (!raw) {
         throw new ApiError("Este ejercicio no tiene video.");
       }
-      const vaultRoot = app.root || process.cwd();
-      const candidates = [raw, path.join(vaultRoot, raw), path.resolve(raw)];
+      const vaultRoot = path.resolve(app.root || process.cwd());
+      // Solo se sirve lo que vive dentro del vault: un video_path absoluto o
+      // con `..` que apunte fuera se rechaza en vez de servirse por http.
+      const withinVault = (abs: string) =>
+        abs === vaultRoot || abs.startsWith(vaultRoot + path.sep);
+      const candidates = [raw, path.join(vaultRoot, raw)]
+        .map((c) => path.resolve(vaultRoot, c))
+        .filter(withinVault);
       let hit: string | null = null;
       for (const c of candidates) {
         try {

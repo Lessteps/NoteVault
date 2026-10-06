@@ -24,6 +24,8 @@ function beep() {
     o.connect(ctx.destination);
     o.start();
     o.stop(ctx.currentTime + 0.18);
+    o.onended = () => void ctx.close().catch(() => {});
+    window.setTimeout(() => void ctx.close().catch(() => {}), 1000);
   } catch {
     /* sin audio */
   }
@@ -109,6 +111,9 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
   const [announced, setAnnounced] = useState(false);
   const [manual, setManual] = useState("");
   const timerId = useRef(`${ex.id}-${day}`);
+  useEffect(() => {
+    timerId.current = `${ex.id}-${day}`;
+  }, [ex.id, day]);
   useEffect(() => {
     const onOther = (e: Event) => {
       if ((e as CustomEvent).detail !== timerId.current) setRunning(false);

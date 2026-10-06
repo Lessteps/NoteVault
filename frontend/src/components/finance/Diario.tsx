@@ -74,7 +74,7 @@ export function Diario() {
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-[21px] font-semibold text-text">💰 Diario</h1>
+        <h1 className="text-[21px] font-semibold text-text">Diario</h1>
         <span className="text-[14px] capitalize text-dim">{WEEKDAY[d.getDay()]} {shortDate(day)}</span>
         <span className="flex-1" />
         <GhostButton onClick={() => setDay(addDays(day, -1))}>‹</GhostButton>
@@ -127,7 +127,6 @@ export function Diario() {
         </section>
       )}
       <MovementTable rows={rows} />
-      <p className="text-[11px] text-faint">Clic en una fila para editarla o adjuntar facturas.</p>
     </div>
   );
 }

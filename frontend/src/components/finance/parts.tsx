@@ -1,6 +1,6 @@
 // Pieces shared by the Finanzas views.
 
-import { Paperclip } from "lucide-react";
+import { Paperclip, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 import { formatMoney, parseMoney } from "../../lib/money";
 import type { FinTotals, Movement } from "../../lib/types";
@@ -97,8 +97,8 @@ export function MovementTable({ rows, withDate }: { rows: GroupedRow[]; withDate
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-card">
       <div className={cn("grid border-b border-line px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-faint",
-        withDate ? "grid-cols-[90px_56px_76px_160px_1fr_180px_120px_30px]" : "grid-cols-[56px_76px_160px_1fr_180px_120px_30px]")}>
-        {withDate && <span>Día</span>}<span>Hora</span><span>Tipo</span><span>Categoría</span><span>En qué</span><span>Razón</span><span className="text-right">Importe</span><span>📎</span>
+        withDate ? "grid-cols-[90px_56px_76px_160px_1fr_180px_120px_30px_24px]" : "grid-cols-[56px_76px_160px_1fr_180px_120px_30px_24px]")}>
+        {withDate && <span>Día</span>}<span>Hora</span><span>Tipo</span><span>Categoría</span><span>En qué</span><span>Razón</span><span className="text-right">Importe</span><span>📎</span><span />
       </div>
       {rows.map((r, i) => {
         if (r.kind === "group") return <div key={i} className="bg-elevated/60 px-3 py-1 text-[11.5px] font-semibold text-dim">{r.label}</div>;
@@ -114,9 +114,9 @@ export function MovementTable({ rows, withDate }: { rows: GroupedRow[]; withDate
         return (
           <button key={m.id} type="button" onDoubleClick={() => edit({ day: m.date, kind: m.type, movement: m })}
             onClick={() => edit({ day: m.date, kind: m.type, movement: m })}
-            title="Clic para editar o adjuntar facturas"
-            className={cn("grid w-full items-center border-b border-line px-3 py-1.5 text-left text-[12.5px] last:border-b-0 hover:bg-hover",
-              withDate ? "grid-cols-[90px_56px_76px_160px_1fr_180px_120px_30px]" : "grid-cols-[56px_76px_160px_1fr_180px_120px_30px]")}>
+            title="Editar o adjuntar facturas"
+            className={cn("group grid w-full items-center border-b border-line px-3 py-1.5 text-left text-[12.5px] last:border-b-0 hover:bg-hover",
+              withDate ? "grid-cols-[90px_56px_76px_160px_1fr_180px_120px_30px_24px]" : "grid-cols-[56px_76px_160px_1fr_180px_120px_30px_24px]")}>
             {withDate && <span className="text-[11.5px] text-faint">{m.date.slice(5)}</span>}
             <span className="font-mono text-[11.5px] text-faint">{m.time ?? ""}</span>
             <span style={{ color: TYPE_COLOURS[m.type] }}>{TYPE_LABELS[m.type]}</span>
@@ -125,6 +125,7 @@ export function MovementTable({ rows, withDate }: { rows: GroupedRow[]; withDate
             <span className="truncate text-faint">{m.reason ?? ""}</span>
             <span className="text-right font-mono" style={{ color: TYPE_COLOURS[m.type] }}>{formatMoney(signed(m), "COP", true)}</span>
             <span className="text-faint">{m.attachments.length ? <span className="flex items-center gap-0.5 text-[11px]"><Paperclip size={11} />{m.attachments.length}</span> : ""}</span>
+            <span className="text-faint opacity-0 transition-opacity group-hover:opacity-100"><Pencil size={12} /></span>
           </button>
         );
       })}

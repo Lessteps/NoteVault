@@ -7,7 +7,6 @@ import { Categories, CategoryDialog } from "./Categories";
 import { Diario } from "./Diario";
 import { FinGoalDialog, FinGoals } from "./Goals";
 import { MovementDialog } from "./MovementDialog";
-import { TYPE_COLOURS } from "./parts";
 import { Sheet } from "./Sheets";
 
 export function FinanceModule() {
@@ -37,15 +36,8 @@ export function FinanceModule() {
         {m && (
           <div className="space-y-4 px-4 pt-4">
             <div>
-              <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Este mes</div>
-              {([["gasto", "Gastos"], ["ingreso", "Ingresos"], ["ahorro", "Ahorro"]] as const).map(([k, l]) => (
-                <div key={k} className="flex text-[12.5px]"><span className="text-dim">{l}</span><span className="ml-auto font-mono" style={{ color: TYPE_COLOURS[k] }}>{formatMoney(m[k])}</span></div>
-              ))}
-              <div className="flex text-[12.5px]"><span className="text-dim">Balance</span><span className="ml-auto font-mono" style={{ color: m.balance >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(m.balance, "COP", true)}</span></div>
-            </div>
-            <div>
               <div className="mb-1 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Ahorro total</div>
-              <div className="text-[18px] font-semibold" style={{ color: TYPE_COLOURS.ahorro }}>{formatMoney(sidebar!.total_saved)}</div>
+              <div className="text-[18px] font-semibold text-text">{formatMoney(sidebar!.total_saved)}</div>
               {sidebar!.goals.map((g) => (
                 <button key={g.id} type="button" onClick={() => openGoal(g.id)} className="block w-full truncate text-left text-[11.5px] text-dim hover:text-text">
                   {g.icon} {g.name}: {formatMoney(g.saved)}

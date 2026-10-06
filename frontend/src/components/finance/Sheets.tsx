@@ -183,7 +183,7 @@ export function Sheet({ kind }: { kind: Kind }) {
   const list = useMemo(() => all.filter((m) => (!fKind || m.type === fKind) && (!fCat || m.category === fCat)
     && (!q || `${m.what ?? ""} ${m.reason ?? ""}`.toLowerCase().includes(q.toLowerCase()))), [all, fKind, fCat, q]);
   const t = totals(list);
-  const title = kind === "semanal" ? "📅 Semanal" : kind === "mensual" ? "🗓 Mensual" : "📊 Anual";
+  const title = kind === "semanal" ? "Semanal" : kind === "mensual" ? "Mensual" : "Anual";
   const sel = cn(inputBase, "py-1 text-[12px]");
 
   const csv = async () => {

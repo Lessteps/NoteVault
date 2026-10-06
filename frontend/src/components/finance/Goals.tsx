@@ -171,7 +171,7 @@ export function FinGoals() {
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-[21px] font-semibold text-text">🎯 Metas financieras</h1>
+        <h1 className="text-[21px] font-semibold text-text">Metas financieras</h1>
         <span className="flex-1" />
         <PrimaryButton onClick={() => setEditing("")}><Plus size={14} /> Nueva meta</PrimaryButton>
       </div>

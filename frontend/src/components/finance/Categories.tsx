@@ -10,6 +10,7 @@ import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
 import { BlockProgress } from "../common/charts";
 import { ColourRow, Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
+import { cn } from "../ui";
 import { MoneyInput } from "./parts";
 
 const COLOURS = ["#f4511e", "#039be5", "#8e24aa", "#f6bf26", "#33b679", "#3f51b5", "#e67c73", "#7986cb", "#616161", "#0b8043"];
@@ -47,6 +48,19 @@ export function CategoryDialog() {
         <Field label="Nombre"><input autoFocus className={input} value={f.name ?? ""} placeholder="p. ej. Mascotas" onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
       </div>
       <Field label="Color"><ColourRow colours={COLOURS} value={f.colour ?? COLOURS[0]!} onChange={(colour) => setF({ ...f, colour })} /></Field>
+      {!editing.id && (
+        <Field label="Tipo">
+          <div className="flex gap-1.5">
+            {(["gasto", "ingreso"] as const).map((k) => (
+              <button key={k} type="button" onClick={() => setF({ ...f, kind: k })}
+                aria-pressed={f.kind === k}
+                className={cn("flex-1 rounded-lg border px-2 py-1.5 text-[12.5px]", f.kind === k ? "border-line-strong text-text" : "border-line text-dim hover:bg-hover")}>
+                {k === "gasto" ? "Gasto" : "Ingreso"}
+              </button>
+            ))}
+          </div>
+        </Field>
+      )}
       {f.kind === "gasto" && (
         <Field label="Presupuesto mensual"><MoneyInput label="Presupuesto mensual" value={f.budget_month_cents || null} onChange={(c) => setF({ ...f, budget_month_cents: c ?? 0 })} className="w-full" placeholder="Sin presupuesto" /></Field>
       )}
@@ -74,10 +88,9 @@ export function Categories() {
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-[21px] font-semibold text-text">🏷 Categorías</h1>
+        <h1 className="text-[21px] font-semibold text-text">Categorías</h1>
         <span className="flex-1" />
         <PrimaryButton onClick={() => setEditing({ id: "", kind: "gasto" })}><Plus size={14} /> Nueva categoría</PrimaryButton>
-        <GhostButton onClick={() => setEditing({ id: "", kind: "ingreso" })}><Plus size={13} /> De ingreso</GhostButton>
       </div>
       {groups.map(([kind, title]) => (
         <section key={kind}>

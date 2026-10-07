@@ -3,8 +3,9 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
+import { addDays } from "../../lib/habits";
 import { formatMoney } from "../../lib/money";
-import { parseRepeat, todayIso } from "../../lib/tasks";
+import { parseRepeat, shortDate, todayIso, type Repeat } from "../../lib/tasks";
 import type { FinRecurring, MovementType } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
@@ -22,6 +23,43 @@ export function ruleText(rule: string): string {
   if (r.kind === "weekly" && r.weekdays.length) return `Cada ${r.weekdays.map((d) => names[d]).join(", ")}`;
   if (r.kind === "workdays") return "Días hábiles";
   return "Sin repetición";
+}
+
+function matchesOn(r: Repeat, iso: string, anchor: string): boolean {
+  const dt = new Date(`${iso}T12:00:00`);
+  switch (r.kind) {
+    case "daily":
+      return true;
+    case "every": {
+      const diff = Math.round((dt.getTime() - new Date(`${anchor}T12:00:00`).getTime()) / 86400000);
+      return diff >= 0 && diff % Math.max(2, r.every) === 0;
+    }
+    case "weekly":
+    case "workdays": {
+      const wd = (dt.getDay() + 6) % 7;
+      return r.kind === "workdays" ? wd < 5 : r.weekdays.includes(wd);
+    }
+    case "monthly":
+      return r.monthDays.includes(dt.getDate());
+    default:
+      return false;
+  }
+}
+
+/** Próximas fechas que genera la regla (para previsualizar en el diálogo). */
+export function nextDates(rule: string, start: string, count = 3): string[] {
+  const r = parseRepeat(rule);
+  if (r.kind === "none") return [];
+  const today = todayIso();
+  const anchor = start || today;
+  const out: string[] = [];
+  const cur = anchor > today ? anchor : today;
+  for (let i = 0; i < 400 && out.length < count; i++) {
+    const iso = addDays(cur, i);
+    if (iso < anchor) continue;
+    if (matchesOn(r, iso, anchor)) out.push(iso);
+  }
+  return out;
 }
 
 export function RecurringDialog() {
@@ -112,6 +150,14 @@ export function RecurringDialog() {
         </Field>
       )}
       <Field label="Se repite"><RepeatPicker value={f.rule ?? "daily"} onChange={(rule) => set({ rule: rule || "daily" })} /></Field>
+      {(() => {
+        const upcoming = nextDates(f.rule ?? "daily", f.start || todayIso());
+        return upcoming.length ? (
+          <p className="text-[11.5px] text-faint">Próximas: {upcoming.map(shortDate).join(" · ")}</p>
+        ) : (
+          <p className="text-[11.5px] text-faint">Esta regla no genera fechas.</p>
+        );
+      })()}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Desde"><input type="date" aria-label="Desde" className={input} value={f.start ?? ""} onChange={(e) => set({ start: e.target.value })} /></Field>
         <Field label="Hasta (opcional)"><input type="date" aria-label="Hasta" className={input} value={f.end ?? ""} onChange={(e) => set({ end: e.target.value })} /></Field>

@@ -248,11 +248,31 @@ export function monthlySigned(rule: string, type: string, amount_cents: number):
   return Math.round(sign * amount_cents * per) || 0;
 }
 
-/** Proyección a 3 meses: promedio de los 3 meses cerrados + recurrentes activos. */
+/** Promedio mensual sobre los meses con datos (no siempre 3). */
+export function monthlyAverages(ms: Movement[]): { n: number; gasto: number; ingreso: number } {
+  const byMonth = new Map<string, FinTotals>();
+  for (const m of ms) {
+    const k = m.date.slice(0, 7);
+    const acc = byMonth.get(k) ?? { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 };
+    const tt = totals([m]);
+    acc.gasto += tt.gasto;
+    acc.ingreso += tt.ingreso;
+    byMonth.set(k, acc);
+  }
+  const months = [...byMonth.values()];
+  const n = Math.max(1, months.length);
+  return {
+    n,
+    gasto: Math.round(months.reduce((a, r) => a + r.gasto, 0) / n),
+    ingreso: Math.round(months.reduce((a, r) => a + r.ingreso, 0) / n),
+  };
+}
+
+/** Proyección a 3 meses: promedio de los meses cerrados con datos + recurrentes activos. */
 export function Projection3m() {
   const version = useFinance((s) => s.version);
   const [proj, setProj] = useState<{
-    baseGasto: number; baseIngreso: number; hasRec: boolean;
+    baseGasto: number; baseIngreso: number; basis: number; hasRec: boolean;
     recFor: (firstDay: string, lastDay: string) => { rg: number; ri: number; ro: number };
   } | null>(null);
   useEffect(() => {
@@ -261,19 +281,7 @@ export function Projection3m() {
     const last = isoDate(new Date(t.getFullYear(), t.getMonth(), 0));
     Promise.all([api.finRange(first, last), api.finRecurringList()])
       .then(([ms, recs]) => {
-        const byMonth = new Map<string, FinTotals>();
-        for (const m of ms) {
-          const k = m.date.slice(0, 7);
-          const acc = byMonth.get(k) ?? { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 };
-          const tt = totals([m]);
-          acc.gasto += tt.gasto;
-          acc.ingreso += tt.ingreso;
-          byMonth.set(k, acc);
-        }
-        const months = [...byMonth.values()];
-        const n = 3;
-        const baseGasto = Math.round(months.reduce((a, r) => a + r.gasto, 0) / n);
-        const baseIngreso = Math.round(months.reduce((a, r) => a + r.ingreso, 0) / n);
+        const avg = monthlyAverages(ms);
         const live = recs.filter((x) => !x.archived);
         // Aporte de recurrentes por mes: los terminados no proyectan.
         const recFor = (firstDay: string, lastDay: string) => {
@@ -290,7 +298,9 @@ export function Projection3m() {
           }
           return { rg, ri, ro };
         };
-        setProj({ baseGasto, baseIngreso, hasRec: live.length > 0, recFor });
+        setProj({
+          baseGasto: avg.gasto, baseIngreso: avg.ingreso, basis: avg.n, hasRec: live.length > 0, recFor,
+        });
       })
       .catch(() => setProj(null));
   }, [version]);
@@ -320,7 +330,9 @@ export function Projection3m() {
               );
             })}
           </div>
-          <p className="mt-1.5 text-[11px] text-faint">Promedio de los últimos 3 meses cerrados + recurrentes activos ese mes.</p>
+          <p className="mt-1.5 text-[11px] text-faint">
+            Promedio de {proj!.basis >= 3 ? "los últimos 3 meses cerrados" : `${proj!.basis} ${proj!.basis === 1 ? "mes con datos" : "meses con datos"}`} + recurrentes activos ese mes.
+          </p>
         </>
       )}
     </Panel>

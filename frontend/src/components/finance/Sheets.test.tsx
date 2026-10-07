@@ -21,7 +21,7 @@ vi.mock("../../lib/bridge", () => ({
   },
 }));
 
-import { monthlySigned, Sheet } from "./Sheets";
+import { monthlyAverages, monthlySigned, Sheet } from "./Sheets";
 
 let host: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
@@ -180,5 +180,22 @@ describe("monthlySigned", () => {
     expect(monthlySigned("monthly:1,15", "ingreso", 10000)).toBe(20000);
     expect(monthlySigned("weekly:1", "gasto", 70000)).toBe(-300000);
     expect(monthlySigned("blah", "gasto", 10000)).toBe(0);
+  });
+});
+
+describe("monthlyAverages", () => {
+  const mov = (date: string, type: string, amount_cents: number) => ({
+    id: `${date}-${type}`, type, amount_cents, currency: "COP", what: "X", attachments: [], date,
+  });
+  it("divide entre los meses con datos, no siempre 3", () => {
+    const one = monthlyAverages([mov("2026-09-15", "gasto", 3000000)] as never);
+    expect(one).toMatchObject({ n: 1, gasto: 3000000, ingreso: 0 });
+    const three = monthlyAverages([
+      mov("2026-07-05", "gasto", 3000000),
+      mov("2026-08-05", "gasto", 6000000),
+      mov("2026-09-05", "ingreso", 9000000),
+    ] as never);
+    expect(three).toMatchObject({ n: 3, gasto: 3000000, ingreso: 3000000 });
+    expect(monthlyAverages([])).toMatchObject({ n: 1, gasto: 0, ingreso: 0 });
   });
 });

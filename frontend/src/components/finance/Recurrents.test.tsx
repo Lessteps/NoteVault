@@ -19,7 +19,7 @@ vi.mock("../../lib/bridge", () => ({
 }));
 
 import { useFinance } from "../../store/finance";
-import { Recurrents, RecurringDialog, ruleText } from "./Recurrents";
+import { Recurrents, RecurringDialog, nextDates, ruleText } from "./Recurrents";
 
 let host: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
@@ -71,6 +71,19 @@ describe("ruleText", () => {
     expect(ruleText("daily")).toBe("Todos los días");
     expect(ruleText("monthly:1")).toContain("mes");
     expect(ruleText("every:15")).toContain("15");
+  });
+});
+
+describe("nextDates", () => {
+  it("previsualiza las próximas fechas de la regla", async () => {
+    const { todayIso } = await import("../../lib/tasks");
+    const { addDays } = await import("../../lib/habits");
+    const today = todayIso();
+    expect(nextDates("daily", today)).toEqual([today, addDays(today, 1), addDays(today, 2)]);
+    const monthly = nextDates("monthly:1", today);
+    expect(monthly).toHaveLength(3);
+    expect(monthly.every((d) => d.slice(8) === "01")).toBe(true);
+    expect(nextDates("blah", today)).toEqual([]);
   });
 });
 

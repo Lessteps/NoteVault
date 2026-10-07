@@ -105,7 +105,24 @@ function createWindow() {
 
 installCrashLog();
 
+// One instance per profile. A second one shares the same storage (LevelDB lock, config), so
+// Chromium made it wait ~6 s on its first localStorage read (measured: 170 ms alone, 6 090 ms
+// with another instance open) and both could write the same files. Opening the app again just
+// brings the existing window to the front. Isolated test runs (NV_E2E_HOME) skip the lock.
+const gotInstanceLock = Boolean(process.env.NV_E2E_HOME) || app.requestSingleInstanceLock();
+if (!gotInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (!win || win.isDestroyed()) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  });
+}
+
 app.whenReady().then(() => {
+  if (!gotInstanceLock) return;
   // The app has its own custom top bar; drop Electron's native File/Edit/View menu.
   Menu.setApplicationMenu(null);
   initRegistry();

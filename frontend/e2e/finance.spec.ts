@@ -156,3 +156,45 @@ test("NV-F-007 duplicar abre copia para hoy y la guarda", async () => {
     timeout: 15_000,
   });
 });
+
+test("NV-F-008 periodo cambia a año y muestra balance acumulado", async () => {
+  await side().getByRole("button", { name: "Periodo" }).click();
+  await expect(win.getByRole("heading", { name: "Periodo" })).toBeVisible({ timeout: 15_000 });
+  await win.getByRole("button", { name: "Año", exact: true }).click();
+  const year = String(new Date().getFullYear());
+  await expect(win.getByText(`TOTAL ${year}`)).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByText("Balance acumulado")).toBeVisible();
+  await expect(win.getByText("Proyección 3 meses")).toBeVisible();
+});
+
+test("NV-F-009 recurrente se crea y queda en disco", async () => {
+  await side().getByRole("button", { name: "Recurrentes" }).click();
+  await expect(win.getByRole("heading", { name: "Recurrentes" })).toBeVisible({ timeout: 15_000 });
+  const what = `E2E Arriendo ${Date.now()}`;
+  await win.getByRole("button", { name: "Nuevo recurrente" }).click();
+  const dialog = win.getByRole("dialog", { name: "Nuevo recurrente" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Importe").fill("800000");
+  await dialog.getByPlaceholder("p. ej. Arriendo").fill(what);
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+  await expect(win.getByRole("button", { name: new RegExp(what) })).toBeVisible({ timeout: 15_000 });
+  const file = join(home, "NoteVault", ".notevault", "finanzas", "recurrentes.json");
+  expect(existsSync(file)).toBe(true);
+  expect(readFileSync(file, "utf-8")).toContain(what);
+});
+
+test("NV-F-010 historial busca en todo el historial", async () => {
+  await gotoDiario();
+  const what = `E2E Viejo ${Date.now()}`;
+  await win.getByLabel("Importe rápido").fill("7000");
+  await win.getByPlaceholder("Detalle").fill(what);
+  await win.getByRole("button", { name: /Guardar/ }).click();
+  await expect(win.getByText(/^Guardado:/)).toBeVisible({ timeout: 15_000 });
+
+  await side().getByRole("button", { name: "Periodo" }).click();
+  await expect(win.getByRole("heading", { name: "Periodo" })).toBeVisible({ timeout: 15_000 });
+  await win.getByPlaceholder(/Buscar/).fill(what);
+  await win.getByRole("button", { name: "Historial" }).click();
+  await expect(win.getByText(/resultados en todo el historial/)).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByRole("button", { name: new RegExp(`Gasto.*${what}`) })).toBeVisible({ timeout: 15_000 });
+});

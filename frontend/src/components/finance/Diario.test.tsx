@@ -4,26 +4,22 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const finAdd = vi.fn(async (_day: string, _fields: Record<string, unknown>) => ({}));
-const finRange = vi.fn(async () => [] as Array<Record<string, unknown>>);
+const finDiarioBundle = vi.fn(async (_day: string) => ({
+  movements: [] as Array<Record<string, unknown>>,
+  checks: [] as Array<Record<string, unknown>>,
+  month: { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 },
+  budget: 0,
+}));
 const finMeta = vi.fn(async () => ({ categories: [], goals: [], types: ["gasto", "ingreso", "ahorro", "retiro"] }));
 const finSidebar = vi.fn(async () => null);
-const finMonthExtras = vi.fn(async () => ({
-  this: { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 },
-  prev: { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 },
-  budgets: [],
-}));
-const finBudgetGet = vi.fn(async () => ({ month_budget_cents: 0 }));
 const finBudgetSet = vi.fn(async (c: number) => ({ month_budget_cents: c }));
 
 vi.mock("../../lib/bridge", () => ({
   api: {
-    finRange: () => finRange(),
-    finDueChecks: async () => [],
+    finDiarioBundle: (day: string) => finDiarioBundle(day),
     finAdd: (day: string, fields: Record<string, unknown>) => finAdd(day, fields),
     finMeta: () => finMeta(),
     finSidebar: () => finSidebar(),
-    finMonthExtras: () => finMonthExtras(),
-    finBudgetGet: () => finBudgetGet(),
     finBudgetSet: (c: number) => finBudgetSet(c),
   },
 }));
@@ -117,13 +113,19 @@ describe("Diario", () => {
     expect(finAdd.mock.calls[0]![1]).toMatchObject({ type: "gasto", what: "Café" });
   });
 
+  it("carga todo el día en una sola llamada", async () => {
+    await mount();
+    expect(finDiarioBundle).toHaveBeenCalledWith(todayIso());
+    expect(host!.textContent ?? "").toContain("Gastos");
+  });
+
   it("muestra la barra del presupuesto cuando vas en 85 %", async () => {
-    finMonthExtras.mockResolvedValueOnce({
-      this: { gasto: 425000000, ingreso: 0, ahorro: 0, retiro: 0, balance: -425000000 },
-      prev: { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 },
-      budgets: [],
+    finDiarioBundle.mockResolvedValueOnce({
+      movements: [],
+      checks: [],
+      month: { gasto: 425000000, ingreso: 0, ahorro: 0, retiro: 0, balance: -425000000 },
+      budget: 500000000,
     });
-    finBudgetGet.mockResolvedValueOnce({ month_budget_cents: 500000000 });
     await mount();
     expect(host!.textContent ?? "").toContain("85 %");
   });
@@ -169,10 +171,15 @@ describe("Diario", () => {
   });
 
   it("el total del día muestra gastos, no balance", async () => {
-    finRange.mockResolvedValueOnce([{
-      id: "m1", type: "gasto", amount_cents: 1250000, currency: "COP",
-      what: "Café", attachments: [], date: todayIso(),
-    }]);
+    finDiarioBundle.mockResolvedValueOnce({
+      movements: [{
+        id: "m1", type: "gasto", amount_cents: 1250000, currency: "COP",
+        what: "Café", attachments: [], date: todayIso(),
+      }],
+      checks: [],
+      month: { gasto: 1250000, ingreso: 0, ahorro: 0, retiro: 0, balance: -1250000 },
+      budget: 0,
+    });
     await mount();
     const text = host!.textContent ?? "";
     expect(text).toContain("GASTOS DEL DÍA");

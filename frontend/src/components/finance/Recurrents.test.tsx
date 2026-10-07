@@ -113,4 +113,22 @@ describe("Recurrents", () => {
     expect(finRecurringSave.mock.calls[0]![0]).toBe("");
     expect(finRecurringSave.mock.calls[0]![1]).toMatchObject({ type: "gasto", what: "Arriendo" });
   });
+
+  it("suma los fijos del mes con signo", async () => {
+    finRecurringList.mockResolvedValueOnce([
+      {
+        id: "rc1", type: "gasto", amount_cents: 80000000, what: "Arriendo", category: "", goal: "",
+        rule: "monthly:1", start: "2020-01-01", end: "", archived: false, last: "",
+      },
+      {
+        id: "rc2", type: "ingreso", amount_cents: 1000000, what: "Extra", category: "", goal: "",
+        rule: "daily", start: "2020-01-01", end: "", archived: false, last: "",
+      },
+    ]);
+    await mount();
+    const text = host!.textContent ?? "";
+    expect(text).toContain("Fijos al mes");
+    // -800.000 + 30 × 10.000 = -500.000.
+    expect(text).toContain("500.000");
+  });
 });

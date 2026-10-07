@@ -398,6 +398,10 @@ export const api = {
     call<{ budgets: Array<{ category: FinCategory; used: number; budget: number }>; this: FinTotals; prev: FinTotals }>(
       "fin_month_extras", year, month),
   finDueChecks: (day: string) => call<FinCheck[]>("fin_due_checks", day),
+  finDiarioBundle: (day: string) => call<{
+    movements: Movement[]; checks: FinCheck[];
+    month: import("./types").FinTotals; budget: number;
+  }>("fin_diario_bundle", day),
   finNewId: () => call<{ id: string }>("fin_new_id"),
   finAdd: (day: string, fields: Partial<Movement>) => call<Movement>("fin_add", day, fields),
   finUpdate: (day: string, id: string, fields: Partial<Movement>, newDay = "") =>

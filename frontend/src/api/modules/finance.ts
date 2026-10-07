@@ -51,6 +51,44 @@ function pairs(
   return items.map(([d, m]) => ({ ...m, date: todayIso(d) }));
 }
 
+function monthExtrasFor(fm: FinanceManager, y: number, m: number) {
+  const [thisMonth, prevMonth] = fm.compareMonth(y, m);
+  return {
+    budgets: fm.budgetUsed(y, m).map(([c, used, budget]) => ({
+      category: c,
+      used,
+      budget,
+    })),
+    this: thisMonth,
+    prev: prevMonth,
+  };
+}
+
+function dueChecksFor(fm: FinanceManager, d: Date): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+  for (const [goal, checked, ids] of fm.dueChecks(d)) {
+    let first: Date;
+    let last: Date;
+    if (goal.cadence?.mode === "period") {
+      const p = (fm as any)._period(goal, d) as [Date, Date];
+      first = p[0];
+      last = p[1];
+    } else {
+      first = d;
+      last = d;
+    }
+    out.push({
+      goal,
+      checked,
+      ids,
+      pace: fm.pace(goal.id),
+      first: todayIso(first),
+      last: todayIso(last),
+    });
+  }
+  return out;
+}
+
 export function financeApi(app: AppState) {
   const getFm = (): FinanceManager => {
     const fm = app.mgrs().finances;
@@ -223,44 +261,29 @@ export function financeApi(app: AppState) {
       const today = new Date();
       const y = clampInt(year, 1970, 3000, today.getFullYear());
       const m = clampInt(month, 1, 12, 1);
-      const fm = getFm();
-      const [thisMonth, prevMonth] = fm.compareMonth(y, m);
-      return {
-        budgets: fm.budgetUsed(y, m).map(([c, used, budget]) => ({
-          category: c,
-          used,
-          budget,
-        })),
-        this: thisMonth,
-        prev: prevMonth,
-      };
+      return monthExtrasFor(getFm(), y, m);
     },
 
     fin_due_checks(day: string) {
       const fm = getFm();
+      return dueChecksFor(fm, finDate(day));
+    },
+
+    /**
+     * Todo lo que pinta el Diario en una sola llamada (día, casillas de
+     * ahorro, totales del mes y presupuesto). 9 idas y vueltas en 3 tandas
+     * se vuelven 1.
+     */
+    fin_diario_bundle(day: string) {
+      const fm = getFm();
       const d = finDate(day);
-      const out: Array<Record<string, unknown>> = [];
-      for (const [goal, checked, ids] of fm.dueChecks(d)) {
-        let first: Date;
-        let last: Date;
-        if (goal.cadence?.mode === "period") {
-          const p = (fm as any)._period(goal, d) as [Date, Date];
-          first = p[0];
-          last = p[1];
-        } else {
-          first = d;
-          last = d;
-        }
-        out.push({
-          goal,
-          checked,
-          ids,
-          pace: fm.pace(goal.id),
-          first: todayIso(first),
-          last: todayIso(last),
-        });
-      }
-      return out;
+      const ex = monthExtrasFor(fm, d.getFullYear(), d.getMonth() + 1);
+      return {
+        movements: pairs(fm.range(d, d)),
+        checks: dueChecksFor(fm, d),
+        month: ex.this,
+        budget: fm.budgetMonth(),
+      };
     },
 
     fin_add(day: string, fields: unknown) {

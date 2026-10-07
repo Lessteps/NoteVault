@@ -33,20 +33,21 @@ export function Diario() {
   const [budgetDraft, setBudgetDraft] = useState<number | null>(null);
 
   useEffect(() => {
-    Promise.all([api.finRange(day, day), api.finDueChecks(day)])
-      .then(([ms, cs]) => { setList(ms); setChecks(cs); })
-      .catch((e) => toast("error", (e as Error).message));
-  }, [day, version, toast]);
-
-  useEffect(() => {
-    const d = new Date(`${day}T12:00:00`);
-    Promise.all([api.finMonthExtras(d.getFullYear(), d.getMonth() + 1), api.finBudgetGet()])
-      .then(([ex, b]) => setMonth({
-        spent: ex.this.gasto,
-        budget: b.month_budget_cents,
-        label: `${MONTHS_ES[d.getMonth()]!.charAt(0).toUpperCase()}${MONTHS_ES[d.getMonth()]!.slice(1)}`,
-      }))
-      .catch(() => setMonth(null));
+    api.finDiarioBundle(day)
+      .then((b) => {
+        setList(b.movements);
+        setChecks(b.checks);
+        const d = new Date(`${day}T12:00:00`);
+        setMonth({
+          spent: b.month.gasto,
+          budget: b.budget,
+          label: `${MONTHS_ES[d.getMonth()]!.charAt(0).toUpperCase()}${MONTHS_ES[d.getMonth()]!.slice(1)}`,
+        });
+      })
+      .catch((e) => {
+        toast("error", (e as Error).message);
+        setMonth(null);
+      });
   }, [day, version, toast]);
 
   const quickSave = async () => {    if (!q.amount) {

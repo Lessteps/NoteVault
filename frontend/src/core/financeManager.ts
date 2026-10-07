@@ -831,7 +831,7 @@ export class FinanceManager {
     let touched = false;
     for (const r of list) {
       if (r.archived) continue;
-      const start: string = r.start > today ? today : r.start || today;
+      const start: string = r.start || today;
       if (start > today) continue;
       const floor = r.last && r.last >= start ? todayIso(addDays(parseIsoDate(r.last) ?? todayD, 1)) : start;
       let d = floor < backstop ? backstop : floor;

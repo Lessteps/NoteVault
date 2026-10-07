@@ -13,6 +13,7 @@ import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms
 import { RepeatPicker } from "../common/RepeatPicker";
 import { cn, confirmAction } from "../ui";
 import { MoneyInput, TYPE_COLOURS, TYPE_LABELS } from "./parts";
+import { monthlySigned } from "./Sheets";
 
 export function ruleText(rule: string): string {
   const r = parseRepeat(rule);
@@ -181,6 +182,10 @@ export function Recurrents() {
   useEffect(() => {
     api.finRecurringList().then(setList).catch((e) => toast("error", (e as Error).message));
   }, [version, toast]);
+  const today = todayIso();
+  const netMonth = (list ?? [])
+    .filter((r) => !r.archived && (!r.end || r.end >= today))
+    .reduce((a, r) => a + monthlySigned(r.rule, r.type, r.amount_cents), 0);
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
       <div className="flex items-center gap-3">
@@ -189,6 +194,9 @@ export function Recurrents() {
         <PrimaryButton onClick={() => setEditing({ id: "" })}><Plus size={14} /> Nuevo recurrente</PrimaryButton>
       </div>
       <p className="text-[12px] text-faint">Arriendo, salario, suscripciones: se materializan solos al abrir Finanzas.</p>
+      {(list?.length ?? 0) > 0 && (
+        <p className="text-[13px] text-text">Fijos al mes: <b className="font-mono">{formatMoney(netMonth, "COP", true)}</b></p>
+      )}
       {!list?.length && <p className="py-10 text-center text-[13px] text-faint">Nada que se repita. Crea el arriendo, por ejemplo.</p>}
       <div className="divide-y divide-line rounded-xl border border-line bg-card">
         {(list ?? []).map((r) => (

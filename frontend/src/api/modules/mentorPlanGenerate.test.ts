@@ -373,7 +373,7 @@ describe("aceptar, listar y leer planes de periodo", () => {
     api.mentor_plan_draft_accept({ turnId: other.pending, chatId: other.chatId });
     expect((api.mentor_plan_list() as any[]).filter((p) => p.status === "activo")).toHaveLength(2);
     const res: any = api.mentor_candidates({ availableMinutes: 480 });
-    const folders = res.candidates.filter((c: any) => c.kind === "plan_item").map((c: any) => c.topicFolder);
+    const folders = res.candidates.filter((c: any) => c.kind === "plan_item" && c.topicFolder).map((c: any) => c.topicFolder); // el proyecto diario no lleva carpeta
     expect(new Set(folders).size).toBe(folders.length);
     expect(folders).toContain(FUND);
   });

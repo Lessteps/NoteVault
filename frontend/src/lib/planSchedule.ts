@@ -14,10 +14,17 @@
 //  4. Un tema que supera los minutos de un día ocupa varios (partes 1/n, 2/n…); nunca se coloca antes de su semana objetivo.
 //  5. En la última semana, lo que no cabe se amontona en el último día de estudio (marcado como desbordado).
 //  Los temas ya completados (`completedAt`) se anotan en el día en que se completaron y no consumen capacidad.
+//
+// Planes POR ÁREAS (`structure: "areas"`): el reparto es POR ENFOQUE (ver `planDayFocus.ts`): cada día tiene un enfoque (Backend…) y sus
+// bloques obligatorios de teoría y práctica (Backend = teoría de backend + práctica de Python + teoría y práctica de bases de datos el MISMO
+// día), los fundamentos se intercalan como lógica aplicada (no se adelantan) y cada día lleva su proyecto diario. Los planes antiguos
+// conservan el algoritmo de arriba.
 
 import { addDays, daysBetween, eachDay, isoDow, weekRangesOf } from "./planTime.js";
 import { type AreaGroup, type PlanDeliverable, type PlanDeliverableStatus, type PlanPurposes } from "./planAreas.js";
 import { FOCUS_LABEL, PHASE_LABEL, PRACTICE_PHASES, practiceDayMinutes, weekTitle, type PhaseStatus, type PracticePhase, type PracticeTrack } from "./practiceTrack.js";
+import { buildFocusSchedule, type BlockKind, type DayBlock, type DayFocus } from "./planDayFocus.js";
+import { dailyProjectOf, monthlyBlocksOf, shortOf, weeklyProjectOf, type PracticeCurriculum } from "./planCurriculum.js";
 
 // ── Entrada estructural (la cumplen `Plan` del núcleo y `MentorPlan` del renderer) ──
 
@@ -52,6 +59,10 @@ export interface SchedulePlan {
   subplans: ScheduleSubplan[];
   deliverables?: PlanDeliverable[];
   purposes?: PlanPurposes;
+  /** «areas» = plan por áreas: agenda por enfoque */
+  structure?: "areas";
+  /** currículo de práctica del plan generado por la IA (opcional); ver `planCurriculum.ts` */
+  practiceCurriculum?: PracticeCurriculum;
 }
 
 // ── Salida ──────────────────────────────────────────────────────────────
@@ -76,6 +87,11 @@ export interface DayTopic {
   done: boolean;
   /** no cupo en la capacidad y se amontonó al final del plan */
   overflow?: boolean;
+  /** agenda por enfoque: bloque principal en que se trabaja y su papel (teoría o práctica) */
+  blockId?: string;
+  role?: BlockKind;
+  /** fundamento intercalado como lógica aplicada al lenguaje */
+  applied?: boolean;
 }
 
 export interface DayPractice {
@@ -97,6 +113,11 @@ export interface ScheduleDay {
   practiceMinutes: number;
   topics: DayTopic[];
   practice: DayPractice;
+  /** agenda por enfoque (planes por áreas): enfoque del día, bloques obligatorios y minutos del proyecto diario y del repaso */
+  focus?: DayFocus;
+  blocks?: DayBlock[];
+  projectMinutes?: number;
+  reviewMinutes?: number;
 }
 
 export interface PlanSchedule {
@@ -105,6 +126,8 @@ export interface PlanSchedule {
   weeks: number;
   days: ScheduleDay[];
   byDate: Map<string, ScheduleDay>;
+  /** «focus» = agenda por enfoque (plan por áreas); «legacy» = reparto por áreas en paralelo */
+  mode?: "focus" | "legacy";
 }
 
 const MIN_CHUNK = 10;
@@ -171,6 +194,63 @@ export function buildSchedule(plan: SchedulePlan): PlanSchedule {
   const groupTitle = new Map<string, Map<string, string>>();
   for (const s of plan.subplans) groupTitle.set(s.id, new Map((s.groups ?? []).map((g) => [g.id, g.title])));
   const clampWeek = (w: number): number => Math.min(ranges.length, Math.max(1, Math.round(w) || 1));
+
+  if (plan.structure === "areas") {
+    // ── agenda por enfoque (planes por áreas) ──
+    const res = buildFocusSchedule(plan, { capOf, weekOf: (d) => Math.floor(daysBetween(plan.start, d) / 7) + 1 });
+    const total = new Map(plan.subplans.map((s) => [s.id, s.topics.length] as const));
+    const position = new Map<string, number>();
+    for (const s of plan.subplans) s.topics.forEach((t, i) => position.set(`${s.id}|${t.folder}`, i + 1));
+    const topicOf = new Map<string, { sub: ScheduleSubplan; t: ScheduleTopic }>();
+    for (const s of plan.subplans) for (const t of s.topics) topicOf.set(`${s.id}|${t.folder}`, { sub: s, t });
+    for (const [key, chunks] of res.chunks) {
+      const hit = topicOf.get(key);
+      if (!hit) continue;
+      const parts = chunks.length;
+      chunks.forEach((c, i) => {
+        const day = byDate.get(c.date);
+        if (!day) return;
+        day.topics.push({
+          subplanId: hit.sub.id,
+          ...(hit.sub.areaId ? { areaId: hit.sub.areaId } : {}),
+          area: hit.sub.area,
+          folder: hit.t.folder,
+          title: hit.t.title,
+          minutes: Math.max(1, r0(c.minutes)),
+          ...(hit.t.group ? { group: hit.t.group, groupTitle: groupTitle.get(hit.sub.id)?.get(hit.t.group) ?? hit.t.group } : {}),
+          part: i + 1,
+          parts,
+          position: position.get(key) ?? 1,
+          total: total.get(hit.sub.id) ?? 1,
+          done: false,
+          ...(c.overflow ? { overflow: true } : {}),
+          ...(c.blockId ? { blockId: c.blockId } : {}),
+          ...(c.role ? { role: c.role } : {}),
+          ...(c.applied ? { applied: true } : {}),
+        });
+      });
+    }
+    for (const day of days) {
+      const f = res.days.get(day.date);
+      if (!f) continue;
+      // cada elemento de un bloque sabe qué parte del tema es
+      for (const b of f.blocks) {
+        for (const it of b.items) {
+          const ch = res.chunks.get(`${it.subplanId}|${it.folder}`) ?? [];
+          const idx = ch.findIndex((c) => c.date === day.date && !c.overflow);
+          it.part = idx + 1;
+          it.parts = ch.length;
+        }
+      }
+      if (f.focus) day.focus = f.focus;
+      day.blocks = f.blocks;
+      day.projectMinutes = f.projectMinutes;
+      day.reviewMinutes = f.reviewMinutes;
+    }
+    addCompleted(plan, byDate, groupTitle);
+    finishDays(plan, days);
+    return { start: plan.start, end: plan.end, weeks: ranges.length, days, byDate, mode: "focus" };
+  }
 
   const segs: Seg[] = [];
   const subIndex = new Map(plan.subplans.map((s, i) => [s.id, i]));
@@ -273,13 +353,20 @@ export function buildSchedule(plan: SchedulePlan): PlanSchedule {
       });
     });
   }
-  // completados: se anotan el día en que se completaron (acotado al plan)
+  void order;
+  addCompleted(plan, byDate, groupTitle);
+  finishDays(plan, days);
+  return { start: plan.start, end: plan.end, weeks: ranges.length, days, byDate, mode: "legacy" };
+}
+
+/** Completados: se anotan el día en que se completaron (acotado al plan) y no consumen capacidad. */
+function addCompleted(plan: SchedulePlan, byDate: Map<string, ScheduleDay>, groupTitle: Map<string, Map<string, string>>): void {
   for (const sub of plan.subplans) {
-    for (const t of sub.topics) {
-      if (!t.completedAt) continue;
+    sub.topics.forEach((t, i) => {
+      if (!t.completedAt) return;
       const when = t.completedAt < plan.start ? plan.start : t.completedAt > plan.end ? plan.end : t.completedAt;
       const day = byDate.get(when);
-      if (!day) continue;
+      if (!day) return;
       day.topics.push({
         subplanId: sub.id,
         ...(sub.areaId ? { areaId: sub.areaId } : {}),
@@ -290,18 +377,20 @@ export function buildSchedule(plan: SchedulePlan): PlanSchedule {
         ...(t.group ? { group: t.group, groupTitle: groupTitle.get(sub.id)?.get(t.group) ?? t.group } : {}),
         part: 1,
         parts: 1,
-        position: position.get(`${sub.id}|${t.folder}`) ?? 1,
-        total: total.get(sub.id) ?? 1,
+        position: i + 1,
+        total: sub.topics.length,
         done: true,
       });
-    }
+    });
   }
-  const subOrder = new Map(plan.subplans.map((s) => [s.id, order(s)] as const));
+}
+
+function finishDays(plan: SchedulePlan, days: ScheduleDay[]): void {
+  const subOrder = new Map(plan.subplans.map((s, i) => [s.id, i] as const));
   for (const d of days) {
     d.topics.sort((a, b) => Number(a.done) - Number(b.done) || (subOrder.get(a.subplanId) ?? 0) - (subOrder.get(b.subplanId) ?? 0) || a.position - b.position);
     d.topicMinutes = d.topics.filter((t) => !t.done).reduce((n, t) => n + t.minutes, 0);
   }
-  return { start: plan.start, end: plan.end, weeks: ranges.length, days, byDate };
 }
 
 // ── Entregables derivados ───────────────────────────────────────────────
@@ -333,14 +422,15 @@ const AREA_STATUS: Record<"idea" | "en_curso" | "hecho", PlanDeliverableStatus> 
  * uno por bloque mensual), los de ÁREA (`Subplan.deliverable`) y los guardados a mano. El estado de cada derivado es lo mejor entre
  * lo que dice la práctica (`practice`) y lo anotado a mano (`Plan.deliverables` con el mismo `id`).
  */
-export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike | null): PlanDeliverable[] {
+export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike | null, schedule?: PlanSchedule): PlanDeliverable[] {
   const out: PlanDeliverable[] = [];
   const stored = new Map((plan.deliverables ?? []).map((d) => [d.id, d]));
   const used = new Set<string>();
   const push = (d: PlanDeliverable): void => {
     const man = stored.get(d.id);
     used.add(d.id);
-    out.push(man ? { ...d, ...man, status: bestStatus(d.status, man.status), kind: d.kind, source: d.source } : d);
+    // el proyecto diario se deriva siempre del reparto actual: solo se conserva lo anotado a mano (estado y archivos)
+    out.push(man ? { ...d, ...man, status: bestStatus(d.status, man.status), kind: d.kind, source: d.source, ...(d.kind === "daily_project" ? { title: d.title, description: d.description, dueDate: d.dueDate, criteria: d.criteria } : {}) } : d);
   };
   const track = plan.programmingPractice;
   const blocked = new Set(plan.preconditions?.blockedDates ?? []);
@@ -365,11 +455,12 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
   for (const w of weeks) {
     if (!w.sessions.length) continue;
     const st = practice?.weeks.find((x) => x.week === w.week);
+    const cw = plan.practiceCurriculum?.weeks.find((x) => x.week === w.week)?.weeklyProject;
     push({
       id: `wp:${w.week}`,
       kind: "weekly_project",
-      title: weekTitle(w),
-      description: "Proyecto semanal full stack (frontend + backend + base de datos): especificación, construcción, defensa y postmortem.",
+      title: cw?.title ?? weekTitle(w),
+      description: cw?.description ?? "Proyecto semanal full stack (frontend + backend + base de datos): especificación, construcción, defensa y postmortem.",
       dueDate: w.sessions[w.sessions.length - 1]!.date,
       criteria: PRACTICE_PHASES.map((p) => `${PHASE_LABEL[p]} hecha`),
       status: st ? fromPhaseStatuses(PRACTICE_PHASES.map((p) => st.phases[p])) : "pendiente",
@@ -381,17 +472,41 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
     const lastWeek = weeks.filter((w) => w.week >= b.fromWeek && w.week <= b.toWeek && w.sessions.length).at(-1);
     const due = lastWeek?.sessions.at(-1)?.date ?? ranges[Math.min(ranges.length, b.toWeek) - 1]?.end ?? plan.end;
     const inside = weeks.filter((w) => w.week >= b.fromWeek && w.week <= b.toWeek && w.sessions.length).map((w) => practice?.weeks.find((x) => x.week === w.week));
+    const cmonth = plan.practiceCurriculum?.monthly.find((x) => x.month === ranges[b.fromWeek - 1]?.start.slice(0, 7));
     const all = inside.length > 0 && inside.every((s) => s && PRACTICE_PHASES.every((p) => s.phases[p] === "hecho"));
     push({
       id: `mp:${b.fromWeek}`,
       kind: "monthly_project",
-      title: b.theme ? `Proyecto mensual: ${b.theme}` : `Proyecto mensual · semanas ${b.fromWeek}–${b.toWeek}`,
-      description: "Un proyecto mayor que integra los proyectos semanales del bloque.",
+      title: cmonth?.title ?? (b.theme ? `Proyecto mensual: ${b.theme}` : `Proyecto mensual · semanas ${b.fromWeek}–${b.toWeek}`),
+      description: cmonth?.description ?? "Un proyecto mayor que integra los proyectos semanales del bloque.",
       dueDate: due,
       criteria: ["Integra lo hecho en los proyectos semanales", "Se puede ejecutar y explicar de principio a fin"],
       status: all ? "hecho" : inside.some((s) => s && PRACTICE_PHASES.some((p) => s.phases[p] === "hecho")) ? "en_curso" : "pendiente",
       source: "practice",
     });
+  }
+  // agenda por enfoque: proyecto DIARIO (todos los días de estudio), SEMANAL (sin pista) y MENSUAL (sin pista mensual)
+  if (plan.structure === "areas") {
+    const sch = schedule ?? buildSchedule(plan);
+    for (const day of sch.days) {
+      const p = dailyProjectOf(plan, sch, day);
+      if (!p) continue;
+      push({ id: p.id, kind: "daily_project", title: p.title, description: p.description, dueDate: day.date, criteria: ["Aplica los temas de teoría y práctica del día", "Se puede ejecutar y explicar", "Suma una pieza al proyecto semanal"], status: "pendiente", source: p.source === "ai" ? "ai" : "practice" });
+    }
+    for (let w = 1; w <= ranges.length; w++) {
+      if (weeks.some((x) => x.week === w && x.sessions.length)) continue;
+      const wp = weeklyProjectOf(plan, sch, w);
+      const last = sch.days.filter((d) => d.week === w && d.study).at(-1);
+      if (!wp || !last) continue;
+      push({ id: wp.id, kind: "weekly_project", title: wp.title, description: wp.description, dueDate: last.date, criteria: ["Integra los mini-proyectos diarios de la semana", "Se puede ejecutar de principio a fin"], status: "pendiente", source: wp.source === "ai" ? "ai" : "practice" });
+    }
+    if (!track?.monthlyProject?.blocks.length) {
+      for (const b of monthlyBlocksOf(plan, sch)) {
+        const lastDay = sch.days.filter((d) => d.study && (b.month ? d.date.startsWith(b.month) : d.week >= b.fromWeek && d.week <= b.toWeek)).at(-1);
+        if (!lastDay) continue;
+        push({ id: b.id, kind: "monthly_project", title: b.title, description: b.description, dueDate: lastDay.date, criteria: ["Integra lo hecho en los proyectos semanales del mes", "Se puede ejecutar y explicar de principio a fin"], status: "pendiente", source: b.source === "ai" ? "ai" : "practice" });
+      }
+    }
   }
   for (const sub of plan.subplans) {
     const d = sub.deliverable;
@@ -459,6 +574,8 @@ export interface WeekSummary {
   projectSessions: number;
   purpose: string;
   autoPurpose: string;
+  /** estructura por enfoque (agenda por enfoque): días por enfoque y horas de teoría vs práctica */
+  focus?: FocusStats;
 }
 
 export interface MonthSummary {
@@ -474,6 +591,7 @@ export interface MonthSummary {
   milestones: string[];
   purpose: string;
   autoPurpose: string;
+  focus?: FocusStats;
 }
 
 const dayRows = (s: PlanSchedule, from: string, to: string): ScheduleDay[] => s.days.filter((d) => d.date >= from && d.date <= to);
@@ -510,6 +628,19 @@ const groupKinds = (plan: SchedulePlan): Map<string, AreaGroup["kind"]> => {
 export function dayPurposeAuto(plan: SchedulePlan, day: ScheduleDay, due: readonly PlanDeliverable[] = []): string {
   if (day.blocked) return "Día bloqueado: sin estudio.";
   if (!day.study) return "Día de descanso.";
+  if (day.focus) {
+    // agenda por enfoque: el propósito sale de la estructura del día (enfoque, teoría, práctica, reto de lógica y proyecto)
+    const extras: string[] = [];
+    if (day.practice.kata) extras.push("reto de lógica");
+    if (day.practice.project) extras.push(`sesión del proyecto semanal (${day.practice.project.phases.map((p) => PHASE_LABEL[p].toLowerCase()).join(" + ")})`);
+    if (day.projectMinutes) extras.push("proyecto diario");
+    const real = due.filter((d) => d.kind !== "kata" && d.kind !== "daily_project");
+    if (real.length) extras.push(`entrega: ${real.map((d) => d.title).join(", ")}`);
+    const line = day.focus.line.replace(/^Hoy:s*/, "");
+    const first = (day.blocks ?? []).flatMap((b) => b.items).filter((i) => !i.applied)[0];
+    const topic = first ? ` (${shortOf(first.title)})` : "";
+    return `Enfoque ${day.focus.label}${topic}: ${line}${extras.length ? `; ${extras.join("; ")}` : ""}.`;
+  }
   const kinds = groupKinds(plan);
   const pending = day.topics.filter((t) => !t.done);
   const parts: string[] = [];
@@ -550,13 +681,17 @@ export function weekSummary(plan: SchedulePlan, sch: PlanSchedule, week: number,
   const pend = days.flatMap((d) => d.topics.filter((t) => !t.done));
   const seq = [...new Map(pend.map((t) => [t.folder, t])).values()];
   const areas = byArea.map((a) => a.area);
-  const autoPurpose = !seq.length && !byArea.length
+  const fstats = focusStatsOf(days);
+  const focusText = fstats.byFocus.map((f) => `${f.label} (${f.days} ${f.days === 1 ? "día" : "días"})`).join(" + ");
+  const autoPurposeBase = !seq.length && !byArea.length
     ? `Semana ${week} · práctica y repaso${real.length ? `; entrega: ${real.map((d) => d.title).join(", ")}` : ""}.`
     : `Semana ${week} · ${areas.slice(0, 2).join(" y ")}${areas.length > 2 ? " y más" : ""}: ${
         seq.length > 1 ? `de ${shortTitle(seq[0]!.title)} a ${shortTitle(seq[seq.length - 1]!.title)}` : shortTitle((seq[0] ?? days.flatMap((d) => d.topics)[0])?.title ?? "repaso")
       }${real.length ? `; entrega: ${real.map((d) => d.title).join(", ")}` : ""}.`;
+  const autoPurpose = sch.mode === "focus" && fstats.byFocus.length ? `Semana ${week} · enfoque ${focusText}: teoría y práctica cada día${real.length ? `; entrega: ${real.map((d) => d.title).join(", ")}` : ""}.` : autoPurposeBase;
   const manual = plan.purposes?.week?.[String(week)];
   return {
+    focus: fstats,
     week,
     start: r.start,
     end: r.end,
@@ -598,11 +733,14 @@ export function monthSummary(plan: SchedulePlan, sch: PlanSchedule, month: strin
   }
   for (const d of deliverables) if (d.kind === "monthly_project" || d.kind === "area_project") milestones.push(`Entrega: ${d.title} (${dateLabel(d.dueDate)})`);
   const topAreas = byArea.slice(0, 2).map((a) => a.area);
-  const autoPurpose = byArea.length
+  const mstats = focusStatsOf(days);
+  const autoPurposeBase = byArea.length
     ? `${monthName(month)} · ${topAreas.join(" y ")}: ${folders.size} ${folders.size === 1 ? "tema" : "temas"} en ${weeks.length} ${weeks.length === 1 ? "semana" : "semanas"}${milestones.length ? `; hito: ${milestones[0]}` : ""}.`
     : `${monthName(month)} · práctica y repaso${milestones.length ? `; hito: ${milestones[0]}` : ""}.`;
+  const autoPurpose = sch.mode === "focus" && mstats.byFocus.length ? `${monthName(month)} · enfoque ${mstats.byFocus.map((f) => `${f.label} (${f.days} ${f.days === 1 ? "día" : "días"})`).join(" + ")}: ${folders.size} ${folders.size === 1 ? "tema" : "temas"} en ${weeks.length} ${weeks.length === 1 ? "semana" : "semanas"}${milestones.length ? `; hito: ${milestones[0]}` : ""}.` : autoPurposeBase;
   const manual = plan.purposes?.month?.[month];
   return {
+    focus: mstats,
     month,
     label: monthName(month),
     start,
@@ -635,6 +773,61 @@ export function planMonths(plan: Pick<SchedulePlan, "start" | "end">): string[] 
     }
   }
   return out;
+}
+
+// ── Estructura por enfoque (semana / mes) ───────────────────────────────
+
+export interface FocusStats {
+  /** días de estudio con enfoque, por enfoque (orden de aparición) */
+  byFocus: Array<{ id: string; label: string; days: number }>;
+  studyDays: number;
+  theoryMinutes: number;
+  practiceMinutes: number;
+  projectMinutes: number;
+  reviewMinutes: number;
+  /** bloques de teoría y de práctica obligatorios (con tema o repaso) */
+  theoryBlocks: number;
+  practiceBlocks: number;
+}
+
+/** Cuántos días de cada enfoque y cuántas horas de teoría vs práctica tiene un conjunto de días (semana o mes). */
+export function focusStatsOf(days: readonly ScheduleDay[]): FocusStats {
+  const by = new Map<string, { id: string; label: string; days: number }>();
+  let theory = 0;
+  let practice = 0;
+  let project = 0;
+  let review = 0;
+  let tb = 0;
+  let pb = 0;
+  let study = 0;
+  for (const d of days) {
+    if (d.study) study++;
+    if (d.focus) {
+      const e = by.get(d.focus.id + d.focus.label) ?? { id: d.focus.id, label: d.focus.label, days: 0 };
+      e.days++;
+      by.set(d.focus.id + d.focus.label, e);
+    }
+    for (const b of d.blocks ?? []) {
+      if (b.status === "omitted") continue;
+      if (b.kind === "theory") {
+        theory += b.minutes;
+        tb++;
+      } else {
+        practice += b.minutes;
+        pb++;
+      }
+    }
+    project += d.projectMinutes ?? 0;
+    review += d.reviewMinutes ?? 0;
+    practice += d.practiceMinutes;
+  }
+  return { byFocus: [...by.values()], studyDays: study, theoryMinutes: theory, practiceMinutes: practice + project, projectMinutes: project, reviewMinutes: review, theoryBlocks: tb, practiceBlocks: pb };
+}
+
+/** «2 teorías, 2 prácticas»: los bloques con contenido de un día (para etiquetas de lector de pantalla). */
+export function dayBlockCounts(day: ScheduleDay): { theory: number; practice: number } {
+  const live = (day.blocks ?? []).filter((b) => b.status !== "omitted");
+  return { theory: live.filter((b) => b.kind === "theory").length, practice: live.filter((b) => b.kind === "practice").length };
 }
 
 // ── Navegación por periodos (día · semana · mes) ────────────────────────

@@ -7,11 +7,11 @@
 
 import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import { addDays, addMonthsToDate, isoDow } from "../../lib/planTime";
-import { dateLabel, deliverablesText, longDateLabel, monthName, topicsText } from "../../lib/planSchedule";
+import { dateLabel, dayBlockCounts, deliverablesText, longDateLabel, monthName, topicsText } from "../../lib/planSchedule";
 import type { MentorPlan } from "../../lib/types";
 import { cn } from "../ui";
 import { DayDetail } from "./AgendaViews";
-import type { AgendaModel } from "./agendaKit";
+import { focusColour, type AgendaModel } from "./agendaKit";
 import { DAY_LONG, DAY_SHORT } from "./planShared";
 
 const monthStart = (d: string): string => `${d.slice(0, 7)}-01`;
@@ -21,7 +21,11 @@ export function cellLabel(m: AgendaModel, date: string): string {
   const day = m.schedule.byDate.get(date);
   if (!day) return `${longDateLabel(date)}: fuera del plan`;
   const due = m.dueByDate.get(date) ?? [];
-  const bits = [topicsText(day.topics.length), deliverablesText(due.length)];
+  const c = dayBlockCounts(day);
+  const proj = day.projectMinutes ? ["proyecto diario"] : [];
+  const bits = day.focus
+    ? [`enfoque ${day.focus.label}`, `${c.theory} ${c.theory === 1 ? "teoría" : "teorías"}`, `${c.practice} ${c.practice === 1 ? "práctica" : "prácticas"}`, ...proj, topicsText(day.topics.length), deliverablesText(due.length)]
+    : [topicsText(day.topics.length), deliverablesText(due.length)];
   if (day.practice.kata) bits.push("kata");
   if (day.practice.project) bits.push("sesión de proyecto");
   if (!day.study) bits.push(day.blocked ? "día bloqueado" : "descanso");
@@ -132,7 +136,7 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
                 const ok = inPlan(date);
                 const selected = date === anchor;
                 const outsideMonth = date.slice(0, 7) !== month;
-                const due = m.dueByDate.get(date) ?? [];
+                const due = (m.dueByDate.get(date) ?? []).filter((d) => d.kind !== "daily_project");
                 const pendingDue = due.some((d) => d.status !== "hecho");
                 return (
                   <div key={date} role="gridcell" aria-selected={ok ? selected : undefined} aria-disabled={ok ? undefined : true} className={cn("min-h-[5.5rem] border-r border-line last:border-r-0", outsideMonth && "bg-surface/60")}>
@@ -156,6 +160,12 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
                         <span className={cn("grid h-6 min-w-6 place-items-center rounded-full px-1", date === m.today && "bg-[var(--nv-btn,var(--nv-accent))] text-white")}>{Number(date.slice(8))}</span>
                         {Number(date.slice(8)) === 1 && <span className="text-[13px] font-medium uppercase text-dim">{dateLabel(date).split(" ")[1]}</span>}
                       </span>
+                      {day?.focus && ok && (
+                        <span className="flex items-center gap-1 truncate text-[12.5px] font-medium text-text" aria-hidden data-testid="agenda-cell-focus">
+                          <span className="inline-block h-2 w-2 flex-none rounded-sm" style={{ background: focusColour(day.focus.id) }} />
+                          <span className="truncate">{day.focus.label}</span>
+                        </span>
+                      )}
                       {day && ok && (
                         <span className="flex flex-wrap items-center gap-1 text-[13px]" aria-hidden>
                           {day.topics.length > 0 && <span className="rounded bg-accent-soft px-1 font-semibold text-accent-text" title="Temas">{day.topics.length} t</span>}
@@ -175,7 +185,7 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
         })}
       </div>
       <p id="agenda-cal-help" className="text-[13.5px] text-dim">
-        Flechas para moverte entre días, Inicio/Fin para el lunes/domingo, Re Pág/Av Pág para cambiar de mes e Intro para abrir el día. «t» = temas, «K» = kata, «P» = sesión de proyecto, «◆» = entregables.
+        Flechas para moverte entre días, Inicio/Fin para el lunes/domingo, Re Pág/Av Pág para cambiar de mes e Intro para abrir el día. «t» = temas, «K» = kata, «P» = sesión de proyecto, «◆» = entregables; el nombre con color es el enfoque del día.
       </p>
       <div ref={detailRef} tabIndex={-1} className="rounded-2xl border border-line bg-card p-4 outline-none @3xl:p-5" data-testid="agenda-calendar-detail">
         <DayDetail m={m} date={anchor} onChanged={onChanged} headingId="agenda-cal-detail-h" level={2} />

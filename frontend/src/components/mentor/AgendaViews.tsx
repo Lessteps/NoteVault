@@ -10,7 +10,8 @@ import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
-import { AreaChip, DeliverableLine, doneText, plural, PurposeBlock, type AgendaModel } from "./agendaKit";
+import { AreaChip, DeliverableLine, doneText, focusColour, plural, PurposeBlock, type AgendaModel } from "./agendaKit";
+import { DayDetailFocus, FocusStructure, MonthProjects, WeekProjects } from "./AgendaDayFocus";
 import { openTopic } from "./openTopic";
 import { hm, ProgressBar } from "./parts";
 import { openPractice } from "./PracticeCard";
@@ -29,6 +30,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2 }: { m: Age
   if (!day) {
     return <p className="rounded-xl border border-dashed border-line p-4 text-[14px] text-dim" data-testid="agenda-day-outside">El {longDateLabel(date)} queda fuera del plan ({dateLabel(m.plan.start)} – {dateLabel(m.plan.end)}).</p>;
   }
+  if (m.schedule.mode === "focus") return <DayDetailFocus m={m} date={date} onChanged={onChanged} {...(headingId ? { headingId } : {})} level={level} />;
   const due = m.dueByDate.get(date) ?? [];
   const real = due.filter((d) => d.kind !== "kata");
   const purpose = dayPurpose(m.plan, day, due);
@@ -210,6 +212,8 @@ export function WeekDetail({ m, week, onPickDay, onChanged, headingId }: { m: Ag
         <span className="text-[14px] font-semibold">{pct} %</span>
       </div>
 
+      {m.schedule.mode === "focus" && <FocusStructure days={days} headingId={`${headingId ?? "wk"}-focus`} label={`de la semana ${week}`} />}
+
       <section aria-labelledby={`${headingId ?? "wk"}-areas`} data-testid="agenda-week-areas">
         <h3 id={`${headingId ?? "wk"}-areas`} className={cn(SECTION, "mb-2")}>Temas por área</h3>
         {w.byArea.length === 0 ? (
@@ -228,13 +232,18 @@ export function WeekDetail({ m, week, onPickDay, onChanged, headingId }: { m: Ag
         )}
       </section>
 
+      {m.schedule.mode === "focus" && <WeekProjects m={m} week={week} headingId={`${headingId ?? "wk"}-projects`} onChanged={onChanged} />}
+
       <section aria-labelledby={`${headingId ?? "wk"}-deliv`} data-testid="agenda-week-deliverables">
         <h3 id={`${headingId ?? "wk"}-deliv`} className={cn(SECTION, "mb-2")}>Entregables de la semana <span className="font-normal normal-case tracking-normal text-dim">({deliverablesText(w.deliverables.length)})</span></h3>
         {w.deliverables.length === 0 ? (
           <p className="text-[14px] text-dim">Sin entregables esta semana.</p>
         ) : (
           <ul className="space-y-2">
-            {[...w.deliverables.filter((d) => d.kind !== "kata"), ...w.deliverables.filter((d) => d.kind === "kata")].map((d) => (
+            {w.deliverables.some((d) => d.kind === "daily_project") && (
+              <li className="list-none text-[14px] text-dim" data-testid="agenda-week-daily-count">Incluye {plural(w.deliverables.filter((d) => d.kind === "daily_project").length, "proyecto diario", "proyectos diarios")} (uno por día de estudio, en «Proyectos de la semana»).</li>
+            )}
+            {[...w.deliverables.filter((d) => d.kind !== "kata" && d.kind !== "daily_project"),...w.deliverables.filter((d) => d.kind === "kata")].map((d) => (
               <DeliverableLine key={d.id} d={d} showDate={dateLabel(d.dueDate)} onOpenPractice={openPractice} />
             ))}
           </ul>
@@ -257,6 +266,12 @@ function WeekDayRow({ m, day, onPick }: { m: AgendaModel; day: ScheduleDay; onPi
   return (
     <li className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-3 py-2 text-[14px]", day.date === m.today ? "border-accent bg-accent-soft" : "border-line")} data-testid="agenda-week-day">
       <span className="w-24 flex-none font-medium capitalize">{DAY_SHORT[day.dow - 1]} {Number(day.date.slice(8))}<span className="sr-only"> {DAY_LONG[day.dow - 1]}</span></span>
+      {day.focus && (
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line px-2 py-0.5 text-[13px] font-medium text-text" data-testid="agenda-week-day-focus">
+          <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: focusColour(day.focus.id) }} />
+          Enfoque: {day.focus.label}
+        </span>
+      )}
       <span className="min-w-0 flex-1 basis-60 text-dim">{purpose}</span>
       <span className="whitespace-nowrap">{topicsText(day.topics.length)}</span>
       <span className="whitespace-nowrap">{deliverablesText(due.length)}</span>
@@ -272,7 +287,7 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId }: { m:
   const s = monthSummary(m.plan, m.schedule, month, m.deliverables);
   if (!s) return <p className="text-[14px] text-dim">Ese mes queda fuera del plan.</p>;
   const manual = !!m.plan.purposes?.month?.[month];
-  const real = s.deliverables.filter((d) => d.kind !== "kata");
+  const real = s.deliverables.filter((d) => d.kind !== "kata" && d.kind !== "daily_project");
   const maxMin = Math.max(1, ...s.byArea.map((a) => a.minutes));
   return (
     <article className="space-y-4" data-testid="agenda-month" aria-labelledby={headingId}>
@@ -284,6 +299,8 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId }: { m:
         {[topicsText(s.topics), `${hm(s.topicMinutes)} de estudio`, deliverablesText(s.deliverables.length), plural(s.weeks.length, "semana", "semanas")].join(" · ")}
       </p>
       <PurposeBlock planId={m.plan.id} scope="month" keyName={month} text={s.purpose} auto={s.autoPurpose} manual={manual} editable={m.editable} onChanged={onChanged} label={s.label} />
+
+      {m.schedule.mode === "focus" && <FocusStructure days={m.schedule.days.filter((d) => d.date >= s.start && d.date <= s.end)} headingId={`${headingId ?? "mo"}-focus`} label={`de ${s.label}`} />}
 
       <section aria-labelledby={`${headingId ?? "mo"}-areas`} data-testid="agenda-month-areas">
         <h3 id={`${headingId ?? "mo"}-areas`} className={cn(SECTION, "mb-2")}>Áreas en foco</h3>
@@ -330,13 +347,15 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId }: { m:
         </ol>
       </section>
 
+      {m.schedule.mode === "focus" && <MonthProjects m={m} month={month} headingId={`${headingId ?? "mo"}-projects`} onChanged={onChanged} />}
+
       <section aria-labelledby={`${headingId ?? "mo"}-deliv`} data-testid="agenda-month-deliverables">
         <h3 id={`${headingId ?? "mo"}-deliv`} className={cn(SECTION, "mb-2")}>Entregables del mes <span className="font-normal normal-case tracking-normal text-dim">({deliverablesText(s.deliverables.length)}{s.deliverables.length ? `, ${doneText(s.deliverables.filter((d) => d.status === "hecho").length)}` : ""})</span></h3>
         {s.deliverables.length === 0 ? (
           <p className="text-[14px] text-dim">Sin entregables este mes.</p>
         ) : (
           <>
-            <p className="mb-2 text-[14px] text-dim">{plural(s.deliverables.filter((d) => d.kind === "kata").length, "kata", "katas")} · {plural(s.deliverables.filter((d) => d.kind === "weekly_project").length, "proyecto semanal", "proyectos semanales")} · {plural(real.filter((d) => d.kind === "monthly_project").length, "proyecto mensual", "proyectos mensuales")} · {plural(real.filter((d) => d.kind === "area_project").length, "proyecto de área", "proyectos de área")}</p>
+            <p className="mb-2 text-[14px] text-dim">{plural(s.deliverables.filter((d) => d.kind === "kata").length, "kata", "katas")} · {plural(s.deliverables.filter((d) => d.kind === "daily_project").length, "proyecto diario", "proyectos diarios")} · {plural(s.deliverables.filter((d) => d.kind === "weekly_project").length, "proyecto semanal", "proyectos semanales")} · {plural(real.filter((d) => d.kind === "monthly_project").length, "proyecto mensual", "proyectos mensuales")} · {plural(real.filter((d) => d.kind === "area_project").length, "proyecto de área", "proyectos de área")}</p>
             <ul className="space-y-2">
               {real.map((d) => <DeliverableLine key={d.id} d={d} showDate={dateLabel(d.dueDate)} onOpenPractice={openPractice} />)}
             </ul>

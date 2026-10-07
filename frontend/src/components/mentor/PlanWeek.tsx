@@ -58,11 +58,13 @@ export function ThisWeek({ items, practiceItems = [], activePlans, headingId = "
       ) : (
         <ul className="mt-4 space-y-2" aria-label="Temas de esta semana">
           {items.map((it) => (
-            <li key={`${it.planId}:${it.subplanId}:${it.folder ?? "deliverable"}`} className="rounded-xl border border-line p-3" data-testid="plan-week-item">
+            <li key={`${it.planId}:${it.subplanId}:${it.folder ?? it.kind}`} className="rounded-xl border border-line p-3" data-testid="plan-week-item">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="text-[15px] font-semibold">{it.title}</span>
                 {activePlans > 1 && <Chip large colour="var(--nv-mint)" className="!whitespace-normal">Plan: {it.label}</Chip>}
                 {it.kind === "deliverable" && <Chip large colour="var(--nv-accent)">Entregable</Chip>}
+                {it.kind === "project" && <Chip large colour="var(--nv-practice, #c58be0)">Proyecto diario</Chip>}
+                {it.role && <Chip large>{it.role === "theory" ? "Teoría" : it.role === "practice" ? "Práctica" : "Teoría y práctica"}{it.focus ? ` · ${it.focus}` : ""}</Chip>}
                 {it.overdue && <Chip large colour="var(--nv-danger)"><span aria-hidden>⚠</span> Atrasado (sem. {it.targetWeek})</Chip>}
                 <span className="text-[14px] text-dim">{hm(it.estMinutes)}</span>
                 {it.folder && (

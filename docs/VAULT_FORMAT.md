@@ -1071,7 +1071,7 @@ anteriores (un subplan «Programación: <objetivo>» por rama) se siguen leyendo
 - `openQuestions` en un plan por áreas: **una sola** pregunta global `{id: "deliverables", text, options}` **sin** `subplanId` (en los antiguos, una por subplan).
   `mentor_plan_answer` sin `subplanId` la responde para todo el plan (yes añade el proyecto PROPIO de cada área: «API REST con persistencia y pruebas»,
   «Esquema relacional con consultas y migraciones»…, distintos por área); las excepciones por área van con `mentor_plan_area_deliverable`.
-- **Entregables de la agenda** (`deliverables`, opcional): `PlanDeliverable {id, kind: "kata"|"weekly_project"|"monthly_project"|"area_project", title, description,
+- **Entregables de la agenda** (`deliverables`, opcional): `PlanDeliverable {id, kind: "kata"|"weekly_project"|"monthly_project"|"area_project"|"daily_project", title, description,
   areaId?, dueDate, files?: [{path?, note}], criteria[], status: "pendiente"|"en_curso"|"hecho", source: "practice"|"ai"}`. Los de **práctica** se DERIVAN
   del plan (un archivo de kata `kata:<fecha>` por día de estudio con kata, `wp:<semana>` por proyecto semanal, `mp:<semana>` por bloque mensual) y los de
   **área** salen de `subplan.deliverable` (`area:<subplan>`, con la fecha en que acaba el área); `Plan.deliverables` solo guarda lo editado a mano (estado,
@@ -1079,11 +1079,56 @@ anteriores (un subplan «Programación: <objetivo>» por rama) se siguen leyendo
   (`PracticeStatus.kataDoneDates` y las fases de cada proyecto) y lo anotado a mano.
 - **Propósitos** (`purposes`, opcional): `{day: {"AAAA-MM-DD": texto}, week: {"3": texto}, month: {"AAAA-MM": texto}}`. Si faltan, el texto sale de plantillas
   deterministas a partir del contenido (áreas, títulos de temas, práctica, entregables); si existen, lo sustituyen. Se editan en la agenda o pidiéndolo al Mentor.
+- **Revisión de cobertura** (`coverageReview`, opcional, aditivo): la guarda «Revisar cobertura con el Mentor» (`mentor_plan_coverage_review`, una llamada a la IA bajo
+  demanda). `{at: ISO, source: "ai", profile?: texto, summary: texto, discarded: n, areas: [{key: areaId|id del subplan, area, assessment, missing: [{title, why, groupId?}],
+  misplaced: [{folder, title, reason, suggestedArea?}]}]}`. La app valida la respuesta: descarta las sugerencias que ya existen como tema de la vault, las áreas que no son
+  del plan y los «sobrantes» que no son temas del plan. Solo informa: no crea notas ni cambia temas. Se ignora si no es válida; deshacer un cambio la conserva.
+  La **cobertura determinista** (teoría y ejercicios por tema, temas de las ramas fuera del plan; `mentor_plan_coverage`, `src/lib/planCoverage.ts`) no se guarda.
+- **Fases mes a mes** (no se guarda, `src/lib/planMonths.ts`): cada semana del plan cuenta en el mes de su día central; por área y mes se agregan temas (por `targetWeek`), horas, semanas activas (`phase`) y grupos.
 - **Agenda** (no se guarda: se recalcula siempre igual, `src/lib/planSchedule.ts`): reparto DIARIO determinista. Cada día de estudio no bloqueado da
   `minutesPerDay × ritmo` menos los minutos de práctica de ese día; cada semana, la capacidad se reparte entre las áreas con temas esa semana en
   proporción a su demanda (nivelado por días si hay holgura); un tema que supera los minutos del día ocupa varios (parte 1/n…); nunca antes de su
   `targetWeek`; los fijados (`pinned`) van primero en su semana; los completados se anotan el día de `completedAt` y no consumen capacidad; lo que no cabe
   en todo el plan se amontona en el último día de estudio, marcado como desbordado. Vistas Día · Semana · Mes · Calendario con conteo de temas y entregables.
+- **Agenda por enfoque** (planes con `structure: "areas"`; no se guarda, `src/lib/planDayFocus.ts` + `planSchedule.ts`): cada día de estudio tiene un **enfoque** (el área
+  principal activa ese día: Backend, Frontend…) y unos **bloques obligatorios** de teoría y de práctica que salen de una **plantilla de día por enfoque**
+  (la tabla `FOCUS_TEMPLATES`, datos, no código disperso). Los temas pendientes se reparten en carriles por tipo de grupo (Conocimientos, Lenguaje, y un carril global
+  de fundamentos «Bases»). Las proporciones son por plantilla; con holgura cada carril toma lo que necesita para acabar al final de la fase del área (nivelado, nunca por
+  debajo del mínimo del bloque); con sobrecarga las proporciones reparten el día y lo sobrante pasa a los bloques atrasados. Se respetan `minutesPerDay` × ritmo, días de
+  estudio y bloqueados, la práctica reservada (kata + sesión del proyecto semanal), los temas que abarcan varios días, `pinned` (no antes de su semana) y las fases.
+
+  | Enfoque | Bloques del día (todos el MISMO día) | % del día (mín.) | Práctica |
+  |---|---|---|---|
+  | **Backend** (+ Databases como acompañante) | Teoría de backend · Práctica de lenguaje (Python) · Teoría de bases de datos · Práctica de bases de datos (SQL) | 30 (25 min) · 28 (25) · 24 (20) · 18 (20) | Python + SQL sobre los temas del día |
+  | **Databases** (sin Backend) | Teoría de bases de datos · Práctica de bases de datos (SQL) | 55 (25) · 45 (20) | SQL |
+  | **Frontend** | Teoría de frontend · Práctica de lenguaje (JavaScript/TypeScript) · Práctica de UI y componentes | 35 (25) · 35 (25) · 30 (20) | lenguaje + componentes |
+  | **Automation** | Teoría de automatización · Práctica de scripting en Python | 50 (25) · 50 (25) | scripting |
+  | **Tooling and Quality** | Teoría de herramientas y calidad · Práctica con Git y pruebas | 50 (25) · 50 (20) | Git, pruebas, linters |
+  | otras áreas (Desktop, Mobile, materias propias) | Teoría de <área> · Práctica de <área> | 60 (25) · 40 (20) | ejercicios del área |
+
+  Además cada día de estudio lleva su **proyecto diario** (12 % de la capacidad, entre 30 y 60 min; 25–45 en áreas genéricas). El enfoque del día se enseña con un chip
+  «Enfoque: Backend», la línea «Hoy: teoría de backend + práctica de Python + teoría y práctica de SQL» y un propósito generado con esa estructura. **Un tipo sin temas**:
+  si el carril tuvo temas pero ya están hechos (o su fase aún no empieza) el bloque queda como **repaso** (≈20 min, con los últimos temas); si el plan no tiene ese tipo de
+  tema (p. ej. sin Databases o sin lenguaje) el bloque se **omite** con una explicación. Con varios enfoques activos en la semana (Automation ‖ Tooling) los días se alternan en
+  proporción a lo que le queda a cada uno; Databases va dentro de los días de Backend mientras coinciden.
+  **«No partir desde cero»**: los fundamentos (grupo «Bases») NO se adelantan como bloque inicial ni ocupan semanas enteras al principio: se **intercalan** durante toda la fase del
+  área que los tiene como **lógica aplicada** dentro de la práctica de lenguaje, repartidos con el lenguaje en proporción a lo que le queda a cada uno. La `targetWeek` de un tema
+  no fijado solo ordena su carril. Los planes de estructura antigua conservan el reparto anterior.
+- **Currículo de práctica del plan** (`practiceCurriculum`, opcional, aditivo; `src/lib/planCurriculum.ts`): lo genera **bajo demanda** «Generar la práctica del plan con el Mentor»
+  (`mentor_plan_practice_generate`; clave de estado/cancelación `practice:<id>`) y queda en el historial de cambios (con instantánea previa: «Deshacer» lo quita). Forma:
+  `{generatedAt, source: "ai"|"mixed"|"template", warnings?: [texto], weeks: [{week, source: "ai"|"template", exercises: [{topic, practice: "language"|"database"|"ui"|"scripting"|"tooling"|"area",
+  language?, title (≤120), statement? (≤280), source: "ai"|"template"|"vault", existing?}], logic: [{title, statement?, source}], weeklyProject?: {title, description?},
+  dailyProjects: [{topic, title, description?, source}]}], monthly: [{month: "AAAA-MM", title, description?, source}]}`. **La IA nunca decide fechas ni minutos**: cada ejercicio se liga a un
+  `topic` (carpeta REAL del plan) y la app lo coloca el día en que su tema se practica; se descartan los temas inexistentes, las semanas fuera del plan y los textos largos. Se
+  genera por bloques de 3 semanas en paralelo limitado (3 llamadas a la vez, 120 s por llamada y 480 s en total, cancelación real con `AbortSignal`); un bloque que falla cae
+  SOLO él a **plantillas** («Practica <tema> en <lenguaje>: 3 ejercicios del tema», marcadas como automáticas) y el resto conserva lo de la IA. Los temas que ya tienen
+  ejercicios en la vault (`exercises` del tema) se **priorizan y se enlazan** («En tu vault»): la IA solo propone donde faltan. Sin currículo la agenda usa esas mismas plantillas
+  por tipo de tema calculadas al vuelo. Los retos de lógica (Programming practice = práctica diaria para entrevistas técnicas) salen del currículo o de plantillas por enfoque.
+- **Proyectos diario, semanal y mensual** (derivados del reparto y del currículo; entregables del plan): cada día de estudio tiene su **proyecto diario** (`dp:<fecha>`, kind
+  `daily_project`) que aplica los temas de teoría y de práctica de ESE día (título/descripción de la IA si propuso uno para un tema del día; si no, plantilla: p. ej. «Mini-endpoint de <tema>
+  con <tema de BD>»); la semana tiene su **proyecto semanal** (el de Programming practice `wp:<n>` si la pista lo tiene; si no `ww:<n>`) que acumula los diarios (cada día enseña qué pieza
+  avanza hoy) y el mes su **proyecto mensual** (`mp:<semana>` de la pista o `mm:<AAAA-MM>`) que integra los semanales. Todos cuentan en los conteos de entregables por día, semana y mes;
+  `Plan.deliverables` solo guarda su estado y archivos anotados a mano.
 - **Reorganizar por áreas** (`mentor_plan_reorganize`): determinista y deshacible. Agrupa los subplanes por rama en áreas y recalcula el reparto con las fases;
   conserva `completedAt`, `pinned`, el estado y el proyecto de los entregables, las metas requeridas, los comentarios del Mentor y la pista de práctica;
   `programming_practice` sale de los subplanes. Queda como un cambio `applied` en `_history/<plan>/<n>.json` (con `before` = el plan antiguo y `nameAfter` si

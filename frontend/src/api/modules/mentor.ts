@@ -68,7 +68,10 @@ import {
 import { generateByParts, PipelineCancel } from "../../core/mentor/planPipeline.js";
 import { canReorganize, reorganizeByAreas } from "../../core/mentor/planReorganize.js";
 import { PLAN_DELIVERABLE_STATUSES, sanitizeGroups, type PlanDeliverableStatus } from "../../lib/planAreas.js";
-import { deliverablesOf } from "../../lib/planSchedule.js";
+import { buildSchedule, deliverablesOf } from "../../lib/planSchedule.js";
+import { CurriculumCancel, generateCurriculum } from "../../core/mentor/planCurriculumAi.js";
+import { areaKeyOf, computeCoverage, MAX_PROFILE_CHARS, parseCoverageReply } from "../../lib/planCoverage.js";
+import { coverageMessages } from "../../core/mentor/planCoverageAi.js";
 import { parseScopeReply, parseTopicsReply, scopeMessages, topicsMessages } from "../../core/mentor/planBuildAi.js";
 import {
   areaOfFolder,
@@ -642,6 +645,20 @@ export function mentorApi(app: AppState, send?: SendFn) {
     return b;
   };
   const buildView = (b: PlanBuild) => ({ loading: false as const, build: b, summary: summaryOf(b) });
+  /** El plan de una petición de cobertura (`{ id }`), o error claro. */
+  const coveragePlan = (opts: unknown): Plan => {
+    const id = String(((opts && typeof opts === "object" ? opts : {}) as Record<string, any>).id ?? "");
+    if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+    const plan = new PlanStore(app.root).load(id);
+    if (!plan) throw new ApiError("Ese plan ya no existe.");
+    return plan;
+  };
+  /** Cobertura determinista del plan contra TODOS los temas de la vault (notas de teoría y ejercicios por tema). */
+  const coverageOf = (plan: Plan) => {
+    const snaps = topicSnaps(app);
+    const topics = snaps.map((t) => ({ folder: t.folder, title: t.title, theoryNotes: t.theoryNotes, exerciseCount: t.exerciseCount, ...(t.planExercises ? { planExercises: t.planExercises } : {}), completenessPct: t.progress.completenessPct }));
+    return { coverage: computeCoverage(plan, topics, { ppReady: !!ppAreaDir(app.root) }), snaps };
+  };
   let acceptRef: (opts: unknown) => any = () => {
     throw new ApiError("No disponible.");
   };
@@ -1544,6 +1561,80 @@ export function mentorApi(app: AppState, send?: SendFn) {
     },
 
     /**
+     * «Generar la práctica del plan con el Mentor»: crea el currículo de práctica del plan (`Plan.practiceCurriculum`: ejercicios por semana
+     * ligados a los temas que se practican, retos de lógica, proyecto semanal, mini-proyectos diarios y proyecto mensual). Solo se ejecuta cuando
+     * el usuario lo pide. Por bloques de semanas en paralelo limitado (timeouts, cancelación real con `mentor_ai_cancel` clave
+     * `practice:<id>`, progreso en `mentor_ai_status`); si un bloque falla cae a plantillas; sin IA todo son plantillas marcadas como
+     * automáticas. Los temas con ejercicios en la vault los prioriza la app. Queda en el historial de cambios con la instantánea previa:
+     * «Deshacer» lo revierte (`mentor_plan_change_undo`).
+     */
+    async mentor_plan_practice_generate(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (!plan.subplans.some((s) => s.topics.length)) throw new ApiError("Este plan no tiene temas.");
+      if (studyIndexCold(app)) return { loading: true as const };
+      return guarded(`plan:${id}`, "practice", () =>
+        withJob(`practice:${id}`, "Preparando la práctica del plan…", async (job) => {
+          const today = localDate();
+          const sch = buildSchedule(plan);
+          const folders = new Set(plan.subplans.flatMap((s) => s.topics.map((t) => t.folder)));
+          const counts = new Map<string, number>();
+          for (const ex of vaultScan(app).exercises) {
+            const parts = ex.rel.replace(/\\/g, "/").split("/");
+            for (let i = parts.length - 1; i > 0; i--) {
+              const dir = parts.slice(0, i).join("/");
+              if (folders.has(dir)) {
+                counts.set(dir, (counts.get(dir) ?? 0) + 1);
+                break;
+              }
+            }
+          }
+          const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+          const aiOn = o.noAi !== true && aiUnavailableReason(cfg) === null;
+          const objective = plan.preconditions?.freeObjective?.trim().slice(0, 300) || plan.subplans.map((s) => s.area).slice(0, 5).join(" + ");
+          const weekNow = Math.floor((Date.parse(today) - Date.parse(plan.start)) / 86400000 / 7) + 1;
+          let res;
+          try {
+            res = await generateCurriculum(plan, sch, {
+              send: (messages, so) => job.send(messages, so),
+              aiOn,
+              existing: { count: (f) => counts.get(f) ?? 0 },
+              fromWeek: o.all === true ? 1 : Math.max(1, Math.min(weekNow, sch.weeks)),
+              objective,
+              cancelled: job.cancelled,
+              onProgress: (_p, label) => job.setLabel(label),
+            });
+          } catch (e) {
+            if (e instanceof CurriculumCancel || e instanceof CancelError) throw new ApiError("Cancelado.");
+            throw e;
+          }
+          const hist = new ChangeStore(app.root);
+          const prev = plan.practiceCurriculum;
+          const merged = prev && res.curriculum.weeks.length ? { ...res.curriculum, weeks: [...prev.weeks.filter((w) => !res.curriculum.weeks.some((x) => x.week === w.week)), ...res.curriculum.weeks].sort((a, b) => a.week - b.week), monthly: [...prev.monthly.filter((m) => !res.curriculum.monthly.some((x) => x.month === m.month)), ...res.curriculum.monthly] } : res.curriculum;
+          const saved = st.save({ ...plan, practiceCurriculum: merged, updatedAt: new Date().toISOString() });
+          const nW = res.curriculum.weeks.length;
+          const entry = hist.append(id, {
+            at: new Date().toISOString(),
+            comment: "Generar la práctica del plan",
+            status: "applied",
+            source: res.aiUsed ? "ai" : "rules",
+            summary: `Práctica del plan: ${nW} ${nW === 1 ? "semana" : "semanas"} ${res.aiUsed ? "con el Mentor" : "con plantillas automáticas"}${res.warnings.length ? ` (${res.warnings.length} ${res.warnings.length === 1 ? "bloque" : "bloques"} con plantillas)` : ""}.`,
+            delta: { added: 0, removed: 0, moved: 0, deliverables: 0 },
+            changed: [],
+            warnings: res.warnings,
+            fixOptions: [],
+            before: plan,
+          });
+          return { loading: false as const, plan: saved, entry: viewOf(entry), history: hist.list(id).map(viewOf), aiUsed: res.aiUsed, calls: res.calls };
+        }),
+      );
+    },
+
+    /**
      * «Reorganizar por áreas»: convierte un plan de estructura antigua (un subplan por rama de carpeta) a áreas elementales con grupos y
      * fases. Solo se ejecuta cuando el usuario lo pide. Determinista, conserva lo completado y los comentarios, y queda en el historial de
      * cambios con la instantánea previa: «Deshacer» lo revierte (`mentor_plan_change_undo`).
@@ -1575,6 +1666,60 @@ export function mentorApi(app: AppState, send?: SendFn) {
         ...(saved.name !== plan.name ? { nameAfter: saved.name ?? "" } : {}),
       });
       return { plan: saved, entry: viewOf(entry), history: hist.list(id).map(viewOf), applied: true as const };
+    },
+
+    // ── Cobertura del plan: notas de teoría y práctica por área (determinista) + revisión con el Mentor (bajo demanda) ──
+
+    /** Cobertura de teoría y práctica de cada área del plan contra la vault y la última revisión guardada. Solo lee. */
+    mentor_plan_coverage(opts: unknown) {
+      const plan = coveragePlan(opts);
+      if (studyIndexCold(app)) return { loading: true as const };
+      return {
+        loading: false as const,
+        coverage: coverageOf(plan).coverage,
+        review: plan.coverageReview ?? null,
+        aiConfigured: aiUnavailableReason(AIConfig.fromDict(AppConfig.get_ai_config())) === null,
+      };
+    },
+
+    /**
+     * «Revisar cobertura con el Mentor»: UNA llamada a la IA con el objetivo, el perfil declarado, los títulos de los temas por área y el
+     * resumen de cobertura (nunca las notas). La respuesta se valida (descarta lo que ya existe como tema, normaliza las áreas) y se guarda
+     * como `coverageReview` en el plan; no crea notas ni cambia temas. Sin IA (o si falla o se cancela) no se guarda nada: `source: "none"`.
+     */
+    async mentor_plan_coverage_review(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const plan = coveragePlan(o);
+      const profile = String(o.profile ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_PROFILE_CHARS);
+      if (studyIndexCold(app)) return { loading: true as const };
+      const { coverage, snaps } = coverageOf(plan);
+      const none = (reason: string) => ({ loading: false as const, source: "none" as const, reason, coverage });
+      if (o.noAi === true) return none("Sin IA por petición tuya: se muestra solo la cobertura calculada.");
+      if (aiUnavailableReason(AIConfig.fromDict(AppConfig.get_ai_config())) !== null) return none("La IA no está configurada: sin IA solo se muestra la cobertura calculada.");
+      const id = plan.id;
+      return guarded(`plan:${id}`, `coverage:${profile}`, () =>
+        withJob(`coverage:${id}`, "Revisando la cobertura del plan con tu objetivo…", async (job) => {
+          const objective = plan.preconditions?.freeObjective?.trim() || plan.subplans.map((s) => s.objective).filter(Boolean).join(" · ");
+          let text: string;
+          try {
+            text = await job.send(coverageMessages({ objective, profile, subplans: plan.subplans, coverage }) as ChatMessage[], { timeoutMs: 180_000 });
+          } catch (e) {
+            if (e instanceof CancelError) return none(e.mode === "abort" ? "Cancelaste la revisión: se muestra solo la cobertura calculada." : "Seguiste sin IA: se muestra solo la cobertura calculada.");
+            return none(`La IA falló (${e instanceof Error ? e.message : String(e)}`.slice(0, 200) + "): se muestra solo la cobertura calculada.");
+          }
+          const parsed = parseCoverageReply(text, {
+            areas: plan.subplans.map((s) => ({ key: areaKeyOf(s), area: s.area, groups: s.groups })),
+            planTopics: plan.subplans.flatMap((s) => s.topics.map((t) => ({ folder: t.folder, title: t.title, key: areaKeyOf(s) }))),
+            vaultTitles: snaps.map((t) => t.title),
+          });
+          if (!parsed.ok) return none(`${parsed.reason} Se muestra solo la cobertura calculada.`);
+          const st = new PlanStore(app.root);
+          const fresh = st.load(id) ?? plan;
+          const review = { at: new Date().toISOString(), source: "ai" as const, ...(profile ? { profile } : {}), ...parsed.review };
+          const saved = st.save({ ...fresh, coverageReview: review });
+          return { loading: false as const, source: "ai" as const, review: saved.coverageReview ?? review, plan: saved, coverage };
+        }),
+      );
     },
 
     // ── Constructor guiado: el plan se arma por etapas y se pregunta al estudiante conforme se arma ──
@@ -1861,10 +2006,10 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const hist = new ChangeStore(app.root);
       const last = [...hist.list(id)].reverse().find((e) => e.status === "applied" && e.before);
       if (!last?.before) throw new ApiError("No hay ningún cambio que deshacer.");
-      const { proposed: _p, archived: _a, name: _n, ...base } = last.before;
+      const { proposed: _p, archived: _a, name: _n, coverageReview: _cr, ...base } = last.before;
       // el nombre actual se conserva (renombrar no es un cambio del plan), salvo que el propio cambio lo hubiera puesto y nadie lo haya tocado después
       const name = last.nameAfter !== undefined && (cur.name ?? "") === last.nameAfter ? last.before.name : cur.name;
-      const restored = st.save({ ...base, ...(cur.proposed ? { proposed: true } : {}), ...(cur.archived ? { archived: true } : {}), ...(name ? { name } : {}), updatedAt: new Date().toISOString() });
+      const restored = st.save({ ...base, ...(cur.proposed ? { proposed: true } : {}), ...(cur.archived ? { archived: true } : {}), ...(name ? { name } : {}), ...(cur.coverageReview ? { coverageReview: cur.coverageReview } : {}), updatedAt: new Date().toISOString() });
       hist.save(id, { ...last, status: "undone" });
       return { plan: restored, history: hist.list(id).map(viewOf) };
     },

@@ -6,16 +6,17 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { AGENDA_VIEWS, canShift, clampToPlan, deliverablesText, monthSummary, periodTitle, shiftAnchor, topicsText, weekSummary, type AgendaView } from "../../lib/planSchedule";
+import { AGENDA_VIEWS, canShift, clampToPlan, dayBlockCounts, deliverablesText, monthSummary, periodTitle, shiftAnchor, topicsText, weekSummary, type AgendaView } from "../../lib/planSchedule";
 import { daysBetween, isDate } from "../../lib/planTime";
 import type { MentorPlan } from "../../lib/types";
-import { usePersistedNav } from "../../store/navState";
+import { useNavState, usePersistedNav } from "../../store/navState";
 import { GhostButton } from "../common/forms";
 import { AgendaCalendar } from "./AgendaCalendar";
+import { PracticeCurriculumBar } from "./AgendaDayFocus";
 import { DayDetail, MonthDetail, WeekDetail } from "./AgendaViews";
 import { useAgendaModel } from "./agendaKit";
 import { TabPanel, Tabs } from "./planKit";
-import type { Loaded } from "./planShared";
+import { agendaDateKey, type Loaded } from "./planShared";
 
 const PREFIX = "agenda-view";
 export const agendaViewKey = (planId: string): string => `mentor.agendaView.${planId}`;
@@ -27,8 +28,15 @@ export function PlanAgenda({ data, plan, onChanged, announce }: { data: Loaded; 
   const [stored, setStored] = usePersistedNav<string>(agendaViewKey(plan.id), "semana");
   const view: AgendaView = AGENDA_VIEWS.some((v) => v.id === stored) ? (stored as AgendaView) : "semana";
   // un plan propuesto o futuro se abre en su fecha de inicio; uno en curso, en hoy; uno terminado, en su último día
-  const [anchor, setAnchorRaw] = useState(() => clampToPlan(data.today, plan));
+  // una fecha pedida desde fuera («Ver este mes en la Agenda») se lee al montar y se consume una sola vez
+  const pendingDate = usePersistedNav<string>(agendaDateKey(plan.id), "")[0];
+  const [anchor, setAnchorRaw] = useState(() => clampToPlan(isDate(pendingDate) ? pendingDate : data.today, plan));
   const setAnchor = useCallback((d: string) => setAnchorRaw(clampToPlan(d, plan)), [plan]);
+  useEffect(() => {
+    if (!isDate(pendingDate)) return;
+    setAnchorRaw(clampToPlan(pendingDate, plan));
+    useNavState.getState().set(agendaDateKey(plan.id), "");
+  }, [pendingDate, plan]);
   const m = useAgendaModel(data, plan);
   const live = useRef("");
   const [liveText, setLiveText] = useState("");
@@ -39,7 +47,9 @@ export function PlanAgenda({ data, plan, onChanged, announce }: { data: Loaded; 
   const summary = useMemo(() => {
     if (view === "dia") {
       const d = m.schedule.byDate.get(anchor);
-      return d ? `${topicsText(d.topics.length)}, ${deliverablesText((m.dueByDate.get(anchor) ?? []).length)}` : "fuera del plan";
+      if (!d) return "fuera del plan";
+      const c = dayBlockCounts(d);
+      return `${d.focus ? `enfoque ${d.focus.label}, ${c.theory} ${c.theory === 1 ? "teoría" : "teorías"}, ${c.practice} ${c.practice === 1 ? "práctica" : "prácticas"}, ` : ""}${topicsText(d.topics.length)}, ${deliverablesText((m.dueByDate.get(anchor) ?? []).length)}`;
     }
     if (view === "semana") {
       const w = weekSummary(plan, m.schedule, Math.floor(daysBetween(plan.start, anchor) / 7) + 1, m.deliverables);
@@ -90,6 +100,7 @@ export function PlanAgenda({ data, plan, onChanged, announce }: { data: Loaded; 
         </nav>
       </div>
       {status && <p className="text-[14px] text-dim" data-testid="agenda-status">{status}</p>}
+      {plan.structure === "areas" && <PracticeCurriculumBar plan={plan} onChanged={onChanged} announce={announce} />}
 
       <div role="group" aria-label="Navegación por el tiempo" className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-card px-3 py-2.5" data-testid="agenda-nav">
         <GhostButton large aria-label={`${VIEW_NOUN[navView]} anterior`} disabled={!canShift(navView, anchor, -1, plan)} onClick={() => shift(-1)} data-testid="agenda-prev">

@@ -23,9 +23,13 @@ import { dayText, LoadState, ProgressBar } from "./parts";
 import { PlanAgenda } from "./PlanAgenda";
 import { PlanChanges } from "./PlanChanges";
 import { PlanDeliverables } from "./PlanDeliverables";
-import { BackToTop, PlanNotes, SectionCard, SectionHeading, SkipLink, TabPanel, Tabs, type TabDef } from "./planKit";
-import { cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanTab } from "./planShared";
+import { BackToTop, PlanNotes, SectionCard, SectionHeading, SkipLink, TabPanel, Tabs, panelId, type TabDef } from "./planKit";
+import { agendaDateKey, cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanTab } from "./planShared";
 import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
+import { PhaseMonthTable } from "./PlanMonths";
+import { CoveragePanel, usePlanCoverage } from "./PlanCoverage";
+import { monthLong } from "../../lib/planMonths";
+import { agendaViewKey } from "./PlanAgenda";
 import { PACE_LABEL } from "./PlanForm";
 import { PracticeRow, practiceSummary } from "./PracticeCard";
 import { PRACTICE_NAME } from "../../lib/practiceTrack";
@@ -93,6 +97,44 @@ export function PlanView({ planId }: { planId: string }) {
     setFocusSignal((n) => n + 1);
     announce("Pedir cambios al plan: escribe tu comentario en el cuadro.");
   }, [changeTab, announce]);
+  // «Pedir cambios» con un texto ya escrito (p. ej. el aviso de Bases): rellena el cuadro, NO lo envía
+  const [prefill, setPrefill] = useState<{ text: string; n: number } | undefined>();
+  const askChangesWith = useCallback(
+    (text: string) => {
+      setPrefill((p) => ({ text, n: (p?.n ?? 0) + 1 }));
+      changeTab("cambios");
+      announce(`Pedir cambios al plan: el cuadro tiene el texto «${text}». Revísalo y pulsa «Aplicar cambios».`);
+    },
+    [changeTab, announce],
+  );
+  // «Ver este mes en la Agenda» (tabla mes a mes): vista Mes en ese mes
+  const pendingAgendaDate = usePersistedNav<string>(agendaDateKey(planId), "")[0];
+  const openMonth = useCallback(
+    (month: string, firstDay: string) => {
+      const nav = useNavState.getState();
+      nav.set(agendaViewKey(planId), "mes");
+      nav.set(agendaDateKey(planId), firstDay);
+      changeTab("agenda");
+      announce(`Agenda del plan, vista Mes: ${monthLong(month)}.`);
+    },
+    [planId, changeTab, announce],
+  );
+  // La fecha pedida se consume una vez. Si la Agenda no la leyó al montarse, se aplica con su selector «Ir a la fecha».
+  useEffect(() => {
+    if (tab !== "agenda" || !pendingAgendaDate) return;
+    const t = setTimeout(() => {
+      const nav = useNavState.getState();
+      if (nav.values[agendaDateKey(planId)] !== pendingAgendaDate) return;
+      const el = document.querySelector<HTMLInputElement>(`#${panelId(PREFIX, "agenda")} [data-testid=agenda-date]`);
+      if (el && el.value !== pendingAgendaDate) {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, pendingAgendaDate);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      if (el) nav.set(agendaDateKey(planId), "");
+    }, 0);
+    return () => clearTimeout(t);
+  }, [tab, pendingAgendaDate, planId, data]);
 
   const rename = async () => {
     if (!plan) return;
@@ -268,6 +310,9 @@ export function PlanView({ planId }: { planId: string }) {
                     summary={summary}
                     highlight={highlight}
                     onChanged={(p) => setData((d) => (d ? { ...d, plan: p } : d))}
+                    onOpenMonth={openMonth}
+                    onAskChange={askChangesWith}
+                    announce={announce}
                     onAddBranches={(names) => {
                       setAutoSend({ text: `Añade las ramas excluidas: ${names.join(", ")}`, n: (autoSend?.n ?? 0) + 1 });
                       changeTab("cambios");
@@ -291,7 +336,7 @@ export function PlanView({ planId }: { planId: string }) {
               </TabPanel>
               {/* «Cambios» siempre montado: conserva el texto a medias, el historial y el «Pensando…» al cambiar de pestaña */}
               <TabPanel prefix={PREFIX} id="cambios" active={tab === "cambios"}>
-                <PlanChanges planId={plan.id} onApplied={applied} autoSend={autoSend} announce={announce} focusSignal={focusSignal} />
+                <PlanChanges planId={plan.id} onApplied={applied} autoSend={autoSend} announce={announce} focusSignal={focusSignal} prefill={prefill} />
               </TabPanel>
             </div>
           </>
@@ -305,7 +350,7 @@ export function PlanView({ planId }: { planId: string }) {
 // ── Pestaña «Mi plan» ───────────────────────────────────────────────────
 
 function MiPlan({
-  data, plan, state, summary, highlight, onChanged, onAddBranches,
+  data, plan, state, summary, highlight, onChanged, onAddBranches, onOpenMonth, onAskChange, announce,
 }: {
   data: Loaded;
   plan: MentorPlanData;
@@ -314,7 +359,11 @@ function MiPlan({
   highlight: Set<string>;
   onChanged: (p: Loaded["plan"]) => void;
   onAddBranches: (names: string[]) => void;
+  onOpenMonth: (month: string, firstDay: string) => void;
+  onAskChange: (text: string) => void;
+  announce: (msg: string) => void;
 }) {
+  const cov = usePlanCoverage(plan.id);
   const pre = plan.preconditions;
   const byAreas = plan.structure === "areas";
   const pending = (plan.openQuestions ?? []).filter((q) => q.id === "deliverables").length;
@@ -435,18 +484,26 @@ function MiPlan({
 
       {byAreas && (
         <section aria-labelledby="mp-phases" data-testid="plan-phases-section">
-          <SectionHeading id="mp-phases" hint="Cada área está activa en un rango de semanas; como mucho dos van en paralelo. El orden y el reparto los recalcula la app con tu capacidad real.">
-            Fases del plan
+          <SectionHeading id="mp-phases" hint="Qué trabaja cada área en cada mes: temas, horas y semanas activas. Como mucho dos áreas van en paralelo; el orden y el reparto los recalcula la app con tu capacidad real.">
+            Fases del plan, mes a mes
           </SectionHeading>
-          <PhaseTimeline plan={plan} currentWeek={summary.currentWeek} weeks={summary.weeks} />
+          <PhaseMonthTable data={data} plan={plan} onOpenMonth={onOpenMonth} />
+          <details className="mt-3" data-testid="plan-phases-bars">
+            <summary className="inline-flex min-h-8 cursor-pointer items-center text-[14px] text-accent-text">Ver las fases por semanas</summary>
+            <div className="mt-2">
+              <PhaseTimeline plan={plan} currentWeek={summary.currentWeek} weeks={summary.weeks} />
+            </div>
+          </details>
         </section>
       )}
+
+      <CoveragePanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} />
 
       <section aria-labelledby="mp-subplans" data-testid="plan-subplans">
         <SectionHeading id="mp-subplans" hint={byAreas ? "Cada tarjeta es un área con sus grupos internos (Bases, Lenguaje, Conocimientos): ábrela para ver su ruta de temas con el registro de completados, las metas enlazadas y el proyecto de área." : "Cada tarjeta resume un subplan: ábrela para ver sus semanas, sus temas con el registro de completados, las metas requeridas y el entregable."}>
           Áreas del plan <span className="text-[14px] font-normal text-dim">{plan.subplans.length} {plan.subplans.length === 1 ? (byAreas ? "área" : "subplan") : byAreas ? "áreas" : "subplanes"}</span>
         </SectionHeading>
-        <SubplanGroups data={data} highlight={highlight} onChanged={onChanged} />
+        <SubplanGroups data={data} highlight={highlight} onChanged={onChanged} coverage={cov.coverage} review={cov.review} onAskChange={onAskChange} />
       </section>
     </>
   );

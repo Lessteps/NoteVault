@@ -82,6 +82,21 @@ export function openPlanTab(planId: string, tab: PlanTab): void {
   nav.set("mentor.view", `plan:${planId}`);
 }
 
+/**
+ * Fecha pedida para la Agenda de un plan (AAAA-MM-DD), escrita por un enlace profundo («ver este mes en la Agenda») y consumida una sola
+ * vez: la Agenda puede leerla al montarse; si no lo hace, la sub-interfaz del plan la aplica con el selector «Ir a la fecha».
+ */
+export const agendaDateKey = (planId: string): string => `mentor.agendaDate.${planId}`;
+
+/** Abre la pestaña Agenda de un plan en una fecha y una vista (por defecto, la vista Mes de ese mes). */
+export function openAgendaAt(planId: string, date: string, view: "dia" | "semana" | "mes" | "calendario" = "mes"): void {
+  const nav = useNavState.getState();
+  nav.set(`mentor.agendaView.${planId}`, view);
+  nav.set(agendaDateKey(planId), date);
+  nav.set(planTabKey(planId), "agenda");
+  nav.set("mentor.view", `plan:${planId}`);
+}
+
 /** Carga un plan (o, sin id, el resumen: el plan por defecto con todos los planes) con el reintento de la vault fría. */
 export function usePlanData(id: string | undefined) {
   const planVersion = useMentor((s) => s.planVersion);

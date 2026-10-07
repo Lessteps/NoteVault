@@ -30,7 +30,7 @@ const when = (iso: string): string => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 };
 
-export function PlanChanges({ planId, onApplied, autoSend, announce, focusSignal }: { planId: string; onApplied: (plan: MentorPlan, changed: string[]) => void; /** un comentario que se envía solo al cambiar (p. ej. «Añadir las ramas excluidas») */ autoSend?: { text: string; n: number }; /** anuncia un mensaje de estado a los lectores de pantalla («Cambios aplicados») */ announce?: (msg: string) => void; /** al cambiar, el foco va al cuadro de comentarios («Pedir cambios» de la barra del plan) */ focusSignal?: number }) {
+export function PlanChanges({ planId, onApplied, autoSend, announce, focusSignal, prefill }: { planId: string; onApplied: (plan: MentorPlan, changed: string[]) => void; /** un comentario que se envía solo al cambiar (p. ej. «Añadir las ramas excluidas») */ autoSend?: { text: string; n: number }; /** anuncia un mensaje de estado a los lectores de pantalla («Cambios aplicados») */ announce?: (msg: string) => void; /** al cambiar, el foco va al cuadro de comentarios («Pedir cambios» de la barra del plan) */ focusSignal?: number; /** un texto que RELLENA el cuadro (no se envía) y deja el foco en él (p. ej. el aviso de Bases de «Mi plan») */ prefill?: { text: string; n: number } }) {
   const toast = useApp((s) => s.toast);
   const [history, setHistory] = useState<MentorChangeEntry[]>([]);
   const [text, setText] = useState("");
@@ -106,6 +106,14 @@ export function PlanChanges({ planId, onApplied, autoSend, announce, focusSignal
       toast("error", (e as Error).message);
     }
   };
+
+  const lastPrefill = useRef(0);
+  useEffect(() => {
+    if (!prefill || prefill.n === lastPrefill.current) return;
+    lastPrefill.current = prefill.n;
+    setText(prefill.text.slice(0, 1500));
+    setTimeout(() => area.current?.focus(), 0);
+  }, [prefill]);
 
   const lastAuto = useRef(0);
   useEffect(() => {

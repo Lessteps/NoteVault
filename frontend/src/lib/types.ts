@@ -1,6 +1,7 @@
 import type { PlanPreconditions, ScopeTopic } from "./planTime";
 import type { AreaGroup, AreaPhase, PlanDeliverable, PlanPurposes } from "./planAreas";
 import type { BuildAnswer, BuildQuestion, BuildStage } from "./planBuild";
+import type { CoverageReview, PlanCoverage } from "./planCoverage";
 import type { PracticeItem, PracticeTrack, PhaseStatus, PracticePhase } from "./practiceTrack";
 // Shapes returned by notevault_app/webapp/api.py. Keep in step with it.
 
@@ -1455,16 +1456,31 @@ export interface MentorPlan {
   deliverables?: PlanDeliverable[];
   /** propósitos de día / semana / mes escritos a mano */
   purposes?: PlanPurposes;
+  /** última revisión de cobertura con el Mentor (solo informa) */
+  coverageReview?: CoverageReview;
+  /** currículo de práctica del plan generado por la IA (ejercicios por semana y proyectos) */
+  practiceCurriculum?: MentorPracticeCurriculum;
 }
+/** currículo de práctica del plan generado por la IA (ejercicios por semana y proyectos) */
+export type MentorPracticeCurriculum = import("./planCurriculum").PracticeCurriculum;
 export type MentorMonthlyPlan = MentorPlan;
-export interface MentorTopicView extends MentorPlannedTopic { state: MentorTopicState; pct: number; found: boolean }
+/** Cobertura de teoría y práctica del plan contra la vault, y la revisión guardada (`mentor_plan_coverage`). */
+export type MentorPlanCoverage = { loading: true } | { loading: false; coverage: PlanCoverage; review: CoverageReview | null; aiConfigured: boolean };
+/** Resultado de «Revisar cobertura con el Mentor» (`mentor_plan_coverage_review`): `source: "none"` = sin IA (no se guarda nada). */
+export type MentorCoverageReviewResult =
+  | { loading: true }
+  | { loading: false; source: "ai"; review: CoverageReview; plan: MentorPlan; coverage: PlanCoverage }
+  | { loading: false; source: "none"; reason: string; coverage: PlanCoverage };
+export interface MentorTopicView extends MentorPlannedTopic { state: MentorTopicState; pct: number; found: boolean; exercises?: number }
 export interface MentorSubplanView { id: string; topics: MentorTopicView[]; total: number; done: number; pct: number; currentWeek: number }
 export interface MentorPlanDerived {
   subplans: MentorSubplanView[];
   summary: { subplans: number; topics: number; done: number; pct: number; currentWeek: number; weeks: number };
 }
 export interface MentorPlanItem {
-  kind: "topic" | "deliverable"; planId: string; subplanId: string; label: string; area: string; title: string;
+  kind: "topic" | "deliverable" | "project"; planId: string; subplanId: string; label: string; area: string; title: string;
+  /** agenda por enfoque: papel del tema hoy, enfoque del día y (proyecto diario) los temas a los que se conecta */
+  role?: "theory" | "practice" | "both"; focus?: string; connected?: string[];
   folder?: string; skills?: string[]; estMinutes: number; targetWeek: number; overdue: boolean; scheduledToday?: boolean; todayMinutes?: number;
 }
 export interface MentorPlanDraft {

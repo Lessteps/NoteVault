@@ -33,7 +33,7 @@ export interface AreaPhase {
   toWeek: number;
 }
 
-export const AREA_DELIVERABLE_KINDS = ["kata", "weekly_project", "monthly_project", "area_project"] as const;
+export const AREA_DELIVERABLE_KINDS = ["kata", "weekly_project", "monthly_project", "area_project", "daily_project"] as const;
 export type PlanDeliverableKind = (typeof AREA_DELIVERABLE_KINDS)[number];
 export const PLAN_DELIVERABLE_STATUSES = ["pendiente", "en_curso", "hecho"] as const;
 export type PlanDeliverableStatus = (typeof PLAN_DELIVERABLE_STATUSES)[number];

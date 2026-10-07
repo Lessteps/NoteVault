@@ -35,6 +35,7 @@ type RangeId = (typeof RANGES)[number]["id"];
 const KINDS: Array<{ id: "" | PlanDeliverableKind; label: string }> = [
   { id: "", label: "Todos los tipos" },
   { id: "kata", label: "Katas" },
+  { id: "daily_project", label: "Proyectos diarios" },
   { id: "weekly_project", label: "Proyectos semanales" },
   { id: "monthly_project", label: "Proyectos mensuales" },
   { id: "area_project", label: "Proyectos de área" },

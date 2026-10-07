@@ -6,14 +6,15 @@ import { useId, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { type PlanDeliverable, type PlanDeliverableKind, type PlanDeliverableStatus } from "../../lib/planAreas";
 import { buildSchedule, deliverablesOf, type PlanSchedule } from "../../lib/planSchedule";
+import type { ExistingExercises } from "../../lib/planCurriculum";
 import type { MentorPlan, MentorTopicView } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { Chip, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import type { Loaded } from "./planShared";
 
-export const KIND_LABEL: Record<PlanDeliverableKind, string> = { kata: "Kata", weekly_project: "Proyecto semanal", monthly_project: "Proyecto mensual", area_project: "Proyecto de área" };
-export const KIND_COLOUR: Record<PlanDeliverableKind, string> = { kata: "var(--nv-practice, #c58be0)", weekly_project: "var(--nv-practice, #c58be0)", monthly_project: "var(--nv-practice, #c58be0)", area_project: "var(--nv-accent)" };
+export const KIND_LABEL: Record<PlanDeliverableKind, string> = { kata: "Kata", weekly_project: "Proyecto semanal", monthly_project: "Proyecto mensual", area_project: "Proyecto de área", daily_project: "Proyecto diario" };
+export const KIND_COLOUR: Record<PlanDeliverableKind, string> = { kata: "var(--nv-practice, #c58be0)", weekly_project: "var(--nv-practice, #c58be0)", monthly_project: "var(--nv-practice, #c58be0)", area_project: "var(--nv-accent)", daily_project: "var(--nv-practice, #c58be0)" };
 export const DSTATUS_LABEL: Record<PlanDeliverableStatus, string> = { pendiente: "Pendiente", en_curso: "En curso", hecho: "Hecho" };
 export const DSTATUS_COLOUR: Record<PlanDeliverableStatus, string> = { pendiente: "var(--nv-faint)", en_curso: "var(--nv-accent)", hecho: "var(--nv-mint)" };
 export const DSTATUS_GLYPH: Record<PlanDeliverableStatus, string> = { pendiente: "○", en_curso: "◐", hecho: "●" };
@@ -33,13 +34,21 @@ export interface AgendaModel {
   practiceStatus: Loaded["practice"];
   /** el Mentor puede tocar propósitos y entregables (no un plan terminado) */
   editable: boolean;
+  /** ejercicios que cada tema ya tiene en la vault (la práctica del plan los prioriza) */
+  existing: ExistingExercises;
+  /** entregable (proyectos incluidos) por id */
+  deliverableById: Map<string, PlanDeliverable>;
 }
+
+/** Color de cada enfoque (marca; el texto siempre acompaña: el color solo no basta). */
+export const FOCUS_COLOUR: Record<string, string> = { backend: "#2383e2", databases: "#8e24aa", frontend: "#33b679", automation: "#c28a00", tooling: "#e67c73", generic: "#039be5" };
+export const focusColour = (id?: string): string => FOCUS_COLOUR[id ?? ""] ?? FOCUS_COLOUR.generic!;
 
 export function useAgendaModel(data: Loaded, plan: MentorPlan): AgendaModel {
   const practice = data.practice ?? null;
   return useMemo(() => {
     const schedule = buildSchedule(plan);
-    const deliverables = deliverablesOf(plan, practice);
+    const deliverables = deliverablesOf(plan, practice, schedule);
     const dueByDate = new Map<string, PlanDeliverable[]>();
     for (const d of deliverables) dueByDate.set(d.dueDate, [...(dueByDate.get(d.dueDate) ?? []), d]);
     const topicByFolder = new Map<string, MentorTopicView>();
@@ -48,7 +57,9 @@ export function useAgendaModel(data: Loaded, plan: MentorPlan): AgendaModel {
       pctBySubplan.set(s.id, s.pct);
       for (const t of s.topics) topicByFolder.set(t.folder, t);
     }
-    return { plan, today: data.today, schedule, deliverables, dueByDate, topicByFolder, pctBySubplan, practiceStatus: practice, editable: true };
+    const deliverableById = new Map(deliverables.map((d) => [d.id, d] as const));
+    const existing: ExistingExercises = { count: (f) => topicByFolder.get(f)?.exercises ?? 0 };
+    return { plan, today: data.today, schedule, deliverables, dueByDate, topicByFolder, pctBySubplan, practiceStatus: practice, editable: true, existing, deliverableById };
   }, [plan, practice, data.derived, data.today]);
 }
 

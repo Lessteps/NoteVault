@@ -367,9 +367,14 @@ export const api = {
   /** Excepción por área tras la pregunta global: añade o quita el proyecto propio de un área. */
   mentorPlanAreaDeliverable: (opts: { id: string; subplanId: string; enabled: boolean }) => call<import("./types").MentorPlan>("mentor_plan_area_deliverable", opts),
   /** Escribe (o borra, con texto vacío) el propósito de un día, semana o mes. */
+  mentorPlanPracticeGenerate: (id: string, opts: { noAi?: boolean; all?: boolean } = {}) => call<{ loading: true } | { loading: false; plan: import("./types").MentorPlan; entry: import("./types").MentorChangeEntry; history: import("./types").MentorChangeEntry[]; aiUsed: boolean; calls: number }>("mentor_plan_practice_generate", { id, ...opts }),
   mentorPlanSetPurpose: (opts: { id: string; scope: "day" | "week" | "month"; key: string; text: string }) => call<import("./types").MentorPlan>("mentor_plan_set_purpose", opts),
   /** «Reorganizar por áreas»: convierte un plan de estructura antigua; queda en el historial y se puede deshacer. */
   mentorPlanReorganize: (id: string) => call<{ plan: import("./types").MentorPlan; entry: import("./types").MentorChangeEntry; history: import("./types").MentorChangeEntry[]; applied: true }>("mentor_plan_reorganize", { id }),
+  /** Cobertura de teoría y práctica de cada área del plan contra la vault (determinista) y la última revisión guardada. */
+  mentorPlanCoverage: (id: string) => call<import("./types").MentorPlanCoverage>("mentor_plan_coverage", { id }),
+  /** «Revisar cobertura con el Mentor»: una llamada a la IA (clave de estado `coverage:<id>`); guarda `coverageReview` en el plan. */
+  mentorPlanCoverageReview: (id: string, profile?: string) => call<import("./types").MentorCoverageReviewResult>("mentor_plan_coverage_review", { id, ...(profile ? { profile } : {}) }),
   mentorPlanChange: (opts: { id: string; comment?: string; ops?: Array<Record<string, unknown>>; label?: string; noAi?: boolean }) => call<import("./types").MentorChangeResult>("mentor_plan_change", opts),
   mentorPlanChanges: (id: string) => call<import("./types").MentorChangeEntry[]>("mentor_plan_changes", { id }),
   mentorPlanChangeUndo: (id: string) => call<{ plan: import("./types").MentorPlan; history: import("./types").MentorChangeEntry[] }>("mentor_plan_change_undo", { id }),

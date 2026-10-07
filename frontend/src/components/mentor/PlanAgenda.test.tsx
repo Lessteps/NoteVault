@@ -215,10 +215,13 @@ describe("conteos visibles de temas y entregables", () => {
     expect(topics.length).toBeGreaterThan(0);
     for (const t of topics) expect(t.querySelector("[data-testid=agenda-topic-minutes]")!.textContent).toMatch(/\d+ min|[\d,.]+ h/);
     expect(byTest("agenda-purpose-text").textContent!.length).toBeGreaterThan(10);
-    expect(host.querySelectorAll("[data-testid=agenda-route]").length).toBeGreaterThan(0);
-    expect(byTest("agenda-route").textContent).toMatch(/tema \d+ de \d+ en la ruta|temas \d+–\d+ de \d+ en la ruta/);
-    expect(byTest("agenda-practice-kata").textContent).toContain("Reto diario");
-    expect(byTest("agenda-day-deliverables").textContent).toContain("Kata del");
+    // la agenda por enfoque ordena el día: teoría → práctica → reto de lógica → proyectos al final
+    expect(byTest("agenda-day-theory").textContent).toContain("Teoría del día");
+    expect(byTest("agenda-day-practice").textContent).toContain("Práctica del día");
+    expect(byTest("agenda-day-logic").textContent).toContain("Reto de lógica");
+    expect(byTest("agenda-practice-kata")).toBeTruthy();
+    expect(byTest("agenda-day-projects").textContent).toContain("Proyecto diario");
+    expect(byTest("agenda-day-projects").textContent).toContain("Proyecto semanal");
   });
 
   it("semana: temas por área, horas, práctica y entregables de la semana, y los días con «Ver día»", async () => {
@@ -269,10 +272,10 @@ describe("calendario accesible", () => {
     expect(grid.getAttribute("aria-label")).toBe("Calendario de Octubre 2026");
     expect([...grid.querySelectorAll("[role=columnheader]")].map((c) => c.getAttribute("aria-label") ?? c.textContent)).toEqual(["Semana", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]);
     const today = grid.querySelector<HTMLButtonElement>("button[data-date='2026-10-14']")!;
-    expect(today.getAttribute("aria-label")).toMatch(/^miércoles 14 de octubre: (\d+ temas?|sin temas), (\d+ entregables?|sin entregables)/);
+    expect(today.getAttribute("aria-label")).toMatch(/^miércoles 14 de octubre: enfoque [^,]+, \d+ teorías?, \d+ prácticas?, (proyecto diario, )?(\d+ temas?|sin temas), (\d+ entregables?|sin entregables)/);
     expect(today.getAttribute("aria-current")).toBe("date");
     const cell = grid.querySelector<HTMLButtonElement>(`button[data-date='${busyDay()}']`)!;
-    expect(cell.getAttribute("aria-label")).toMatch(/: \d+ temas?, \d+ entregables?/);
+    expect(cell.getAttribute("aria-label")).toMatch(/: enfoque [^,]+, \d+ teorías?, \d+ prácticas?, .*\d+ temas?, \d+ entregables?/);
     // las filas enteras fuera del plan no se pintan (el plan empieza el lunes 5 de oct: no hay fila de septiembre)
     expect(grid.querySelector("button[data-date='2026-10-04']")).toBeNull();
     const margins = grid.querySelectorAll("[data-testid=agenda-week-margin]");

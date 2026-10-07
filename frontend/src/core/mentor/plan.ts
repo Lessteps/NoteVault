@@ -43,6 +43,9 @@ import {
   type PlanPurposes,
 } from "../../lib/planAreas.js";
 import { buildSchedule } from "../../lib/planSchedule.js";
+import { dailyProjectOf } from "../../lib/planCurriculum.js";
+import { sanitizeCurriculum, scopeOfPlan, type PracticeCurriculum } from "../../lib/planCurriculum.js";
+import { areaKeyOf, sanitizeCoverageReview, type CoverageReview } from "../../lib/planCoverage.js";
 import { sanitizePracticeTrack, type PracticeTrack } from "../../lib/practiceTrack.js";
 import * as store from "../store.js";
 import { formatLayout, isSyncConflict, LAYOUT } from "../vaultFormat.js";
@@ -206,6 +209,10 @@ export interface Plan {
   deliverables?: PlanDeliverable[];
   /** propósitos de día / semana / mes escritos a mano (sustituyen al texto determinista) */
   purposes?: PlanPurposes;
+  /** la última revisión de cobertura hecha con el Mentor (solo informa: no cambia temas); ver `lib/planCoverage.ts` */
+  coverageReview?: CoverageReview;
+  /** currículo de práctica del plan generado por la IA bajo demanda (ejercicios por semana y proyectos); ver `lib/planCurriculum.ts` */
+  practiceCurriculum?: PracticeCurriculum;
   subplans: Subplan[];
 }
 /** Nombre histórico: un plan mensual es un plan de periodo. */
@@ -218,6 +225,8 @@ export interface TopicLite {
   progress: TopicProgressSnap;
   attemptCount: number;
   lastAttemptAt?: string | null;
+  /** ejercicios que el tema ya tiene en la vault */
+  exerciseCount?: number;
 }
 export type TopicLiteLookup = (folder: string) => TopicLite | null | undefined;
 
@@ -700,6 +709,8 @@ export interface TopicView extends PlannedTopic {
   /** 0..100 */
   pct: number;
   found: boolean;
+  /** ejercicios que el tema ya tiene en la vault (la práctica del plan los prioriza) */
+  exercises?: number;
 }
 
 export interface SubplanView {
@@ -735,7 +746,7 @@ export function deriveView(plan: Plan, lookup: TopicLiteLookup, today: string): 
       const snap = lookup(t.folder) ?? null;
       const state = topicState(snap);
       const pct = snap ? Math.max(0, Math.min(100, Math.round(snap.progress.completenessPct))) : 0;
-      return { ...t, state, pct: state === "completo" ? 100 : pct, found: !!snap };
+      return { ...t, state, pct: state === "completo" ? 100 : pct, found: !!snap, ...(snap?.exerciseCount ? { exercises: snap.exerciseCount } : {}) };
     });
     const done = topics.filter((t) => t.state === "completo" || !!t.completedAt).length;
     const pct = topics.length ? Math.round(topics.reduce((n, t) => n + (t.completedAt && t.state !== "completo" ? Math.max(t.pct, 100) : t.pct), 0) / topics.length) : 0;
@@ -774,7 +785,7 @@ export function refreshPlanProgress(
 // ── Del plan al plan diario ──────────────────────────────────────────────
 
 export interface PlanItem {
-  kind: "topic" | "deliverable";
+  kind: "topic" | "deliverable" | "project";
   /** id del plan del que viene (varios planes pueden estar activos a la vez) */
   planId: string;
   subplanId: string;
@@ -792,6 +803,11 @@ export interface PlanItem {
   scheduledToday?: boolean;
   /** minutos que el reparto diario le da HOY (un tema puede abarcar varios días) */
   todayMinutes?: number;
+  /** agenda por enfoque: el tema de hoy es de teoría o de práctica (o de ambas) y el enfoque del día */
+  role?: "theory" | "practice" | "both";
+  focus?: string;
+  /** proyecto diario: título del proyecto y temas del día a los que se conecta */
+  connected?: string[];
 }
 
 export const DELIVERABLE_MINUTES = 45;
@@ -821,8 +837,16 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
     if (cur < 1) continue;
     // el reparto por días: lo que la agenda coloca hoy (con sus minutos) pasa por delante de lo demás de la semana
     let todayOf = new Map<string, number>();
+    const roleOf = new Map<string, "theory" | "practice" | "both">();
+    let focusToday = "";
+    let dailyToday: { title: string; minutes: number; topics: string[] } | null = null;
     try {
-      const day = buildSchedule(plan).byDate.get(date);
+      const sch = buildSchedule(plan);
+      const day = sch.byDate.get(date);
+      for (const b of day?.blocks ?? []) for (const it of b.items) roleOf.set(it.folder, roleOf.has(it.folder) && roleOf.get(it.folder) !== b.kind ? "both" : b.kind);
+      focusToday = day?.focus?.label ?? "";
+      const dp = day && sch.mode === "focus" ? dailyProjectOf(plan, sch, day) : null;
+      if (dp) dailyToday = { title: dp.title, minutes: dp.minutes, topics: dp.topics.map((t) => t.title) };
       todayOf = new Map(
         [...new Set((day?.topics ?? []).filter((t) => !t.done).map((t) => t.folder))].map((f) => [f, (day?.topics ?? []).filter((t) => t.folder === f && !t.done).reduce((n, t) => n + t.minutes, 0)] as const),
       );
@@ -851,6 +875,8 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
           targetWeek: t.targetWeek,
           overdue: t.targetWeek < cur,
           ...(todayOf.has(t.folder) ? { scheduledToday: true, todayMinutes: todayOf.get(t.folder)! } : {}),
+          ...(roleOf.has(t.folder) ? { role: roleOf.get(t.folder)! } : {}),
+          ...(focusToday && todayOf.has(t.folder) ? { focus: focusToday } : {}),
         });
       }
       const d = s.deliverable;
@@ -858,6 +884,7 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
         out.push({ kind: "deliverable", planId: plan.id, subplanId: s.id, label, area: s.area, title: d.title, estMinutes: DELIVERABLE_MINUTES, targetWeek: weeks, overdue: false });
       }
     }
+    if (dailyToday) out.push({ kind: "project", planId: plan.id, subplanId: plan.subplans[0]?.id ?? "", label: plan.name ?? plan.id, area: focusToday || "Plan", title: dailyToday.title, estMinutes: dailyToday.minutes, targetWeek: cur, overdue: false, scheduledToday: true, todayMinutes: dailyToday.minutes, connected: dailyToday.topics, ...(focusToday ? { focus: focusToday } : {}) });
   }
   // atrasados primero, luego por semana objetivo y, dentro de una misma semana, lo que la agenda coloca HOY por delante
   return out.sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.targetWeek - b.targetWeek || Number(!!b.scheduledToday) - Number(!!a.scheduledToday));
@@ -947,6 +974,7 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
   const hours = Number(raw.hoursPerWeek);
   const practice = sanitizePracticeTrack(raw.programmingPractice, start, end);
   const questions = sanitizeOpenQuestions(raw.openQuestions, subplans);
+  const curriculum = sanitizeCurriculum(raw.practiceCurriculum, scopeOfPlan({ start, end, subplans }));
   const pre = raw.preconditions && typeof raw.preconditions === "object" ? sanitizePreconditions({ ...raw.preconditions, start, end }, start) : undefined;
   return {
     id,
@@ -967,6 +995,8 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
     ...(raw.structure === "areas" ? { structure: "areas" as const } : {}),
     ...(sanitizePlanDeliverables(raw.deliverables).length ? { deliverables: sanitizePlanDeliverables(raw.deliverables) } : {}),
     ...(sanitizePurposes(raw.purposes) ? { purposes: sanitizePurposes(raw.purposes)! } : {}),
+    ...(sanitizeCoverageReview(raw.coverageReview, subplans.map(areaKeyOf)) ? { coverageReview: sanitizeCoverageReview(raw.coverageReview, subplans.map(areaKeyOf))! } : {}),
+    ...(curriculum ? { practiceCurriculum: curriculum } : {}),
     subplans,
   };
 }

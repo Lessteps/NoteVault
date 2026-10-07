@@ -387,6 +387,22 @@ function addPlanItems(list: Candidate[], items: readonly PlanItem[], topics: Top
   const taken = new Set<string>();
   for (const it of items) {
     const links: CandidateLinks = { subplanId: it.subplanId, subplan: it.label };
+    if (it.kind === "project") {
+      // el proyecto diario del plan por enfoque: aplica los temas teóricos y prácticos de hoy
+      const id = `plan:${it.planId}:daily-project`;
+      if (taken.has(id)) continue;
+      taken.add(id);
+      out.push({
+        id,
+        kind: "plan_item",
+        subject: it.area,
+        estMinutes: Math.max(SPLIT_MIN_MINUTES, it.todayMinutes ?? it.estMinutes),
+        score: 84,
+        reasons: [`proyecto diario del plan (${it.label}${it.focus ? `, enfoque ${it.focus}` : ""}): ${it.title}${it.connected?.length ? `; aplica ${it.connected.slice(0, 3).join(", ")}` : ""}`],
+        links,
+      });
+      continue;
+    }
     if (it.kind === "deliverable") {
       const id = `plan:${it.planId}:${it.subplanId}:deliverable`;
       if (taken.has(id)) continue;
@@ -419,7 +435,7 @@ function addPlanItems(list: Candidate[], items: readonly PlanItem[], topics: Top
       estMinutes: Math.min(60, Math.max(20, it.todayMinutes ?? base?.estMinutes ?? it.estMinutes)),
       score: clamp100(Math.max(base?.score ?? 50, 50) + PLAN_BOOST + (it.overdue ? 5 : 0) + (it.scheduledToday ? 3 : 0)),
       reasons: [
-        it.scheduledToday ? `toca hoy en la agenda del plan (${it.label}, semana ${it.targetWeek})` : `lo pide el plan (${it.label}, semana ${it.targetWeek})${it.overdue ? " y va atrasado" : ""}`,
+        it.scheduledToday ? `toca hoy en la agenda del plan (${it.label}, semana ${it.targetWeek}${it.role ? `; ${it.role === "theory" ? "teoría" : it.role === "practice" ? "práctica" : "teoría y práctica"}${it.focus ? ` de ${it.focus}` : ""}` : ""})` : `lo pide el plan (${it.label}, semana ${it.targetWeek})${it.overdue ? " y va atrasado" : ""}`,
         ...(base?.reasons ?? [`tema a medias (${t.completenessPct}%)`]),
       ],
       links: { ...(base?.links ?? {}), topicFolder: folder, ...links },

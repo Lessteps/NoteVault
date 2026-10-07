@@ -63,7 +63,7 @@ function reset() {
   useGoals.setState({
     view: "tablero", area: "*", filter: "todas", meta: null, sidebar: null,
     areas: [], cards: [], loaded: false, openId: null, detail: null,
-    tab: "submetas", subView: "tarjetas", itemId: null, submetaId: null,
+    tab: "resumen", subView: "lista", itemId: null, submetaId: null,
     editing: null, areaEditing: null, checklistFor: null, version: 0,
   });
   useApp.setState({ toasts: [] });
@@ -139,7 +139,7 @@ describe("open/reload", () => {
     const s = useGoals.getState();
     expect(s.openId).toBe("g1");
     expect(s.view).toBe("tablero");
-    expect(s.tab).toBe("submetas");
+    expect(s.tab).toBe("resumen");
     expect(s.detail?.goal.id).toBe("g1");
   });
   it("open(null) closes and refreshes the board", async () => {

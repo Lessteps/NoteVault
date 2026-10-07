@@ -25,6 +25,22 @@ contextBridge.exposeInMainWorld("nv", {
       ipcRenderer.removeListener("nv-open-review", handler);
     };
   },
+  /** The capture shortcut was pressed (channel: nv-capture-request). */
+  onCaptureRequest: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on("nv-capture-request", handler);
+    return () => {
+      ipcRenderer.removeListener("nv-capture-request", handler);
+    };
+  },
+  /** A screenshot was saved (channel: nv-capture-done). */
+  onCaptureDone: (cb: (data: { rel: string; name: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: any) => cb(data);
+    ipcRenderer.on("nv-capture-done", handler);
+    return () => {
+      ipcRenderer.removeListener("nv-capture-done", handler);
+    };
+  },
   onWindowState: (cb: (data: { maximized: boolean }) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: { maximized: boolean }) => cb(data);
     ipcRenderer.on("nv-window-state", handler);

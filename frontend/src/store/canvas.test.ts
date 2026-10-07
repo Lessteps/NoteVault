@@ -126,12 +126,14 @@ describe("save", () => {
     await useCanvas.getState().save(true);
     expect(apiMock.canvasWrite).toHaveBeenCalledWith("mapa.canvas", doc(1), null);
   });
-  it("a conflict marks the state and writes no modified", async () => {
-    apiMock.canvasWrite.mockResolvedValueOnce({ ok: false, conflict: true, modified: 9 });
-    useCanvas.setState({ path: "mapa.canvas", dirty: true, doc: doc(1) });
+  it("a conflict with disk is overwritten without a banner", async () => {
+    apiMock.canvasWrite
+      .mockResolvedValueOnce({ ok: false, conflict: true, modified: 9 })
+      .mockResolvedValueOnce({ ok: true, conflict: false, modified: 10 });
+    useCanvas.setState({ path: "mapa.canvas", modified: 1, dirty: true, doc: doc(1) });
     await useCanvas.getState().save();
-    expect(useCanvas.getState().conflict).toBe(true);
-    expect(useCanvas.getState().dirty).toBe(true);
+    expect(apiMock.canvasWrite).toHaveBeenLastCalledWith("mapa.canvas", doc(1), null);
+    expect(useCanvas.getState()).toMatchObject({ conflict: false, dirty: false, modified: 10 });
   });
   it("edits made while writing keep it dirty", async () => {
     useCanvas.setState({ path: "mapa.canvas", modified: 1, dirty: true, doc: doc(1) });
@@ -170,6 +172,7 @@ describe("save", () => {
 
 describe("reload", () => {
   it("re-reads a clean canvas", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 10_000); // past the echo window of an earlier save
     useCanvas.setState({ path: "mapa.canvas", modified: 1, dirty: false, conflict: true });
     apiMock.canvasRead.mockResolvedValueOnce(read({ doc: doc(5), modified: 3 }));
     await useCanvas.getState().reload();
@@ -177,10 +180,19 @@ describe("reload", () => {
     expect(useCanvas.getState().modified).toBe(3);
     expect(useCanvas.getState().conflict).toBe(false);
   });
-  it("a dirty canvas becomes a conflict instead of losing edits", async () => {
+  it("ignores the watcher echo of its own save", async () => {
+    useCanvas.setState({ path: "mapa.canvas", modified: 1, dirty: true, doc: doc(1) });
+    apiMock.canvasWrite.mockResolvedValueOnce({ ok: true, modified: 2 });
+    await useCanvas.getState().save();
+    apiMock.canvasRead.mockClear();
+    await useCanvas.getState().reload();
+    expect(apiMock.canvasRead).not.toHaveBeenCalled();
+  });
+  it("a dirty canvas keeps its edits: no reload and no conflict banner", async () => {
     useCanvas.setState({ path: "mapa.canvas", dirty: true, doc: doc(1) });
     await useCanvas.getState().reload();
-    expect(useCanvas.getState().conflict).toBe(true);
+    expect(useCanvas.getState().conflict).toBe(false);
+    expect(useCanvas.getState().doc).toEqual(doc(1));
     expect(apiMock.canvasRead).not.toHaveBeenCalled();
   });
   it("no path means nothing to reload", async () => {

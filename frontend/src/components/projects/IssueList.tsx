@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Issue } from "../../lib/types";
 import { issueById, useProjects } from "../../store/projects";
 import { inputBase } from "../common/forms";
+import { StatusSelect } from "../tasks/controls";
 import { cn, IconButton } from "../ui";
 import { DueChip, PriorityMark } from "./IssueBits";
 
@@ -69,7 +70,7 @@ export function IssueList() {
               </button>
               <DueChip issue={i} />
               <PriorityMark p={i.priority} />
-              <span className="w-24 truncate text-right text-[11.5px] text-dim">{i.status}</span>
+              <StatusSelect value={i.status} statuses={p.columns} onChange={(v) => void moveIssue(i.id, v, 10 ** 6)} />
               {i.type !== "Subtarea" && (
                 <IconButton title="Crear hija" className="opacity-0 group-hover:opacity-100" onClick={() => setCreating({ parent: i.id })}><Plus size={13} /></IconButton>
               )}

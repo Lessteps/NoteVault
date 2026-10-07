@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, shell } from "electron";
+import { app, BrowserWindow, globalShortcut, Menu, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerIpc } from "./ipc";
@@ -10,6 +10,7 @@ import { AppConfig } from "../src/api/appConfig";
 import { readGpuStatus } from "../src/api/gpuStatus";
 import { browserManager } from "./browserManager";
 import { getPreloadPath } from "./windowFactory";
+import { installCrashLog, watchWindowHealth } from "./crashLog";
 
 // Allow HTML5 video and audio autoplay in embedded views
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -84,6 +85,7 @@ function createWindow() {
   const state = getAppState();
   if (state) state.window = win;
   browserManager.setWindow(win);
+  watchWindowHealth(win);
   restartFileWatcher();
   // The window must never navigate away; external links open in the OS browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -101,6 +103,8 @@ function createWindow() {
   else void win.loadFile(path.join(__dirname, "../dist/index.html"));
 }
 
+installCrashLog();
+
 app.whenReady().then(() => {
   // The app has its own custom top bar; drop Electron's native File/Edit/View menu.
   Menu.setApplicationMenu(null);
@@ -108,6 +112,10 @@ app.whenReady().then(() => {
   registerIpc();
   createWindow();
   startReviewNotifier();
+  // Works from any app, so a shot can be taken of whatever is in front.
+  globalShortcut.register("CommandOrControl+Alt+S", () => {
+    if (win && !win.isDestroyed()) win.webContents.send("nv-capture-request");
+  });
   // The first study view of a cold process used to wait ~30 s for the whole vault
   // to be read (measured over 2 107 notes). Warming it here, in the background and
   // in batches, takes that off the click; nothing is waiting for the result.
@@ -124,6 +132,8 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
+
+app.on("will-quit", () => globalShortcut.unregisterAll());
 
 app.on("before-quit", () => {
   browserManager.destroy();

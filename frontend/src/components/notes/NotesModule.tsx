@@ -10,6 +10,7 @@ import { CanvasView } from "../canvas/CanvasView";
 import { ConceptMapDialog } from "../canvas/ConceptMapDialog";
 import { StudyFoldersDialog } from "../study/StudyFoldersDialog";
 import { StudySpaceDialog } from "../study/StudySpaceDialog";
+import { PracticeProjectDialog } from "../practice/PracticeProjectDialog";
 
 const WIDTH_KEY = "nv.explorer.width";
 
@@ -73,6 +74,7 @@ export function NotesModule() {
       <ConceptMapDialog />
       <StudyFoldersDialog />
       <StudySpaceDialog />
+      <PracticeProjectDialog />
       <EnglishAudioDialog />
     </div>
   );

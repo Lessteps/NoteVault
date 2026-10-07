@@ -2,14 +2,15 @@
 // .canvas files as the classic app (and Obsidian).
 
 import {
-  ArrowLeftRight, Diamond, FileText, Grid3x3, Hand, Image as ImageIcon, LayoutDashboard, Link2, Maximize,
-  Minus, PenLine, Plus, Redo2, SquareDashed, StickyNote, Trash2, Undo2,
+  ArrowLeftRight, Diamond, FileText, Grid3x3, Image as ImageIcon, LayoutDashboard, Link2, Magnet, Maximize,
+  Minus, MousePointer2, PenLine, Plus, Redo2, SquareDashed, StickyNote, Trash2, Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
 import {
-  bounds, cloneNodes, colorOf, contains, drawingNode, edgePath, intersects, nearestSide, newId, PRESET_COLORS,
-  pruneEdges, SHAPES, type CEdge, type CNode, type CanvasDoc, type Rect, type Side,
+  anchorExtras, borderHit, bounds, cloneNodes, colorOf, contains, drawingNode, edgePath, edgeT, GRID, gridBackgroundOffset, intersects,
+  nearestSide, newId, portPoint, PRESET_COLORS, pruneEdges, resizeHandleAt, resizeRect, RESIZE_CURSOR, SHAPES, snappedDelta, snapRect,
+  snapTo, type BorderHit, type CEdge, type CNode, type CanvasDoc, type Rect, type ResizeHandle, type Side,
 } from "../../lib/canvas";
 import { readClipboard } from "../../lib/clipboard";
 import { inViewport, visibleCanvas, visibleWorldRect } from "../../lib/canvasViewport";
@@ -23,16 +24,18 @@ import { DRAG_MIME } from "../notes/FileTree";
 type View = { x: number; y: number; zoom: number };
 type Drag =
   | { kind: "pan"; sx: number; sy: number; vx: number; vy: number }
-  | { kind: "move"; sx: number; sy: number; start: Map<string, [number, number]>; moved: boolean }
+  | { kind: "move"; sx: number; sy: number; /** the card being dragged: it is the one that lands on the grid */ anchor: string; start: Map<string, [number, number]>; moved: boolean }
   | { kind: "resize"; id: string; sx: number; sy: number; w: number; h: number; x: number; y: number; handle: string }
-  | { kind: "connect"; from: string; side: Side; x: number; y: number }
+  | { kind: "connect"; from: string; side: Side; /** position along that side, 0..1 */ t: number; /** where the pointer went down */ ox: number; oy: number; x: number; y: number }
   | { kind: "box"; x0: number; y0: number; x: number; y: number; add: boolean }
   | { kind: "draw"; points: Array<[number, number]> };
 
-const GRID = 20;
+/** How close (in screen pixels) the pointer has to be to a card's outline to grab it. */
+const BORDER_PX = 8;
+/** Within this many screen pixels of a corner, the outline resizes both ways. */
+const CORNER_PX = 14;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 3;
-const snapTo = (v: number, on: boolean) => (on ? Math.round(v / GRID) * GRID : v);
 
 export function CanvasView() {
   const path = useCanvas((s) => s.path)!;
@@ -51,6 +54,10 @@ export function CanvasView() {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [selEdge, setSelEdge] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  /** True while the selection is the result of a selection box (drawings then show their box; after a click on the stroke they do not). */
+  const [marquee, setMarquee] = useState(false);
+  /** The strokes a drawing had when a resize started: each move scales those, so no error builds up. */
+  const strokeBase = useRef(new WeakMap<object, unknown>());
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
   dragRef.current = drag;
@@ -62,6 +69,32 @@ export function CanvasView() {
   const clip = useRef<CanvasDoc | null>(null);
   const docRef = useRef(doc);
   docRef.current = doc;
+  /** The outline the pointer is over and what dragging it would do: move it (a group) or stretch it (which handle). */
+  const [hoverBorder, setHoverBorder] = useState<{ id: string; handle: ResizeHandle; move: boolean } | null>(null);
+  /** Space held: dragging moves the view instead of selecting. */
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const spaceRef = useRef(false);
+  spaceRef.current = spaceHeld;
+  /**
+   * The card whose outline is under a world point. The NEAREST outline wins: a card sitting a few pixels inside its group must not
+   * steal the group's own border (the groups of a map are covered by their cards, so the border is the only place to grab them).
+   * When two outlines are about equally near (a card flush against its group), the smaller one wins.
+   */
+  const hitBorder = (wx: number, wy: number, exclude?: string): (BorderHit & { id: string }) | null => {
+    const tol = BORDER_PX / viewRef.current.zoom;
+    let best: (BorderHit & { id: string; area: number }) | null = null;
+    for (const n of docRef.current.nodes) {
+      if (n.id === exclude || n.type === "nv-drawing") continue;
+      const hit = borderHit(n, wx, wy, tol);
+      if (!hit) continue;
+      const area = n.width * n.height;
+      const same = 2 / viewRef.current.zoom; // "about equally near": two screen pixels
+      if (!best || hit.distance < best.distance - same || (Math.abs(hit.distance - best.distance) <= same && area < best.area)) {
+        best = { ...hit, id: n.id, area };
+      }
+    }
+    return best;
+  };
   // Host size for viewport culling — updated on resize
   const [hostSize, setHostSize] = useState({ w: 1200, h: 800 });
 
@@ -129,16 +162,21 @@ export function CanvasView() {
     });
   }, []);
 
-  // Wheel: pan; Ctrl/pinch: zoom around the pointer. Non-passive to stop
+  // Wheel: moves up and down; Shift + wheel moves sideways; Ctrl/pinch: zoom around the pointer. Non-passive to stop
   // the page from scrolling.
   useEffect(() => {
     const el = host.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if ((e.target as Element).closest("textarea")) return;
+      // A card being edited scrolls its own text; Ctrl + wheel still zooms the board.
+      if ((e.target as Element).closest("textarea") || (!(e.ctrlKey || e.metaKey) && (e.target as Element).closest("[data-card-editor]"))) return;
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.0022), e.clientX, e.clientY);
-      else setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
+      else if (e.shiftKey) {
+        // Chromium leaves the movement in deltaY when Shift is held; a touchpad may already send deltaX.
+        const dx = e.deltaX || e.deltaY;
+        setView((v) => ({ ...v, x: v.x - dx }));
+      } else setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -165,6 +203,17 @@ export function CanvasView() {
     const d = docRef.current;
     commit({ ...d, edges: d.edges.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
   }, [commit]);
+
+  /** Asks for the text of an arrow (empty removes it). */
+  const editEdgeLabel = useCallback(async (edge: CEdge) => {
+    const label = await askText("Etiqueta de la flecha", edge.label ?? "", "Guardar");
+    if (label !== null) patchEdge(edge.id, { label });
+  }, [patchEdge]);
+
+  const toggleGrid = useCallback(() => setShowGrid((v) => {
+    localStorage.setItem("nv.canvas.grid", v ? "0" : "1");
+    return !v;
+  }), []);
 
   const deleteSelection = useCallback(() => {
     const d = docRef.current;
@@ -245,12 +294,47 @@ export function CanvasView() {
   }, [patchNodes]);
 
   // ── pointer interactions ─────────────────────────────────────────────
+  /**
+   * The card element under a target, EXCEPT a group's empty interior: that is the board. Grabbing the inside of a group used to
+   * move the whole group (a big group is mostly interior), so now the interior pans, box-selects and creates cards like the
+   * rest of the board, and a group is moved by its label (or resized by its outline).
+   */
+  const cardElOf = (target: Element): Element | null => {
+    const el = target.closest("[data-node-id]");
+    if (!el) return null;
+    const n = byId.get(el.getAttribute("data-node-id")!);
+    if (n?.type === "group" && !target.closest("[data-group-label],[data-port],[data-resize]")) return null;
+    return el;
+  };
+
+  /** Starts moving `id` and everything selected with it; moving a group carries the cards inside it. */
+  const beginMove = (e: React.PointerEvent, id: string, wx: number, wy: number) => {
+    setSelEdge(null);
+    let next = sel;
+    if (e.shiftKey) {
+      next = new Set(sel);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+    } else if (!sel.has(id)) next = new Set([id]);
+    setSel(next);
+    const start = new Map<string, [number, number]>();
+    for (const n of doc.nodes) {
+      if (next.has(n.id)) start.set(n.id, [n.x, n.y]);
+    }
+    for (const g of doc.nodes.filter((n) => next.has(n.id) && n.type === "group")) {
+      for (const n of doc.nodes) if (n.id !== g.id && contains(g, n)) start.set(n.id, [n.x, n.y]);
+    }
+    startDrag(e, { kind: "move", sx: wx, sy: wy, anchor: id, start, moved: false });
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    // The view moves with the middle button, Alt + drag, or Space + drag. A plain drag on the board selects (see below).
+    if (e.button === 1 || (e.button === 0 && (e.altKey || spaceRef.current))) {
       startDrag(e, { kind: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y });
       return;
     }
     if (e.button !== 0) return;
+    setMarquee(false);
     const t = e.target as Element;
     if (t.closest("[data-canvas-ui]")) return;
     const [wx, wy] = toWorld(e.clientX, e.clientY);
@@ -264,21 +348,51 @@ export function CanvasView() {
       setSel(new Set());
       return;
     }
-    const nodeEl = t.closest("[data-node-id]");
-    if (!nodeEl) {
-      setSelEdge(null);
-      if (e.shiftKey) startDrag(e, { kind: "box", x0: wx, y0: wy, x: wx, y: wy, add: true });
-      else {
-        setSel(new Set());
-        startDrag(e, { kind: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y });
+    // The WHOLE outline of a card is a resize handle, wherever along it the pointer is: a drag from a side stretches that side,
+    // from near a corner both. The outline of a GROUP is how you grab it: it moves the group (with what it holds); its handles
+    // resize it. The round ports connect, and Ctrl + drag from any outline connects from exactly that point. A card being edited
+    // keeps its text.
+    if (!t.closest("[data-port],[data-resize]")) {
+      const hit = hitBorder(wx, wy);
+      const target = hit ? byId.get(hit.id) : undefined;
+      if (hit && target && editing !== hit.id) {
+        setHoverBorder(null);
+        if (e.ctrlKey || e.metaKey) {
+          startDrag(e, { kind: "connect", from: hit.id, side: hit.side, t: hit.t, ox: wx, oy: wy, x: wx, y: wy });
+          return;
+        }
+        // The whole outline stretches the card, a group included: a group is moved from inside it once selected (below).
+        const handle = resizeHandleAt(target, hit, CORNER_PX / viewRef.current.zoom);
+        if (!sel.has(hit.id)) {
+          setSel(new Set([hit.id]));
+          setSelEdge(null);
+        }
+        snapshot();
+        startDrag(e, { kind: "resize", id: hit.id, sx: wx, sy: wy, w: target.width, h: target.height, x: target.x, y: target.y, handle });
+        return;
       }
+    }
+    const nodeEl = cardElOf(t);
+    if (!nodeEl) {
+      // The inside of a group that is already selected moves it (with what it holds): press its outline to select it, then drag inside.
+      const held = doc.nodes
+        .filter((n) => n.type === "group" && sel.has(n.id) && wx >= n.x && wx <= n.x + n.width && wy >= n.y && wy <= n.y + n.height)
+        .sort((a, b) => a.width * a.height - b.width * b.height)[0];
+      if (held && !e.shiftKey) {
+        beginMove(e, held.id, wx, wy);
+        return;
+      }
+      // The default tool selects: a drag on the board (or inside a group) draws a selection box; Shift adds to the selection.
+      setSelEdge(null);
+      if (!e.shiftKey) setSel(new Set());
+      startDrag(e, { kind: "box", x0: wx, y0: wy, x: wx, y: wy, add: e.shiftKey });
       return;
     }
     const id = nodeEl.getAttribute("data-node-id")!;
     if (editing === id) return;
     const port = t.closest("[data-port]");
     if (port) {
-      startDrag(e, { kind: "connect", from: id, side: port.getAttribute("data-port") as Side, x: wx, y: wy });
+      startDrag(e, { kind: "connect", from: id, side: port.getAttribute("data-port") as Side, t: 0.5, ox: wx, oy: wy, x: wx, y: wy });
       return;
     }
     if (t.closest("[data-resize]")) {
@@ -288,23 +402,7 @@ export function CanvasView() {
       startDrag(e, { kind: "resize", id, sx: wx, sy: wy, w: n.width, h: n.height, x: n.x, y: n.y, handle });
       return;
     }
-    setSelEdge(null);
-    let next = sel;
-    if (e.shiftKey) {
-      next = new Set(sel);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-    } else if (!sel.has(id)) next = new Set([id]);
-    setSel(next);
-    // Moving a group carries the cards inside it.
-    const start = new Map<string, [number, number]>();
-    for (const n of doc.nodes) {
-      if (next.has(n.id)) start.set(n.id, [n.x, n.y]);
-    }
-    for (const g of doc.nodes.filter((n) => next.has(n.id) && n.type === "group")) {
-      for (const n of doc.nodes) if (n.id !== g.id && contains(g, n)) start.set(n.id, [n.x, n.y]);
-    }
-    startDrag(e, { kind: "move", sx: wx, sy: wy, start, moved: false });
+    beginMove(e, id, wx, wy);
   };
 
   const startDrag = (e: React.PointerEvent, d: Drag) => {
@@ -314,7 +412,26 @@ export function CanvasView() {
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
-    if (!d) return;
+    // The button (or the pen tip) is already up but its "up" never reached us: end the gesture instead of drawing on.
+    if (d && e.buttons === 0 && e.pointerType !== "touch") {
+      onPointerUp(e);
+      return;
+    }
+    if (!d) {
+      if (e.buttons === 0 && !drawMode) {
+        const [hx, hy] = toWorld(e.clientX, e.clientY);
+        const onUi = (e.target as Element).closest("[data-canvas-ui],[data-port],[data-resize],[data-edge-id]");
+        const hit = onUi || spaceRef.current ? null : hitBorder(hx, hy);
+        const node = hit ? byId.get(hit.id) : undefined;
+        const handle = hit && node ? resizeHandleAt(node, hit, CORNER_PX / viewRef.current.zoom) : null;
+        const move = false;
+        setHoverBorder((prev) => {
+          if (!hit || !handle) return prev ? null : prev;
+          return prev && prev.id === hit.id && prev.handle === handle && prev.move === move ? prev : { id: hit.id, handle, move };
+        });
+      }
+      return;
+    }
     if (d.kind === "pan") {
       setView((v) => ({ ...v, x: d.vx + e.clientX - d.sx, y: d.vy + e.clientY - d.sy }));
       return;
@@ -329,37 +446,32 @@ export function CanvasView() {
         d.moved = true;
       }
       const cur = docRef.current;
+      // The dragged card lands on the grid and the others keep their place relative to it.
+      const anchor = d.start.get(d.anchor) ?? [...d.start.values()][0] ?? [0, 0];
+      const [mx, my] = snappedDelta(anchor, dx, dy, snap);
       commit({
         ...cur,
         nodes: cur.nodes.map((n) => {
           const s = d.start.get(n.id);
-          return s ? { ...n, x: snapTo(s[0] + dx, snap), y: snapTo(s[1] + dy, snap) } : n;
+          return s ? { ...n, x: s[0] + mx, y: s[1] + my } : n;
         }),
       }, false);
     } else if (d.kind === "resize") {
       const cur = docRef.current;
-      const dx = wx - d.sx;
-      const dy = wy - d.sy;
-      const h = d.handle;
-      const isW = h.includes("w");
-      const isN = h.includes("n");
-      const isE = h.includes("e");
-      const isS = h.includes("s");
-      // Horizontal
-      let newX = d.x;
-      let newW = d.w;
-      if (isE) newW = Math.max(40, snapTo(d.w + dx, snap));
-      if (isW) { newW = Math.max(40, snapTo(d.w - dx, snap)); newX = snapTo(d.x + d.w - newW, snap); }
-      // Vertical
-      let newY = d.y;
-      let newH = d.h;
-      if (isS) newH = Math.max(30, snapTo(d.h + dy, snap));
-      if (isN) { newH = Math.max(30, snapTo(d.h - dy, snap)); newY = snapTo(d.y + d.h - newH, snap); }
+      // The edges being dragged snap to the grid; the opposite ones do not move.
+      const r = resizeRect({ x: d.x, y: d.y, width: d.w, height: d.h }, d.handle, wx - d.sx, wy - d.sy, snap);
       commit({
         ...cur,
-        nodes: cur.nodes.map((n) => (n.id === d.id
-          ? { ...n, x: newX, y: newY, width: newW, height: newH }
-          : n)),
+        nodes: cur.nodes.map((n) => {
+          if (n.id !== d.id) return n;
+          if (n.type !== "nv-drawing") return { ...n, x: r.x, y: r.y, width: r.width, height: r.height };
+          // A drawing scales its strokes with its box (their thickness stays).
+          if (!strokeBase.current.has(d)) strokeBase.current.set(d, structuredClone(n.nv?.strokes ?? []));
+          const base = strokeBase.current.get(d) as NonNullable<NonNullable<CNode["nv"]>["strokes"]>;
+          const fx = r.width / d.w, fy = r.height / d.h;
+          const strokes = base.map((s) => ({ ...s, points: s.points.map(([px, py]) => [Math.round(px * fx * 10) / 10, Math.round(py * fy * 10) / 10] as [number, number]) }));
+          return { ...n, x: r.x, y: r.y, width: r.width, height: r.height, nv: { ...n.nv, strokes } };
+        }),
       }, false);
     } else if (d.kind === "connect" || d.kind === "box") {
       setDrag({ ...d, x: wx, y: wy });
@@ -373,6 +485,8 @@ export function CanvasView() {
 
   const onPointerUp = (e: React.PointerEvent) => {
     const d = dragRef.current;
+    // Cleared at once: the same gesture can end through several events (up, cancel, lost capture) and must only count once.
+    dragRef.current = null;
     setDrag(null);
     if (!d) return;
     if (d.kind === "connect") {
@@ -381,24 +495,38 @@ export function CanvasView() {
       const cur = docRef.current;
       const from = byId.get(d.from)!;
       const [wx, wy] = toWorld(e.clientX, e.clientY);
-      if (toId && toId !== d.from) {
-        const to = byId.get(toId)!;
-        const edge: CEdge = { id: newId(), fromNode: d.from, fromSide: d.side, toNode: toId, toSide: nearestSide(to, ...portOf(from, d.side)), toEnd: "arrow" };
+      // A click on an outline (no drag) just selects the card, as a click on its body would.
+      if (Math.hypot(wx - d.ox, wy - d.oy) * viewRef.current.zoom < 3) {
+        setSelEdge(null);
+        setSel(new Set([d.from]));
+        return;
+      }
+      const [sx, sy] = portPoint(from, d.side, d.t);
+      // Dropped on an outline: end exactly there. Dropped on a card's body: the side that faces where the line started.
+      const end = hitBorder(wx, wy, d.from);
+      if (end || (toId && toId !== d.from)) {
+        const to = byId.get(end ? end.id : toId!)!;
+        const nv = anchorExtras(d.t, end ? end.t : 0.5);
+        const edge: CEdge = { id: newId(), fromNode: d.from, fromSide: d.side, toNode: to.id, toSide: end ? end.side : nearestSide(to, sx, sy), toEnd: "arrow", ...(nv ? { nv } : {}) };
         commit({ ...cur, edges: [...cur.edges, edge] });
         setSelEdge(edge.id);
         setSel(new Set());
-      } else if (!toId && Math.hypot(wx - portOf(from, d.side)[0], wy - portOf(from, d.side)[1]) > 40) {
+      } else if (!toId && Math.hypot(wx - sx, wy - sy) > 40) {
         // Dropped on empty board: a new card there, already connected.
         const node: CNode = { id: newId(), type: "text", x: snapTo(wx - 125, snap), y: snapTo(wy - 40, snap), width: 250, height: 80, text: "" };
-        const edge: CEdge = { id: newId(), fromNode: d.from, fromSide: d.side, toNode: node.id, toSide: nearestSide(node, ...portOf(from, d.side)), toEnd: "arrow" };
+        const nv = anchorExtras(d.t, 0.5);
+        const edge: CEdge = { id: newId(), fromNode: d.from, fromSide: d.side, toNode: node.id, toSide: nearestSide(node, sx, sy), toEnd: "arrow", ...(nv ? { nv } : {}) };
         commit({ nodes: [...cur.nodes, node], edges: [...cur.edges, edge] });
         setSel(new Set([node.id]));
         setEditing(node.id);
       }
     } else if (d.kind === "box") {
       const r: Rect = { x: Math.min(d.x0, d.x), y: Math.min(d.y0, d.y), width: Math.abs(d.x - d.x0), height: Math.abs(d.y - d.y0) };
-      const hit = docRef.current.nodes.filter((n) => intersects(r, n)).map((n) => n.id);
+      // A click on the board (no real box) selects nothing new; a box takes the cards it touches and the groups it fully holds.
+      const real = r.width * viewRef.current.zoom >= 3 || r.height * viewRef.current.zoom >= 3;
+      const hit = real ? docRef.current.nodes.filter((n) => (n.type === "group" ? contains(r, n) : intersects(r, n))).map((n) => n.id) : [];
       setSel(new Set([...(d.add ? sel : []), ...hit]));
+      setMarquee(hit.length > 0);
     } else if (d.kind === "draw") {
       const node = drawingNode(d.points, pen.color, pen.width);
       if (node) {
@@ -408,9 +536,36 @@ export function CanvasView() {
     }
   };
 
+  /**
+   * A pen or a tablet may cancel the gesture (the system takes it for a scroll, or the pen leaves the sensing range) instead of
+   * sending "up". A stroke already drawn is kept; anything else is simply dropped.
+   */
+  const onPointerCancel = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (d?.kind === "draw") onPointerUp(e);
+    else {
+      dragRef.current = null;
+      setDrag(null);
+    }
+  };
+
   const onDoubleClick = (e: React.MouseEvent) => {
-    if (drawMode || (e.target as Element).closest("[data-canvas-ui]")) return;
-    const nodeEl = (e.target as Element).closest("[data-node-id]");
+    // The press that starts a drag captures the pointer on the board, so the browser reports the board as the target of the
+    // double click even when it landed on a group's label. Resolve the element under the pointer instead.
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const target = e.target === host.current && under && host.current?.contains(under) ? under : (e.target as Element);
+    if (drawMode || target.closest("[data-canvas-ui]")) return;
+    const edgeEl = target.closest("[data-edge-id]");
+    if (edgeEl) {
+      const found = docRef.current.edges.find((x) => x.id === edgeEl.getAttribute("data-edge-id"));
+      if (found) {
+        setSelEdge(found.id);
+        setSel(new Set());
+        void editEdgeLabel(found);
+      }
+      return;
+    }
+    const nodeEl = cardElOf(target);
     if (!nodeEl) {
       const [x, y] = toWorld(e.clientX, e.clientY);
       addText(x, y);
@@ -426,13 +581,14 @@ export function CanvasView() {
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     const [x, y] = toWorld(e.clientX, e.clientY);
-    const nodeEl = (e.target as Element).closest("[data-node-id]");
+    const nodeEl = cardElOf(e.target as Element);
     if (nodeEl) {
       const id = nodeEl.getAttribute("data-node-id")!;
       if (!sel.has(id)) setSel(new Set([id]));
       const ids = sel.has(id) ? sel : new Set([id]);
       openMenu(e, [
         { label: "Duplicar", onSelect: () => pasteDoc(docRef.current, ids, 30, 30) },
+        { label: "Alinear a la cuadrícula", onSelect: () => alignToGrid(ids) },
         { label: "Agrupar", onSelect: groupSelection },
         { label: "Grosor: Fino (1px)", onSelect: () => setThickness(ids, 1) },
         { label: "Grosor: Normal (2px)", onSelect: () => setThickness(ids, 2) },
@@ -455,7 +611,14 @@ export function CanvasView() {
         addNode({ type: "group", x: x - 200, y: y - 150, width: 400, height: 300, label: "Grupo" });
       }},
       { label: "Pegar", onSelect: () => void paste() },
+      { label: "Alinear todo a la cuadrícula", onSelect: () => alignToGrid(new Set(docRef.current.nodes.map((n) => n.id))) },
     ]);
+  };
+
+  /** Puts the four edges of the given cards on the grid (cards that were placed before, or by a generator, are often off it). */
+  const alignToGrid = (ids: Set<string>) => {
+    const d = docRef.current;
+    commit({ ...d, nodes: d.nodes.map((n) => (ids.has(n.id) && n.type !== "nv-drawing" ? { ...n, ...snapRect(n) } : n)) });
   };
 
   const setThickness = (ids: Set<string>, borderWidth: number) => {
@@ -488,6 +651,13 @@ export function CanvasView() {
   // ── keyboard ─────────────────────────────────────────────────────────
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (editing || (e.target as Element).closest("input, textarea")) return;
+    if (e.key === " ") {
+      // Held, it turns a drag into moving the view; it must not click a focused button or scroll the page.
+      e.preventDefault();
+      e.stopPropagation();
+      if (!e.repeat) setSpaceHeld(true);
+      return;
+    }
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     const run = (f: () => void) => {
@@ -518,10 +688,11 @@ export function CanvasView() {
     else if (k === "z") run(() => addText());
     else if (k === "x") run(() => setPicker("note"));
     else if (k === "c") run(() => setPicker("image"));
-    else if (k === "v") run(() => void addLink());
+    else if (k === "v") run(() => { setDrawMode(false); host.current?.focus(); }); // the selector: cancels pen mode and any other tool
+    else if (k === "g") run(toggleGrid);
     else if (k === "b") run(groupSelection);
-    else if (k === "n") run(() => setDrawMode((v) => !v));
-    else if (k === "m") run(() => addShape("process"));
+    else if (k === "r") run(() => { setDrawMode((v) => !v); host.current?.focus(); }); // free drawing
+    else if (k === "f") run(openShapes); // the shapes menu, the same one the toolbar button opens
     else if (k === "a") run(() => setPicker("canvas"));
     else if (k === "s") run(() => void addLink());
     else if (e.key.startsWith("Arrow") && sel.size) {
@@ -530,9 +701,17 @@ export function CanvasView() {
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
         const d = docRef.current;
-        commit({ ...d, nodes: d.nodes.map((n) => (sel.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)) });
+        commit({ ...d, nodes: d.nodes.map((n) => (sel.has(n.id) ? { ...n, x: snapTo(n.x + dx, snap && !e.shiftKey), y: snapTo(n.y + dy, snap && !e.shiftKey) } : n)) });
       });
     }
+  };
+
+  const shapesBtn = useRef<HTMLButtonElement>(null);
+  /** Opens the shapes menu above the toolbar button (from the keyboard there is no click to place it). */
+  const openShapes = () => {
+    const r = shapesBtn.current?.getBoundingClientRect();
+    const at = { clientX: r ? r.left : 200, clientY: r ? r.top : 200, preventDefault: () => undefined };
+    openMenu(at, SHAPES.map((s) => ({ label: s.name, onSelect: () => addShape(s.id) })));
   };
 
   // ── render ───────────────────────────────────────────────────────────
@@ -548,10 +727,16 @@ export function CanvasView() {
     // `viewport` is a fresh object per render: compare its numbers instead.
     [doc, viewport.x, viewport.y, viewport.width, viewport.height, sel],
   );
-  const groups = doc.nodes.filter((n) => n.type === "group" && inViewport(n, viewport));
+  // A group that contains another is its parent: it is drawn first, so the inner one stays on top and can be reached.
+  const groups = useMemo(() => {
+    const all = doc.nodes.filter((n) => n.type === "group");
+    const depth = (g: CNode) => all.filter((o) => o.id !== g.id && contains(o, g)).length;
+    return all.filter((g) => inViewport(g, viewport)).map((g) => ({ g, d: depth(g) })).sort((a, b) => a.d - b.d).map((x) => x.g);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc.nodes, viewport.x, viewport.y, viewport.width, viewport.height]);
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col bg-surface">
+    <div className="relative flex min-w-0 flex-1 flex-col bg-surface">
       <div className="flex h-10 flex-none items-center gap-2 border-b border-line px-4">
         <LayoutDashboard size={15} className="text-warn" />
         <span className="truncate text-[13px] font-semibold text-text">{title}</span>
@@ -562,7 +747,7 @@ export function CanvasView() {
           className="rounded-md px-2 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">Cerrar</button>
       </div>
       {conflict && (
-        <div className="flex flex-none items-center gap-3 border-b border-warn/40 bg-warn-soft px-4 py-2 text-[12.5px] text-text">
+        <div className="pointer-events-auto absolute left-1/2 top-12 z-30 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-warn/40 bg-warn-soft px-4 py-2 text-[12.5px] text-text shadow-lg">
           El canvas cambió en disco (otra app lo editó).
           <button type="button" className="font-semibold text-accent-text" onClick={() => void useCanvas.getState().open(path)}>Recargar</button>
           <button type="button" className="font-semibold text-warn" onClick={() => void useCanvas.getState().save(true)}>Sobrescribir</button>
@@ -573,19 +758,30 @@ export function CanvasView() {
         tabIndex={0}
         role="application"
         aria-label="Canvas"
-        className={cn("nv-canvas relative min-h-0 flex-1 overflow-hidden outline-none",
-          drawMode ? "cursor-crosshair" : drag?.kind === "pan" ? "cursor-grabbing" : "cursor-default")}
+        className={cn("nv-canvas relative min-h-0 flex-1 touch-none overflow-hidden outline-none",
+          drawMode ? "cursor-crosshair"
+            : drag?.kind === "pan" ? "cursor-grabbing"
+              : spaceHeld ? "cursor-grab"
+                : drag?.kind === "resize" ? RESIZE_CURSOR[drag.handle as ResizeHandle] ?? "cursor-default"
+                  : drag?.kind === "move" ? "cursor-move"
+                    : hoverBorder && !drag ? (hoverBorder.move ? "cursor-move" : RESIZE_CURSOR[hoverBorder.handle])
+                      : "cursor-default")}
         style={{
           backgroundImage: showGrid ? "radial-gradient(circle, var(--nv-line-strong) 1px, transparent 1.2px)" : "none",
           backgroundSize: `${gridSize}px ${gridSize}px`,
-          backgroundPosition: `${view.x}px ${view.y}px`,
+          backgroundPosition: `${gridBackgroundOffset(view.x, gridSize)}px ${gridBackgroundOffset(view.y, gridSize)}px`,
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onLostPointerCapture={onPointerCancel}
+        onPointerLeave={() => setHoverBorder(null)}
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
         onKeyDown={onKeyDown}
+        onKeyUp={(e) => { if (e.key === " ") setSpaceHeld(false); }}
+        onBlur={() => setSpaceHeld(false)}
         data-dropzone
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes(DRAG_MIME)) {
@@ -607,7 +803,7 @@ export function CanvasView() {
         <div className="absolute left-0 top-0 origin-top-left"
           style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
           {groups.map((n) => (
-            <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} editing={editing === n.id} onEditDone={onEditDone} />
+            <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} boxed={marquee} editing={editing === n.id} onEditDone={onEditDone} />
           ))}
           <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={1} height={1}>
             {visible.edges.map((e) => {
@@ -616,7 +812,7 @@ export function CanvasView() {
               return a && b ? <EdgeView key={e.id} edge={e} a={a} b={b} selected={selEdge === e.id} /> : null;
             })}
             {drag?.kind === "connect" && byId.get(drag.from) && (
-              <line x1={portOf(byId.get(drag.from)!, drag.side)[0]} y1={portOf(byId.get(drag.from)!, drag.side)[1]}
+              <line x1={portOf(byId.get(drag.from)!, drag.side, drag.t)[0]} y1={portOf(byId.get(drag.from)!, drag.side, drag.t)[1]}
                 x2={drag.x} y2={drag.y} stroke="var(--nv-accent)" strokeWidth={2 / view.zoom} strokeDasharray="6 4" />
             )}
             {drag?.kind === "draw" && (
@@ -629,7 +825,7 @@ export function CanvasView() {
             )}
           </svg>
           {visible.nodes.filter((n) => n.type !== "group").map((n) => (
-            <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} editing={editing === n.id} onEditDone={onEditDone} />
+            <CanvasNodeView key={n.id} node={n} selected={sel.has(n.id)} boxed={marquee} editing={editing === n.id} onEditDone={onEditDone} />
           ))}
         </div>
 
@@ -637,7 +833,7 @@ export function CanvasView() {
           <div className="pointer-events-none absolute inset-0 grid place-items-center text-center text-[13px] text-faint">
             <div>
               <p className="text-[15px] text-dim">Canvas vacío</p>
-              <p className="mt-1">Doble clic para crear una tarjeta · Z texto · X nota · N dibujar · clic derecho para más</p>
+              <p className="mt-1">Doble clic para crear una tarjeta · Z texto · X nota · N dibujar · V seleccionar · G cuadrícula · Espacio + arrastrar mueve la vista</p>
             </div>
           </div>
         )}
@@ -651,25 +847,24 @@ export function CanvasView() {
             onDelete={deleteSelection}
             onEdit={single && ["text", "nv-shape", "group"].includes(single.type) ? () => setEditing(single.id) : undefined}
             onEdge={(p) => edge && patchEdge(edge.id, p)}
-            onEdgeLabel={async () => {
-              if (!edge) return;
-              const label = await askText("Etiqueta de la flecha", edge.label ?? "", "Guardar");
-              if (label !== null) patchEdge(edge.id, { label });
+            onEdgeLabel={() => {
+              if (edge) void editEdgeLabel(edge);
             }}
           />
         )}
 
         <Toolbar>
+          <Tool title="Seleccionar (V) · Espacio + arrastrar mueve la vista" kbd="V" active={!drawMode} onClick={() => { setDrawMode(false); host.current?.focus(); }}><MousePointer2 size={16} /></Tool>
           <Tool title="Tarjeta de texto (Z)" kbd="Z" onClick={() => addText()}><StickyNote size={16} /></Tool>
           <Tool title="Nota de la vault (X)" kbd="X" onClick={() => setPicker("note")}><FileText size={16} /></Tool>
           <Tool title="Imagen de la vault (C)" kbd="C" onClick={() => setPicker("image")}><ImageIcon size={16} /></Tool>
           <Tool title="Canvas embebido (A)" onClick={() => setPicker("canvas")}><LayoutDashboard size={16} /></Tool>
-          <Tool title="Enlace web (V)" kbd="V" onClick={() => void addLink()}><Link2 size={16} /></Tool>
-          <Tool title="Forma de diagrama (M)" kbd="M" onClick={(e) => openMenu(e, SHAPES.map((s) => ({ label: s.name, onSelect: () => addShape(s.id) })))}>
+          <Tool title="Enlace web (S)" kbd="S" onClick={() => void addLink()}><Link2 size={16} /></Tool>
+          <Tool title="Forma de diagrama (F)" kbd="F" btnRef={shapesBtn} onClick={(e) => openMenu(e, SHAPES.map((s) => ({ label: s.name, onSelect: () => addShape(s.id) })))}>
             <Diamond size={16} />
           </Tool>
           <Tool title="Grupo (B / Ctrl+G)" kbd="B" onClick={groupSelection}><SquareDashed size={16} /></Tool>
-          <Tool title="Dibujo libre (N)" kbd="N" active={drawMode} onClick={() => setDrawMode((v) => !v)}><PenLine size={16} /></Tool>
+          <Tool title="Dibujo libre (R)" kbd="R" active={drawMode} onClick={() => { setDrawMode((v) => !v); host.current?.focus(); }}><PenLine size={16} /></Tool>
           {drawMode && (
             <div className="flex items-center gap-1 px-1">
               {Object.keys(PRESET_COLORS).map((c) => (
@@ -684,20 +879,16 @@ export function CanvasView() {
             </div>
           )}
           <Sep />
-          <Tool title="Cuadrícula" active={showGrid} onClick={() => setShowGrid((v) => {
-            localStorage.setItem("nv.canvas.grid", v ? "0" : "1");
-            return !v;
-          })}><Grid3x3 size={16} /></Tool>
+          <Tool title="Cuadrícula (G)" kbd="G" active={showGrid} onClick={toggleGrid}><Grid3x3 size={16} /></Tool>
           <Tool title="Ajustar a la cuadrícula" active={snap} onClick={() => setSnap((v) => {
             localStorage.setItem("nv.canvas.snap", v ? "0" : "1");
             return !v;
-          })}><Hand size={16} /></Tool>
+          })}><Magnet size={16} /></Tool>
           <Tool title="Alejar (Ctrl+−)" onClick={() => zoomAt(1 / 1.2)}><Minus size={16} /></Tool>
           <Tool title="Acercar (Ctrl++)" onClick={() => zoomAt(1.2)}><Plus size={16} /></Tool>
           <Tool title="Ver todo (Ctrl+0)" onClick={() => fit()}><Maximize size={16} /></Tool>
           <Tool title="Deshacer (Ctrl+Z)" disabled={!canUndo} onClick={undo}><Undo2 size={16} /></Tool>
           <Tool title="Rehacer (Ctrl+Y)" disabled={!canRedo} onClick={redo}><Redo2 size={16} /></Tool>
-          <Tool title="Mover: arrastra el fondo · Alt+arrastrar · rueda" onClick={() => setDrawMode(false)}><Hand size={16} /></Tool>
         </Toolbar>
       </div>
 
@@ -720,19 +911,14 @@ export function CanvasView() {
   );
 }
 
-function portOf(n: Rect, side: Side): [number, number] {
-  switch (side) {
-    case "top": return [n.x + n.width / 2, n.y];
-    case "bottom": return [n.x + n.width / 2, n.y + n.height];
-    case "left": return [n.x, n.y + n.height / 2];
-    default: return [n.x + n.width, n.y + n.height / 2];
-  }
+function portOf(n: Rect, side: Side, t = 0.5): [number, number] {
+  return portPoint(n, side, t);
 }
 
 const INWARD: Record<Side, [number, number]> = { top: [0, 1], bottom: [0, -1], left: [1, 0], right: [-1, 0] };
 
-function arrowHead(n: Rect, side: Side, size: number): string {
-  const [x, y] = portOf(n, side);
+function arrowHead(n: Rect, side: Side, size: number, t = 0.5): string {
+  const [x, y] = portOf(n, side, t);
   const [dx, dy] = INWARD[side];
   // The tip touches the card; the base sits `size` outside it.
   const bx = x - dx * size;
@@ -743,18 +929,20 @@ function arrowHead(n: Rect, side: Side, size: number): string {
 }
 
 function EdgeView({ edge, a, b, selected }: { edge: CEdge; a: CNode; b: CNode; selected: boolean }) {
-  const { d, mid } = edgePath(a, edge.fromSide, b, edge.toSide);
+  const fromT = edgeT(edge, "from");
+  const toT = edgeT(edge, "to");
+  const { d, mid } = edgePath(a, edge.fromSide, b, edge.toSide, fromT, toT);
   const col = selected ? "var(--nv-accent)" : colorOf(edge.color, "var(--nv-dim)");
   const dash = edge.nv?.style === "dashed" ? "8 6" : edge.nv?.style === "dotted" ? "2 5" : undefined;
   return (
     <g>
       <path data-edge-id={edge.id} d={d} fill="none" stroke="transparent" strokeWidth={14} className="pointer-events-auto cursor-pointer" />
       <path d={d} fill="none" stroke={col} strokeWidth={selected ? 3 : 2} strokeDasharray={dash} />
-      {(edge.toEnd ?? "arrow") === "arrow" && <polygon points={arrowHead(b, edge.toSide, 12)} fill={col} />}
-      {edge.fromEnd === "arrow" && <polygon points={arrowHead(a, edge.fromSide, 12)} fill={col} />}
+      {(edge.toEnd ?? "arrow") === "arrow" && <polygon points={arrowHead(b, edge.toSide, 12, toT)} fill={col} />}
+      {edge.fromEnd === "arrow" && <polygon points={arrowHead(a, edge.fromSide, 12, fromT)} fill={col} />}
       {edge.label && (
         <foreignObject x={mid[0] - 90} y={mid[1] - 14} width={180} height={28} className="overflow-visible">
-          <div className="mx-auto w-fit max-w-[180px] truncate rounded-md border border-line bg-card px-2 py-0.5 text-center text-[12px] text-text">
+          <div data-edge-id={edge.id} title="Doble clic para editar" className="pointer-events-auto mx-auto w-fit max-w-[180px] cursor-pointer truncate rounded-md border border-line bg-card px-2 py-0.5 text-center text-[12px] text-text">
             {edge.label}
           </div>
         </foreignObject>
@@ -775,11 +963,12 @@ function Sep() {
   return <span className="mx-1 h-5 w-px bg-line" />;
 }
 
-function Tool({ title, kbd, onClick, children, active, disabled }: {
+function Tool({ title, kbd, onClick, children, active, disabled, btnRef }: {
   title: string; kbd?: string; onClick: (e: React.MouseEvent) => void; children: ReactNode; active?: boolean; disabled?: boolean;
+  btnRef?: React.Ref<HTMLButtonElement>;
 }) {
   return (
-    <button type="button" title={title} aria-label={title} disabled={disabled} onClick={onClick}
+    <button ref={btnRef} type="button" title={title} aria-label={title} disabled={disabled} onClick={onClick}
       className={cn("relative grid h-8 place-items-center rounded-lg px-1.5 transition-colors disabled:opacity-35 min-w-[2rem]",
         active ? "bg-accent-soft text-accent-text" : "text-dim hover:bg-hover hover:text-text")}>
       {children}

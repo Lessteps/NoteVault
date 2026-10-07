@@ -177,7 +177,7 @@ export function TopicGeneralView({ topicData, snap, onOpenConfigurator, onPracti
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-warn/30 bg-warn-soft/50 px-3.5 py-2.5">
             <AlertTriangle size={15} className="flex-none text-warn" />
             <p className="min-w-0 flex-1 text-[11.5px] leading-snug text-dim">
-              <b className="text-warn">{notStarted.length} competencias sin iniciar:</b> {isEnglishTopic ? "Empieza por la competencia más fácil de la matriz." : "Comienza practicando problemas básicos o cálculo mental."}
+              <b className="text-warn">{notStarted.length} competencias sin iniciar:</b> {isEnglishTopic || manifest.subject === "programming" ? "Empieza por la competencia más fácil de la matriz." : "Comienza practicando problemas básicos o cálculo mental."}
             </p>
             <div className="text-right">
               <div className="font-mono text-[14px] font-bold text-text">

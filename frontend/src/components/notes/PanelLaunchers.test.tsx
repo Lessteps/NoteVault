@@ -128,3 +128,19 @@ describe("PanelLaunchers", () => {
     expect(useApp.getState().muscleOpen).toBe(false);
   });
 });
+
+describe("PanelLaunchers: Mentor", () => {
+  it("muestra 'Mentor' justo debajo de 'Asistente IA' y abre la pestaña completa del Mentor", () => {
+    mount();
+    const labels = [...container.querySelectorAll("aside button")].map((b) => b.getAttribute("aria-label"));
+    expect(labels.indexOf("Mentor")).toBe(labels.indexOf("Asistente IA") + 1);
+    expect(labels.indexOf("Páginas del navegador")).toBe(labels.indexOf("Mentor") + 1);
+
+    act(() => {
+      byLabel("Mentor").click();
+    });
+    expect(useApp.getState().module).toBe("mentor");
+    // no es una cara del panel: no abre ni cierra el asistente
+    expect(useAssistant.getState().open).toBe(false);
+  });
+});

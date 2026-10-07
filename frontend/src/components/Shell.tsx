@@ -3,7 +3,7 @@
 import {
   Calendar, CircleCheck, Copy, Dumbbell, Flag, Globe, House, Kanban, Minus, Moon, PanelLeft,
   PenLine, Pin, PinOff, Plus, Square, SquareCheck, Sun, Wallet, X, Cloud, CloudUpload,
-  CircleAlert, Settings, FileCode2, FileText, LayoutDashboard,
+  CircleAlert, Settings, FileCode2, FileText, LayoutDashboard, GraduationCap,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -32,11 +32,11 @@ export const MODULES: Array<{ id: ModuleId; label: string; Icon: ComponentType<{
 
 export function moduleLabel(id: ModuleId): string {
   return MODULES.find((m) => m.id === id)?.label
-    ?? (id === "web" ? "Navegador Web" : id === "player" ? "Reproductor de inglés" : id);
+    ?? (id === "web" ? "Navegador Web" : id === "player" ? "Reproductor de inglés" : id === "mentor" ? "Mentor" : id);
 }
 
 function moduleIcon(id: ModuleId): ComponentType<{ size?: number; strokeWidth?: number }> {
-  return MODULES.find((m) => m.id === id)?.Icon ?? PenLine;
+  return MODULES.find((m) => m.id === id)?.Icon ?? (id === "mentor" ? GraduationCap : PenLine);
 }
 
 // ── Tab label / icon helpers ────────────────────────────────────────────────
@@ -172,7 +172,7 @@ function TabStrip() {
               },
             ])}
             className={cn(
-              "group relative flex h-full max-w-[176px] flex-none cursor-pointer items-center gap-1.5 border-r border-line px-2.5 text-[12px]",
+              "group relative flex h-full w-[148px] flex-none cursor-pointer items-center gap-1.5 border-r border-line px-2.5 text-[12px]",
               dragging === tab.tabId && "opacity-50",
               dropAt?.tabId === tab.tabId && (dropAt.side === "left"
                 ? "shadow-[inset_2px_0_0_var(--nv-accent)]"
@@ -183,7 +183,7 @@ function TabStrip() {
             )}
           >
             <TabIcon tab={tab} notes={notes as Record<string, { kind: string }>} />
-            <span className="truncate">{label}</span>
+            <span className="min-w-0 flex-1 truncate">{label}</span>
             {isPinned ? (
               <Pin size={11} className="flex-none text-accent-text" />
             ) : (

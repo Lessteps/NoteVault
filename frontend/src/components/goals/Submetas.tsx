@@ -10,7 +10,6 @@ import { pct, useGoals } from "../../store/goals";
 import { BlockProgress } from "../common/charts";
 import { Chip, GhostButton, inputBase, PRIORITY_COLOURS, PRIORITY_GLYPHS, PRIORITY_NAMES } from "../common/forms";
 import { cn, IconButton } from "../ui";
-import { ItemEditor } from "./ItemEditor";
 
 const CAT_COLOURS = ["#2383e2", "#a855f7", "#33b679", "#ff9632", "#f2555a", "#38bdf8", "#facc15", "#fb7185"];
 export function catColour(c: string): string {
@@ -19,7 +18,7 @@ export function catColour(c: string): string {
   return CAT_COLOURS[h % CAT_COLOURS.length]!;
 }
 
-function useToggle() {
+export function useToggle() {
   const detail = useGoals((s) => s.detail)!;
   const refresh = useGoals((s) => s.refreshAfterWrite);
   const toast = useApp((s) => s.toast);
@@ -41,7 +40,6 @@ export function SubmetaCards() {
   const detail = useGoals((s) => s.detail)!;
   const openSubmeta = useGoals((s) => s.openSubmeta);
   const openItem = useGoals((s) => s.openItem);
-  const setSubView = useGoals((s) => s.setSubView);
   const setChecklistFor = useGoals((s) => s.setChecklistFor);
   const toggle = useToggle();
   const [cat, setCat] = useState("");
@@ -79,7 +77,7 @@ export function SubmetaCards() {
             <div key={it.id} className="rounded-xl border border-line bg-card p-3.5" style={{ borderTop: `3px solid ${accent}` }}>
               <div className="flex items-start gap-2">
                 <span>{it.is_priority ? "⭐" : !it.is_leaf ? "📁" : "•"}</span>
-                <button type="button" onClick={() => (it.is_priority || !it.is_leaf ? openSubmeta(it.id) : (setSubView("arbol"), openItem(it.id)))}
+                <button type="button" onClick={() => openItem(it.id)}
                   className="min-w-0 flex-1 text-left text-[13px] font-semibold leading-snug text-text hover:underline">{it.name}</button>
                 <Chip colour={PRIORITY_COLOURS[it.priority]}>{PRIORITY_GLYPHS[it.priority]} {PRIORITY_NAMES[it.priority]}</Chip>
               </div>
@@ -122,7 +120,6 @@ export function SubmetaTree() {
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [habitNames, setHabitNames] = useState<Record<string, string>>({});
   const g = detail.goal;
-  const byId = new Map(detail.items.map((i) => [i.id, i]));
 
   if (!Object.keys(habitNames).length) {
     void api.habitsList().then((hs) => setHabitNames(Object.fromEntries(hs.map((h) => [h.id, `${h.icon} ${h.name}`])))).catch(() => undefined);
@@ -144,7 +141,6 @@ export function SubmetaTree() {
     });
   };
   walk("", 0);
-  const editing = itemId ? byId.get(itemId) : undefined;
 
   return (
     <div className="flex min-h-0 gap-0">
@@ -170,7 +166,7 @@ export function SubmetaTree() {
               <span className="text-[11.5px]" style={{ color: PRIORITY_COLOURS[it.priority] }}>{PRIORITY_GLYPHS[it.priority]} {PRIORITY_NAMES[it.priority]}</span>
               <span className="truncate text-[11.5px] text-dim">{it.schedule || "—"}</span>
               <span className="flex items-center gap-1"><BlockProgress value={it.progress} colour={g.colour} blocks={6} /></span>
-              <span className="truncate text-[11px] text-dim">{it.habit_links.map((h) => habitNames[h] ?? "").filter(Boolean).join(", ")}</span>
+              <span className="truncate text-[11px] text-dim">{[...it.habit_links.map((h) => habitNames[h] ?? ""), ...(it.topic_progress?.links.map((l) => `📚 ${l.title} ${l.broken ? "(roto)" : `${l.pct}%`}`) ?? [])].filter(Boolean).join(", ")}</span>
                 <span className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                   <IconButton title="Subir" disabled={n === 0} onClick={() => void act(() => api.goalItemMove(g.id, it.id, it.parent, n - 1))}><ArrowUp size={12} /></IconButton>
                   <IconButton title="Bajar" disabled={n === count - 1} onClick={() => void act(() => api.goalItemMove(g.id, it.id, it.parent, n + 1))}><ArrowDown size={12} /></IconButton>
@@ -184,7 +180,6 @@ export function SubmetaTree() {
           {!rows.length && <div className="p-6 text-center text-[13px] text-faint">Sin submetas. Crea la primera con «+ Submeta».</div>}
         </div>
       </div>
-      {editing && <ItemEditor item={editing} onClose={() => openItem(null)} />}
     </div>
   );
 }

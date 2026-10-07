@@ -31,6 +31,21 @@ interface CanvasState {
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 
+/** The file was deleted or moved outside the app: the API answers "No existe: <path>". */
+const isGone = (e: unknown): boolean => /No existe/i.test((e as Error)?.message ?? "");
+
+/** Closes the tab of a canvas that no longer exists, once and quietly (instead of one error toast per save or reload). */
+function closeGone(path: string): void {
+  clearPending(`canvas:${path}`);
+  const app = useApp.getState();
+  app.pathDeleted(path);
+  app.toast("info", "El canvas ya no existe en disco: se cerró su pestaña.");
+}
+
+/** When this app last saved the open canvas: the file watcher echoes our own save, and re-reading a big canvas for it re-renders the whole board. */
+let wroteAt = 0;
+const WRITE_ECHO_MS = 2500;
+
 export const useCanvas = create<CanvasState>((set, get) => {
   const schedule = () => {
     if (timer) clearTimeout(timer);
@@ -104,15 +119,21 @@ export const useCanvas = create<CanvasState>((set, get) => {
       }
       if (!path || !dirty) return;
       try {
+        wroteAt = Date.now();
         const r = await api.canvasWrite(path, doc, force ? null : modified);
         if (r.conflict) {
-          set({ conflict: true });
+          // Changed on disk by another app: the app's version wins, no banner and no reload.
+          await get().save(true);
           return;
         }
         // Edits made while the write was in flight stay dirty.
         set((s) => ({ modified: r.modified, conflict: false, dirty: s.doc !== doc }));
         if (get().doc === doc) clearPending(`canvas:${path}`);
       } catch (e) {
+        if (isGone(e)) {
+          closeGone(path);
+          return;
+        }
         useApp.getState().toast("error", (e as Error).message);
       }
     },
@@ -120,10 +141,10 @@ export const useCanvas = create<CanvasState>((set, get) => {
     reload: async () => {
       const { path, dirty } = get();
       if (!path) return;
-      if (dirty) {
-        set({ conflict: true });
-        return;
-      }
+      // Unsaved edits win, as in save(): the disk change (often the echo of our own autosave) is neither reloaded nor announced,
+      // because a banner appearing mid-drag shifted the whole board.
+      if (dirty) return;
+      if (Date.now() - wroteAt < WRITE_ECHO_MS) return;
       try {
         const r = await api.canvasRead(path);
         set({
@@ -134,8 +155,9 @@ export const useCanvas = create<CanvasState>((set, get) => {
           dirty: false,
           conflict: false,
         });
-      } catch {
-        /* file might have moved or disappeared */
+      } catch (e) {
+        // A file that disappeared closes its tab; any other failure leaves the canvas as it is.
+        if (isGone(e)) closeGone(path);
       }
     },
 

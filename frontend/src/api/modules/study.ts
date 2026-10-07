@@ -10,7 +10,7 @@ import { parseFrontmatter } from "../../core/frontmatter.js";
 import { loadCard } from "../../core/practice/cards.js";
 import { DISCIPLINES, skillOf } from "../../core/practice/disciplineCatalog.js";
 import { writeErrorDigest } from "../../core/practice/errorLog.js";
-import type { ExerciseRef, VaultScan } from "../../core/practice/exerciseIndex.js";
+import type { ExerciseRef } from "../../core/practice/exerciseIndex.js";
 import { BANDS, attemptPassed } from "../../core/practice/ledger.js";
 import { MODES } from "../../core/practice/modes.js";
 import {
@@ -19,7 +19,7 @@ import {
   skillLabel,
 } from "../../core/practice/recommender.js";
 import { StudyArea, detectStudyArea } from "../../core/practice/studyArea.js";
-import { ensureExerciseSetFile, ensureOverviewFile, ensureTopicViewFiles, isExerciseFolder, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf, overviewFileText, viewFileName } from "../../core/practice/viewFiles.js";
+import { ensureExerciseSetFile, ensureProjectsViewFile, projectsFolderOf, ensureOverviewFile, ensureTopicViewFiles, isExerciseFolder, folderHasTopicsBelow, isSubjectRoot, isTopicFolder, mapNoteOf, overviewFileText, viewFileName } from "../../core/practice/viewFiles.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { StudySRSManager } from "../../core/studySrsManager.js";
 import { LAYOUT } from "../../core/vaultFormat.js";
@@ -49,7 +49,7 @@ import {
   loadExamRecordForTopic,
 } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
-import { clearExerciseIndexCache, scanVault, warmNoteCache } from "../../core/practice/exerciseIndex.js";
+import { clearExerciseIndexCache, warmNoteCache } from "../../core/practice/exerciseIndex.js";
 import { AIConfig, sendChat } from "../../core/aiClient.js";
 import {
   applyPlanToPractica,
@@ -82,7 +82,11 @@ import {
 import { AppConfig } from "../appConfig.js";
 import type { DifficultyLevel } from "../../core/practice/skills.js";
 import type { AppState } from "../appState.js";
+import { clearVaultScanCache, hasVaultScan, vaultScan } from "../vaultScan.js";
 import { isoDate } from "../common.js";
+
+// `vaultScan` vive en ../vaultScan.ts (sin ciclo con appState); se reexporta aquí.
+export { vaultScan };
 
 export const STUDY_IDS = ["mathematics", "programming", "english"] as const;
 
@@ -166,16 +170,6 @@ const _dashboardCache = new Map<string, { data: unknown; timestamp: number }>();
 const _dashboardRefreshing = new Set<string>();
 
 /**
- * One vault scan, shared by every study call that needs it.
- *
- * Reading every note is the expensive part of the whole study API (six call sites
- * used to do it independently, each paying the disk cost), so the scan is kept
- * here and dropped whenever the vault changes — the same invalidation the
- * snapshots use, plus the TTL as a safety net.
- */
-const _scanCache = new Map<string, { data: VaultScan; timestamp: number }>();
-
-/**
  * True once `warmStudyIndex` has read every note into the per-file cache, so a
  * later `scanVault` is cheap. Until then, blocks like the topic dashboard must
  * not pay the cold read themselves (see `study_topic_dashboard`).
@@ -184,18 +178,32 @@ let _indexWarmed = false;
 /** Vaults whose background scan has already been kicked off. */
 const _scanKicked = new Set<string>();
 
-export function vaultScan(app: AppState): VaultScan {
-  const hit = _scanCache.get(app.root);
-  if (hit && Date.now() - hit.timestamp < SNAPSHOT_CACHE_TTL_MS) return hit.data;
-  const data = scanVault(app.root, app.vault.notePaths());
-  _scanCache.set(app.root, { data, timestamp: Date.now() });
-  return data;
+/**
+ * True while the vault index is still cold (nothing scanned yet and the background warm-up
+ * not finished); in that case it also starts the scan in the background. Callers that need
+ * the whole-vault scan (the Mentor) answer `loading` instead of blocking the main process.
+ */
+export function studyIndexCold(app: AppState): boolean {
+  if (hasVaultScan(app.root) || _indexWarmed) return false;
+  if (!_scanKicked.has(app.root)) {
+    _scanKicked.add(app.root);
+    setImmediate(() => {
+      try {
+        vaultScan(app);
+      } catch {
+        /* the renderer's retry will surface any error */
+      } finally {
+        _scanKicked.delete(app.root);
+      }
+    });
+  }
+  return true;
 }
 
 export function clearStudySnapshotCache(): void {
   _snapshotCache.clear();
   _dashboardCache.clear();
-  _scanCache.clear();
+  clearVaultScanCache();
   _scanKicked.clear();
 }
 
@@ -745,6 +753,12 @@ export function studyApi(app: AppState) {
           created: created ? [app.rel(file)] : [],
           errors: [],
         };
+      }
+      // programming_practice/projects (and its _specs folder) open the weekly-project workspace.
+      const projectsAbs = stat.isDirectory() ? projectsFolderOf(folderAbs) : null;
+      if (projectsAbs) {
+        const { file, created } = ensureProjectsViewFile(projectsAbs);
+        return { ok: true, kind: "proyectos", path: app.rel(file).split(path.sep).join("/"), created: created ? [app.rel(file)] : [], errors: [] };
       }
       // The subject root groups areas: it gets its overview and nothing else.
       const subjectRoot = isSubjectRoot(app.root, folderAbs);
@@ -1441,7 +1455,7 @@ export function studyApi(app: AppState) {
       // every note (measured: 30 s over 2 107 notes). Return a provisional empty
       // payload instead and let the startup warm — or this background scan — fill
       // the cache; the view retries until the real data arrives.
-      if (!_scanCache.has(app.root) && !_indexWarmed) {
+      if (!hasVaultScan(app.root) && !_indexWarmed) {
         if (!_scanKicked.has(app.root)) {
           _scanKicked.add(app.root);
           setImmediate(() => {

@@ -6,7 +6,7 @@ import type { AppInfo, Frontmatter, NoteData, RenderingSettings } from "../lib/t
 
 export type ModuleId =
   | "home" | "calendario" | "habits" | "ejercicio" | "proyectos"
-  | "metas" | "finanzas" | "notas" | "tareas" | "web" | "player";
+  | "metas" | "finanzas" | "notas" | "tareas" | "web" | "player" | "mentor";
 
 export type ViewMode = "read" | "edit" | "split";
 export type ExplorerTab = "files" | "search" | "bookmarks" | "tags" | "graph";

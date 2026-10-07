@@ -6,14 +6,15 @@ import { MODES, modeFor } from "./modes";
 import { buildProgrammingExercisePrompt, formatProgrammingExerciseNote, languageOfDiscipline } from "./programmingExercises";
 import { buildExerciseGenerationPrompt, formatExerciseNote } from "./sessionBuilder";
 import { PROGRAMMING_SKILLS, skillsForSubject } from "./skills";
+import { skillsForTopicType } from "./skillSelection";
 import { createDefaultTopicManifest } from "./topic";
 
 const topic = (folder: string, title = "Cola de trabajos") => ({ ...createDefaultTopicManifest(folder, title, "programming", []), folder });
 
 describe("programming competencies", () => {
-  it("has the original eight plus the seven new ones, in the core and in the client mirror", () => {
+  it("has the original eight plus the eleven new ones, in the core and in the client mirror", () => {
     expect(PROGRAMMING_SKILLS.map((s) => s.id)).toEqual(["implement", "debug", "refactor", "design", "commands", "explain", "cloze", "find_error", ...PROGRAMMING_EXTRA_IDS]);
-    expect(PROGRAMMING_EXTRA_IDS).toEqual(["trace", "review", "test", "analyze", "decompose", "port", "query"]);
+    expect(PROGRAMMING_EXTRA_IDS).toEqual(["trace", "review", "test", "analyze", "decompose", "port", "pg_true_false", "pg_classify", "pg_compare", "pp_kata", "query"]);
     expect(CLIENT_PROGRAMMING_SKILLS.map((s) => s.id)).toEqual(PROGRAMMING_SKILLS.map((s) => s.id));
     expect(skillsForSubject("programming")).toBe(PROGRAMMING_SKILLS);
   });
@@ -32,6 +33,25 @@ describe("programming competencies", () => {
     // never shared with mathematics or english
     expect(skillsForSubject("mathematics").some((s) => PROGRAMMING_EXTRA_IDS.includes(s.id))).toBe(false);
     expect(() => modeFor({ subject: "english", mode: "trace" })).toThrow();
+  });
+});
+
+describe("practice follows the nature of the topic", () => {
+  it("a theory topic is practised with concept skills and never with code skills", () => {
+    const skills = skillsForTopicType("programming", "theoretical");
+    expect(skills).toEqual(expect.arrayContaining(["pg_true_false", "pg_classify", "pg_compare", "explain", "find_error"]));
+    for (const code of ["implement", "debug", "refactor", "commands", "cloze", "trace", "test", "query"]) expect(skills).not.toContain(code);
+  });
+
+  it("a procedural topic is practised with code skills and no concept skills", () => {
+    const skills = skillsForTopicType("programming", "procedural");
+    expect(skills).toEqual(expect.arrayContaining(["implement", "trace", "debug"]));
+    for (const concept of ["pg_true_false", "pg_classify", "pg_compare"]) expect(skills).not.toContain(concept);
+  });
+
+  it("a mixed topic offers both families", () => {
+    const skills = skillsForTopicType("programming", "mixed");
+    expect(skills).toEqual(expect.arrayContaining(["pg_true_false", "implement", "explain"]));
   });
 });
 
@@ -101,5 +121,31 @@ describe("programming exercises", () => {
     expect(note).not.toContain("Enunciado");
     expect(disciplineFor({ subject: "programming", discipline: "python" }).id).toBe("python");
     expect(formatProgrammingExerciseNote(topic("Programación/6 Bases de datos/6.5 JOINs"), "query", 1, "no_help", { title: "t", statement: "s", hints: [], solution: "x", rubric: [] })).toContain("discipline: sql");
+  });
+});
+
+describe("exercise prompts follow the topic type", () => {
+  const theory = [{ title: "What it is", content: "A runtime executes programs." }];
+  const manifest = (type?: "theoretical" | "procedural") => ({ ...topic("Programación/1 Fundamentals/1.2 How a computer works", "How a computer works"), ...(type ? { topic_type: type } : {}) });
+  const prompt = (m: ReturnType<typeof manifest>, skill: string) => buildProgrammingExercisePrompt(m, theory, skill, 2, "no_help", 2)[0]!.content;
+
+  it("a theory topic asks about ideas, never to write code, even for find_error and explain", () => {
+    for (const skill of ["find_error", "explain", "pg_true_false"]) {
+      const p = prompt(manifest("theoretical"), skill);
+      expect(p, skill).toContain("never ask the learner to write code or commands");
+    }
+    expect(prompt(manifest("theoretical"), "find_error")).toContain("wrong in a subtle, plausible way");
+    expect(prompt(manifest("theoretical"), "explain")).not.toContain("explain a mechanism or a decision");
+  });
+
+  it("a procedural topic keeps the code-oriented shape", () => {
+    const p = prompt(manifest("procedural"), "find_error");
+    expect(p).not.toContain("never ask the learner to write code or commands");
+    expect(p).toContain("Give code with one or two real behavioural errors");
+  });
+
+  it("the concept skills have their own exercise shape", () => {
+    expect(prompt(manifest(), "pg_classify")).toContain("borderline cases");
+    expect(prompt(manifest(), "pg_compare")).toContain("decisive difference");
   });
 });

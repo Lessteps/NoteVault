@@ -106,7 +106,7 @@ describe("TestModes", () => {
 
 describe("TestDisciplines", () => {
   it("catalogue", () => {
-    expect(Object.keys(DISCIPLINES).length).toBe(20); // + english reading, listening and speaking + programming by area (typescript, backend, frontend, desktop, automation, mobile, devtools)
+    expect(Object.keys(DISCIPLINES).length).toBe(21); // + programming_practice + english reading, listening and speaking + programming by area (typescript, backend, frontend, desktop, automation, mobile, devtools)
     const expectedSkills: Record<string, number> = {
       python: 15,
       javascript: 14,

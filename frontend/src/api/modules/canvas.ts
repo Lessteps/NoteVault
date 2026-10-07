@@ -21,6 +21,8 @@ export const MAX_CANVAS_BYTES = 8 * 1024 * 1024;
 export const MAX_NODES = 5000;
 export const MAX_EDGES = 10000;
 export const MAX_STROKE_POINTS = 20000;
+/** Largest width or height of a card or group. A deliverable canvas is many thousands of pixels wide, and its step groups wrap all of it. */
+export const MAX_NODE_SIZE = 1_000_000;
 export const MAX_MEDIA_BYTES = 15 * 1024 * 1024;
 const _ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const _COLOR_RE = /^([1-6]|#[0-9a-fA-F]{6})?$/;
@@ -109,8 +111,8 @@ export function cleanDoc(data: any): cf.CanvasDoc {
         type: kind,
         x: _num(d.x),
         y: _num(d.y),
-        width: _num(d.width, 10, 20000, 250),
-        height: _num(d.height, 10, 20000, 60),
+        width: _num(d.width, 10, MAX_NODE_SIZE, 250),
+        height: _num(d.height, 10, MAX_NODE_SIZE, 60),
         color: _color(d.color),
         file: _text(d.file, 1000).replace(/\\/g, "/"),
         text: _text(d.text, 200_000),

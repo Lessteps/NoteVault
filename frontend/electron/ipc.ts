@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from "electron";
 import { getRegistry } from "../src/api/registry";
 import { browserManager, type BrowserBounds } from "./browserManager";
 import { openSecondaryWindow } from "./windowFactory";
+import { cancelCapture, commitCapture, startCapture, type CaptureCommit } from "./screenCapture";
 
 /** The window the app is drawing its own title bar for. */
 function appWindow(): BrowserWindow | null {
@@ -9,7 +10,7 @@ function appWindow(): BrowserWindow | null {
 }
 
 export function registerIpc(): void {
-  ipcMain.handle("nv", async (_e, method: string, args: unknown[]) => {
+  ipcMain.handle("nv", async (e, method: string, args: unknown[]) => {
     switch (method) {
       case "window_minimize":
         appWindow()?.minimize();
@@ -28,6 +29,12 @@ export function registerIpc(): void {
         return openSecondaryWindow(String(args[0] ?? ""));
       case "window_state":
         return { maximized: appWindow()?.isMaximized() ?? false };
+      case "capture_start":
+        return await startCapture(e.sender, String(args[0] ?? ""));
+      case "capture_commit":
+        return await commitCapture(args[0] as CaptureCommit);
+      case "capture_cancel":
+        return cancelCapture();
       case "browser_attach":
         return browserManager.attach(args[0] as BrowserBounds, args[1] as string | undefined);
       case "browser_detach":

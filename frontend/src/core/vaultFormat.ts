@@ -75,7 +75,22 @@ export const LAYOUT = {
   study_ledger: `${DATA_DIR}/estudio/ledger/{id}.json`,
   study_exams_dir: `${DATA_DIR}/estudio/exams`,
   study_exam: `${DATA_DIR}/estudio/exams/{id}.json`,
+  study_pp_dir: `${DATA_DIR}/estudio/pp`,
+  study_pp_profile: `${DATA_DIR}/estudio/pp/profile.json`,
   kb_canvas_manifest: `${DATA_DIR}/estudio/kb_canvas_manifest.json`,
+  mentor_dir: `${DATA_DIR}/mentor`,
+  mentor_sessions_dir: `${DATA_DIR}/mentor/sessions`,
+  mentor_session: `${DATA_DIR}/mentor/sessions/{date}.json`,
+  mentor_chat: `${DATA_DIR}/mentor/chat.json`,
+  mentor_chats_dir: `${DATA_DIR}/mentor/chats`,
+  mentor_chat_file: `${DATA_DIR}/mentor/chats/{id}.json`,
+  mentor_chats_index: `${DATA_DIR}/mentor/chats/index.json`,
+  mentor_plans_dir: `${DATA_DIR}/mentor/plans`,
+  mentor_plan: `${DATA_DIR}/mentor/plans/{id}.json`,
+  mentor_plan_builds_dir: `${DATA_DIR}/mentor/plans/_building`,
+  mentor_plan_build: `${DATA_DIR}/mentor/plans/_building/{id}.json`,
+  mentor_plan_history_dir: `${DATA_DIR}/mentor/plans/_history/{id}`,
+  mentor_plan_history: `${DATA_DIR}/mentor/plans/_history/{id}/{n}.json`,
   web_dir: `${DATA_DIR}/web`,
   web_bookmarks: `${DATA_DIR}/web/marcadores.json`,
   web_restrictions: `${DATA_DIR}/web/restricciones.json`,
@@ -154,6 +169,8 @@ export const GOAL_ITEM_FIELDS: readonly FieldDef[] = [
   ["repeat", "str"], ["repeat_until", "date"], ["in_calendar", "bool"],
   ["reminder_min", "int"], ["target", "num"], ["unit", "str"], ["value", "num"],
   ["habit_links", "list"], ["done_at", "date"], ["created", "date"],
+  // Opcional y aditivo (se omite si está vacío): temas de estudio que cumplen la submeta.
+  ["topic_links", "list"],
 ] as const;
 
 export const PROJECT_V4_STATUSES = PROJECT_STATUSES;

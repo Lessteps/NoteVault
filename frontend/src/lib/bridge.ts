@@ -20,6 +20,8 @@ declare global {
     nv?: {
       invoke: (method: string, args: unknown[]) => Promise<unknown>;
       onOpenReview?: (cb: () => void) => () => void;
+      onCaptureRequest?: (cb: () => void) => () => void;
+      onCaptureDone?: (cb: (data: { rel: string; name: string }) => void) => () => void;
       onWatchEvent?: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void) => () => void;
       onBrowserState?: (cb: (data: BrowserState) => void) => () => void;
       onWindowState?: (cb: (data: { maximized: boolean }) => void) => () => void;
@@ -312,12 +314,81 @@ export const api = {
   goalItemCreate: (gid: string, name: string, parent = "", fields: Partial<GoalItem> = {}, subtasks: string[] = []) =>
     call<GoalItem>("goals_item_create", gid, name, parent, fields, subtasks),
   goalItemUpdate: (gid: string, iid: string, fields: Partial<GoalItem>) => call<GoalItem>("goals_item_update", gid, iid, fields),
+  goalsTopicLinksProgress: (links: string[]) =>
+    call<import("./types").TopicLinkProgress>("goals_topic_links_progress", links),
   goalItemDelete: (gid: string, iid: string) => call<{ ok: boolean }>("goals_item_delete", gid, iid),
   goalItemMove: (gid: string, iid: string, parent: string, index: number) =>
     call<{ ok: boolean }>("goals_item_move", gid, iid, parent, index),
   goalItemIndent: (gid: string, iid: string, direction: number) => call<{ ok: boolean }>("goals_item_indent", gid, iid, direction),
   goalSetDone: (gid: string, iid: string, day: string, done: boolean, value: number | string | null = null) =>
     call<{ ok: boolean }>("goals_set_done", gid, iid, day, done, value),
+
+  // Mentor
+  mentorBrief: (opts: { maxChars?: number; only?: string[]; exclude?: string[] } = {}) =>
+    call<import("./types").MentorBriefResult>("mentor_brief", opts),
+  mentorCandidates: (opts: { availableMinutes: number; maxSubjects?: number; objective?: import("./types").MentorSessionObjective }) =>
+    call<import("./types").MentorCandidatesResult>("mentor_candidates", opts),
+  mentorSessionSave: (record: import("./types").MentorSessionRecord) =>
+    call<import("./types").MentorSessionRecord>("mentor_session_save", record),
+  mentorSessionLoad: (date: string) => call<import("./types").MentorSessionRecord | null>("mentor_session_load", date),
+  mentorSessionRecent: (n = 14) => call<import("./types").MentorSessionRecord[]>("mentor_session_recent", n),
+  mentorSessionMarkBlock: (date: string, candidateId: string, status: import("./types").MentorBlockStatus, note?: string) =>
+    call<import("./types").MentorSessionRecord | null>("mentor_session_mark_block", date, candidateId, status, note),
+  mentorAdherence: (n = 30) => call<import("./types").MentorAdherence>("mentor_adherence", n),
+  mentorOverview: () => call<import("./types").MentorOverview>("mentor_overview"),
+  mentorPlanPropose: (opts: import("./types").MentorPlanRequest) =>
+    call<import("./types").MentorProposeResult>("mentor_plan_propose", opts),
+  mentorPlanAccept: (opts: { date?: string; availableMinutes: number; objective?: string; blocks: import("./types").MentorProposedBlock[] }) =>
+    call<import("./types").MentorSessionRecord>("mentor_plan_accept", opts),
+  mentorBlockStatus: (date: string, candidateId: string, status: import("./types").MentorBlockStatus, note?: string) =>
+    call<import("./types").MentorSessionRecord>("mentor_block_status", date, candidateId, status, note),
+  mentorChatLoad: () => call<import("./types").MentorChatState>("mentor_chat_load"),
+  mentorChatClear: () => call<import("./types").MentorChatState>("mentor_chat_clear"),
+  mentorChat: (message: string, chatId?: string, mode?: "plan") => call<import("./types").MentorChatResult>("mentor_chat", { message, chatId, mode }),
+  mentorPlanList: () => call<import("./types").MentorPlanListRow[]>("mentor_plan_list"),
+  mentorPlanGet: (id?: string) => call<import("./types").MentorPlanGet>("mentor_plan_get", { id }),
+  mentorPlanOptions: () => call<import("./types").MentorPlanOptions>("mentor_plan_options"),
+  mentorPlanGenerate: (preconditions: import("./planTime").PlanPreconditions) => call<import("./types").MentorPlanGenerateResult>("mentor_plan_generate", { preconditions }),
+  /** Compatibilidad: genera un BORRADOR en el chat (sin crear el plan). */
+  mentorPlanGenerateDraft: (preconditions: import("./planTime").PlanPreconditions) => call<import("./types").MentorPlanGenerateResult>("mentor_plan_generate_draft", { preconditions }),
+  /** «Generar plan»: crea YA el plan propuesto (`noAi` = plan automático sin IA). */
+  mentorPlanGenerateNow: (preconditions: import("./planTime").PlanPreconditions, noAi = false) => call<import("./types").MentorPlanGenerateResult>("mentor_plan_generate", { preconditions, ...(noAi ? { noAi: true } : {}) }),
+  mentorPlanKeep: (id: string) => call<import("./types").MentorPlan>("mentor_plan_keep", { id }),
+  mentorPlanAnswer: (opts: { id: string; subplanId: string; answer: "yes" | "no" | "later"; questionId?: string }) => call<import("./types").MentorPlan>("mentor_plan_answer", opts),
+  mentorPlanChange: (opts: { id: string; comment?: string; ops?: Array<Record<string, unknown>>; label?: string; noAi?: boolean }) => call<import("./types").MentorChangeResult>("mentor_plan_change", opts),
+  mentorPlanChanges: (id: string) => call<import("./types").MentorChangeEntry[]>("mentor_plan_changes", { id }),
+  mentorPlanChangeUndo: (id: string) => call<{ plan: import("./types").MentorPlan; history: import("./types").MentorChangeEntry[] }>("mentor_plan_change_undo", { id }),
+  mentorAiStatus: (key: string) => call<import("./types").MentorAiStatus>("mentor_ai_status", { key }),
+  mentorAiCancel: (key: string, mode: "abort" | "auto" = "abort") => call<{ cancelled: boolean }>("mentor_ai_cancel", { key, mode }),
+  mentorPlanBuildStart: (preconditions: import("./planTime").PlanPreconditions, id?: string) => call<import("./types").MentorBuildResult>("mentor_plan_build_start", { preconditions, ...(id ? { id } : {}) }),
+  mentorPlanBuildGet: (id: string) => call<import("./types").MentorBuildResult>("mentor_plan_build_get", { id }),
+  mentorPlanBuildList: () => call<import("./types").MentorBuildSummary[]>("mentor_plan_build_list"),
+  mentorPlanBuildAnswer: (opts: { id: string; questionId: string; choice?: string; answer?: string; skip?: boolean; delegate?: boolean }) => call<import("./types").MentorBuildResult>("mentor_plan_build_answer", opts),
+  mentorPlanBuildBack: (id: string, stage: import("./planBuild").BuildStage) => call<import("./types").MentorBuildResult>("mentor_plan_build_back", { id, stage }),
+  mentorPlanBuildFinishNow: (id: string) => call<import("./types").MentorBuildResult>("mentor_plan_build_finish_now", { id }),
+  mentorPlanBuildAbandon: (id: string) => call<{ id: string; builds: import("./types").MentorBuildSummary[] }>("mentor_plan_build_abandon", { id }),
+  mentorPlanBuildAccept: (id: string) => call<import("./types").MentorPlanAccepted | { loading: true }>("mentor_plan_build_accept", { id }),
+  mentorPlanRename: (id: string, name: string) => call<import("./types").MentorPlan>("mentor_plan_rename", { id, name }),
+  mentorPlanArchive: (id: string, archived: boolean) => call<import("./types").MentorPlan>("mentor_plan_archive", { id, archived }),
+  mentorPlanDelete: (id: string) => call<{ id: string; plans: import("./types").MentorPlanRow[] }>("mentor_plan_delete", { id }),
+  mentorPlanDraftAccept: (turnId: string, chatId?: string) => call<import("./types").MentorPlanAccepted>("mentor_plan_draft_accept", { turnId, chatId }),
+  /** Responde una pregunta pendiente del borrador (entregables): yes añade la propuesta, no la descarta, later la deja. */
+  mentorPlanDraftAnswer: (opts: { turnId: string; chatId?: string; subplanId: string; answer: "yes" | "no" | "later"; questionId?: string }) =>
+    call<{ turns: import("./types").MentorChatTurn[]; pending: string | null; planDraft: import("./types").MentorPlanDraft }>("mentor_plan_draft_answer", opts),
+  mentorPlanDraftDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_plan_draft_discard", turnId),
+  /** Mismo efecto que `mentorPlanDraftDiscard` (nombre corto del contrato). */
+  mentorPlanDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_plan_discard", turnId),
+  mentorPlanUpdateDeliverable: (opts: { id: string; subplanId: string; status: import("./types").MentorDeliverableStatus; projectId?: string | null }) =>
+    call<import("./types").MentorPlan>("mentor_plan_update_deliverable", opts),
+  mentorChatsList: () => call<import("./types").MentorChatMeta[]>("mentor_chats_list"),
+  mentorChatNew: () => call<import("./types").MentorChatState>("mentor_chat_new"),
+  mentorChatOpen: (id: string) => call<import("./types").MentorChatState>("mentor_chat_open", id),
+  mentorChatRename: (id: string, title: string) => call<{ id: string; title: string }>("mentor_chat_rename", id, title),
+  mentorChatDelete: (id: string) => call<import("./types").MentorChatState>("mentor_chat_delete", id),
+  mentorDraftDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_draft_discard", turnId),
+  mentorGoalCreate: (draft: import("./types").MentorGoalDraft, turnId?: string) =>
+    call<import("./types").MentorGoalCreated>("mentor_goal_create", { draft, turnId }),
+  mentorPanels: () => call<import("./types").MentorPanels>("mentor_panels"),
 
   // Finanzas
   finMeta: () => call<FinMeta>("fin_meta"),
@@ -463,7 +534,7 @@ export const api = {
   /** The view file of a folder (created when missing): practica or resumen. */
 studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic_map", rel),
     studyViewEnsure: (rel: string) =>
-    call<{ ok: boolean; kind: "practica" | "resumen" | "ejercicios" | "none"; path: string; created: string[]; tagged?: string[]; errors: string[] }>("study_view_ensure", rel),
+    call<{ ok: boolean; kind: "practica" | "resumen" | "ejercicios" | "proyectos" | "none"; path: string; created: string[]; tagged?: string[]; errors: string[] }>("study_view_ensure", rel),
   studyTopicConvert: (folder: string) => call<{ ok: boolean; path: string; manifest: any }>("study_topic_convert", folder),
   studyTopicSessionBuild: (
     folder: string,
@@ -563,6 +634,22 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   codeRuntimes: () => call<{ items: import("./types").CodeRuntime[] }>("code_runtimes"),
   codeRun: (language: string, code: string, stdin = "") => call<import("./types").CodeRun>("code_run", language, code, stdin),
   codeTrace: (language: string, code: string, stdin = "") => call<import("./types").CodeTrace>("code_trace", language, code, stdin),
+  // programming_practice: the weekly project pipeline (build → construct → defend → postmortem)
+  ppStatus: () => call<import("./types").PpStatus>("pp_status"),
+  ppInit: () => call<{ ok: boolean; area: string; created: string[] }>("pp_init"),
+  ppProfile: () => call<{ weaknesses: Array<{ label: string; layer: string; count: number; status: string }>; strengths: Array<{ label: string; count: number }>; style: string[]; summary: string; suggestedFocus: string | null }>("pp_profile"),
+  ppIdeas: (opts: { focus?: string; client?: string; notes?: string } = {}) =>
+    call<{ ideas: import("./types").PpIdea[]; focus: string | null; conversationId: string }>("pp_ideas", opts),
+  ppBuild: (req: { idea?: Partial<import("./types").PpIdea>; focus?: string; client?: string; notes?: string; week?: number }) =>
+    call<{ folder: string; rel: string; conversationId: string }>("pp_build", req),
+  ppPlan: (opts: { weeks?: number; notes?: string } = {}) =>
+    call<{ plan: Array<import("./types").PpIdea & { week: number }>; rel: string; conversationId: string }>("pp_plan", opts),
+  ppConstruct: (folder: string) => call<{ ok: boolean; rel: string }>("pp_construct", folder),
+  ppDefendEstimate: (folder: string, onlyChanged = false) => call<import("./types").PpEstimate>("pp_defend_estimate", folder, onlyChanged),
+  ppDefend: (folder: string, opts: { runChecks?: boolean; onlyChanged?: boolean } = {}) => call<import("./types").PpDefense>("pp_defend", folder, opts),
+  ppDefendGrade: (folder: string, answers: Record<string, string>) => call<{ grade: import("./types").PpGrade; conversationId: string }>("pp_defend_grade", folder, answers),
+  ppPostmortem: (folder: string) => call<import("./types").PpPostmortem>("pp_postmortem", folder),
+  ppKataPostmortem: () => call<import("./types").PpPostmortem>("pp_kata_postmortem"),
   enRecordingList: () => call<{ items: import("./types").EnglishRecording[] }>("en_recording_list"),
   enRecordingUrl: (id: string) => call<{ url: string }>("en_recording_url", id),
   enRecordingRename: (id: string, name: string) => call<{ ok: boolean; id: string }>("en_recording_rename", id, name),
@@ -585,6 +672,15 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   /** A review notification was clicked: open the Repaso calendar. */
   onOpenReview: (cb: () => void): (() => void) => {
     if (typeof window !== "undefined" && window.nv?.onOpenReview) return window.nv.onOpenReview(cb);
+    return () => undefined;
+  },
+  captureStart: (folder: string) => call<{ ok: boolean }>("capture_start", folder),
+  onCaptureRequest: (cb: () => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onCaptureRequest) return window.nv.onCaptureRequest(cb);
+    return () => undefined;
+  },
+  onCaptureDone: (cb: (data: { rel: string; name: string }) => void): (() => void) => {
+    if (typeof window !== "undefined" && window.nv?.onCaptureDone) return window.nv.onCaptureDone(cb);
     return () => undefined;
   },
   onWatchEvent: (cb: (data: { eventType: string; relPath: string; fullPath: string }) => void): (() => void) => {

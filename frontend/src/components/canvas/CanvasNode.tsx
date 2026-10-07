@@ -6,6 +6,7 @@ import { memo, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { colorOf, shapePath, type CNode, type Side } from "../../lib/canvas";
 import { renderMarkdown } from "../../lib/markdown";
+import { SourceEditor } from "../notes/SourceEditor";
 import { cn } from "../ui";
 
 type FileInfo = { exists: boolean; kind?: string; title?: string; path?: string; text?: string; src?: string };
@@ -111,19 +112,44 @@ function TextEditor({ value, onDone, className }: { value: string; onDone: (v: s
   );
 }
 
+/**
+ * The editor of a text card: the same live-preview editor as a note (headings, bold and lists are drawn as you type, the
+ * Markdown markers hidden away from the cursor), never the raw source in a plain box.
+ */
+function CardEditor({ value, onDone }: { value: string; onDone: (v: string | null) => void }) {
+  const draft = useRef(value);
+  return (
+    <div
+      data-card-editor
+      className="nv-card-editor h-full min-h-0 overflow-hidden px-2.5 py-1.5 [&_.cm-content]:!max-w-none [&_.cm-scroller]:!p-0 [&_.cm-scroller]:!pb-2"
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onDone(draft.current); }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Escape") onDone(draft.current);
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <SourceEditor value={value} eol={"\n"} code={false} onChange={(raw) => { draft.current = raw; }} />
+    </div>
+  );
+}
+
 const SIDES: Side[] = ["top", "right", "bottom", "left"];
 const PORT_POS: Record<Side, string> = {
-  top: "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2",
-  right: "right-0 top-1/2 translate-x-1/2 -translate-y-1/2",
-  bottom: "left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2",
-  left: "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2",
+  // 12 px OUTSIDE the side: at the middle of the outline they sat on top of the side resize handles and hid them.
+  top: "left-1/2 top-0 -translate-x-1/2 -translate-y-[calc(50%_+_12px)]",
+  right: "right-0 top-1/2 translate-x-[calc(50%_+_12px)] -translate-y-1/2",
+  bottom: "left-1/2 bottom-0 -translate-x-1/2 translate-y-[calc(50%_+_12px)]",
+  left: "left-0 top-1/2 -translate-x-[calc(50%_+_12px)] -translate-y-1/2",
 };
 
 export const CanvasNodeView = memo(function CanvasNodeView({
-  node, selected, editing, onEditDone,
+  node, selected, editing, onEditDone, boxed,
 }: {
   node: CNode;
   selected: boolean;
+  /** The selection came from a selection box: a drawing then shows its box as well (a click shows the stroke itself). */
+  boxed?: boolean;
   editing: boolean;
   onEditDone: (id: string, text: string | null) => void;
 }) {
@@ -144,19 +170,20 @@ export const CanvasNodeView = memo(function CanvasNodeView({
     return (
       <div
         data-node-id={node.id}
-        className={cn("absolute rounded-2xl", selected && "outline outline-2 outline-offset-2 outline-accent")}
+        className={cn("pointer-events-none absolute rounded-2xl", selected && "outline outline-2 outline-offset-2 outline-accent")}
         style={{ ...style, borderColor: col, background: `color-mix(in srgb, ${colorOf(node.color, "var(--nv-dim)")} 7%, transparent)` }}
       >
-        <div className="absolute -top-8 left-0 flex h-7 max-w-full items-center rounded-lg px-2 text-[14px] font-semibold text-text"
+        <div data-group-label title="Arrastra para mover el grupo" className={cn("pointer-events-auto absolute -top-8 left-0 flex h-7 cursor-move items-center whitespace-nowrap rounded-lg px-2 text-[14px] font-semibold text-text", !editing && "max-w-full")}
           style={{ background: `color-mix(in srgb, ${colorOf(node.color, "var(--nv-dim)")} 22%, var(--nv-surface))` }}>
           {editing
-            ? <input autoFocus defaultValue={node.label ?? ""} onBlur={(e) => done(e.target.value)}
+            ? <input autoFocus defaultValue={node.label ?? ""} size={Math.max(8, (node.label ?? "").length + 2)}
+              onInput={(e) => { e.currentTarget.size = Math.max(8, e.currentTarget.value.length + 2); }} onBlur={(e) => done(e.target.value)}
               onKeyDown={(e) => {
                 e.stopPropagation();
                 if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur();
               }}
               onPointerDown={(e) => e.stopPropagation()}
-              className="w-48 bg-transparent outline-none" />
+              className="min-w-0 bg-transparent outline-none" />
             : <span className="truncate">{node.label || "Grupo"}</span>}
         </div>
         <Handles selected={selected} />
@@ -167,14 +194,23 @@ export const CanvasNodeView = memo(function CanvasNodeView({
   if (node.type === "nv-drawing") {
     const strokes = node.nv?.strokes ?? [];
     return (
-      <div data-node-id={node.id} className={cn("absolute", selected && "rounded outline-dashed outline-1 outline-accent")} style={{ left: node.x, top: node.y, width: node.width, height: node.height }}>
+      // Only the stroke itself takes the pointer (never its box): a click on the line selects it, a click beside it is the board.
+      <div data-node-id={node.id} className={cn("pointer-events-none absolute", selected && boxed && "rounded outline-dashed outline-1 outline-accent")} style={{ left: node.x, top: node.y, width: node.width, height: node.height }}>
         <svg width={node.width} height={node.height} className="overflow-visible">
+          {selected && strokes.map((s, i) => (
+            <polyline key={"halo" + i} points={s.points.map((p) => p.join(",")).join(" ")} fill="none"
+              stroke="var(--nv-accent)" strokeOpacity={0.35} strokeWidth={s.width + 6} strokeLinecap="round" strokeLinejoin="round" />
+          ))}
           {strokes.map((s, i) => (
             <polyline key={i} points={s.points.map((p) => p.join(",")).join(" ")} fill="none"
               stroke={colorOf(s.color, "var(--nv-text)")} strokeWidth={s.width} strokeLinecap="round" strokeLinejoin="round" />
           ))}
+          {strokes.map((s, i) => (
+            <polyline key={"hit" + i} points={s.points.map((p) => p.join(",")).join(" ")} fill="none" stroke="transparent"
+              strokeWidth={Math.max(s.width, 10)} strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: "stroke" }} />
+          ))}
         </svg>
-        <Handles selected={selected} />
+        <Handles selected={selected} noPorts />
       </div>
     );
   }
@@ -206,7 +242,7 @@ export const CanvasNodeView = memo(function CanvasNodeView({
       style={{ ...style, borderColor: col, background: tint }}
     >
       {node.type === "text" && (editing
-        ? <TextEditor value={node.text ?? ""} onDone={done} />
+        ? <CardEditor value={node.text ?? ""} onDone={done} />
         : (
           <div className="nv-prose h-full px-3 py-2 text-[13.5px]"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(node.text ?? "") }} />
@@ -236,16 +272,16 @@ const RESIZE_HANDLES = [
 ];
 
 /** Ports to drag connections from, and the 8 resize handles. */
-function Handles({ selected }: { selected: boolean }) {
+function Handles({ selected, noPorts }: { selected: boolean; noPorts?: boolean }) {
   return (
     <>
-      {SIDES.map((s) => (
+      {!noPorts && SIDES.map((s) => (
         <span
           key={s}
           data-port={s}
           title="Arrastra para conectar"
           className={cn(
-            "nv-port absolute z-20 h-3.5 w-3.5 cursor-crosshair rounded-full border-2 border-accent bg-card",
+            "nv-port pointer-events-auto absolute z-20 h-3.5 w-3.5 cursor-pointer rounded-full border-2 border-accent bg-card",
             PORT_POS[s], selected ? "opacity-100" : "opacity-0",
           )}
         />
@@ -256,7 +292,7 @@ function Handles({ selected }: { selected: boolean }) {
           data-resize={handle}
           title="Cambiar tamaño"
           className={cn(
-            "absolute z-10 rounded-sm border-2 border-accent bg-card",
+            "pointer-events-auto absolute z-10 rounded-sm border-2 border-accent bg-card",
             handle === "n" || handle === "s" ? "h-3.5 w-7" : handle === "w" || handle === "e" ? "h-7 w-3.5" : "h-3.5 w-3.5",
             pos,
           )}

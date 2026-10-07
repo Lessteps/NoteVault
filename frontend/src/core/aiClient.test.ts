@@ -6,6 +6,7 @@ import {
   PROVIDERS,
   buildBridgePrompt,
   buildMessages,
+  sendChat,
   streamChat,
 } from "./aiClient.js";
 
@@ -164,6 +165,43 @@ describe("streaming", () => {
       expect(text).toBe("parcial");
     } finally {
       globalThis.fetch = original;
+    }
+  });
+});
+
+describe("sendChat: cancelar y vencer el tiempo de verdad", () => {
+  const hangingFetch = () => {
+    const original = globalThis.fetch;
+    let seen: AbortSignal | undefined;
+    globalThis.fetch = ((_url: unknown, init?: RequestInit) =>
+      new Promise((_ok, no) => {
+        seen = init?.signal ?? undefined;
+        init?.signal?.addEventListener("abort", () => no(Object.assign(new Error("aborted"), { name: "AbortError" })));
+      })) as typeof fetch;
+    return { restore: () => { globalThis.fetch = original; }, signal: () => seen };
+  };
+
+  it("con una AbortSignal aborta la petición y rechaza con «Cancelado»", async () => {
+    const f = hangingFetch();
+    try {
+      const ctl = new AbortController();
+      const p = sendChat(new AIConfig({ provider: "deepseek", api_key: "k", model: "m" }), [{ role: "user", content: "hola" }], { signal: ctl.signal });
+      setTimeout(() => ctl.abort(), 10);
+      await expect(p).rejects.toThrow(/Cancelado/);
+      expect(f.signal()!.aborted).toBe(true);
+      await expect(sendChat(new AIConfig({ provider: "deepseek", api_key: "k", model: "m" }), [], { signal: ctl.signal })).rejects.toThrow(/Cancelado/);
+    } finally {
+      f.restore();
+    }
+  });
+
+  it("con timeoutMs vence antes del tiempo del proveedor y lo dice", async () => {
+    const f = hangingFetch();
+    try {
+      await expect(sendChat(new AIConfig({ provider: "deepseek", api_key: "k", model: "m" }), [{ role: "user", content: "hola" }], { timeoutMs: 30 })).rejects.toThrow(/tardó demasiado/);
+      expect(f.signal()!.aborted).toBe(true);
+    } finally {
+      f.restore();
     }
   });
 });

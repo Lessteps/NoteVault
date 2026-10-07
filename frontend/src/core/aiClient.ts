@@ -10,6 +10,7 @@
 // The Python original used the stdlib urllib so the frozen .exe stayed
 // dependency free. In the Electron main process we use the global fetch.
 
+import { CLAUDE_MODEL_ALIASES, DEFAULT_TIMEOUT_S, runClaudeCode } from "./claudeCode.js";
 import { FILES_DIRECTIVE, FILES_MODE, VAULT_MODE_DIRECTIVES } from "./assistantModes.js";
 
 // ── Provider catalogue ─────────────────────────────────────────────────────
@@ -20,6 +21,7 @@ export const OLLAMA = "ollama";
 export const OPENAI_COMPATIBLE = "openai_compatible";
 export const OPENAI = "openai";
 export const ANTHROPIC = "anthropic";
+export const CLAUDE_CODE = "claude_code";
 export const BRIDGE_CLAUDE = "bridge_claude";
 export const BRIDGE_CHATGPT = "bridge_chatgpt";
 export const BRIDGE_ANTIGRAVITY = "bridge_antigravity";
@@ -124,6 +126,17 @@ export const PROVIDERS: ProviderInfo[] = [
     },
   ),
   provider(
+    CLAUDE_CODE,
+    "Claude Code (tu suscripción, sin API key)",
+    "Usa tu sesión de Claude Code; no consume tokens de DeepSeek. Requiere tener Claude Code " +
+      "instalado e iniciado sesión (ejecuta `claude` una vez y haz /login). Se usa como chat " +
+      "puro: sin acceso a archivos ni comandos.",
+    {
+      default_model: "sonnet",
+      default_models: [...CLAUDE_MODEL_ALIASES, "default"],
+    },
+  ),
+  provider(
     BRIDGE_CLAUDE,
     "Claude web (sin API)",
     "Copia la pregunta con el contexto de la nota y abre claude.ai. " +
@@ -184,6 +197,9 @@ export class AIConfig {
   temperature: number = 0.7;
   max_tokens: number = 1500;
   include_note: boolean = true;
+  /** Claude Code: ruta opcional de claude.exe y timeout (s) de cada llamada. */
+  claude_path: string = "";
+  claude_timeout_s: number = DEFAULT_TIMEOUT_S;
 
   constructor(init: Partial<AIConfig> = {}) {
     Object.assign(this, init);
@@ -206,6 +222,8 @@ export class AIConfig {
       temperature: this.temperature,
       max_tokens: this.max_tokens,
       include_note: this.include_note,
+      claude_path: this.claude_path,
+      claude_timeout_s: this.claude_timeout_s,
     };
   }
 
@@ -230,14 +248,25 @@ export class AIError extends Error {
 
 // ── Transport ──────────────────────────────────────────────────────────────
 
+/** Opciones de una llamada puntual: cancelarla de verdad (mata la petición o el proceso) y acotar su tiempo. */
+export interface SendOpts {
+  signal?: AbortSignal;
+  /** tiempo máximo de esta llamada (por defecto el del proveedor) */
+  timeoutMs?: number;
+}
+
 async function postJson(
   url: string,
   payload: unknown,
   headers: Record<string, string>,
   timeout = 120_000,
+  signal?: AbortSignal,
 ): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
+  const onAbort = (): void => controller.abort();
+  if (signal?.aborted) controller.abort();
+  else signal?.addEventListener("abort", onAbort, { once: true });
   let resp: Response;
   try {
     resp = await fetch(url, {
@@ -248,7 +277,7 @@ async function postJson(
     });
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
-      throw new AIError("La petición tardó demasiado y se canceló.");
+      throw new AIError(signal?.aborted ? "Cancelado." : "La petición tardó demasiado y se canceló.");
     }
     const reason = e instanceof Error ? e.message : String(e);
     throw new AIError(
@@ -257,6 +286,7 @@ async function postJson(
     );
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
   }
   const text = await resp.text();
   if (!resp.ok) {
@@ -265,7 +295,7 @@ async function postJson(
   return JSON.parse(text);
 }
 
-async function chatOpenAiStyle(cfg: AIConfig, messages: ChatMessage[]): Promise<string> {
+async function chatOpenAiStyle(cfg: AIConfig, messages: ChatMessage[], opts: SendOpts = {}): Promise<string> {
   const url = cfg.base_url.replace(/\/+$/, "") + "/chat/completions";
   const headers: Record<string, string> = {};
   if (cfg.api_key) headers["Authorization"] = `Bearer ${cfg.api_key}`;
@@ -276,7 +306,7 @@ async function chatOpenAiStyle(cfg: AIConfig, messages: ChatMessage[]): Promise<
     max_tokens: cfg.max_tokens,
     stream: false,
   };
-  const data = (await postJson(url, payload, headers)) as {
+  const data = (await postJson(url, payload, headers, opts.timeoutMs, opts.signal)) as {
     choices?: { message?: { content?: string } }[];
   };
   const content = data?.choices?.[0]?.message?.content;
@@ -286,7 +316,7 @@ async function chatOpenAiStyle(cfg: AIConfig, messages: ChatMessage[]): Promise<
   return content;
 }
 
-async function chatAnthropic(cfg: AIConfig, messages: ChatMessage[]): Promise<string> {
+async function chatAnthropic(cfg: AIConfig, messages: ChatMessage[], opts: SendOpts = {}): Promise<string> {
   const url = cfg.base_url.replace(/\/+$/, "") + "/messages";
   if (!cfg.api_key) throw new AIError("Falta la API key de Anthropic.");
   const headers = { "x-api-key": cfg.api_key, "anthropic-version": "2023-06-01" };
@@ -302,7 +332,7 @@ async function chatAnthropic(cfg: AIConfig, messages: ChatMessage[]): Promise<st
     max_tokens: cfg.max_tokens,
     temperature: cfg.temperature,
   };
-  const data = (await postJson(url, payload, headers)) as { content?: { text?: string }[] };
+  const data = (await postJson(url, payload, headers, opts.timeoutMs, opts.signal)) as { content?: { text?: string }[] };
   const parts = data?.content;
   if (!Array.isArray(parts)) {
     throw new AIError(`Respuesta inesperada de Anthropic:\n${JSON.stringify(data).slice(0, 400)}`);
@@ -310,18 +340,30 @@ async function chatAnthropic(cfg: AIConfig, messages: ChatMessage[]): Promise<st
   return parts.map((p) => p.text ?? "").join("");
 }
 
-export async function sendChat(cfg: AIConfig, messages: ChatMessage[]): Promise<string> {
+export async function sendChat(cfg: AIConfig, messages: ChatMessage[], opts: SendOpts = {}): Promise<string> {
   if (cfg.is_bridge) {
     throw new AIError(
       "Este proveedor funciona en modo puente: copia el prompt y pega la respuesta manualmente.",
     );
   }
-  if (cfg.provider === ANTHROPIC) return chatAnthropic(cfg, messages);
-  return chatOpenAiStyle(cfg, messages);
+  if (opts.signal?.aborted) throw new AIError("Cancelado.");
+  if (cfg.provider === CLAUDE_CODE) {
+    // al cancelar o vencer el tiempo se MATA el proceso de Claude Code (no solo se descarta el resultado)
+    const out = await runClaudeCode(
+      opts.timeoutMs ? { model: cfg.model, claude_path: cfg.claude_path, claude_timeout_s: Math.max(1, Math.ceil(opts.timeoutMs / 1000)) } : cfg,
+      messages,
+      { signal: opts.signal },
+    );
+    if (opts.signal?.aborted) throw new AIError("Cancelado.");
+    return out;
+  }
+  if (cfg.provider === ANTHROPIC) return chatAnthropic(cfg, messages, opts);
+  return chatOpenAiStyle(cfg, messages, opts);
 }
 
 /** Ask an OpenAI-compatible server which models it has loaded. */
 export async function listModels(cfg: AIConfig): Promise<string[]> {
+  if (cfg.provider === CLAUDE_CODE) return [...CLAUDE_MODEL_ALIASES, "default"];
   if (cfg.is_bridge || cfg.provider === ANTHROPIC) return [];
   const url = cfg.base_url.replace(/\/+$/, "") + "/models";
   const headers: Record<string, string> = {};
@@ -396,6 +438,7 @@ export async function streamChat(
       "Este proveedor funciona en modo puente: copia el prompt y pega la respuesta manualmente.",
     );
   }
+  if (cfg.provider === CLAUDE_CODE) return runClaudeCode(cfg, messages, handlers);
   const anthropic = cfg.provider === ANTHROPIC;
   const base = cfg.base_url.replace(/\/+$/, "");
   const headers: Record<string, string> = { Accept: "text/event-stream" };

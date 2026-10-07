@@ -22,6 +22,7 @@ const LANGUAGE_OF: Record<string, string> = {
   automation: "Python 3.12, TypeScript, or the n8n / Power Automate node names when the topic is about them",
   mobile: "TypeScript with React Native (Kotlin for native modules)",
   devtools: "shell / PowerShell commands, Dockerfile, YAML and config files",
+  programming_practice: "Python 3.12 or TypeScript 5 (the learner picks; the statement must work in both)",
 };
 
 export const languageOfDiscipline = (id: string): string => LANGUAGE_OF[id] ?? LANGUAGE_OF.programming_logic!;
@@ -43,6 +44,16 @@ const SHAPE_OF_MODE: Record<string, string> = {
   decompose: "Give a real requirement. The learner writes the plan (inputs and outputs, edge cases, ordered steps or a module breakdown), not the code. The solution is a model plan.",
   port: "Give working code in one language and name the target language. The solution is the idiomatic equivalent and lists the language differences that matter.",
   query: "Give a schema with a few sample rows and a question. The solution is the query, the result on the sample and why edge cases (NULLs, ties, empty groups) are handled.",
+  pp_kata: "Give one self-contained logic problem built on a pattern (arrays and strings, hashing, recursion, sorting and searching, two pointers, stacks and queues, trees and graphs, dynamic programming) with a precise statement, a table of inputs and expected outputs including edge cases. The solution is a reference solution, the pattern it uses and its complexity. No trick questions and no memorised-puzzle names.",
+  pg_true_false: "Give 4 to 6 short statements about the concept, about half of them false in a subtle way (a plausible misconception, a swapped cause, an absolute word such as 'always' or 'never'). The learner marks each true or false and justifies it. The solution lists every verdict, the reason, and the corrected statement for each false one. No code has to be written.",
+  pg_classify: "Give 5 to 8 concrete cases (a snippet to read, a log line, a requirement) and the categories of the topic, including borderline cases. The learner places each case and names the deciding criterion. The solution gives the category and the criterion for each case.",
+  pg_compare: "Name two or three easily confused concepts of this topic and give two small real situations. The learner states what is the same, what differs and which concept fits each situation and why. The solution gives the decisive difference and the assignment of each situation.",
+};
+
+/** When the topic is a CONCEPT (topic_type theoretical) these skills are asked about ideas, not about code. */
+const CONCEPT_SHAPE_OF_MODE: Record<string, string> = {
+  find_error: "Give a short explanation or a list of statements about the concept in which ONE OR TWO claims are wrong in a subtle, plausible way (a swapped cause, a missing condition, a mixed-up term). The learner finds the wrong claim(s), explains why each is wrong and rewrites it correctly. No code has to be fixed. The solution names each wrong claim, the reason and the corrected claim.",
+  explain: "Ask the learner to explain how the concept works and why it matters, with an example of their own, in a concrete situation (a failing request, a slow page, a lost file). No code has to be written. The solution is a model explanation with the key ideas the rubric checks.",
 };
 
 export function buildProgrammingExercisePrompt(
@@ -64,6 +75,7 @@ export function buildProgrammingExercisePrompt(
     .slice(0, 5)
     .map((t) => `### ${t.title}\n${t.content.slice(0, 1200).trim()}`)
     .join("\n\n");
+  const conceptTopic = manifest.topic_type === "theoretical";
   const anchors = discipline.skills.map((s) => `- ${s.title}: ${s.anchors.join("; ")}`).join("\n");
 
   const system = [
@@ -72,7 +84,8 @@ export function buildProgrammingExercisePrompt(
     `Skill to train: ${skill}${mode ? ` — ${mode.label}` : ""}. Level: ${level}.`,
     `Discipline framing: ${discipline.framing}`,
     mode ? `What this skill asks of the learner: ${mode.act}` : "",
-    `Shape of the exercise: ${SHAPE_OF_MODE[skill] ?? "A concrete task that trains exactly this skill."}`,
+    `Shape of the exercise: ${(conceptTopic ? CONCEPT_SHAPE_OF_MODE[skill] : undefined) ?? SHAPE_OF_MODE[skill] ?? "A concrete task that trains exactly this skill."}`,
+    conceptTopic ? "This topic is a CONCEPT, not a procedure: never ask the learner to write code or commands. Situations may quote a short snippet, a log excerpt or a request/response to READ and reason about." : "",
     "CRITICAL RULES:",
     "1. Every exercise is about the specific concepts of THIS topic, never generic filler; the topic's central mechanism must be what is being tested.",
     "2. Every exercise is real and applied (a script, a pipeline step, a business rule, concrete data). Never toy drills with names like data1 or valueA.",

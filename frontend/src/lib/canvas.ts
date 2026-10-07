@@ -105,23 +105,168 @@ export function shapePath(kind: string, w: number, h: number): string {
   }
 }
 
-export function portPoint(n: Rect, side: Side): [number, number] {
+const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
+
+/**
+ * Where an edge touches a side: `t` is the position along that side (0 = the start, 1 = the end, 0.5 = the middle, the
+ * default and the only place JSON Canvas itself knows). Always on the outline, never off it.
+ */
+export function portPoint(n: Rect, side: Side, t = 0.5): [number, number] {
+  const k = clamp01(t);
   switch (side) {
-    case "top": return [n.x + n.width / 2, n.y];
-    case "bottom": return [n.x + n.width / 2, n.y + n.height];
-    case "left": return [n.x, n.y + n.height / 2];
-    default: return [n.x + n.width, n.y + n.height / 2];
+    case "top": return [n.x + n.width * k, n.y];
+    case "bottom": return [n.x + n.width * k, n.y + n.height];
+    case "left": return [n.x, n.y + n.height * k];
+    default: return [n.x + n.width, n.y + n.height * k];
   }
+}
+
+/**
+ * The position along its side where an edge starts or ends. It lives in the edge's `nv` extras (`fromT` / `toT`), so the
+ * file stays a valid Obsidian canvas: another app simply draws the edge from the middle of the side.
+ */
+export function edgeT(edge: { nv?: Record<string, unknown> }, end: "from" | "to"): number {
+  const v = edge.nv?.[end === "from" ? "fromT" : "toT"];
+  return typeof v === "number" && Number.isFinite(v) ? clamp01(v) : 0.5;
+}
+
+/** The `nv` extras for a new edge, or undefined when both ends are in the middle (nothing to store). */
+export function anchorExtras(fromT: number, toT: number): { fromT?: number; toT?: number } | undefined {
+  const out: { fromT?: number; toT?: number } = {};
+  if (Math.abs(fromT - 0.5) > 1e-6) out.fromT = Math.round(clamp01(fromT) * 1000) / 1000;
+  if (Math.abs(toT - 0.5) > 1e-6) out.toT = Math.round(clamp01(toT) * 1000) / 1000;
+  return Object.keys(out).length ? out : undefined;
+}
+
+export interface BorderHit {
+  side: Side;
+  /** Position along that side, 0..1. */
+  t: number;
+  /** The point on the outline that was hit (what the connection starts from). */
+  x: number;
+  y: number;
+  /** How far the pointer is from the outline. */
+  distance: number;
+}
+
+/**
+ * Whether (x, y) is on the outline of `n`: within `tol` outside it, or inside it by at most `tol` (never more than a
+ * quarter of the smaller side, so a small card keeps a body to grab). Returns the nearest point of the outline, on which
+ * side and how far along it. Near the middle of a side the point sticks to the middle, so aligned lines are easy.
+ */
+export function borderHit(n: Rect, x: number, y: number, tol: number): BorderHit | null {
+  const inside = x >= n.x && x <= n.x + n.width && y >= n.y && y <= n.y + n.height;
+  const limit = inside ? Math.min(tol, Math.min(n.width, n.height) / 4) : tol;
+  const sides: Array<[Side, number]> = [
+    ["top", Math.abs(y - n.y)],
+    ["bottom", Math.abs(y - (n.y + n.height))],
+    ["left", Math.abs(x - n.x)],
+    ["right", Math.abs(x - (n.x + n.width))],
+  ];
+  let best: { side: Side; d: number } | null = null;
+  for (const [side, perpendicular] of sides) {
+    const horizontal = side === "top" || side === "bottom";
+    // Distance to the SEGMENT of that side: beyond its ends the distance grows with the overshoot.
+    const along = horizontal ? x : y;
+    const from = horizontal ? n.x : n.y;
+    const to = from + (horizontal ? n.width : n.height);
+    const overshoot = along < from ? from - along : along > to ? along - to : 0;
+    const d = Math.hypot(perpendicular, overshoot);
+    if (d <= limit && (!best || d < best.d)) best = { side, d };
+  }
+  if (!best) return null;
+  const horizontal = best.side === "top" || best.side === "bottom";
+  const length = horizontal ? n.width : n.height;
+  let t = clamp01(((horizontal ? x - n.x : y - n.y)) / Math.max(1, length));
+  if (Math.abs(t - 0.5) * length <= tol) t = 0.5;
+  const [px, py] = portPoint(n, best.side, t);
+  return { side: best.side, t, x: px, y: py, distance: best.d };
 }
 
 const NORMAL: Record<Side, [number, number]> = {
   top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0],
 };
 
+/** The grid: cards and edges snap to multiples of this many canvas units. */
+export const GRID = 20;
+export const MIN_WIDTH = 40;
+export const MIN_HEIGHT = 30;
+
+export const snapTo = (v: number, on: boolean): number => (on ? Math.round(v / GRID) * GRID : v);
+
+/**
+ * The offset to move a group of cards by when the pointer moved (dx, dy): it is chosen so that the ANCHOR card (the one being
+ * dragged) lands exactly on the grid, and every other card moves by the same amount, so the group keeps its shape. Snapping
+ * each card on its own would drag cards that sit off-grid to different places and scramble the layout.
+ */
+export function snappedDelta(anchor: readonly [number, number], dx: number, dy: number, on: boolean): [number, number] {
+  return [snapTo(anchor[0] + dx, on) - anchor[0], snapTo(anchor[1] + dy, on) - anchor[1]];
+}
+
+/**
+ * The rectangle after dragging `handle` by (dx, dy). The EDGES that move are the ones snapped to the grid, and the opposite
+ * edges do not move at all (snapping the width and the position separately made them drift).
+ */
+export function resizeRect(start: Rect, handle: string, dx: number, dy: number, snap: boolean): Rect {
+  const right0 = start.x + start.width;
+  const bottom0 = start.y + start.height;
+  let x = start.x;
+  let y = start.y;
+  let right = right0;
+  let bottom = bottom0;
+  if (handle.includes("e")) right = Math.max(start.x + MIN_WIDTH, snapTo(right0 + dx, snap));
+  if (handle.includes("w")) x = Math.min(right0 - MIN_WIDTH, snapTo(start.x + dx, snap));
+  if (handle.includes("s")) bottom = Math.max(start.y + MIN_HEIGHT, snapTo(bottom0 + dy, snap));
+  if (handle.includes("n")) y = Math.min(bottom0 - MIN_HEIGHT, snapTo(start.y + dy, snap));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+/** A rectangle with its four edges on the grid (the smallest size is kept). */
+export function snapRect(n: Rect): Rect {
+  const x = snapTo(n.x, true);
+  const y = snapTo(n.y, true);
+  const right = Math.max(x + MIN_WIDTH, snapTo(n.x + n.width, true));
+  const bottom = Math.max(y + MIN_HEIGHT, snapTo(n.y + n.height, true));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+/**
+ * Where the grid's background starts. The dots are drawn at the CENTRE of each tile of the background, so the tile has to
+ * start half a cell before the origin: that way a dot falls on every multiple of the grid, exactly where cards snap to.
+ */
+export const gridBackgroundOffset = (viewPos: number, cell: number): number => viewPos - cell / 2;
+
+export type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+/**
+ * Which resize handle a point of the outline stands for: the corner when it is within `corner` of one, otherwise the side.
+ * The whole outline resizes the card, so the handles a card draws are only a hint of where.
+ */
+export function resizeHandleAt(n: Rect, hit: Pick<BorderHit, "side" | "t">, corner: number): ResizeHandle {
+  const horizontal = hit.side === "top" || hit.side === "bottom";
+  const length = horizontal ? n.width : n.height;
+  const along = hit.t * length;
+  const c = Math.min(corner, length / 3);
+  const first = along <= c;
+  const last = along >= length - c;
+  if (horizontal) {
+    const v = hit.side === "top" ? "n" : "s";
+    return (first ? v + "w" : last ? v + "e" : v) as ResizeHandle;
+  }
+  const h = hit.side === "left" ? "w" : "e";
+  return (first ? "n" + h : last ? "s" + h : h) as ResizeHandle;
+}
+
+/** The pointer that shows what dragging each handle does (Tailwind classes). */
+export const RESIZE_CURSOR: Record<ResizeHandle, string> = {
+  n: "cursor-ns-resize", s: "cursor-ns-resize", e: "cursor-ew-resize", w: "cursor-ew-resize",
+  ne: "cursor-nesw-resize", sw: "cursor-nesw-resize", nw: "cursor-nwse-resize", se: "cursor-nwse-resize",
+};
+
 /** A cubic curve leaving each node straight out of its side. */
-export function edgePath(a: Rect, as: Side, b: Rect, bs: Side): { d: string; mid: [number, number] } {
-  const [x1, y1] = portPoint(a, as);
-  const [x2, y2] = portPoint(b, bs);
+export function edgePath(a: Rect, as: Side, b: Rect, bs: Side, at = 0.5, bt = 0.5): { d: string; mid: [number, number] } {
+  const [x1, y1] = portPoint(a, as, at);
+  const [x2, y2] = portPoint(b, bs, bt);
   const k = Math.max(40, Math.min(200, Math.hypot(x2 - x1, y2 - y1) / 2));
   const c1: [number, number] = [x1 + NORMAL[as][0] * k, y1 + NORMAL[as][1] * k];
   const c2: [number, number] = [x2 + NORMAL[bs][0] * k, y2 + NORMAL[bs][1] * k];

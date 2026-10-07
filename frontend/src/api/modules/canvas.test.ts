@@ -90,6 +90,14 @@ describe("canvasApi", () => {
     expect(api.canvas_write(rel, doc, data.modified - 100).conflict).toBe(true);
   });
 
+  it("a group that wraps a whole deliverable keeps its size (no 20000 px cap)", () => {
+    const doc = { nodes: [{ id: "g", type: "group", x: 0, y: 0, width: 26414, height: 30000, label: "Step 1" }], edges: [] };
+    api.canvas_write(rel, doc);
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, rel), "utf-8"));
+    expect(onDisk.nodes[0].width).toBe(26414);
+    expect(onDisk.nodes[0].height).toBe(30000);
+  });
+
   it("test_bad_input_is_dropped", () => {
     const doc = {
       nodes: [

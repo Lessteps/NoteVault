@@ -59,6 +59,8 @@ async function requestTitle(
       temperature: 0.2,
       max_tokens: maxTokens,
       include_note: false,
+      claude_path: cfg.claude_path,
+      claude_timeout_s: cfg.claude_timeout_s,
     }),
     messages,
   );

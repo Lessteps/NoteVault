@@ -49,6 +49,11 @@ vault/
 │   │   ├── <goal-id>/items/<item-id>.md   una submeta por archivo
 │   │   └── registro/YYYY/MM/YYYY-MM-DD.json  checks del día
 │   ├── estudio/                           práctica: intentos, errores, repaso
+│   ├── mentor/                            opcional: registro de sesiones del Mentor
+│   │   └── sessions/YYYY-MM-DD.json       un plan de estudio por día
+│   │   ├── chat.json                      (antiguo) una sola conversación; se migra a chats/
+│   │   └── chats/<id>.json                una conversación del Mentor (crear metas) + index.json
+│   │   └── plans/YYYY-MM.json             el plan mensual del Mentor (subplanes por área)
 │   ├── web/                               módulo WEB: marcadores, reglas, historial, uso
 │   │   ├── marcadores.json
 │   │   ├── restricciones.json
@@ -436,6 +441,7 @@ formaría un ciclo, se muestra en el primer nivel. Claves (`GOAL_ITEM_FIELDS`):
 | `habit_links` | list | Hábitos que se marcan al completarla. |
 | `done_at` | date | Día en que una submeta única pasó a Hecha. |
 | `created` | date | |
+| `topic_links` | list | Opcional (se omite si está vacía). Temas de estudio que la cumplen; ver [Conexión con temas de estudio](#conexión-con-temas-de-estudio). |
 
 El cuerpo son las notas. Una submeta con hijas es una **rama**: no se marca a
 mano, está hecha cuando todas sus hijas lo están.
@@ -472,8 +478,33 @@ Al marcar una submeta con `habit_links`, para cada hábito activo ese día:
 Al desmarcar se quita la submeta de las fuentes y, si no queda ninguna, se
 desmarca el hábito. Una marca manual nunca se quita.
 
+### Conexión con temas de estudio
+
+`topic_links` es un campo **aditivo y opcional** (no cambia `FORMAT_VERSION`):
+un lector que no lo conoce lo conserva como clave extra sin tocarlo. Cada
+entrada de la lista (separada por comas, como `habit_links`) es:
+
+- `<carpeta-del-tema>`: todas las skills del tema;
+- `<carpeta-del-tema>#skill1+skill2`: solo esas skills.
+
+`<carpeta-del-tema>` es la ruta POSIX de la carpeta del tema (la del `_tema.md`
+/ `.practica.md`) relativa a la vault. En ella se escapan `%`, `,` y `#` como
+`%25`, `%2C` y `%23`. Las skills van en minúsculas, separadas por `+`.
+
+Una submeta con `topic_links` **no se marca a mano: se cumple sola** cuando
+cada tema enlazado cumple lo pedido: cada skill pedida (o todas las del tema)
+dominada (`mastered` en el progreso del tema) y, en un enlace al tema entero,
+el examen aprobado si el tema lo exige (`mastery.exam: required`). Su progreso
+es el porcentaje de esas unidades cumplidas. Una carpeta que ya no tiene tema
+es un **enlace roto**: se conserva, cuenta como no cumplido y no da error.
+
+> Pendiente para el cliente móvil (`notevault_mobile`): leer/conservar
+> `topic_links` y, si quiere mostrar el cumplimiento, calcularlo igual que la
+> app de escritorio (`frontend/src/core/practice/topicLinks.ts`).
+
 ### Progreso
 
+- Hoja con `topic_links`: el avance de sus temas (0–1), sin importar `repeat`.
 - Hoja única: 1 si está hecha; si es medible, `value / target` (máx. 1).
 - Hoja repetitiva: días cumplidos / días programados desde `start` (o el
   inicio de la meta, o `created`) hasta hoy, sin pasar de `repeat_until` ni
@@ -623,6 +654,7 @@ nota. El cliente móvil conserva estos archivos sin tocarlos.
 | `study_handoff_response` | `.notevault/estudio/handoff/responses/<req-id>.json` |
 | `study_ledger` | `.notevault/estudio/ledger/<disciplina>.json` — estado por skill (fase 6) |
 | `study_exam` | `.notevault/estudio/exams/<slug>.json` — registros de exámenes rendidos (fase 5) |
+| `study_pp_profile` | `.notevault/estudio/pp/profile.json` — perfil de debilidades y estilo de `programming_practice` (lo escribe `pp_postmortem`, lo lee `pp_build`) |
 | `kb_canvas_manifest` | `.notevault/estudio/kb_canvas_manifest.json` — hashes de canvas generados |
 
 ### `.notevault/estudio/intentos/<att-id>.json`
@@ -748,6 +780,200 @@ Resumen de conceptos y competencias del tema.
 - `skills`: lista de competencias requeridas para este tema.
 - Si una carpeta carece de `_tema.md`, NoteVault infiere dinámicamente el tema a
   partir de las etiquetas (`tags`) y la ubicación de las notas hijas.
+
+## Mentor (opcional, aditivo)
+
+El módulo Mentor propone un plan diario a partir de un informe del estudiante y
+guarda aquí lo que se planeó y lo que se cumplió. Es **opcional y aditivo**: una
+vault sin `.notevault/mentor/` es válida, un cliente que no lo conoce puede
+ignorarlo, y no sube `FORMAT_VERSION`.
+
+| Clave de `LAYOUT` | Ruta |
+|---|---|
+| `mentor_session` | `.notevault/mentor/sessions/AAAA-MM-DD.json` — el plan de un día |
+| `mentor_chat` | `.notevault/mentor/chat.json` — (antiguo) la única conversación con el Mentor; solo se lee para migrarla |
+| `mentor_chat_file` | `.notevault/mentor/chats/<id>.json` — una conversación con el Mentor |
+| `mentor_chats_index` | `.notevault/mentor/chats/index.json` — la conversación activa y la marca de migración |
+| `mentor_plan_build` | `.notevault/mentor/plans/_building/<id>.json` — plan EN CONSTRUCCIÓN (constructor guiado, ver «Plan del Mentor»); `mentor_plan_builds_dir` es la carpeta |
+| `mentor_plan_history` | `.notevault/mentor/plans/_history/<plan>/<n>.json` — un cambio pedido al plan con comentarios; `mentor_plan_history_dir` es la carpeta |
+| `mentor_plan` | `.notevault/mentor/plans/<id>.json` — un plan del Mentor sobre un periodo libre (ver «Plan del Mentor»); `<id>` es `<inicio>_<fin>` o, en los planes mensuales heredados, `AAAA-MM`; `mentor_plans_dir` es la carpeta |
+
+```json
+{"date": "2026-10-05", "availableMinutes": 90, "objective": "Cerrar la meta de álgebra",
+ "createdAt": "2026-10-05T08:00:00", "acceptedAt": "2026-10-05T08:02:10",
+ "blocks": [{"candidateId": "srs:mathematics", "kind": "srs_review", "subject": "mathematics",
+             "topicFolder": "Matemáticas/2 Álgebra", "minutes": 20, "status": "done",
+             "note": "opcional"}]}
+```
+
+- `status` de un bloque: `planned` | `done` | `skipped` | `partial`.
+- `reason` (opcional): la razón de una línea con la que el Mentor propuso el bloque.
+- `acceptedAt` solo existe cuando el estudiante aceptó el plan; es la fuente de verdad del
+  plan de hoy (no se copia a la cola de estudio ni a la agenda).
+- El informe que ve la IA se calcula al vuelo y no se guarda.
+
+### Conversaciones del Mentor (`chats/<id>.json`)
+
+El Mentor tiene su **propio historial de conversaciones**, aparte del historial del asistente (que
+vive en la carpeta de datos de la app). Cada conversación en la que el Mentor ayuda a crear una meta es
+un archivo `.notevault/mentor/chats/<id>.json` (`<id>` = `[A-Za-z0-9_-]`, hasta 48 caracteres) con sus
+últimos 60 turnos. Es opcional y aditivo, como el resto de `mentor/`.
+
+```json
+{"version": 1, "id": "cm1x2y3z", "title": "backend en Python en 3 meses",
+ "createdAt": "2026-10-05T10:00:00", "updatedAt": "2026-10-05T10:01:10",
+ "turns": [
+  {"id": "t1", "role": "user", "content": "backend en Python en 3 meses", "at": "2026-10-05T10:00:00"},
+  {"id": "t2", "role": "assistant", "content": "¿Cuántas horas por semana tienes?", "at": "2026-10-05T10:00:03"},
+  {"id": "t3", "role": "assistant", "content": "Primero bases, luego APIs.", "at": "2026-10-05T10:01:10",
+   "draft": {"name": "Backend con Python", "area": "", "description": "…", "topics": [], "schedule": {}, "discarded": []},
+   "createdGoalId": "g…"}
+ ]}
+```
+
+```json
+{"version": 1, "active": "cm1x2y3z", "migrated": true}
+```
+
+- `title`: se pone solo con el primer mensaje del estudiante (una línea, máx. 60 caracteres) y se puede
+  renombrar. `createdAt` / `updatedAt` son marcas locales sin zona (`AAAA-MM-DDTHH:MM:SS`), como las del
+  historial del asistente. No hay un índice con la lista: se lee la carpeta; las conversaciones sin
+  turnos no se listan.
+- `index.json` (`chats/index.json`) guarda solo la conversación activa (`active`) y `migrated`. Nunca es
+  una conversación: un cliente debe ignorarlo al listar `chats/`.
+- **Migración**: la primera vez que se abre el historial, si existe el antiguo `.notevault/mentor/chat.json`
+  (una sola conversación, `{"version": 1, "turns": [...]}`) con turnos y `chats/` no tiene conversaciones, se
+  copia como la primera (con su borrador pendiente) y queda activa. El `chat.json` original **no se
+  modifica ni se borra**; `migrated: true` evita importarlo otra vez.
+- Borrar una conversación la mueve a `.notevault/.papelera/mentor-chats/`.
+- `draft` (solo turnos `assistant`): el borrador de meta con su calendario ya calculado. Es una
+  previsualización; **no existe como meta** hasta que el estudiante pulsa «Crear meta».
+- `createdGoalId`: id de la meta creada a partir de ese borrador; `discarded: true`: se descartó.
+- Al crear la meta, la app vuelve a calcular el calendario con los temas que existen entonces y
+  escribe una `Goal` normal (`.notevault/goals/…`) con una submeta por tema o bloque de temas, cada
+  una con `topic_links` (ver «Conexión con temas de estudio»). El Mentor no escribe nada más.
+- La IA solo recibe el informe, un catálogo compacto de temas (carpeta, título, materia, skills,
+  completitud, minutos estimados) y esta conversación; nunca el contenido de las notas.
+
+### Plan del Mentor (`plans/<id>.json`)
+
+Un archivo por plan. Un plan cubre un **periodo libre** `[start, end]` (1 semana, 2 meses, fechas a medida…) y
+agrupa los **subplanes** (uno por área y objetivo). Varios planes pueden coexistir y solaparse. Es opcional y
+aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`.
+
+```json
+{"id": "2026-10-06_2026-11-05", "start": "2026-10-06", "end": "2026-11-05",
+ "createdAt": "2026-10-05T09:00:00.000Z", "updatedAt": "2026-10-12T18:30:00.000Z",
+ "hoursPerWeek": 14.9, "auto": false, "rationale": "Primero bases y luego APIs.",
+ "preconditions": {"start": "2026-10-06", "end": "2026-11-05", "minutesPerDay": 240,
+                   "studyDays": [1,2,3,4,5,6], "blockedDates": ["2026-10-12"], "pace": "normal",
+                   "goalIds": ["g20260914-a1b2c3"], "subjects": ["Programación"], "freeObjective": "", "notes": "tengo examen el 20; prefiero teoría por las mañanas",
+                   "levels": {"Programación": "basico"}, "deliverables": "ask",
+                   "practice": {"kataMinutes": 30, "sessionsPerWeek": 3, "minutesPerSession": 90, "monthly": false, "focus": "rotate"}},
+ "subplans": [{
+   "id": "s1-programacion", "area": "Programación", "objective": "Desarrollo Backend",
+   "goalId": "g20260914-a1b2c3", "goalItemIds": ["i20260914-abc123"],
+   "topics": [{"folder": "Programación/Python/1 Fundamentos", "title": "1 Fundamentos", "skills": ["debug"],
+               "targetWeek": 1, "estMinutes": 90, "completedAt": "2026-10-09", "diagnostic": true}],
+   "weeks": [{"week": 1, "start": "2026-10-06", "end": "2026-10-12", "topics": ["Programación/Python/1 Fundamentos"],
+              "minutes": 90, "capacityMinutes": 240}],
+   "requiredGoals": [{"goalId": "g20260914-a1b2c3", "itemId": "i20260914-abc123", "note": "submeta que lo pide"}],
+   "deliverable": {"title": "API de inventario", "description": "…", "criteria": ["CRUD", "tests"],
+                   "projectId": "p20260915-49887f", "status": "en_curso"},
+   "notes": "opcional"}],
+ "programmingPractice": {
+   "kata": {"minutesPerDay": 30, "days": [1,2,3,4,5,6]},
+   "weeklyProject": {"sessionsPerWeek": 3, "minutesPerSession": 90, "focusMode": "rotate",
+     "weeks": [{"week": 1, "start": "2026-10-06", "end": "2026-10-12", "focus": "backend", "theme": "Gestor de gastos",
+                "sessions": [{"date": "2026-10-06", "minutes": 90, "phases": ["build"]},
+                             {"date": "2026-10-08", "minutes": 90, "phases": ["construct"]},
+                             {"date": "2026-10-11", "minutes": 90, "phases": ["defend", "postmortem"]}]}]},
+   "monthlyProject": {"blocks": [{"fromWeek": 1, "toWeek": 4, "theme": "Portafolio"}]}},
+ "openQuestions": [{"id": "deliverables", "subplanId": "s1-programacion",
+                    "text": "¿Quieres un entregable (proyecto de demostración) para Programación: Desarrollo Backend?",
+                    "options": ["Sí", "No", "Después"]}]}
+```
+
+- `start`/`end` (AAAA-MM-DD, ambos incluidos) son el periodo. `id` es el nombre del archivo sin `.json`
+  (`<inicio>_<fin>`); la app manda el nombre del archivo si difiere.
+- **Planes mensuales heredados**: un archivo `AAAA-MM.json` con `"month": "2026-10"` y sin `start`/`end` se
+  lee como un plan de periodo (día 1 – último día del mes, id = el mes). No hay migración: el archivo no se
+  reescribe hasta que se modifica (p. ej. el estado del entregable) y entonces conserva `month`.
+- Las semanas son trozos de 7 días desde `start` (la última puede ser más corta); `targetWeek` cuenta desde 1
+  en el plan. `weeks[].capacityMinutes` es la capacidad real de esa semana para el subplan (solo los días de
+  estudio no bloqueados, desde hoy si el plan ya empezó).
+- `preconditions` (opcional) son los hechos con los que se armó el plan: `minutesPerDay` (tiempo diario),
+  `studyDays` (ISO: 1 = lunes … 7 = domingo), `blockedDates`, `pace` (`suave` 70 % / `normal` 85 % /
+  `intenso` 100 % del tiempo declarado), metas (`goalIds`) y materias (`subjects`) a cubrir, `levels` por
+  materia (`empezando` | `basico` | `intermedio` | `avanzado` | `no_se`: solo una hipótesis para el reparto) y
+  `deliverables` (aditivo, sin subir `FORMAT_VERSION`): **`"ask"`** (por defecto: «a discutir», no se propone ningún
+  entregable en el primer borrador y queda una pregunta pendiente por subplan), `"yes"` (se propone uno por subplan) o
+  `"no"`; los planes antiguos con `true`/`false` se leen como `"yes"`/`"no"` y no se reescriben, y si falta es `"ask"`.
+  `practice` (opcional) son las preferencias de la pista *Programming practice*: `kataMinutes` (0 = sin kata),
+  `sessionsPerWeek` (0 = sin proyecto semanal) y `minutesPerSession`, `monthly` y `focus` (`"rotate"` o un foco fijo:
+  `backend` · `databases` · `frontend` · `desktop` · `mobile` · `automation`). `auto: true` marca un plan automático (sin IA). `topics[].diagnostic` marca el primer tema
+  de una materia de nivel «no sé» (se empieza con un diagnóstico corto).
+  `preconditions.notes` (opcional, aditivo: sin subir `FORMAT_VERSION`) son los comentarios libres del estudiante
+  para la IA (hasta 1500 caracteres, saltos de línea conservados, sin caracteres de control). La IA los usa como
+  preferencias al elegir y ordenar temas, nunca para cambiar periodo, tiempo ni días; un plan automático (sin IA)
+  no los interpreta pero los conserva y los muestra.
+- `topics[].folder` es la carpeta del tema (el mismo id que usan los `topic_links` de las submetas). El
+  estado de práctica (sin tratar / practicando / consolidado / completo / examen pendiente) y el
+  porcentaje **no se guardan**: se derivan en vivo del motor de práctica.
+- `completedAt` (AAAA-MM-DD) es el **registro de temas completados**: se anota la primera vez que la
+  app observa el tema completo y no se vuelve a modificar.
+- `deliverable.status`: `idea` | `en_curso` | `hecho`; `projectId` enlaza un proyecto existente (nunca se
+  crean proyectos automáticamente). Es lo único que el Mentor edita después de aceptar el plan.
+- El plan diario sale de los planes **activos** (los que contienen la fecha de hoy): los temas cuya semana
+  objetivo es la actual (o anterior) y siguen sin completar se ofrecen primero en «Hoy»; con planes
+  solapados se combinan sin repetir un mismo tema. El `minutesPerDay` del plan activo sugiere el tiempo de «Hoy».
+- **Programming practice** (`programmingPractice`, opcional y aditivo): la rama de práctica de programación de la app
+  (carpeta `programming_practice` de la vault y su diálogo «Práctica de programación») planificada dentro del plan.
+  Es una pista aparte del plan y no un subplan, porque no tiene temas, se agenda en días del calendario y su estado sale de
+  otro módulo. `kata` = reto de lógica diario (`pp_kata`) en los `days` ISO (los de estudio por defecto). `weeklyProject` =
+  un proyecto **siempre full stack** (frontend + backend + base de datos) por semana: `weeks[]` lleva el `focus` de la semana
+  (rota por el stack, o el fijado; solo añade criterios, no quita capas), un `theme` opcional (lo puede sugerir la IA; el plan
+  automático lo deja vacío y se titula «Proyecto semanal N · foco X») y las `sessions[]` con fecha, minutos y las **fases**
+  del módulo de práctica que se trabajan ese día (`build` especificación · `construct` construcción · `defend` defensa ·
+  `postmortem`). Con 1 a 3 sesiones por semana las fases se funden (nunca se pierde ninguna); con más de 4, las sesiones
+  extra son de construcción. `monthlyProject.blocks[]` = un proyecto mayor cada 4 semanas que integra los semanales.
+  Los minutos de la práctica se **reservan** día a día de lo que da cada día de estudio (`minutesPerDay` × ritmo): el ritmo
+  no los recorta y el resto es para temas (de ahí salen `weeks[].capacityMinutes` y `hoursPerWeek`, que pasan a ser horas de
+  temas). La IA solo puede sugerir temas y, con foco rotativo, focos del esquema; nunca minutos ni fases, y al aceptar la
+  app recalcula la pista de forma determinista.
+  El **estado no se guarda**: se deriva del módulo `programming_practice` (kata del día = hay un intento con la skill
+  `pp_kata` ese día; fases = el `state` de `projects/<x>/.pp.json` —building / defended / done, y la nota de la defensa— del
+  proyecto cuya especificación o carpeta se creó esa semana) y de lo que el estudiante marca en los bloques de «Hoy»
+  (registro manual hecho/saltado: `practice:<plan>:kata` y `practice:<plan>:project:w<N>:<fases>`). Para «Hoy», los
+  candidatos son `programming_practice_kata` y `programming_practice_project`.
+- `openQuestions` (opcional, aditivo): decisiones que quedaron pendientes al armar el plan. Hoy solo `id: "deliverables"`
+  (entregable de un subplan, opciones Sí / No / Después). En el borrador se responden con `mentor_plan_draft_answer`
+  (yes añade la propuesta determinista, no la descarta, later la deja); al aceptar se conservan solo las de subplanes que siguen
+  sin entregable.
+- La IA propone el plan (`plan_draft` en la conversación o desde el formulario de precondiciones, con temas del
+  catálogo real y metas existentes; las precondiciones son hechos fijos que no puede cambiar); sin IA la app
+  genera un plan automático determinista. Solo se escribe este archivo cuando el estudiante pulsa «Aceptar plan».
+
+#### Plan propuesto, comentarios y constructor guiado (aditivo; sin subir `FORMAT_VERSION`)
+
+- **`proposed: true`** (opcional) en `plans/<id>.json`: el plan lo creó el Mentor (generación completa o fin del constructor guiado) y el estudiante aún no lo
+  mantiene. Es un plan REAL con su sub-interfaz, pero no cuenta como activo: no alimenta «Hoy» ni «Esta semana» y no reserva tiempo.
+  «Mantener plan» quita el campo; «Borrar» manda el archivo a `.notevault/.papelera/mentor-plans/`. Los planes anteriores no lo tienen.
+- `preconditions.branches` (área → ramas incluidas; la rama es el 2.º segmento de la carpeta del tema, p. ej. `4 Backend`), `branchPreset`
+  (`fullstack` · `backend` · `frontend` · `desktop` · `mobile` · `all`) y `branchExcluded` (solo para explicarlo). Sin `branches` para un área entran todas
+  sus ramas. Las ramas excluidas no entran al catálogo que ve la IA, ni al plan automático, ni al aceptar.
+- `topics[].pinned: true`: el estudiante fijó la semana del tema con un comentario; el reparto no la mueve.
+- **Historial de cambios** `plans/_history/<plan>/<n>.json`: `{n, at, comment, status: "applied"|"pending"|"undone", source: "ai"|"rules"|"none", summary,
+  delta: {added, removed, moved, deliverables}, changed: [carpetas], warnings, fixOptions, before: <el plan antes del cambio>}`. «Deshacer» restaura `before`.
+  Un comentario que no se pudo aplicar queda como `pending` (el texto no se pierde). El parche que propone la IA (`add_topic`, `remove_topic`, `move_topic`,
+  `remove_subplan`, `add_subplan`, `set_deliverable`, `set_practice`, `set_note`, `lighter`) se valida contra el plan y el catálogo real, y el reparto semanal
+  se recalcula siempre de forma determinista; nada fuera del archivo del plan se toca.
+- **Plan en construcción** `plans/_building/<id>.json`: `{id, createdAt, updatedAt, pre (precondiciones del formulario), effective (tras las decisiones),
+  stage: alcance|esqueleto|temas|capacidad|practica|entregables|revision, steps, answers: [{questionId, stage, kind, question, choice, label, text?, skipped?, at}],
+  draft (parcial, completo en la revisión), skeleton, openQuestion, source: "ai"|"rules", questionCount, maxQuestions (6), status: "building"|"review"|"abandoned",
+  finishing, ai: {lo que la IA aportó y la app validó}, name}`. El estado se REPRODUCE desde `pre` + `answers`; al crear el plan se recalcula todo y el archivo se
+  elimina; «Abandonar» lo manda a `.notevault/.papelera/mentor-plans/`. `plans/` solo lee los `*.json` de primer nivel, así que `_building` y `_history` no son planes.
+- `openQuestions` pendientes («Después») se responden también sobre el plan ya guardado con `mentor_plan_answer` (yes añade la propuesta de entregable, no la descarta).
 
 ## Contrato móvil (Mobile Contract)
 

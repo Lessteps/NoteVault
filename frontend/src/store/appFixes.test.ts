@@ -62,7 +62,10 @@ describe("pathRenamed keeps the active tab", () => {
 describe("canvas closed after a conflict", () => {
   it("does not leave the unsaved counter stuck", async () => {
     const invoke = vi.fn(async (method: string, args?: unknown[]) => {
-      if (method === "canvas_write") return { conflict: true, modified: 1 };
+      if (method === "canvas_write") {
+        const forced = (args as unknown[])?.[2] === null;
+        return forced ? { ok: true, conflict: false, modified: 2 } : { conflict: true, modified: 1 };
+      }
       if (method === "set_unsaved") return { ok: true, args };
       return {};
     });

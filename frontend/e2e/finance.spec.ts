@@ -181,6 +181,16 @@ test("NV-F-009 recurrente se crea y queda en disco", async () => {
   const file = join(home, "NoteVault", ".notevault", "finanzas", "recurrentes.json");
   expect(existsSync(file)).toBe(true);
   expect(readFileSync(file, "utf-8")).toContain(what);
+
+  // Limpieza: el recurrente es diario y materializaría fantasmas en los siguientes tests.
+  await win.getByRole("button", { name: new RegExp(what) }).click();
+  const edit = win.getByRole("dialog", { name: "Editar recurrente" });
+  await expect(edit).toBeVisible();
+  await edit.getByRole("button", { name: "Eliminar" }).click();
+  const confirm = win.getByRole("alertdialog", { name: "Eliminar recurrente" });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "Eliminar" }).click();
+  await expect(win.getByRole("button", { name: new RegExp(what) })).toHaveCount(0, { timeout: 15_000 });
 });
 
 test("NV-F-010 historial busca en todo el historial", async () => {

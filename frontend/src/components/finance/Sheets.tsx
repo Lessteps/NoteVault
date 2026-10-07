@@ -390,10 +390,11 @@ export function Sheet() {
     const global = history && q.trim() && found ? found.movements : null;
     const source = global ?? list;
     const rows = [...source].sort((a, b) => a.date.localeCompare(b.date)).map((m) => [
-      m.date, m.time ?? "", TYPE_LABELS[m.type], categoryText(m), m.what ?? "", m.reason ?? "", (signed(m) / 100).toFixed(2)]);
+      m.date, m.time ?? "", TYPE_LABELS[m.type], categoryText(m),
+      [m.what, m.reason].filter(Boolean).join(" — "), (signed(m) / 100).toFixed(2)]);
     try {
       const r = await exportCsv(global ? `finanzas_busqueda_${q.trim()}.csv` : `finanzas_${first}_${last}.csv`,
-        ["Fecha", "Hora", "Tipo", "Categoría", "En qué", "Razón", "Importe"], rows);
+        ["Fecha", "Hora", "Tipo", "Categoría", "Detalle", "Importe"], rows);
       if (r.ok) toast("info", `Exportado: ${r.path}`);
     } catch (e) {
       toast("error", (e as Error).message);

@@ -9,6 +9,7 @@
 
 import { searchExercises, exercises as CATALOG_EXERCISES, type Exercise as GuideExercise } from "@bryllim/workout-guide";
 import type { LibraryUserEntry } from "./libraryTypes";
+import { normalizeLibraryName } from "./libraryTypes";
 import { muscleName } from "./muscles";
 
 import instruccionesPecho from "./exerciseInstructions.grupo-pecho.json";
@@ -92,6 +93,8 @@ export interface LibraryEntry {
   /** Rutas locales de los tres frames (public/workout-guide-assets). */
   frames: string[];
   frame1: string | null;
+  /** Video propio dentro del vault, si la entrada lo tiene. */
+  video_path?: string;
   /**
    * Pasos escritos por la persona, en crudo y solo para las entradas propias.
    * Vacío significa «déjalo como estaba»: la redacción del catálogo sigue viva.
@@ -121,6 +124,7 @@ function toEntry(e: GuideExercise): LibraryEntry {
     localSecondary,
     frames,
     frame1: frames[0] ?? null,
+    video_path: "",
   };
 }
 
@@ -166,6 +170,7 @@ function mergeUncached(userEntries: LibraryUserEntry[]): LibraryEntry[] {
       ...base,
       name: propio(own.name, base.name),
       equipment: propio(own.equipment, base.equipment),
+      video_path: own.video_path?.trim() ? own.video_path : (base.video_path ?? ""),
       localPrimary: own.muscles.primary.length ? own.muscles.primary : base.localPrimary,
       localSecondary: own.muscles.secondary.length ? own.muscles.secondary : base.localSecondary,
       guidePrimary: own.muscles.primary.length
@@ -195,6 +200,7 @@ function toOwnEntry(own: LibraryUserEntry): LibraryEntry {
     localSecondary: own.muscles.secondary,
     frames: [],
     frame1: null,
+    video_path: own.video_path ?? "",
     how_toPropia: own.how_to,
     own: true,
   };
@@ -251,6 +257,31 @@ export function staleCopies<T extends { source?: string; sourceFp?: string }>(
     const entry = libraryEntry(ex.source, userEntries);
     if (!entry) continue;
     if (libraryFingerprint(entry) !== (ex.sourceFp ?? "")) out.push(ex);
+  }
+  return out;
+}
+
+/**
+ * Copias antiguas sin origen que parecen venir de la Biblioteca.
+ *
+ * Solo propone cuando el nombre normalizado coincide con **una sola**
+ * entrada fusionada: con cero no hay nada que vincular, con dos o más
+ * sería adivinar. Ya decidido (`source` o `sourceFp` con algo) no se propone.
+ */
+export function orphanCopies<T extends { source?: string; sourceFp?: string; name?: string }>(
+  list: T[],
+  userEntries: LibraryUserEntry[] = [],
+): Array<{ exercise: T; entry: LibraryEntry }> {
+  const out: Array<{ exercise: T; entry: LibraryEntry }> = [];
+  const all = mergeLibrary(userEntries);
+  for (const ex of list) {
+    if (ex.source) continue;
+    if ((ex.sourceFp ?? "") !== "") continue;
+    const key = normalizeLibraryName(ex.name ?? "");
+    if (!key) continue;
+    const hits = all.filter((e) => normalizeLibraryName(e.name) === key);
+    if (hits.length !== 1) continue;
+    out.push({ exercise: ex, entry: hits[0]! });
   }
   return out;
 }
@@ -375,6 +406,7 @@ export function fieldsFromLibrary(
   muscles: { primary: string[]; secondary: string[] };
   source: string;
   sourceFp: string;
+  video_path: string;
 } {
   const steps = getInstructions(entry.slug, userEntries)?.steps_es ?? [];
   // El plan B es «equipo · grupo», pero si no hay ninguno de los dos no se
@@ -389,6 +421,8 @@ export function fieldsFromLibrary(
     // De qué entrada sale, para poder avisar si luego cambia.
     source: entry.slug,
     sourceFp: libraryFingerprint(entry),
+    // El video sí se hereda: es de la biblioteca, no prescripción.
+    video_path: entry.video_path ?? "",
   };
 }
 

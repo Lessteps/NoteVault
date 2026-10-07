@@ -181,6 +181,16 @@ Lista de definiciones de ejercicio:
 - Toda rutina termina con un ejercicio cuyo nombre empieza por
   `Estiramientos`; si falta, se añade al cargar.
 
+### `.notevault/ejercicio/biblioteca.json`
+
+Entradas propias de la biblioteca (las que la persona escribe sobre el
+catálogo del paquete). `{ "entries": [...] }`; fichero ilegible = vacío.
+
+### `.notevault/ejercicio/biblioteca-favoritos.json`
+
+Slugs marcados como favoritos. `{ "favorites": ["press-banca", ...] }`;
+fichero ausente o corrupto = vacío.
+
 ### `.notevault/ejercicio/YYYY/MM/YYYY-MM-DD.json`
 
 Registro del día, indexado por id de ejercicio:

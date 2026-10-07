@@ -100,6 +100,9 @@ const [storedView, setView] = usePersistedNav("ejercicio.view", "general");
   // cosas: las flechas sobreviven a un cambio de pantalla, y «Ir a hoy» desde
   // Tu programa puede volver a él.
   const [date, setDate] = useState(() => todayIso());
+  // La barra lateral se colapsa a solo iconos: en pantallas estrechas los
+  // anillos del SideStats se apilan en vertical (una columna).
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Antes el módulo tenía semanal/mensual/anual sueltos y biblioteca y gestión
   // por separado. Quien tenga una de esas vistas guardadas cae en la general en
@@ -131,6 +134,9 @@ const [storedView, setView] = usePersistedNav("ejercicio.view", "general");
       <ModuleSidebar
         title="Ejercicio"
         active={view}
+        collapsible
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
         onSelect={(id) => {
           setView(id);
           setVideo(null);
@@ -141,7 +147,7 @@ const [storedView, setView] = usePersistedNav("ejercicio.view", "general");
           { id: "ejercicios", label: "Ejercicios", hint: `${list.length} en la rutina · 302 en la biblioteca`, icon: <Dumbbell /> },
         ]}
       >
-        <SideStats />
+        <SideStats collapsed={sidebarCollapsed} />
       </ModuleSidebar>
       <main className="flex min-w-0 flex-1 flex-col bg-surface">
         {video ? (

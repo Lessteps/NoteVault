@@ -60,6 +60,7 @@ export class Managers {
     };
     ex._exercises = null;
     ex._logCache.clear();
+    this.library.invalidate();
     const goals = this.goals as unknown as {
       _goalsCache: unknown;
       _itemsCache: Map<unknown, unknown>;

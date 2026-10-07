@@ -6,6 +6,7 @@
 // pantalla — que era el rodeo queJusto justificaba fusionar ambas vistas.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { weekdayKeyOf } from "../../lib/exercise";
 import { todayIso } from "../../lib/tasks";
@@ -47,12 +48,17 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
   // Las entradas que ha escrito la persona. Se cargan del vault y se mezclan con
   // el catálogo, así que un ejercicio tuyo sale en la lista como cualquier otro.
   const [userEntries, setUserEntries] = useState<LibraryUserEntry[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [onlyFavs, setOnlyFavs] = useState(false);
   useEffect(() => {
     let alive = true;
     void api.exLibraryList().then((e) => {
       // El puente devuelve lo que venga; si no es una lista, biblioteca vacía.
       const next = Array.isArray(e) ? e : [];
       if (alive && next.length) setUserEntries(next);
+    }).catch(() => undefined);
+    void api.exFavorites().then((f) => {
+      if (alive && Array.isArray(f)) setFavorites(f);
     }).catch(() => undefined);
     return () => {
       alive = false;
@@ -61,6 +67,8 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
   // El ejercicio recién añadido: su formulario aparece en el detalle.
   const [added, setAdded] = useState<{ id: string; fields: Partial<Exercise> } | null>(null);
   const [editStatus, setEditStatus] = useState("");
+  /** URL servida del video propio, por slug. Vacío = sin video o sin resolver. */
+  const [videoUrls, setVideoUrls] = useState<Record<string, string>>({});
 
   // La Biblioteca no pregunta el día: lo que se añade entra en la rutina del
   // día de hoy. Para moverlo de día, «Tu programa».
@@ -74,18 +82,46 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
     searchRef.current?.focus();
   }, []);
 
-  const rows = useMemo(
-    () =>
-      localMuscle
-        ? filterLibraryByLocalMuscle(localMuscle, { query: q, equipment }, userEntries)
-        : filterLibrary({ query: q, equipment, muscle }, userEntries),
-    [q, equipment, muscle, localMuscle, userEntries],
-  );
+  const rows = useMemo(() => {
+    const base = localMuscle
+      ? filterLibraryByLocalMuscle(localMuscle, { query: q, equipment }, userEntries)
+      : filterLibrary({ query: q, equipment, muscle }, userEntries);
+    if (!onlyFavs) return base;
+    const favs = new Set(favorites);
+    return base.filter((r) => favs.has(r.slug));
+  }, [q, equipment, muscle, localMuscle, userEntries, favorites, onlyFavs]);
   // Nada seleccionado al entrar: el panel muestra un aviso, no el primer
   // ejercicio de la lista por sorpresa.
   const current = rows.find((r) => r.slug === selected) ?? null;
+  // El video propio se sirve por http para poder verlo en el detalle.
+  useEffect(() => {
+    if (!current?.video_path) return;
+    let alive = true;
+    void api.exLibraryVideoUrl(current.slug)
+      .then((r) => {
+        if (alive && r?.url) setVideoUrls((prev) => ({ ...prev, [current.slug]: r.url }));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [current?.slug, current?.video_path]);
 
   const toggleMuscle = (id: string) => setLocalMuscle((m) => (m === id ? "" : id));
+
+  const toggleFavorite = async (slug: string) => {
+    try {
+      const r = await api.exFavoriteToggle(slug);
+      setFavorites((prev) => {
+        const next = new Set(prev);
+        if (r.on) next.add(r.slug);
+        else next.delete(r.slug);
+        return [...next].sort();
+      });
+    } catch (e) {
+      fail(e);
+    }
+  };
 
   const clearAll = () => {
     setQ("");
@@ -131,8 +167,34 @@ export function Library({ embedded = false }: { embedded?: boolean }) {
  * Los ejercicios del catálogo no ofrecen esto: no están en tu fichero, y
  * borrarlos no sería deshacer.
  */
-const removeFromLibrary = async (slug: string, name: string) => {
-  const ok = await confirmAction(
+  const pickVideo = async (slug: string, name: string) => {
+    try {
+      const picked = await api.exLibraryPickVideo();
+      if (!picked?.ok || !picked.video_path) return;
+      await api.exLibrarySave({ name, slug, video_path: picked.video_path });
+      setStatus(`Video añadido a «${name}» ✓`);
+      setUserEntries(await api.exLibraryList().catch(() => userEntries));
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  const removeVideo = async (slug: string, name: string) => {
+    try {
+      await api.exLibrarySave({ name, slug, video_path: "" });
+      setStatus(`Video quitado de «${name}» ✓`);
+      setVideoUrls((prev) => {
+        const next = { ...prev };
+        delete next[slug];
+        return next;
+      });
+      setUserEntries(await api.exLibraryList().catch(() => userEntries));
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+const removeFromLibrary = async (slug: string, name: string) => {  const ok = await confirmAction(
     "Quitar de la biblioteca",
     `¿Quitar «${name}» de tu biblioteca? Volverá a estar como está en el catálogo. Los ejercicios que ya lo usan en tu programa no se tocan.`,
     "Quitar",
@@ -233,6 +295,20 @@ const saveAdded = async (fields: Partial<Exercise>) => {
                   {r.equipment} · {r.guidePrimary}
                 </div>
               </div>
+              <button
+                type="button"
+                data-favorite={r.slug}
+                aria-pressed={favorites.includes(r.slug)}
+                aria-label={favorites.includes(r.slug) ? `Quitar ${r.name} de favoritos` : `Guardar ${r.name} en favoritos`}
+                title={favorites.includes(r.slug) ? "Quitar de favoritos" : "Guardar en favoritos"}
+                onClick={(e) => { e.stopPropagation(); void toggleFavorite(r.slug); }}
+                className={cn(
+                  "grid h-7 w-7 flex-none place-items-center rounded-lg text-[15px] transition-colors",
+                  favorites.includes(r.slug) ? "text-amber-400" : "text-faint hover:text-dim",
+                )}
+              >
+                {favorites.includes(r.slug) ? "★" : "☆"}
+              </button>
               <GhostButton
                 data-library-add={r.slug}
                 data-library-added={added?.fields.name === r.name ? "true" : undefined}
@@ -279,6 +355,17 @@ const saveAdded = async (fields: Partial<Exercise>) => {
               busy={busy}
               onAdd={(slug) => void add(slug)}
               userEntries={userEntries}
+              videoUrl={videoUrls[current.slug]}
+              onPickVideo={
+                userEntries.some((u) => u.slug === current.slug)
+                  ? () => void pickVideo(current.slug, current.name)
+                  : undefined
+              }
+              onRemoveVideo={
+                current.video_path
+                  ? () => void removeVideo(current.slug, current.name)
+                  : undefined
+              }
               onRemove={
                 current && userEntries.some((u) => u.slug === current.slug)
                   ? () => void removeFromLibrary(current.slug, current.name)
@@ -295,7 +382,73 @@ const saveAdded = async (fields: Partial<Exercise>) => {
     </div>
   );
 
-  if (embedded) return body;
+  if (embedded)
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div
+          data-library-toolbar
+          className="flex flex-none flex-wrap items-center gap-2 px-6 py-2"
+        >
+          <span className="font-mono text-[11.5px] text-faint">{rows.length} de 302</span>
+          <button
+            type="button"
+            data-favorites-only={onlyFavs ? "true" : "false"}
+            aria-pressed={onlyFavs}
+            onClick={() => setOnlyFavs((v) => !v)}
+            title="Ver solo mis favoritos"
+            className={cn(
+              "rounded-lg border px-2.5 py-1 text-[12px] transition-colors",
+              onlyFavs
+                ? "border-accent bg-accent-soft text-text"
+                : "border-line text-dim hover:bg-hover hover:text-text",
+            )}
+          >
+            ★ Favoritos{favorites.length ? ` (${favorites.length})` : ""}
+          </button>
+          <span className="flex-1" />
+          <select
+            className={cn(input, "w-36")}
+            value={equipment}
+            aria-label="Filtrar por equipo"
+            onChange={(e) => setEquipment(e.target.value)}
+          >
+            <option value="">Todo el equipo</option>
+            {libraryEquipment(userEntries).map((x) => (
+              <option key={x} value={x}>{x}</option>
+            ))}
+          </select>
+          <div className="relative">
+            <input
+              ref={searchRef}
+              className={cn(input, "w-56 pr-8")}
+              placeholder="Buscar ejercicios…"
+              aria-label="Buscar ejercicios"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onInput={(e) => setQ((e.target as HTMLInputElement).value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setQ("");
+                }
+              }}
+            />
+            {q && (
+              <button
+                type="button"
+                aria-label="Limpiar búsqueda"
+                title="Limpiar búsqueda"
+                onClick={() => setQ("")}
+                className="absolute right-2 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded text-faint hover:bg-hover hover:text-text"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+        {body}
+      </div>
+    );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

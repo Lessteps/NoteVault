@@ -3,8 +3,6 @@
 
 import { useApp } from "../../store/app";
 import { useExercise } from "../../store/exercise";
-import { Bar } from "../habits/parts";
-import { pct } from "../../lib/habits";
 
 export const ORANGE = "#ff9632";
 
@@ -63,19 +61,40 @@ export function Ring({
   );
 }
 
-/** The four dashboards, in the order of the periods. */
-export function PeriodRings() {
-  const stats = useExercise((s) => s.stats);
-  const rings = [
+type ExerciseStats = ReturnType<typeof useExercise.getState>["stats"];
+
+/** Los cuatro paneles circulares, en el orden de los periodos. Una sola lista:
+ *  la pintan `PeriodRings` y el sidebar, así que no hay dos sitios que
+ *  diverjan cuando cambie un periodo. */
+function periodRingDefs(stats: ExerciseStats): Array<{ label: string; value: number; sub?: string }> {
+  return [
     { label: "Hoy", value: stats?.today.pct ?? 0, sub: stats ? `${stats.today.done}/${stats.today.total}` : undefined },
     { label: "Semana", value: stats?.week.pct ?? 0, sub: stats ? `${stats.week.trained}/${stats.week.due} días` : undefined },
     { label: "Mes", value: stats?.month.pct ?? 0, sub: stats ? `${stats.month.trained}/${stats.month.due} días` : undefined },
     { label: "Año", value: stats?.anual.pct ?? 0, sub: stats ? `${stats.anual.trained}/${stats.anual.due} días` : undefined },
   ];
+}
+
+/**
+ * The four dashboards, in the order of the periods.
+ *
+ * `size`/`thickness` los usan las versiones pequeñas (tira de Vista general,
+ * sidebar): por defecto son los grandes de siempre. `columns="two"` fija dos
+ * columnas también en pantallas anchas —en el sidebar de 260 px cuatro anillos
+ * en fila no caben—.
+ */
+export function PeriodRings({ size = 104, thickness = 10, columns = "auto" }: {
+  size?: number; thickness?: number; columns?: "auto" | "two" | "one";
+}) {
+  const stats = useExercise((s) => s.stats);
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      {rings.map((r) => (
-        <Ring key={r.label} value={r.value} label={r.label} sub={r.sub} size={104} thickness={10} />
+    <div
+      data-period-rings
+      className={columns === "one"
+        ? "grid grid-cols-1 gap-3"
+        : columns === "two" ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-4 sm:grid-cols-4"}>
+      {periodRingDefs(stats).map((r) => (
+        <Ring key={r.label} value={r.value} label={r.label} sub={r.sub} size={size} thickness={thickness} />
       ))}
     </div>
   );
@@ -110,32 +129,22 @@ export function StreakLine({ compact }: { compact?: boolean }) {
   );
 }
 
-/** The panel the module keeps at the bottom of its sidebar. */
-export function SideStats() {
-  const stats = useExercise((s) => s.stats);
-  const rows: Array<[string, number]> = [
-    ["Hoy", stats?.today.pct ?? 0],
-    ["Semana", stats?.week.pct ?? 0],
-    ["Mes", stats?.month.pct ?? 0],
-    ["Año", stats?.anual.pct ?? 0],
-  ];
+/**
+ * The panel the module keeps at the bottom of its sidebar.
+ *
+ * Son los cuatro anillos en pequeño (2×2: en 260 px no caben en fila) más la
+ * racha compacta. Antes eran cuatro barras con los mismos números en otro
+ * formato; ahora los dicen los anillos, que se ven desde cualquier pantalla
+ * del módulo y no solo desde Vista general.
+ */
+export function SideStats({ collapsed }: { collapsed?: boolean }) {
   return (
-    <div className="px-4 pt-4">
-      <div className="mb-2 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Estadísticas</div>
-      <div className="space-y-2.5">
-        {rows.map(([l, v]) => (
-          <div key={l}>
-            <div className="mb-1 flex text-[12px] text-dim">
-              <span>{l}</span>
-              <span className="ml-auto font-mono">{pct(v)}</span>
-            </div>
-            <Bar value={v} colour={ORANGE} />
-          </div>
-        ))}
-        <div className="pt-1">
-          <StreakLine compact />
-        </div>
-      </div>
+    <div className="space-y-3 px-4 pt-4">
+      {!collapsed && (
+        <div className="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Estadísticas</div>
+      )}
+      <PeriodRings size={collapsed ? 40 : 60} thickness={7} columns={collapsed ? "one" : "two"} />
+      {!collapsed && <StreakLine compact />}
     </div>
   );
 }

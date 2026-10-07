@@ -16,6 +16,8 @@ export interface LibraryUserEntry {
   equipment: string;
   muscles: { primary: string[]; secondary: string[] };
   how_to: string;
+  /** Ruta del video dentro del vault, si el ejercicio propio tiene uno. */
+  video_path?: string;
 }
 
 /**

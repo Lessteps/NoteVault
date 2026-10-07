@@ -1,4 +1,5 @@
-﻿import * as path from "node:path";
+﻿import * as fs from "node:fs";
+import * as path from "node:path";
 import { addDays, todayIso, weekday } from "../../core/dates.js";
 import { ApiError } from "../../core/errors.js";
 import {
@@ -273,6 +274,15 @@ export function exerciseApi(app: AppState) {
       const howTo = String(f.how_to || "").slice(0, 4000).trim();
       const equipment = oneLine(f.equipment, 60);
       const muscles = normalizeMuscles(f.muscles);
+      const videoPath = oneLine(f.video_path, 1000);
+      if (videoPath) {
+        const ext = path.extname(videoPath).toLowerCase();
+        if (!VIDEO_EXTS.includes(ext as any)) {
+          throw new ApiError(
+            "Eso no es un video (mp4, mov, webm, mkv, m4v, avi)."
+          );
+        }
+      }
 
       const store = lib();
       const entries = store.entries();
@@ -308,10 +318,13 @@ export function exerciseApi(app: AppState) {
               equipment: "",
               muscles: { primary: [], secondary: [] },
               how_to: "",
+              video_path: "",
             }
           : propia);
 
       // Un campo llega si trae algo; si no, se conserva el que había.
+      // `video_path` es la excepción: quitar el video manda "" a propósito,
+      // así que la presencia de la clave manda, no su contenido.
       const next: LibraryUserEntry = {
         // Renombrar **no** cambia el slug: el ejercicio sigue siendo el mismo.
         slug: actual?.slug ?? `mia-${Math.random().toString(36).slice(2, 10)}`,
@@ -321,6 +334,7 @@ export function exerciseApi(app: AppState) {
           ? { primary: muscles.primary, secondary: muscles.secondary }
           : actual?.muscles ?? { primary: [], secondary: [] },
         how_to: howTo || actual?.how_to || "",
+        video_path: ("video_path" in f ? videoPath : actual?.video_path) || "",
       };
 
       // Se van dos: la que tenía el slug nuevo y **la que se estaba editando**, si al
@@ -340,7 +354,8 @@ export function exerciseApi(app: AppState) {
         !next.how_to &&
         !next.equipment &&
         !next.muscles.primary.length &&
-        !next.muscles.secondary.length;
+        !next.muscles.secondary.length &&
+        !next.video_path;
       if (!espejoDelCatalogo) {
         store.save(zajada ? [...resto.filter((e) => e.slug !== zajada.slug), next] : [...resto, next]);
       }
@@ -363,6 +378,49 @@ export function exerciseApi(app: AppState) {
       if (!entries.some((e) => e.slug === s)) return false;
       store.save(entries.filter((e) => e.slug !== s));
       return true;
+    },
+
+    ex_favorites(): string[] {
+      return lib().favorites();
+    },
+
+    ex_favorite_toggle(slug: string) {
+      const s = String(slug ?? "").trim();
+      if (!s) throw new ApiError("Ejercicio inválido.");
+      const on = lib().toggleFavorite(s);
+      return { slug: s, on };
+    },
+
+    /**
+     * Sesiones hechas de un ejercicio: fecha, kg, reps, volumen y 1RM (Epley).
+     * Solo las marcadas como hechas; el año por defecto es el actual.
+     */
+    ex_history(exerciseId: string, year = 0) {
+      const m = mgr();
+      const now = new Date();
+      const y = clampInt(year || now.getFullYear(), 1970, 3000, now.getFullYear());
+      const ex = m.exercises().find((e) => e.id === String(exerciseId));
+      if (!ex) return [];
+      const target = DAY_KEYS.indexOf(ex.day);
+      if (target === -1) return [];
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const out: Array<{ date: string; weight: number; reps: number; volume: number; e1rm: number | null }> = [];
+      for (let d = new Date(y, 0, 1); d <= midnight && d.getFullYear() <= y; d = addDays(d, 1)) {
+        if (weekday(d) !== target) continue;
+        const iso = todayIso(d);
+        const entry = m.getLog(d).entries[String(exerciseId)];
+        if (!entry?.done) continue;
+        const reps = entry.reps > 0 ? entry.reps : 0;
+        const weight = entry.weight > 0 ? entry.weight : 0;
+        out.push({
+          date: iso,
+          weight,
+          reps,
+          volume: reps > 0 ? (weight > 0 ? weight * reps : reps) : 1,
+          e1rm: weight > 0 && reps > 0 ? weight * (1 + reps / 30) : null,
+        });
+      }
+      return out;
     },
 
     ex_overview(year = 0, exerciseId = "") {
@@ -638,6 +696,96 @@ export function exerciseApi(app: AppState) {
       }
       m.importVideo(String(exerciseId), source);
       return { ok: true };
+    },
+
+    async ex_library_video_url(slug: string) {
+      const s = String(slug ?? "");
+      const entry = lib().entries().find((e) => e.slug === s);
+      const raw = String(entry?.video_path ?? "").trim();
+      if (!raw) {
+        throw new ApiError("Este ejercicio no tiene video.");
+      }
+      const vaultRoot = path.resolve(app.root || process.cwd());
+      // Solo se sirve lo que vive dentro del vault: un video_path absoluto o
+      // con `..` que apunte fuera se rechaza en vez de servirse por http.
+      const withinVault = (abs: string) =>
+        abs === vaultRoot || abs.startsWith(vaultRoot + path.sep);
+      const candidates = [raw, path.join(vaultRoot, raw)]
+        .map((c) => path.resolve(vaultRoot, c))
+        .filter(withinVault);
+      let hit: string | null = null;
+      for (const c of candidates) {
+        try {
+          if (c && fs.existsSync(c) && fs.statSync(c).isFile()) {
+            hit = path.resolve(c);
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+      if (!hit) {
+        throw new ApiError("No se encontró el video. Elige otro en la Biblioteca.");
+      }
+      const srv = server();
+      return { url: await srv.urlFor(hit), name: path.basename(hit) };
+    },
+
+    ex_library_pick_video() {
+      if (app.window === null || app.window === undefined) {
+        throw new ApiError("Solo disponible en la app de escritorio.");
+      }
+      let chosen: string | null = null;
+      const win = app.window as any;
+      if (typeof win.create_file_dialog === "function") {
+        const res = win.create_file_dialog(1, [
+          "Videos (*.mp4 *.mov *.webm *.mkv *.m4v *.avi)",
+        ]);
+        if (res) chosen = Array.isArray(res) ? res[0] : res;
+      } else {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const electron = require("electron") as {
+            dialog: { showOpenDialogSync(opts: unknown): string[] | undefined };
+          };
+          const res = electron.dialog.showOpenDialogSync({
+            properties: ["openFile"],
+            filters: [
+              {
+                name: "Videos",
+                extensions: ["mp4", "mov", "webm", "mkv", "m4v", "avi"],
+              },
+            ],
+          });
+          if (res && res.length) chosen = res[0]!;
+        } catch {
+          chosen = null;
+        }
+      }
+      if (!chosen) {
+        return { ok: false as const };
+      }
+      const source = path.resolve(chosen);
+      const ext = path.extname(source).toLowerCase();
+      if (!VIDEO_EXTS.includes(ext as any)) {
+        throw new ApiError("Eso no es un video.");
+      }
+      const videosDir = mgr().videosDir;
+      fs.mkdirSync(videosDir, { recursive: true });
+      const fileName = path.basename(source);
+      let target = path.join(videosDir, fileName);
+      if (path.resolve(target) !== path.resolve(source)) {
+        if (fs.existsSync(target)) {
+          const parsed = path.parse(fileName);
+          let n = 2;
+          while (fs.existsSync(target)) {
+            target = path.join(videosDir, `${parsed.name} ${n}${parsed.ext}`);
+            n += 1;
+          }
+        }
+        fs.copyFileSync(source, target);
+      }
+      return { ok: true as const, video_path: target };
     },
   };
 }

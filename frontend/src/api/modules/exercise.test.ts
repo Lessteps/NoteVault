@@ -32,6 +32,14 @@ function fetchStatus(url: string): Promise<number> {
 }
 
 describe("exerciseApi", () => {
+  it("favoritos alternan y persisten", () => {
+    expect(api.ex_favorites()).toEqual([]);
+    expect(api.ex_favorite_toggle("bench-press")).toEqual({ slug: "bench-press", on: true });
+    expect(api.ex_favorites()).toEqual(["bench-press"]);
+    expect(api.ex_favorite_toggle("bench-press")).toEqual({ slug: "bench-press", on: false });
+    expect(api.ex_favorites()).toEqual([]);
+  });
+
   let tmpDir: string;
   let app: AppState;
   let api: ReturnType<typeof exerciseApi>;
@@ -79,6 +87,64 @@ describe("exerciseApi", () => {
 
     expect(api.ex_overview().week).toBeGreaterThan(0);
     expect(() => api.ex_mark(today, ex.id, true, "mucho")).toThrow(ApiError);
+  });
+
+  it("ex_history devuelve las sesiones hechas con volumen y 1RM", () => {
+    seedWeek();
+    const lunes = (api.ex_list() as Array<{ id: string; day: string }>).find((x) => x.day === "lunes")!;
+    // Dos lunes pasados: fechas con weekday lunes del año en curso.
+    const mondays: string[] = [];
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    while (mondays.length < 2) {
+      d.setDate(d.getDate() - 1);
+      const js = (d.getDay() + 6) % 7;
+      if (js === 0) mondays.push(todayIso(d));
+    }
+    const [viejo, nuevo] = [mondays[1]!, mondays[0]!];
+    api.ex_mark(nuevo, lunes.id, true, 70, 5, "");
+    api.ex_mark(viejo, lunes.id, true, 60, 8, "");
+    const hist = api.ex_history(lunes.id) as Array<{ date: string; volume: number; e1rm: number | null }>;
+    const mine = hist.filter((h) => h.date === viejo || h.date === nuevo);
+    expect(mine.map((h) => h.date)).toEqual([viejo, nuevo]);
+    expect(mine.find((h) => h.date === viejo)!.volume).toBe(480);
+    expect(mine.find((h) => h.date === nuevo)!.e1rm).toBeCloseTo(70 * (1 + 5 / 30), 6);
+  });
+
+  it("ex_history de un ejercicio inexistente es vacío", () => {
+    expect(api.ex_history("no-existe")).toEqual([]);
+  });
+
+  it("mover cambia solo el día y conserva todo lo demás", () => {
+    const e = api.ex_save("", {
+      day: "lunes", name: "Press", series_reps: "4×8", rest: "90 s",
+      source: "bench-press", sourceFp: "abc",
+    }) as { id: string };
+    api.ex_save(e.id, { day: "martes" });
+    const got = api.ex_list().find((x) => x.id === e.id)! as Record<string, unknown>;
+    expect(got.day).toBe("martes");
+    expect(got.name).toBe("Press");
+    expect(got.series_reps).toBe("4×8");
+    expect(got.rest).toBe("90 s");
+    expect(got.source).toBe("bench-press");
+    expect(got.sourceFp).toBe("abc");
+  });
+
+  it("duplicar a otro día crea copia con nuevo id y mismo origen", () => {
+    const e = api.ex_save("", {
+      day: "lunes", name: "Press", series_reps: "4×8",
+      source: "bench-press", sourceFp: "abc",
+    }) as { id: string };
+    const src = api.ex_list().find((x) => x.id === e.id)! as Record<string, unknown>;
+    const copy = api.ex_save("", {
+      day: "martes", name: src.name, series_reps: src.series_reps,
+      source: src.source, sourceFp: src.sourceFp,
+    }) as { id: string };
+    expect(copy.id).not.toBe(e.id);
+    const got = api.ex_list().find((x) => x.id === copy.id)! as Record<string, unknown>;
+    expect(got.day).toBe("martes");
+    expect(got.source).toBe("bench-press");
+    expect(api.ex_list().filter((x) => (x as Record<string, unknown>).name === "Press")).toHaveLength(2);
   });
 
   it("routine edits", () => {
@@ -138,6 +204,24 @@ describe("exerciseApi", () => {
       id: string;
     };
     await expect(api.ex_video_url(e.id)).rejects.toThrow(ApiError);
+  });
+
+  it("el video propio se sirve por http", async () => {
+    const mgr = new ExerciseManager(tmpDir);
+    fs.mkdirSync(mgr.videosDir, { recursive: true });
+    const data = Buffer.alloc(256 * 10);
+    const file = path.join(mgr.videosDir, "mio.mp4");
+    fs.writeFileSync(file, data);
+    const r = api.ex_library_save({ name: "Mío", video_path: file });
+    const res = await api.ex_library_video_url(r.entry.slug);
+    expect(res.url.startsWith("http://127.0.0.1:")).toBe(true);
+    expect(res.name).toBe("mio.mp4");
+  });
+
+  it("sin video propio no hay url", async () => {
+    api.ex_library_save({ name: "Mío" });
+    const slug = api.ex_library_list()[0]!.slug;
+    await expect(api.ex_library_video_url(slug)).rejects.toThrow(ApiError);
   });
 
   it("stats report the four periods, with nothing trained on an empty log", () => {
@@ -224,6 +308,12 @@ describe("exerciseApi", () => {
     const e = api.ex_library_list()[0]!;
     expect(e.how_to).toBe("el bueno");
     expect(e.equipment).toBe("Barra");
+  });
+
+  it("el video propio se guarda y sobrevive a una edición sin video", () => {
+    api.ex_library_save({ name: "Mi press", video_path: "ejercicio/videos/mio.mp4" });
+    api.ex_library_save({ name: "Mi press", how_to: "pasos" });
+    expect(api.ex_library_list()[0]!.video_path).toBe("ejercicio/videos/mio.mp4");
   });
 
   it("solo difiere en mayúsculas y espacios: edita, no duplica", () => {

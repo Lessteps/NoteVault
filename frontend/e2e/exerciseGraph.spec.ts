@@ -49,6 +49,9 @@ test.afterAll(async () => {
 async function addExerciseForDay(dayKey: string, query: string): Promise<void> {
   await side().getByRole("button", { name: "Ejercicios" }).click();
   await win.locator('[data-exercises-tab="programa"]').click();
+  // El formulario vive en un panel: se abre para escribir (igual que en
+  // exercise.spec.ts) y se cierra solo al guardar.
+  await win.getByRole("button", { name: "Añadir ejercicio" }).click();
   const search = win.locator('input[aria-label="Buscar en la biblioteca"]');
   await expect(search).toBeVisible({ timeout: 15_000 });
   await search.fill(query);
@@ -57,7 +60,7 @@ async function addExerciseForDay(dayKey: string, query: string): Promise<void> {
   await pick.click();
   await win.locator('select[aria-label="Día"]').selectOption(dayKey);
   await win.getByRole("button", { name: "Guardar ejercicio" }).click();
-  await expect(search).toBeVisible({ timeout: 15_000 });
+  await expect(win.locator("[data-exercise-drawer]")).toHaveCount(0, { timeout: 15_000 });
 }
 
 test("NV-X-010 la gráfica dibuja líneas cuando hay reps registradas", async () => {

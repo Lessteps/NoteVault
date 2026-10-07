@@ -41,15 +41,19 @@ function normalizeEntry(raw: unknown): LibraryUserEntry {
     equipment: asString(e.equipment),
     muscles: { primary: asIdList(muscles.primary), secondary: asIdList(muscles.secondary) },
     how_to: asString(e.how_to),
+    video_path: asString(e.video_path),
   };
 }
 
 export class LibraryStore {
   private _configPath: string;
+  private _favoritesPath: string;
   private _entries: LibraryUserEntry[] | null = null;
+  private _favorites: string[] | null = null;
 
   constructor(vaultRoot: string) {
     this._configPath = path.join(path.resolve(vaultRoot), LAYOUT.library);
+    this._favoritesPath = path.join(path.resolve(vaultRoot), LAYOUT.favorites);
   }
 
   /**
@@ -72,6 +76,52 @@ export class LibraryStore {
       JSON.stringify({ entries: entries ?? [] }, null, 2),
       "utf-8",
     );
+  }
+
+  /** Olvida lo leído: la próxima lectura vuelve al disco. */
+  invalidate(): void {
+    this._entries = null;
+    this._favorites = null;
+  }
+
+  /** Slugs de la biblioteca marcados como favoritos. Fichero corrupto = vacío. */
+  favorites(): string[] {
+    if (this._favorites === null) {
+      this._favorites = this._loadFavorites();
+    }
+    return [...this._favorites];
+  }
+
+  /** Alterna un favorito. Devuelve true si queda marcado. */
+  toggleFavorite(slug: string): boolean {
+    const s = String(slug ?? "").trim();
+    if (!s) return false;
+    const next = new Set(this.favorites());
+    const on = !next.has(s);
+    if (on) next.add(s);
+    else next.delete(s);
+    this._favorites = [...next].sort();
+    fs.mkdirSync(path.dirname(this._favoritesPath), { recursive: true });
+    fs.writeFileSync(
+      this._favoritesPath,
+      JSON.stringify({ favorites: this._favorites }, null, 2),
+      "utf-8",
+    );
+    return on;
+  }
+
+  private _loadFavorites(): string[] {
+    if (!fs.existsSync(this._favoritesPath)) return [];
+    try {
+      const parsed = JSON.parse(fs.readFileSync(this._favoritesPath, "utf-8")) as
+        | { favorites?: unknown }
+        | unknown[];
+      const raw = Array.isArray(parsed) ? parsed : parsed?.favorites;
+      if (!Array.isArray(raw)) return [];
+      return [...new Set(raw.filter((x): x is string => typeof x === "string" && !!x.trim()))].sort();
+    } catch {
+      return [];
+    }
   }
 
   private _load(): LibraryUserEntry[] {

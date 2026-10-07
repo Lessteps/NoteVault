@@ -27,6 +27,17 @@ describe("LibraryStore", () => {
     expect(new LibraryStore(tmpDir).entries()).toEqual([]);
   });
 
+  it("favoritos: vacío, alterna y persiste", () => {
+    const a = new LibraryStore(tmpDir);
+    expect(a.favorites()).toEqual([]);
+    expect(a.toggleFavorite("bench-press")).toBe(true);
+    expect(a.favorites()).toEqual(["bench-press"]);
+    expect(a.toggleFavorite("bench-press")).toBe(false);
+    expect(a.favorites()).toEqual([]);
+    a.toggleFavorite("squat");
+    expect(new LibraryStore(tmpDir).favorites()).toEqual(["squat"]);
+  });
+
   it("guarda y relee las entradas", () => {
     new LibraryStore(tmpDir).save([
       {
@@ -93,5 +104,29 @@ it("un fichero corrupto no rompe: vacío y sin lanzar", () => {
     write(JSON.stringify({ entries: [{ slug: "", name: "Sin slug" }, { slug: "mia-b", name: "Con slug" }] }));
     const entries = new LibraryStore(tmpDir).entries();
     expect(entries.map((e) => e.slug)).toEqual(["mia-b"]);
+  });
+
+  it("invalidate olvida la caché y relee el fichero", () => {
+    const store = new LibraryStore(tmpDir);
+    expect(store.entries()).toEqual([]);
+    write(JSON.stringify({ entries: [{ slug: "mia-x", name: "X", muscles: { primary: [], secondary: [] } }] }));
+    // Sin invalidar, sigue lo leído antes.
+    expect(store.entries()).toEqual([]);
+    store.invalidate();
+    expect(store.entries().map((e) => e.slug)).toEqual(["mia-x"]);
+  });
+
+  it("el video propio persiste al releer", () => {
+    new LibraryStore(tmpDir).save([
+      {
+        slug: "mia-a1",
+        name: "Mío",
+        equipment: "",
+        muscles: { primary: [], secondary: [] },
+        how_to: "",
+        video_path: "ejercicio/videos/mio.mp4",
+      },
+    ]);
+    expect(new LibraryStore(tmpDir).entries()[0]!.video_path).toBe("ejercicio/videos/mio.mp4");
   });
 });

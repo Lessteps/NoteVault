@@ -420,13 +420,18 @@ export const api = {
   exMark: (day: string, id: string, done: boolean, weight: number | string = 0, reps: number | string = 0, notes = "") =>
     call<{ ok: boolean; pct: number }>("ex_mark", day, id, done, weight, reps, notes),
   exOverview: (year = 0, exerciseId = "") => call<ExerciseOverview>("ex_overview", year, exerciseId),
+  exHistory: (id: string, year = 0) => call<Array<{ date: string; weight: number; reps: number; volume: number; e1rm: number | null }>>("ex_history", id, year),
   exSave: (id: string, fields: Partial<Exercise>) => call<Exercise>("ex_save", id, fields),
   exRemove: (id: string) => call<{ ok: boolean }>("ex_remove", id),
   exLinkVideos: () => call<{ linked: string[]; already: string[]; missing: string[] }>("ex_link_videos"),
   exLibraryList: () => call<LibraryUserEntry[]>("ex_library_list"),
-  exLibrarySave: (fields: { name: string; slug?: string; equipment?: string; muscles?: unknown; how_to?: string }) =>
+  exLibrarySave: (fields: { name: string; slug?: string; equipment?: string; muscles?: unknown; how_to?: string; video_path?: string }) =>
     call<{ entry: LibraryUserEntry; wrote: boolean; created: boolean; updatedFrom?: string }>("ex_library_save", fields),
   exLibraryRemove: (slug: string) => call<boolean>("ex_library_remove", slug),
+  exLibraryVideoUrl: (slug: string) => call<{ url: string; name: string }>("ex_library_video_url", slug),
+  exLibraryPickVideo: () => call<{ ok: boolean; video_path?: string }>("ex_library_pick_video"),
+  exFavorites: () => call<string[]>("ex_favorites"),
+  exFavoriteToggle: (slug: string) => call<{ slug: string; on: boolean }>("ex_favorite_toggle", slug),
   exVideoUrl: (id: string) => call<{ url: string; name: string }>("ex_video_url", id),
   exOpenVideo: (id: string) => call<{ ok: boolean }>("ex_open_video", id),
   exPickVideo: (id: string) => call<{ ok: boolean }>("ex_pick_video", id),

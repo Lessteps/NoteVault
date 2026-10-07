@@ -251,7 +251,10 @@ export function monthlySigned(rule: string, type: string, amount_cents: number):
 /** Proyección a 3 meses: promedio de los 3 meses cerrados + recurrentes activos. */
 export function Projection3m() {
   const version = useFinance((s) => s.version);
-  const [avg, setAvg] = useState<{ gasto: number; ingreso: number; otros: number } | null>(null);
+  const [proj, setProj] = useState<{
+    baseGasto: number; baseIngreso: number; hasRec: boolean;
+    recFor: (firstDay: string, lastDay: string) => { rg: number; ri: number; ro: number };
+  } | null>(null);
   useEffect(() => {
     const t = new Date();
     const first = isoDate(new Date(t.getFullYear(), t.getMonth() - 3, 1));
@@ -269,26 +272,31 @@ export function Projection3m() {
         }
         const months = [...byMonth.values()];
         const n = 3;
-        let rg = 0;
-        let ri = 0;
-        let ro = 0;
-        for (const r of recs.filter((x) => !x.archived)) {
-          const v = monthlySigned(r.rule, r.type, r.amount_cents);
-          if (r.type === "gasto") rg += -v;
-          else if (r.type === "ingreso") ri += v;
-          else ro += v;
-        }
-        setAvg({
-          gasto: Math.round(months.reduce((a, r) => a + r.gasto, 0) / n) + rg,
-          ingreso: Math.round(months.reduce((a, r) => a + r.ingreso, 0) / n) + ri,
-          otros: ro,
-        });
+        const baseGasto = Math.round(months.reduce((a, r) => a + r.gasto, 0) / n);
+        const baseIngreso = Math.round(months.reduce((a, r) => a + r.ingreso, 0) / n);
+        const live = recs.filter((x) => !x.archived);
+        // Aporte de recurrentes por mes: los terminados no proyectan.
+        const recFor = (firstDay: string, lastDay: string) => {
+          let rg = 0;
+          let ri = 0;
+          let ro = 0;
+          for (const r of live) {
+            if (r.start > lastDay) continue;
+            if (r.end && r.end < firstDay) continue;
+            const v = monthlySigned(r.rule, r.type, r.amount_cents);
+            if (r.type === "gasto") rg += -v;
+            else if (r.type === "ingreso") ri += v;
+            else ro += v;
+          }
+          return { rg, ri, ro };
+        };
+        setProj({ baseGasto, baseIngreso, hasRec: live.length > 0, recFor });
       })
-      .catch(() => setAvg(null));
+      .catch(() => setProj(null));
   }, [version]);
   const t = new Date();
   const next = [1, 2, 3].map((i) => new Date(t.getFullYear(), t.getMonth() + i, 1));
-  const empty = !avg || (avg.gasto === 0 && avg.ingreso === 0 && avg.otros === 0);
+  const empty = !proj || (proj.baseGasto === 0 && proj.baseIngreso === 0 && !proj.hasRec);
   return (
     <Panel title="Proyección 3 meses">
       {empty ? (
@@ -297,17 +305,22 @@ export function Projection3m() {
         <>
           <div className="space-y-1.5">
             {next.map((d) => {
-              const net = avg!.ingreso - avg!.gasto + avg!.otros;
+              const firstDay = isoDate(new Date(d.getFullYear(), d.getMonth(), 1));
+              const lastDay = isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+              const rec = proj!.recFor(firstDay, lastDay);
+              const gasto = proj!.baseGasto + rec.rg;
+              const ingreso = proj!.baseIngreso + rec.ri;
+              const net = ingreso - gasto + rec.ro;
               return (
                 <div key={d.toISOString()} className="flex items-center gap-2 text-[12.5px]">
                   <span className="w-24 capitalize text-dim">{MONTHS_ES[d.getMonth()]}</span>
                   <span className="font-mono text-text">{formatMoney(net, "COP", true)}</span>
-                  <span className="text-[11px] text-faint">≈ {formatMoney(avg!.ingreso)} − {formatMoney(avg!.gasto)}</span>
+                  <span className="text-[11px] text-faint">≈ {formatMoney(ingreso)} − {formatMoney(gasto)}</span>
                 </div>
               );
             })}
           </div>
-          <p className="mt-1.5 text-[11px] text-faint">Promedio de los últimos 3 meses cerrados + recurrentes activos.</p>
+          <p className="mt-1.5 text-[11px] text-faint">Promedio de los últimos 3 meses cerrados + recurrentes activos ese mes.</p>
         </>
       )}
     </Panel>

@@ -149,6 +149,27 @@ describe("Sheet (Periodo)", () => {
     expect(finSearch).toHaveBeenLastCalledWith("arriendo", "", "", 100);
     expect(host!.textContent ?? "").not.toContain("Mostrar más");
   });
+  it("la proyección suma recurrentes vigentes e ignora terminados", async () => {
+    const rec = (end: string) => ({
+      id: "rc1", type: "gasto", amount_cents: 80000000, what: "Arriendo", category: "", goal: "",
+      rule: "monthly:1", start: "2020-01-01", end, archived: false, last: "",
+    });
+    finRecurringList.mockResolvedValueOnce([rec("")]);
+    await mount();
+    await click("Año");
+    expect(host!.textContent ?? "").toContain("800.000");
+    expect(host!.textContent ?? "").toContain("Proyección 3 meses");
+  });
+
+  it("un recurrente terminado no proyecta", async () => {
+    finRecurringList.mockResolvedValueOnce([{
+      id: "rc1", type: "gasto", amount_cents: 80000000, what: "Arriendo", category: "", goal: "",
+      rule: "monthly:1", start: "2020-01-01", end: "2020-06-01", archived: false, last: "",
+    }]);
+    await mount();
+    await click("Año");
+    expect(host!.textContent ?? "").not.toContain("800.000");
+  });
 });
 
 describe("monthlySigned", () => {

@@ -43,7 +43,7 @@ test.afterAll(async () => {
 test("NV-F-001 registro rapido de gasto aparece en tabla y en disco", async () => {
   const what = `E2E Cafe ${Date.now()}`;
   await win.getByLabel("Importe rápido").fill("12500");
-  await win.getByPlaceholder("En qué").fill(what);
+  await win.getByPlaceholder("Detalle").fill(what);
   await win.getByRole("button", { name: /Guardar/ }).click();
   await expect(win.getByText(/^Guardado:/)).toBeVisible({ timeout: 15_000 });
   await expect(win.getByRole("button", { name: new RegExp(`Gasto.*${what}`) })).toBeVisible({ timeout: 15_000 });
@@ -72,10 +72,11 @@ test("NV-F-003 ingreso con formulario aparece en tabla y en disco", async () => 
   const dialog = win.getByRole("dialog", { name: "Nuevo gasto" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Ingreso" }).click();
-  await expect(win.getByRole("dialog", { name: "Nuevo ingreso" })).toBeVisible();
-  await dialog.getByLabel("Importe").fill("50000");
-  await dialog.getByPlaceholder("p. ej. Almuerzo").fill(what);
-  await dialog.getByRole("button", { name: "Guardar" }).click();
+  const ingresoDialog = win.getByRole("dialog", { name: "Nuevo ingreso" });
+  await expect(ingresoDialog).toBeVisible();
+  await ingresoDialog.getByLabel("Importe").fill("50000");
+  await ingresoDialog.getByPlaceholder("p. ej. Almuerzo").fill(what);
+  await ingresoDialog.getByRole("button", { name: "Guardar" }).click();
   await expect(win.getByRole("button", { name: new RegExp(`Ingreso.*${what}`) })).toBeVisible({
     timeout: 15_000,
   });
@@ -88,7 +89,7 @@ test("NV-F-004 eliminar movimiento lo saca de la tabla y del disco", async () =>
   await gotoDiario();
   const what = `E2E Borrar ${Date.now()}`;
   await win.getByLabel("Importe rápido").fill("8000");
-  await win.getByPlaceholder("En qué").fill(what);
+  await win.getByPlaceholder("Detalle").fill(what);
   await win.getByRole("button", { name: /Guardar/ }).click();
   const row = win.getByRole("button", { name: new RegExp(`Gasto.*${what}`) });
   await expect(row).toBeVisible({ timeout: 15_000 });
@@ -98,7 +99,7 @@ test("NV-F-004 eliminar movimiento lo saca de la tabla y del disco", async () =>
   const dialog = win.getByRole("dialog", { name: "Editar movimiento" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Eliminar" }).click();
-  const confirm = win.getByRole("dialog", { name: "Eliminar movimiento" });
+  const confirm = win.getByRole("alertdialog", { name: "Eliminar movimiento" });
   await expect(confirm).toBeVisible();
   await confirm.getByRole("button", { name: "Eliminar" }).click();
 
@@ -133,14 +134,14 @@ test("NV-F-006 crear meta en 2 pasos calcula el aporte y la muestra", async () =
   await dialog.getByLabel("Fecha límite").fill("2026-12-31");
   await expect(dialog.getByText(/Calculado del objetivo/)).toBeVisible();
   await dialog.getByRole("button", { name: "Crear meta" }).click();
-  await expect(win.getByRole("button", { name: new RegExp(name) })).toBeVisible({ timeout: 15_000 });
+  await expect(win.locator("main").getByRole("button", { name: new RegExp(name) }).first()).toBeVisible({ timeout: 15_000 });
 });
 
 test("NV-F-007 duplicar abre copia para hoy y la guarda", async () => {
   await gotoDiario();
   const what = `E2E Plantilla ${Date.now()}`;
   await win.getByLabel("Importe rápido").fill("9000");
-  await win.getByPlaceholder("En qué").fill(what);
+  await win.getByPlaceholder("Detalle").fill(what);
   await win.getByRole("button", { name: /Guardar/ }).click();
   const row = win.getByRole("button", { name: new RegExp(`Gasto.*${what}`) });
   await expect(row).toBeVisible({ timeout: 15_000 });

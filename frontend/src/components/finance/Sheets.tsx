@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { MONTHS_ES, WEEKDAYS_ES } from "../../lib/calendar";
+import { parseRepeat } from "../../lib/tasks";
 import { addDays, daysBetween, monthBounds, parseIso, weekStart } from "../../lib/habits";
 import { formatMoney } from "../../lib/money";
 import { isoDate, todayIso } from "../../lib/tasks";
@@ -183,16 +184,18 @@ function prevRange(kind: Kind, first: string): [string, string] | null {
   return null;
 }
 
-/** Comparación con el periodo anterior para semana y año. */
-function PrevCompare({ kind, first, current }: { kind: Kind; first: string; current: FinTotals }) {
+/** Comparación con el periodo anterior para semana y año, con los filtros vigentes. */
+function PrevCompare({ kind, first, current, fKind, fCat }: {
+  kind: Kind; first: string; current: FinTotals; fKind: string; fCat: string;
+}) {
   const version = useFinance((s) => s.version);
   const [prev, setPrev] = useState<FinTotals | null>(null);
   useEffect(() => {
     const b = prevRange(kind, first);
     if (!b) return;
-    api.finRange(b[0], b[1]).then((ms) => setPrev(totals(ms))).catch(() => setPrev(null));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind, first, version]);
+    const match = (m: Movement) => (!fKind || m.type === fKind) && (!fCat || m.category === fCat);
+    api.finRange(b[0], b[1]).then((ms) => setPrev(totals(ms.filter(match)))).catch(() => setPrev(null));
+  }, [kind, first, fKind, fCat, version]);
   if (!prev) return null;
   const rows: Array<[keyof FinTotals, string]> = [["gasto", "Gastos"], ["ingreso", "Ingresos"], ["ahorro", "Ahorro"], ["balance", "Balance"]];
   return (
@@ -233,16 +236,28 @@ export function BalanceAccumulated({ yearRows }: { yearRows: FinTotals[] }) {
   );
 }
 
-/** Proyección simple a 3 meses por promedio de los últimos 3 meses cerrados. */
+/** Equivalente mensual con signo (gasto/ahorro restan) de una regla. */
+export function monthlySigned(rule: string, type: string, amount_cents: number): number {
+  const r = parseRepeat(rule);
+  const per = r.kind === "daily" ? 30
+    : r.kind === "every" ? 30 / Math.max(2, r.every)
+    : r.kind === "weekly" || r.kind === "workdays" ? (r.weekdays.length * 30) / 7
+    : r.kind === "monthly" ? Math.max(1, r.monthDays.length)
+    : 0;
+  const sign = type === "gasto" || type === "ahorro" ? -1 : 1;
+  return Math.round(sign * amount_cents * per) || 0;
+}
+
+/** Proyección a 3 meses: promedio de los 3 meses cerrados + recurrentes activos. */
 export function Projection3m() {
   const version = useFinance((s) => s.version);
-  const [avg, setAvg] = useState<{ gasto: number; ingreso: number } | null>(null);
+  const [avg, setAvg] = useState<{ gasto: number; ingreso: number; otros: number } | null>(null);
   useEffect(() => {
     const t = new Date();
     const first = isoDate(new Date(t.getFullYear(), t.getMonth() - 3, 1));
     const last = isoDate(new Date(t.getFullYear(), t.getMonth(), 0));
-    api.finRange(first, last)
-      .then((ms) => {
+    Promise.all([api.finRange(first, last), api.finRecurringList()])
+      .then(([ms, recs]) => {
         const byMonth = new Map<string, FinTotals>();
         for (const m of ms) {
           const k = m.date.slice(0, 7);
@@ -254,34 +269,45 @@ export function Projection3m() {
         }
         const months = [...byMonth.values()];
         const n = 3;
+        let rg = 0;
+        let ri = 0;
+        let ro = 0;
+        for (const r of recs.filter((x) => !x.archived)) {
+          const v = monthlySigned(r.rule, r.type, r.amount_cents);
+          if (r.type === "gasto") rg += -v;
+          else if (r.type === "ingreso") ri += v;
+          else ro += v;
+        }
         setAvg({
-          gasto: Math.round(months.reduce((a, r) => a + r.gasto, 0) / n),
-          ingreso: Math.round(months.reduce((a, r) => a + r.ingreso, 0) / n),
+          gasto: Math.round(months.reduce((a, r) => a + r.gasto, 0) / n) + rg,
+          ingreso: Math.round(months.reduce((a, r) => a + r.ingreso, 0) / n) + ri,
+          otros: ro,
         });
       })
       .catch(() => setAvg(null));
   }, [version]);
   const t = new Date();
   const next = [1, 2, 3].map((i) => new Date(t.getFullYear(), t.getMonth() + i, 1));
+  const empty = !avg || (avg.gasto === 0 && avg.ingreso === 0 && avg.otros === 0);
   return (
     <Panel title="Proyección 3 meses">
-      {!avg || (avg.gasto === 0 && avg.ingreso === 0) ? (
+      {empty ? (
         <p className="text-[12px] text-faint">Sin datos suficientes para proyectar.</p>
       ) : (
         <>
           <div className="space-y-1.5">
             {next.map((d) => {
-              const net = avg.ingreso - avg.gasto;
+              const net = avg!.ingreso - avg!.gasto + avg!.otros;
               return (
                 <div key={d.toISOString()} className="flex items-center gap-2 text-[12.5px]">
                   <span className="w-24 capitalize text-dim">{MONTHS_ES[d.getMonth()]}</span>
                   <span className="font-mono text-text">{formatMoney(net, "COP", true)}</span>
-                  <span className="text-[11px] text-faint">≈ {formatMoney(avg.ingreso)} − {formatMoney(avg.gasto)}</span>
+                  <span className="text-[11px] text-faint">≈ {formatMoney(avg!.ingreso)} − {formatMoney(avg!.gasto)}</span>
                 </div>
               );
             })}
           </div>
-          <p className="mt-1.5 text-[11px] text-faint">Promedio de los últimos 3 meses cerrados.</p>
+          <p className="mt-1.5 text-[11px] text-faint">Promedio de los últimos 3 meses cerrados + recurrentes activos.</p>
         </>
       )}
     </Panel>
@@ -314,7 +340,7 @@ export function Sheet() {
       setFound(null);
       return;
     }
-    api.finSearch(q.trim(), fKind, fCat)
+    api.finSearch(q.trim(), fKind, fCat, 0)
       .then(setFound)
       .catch((e) => {
         toast("error", (e as Error).message);
@@ -322,16 +348,27 @@ export function Sheet() {
       });
   }, [history, q, fKind, fCat, version, toast]);
 
+  const moreResults = () => {
+    if (!found || found.movements.length >= found.total) return;
+    api.finSearch(q.trim(), fKind, fCat, found.movements.length)
+      .then((r) => setFound((prev) => prev ? { total: r.total, movements: [...prev.movements, ...r.movements] } : r))
+      .catch((e) => toast("error", (e as Error).message));
+  };
+
   const list = useMemo(() => all.filter((m) => (!fKind || m.type === fKind) && (!fCat || m.category === fCat)
     && (!q || `${m.what ?? ""} ${m.reason ?? ""}`.toLowerCase().includes(q.toLowerCase()))), [all, fKind, fCat, q]);
   const t = totals(list);
   const sel = cn(inputBase, "py-1 text-[12px]");
 
   const csv = async () => {
-    const rows = [...list].sort((a, b) => a.date.localeCompare(b.date)).map((m) => [
+    // Exporta lo visible: el historial trae lo cargado con "Mostrar más".
+    const global = history && q.trim() && found ? found.movements : null;
+    const source = global ?? list;
+    const rows = [...source].sort((a, b) => a.date.localeCompare(b.date)).map((m) => [
       m.date, m.time ?? "", TYPE_LABELS[m.type], categoryText(m), m.what ?? "", m.reason ?? "", (signed(m) / 100).toFixed(2)]);
     try {
-      const r = await exportCsv(`finanzas_${first}_${last}.csv`, ["Fecha", "Hora", "Tipo", "Categoría", "En qué", "Razón", "Importe"], rows);
+      const r = await exportCsv(global ? `finanzas_busqueda_${q.trim()}.csv` : `finanzas_${first}_${last}.csv`,
+        ["Fecha", "Hora", "Tipo", "Categoría", "En qué", "Razón", "Importe"], rows);
       if (r.ok) toast("info", `Exportado: ${r.path}`);
     } catch (e) {
       toast("error", (e as Error).message);
@@ -386,14 +423,19 @@ export function Sheet() {
       {history && q.trim() ? (
         <>
           <p className="text-[12.5px] text-dim">
-            {found ? <><b className="font-mono text-text">{found.total}</b> resultados en todo el historial{found.total > found.movements.length ? " (primeros 100)" : ""}</> : "Buscando…"}
+            {found ? <><b className="font-mono text-text">{found.total}</b> resultados en todo el historial · mostrando {found.movements.length}</> : "Buscando…"}
           </p>
           <MovementTable withDate rows={groupedRows(found?.movements ?? [])} />
+          {found && found.movements.length < found.total && (
+            <div>
+              <GhostButton onClick={moreResults}>Mostrar más ({found.movements.length} de {found.total})</GhostButton>
+            </div>
+          )}
         </>
       ) : (
         <>
           {kind === "mensual" && <MonthExtras first={first} list={list} cats={cats} />}
-          {kind !== "mensual" && <PrevCompare kind={kind} first={first} current={totals(all)} />}
+          {kind !== "mensual" && <PrevCompare kind={kind} first={first} current={t} fKind={fKind} fCat={fCat} />}
           {kind === "anual" ? (
             <>
               <Panel title="Gasto por mes">

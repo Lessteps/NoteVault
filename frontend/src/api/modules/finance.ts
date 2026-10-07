@@ -504,9 +504,9 @@ export function financeApi(app: AppState) {
 
     /**
      * Búsqueda en todo el historial (el buscador de Periodo solo ve el rango
-     * cargado). Devuelve los 100 primeros + total.
+     * cargado). Página de 100 + total para corte explícito.
      */
-    fin_search(query: string, kind = "", category = "") {
+    fin_search(query: string, kind = "", category = "", offset = 0) {
       const fm = getFm();
       const q = String(query ?? "").trim();
       const k = String(kind || "");
@@ -519,7 +519,8 @@ export function financeApi(app: AppState) {
         for (const m of fm.day(d)) all.push([d, m]);
       }
       const found = fm.search(all, q, k, String(category || ""));
-      return { total: found.length, movements: pairs(found.slice(0, 100)) };
+      const start = Math.max(0, Math.floor(Number(offset) || 0));
+      return { total: found.length, movements: pairs(found.slice(start, start + 100)) };
     },
   };
 }

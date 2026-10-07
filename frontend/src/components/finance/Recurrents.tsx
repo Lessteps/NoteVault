@@ -95,7 +95,7 @@ export function RecurringDialog() {
         ))}
       </div>
       <Field label="Importe"><MoneyInput label="Importe" value={f.amount_cents || null} onChange={(c) => set({ amount_cents: c ?? 0 })} autoFocus className="w-full text-[18px]" onEnter={() => void save()} /></Field>
-      <Field label="En qué"><input className={input} value={f.what ?? ""} placeholder="p. ej. Arriendo" onChange={(e) => set({ what: e.target.value })} /></Field>
+      <Field label="Detalle"><input className={input} value={f.what ?? ""} placeholder="p. ej. Arriendo" onChange={(e) => set({ what: e.target.value })} /></Field>
       {kind === "gasto" || kind === "ingreso" ? (
         <Field label="Categoría">
           <select className={input} value={f.category ?? ""} onChange={(e) => set({ category: e.target.value })}>

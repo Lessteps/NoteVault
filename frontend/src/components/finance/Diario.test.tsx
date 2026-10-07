@@ -77,7 +77,7 @@ describe("Diario", () => {
     await mount();
     const type = host!.querySelector('select[aria-label="Tipo rápido"]') as HTMLSelectElement;
     const amount = host!.querySelector('input[aria-label="Importe rápido"]') as HTMLInputElement;
-    const what = host!.querySelector('input[placeholder="En qué"]') as HTMLInputElement;
+    const what = host!.querySelector('input[placeholder="Detalle"]') as HTMLInputElement;
     const save = [...host!.querySelectorAll("button")].find((b) => b.textContent?.includes("Guardar"))!;
     await act(async () => {
       setNative(type, "ingreso");
@@ -101,7 +101,7 @@ describe("Diario", () => {
   it("el registro rápido por defecto sigue siendo gasto", async () => {
     await mount();
     const amount = host!.querySelector('input[aria-label="Importe rápido"]') as HTMLInputElement;
-    const what = host!.querySelector('input[placeholder="En qué"]') as HTMLInputElement;
+    const what = host!.querySelector('input[placeholder="Detalle"]') as HTMLInputElement;
     const save = [...host!.querySelectorAll("button")].find((b) => b.textContent?.includes("Guardar"))!;
     await act(async () => {
       setNative(amount, "12500");

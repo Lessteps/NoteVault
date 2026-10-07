@@ -201,5 +201,9 @@ describe("financeApi", () => {
 
     expect((api.fin_search("", "", "") as { total: number }).total).toBe(0);
     expect(() => api.fin_search("x", "nope", "")).toThrow();
+
+    const page = api.fin_search("arriendo", "", "", 1) as { total: number; movements: Array<{ what: string }> };
+    expect(page.total).toBe(2);
+    expect(page.movements).toHaveLength(1);
   });
 });

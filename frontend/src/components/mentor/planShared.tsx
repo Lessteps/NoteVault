@@ -72,7 +72,7 @@ export async function openProjectInProyectos(id: string): Promise<void> {
 
 /** Clave de la pestaña recordada de un plan (el mismo almacén que la navegación persistida). */
 export const planTabKey = (planId: string): string => `mentor.planTab.${planId}`;
-export const PLAN_TABS = ["plan", "semana", "practica", "entregables", "cambios"] as const;
+export const PLAN_TABS = ["plan", "agenda", "practica", "entregables", "cambios"] as const;
 export type PlanTab = (typeof PLAN_TABS)[number];
 
 /** Abre un plan en una pestaña concreta (enlace profundo interno: «Ver cambios», «Ver entregables»…). */

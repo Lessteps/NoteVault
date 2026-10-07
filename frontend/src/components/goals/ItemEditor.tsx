@@ -20,6 +20,8 @@ import {
 } from "../common/peek";
 import { RepeatPicker } from "../common/RepeatPicker";
 import { cn, confirmAction, IconButton } from "../ui";
+import { promoteItem, TransferDialog } from "./ItemTransfer";
+import { PracticeLinks } from "./PracticeLinks";
 import { TopicLinks } from "./TopicLinks";
 
 export function HabitLinks({ value, onChange }: { value: string[]; onChange: (ids: string[]) => void }) {
@@ -78,6 +80,7 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
   const toast = useApp((s) => s.toast);
   const [f, setF] = useState<Partial<GoalItem>>({});
   const [hint, setHint] = useState("");
+  const [moving, setMoving] = useState(false);
   const initial = useRef("");
   const panel = useRef<HTMLDivElement>(null);
   const title = useRef<HTMLTextAreaElement>(null);
@@ -112,7 +115,7 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
       duration_min: time ? f.duration_min ?? null : null, reminder_min: time ? f.reminder_min ?? null : null,
       in_calendar: Boolean(f.in_calendar) || Boolean(!repeating && f.due && time),
       target, unit: target ? f.unit ?? "" : "", value: !repeating && f.value !== null && f.value !== undefined && String(f.value) !== "" ? f.value : null,
-      habit_links: f.habit_links ?? [], topic_links: f.topic_links ?? [], notes: f.notes ?? "",
+      habit_links: f.habit_links ?? [], topic_links: f.topic_links ?? [], practice_links: f.practice_links ?? [], notes: f.notes ?? "",
       linked_notes: f.linked_notes ?? [], linked_folder: f.linked_folder ?? "",
     };
     if (item.is_leaf) fields.status = f.status;
@@ -191,6 +194,7 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
   if (f.category && !detail.categories.includes(f.category)) categoryOptions.push({ value: f.category, label: f.category });
 
   return (
+    <>
     <div className="nv-fade fixed inset-0 z-40 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }} onMouseDown={() => void close()}>
       <div ref={panel} role="dialog" aria-label="Detalle de la submeta" onMouseDown={(e) => e.stopPropagation()}
@@ -366,6 +370,10 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
               <TopicLinks value={f.topic_links ?? []} onChange={(topic_links) => set({ topic_links })} />
               {(f.topic_links ?? []).length > 0 && <p className="mt-1 text-[11px] text-faint">Se cumple sola cuando el estudio de esos temas está dominado.</p>}
             </Section>
+            <Section label="Práctica">
+              <PracticeLinks value={f.practice_links ?? []} onChange={(practice_links) => set({ practice_links })} />
+              {(f.practice_links ?? []).length > 0 && <p className="mt-1 text-[11px] text-faint">Se cumple sola con tu kata diario y tus proyectos de Programming practice.</p>}
+            </Section>
             <Section label="Notas">
               <textarea rows={6} aria-label="Notas" placeholder="Resúmenes, enlaces a recursos o notas de esta submeta…" value={f.notes ?? ""}
                 onChange={(e) => set({ notes: e.target.value })}
@@ -388,9 +396,18 @@ export function ItemEditor({ item, onClose }: { item: GoalItem; onClose: () => v
             }
           }}><Trash2 size={13} /> Eliminar</GhostButton>
           <GhostButton onClick={() => { onClose(); openSubmeta(item.id); }}>📊 Estadísticas ›</GhostButton>
+          <GhostButton onClick={async () => {
+            if (dirty() && !(await save())) return;
+            if (!(await confirmAction("Promover a meta", `«${item.name}» pasará a ser una meta principal con sus submetas.`, "Promover"))) return;
+            onClose();
+            await promoteItem(g.id, item);
+          }}>⬆ Promover a meta</GhostButton>
+          <GhostButton onClick={() => setMoving(true)}>↪ Mover a…</GhostButton>
           <span className="min-w-0 flex-1 truncate text-right text-[11px] text-faint">{hint}</span>
         </div>
       </div>
     </div>
+    {moving && <TransferDialog mode="item" gid={g.id} item={item} onClose={() => setMoving(false)} />}
+    </>
   );
 }

@@ -212,14 +212,14 @@ describe("plan aceptado: tarjeta Programming practice", () => {
 });
 
 describe("esta semana y hoy: la práctica del día", () => {
-  it("lista el kata y la sesión del proyecto; «Planear mi día con esto» y el atajo de práctica dejan el objetivo", async () => {
+  it("la Agenda del día lista el kata y la sesión del proyecto; «Planear mi día con esto» y el atajo de práctica dejan el objetivo", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    await openTab("semana");
-    const items = host.querySelectorAll("[data-testid=plan-week-practice-item]");
-    expect(items.length).toBeGreaterThanOrEqual(1);
-    expect(items[0]!.textContent).toContain("Reto diario");
-    expect(items[0]!.textContent).toContain("Programming practice");
+    await openTab("agenda");
+    await click(host.querySelector("#agenda-view-tab-dia")!);
+    const kata = host.querySelector("[data-testid=agenda-practice-kata]")!;
+    expect(kata.textContent).toContain("Reto diario");
+    expect(kata.textContent).toContain("Programming practice");
     await click(button("Programming practice (kata + proyecto)"));
     expect(useMentor.getState().pendingObjective).toEqual({ type: "programming_practice" });
     expect(useNavState.getState().values["mentor.view"]).toBe("hoy");

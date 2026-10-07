@@ -50,6 +50,7 @@ api_keys.json
 logs/
 
 # ── Web UI (frontend/) ───────────────────────────────────────────
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/dist-electron/

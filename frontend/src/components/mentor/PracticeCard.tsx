@@ -11,6 +11,7 @@ import { isoDow, shortWeekLabel } from "../../lib/planTime";
 import {
   FOCUS_LABEL,
   PHASE_LABEL,
+  PRACTICE_BLURB,
   PRACTICE_NAME,
   PRACTICE_PHASES,
   phasesText,
@@ -187,7 +188,7 @@ export function PracticeRow({ track, status, today }: { track: PracticeTrack; st
     <section className="space-y-3" data-testid="practice-row" aria-labelledby="pr-title">
       <SectionHeading
         id="pr-title"
-        hint={practiceSummary(track)}
+        hint={<>{PRACTICE_BLURB} <span className="block">{practiceSummary(track)}</span></>}
         right={
           <PrimaryButton large onClick={openPractice}>
             <ExternalLink size={16} aria-hidden /> Abrir práctica
@@ -198,7 +199,7 @@ export function PracticeRow({ track, status, today }: { track: PracticeTrack; st
       </SectionHeading>
       <div className="grid items-start gap-4 @3xl:grid-cols-2 @6xl:grid-cols-3">{cards}</div>
       <p className="text-[14px] text-dim">
-        El proyecto semanal es siempre full stack (frontend + backend + base de datos); el foco solo añade criterios. Se trabaja en el módulo de práctica de programación («Abrir práctica»).
+        Los proyectos de práctica complementan al kata diario y son siempre full stack (frontend + backend + base de datos); el foco solo añade criterios. Se trabajan en el módulo de práctica de programación («Abrir práctica»).
       </p>
     </section>
   );

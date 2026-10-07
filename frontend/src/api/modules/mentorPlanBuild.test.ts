@@ -189,7 +189,8 @@ describe("constructor guiado (sin IA)", () => {
     const plan = JSON.parse(fs.readFileSync(path.join(plansDir(), `${out.id}.json`), "utf-8"));
     expect(plan.proposed).toBe(true);
     expect(JSON.stringify(plan)).not.toContain("Inventado");
-    expect(plan.subplans[0].area).toBe("Programación");
+    expect(plan.subplans[0].area).toBe("Backend"); // un subplan = un área elemental
+    expect(plan.structure).toBe("areas");
     expect(plan.openQuestions.length).toBeGreaterThan(0);
   });
 });
@@ -241,16 +242,17 @@ describe("plan propuesto: no alimenta Hoy, se mantiene o se borra", () => {
     const one = { branches: { Programación: ["4 Backend"] }, branchPreset: "backend" };
     const r: any = await a.mentor_plan_generate({ preconditions: pre({ deliverables: "ask", ...one }) });
     const plan: any = a.mentor_plan_get({ id: r.planId }).plan;
+    // UNA sola pregunta global (sin subplanId) para todo el plan por áreas
     expect(plan.openQuestions).toHaveLength(1);
-    const sid = plan.subplans[0].id;
-    expect(a.mentor_plan_answer({ id: r.planId, subplanId: sid, answer: "later" })).toMatchObject({ openQuestions: expect.any(Array) });
-    const yes: any = a.mentor_plan_answer({ id: r.planId, subplanId: sid, answer: "yes" });
-    expect(yes.subplans[0].deliverable).toMatchObject({ status: "idea" });
+    expect(plan.openQuestions[0].subplanId).toBeUndefined();
+    expect(a.mentor_plan_answer({ id: r.planId, answer: "later" })).toMatchObject({ openQuestions: expect.any(Array) });
+    const yes: any = a.mentor_plan_answer({ id: r.planId, answer: "yes" });
+    expect(yes.subplans[0].deliverable).toMatchObject({ status: "idea", title: "API REST con persistencia y pruebas" });
     expect(yes.openQuestions).toBeUndefined();
-    expect(() => a.mentor_plan_answer({ id: r.planId, subplanId: sid, answer: "yes" })).toThrow(/ya no está pendiente/);
+    expect(() => a.mentor_plan_answer({ id: r.planId, answer: "yes" })).toThrow(/ya no está pendiente/);
     expect(() => a.mentor_plan_answer({ id: r.planId, subplanId: "x", answer: "yes" })).toThrow(/ya no existe/);
     const r2: any = await a.mentor_plan_generate({ preconditions: pre({ deliverables: "ask", end: addDays(todayIso(), 25), ...one }) });
-    const no: any = a.mentor_plan_answer({ id: r2.planId, subplanId: (a.mentor_plan_get({ id: r2.planId }) as any).plan.subplans[0].id, answer: "no" });
+    const no: any = a.mentor_plan_answer({ id: r2.planId, answer: "no" });
     expect(no.subplans[0].deliverable).toBeUndefined();
     expect(no.openQuestions).toBeUndefined();
   });
@@ -263,7 +265,7 @@ describe("ramas: exclusión determinista y validación de la IA", () => {
     withAi();
     const send = vi.fn().mockImplementation(async (_cfg: unknown, m: any[]) => {
       const system = m[0].content as string;
-      if (system.includes("ESQUELETO")) return JSON.stringify({ type: "skeleton", rationale: "Primero lo básico.", subplans: [{ key: "programacion|avanzar en fundamentals", weight: 2 }, { key: "programacion|avanzar en backend", weight: 4 }, { key: "programacion|avanzar en mobile", weight: 3 }] });
+      if (system.includes("ESQUELETO")) return JSON.stringify({ type: "skeleton", rationale: "Primero lo básico.", subplans: [{ key: "backend|construir servicios y apis solidos y seguros", weight: 4 }, { key: "mobile|construir aplicaciones moviles", weight: 3 }] });
       const key = /SUBPLAN key=(\S+)/.exec(m[1].content)![1]!;
       return JSON.stringify({ type: "topic_order", subplans: [{ key, reason: "Orden de lo básico a lo avanzado.", topics: ["Programación/4 Backend/02 Tema", "Programación/8 Mobile/01 Tema", "Programación/3 Desktop Apps/01 Tema", "Programación/1 Fundamentals/01 Tema", "Programación/5 Frontend/01 Tema"] }] });
     });
@@ -277,15 +279,15 @@ describe("ramas: exclusión determinista y validación de la IA", () => {
     const plan = (a.mentor_plan_get({ id: r.planId }) as any).plan;
     const folders = plan.subplans.flatMap((s: any) => s.topics.map((t: any) => t.folder));
     expect(folders.join()).not.toMatch(/Mobile|Desktop/);
-    expect(plan.subplans.map((s: any) => s.objective)).toEqual(["Avanzar en Fundamentals", "Avanzar en Backend", "Avanzar en Frontend"].filter((o) => o !== "Avanzar en Frontend"));
+    expect(plan.subplans.map((s: any) => s.area)).toEqual(["Backend"]); // la IA no incluyó Frontend en el esqueleto
     expect(plan.preconditions.branchExcluded).toEqual(["3 Desktop Apps", "8 Mobile"]);
     expect(plan.preconditions.branchPreset).toBe("fullstack");
-    // sin IA: el plan automático tampoco los incluye y reparte por RAMA (un subplan por rama, no uno solo)
+    // sin IA: el plan automático tampoco los incluye y reparte por ÁREA (un subplan por área, con los grupos Bases + Conocimientos)
     noAi();
     const auto: any = await api().mentor_plan_generate({ preconditions: pre({ branches, branchPreset: "fullstack", end: addDays(todayIso(), 30) }) });
     const autoPlan = (api().mentor_plan_get({ id: auto.planId }) as any).plan;
     expect(JSON.stringify(autoPlan.subplans)).not.toMatch(/Mobile|Desktop/);
-    expect(autoPlan.subplans.map((s: any) => [s.objective, s.topics.length])).toEqual([["Avanzar en Fundamentals", 3], ["Avanzar en Backend", 4], ["Avanzar en Frontend", 3]]);
+    expect(autoPlan.subplans.map((s: any) => [s.area, s.topics.length])).toEqual([["Backend", 7], ["Frontend", 3]]); // Fundamentals es el grupo «Bases» de Backend
   });
 
   it("si el estudiante reañade las ramas (sin selección de ramas) entran todas; aceptar un borrador con una rama excluida la ignora", async () => {
@@ -317,7 +319,7 @@ describe("constructor guiado con IA simulada", () => {
   const oneBranch = { Programación: ["4 Backend"] };
   const scope = (over: Record<string, unknown> = {}) =>
     JSON.stringify({ type: "scope", rewrites: { "level:Programación": { text: "¿Con qué soltura programas hoy?", why: "Ajusta tus tiempos." } }, questions: [{ text: "¿Teoría por la mañana?", why: "Tus comentarios", options: ["Sí", "No"] }], ...over });
-  const order = (folders: string[]) => JSON.stringify({ type: "topic_order", subplans: [{ key: "programacion|avanzar en programacion", topics: folders.map((folder) => ({ folder, why: "base" })) }] });
+  const order = (folders: string[]) => JSON.stringify({ type: "topic_order", subplans: [{ key: "backend|construir servicios y apis solidos y seguros", topics: folders.map((folder) => ({ folder, why: "base" })) }] });
 
   it("una llamada de alcance (no se repite): reformula la pregunta de reglas y añade UNA pregunta propia con texto libre; los comentarios hostiles no rompen el flujo", async () => {
     withAi();
@@ -443,7 +445,7 @@ describe("pedir cambios al plan con comentarios", () => {
     clearVaultScanCache();
     app = new AppState(dir);
     vaultScan(app);
-    const r: any = await api().mentor_plan_generate({ preconditions: pre({ end: addDays(todayIso(), 40), branches: { Programación: ["1 Fundamentals", "4 Backend"] }, branchPreset: "backend" }) });
+    const r: any = await api().mentor_plan_generate({ preconditions: pre({ end: addDays(todayIso(), 40), branches: { Programación: ["1 Fundamentals", "4 Backend", "5 Frontend"] }, branchPreset: "fullstack" }) });
     planId = r.planId;
     sub = (api().mentor_plan_get({ id: planId }) as any).plan.subplans[0].id;
   });
@@ -509,7 +511,7 @@ describe("pedir cambios al plan con comentarios", () => {
     const r: any = await a.mentor_plan_change({ id: planId, comment: "quita la rama backend" });
     expect(r.applied).toBe(true);
     expect(r.entry.source).toBe("rules");
-    expect(topics()).toHaveLength(n - 4);
+    expect(topics()).toHaveLength(n - 7); // «backend» es un ÁREA: se quita entera (Bases + Conocimientos de backend)
     const pend: any = await a.mentor_plan_change({ id: planId, comment: "hazlo como creas mejor, estoy abierto a todo" });
     expect(pend.applied).toBe(false);
     expect(pend.entry).toMatchObject({ status: "pending", comment: "hazlo como creas mejor, estoy abierto a todo" });
@@ -527,7 +529,7 @@ describe("pedir cambios al plan con comentarios", () => {
     const boom = api(vi.fn().mockRejectedValue(new Error("sin red")));
     const r: any = await boom.mentor_plan_change({ id: planId, comment: "quita la rama backend" });
     expect(r.entry.source).toBe("rules");
-    expect(topics()).toHaveLength(n - 4);
+    expect(topics()).toHaveLength(n - 7);
     const send = vi.fn().mockImplementation(() => new Promise<string>(() => undefined));
     const a = api(send);
     const p: Promise<any> = a.mentor_plan_change({ id: planId, comment: "quita la rama frontend" });

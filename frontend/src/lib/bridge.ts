@@ -316,6 +316,14 @@ export const api = {
   goalItemUpdate: (gid: string, iid: string, fields: Partial<GoalItem>) => call<GoalItem>("goals_item_update", gid, iid, fields),
   goalsTopicLinksProgress: (links: string[]) =>
     call<import("./types").TopicLinkProgress>("goals_topic_links_progress", links),
+  goalsPracticeLinksProgress: (links: string[]) =>
+    call<import("./types").PracticeLinkProgress>("goals_practice_links_progress", links),
+  goalsPracticeCatalog: () => call<import("./types").PracticeCatalog>("goals_practice_catalog"),
+  goalsTree: (goalId = "") => call<import("./types").GoalTree[]>("goals_tree", { goalId }),
+  goalItemPromote: (gid: string, iid: string) => call<Goal>("goals_item_promote", gid, iid),
+  goalDemote: (gid: string, targetGid: string, parent = "") => call<GoalItem>("goals_goal_demote", gid, targetGid, parent),
+  goalItemMoveTo: (gid: string, iid: string, targetGid: string, parent = "") =>
+    call<GoalItem>("goals_item_move_to", gid, iid, targetGid, parent),
   goalItemDelete: (gid: string, iid: string) => call<{ ok: boolean }>("goals_item_delete", gid, iid),
   goalItemMove: (gid: string, iid: string, parent: string, index: number) =>
     call<{ ok: boolean }>("goals_item_move", gid, iid, parent, index),
@@ -354,7 +362,14 @@ export const api = {
   /** «Generar plan»: crea YA el plan propuesto (`noAi` = plan automático sin IA). */
   mentorPlanGenerateNow: (preconditions: import("./planTime").PlanPreconditions, noAi = false) => call<import("./types").MentorPlanGenerateResult>("mentor_plan_generate", { preconditions, ...(noAi ? { noAi: true } : {}) }),
   mentorPlanKeep: (id: string) => call<import("./types").MentorPlan>("mentor_plan_keep", { id }),
-  mentorPlanAnswer: (opts: { id: string; subplanId: string; answer: "yes" | "no" | "later"; questionId?: string }) => call<import("./types").MentorPlan>("mentor_plan_answer", opts),
+  /** Responde la pregunta de entregables: sin `subplanId` es la GLOBAL del plan por áreas; con él, la de un subplan. */
+  mentorPlanAnswer: (opts: { id: string; subplanId?: string; answer: "yes" | "no" | "later"; questionId?: string }) => call<import("./types").MentorPlan>("mentor_plan_answer", opts),
+  /** Excepción por área tras la pregunta global: añade o quita el proyecto propio de un área. */
+  mentorPlanAreaDeliverable: (opts: { id: string; subplanId: string; enabled: boolean }) => call<import("./types").MentorPlan>("mentor_plan_area_deliverable", opts),
+  /** Escribe (o borra, con texto vacío) el propósito de un día, semana o mes. */
+  mentorPlanSetPurpose: (opts: { id: string; scope: "day" | "week" | "month"; key: string; text: string }) => call<import("./types").MentorPlan>("mentor_plan_set_purpose", opts),
+  /** «Reorganizar por áreas»: convierte un plan de estructura antigua; queda en el historial y se puede deshacer. */
+  mentorPlanReorganize: (id: string) => call<{ plan: import("./types").MentorPlan; entry: import("./types").MentorChangeEntry; history: import("./types").MentorChangeEntry[]; applied: true }>("mentor_plan_reorganize", { id }),
   mentorPlanChange: (opts: { id: string; comment?: string; ops?: Array<Record<string, unknown>>; label?: string; noAi?: boolean }) => call<import("./types").MentorChangeResult>("mentor_plan_change", opts),
   mentorPlanChanges: (id: string) => call<import("./types").MentorChangeEntry[]>("mentor_plan_changes", { id }),
   mentorPlanChangeUndo: (id: string) => call<{ plan: import("./types").MentorPlan; history: import("./types").MentorChangeEntry[] }>("mentor_plan_change_undo", { id }),
@@ -373,12 +388,13 @@ export const api = {
   mentorPlanDelete: (id: string) => call<{ id: string; plans: import("./types").MentorPlanRow[] }>("mentor_plan_delete", { id }),
   mentorPlanDraftAccept: (turnId: string, chatId?: string) => call<import("./types").MentorPlanAccepted>("mentor_plan_draft_accept", { turnId, chatId }),
   /** Responde una pregunta pendiente del borrador (entregables): yes añade la propuesta, no la descarta, later la deja. */
-  mentorPlanDraftAnswer: (opts: { turnId: string; chatId?: string; subplanId: string; answer: "yes" | "no" | "later"; questionId?: string }) =>
+  mentorPlanDraftAnswer: (opts: { turnId: string; chatId?: string; subplanId?: string; answer: "yes" | "no" | "later"; questionId?: string }) =>
     call<{ turns: import("./types").MentorChatTurn[]; pending: string | null; planDraft: import("./types").MentorPlanDraft }>("mentor_plan_draft_answer", opts),
   mentorPlanDraftDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_plan_draft_discard", turnId),
   /** Mismo efecto que `mentorPlanDraftDiscard` (nombre corto del contrato). */
   mentorPlanDiscard: (turnId: string) => call<import("./types").MentorChatState>("mentor_plan_discard", turnId),
-  mentorPlanUpdateDeliverable: (opts: { id: string; subplanId: string; status: import("./types").MentorDeliverableStatus; projectId?: string | null }) =>
+  /** Cambia el estado de un entregable: el de un área (`subplanId`) o uno de la agenda (`deliverableId`: kata:<fecha>, wp:<semana>, mp:<semana>, area:<subplan>, x:<n>), con archivos opcionales. */
+  mentorPlanUpdateDeliverable: (opts: { id: string; subplanId?: string; deliverableId?: string; status: import("./types").MentorDeliverableStatus | import("./planAreas").PlanDeliverableStatus; projectId?: string | null; files?: Array<{ path?: string; note: string }> }) =>
     call<import("./types").MentorPlan>("mentor_plan_update_deliverable", opts),
   mentorChatsList: () => call<import("./types").MentorChatMeta[]>("mentor_chats_list"),
   mentorChatNew: () => call<import("./types").MentorChatState>("mentor_chat_new"),

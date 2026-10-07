@@ -170,6 +170,8 @@ export const GOAL_ITEM_FIELDS: readonly FieldDef[] = [
   ["habit_links", "list"], ["done_at", "date"], ["created", "date"],
   // Opcional y aditivo (se omite si está vacío): temas de estudio que cumplen la submeta.
   ["topic_links", "list"],
+  // Opcional y aditivo (se omite si está vacío): enlaces al sistema Programming practice (kata diario, proyectos).
+  ["practice_links", "list"],
 ] as const;
 
 export const PROJECT_V4_STATUSES = PROJECT_STATUSES;

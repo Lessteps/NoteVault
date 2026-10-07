@@ -60,30 +60,39 @@ describe("inferBranches en el servidor", () => {
   });
 });
 
-describe("plan automático: respeta las exclusiones y reparte por rama", () => {
+describe("plan automático POR ÁREAS: respeta las exclusiones y agrupa las ramas en áreas elementales", () => {
   const seedsFor = (p: ReturnType<typeof pre>) => autoSeeds(p, resolveScope(p, ALL, []));
 
-  it("un subplan por rama principal (no un único «Avanzar en Programación (243)») y nada de las ramas excluidas", () => {
+  it("un subplan por ÁREA (no uno por rama ni un único «Avanzar en Programación (243)») y nada de las ramas excluidas", () => {
     const p = resolveBranches(pre({ freeObjective: "full stack" }), ALL, []);
     const seeds = seedsFor(p);
-    expect(seeds.map((s) => s.objective)).toEqual(["Avanzar en Fundamentals", "Avanzar en Python", "Avanzar en Backend", "Avanzar en Frontend", "Avanzar en Databases", "Avanzar en Tooling and Quality"]);
+    expect(seeds.map((s) => s.area)).toEqual(["Backend", "Databases", "Frontend", "Tooling and Quality"]);
+    expect(seeds.map((s) => s.areaId)).toEqual(["backend", "databases", "frontend", "tooling"]);
+    expect(seeds.map((s) => s.objective)).toEqual(["Construir servicios y APIs sólidos y seguros", "Modelar, consultar y operar bases de datos", "Crear interfaces web accesibles y mantenibles", "Trabajar con Git, pruebas y calidad de código"]);
     expect(seeds.flatMap((s) => s.topics).some((x) => /Mobile|Desktop|Automation/.test(x.folder))).toBe(false);
+    // Backend lleva Bases (Fundamentals) + Lenguaje (Python) + Conocimientos (4 Backend), en ese orden
+    const backend = seeds[0]!;
+    expect(backend.groups!.map((g) => g.title)).toEqual(["Bases", "Lenguaje: Python", "Conocimientos de backend"]);
+    expect(backend.topics.map((t) => t.group).filter((g, i, l) => l.indexOf(g) === i)).toEqual(["bases", "lang-python", "core"]);
+    // programming_practice (si existiera) no es un área
+    expect(seeds.some((s) => /practice/i.test(s.area))).toBe(false);
   });
 
-  it("Fundamentals se limita a los realmente previos según el nivel declarado (básico 15; empezando o sin nivel, todos)", () => {
-    const fund = (p: ReturnType<typeof pre>) => seedsFor(resolveBranches(p, ALL, [], "full stack")).find((s) => s.objective === "Avanzar en Fundamentals")!.topics.length;
-    expect(fund(pre({ levels: { Programación: "basico" } }))).toBe(15);
-    expect(fund(pre({ levels: { Programación: "intermedio" } }))).toBe(8);
-    expect(fund(pre({ levels: { Programación: "avanzado" } }))).toBe(4);
-    expect(fund(pre({ levels: { Programación: "empezando" } }))).toBe(75);
-    expect(fund(pre({ levels: {} }))).toBe(75);
+  it("Fundamentals (grupo «Bases») se limita a los realmente previos según el nivel declarado (básico 15; empezando o sin nivel, todos)", () => {
+    const bases = (p: ReturnType<typeof pre>) => seedsFor(resolveBranches(p, ALL, [], "full stack")).find((s) => s.areaId === "backend")!.topics.filter((t) => t.group === "bases").length;
+    expect(bases(pre({ levels: { Programación: "basico" } }))).toBe(15);
+    expect(bases(pre({ levels: { Programación: "intermedio" } }))).toBe(8);
+    expect(bases(pre({ levels: { Programación: "avanzado" } }))).toBe(4);
+    expect(bases(pre({ levels: { Programación: "empezando" } }))).toBe(75);
+    expect(bases(pre({ levels: {} }))).toBe(75);
   });
 
-  it("una materia con una sola rama sigue siendo un subplan por materia", () => {
+  it("una materia con una sola rama sigue siendo un solo subplan (su área)", () => {
     const only = ALL.filter((x) => x.folder.includes("4 Backend"));
     const p = pre();
     const seeds = autoSeeds(p, resolveScope(p, only, []));
     expect(seeds).toHaveLength(1);
-    expect(seeds[0]!.objective).toBe("Avanzar en Programación");
+    expect(seeds[0]!.area).toBe("Backend");
+    expect(seeds[0]!.objective).toBe("Construir servicios y APIs sólidos y seguros");
   });
 });

@@ -1,10 +1,13 @@
 /**
  * Generación COMPLETA por partes (en vez de una sola llamada gigante a la IA, que en planes largos supera el tiempo):
- *  1. ESQUELETO: una llamada pequeña decide qué subplanes entran, su orden, su peso y su objetivo (sin temas).
- *  2. TEMAS: una llamada por subplan (y por cada bloque de ≤60 temas) con solo los candidatos de esa rama, EN PARALELO con concurrencia
- *     limitada. La respuesta es compacta: carpetas elegidas + UNA razón corta por subplan.
+ *  1. ESQUELETO: una llamada pequeña decide qué ÁREAS entran (Backend, Frontend…), su orden, su peso y su objetivo corto (sin temas).
+ *     La secuencia por fases (rangos de semanas, ≤2 áreas en paralelo) la calcula después la app con ese orden y esos pesos.
+ *  2. TEMAS: una llamada por área (y por cada bloque de ≤60 temas) con solo los candidatos de esa área, EN PARALELO con concurrencia
+ *     limitada. La respuesta es compacta: carpetas elegidas + UNA razón corta por área. La app conserva el orden de los grupos
+ *     internos (Bases → Lenguaje → Conocimientos) y la IA ordena dentro de cada grupo.
  *  Cada llamada tiene su tiempo máximo y todas comparten un presupuesto total; si un bloque falla (o se acaba el tiempo), SOLO ese bloque
- *  cae a reglas (orden natural) y el resto conserva lo que la IA devolvió. Se marca la fuente por subplan y se avisa con el motivo concreto.
+ *  cae a reglas (orden natural) y el resto conserva lo que la IA devolvió. Se marca la fuente por área y el aviso «completado con reglas»
+ *  (con su motivo) solo aparece cuando de verdad ocurrió: no se escriben notas internas.
  *  Cancelar mata las llamadas en vuelo (AbortSignal): `abort` lanza; `auto` deja el resto en reglas y termina.
  */
 
@@ -13,6 +16,7 @@ import { TOPIC_BLOCK } from "../../lib/planBuild.js";
 import type { PlanPreconditions } from "../../lib/planTime.js";
 import type { StudentBrief } from "./brief.js";
 import { fold, keywordsOf } from "./goalDraft.js";
+import { sortByGroupOrder } from "../../lib/planAreas.js";
 import { subplanKey, type SubplanSeed } from "./plan.js";
 import { parseSkeletonReply, parseTopicsReply, skeletonMessages, topicsBlockMessages } from "./planBuildAi.js";
 
@@ -64,7 +68,8 @@ export interface PipelineResult {
 }
 
 const short = (s: string, n = 28): string => (s.length > n ? `${s.slice(0, n - 1).trim()}…` : s);
-const nameOf = (s: Pick<SubplanSeed, "area" | "objective">): string => short(s.objective.replace(/^Avanzar en /, "") || s.area);
+/** Nombre corto del área para el progreso y los avisos (en planes antiguos, su objetivo sin «Avanzar en»). */
+const nameOf = (s: Pick<SubplanSeed, "area" | "objective"> & { areaId?: string }): string => short(s.areaId ? s.area : s.objective.replace(/^Avanzar en /, "") || s.area);
 
 /** Ordena los candidatos de un subplan grande por relevancia con lo que pidió el estudiante (los demás, en su orden natural). */
 function byRelevance(topics: SubplanSeed["topics"], hint: string): SubplanSeed["topics"] {
@@ -134,7 +139,7 @@ export async function generateByParts(pre: PlanPreconditions, seedsIn: readonly 
 
   // sin IA: nada que pedir
   const strip = (s: SubplanSeed): SubplanSeed => {
-    const { notes: _n, ...rest } = s;
+    const { notes: _n, fallback: _f, ...rest } = s;
     return { ...rest, topics: s.topics.map(({ diagnostic: _d, ...t }) => t) };
   };
   let seeds = seedsIn.map(strip);
@@ -150,7 +155,7 @@ export async function generateByParts(pre: PlanPreconditions, seedsIn: readonly 
     const doneN = progress.subplans.filter((p) => p.state === "done" || p.state === "rules" || p.state === "mixed").length;
     for (const p of progress.subplans.slice(0, 5)) parts.push(`${p.name} ${p.state === "done" ? "✓" : p.state === "rules" || p.state === "mixed" ? "(reglas)" : p.state === "running" ? "…" : "·"}`);
     if (progress.subplans.length > 5) parts.push(`+${progress.subplans.length - 5}`);
-    if (progress.subplans.length) parts.push(`${doneN}/${progress.subplans.length} subplanes`);
+    if (progress.subplans.length) parts.push(`${doneN}/${progress.subplans.length} áreas`);
     return parts.join(" · ");
   };
   const emit = (): void => o.onProgress?.(progress, label());
@@ -177,11 +182,11 @@ export async function generateByParts(pre: PlanPreconditions, seedsIn: readonly 
         seeds = ordered;
         progress.skeleton = "done";
       } else {
-        warnings.push("El esqueleto lo armó la app con reglas porque la IA no devolvió un esqueleto válido.");
+        warnings.push("El esqueleto (orden y peso de las áreas) lo armó la app con reglas porque la IA no devolvió un esqueleto válido.");
         progress.skeleton = "rules";
       }
     } else {
-      warnings.push(`El esqueleto lo armó la app con reglas porque ${r.msg}.`);
+      warnings.push(`El esqueleto (orden y peso de las áreas) lo armó la app con reglas porque ${r.msg}.`);
       progress.skeleton = "rules";
     }
   } else progress.skeleton = "skipped";
@@ -253,14 +258,17 @@ export async function generateByParts(pre: PlanPreconditions, seedsIn: readonly 
     const notes: string[] = [];
     const why = rs.find((r) => r.why)?.why;
     if (why) notes.push(why);
+    let fallback: SubplanSeed["fallback"];
     if (kind !== "ai") {
       const reason = rs.find((r) => !r.ok)?.reason ?? "la IA no respondió";
-      warnings.push(`El subplan «${nameOf(s)}» se ${kind === "mixed" ? "completó en parte" : "completó"} con reglas porque ${reason}.`);
-      notes.push("Temas en el orden natural de la materia (sin la selección de la IA).");
+      warnings.push(`El área «${nameOf(s)}» se ${kind === "mixed" ? "completó en parte" : "completó"} con reglas porque ${reason}.`);
+      fallback = { kind: kind === "mixed" ? "mixed" : "rules", reason };
     }
     const w = weights.get(key);
     const mins = topics.reduce((n, t) => n + t.estMinutes, 0);
-    out.push({ ...s, topics: topics.length ? topics : s.topics, ...(notes.length ? { notes: notes.join(" ") } : {}), ...(w ? { weight: Math.max(1, Math.round((mins * w) / 3)) } : {}) });
+    // la IA ordena dentro de cada grupo; los grupos (Bases → Lenguaje → Conocimientos) los ordena la app
+    const ordered = sortByGroupOrder(topics.length ? topics : s.topics, s.groups);
+    out.push({ ...s, topics: ordered, ...(notes.length ? { notes: notes.join(" ") } : {}), ...(fallback ? { fallback } : {}), ...(w ? { weight: Math.max(1, Math.round((mins * w) / 3)) } : {}) });
   });
   return { seeds: out, sources, warnings, rationale, discarded: [...new Set(discarded)].slice(0, 20), aiUsed, skeletonOk, calls };
 }

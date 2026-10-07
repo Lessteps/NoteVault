@@ -10,6 +10,7 @@ import { pct, useGoals } from "../../store/goals";
 import { BlockProgress } from "../common/charts";
 import { Chip, GhostButton, inputBase, PRIORITY_COLOURS, PRIORITY_GLYPHS, PRIORITY_NAMES } from "../common/forms";
 import { cn, IconButton } from "../ui";
+import { PracticeChips } from "./PracticeLinks";
 
 const CAT_COLOURS = ["#2383e2", "#a855f7", "#33b679", "#ff9632", "#f2555a", "#38bdf8", "#facc15", "#fb7185"];
 export function catColour(c: string): string {
@@ -87,6 +88,7 @@ export function SubmetaCards() {
                 {it.is_priority && <Chip colour="#a855f7">Detallada</Chip>}
               </div>
               {it.schedule && <div className="mt-1.5 text-[11px] text-faint">📅 {it.schedule}</div>}
+              <div className="mt-1.5"><PracticeChips item={it} /></div>
               <div className="mt-2 flex items-center gap-2">
                 <BlockProgress value={it.progress} colour={accent} blocks={10} />
                 <span className="ml-auto text-[11px] text-dim">{!it.is_leaf || it.counts[1] > 1 ? `${it.counts[0]}/${it.counts[1]} subtareas` : `${Math.round(it.progress * 100)} %`}</span>
@@ -166,7 +168,8 @@ export function SubmetaTree() {
               <span className="text-[11.5px]" style={{ color: PRIORITY_COLOURS[it.priority] }}>{PRIORITY_GLYPHS[it.priority]} {PRIORITY_NAMES[it.priority]}</span>
               <span className="truncate text-[11.5px] text-dim">{it.schedule || "—"}</span>
               <span className="flex items-center gap-1"><BlockProgress value={it.progress} colour={g.colour} blocks={6} /></span>
-              <span className="truncate text-[11px] text-dim">{[...it.habit_links.map((h) => habitNames[h] ?? ""), ...(it.topic_progress?.links.map((l) => `📚 ${l.title} ${l.broken ? "(roto)" : `${l.pct}%`}`) ?? [])].filter(Boolean).join(", ")}</span>
+              <span className="truncate text-[11px] text-dim">{[...it.habit_links.map((h) => habitNames[h] ?? ""), ...(it.topic_progress?.links.map((l) => `📚 ${l.title} ${l.broken ? "(roto)" : `${l.pct}%`}`) ?? []),
+                ...(it.practice_progress?.links.map((l) => `🏋 ${l.label} ${l.broken ? "(roto)" : l.noData ? "(sin datos)" : `${l.pct}%`}`) ?? [])].filter(Boolean).join(", ")}</span>
                 <span className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                   <IconButton title="Subir" disabled={n === 0} onClick={() => void act(() => api.goalItemMove(g.id, it.id, it.parent, n - 1))}><ArrowUp size={12} /></IconButton>
                   <IconButton title="Bajar" disabled={n === count - 1} onClick={() => void act(() => api.goalItemMove(g.id, it.id, it.parent, n + 1))}><ArrowDown size={12} /></IconButton>

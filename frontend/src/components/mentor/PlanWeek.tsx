@@ -44,7 +44,7 @@ export function ThisWeek({ items, practiceItems = [], activePlans, headingId = "
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="text-[15px] font-semibold">{it.kind === "kata" ? "Reto diario (kata de lógica)" : `Proyecto semanal: ${it.phases?.length ? phasesText(it.phases) : "sesión"}`}</span>
                 <Chip large colour="var(--nv-practice, #c58be0)">{PRACTICE_NAME}</Chip>
-                {activePlans > 1 && <Chip large colour="var(--nv-mint)">Plan: {it.label}</Chip>}
+                {activePlans > 1 && <Chip large colour="var(--nv-mint)" className="!whitespace-normal">Plan: {it.label}</Chip>}
                 {it.kind === "project" && it.focus && <Chip large colour="var(--nv-accent)">Semana {it.week} · foco {FOCUS_NAME[it.focus]}</Chip>}
                 <span className="text-[14px] text-dim">{hm(it.estMinutes)}</span>
                 <GhostButton className="ml-auto" onClick={openPractice}>Abrir práctica</GhostButton>
@@ -61,7 +61,7 @@ export function ThisWeek({ items, practiceItems = [], activePlans, headingId = "
             <li key={`${it.planId}:${it.subplanId}:${it.folder ?? "deliverable"}`} className="rounded-xl border border-line p-3" data-testid="plan-week-item">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="text-[15px] font-semibold">{it.title}</span>
-                {activePlans > 1 && <Chip large colour="var(--nv-mint)">Plan: {it.label}</Chip>}
+                {activePlans > 1 && <Chip large colour="var(--nv-mint)" className="!whitespace-normal">Plan: {it.label}</Chip>}
                 {it.kind === "deliverable" && <Chip large colour="var(--nv-accent)">Entregable</Chip>}
                 {it.overdue && <Chip large colour="var(--nv-danger)"><span aria-hidden>⚠</span> Atrasado (sem. {it.targetWeek})</Chip>}
                 <span className="text-[14px] text-dim">{hm(it.estMinutes)}</span>

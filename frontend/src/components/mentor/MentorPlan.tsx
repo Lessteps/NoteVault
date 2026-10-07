@@ -145,7 +145,7 @@ function PlanCard({ plan }: { plan: MentorPlanRow }) {
         <span className="text-[14px] font-semibold">{plan.pct} %</span>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-2 text-[14px] text-dim">
-        <span>{plan.subplans} {plan.subplans === 1 ? "subplan" : "subplanes"}</span>
+        <span>{plan.subplans} {plan.structure === "areas" ? (plan.subplans === 1 ? "área" : "áreas") : plan.subplans === 1 ? "subplan" : "subplanes"}</span>
         <span>· {plan.completed}/{plan.topics} temas</span>
         {plan.minutesPerDay ? <span>· {num1(plan.minutesPerDay / 60)} h/día</span> : null}
         {plan.auto && <span>· automático</span>}
@@ -160,8 +160,8 @@ function EmptyPlan({ aiConfigured, onCreate }: { aiConfigured: boolean; onCreate
       <CalendarDays size={24} aria-hidden className="mx-auto text-faint" />
       <p className="mt-2 text-[16px] font-medium">Aún no tienes ningún plan</p>
       <p className="mx-auto mt-1 max-w-[560px] text-[14px] text-dim">
-        Un plan reparte los temas que necesitas por semanas en el periodo que elijas (una semana, dos meses, fechas a medida), agrupados en subplanes por área y
-        objetivo, con las metas que debes cumplir y un entregable (un proyecto) que demuestre que lo lograste. Cada plan tendrá su propia sub-interfaz y de ellos
+        Un plan reparte los temas que necesitas por semanas en el periodo que elijas (una semana, dos meses, fechas a medida), organizados en ÁREAS
+        elementales (Backend, Frontend, Databases…) con su ruta de temas, sus metas enlazadas y entregables (archivos prácticos) que demuestran lo que sabes. Cada plan tendrá su propia sub-interfaz y de ellos
         sale tu plan de cada día en «Hoy».
       </p>
       {!aiConfigured && <p className="mx-auto mt-2 max-w-[520px] text-[14px] text-warn">La IA no está configurada: se generará un plan automático con tus metas y materias.</p>}
@@ -195,7 +195,7 @@ export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft
         <h2 className="text-[16px] font-semibold">Borrador del plan {pre ? "del" : "de"} {draftPeriod(draft)}</h2>
         {draft.auto ? <Chip large colour="var(--nv-warn)">Plan automático</Chip> : <Chip large colour="var(--nv-accent)">Propuesto por el Mentor</Chip>}
         <span className="text-[14px] text-dim">
-          {draft.subplans.length} subplanes · {topics} temas · {draft.hoursPerWeek} h/semana · {hm(draft.totalMinutes)} de {hm(draft.availableMinutes)}
+          {draft.subplans.length} {draft.structure === "areas" ? (draft.subplans.length === 1 ? "área" : "áreas") : "subplanes"} · {topics} temas · {draft.hoursPerWeek} h/semana · {hm(draft.totalMinutes)} de {hm(draft.availableMinutes)}
         </span>
       </div>
       {pre && (
@@ -232,7 +232,7 @@ export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft
           <h3 className="flex flex-wrap items-center gap-2 text-[15px] font-semibold">
             Por decidir: entregables <Chip large colour="var(--nv-warn)">Pendiente de decidir</Chip>
           </h3>
-          <p className="mt-0.5 text-[14px] text-dim">El borrador no añade entregables todavía. Decide subplan a subplan; lo que dejes sin responder se queda pendiente en el plan.</p>
+          <p className="mt-0.5 text-[14px] text-dim">El borrador no añade proyectos de área todavía. Decide una sola vez para todo el plan (después puedes quitar el de un área); lo que dejes sin responder se queda pendiente en el plan.</p>
           <ul className="mt-2 space-y-2">
             {questions.map((q) => (
               <li key={`${q.id}:${q.subplanId}`} className="flex flex-wrap items-center gap-2 text-[14px]" data-testid="draft-open-question">

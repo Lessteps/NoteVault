@@ -23,6 +23,13 @@ import {
   type TopicLinkProgress,
   type TopicLookup,
 } from "./practice/topicLinks";
+import {
+  combineLinkProgress,
+  normalizePracticeLinks,
+  practiceLinkProgress,
+  type PracticeLinkProgress,
+  type PracticeLookup,
+} from "./practice/practiceLinks";
 import { Recurrence } from "./recurrence";
 import { Occurrence } from "./scheduleFormat";
 import {
@@ -178,6 +185,8 @@ export class GoalItem {
   habit_links: string[];
   /** Temas de estudio enlazados (ver core/practice/topicLinks.ts). Con enlaces, la submeta se cumple sola. */
   topic_links: string[];
+  /** Enlaces a «Programming practice» (ver core/practice/practiceLinks.ts). Igual que `topic_links`: cumplimiento derivado. */
+  practice_links: string[];
   done_at: Date | null;
   created: Date | null;
   notes: string;
@@ -222,6 +231,7 @@ export class GoalItem {
     }
     this.habit_links = links;
     this.topic_links = normalizeTopicLinks(values.topic_links);
+    this.practice_links = normalizePracticeLinks(values.practice_links);
 
     this.done_at = values.done_at ? parseIsoDate(values.done_at) : null;
     this.created = values.created ? parseIsoDate(values.created) : null;
@@ -348,6 +358,8 @@ export class GoalManager {
    * `topic_links` no afecta al cumplimiento.
    */
   topicLookup: TopicLookup | null = null;
+  /** Datos de «Programming practice» para `practice_links`; mismo patrón que `topicLookup` (inyectado por la capa API). */
+  practiceLookup: PracticeLookup | null = null;
 
   private _goalsCache: Goal[] | null = null;
   private _goalsStamp: string | null = null;
@@ -569,6 +581,8 @@ export class GoalManager {
           val = Array.isArray(val) ? val.map(String) : splitList(val);
         } else if (k === "topic_links") {
           val = normalizeTopicLinks(val);
+        } else if (k === "practice_links") {
+          val = normalizePracticeLinks(val);
         } else if (k === "start" || k === "end" || k === "due" || k === "repeat_until" || k === "done_at" || k === "created") {
           val = val ? parseIsoDate(val) : null;
         }
@@ -885,6 +899,180 @@ export class GoalManager {
     this.delete_item(gid, iid);
   }
 
+  // ── Promover / convertir / mover entre metas ───────────────────────────
+
+  /**
+   * Copia `items` (un subárbol) a la meta `dstGid` conservando ids (salvo choque), orden y todos sus campos, y
+   * borra los originales. Los que no tienen su padre dentro del conjunto cuelgan de `rootParent`. Las marcas del
+   * registro (`goal/item`) y las procedencias de hábito se renombran para no perder rachas.
+   */
+  private _transfer(srcGid: string, items: GoalItem[], dstGid: string, rootParent: string): GoalItem[] {
+    const inSet = new Set(items.map((i) => i.id));
+    const taken = new Set(this.items(dstGid).map((i) => i.id));
+    const idMap = new Map<string, string>();
+    for (const i of items) {
+      let nid = i.id;
+      while (taken.has(nid)) nid = newId("i");
+      taken.add(nid);
+      idMap.set(i.id, nid);
+    }
+    const siblings = this.items(dstGid).filter((i) => i.parent === rootParent);
+    let next = siblings.length ? Math.max(...siblings.map((s) => s.order)) : 0;
+    const roots = items.filter((i) => !inSet.has(i.parent)).sort((a, b) => a.order - b.order);
+    const rootOrder = new Map(roots.map((r) => [r.id, ++next]));
+    const moved: GoalItem[] = [];
+    for (const i of items) {
+      const copy = new GoalItem(
+        {
+          ...i.values(),
+          id: idMap.get(i.id),
+          goal: dstGid,
+          parent: inSet.has(i.parent) ? idMap.get(i.parent) : rootParent,
+          order: rootOrder.get(i.id) ?? i.order,
+        },
+        i.extra,
+        i.notes,
+      );
+      this.save_item(copy);
+      moved.push(copy);
+    }
+    for (const i of items) {
+      fs.rmSync(this.item_path(srcGid, i.id), { force: true });
+    }
+    this._itemsCache.delete(srcGid);
+    this._itemsCache.delete(dstGid);
+    this._renameLogKeys(new Map(items.map((i) => [`${srcGid}/${i.id}`, `${dstGid}/${idMap.get(i.id)}`])));
+    return moved;
+  }
+
+  private _renameLogKeys(map: Map<string, string>): void {
+    const root = path.join(this.dir, LOG_BUCKET);
+    if (!map.size || !fs.existsSync(root)) return;
+    const walk = (dir: string): void => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (!e.name.endsWith(".json") || isSyncConflict(e.name)) continue;
+        const data = loadJson<Record<string, any>>(full);
+        if (!data || typeof data !== "object") continue;
+        let changed = false;
+        if (data.items && typeof data.items === "object") {
+          for (const [k, v] of Object.entries<any>(data.items)) {
+            const to = map.get(k);
+            if (to) {
+              data.items[to] = v;
+              delete data.items[k];
+              changed = true;
+            }
+          }
+        }
+        if (data.habit_marks && typeof data.habit_marks === "object") {
+          for (const [h, list] of Object.entries<any>(data.habit_marks)) {
+            if (!Array.isArray(list)) continue;
+            const mapped = list.map((k) => map.get(String(k)) ?? k);
+            if (mapped.some((k, n) => k !== list[n])) {
+              data.habit_marks[h] = mapped;
+              changed = true;
+            }
+          }
+        }
+        if (changed) {
+          writeJson(full, data);
+          this._logs.forget(full);
+        }
+      }
+    };
+    walk(root);
+  }
+
+  /**
+   * «Promover a meta»: la submeta pasa a ser una meta principal (hereda área, icono y color de la meta que la
+   * contenía; prioridad, fechas, notas y carpeta/notas vinculadas son suyas). Sus submetas hijas pasan a ser las de
+   * primer nivel de la meta nueva, con el mismo árbol. Si la submeta tenía datos propios que una meta no tiene
+   * (enlaces a temas/hábitos/práctica, repetición o medida), se conserva como única submeta raíz para no
+   * perderlos ni cambiar el avance.
+   */
+  promote_item(gid: string, iid: string): Goal | null {
+    const goal = this.get_goal(gid);
+    const item = this.get_item(gid, iid);
+    if (!goal || !item) return null;
+    const subtree = [item, ...this.descendants(item)];
+    const keepsItself =
+      item.topic_links.length > 0 || item.habit_links.length > 0 || item.practice_links.length > 0 || item.repeating || item.measurable;
+    const linked: Record<string, any> = {};
+    for (const k of ["linked_folder", "linked_notes"]) if (item.extra[k] !== undefined) linked[k] = item.extra[k];
+    const fresh = this.create_goal(item.name, {
+      area: goal.area,
+      icon: goal.icon,
+      colour: goal.colour,
+      priority: item.priority,
+      in_overview: goal.in_overview,
+      status: item.is_leaf && item.status === ITEM_DONE ? STATUS_DONE : STATUS_ACTIVE,
+      description: item.notes,
+      ...(item.start ? { start: item.start } : {}),
+      ...(item.due ? { end: item.due } : {}),
+      ...(Object.keys(linked).length ? { extra: linked } : {}),
+    });
+    const moving = keepsItself ? subtree : subtree.slice(1);
+    if (moving.length) this._transfer(gid, moving, fresh.id, "");
+    if (!keepsItself) {
+      toTrash(this.vaultRoot, this.item_path(gid, item.id), `metas/${gid}`);
+      this._itemsCache.delete(gid);
+    }
+    return fresh;
+  }
+  promoteItem(gid: string, iid: string): Goal | null {
+    return this.promote_item(gid, iid);
+  }
+
+  /**
+   * «Convertir en submeta de…»: la meta principal pasa a ser una submeta de otra meta (bajo `parentIid` o en la
+   * raíz). Sus submetas cuelgan de la nueva con el mismo árbol. Área, icono y color de la meta se pierden (la
+   * submeta hereda los de su meta); la meta se envía a la papelera.
+   */
+  demote_goal(srcGid: string, dstGid: string, parentIid = ""): GoalItem | null {
+    const src = this.get_goal(srcGid);
+    const dst = this.get_goal(dstGid);
+    if (!src || !dst || src.id === dst.id) return null;
+    if (parentIid && !this.get_item(dstGid, parentIid)) return null;
+    const own = this.items(srcGid);
+    const linked: Record<string, any> = {};
+    for (const k of ["linked_folder", "linked_notes"]) if (src.extra[k] !== undefined) linked[k] = src.extra[k];
+    const item = this.create_item(dstGid, src.name, parentIid, {
+      priority: src.priority,
+      status: src.status === STATUS_DONE ? ITEM_DONE : ITEM_TODO,
+      notes: src.description,
+      ...(src.start ? { start: src.start } : {}),
+      ...(src.end ? { due: src.end } : {}),
+      ...(Object.keys(linked).length ? { extra: linked } : {}),
+    });
+    if (own.length) this._transfer(srcGid, own, dstGid, item.id);
+    this.delete_goal(srcGid);
+    return this.get_item(dstGid, item.id);
+  }
+  demoteGoal(srcGid: string, dstGid: string, parentIid = ""): GoalItem | null {
+    return this.demote_goal(srcGid, dstGid, parentIid);
+  }
+
+  /** Mueve una submeta (con su subárbol) a otra meta, bajo `parentIid` o en la raíz. Devuelve la submeta movida. */
+  move_item_to_goal(srcGid: string, iid: string, dstGid: string, parentIid = ""): GoalItem | null {
+    const item = this.get_item(srcGid, iid);
+    if (!item || !this.get_goal(dstGid)) return null;
+    if (srcGid === dstGid) {
+      this.move_item(srcGid, iid, parentIid, 1e6);
+      return this.get_item(srcGid, iid);
+    }
+    if (parentIid && !this.get_item(dstGid, parentIid)) return null;
+    const moved = this._transfer(srcGid, [item, ...this.descendants(item)], dstGid, parentIid);
+    return moved[0] ?? null;
+  }
+  moveItemToGoal(srcGid: string, iid: string, dstGid: string, parentIid = ""): GoalItem | null {
+    return this.move_item_to_goal(srcGid, iid, dstGid, parentIid);
+  }
+
   // ── Registro ──────────────────────────────────────────────────────────
 
   log(d: Date): { items: Record<string, any>; habit_marks: Record<string, string[]> } {
@@ -972,10 +1160,34 @@ export class GoalManager {
     return this.topic_progress(item);
   }
 
+  /** Cumplimiento calculado de una submeta con `practice_links`; null si no aplica. */
+  practice_progress(item: GoalItem, today?: Date | null): PracticeLinkProgress | null {
+    if (!this.practiceLookup || !item.practice_links.length) return null;
+    const p = practiceLinkProgress(item.practice_links, this.practiceLookup, today || _today());
+    return p.links.length ? p : null;
+  }
+  practiceProgress(item: GoalItem, today?: Date | null): PracticeLinkProgress | null {
+    return this.practice_progress(item, today);
+  }
+
+  /**
+   * Avance derivado de TODOS los enlaces de la submeta (temas + práctica); null si no tiene enlaces
+   * evaluables. Regla: cada enlace pesa lo mismo (ver `combineLinkProgress`).
+   */
+  linked_progress(item: GoalItem, today?: Date | null): { pct: number; done: boolean } | null {
+    return combineLinkProgress(this.topic_progress(item), this.practice_progress(item, today));
+  }
+  linkedProgress(item: GoalItem, today?: Date | null): { pct: number; done: boolean } | null {
+    return this.linked_progress(item, today);
+  }
+
   is_done_on(item: GoalItem, d: Date): boolean {
-    // Una submeta enlazada a temas se cumple sola: no se marca a mano (ni repite).
-    const tp = this.topic_progress(item);
-    if (tp) return tp.done;
+    // Una submeta enlazada a temas o a práctica se cumple sola: no se marca a mano (ni repite).
+    // Una RAMA con enlaces propios sigue el criterio de `branch_done` (hijas + enlaces).
+    if (item.is_leaf) {
+      const lp = this.linked_progress(item);
+      if (lp) return lp.done;
+    }
     if (item.repeating) {
       const e = this.entry(item, d);
       if (item.measurable && typeof e.value === "number") {
@@ -1007,7 +1219,8 @@ export class GoalManager {
     if (item.is_leaf) {
       return this.is_done_on(item, d || _today());
     }
-    return item.children.every((c) => this.branch_done(c, d));
+    const own = this.linked_progress(item);
+    return item.children.every((c) => this.branch_done(c, d)) && (own ? own.done : true);
   }
   branchDone(item: GoalItem, d?: Date | null): boolean {
     return this.branch_done(item, d);
@@ -1221,15 +1434,17 @@ export class GoalManager {
 
     if (!current.is_leaf) {
       if (!current.children.length) return 0.0;
+      // Los enlaces propios de una rama (temas/práctica) cuentan como un miembro más de la media.
+      const own = this.linked_progress(current, t);
       const sum = current.children.reduce(
         (acc, c) => acc + this.item_progress(c, goal, t),
-        0,
+        own ? own.pct / 100 : 0,
       );
-      return sum / current.children.length;
+      return sum / (current.children.length + (own ? 1 : 0));
     }
 
-    const tp = this.topic_progress(current);
-    if (tp) return tp.pct / 100;
+    const lp = this.linked_progress(current, t);
+    if (lp) return lp.pct / 100;
 
     if (current.repeating) {
       const days = this.scheduled_days(current, goal, t);

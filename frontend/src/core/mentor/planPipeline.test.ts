@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { sanitizePreconditions } from "../../lib/planTime.js";
 import type { StudentBrief } from "./brief.js";
 import type { CatalogTopic } from "./goalDraft.js";
+import { subplanKey } from "./plan.js";
 import { generateByParts, PipelineCancel, type PipelineProgress } from "./planPipeline.js";
 import { autoSeeds, resolveScope, resolveBranches } from "./planSpec.js";
 
@@ -27,20 +28,20 @@ const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const run = (send: Send, o: Record<string, unknown> = {}, p = pre()) => generateByParts(p, seedsOf(p), { brief, aiOn: true, send, ...o } as never);
 
 describe("un plan de 26 semanas ya no hace una sola llamada gigante", () => {
-  it("1 llamada de esqueleto + una por subplan/bloque, cada una con ≤ 60 temas candidatos", async () => {
+  it("1 llamada de esqueleto + una por ÁREA/bloque, cada una con ≤ 60 temas candidatos", async () => {
     const p = resolveBranches(pre(), ALL, [], "quiero ser full stack"); // sin Desktop, Mobile ni Automation
     const seen: { sys: string; topics: number; chars: number }[] = [];
     const send: Send = async (m) => {
       const sys = m[0].content as string;
       seen.push({ sys, topics: (m[1].content.match(/folder=/g) ?? []).length, chars: m[1].content.length });
-      return sys.includes("ESQUELETO") ? skeleton(seedsOf(p).map((s) => `${s.area}|${s.objective}`.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""))) : picks(m);
+      return sys.includes("ESQUELETO") ? skeleton(seedsOf(p).map(subplanKey)) : picks(m);
     };
     const r = await run(send, {}, p);
     const skel = seen.filter((c) => c.sys.includes("ESQUELETO"));
     const blocks = seen.filter((c) => !c.sys.includes("ESQUELETO"));
     expect(skel).toHaveLength(1);
     expect(skel[0]!.topics).toBe(0); // el esqueleto no lleva temas
-    expect(blocks.length).toBeGreaterThanOrEqual(5); // Fundamentals (15 por nivel básico), Python, Backend, Frontend, Databases, Tooling…
+    expect(blocks.length).toBeGreaterThanOrEqual(4); // Backend (Bases 15 + Python + Backend: 2 bloques), Databases y Frontend
     expect(Math.max(...blocks.map((b) => b.topics))).toBeLessThanOrEqual(60);
     expect(seen.every((c) => c.chars < 12_000)).toBe(true); // ningún prompt enorme
     expect(r.calls).toBe(seen.length);
@@ -49,7 +50,7 @@ describe("un plan de 26 semanas ya no hace una sola llamada gigante", () => {
     expect(r.seeds.flatMap((s) => s.topics).some((t) => /Mobile|Desktop|Automation/.test(t.folder))).toBe(false);
   });
 
-  it("un subplan con más de 60 temas se pide por bloques de 60", async () => {
+  it("un área con más de 60 temas se pide por bloques de 60", async () => {
     const big: CatalogTopic[] = topics("4 Backend", 130);
     const p = pre({ levels: {} });
     const seeds = autoSeeds(p, resolveScope(p, big, []));
@@ -80,27 +81,28 @@ describe("paralelismo limitado, progreso y respuesta compacta", () => {
     }
   });
 
-  it("el progreso es real: «Esqueleto ✓ · Backend ✓ · Frontend … · 2/5 subplanes»", async () => {
+  it("el progreso es real: «Esqueleto ✓ · Backend ✓ · Databases … · 1/3 áreas»", async () => {
     const labels: string[] = [];
     const prog: PipelineProgress[] = [];
     const p = pre({ branches: { Programación: ["4 Backend", "5 Frontend", "6 Databases"] }, branchPreset: "x" });
-    const send: Send = async (m) => (m[0].content.includes("ESQUELETO") ? skeleton(seedsOf(p).map((s) => `programacion|${s.objective.toLowerCase()}`)) : picks(m));
+    const send: Send = async (m) => (m[0].content.includes("ESQUELETO") ? skeleton(seedsOf(p).map(subplanKey)) : picks(m));
     await run(send, { concurrency: 1, onProgress: (pr: PipelineProgress, l: string) => { labels.push(l); prog.push(JSON.parse(JSON.stringify(pr))); } }, p);
     expect(labels[0]).toBe("Esqueleto …");
     expect(labels.some((l) => l.startsWith("Esqueleto ✓ · Backend … "))).toBe(true);
-    expect(labels.some((l) => /^Esqueleto ✓ · Backend ✓ · Frontend … · Databases · · 1\/3 subplanes$/.test(l) || /Backend ✓ · Frontend … .*1\/3 subplanes/.test(l))).toBe(true);
-    expect(labels.at(-1)).toMatch(/Backend ✓ · Frontend ✓ · Databases ✓ · 3\/3 subplanes$/);
+    expect(labels.some((l) => /Backend ✓ · Databases … .*1\/3 áreas/.test(l))).toBe(true);
+    expect(labels.at(-1)).toMatch(/Backend ✓ · Databases ✓ · Frontend ✓ · 3\/3 áreas$/);
     expect(prog.at(-1)!.subplans.every((s) => s.state === "done")).toBe(true);
   });
 
-  it("el esqueleto fija orden, pesos y objetivo; las claves inventadas se descartan", async () => {
+  it("el esqueleto fija orden, pesos y objetivo (corto) de las áreas; las claves inventadas se descartan", async () => {
     const p = pre({ branches: { Programación: ["4 Backend", "5 Frontend"] }, branchPreset: "x" });
     const send: Send = async (m) =>
       m[0].content.includes("ESQUELETO")
-        ? JSON.stringify({ type: "skeleton", rationale: "Front primero.", subplans: [{ key: "programacion|avanzar en frontend", weight: 5, objective: "Interfaces con React" }, { key: "inventada|x", weight: 1 }, { key: "programacion|avanzar en backend", weight: 1 }] })
+        ? JSON.stringify({ type: "skeleton", rationale: "Front primero.", subplans: [{ key: subplanKey(seedsOf(p).find((s) => s.areaId === "frontend")!), weight: 5, objective: "Interfaces con React" }, { key: "inventada|x", weight: 1 }, { key: subplanKey(seedsOf(p).find((s) => s.areaId === "backend")!), weight: 1 }] })
         : picks(m);
     const r = await run(send, {}, p);
-    expect(r.seeds.map((s) => s.objective)).toEqual(["Interfaces con React", "Avanzar en Backend"]);
+    expect(r.seeds.map((s) => s.objective)).toEqual(["Interfaces con React", "Construir servicios y APIs sólidos y seguros"]);
+    expect(r.seeds.map((s) => s.areaId)).toEqual(["frontend", "backend"]);
     expect(r.seeds[0]!.weight).toBeGreaterThan(r.seeds[1]!.weight!);
     expect(r.rationale).toBe("Front primero.");
     expect(r.discarded.join()).toContain("inventada");
@@ -118,30 +120,34 @@ describe("paralelismo limitado, progreso y respuesta compacta", () => {
 
 describe("fallos y tiempos: solo cae a reglas el bloque que falla", () => {
   const p = () => pre({ branches: { Programación: ["4 Backend", "5 Frontend", "6 Databases"] }, branchPreset: "x" });
-  const skel = () => JSON.stringify({ type: "skeleton", rationale: "ok", subplans: seedsOf(p()).map((s) => ({ key: `programacion|${s.objective.toLowerCase()}`, weight: 3 })) });
+  const skel = () => JSON.stringify({ type: "skeleton", rationale: "ok", subplans: seedsOf(p()).map((s) => ({ key: subplanKey(s), weight: 3 })) });
 
-  it("si Frontend falla, Backend y Databases conservan lo de la IA, Frontend queda en orden natural y se avisa con el motivo", async () => {
+  it("si Frontend falla, Backend y Databases conservan lo de la IA, Frontend queda en orden natural y se avisa con el motivo (sin notas internas)", async () => {
     const send: Send = async (m) => {
       if (m[0].content.includes("ESQUELETO")) return skel();
       if (keyOf(m).includes("frontend")) throw new Error("HTTP 500");
       return picks(m);
     };
     const r = await run(send, {}, p());
-    expect(r.sources).toEqual({ "programacion|avanzar en backend": "ai", "programacion|avanzar en frontend": "rules", "programacion|avanzar en databases": "ai" });
+    const k = (id: string) => subplanKey(seedsOf(p()).find((s) => s.areaId === id)!);
+    expect(r.sources).toEqual({ [k("backend")]: "ai", [k("frontend")]: "rules", [k("databases")]: "ai" });
     expect(r.aiUsed).toBe(true);
-    const by = (k: string) => r.seeds.find((s) => s.objective.toLowerCase().includes(k))!;
+    const by = (k: string) => r.seeds.find((s) => s.areaId === k)!;
     expect(by("backend").topics[0]!.folder).toBe("Programación/4 Backend/T040"); // la IA los dio al revés
     expect(by("frontend").topics[0]!.folder).toBe("Programación/5 Frontend/T001"); // orden natural
     expect(by("frontend").topics).toHaveLength(30); // no se pierde ningún tema
-    expect(r.warnings).toEqual(["El subplan «Frontend» se completó con reglas porque la IA falló (HTTP 500)."]);
-    expect(by("frontend").notes).toContain("orden natural");
+    expect(r.warnings).toEqual(["El área «Frontend» se completó con reglas porque la IA falló (HTTP 500)."]);
+    // el aviso es estructurado (con su motivo), no una nota interna tipo «sin la selección de la IA»
+    expect(by("frontend").fallback).toEqual({ kind: "rules", reason: "la IA falló (HTTP 500)" });
+    expect(by("frontend").notes ?? "").not.toContain("selección de la IA");
+    expect(by("backend").fallback).toBeUndefined();
   });
 
   it("una llamada que se cuelga vence en su tiempo, se ABORTA su señal y solo ese subplan va por reglas", async () => {
     const signals: AbortSignal[] = [];
     const send: Send = (m, o) => {
       if (m[0].content.includes("ESQUELETO")) return Promise.resolve(skel());
-      if (keyOf(m).includes("databases")) {
+      if (keyOf(m).startsWith("databases")) {
         signals.push(o.signal);
         return new Promise(() => undefined); // nunca responde y no respeta la señal
       }
@@ -152,9 +158,9 @@ describe("fallos y tiempos: solo cae a reglas el bloque que falla", () => {
     expect(Date.now() - t0).toBeLessThan(3000);
     expect(signals).toHaveLength(1);
     expect(signals[0]!.aborted).toBe(true);
-    expect(r.sources["programacion|avanzar en databases"]).toBe("rules");
-    expect(r.sources["programacion|avanzar en backend"]).toBe("ai");
-    expect(r.warnings.join()).toContain("El subplan «Databases» se completó con reglas porque la IA tardó demasiado.");
+    expect(r.sources[subplanKey(seedsOf(p()).find((s) => s.areaId === "databases")!)]).toBe("rules");
+    expect(r.sources[subplanKey(seedsOf(p()).find((s) => s.areaId === "backend")!)]).toBe("ai");
+    expect(r.warnings.join()).toContain("El área «Databases» se completó con reglas porque la IA tardó demasiado.");
   });
 
   it("presupuesto total: lo que no cabe en el tiempo va por reglas con su motivo", async () => {
@@ -176,7 +182,7 @@ describe("fallos y tiempos: solo cae a reglas el bloque que falla", () => {
     };
     const r = await run(send, {}, p());
     expect(r.skeletonOk).toBe(false);
-    expect(r.warnings[0]).toContain("El esqueleto lo armó la app con reglas porque la IA falló");
+    expect(r.warnings[0]).toContain("El esqueleto (orden y peso de las áreas) lo armó la app con reglas porque la IA falló");
     expect(r.seeds).toHaveLength(3);
     expect(r.aiUsed).toBe(true);
   });
@@ -185,7 +191,8 @@ describe("fallos y tiempos: solo cae a reglas el bloque que falla", () => {
     const r = await run(async () => "basura", {}, p());
     expect(r.aiUsed).toBe(false);
     expect(Object.values(r.sources)).toEqual(["rules", "rules", "rules"]);
-    expect(r.warnings.filter((w) => w.startsWith("El subplan"))).toHaveLength(3);
+    expect(r.warnings.filter((w) => w.startsWith("El área"))).toHaveLength(3);
+    expect(r.seeds.every((x) => x.fallback?.kind === "rules")).toBe(true);
     expect(r.warnings.join()).toContain("no devolvió una respuesta válida");
   });
 
@@ -200,7 +207,7 @@ describe("fallos y tiempos: solo cae a reglas el bloque que falla", () => {
 
 describe("cancelar de verdad", () => {
   const p = () => pre({ branches: { Programación: ["4 Backend", "5 Frontend", "6 Databases"] }, branchPreset: "x" });
-  const sk = () => JSON.stringify({ type: "skeleton", rationale: "ok", subplans: seedsOf(p()).map((s) => ({ key: `programacion|${s.objective.toLowerCase()}`, weight: 3 })) });
+  const sk = () => JSON.stringify({ type: "skeleton", rationale: "ok", subplans: seedsOf(p()).map((s) => ({ key: subplanKey(s), weight: 3 })) });
 
   it("«abort»: lanza PipelineCancel y las llamadas en vuelo reciben la señal abortada (se mata el proceso)", async () => {
     let mode: "abort" | undefined;

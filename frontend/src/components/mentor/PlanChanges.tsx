@@ -9,6 +9,7 @@ import { api } from "../../lib/bridge";
 import { deltaText } from "../../lib/planBuild";
 import type { MentorChangeEntry, MentorChangeResult, MentorPlan } from "../../lib/types";
 import { useApp } from "../../store/app";
+import { useMentor } from "../../store/mentor";
 import { Chip, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { SectionHeading } from "./planKit";
@@ -16,9 +17,9 @@ import { ThinkingStatus, useAiStatus } from "./parts";
 
 const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
-export const CHANGE_PLACEHOLDER = "Ej.: Necesito condensar Docker en dos semanas y posponer la parte de WebSockets hacia el final…";
+export const CHANGE_PLACEHOLDER = "Ej.: Más SQL antes del backend; pasa el lenguaje Python a Automation; condensa Docker en dos semanas y deja WebSockets para el final…";
 /** Sugerencias clicables: rellenan el cuadro (no envían nada). */
-export const CHANGE_SUGGESTIONS = ["Quita lo de desktop", "Más SQL antes del backend", "Pasa la semana 3 a la 5", "Añade un entregable al subplán de Python", "Hazlo más ligero"] as const;
+export const CHANGE_SUGGESTIONS = ["Más SQL antes del backend", "Pasa el frontend a la semana 10", "Quita lo de desktop", "Añade un entregable al área de Backend", "Pasa el lenguaje Python a Automation", "Hazlo más ligero"] as const;
 
 const SOURCE_LABEL = { ai: "con el Mentor", rules: "por reglas", none: "sin aplicar" } as const;
 const STATUS_TEXT = { applied: "Aplicado", pending: "Pendiente", undone: "Deshecho" } as const;
@@ -29,7 +30,7 @@ const when = (iso: string): string => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 };
 
-export function PlanChanges({ planId, onApplied, autoSend, announce }: { planId: string; onApplied: (plan: MentorPlan, changed: string[]) => void; /** un comentario que se envía solo al cambiar (p. ej. «Añadir las ramas excluidas») */ autoSend?: { text: string; n: number }; /** anuncia un mensaje de estado a los lectores de pantalla («Cambios aplicados») */ announce?: (msg: string) => void }) {
+export function PlanChanges({ planId, onApplied, autoSend, announce, focusSignal }: { planId: string; onApplied: (plan: MentorPlan, changed: string[]) => void; /** un comentario que se envía solo al cambiar (p. ej. «Añadir las ramas excluidas») */ autoSend?: { text: string; n: number }; /** anuncia un mensaje de estado a los lectores de pantalla («Cambios aplicados») */ announce?: (msg: string) => void; /** al cambiar, el foco va al cuadro de comentarios («Pedir cambios» de la barra del plan) */ focusSignal?: number }) {
   const toast = useApp((s) => s.toast);
   const [history, setHistory] = useState<MentorChangeEntry[]>([]);
   const [text, setText] = useState("");
@@ -42,6 +43,7 @@ export function PlanChanges({ planId, onApplied, autoSend, announce }: { planId:
   const alive = useRef(true);
   const key = `change:${planId}`;
   const status = useAiStatus(key, busy);
+  const planVersion = useMentor((s) => s.planVersion);
 
   useEffect(() => {
     alive.current = true;
@@ -49,7 +51,12 @@ export function PlanChanges({ planId, onApplied, autoSend, announce }: { planId:
     return () => {
       alive.current = false;
     };
-  }, [planId]);
+  }, [planId, planVersion]);
+
+  // «Pedir cambios» en la barra del plan: abre la pestaña y deja el cursor en el cuadro
+  useEffect(() => {
+    if (focusSignal) setTimeout(() => area.current?.focus(), 0);
+  }, [focusSignal]);
 
   const send = useCallback(
     async (opts: { comment?: string; ops?: Array<Record<string, unknown>>; label?: string }) => {
@@ -122,7 +129,7 @@ export function PlanChanges({ planId, onApplied, autoSend, announce }: { planId:
 
   return (
     <section className="rounded-2xl border border-line bg-card p-4 @3xl:p-5" aria-labelledby={`${uid}-title`} data-testid="plan-changes">
-      <SectionHeading id={`${uid}-title`} hint="Cuéntale al Mentor qué no te gustó o qué quieres distinto. Aplica los cambios sobre este mismo plan y recalcula el reparto con tu capacidad real.">
+      <SectionHeading id={`${uid}-title`} hint="Cuéntale al Mentor qué no te gustó o qué quieres distinto: mover un tema o un grupo de un área a otra, añadir o quitar un área, cambiar sus semanas, añadir un entregable o reescribir el propósito de un día, semana o mes. Aplica los cambios sobre este mismo plan, recalcula el reparto con tu capacidad real y puedes deshacerlos.">
         <span className="inline-flex items-center gap-2"><MessageSquareText size={18} aria-hidden className="text-accent-text" /> Pedir cambios al plan</span>
       </SectionHeading>
 

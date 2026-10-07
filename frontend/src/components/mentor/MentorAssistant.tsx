@@ -51,7 +51,7 @@ export function PlanDraftChatCard({ turn, current }: { turn: MentorChatTurn; cur
         <div className="min-w-0 flex-1">
           <div className="text-[12.5px] font-semibold leading-snug text-text">{draft.preconditions && draft.start && draft.end ? `Plan del ${periodLabel(draft.start, draft.end)}` : `Plan de ${draft.month}`}{draft.auto ? " · automático" : ""}</div>
           <div className="text-[11px] text-faint">
-            {draft.subplans.length} subplanes · {topics} temas · {draft.hoursPerWeek} h/semana
+            {draft.subplans.length} {draft.structure === "areas" ? (draft.subplans.length === 1 ? "área" : "áreas") : "subplanes"} · {topics} temas · {draft.hoursPerWeek} h/semana
           </div>
           <div className="mt-0.5 text-[11px] text-dim">{draft.subplans.map((s) => s.area).filter((a, i, l) => l.indexOf(a) === i).join(" · ")}</div>
           {(draft.programmingPractice || draft.openQuestions?.length) && (

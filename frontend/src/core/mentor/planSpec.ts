@@ -30,8 +30,9 @@ import {
 } from "../../lib/planTime.js";
 import type { StudentBrief } from "./brief.js";
 import { fold, keywordsOf, type CatalogTopic, type ChatTurn } from "./goalDraft.js";
-import { capacityWithPractice, PHASE_LABEL, practiceDayMinutes, PRACTICE_NAME, type PracticeFocus, type PracticeSuggestions } from "../../lib/practiceTrack.js";
-import { buildPlan, deliverableQuestion, type SubplanSeed } from "./plan.js";
+import { capacityWithPractice, PHASE_LABEL, practiceDayMinutes, PRACTICE_NAME, PRACTICE_PURPOSE, type PracticeFocus, type PracticeSuggestions } from "../../lib/practiceTrack.js";
+import { buildPlan, deliverableQuestion, globalDeliverableQuestion, type RequiredGoal, type SubplanSeed } from "./plan.js";
+import { areaDef, bucketByArea } from "../../lib/planAreas.js";
 import {
   buildChatMessages,
   parseChatResponse,
@@ -250,6 +251,24 @@ export function defaultDeliverable(label: string): NonNullable<SubplanSeed["deli
   };
 }
 
+/**
+ * Entregable propuesto para un subplan: el de su ÁREA (un proyecto distinto y concreto por área: «API REST con persistencia y pruebas»,
+ * «Esquema relacional con consultas y migraciones»…) o, en un subplan antiguo, el genérico con su etiqueta.
+ */
+export function defaultDeliverableFor(sub: { areaId?: string; area: string; objective: string; goalId?: string }): NonNullable<SubplanSeed["deliverable"]> {
+  const def = sub.areaId ? areaDef(sub.areaId) : undefined;
+  if (def) return { title: def.deliverable.title, description: def.deliverable.description, criteria: [...def.deliverable.criteria], status: "idea" };
+  if (sub.areaId) {
+    return {
+      title: `Proyecto de demostración: ${sub.area}`,
+      description: `Un proyecto pequeño que demuestre lo aprendido en ${sub.area}: algo que puedas enseñar y explicar.`,
+      criteria: ["Funciona de principio a fin", "Usa lo estudiado en los temas del área", "Puedes explicarlo sin mirar tus apuntes"],
+      status: "idea",
+    };
+  }
+  return defaultDeliverable(sub.goalId ? sub.objective : sub.area);
+}
+
 /** Marca el primer tema de cada materia de nivel «no sé» como diagnóstico inicial y lo anota en el subplan. */
 export function markDiagnostics(seeds: SubplanSeed[], pre: PlanPreconditions): SubplanSeed[] {
   const done = new Set<string>();
@@ -266,92 +285,107 @@ export function markDiagnostics(seeds: SubplanSeed[], pre: PlanPreconditions): S
   });
 }
 
-/** Plan automático determinista a partir de lo elegido (sin IA). */
-const cleanBranchName = (n: string): string => n.replace(/^[\d.\s_-]+/, "").trim() || n;
 /** Cuántos temas de «Fundamentals» son realmente previos según el nivel declarado (sin tope si empieza de cero o no sabe). */
 const FUNDAMENTALS_CAP: Partial<Record<PlanLevel, number>> = { basico: 15, intermedio: 8, avanzado: 4 };
 
-/** Un subplan por RAMA principal cuando la materia tiene varias; si no, uno solo por materia (como siempre). */
-function branchSeeds(g: { area: string; topics: CatalogTopic[] }, pre: PlanPreconditions): SubplanSeed[] {
-  const names = [...new Set(g.topics.map((t) => branchOfFolder(t.folder)))];
-  const toSeed = (objective: string, topics: CatalogTopic[], label: string): SubplanSeed => ({
-    area: g.area,
-    objective,
-    topics: topics.map((t) => ({ folder: t.folder, title: t.title, estMinutes: minutesOf(t, pre) })),
-    ...(pre.deliverables === "yes" ? { deliverable: defaultDeliverable(label) } : {}),
-  });
-  if (names.filter(Boolean).length < 2) return [toSeed(`Avanzar en ${g.area}`, g.topics, g.area)];
-  const out: SubplanSeed[] = [];
-  for (const name of names.sort((a, b) => naturalCmp(a, b))) {
-    let topics = g.topics.filter((t) => branchOfFolder(t.folder) === name);
-    if (name && classifyBranch(name) === "fundamentals") {
-      const cap = FUNDAMENTALS_CAP[pre.levels[g.area] as PlanLevel];
-      if (cap) topics = topics.slice(0, cap);
-    }
-    if (!topics.length) continue;
-    const label = name ? cleanBranchName(name) : g.area;
-    out.push(toSeed(`Avanzar en ${label}`, topics, label));
+const goalMatchesArea = (goalName: string, areaId: string): boolean => {
+  const def = areaDef(areaId);
+  return !!def && def.goalRe.test(fold(goalName));
+};
+
+/** Metas del estudiante que corresponden a un área (por nombre) y submetas cuyos `topic_links` caen en sus temas. */
+export function requiredGoalsFor(areaId: string, folders: ReadonlySet<string>, goals: readonly GoalScope[]): RequiredGoal[] {
+  const out: RequiredGoal[] = [];
+  for (const g of goals) {
+    if (goalMatchesArea(g.name, areaId)) out.push({ goalId: g.id, note: `Meta «${g.name}» que esta área ayuda a cumplir` });
   }
-  return out;
+  for (const g of goals) {
+    for (const it of g.items) {
+      if (!it.links.some((l) => folders.has(l.folder))) continue;
+      if (out.some((r) => r.goalId === g.id && r.itemId === it.id)) continue;
+      out.push({ goalId: g.id, itemId: it.id, note: `Submeta «${it.name}»` });
+    }
+  }
+  return out.slice(0, 10);
 }
 
-export function autoSeeds(pre: PlanPreconditions, scope: ResolvedScope): SubplanSeed[] {
-  const seeds: SubplanSeed[] = [];
-  for (const g of scope.goalGroups) {
-    seeds.push({
-      area: g.area,
-      objective: g.goal.name,
-      goalId: g.goal.id,
-      goalItemIds: [...new Set(g.topics.map((x) => x.itemId))],
-      topics: g.topics.map((x) => ({
-        folder: x.topic.folder,
-        title: x.topic.title,
-        ...(x.skills.length && x.skills.length < x.topic.skills.length ? { skills: x.skills } : {}),
-        estMinutes: minutesOf(x.topic, pre),
-      })),
-      requiredGoals: [{ goalId: g.goal.id, note: "Meta que este subplan ayuda a cumplir" }],
-      ...(pre.deliverables === "yes" ? { deliverable: defaultDeliverable(g.goal.name) } : {}),
-    });
+/**
+ * Plan automático determinista a partir de lo elegido (sin IA), POR ÁREAS: los temas de metas, materias y texto libre se reparten en
+ * áreas elementales con grupos internos (ver `lib/planAreas.ts`: tabla rama → área + grupo). `goals` = todas las metas activas, para enlazar
+ * `requiredGoals` por nombre y por `topic_links`. La secuencia por fases la calcula `buildPlan` al repartir.
+ */
+export function autoSeeds(pre: PlanPreconditions, scope: ResolvedScope, goals: readonly GoalScope[] = []): SubplanSeed[] {
+  const seen = new Set<string>();
+  const items: Array<{ folder: string; title: string; skills?: string[]; estMinutes: number }> = [];
+  const add = (t: CatalogTopic, skills?: string[]): void => {
+    if (seen.has(t.folder)) return;
+    seen.add(t.folder);
+    items.push({ folder: t.folder, title: t.title, ...(skills?.length && skills.length < t.skills.length ? { skills } : {}), estMinutes: minutesOf(t, pre) });
+  };
+  for (const g of scope.goalGroups) for (const x of g.topics) add(x.topic, x.skills);
+  for (const g of scope.areaGroups) {
+    const cap = FUNDAMENTALS_CAP[pre.levels[g.area] as PlanLevel];
+    let fund = 0;
+    for (const t of g.topics) {
+      const b = branchOfFolder(t.folder);
+      if (b && classifyBranch(b) === "fundamentals" && cap !== undefined && ++fund > cap) continue;
+      add(t);
+    }
   }
-  for (const g of scope.areaGroups) seeds.push(...branchSeeds(g, pre));
-  if (scope.free.length) {
-    const label = pre.freeObjective ?? "Otro objetivo";
-    seeds.push({
-      area: areaOfFolder(scope.free[0]!.folder) || "General",
-      objective: label.slice(0, 120),
-      topics: scope.free.map((t) => ({ folder: t.folder, title: t.title, estMinutes: minutesOf(t, pre) })),
-      ...(pre.deliverables === "yes" ? { deliverable: defaultDeliverable(label.slice(0, 80)) } : {}),
-    });
-  }
+  for (const t of scope.free) add(t);
+  const seeds: SubplanSeed[] = bucketByArea(items).map((b) => {
+    const folders = new Set(b.topics.map((t) => t.folder));
+    const def = areaDef(b.areaId);
+    const base = { area: b.name, areaId: b.areaId, objective: def?.objective ?? `Avanzar en ${b.name}`, groups: b.groups };
+    return {
+      ...base,
+      topics: b.topics,
+      requiredGoals: requiredGoalsFor(b.areaId, folders, goals),
+      ...(pre.deliverables === "yes" ? { deliverable: defaultDeliverableFor(base) } : {}),
+    };
+  });
   return markDiagnostics(seeds, pre);
 }
 
 /** Semillas desde la respuesta de la IA: solo temas del catálogo; minutos ajustados por nivel; entregables solo con «yes» (con «ask» queda la pregunta pendiente). */
-export function seedsFromReply(reply: PlanDraftReply, catalog: readonly CatalogTopic[], pre: PlanPreconditions, goalNames: ReadonlyMap<string, string>): { seeds: SubplanSeed[]; why: Record<string, string> } {
+export function seedsFromReply(reply: PlanDraftReply, catalog: readonly CatalogTopic[], pre: PlanPreconditions, _goalNames: ReadonlyMap<string, string>, goals: readonly GoalScope[] = []): { seeds: SubplanSeed[]; why: Record<string, string> } {
   const byFolder = new Map(catalog.map((t) => [t.folder, t]));
   const why: Record<string, string> = {};
   const seen = new Set<string>();
-  const seeds: SubplanSeed[] = [];
+  const items: Array<{ folder: string; title: string; skills?: string[]; estMinutes: number }> = [];
   for (const s of reply.subplans) {
-    const topics = s.topics
-      .filter((t) => byFolder.has(t.folder) && !seen.has(t.folder))
-      .map((t) => {
-        const c = byFolder.get(t.folder)!;
-        seen.add(t.folder);
-        if (t.why) why[t.folder] = t.why;
-        return { folder: c.folder, title: c.title, ...(t.skills.length ? { skills: t.skills } : {}), estMinutes: minutesOf(c, pre) };
-      });
-    const deliverable = pre.deliverables === "yes" && s.deliverable ? { ...s.deliverable, status: "idea" as const } : undefined;
-    if (!topics.length && !deliverable) continue;
-    seeds.push({
-      area: s.area,
-      objective: s.objective || (s.goalId ? (goalNames.get(s.goalId) ?? "") : ""),
-      ...(s.goalId ? { goalId: s.goalId } : {}),
-      topics,
-      requiredGoals: s.requiredGoals,
-      ...(deliverable ? { deliverable } : {}),
-    });
+    for (const t of s.topics) {
+      if (!byFolder.has(t.folder) || seen.has(t.folder)) continue;
+      const c = byFolder.get(t.folder)!;
+      seen.add(t.folder);
+      if (t.why) why[t.folder] = t.why;
+      items.push({ folder: c.folder, title: c.title, ...(t.skills.length ? { skills: t.skills } : {}), estMinutes: minutesOf(c, pre) });
+    }
   }
+  // lo que elige la IA se reparte en las áreas elementales (la tabla rama → área manda); dentro de cada grupo se respeta su orden
+  const buckets = bucketByArea(items, { keepOrder: true });
+  const areaIdByFolder = new Map(buckets.flatMap((b) => b.topics.map((t) => [t.folder, b.areaId] as const)));
+  // el entregable y las metas que propuso la IA para un subplan van al área donde cayeron casi todos sus temas
+  const aiDeliverable = new Map<string, NonNullable<SubplanSeed["deliverable"]>>();
+  const aiGoals = new Map<string, RequiredGoal[]>();
+  for (const s of reply.subplans) {
+    const count = new Map<string, number>();
+    for (const t of s.topics) {
+      const a = areaIdByFolder.get(t.folder);
+      if (a) count.set(a, (count.get(a) ?? 0) + 1);
+    }
+    const dominant = [...count.entries()].sort((x, y) => y[1] - x[1])[0]?.[0];
+    if (!dominant) continue;
+    if (pre.deliverables === "yes" && s.deliverable && !aiDeliverable.has(dominant)) aiDeliverable.set(dominant, { ...s.deliverable, status: "idea" as const });
+    const goalsHere = [...s.requiredGoals, ...(s.goalId && !s.requiredGoals.some((g) => g.goalId === s.goalId && !g.itemId) ? [{ goalId: s.goalId, note: "Meta que esta área ayuda a cumplir" }] : [])];
+    aiGoals.set(dominant, [...(aiGoals.get(dominant) ?? []), ...goalsHere]);
+  }
+  const seeds: SubplanSeed[] = buckets.map((b) => {
+    const base = { area: b.name, areaId: b.areaId, objective: areaDef(b.areaId)?.objective ?? `Avanzar en ${b.name}`, groups: b.groups };
+    const mine = requiredGoalsFor(b.areaId, new Set(b.topics.map((t) => t.folder)), goals);
+    const extra = (aiGoals.get(b.areaId) ?? []).filter((g) => !mine.some((m) => m.goalId === g.goalId && (m.itemId ?? "") === (g.itemId ?? "")));
+    return { ...base, topics: b.topics, requiredGoals: [...mine, ...extra].slice(0, 12), ...(pre.deliverables === "yes" ? { deliverable: aiDeliverable.get(b.areaId) ?? defaultDeliverableFor(base) } : {}) };
+  });
   return { seeds: markDiagnostics(seeds, pre), why };
 }
 
@@ -400,7 +434,9 @@ export function composeFromPreconditions(seeds: readonly SubplanSeed[], pre: Pla
     ? ` ${PRACTICE_NAME}: ~${hours(capP.practiceMinutes)} reservadas (kata ${hours(capP.kataMinutes)} + proyecto semanal ${hours(capP.projectMinutes)}), ${hours(capP.topicMinutes)} quedan para temas.${capP.overflowDays ? ` En ${capP.overflowDays} ${capP.overflowDays === 1 ? "día" : "días"} la práctica sola ya no cabe en el tiempo diario.` : ""}`
     : "";
   // «a discutir»: los subplanes quedan sin entregable y con una pregunta pendiente anotada
-  const openQuestions = pre.deliverables === "ask" ? built.plan.subplans.filter((s) => !s.deliverable).map(deliverableQuestion) : [];
+  // una SOLA pregunta global en los planes por áreas (con excepciones por área al responderla); por subplan en los antiguos
+  const lacking = built.plan.subplans.filter((s) => !s.deliverable);
+  const openQuestions = pre.deliverables === "ask" && lacking.length ? (built.plan.structure === "areas" ? [globalDeliverableQuestion()] : lacking.map(deliverableQuestion)) : [];
   return {
     id,
     start: pre.start,
@@ -409,6 +445,7 @@ export function composeFromPreconditions(seeds: readonly SubplanSeed[], pre: Pla
     hoursPerWeek: built.plan.hoursPerWeek ?? capP.hoursPerWeek,
     rationale: meta.rationale,
     subplans: built.plan.subplans,
+    ...(built.plan.structure ? { structure: built.plan.structure } : {}),
     warnings: built.warnings,
     fits: built.fits,
     totalMinutes: built.totalMinutes,
@@ -469,10 +506,10 @@ export function preconditionsPrompt(pre: PlanPreconditions, scope: ResolvedScope
   if (pre.freeObjective) lines.push(`- Otro objetivo del estudiante (texto libre): «${pre.freeObjective}».`);
   lines.push(
     pre.deliverables === "yes"
-      ? "- Entregables: SÍ. Cada subplan lleva un `deliverable` (proyecto de demostración con 2-4 criterios comprobables)."
+      ? "- Entregables: SÍ. Cada área lleva un `deliverable` (proyecto de demostración propio de esa área, con 2-4 criterios comprobables)."
       : pre.deliverables === "no"
         ? "- Entregables: NO. No incluyas `deliverable` en ningún subplan."
-        : "- Entregables: A DISCUTIR. No incluyas `deliverable` todavía en ningún subplan: la app dejará la pregunta pendiente y el estudiante decidirá después, subplan a subplan.",
+        : "- Entregables: A DISCUTIR. No incluyas `deliverable` todavía en ningún área: la app dejará UNA pregunta global pendiente y el estudiante decidirá después.",
   );
   const pp = pre.practice;
   if (pp && cap.track) {
@@ -481,7 +518,7 @@ export function preconditionsPrompt(pre: PlanPreconditions, scope: ResolvedScope
       pp.sessionsPerWeek > 0 ? `un proyecto semanal full stack (frontend + backend + base de datos) en ${pp.sessionsPerWeek} ${pp.sessionsPerWeek === 1 ? "sesión" : "sesiones"} de ${pp.minutesPerSession} min por semana, con cuatro fases (${PRACTICE_PHASE_LIST})` : "",
       pp.monthly ? "un proyecto mayor cada 4 semanas que integra los semanales" : "",
     ].filter(Boolean);
-    lines.push(`- ${PRACTICE_NAME}: SÍ (HECHO FIJO). Incluye ${parts.join("; ")}. Esos minutos ya están reservados y descontados: no los metas como temas y no cambies minutos ni fases.`);
+    lines.push(`- ${PRACTICE_NAME}: SÍ (HECHO FIJO). Es una ${PRACTICE_PURPOSE} y NO es un área ni una rama del plan. Incluye ${parts.join("; ")}. Esos minutos ya están reservados y descontados: no los metas como temas y no cambies minutos ni fases.`);
     if (pp.sessionsPerWeek > 0) {
       lines.push(
         pp.focus === "rotate"

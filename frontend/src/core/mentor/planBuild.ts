@@ -50,7 +50,7 @@ import { formatLayout, isSyncConflict, LAYOUT } from "../vaultFormat.js";
 import type { CatalogTopic } from "./goalDraft.js";
 import { defaultPlanName, subplanKey, subplanLabel, type SubplanSeed } from "./plan.js";
 import type { PlanDraft } from "./planDraft.js";
-import { autoSeeds, composeFromPreconditions, markDiagnostics, resolveScope, type GoalScope } from "./planSpec.js";
+import { autoSeeds, composeFromPreconditions, defaultDeliverableFor, markDiagnostics, resolveScope, type GoalScope } from "./planSpec.js";
 
 export * from "../../lib/planBuild.js";
 
@@ -195,6 +195,9 @@ interface Decisions {
   fewer: boolean;
   noProject: boolean;
   deliverables: Record<string, "yes" | "no" | "later">;
+  /** respuesta a la pregunta GLOBAL de entregables («deliverable:all»): sí en todas, no, después, o sí salvo en un área */
+  allDeliverables?: "yes" | "no" | "later";
+  deliverableExcept: string[];
   capacityRounds: number;
   capacityKept: boolean;
   /** «añadir más temas»: devolver los que la IA dejó fuera y/o sumar áreas pendientes */
@@ -205,7 +208,7 @@ interface Decisions {
 const after = (s: string, prefix: string): string => (s.startsWith(prefix) ? s.slice(prefix.length) : "");
 
 export function foldAnswers(answers: readonly BuildAnswer[]): Decisions {
-  const d: Decisions = { levels: {}, boost: {}, removed: new Set(), weight: "ok", kata15: false, fewer: false, noProject: false, deliverables: {}, capacityRounds: 0, capacityKept: false, restore: false, extraAreas: [] };
+  const d: Decisions = { levels: {}, boost: {}, removed: new Set(), weight: "ok", kata15: false, fewer: false, noProject: false, deliverables: {}, capacityRounds: 0, capacityKept: false, restore: false, extraAreas: [], deliverableExcept: [] };
   for (const a of answers) {
     const c = a.choice;
     switch (a.kind) {
@@ -243,7 +246,13 @@ export function foldAnswers(answers: readonly BuildAnswer[]): Decisions {
         break;
       case "deliverable": {
         const key = after(a.questionId, "deliverable:");
-        if (key && (c === "yes" || c === "no" || c === "later")) d.deliverables[key] = c;
+        if (key === "all") {
+          if (c === "yes" || c === "no" || c === "later") d.allDeliverables = c;
+          else if (c.startsWith("except:") && c.slice(7)) {
+            d.allDeliverables = "yes";
+            d.deliverableExcept.push(c.slice(7));
+          }
+        } else if (key && (c === "yes" || c === "no" || c === "later")) d.deliverables[key] = c;
         break;
       }
       default:
@@ -292,7 +301,7 @@ interface Assembled {
 function assemble(effPre: PlanPreconditions, d: Decisions, ai: BuildAiState, ctx: BuildCtx, answersCount: number): Assembled {
   const scope = resolveScope(effPre, ctx.all, ctx.goals);
   // sin diagnósticos todavía: se vuelven a marcar tras reordenar
-  let seeds: SubplanSeed[] = autoSeeds(effPre, scope).map((s) => {
+  let seeds: SubplanSeed[] = autoSeeds(effPre, scope, ctx.goals).map((s) => {
     const { notes: _n, ...rest } = s;
     return { ...rest, topics: s.topics.map(({ diagnostic: _d, ...t }) => t) };
   });
@@ -327,7 +336,8 @@ function assemble(effPre: PlanPreconditions, d: Decisions, ai: BuildAiState, ctx
     if (i > 0) seeds = [seeds[i]!, ...seeds.slice(0, i), ...seeds.slice(i + 1)];
   }
   seeds = markDiagnostics(seeds, effPre);
-  seeds = seeds.map((s) => (d.deliverables[subplanKey(s)] === "yes" && !s.deliverable ? { ...s, deliverable: defaultDeliverableFor(s) } : s));
+  const wantsDeliverable = (s: SubplanSeed): boolean => d.deliverables[subplanKey(s)] === "yes" || (d.allDeliverables === "yes" && !d.deliverableExcept.includes(subplanKey(s)) && d.deliverables[subplanKey(s)] !== "no");
+  seeds = seeds.map((s) => (wantsDeliverable(s) && !s.deliverable ? { ...s, deliverable: defaultDeliverableFor(s) } : s));
 
   const from = fromOf(effPre, ctx.today);
   const cap = capacityWithPractice(effPre, from, { startFocus: ctx.startFocus });
@@ -392,24 +402,17 @@ function assemble(effPre: PlanPreconditions, d: Decisions, ai: BuildAiState, ctx
   draft.subplans.forEach((sp, i) => {
     keyOfId[sp.id] = subplanKey(seeds[i] ?? sp);
   });
-  // lo que el estudiante respondió «no» ya no queda pendiente
+  // lo que el estudiante respondió «no» ya no queda pendiente (por área, o para todas con la pregunta global)
   const noKeys = new Set(Object.entries(d.deliverables).filter(([, v]) => v === "no").map(([k]) => k));
+  if (d.allDeliverables === "no") for (const s of seeds) noKeys.add(subplanKey(s));
+  for (const k of d.deliverableExcept) noKeys.add(k);
   if (draft.openQuestions?.length) {
-    const kept = draft.openQuestions.filter((q) => !noKeys.has(keyOfId[q.subplanId ?? ""] ?? ""));
+    const lacking = draft.subplans.filter((sp) => !sp.deliverable && !noKeys.has(keyOfId[sp.id] ?? ""));
+    const kept = draft.openQuestions.filter((q) => (q.subplanId ? !noKeys.has(keyOfId[q.subplanId] ?? "") : lacking.length > 0));
     if (kept.length) draft.openQuestions = kept;
     else delete draft.openQuestions;
   }
   return { seeds, draft, cap, keyOfId, omitted };
-}
-
-function defaultDeliverableFor(s: SubplanSeed): NonNullable<SubplanSeed["deliverable"]> {
-  const label = s.goalId ? s.objective : s.area;
-  return {
-    title: `Proyecto de demostración: ${label}`,
-    description: "Aplica lo que estudiaste en un proyecto pequeño que puedas enseñar. Propuesta: créalo en el módulo Proyectos cuando empieces.",
-    criteria: ["Funciona de principio a fin", "Usa lo estudiado en los temas del subplan", "Puedes explicarlo sin mirar tus apuntes"],
-    status: "idea",
-  };
 }
 
 // ── Preguntas ────────────────────────────────────────────────────────────
@@ -463,13 +466,13 @@ function priorityQuestion(seeds: readonly SubplanSeed[]): BuildQuestion {
 }
 
 function skeletonQuestion(rows: readonly SkeletonRow[]): BuildQuestion {
-  const lines = rows.map((r) => `${r.area}${r.objective ? `: ${r.objective}` : ""} ${hoursText(r.hours * 60)}`).join(" · ");
+  const lines = rows.map((r) => `${r.area} ${hoursText(r.hours * 60)}`).join(" · ");
   return {
     id: "skeleton",
     stage: "esqueleto",
     kind: "skeleton",
     text: `Así se repartirían tus horas de estudio: ${lines}. ¿Lo ajustamos?`,
-    why: "Puedes darle más tiempo a un subplan o quitar uno; el resto se reparte con lo que queda.",
+    why: "Puedes darle más tiempo a un área o quitar una; el resto se reparte con lo que queda y las áreas se secuencian por fases.",
     options: [
       opt("ok", "Está bien"),
       ...rows.slice(0, 3).map((r) => opt(`more:${r.key}`, `Más tiempo a «${r.area}»`)),
@@ -652,14 +655,20 @@ function practiceQuestion(effPre: PlanPreconditions, overflow: number): BuildQue
   };
 }
 
-function deliverableQuestion(s: SubplanSeed): BuildQuestion {
+/**
+ * UNA sola pregunta global de entregables para todo el plan por áreas (en vez de una por subplan): «Sí, en todas las áreas», «No»,
+ * «Después» y, como excepciones, «Sí, salvo en X» para las áreas donde un proyecto propio encaja menos (Tooling, Automation…).
+ */
+function deliverableQuestion(seeds: readonly SubplanSeed[]): BuildQuestion {
+  const exceptable = seeds.filter((s) => s.areaId === "tooling" || s.areaId === "automation");
+  const except = (exceptable.length ? exceptable : seeds.slice(-1)).slice(0, 2).filter(() => seeds.length > 1);
   return {
-    id: `deliverable:${subplanKey(s)}`,
+    id: "deliverable:all",
     stage: "entregables",
     kind: "deliverable",
-    text: `¿Quieres un entregable (proyecto de demostración) para ${seedLabel(s)}?`,
-    why: "Un entregable es un proyecto pequeño que demuestra que lograste el objetivo; «Después» lo deja pendiente en el plan.",
-    options: [opt("yes", "Sí"), opt("no", "No"), opt("later", "Después")],
+    text: "¿Quieres un entregable (proyecto de demostración) por cada área del plan?",
+    why: "Un entregable es un proyecto pequeño que demuestra lo aprendido en el área; «Después» lo deja pendiente en el plan. Puedes excluir un área.",
+    options: [opt("yes", "Sí, en todas las áreas"), ...except.map((s) => opt(`except:${subplanKey(s)}`, `Sí, menos en «${seedLabel(s)}»`)), opt("no", "No quiero entregables"), opt("later", "Decidirlo después")],
     allowText: false,
     defaultChoice: "later",
     mentorChoice: "yes",
@@ -826,7 +835,7 @@ export function computeBuild(b: BuildInput, ctx: BuildCtx, opts: ComputeOpts = {
   }
   // 6 · Entregables
   if (!needs && !question && effPre.deliverables === "ask") {
-    const q = next(asm.seeds.filter((s) => !s.deliverable).map(deliverableQuestion));
+    const q = asm.seeds.some((s) => !s.deliverable) ? next([deliverableQuestion(asm.seeds)]) : undefined;
     if (q) {
       stage = "entregables";
       question = q;
@@ -867,8 +876,8 @@ function summariesOf(effPre: PlanPreconditions, d: Decisions, a: Assembled, answ
   const del = a.seeds.filter((s) => s.deliverable).length;
   const p = effPre.practice;
   return {
-    alcance: [lv.length ? `Niveles — ${lv.join(", ")}` : "", first ? `«${first.area}» primero` : ""].filter(Boolean).join(" · ") || `${a.seeds.length} ${a.seeds.length === 1 ? "subplan" : "subplanes"}`,
-    esqueleto: `${a.seeds.length} ${a.seeds.length === 1 ? "subplan" : "subplanes"}${d.removed.size ? ` (${d.removed.size} quitado${d.removed.size === 1 ? "" : "s"})` : ""}`,
+    alcance: [lv.length ? `Niveles — ${lv.join(", ")}` : "", first ? `«${first.area}» primero` : ""].filter(Boolean).join(" · ") || `${a.seeds.length} ${a.seeds.length === 1 ? "área" : "áreas"}`,
+    esqueleto: `${a.seeds.length} ${a.seeds.length === 1 ? "área" : "áreas"}${d.removed.size ? ` (${d.removed.size} quitada${d.removed.size === 1 ? "" : "s"})` : ""}`,
     temas: `${topics} temas${d.weight === "light" ? " · más ligero" : d.weight === "intense" ? " · más intenso" : ""}`,
     capacidad: a.draft.fits ? "Cabe en el periodo" : "No cabe del todo",
     practica: p ? `${p.kataMinutes ? `kata ${p.kataMinutes} min` : "sin kata"} · ${p.sessionsPerWeek ? `${p.sessionsPerWeek} sesiones/semana` : "sin proyecto semanal"}` : "No incluida",

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
 // Mentor — sub-interfaz de un plan: la estructura por pestañas y su accesibilidad (patrón WAI-ARIA tabs con teclado, la pestaña
-// activa se recuerda por plan, banner «¿lo mantienes?» visible en todas, acciones masivas de entregables, sugerencias que rellenan
+// activa se recuerda por plan, banner «¿lo mantienes?» visible en todas, acciones de entregables, sugerencias que rellenan
 // el cuadro de cambios, enlace «Saltar al contenido», región aria-live y jerarquía de encabezados).
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -66,7 +66,7 @@ const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "")))!;
 const tab = (id: string) => host.querySelector<HTMLButtonElement>(`#plan-tabs-tab-${id}`)!;
 const key = async (el: Element, k: string) => { await act(async () => { el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })); }); await flush(); };
-const panelsVisible = () => [...host.querySelectorAll("[role=tabpanel]")].filter((p) => !(p as HTMLElement).hidden).map((p) => p.id.replace("plan-tabs-panel-", ""));
+const panelsVisible = () => [...host.querySelectorAll("[role=tabpanel][id^=plan-tabs-panel-]")].filter((p) => !(p as HTMLElement).hidden).map((p) => p.id.replace("plan-tabs-panel-", ""));
 
 beforeEach(() => {
   localStorage.clear();
@@ -93,10 +93,10 @@ describe("pestañas del plan (WAI-ARIA)", () => {
     await mountEl(<MentorPlan planId={PID} />);
     const list = host.querySelector("[role=tablist]")!;
     expect(list.getAttribute("aria-label")).toBeTruthy();
-    // sin pista Programming practice no hay «Práctica diaria»
-    expect([...list.querySelectorAll("[role=tab]")].map((t) => t.id.replace("plan-tabs-tab-", ""))).toEqual(["plan", "semana", "entregables", "cambios"]);
+    // sin pista Programming practice no hay «Práctica»
+    expect([...list.querySelectorAll("[role=tab]")].map((t) => t.id.replace("plan-tabs-tab-", ""))).toEqual(["plan", "agenda", "entregables", "cambios"]);
     expect(tab("plan").getAttribute("aria-selected")).toBe("true");
-    expect(tab("semana").getAttribute("aria-selected")).toBe("false");
+    expect(tab("agenda").getAttribute("aria-selected")).toBe("false");
     // solo la pestaña activa entra en el orden de Tab (roving tabindex)
     expect([...list.querySelectorAll("[role=tab]")].map((t) => (t as HTMLElement).tabIndex)).toEqual([0, -1, -1, -1]);
     for (const t of list.querySelectorAll("[role=tab]")) {
@@ -114,10 +114,10 @@ describe("pestañas del plan (WAI-ARIA)", () => {
     await mountEl(<MentorPlan planId={PID} />);
     tab("plan").focus();
     await key(tab("plan"), "ArrowRight");
-    expect(tab("semana").getAttribute("aria-selected")).toBe("true");
-    expect(document.activeElement).toBe(tab("semana"));
-    expect(panelsVisible()).toEqual(["semana"]);
-    await key(tab("semana"), "End");
+    expect(tab("agenda").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tab("agenda"));
+    expect(panelsVisible()).toEqual(["agenda"]);
+    await key(tab("agenda"), "End");
     expect(document.activeElement).toBe(tab("cambios"));
     await key(tab("cambios"), "ArrowRight"); // vuelve al principio
     expect(document.activeElement).toBe(tab("plan"));
@@ -169,7 +169,7 @@ describe("plan propuesto", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const keep = vi.spyOn(api, "mentorPlanKeep").mockResolvedValue(plan({ proposed: false }));
     await mountEl(<MentorPlan planId={PID} />);
-    for (const t of ["plan", "semana", "entregables", "cambios"]) {
+    for (const t of ["plan", "agenda", "entregables", "cambios"]) {
       await click(tab(t));
       const bar = host.querySelector("[data-testid=plan-proposed-bar]")!;
       expect(bar).toBeTruthy();
@@ -194,14 +194,31 @@ describe("plan propuesto", () => {
     expect(del).toHaveBeenCalledWith(PID);
   });
 
-  it("la pestaña «Semana actual» de un plan propuesto muestra la vista previa y no la semana de los planes activos", async () => {
+  it("la Agenda de un plan propuesto muestra su propia semana (no la de los planes activos) y no ofrece «Planear mi día»", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    await click(tab("semana"));
-    const prev = host.querySelector("[data-testid=plan-week-preview]")!;
-    expect(prev.textContent).toContain("Vista previa de la semana 1");
-    expect(prev.textContent).toContain("1.1 What programming is");
+    await click(tab("agenda"));
+    const week = host.querySelector("[data-testid=agenda-week]")!;
+    expect(week.querySelector("h2")!.textContent).toContain("Semana 1");
+    expect(week.textContent).toContain("1.1 What programming is");
     expect(host.querySelector("[data-testid=plan-this-week]")).toBeNull();
+    await click(host.querySelector("#agenda-view-tab-dia")!);
+    expect(button("Planear mi día con esto")).toBeUndefined();
+  });
+
+  it("«Pedir cambios» está siempre visible junto a las pestañas: abre «Cambios» y deja el cursor en el cuadro", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    await mountEl(<MentorPlan planId={PID} />);
+    for (const t of ["plan", "agenda", "entregables"]) {
+      await click(tab(t));
+      const ask = host.querySelector<HTMLButtonElement>("[data-testid=plan-ask-changes]")!;
+      expect(ask.textContent).toContain("Pedir cambios");
+      expect(ask.closest("[data-testid=plan-sticky]")).toBeTruthy();
+    }
+    await click(host.querySelector("[data-testid=plan-ask-changes]"));
+    expect(tab("cambios").getAttribute("aria-selected")).toBe("true");
+    await act(async () => { await new Promise((ok) => setTimeout(ok, 5)); });
+    expect(document.activeElement).toBe(host.querySelector("[data-testid=plan-changes] textarea"));
   });
 });
 
@@ -274,9 +291,18 @@ describe("pestaña «Entregables»: acciones masivas", () => {
     expect(card.textContent).toContain("API de inventario");
     expect(card.textContent).toContain("En curso");
     expect(card.textContent).toContain("CRUD completo");
-    expect(card.querySelector("select")!.getAttribute("aria-label")).toContain("Reforzar bases");
     expect(button("Abrir en Proyectos: Inventario", card)).toBeTruthy();
     expect(host.querySelector("[data-testid=plan-open-questions]")).toBeNull();
+    // el estado se edita en la agenda de entregables (todo el plan): hecho / pendiente, con su selector
+    const range = host.querySelector<HTMLSelectElement>("select[aria-label='Periodo']")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(range, "todo");
+      range.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+    const row = [...host.querySelectorAll("[data-testid=deliverable-row]")].find((r) => r.textContent?.includes("API de inventario"))!;
+    expect(row.querySelector("select")!.getAttribute("aria-label")).toBe("Estado de API de inventario");
+    expect(row.textContent).toContain("Proyecto de área");
   });
 });
 
@@ -288,11 +314,11 @@ describe("pestaña «Cambios»: sugerencias", () => {
     await click(tab("cambios"));
     const box = host.querySelector("[data-testid=plan-changes]")!;
     const chips = [...box.querySelectorAll("[data-testid=change-suggestions] button")];
-    expect(chips.map((c) => c.textContent)).toEqual(["Quita lo de desktop", "Más SQL antes del backend", "Pasa la semana 3 a la 5", "Añade un entregable al subplán de Python", "Hazlo más ligero"]);
+    expect(chips.map((c) => c.textContent)).toEqual(["Más SQL antes del backend", "Pasa el frontend a la semana 10", "Quita lo de desktop", "Añade un entregable al área de Backend", "Pasa el lenguaje Python a Automation", "Hazlo más ligero"]);
     const ta = box.querySelector<HTMLTextAreaElement>("textarea")!;
-    await click(chips[0]!);
+    await click(chips[2]!);
     expect(ta.value).toBe("Quita lo de desktop");
-    await click(chips[4]!);
+    await click(chips[5]!);
     expect(ta.value).toBe("Quita lo de desktop\nHazlo más ligero");
     expect(change).not.toHaveBeenCalled();
     expect(button("Aplicar cambios", box).hasAttribute("disabled")).toBe(false);
@@ -304,7 +330,7 @@ describe("pestaña «Cambios»: sugerencias", () => {
     vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, applied: true, plan: plan(), history: [entry], entry });
     await mountEl(<MentorPlan planId={PID} />);
     await click(tab("cambios"));
-    await click([...host.querySelectorAll("[data-testid=change-suggestions] button")][0]!);
+    await click([...host.querySelectorAll("[data-testid=change-suggestions] button")][2]!);
     await click(button("Aplicar cambios"));
     expect(host.querySelector("[data-testid=plan-live]")!.textContent).toContain("Cambios aplicados: −4 temas");
   });
@@ -324,7 +350,7 @@ describe("estructura accesible", () => {
   it("un solo h1 y los encabezados nunca saltan de nivel; las regiones tienen nombre", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    for (const t of ["plan", "semana", "entregables", "cambios"]) {
+    for (const t of ["plan", "agenda", "entregables", "cambios"]) {
       await click(tab(t));
       const hs = [...host.querySelectorAll("h1,h2,h3,h4,h5,h6")].filter((h) => !h.closest("[hidden]"));
       expect(hs.filter((h) => h.tagName === "H1")).toHaveLength(1);
@@ -366,7 +392,7 @@ describe("estructura accesible", () => {
   it("no hay métricas inventadas (solo datos reales del plan)", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    for (const t of ["plan", "semana", "entregables", "cambios"]) {
+    for (const t of ["plan", "agenda", "entregables", "cambios"]) {
       await click(tab(t));
       for (const fake of ["Auditoría IA", "Mentor IA", "Latencia IA", "Sistemas operativos", "CM-8842", "sub-hitos", "Factibilidad"]) expect(host.textContent).not.toContain(fake);
     }

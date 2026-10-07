@@ -18,6 +18,7 @@ import { SubmetaList } from "./SubmetaList";
 import { SubmetaCards, SubmetaTree } from "./Submetas";
 import { ViewToggle } from "../common/SubmetaTable";
 import { SubmetaDetail } from "./SubmetaDetail";
+import { TransferDialog } from "./ItemTransfer";
 import { TodayList } from "./TodayList";
 
 const TABS: Array<[GoalTab, string]> = [["resumen", "Resumen"], ["submetas", "Submetas"], ["tablero", "Tablero"], ["hoy", "Hoy"], ["historial", "Historial"], ["notas", "Notas"]];
@@ -134,6 +135,7 @@ export function GoalView() {
   const areas = useGoals((s) => s.areas);
   const toast = useApp((s) => s.toast);
   const [name, setName] = useState("");
+  const [demoting, setDemoting] = useState(false);
   useEffect(() => setName(detail?.goal.name ?? ""), [detail?.goal.id, detail?.goal.name]);
 
   if (!detail) return <div className="grid flex-1 place-items-center text-[13px] text-faint">Cargando meta…</div>;
@@ -148,6 +150,7 @@ export function GoalView() {
         <GhostButton onClick={() => void open(null)} className="border-transparent px-1.5"><ChevronLeft size={14} /> Metas</GhostButton>
         <span className="flex-1" />
         <GhostButton onClick={() => setEditing(g.id)}><Pencil size={13} /> Editar meta…</GhostButton>
+        <GhostButton onClick={() => setDemoting(true)}>↩ Convertir en submeta de…</GhostButton>
         <GhostButton danger onClick={async () => {
           if (!(await confirmAction("Eliminar meta", `¿Eliminar «${g.name}» con todas sus submetas? Se mueve a la papelera de la vault. Si solo quieres ocultarla, márcala como Archivada.`, "Eliminar", true))) return;
           try {
@@ -218,6 +221,7 @@ export function GoalView() {
             : tab === "historial" ? <History /> : <Notes />}
       </div>
       {itemId && editing && <ItemEditor item={editing} onClose={() => openItem(null)} />}
+      {demoting && <TransferDialog mode="goal" gid={g.id} onClose={() => setDemoting(false)} />}
     </div>
   );
 }

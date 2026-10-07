@@ -65,7 +65,8 @@ describe("ramas inferidas en el servidor (API directa, sin el campo de ramas)", 
     const plan = planOf(a, r.planId);
     expect(folders(plan).join()).not.toMatch(/Mobile|Desktop/);
     expect(plan.preconditions).toMatchObject({ branchPreset: "fullstack", branchExcluded: ["3 Desktop Apps", "8 Mobile"] });
-    expect(plan.subplans.map((s: any) => s.objective)).toEqual(["Avanzar en Fundamentals", "Avanzar en Backend", "Avanzar en Frontend", "Avanzar en Databases"]);
+    expect(plan.subplans.map((s: any) => s.area)).toEqual(["Backend", "Databases", "Frontend"]); // un subplan por ÁREA (Fundamentals es el grupo «Bases» de Backend)
+    expect(plan.structure).toBe("areas");
   });
 
   it("mención explícita de mobile o desktop: se incluyen; sin mención no se acota nada", async () => {
@@ -99,7 +100,9 @@ describe("ramas inferidas en el servidor (API directa, sin el campo de ramas)", 
     expect(plan.preconditions.branchPreset).toBe("fullstack");
     expect(plan.preconditions.branchExcluded).toEqual(["3 Desktop Apps", "8 Mobile"]);
     expect(folders(plan).join()).not.toMatch(/Mobile|Desktop/);
-    expect(plan.subplans.some((s: any) => s.objective === "Desarrollo Backend")).toBe(true);
+    // la meta «Desarrollo Backend» queda enlazada al área Backend (y la de Frontend al área Frontend) por nombre
+    expect(plan.subplans.find((s: any) => s.areaId === "backend").requiredGoals.some((g: any) => g.goalId === be.id && !g.itemId)).toBe(true);
+    expect(plan.subplans.find((s: any) => s.areaId === "frontend").requiredGoals.some((g: any) => g.goalId === fe.id && !g.itemId)).toBe(true);
   });
 
   it("también en el constructor guiado", async () => {
@@ -127,15 +130,15 @@ describe("ramas inferidas en el servidor (API directa, sin el campo de ramas)", 
 
 describe("generación completa por partes (API)", () => {
   const skeleton = (keys: string[]) => JSON.stringify({ type: "skeleton", rationale: "Primero lo básico.", subplans: keys.map((key) => ({ key, weight: 3 })) });
-  const KEYS = ["programacion|avanzar en fundamentals", "programacion|avanzar en backend", "programacion|avanzar en frontend"];
+  const KEYS = ["backend|construir servicios y apis solidos y seguros", "frontend|crear interfaces web accesibles y mantenibles"];
   const order = (m: any[], reverse = true) => {
     const key = /SUBPLAN key=(.+?) \|/.exec(m[1].content)![1]!;
     const fs_ = [...m[1].content.matchAll(/folder=(\S[^|]*?) \|/g)].map((x) => x[1] as string);
-    return JSON.stringify({ type: "topic_order", subplans: [{ key, reason: `Razón de ${key.split(" ").pop()}.`, topics: reverse ? [...fs_].reverse() : fs_ }] });
+    return JSON.stringify({ type: "topic_order", subplans: [{ key, reason: `Razón de ${key.split("|")[0]}.`, topics: reverse ? [...fs_].reverse() : fs_ }] });
   };
   const fullstack = { freeObjective: "full stack", branches: { Programación: ["1 Fundamentals", "4 Backend", "5 Frontend"] }, branchPreset: "fullstack" };
 
-  it("una llamada de esqueleto y una por subplan, sin una sola llamada gigante; se conserva la razón de cada subplan", async () => {
+  it("una llamada de esqueleto y una por ÁREA, sin una sola llamada gigante; se conserva la razón de cada área", async () => {
     withAi();
     const calls: string[] = [];
     const send = vi.fn().mockImplementation(async (_c: unknown, m: any[]) => {
@@ -144,31 +147,38 @@ describe("generación completa por partes (API)", () => {
     });
     const a = mentorApi(app, send as never);
     const r: any = await a.mentor_plan_generate({ preconditions: pre(fullstack) });
-    expect(calls).toEqual(["esqueleto", "temas", "temas", "temas"]);
+    expect(calls).toEqual(["esqueleto", "temas", "temas"]);
     expect(r.source).toBe("ai");
     const plan = planOf(a, r.planId);
-    expect(plan.subplans[1].topics[0].folder).toBe("Programación/4 Backend/05 Tema"); // orden de la IA
-    expect(plan.subplans[1].notes).toContain("Razón de backend.");
+    // la IA ordena DENTRO de cada grupo (al revés aquí) y la app mantiene el orden de los grupos: Bases (Fundamentals) → Conocimientos de backend
+    expect(plan.subplans[0].groups.map((g: any) => g.id)).toEqual(["bases", "core"]);
+    expect(plan.subplans[0].topics[0].folder).toBe("Programación/1 Fundamentals/04 Tema");
+    expect(plan.subplans[0].topics.find((t: any) => t.group === "core").folder).toBe("Programación/4 Backend/05 Tema");
+    expect(plan.subplans[0].notes).toContain("Razón de backend.");
     expect(plan.rationale).toContain("Primero lo básico.");
     expect(r.planDraft.warnings.filter((w: string) => w.includes("reglas"))).toEqual([]);
   });
 
-  it("si un bloque falla solo ese subplan cae a reglas; el resto conserva la IA y el aviso es concreto y queda en el plan", async () => {
+  it("si un bloque falla solo esa área cae a reglas; el resto conserva la IA y el aviso es concreto y queda en el plan (sin notas internas)", async () => {
     withAi();
     const send = vi.fn().mockImplementation(async (_c: unknown, m: any[]) => {
       if (m[0].content.includes("ESQUELETO")) return skeleton(KEYS);
-      if (m[1].content.includes("avanzar en frontend")) throw new Error("HTTP 529");
+      if (m[1].content.includes("key=frontend")) throw new Error("HTTP 529");
       return order(m);
     });
     const a = mentorApi(app, send as never);
     const r: any = await a.mentor_plan_generate({ preconditions: pre(fullstack) });
     expect(r.source).toBe("ai"); // la IA aportó
     const plan = planOf(a, r.planId);
-    const fe = plan.subplans.find((s: any) => s.objective.includes("Frontend"));
+    const fe = plan.subplans.find((s: any) => s.areaId === "frontend");
     expect(fe.topics.map((t: any) => t.folder)).toEqual([1, 2, 3, 4].map((n) => `Programación/5 Frontend/0${n} Tema`)); // natural
-    expect(fe.notes).toContain("orden natural");
-    expect(plan.subplans.find((s: any) => s.objective.includes("Backend")).topics[0].folder).toBe("Programación/4 Backend/05 Tema");
-    expect(r.planDraft.warnings).toContain("El subplan «Frontend» se completó con reglas porque la IA falló (HTTP 529).");
+    // el aviso es estructurado y con su motivo; ya no hay notas internas tipo «sin la selección de la IA»
+    expect(fe.fallback).toEqual({ kind: "rules", reason: "la IA falló (HTTP 529)" });
+    expect(fe.notes ?? "").not.toContain("selección de la IA");
+    const be = plan.subplans.find((s: any) => s.areaId === "backend");
+    expect(be.fallback).toBeUndefined();
+    expect(be.topics[0].folder).toBe("Programación/1 Fundamentals/04 Tema");
+    expect(r.planDraft.warnings).toContain("El área «Frontend» se completó con reglas porque la IA falló (HTTP 529).");
   });
 
   it("si todo falla se completa todo con reglas (la red de seguridad sigue funcionando)", async () => {
@@ -176,25 +186,24 @@ describe("generación completa por partes (API)", () => {
     const a = mentorApi(app, vi.fn().mockRejectedValue(new Error("sin red")) as never);
     const r: any = await a.mentor_plan_generate({ preconditions: pre(fullstack) });
     expect(r.source).toBe("auto");
-    expect(planOf(a, r.planId).subplans).toHaveLength(3);
+    expect(planOf(a, r.planId).subplans).toHaveLength(2);
     expect(planOf(a, r.planId).auto).toBe(true);
   });
 
-  it("el progreso real se ve en el estado: «Esqueleto ✓ · … · n/m subplanes»", async () => {
+  it("el progreso real se ve en el estado: «Esqueleto ✓ · … · n/m áreas»", async () => {
     withAi();
     let release: (v: string) => void = () => undefined;
     const send = vi.fn().mockImplementation((_c: unknown, m: any[]) => {
       if (m[0].content.includes("ESQUELETO")) return Promise.resolve(skeleton(KEYS));
-      if (m[1].content.includes("avanzar en frontend")) return new Promise<string>((ok) => (release = ok));
+      if (m[1].content.includes("key=frontend")) return new Promise<string>((ok) => (release = ok));
       return Promise.resolve(order(m));
     });
     const a = mentorApi(app, send as never);
     const p: Promise<any> = a.mentor_plan_generate({ preconditions: pre(fullstack) });
-    await vi.waitFor(() => expect((a.mentor_ai_status({ key: "generate" }) as any).label).toMatch(/Esqueleto ✓ · .*Frontend … .*2\/3 subplanes/));
+    await vi.waitFor(() => expect((a.mentor_ai_status({ key: "generate" }) as any).label).toMatch(/Esqueleto ✓ · .*Frontend … .*1\/2 áreas/));
     const st = a.mentor_ai_status({ key: "generate" }) as any;
-    expect(st.label).toContain("Fundamentals ✓");
     expect(st.label).toContain("Backend ✓");
-    release(order([{}, { content: "SUBPLAN key=programacion|avanzar en frontend | x\n  - folder=Programación/5 Frontend/01 Tema | ~40m" }] as any, false));
+    release(order([{}, { content: `SUBPLAN key=${KEYS[1]} | x\n  - folder=Programación/5 Frontend/01 Tema | ~40m` }] as any, false));
     const r = await p;
     expect(r.kind).toBe("plan_created");
   });
@@ -210,7 +219,7 @@ describe("generación completa por partes (API)", () => {
     const a = mentorApi(app, send as never);
     const p: Promise<any> = a.mentor_plan_generate({ preconditions: pre(fullstack) });
     const done = p.then(() => "ok", (e) => String(e.message));
-    await vi.waitFor(() => expect(signals.length).toBe(3)); // las tres tareas arrancan en paralelo
+    await vi.waitFor(() => expect(signals.length).toBe(2)); // las dos tareas arrancan en paralelo
     a.mentor_ai_cancel({ key: "generate", mode: "abort" });
     expect(await done).toMatch(/cancelada/i);
     expect(signals.every((s) => s.aborted)).toBe(true);
@@ -218,7 +227,7 @@ describe("generación completa por partes (API)", () => {
 
     signals.length = 0;
     const p2: Promise<any> = a.mentor_plan_generate({ preconditions: pre({ ...fullstack, end: addDays(todayIso(), 70) }) });
-    await vi.waitFor(() => expect(signals.length).toBe(3));
+    await vi.waitFor(() => expect(signals.length).toBe(2));
     a.mentor_ai_cancel({ key: "generate", mode: "auto" });
     const r = await p2;
     expect(signals.every((s) => s.aborted)).toBe(true);
@@ -226,16 +235,17 @@ describe("generación completa por partes (API)", () => {
     expect(r.planDraft.warnings.join()).toContain("pediste seguir sin IA");
   });
 
-  it("una llamada colgada vence en el tiempo por llamada y solo ese subplan va por reglas", async () => {
+  it("una llamada colgada vence en el tiempo por llamada y solo esa área va por reglas", async () => {
     withAi();
     const send = vi.fn().mockImplementation((_c: unknown, m: any[]) => {
       if (m[0].content.includes("ESQUELETO")) return Promise.resolve(skeleton(KEYS));
-      if (m[1].content.includes("avanzar en backend")) return new Promise<string>(() => undefined);
+      if (m[1].content.includes("key=backend")) return new Promise<string>(() => undefined);
       return Promise.resolve(order(m));
     });
     const a = mentorApi(app, send as never);
     const r: any = await a.mentor_plan_generate({ preconditions: pre(fullstack), callTimeoutMs: 80 });
-    expect(r.planDraft.warnings).toContain("El subplan «Backend» se completó con reglas porque la IA tardó demasiado.");
-    expect(planOf(a, r.planId).subplans.find((s: any) => s.objective.includes("Fundamentals")).topics[0].folder).toBe("Programación/1 Fundamentals/04 Tema");
+    expect(r.planDraft.warnings).toContain("El área «Backend» se completó con reglas porque la IA tardó demasiado.");
+    expect(planOf(a, r.planId).subplans.find((s: any) => s.areaId === "backend").topics[0].folder).toBe("Programación/1 Fundamentals/01 Tema"); // orden natural
+    expect(planOf(a, r.planId).subplans.find((s: any) => s.areaId === "frontend").topics[0].folder).toBe("Programación/5 Frontend/04 Tema"); // la IA
   });
 });

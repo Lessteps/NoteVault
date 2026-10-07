@@ -1,0 +1,684 @@
+// Agenda del Plan del Mentor: ASIGNACIÓN DIARIA determinista (qué temas, práctica y entregables tocan cada día) y resúmenes por
+// semana y por mes, con textos de propósito generados por plantillas.
+//
+// Módulo PURO y compartido (núcleo, API y renderer): sin node:* ni DOM. Parte de lo que el plan ya guarda (temas con su semana
+// objetivo `targetWeek` y su secuencia dentro del área, las precondiciones y la pista de práctica) y no escribe nada: el reparto
+// por días se RECALCULA siempre igual (misma entrada → misma salida), así que nunca se queda desfasado respecto al plan.
+//
+// Algoritmo (por semana, en orden):
+//  1. Capacidad de cada día = tiempo diario × ritmo (0 en días sin estudio o bloqueados) − minutos de práctica de ese día.
+//  2. Cada área (subplan) tiene en la semana una cola de temas: primero los FIJADOS (`pinned`) de esa semana, luego lo que se arrastra
+//     de semanas anteriores y luego los demás temas con esa `targetWeek`, en el orden del área (grupos incluidos).
+//  3. La capacidad de la semana se reparte entre las áreas con demanda en proporción a su demanda; con holgura el reparto es parejo
+//     por días (nivelado), con sobrecarga cada día se llena entero y lo que no cabe se arrastra a la semana siguiente.
+//  4. Un tema que supera los minutos de un día ocupa varios (partes 1/n, 2/n…); nunca se coloca antes de su semana objetivo.
+//  5. En la última semana, lo que no cabe se amontona en el último día de estudio (marcado como desbordado).
+//  Los temas ya completados (`completedAt`) se anotan en el día en que se completaron y no consumen capacidad.
+
+import { addDays, daysBetween, eachDay, isoDow, weekRangesOf } from "./planTime.js";
+import { type AreaGroup, type PlanDeliverable, type PlanDeliverableStatus, type PlanPurposes } from "./planAreas.js";
+import { FOCUS_LABEL, PHASE_LABEL, PRACTICE_PHASES, practiceDayMinutes, weekTitle, type PhaseStatus, type PracticePhase, type PracticeTrack } from "./practiceTrack.js";
+
+// ── Entrada estructural (la cumplen `Plan` del núcleo y `MentorPlan` del renderer) ──
+
+export interface ScheduleTopic {
+  folder: string;
+  title: string;
+  estMinutes: number;
+  targetWeek: number;
+  completedAt?: string;
+  pinned?: boolean;
+  group?: string;
+}
+
+export interface ScheduleSubplan {
+  id: string;
+  area: string;
+  areaId?: string;
+  objective: string;
+  topics: ScheduleTopic[];
+  groups?: AreaGroup[];
+  phase?: { fromWeek: number; toWeek: number };
+  deliverable?: { title: string; description: string; criteria: string[]; status: "idea" | "en_curso" | "hecho" };
+}
+
+export interface SchedulePlan {
+  id: string;
+  start: string;
+  end: string;
+  hoursPerWeek?: number;
+  preconditions?: { minutesPerDay: number; studyDays: number[]; blockedDates?: string[]; pace: "suave" | "normal" | "intenso" };
+  programmingPractice?: PracticeTrack;
+  subplans: ScheduleSubplan[];
+  deliverables?: PlanDeliverable[];
+  purposes?: PlanPurposes;
+}
+
+// ── Salida ──────────────────────────────────────────────────────────────
+
+export interface DayTopic {
+  subplanId: string;
+  areaId?: string;
+  area: string;
+  folder: string;
+  title: string;
+  /** minutos de este tema en ESTE día */
+  minutes: number;
+  group?: string;
+  groupTitle?: string;
+  /** parte del tema (1..parts) cuando abarca varios días */
+  part: number;
+  parts: number;
+  /** posición del tema en la ruta del área (1..total) */
+  position: number;
+  total: number;
+  /** ya completado (se anota el día en que se completó) */
+  done: boolean;
+  /** no cupo en la capacidad y se amontonó al final del plan */
+  overflow?: boolean;
+}
+
+export interface DayPractice {
+  kata?: { minutes: number };
+  project?: { minutes: number; phases: PracticePhase[]; week: number; focus: string; theme?: string };
+}
+
+export interface ScheduleDay {
+  date: string;
+  /** semana del plan (1..) */
+  week: number;
+  /** día ISO 1..7 */
+  dow: number;
+  /** día de estudio no bloqueado */
+  study: boolean;
+  blocked: boolean;
+  capacityMinutes: number;
+  topicMinutes: number;
+  practiceMinutes: number;
+  topics: DayTopic[];
+  practice: DayPractice;
+}
+
+export interface PlanSchedule {
+  start: string;
+  end: string;
+  weeks: number;
+  days: ScheduleDay[];
+  byDate: Map<string, ScheduleDay>;
+}
+
+const MIN_CHUNK = 10;
+/** con holgura, cada área reparte sus temas de forma pareja por días, pero nunca con trozos por debajo de esto (min) */
+const LEVEL_FLOOR = 45;
+const r0 = (n: number): number => Math.round(n);
+
+interface Seg {
+  sub: ScheduleSubplan;
+  topic: ScheduleTopic;
+  order: number;
+  remaining: number;
+  chunks: Array<{ date: string; minutes: number; overflow?: boolean }>;
+}
+
+/** Capacidad base de cada día (sin práctica): tiempo diario × ritmo en días de estudio no bloqueados. */
+function baseCapacity(plan: SchedulePlan): (date: string) => number {
+  const pre = plan.preconditions;
+  if (!pre) {
+    const perDay = ((plan.hoursPerWeek ?? 10) * 60) / 7;
+    return () => perDay;
+  }
+  const study = new Set(pre.studyDays);
+  const blocked = new Set(pre.blockedDates ?? []);
+  const f = pre.pace === "suave" ? 0.7 : pre.pace === "normal" ? 0.85 : 1;
+  return (d) => (study.has(isoDow(d)) && !blocked.has(d) ? pre.minutesPerDay * f : 0);
+}
+
+export function buildSchedule(plan: SchedulePlan): PlanSchedule {
+  const ranges = weekRangesOf(plan.start, plan.end);
+  const allDays = eachDay(plan.start, plan.end);
+  const base = baseCapacity(plan);
+  const blockedSet = new Set(plan.preconditions?.blockedDates ?? []);
+  const practiceMin = practiceDayMinutes(plan.programmingPractice, { blockedDates: plan.preconditions?.blockedDates, from: plan.start });
+  const track = plan.programmingPractice;
+  const sessionOf = new Map<string, { minutes: number; phases: PracticePhase[]; week: number; focus: string; theme?: string }>();
+  for (const w of track?.weeklyProject?.weeks ?? []) {
+    for (const s of w.sessions) sessionOf.set(s.date, { minutes: s.minutes, phases: s.phases, week: w.week, focus: FOCUS_LABEL[w.focus], ...(w.theme ? { theme: w.theme } : {}) });
+  }
+  const kataDays = new Set(track?.kata?.days ?? []);
+
+  const days: ScheduleDay[] = allDays.map((date) => {
+    const dow = isoDow(date);
+    const cap = Math.max(0, base(date) - (base(date) > 0 ? practiceMin(date) : 0));
+    const kata = track?.kata && kataDays.has(dow) && !blockedSet.has(date) ? { minutes: track.kata.minutesPerDay } : undefined;
+    const project = sessionOf.get(date);
+    return {
+      date,
+      week: Math.floor(daysBetween(plan.start, date) / 7) + 1,
+      dow,
+      study: base(date) > 0,
+      blocked: blockedSet.has(date),
+      capacityMinutes: r0(cap),
+      topicMinutes: 0,
+      practiceMinutes: (kata?.minutes ?? 0) + (project?.minutes ?? 0),
+      topics: [],
+      practice: { ...(kata ? { kata } : {}), ...(project ? { project } : {}) },
+    };
+  });
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const capOf = (d: string): number => Math.max(0, base(d) - (base(d) > 0 ? practiceMin(d) : 0));
+
+  // posición de cada tema en la ruta de su área (por semana objetivo y orden guardado)
+  const groupTitle = new Map<string, Map<string, string>>();
+  for (const s of plan.subplans) groupTitle.set(s.id, new Map((s.groups ?? []).map((g) => [g.id, g.title])));
+  const clampWeek = (w: number): number => Math.min(ranges.length, Math.max(1, Math.round(w) || 1));
+
+  const segs: Seg[] = [];
+  const subIndex = new Map(plan.subplans.map((s, i) => [s.id, i]));
+  plan.subplans.forEach((sub) => {
+    sub.topics.forEach((t, order) => {
+      if (t.completedAt) return;
+      segs.push({ sub, topic: t, order, remaining: Math.max(1, t.estMinutes), chunks: [] });
+    });
+  });
+
+  // ── simulación semana a semana ──
+  const carry = new Map<string, Seg[]>();
+  const lastStudy = [...days].reverse().find((d) => capOf(d.date) > 0)?.date ?? plan.end;
+  ranges.forEach((_range, wi) => {
+    const week = wi + 1;
+    const isLast = week === ranges.length;
+    const weekDays = days.filter((d) => d.week === week);
+    const queues = new Map<string, Seg[]>();
+    for (const sub of plan.subplans) {
+      const fresh = segs.filter((s) => s.sub === sub && clampWeek(s.topic.targetWeek) === week);
+      const pinned = fresh.filter((s) => s.topic.pinned).sort((a, b) => a.order - b.order);
+      const rest = fresh.filter((s) => !s.topic.pinned).sort((a, b) => a.order - b.order);
+      const q = [...pinned, ...(carry.get(sub.id) ?? []), ...rest];
+      if (q.length) queues.set(sub.id, q);
+    }
+    carry.clear();
+    const demand = new Map([...queues].map(([id, q]) => [id, q.reduce((n, s) => n + s.remaining, 0)] as const));
+    const totalDemand = [...demand.values()].reduce((n, x) => n + x, 0);
+    const weekCap = weekDays.reduce((n, d) => n + capOf(d.date), 0);
+    if (totalDemand <= 0) return;
+    const scale = weekCap > 0 ? Math.min(1, totalDemand / weekCap) : 0;
+    const slack = scale < 0.999;
+    for (const [subId, q] of queues) {
+      const share = (demand.get(subId) ?? 0) / totalDemand;
+      for (const d of weekDays) {
+        // `full` = lo que de verdad le toca a esta área hoy (límite duro); `level` = el reparto NIVELADO por días con holgura (con un mínimo
+        // razonable para que un tema no se parta en trocitos de 8 minutos)
+        const full = capOf(d.date) * share;
+        if (full <= 0.5) continue;
+        const level = slack ? Math.min(full, Math.max(full * scale, Math.min(full, LEVEL_FLOOR))) : full;
+        let used = 0;
+        while (q.length) {
+          const seg = q[0]!;
+          const room = level - used;
+          const hard = full - used;
+          if (hard < 0.5) break;
+          // si el tema cabe (con un pequeño pase de hasta un 35 % sobre lo nivelado cuando hay holgura) se hace entero hoy
+          let take = 0;
+          if (seg.remaining <= hard + 0.5 && seg.remaining <= (slack ? room * 1.35 + 5 : room + 0.5)) take = seg.remaining;
+          else {
+            const part = Math.min(room, hard);
+            const fresh = seg.chunks.length === 0;
+            if (part >= (fresh ? Math.max(MIN_CHUNK, Math.min(30, seg.remaining * 0.4)) : MIN_CHUNK)) take = part;
+            else break; // el día está lleno para este tema: sigue mañana
+          }
+          seg.chunks.push({ date: d.date, minutes: take });
+          seg.remaining -= take;
+          used += take;
+          if (seg.remaining < 0.5) q.shift();
+        }
+        if (!q.length) break;
+      }
+      if (q.length) {
+        if (isLast) {
+          // no cabe: se amontona en el último día de estudio, marcado como desbordado
+          for (const seg of q) {
+            seg.chunks.push({ date: lastStudy, minutes: seg.remaining, overflow: true });
+            seg.remaining = 0;
+          }
+        } else carry.set(subId, q);
+      }
+    }
+  });
+
+  // ── a los días ──
+  const total = new Map(plan.subplans.map((s) => [s.id, s.topics.length] as const));
+  const position = new Map<string, number>();
+  for (const s of plan.subplans) s.topics.forEach((t, i) => position.set(`${s.id}|${t.folder}`, i + 1));
+  const order = (s: ScheduleSubplan): number => subIndex.get(s.id) ?? 0;
+  for (const seg of segs) {
+    const parts = seg.chunks.length;
+    seg.chunks.forEach((c, i) => {
+      const day = byDate.get(c.date);
+      if (!day) return;
+      const minutes = Math.max(1, r0(c.minutes));
+      day.topics.push({
+        subplanId: seg.sub.id,
+        ...(seg.sub.areaId ? { areaId: seg.sub.areaId } : {}),
+        area: seg.sub.area,
+        folder: seg.topic.folder,
+        title: seg.topic.title,
+        minutes,
+        ...(seg.topic.group ? { group: seg.topic.group, groupTitle: groupTitle.get(seg.sub.id)?.get(seg.topic.group) ?? seg.topic.group } : {}),
+        part: i + 1,
+        parts,
+        position: position.get(`${seg.sub.id}|${seg.topic.folder}`) ?? 1,
+        total: total.get(seg.sub.id) ?? 1,
+        done: false,
+        ...(c.overflow ? { overflow: true } : {}),
+      });
+    });
+  }
+  // completados: se anotan el día en que se completaron (acotado al plan)
+  for (const sub of plan.subplans) {
+    for (const t of sub.topics) {
+      if (!t.completedAt) continue;
+      const when = t.completedAt < plan.start ? plan.start : t.completedAt > plan.end ? plan.end : t.completedAt;
+      const day = byDate.get(when);
+      if (!day) continue;
+      day.topics.push({
+        subplanId: sub.id,
+        ...(sub.areaId ? { areaId: sub.areaId } : {}),
+        area: sub.area,
+        folder: t.folder,
+        title: t.title,
+        minutes: Math.max(1, t.estMinutes),
+        ...(t.group ? { group: t.group, groupTitle: groupTitle.get(sub.id)?.get(t.group) ?? t.group } : {}),
+        part: 1,
+        parts: 1,
+        position: position.get(`${sub.id}|${t.folder}`) ?? 1,
+        total: total.get(sub.id) ?? 1,
+        done: true,
+      });
+    }
+  }
+  const subOrder = new Map(plan.subplans.map((s) => [s.id, order(s)] as const));
+  for (const d of days) {
+    d.topics.sort((a, b) => Number(a.done) - Number(b.done) || (subOrder.get(a.subplanId) ?? 0) - (subOrder.get(b.subplanId) ?? 0) || a.position - b.position);
+    d.topicMinutes = d.topics.filter((t) => !t.done).reduce((n, t) => n + t.minutes, 0);
+  }
+  return { start: plan.start, end: plan.end, weeks: ranges.length, days, byDate };
+}
+
+// ── Entregables derivados ───────────────────────────────────────────────
+
+/** Lo que se sabe del estado de la práctica (subconjunto de `MentorPracticeStatus`). */
+export interface PracticeStatusLike {
+  /** fechas (AAAA-MM-DD) con kata hecho */
+  kataDoneDates?: string[];
+  weeks: Array<{ week: number; phases: Record<PracticePhase, PhaseStatus> }>;
+}
+
+const MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const MONTHS_LONG = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const DAYS_LONG = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+export const dateLabel = (iso: string): string => `${Number(iso.slice(8))} ${MONTHS_ES[Number(iso.slice(5, 7)) - 1]}`;
+export const longDateLabel = (iso: string): string => `${DAYS_LONG[isoDow(iso) - 1]} ${Number(iso.slice(8))} de ${MONTHS_LONG[Number(iso.slice(5, 7)) - 1]}`;
+export const monthName = (month: string): string => {
+  const t = MONTHS_LONG[Number(month.slice(5, 7)) - 1] ?? month;
+  return `${t.charAt(0).toUpperCase()}${t.slice(1)} ${month.slice(0, 4)}`;
+};
+
+const RANK: Record<PlanDeliverableStatus, number> = { pendiente: 0, en_curso: 1, hecho: 2 };
+const bestStatus = (a: PlanDeliverableStatus, b: PlanDeliverableStatus): PlanDeliverableStatus => (RANK[b] > RANK[a] ? b : a);
+const fromPhaseStatuses = (st: PhaseStatus[]): PlanDeliverableStatus => (st.length && st.every((s) => s === "hecho") ? "hecho" : st.some((s) => s === "hecho" || s === "en_curso") ? "en_curso" : "pendiente");
+const AREA_STATUS: Record<"idea" | "en_curso" | "hecho", PlanDeliverableStatus> = { idea: "pendiente", en_curso: "en_curso", hecho: "hecho" };
+
+/**
+ * Todos los entregables del plan: los de PRÁCTICA derivados de la pista (un archivo de kata por día con kata, un proyecto por semana,
+ * uno por bloque mensual), los de ÁREA (`Subplan.deliverable`) y los guardados a mano. El estado de cada derivado es lo mejor entre
+ * lo que dice la práctica (`practice`) y lo anotado a mano (`Plan.deliverables` con el mismo `id`).
+ */
+export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike | null): PlanDeliverable[] {
+  const out: PlanDeliverable[] = [];
+  const stored = new Map((plan.deliverables ?? []).map((d) => [d.id, d]));
+  const used = new Set<string>();
+  const push = (d: PlanDeliverable): void => {
+    const man = stored.get(d.id);
+    used.add(d.id);
+    out.push(man ? { ...d, ...man, status: bestStatus(d.status, man.status), kind: d.kind, source: d.source } : d);
+  };
+  const track = plan.programmingPractice;
+  const blocked = new Set(plan.preconditions?.blockedDates ?? []);
+  const kataDone = new Set(practice?.kataDoneDates ?? []);
+  if (track?.kata) {
+    const kd = new Set(track.kata.days);
+    for (const date of eachDay(plan.start, plan.end)) {
+      if (!kd.has(isoDow(date)) || blocked.has(date)) continue;
+      push({
+        id: `kata:${date}`,
+        kind: "kata",
+        title: `Kata del ${dateLabel(date)}`,
+        description: "Archivo con tu solución del reto de lógica del día, con casos de prueba y una nota sobre su complejidad.",
+        dueDate: date,
+        criteria: ["Resuelve el reto", "Incluye casos de prueba", "Anota la complejidad y qué mejorarías"],
+        status: kataDone.has(date) ? "hecho" : "pendiente",
+        source: "practice",
+      });
+    }
+  }
+  const weeks = track?.weeklyProject?.weeks ?? [];
+  for (const w of weeks) {
+    if (!w.sessions.length) continue;
+    const st = practice?.weeks.find((x) => x.week === w.week);
+    push({
+      id: `wp:${w.week}`,
+      kind: "weekly_project",
+      title: weekTitle(w),
+      description: "Proyecto semanal full stack (frontend + backend + base de datos): especificación, construcción, defensa y postmortem.",
+      dueDate: w.sessions[w.sessions.length - 1]!.date,
+      criteria: PRACTICE_PHASES.map((p) => `${PHASE_LABEL[p]} hecha`),
+      status: st ? fromPhaseStatuses(PRACTICE_PHASES.map((p) => st.phases[p])) : "pendiente",
+      source: "practice",
+    });
+  }
+  const ranges = weekRangesOf(plan.start, plan.end);
+  for (const b of track?.monthlyProject?.blocks ?? []) {
+    const lastWeek = weeks.filter((w) => w.week >= b.fromWeek && w.week <= b.toWeek && w.sessions.length).at(-1);
+    const due = lastWeek?.sessions.at(-1)?.date ?? ranges[Math.min(ranges.length, b.toWeek) - 1]?.end ?? plan.end;
+    const inside = weeks.filter((w) => w.week >= b.fromWeek && w.week <= b.toWeek && w.sessions.length).map((w) => practice?.weeks.find((x) => x.week === w.week));
+    const all = inside.length > 0 && inside.every((s) => s && PRACTICE_PHASES.every((p) => s.phases[p] === "hecho"));
+    push({
+      id: `mp:${b.fromWeek}`,
+      kind: "monthly_project",
+      title: b.theme ? `Proyecto mensual: ${b.theme}` : `Proyecto mensual · semanas ${b.fromWeek}–${b.toWeek}`,
+      description: "Un proyecto mayor que integra los proyectos semanales del bloque.",
+      dueDate: due,
+      criteria: ["Integra lo hecho en los proyectos semanales", "Se puede ejecutar y explicar de principio a fin"],
+      status: all ? "hecho" : inside.some((s) => s && PRACTICE_PHASES.some((p) => s.phases[p] === "hecho")) ? "en_curso" : "pendiente",
+      source: "practice",
+    });
+  }
+  for (const sub of plan.subplans) {
+    const d = sub.deliverable;
+    if (!d) continue;
+    const toWeek = Math.min(ranges.length, Math.max(1, sub.phase?.toWeek ?? ranges.length));
+    push({
+      id: `area:${sub.id}`,
+      kind: "area_project",
+      title: d.title,
+      description: d.description,
+      ...(sub.areaId ? { areaId: sub.areaId } : {}),
+      dueDate: ranges[toWeek - 1]?.end ?? plan.end,
+      criteria: d.criteria,
+      status: AREA_STATUS[d.status],
+      source: "ai",
+    });
+  }
+  for (const [id, d] of stored) if (!used.has(id)) out.push(d);
+  return out.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
+}
+
+export interface DeliverableCount {
+  total: number;
+  done: number;
+  pending: number;
+}
+
+export function countDeliverables(list: readonly PlanDeliverable[]): DeliverableCount {
+  const done = list.filter((d) => d.status === "hecho").length;
+  return { total: list.length, done, pending: list.length - done };
+}
+
+export const deliverablesBetween = (list: readonly PlanDeliverable[], from: string, to: string): PlanDeliverable[] => list.filter((d) => d.dueDate >= from && d.dueDate <= to);
+
+/** «1 entregable» / «3 entregables» / «sin entregables». */
+export const deliverablesText = (n: number): string => (n === 0 ? "sin entregables" : `${n} ${n === 1 ? "entregable" : "entregables"}`);
+export const topicsText = (n: number): string => (n === 0 ? "sin temas" : `${n} ${n === 1 ? "tema" : "temas"}`);
+
+// ── Resúmenes por semana y por mes ──────────────────────────────────────
+
+export interface AreaLoad {
+  areaId?: string;
+  area: string;
+  subplanId: string;
+  /** temas distintos tocados */
+  topics: number;
+  minutes: number;
+  /** títulos de esos temas, en orden */
+  titles: string[];
+}
+
+export interface WeekSummary {
+  week: number;
+  start: string;
+  end: string;
+  /** temas distintos (no hechos aún o hechos) con alguna parte en la semana */
+  topics: number;
+  topicsDone: number;
+  topicMinutes: number;
+  practiceMinutes: number;
+  capacityMinutes: number;
+  byArea: AreaLoad[];
+  deliverables: PlanDeliverable[];
+  katas: number;
+  projectSessions: number;
+  purpose: string;
+  autoPurpose: string;
+}
+
+export interface MonthSummary {
+  month: string;
+  label: string;
+  start: string;
+  end: string;
+  weeks: WeekSummary[];
+  topics: number;
+  topicMinutes: number;
+  byArea: AreaLoad[];
+  deliverables: PlanDeliverable[];
+  milestones: string[];
+  purpose: string;
+  autoPurpose: string;
+}
+
+const dayRows = (s: PlanSchedule, from: string, to: string): ScheduleDay[] => s.days.filter((d) => d.date >= from && d.date <= to);
+
+function loadByArea(days: readonly ScheduleDay[]): AreaLoad[] {
+  const m = new Map<string, AreaLoad & { folders: Map<string, string> }>();
+  for (const d of days) {
+    for (const t of d.topics) {
+      const e = m.get(t.subplanId) ?? { ...(t.areaId ? { areaId: t.areaId } : {}), area: t.area, subplanId: t.subplanId, topics: 0, minutes: 0, titles: [], folders: new Map<string, string>() };
+      e.folders.set(t.folder, t.title);
+      e.minutes += t.minutes;
+      m.set(t.subplanId, e);
+    }
+  }
+  return [...m.values()].map(({ folders, ...rest }) => ({ ...rest, topics: folders.size, titles: [...folders.values()] }));
+}
+
+const shortTitle = (t: string): string => t.replace(/^[\d.\s_-]+/, "").trim() || t;
+const listTitles = (titles: readonly string[], max = 2): string => {
+  const u = [...new Set(titles.map(shortTitle))];
+  const head = u.slice(0, max).join(" y ");
+  return u.length > max ? `${head} y ${u.length - max} más` : head;
+};
+const kindVerb = (g: AreaGroup["kind"] | undefined, area: string): string =>
+  g === "bases" ? "afianzar los fundamentos" : g === "language" ? "practicar el lenguaje" : `avanzar en la ruta de ${area.toLowerCase()}`;
+
+const groupKinds = (plan: SchedulePlan): Map<string, AreaGroup["kind"]> => {
+  const m = new Map<string, AreaGroup["kind"]>();
+  for (const s of plan.subplans) for (const g of s.groups ?? []) m.set(`${s.id}|${g.id}`, g.kind);
+  return m;
+};
+
+/** Propósito determinista de un día a partir de su contenido (áreas, temas, práctica, entregables). */
+export function dayPurposeAuto(plan: SchedulePlan, day: ScheduleDay, due: readonly PlanDeliverable[] = []): string {
+  if (day.blocked) return "Día bloqueado: sin estudio.";
+  if (!day.study) return "Día de descanso.";
+  const kinds = groupKinds(plan);
+  const pending = day.topics.filter((t) => !t.done);
+  const parts: string[] = [];
+  const byArea = new Map<string, DayTopic[]>();
+  for (const t of pending.length ? pending : day.topics) byArea.set(t.subplanId, [...(byArea.get(t.subplanId) ?? []), t]);
+  for (const [sid, list] of [...byArea].slice(0, 2)) {
+    const first = list[0]!;
+    const cont = list.every((t) => t.part > 1);
+    const verb = cont ? "continuar" : kindVerb(first.group ? kinds.get(`${sid}|${first.group}`) : undefined, first.area);
+    parts.push(`${first.area} · ${listTitles(list.map((t) => t.title))}: ${verb}`);
+  }
+  if (byArea.size > 2) parts.push(`${byArea.size - 2} áreas más`);
+  const extras: string[] = [];
+  if (day.practice.kata) extras.push("kata de lógica");
+  if (day.practice.project) extras.push(`sesión del proyecto semanal (${day.practice.project.phases.map((p) => PHASE_LABEL[p].toLowerCase()).join(" + ")})`);
+  const real = due.filter((d) => d.kind !== "kata");
+  if (real.length) extras.push(`entrega: ${real.map((d) => d.title).join(", ")}`);
+  if (!parts.length) return extras.length ? `Práctica del día: ${extras.join("; ")}.` : "Repaso libre y recuperación.";
+  return `${parts.join("; ")}${extras.length ? `; ${extras.join("; ")}` : ""}.`;
+}
+
+export function dayPurpose(plan: SchedulePlan, day: ScheduleDay, due: readonly PlanDeliverable[] = []): { text: string; auto: string; manual: boolean } {
+  const auto = dayPurposeAuto(plan, day, due);
+  const manual = plan.purposes?.day?.[day.date];
+  return { text: manual || auto, auto, manual: !!manual };
+}
+
+export function weekSummary(plan: SchedulePlan, sch: PlanSchedule, week: number, all: readonly PlanDeliverable[] = []): WeekSummary | null {
+  const r = weekRangesOf(plan.start, plan.end)[week - 1];
+  if (!r) return null;
+  const days = dayRows(sch, r.start, r.end);
+  const byArea = loadByArea(days);
+  const folders = new Set<string>();
+  const doneFolders = new Set<string>();
+  for (const d of days) for (const t of d.topics) (t.done ? doneFolders : folders).add(t.folder);
+  const deliverables = deliverablesBetween(all, r.start, r.end);
+  const real = deliverables.filter((d) => d.kind !== "kata");
+  const pend = days.flatMap((d) => d.topics.filter((t) => !t.done));
+  const seq = [...new Map(pend.map((t) => [t.folder, t])).values()];
+  const areas = byArea.map((a) => a.area);
+  const autoPurpose = !seq.length && !byArea.length
+    ? `Semana ${week} · práctica y repaso${real.length ? `; entrega: ${real.map((d) => d.title).join(", ")}` : ""}.`
+    : `Semana ${week} · ${areas.slice(0, 2).join(" y ")}${areas.length > 2 ? " y más" : ""}: ${
+        seq.length > 1 ? `de ${shortTitle(seq[0]!.title)} a ${shortTitle(seq[seq.length - 1]!.title)}` : shortTitle((seq[0] ?? days.flatMap((d) => d.topics)[0])?.title ?? "repaso")
+      }${real.length ? `; entrega: ${real.map((d) => d.title).join(", ")}` : ""}.`;
+  const manual = plan.purposes?.week?.[String(week)];
+  return {
+    week,
+    start: r.start,
+    end: r.end,
+    topics: folders.size + doneFolders.size,
+    topicsDone: doneFolders.size,
+    topicMinutes: days.reduce((n, d) => n + d.topicMinutes, 0),
+    practiceMinutes: days.reduce((n, d) => n + d.practiceMinutes, 0),
+    capacityMinutes: days.reduce((n, d) => n + d.capacityMinutes, 0),
+    byArea,
+    deliverables,
+    katas: days.filter((d) => d.practice.kata).length,
+    projectSessions: days.filter((d) => d.practice.project).length,
+    purpose: manual || autoPurpose,
+    autoPurpose,
+  };
+}
+
+/** Mes de calendario `AAAA-MM` recortado al plan; null si no se solapa. */
+export function monthSummary(plan: SchedulePlan, sch: PlanSchedule, month: string, all: readonly PlanDeliverable[] = []): MonthSummary | null {
+  const first = `${month}-01`;
+  const lastDay = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+  const monthEnd = `${month}-${String(lastDay).padStart(2, "0")}`;
+  const start = first < plan.start ? plan.start : first;
+  const end = monthEnd > plan.end ? plan.end : monthEnd;
+  if (end < start) return null;
+  const days = dayRows(sch, start, end);
+  const weeks = [...new Set(days.map((d) => d.week))].map((w) => weekSummary(plan, sch, w, all)!).filter(Boolean);
+  const byArea = loadByArea(days).sort((a, b) => b.minutes - a.minutes);
+  const folders = new Set(days.flatMap((d) => d.topics.map((t) => t.folder)));
+  const deliverables = deliverablesBetween(all, start, end);
+  const milestones: string[] = [];
+  for (const s of plan.subplans) {
+    if (!s.phase) continue;
+    const ranges = weekRangesOf(plan.start, plan.end);
+    const a = ranges[s.phase.fromWeek - 1];
+    const b = ranges[s.phase.toWeek - 1];
+    if (a && a.start >= start && a.start <= end && s.phase.fromWeek > 1) milestones.push(`Empieza ${s.area} (${dateLabel(a.start)})`);
+    if (b && b.end >= start && b.end <= end) milestones.push(`Termina ${s.area} (${dateLabel(b.end)})`);
+  }
+  for (const d of deliverables) if (d.kind === "monthly_project" || d.kind === "area_project") milestones.push(`Entrega: ${d.title} (${dateLabel(d.dueDate)})`);
+  const topAreas = byArea.slice(0, 2).map((a) => a.area);
+  const autoPurpose = byArea.length
+    ? `${monthName(month)} · ${topAreas.join(" y ")}: ${folders.size} ${folders.size === 1 ? "tema" : "temas"} en ${weeks.length} ${weeks.length === 1 ? "semana" : "semanas"}${milestones.length ? `; hito: ${milestones[0]}` : ""}.`
+    : `${monthName(month)} · práctica y repaso${milestones.length ? `; hito: ${milestones[0]}` : ""}.`;
+  const manual = plan.purposes?.month?.[month];
+  return {
+    month,
+    label: monthName(month),
+    start,
+    end,
+    weeks,
+    topics: folders.size,
+    topicMinutes: days.reduce((n, d) => n + d.topicMinutes, 0),
+    byArea,
+    deliverables,
+    milestones,
+    purpose: manual || autoPurpose,
+    autoPurpose,
+  };
+}
+
+/** Meses (AAAA-MM) que toca el plan, en orden. */
+export function planMonths(plan: Pick<SchedulePlan, "start" | "end">): string[] {
+  const out: string[] = [];
+  let y = Number(plan.start.slice(0, 4));
+  let m = Number(plan.start.slice(5, 7));
+  const endKey = plan.end.slice(0, 7);
+  for (let i = 0; i < 40; i++) {
+    const key = `${y}-${String(m).padStart(2, "0")}`;
+    out.push(key);
+    if (key >= endKey) break;
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  return out;
+}
+
+// ── Navegación por periodos (día · semana · mes) ────────────────────────
+
+export type AgendaView = "dia" | "semana" | "mes" | "calendario";
+export const AGENDA_VIEWS: ReadonlyArray<{ id: AgendaView; label: string }> = [
+  { id: "dia", label: "Día" },
+  { id: "semana", label: "Semana" },
+  { id: "mes", label: "Mes" },
+  { id: "calendario", label: "Calendario" },
+];
+
+/** Una fecha dentro del plan: las anteriores van al inicio y las posteriores al final. */
+export const clampToPlan = (date: string, plan: Pick<SchedulePlan, "start" | "end">): string => (date < plan.start ? plan.start : date > plan.end ? plan.end : date);
+
+/** Mueve la fecha ancla `delta` periodos (día, semana del plan, mes); siempre dentro del plan. */
+export function shiftAnchor(view: AgendaView, anchor: string, delta: number, plan: Pick<SchedulePlan, "start" | "end">): string {
+  if (view === "dia") return clampToPlan(addDays(anchor, delta), plan);
+  if (view === "semana") {
+    const w = Math.floor(daysBetween(plan.start, anchor) / 7) + delta;
+    return clampToPlan(addDays(plan.start, Math.max(0, w) * 7), plan);
+  }
+  const y = Number(anchor.slice(0, 4));
+  const m = Number(anchor.slice(5, 7)) - 1 + delta;
+  const d = new Date(Date.UTC(y, m, 1));
+  return clampToPlan(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01`, plan);
+}
+
+/** ¿Se puede mover `delta` periodos sin salirse del plan? */
+export function canShift(view: AgendaView, anchor: string, delta: number, plan: Pick<SchedulePlan, "start" | "end">): boolean {
+  const next = shiftAnchor(view, anchor, delta, plan);
+  if (view === "dia") return next !== anchor;
+  if (view === "semana") return Math.floor(daysBetween(plan.start, next) / 7) !== Math.floor(daysBetween(plan.start, anchor) / 7);
+  return next.slice(0, 7) !== anchor.slice(0, 7);
+}
+
+/** Texto del periodo mostrado: «martes 6 de octubre», «Semana 3 · 20–26 oct», «Octubre 2026». */
+export function periodTitle(view: AgendaView, anchor: string, plan: Pick<SchedulePlan, "start" | "end">): string {
+  if (view === "dia") return longDateLabel(anchor);
+  if (view === "semana") {
+    const w = Math.floor(daysBetween(plan.start, anchor) / 7) + 1;
+    const r = weekRangesOf(plan.start, plan.end)[w - 1];
+    return r ? `Semana ${w} · ${r.start.slice(0, 7) === r.end.slice(0, 7) ? `${Number(r.start.slice(8))}–${dateLabel(r.end)}` : `${dateLabel(r.start)} – ${dateLabel(r.end)}`}` : "Semana";
+  }
+  return monthName(anchor.slice(0, 7));
+}
+

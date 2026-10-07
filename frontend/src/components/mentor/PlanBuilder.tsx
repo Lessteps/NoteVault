@@ -349,14 +349,19 @@ function GrowingDraft({ build }: { build: MentorPlanBuild }) {
         {eff.branchExcluded?.length ? <li className="rounded-md border border-line px-2 py-0.5">Sin ramas: {eff.branchExcluded.map(cleanBranch).join(", ")}</li> : null}
       </ul>
 
-      {rows ? (
+      {rows && areas.length === rows.length ? (
+        // plan por áreas: cada fila del esqueleto ES un área (Backend, Frontend…): una sola fila de tarjetas, no una sección por área
+        <AreaRow title="Áreas del plan" colour={PALETTE[0]!} count={rows.length} noun={["área", "áreas"]}>
+          {rows.map((r, i) => <SkeletonCard key={r.key} row={r} sub={draft?.subplans[i]} colour={PALETTE[i % PALETTE.length]!} />)}
+        </AreaRow>
+      ) : rows ? (
         areas.map((area, ai) => (
           <AreaRow key={area} title={area} colour={PALETTE[ai % PALETTE.length]!} count={rows.filter((r) => r.area === area).length} noun={["subplan", "subplanes"]}>
             {rows.map((r, i) => (r.area === area ? <SkeletonCard key={r.key} row={r} sub={draft?.subplans[i]} colour={PALETTE[ai % PALETTE.length]!} /> : null))}
           </AreaRow>
         ))
       ) : (
-        <Pending stage="esqueleto">Los subplanes y su reparto de horas aparecerán al terminar el Alcance.</Pending>
+        <Pending stage="esqueleto">Las áreas del plan y su reparto de horas aparecerán al terminar el Alcance.</Pending>
       )}
 
       {idx < 2 && rows && <Pending stage="temas" />}
@@ -389,8 +394,8 @@ function SkeletonCard({ row, sub, colour }: { row: MentorSkeletonRow; sub?: NonN
   const lastWeek = sub?.weeks.filter((w) => w.topics.length).at(-1);
   return (
     <section className={CARD_CLASS} style={{ borderTop: `3px solid ${colour}` }} data-testid="build-subplan" aria-label={`Subplan ${row.objective || row.area}`}>
-      <div className="text-[13px] font-medium uppercase tracking-wide text-faint">{row.area}</div>
-      <div className="text-[14px] font-semibold leading-snug">{row.objective || row.area}</div>
+      <div className="text-[14px] font-semibold leading-snug">{row.area}</div>
+      {row.objective && row.objective !== row.area && <div className="text-[13px] text-dim">{row.objective}</div>}
       <div className="mt-2 flex items-center gap-2">
         <div className="flex-1"><ProgressBar pct={row.sharePct} colour={colour} /></div>
         <span className="text-[13px] font-medium">{row.sharePct} %</span>

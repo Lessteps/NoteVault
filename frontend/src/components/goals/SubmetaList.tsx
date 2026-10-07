@@ -6,6 +6,7 @@ import type { GoalItem } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useGoals } from "../../store/goals";
 import { filterRows, SubmetaFilters, SubmetaTable, type SubmetaRow } from "../common/SubmetaTable";
+import { PracticeChips } from "./PracticeLinks";
 import { catColour, useToggle } from "./Submetas";
 
 const STATUS_COLOURS: Record<string, string> = { Hecha: "var(--nv-mint)", "En curso": "var(--nv-info)" };
@@ -39,6 +40,7 @@ export function SubmetaList() {
     due: it.due,
     overdue: it.late,
     statusLocked: !it.is_leaf,
+    extra: <PracticeChips item={it} />,
     finished: it.is_leaf ? it.status === "Hecha" || it.done_today : it.progress >= 1,
     colour: it.category ? catColour(it.category) : detail.goal.colour,
     children: it.children.map((c) => byId.get(c)).filter((k): k is GoalItem => Boolean(k)).sort((a, b) => a.order - b.order).map(rowOf),

@@ -122,6 +122,10 @@ export interface ChangeDeltaLike {
   moved: number;
   /** entregables: + añadidos, − quitados */
   deliverables: number;
+  /** cambios de estructura por áreas: áreas añadidas/quitadas/reordenadas, fases cambiadas, temas o grupos movidos de área */
+  structure?: number;
+  /** textos editados (propósitos de día, semana o mes) */
+  texts?: number;
 }
 
 /** «+5 temas, −3 temas, 1 movido, +1 entregable»: el resumen de un cambio pedido al plan. */
@@ -131,6 +135,8 @@ export function deltaText(d: ChangeDeltaLike): string {
     d.removed ? `−${d.removed} ${d.removed === 1 ? "tema" : "temas"}` : "",
     d.moved ? `${d.moved} ${d.moved === 1 ? "movido" : "movidos"}` : "",
     d.deliverables ? `${d.deliverables > 0 ? "+" : "−"}${Math.abs(d.deliverables)} ${Math.abs(d.deliverables) === 1 ? "entregable" : "entregables"}` : "",
+    d.structure ? `${d.structure} ${d.structure === 1 ? "cambio de áreas" : "cambios de áreas"}` : "",
+    d.texts ? `${d.texts} ${d.texts === 1 ? "texto editado" : "textos editados"}` : "",
   ].filter(Boolean);
   return parts.join(", ") || "sin cambios en los temas";
 }

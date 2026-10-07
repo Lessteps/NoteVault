@@ -532,7 +532,7 @@ function BlockHead({ kind, subject, minutes, status, plan }: { kind: string; sub
     <div className="flex flex-wrap items-center gap-2">
       <span className={cn("text-[13.5px] font-semibold", subject !== "programming_practice" && "capitalize")}>{subject === "programming_practice" ? "Programming practice" : subject}</span>
       <Chip>{KIND_LABEL[kind] ?? kind}</Chip>
-      {plan && <Chip colour="var(--nv-mint)">Plan: {plan}</Chip>}
+      {plan && <Chip colour="var(--nv-mint)" className="!whitespace-normal text-left">Plan: {plan}</Chip>}
       <span className="text-[12px] text-faint">{minutes} min</span>
       {status && status !== "planned" && (
         <Chip colour={status === "done" ? "var(--nv-mint)" : status === "partial" ? "var(--nv-accent)" : "var(--nv-warn)"}>{STATUS_LABEL[status]}</Chip>

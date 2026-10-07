@@ -1,4 +1,5 @@
 import type { PlanPreconditions, ScopeTopic } from "./planTime";
+import type { AreaGroup, AreaPhase, PlanDeliverable, PlanPurposes } from "./planAreas";
 import type { BuildAnswer, BuildQuestion, BuildStage } from "./planBuild";
 import type { PracticeItem, PracticeTrack, PhaseStatus, PracticePhase } from "./practiceTrack";
 // Shapes returned by notevault_app/webapp/api.py. Keep in step with it.
@@ -435,6 +436,38 @@ export interface TopicLinkProgress {
   broken: string[];
 }
 
+/** Espejo de core/practice/practiceLinks.ts (pct 0..100). */
+export interface PracticeLinkItemProgress {
+  link: string;
+  kind: "kata" | "project";
+  label: string;
+  detail: string;
+  noData: boolean;
+  broken: boolean;
+  done: boolean;
+  pct: number;
+}
+export interface PracticeLinkProgress {
+  done: boolean;
+  pct: number;
+  links: PracticeLinkItemProgress[];
+  noData: boolean;
+}
+export interface PracticeCatalog {
+  ready: boolean;
+  projects: Array<{ folder: string; title: string; state: "spec" | "building" | "defended" | "done"; focus: string; date: string }>;
+}
+/** Nodo de `goals_tree`: submeta con sus hijas anidadas, enlaces y progreso derivado. */
+export interface GoalTreeNode {
+  id: string; goal: string; parent: string; name: string; status: string; priority: number;
+  start: string | null; due: string | null; progress: number; done: boolean; is_leaf: boolean; counts: [number, number];
+  topic_links: string[]; topic_progress: TopicLinkProgress | null;
+  practice_links: string[]; practice_progress: PracticeLinkProgress | null;
+  habit_links: string[];
+  children: GoalTreeNode[];
+}
+export interface GoalTree { goal: Goal; progress: number; counts: [number, number]; items: GoalTreeNode[] }
+
 export interface GoalItem {
   id: string;
   goal: string;
@@ -459,6 +492,10 @@ export interface GoalItem {
   topic_links: string[];
   /** Avance calculado de los `topic_links`; null si no hay enlaces. */
   topic_progress: TopicLinkProgress | null;
+  /** `kata:daily[#week=N|#streak=N]`, `project:weekly|monthly[#foco]`, `project:folder:<carpeta>`. Cumplimiento derivado. */
+  practice_links: string[];
+  /** Avance calculado de los `practice_links`; null si no hay enlaces. */
+  practice_progress: PracticeLinkProgress | null;
   done_at: string | null;
   created: string | null;
   notes: string;
@@ -1392,6 +1429,8 @@ export type MentorDeliverableStatus = "idea" | "en_curso" | "hecho";
 export type MentorTopicState = "sin_tratar" | "practicando" | "consolidado" | "completo" | "examen_pendiente" | "no_encontrado";
 export interface MentorPlannedTopic {
   folder: string; title: string; skills?: string[]; targetWeek: number; estMinutes: number; completedAt?: string; diagnostic?: boolean; pinned?: boolean;
+  /** grupo interno del área (Bases, Lenguaje: Python, Conocimientos…) */
+  group?: string;
 }
 export interface MentorWeekSlice { week: number; start: string; end: string; topics: string[]; minutes: number; capacityMinutes: number }
 export interface MentorRequiredGoal { goalId: string; itemId?: string; note: string }
@@ -1399,6 +1438,8 @@ export interface MentorDeliverable { title: string; description: string; criteri
 export interface MentorSubplan {
   id: string; area: string; objective: string; goalId?: string; goalItemIds?: string[];
   topics: MentorPlannedTopic[]; weeks: MentorWeekSlice[]; requiredGoals: MentorRequiredGoal[]; deliverable?: MentorDeliverable; notes?: string;
+  /** plan por áreas: id del área elemental, sus grupos internos, sus semanas activas y, si se completó con reglas, por qué */
+  areaId?: string; groups?: AreaGroup[]; phase?: AreaPhase; fallback?: { kind: "rules" | "mixed"; reason: string };
 }
 /** Decisión pendiente al armar el plan (hoy: entregables «a discutir»). */
 export interface MentorOpenQuestion { id: string; subplanId?: string; text: string; options: string[] }
@@ -1408,6 +1449,12 @@ export interface MentorPlan {
   /** pista Programming practice: kata diario + proyecto semanal full stack (+ mensual) */
   programmingPractice?: PracticeTrack;
   openQuestions?: MentorOpenQuestion[];
+  /** «areas» = estructura por áreas elementales; ausente = estructura antigua (se puede «Reorganizar por áreas») */
+  structure?: "areas";
+  /** entregables editados a mano (por id) y extras; los de práctica y de área se derivan del plan */
+  deliverables?: PlanDeliverable[];
+  /** propósitos de día / semana / mes escritos a mano */
+  purposes?: PlanPurposes;
 }
 export type MentorMonthlyPlan = MentorPlan;
 export interface MentorTopicView extends MentorPlannedTopic { state: MentorTopicState; pct: number; found: boolean }
@@ -1418,7 +1465,7 @@ export interface MentorPlanDerived {
 }
 export interface MentorPlanItem {
   kind: "topic" | "deliverable"; planId: string; subplanId: string; label: string; area: string; title: string;
-  folder?: string; skills?: string[]; estMinutes: number; targetWeek: number; overdue: boolean;
+  folder?: string; skills?: string[]; estMinutes: number; targetWeek: number; overdue: boolean; scheduledToday?: boolean; todayMinutes?: number;
 }
 export interface MentorPlanDraft {
   id?: string; start?: string; end?: string;
@@ -1430,11 +1477,14 @@ export interface MentorPlanDraft {
   openQuestions?: MentorOpenQuestion[];
   weights?: Record<string, number>;
   compact?: boolean;
+  structure?: "areas";
 }
 /** Estado derivado de la práctica de un plan (módulo `programming_practice` + registro manual de «Hoy»). */
 export interface MentorPracticeStatus {
   ppReady: boolean;
   kata: { plannedDays: number; doneDays: number; streak: number; todayPlanned: boolean; todayDone: boolean } | null;
+  /** fechas de días de kata ya hechos */
+  kataDoneDates?: string[];
   weeks: Array<{
     week: number;
     phases: Record<PracticePhase, PhaseStatus>;
@@ -1455,7 +1505,7 @@ export type MentorPlanGet =
 export type MentorPlanStatus = "activo" | "futuro" | "terminado" | "propuesto";
 export interface MentorPlanRow {
   id: string; start: string; end: string; month?: string; name: string; period: string; status: MentorPlanStatus; archived: boolean; auto: boolean;
-  subplans: number; topics: number; completed: number; pct: number; minutesPerDay: number | null; programmingPractice?: boolean;
+  subplans: number; topics: number; completed: number; pct: number; minutesPerDay: number | null; programmingPractice?: boolean; structure?: "areas";
 }
 /** Compatibilidad: antes solo había planes mensuales. */
 export type MentorPlanListRow = MentorPlanRow;
@@ -1488,7 +1538,7 @@ export interface MentorBuildSummary {
 export type MentorBuildResult = { loading: true } | { loading: false; build: MentorPlanBuild; summary: MentorBuildSummary };
 /** Estado de una llamada larga de la IA («pensando…»). */
 export interface MentorAiStatus { busy: boolean; label: string; elapsed: number }
-export interface MentorChangeDelta { added: number; removed: number; moved: number; deliverables: number }
+export interface MentorChangeDelta { added: number; removed: number; moved: number; deliverables: number; structure?: number; texts?: number }
 export interface MentorFixOption { id: string; label: string; op: Record<string, unknown> }
 export interface MentorChangeEntry {
   n: number; at: string; comment: string; status: "applied" | "pending" | "undone"; source: "ai" | "rules" | "none"; summary: string;

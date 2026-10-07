@@ -70,11 +70,11 @@ async function generate(over: Record<string, unknown> = {}, send?: any) {
 }
 
 describe("entregables a discutir en el borrador", () => {
-  it("por defecto «ask»: ningún entregable y una pregunta pendiente por subplan; booleanos antiguos se leen", async () => {
+  it("por defecto «ask»: ningún entregable y UNA sola pregunta global pendiente; booleanos antiguos se leen", async () => {
     const { draft } = await generate();
     expect(draft.preconditions.deliverables).toBe("ask");
     expect(draft.subplans.every((s: any) => !s.deliverable)).toBe(true);
-    expect(draft.openQuestions).toEqual([expect.objectContaining({ id: "deliverables", subplanId: draft.subplans[0].id, options: ["Sí", "No", "Después"] })]);
+    expect(draft.openQuestions).toEqual([{ id: "deliverables", text: expect.stringContaining("por cada área"), options: ["Sí", "No", "Después"] }]);
     expect((await generate({ deliverables: true })).draft.subplans[0].deliverable).toBeTruthy();
     expect((await generate({ deliverables: false })).draft.openQuestions).toBeUndefined();
   });
@@ -91,15 +91,14 @@ describe("entregables a discutir en el borrador", () => {
     expect(draft.openQuestions).toHaveLength(1);
   });
 
-  it("responder: yes añade la propuesta, no la descarta, later la deja; todo queda en el borrador", async () => {
-    const { api, res, draft } = await generate({ subjects: ["Programación"], goalIds: [] });
-    const sid = draft.subplans[0].id;
-    const base = { turnId: res.pending, chatId: res.chatId, subplanId: sid };
+  it("responder la pregunta global: yes añade el proyecto de cada área, no la descarta, later la deja; todo queda en el borrador", async () => {
+    const { api, res } = await generate({ subjects: ["Programación"], goalIds: [] });
+    const base = { turnId: res.pending, chatId: res.chatId };
     const later: any = api.mentor_plan_draft_answer({ ...base, answer: "later" });
     expect(later.planDraft.openQuestions).toHaveLength(1);
     expect(later.planDraft.subplans[0].deliverable).toBeUndefined();
     const yes: any = api.mentor_plan_draft_answer({ ...base, answer: "yes" });
-    expect(yes.planDraft.subplans[0].deliverable).toMatchObject({ status: "idea", title: expect.stringContaining("Proyecto de demostración") });
+    expect(yes.planDraft.subplans[0].deliverable).toMatchObject({ status: "idea", title: "API REST con persistencia y pruebas" });
     expect(yes.planDraft.openQuestions).toBeUndefined();
     // persistido en el turno: el panel lo vuelve a leer igual
     expect((api.mentor_chat_load() as any).turns.find((t: any) => t.id === res.pending).planDraft.subplans[0].deliverable).toBeTruthy();
@@ -110,7 +109,7 @@ describe("entregables a discutir en el borrador", () => {
     expect(fs.existsSync(path.join(dir, ".notevault", "mentor", "plans"))).toBe(false);
 
     const second = await generate({ end: addDays(todayIso(), 13) });
-    const no: any = second.api.mentor_plan_draft_answer({ turnId: second.res.pending, chatId: second.res.chatId, subplanId: second.draft.subplans[0].id, answer: "no" });
+    const no: any = second.api.mentor_plan_draft_answer({ turnId: second.res.pending, chatId: second.res.chatId, answer: "no" });
     expect(no.planDraft.openQuestions).toBeUndefined();
     expect(no.planDraft.subplans[0].deliverable).toBeUndefined();
   });
@@ -120,12 +119,13 @@ describe("entregables a discutir en el borrador", () => {
     const out: any = api.mentor_plan_draft_accept({ turnId: res.pending, chatId: res.chatId });
     const plan: any = (api.mentor_plan_get({ id: out.id }) as any).plan;
     expect(plan.subplans[0].deliverable).toBeUndefined();
-    expect(plan.openQuestions).toEqual([expect.objectContaining({ id: "deliverables", subplanId: plan.subplans[0].id })]);
+    expect(plan.openQuestions).toEqual([expect.objectContaining({ id: "deliverables" })]);
+    expect(plan.openQuestions[0].subplanId).toBeUndefined();
   });
 
   it("aceptar tras responder «yes» guarda el entregable y ninguna pregunta", async () => {
-    const { api, res, draft } = await generate();
-    api.mentor_plan_draft_answer({ turnId: res.pending, chatId: res.chatId, subplanId: draft.subplans[0].id, answer: "yes" });
+    const { api, res } = await generate();
+    api.mentor_plan_draft_answer({ turnId: res.pending, chatId: res.chatId, answer: "yes" });
     const out: any = api.mentor_plan_draft_accept({ turnId: res.pending, chatId: res.chatId });
     const plan: any = (api.mentor_plan_get({ id: out.id }) as any).plan;
     expect(plan.subplans[0].deliverable.status).toBe("idea");

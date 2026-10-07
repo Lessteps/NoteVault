@@ -185,7 +185,10 @@ describe("planItemsFor: del plan mensual al plan diario", () => {
     const wk = plan.subplans[0]!.topics.map((t) => t.targetWeek);
     expect(wk).toEqual([1, 1, 1, 2, 2, 2]);
     const w2 = planItemsFor("2026-10-09", [plan]);
-    expect(w2.map((i) => i.folder)).toEqual(["P/T1", "P/T2", "P/T3", "P/T4", "P/T5", "P/T6"]);
+    // dentro de una misma semana objetivo, lo que el reparto DIARIO coloca hoy (T3) va por delante
+    expect(w2.map((i) => i.folder)).toEqual(["P/T3", "P/T1", "P/T2", "P/T4", "P/T5", "P/T6"]);
+    expect(w2[0]).toMatchObject({ scheduledToday: true });
+    expect(w2[0]!.todayMinutes).toBeGreaterThan(0);
     expect(w2.slice(0, 3).every((i) => i.overdue)).toBe(true); // la semana 1 ya pasó
     expect(w2[3]!.overdue).toBe(false);
     expect(w2.every((i) => i.label === "Programación: Backend")).toBe(true);
@@ -280,7 +283,8 @@ describe("planes de periodo libre", () => {
     const b = buildPlan([{ area: "P", objective: "Backend", topics: [T(1), T(2)] }], { id: "2026-10-06_2026-11-05", start: pre.start, end: pre.end, minutesPerDay: 240, studyDays: pre.studyDays, pace: "normal", preconditions: pre, auto: true });
     expect(b.plan).toMatchObject({ id: "2026-10-06_2026-11-05", start: "2026-10-06", end: "2026-11-05", auto: true });
     expect(b.plan.month).toBeUndefined();
-    expect(b.plan.name).toBe("Backend · 6 oct–5 nov");
+    // el nombre sale de las ÁREAS (sin «+N» ni repetir el periodo)
+    expect(b.plan.name).toBe("P · 6 oct–5 nov");
     expect(b.plan.subplans[0]!.weeks).toHaveLength(5);
     expect(b.plan.hoursPerWeek).toBeGreaterThan(10);
     expect(b.plan.preconditions!.minutesPerDay).toBe(240);
@@ -365,7 +369,7 @@ describe("planes solapados, nombre, archivo y papelera", () => {
     expect(planStatus(a, "2026-10-08")).toBe("activo");
     expect(planStatus(a, "2026-10-12")).toBe("terminado");
     expect(planStatus({ ...a, archived: true }, "2026-10-08")).toBe("terminado");
-    expect(planName(a)).toBe("o2026-10-05 · 5 oct–11 oct");
+    expect(planName(a)).toBe("A · 5 oct–11 oct");
     expect(planName({ ...a, name: "Mi plan" })).toBe("Mi plan");
   });
 

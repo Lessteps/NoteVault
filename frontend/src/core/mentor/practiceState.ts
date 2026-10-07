@@ -159,6 +159,8 @@ export interface PracticeStatus {
   /** el módulo `programming_practice` existe en la vault (si no, todo es registro manual) */
   ppReady: boolean;
   kata: { plannedDays: number; doneDays: number; streak: number; todayPlanned: boolean; todayDone: boolean } | null;
+  /** fechas (AAAA-MM-DD) de días de kata ya hechos: de ahí sale el estado de «Kata del día» en los entregables */
+  kataDoneDates: string[];
   weeks: PracticeWeekStatus[];
 }
 
@@ -190,6 +192,7 @@ export function derivePracticeStatus(inp: PracticeStatusInput): PracticeStatus |
   const ranges = weekRangesOf(plan.start, plan.end);
 
   let kata: PracticeStatus["kata"] = null;
+  let kataDoneDates: string[] = [];
   if (track.kata) {
     const blocked = new Set(plan.preconditions?.blockedDates ?? []);
     const days = new Set(track.kata.days);
@@ -200,6 +203,7 @@ export function derivePracticeStatus(inp: PracticeStatusInput): PracticeStatus |
     const past = todayPlanned && !isDone(today) ? planned.slice(0, -1) : planned;
     for (let i = past.length - 1; i >= 0 && isDone(past[i]!); i--) streak++;
     kata = { plannedDays: planned.length, doneDays: planned.filter(isDone).length, streak, todayPlanned, todayDone: todayPlanned && isDone(today) };
+    kataDoneDates = planned.filter(isDone);
   }
 
   const weeks: PracticeWeekStatus[] = [];
@@ -232,7 +236,7 @@ export function derivePracticeStatus(inp: PracticeStatusInput): PracticeStatus |
       source: used.pp && used.manual ? "mixed" : used.pp ? "pp" : used.manual ? "manual" : "none",
     });
   }
-  return { ppReady: inp.ppReady, kata, weeks };
+  return { ppReady: inp.ppReady, kata, kataDoneDates, weeks };
 }
 
 /** Cierra el círculo con «Hoy»: ¿está hecha esa fase de esa semana? (todas las fases de la sesión) */

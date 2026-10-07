@@ -416,10 +416,10 @@ function addPlanItems(list: Candidate[], items: readonly PlanItem[], topics: Top
       subject: t.subject,
       topicFolder: folder,
       ...(wanted?.length ? { skills: wanted } : {}),
-      estMinutes: Math.min(60, Math.max(20, base?.estMinutes ?? it.estMinutes)),
-      score: clamp100(Math.max(base?.score ?? 50, 50) + PLAN_BOOST + (it.overdue ? 5 : 0)),
+      estMinutes: Math.min(60, Math.max(20, it.todayMinutes ?? base?.estMinutes ?? it.estMinutes)),
+      score: clamp100(Math.max(base?.score ?? 50, 50) + PLAN_BOOST + (it.overdue ? 5 : 0) + (it.scheduledToday ? 3 : 0)),
       reasons: [
-        `lo pide el plan del mes (${it.label}, semana ${it.targetWeek})${it.overdue ? " y va atrasado" : ""}`,
+        it.scheduledToday ? `toca hoy en la agenda del plan (${it.label}, semana ${it.targetWeek})` : `lo pide el plan (${it.label}, semana ${it.targetWeek})${it.overdue ? " y va atrasado" : ""}`,
         ...(base?.reasons ?? [`tema a medias (${t.completenessPct}%)`]),
       ],
       links: { ...(base?.links ?? {}), topicFolder: folder, ...links },

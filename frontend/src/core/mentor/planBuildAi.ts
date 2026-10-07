@@ -16,7 +16,7 @@ import { objectsIn } from "./planDraft.js";
 import { subplanKey, type SubplanSeed } from "./plan.js";
 import { TOPIC_BLOCK, type BuildAnswer } from "../../lib/planBuild.js";
 import type { PlanPreconditions } from "../../lib/planTime.js";
-import { PRACTICE_NAME } from "../../lib/practiceTrack.js";
+import { PRACTICE_NAME, PRACTICE_PURPOSE } from "../../lib/practiceTrack.js";
 import type { AiScopeQuestion, BuildAiState } from "./planBuild.js";
 
 const DAY_NAMES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
@@ -27,10 +27,10 @@ function factsText(pre: PlanPreconditions, areas: readonly string[], answers: re
   const lines = [
     "HECHOS FIJOS DEL PLAN (NO los cambies, NO los discutas y NO preguntes por ellos):",
     `- Periodo: del ${pre.start} al ${pre.end}. Tiempo diario: ${Math.round((pre.minutesPerDay / 60) * 10) / 10} h. Días: ${pre.studyDays.map((d) => DAY_NAMES[d - 1]).join(", ")}. Ritmo: ${PACE_TEXT[pre.pace]}.`,
-    areas.length ? `- Áreas / subplanes a cubrir: ${areas.join("; ")}.` : "",
+    areas.length ? `- Áreas del plan (cada subplan es un ÁREA elemental con grupos internos: Bases, Lenguaje y Conocimientos): ${areas.join("; ")}.` : "",
     Object.keys(pre.levels).length ? `- Nivel declarado: ${Object.entries(pre.levels).map(([a, l]) => `${a} = ${l}`).join("; ")}.` : "",
-    `- Entregables: ${pre.deliverables === "yes" ? "sí" : pre.deliverables === "no" ? "no" : "a discutir (la app pregunta por subplan más adelante)"}.`,
-    pre.practice ? `- ${PRACTICE_NAME}: incluida (minutos y fases los fija la app).` : "",
+    `- Entregables: ${pre.deliverables === "yes" ? "sí (uno por área)" : pre.deliverables === "no" ? "no" : "a discutir (la app hace UNA pregunta global más adelante)"}.`,
+    pre.practice ? `- ${PRACTICE_NAME}: incluida, es una ${PRACTICE_PURPOSE}; NO es un área del plan (minutos y fases los fija la app).` : "",
     pre.branchExcluded?.length ? `- Ramas EXCLUIDAS del alcance (NO propongas temas de ellas): ${pre.branchExcluded.join("; ")}.` : "",
   ].filter(Boolean);
   if (answers.length) {
@@ -180,10 +180,10 @@ export function parseTopicsReply(raw: string, candidates: ReadonlyMap<string, Re
 // ── Generación completa por partes (esqueleto + un bloque de temas por subplan) ──
 
 export const SKELETON_SYSTEM = [
-  "Eres el Mentor de estudio: ayudas a un estudiante a armar un PLAN. Esta es la etapa ESQUELETO: decides qué subplanes entran, su orden, su peso y su objetivo, SIN elegir temas.",
-  "Solo ves el informe del estudiante y la lista de subplanes candidatos que da la app; no tienes acceso a sus notas.",
-  "Cada candidato lleva una `key` EXACTA. Devuelve los que deben entrar, en el orden en que conviene estudiarlos (lo básico antes), con un `weight` entero de 1 (poco) a 5 (mucho) para repartir las horas y, solo en los de materia (sin meta), un `objective` corto (<=100 caracteres). Puedes omitir un subplan que no encaje con lo que pidió el estudiante (sus comentarios y objetivo).",
-  "NO propongas ramas ni subplanes que no estén en la lista. No incluyas fechas ni minutos: la app reparte con la capacidad real.",
+  "Eres el Mentor de estudio: ayudas a un estudiante a armar un PLAN POR ÁREAS. Esta es la etapa ESQUELETO: decides qué ÁREAS entran (Backend, Frontend, Databases…), su orden, su peso y su objetivo, SIN elegir temas.",
+  "Solo ves el informe del estudiante y la lista de áreas candidatas que da la app (cada una con sus grupos internos: Bases, Lenguaje, Conocimientos); no tienes acceso a sus notas.",
+  "Cada candidata lleva una `key` EXACTA. Devuelve las que deben entrar, en el orden en que conviene estudiarlas (lo básico antes; la app las secuencia por fases y como máximo 2 van en paralelo), con un `weight` entero de 1 (poco) a 5 (mucho) para repartir tiempo y, opcionalmente, un `objective` de UNA línea corta y completa (<=90 caracteres, sin puntos suspensivos). Puedes omitir un área que no encaje con lo que pidió el estudiante (sus comentarios y objetivo).",
+  "NO propongas áreas ni ramas que no estén en la lista. NO conviertas Programming practice en un área: es una práctica diaria aparte. No incluyas fechas ni minutos: la app reparte con la capacidad real.",
   "Responde EXCLUSIVAMENTE con JSON válido, sin texto antes ni después:",
   '{ "type": "skeleton", "rationale": string, "subplans": [ { "key": string, "weight"?: number, "objective"?: string } ] }',
 ].join("\n");
@@ -191,7 +191,9 @@ export const SKELETON_SYSTEM = [
 export function skeletonMessages(brief: StudentBrief, pre: PlanPreconditions, seeds: ReadonlyArray<Pick<SubplanSeed, "area" | "objective" | "goalId" | "topics">>, answers: readonly BuildAnswer[] = []): ChatMessage[] {
   const lines = seeds.map((s) => {
     const m = s.topics.reduce((n, t) => n + t.estMinutes, 0);
-    return `- key=${subplanKey(s)} | ${s.area} · ${s.objective}${s.goalId ? " (meta)" : ""} | ${s.topics.length} temas | ~${Math.round(m / 60)} h`;
+    const gs = (s as SubplanSeed).groups;
+    const groups = gs?.length ? ` | grupos: ${gs.map((g) => g.title).join(", ")}` : "";
+    return `- key=${subplanKey(s)} | ${s.area} · ${s.objective}${s.goalId ? " (meta)" : ""} | ${s.topics.length} temas | ~${Math.round(m / 60)} h${groups}`;
   });
   const user = [toPromptText(brief, BRIEF_CHARS), factsText(pre, seeds.map((s) => s.area), answers), `SUBPLANES CANDIDATOS:\n${lines.join("\n")}`, "Responde con el JSON del ESQUELETO."].join("\n\n");
   return [
@@ -222,7 +224,9 @@ export function parseSkeletonReply(raw: string, keys: ReadonlySet<string>): Skel
     }
     if (items.some((i) => i.key === key)) continue;
     const w = Math.round(Number(sp.weight));
-    const objective = oneLine(sp.objective, 100);
+    // un objetivo demasiado largo NO se trunca (quedaría cortado a media frase): se descarta y se usa el de la app
+    const raw = oneLine(sp.objective, 400);
+    const objective = raw.length <= 100 && !raw.endsWith("…") && !raw.endsWith("..") ? raw : "";
     items.push({ key, weight: Number.isFinite(w) ? Math.min(5, Math.max(1, w)) : 3, ...(objective ? { objective } : {}) });
   }
   if (!items.length) return { ok: false, reason: "La IA no eligió ningún subplan válido.", rationale: "", items: [], discarded };
@@ -232,7 +236,7 @@ export function parseSkeletonReply(raw: string, keys: ReadonlySet<string>): Skel
 export const TOPICS_COMPACT_SYSTEM = [
   "Eres el Mentor de estudio: ayudas a un estudiante a armar un PLAN. Esta es la etapa TEMAS de UN subplan.",
   "Solo ves el informe, el alcance y los temas candidatos de ese subplan; no tienes acceso a sus notas.",
-  "Elige y ORDENA, de lo básico a lo avanzado y respetando el nivel y los comentarios del estudiante, los temas que entran. Usa SOLO las carpetas (`folder`) listadas. Puedes omitir un tema que no haga falta. Da UNA razón corta del conjunto (<=140 caracteres), no una por tema.",
+  "Elige y ORDENA, de lo básico a lo avanzado y respetando el nivel y los comentarios del estudiante, los temas que entran. Usa SOLO las carpetas (`folder`) listadas. Los temas pertenecen a grupos del área (Bases → Lenguaje → Conocimientos): la app mantiene ese orden de grupos y tú ordenas DENTRO de cada grupo. Puedes omitir un tema que no haga falta. Da UNA razón corta del conjunto (<=140 caracteres), no una por tema.",
   "No incluyas fechas ni minutos: la app reparte los temas por semanas.",
   "Responde EXCLUSIVAMENTE con JSON válido, sin texto antes ni después (los temas son solo las carpetas):",
   '{ "type": "topic_order", "subplans": [ { "key": string, "reason": string, "topics": [ string ] } ] }',
@@ -240,7 +244,8 @@ export const TOPICS_COMPACT_SYSTEM = [
 
 /** Un bloque de temas de un subplan (≤ TOPIC_BLOCK), en formato compacto: una línea por tema y la respuesta solo con carpetas. */
 export function topicsBlockMessages(brief: StudentBrief, pre: PlanPreconditions, seed: SubplanSeed, block: { index: number; count: number }, answers: readonly BuildAnswer[] = []): ChatMessage[] {
-  const lines = seed.topics.map((t) => `  - folder=${t.folder} | ~${t.estMinutes}m`).join("\n");
+  const gt = new Map((seed.groups ?? []).map((g) => [g.id, g.title]));
+  const lines = seed.topics.map((t) => `  - folder=${t.folder} | ~${t.estMinutes}m${t.group && gt.has(t.group) ? ` | grupo=${gt.get(t.group)}` : ""}`).join("\n");
   const part = block.count > 1 ? ` (bloque ${block.index + 1} de ${block.count} de ese subplan)` : "";
   const user = [toPromptText(brief, 2500), factsText(pre, [seed.area], answers), `SUBPLAN key=${subplanKey(seed)} | ${seed.area} · ${seed.objective}${part}\n${lines}`, "Responde con el JSON de la etapa TEMAS."].join("\n\n");
   return [

@@ -13,6 +13,7 @@
 
 import {
   capacityOf,
+  classifyBranch,
   eachDay,
   isDate,
   isoDow,
@@ -29,6 +30,10 @@ export type { PracticeFocus };
 
 /** El nombre de la rama en la interfaz (coincide con la carpeta `programming_practice` de la vault). */
 export const PRACTICE_NAME = "Programming practice";
+/** Qué es, en una frase (se usa igual en tarjetas, ayudas, formulario, prompts de la IA y documentación). */
+export const PRACTICE_PURPOSE = "práctica diaria enfocada en prepararte para entrevistas técnicas y en mejorar tu lógica y tu resolución de procesos";
+/** Descripción completa: el reto diario de lógica (kata) es el centro y los proyectos de práctica son el complemento. */
+export const PRACTICE_BLURB = `${PRACTICE_NAME} es un sistema de ${PRACTICE_PURPOSE}: un reto de lógica (kata) cada día, al estilo de las entrevistas técnicas, y proyectos de práctica como complemento.`;
 
 export const PRACTICE_PHASES = ["build", "construct", "defend", "postmortem"] as const;
 export type PracticePhase = (typeof PRACTICE_PHASES)[number];
@@ -100,11 +105,22 @@ function spread<T>(items: readonly T[], n: number): T[] {
   return Array.from({ length: n }, (_, i) => items[Math.round((i * (items.length - 1)) / (n - 1))]!);
 }
 
-/** Focos para `count` semanas: fijo, o rotando por las áreas del stack desde `start` (por defecto, backend). */
-export function rotateFocuses(count: number, mode: "rotate" | PracticeFocus, start?: PracticeFocus): PracticeFocus[] {
+/**
+ * Focos que entran en la rotación del proyecto semanal: todos salvo los de las ramas que el plan EXCLUYÓ (si el estudiante dejó fuera
+ * Desktop y Mobile, la práctica tampoco rota por ellos). Sin exclusiones, todos.
+ */
+export function focusPool(pre: Pick<PlanPreconditions, "branchExcluded">): PracticeFocus[] {
+  const out = new Set((pre.branchExcluded ?? []).map((b) => classifyBranch(b) as string));
+  const pool = PRACTICE_FOCUSES.filter((f) => !out.has(f));
+  return pool.length ? pool : [...PRACTICE_FOCUSES];
+}
+
+/** Focos para `count` semanas: fijo, o rotando por las áreas del stack (`pool`) desde `start` (por defecto, backend). */
+export function rotateFocuses(count: number, mode: "rotate" | PracticeFocus, start?: PracticeFocus, pool: readonly PracticeFocus[] = PRACTICE_FOCUSES): PracticeFocus[] {
   if (mode !== "rotate") return Array.from({ length: count }, () => mode);
-  const at = Math.max(0, PRACTICE_FOCUSES.indexOf(start ?? "backend"));
-  return Array.from({ length: count }, (_, i) => PRACTICE_FOCUSES[(at + i) % PRACTICE_FOCUSES.length]!);
+  const list = pool.length ? pool : PRACTICE_FOCUSES;
+  const at = Math.max(0, list.indexOf(start ?? "backend"));
+  return Array.from({ length: count }, (_, i) => list[(at + i) % list.length]!);
 }
 
 const oneLine = (v: unknown, max: number): string => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
@@ -137,7 +153,8 @@ export function buildPracticeTrack(pre: PlanPreconditions, opts: BuildTrackOpts 
   if (prefs.sessionsPerWeek > 0) {
     const ranges = weekRangesOf(pre.start, pre.end);
     const active = ranges.filter((r) => r.end >= from);
-    const focuses = rotateFocuses(active.length, prefs.focus, opts.startFocus);
+    const pool = focusPool(pre);
+    const focuses = rotateFocuses(active.length, prefs.focus, opts.startFocus, pool);
     const sugg = new Map((opts.suggestions?.weeks ?? []).map((w) => [Math.round(Number(w.week)), w]));
     const weeks: PracticeWeek[] = ranges.map((r) => {
       const days = r.end < from ? [] : eachDay(r.start > from ? r.start : from, r.end).filter((d) => study.has(isoDow(d)) && !blocked.has(d));
@@ -145,13 +162,13 @@ export function buildPracticeTrack(pre: PlanPreconditions, opts: BuildTrackOpts 
       const phases = phasesForSessions(picked.length);
       const idx = active.indexOf(r);
       const s = sugg.get(r.week);
-      const sFocus = prefs.focus === "rotate" && s && (PRACTICE_FOCUSES as readonly string[]).includes(String(s.focus)) ? (s.focus as PracticeFocus) : null;
+      const sFocus = prefs.focus === "rotate" && s && (pool as readonly string[]).includes(String(s.focus)) ? (s.focus as PracticeFocus) : null;
       const theme = oneLine(s?.theme, 80);
       return {
         week: r.week,
         start: r.start,
         end: r.end,
-        focus: sFocus ?? (idx >= 0 ? focuses[idx]! : prefs.focus === "rotate" ? (opts.startFocus ?? "backend") : prefs.focus),
+        focus: sFocus ?? (idx >= 0 ? focuses[idx]! : prefs.focus === "rotate" ? (pool.includes(opts.startFocus ?? "backend") ? (opts.startFocus ?? "backend") : pool[0]!) : prefs.focus),
         ...(theme ? { theme } : {}),
         sessions: picked.map((date, i) => ({ date, minutes: prefs.minutesPerSession, phases: phases[i]! })),
       };

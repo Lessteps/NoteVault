@@ -13,6 +13,7 @@ import {
   GoalManager,
   ITEM_DONE,
 } from "../../core/goalManager.js";
+import { normalizePracticeLinks, practiceLinkProgress } from "../../core/practice/practiceLinks.js";
 import { normalizeTopicLinks, topicLinkProgress } from "../../core/practice/topicLinks.js";
 import { Recurrence } from "../../core/recurrence.js";
 import {
@@ -20,6 +21,7 @@ import {
   GOAL_STATUSES,
 } from "../../core/vaultFormat.js";
 import type { AppState } from "../appState.js";
+import { readPracticeData, practiceLookupFor } from "../practiceLookup.js";
 import { topicLookupFor } from "../topicLookup.js";
 import { clampInt, isoDate, oneLine, optDate, optTime } from "../common.js";
 
@@ -232,6 +234,14 @@ function itemFields(
     // No se exige que el tema exista: un enlace roto se muestra y se puede reparar.
     out.topic_links = normalizeTopicLinks(linksList.map((l) => oneLine(l, 400))).slice(0, 20);
   }
+  if ("practice_links" in f) {
+    const linksList = f.practice_links || [];
+    if (!Array.isArray(linksList)) {
+      throw new ApiError("Enlaces de práctica inválidos.");
+    }
+    // Solo cadenas con formato válido (kata:daily, project:weekly...); que el módulo exista no se exige.
+    out.practice_links = normalizePracticeLinks(linksList.map((l) => oneLine(l, 400))).slice(0, 20);
+  }
   if ("notes" in f) {
     out.notes = String(f.notes || "").slice(0, 200000);
   }
@@ -260,6 +270,7 @@ export function goalsApi(app: AppState) {
   const gm = (): GoalManager => {
     const m = app.mgrs().goals;
     if (!m.topicLookup) m.topicLookup = topicLookupFor(app);
+    if (!m.practiceLookup) m.practiceLookup = practiceLookupFor(app);
     return m;
   };
 
@@ -309,6 +320,8 @@ export function goalsApi(app: AppState) {
       habit_links: [...i.habit_links],
       topic_links: [...i.topic_links],
       topic_progress: m.topicProgress(i),
+      practice_links: [...i.practice_links],
+      practice_progress: m.practiceProgress(i, today),
       done_at: isoDate(i.done_at),
       created: isoDate(i.created),
       notes: i.notes,
@@ -585,6 +598,102 @@ export function goalsApi(app: AppState) {
         throw new ApiError("Temas de estudio inválidos.");
       }
       return topicLinkProgress(normalizeTopicLinks(links), topicLookupFor(app));
+    },
+
+    /** Avance de una selección de enlaces de práctica (aún sin guardar), para los chips del editor. */
+    goals_practice_links_progress(links: unknown) {
+      if (!Array.isArray(links)) {
+        throw new ApiError("Enlaces de práctica inválidos.");
+      }
+      return practiceLinkProgress(normalizePracticeLinks(links), practiceLookupFor(app));
+    },
+
+    /** Qué se puede enlazar del sistema de práctica: si existe el módulo y sus proyectos (para el selector). */
+    goals_practice_catalog() {
+      const d = readPracticeData(app.root);
+      return {
+        ready: d.ready,
+        projects: d.projects.map((p) => ({ folder: p.folder, title: p.title, state: p.state, focus: p.focus ?? "", date: p.date })),
+      };
+    },
+
+    /**
+     * Jerarquía completa meta -> submetas anidadas (N niveles) con enlaces a temas, práctica y hábitos y su
+     * progreso derivado. Sin argumento: todas las metas no archivadas; con `{goalId}` (o un id): solo esa.
+     * Lo consume el Plan del Mentor para enlazar áreas con metas y submetas.
+     */
+    goals_tree(opts?: unknown) {
+      const m = gm();
+      const gid = typeof opts === "string" ? opts : String((opts as { goalId?: unknown } | null)?.goalId ?? "");
+      const today = new Date();
+      const goals = gid ? [needGoal(gid)] : m.goals(FILTER_ALL);
+      const node = (g: Goal, i: GoalItem): Record<string, unknown> => {
+        const d = itemDict(g, i, today);
+        return {
+          id: i.id,
+          goal: g.id,
+          parent: i.parent,
+          name: i.name,
+          status: i.status,
+          priority: i.priority,
+          start: d.start,
+          due: d.due,
+          progress: d.progress,
+          done: i.is_leaf ? d.done_today : m.branchDone(i, today),
+          is_leaf: i.is_leaf,
+          counts: d.counts,
+          topic_links: d.topic_links,
+          topic_progress: d.topic_progress,
+          practice_links: d.practice_links,
+          practice_progress: d.practice_progress,
+          habit_links: d.habit_links,
+          children: i.children.map((c) => node(g, c)),
+        };
+      };
+      return goals.map((g) => ({
+        goal: goalDict(g, today),
+        progress: m.progress(g, today),
+        counts: m.counts(g, today),
+        items: m.tree(g.id).map((r) => node(g, r)),
+      }));
+    },
+
+    /** «Promover a meta»: la submeta pasa a ser una meta principal (ver GoalManager.promote_item). */
+    goals_item_promote(gid: string, iid: string) {
+      const g = needGoal(gid);
+      needItem(g.id, iid);
+      const fresh = gm().promoteItem(g.id, String(iid));
+      if (!fresh) throw new ApiError("No se pudo promover la submeta.");
+      return goalDict(needGoal(fresh.id), new Date());
+    },
+
+    /** «Convertir en submeta de…»: la meta pasa a ser submeta de `targetGid` (bajo `parent` o en la raíz). */
+    goals_goal_demote(gid: string, targetGid: string, parent = "") {
+      const g = needGoal(gid);
+      const t = needGoal(targetGid);
+      if (g.id === t.id) throw new ApiError("Una meta no puede ser submeta de sí misma.");
+      if (parent) needItem(t.id, parent);
+      const item = gm().demoteGoal(g.id, t.id, parent || "");
+      if (!item) throw new ApiError("No se pudo convertir la meta en submeta.");
+      return itemDict(t, needItem(t.id, item.id), new Date());
+    },
+
+    /** Mueve una submeta (con sus hijas) a otra meta. */
+    goals_item_move_to(gid: string, iid: string, targetGid: string, parent = "") {
+      const g = needGoal(gid);
+      const t = needGoal(targetGid);
+      needItem(g.id, iid);
+      if (parent) needItem(t.id, parent);
+      if (g.id === t.id && parent) {
+        const items = gm().items(g.id);
+        const byId = new Map(items.map((x) => [x.id, x]));
+        for (let c = byId.get(parent); c; c = c.parent ? byId.get(c.parent) : undefined) {
+          if (c.id === String(iid)) throw new ApiError("No se puede mover una submeta dentro de sí misma.");
+        }
+      }
+      const moved = gm().moveItemToGoal(g.id, String(iid), t.id, parent || "");
+      if (!moved) throw new ApiError("No se pudo mover la submeta.");
+      return itemDict(t, needItem(t.id, moved.id), new Date());
     },
 
     goals_item_delete(gid: string, iid: string) {

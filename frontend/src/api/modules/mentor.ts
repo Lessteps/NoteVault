@@ -66,12 +66,15 @@ import {
   type ChangeOp,
 } from "../../core/mentor/planChange.js";
 import { generateByParts, PipelineCancel } from "../../core/mentor/planPipeline.js";
+import { canReorganize, reorganizeByAreas } from "../../core/mentor/planReorganize.js";
+import { PLAN_DELIVERABLE_STATUSES, sanitizeGroups, type PlanDeliverableStatus } from "../../lib/planAreas.js";
+import { deliverablesOf } from "../../lib/planSchedule.js";
 import { parseScopeReply, parseTopicsReply, scopeMessages, topicsMessages } from "../../core/mentor/planBuildAi.js";
 import {
   areaOfFolder,
   adjustedMinutes,
   autoSeeds,
-  defaultDeliverable,
+  defaultDeliverableFor,
   buildPlanMessages,
   composeFromPreconditions,
   dynamicCatalogMax,
@@ -279,6 +282,29 @@ function todaysPracticeItems(app: AppState, day: string = localDate()): Practice
   );
 }
 
+/**
+ * Responde la pregunta de entregables sobre una lista de subplanes. Sin `subplanId` es la pregunta GLOBAL del plan por áreas:
+ * «yes» añade el proyecto propio de cada área que aún no lo tiene (y retira también las preguntas por subplan antiguas) y «no» descarta
+ * la pregunta. Con `subplanId` es la de ese subplan (planes antiguos). Los entregables repetidos se evitan: cada área propone el suyo.
+ */
+function answerDeliverables<T extends { id: string; area: string; objective: string; areaId?: string; goalId?: string; deliverable?: { title: string; description: string; criteria: string[]; status: DeliverableStatus; projectId?: string } }>(
+  subplans: readonly T[],
+  open: ReadonlyArray<{ id: string; subplanId?: string; text: string; options: string[] }> | undefined,
+  subplanId: string,
+  answer: "yes" | "no",
+): { subplans: T[]; openQuestions: Array<{ id: string; subplanId?: string; text: string; options: string[] }> } {
+  const targets = subplanId ? subplans.filter((s) => s.id === subplanId) : subplans;
+  const next = subplans.map((s) => {
+    if (answer !== "yes" || !targets.includes(s) || s.deliverable) return s;
+    const d = defaultDeliverableFor(s);
+    return { ...s, deliverable: { title: d.title, description: d.description ?? "", criteria: d.criteria ?? [], status: "idea" as const } };
+  });
+  let rest = (open ?? []).filter((q) => (subplanId ? !(q.id === "deliverables" && q.subplanId === subplanId) : q.id !== "deliverables"));
+  // si ya no queda ningún área sin proyecto, la pregunta global está respondida
+  if (next.every((s) => !!s.deliverable)) rest = rest.filter((q) => q.id !== "deliverables");
+  return { subplans: next, openQuestions: [...rest] };
+}
+
 /** Planes que contienen el día `day` (varios pueden estar activos a la vez). */
 const activePlans = (plans: readonly Plan[], day: string): Plan[] => plans.filter((p) => planStatus(p, day) === "activo");
 
@@ -302,6 +328,7 @@ const planRow = (p: Plan, today: string, lookup?: TopicLiteLookup) => {
     pct: view ? view.summary.pct : topics ? Math.round((completed / topics) * 100) : 0,
     minutesPerDay: p.preconditions?.minutesPerDay ?? null,
     programmingPractice: !!p.programmingPractice,
+    ...(p.structure ? { structure: p.structure } : {}),
   };
 };
 
@@ -1110,7 +1137,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
           const brief = unavailable ? (null as never) : buildStudentBrief(briefContext(app, log()));
           let res;
           try {
-            res = await generateByParts(pre, autoSeeds(pre, scope), {
+            res = await generateByParts(pre, autoSeeds(pre, scope, goals), {
               aiOn: !unavailable,
               brief,
               send: (m, so) => job.send(m, so),
@@ -1141,7 +1168,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
             const raw = await job.send(buildPlanMessages(pre, brief, catalog, [], { today, areas: areaNames, plan: planCtx, scope }));
             const parsed = parsePreconditionReply(raw, catalog, planCtx);
             if (parsed.ok) {
-              const { seeds, why } = seedsFromReply(parsed.reply, catalog, pre, new Map(goals.map((g) => [g.id, g.name])));
+              const { seeds, why } = seedsFromReply(parsed.reply, catalog, pre, new Map(goals.map((g) => [g.id, g.name])), goals);
               if (seeds.length) {
                 draft = composeFromPreconditions(seeds, pre, { today, auto: false, rationale: parsed.reply.rationale, discarded: parsed.reply.discarded, why, startFocus: practiceStartFocus(app), practiceSuggestions: parsed.reply.practice });
               } else fallbackReason = "La IA no propuso ningún tema válido.";
@@ -1153,7 +1180,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
         }
         if (!draft) {
           const why = unavailable ? (o.noAi === true ? "Lo pediste sin IA" : "La IA no está configurada") : `La IA no devolvió un plan válido (${fallbackReason ?? "sin detalle"})`;
-          draft = composeFromPreconditions(autoSeeds(pre, scope), pre, {
+          draft = composeFromPreconditions(autoSeeds(pre, scope, goals), pre, {
             today,
             auto: true,
             startFocus: practiceStartFocus(app),
@@ -1290,6 +1317,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
       for (const s of d.subplans.slice(0, 12) as any[]) {
         const seen = new Set<string>();
         const topics: SubplanSeed["topics"] = [];
+        // plan por áreas: el área y sus grupos internos viajan con el borrador (se revalidan: solo ids de área seguros y grupos conocidos)
+        const areaId = /^[a-z][a-z0-9-]{0,39}$/.test(String(s?.areaId ?? "")) ? String(s.areaId) : undefined;
+        const groups = areaId ? sanitizeGroups(s?.groups) : [];
         for (const t of (Array.isArray(s?.topics) ? s.topics : []).slice(0, 400) as any[]) {
           const folder = String(t?.folder ?? "").replace(/\\/g, "/");
           const snap = snaps.get(folder);
@@ -1299,7 +1329,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
           const valid = new Set(Object.keys(snap.progress.skills));
           const skills = Array.isArray(t.skills) ? t.skills.map((x: unknown) => String(x).toLowerCase()).filter((x: string) => valid.has(x)) : [];
           const base = estimateTopicMinutes(snap);
-          topics.push({ folder, title: snap.title, ...(skills.length ? { skills } : {}), estMinutes: pre ? adjustedMinutes(base, areaOfFolder(folder), pre.levels) : base });
+          const group = groups.some((g) => g.id === String(t?.group)) ? String(t.group) : undefined;
+          topics.push({ folder, title: snap.title, ...(skills.length ? { skills } : {}), estMinutes: pre ? adjustedMinutes(base, areaOfFolder(folder), pre.levels) : base, ...(group ? { group } : {}) });
         }
         const goalId = goalById.has(String(s?.goalId)) ? String(s.goalId) : undefined;
         const requiredGoals = (Array.isArray(s?.requiredGoals) ? s.requiredGoals : [])
@@ -1313,7 +1344,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
         const weight = Number(d.weights && typeof d.weights === "object" ? d.weights[String(s?.id)] : 0);
         // las notas que ya trae el subplan (razón del Mentor, aviso de «completado con reglas»); la nota de diagnóstico se vuelve a derivar
         const keepNote = String(s?.notes ?? "").replace(/Nivel «no sé» en [^:]+: empieza con un diagnóstico corto de «[^»]*» para calibrar el resto\.\s*/g, "").trim();
-        seeds.push({ ...(/^[A-Za-z0-9_-]{1,40}$/.test(String(s?.id ?? "")) ? { id: String(s.id) } : {}), area: String(s?.area ?? ""), objective: String(s?.objective ?? ""), ...(goalId ? { goalId } : {}), topics, requiredGoals, ...(deliverable ? { deliverable } : {}), ...(weight > 0 ? { weight } : {}), ...(keepNote ? { notes: keepNote.slice(0, 400) } : {}) });
+        const fb = s?.fallback && (s.fallback.kind === "rules" || s.fallback.kind === "mixed") ? { kind: s.fallback.kind as "rules" | "mixed", reason: String(s.fallback.reason ?? "").replace(/s+/g, " ").trim().slice(0, 240) } : undefined;
+        seeds.push({ ...(/^[A-Za-z0-9_-]{1,40}$/.test(String(s?.id ?? "")) ? { id: String(s.id) } : {}), area: String(s?.area ?? ""), objective: String(s?.objective ?? ""), ...(goalId ? { goalId } : {}), topics, requiredGoals, ...(deliverable ? { deliverable } : {}), ...(weight > 0 ? { weight } : {}), ...(keepNote ? { notes: keepNote.slice(0, 400) } : {}), ...(areaId ? { areaId } : {}), ...(groups.length ? { groups } : {}), ...(fb ? { fallback: fb } : {}) });
       }
       if (!seeds.length) throw new ApiError("Ninguno de los temas del borrador existe ya en tu sistema.");
       if (pre) seeds = markDiagnostics(seeds, pre);
@@ -1376,22 +1408,18 @@ export function mentorApi(app: AppState, send?: SendFn) {
       if (questionId !== "deliverables") throw new ApiError("Pregunta desconocida.");
       const answer = String(o.answer ?? "");
       if (!["yes", "no", "later"].includes(answer)) throw new ApiError("Respuesta inválida (yes, no o later).");
+      // sin `subplanId` es la pregunta GLOBAL («¿un entregable por cada área?»); con él, la de un subplan (planes antiguos) o una excepción por área
       const subplanId = String(o.subplanId ?? "");
-      const sub = draft.subplans.find((s) => s.id === subplanId);
-      if (!sub) throw new ApiError("Ese subplan ya no existe en el borrador.");
+      if (subplanId && !draft.subplans.some((s) => s.id === subplanId)) throw new ApiError("Ese subplan ya no existe en el borrador.");
       let next = draft;
       if (answer !== "later") {
-        const proposal = defaultDeliverable(sub.objective || sub.area);
-        const subplans = draft.subplans.map((s) =>
-          s.id === subplanId && answer === "yes" && !s.deliverable ? { ...s, deliverable: { title: proposal.title, description: proposal.description ?? "", criteria: proposal.criteria ?? [], status: "idea" as const } } : s,
-        );
-        next = { ...draft, subplans, openQuestions: (draft.openQuestions ?? []).filter((q) => !(q.id === questionId && q.subplanId === subplanId)) };
+        const r = answerDeliverables(draft.subplans, draft.openQuestions, subplanId, answer as "yes" | "no");
+        next = { ...draft, subplans: r.subplans, openQuestions: r.openQuestions };
         if (!next.openQuestions!.length) delete next.openQuestions;
       }
       const turns = chat.patch(turn.id, { planDraft: next });
       return { turns, pending: pendingDraft(turns ?? [])?.id ?? null, planDraft: next };
     },
-
     /** "Descartar" el borrador del plan: no escribe ningún plan; solo marca el borrador. */
     mentor_plan_draft_discard: discardPlanDraft,
     mentor_plan_discard: discardPlanDraft,
@@ -1402,11 +1430,28 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const id = String(o.id ?? o.month ?? "");
       if (o.month && !o.id && !MONTH_RE.test(id)) throw new ApiError("Mes inválido (AAAA-MM).");
       if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
-      if (!(DELIVERABLE_STATUSES as readonly string[]).includes(String(o.status))) throw new ApiError("Estado de entregable inválido.");
+      // dos vocabularios: el del entregable de un área (idea · en_curso · hecho) y el de la agenda (pendiente · en_curso · hecho)
+      const raw = String(o.status);
+      if (!(DELIVERABLE_STATUSES as readonly string[]).includes(raw) && !(PLAN_DELIVERABLE_STATUSES as readonly string[]).includes(raw)) throw new ApiError("Estado de entregable inválido.");
+      const agendaStatus: PlanDeliverableStatus = raw === "idea" ? "pendiente" : (raw as PlanDeliverableStatus);
+      const areaStatus: DeliverableStatus = raw === "pendiente" ? "idea" : (raw as DeliverableStatus);
       const st = new PlanStore(app.root);
       const plan = st.load(id);
-      const sub = plan?.subplans.find((s) => s.id === String(o.subplanId ?? ""));
-      if (!plan || !sub) throw new ApiError("Ese subplan ya no existe.");
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      const deliverableId = String(o.deliverableId ?? "");
+      // un entregable de la agenda (kata del día, proyecto semanal o mensual, extra) o el de un área por su id `area:<subplan>`
+      const subId = deliverableId.startsWith("area:") ? deliverableId.slice(5) : String(o.subplanId ?? "");
+      if (deliverableId && !deliverableId.startsWith("area:")) {
+        const derived = deliverablesOf(plan, practiceStatusOf(app, plan, localDate(), log()));
+        const d = derived.find((x) => x.id === deliverableId);
+        if (!d) throw new ApiError("Ese entregable ya no existe en el plan.");
+        const files = Array.isArray(o.files) ? (o.files as any[]).slice(0, 12).map((f) => ({ ...(f?.path ? { path: String(f.path).slice(0, 300) } : {}), note: String(f?.note ?? "").slice(0, 200) })) : d.files;
+        const entry = { ...d, status: agendaStatus, ...(files?.length ? { files } : {}) };
+        const list = [...(plan.deliverables ?? []).filter((x) => x.id !== deliverableId), entry];
+        return st.save({ ...plan, deliverables: list, updatedAt: new Date().toISOString() });
+      }
+      const sub = plan.subplans.find((s) => s.id === subId);
+      if (!sub) throw new ApiError("Ese subplan ya no existe.");
       if (!sub.deliverable) throw new ApiError("Ese subplan no tiene entregable.");
       let projectId = sub.deliverable.projectId;
       if (o.projectId !== undefined) {
@@ -1414,7 +1459,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
         if (wanted && !app.mgrs().projects.get(wanted)) throw new ApiError("Ese proyecto no existe.");
         projectId = wanted || undefined;
       }
-      sub.deliverable = { ...sub.deliverable, status: o.status as DeliverableStatus, ...(projectId ? { projectId } : {}) };
+      sub.deliverable = { ...sub.deliverable, status: areaStatus, ...(projectId ? { projectId } : {}) };
       if (!projectId) delete sub.deliverable.projectId;
       plan.updatedAt = new Date().toISOString();
       return st.save(plan);
@@ -1436,18 +1481,100 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const st = new PlanStore(app.root);
       const plan = st.load(id);
       if (!plan) throw new ApiError("Ese plan ya no existe.");
+      // sin `subplanId` es la pregunta GLOBAL de entregables del plan por áreas; con él, la de un subplan (planes antiguos)
       const subplanId = String(o.subplanId ?? "");
-      const sub = plan.subplans.find((s) => s.id === subplanId);
-      if (!sub) throw new ApiError("Ese subplan ya no existe en el plan.");
-      if (!(plan.openQuestions ?? []).some((q) => q.id === questionId && q.subplanId === subplanId)) throw new ApiError("Esa pregunta ya no está pendiente.");
+      if (subplanId && !plan.subplans.some((s) => s.id === subplanId)) throw new ApiError("Ese subplan ya no existe en el plan.");
+      if (!(plan.openQuestions ?? []).some((q) => q.id === questionId && (q.subplanId ?? "") === subplanId)) throw new ApiError("Esa pregunta ya no está pendiente.");
       if (answer === "later") return plan;
-      const proposal = defaultDeliverable(sub.objective || sub.area);
-      const subplans = plan.subplans.map((s) =>
-        s.id === subplanId && answer === "yes" && !s.deliverable ? { ...s, deliverable: { title: proposal.title, description: proposal.description ?? "", criteria: proposal.criteria ?? [], status: "idea" as const } } : s,
-      );
-      const rest = (plan.openQuestions ?? []).filter((q) => !(q.id === questionId && q.subplanId === subplanId));
+      const r = answerDeliverables(plan.subplans, plan.openQuestions, subplanId, answer as "yes" | "no");
       const { openQuestions: _q, ...base } = plan;
-      return st.save({ ...base, subplans, ...(rest.length ? { openQuestions: rest } : {}), updatedAt: new Date().toISOString() });
+      return st.save({ ...base, subplans: r.subplans, ...(r.openQuestions.length ? { openQuestions: r.openQuestions } : {}), updatedAt: new Date().toISOString() });
+    },
+
+    /**
+     * Excepción por área tras la pregunta global: añade o quita el entregable (el proyecto) de UN área. Solo se quita si sigue en «idea»
+     * (un entregable ya empezado o hecho no se borra por error).
+     */
+    mentor_plan_area_deliverable(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      const sub = plan?.subplans.find((s) => s.id === String(o.subplanId ?? ""));
+      if (!plan || !sub) throw new ApiError("Ese área ya no existe en el plan.");
+      if (o.enabled === true) {
+        if (sub.deliverable) return plan;
+        const d = defaultDeliverableFor(sub);
+        sub.deliverable = { title: d.title ?? "", description: d.description ?? "", criteria: d.criteria ?? [], status: "idea" };
+      } else {
+        if (!sub.deliverable) return plan;
+        if (sub.deliverable.status !== "idea") throw new ApiError("Ese entregable ya está en marcha: cambia su estado en lugar de quitarlo.");
+        delete sub.deliverable;
+      }
+      plan.updatedAt = new Date().toISOString();
+      return st.save(plan);
+    },
+
+    /** Escribe (o borra, con texto vacío) el propósito de un día, una semana o un mes. Es una edición directa, sin pasar por la IA. */
+    mentor_plan_set_purpose(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      const scope = String(o.scope ?? "");
+      const key = String(o.key ?? "");
+      const text = String(o.text ?? "").replace(/\s+/g, " ").trim().slice(0, 300);
+      const weeks = Math.floor((Date.parse(plan.end) - Date.parse(plan.start)) / 86400000 / 7) + 1;
+      const ok =
+        scope === "day" ? /^\d{4}-\d{2}-\d{2}$/.test(key) && key >= plan.start && key <= plan.end
+        : scope === "week" ? /^\d{1,3}$/.test(key) && Number(key) >= 1 && Number(key) <= weeks
+        : scope === "month" ? /^\d{4}-(0[1-9]|1[0-2])$/.test(key) && key >= plan.start.slice(0, 7) && key <= plan.end.slice(0, 7)
+        : false;
+      if (!ok) throw new ApiError("Ese día, semana o mes no está en el plan.");
+      const purposes = JSON.parse(JSON.stringify(plan.purposes ?? {})) as NonNullable<Plan["purposes"]>;
+      const bag = ((purposes as any)[scope] ??= {}) as Record<string, string>;
+      if (text) bag[key] = text;
+      else delete bag[key];
+      if (!Object.keys(bag).length) delete (purposes as any)[scope];
+      const { purposes: _p, ...base } = plan;
+      return st.save({ ...base, ...(Object.keys(purposes).length ? { purposes } : {}), updatedAt: new Date().toISOString() });
+    },
+
+    /**
+     * «Reorganizar por áreas»: convierte un plan de estructura antigua (un subplan por rama de carpeta) a áreas elementales con grupos y
+     * fases. Solo se ejecuta cuando el usuario lo pide. Determinista, conserva lo completado y los comentarios, y queda en el historial de
+     * cambios con la instantánea previa: «Deshacer» lo revierte (`mentor_plan_change_undo`).
+     */
+    mentor_plan_reorganize(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      if (plan.structure === "areas") throw new ApiError("Este plan ya está organizado por áreas.");
+      if (!canReorganize(plan)) throw new ApiError("Este plan no tiene temas que reorganizar.");
+      const hist = new ChangeStore(app.root);
+      const res = reorganizeByAreas(plan, { today: localDate(), startFocus: practiceStartFocus(app), goals: goalScopes(app) });
+      if (!res) throw new ApiError("No se pudo reorganizar el plan.");
+      const saved = st.save(res.plan);
+      const entry = hist.append(id, {
+        at: new Date().toISOString(),
+        comment: "Reorganizar por áreas",
+        status: "applied",
+        source: "rules",
+        summary: res.summary,
+        delta: { added: 0, removed: res.dropped.length, moved: res.moved, deliverables: 0, structure: saved.subplans.length },
+        changed: res.changed,
+        warnings: res.warnings,
+        fixOptions: [],
+        before: plan,
+        ...(saved.name !== plan.name ? { nameAfter: saved.name ?? "" } : {}),
+      });
+      return { plan: saved, entry: viewOf(entry), history: hist.list(id).map(viewOf), applied: true as const };
     },
 
     // ── Constructor guiado: el plan se arma por etapas y se pregunta al estudiante conforme se arma ──
@@ -1735,7 +1862,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const last = [...hist.list(id)].reverse().find((e) => e.status === "applied" && e.before);
       if (!last?.before) throw new ApiError("No hay ningún cambio que deshacer.");
       const { proposed: _p, archived: _a, name: _n, ...base } = last.before;
-      const restored = st.save({ ...base, ...(cur.proposed ? { proposed: true } : {}), ...(cur.archived ? { archived: true } : {}), ...(cur.name ? { name: cur.name } : {}), updatedAt: new Date().toISOString() });
+      // el nombre actual se conserva (renombrar no es un cambio del plan), salvo que el propio cambio lo hubiera puesto y nadie lo haya tocado después
+      const name = last.nameAfter !== undefined && (cur.name ?? "") === last.nameAfter ? last.before.name : cur.name;
+      const restored = st.save({ ...base, ...(cur.proposed ? { proposed: true } : {}), ...(cur.archived ? { archived: true } : {}), ...(name ? { name } : {}), updatedAt: new Date().toISOString() });
       hist.save(id, { ...last, status: "undone" });
       return { plan: restored, history: hist.list(id).map(viewOf) };
     },

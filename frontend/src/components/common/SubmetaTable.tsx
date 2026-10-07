@@ -35,6 +35,8 @@ export interface SubmetaRow {
   statusLocked?: boolean;
   /** Its tasks and sub-tasks, shown under it when the row is expanded. */
   children?: SubmetaRow[];
+  /** Extra read-only chips (links to practice, topics…) shown beside the name and on the card. */
+  extra?: ReactNode;
 }
 
 export type SubmetaView = "tarjetas" | "lista";
@@ -168,6 +170,7 @@ export function SubmetaTable({ rows, selectedId, onOpen, onToggle, onDetail, edi
             <span className="flex-none" style={{ color: r.colour }}>{r.icon}</span>
             {r.code && <span className="flex-none font-mono text-[11px] text-faint">{r.code}</span>}
             <span className="truncate">{r.name}</span>
+            {r.extra}
           </span>
           <span>
             {edits?.onStatus && !r.statusLocked
@@ -257,6 +260,7 @@ export function SubmetaCardGrid({ rows, onOpen, onDetail, empty }: {
             {r.due && <Chip colour={r.overdue ? "var(--nv-danger)" : undefined}>⏰ {shortDate(r.due)}</Chip>}
           </div>
           {r.note && <div className="mt-1.5 text-[11px] text-faint">{r.note}</div>}
+          {r.extra && <div className="mt-1.5">{r.extra}</div>}
           <div className="mt-2 flex items-center gap-2">
             <BlockProgress value={r.progress} colour={r.colour} blocks={10} />
             <span className="ml-auto text-[11px] text-dim">{r.done}/{r.total} tareas · {Math.round(r.progress * 100)} %</span>

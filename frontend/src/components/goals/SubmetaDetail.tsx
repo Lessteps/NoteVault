@@ -1,17 +1,21 @@
 // The full view of a (priority) sub-goal: tiles, checklist, notes and links.
 
-import { ChevronLeft, Pencil, Trash2, X } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, Move, Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
-import { shortDate, todayIso } from "../../lib/tasks";
+import { todayIso } from "../../lib/tasks";
 import { clearPending, markPending, useApp } from "../../store/app";
 import { pct, useGoals } from "../../store/goals";
 import { BlockProgress } from "../common/charts";
-import { Chip, GhostButton, input, Label, PRIORITY_COLOURS, PRIORITY_GLYPHS, PRIORITY_NAMES } from "../common/forms";
+import { Chip, GhostButton, input, inputBase, Label, PRIORITY_COLOURS, PRIORITY_GLYPHS, PRIORITY_NAMES } from "../common/forms";
+import { DateInput } from "../tasks/controls";
 import { LinkedNotes } from "../common/LinkedNotes";
 import { StatTile } from "../common/StatTile";
 import { cn, confirmAction, IconButton } from "../ui";
+import { promoteItem, TransferDialog } from "./ItemTransfer";
+import { PracticeLinks } from "./PracticeLinks";
 import { catColour } from "./Submetas";
+import { TopicLinks } from "./TopicLinks";
 
 export function SubmetaDetail() {
   const detail = useGoals((s) => s.detail)!;
@@ -25,6 +29,7 @@ export function SubmetaDetail() {
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   const [add, setAdd] = useState("");
+  const [moving, setMoving] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   const pending = useRef<string | null>(null);
   const g = detail.goal;
@@ -62,12 +67,37 @@ export function SubmetaDetail() {
     }
   };
   const today = todayIso();
+  // Ancestros (de la raíz hacia esta) y todos los niveles de subtareas, para navegar por la jerarquía.
+  const trail: typeof detail.items = [];
+  for (let p = item.parent ? detail.items.find((i) => i.id === item.parent) : undefined; p; p = p.parent ? detail.items.find((i) => i.id === p!.parent) : undefined) trail.unshift(p);
+  const nested: Array<{ k: typeof kids[number]; depth: number }> = [];
+  const walk = (parent: string, depth: number) => {
+    for (const k of detail.items.filter((i) => i.parent === parent).sort((a, b) => a.order - b.order)) {
+      nested.push({ k, depth });
+      walk(k.id, depth + 1);
+    }
+  };
+  walk(item.id, 0);
+  const daysLeft = item.due ? Math.round((new Date(`${item.due}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000) : null;
+  const patch = (fields: Partial<typeof item>) => void act(() => api.goalItemUpdate(g.id, item.id, fields));
 
   return (
     <div className="space-y-4">
+      <nav aria-label="Ruta de la submeta" className="flex flex-wrap items-center gap-1 text-[12px] text-dim">
+        <button type="button" onClick={() => openSubmeta(null)} className="hover:text-text hover:underline">{g.icon} {g.name}</button>
+        {trail.map((t) => (
+          <span key={t.id} className="flex items-center gap-1">› <button type="button" onClick={() => openSubmeta(t.id)} className="hover:text-text hover:underline">{t.name}</button></span>
+        ))}
+        <span className="flex items-center gap-1">› <span aria-current="page" className="text-text">{item.name}</span></span>
+      </nav>
       <div className="flex items-center gap-2">
-        <GhostButton onClick={() => openSubmeta(null)} className="border-transparent px-1.5"><ChevronLeft size={14} /> Volver a la meta</GhostButton>
+        <GhostButton onClick={() => openSubmeta(item.parent || null)} className="border-transparent px-1.5"><ChevronLeft size={14} /> {item.parent ? "Volver a la submeta madre" : "Volver a la meta"}</GhostButton>
         <span className="flex-1" />
+        <GhostButton onClick={async () => {
+          if (!(await confirmAction("Promover a meta", `«${item.name}» pasará a ser una meta principal con sus submetas.`, "Promover"))) return;
+          await promoteItem(g.id, item);
+        }}><ArrowUpRight size={13} /> Promover a meta</GhostButton>
+        <GhostButton onClick={() => setMoving(true)}><Move size={13} /> Mover a…</GhostButton>
         <GhostButton onClick={() => { openSubmeta(null); setSubView("arbol"); openItem(item.id); }}><Pencil size={13} /> Editar propiedades…</GhostButton>
         <GhostButton danger onClick={async () => {
           if (!(await confirmAction("Eliminar submeta", `¿Eliminar «${item.name}» y sus ${kids.length} subtareas?`, "Eliminar", true))) return;
@@ -88,13 +118,29 @@ export function SubmetaDetail() {
         <Chip colour={PRIORITY_COLOURS[item.priority]}>{PRIORITY_GLYPHS[item.priority]} {PRIORITY_NAMES[item.priority]}</Chip>
         {item.schedule && <Chip>📅 {item.schedule}</Chip>}
       </div>
+      <div className="flex flex-wrap items-center gap-3 text-[12px] text-dim" role="group" aria-label="Propiedades de la submeta">
+        {item.is_leaf && (
+          <label className="flex items-center gap-1.5">Estado
+            <select aria-label="Estado" className={cn(inputBase, "h-8 py-0 text-[12px]")} value={item.status} onChange={(e) => patch({ status: e.target.value })}>
+              {["Pendiente", "En curso", "Hecha"].map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+        )}
+        <label className="flex items-center gap-1.5">Prioridad
+          <select aria-label="Prioridad" className={cn(inputBase, "h-8 py-0 text-[12px]")} value={item.priority} onChange={(e) => patch({ priority: Number(e.target.value) })}>
+            {[4, 3, 2, 1].map((n) => <option key={n} value={n}>{PRIORITY_GLYPHS[n]} {PRIORITY_NAMES[n]}</option>)}
+          </select>
+        </label>
+        <span className="flex items-center gap-1.5">Salida <DateInput title="Fecha de salida" value={item.start} onChange={(start) => patch({ start })} /></span>
+        <span className="flex items-center gap-1.5">Fecha límite <DateInput title="Fecha límite" value={item.due} onChange={(due) => patch({ due })} /></span>
+      </div>
       <div className="grid grid-cols-6 gap-3">
         <StatTile value={pct(item.progress)} label="Progreso" colour="var(--nv-mint)" />
         <StatTile value={`${item.counts[0]}/${item.counts[1]}`} label="Completadas" />
         <StatTile value={pct(item.adherence7)} label="Adherencia 7d" />
         <StatTile value={pct(item.adherence30)} label="Adherencia 30d" />
         <StatTile value={item.streak} label="Racha" colour="var(--nv-warn)" />
-        <StatTile value={item.due ? shortDate(item.due) : "—"} label="Fecha límite" />
+        <StatTile value={daysLeft === null ? "—" : daysLeft} label="Días restantes" colour={daysLeft !== null && daysLeft < 0 && item.status !== "Hecha" ? "var(--nv-danger)" : undefined} />
       </div>
       <BlockProgress value={item.progress} colour="var(--nv-mint)" blocks={30} />
       <section className="rounded-xl border border-line bg-card p-4">
@@ -129,6 +175,27 @@ export function SubmetaDetail() {
             });
           }} />
       </section>
+      {nested.some(({ depth }) => depth > 0) && (
+        <section className="rounded-xl border border-line bg-card p-4">
+          <Label>Submetas anidadas</Label>
+          <ul className="space-y-0.5">
+            {nested.map(({ k, depth }) => (
+              <li key={k.id} className="flex items-center gap-2 text-[12.5px]" style={{ paddingLeft: depth * 18 }}>
+                <button type="button" onClick={() => openSubmeta(k.id)} className="min-w-0 flex-1 truncate text-left text-text hover:underline">{k.is_leaf ? "•" : "📁"} {k.name}</button>
+                <span className="font-mono text-[11px] text-dim">{Math.round(k.progress * 100)}%</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <section className="rounded-xl border border-line bg-card p-4">
+        <Label>Temas de estudio</Label>
+        <TopicLinks value={item.topic_links} onChange={(topic_links) => patch({ topic_links })} />
+      </section>
+      <section className="rounded-xl border border-line bg-card p-4">
+        <Label>Práctica</Label>
+        <PracticeLinks value={item.practice_links} onChange={(practice_links) => patch({ practice_links })} />
+      </section>
       <section className="rounded-xl border border-line bg-card p-4">
         <Label>Notas, enlaces y resumen teórico</Label>
         <textarea rows={8} className={cn(input, "resize-y")} value={notes} placeholder="Escribe aquí resúmenes de teoría, enlaces a recursos o notas de esta submeta..."
@@ -146,6 +213,7 @@ export function SubmetaDetail() {
             onChange={(linked_notes, linked_folder) => void act(() => api.goalItemUpdate(g.id, item.id, { linked_notes, linked_folder }))} />
         </div>
       </section>
+      {moving && <TransferDialog mode="item" gid={g.id} item={item} onClose={() => setMoving(false)} />}
     </div>
   );
 }

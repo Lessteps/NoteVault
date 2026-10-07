@@ -38,7 +38,7 @@ import {
 } from "../../lib/planTime";
 import { api } from "../../lib/bridge";
 import { newBuildId } from "../../lib/planBuild";
-import { capacityWithPractice, FOCUS_LABEL, PRACTICE_FOCUSES, PRACTICE_NAME, type PracticeFocus } from "../../lib/practiceTrack";
+import { capacityWithPractice, FOCUS_LABEL, PRACTICE_BLURB, PRACTICE_FOCUSES, PRACTICE_NAME, type PracticeFocus } from "../../lib/practiceTrack";
 import type { MentorPlanOptions } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { planViewId, useMentor } from "../../store/mentor";
@@ -629,7 +629,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
           <span className="text-[14px]">{practiceOn ? "Incluida en el plan" : "No incluida"}</span>
         </div>
         <p className="mt-1.5 text-[14px] text-faint">
-          Tu rama de práctica de programación (la carpeta <code>programming_practice</code>): un reto de lógica diario y un proyecto semanal full stack (frontend + backend + base de datos) con cuatro fases: especificación, construcción, defensa y postmortem. Esos minutos se reservan del tiempo diario; el resto va a tus temas.
+          {PRACTICE_BLURB} No es un área de estudio del plan, sino una pista aparte; sus proyectos son full stack (especificación, construcción, defensa y postmortem). Esos minutos se reservan del tiempo diario; el resto va a tus temas.
         </p>
         {practiceOn && (
           <div className="mt-3 space-y-3" data-testid="practice-options">
@@ -693,7 +693,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <p className="mt-1.5 text-[14px] text-faint">
-          Un entregable es un proyecto de demostración por subplan. Es una opción a discutir: con «Lo decidimos al armar el plan» el borrador no los añade y te pregunta, subplan a subplan, si quieres uno.
+          Es una opción a discutir. Un entregable es un archivo práctico que demuestra una habilidad: los de práctica (kata del día, proyecto semanal y mensual) salen de {PRACTICE_NAME} y el proyecto de cada área lo propone la IA. Con «Lo decidimos al armar el plan» el borrador no añade proyectos de área y te hace UNA sola pregunta para todo el plan.
         </p>
       </Panel>
 

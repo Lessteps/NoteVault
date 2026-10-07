@@ -35,18 +35,17 @@ describe("entregables: ask / yes / no", () => {
     expect(autoSeeds(pre({ deliverables: "yes" }), scope()).every((s) => !!s.deliverable)).toBe(true);
   });
 
-  it("con «ask» el borrador no trae entregables pero deja una pregunta pendiente por subplan", () => {
+  it("con «ask» el borrador no trae entregables pero deja UNA sola pregunta global pendiente", () => {
     const p = pre();
     const d = composeFromPreconditions(autoSeeds(p, scope()), p, { today: "2026-10-05", auto: true, rationale: "r" });
     expect(d.subplans.every((s) => !s.deliverable)).toBe(true);
-    expect(d.openQuestions).toHaveLength(d.subplans.length);
+    // una sola pregunta para todo el plan (no una por subplan), sin subplanId
+    expect(d.openQuestions).toHaveLength(1);
     expect(d.openQuestions![0]).toEqual({
       id: "deliverables",
-      subplanId: d.subplans[0]!.id,
-      text: expect.stringContaining("¿Quieres un entregable (proyecto de demostración) para "),
+      text: "¿Quieres un entregable (proyecto de demostración) por cada área del plan?",
       options: ["Sí", "No", "Después"],
     });
-    expect(d.openQuestions![0]!.text).toContain("Backend");
     // «no» y «yes»: nada pendiente
     for (const mode of ["no", "yes"] as const) {
       const q = pre({ deliverables: mode });

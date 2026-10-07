@@ -89,11 +89,11 @@ describe("etapas Esqueleto, Temas y tope de preguntas", () => {
   });
 
   it("«quitar» saca el subplan y «más tiempo» le da más horas", () => {
-    const key = "programacion|avanzar en programacion";
+    const key = "backend|construir servicios y apis solidos y seguros";
     const dropped = computeBuild(input(pre, [...answeredAlcance, ans("skeleton", "skeleton", "esqueleto", `drop:${key}`)]), ctxOf(all));
     expect(dropped.skeleton!.map((r) => r.area)).toEqual(["Matemáticas"]);
     const more = computeBuild(input(pre, [...answeredAlcance, ans("skeleton", "skeleton", "esqueleto", `more:${key}`)]), ctxOf(all));
-    expect(more.skeleton!.find((r) => r.area === "Programación")!.sharePct).toBeGreaterThan(50);
+    expect(more.skeleton!.find((r) => r.area === "Backend")!.sharePct).toBeGreaterThan(50);
   });
 
   it("no pregunta lo que no es una decisión: sin holgura ni apuro, ni capacidad ni carga", () => {
@@ -118,7 +118,7 @@ describe("etapas Esqueleto, Temas y tope de preguntas", () => {
     expect(c.question).toBeUndefined();
     expect(c.stage).toBe("revision");
     expect(c.status).toBe("review");
-    expect(c.draft!.openQuestions!.length).toBe(2); // los entregables quedaron «después»
+    expect(c.draft!.openQuestions!.length).toBe(1); // los entregables quedaron «después»: UNA sola pregunta global
   });
 });
 
@@ -196,7 +196,7 @@ describe("etapas Práctica y Entregables", () => {
     expect(computeBuild(input(ok), ctxOf(all)).question?.kind).not.toBe("practice"); // todo definido: la etapa pasa sola
   });
 
-  it("entregables «a discutir»: una pregunta por subplan; sí añade, no descarta la pregunta, después la deja pendiente", () => {
+  it("entregables «a discutir»: UNA pregunta global para todo el plan; sí añade el proyecto de cada área, no descarta la pregunta, «salvo en…» deja una excepción, después la deja pendiente", () => {
     const two = [...topics("Programación", "4 Backend", 8), ...topics("Matemáticas", "1 Álgebra", 8)];
     const pre = preOf({ subjects: ["Programación", "Matemáticas"], deliverables: "ask", levels: { Programación: "basico", Matemáticas: "basico" } });
     const base = [ans("priority", "priority", "alcance", "equal"), ans("skeleton", "skeleton", "esqueleto", "ok")];
@@ -205,16 +205,23 @@ describe("etapas Práctica y Entregables", () => {
     const keep = ans("capacity:1", "capacity", "capacidad", "keep");
     const d1 = computeBuild(input(pre, [...base, keep], { maxQuestions: 12 }), ctxOf(two));
     expect(d1.question).toMatchObject({ kind: "deliverable", stage: "entregables" });
-    const k1 = d1.question!.id;
-    const d2 = computeBuild(input(pre, [...base, keep, ans(k1, "deliverable", "entregables", "yes")], { maxQuestions: 12 }), ctxOf(two));
-    expect(d2.question!.id).not.toBe(k1);
-    const k2 = d2.question!.id;
-    const done = computeBuild(input(pre, [...base, keep, ans(k1, "deliverable", "entregables", "yes"), ans(k2, "deliverable", "entregables", "no")], { maxQuestions: 12 }), ctxOf(two));
-    expect(done.status).toBe("review");
-    expect(done.draft!.subplans.filter((s) => s.deliverable)).toHaveLength(1);
-    expect(done.draft!.openQuestions).toBeUndefined(); // el «no» tampoco queda pendiente
-    const later = computeBuild(input(pre, [...base, keep, ans(k1, "deliverable", "entregables", "yes"), ans(k2, "deliverable", "entregables", "later")], { maxQuestions: 12 }), ctxOf(two));
+    expect(d1.question!.id).toBe("deliverable:all");
+    expect(d1.question!.text).toContain("por cada área");
+    // sí: un proyecto PROPIO por área (no el mismo texto repetido) y ya no queda nada pendiente
+    const yes = computeBuild(input(pre, [...base, keep, ans("deliverable:all", "deliverable", "entregables", "yes")], { maxQuestions: 12 }), ctxOf(two));
+    expect(yes.status).toBe("review");
+    expect(yes.draft!.subplans.filter((s) => s.deliverable)).toHaveLength(2);
+    expect(new Set(yes.draft!.subplans.map((s) => s.deliverable!.title)).size).toBe(2);
+    expect(yes.draft!.openQuestions).toBeUndefined();
+    // no: ninguno y la pregunta tampoco queda pendiente
+    const no = computeBuild(input(pre, [...base, keep, ans("deliverable:all", "deliverable", "entregables", "no")], { maxQuestions: 12 }), ctxOf(two));
+    expect(no.status).toBe("review");
+    expect(no.draft!.subplans.filter((s) => s.deliverable)).toHaveLength(0);
+    expect(no.draft!.openQuestions).toBeUndefined();
+    // después: sigue pendiente (una sola pregunta)
+    const later = computeBuild(input(pre, [...base, keep, ans("deliverable:all", "deliverable", "entregables", "later")], { maxQuestions: 12 }), ctxOf(two));
     expect(later.draft!.openQuestions).toHaveLength(1);
+    expect(later.draft!.openQuestions![0]!.subplanId).toBeUndefined();
     expect(c.question).toBeTruthy();
   });
 
@@ -280,7 +287,7 @@ describe("IA: validación estricta de lo que devuelve", () => {
 
   it("el orden de la IA se aplica solo a los temas del subplan y lo que dejó fuera se puede recuperar con «añadir temas»", () => {
     const all = [...topics("Programación", "4 Backend", 10)];
-    const ai = { ...emptyAi(), topicsOk: true, topicsDone: ["programacion|avanzar en programacion#0"], topicsOkBlocks: ["programacion|avanzar en programacion#0"], order: { "programacion|avanzar en programacion": [{ folder: "Programación/4 Backend/T05", why: "base" }, { folder: "Programación/4 Backend/T01", why: "luego" }, { folder: "Programación/Inventado/X", why: "no existe" }] } };
+    const ai = { ...emptyAi(), topicsOk: true, topicsDone: ["backend|construir servicios y apis solidos y seguros#0"], topicsOkBlocks: ["backend|construir servicios y apis solidos y seguros#0"], order: { "backend|construir servicios y apis solidos y seguros": [{ folder: "Programación/4 Backend/T05", why: "base" }, { folder: "Programación/4 Backend/T01", why: "luego" }, { folder: "Programación/Inventado/X", why: "no existe" }] } };
     const pre = preOf({ levels: { Programación: "basico" } });
     const c = computeBuild({ pre, answers: [], ai, maxQuestions: 6 }, ctxOf(all, { aiOn: true }));
     expect(c.draft!.subplans[0]!.topics.map((t) => t.folder)).toEqual(["Programación/4 Backend/T05", "Programación/4 Backend/T01"]);
@@ -298,11 +305,11 @@ describe("IA: validación estricta de lo que devuelve", () => {
     const ai = { ...emptyAi(), scopeTried: true };
     const first = computeBuild({ pre, answers: base, ai, maxQuestions: 6 }, ctxOf(all, { aiOn: true }));
     expect(first.needs).toBe("ai_topics");
-    expect(first.info!.block).toBe("programacion|avanzar en programacion#0");
+    expect(first.info!.block).toBe("backend|construir servicios y apis solidos y seguros#0");
     expect(first.info!.seeds[0]!.topics).toHaveLength(60);
-    const done = ["programacion|avanzar en programacion#0", "programacion|avanzar en programacion#1", "programacion|avanzar en programacion#2", "matematicas|avanzar en matematicas#0"];
+    const done = ["backend|construir servicios y apis solidos y seguros#0", "backend|construir servicios y apis solidos y seguros#1", "backend|construir servicios y apis solidos y seguros#2", "matematicas|avanzar en matematicas#0"];
     const second = computeBuild({ pre, answers: base, ai: { ...ai, topicsDone: done.slice(0, 1) }, maxQuestions: 6 }, ctxOf(all, { aiOn: true }));
-    expect(second.info!.block).toBe("programacion|avanzar en programacion#1");
+    expect(second.info!.block).toBe("backend|construir servicios y apis solidos y seguros#1");
     const third = computeBuild({ pre, answers: base, ai: { ...ai, topicsDone: done.slice(0, 2) }, maxQuestions: 6 }, ctxOf(all, { aiOn: true }));
     expect(third.info!.seeds[0]!.topics).toHaveLength(10);
     const end = computeBuild({ pre, answers: base, ai: { ...ai, topicsDone: done }, maxQuestions: 6 }, ctxOf(all, { aiOn: true }));

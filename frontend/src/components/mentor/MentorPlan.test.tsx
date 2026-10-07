@@ -224,14 +224,15 @@ describe("Mentor — sub-interfaz de un plan", () => {
     expect(button("Abrir en Proyectos", d)).toBeUndefined();
   });
 
-  it("'Esta semana / Hoy' combina los planes activos y 'Planear mi día con esto' lleva a Hoy", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plans: [row(PID, "A"), row("2026-10-10_2026-10-31", "B")] }));
+  it("la Agenda (vista Día) enseña lo que toca hoy y 'Planear mi día con esto' lleva a Hoy", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ today: "2026-10-13", plans: [row(PID, "A"), row("2026-10-10_2026-10-31", "B")] }));
     await mountEl(<MentorPlan planId={PID} />);
-    await openTab("semana");
-    const items = host.querySelectorAll("[data-testid=plan-week-item]");
+    await openTab("agenda");
+    await click(host.querySelector("#agenda-view-tab-dia")!);
+    const items = host.querySelectorAll("[data-testid=agenda-topic]");
     expect(items).toHaveLength(1);
     expect(items[0]!.textContent).toContain("2 APIs web");
-    expect(host.querySelector("[data-testid=plan-this-week]")!.textContent).toContain("2 planes activos combinados");
+    expect(host.querySelector("[data-testid=agenda-day-counts]")!.textContent).toContain("1 tema");
     await click(button("Planear mi día con esto"));
     expect(useMentor.getState().pendingObjective).toEqual({ type: "plan" });
     expect(useNavState.getState().values["mentor.view"]).toBe("hoy");

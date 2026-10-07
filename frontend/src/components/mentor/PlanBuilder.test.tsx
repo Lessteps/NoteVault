@@ -396,7 +396,7 @@ describe("«Pedir cambios al plan»", () => {
     // el cuadro tiene una etiqueta visible asociada y los ejemplos son chips clicables
     expect(box.querySelector(`label[for='${ta.id}']`)!.textContent).toContain("Tu comentario para el Mentor");
     expect(ta.placeholder).toContain("Ej.:");
-    expect([...box.querySelectorAll("[data-testid=change-suggestions] button")].map((b) => b.textContent)).toContain("Pasa la semana 3 a la 5");
+    expect([...box.querySelectorAll("[data-testid=change-suggestions] button")].map((b) => b.textContent)).toContain("Pasa el frontend a la semana 10");
     expect(button("Aplicar cambios", box).hasAttribute("disabled")).toBe(true);
     await type(ta, "Quita lo de desktop");
     await act(async () => { ta.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })); });

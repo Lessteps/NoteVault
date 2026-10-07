@@ -181,7 +181,7 @@ describe("plan mensual → candidatos (plan_item)", () => {
     const c = buildCandidates(world(), { availableMinutes: 480, planItems });
     expect(c.slice(0, 2).map((x) => x.kind)).toEqual(["plan_item", "plan_item"]);
     expect(c[0]!.links.subplan).toBe("Programación: Backend");
-    expect(c[0]!.reasons[0]).toContain("plan del mes");
+    expect(c[0]!.reasons[0]).toContain("lo pide el plan");
     expect(c.filter((x) => x.topicFolder === "Prog/APIs")).toHaveLength(1); // sin duplicar `topic:`
     expect(c.find((x) => x.id === "srs:mathematics")!.score).toBeLessThan(c[0]!.score);
   });

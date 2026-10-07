@@ -230,10 +230,13 @@ describe("mentor_plan_generate: sin IA (plan automático determinista)", () => {
     expect(d.rationale).toContain("La IA no está configurada");
     expect(d.subplans).toHaveLength(1);
     const s = d.subplans[0];
-    expect(s).toMatchObject({ area: "Programación", objective: "Desarrollo Backend", goalId });
+    // un subplan = un ÁREA elemental: «Python» va al área Backend (grupo «Lenguaje») y la meta «Desarrollo Backend» queda enlazada por nombre
+    expect(s).toMatchObject({ area: "Backend", areaId: "backend", objective: "Construir servicios y APIs sólidos y seguros" });
+    expect(s.groups.map((g: any) => g.title)).toEqual(["Lenguaje: Python"]);
     expect(s.topics.map((t: any) => t.folder)).toEqual([FUND, APIS, DB]);
     expect(s.topics.find((t: any) => t.folder === APIS).skills).toEqual(["debug"]);
-    expect(s.requiredGoals).toEqual([{ goalId, note: expect.any(String) }]);
+    expect(s.requiredGoals[0]).toEqual({ goalId, note: expect.any(String) });
+    expect(s.requiredGoals.filter((g: any) => g.itemId).map((g: any) => g.note).sort()).toEqual(["Submeta «Aprender Python»", "Submeta «Datos»"]);
     expect(s.deliverable).toMatchObject({ status: "idea" });
     expect(d.preconditions.minutesPerDay).toBe(120);
     expect(d.fits).toBe(true);
@@ -243,13 +246,13 @@ describe("mentor_plan_generate: sin IA (plan automático determinista)", () => {
   it("materias: sus temas en orden natural; los de una meta no se repiten", async () => {
     const res: any = await mentorApi(app, vi.fn()).mentor_plan_generate_draft(pre({ goalIds: [goalId], subjects: ["Programación", "Matemáticas"] }));
     const subs = res.planDraft.subplans;
-    expect(subs.map((s: any) => s.area)).toEqual(["Programación", "Matemáticas"]);
+    expect(subs.map((s: any) => s.area)).toEqual(["Backend", "Matemáticas"]);
     expect(subs[1].topics.map((t: any) => t.folder)).toEqual([MAT]);
     const all = subs.flatMap((s: any) => s.topics.map((t: any) => t.folder));
     expect(new Set(all).size).toBe(all.length);
     const onlySubject: any = await mentorApi(app, vi.fn()).mentor_plan_generate_draft(pre({ goalIds: [], subjects: ["Programación"] }));
     expect(onlySubject.planDraft.subplans[0].topics.map((t: any) => t.folder)).toEqual([FUND, APIS, DB]);
-    expect(onlySubject.planDraft.subplans[0].objective).toBe("Avanzar en Programación");
+    expect(onlySubject.planDraft.subplans[0].objective).toBe("Construir servicios y APIs sólidos y seguros");
   });
 
   it("nivel «no sé»: añade un diagnóstico corto al inicio de esa materia", async () => {
@@ -312,7 +315,8 @@ describe("aceptar, listar y leer planes de periodo", () => {
     const saved = JSON.parse(fs.readFileSync(file, "utf-8"));
     expect(saved).toMatchObject({ id, start: pre().start, end: pre().end, preconditions: { minutesPerDay: 120, studyDays: [1, 2, 3, 4, 5, 6], pace: "normal" } });
     expect(saved.month).toBeUndefined();
-    expect(saved.name).toContain("Desarrollo Backend");
+    expect(saved.name).toBe(`Backend · ${new Date(`${pre().start}T00:00:00`).getDate()} ${["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"][new Date(`${pre().start}T00:00:00`).getMonth()]}–${Number(pre().end.slice(8))} ${["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"][Number(pre().end.slice(5, 7)) - 1]}`);
+    expect(saved.structure).toBe("areas");
     expect(saved.subplans[0].topics.map((t: any) => t.folder)).toEqual([FUND, APIS]);
     expect(saved.subplans[0].weeks.length).toBe(5);
     expect(api.mentor_chat_load().turns.find((t) => t.id === res.pending)!.acceptedPlan).toBe(id);
@@ -396,7 +400,7 @@ describe("renombrar, archivar y eliminar", () => {
     expect(JSON.parse(fs.readFileSync(path.join(plansDir(), `${id}.json`), "utf-8")).name).toBe("Mis planes de estudios");
     expect((api.mentor_plan_list() as any[])[0].name).toBe("Mis planes de estudios");
     expect(api.mentor_plan_rename({ id, name: "" }).name).toBeUndefined();
-    expect((api.mentor_plan_list() as any[])[0].name).toContain("Desarrollo Backend");
+    expect((api.mentor_plan_list() as any[])[0].name).toContain("Backend");
     expect(() => api.mentor_plan_rename({ id: "nada", name: "x" })).toThrow(ApiError);
   });
 

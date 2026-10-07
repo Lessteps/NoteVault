@@ -47,8 +47,8 @@ export interface PlanContext {
 // ── Prompt ───────────────────────────────────────────────────────────────
 
 export const PLAN_PROMPT_ADDENDUM = [
-  "TAMBIÉN puedes proponer el PLAN DEL MES cuando el estudiante lo pida (un plan mensual con subplanes por área y objetivo).",
-  "Un subplan = un área (materia o área de vida) + un objetivo, con los temas del catálogo que hay que estudiar ESE mes, las metas existentes que necesita cumplir y un ENTREGABLE (proyecto a realizar para demostrar que logró el objetivo).",
+  "TAMBIÉN puedes proponer el PLAN cuando el estudiante lo pida: un plan por ÁREAS ELEMENTALES (Backend, Frontend, Databases, Automation, Tooling and Quality…).",
+  "Un subplan = un área elemental con un objetivo corto (una línea), los temas del catálogo que hay que estudiar, las metas existentes que necesita cumplir y, solo si se pide, un ENTREGABLE (proyecto para demostrar el objetivo). La app agrupa los temas por área (Bases, Lenguaje, Conocimientos) y secuencia las áreas por fases: tú solo eliges y ordenas temas.",
   "Reglas del plan_draft:",
   "- Si no sabes las HORAS POR SEMANA, qué METAS priorizar o qué áreas quiere cubrir, PREGUNTA (type question).",
   "- Temas: SOLO `folder` exactos del catálogo. Metas (`goalId`, `itemId`): SOLO las de la lista METAS EXISTENTES. `projectId`: SOLO uno de PROYECTOS EXISTENTES si encaja; si no, omítelo (el entregable queda como propuesta; no se crean proyectos).",
@@ -315,6 +315,8 @@ export interface PlanDraft {
   weights?: Record<string, number>;
   /** reparto compacto (llena primero las primeras semanas): lo elige el constructor guiado con «más intenso» */
   compact?: boolean;
+  /** «areas» = el borrador es un plan por áreas elementales (cada subplan es un área con grupos y fase) */
+  structure?: "areas";
 }
 
 /** Mes (AAAA-MM) y primer día del reparto: el mes en curso reparte desde hoy; uno futuro, desde el día 1. */

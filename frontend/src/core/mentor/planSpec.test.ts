@@ -63,13 +63,17 @@ describe("alcance", () => {
 });
 
 describe("plan automático", () => {
-  it("semillas: una meta y una materia, sin repetir, con diagnóstico para «no sé»", () => {
+  it("semillas POR ÁREAS: los temas de la meta y de la materia, sin repetir, en un área, con la meta enlazada y diagnóstico para «no sé»", () => {
     const p = pre({ deliverables: "yes", levels: { Prog: "no_se" } });
-    const seeds = autoSeeds(p, resolveScope(p, ALL, GOALS));
-    expect(seeds.map((s) => s.objective)).toEqual(["Backend", "Avanzar en Prog"]);
+    const seeds = autoSeeds(p, resolveScope(p, ALL, GOALS), GOALS);
+    // la materia «Prog» no tiene ramas de programación: es su propia área (no un subplan por tema ni por meta)
+    expect(seeds.map((s) => s.objective)).toEqual(["Avanzar en Prog"]);
+    expect(seeds[0]!.areaId).toBe("x-prog");
+    expect(seeds[0]!.topics.map((t) => t.folder).sort()).toEqual(["Prog/1 Base", "Prog/10 Final", "Prog/2 Medio"]);
+    expect(seeds[0]!.requiredGoals).toEqual([{ goalId: "g1", itemId: "i1", note: "Submeta «x»" }]);
     expect(seeds[0]!.deliverable).toBeTruthy();
     const diag = seeds.flatMap((s) => s.topics.filter((t) => t.diagnostic).map((t) => t.folder));
-    expect(diag).toEqual(["Prog/2 Medio"]); // solo el primero de la materia
+    expect(diag).toEqual(["Prog/1 Base"]); // solo el primero de la materia
     expect(seeds[0]!.notes).toContain("diagnóstico");
     expect(markDiagnostics([{ area: "Mat", objective: "o", topics: [{ folder: "Mat/1", title: "1", estMinutes: 30 }] }], pre({ levels: {} }))[0]!.topics[0]!.diagnostic).toBeUndefined();
   });

@@ -432,6 +432,7 @@ formaría un ciclo, se muestra en el primer nivel. Claves (`GOAL_ITEM_FIELDS`):
 | `done_at` | date | Día en que una submeta única pasó a Hecha. |
 | `created` | date | |
 | `topic_links` | list | Opcional (se omite si está vacía). Temas de estudio que la cumplen; ver [Conexión con temas de estudio](#conexión-con-temas-de-estudio). |
+| `practice_links` | list | Opcional (se omite si está vacía). Enlaces al sistema Programming practice (kata diario, proyectos); ver [Submetas de primera clase y práctica](#submetas-de-primera-clase-y-práctica). |
 
 El cuerpo son las notas. Una submeta con hijas es una **rama**: no se marca a
 mano, está hecha cuando todas sus hijas lo están.
@@ -492,9 +493,78 @@ es un **enlace roto**: se conserva, cuenta como no cumplido y no da error.
 > `topic_links` y, si quiere mostrar el cumplimiento, calcularlo igual que la
 > app de escritorio (`frontend/src/core/practice/topicLinks.ts`).
 
+### Submetas de primera clase y práctica
+
+Una submeta funciona como una meta principal: se abre en su propia vista (ruta de
+ancestros, estado, prioridad, fechas, % de avance, días restantes, submetas anidadas
+a N niveles, temas, hábitos, práctica) y se puede **promover a meta** o **mover**.
+Se resolvió con el mínimo de modelo: la submeta **hereda** de su meta el área, el
+icono y el color (no se guardan en el archivo de la submeta) y el avance sube por el
+árbol como siempre. Al promoverla, esos tres valores se copian a la meta nueva.
+
+`practice_links` es un campo **aditivo y opcional** (no cambia `FORMAT_VERSION`; un
+lector que no lo conoce lo conserva como clave extra). Lista separada por comas,
+como `topic_links`/`habit_links`. Cada entrada:
+
+- `kata:daily`: kata diario, objetivo por defecto 5 días con intento por semana;
+- `kata:daily#week=N`: N días (1–7) con intento en la semana actual (lun–dom);
+- `kata:daily#streak=N`: racha actual de N días seguidos (1–365);
+- `project:weekly` / `project:monthly`: proyecto de práctica de la semana / del mes
+  actual; con `#<foco>` (`backend`, `databases`, `frontend`, `desktop`, `mobile`,
+  `automation`) solo proyectos de ese foco;
+- `project:folder:<carpeta>`: un proyecto concreto (`projects/<carpeta>`); en la
+  carpeta se escapan `%`, `,` y `#` como `%25`, `%2C` y `%23`.
+
+Cuerpo de referencia: `frontend/src/core/practice/practiceLinks.ts`. No existe un
+enlace `skill`: en `programming_practice` las «skills» (`pp_build`...) son
+instrucciones de la IA, no habilidades del alumno.
+
+**Cumplimiento derivado** (nunca se guarda; se calcula con los datos del módulo
+`programming_practice`: intentos `pp_kata` en `estudio/intentos`, y
+`projects/<x>/.pp.json` / `projects/_specs/<x>.spec.json`, los mismos que lee el
+Mentor):
+
+- kata: días distintos con algún intento `pp_kata` en la semana / objetivo; con
+  `streak`, la racha actual (acabando hoy, o ayer si hoy aún no hay intento) / N.
+- proyecto semanal o mensual: de los proyectos creados en el periodo (y con el foco
+  pedido) se toma el más avanzado; avance = (fases hechas + ½ por fase en curso) / 4
+  con las fases especificación, construcción, defensa y postmortem. Cumplido solo
+  con el proyecto terminado (`state: done`). Sin proyecto: 0 %.
+- proyecto por carpeta: igual, sin límite de fecha; si ya no existe es un enlace
+  **roto** (se conserva, no cumple, no da error).
+- sin módulo `programming_practice` en la vault: «sin datos de práctica», 0 %, sin
+  cumplir, sin error.
+
+**Avance combinado**: con `topic_links` y `practice_links` a la vez cada enlace pesa
+lo mismo: `(pct_temas × n_enlaces_temas + pct_práctica × n_enlaces_práctica) /
+n_enlaces`; con solo temas el resultado es el de siempre. La submeta está hecha
+cuando todos sus enlaces lo están. Una **rama** con enlaces propios los cuenta como
+un miembro más de la media de sus hijas.
+
+**Promover / convertir / mover** (los ids de submeta se conservan salvo choque):
+
+- *Promover a meta*: crea una meta con los datos de la submeta (nombre, prioridad,
+  `start`, `due` → `end`, notas → descripción, carpeta/notas vinculadas) y área,
+  icono y color de la meta origen; sus hijas pasan a ser el primer nivel con el
+  mismo árbol. Si la submeta tenía datos que una meta no tiene (enlaces a temas,
+  hábitos o práctica, repetición o medida), se conserva como única submeta raíz de
+  la meta nueva para no perderlos.
+- *Convertir en submeta de…*: la meta pasa a ser una submeta (bajo otra submeta o
+  en el primer nivel) de otra meta, con todo su árbol dentro; la meta se envía a la
+  papelera (área, icono y color se pierden: la submeta hereda los de la meta destino).
+- *Mover a otra meta*: mueve la submeta y su subárbol.
+- Las marcas de `registro/…` (`<meta>/<submeta>`) y las procedencias de hábito de
+  lo movido se renombran para no perder rachas.
+
+> Pendiente para el cliente móvil (`notevault_mobile`): conservar `practice_links`
+> (clave extra) y, si quiere mostrarlo, leer `estudio/intentos` y los `.pp.json`
+> con las reglas de arriba; al mover submetas entre metas renombrar también las
+> claves del registro. No necesita cambios para seguir funcionando.
+
 ### Progreso
 
-- Hoja con `topic_links`: el avance de sus temas (0–1), sin importar `repeat`.
+- Hoja con `topic_links` y/o `practice_links`: el avance de sus enlaces (0–1), sin importar `repeat`
+  (ver la regla de peso en [Submetas de primera clase y práctica](#submetas-de-primera-clase-y-práctica)).
 - Hoja única: 1 si está hecha; si es medible, `value / target` (máx. 1).
 - Hoja repetitiva: días cumplidos / días programados desde `start` (o el
   inicio de la meta, o `created`) hasta hoy, sin pasar de `repeat_until` ni
@@ -917,7 +987,7 @@ aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`
 - El plan diario sale de los planes **activos** (los que contienen la fecha de hoy): los temas cuya semana
   objetivo es la actual (o anterior) y siguen sin completar se ofrecen primero en «Hoy»; con planes
   solapados se combinan sin repetir un mismo tema. El `minutesPerDay` del plan activo sugiere el tiempo de «Hoy».
-- **Programming practice** (`programmingPractice`, opcional y aditivo): la rama de práctica de programación de la app
+- **Programming practice** (`programmingPractice`, opcional y aditivo; un sistema de práctica diaria enfocado en prepararse para entrevistas técnicas y en mejorar la lógica y la resolución de procesos): la rama de práctica de programación de la app
   (carpeta `programming_practice` de la vault y su diálogo «Práctica de programación») planificada dentro del plan.
   Es una pista aparte del plan y no un subplan, porque no tiene temas, se agenda en días del calendario y su estado sale de
   otro módulo. `kata` = reto de lógica diario (`pp_kata`) en los `days` ISO (los de estudio por defecto). `weeklyProject` =
@@ -964,6 +1034,57 @@ aditivo: un cliente que no lo conoce puede ignorarlo, y no sube `FORMAT_VERSION`
   finishing, ai: {lo que la IA aportó y la app validó}, name}`. El estado se REPRODUCE desde `pre` + `answers`; al crear el plan se recalcula todo y el archivo se
   elimina; «Abandonar» lo manda a `.notevault/.papelera/mentor-plans/`. `plans/` solo lee los `*.json` de primer nivel, así que `_building` y `_history` no son planes.
 - `openQuestions` pendientes («Después») se responden también sobre el plan ya guardado con `mentor_plan_answer` (yes añade la propuesta de entregable, no la descarta).
+
+#### Plan por ÁREAS, agenda y entregables (aditivo; sin subir `FORMAT_VERSION`)
+
+El plan se organiza por **áreas elementales** en vez de por rama de carpeta: **Backend**, **Frontend**, **Databases**, **Automation**,
+**Tooling and Quality** (y **Desktop** / **Mobile** solo si el estudiante las incluye). Cada área es un subplan con grupos internos. Los planes
+anteriores (un subplan «Programación: <objetivo>» por rama) se siguen leyendo igual y no se reescriben: solo cambian cuando el estudiante pulsa
+**«Reorganizar por áreas»** en la sub-interfaz del plan.
+
+- `structure: "areas"` (opcional, en el plan): marca la estructura nueva. Si falta, es la estructura antigua.
+- Por subplan (todo opcional): `areaId` (`backend` · `frontend` · `databases` · `automation` · `tooling` · `desktop` · `mobile`; o `x-<materia>` para
+  materias que no son de programación, que forman su propia área); `objective` es **una línea corta** («Construir servicios y APIs sólidos y seguros»);
+  `groups[]` = `{id, title, kind: "bases"|"language"|"knowledge", order}` (Bases · «Lenguaje: Python» · «Conocimientos de backend»);
+  `phase: {fromWeek, toWeek}` = las semanas en que el área está activa (como mucho **2 áreas en paralelo**); `fallback: {kind: "rules"|"mixed", reason}`
+  = el aviso «completado con reglas», **solo** cuando la IA no pudo elegir esos temas (con su motivo; ya no se escriben notas internas como
+  «sin la selección de la IA»). `topics[].group` es el grupo del tema; dentro del área los temas van por grupo (Bases → Lenguaje → Conocimientos).
+- **Tabla rama → área + grupo** (`src/lib/planAreas.ts`, datos, no código disperso): `4 Backend`→Backend, `5 Frontend`→Frontend, `6 Databases`→Databases,
+  `7 Automation`→Automation, `9 Tooling and Quality`→Tooling and Quality, `3 Desktop Apps`/`8 Mobile`→sus áreas (grupo «Conocimientos»);
+  `2.1 Python`→grupo «Lenguaje» de Backend (si Backend no está en el alcance y sí Automation, de Automation); `2.2 JavaScript`/`2.3 TypeScript`→grupo
+  «Lenguaje» de Frontend (sin Frontend, de Backend); `1 Fundamentals`→grupo «Bases» del primer área del plan, limitado por el nivel declarado.
+  **`programming_practice` NO es un área**: es la pista de práctica aparte (`programmingPractice`).
+- **Fases**: las áreas se secuencian por rangos de semanas distintos (no todas en todo el periodo). El orden y los pesos los propone la IA en el esqueleto
+  (la app los valida) o salen del orden por defecto (Backend, Databases, Frontend, Automation, Tooling); la secuencia la calcula la app de forma determinista simulando semana a semana con la capacidad real. Por defecto forman fases `Backend ‖ Databases → Frontend → Automation ‖ Tooling` (las áreas consecutivas de una misma pareja van en paralelo; el resto, solas), de modo que nunca hay más de 2 áreas en una misma semana.
+- **Nombre del plan** autogenerado a partir de las áreas: «Full stack web · 6 oct–5 abr» (Backend + Frontend → «Full stack web»; sin sufijos «+N» ni el
+  periodo repetido). Solo se regeneran los nombres autogenerados antiguos al reorganizar; uno editado a mano se respeta.
+- `openQuestions` en un plan por áreas: **una sola** pregunta global `{id: "deliverables", text, options}` **sin** `subplanId` (en los antiguos, una por subplan).
+  `mentor_plan_answer` sin `subplanId` la responde para todo el plan (yes añade el proyecto PROPIO de cada área: «API REST con persistencia y pruebas»,
+  «Esquema relacional con consultas y migraciones»…, distintos por área); las excepciones por área van con `mentor_plan_area_deliverable`.
+- **Entregables de la agenda** (`deliverables`, opcional): `PlanDeliverable {id, kind: "kata"|"weekly_project"|"monthly_project"|"area_project", title, description,
+  areaId?, dueDate, files?: [{path?, note}], criteria[], status: "pendiente"|"en_curso"|"hecho", source: "practice"|"ai"}`. Los de **práctica** se DERIVAN
+  del plan (un archivo de kata `kata:<fecha>` por día de estudio con kata, `wp:<semana>` por proyecto semanal, `mp:<semana>` por bloque mensual) y los de
+  **área** salen de `subplan.deliverable` (`area:<subplan>`, con la fecha en que acaba el área); `Plan.deliverables` solo guarda lo editado a mano (estado,
+  archivos) casado por `id`, y los extras que añade la IA (`x:<n>`). El estado final es lo más avanzado entre lo que dice la práctica
+  (`PracticeStatus.kataDoneDates` y las fases de cada proyecto) y lo anotado a mano.
+- **Propósitos** (`purposes`, opcional): `{day: {"AAAA-MM-DD": texto}, week: {"3": texto}, month: {"AAAA-MM": texto}}`. Si faltan, el texto sale de plantillas
+  deterministas a partir del contenido (áreas, títulos de temas, práctica, entregables); si existen, lo sustituyen. Se editan en la agenda o pidiéndolo al Mentor.
+- **Agenda** (no se guarda: se recalcula siempre igual, `src/lib/planSchedule.ts`): reparto DIARIO determinista. Cada día de estudio no bloqueado da
+  `minutesPerDay × ritmo` menos los minutos de práctica de ese día; cada semana, la capacidad se reparte entre las áreas con temas esa semana en
+  proporción a su demanda (nivelado por días si hay holgura); un tema que supera los minutos del día ocupa varios (parte 1/n…); nunca antes de su
+  `targetWeek`; los fijados (`pinned`) van primero en su semana; los completados se anotan el día de `completedAt` y no consumen capacidad; lo que no cabe
+  en todo el plan se amontona en el último día de estudio, marcado como desbordado. Vistas Día · Semana · Mes · Calendario con conteo de temas y entregables.
+- **Reorganizar por áreas** (`mentor_plan_reorganize`): determinista y deshacible. Agrupa los subplanes por rama en áreas y recalcula el reparto con las fases;
+  conserva `completedAt`, `pinned`, el estado y el proyecto de los entregables, las metas requeridas, los comentarios del Mentor y la pista de práctica;
+  `programming_practice` sale de los subplanes. Queda como un cambio `applied` en `_history/<plan>/<n>.json` (con `before` = el plan antiguo y `nameAfter` si
+  cambió el nombre): «Deshacer» restaura el plan antiguo exacto (y su nombre, mientras no se haya renombrado a mano).
+- Parche de la IA (cambios pedidos con comentarios), además de los anteriores: `move_topic_area`, `move_group`, `add_area`, `set_area_order`, `set_phase`,
+  `add_deliverable`, `set_purpose`. `subplan` acepta el id del subplan, el `areaId` o el nombre del área. Se valida igual (ids y carpetas reales, semanas dentro del
+  plan, como mucho 2 áreas en paralelo) y el reparto se recalcula siempre con la capacidad real; las operaciones que solo escriben textos o entregables propios
+  no tocan el reparto de los temas.
+- **Programming practice** es un sistema de práctica diaria enfocado en prepararse para entrevistas técnicas y en mejorar la lógica y la resolución de procesos:
+  un reto de lógica (kata) cada día y proyectos de práctica como complemento. No es un área de estudio del plan. Si el plan excluyó Desktop y Mobile, el foco rotativo
+  de sus proyectos semanales tampoco pasa por ellos.
 
 ## Contrato móvil (Mobile Contract)
 

@@ -29,6 +29,20 @@ import {
   type PlanPace,
   type PlanPreconditions,
 } from "../../lib/planTime.js";
+import {
+  areasPlanName,
+  PARALLEL_GROUP,
+  planAreaPhases,
+  sanitizeGroups,
+  sanitizePhase,
+  sanitizePlanDeliverables,
+  sanitizePurposes,
+  type AreaGroup,
+  type AreaPhase,
+  type PlanDeliverable,
+  type PlanPurposes,
+} from "../../lib/planAreas.js";
+import { buildSchedule } from "../../lib/planSchedule.js";
 import { sanitizePracticeTrack, type PracticeTrack } from "../../lib/practiceTrack.js";
 import * as store from "../store.js";
 import { formatLayout, isSyncConflict, LAYOUT } from "../vaultFormat.js";
@@ -53,6 +67,8 @@ export interface PlannedTopic {
   diagnostic?: boolean;
   /** el estudiante fijó su semana con un comentario («pasa X a la semana 5»): el reparto no la mueve */
   pinned?: boolean;
+  /** grupo interno del área al que pertenece (Bases, Lenguaje: Python, Conocimientos…); ver `lib/planAreas.ts` */
+  group?: string;
 }
 
 export interface WeekSlice {
@@ -81,11 +97,17 @@ export interface Deliverable {
   status: DeliverableStatus;
 }
 
+/** Por qué un subplan se completó con reglas en vez de con la selección de la IA (solo cuando de verdad ocurrió). */
+export interface SubplanFallback {
+  kind: "rules" | "mixed";
+  reason: string;
+}
+
 export interface Subplan {
   id: string;
-  /** materia o área de vida */
+  /** área elemental (Backend, Frontend…) en los planes por áreas; materia o área de vida en los antiguos */
   area: string;
-  /** meta enlazada (texto) o texto libre */
+  /** objetivo corto (una línea) del área; en los planes antiguos, la meta o el objetivo largo */
   objective: string;
   goalId?: string;
   goalItemIds?: string[];
@@ -94,6 +116,13 @@ export interface Subplan {
   requiredGoals: RequiredGoal[];
   deliverable?: Deliverable;
   notes?: string;
+  /** id del área elemental (`backend`, `frontend`…): presente en los planes por áreas */
+  areaId?: string;
+  /** grupos internos del área, en orden (Bases · Lenguaje · Conocimientos) */
+  groups?: AreaGroup[];
+  /** semanas del plan en que el área está activa (secuencia por fases) */
+  phase?: AreaPhase;
+  fallback?: SubplanFallback;
 }
 
 /**
@@ -111,24 +140,35 @@ export interface OpenQuestion {
 export const DELIVERABLE_QUESTION_ID = "deliverables";
 export const DELIVERABLE_QUESTION_OPTIONS = ["Sí", "No", "Después"] as const;
 
+/** Pregunta POR SUBPLAN (planes antiguos): «¿Quieres un entregable para X?». */
 export function deliverableQuestion(sub: Pick<Subplan, "id" | "area" | "objective">): OpenQuestion {
   return { id: DELIVERABLE_QUESTION_ID, subplanId: sub.id, text: `¿Quieres un entregable (proyecto de demostración) para ${subplanLabel(sub)}?`, options: [...DELIVERABLE_QUESTION_OPTIONS] };
 }
 
-/** Preguntas válidas: de un subplan que existe y que aún no tiene entregable (si ya lo tiene, la pregunta está respondida). */
+/** UNA sola pregunta global de entregables para todo el plan por áreas (con excepciones por área al responder). */
+export function globalDeliverableQuestion(): OpenQuestion {
+  return { id: DELIVERABLE_QUESTION_ID, text: "¿Quieres un entregable (proyecto de demostración) por cada área del plan?", options: [...DELIVERABLE_QUESTION_OPTIONS] };
+}
+
+/**
+ * Preguntas válidas: de un subplan que existe y que aún no tiene entregable (si ya lo tiene, la pregunta está respondida), o la pregunta
+ * GLOBAL de entregables (sin subplan) mientras algún subplan siga sin entregable.
+ */
 export function sanitizeOpenQuestions(raw: unknown, subplans: readonly Subplan[]): OpenQuestion[] {
   const out: OpenQuestion[] = [];
   const seen = new Set<string>();
   for (const q of Array.isArray(raw) ? raw : []) {
     const id = oneLine(q?.id, 40);
-    const sub = subplans.find((s) => s.id === String(q?.subplanId ?? ""));
-    if (!id || (q?.subplanId !== undefined && !sub)) continue;
-    if (id === DELIVERABLE_QUESTION_ID && (!sub || sub.deliverable)) continue;
+    const hasSub = q?.subplanId !== undefined && q?.subplanId !== null && String(q.subplanId) !== "";
+    const sub = hasSub ? subplans.find((s) => s.id === String(q.subplanId)) : undefined;
+    if (!id || (hasSub && !sub)) continue;
+    if (id === DELIVERABLE_QUESTION_ID && (sub ? !!sub.deliverable : subplans.every((s) => !!s.deliverable))) continue;
     const key = `${id}:${sub?.id ?? ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
     const options = (Array.isArray(q?.options) ? q.options : []).map((o: unknown) => oneLine(o, 40)).filter(Boolean).slice(0, 6);
-    out.push({ id, ...(sub ? { subplanId: sub.id } : {}), text: oneLine(q?.text, 300) || (sub ? deliverableQuestion(sub).text : id), options: options.length ? options : [...DELIVERABLE_QUESTION_OPTIONS] });
+    const fallbackText = sub ? deliverableQuestion(sub).text : id === DELIVERABLE_QUESTION_ID ? globalDeliverableQuestion().text : id;
+    out.push({ id, ...(sub ? { subplanId: sub.id } : {}), text: oneLine(q?.text, 300) || fallbackText, options: options.length ? options : [...DELIVERABLE_QUESTION_OPTIONS] });
   }
   return out;
 }
@@ -160,6 +200,12 @@ export interface Plan {
   programmingPractice?: PracticeTrack;
   /** decisiones que quedaron pendientes al armar el plan (p. ej. entregables «a discutir») */
   openQuestions?: OpenQuestion[];
+  /** «areas» = subplanes por áreas elementales con grupos y fases (estructura nueva); ausente = estructura antigua */
+  structure?: "areas";
+  /** ediciones a mano de entregables derivados (por id) y entregables extra; ver `lib/planAreas.ts` */
+  deliverables?: PlanDeliverable[];
+  /** propósitos de día / semana / mes escritos a mano (sustituyen al texto determinista) */
+  purposes?: PlanPurposes;
   subplans: Subplan[];
 }
 /** Nombre histórico: un plan mensual es un plan de periodo. */
@@ -217,12 +263,13 @@ export function planStatus(plan: Pick<Plan, "start" | "end" | "archived" | "prop
 const MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const dmShort = (iso: string): string => `${Number(iso.slice(8))} ${MONTHS_ES[Number(iso.slice(5, 7)) - 1]}`;
 
-/** Nombre autogenerado: «Backend · 6 oct–6 nov» (el objetivo del primer subplan, o su área, y el periodo). */
-export function defaultPlanName(subplans: ReadonlyArray<Pick<Subplan, "area" | "objective">>, start: string, end: string): string {
-  const first = subplans[0];
-  const topic = first ? (first.objective.trim() || first.area).slice(0, 40) : "Plan";
-  const extra = subplans.length > 1 ? ` +${subplans.length - 1}` : "";
-  return `${topic}${extra} · ${dmShort(start)}–${dmShort(end)}`;
+/**
+ * Nombre autogenerado a partir de las ÁREAS: «Full stack web · 6 oct–5 abr» (el periodo una sola vez, sin sufijos «+N»). Con subplanes
+ * antiguos sin `areaId` se usan sus áreas de vida («Programación · 6 oct–5 abr»).
+ */
+export function defaultPlanName(subplans: ReadonlyArray<Pick<Subplan, "area" | "objective"> & { areaId?: string }>, start: string, end: string): string {
+  if (!subplans.length) return `Plan · ${dmShort(start)}–${dmShort(end)}`;
+  return areasPlanName(subplans, start, end);
 }
 /** El nombre del plan: el editado o el autogenerado. */
 export const planName = (p: Pick<Plan, "name" | "subplans" | "start" | "end" | "month">): string => {
@@ -273,6 +320,8 @@ export interface Capacity {
   pace?: PlanPace;
   /** minutos de cada día reservados a otra cosa (la práctica): se restan de lo que da el día antes de repartir temas */
   reservedMinutes?: (date: string) => number;
+  /** fracción (0..1) de lo que queda del día para este reparto: con áreas en paralelo, el área activa se lleva su parte; 0 = área inactiva */
+  shareAt?: (date: string) => number;
 }
 
 export interface DistributeInput extends Capacity {
@@ -281,7 +330,9 @@ export interface DistributeInput extends Capacity {
   /** o un periodo libre */
   start?: string;
   end?: string;
-  topics: ReadonlyArray<{ folder: string; title: string; skills?: string[]; estMinutes: number }>;
+  topics: ReadonlyArray<{ folder: string; title: string; skills?: string[]; estMinutes: number; group?: string }>;
+  /** semanas (1..) en que el reparto puede colocar temas (fase del área); fuera de ellas la capacidad es 0 */
+  window?: AreaPhase;
   /** primer día disponible (AAAA-MM-DD); por defecto, el inicio del periodo */
   from?: string;
   /** si todo cabe, reparte los temas a partes iguales por las semanas aprovechables (en vez de llenar las primeras) */
@@ -312,15 +363,17 @@ function periodOf(i: { month?: string; start?: string; end?: string }): { start:
 
 /** Minutos que da cada día según la capacidad; lanza si no hay capacidad positiva. */
 function dayMinutesOf(c: Capacity): (date: string) => number {
+  const share = c.shareAt;
   if (c.minutesPerDay !== undefined) {
     if (!(c.minutesPerDay > 0)) throw new Error("El tiempo diario debe ser mayor que 0.");
     const base = dayMinutes({ minutesPerDay: c.minutesPerDay, studyDays: c.studyDays ?? [1, 2, 3, 4, 5, 6, 7], blockedDates: c.blockedDates, pace: c.pace ?? "intenso" });
     const reserved = c.reservedMinutes;
-    return reserved ? (date) => (base(date) > 0 ? Math.max(0, base(date) - reserved(date)) : 0) : base;
+    const net = reserved ? (date: string) => (base(date) > 0 ? Math.max(0, base(date) - reserved(date)) : 0) : base;
+    return share ? (date) => net(date) * share(date) : net;
   }
   if (!(Number(c.hoursPerWeek) > 0)) throw new Error("Las horas por semana deben ser mayores que 0.");
   const perDay = (Number(c.hoursPerWeek) * 60) / 7;
-  return () => perDay;
+  return share ? (date) => perDay * share(date) : () => perDay;
 }
 
 /**
@@ -334,9 +387,11 @@ export function distributeTopics(input: DistributeInput): Distribution {
   const dm = dayMinutesOf(input);
   const ranges = weekRangesOf(period.start, period.end);
   const from = input.from && DATE_RE.test(input.from) && input.from > period.start ? (input.from > period.end ? addDays(period.end, 1) : input.from) : period.start;
+  const win = input.window;
   const weeks: WeekSlice[] = ranges.map((r) => {
     const days = eachDay(from > r.start ? from : r.start, r.end);
-    return { week: r.week, start: r.start, end: r.end, topics: [], minutes: 0, capacityMinutes: Math.round(days.reduce((n, d) => n + dm(d), 0)) };
+    const inside = !win || (r.week >= win.fromWeek && r.week <= win.toWeek);
+    return { week: r.week, start: r.start, end: r.end, topics: [], minutes: 0, capacityMinutes: inside ? Math.round(days.reduce((n, d) => n + dm(d), 0)) : 0 };
   });
   const usable = weeks.filter((w) => w.capacityMinutes > 0);
   const availableMinutes = usable.reduce((n, w) => n + w.capacityMinutes, 0);
@@ -347,10 +402,13 @@ export function distributeTopics(input: DistributeInput): Distribution {
   const target = input.spread && usable.length > 1 && totalNeed <= availableMinutes ? Math.ceil(totalNeed / usable.length) : Infinity;
   const budget = (w: WeekSlice): number => Math.min(w.capacityMinutes, target);
   let idx = Math.max(0, weeks.findIndex((w) => w.capacityMinutes > 0));
+  if (win && !usable.length) idx = Math.min(weeks.length - 1, Math.max(0, win.fromWeek - 1));
+  // con una fase (ventana de semanas) lo que sobra se queda en la última semana de la ventana, no más allá
+  const lastIdx = win ? Math.min(weeks.length - 1, Math.max(idx, win.toWeek - 1)) : weeks.length - 1;
   let remaining = budget(weeks[idx]!);
   const planned: PlannedTopic[] = [];
   for (const t of topics) {
-    while (idx < weeks.length - 1 && weeks[idx]!.topics.length > 0 && remaining < t.estMinutes * 0.5) {
+    while (idx < lastIdx && weeks[idx]!.topics.length > 0 && remaining < t.estMinutes * 0.5) {
       idx++;
       remaining = budget(weeks[idx]!);
     }
@@ -358,7 +416,7 @@ export function distributeTopics(input: DistributeInput): Distribution {
     w.topics.push(t.folder);
     w.minutes += t.estMinutes;
     remaining -= t.estMinutes;
-    planned.push({ folder: t.folder, title: t.title, ...(t.skills?.length ? { skills: t.skills } : {}), targetWeek: w.week, estMinutes: t.estMinutes });
+    planned.push({ folder: t.folder, title: t.title, ...(t.skills?.length ? { skills: t.skills } : {}), targetWeek: w.week, estMinutes: t.estMinutes, ...(t.group ? { group: t.group } : {}) });
   }
 
   const totalMinutes = topics.reduce((n, t) => n + t.estMinutes, 0);
@@ -384,12 +442,18 @@ export interface SubplanSeed {
   objective: string;
   goalId?: string;
   goalItemIds?: string[];
-  topics: Array<{ folder: string; title: string; skills?: string[]; estMinutes: number; diagnostic?: boolean }>;
+  topics: Array<{ folder: string; title: string; skills?: string[]; estMinutes: number; diagnostic?: boolean; group?: string }>;
   requiredGoals?: RequiredGoal[];
   deliverable?: Partial<Deliverable> & { title: string };
   notes?: string;
   /** peso para repartir la capacidad entre subplanes (por defecto, sus minutos): el constructor guiado lo usa para «más tiempo a…» */
   weight?: number;
+  /** área elemental (`backend`…) y sus grupos internos: el subplan es un ÁREA del plan por áreas */
+  areaId?: string;
+  groups?: AreaGroup[];
+  /** semanas en que el área está activa; si falta en un plan por áreas, `buildPlan` secuencia las áreas por fases */
+  phase?: AreaPhase;
+  fallback?: SubplanFallback;
 }
 
 const fold = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -462,19 +526,49 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
   let totalMinutes = 0;
   let availableMinutes = 0;
   const perDayMode = opts.minutesPerDay !== undefined;
+  const ranges = weekRangesOf(period.start, period.end);
+  // PLAN POR ÁREAS: cada área tiene una fase (semanas en que está activa); en cada semana la capacidad se reparte solo entre las activas
+  const byAreas = seeds.length > 0 && seeds.every((s) => !!s.areaId);
+  const phases = new Map<number, AreaPhase>();
+  if (byAreas) {
+    const given = seeds.map((s) => s.phase);
+    if (given.every(Boolean)) given.forEach((p, i) => phases.set(i, p!));
+    else {
+      // secuencia determinista por fases a partir del orden de las semillas y de sus pesos
+      const dm = dayMinutesOf(perDayMode ? { minutesPerDay: opts.minutesPerDay, studyDays: opts.studyDays, blockedDates: opts.blockedDates, pace: opts.pace, ...(opts.reservedMinutes ? { reservedMinutes: opts.reservedMinutes } : {}) } : { hoursPerWeek: opts.hoursPerWeek });
+      const from0 = opts.from && DATE_RE.test(opts.from) && opts.from > period.start ? opts.from : period.start;
+      const caps = ranges.map((r) => eachDay(from0 > r.start ? (from0 > r.end ? addDays(r.end, 1) : from0) : r.start, r.end).reduce((n, d) => n + dm(d), 0));
+      const result = planAreaPhases(seeds.map((s, i) => ({ key: String(i), weight: weightOf(s), ...(s.areaId && PARALLEL_GROUP[s.areaId] ? { group: PARALLEL_GROUP[s.areaId] } : {}) })), caps);
+      seeds.forEach((_, i) => phases.set(i, result[String(i)]!));
+    }
+  }
+  const activeWeight = (week: number): number => seeds.reduce((n, s, i) => (phases.get(i)!.fromWeek <= week && week <= phases.get(i)!.toWeek ? n + weightOf(s) : n), 0);
+  const weekOfDate = (date: string): number => Math.floor(daysBetween(period.start, date) / 7) + 1;
   seeds.forEach((seed, i) => {
     const share = total > 0 && weightTotal > 0 ? weightOf(seed) / weightTotal : 1 / Math.max(1, seeds.length);
-    // un subplan sin temas (solo entregable) no consume horas: se le da un mínimo simbólico para poder calcular
-    const cap: Capacity = perDayMode
-      ? {
-          minutesPerDay: Math.max(0.5, opts.minutesPerDay! * share),
-          studyDays: opts.studyDays,
-          blockedDates: opts.blockedDates,
-          pace: opts.pace,
-          ...(opts.reservedMinutes ? { reservedMinutes: (d: string) => opts.reservedMinutes!(d) * share } : {}),
+    const win = byAreas ? phases.get(i)! : undefined;
+    const shareAt = byAreas
+      ? (date: string): number => {
+          const w = weekOfDate(date);
+          const all = activeWeight(w);
+          return win && w >= win.fromWeek && w <= win.toWeek && all > 0 ? weightOf(seed) / all : 0;
         }
-      : { hoursPerWeek: Math.max(0.1, Number(opts.hoursPerWeek) * share) };
-    const dist = distributeTopics({ ...cap, start: period.start, end: period.end, topics: seed.topics, from: opts.from, spread: opts.spread ?? perDayMode });
+      : undefined;
+    // un subplan sin temas (solo entregable) no consume horas: se le da un mínimo simbólico para poder calcular
+    const cap: Capacity = byAreas
+      ? perDayMode
+        ? { minutesPerDay: opts.minutesPerDay, studyDays: opts.studyDays, blockedDates: opts.blockedDates, pace: opts.pace, ...(opts.reservedMinutes ? { reservedMinutes: opts.reservedMinutes } : {}), shareAt }
+        : { hoursPerWeek: Math.max(0.1, Number(opts.hoursPerWeek)), shareAt }
+      : perDayMode
+        ? {
+            minutesPerDay: Math.max(0.5, opts.minutesPerDay! * share),
+            studyDays: opts.studyDays,
+            blockedDates: opts.blockedDates,
+            pace: opts.pace,
+            ...(opts.reservedMinutes ? { reservedMinutes: (d: string) => opts.reservedMinutes!(d) * share } : {}),
+          }
+        : { hoursPerWeek: Math.max(0.1, Number(opts.hoursPerWeek) * share) };
+    const dist = distributeTopics({ ...cap, start: period.start, end: period.end, topics: seed.topics, from: opts.from, spread: opts.spread ?? perDayMode, ...(win ? { window: win } : {}) });
     totalMinutes += dist.totalMinutes;
     availableMinutes += total > 0 ? dist.availableMinutes : 0;
     let id = seed.id && /^[A-Za-z0-9_-]{1,40}$/.test(seed.id) ? seed.id : `s${i + 1}-${slugOf(seed.area)}`;
@@ -493,6 +587,10 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
       requiredGoals: (seed.requiredGoals ?? []).map((g) => ({ goalId: g.goalId, ...(g.itemId ? { itemId: g.itemId } : {}), note: oneLine(g.note, 200) })),
       ...(deliverable ? { deliverable } : {}),
       ...(seed.notes ? { notes: oneLine(seed.notes, 400) } : {}),
+      ...(seed.areaId ? { areaId: seed.areaId } : {}),
+      ...(seed.groups?.length ? { groups: seed.groups } : {}),
+      ...(win ? { phase: win } : {}),
+      ...(seed.fallback ? { fallback: seed.fallback } : {}),
     });
   });
   const fits = totalMinutes <= availableMinutes || total === 0;
@@ -504,12 +602,12 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
   const requiredHoursPerWeek = availableMinutes > 0 ? r1((totalMinutes / availableMinutes) * hoursPerWeek) : null;
   if (!fits) {
     warnings.push(
-      `No cabe en el periodo: harían falta unas ${requiredHoursPerWeek ?? "?"} h/semana (tienes ${hoursPerWeek}) o quitar temas. Lo que sobra queda en la última semana de cada subplan.`,
+      `No cabe en el periodo: harían falta unas ${requiredHoursPerWeek ?? "?"} h/semana (tienes ${hoursPerWeek}) o quitar temas. Lo que sobra queda en la última semana de ${byAreas ? "cada área" : "cada subplan"}.`,
     );
   } else if (total > 0 && totalMinutes < availableMinutes * 0.4) {
     warnings.push(`Te sobra tiempo: a ${hoursPerWeek} h/semana solo usas ${Math.round((totalMinutes / availableMinutes) * 100)}% del periodo.`);
   }
-  if (!subplans.length) warnings.push("El plan no tiene subplanes.");
+  if (!subplans.length) warnings.push("El plan no tiene áreas.");
   const legacyMonth = opts.start === undefined && opts.month && MONTH_RE.test(opts.month) ? opts.month : undefined;
   return {
     plan: {
@@ -525,6 +623,7 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
       ...(opts.auto ? { auto: true } : {}),
       ...(opts.rationale ? { rationale: oneLine(opts.rationale, 600) } : {}),
       ...(opts.programmingPractice ? { programmingPractice: opts.programmingPractice } : {}),
+      ...(byAreas ? { structure: "areas" as const } : {}),
       subplans,
       ...(sanitizeOpenQuestions(opts.openQuestions, subplans).length ? { openQuestions: sanitizeOpenQuestions(opts.openQuestions, subplans) } : {}),
     },
@@ -543,7 +642,10 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
  */
 export function mergePlans(existing: Plan | null, incoming: Plan, now: string = new Date().toISOString()): Plan {
   if (!existing) return incoming;
-  const byKey = new Map(existing.subplans.map((s) => [subplanKey(s), s]));
+  // un plan por áreas sustituye a uno de estructura antigua del mismo periodo (los temas completados se conservan por carpeta)
+  const restructure = incoming.structure === "areas" && existing.structure !== "areas";
+  const doneByFolder = new Map(existing.subplans.flatMap((s) => s.topics.filter((t) => t.completedAt).map((t) => [t.folder, t.completedAt!] as const)));
+  const byKey = new Map(restructure ? [] : existing.subplans.map((s) => [subplanKey(s), s]));
   const taken = new Set<string>();
   const merged: Subplan[] = [];
   const ids = new Set<string>();
@@ -551,7 +653,7 @@ export function mergePlans(existing: Plan | null, incoming: Plan, now: string = 
   for (const s of incoming.subplans) {
     const old = byKey.get(subplanKey(s));
     if (old) taken.add(subplanKey(old));
-    const done = new Map((old?.topics ?? []).filter((t) => t.completedAt).map((t) => [t.folder, t.completedAt!]));
+    const done = restructure ? doneByFolder : new Map((old?.topics ?? []).filter((t) => t.completedAt).map((t) => [t.folder, t.completedAt!]));
     let id = old?.id ?? s.id;
     while (ids.has(id)) id += "x";
     ids.add(id);
@@ -565,14 +667,14 @@ export function mergePlans(existing: Plan | null, incoming: Plan, now: string = 
         : {}),
     });
   }
-  for (const s of existing.subplans) {
+  for (const s of restructure ? [] : existing.subplans) {
     if (taken.has(subplanKey(s))) continue;
     let id = s.id;
     while (ids.has(id)) id += "x";
     ids.add(id);
     merged.push({ ...s, id });
   }
-  const { auto: _auto, openQuestions: _oq, programmingPractice: _pp, ...rest } = existing;
+  const { auto: _auto, openQuestions: _oq, programmingPractice: _pp, structure: _st, ...rest } = existing;
   const practice = incoming.programmingPractice ?? existing.programmingPractice;
   const questions = sanitizeOpenQuestions(
     [...(incoming.openQuestions ?? []).map((q) => ({ ...q, subplanId: remap.get(String(q.subplanId)) ?? q.subplanId })), ...(existing.openQuestions ?? [])],
@@ -580,6 +682,7 @@ export function mergePlans(existing: Plan | null, incoming: Plan, now: string = 
   );
   return {
     ...rest,
+    ...((incoming.structure ?? existing.structure) ? { structure: (incoming.structure ?? existing.structure)! } : {}),
     ...(practice ? { programmingPractice: practice } : {}),
     ...(questions.length ? { openQuestions: questions } : {}),
     hoursPerWeek: incoming.hoursPerWeek ?? existing.hoursPerWeek,
@@ -685,14 +788,20 @@ export interface PlanItem {
   targetWeek: number;
   /** la semana objetivo ya pasó */
   overdue: boolean;
+  /** el reparto DIARIO del plan lo coloca en este día (agenda del plan) */
+  scheduledToday?: boolean;
+  /** minutos que el reparto diario le da HOY (un tema puede abarcar varios días) */
+  todayMinutes?: number;
 }
 
 export const DELIVERABLE_MINUTES = 45;
 
-export function subplanLabel(s: Pick<Subplan, "area" | "objective">): string {
+export function subplanLabel(s: Pick<Subplan, "area" | "objective"> & { areaId?: string }): string {
+  // en un plan por áreas el área ya es el nombre corto: sin objetivo pegado ni truncado
+  if (s.areaId) return s.area;
   const o = s.objective.trim();
   const base = o && fold(o) !== fold(s.area) ? `${s.area}: ${o}` : s.area;
-  return base.length > 48 ? `${base.slice(0, 47).trim()}…` : base;
+  return base.length > 64 ? `${base.slice(0, 63).trim()}…` : base;
 }
 
 /**
@@ -710,6 +819,16 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
     const weeks = weekRangesOf(plan.start, plan.end).length;
     const cur = weekIndex(date, plan.start, plan.end);
     if (cur < 1) continue;
+    // el reparto por días: lo que la agenda coloca hoy (con sus minutos) pasa por delante de lo demás de la semana
+    let todayOf = new Map<string, number>();
+    try {
+      const day = buildSchedule(plan).byDate.get(date);
+      todayOf = new Map(
+        [...new Set((day?.topics ?? []).filter((t) => !t.done).map((t) => t.folder))].map((f) => [f, (day?.topics ?? []).filter((t) => t.folder === f && !t.done).reduce((n, t) => n + t.minutes, 0)] as const),
+      );
+    } catch {
+      /* sin agenda: solo la semana */
+    }
     for (const s of plan.subplans) {
       const label = subplanLabel(s);
       let pending = 0;
@@ -731,6 +850,7 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
           estMinutes: t.estMinutes,
           targetWeek: t.targetWeek,
           overdue: t.targetWeek < cur,
+          ...(todayOf.has(t.folder) ? { scheduledToday: true, todayMinutes: todayOf.get(t.folder)! } : {}),
         });
       }
       const d = s.deliverable;
@@ -739,7 +859,8 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
       }
     }
   }
-  return out.sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.targetWeek - b.targetWeek);
+  // atrasados primero, luego por semana objetivo y, dentro de una misma semana, lo que la agenda coloca HOY por delante
+  return out.sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.targetWeek - b.targetWeek || Number(!!b.scheduledToday) - Number(!!a.scheduledToday));
 }
 
 // ── Persistencia ─────────────────────────────────────────────────────────
@@ -758,6 +879,8 @@ function cleanTopic(raw: any): PlannedTopic | null {
   if (DATE_RE.test(String(raw.completedAt ?? ""))) t.completedAt = String(raw.completedAt);
   if (raw.diagnostic === true) t.diagnostic = true;
   if (raw.pinned === true) t.pinned = true;
+  const group = oneLine(raw.group, 40);
+  if (group) t.group = group;
   return t;
 }
 
@@ -815,6 +938,10 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
         .map((g: any) => ({ goalId: String(g.goalId), ...(g.itemId ? { itemId: String(g.itemId) } : {}), note: oneLine(g.note, 200) })),
       ...(deliverable ? { deliverable } : {}),
       ...(s.notes ? { notes: oneLine(s.notes, 400) } : {}),
+      ...(oneLine(s.areaId, 40) ? { areaId: oneLine(s.areaId, 40) } : {}),
+      ...(sanitizeGroups(s.groups).length ? { groups: sanitizeGroups(s.groups) } : {}),
+      ...(sanitizePhase(s.phase, ranges.length) ? { phase: sanitizePhase(s.phase, ranges.length)! } : {}),
+      ...(s.fallback && (s.fallback.kind === "rules" || s.fallback.kind === "mixed") ? { fallback: { kind: s.fallback.kind as "rules" | "mixed", reason: oneLine(s.fallback.reason, 240) } } : {}),
     });
   }
   const hours = Number(raw.hoursPerWeek);
@@ -837,6 +964,9 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
     ...(raw.rationale ? { rationale: oneLine(raw.rationale, 600) } : {}),
     ...(practice ? { programmingPractice: practice } : {}),
     ...(questions.length ? { openQuestions: questions } : {}),
+    ...(raw.structure === "areas" ? { structure: "areas" as const } : {}),
+    ...(sanitizePlanDeliverables(raw.deliverables).length ? { deliverables: sanitizePlanDeliverables(raw.deliverables) } : {}),
+    ...(sanitizePurposes(raw.purposes) ? { purposes: sanitizePurposes(raw.purposes)! } : {}),
     subplans,
   };
 }

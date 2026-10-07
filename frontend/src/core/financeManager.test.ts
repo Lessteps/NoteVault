@@ -125,19 +125,36 @@ describe("FinanceManager", () => {
       expect(prevM[GASTO]).toBe(100);
     });
 
-    it("default categories and budget", () => {
-      expect(fm.ensure_defaults()).toBe(true);
+    it("no siembra categorías y no inventa nada", () => {
+      // Un vault nace vacío: las categorías son las que crea la persona.
       expect(fm.ensure_defaults()).toBe(false);
+      expect(fm.categories(null, true)).toEqual([]);
+      // Idempotente aunque se insista.
+      expect(fm.ensure_defaults()).toBe(false);
+      expect(fm.categories(null, true)).toEqual([]);
+    });
 
-      const names = fm.categories(GASTO).map((c) => c.name);
-      expect(names[0]).toBe("Comida");
-      expect(fm.categories(INGRESO).length).toBe(3);
+    it("categoría creada a mano y presupuesto", () => {
+      fm.create_category("Comida", GASTO, "🍽", "#f4511e", 60000000);
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["Comida"]);
+      expect(fm.categories(INGRESO)).toEqual([]);
 
-      fm.update_category("comida", { budget_month_cents: 60000000 });
       fm.add(D, GASTO, 1000000, { category: "comida" });
-
       const used = fm.budget_used(2026, 9).map(([c, u, b]) => [c.id, u, b]);
       expect(used).toEqual([["comida", 1000000, 60000000]]);
+    });
+
+    it("eliminar una categoría la manda a la papelera", () => {
+      fm.create_category("Comida", GASTO, "🍽", "#f4511e", 0);
+      fm.add(D, GASTO, 1000000, { category: "comida" });
+
+      expect(fm.delete_category("comida")).toBe(true);
+      expect(fm.categories(null, true)).toEqual([]);
+      expect(fm.delete_category("comida")).toBe(false);
+      // El movimiento sobrevive y queda sin categoría.
+      expect(fm.day(D)[0]!.category).toBe("comida");
+      // Y no vuelve sola al vaciarse la carpeta.
+      expect(fm.ensure_defaults()).toBe(false);
     });
 
     it("money format", () => {

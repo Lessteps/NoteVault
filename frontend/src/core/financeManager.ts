@@ -48,20 +48,14 @@ export const TYPE_COLOURS: Record<string, string> = {
   [RETIRO]: "#ff9632",
 };
 
-export const DEFAULT_CATEGORIES: readonly [string, string, string, string][] = [
-  ["Comida", "🍽", "#f4511e", GASTO],
-  ["Transporte", "🚌", "#039be5", GASTO],
-  ["Vivienda", "🏠", "#8e24aa", GASTO],
-  ["Servicios", "💡", "#f6bf26", GASTO],
-  ["Salud", "💊", "#33b679", GASTO],
-  ["Educación", "📚", "#3f51b5", GASTO],
-  ["Ocio", "🎮", "#e67c73", GASTO],
-  ["Compras", "🛍", "#7986cb", GASTO],
-  ["Otros", "•", "#616161", GASTO],
-  ["Salario", "💼", "#0b8043", INGRESO],
-  ["Extra", "✨", "#33b679", INGRESO],
-  ["Regalo", "🎁", "#e67c73", INGRESO],
-];
+/**
+ * Categorías con las que nace un vault. Vacío a propósito: las suyas las
+ * creas tú en Finanzas › Categorías. Antes sembraba 9 gastos y 3 ingresos, y
+ * quien no usaba la mitad terminaba con selectores llenos de cosas suyas.
+ * Añade aquí una entrada `[nombre, icono, color, tipo]` solo si *de verdad*
+ * quieres que toda vault nueva la reciba.
+ */
+export const DEFAULT_CATEGORIES: readonly [string, string, string, string][] = [];
 
 export { formatMoney, format_money };
 
@@ -278,6 +272,10 @@ export class FinanceManager {
     if (this.categories(null, true).length > 0) {
       return false;
     }
+    // Sin catálogo por defecto no hay nada que sembrar: no se dice que sí.
+    if (DEFAULT_CATEGORIES.length === 0) {
+      return false;
+    }
     let n = 1;
     for (const [name, icon, colour, kind] of DEFAULT_CATEGORIES) {
       this._saveCategory(
@@ -365,6 +363,18 @@ export class FinanceManager {
   }
   archive_category(cid: string, archived = true): Record<string, any> | null {
     return this.archiveCategory(cid, archived);
+  }
+
+  /**
+   * Borra la categoría moviendo su fichero a la papelera del vault. Los
+   * movimientos que la usaban se quedan apuntando a un id que ya no existe y
+   * se muestran como «Sin categoría»; no se reasignan ni se borran.
+   */
+  deleteCategory(cid: string): boolean {
+    return toTrash(this.vaultRoot, this.categoryPath(String(cid)), "finanzas-categorias") !== null;
+  }
+  delete_category(cid: string): boolean {
+    return this.deleteCategory(cid);
   }
 
   // ── Movements ─────────────────────────────────────────────────────────

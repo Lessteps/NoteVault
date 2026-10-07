@@ -382,6 +382,19 @@ export function financeApi(app: AppState) {
       return fm.updateCategory(String(cid), patch);
     },
 
+    /**
+     * Borra la categoría (a la papelera del vault). Los movimientos que la
+     * usaban quedan sin categoría: no se borran ni se reasignan.
+     */
+    fin_category_delete(cid: string) {
+      const s = String(cid || "");
+      if (!s) throw new ApiError("Categoría inválida.");
+      if (!(s in getFm().categoryMap())) {
+        throw new ApiError("Esa categoría ya no existe.");
+      }
+      return { ok: getFm().deleteCategory(s) };
+    },
+
     fin_goals() {
       const fm = getFm();
       const today = new Date();

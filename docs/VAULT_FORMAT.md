@@ -526,9 +526,11 @@ unidad); otras monedas con dos decimales (`$ 12,50`).
 ```
 
 Claves en ese orden (`CATEGORY_KEYS`). `kind` ∈ `gasto` · `ingreso`. El id es el
-nombre sin tildes con guiones. Si la carpeta está vacía se crean: Comida,
-Transporte, Vivienda, Servicios, Salud, Educación, Ocio, Compras, Otros
-(gasto) y Salario, Extra, Regalo (ingreso).
+nombre sin tildes con guiones. **Un vault no trae categorías**: las crea la
+persona en Finanzas › Categorías, y borrarlas es permanente (van a la papelera).
+`DEFAULT_CATEGORIES` está vacío a propósito; si alguna vez debe sembrarse una,
+va en `frontend/src/core/financeManager.ts` y `ensureDefaults()` solo escribe si
+la carpeta está vacía.
 
 ### `metas/<fgoal-id>.json`
 

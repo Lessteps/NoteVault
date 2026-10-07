@@ -10,7 +10,7 @@ import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
 import { BlockProgress } from "../common/charts";
 import { ColourRow, Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
-import { cn } from "../ui";
+import { cn, confirmAction } from "../ui";
 import { MoneyInput } from "./parts";
 
 const COLOURS = ["#f4511e", "#039be5", "#8e24aa", "#f6bf26", "#33b679", "#3f51b5", "#e67c73", "#7986cb", "#616161", "#0b8043"];
@@ -38,10 +38,26 @@ export function CategoryDialog() {
       toast("error", (e as Error).message);
     }
   };
+  const remove = async () => {
+    const c = meta?.categories.find((x) => x.id === editing.id);
+    if (!(await confirmAction("Eliminar categoría",
+      `¿Eliminar «${c?.name ?? "esta categoría"}»? Va a la papelera del vault. Los movimientos que la usaban se quedan sin categoría (no se borran). Si solo quieres dejar de verla, archívala.`,
+      "Eliminar", true))) return;
+    try {
+      await api.finCategoryDelete(editing.id);
+      setEditing(null);
+      await changed();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
   return (
     <Modal title={editing.id ? "Editar categoría" : "Nueva categoría"} onClose={() => setEditing(null)} width={460}
       footer={<>
-        {editing.id && <GhostButton danger={!f.archived} onClick={() => void save({ archived: !f.archived })}>{f.archived ? "Reactivar" : "Archivar"}</GhostButton>}
+        {editing.id && <>
+          <GhostButton danger={!f.archived} onClick={() => void save({ archived: !f.archived })}>{f.archived ? "Reactivar" : "Archivar"}</GhostButton>
+          <GhostButton danger onClick={() => void remove()}>Eliminar</GhostButton>
+        </>}
         <span className="flex-1" /><GhostButton onClick={() => setEditing(null)}>Cancelar</GhostButton><PrimaryButton onClick={() => void save()}>Guardar</PrimaryButton></>}>
       <div className="grid grid-cols-[70px_1fr] gap-3">
         <Field label="Icono"><input className={input} value={f.icon ?? ""} placeholder="🐶" onChange={(e) => setF({ ...f, icon: e.target.value })} /></Field>
@@ -85,6 +101,7 @@ export function Categories() {
     }).catch(() => undefined);
   }, [version]);
   const groups: Array<["gasto" | "ingreso", string]> = [["gasto", "Gastos"], ["ingreso", "Ingresos"]];
+  const total = (meta?.categories ?? []).length;
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-4">
       <div className="flex items-center gap-3">
@@ -92,6 +109,11 @@ export function Categories() {
         <span className="flex-1" />
         <PrimaryButton onClick={() => setEditing({ id: "", kind: "gasto" })}><Plus size={14} /> Nueva categoría</PrimaryButton>
       </div>
+      {total === 0 && (
+        <p className="py-10 text-center text-[13px] text-faint">
+          Aún no hay categorías. Crea las tuyas: son las que aparecerán al registrar un gasto.
+        </p>
+      )}
       {groups.map(([kind, title]) => (
         <section key={kind}>
           <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">{title} · este mes</div>

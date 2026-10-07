@@ -109,15 +109,26 @@ test("NV-F-004 eliminar movimiento lo saca de la tabla y del disco", async () =>
   await expect.poll(() => readFileSync(todayFile(), "utf-8")).not.toContain(what);
 });
 
-test("NV-F-005 categorías muestra Comida y vuelve al diario", async () => {
+test("NV-F-005 categorías nacen vacías y se puede crear una", async () => {
   await side().getByRole("button", { name: "Categorías" }).click();
   await expect(win.getByRole("heading", { name: /Categorías/ })).toBeVisible({ timeout: 15_000 });
-  await expect(win.locator("main").locator("span", { hasText: "Comida" }).first()).toBeVisible({
+  // Un vault nuevo no trae catálogo: las categorías las crea la persona.
+  await expect(win.getByText("Aún no hay categorías")).toBeVisible({ timeout: 15_000 });
+
+  const name = `E2E Mascotas ${Date.now()}`;
+  await win.getByRole("button", { name: "Nueva categoría" }).click();
+  const dialog = win.getByRole("dialog", { name: "Nueva categoría" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByPlaceholder("p. ej. Mascotas").fill(name);
+  await dialog.getByRole("button", { name: "Guardar" }).click();
+  await expect(win.locator("main").locator("span", { hasText: name }).first()).toBeVisible({
     timeout: 15_000,
   });
 
   await gotoDiario();
   await expect(win.getByLabel("Importe rápido")).toBeVisible({ timeout: 15_000 });
+  // Y aparece en el selector del registro rápido.
+  await expect(win.locator("select").filter({ hasText: name }).first()).toBeVisible({ timeout: 15_000 });
 });
 
 test("NV-F-006 crear meta en 2 pasos calcula el aporte y la muestra", async () => {

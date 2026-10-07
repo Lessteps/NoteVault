@@ -129,6 +129,47 @@ test("NV-F-005 categorías nacen vacías y se puede crear una", async () => {
   await expect(win.getByLabel("Importe rápido")).toBeVisible({ timeout: 15_000 });
   // Y aparece en el selector del registro rápido.
   await expect(win.locator("select").filter({ hasText: name }).first()).toBeVisible({ timeout: 15_000 });
+
+  // Se puede crear una categoría sin salir del Diario: sin esto, todo movimiento
+  // caía en «Sin categoría» y no había forma de arreglarlo aquí.
+  const inline = `E2E Taxi ${Date.now()}`;
+  await win.getByTitle("Crear categoría").click();
+  const inlineDialog = win.getByRole("dialog", { name: "Nueva categoría" });
+  await expect(inlineDialog).toBeVisible();
+  await inlineDialog.getByPlaceholder("p. ej. Mascotas").fill(inline);
+  await inlineDialog.getByRole("button", { name: "Guardar" }).click();
+  await expect(win.locator("select").filter({ hasText: inline }).first()).toBeVisible({ timeout: 15_000 });
+});
+
+test("NV-F-011 categorías se reordenan con las flechas", async () => {
+  await side().getByRole("button", { name: "Categorías" }).click();
+  await expect(win.getByRole("heading", { name: /Categorías/ })).toBeVisible({ timeout: 15_000 });
+
+  const a = `E2E Uno ${Date.now()}`;
+  const b = `E2E Dos ${Date.now()}`;
+  for (const name of [a, b]) {
+    await win.getByRole("button", { name: "Nueva categoría" }).click();
+    const dialog = win.getByRole("dialog", { name: "Nueva categoría" });
+    await dialog.getByPlaceholder("p. ej. Mascotas").fill(name);
+    await dialog.getByRole("button", { name: "Guardar" }).click();
+    await expect(win.locator("main").locator("span", { hasText: name }).first()).toBeVisible({ timeout: 15_000 });
+  }
+
+  const main = win.locator("main");
+  const row = (name: string) => main.locator("[data-cat-row]").filter({ hasText: name });
+  const pos = async (name: string) => {
+    const box = await row(name).boundingBox();
+    return box?.y ?? 0;
+  };
+  // La primera de la lista no se puede subir.
+  await expect(main.locator("[data-cat-row]").first().getByTitle("Subir")).toBeDisabled();
+
+  // Sube la de las dos que esté más abajo y comprueba que cambia de sitio.
+  const before = { a: await pos(a), b: await pos(b) };
+  const lower = before.a > before.b ? a : b;
+  const wasAt = Math.max(before.a, before.b);
+  await row(lower).getByTitle("Subir").click();
+  await expect.poll(async () => pos(lower), { timeout: 15_000 }).toBeLessThan(wasAt);
 });
 
 test("NV-F-006 crear meta en 2 pasos calcula el aporte y la muestra", async () => {

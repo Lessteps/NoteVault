@@ -395,6 +395,19 @@ export function financeApi(app: AppState) {
       return { ok: getFm().deleteCategory(s) };
     },
 
+    /** Sube (−1) o baja (1) la categoría dentro de su tipo. */
+    fin_category_move(cid: string, delta: number) {
+      const s = String(cid || "");
+      const d = Number(delta);
+      if (!s) throw new ApiError("Categoría inválida.");
+      if (d !== 1 && d !== -1) throw new ApiError("Desplazamiento inválido.");
+      if (!(s in getFm().categoryMap())) throw new ApiError("Esa categoría ya no existe.");
+      if (!getFm().moveCategory(s, d)) {
+        throw new ApiError("Ya está en el extremo de la lista.");
+      }
+      return { ok: true };
+    },
+
     fin_goals() {
       const fm = getFm();
       const today = new Date();

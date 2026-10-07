@@ -78,6 +78,15 @@ describe("financeApi", () => {
     expect(() => api.fin_category_delete("")).toThrow();
   });
 
+  it("moves a category and refuses the edges", () => {
+    seed(["Almuerzo", "gasto"], ["Bus", "gasto"], ["Sueldo", "ingreso"]);
+    expect(api.fin_category_move("bus", -1)).toEqual({ ok: true });
+    expect(api.fin_meta().categories.map((c) => c.name)).toEqual(["Bus", "Almuerzo", "Sueldo"]);
+    expect(() => api.fin_category_move("bus", -1)).toThrow();
+    expect(() => api.fin_category_move("bus", 5)).toThrow();
+    expect(() => api.fin_category_move("no-existe", 1)).toThrow();
+  });
+
   it("handles goal savings and status updates", () => {
     const g = api.fin_goal_save("", {
       name: "Moto",

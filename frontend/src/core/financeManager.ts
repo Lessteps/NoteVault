@@ -305,7 +305,7 @@ export class FinanceManager {
 
   createCategory(
     name: string,
-    kind = GASTO,
+    kind: string = GASTO,
     icon = "",
     colour = "#616161",
     budgetMonthCents = 0,
@@ -335,7 +335,7 @@ export class FinanceManager {
   }
   create_category(
     name: string,
-    kind = GASTO,
+    kind: string = GASTO,
     icon = "",
     colour = "#616161",
     budgetMonthCents = 0,
@@ -375,6 +375,37 @@ export class FinanceManager {
   }
   delete_category(cid: string): boolean {
     return this.deleteCategory(cid);
+  }
+
+  /**
+   * Sube o baja la categoría dentro de su tipo (gastos / ingresos).
+   * Intercambia el `order` con la vecina: no renumera la lista entera.
+   * Devuelve false si no existe o si ya está en el borde.
+   */
+  moveCategory(cid: string, delta: number): boolean {
+    const cat = this.categoryMap()[String(cid)];
+    if (!cat || delta !== 1 && delta !== -1) return false;
+    const siblings = this.categories(cat.kind as string, true);
+    const i = siblings.findIndex((c) => c.id === cat.id);
+    const j = i + delta;
+    if (i === -1 || j < 0 || j >= siblings.length) return false;
+    const other = siblings[j]!;
+    const orderA = cat.order;
+    const orderB = other.order;
+    // Si el borde comparte order (los creados a mano pueden), renumera el tramo.
+    if (orderA === orderB) {
+      const ordered = [...siblings].sort((x, y) => x.order - y.order);
+      ordered.forEach((c, n) => this.updateCategory(c.id, { order: n + 1 }));
+      this.updateCategory(cat.id, { order: j + 1 });
+      this.updateCategory(other.id, { order: i + 1 });
+      return true;
+    }
+    this.updateCategory(cat.id, { order: orderB });
+    this.updateCategory(other.id, { order: orderA });
+    return true;
+  }
+  move_category(cid: string, delta: number): boolean {
+    return this.moveCategory(cid, delta);
   }
 
   // ── Movements ─────────────────────────────────────────────────────────

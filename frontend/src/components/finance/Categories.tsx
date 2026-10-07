@@ -1,6 +1,6 @@
 // Categorías: expense and income categories with a monthly budget.
 
-import { Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
 import { formatMoney } from "../../lib/money";
@@ -88,6 +88,8 @@ export function Categories() {
   const meta = useFinance((s) => s.meta);
   const version = useFinance((s) => s.version);
   const setEditing = useFinance((s) => s.setCategoryEditing);
+  const changed = useFinance((s) => s.changed);
+  const toast = useApp((s) => s.toast);
   const [used, setUsed] = useState<Record<string, number>>({});
   useEffect(() => {
     const d = new Date();
@@ -114,14 +116,35 @@ export function Categories() {
           Aún no hay categorías. Crea las tuyas: son las que aparecerán al registrar un gasto.
         </p>
       )}
-      {groups.map(([kind, title]) => (
+      {groups.map(([kind, title]) => {
+        const rows = (meta?.categories ?? []).filter((c) => c.kind === kind);
+        return (
         <section key={kind}>
           <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">{title} · este mes</div>
           <div className="divide-y divide-line rounded-xl border border-line bg-card">
-            {(meta?.categories ?? []).filter((c) => c.kind === kind).map((c) => {
+            {rows.map((c, i) => {
               const u = used[c.id] ?? 0;
+              const nudge = async (delta: number) => {
+                try {
+                  await api.finCategoryMove(c.id, delta);
+                  await changed();
+                } catch (e) {
+                  toast("error", (e as Error).message);
+                }
+              };
               return (
-                <div key={c.id} className="flex items-center gap-3 px-3 py-2">
+                <div key={c.id} data-cat-row={c.id} className="flex items-center gap-3 px-3 py-2">
+                  {/* El orden es tuyo, así que se edita desde aquí y no solo al crear. */}
+                  <span className="flex flex-none flex-col">
+                    <button type="button" data-cat-up={c.id} disabled={i === 0} title="Subir"
+                      onClick={() => void nudge(-1)} className="text-faint hover:text-text disabled:opacity-25 disabled:hover:text-faint">
+                      <ChevronUp size={12} />
+                    </button>
+                    <button type="button" data-cat-down={c.id} disabled={i === rows.length - 1} title="Bajar"
+                      onClick={() => void nudge(1)} className="text-faint hover:text-text disabled:opacity-25 disabled:hover:text-faint">
+                      <ChevronDown size={12} />
+                    </button>
+                  </span>
                   <span className="w-48 truncate text-[13px] font-semibold" style={{ color: c.colour, opacity: c.archived ? 0.5 : 1 }}>{c.icon} {c.name}{c.archived ? " (archivada)" : ""}</span>
                   {c.budget_month_cents ? (
                     <>
@@ -136,7 +159,7 @@ export function Categories() {
             })}
           </div>
         </section>
-      ))}
+      );})}
     </div>
   );
 }

@@ -157,6 +157,38 @@ describe("FinanceManager", () => {
       expect(fm.ensure_defaults()).toBe(false);
     });
 
+    it("reordena categorías dentro de su tipo", () => {
+      fm.create_category("Almuerzo", GASTO);
+      fm.create_category("Bus", GASTO);
+      fm.create_category("Sueldo", INGRESO);
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["Almuerzo", "Bus"]);
+
+      expect(fm.move_category("bus", -1)).toBe(true);
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["Bus", "Almuerzo"]);
+      // Los bordes no se mueven…
+      expect(fm.move_category("bus", -1)).toBe(false);
+      expect(fm.move_category("almuerzo", 1)).toBe(false);
+      // …y se puede volver a bajar.
+      expect(fm.move_category("bus", 1)).toBe(true);
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["Almuerzo", "Bus"]);
+      // El ingreso no se mezcla con los gastos.
+      expect(fm.move_category("sueldo", 1)).toBe(false);
+      expect(fm.categories(INGRESO).map((c) => c.name)).toEqual(["Sueldo"]);
+      expect(fm.move_category("no-existe", 1)).toBe(false);
+    });
+
+    it("reordena aunque dos categorías compartan order", () => {
+      fm.create_category("A", GASTO);
+      fm.create_category("B", GASTO);
+      // A mano, dos con el mismo order: el orden estable cae al nombre.
+      fm.update_category("a", { order: 1 });
+      fm.update_category("b", { order: 1 });
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["A", "B"]);
+
+      expect(fm.move_category("b", -1)).toBe(true);
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["B", "A"]);
+    });
+
     it("money format", () => {
       expect(formatMoney(1250000)).toBe("$ 12.500");
       expect(formatMoney(-120000000)).toBe("-$ 1.200.000");

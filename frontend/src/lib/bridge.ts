@@ -410,6 +410,7 @@ export const api = {
   finDeleteMany: (pairs: Array<[string, string]>) => call<{ ok: boolean }>("fin_delete_many", pairs),
   finCategorySave: (id: string, fields: Partial<FinCategory>) => call<FinCategory>("fin_category_save", id, fields),
   finCategoryDelete: (id: string) => call<{ ok: boolean }>("fin_category_delete", id),
+  finCategoryMove: (id: string, delta: number) => call<{ ok: boolean }>("fin_category_move", id, delta),
   finGoals: () => call<{ goals: Array<FinGoal & { pace: FinPace; projection: string | null }>; general: number }>("fin_goals"),
   finGoal: (id: string) => call<{
     goal: FinGoal; pace: FinPace; projection: string | null; days: Array<{ date: string; net: number }>;

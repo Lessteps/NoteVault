@@ -1,6 +1,6 @@
 // Diario: one day's movements, quick entry and the savings checks due that day.
 
-import { Paperclip } from "lucide-react";
+import { Paperclip, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
 import { MONTHS_ES } from "../../lib/calendar";
@@ -21,6 +21,7 @@ export function Diario() {
   const meta = useFinance((s) => s.meta);
   const version = useFinance((s) => s.version);
   const edit = useFinance((s) => s.edit);
+  const setCategoryEditing = useFinance((s) => s.setCategoryEditing);
   const changed = useFinance((s) => s.changed);
   const toast = useApp((s) => s.toast);
   const [day, setDay] = useState(todayIso());
@@ -156,10 +157,17 @@ export function Diario() {
           <input className={cn(sel, "min-w-0 flex-1")} placeholder="Detalle" value={q.what} onChange={(e) => setQ({ ...q, what: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && void quickSave()} />
           {(q.type === "gasto" || q.type === "ingreso") && (
-            <select className={sel} value={q.category} onChange={(e) => setQ({ ...q, category: e.target.value })}>
-              <option value="">Sin categoría</option>
-              {(q.type === "gasto" ? expenseCats : incomeCats).map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-            </select>
+            <>
+              <select className={sel} value={q.category} onChange={(e) => setQ({ ...q, category: e.target.value })}>
+                <option value="">Sin categoría</option>
+                {(q.type === "gasto" ? expenseCats : incomeCats).map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+              </select>
+              {/* El vault nace sin categorías: sin este enlace, todo movimiento
+                  caía en «Sin categoría» y no había forma de arreglarlo aquí. */}
+              <GhostButton title="Crear categoría" onClick={() => setCategoryEditing({ id: "", kind: q.type === "ingreso" ? "ingreso" : "gasto" })}>
+                <Plus size={13} />
+              </GhostButton>
+            </>
           )}
           <GhostButton title="Abrir el formulario completo para adjuntar la factura"
             onClick={() => edit({ day, kind: q.type, preset: { type: q.type, amount_cents: q.amount ?? undefined, what: q.what, category: q.category },

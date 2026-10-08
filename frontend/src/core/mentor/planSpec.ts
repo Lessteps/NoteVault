@@ -32,7 +32,8 @@ import type { StudentBrief } from "./brief.js";
 import { fold, keywordsOf, type CatalogTopic, type ChatTurn } from "./goalDraft.js";
 import { capacityWithPractice, PHASE_LABEL, practiceDayMinutes, PRACTICE_NAME, PRACTICE_PURPOSE, type PracticeFocus, type PracticeSuggestions } from "../../lib/practiceTrack.js";
 import { buildPlan, deliverableQuestion, globalDeliverableQuestion, type RequiredGoal, type SubplanSeed } from "./plan.js";
-import { areaDef, bucketByArea } from "../../lib/planAreas.js";
+import { areaDef, bucketByArea, resolveAreaMode } from "../../lib/planAreas.js";
+import { resolveLanguages } from "../../lib/planLanguages.js";
 import {
   buildChatMessages,
   parseChatResponse,
@@ -404,10 +405,16 @@ export interface PreDraftMeta {
   practiceSuggestions?: PracticeSuggestions;
   /** reparto compacto: llena primero las primeras semanas (constructor guiado, «más intenso») */
   compact?: boolean;
+  /** lo que el Mentor propuso para el modo de áreas (esqueleto); la app lo valida: solo `together` · `phased` y una línea de justificación */
+  areaProposal?: { mode?: unknown; why?: unknown; by?: unknown } | null;
 }
 
 /** Une las semillas con las precondiciones y calcula el reparto semanal con la capacidad REAL. */
-export function composeFromPreconditions(seeds: readonly SubplanSeed[], pre: PlanPreconditions, meta: PreDraftMeta): PlanDraft {
+export function composeFromPreconditions(seeds: readonly SubplanSeed[], preIn: PlanPreconditions, meta: PreDraftMeta): PlanDraft {
+  // lenguajes con práctica diaria: los obligatorios por las áreas del plan + lo que marcó el estudiante (solo si el plan los declara)
+  const areaIds = seeds.map((s) => s.areaId).filter((a): a is string => !!a);
+  const pre: PlanPreconditions = preIn.languages !== undefined ? { ...preIn, languages: resolveLanguages(preIn.languages, areaIds) } : preIn;
+  const mode = seeds.length > 0 && areaIds.length === seeds.length ? resolveAreaMode(pre.areaMode, areaIds, meta.areaProposal) : undefined;
   const from = meta.today > pre.start ? meta.today : pre.start;
   const id = `${pre.start}_${pre.end}`;
   // la práctica reserva sus minutos día a día; el resto es para los temas
@@ -427,6 +434,7 @@ export function composeFromPreconditions(seeds: readonly SubplanSeed[], pre: Pla
     ...(meta.auto ? { auto: true } : {}),
     rationale: meta.rationale,
     ...(meta.compact ? { spread: false } : {}),
+    ...(mode ? { areaMode: mode.mode, areaModeWhy: mode.why, areaModeBy: mode.by } : {}),
   });
   const weights = seeds.some((x) => x.weight !== undefined) ? Object.fromEntries(built.plan.subplans.map((s, i) => [s.id, Math.max(1, Math.round(seeds[i]?.weight ?? 0))])) : undefined;
   const cov = coverage(built.totalMinutes, capP.topicMinutes);
@@ -446,6 +454,7 @@ export function composeFromPreconditions(seeds: readonly SubplanSeed[], pre: Pla
     rationale: meta.rationale,
     subplans: built.plan.subplans,
     ...(built.plan.structure ? { structure: built.plan.structure } : {}),
+    ...(built.plan.areaMode ? { areaMode: built.plan.areaMode, ...(built.plan.areaModeWhy ? { areaModeWhy: built.plan.areaModeWhy } : {}), ...(built.plan.areaModeBy ? { areaModeBy: built.plan.areaModeBy } : {}) } : {}),
     warnings: built.warnings,
     fits: built.fits,
     totalMinutes: built.totalMinutes,

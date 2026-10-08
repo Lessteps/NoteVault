@@ -12,6 +12,7 @@ import { cn, IconButton, Kbd, openMenu, type MenuItem } from "../ui";
 import { ErrorBoundary } from "../common/ErrorBoundary";
 import { newNoteIn } from "./FileTree";
 import { ReadView } from "./ReadView";
+import { RouteBanner } from "../study/RouteUi";
 import { PracticeView } from "../practice/PracticeView";
 import { ExerciseFolderView } from "../practice/ExerciseFolderView";
 import { PracticeProjectsView } from "../practice/PracticeProjectDialog";
@@ -334,6 +335,7 @@ export function EditorArea() {
           ) : (
             <>
               <NoteHeader note={note} />
+              <RouteBanner path={note.path} />
               {/* La barra de formato vive justo debajo de Lectura / Editar: en
                   modo lectura no hay nada que formatear. */}
               {mode !== "read" && note.kind === "note" && <FormatBar />}

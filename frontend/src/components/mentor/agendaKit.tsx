@@ -5,7 +5,7 @@ import { Pencil, RotateCcw } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { type PlanDeliverable, type PlanDeliverableKind, type PlanDeliverableStatus } from "../../lib/planAreas";
-import { buildSchedule, deliverablesOf, type PlanSchedule } from "../../lib/planSchedule";
+import { areaRowsText, buildSchedule, deliverableAreaRows, deliverablesOf, type PlanSchedule } from "../../lib/planSchedule";
 import type { ExistingExercises } from "../../lib/planCurriculum";
 import type { MentorPlan, MentorTopicView } from "../../lib/types";
 import { useApp } from "../../store/app";
@@ -13,8 +13,19 @@ import { Chip, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import type { Loaded } from "./planShared";
 
-export const KIND_LABEL: Record<PlanDeliverableKind, string> = { kata: "Kata", weekly_project: "Proyecto semanal", monthly_project: "Proyecto mensual", area_project: "Proyecto de área", daily_project: "Proyecto diario" };
-export const KIND_COLOUR: Record<PlanDeliverableKind, string> = { kata: "var(--nv-practice, #c58be0)", weekly_project: "var(--nv-practice, #c58be0)", monthly_project: "var(--nv-practice, #c58be0)", area_project: "var(--nv-accent)", daily_project: "var(--nv-practice, #c58be0)" };
+/** «Backend 12 · Frontend 12 · Databases 5 · Integradores 8»: el desglose por ÁREA de una lista de entregables (la suma de las partes es el total). */
+export function AreaCounts({ plan, list, testid = "area-counts" }: { plan: { subplans: ReadonlyArray<{ areaId?: string; area: string }> }; list: readonly PlanDeliverable[]; testid?: string }) {
+  const rows = deliverableAreaRows(list, plan.subplans.filter((s) => s.areaId).map((s) => ({ id: s.areaId!, name: s.area })));
+  if (rows.length < 2 && !(rows.length === 1 && rows[0]!.id !== "practice")) return null;
+  return (
+    <span className="mt-0.5 block text-[13.5px] font-normal text-dim" data-testid={testid} aria-label={`Entregables por área: ${areaRowsText(rows)}`}>
+      Por área: {areaRowsText(rows)}
+    </span>
+  );
+}
+
+export const KIND_LABEL: Record<PlanDeliverableKind, string> = { kata: "Kata", weekly_project: "Proyecto semanal", monthly_project: "Proyecto mensual", area_project: "Proyecto de área", daily_project: "Proyecto diario", topic_project: "Proyecto del tema" };
+export const KIND_COLOUR: Record<PlanDeliverableKind, string> = { kata: "var(--nv-practice, #c58be0)", weekly_project: "var(--nv-practice, #c58be0)", monthly_project: "var(--nv-practice, #c58be0)", area_project: "var(--nv-accent)", daily_project: "var(--nv-practice, #c58be0)", topic_project: "var(--nv-mint)" };
 export const DSTATUS_LABEL: Record<PlanDeliverableStatus, string> = { pendiente: "Pendiente", en_curso: "En curso", hecho: "Hecho" };
 export const DSTATUS_COLOUR: Record<PlanDeliverableStatus, string> = { pendiente: "var(--nv-faint)", en_curso: "var(--nv-accent)", hecho: "var(--nv-mint)" };
 export const DSTATUS_GLYPH: Record<PlanDeliverableStatus, string> = { pendiente: "○", en_curso: "◐", hecho: "●" };

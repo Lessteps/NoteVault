@@ -441,11 +441,11 @@ describe("pestaña «Entregables»: pregunta global, proyectos de área y agenda
     // semana del 12 al 18 oct: 6 katas (lunes a sábado)
     expect(host.querySelectorAll("[data-testid=deliverable-row]")).toHaveLength(6);
     expect(byTest("deliverable-count").textContent).toMatch(/^6 entregables · 2 hechos · 4 pendientes/);
-    // el filtro por área deja solo lo de esa área (los katas no tienen área)
+    // el filtro por área deja lo de esa área y los proyectos integradores que la incluyen (los katas no tienen área)
     await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Tipo']")!, "");
     await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Periodo']")!, "todo");
     await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Área']")!, "backend");
-    expect([...host.querySelectorAll("[data-testid=deliverable-row]")].every((r) => r.textContent!.includes("Proyecto de área"))).toBe(true);
+    expect([...host.querySelectorAll("[data-testid=deliverable-row]")].every((r) => !r.textContent!.includes("Kata") && r.textContent!.includes("Proyecto"))).toBe(true);
     // cambiar el estado de uno
     await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Área']")!, "");
     await setValue(host.querySelector<HTMLSelectElement>("select[aria-label='Periodo']")!, "semana");

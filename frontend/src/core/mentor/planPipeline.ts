@@ -61,6 +61,8 @@ export interface PipelineResult {
   warnings: string[];
   rationale: string;
   discarded: string[];
+  /** lo que el Mentor propuso para el modo de áreas en el esqueleto (con `areaMode: "ai"`); la app lo valida al resolver */
+  areaProposal?: { mode: "together" | "phased"; why: string };
   /** alguna llamada de la IA contribuyó */
   aiUsed: boolean;
   skeletonOk: boolean;
@@ -163,6 +165,7 @@ export async function generateByParts(pre: PlanPreconditions, seedsIn: readonly 
 
   // ── 1 · esqueleto ──
   const weights = new Map<string, number>();
+  let areaProposal: PipelineResult["areaProposal"];
   if (seeds.length > 1) {
     const r = await call(skeletonMessages(o.brief, pre, seeds));
     if (r.ok) {
@@ -170,6 +173,7 @@ export async function generateByParts(pre: PlanPreconditions, seedsIn: readonly 
       if (parsed.ok) {
         skeletonOk = true;
         rationale = parsed.rationale;
+        if (parsed.areaMode) areaProposal = parsed.areaMode;
         discarded.push(...parsed.discarded);
         const byKey = new Map(seeds.map((s) => [subplanKey(s), s]));
         const ordered: SubplanSeed[] = [];
@@ -270,5 +274,5 @@ export async function generateByParts(pre: PlanPreconditions, seedsIn: readonly 
     const ordered = sortByGroupOrder(topics.length ? topics : s.topics, s.groups);
     out.push({ ...s, topics: ordered, ...(notes.length ? { notes: notes.join(" ") } : {}), ...(fallback ? { fallback } : {}), ...(w ? { weight: Math.max(1, Math.round((mins * w) / 3)) } : {}) });
   });
-  return { seeds: out, sources, warnings, rationale, discarded: [...new Set(discarded)].slice(0, 20), aiUsed, skeletonOk, calls };
+  return { seeds: out, sources, warnings, rationale, discarded: [...new Set(discarded)].slice(0, 20), aiUsed, skeletonOk, calls, ...(areaProposal ? { areaProposal } : {}) };
 }

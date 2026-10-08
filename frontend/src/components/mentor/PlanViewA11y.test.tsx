@@ -206,13 +206,13 @@ describe("plan propuesto", () => {
     expect(button("Planear mi día con esto")).toBeUndefined();
   });
 
-  it("«Pedir cambios» está siempre visible junto a las pestañas: abre «Cambios» y deja el cursor en el cuadro", async () => {
+  it("«Preguntar o ajustar» está siempre visible junto a las pestañas: abre «Cambios» y deja el cursor en el cuadro", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
     for (const t of ["plan", "agenda", "entregables"]) {
       await click(tab(t));
       const ask = host.querySelector<HTMLButtonElement>("[data-testid=plan-ask-changes]")!;
-      expect(ask.textContent).toContain("Pedir cambios");
+      expect(ask.textContent).toContain("Preguntar o ajustar");
       expect(ask.closest("[data-testid=plan-sticky]")).toBeTruthy();
     }
     await click(host.querySelector("[data-testid=plan-ask-changes]"));
@@ -306,7 +306,7 @@ describe("pestaña «Entregables»: acciones masivas", () => {
   });
 });
 
-describe("pestaña «Cambios»: sugerencias", () => {
+describe("pestaña «Preguntas y ajustes»: sugerencias", () => {
   it("los chips rellenan el cuadro (acumulan si ya hay texto) sin enviar nada", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const change = vi.spyOn(api, "mentorPlanChange");
@@ -314,11 +314,11 @@ describe("pestaña «Cambios»: sugerencias", () => {
     await click(tab("cambios"));
     const box = host.querySelector("[data-testid=plan-changes]")!;
     const chips = [...box.querySelectorAll("[data-testid=change-suggestions] button")];
-    expect(chips.map((c) => c.textContent)).toEqual(["Más SQL antes del backend", "Pasa el frontend a la semana 10", "Quita lo de desktop", "Añade un entregable al área de Backend", "Pasa el lenguaje Python a Automation", "Hazlo más ligero"]);
+    expect(chips.map((c) => c.textContent)).toEqual(["¿Por qué este orden?", "¿Qué toca esta semana?", "Más SQL antes del backend", "Pasa el frontend a la semana 10", "Quita lo de desktop", "Añade un entregable al área de Backend", "Pasa el lenguaje Python a Automation", "Hazlo más ligero"]);
     const ta = box.querySelector<HTMLTextAreaElement>("textarea")!;
-    await click(chips[2]!);
+    await click(chips[4]!);
     expect(ta.value).toBe("Quita lo de desktop");
-    await click(chips[5]!);
+    await click(chips[7]!);
     expect(ta.value).toBe("Quita lo de desktop\nHazlo más ligero");
     expect(change).not.toHaveBeenCalled();
     expect(button("Aplicar cambios", box).hasAttribute("disabled")).toBe(false);
@@ -330,7 +330,7 @@ describe("pestaña «Cambios»: sugerencias", () => {
     vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, applied: true, plan: plan(), history: [entry], entry });
     await mountEl(<MentorPlan planId={PID} />);
     await click(tab("cambios"));
-    await click([...host.querySelectorAll("[data-testid=change-suggestions] button")][2]!);
+    await click([...host.querySelectorAll("[data-testid=change-suggestions] button")][4]!);
     await click(button("Aplicar cambios"));
     expect(host.querySelector("[data-testid=plan-live]")!.textContent).toContain("Cambios aplicados: −4 temas");
   });

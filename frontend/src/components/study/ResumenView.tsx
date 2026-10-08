@@ -23,6 +23,7 @@ import { useApp, type OpenNote } from "../../store/app";
 import { Donut } from "../common/charts";
 import { cn } from "../ui";
 import { useStudyVersion } from "./StudyPanel";
+import { RouteNow } from "./RouteUi";
 
 const DIFFICULTY_COLOURS = ["var(--nv-mint)", "var(--nv-accent)", "var(--nv-info)"];
 const DIFFICULTY_LABELS = ["★ Fácil", "★★ Med", "★★★ Dif"];
@@ -92,6 +93,7 @@ export function ResumenView({ note }: { note: OpenNote }) {
   const stats = useMemo(() => aggregateArea(topics), [topics]);
   const groups = useMemo(() => groupTopics(topics, scope), [topics, scope]);
 
+  const inScope = useCallback((folder: string) => folderInScope(folder, scope), [scope]);
   const title = String(note.frontmatter?.title ?? note.title ?? "");
   const atSubjectRoot = groups.length > 0 && groups.some((g) => !g.isTopic);
 
@@ -156,6 +158,9 @@ export function ResumenView({ note }: { note: OpenNote }) {
           <RefreshCw size={13} className={cn(loading && "animate-spin")} />
         </button>
       </header>
+
+      {/* Qué estudiar ahora: los temas exactos de tu ruta del Mentor dentro de esta parte */}
+      <RouteNow inScope={inScope} onOpen={(folder) => void openTopicView({ folder } as TopicDashboardItem)} />
 
       {/* KPIs */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(132px,1fr))] gap-3">

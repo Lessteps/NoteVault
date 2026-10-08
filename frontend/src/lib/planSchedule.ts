@@ -24,6 +24,8 @@ import { addDays, daysBetween, eachDay, isoDow, weekRangesOf } from "./planTime.
 import { type AreaGroup, type PlanDeliverable, type PlanDeliverableStatus, type PlanPurposes } from "./planAreas.js";
 import { FOCUS_LABEL, PHASE_LABEL, PRACTICE_PHASES, practiceDayMinutes, weekTitle, type PhaseStatus, type PracticePhase, type PracticeTrack } from "./practiceTrack.js";
 import { buildFocusSchedule, type BlockKind, type DayBlock, type DayFocus } from "./planDayFocus.js";
+import { isLive } from "./planRoute.js";
+import { topicProjectId, type TopicProject } from "./planTopicProject.js";
 import { dailyProjectOf, monthlyBlocksOf, shortOf, weeklyProjectOf, type PracticeCurriculum } from "./planCurriculum.js";
 
 // ── Entrada estructural (la cumplen `Plan` del núcleo y `MentorPlan` del renderer) ──
@@ -36,6 +38,10 @@ export interface ScheduleTopic {
   completedAt?: string;
   pinned?: boolean;
   group?: string;
+  /** ruta: `skipped` queda fuera del reparto y de las cuentas (ver `planRoute.ts`) */
+  route?: string;
+  /** proyecto de aplicación tras el tema (ver `planTopicProject.ts`) */
+  topicProject?: TopicProject;
 }
 
 export interface ScheduleSubplan {
@@ -54,7 +60,18 @@ export interface SchedulePlan {
   start: string;
   end: string;
   hoursPerWeek?: number;
-  preconditions?: { minutesPerDay: number; studyDays: number[]; blockedDates?: string[]; pace: "suave" | "normal" | "intenso" };
+  preconditions?: {
+    minutesPerDay: number;
+    studyDays: number[];
+    blockedDates?: string[];
+    pace: "suave" | "normal" | "intenso";
+    /** lo que eligió el estudiante al crear el plan (el modo ya decidido está en `areaMode` del plan) */
+    areaMode?: "together" | "phased" | "ai";
+    /** lenguajes con práctica diaria propia (rotación por peso) */
+    languages?: ReadonlyArray<{ id: string; weight?: number; required?: boolean; why?: string }>;
+  };
+  /** cómo se combinan las áreas, ya decidido (ausente = por fases como siempre) */
+  areaMode?: "together" | "phased";
   programmingPractice?: PracticeTrack;
   subplans: ScheduleSubplan[];
   deliverables?: PlanDeliverable[];
@@ -94,6 +111,19 @@ export interface DayTopic {
   applied?: boolean;
 }
 
+/** El proyecto de aplicación de un tema, colocado el día en que se completa el tema. */
+export interface DayTopicProject {
+  id: string;
+  subplanId: string;
+  areaId?: string;
+  area: string;
+  folder: string;
+  title: string;
+  project: TopicProject;
+  /** minutos de ese día para el proyecto (de los del proyecto diario) */
+  minutes: number;
+}
+
 export interface DayPractice {
   kata?: { minutes: number };
   project?: { minutes: number; phases: PracticePhase[]; week: number; focus: string; theme?: string };
@@ -118,6 +148,16 @@ export interface ScheduleDay {
   blocks?: DayBlock[];
   projectMinutes?: number;
   reviewMinutes?: number;
+  /** minutos del bloque diario de práctica de lenguaje */
+  languageMinutes?: number;
+  /** proyectos de aplicación de los temas que se completan ese día */
+  topicProjects?: DayTopicProject[];
+}
+
+/** El modo de áreas ya decidido de un plan: `together` solo si el plan es por áreas y lo declara (o lo eligió el estudiante); si no, por fases. */
+export function effectiveAreaMode(plan: Pick<SchedulePlan, "areaMode" | "preconditions" | "structure">): "together" | "phased" {
+  if (plan.structure !== "areas") return "phased";
+  return plan.areaMode ?? (plan.preconditions?.areaMode === "together" ? "together" : "phased");
 }
 
 export interface PlanSchedule {
@@ -156,7 +196,9 @@ function baseCapacity(plan: SchedulePlan): (date: string) => number {
   return (d) => (study.has(isoDow(d)) && !blocked.has(d) ? pre.minutesPerDay * f : 0);
 }
 
-export function buildSchedule(plan: SchedulePlan): PlanSchedule {
+export function buildSchedule(planIn: SchedulePlan): PlanSchedule {
+  // los temas «fuera de ruta» no se reparten ni cuentan (se quedan en el plan y en la vault, atenuados)
+  const plan: SchedulePlan = planIn.subplans.some((s) => s.topics.some((t) => !isLive(t))) ? { ...planIn, subplans: planIn.subplans.map((s) => ({ ...s, topics: s.topics.filter(isLive) })) } : planIn;
   const ranges = weekRangesOf(plan.start, plan.end);
   const allDays = eachDay(plan.start, plan.end);
   const base = baseCapacity(plan);
@@ -197,7 +239,8 @@ export function buildSchedule(plan: SchedulePlan): PlanSchedule {
 
   if (plan.structure === "areas") {
     // ── agenda por enfoque (planes por áreas) ──
-    const res = buildFocusSchedule(plan, { capOf, weekOf: (d) => Math.floor(daysBetween(plan.start, d) / 7) + 1 });
+    const langs = plan.preconditions?.languages;
+    const res = buildFocusSchedule({ start: plan.start, end: plan.end, subplans: plan.subplans, areaMode: effectiveAreaMode(plan), ...(langs?.length ? { languages: langs.map((l) => ({ id: l.id, ...(l.weight ? { weight: l.weight } : {}) })) } : {}) }, { capOf, weekOf: (d) => Math.floor(daysBetween(plan.start, d) / 7) + 1 });
     const total = new Map(plan.subplans.map((s) => [s.id, s.topics.length] as const));
     const position = new Map<string, number>();
     for (const s of plan.subplans) s.topics.forEach((t, i) => position.set(`${s.id}|${t.folder}`, i + 1));
@@ -246,6 +289,28 @@ export function buildSchedule(plan: SchedulePlan): PlanSchedule {
       day.blocks = f.blocks;
       day.projectMinutes = f.projectMinutes;
       day.reviewMinutes = f.reviewMinutes;
+      if (f.languageMinutes) day.languageMinutes = f.languageMinutes;
+    }
+    // proyecto de aplicación de cada tema: el día en que se completa (o el siguiente día con tiempo de proyecto)
+    const studyDates = days.filter((d) => d.study);
+    for (const sub of plan.subplans) {
+      for (const t of sub.topics) {
+        if (!t.topicProject || t.completedAt) continue;
+        const last = [...(res.chunks.get(`${sub.id}|${t.folder}`) ?? [])].reverse().find((c) => !c.overflow);
+        if (!last) continue;
+        let day = byDate.get(last.date);
+        if (day && !day.projectMinutes) {
+          const next = studyDates.find((d) => d.date > last.date && d.projectMinutes);
+          if (next) day = next;
+        }
+        if (!day) continue;
+        (day.topicProjects ??= []).push({ id: topicProjectId(t.folder), subplanId: sub.id, ...(sub.areaId ? { areaId: sub.areaId } : {}), area: sub.area, folder: t.folder, title: t.title, project: t.topicProject, minutes: 0 });
+      }
+    }
+    for (const d of days) {
+      if (!d.topicProjects?.length) continue;
+      const each = d.projectMinutes ? Math.max(10, Math.round((d.projectMinutes * 0.6) / d.topicProjects.length)) : 0;
+      for (const tp of d.topicProjects) tp.minutes = each;
     }
     addCompleted(plan, byDate, groupTitle);
     finishDays(plan, days);
@@ -430,7 +495,14 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
     const man = stored.get(d.id);
     used.add(d.id);
     // el proyecto diario se deriva siempre del reparto actual: solo se conserva lo anotado a mano (estado y archivos)
-    out.push(man ? { ...d, ...man, status: bestStatus(d.status, man.status), kind: d.kind, source: d.source, ...(d.kind === "daily_project" ? { title: d.title, description: d.description, dueDate: d.dueDate, criteria: d.criteria } : {}) } : d);
+    if (!man) return void out.push(d);
+    const merged: PlanDeliverable = { ...d, ...man, status: bestStatus(d.status, man.status), kind: d.kind, source: d.source, ...(d.kind === "daily_project" || d.kind === "topic_project" ? { title: d.title, description: d.description, dueDate: d.dueDate, criteria: d.criteria } : {}) };
+    // el área sale siempre de lo derivado (lo anotado a mano no la fija)
+    if (d.areaId) merged.areaId = d.areaId;
+    else delete merged.areaId;
+    if (d.areaIds) merged.areaIds = d.areaIds;
+    else delete merged.areaIds;
+    out.push(merged);
   };
   const track = plan.programmingPractice;
   const blocked = new Set(plan.preconditions?.blockedDates ?? []);
@@ -463,6 +535,7 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
       description: cw?.description ?? "Proyecto semanal full stack (frontend + backend + base de datos): especificación, construcción, defensa y postmortem.",
       dueDate: w.sessions[w.sessions.length - 1]!.date,
       criteria: PRACTICE_PHASES.map((p) => `${PHASE_LABEL[p]} hecha`),
+      areaId: "all",
       status: st ? fromPhaseStatuses(PRACTICE_PHASES.map((p) => st.phases[p])) : "pendiente",
       source: "practice",
     });
@@ -481,6 +554,7 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
       description: cmonth?.description ?? "Un proyecto mayor que integra los proyectos semanales del bloque.",
       dueDate: due,
       criteria: ["Integra lo hecho en los proyectos semanales", "Se puede ejecutar y explicar de principio a fin"],
+      areaId: "all",
       status: all ? "hecho" : inside.some((s) => s && PRACTICE_PHASES.some((p) => s.phases[p] === "hecho")) ? "en_curso" : "pendiente",
       source: "practice",
     });
@@ -491,20 +565,34 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
     for (const day of sch.days) {
       const p = dailyProjectOf(plan, sch, day);
       if (!p) continue;
-      push({ id: p.id, kind: "daily_project", title: p.title, description: p.description, dueDate: day.date, criteria: ["Aplica los temas de teoría y práctica del día", "Se puede ejecutar y explicar", "Suma una pieza al proyecto semanal"], status: "pendiente", source: p.source === "ai" ? "ai" : "practice" });
+      push({ id: p.id, kind: "daily_project", title: p.title, description: p.description, dueDate: day.date, ...areaFields(p.areaIds), criteria: ["Aplica los temas de teoría y práctica del día", "Se puede ejecutar y explicar", "Suma una pieza al proyecto semanal"], status: "pendiente", source: p.source === "ai" ? "ai" : "practice" });
+      // proyecto de aplicación de los temas que se completan este día (calibrado al nivel; cuenta como entregable)
+      for (const tp of day.topicProjects ?? []) {
+        push({
+          id: tp.id,
+          kind: "topic_project",
+          title: `Proyecto del tema: ${tp.project.title}`,
+          description: tp.project.description,
+          dueDate: day.date,
+          ...areaFields(tp.areaId ? [tp.areaId] : []),
+          criteria: [`Aplica «${shortOf(tp.title)}» de forma real`, `Nivel ${tp.project.level}: no pidas más de lo que ya dominas`, "Funciona y puedes explicarlo"],
+          status: "pendiente",
+          source: tp.project.source === "ai" ? "ai" : "practice",
+        });
+      }
     }
     for (let w = 1; w <= ranges.length; w++) {
       if (weeks.some((x) => x.week === w && x.sessions.length)) continue;
       const wp = weeklyProjectOf(plan, sch, w);
       const last = sch.days.filter((d) => d.week === w && d.study).at(-1);
       if (!wp || !last) continue;
-      push({ id: wp.id, kind: "weekly_project", title: wp.title, description: wp.description, dueDate: last.date, criteria: ["Integra los mini-proyectos diarios de la semana", "Se puede ejecutar de principio a fin"], status: "pendiente", source: wp.source === "ai" ? "ai" : "practice" });
+      push({ id: wp.id, kind: "weekly_project", title: wp.title, description: wp.description, dueDate: last.date, ...areaFields(wp.areaIds), criteria: ["Integra los mini-proyectos diarios de la semana", "Se puede ejecutar de principio a fin"], status: "pendiente", source: wp.source === "ai" ? "ai" : "practice" });
     }
     if (!track?.monthlyProject?.blocks.length) {
       for (const b of monthlyBlocksOf(plan, sch)) {
         const lastDay = sch.days.filter((d) => d.study && (b.month ? d.date.startsWith(b.month) : d.week >= b.fromWeek && d.week <= b.toWeek)).at(-1);
         if (!lastDay) continue;
-        push({ id: b.id, kind: "monthly_project", title: b.title, description: b.description, dueDate: lastDay.date, criteria: ["Integra lo hecho en los proyectos semanales del mes", "Se puede ejecutar y explicar de principio a fin"], status: "pendiente", source: b.source === "ai" ? "ai" : "practice" });
+        push({ id: b.id, kind: "monthly_project", title: b.title, description: b.description, dueDate: lastDay.date, ...areaFields(b.areaIds), criteria: ["Integra lo hecho en los proyectos semanales del mes", "Se puede ejecutar y explicar de principio a fin"], status: "pendiente", source: b.source === "ai" ? "ai" : "practice" });
       }
     }
   }
@@ -528,6 +616,12 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
   return out.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
 }
 
+/** Campos de área de un entregable: un área = `areaId`; varias = proyecto integrador (`areaId: "all"` + `areaIds`); ninguna = sin área. */
+function areaFields(ids: readonly string[]): { areaId?: string; areaIds?: string[] } {
+  const u = [...new Set(ids)];
+  return u.length === 1 ? { areaId: u[0]! } : u.length > 1 ? { areaId: "all", areaIds: u } : {};
+}
+
 export interface DeliverableCount {
   total: number;
   done: number;
@@ -540,6 +634,77 @@ export function countDeliverables(list: readonly PlanDeliverable[]): Deliverable
 }
 
 export const deliverablesBetween = (list: readonly PlanDeliverable[], from: string, to: string): PlanDeliverable[] => list.filter((d) => d.dueDate >= from && d.dueDate <= to);
+
+/** Filtro de `deliverablesBy`: un día (AAAA-MM-DD), una semana del plan (1..), un mes (AAAA-MM) y/o un área (`backend`…; también los integradores que la incluyen). */
+export interface DeliverableQuery {
+  day?: string;
+  week?: number;
+  month?: string;
+  area?: string;
+  kind?: PlanDeliverable["kind"];
+  status?: PlanDeliverableStatus;
+}
+
+/** ¿Pertenece el entregable al área? Lo propio del área y los proyectos integradores que la incluyen. */
+export const deliverableInArea = (d: PlanDeliverable, area: string): boolean => d.areaId === area || (area === "all" ? false : d.areaId === "all" && (!d.areaIds || d.areaIds.includes(area)));
+
+/**
+ * Los entregables de un plan filtrados por día, semana, mes y/o ÁREA (función pura): `deliverablesBy(plan, { week: 3, area: "frontend" })`.
+ * Sin filtro devuelve todos. El resultado sale de `deliverablesOf` (derivados del plan + anotados a mano).
+ */
+export function deliverablesBy(plan: SchedulePlan, q: DeliverableQuery, practice?: PracticeStatusLike | null, schedule?: PlanSchedule): PlanDeliverable[] {
+  const sch = schedule ?? buildSchedule(plan);
+  let list = deliverablesOf(plan, practice, sch);
+  if (q.day) list = list.filter((d) => d.dueDate === q.day);
+  if (q.week !== undefined) {
+    const r = weekRangesOf(plan.start, plan.end)[q.week - 1];
+    list = r ? deliverablesBetween(list, r.start, r.end) : [];
+  }
+  if (q.month) list = list.filter((d) => d.dueDate.startsWith(q.month!));
+  if (q.area) list = list.filter((d) => deliverableInArea(d, q.area!));
+  if (q.kind) list = list.filter((d) => d.kind === q.kind);
+  if (q.status) list = list.filter((d) => d.status === q.status);
+  return list;
+}
+
+export interface AreaDeliverableRow {
+  /** id del área (`backend`…), `all` (integradores) o `practice` (sin área: katas…) */
+  id: string;
+  name: string;
+  total: number;
+  done: number;
+  pending: number;
+}
+
+/**
+ * Desglose por ÁREA de una lista de entregables, que PARTICIONA la lista (la suma de las filas = el total): cada entregable cuenta en el área a
+ * la que pertenece; los proyectos integradores van en «Integradores» y los que no tienen área (katas) en «Práctica». Para el filtro «ver los de
+ * Backend» use `deliverableInArea`, que además incluye los integradores que la contienen.
+ */
+export function deliverableAreaRows(list: readonly PlanDeliverable[], areaOrder: ReadonlyArray<{ id: string; name: string }>): AreaDeliverableRow[] {
+  const key = (d: PlanDeliverable): string => d.areaId ?? "practice";
+  const rows = new Map<string, AreaDeliverableRow>();
+  const names = new Map(areaOrder.map((a) => [a.id, a.name] as const));
+  const row = (id: string): AreaDeliverableRow => {
+    let r = rows.get(id);
+    if (!r) rows.set(id, (r = { id, name: id === "all" ? "Integradores" : id === "practice" ? "Práctica" : (names.get(id) ?? id), total: 0, done: 0, pending: 0 }));
+    return r;
+  };
+  for (const a of areaOrder) row(a.id);
+  for (const d of list) {
+    const r = row(key(d));
+    r.total++;
+    if (d.status === "hecho") r.done++;
+    else r.pending++;
+  }
+  row("all");
+  row("practice");
+  const order = [...areaOrder.map((a) => a.id), "all", "practice"];
+  return [...rows.values()].filter((r) => r.total > 0 || names.has(r.id)).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+}
+
+/** «Backend 12 · Frontend 12 · Databases 5 · Integradores 8»: el resumen por área en una línea. */
+export const areaRowsText = (rows: readonly AreaDeliverableRow[]): string => rows.map((r) => `${r.name} ${r.total}`).join(" · ");
 
 /** «1 entregable» / «3 entregables» / «sin entregables». */
 export const deliverablesText = (n: number): string => (n === 0 ? "sin entregables" : `${n} ${n === 1 ? "entregable" : "entregables"}`);

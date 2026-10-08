@@ -374,8 +374,16 @@ export const api = {
   /** Cobertura de teoría y práctica de cada área del plan contra la vault (determinista) y la última revisión guardada. */
   mentorPlanCoverage: (id: string) => call<import("./types").MentorPlanCoverage>("mentor_plan_coverage", { id }),
   /** «Revisar cobertura con el Mentor»: una llamada a la IA (clave de estado `coverage:<id>`); guarda `coverageReview` en el plan. */
-  mentorPlanCoverageReview: (id: string, profile?: string) => call<import("./types").MentorCoverageReviewResult>("mentor_plan_coverage_review", { id, ...(profile ? { profile } : {}) }),
-  mentorPlanChange: (opts: { id: string; comment?: string; ops?: Array<Record<string, unknown>>; label?: string; noAi?: boolean }) => call<import("./types").MentorChangeResult>("mentor_plan_change", opts),
+  mentorPlanCoverageReview: (id: string, profile?: string, criteria?: import("./planCoverage").CoverageCriteria) => call<import("./types").MentorCoverageReviewResult>("mentor_plan_coverage_review", { id, ...(profile ? { profile } : {}), ...(criteria ? { criteria } : {}) }),
+  mentorPlanCoverageAccept: (id: string, areaKey: string, title: string, accepted = true) => call<{ review: import("./planCoverage").CoverageReview }>("mentor_plan_coverage_accept", { id, areaKey, title, accepted }),
+  mentorPlanRouteSet: (opts: { id: string; folders: string[]; route: "core" | "optional" | "skipped"; reason?: string; label?: string }) =>
+    call<import("./types").MentorRouteChangeResult>("mentor_plan_route_set", opts),
+  /** La RUTA del plan activo (o de todos los activos, o la de `planId`): cada tema con su ruta (core · optional · skipped) y su semana objetivo. Solo lee; nunca borra notas. */
+  mentorRoute: (planId?: string) => call<import("./types").MentorRoute>("mentor_route", planId ? { planId } : {}),
+  mentorPlanReduce: (opts: { id: string; areaId?: string; groupId?: string; max?: number }) => call<import("./types").MentorRouteChangeResult>("mentor_plan_reduce", opts),
+  mentorPlanChange: (opts: { id: string; comment?: string; ops?: Array<Record<string, unknown>>; label?: string; noAi?: boolean; intent?: "fix" | "adjust" }) => call<import("./types").MentorChangeResult>("mentor_plan_change", opts),
+  mentorPlanAsk: (id: string, question: string, opts: { noAi?: boolean } = {}) => call<import("./types").MentorAskResult>("mentor_plan_ask", { id, question, ...opts }),
+  mentorPlanIntent: (id: string, text: string, opts: { noAi?: boolean } = {}) => call<import("./types").MentorIntentResult>("mentor_plan_intent", { id, text, ...opts }),
   mentorPlanChanges: (id: string) => call<import("./types").MentorChangeEntry[]>("mentor_plan_changes", { id }),
   mentorPlanChangeUndo: (id: string) => call<{ plan: import("./types").MentorPlan; history: import("./types").MentorChangeEntry[] }>("mentor_plan_change_undo", { id }),
   mentorAiStatus: (key: string) => call<import("./types").MentorAiStatus>("mentor_ai_status", { key }),

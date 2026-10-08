@@ -295,7 +295,7 @@ describe("«Generar la práctica del plan con el Mentor»", () => {
     await click(byTest("practice-curriculum-generate"));
     expect(gen).toHaveBeenCalledWith(PID, {});
     expect(byTest("practice-curriculum-note").textContent).toContain("Práctica del plan: 14 semanas con el Mentor.");
-    expect(byTest("practice-curriculum-note").textContent).toContain("Puedes deshacerlo en «Cambios»");
+    expect(byTest("practice-curriculum-note").textContent).toContain("Puedes deshacerlo en «Preguntas y ajustes»");
     expect(byTest("practice-curriculum-state").textContent).toMatch(/Generada con el Mentor/);
     expect(button("Regenerar la práctica del plan con el Mentor", bar)).toBeTruthy();
   });

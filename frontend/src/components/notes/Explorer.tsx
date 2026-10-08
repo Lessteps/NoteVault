@@ -11,6 +11,7 @@ import { FileTree, newCanvasIn, newFolderIn, newNoteIn } from "./FileTree";
 import { GraphPanel } from "./GraphPanel";
 import { useConceptMap } from "../canvas/ConceptMapDialog";
 import { useStudyFolders } from "../study/StudyFoldersDialog";
+import { RouteToggle } from "../study/RouteUi";
 
 const TABS: Array<{ id: ExplorerTab; label: string; icon: ReactNode }> = [
   { id: "files", label: "Files", icon: <Files size={14} /> },
@@ -122,6 +123,7 @@ function FilesPanel() {
           )}
         </label>
       </div>
+      <RouteToggle className="flex-none px-2.5 pb-1.5" />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <FileTree filter={filter} />
       </div>

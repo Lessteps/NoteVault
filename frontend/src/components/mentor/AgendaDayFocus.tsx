@@ -9,7 +9,10 @@ import { CalendarDays, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { PlanDeliverable, PlanDeliverableStatus } from "../../lib/planAreas";
-import { dayExercisesOf, dailyProjectOf, dayLogicOf, monthlyBlocksOf, shortOf, weeklyProjectOf, type MonthlyBlock } from "../../lib/planCurriculum";
+import { dayExercisesOf, dailyProjectOf, dayLogicOf, languageBlockExercises, monthlyBlocksOf, shortOf, weeklyProjectOf, type MonthlyBlock } from "../../lib/planCurriculum";
+import { areaPracticeOf } from "../../lib/planAreaPractice";
+import { PROJECT_BASIS_LABEL, PROJECT_LEVEL_LABEL } from "../../lib/planTopicProject";
+import type { DayBlock } from "../../lib/planDayFocus";
 import type { BlockItem } from "../../lib/planDayFocus";
 import { dateLabel, dayPurpose, deliverablesText, focusStatsOf, longDateLabel, topicsText, type ScheduleDay } from "../../lib/planSchedule";
 import { PHASE_LABEL, PRACTICE_NAME, type PracticePhase } from "../../lib/practiceTrack";
@@ -19,7 +22,7 @@ import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
-import { AreaChip, DSTATUS_LABEL, focusColour, plural, PurposeBlock, StatusChip, type AgendaModel } from "./agendaKit";
+import { AreaChip, AreaCounts, DSTATUS_LABEL, focusColour, plural, PurposeBlock, StatusChip, type AgendaModel } from "./agendaKit";
 import { openTopic } from "./openTopic";
 import { hm, ProgressBar, ThinkingStatus, useAiStatus } from "./parts";
 import { openPractice } from "./PracticeCard";
@@ -77,6 +80,29 @@ function ProjectCard({ m, d, kind, onChanged, children, testid }: { m: AgendaMod
   );
 }
 
+/** La práctica diaria de lenguaje (bloque sin tema propio): su nota y los ejercicios ligados a los temas del día. */
+function FreeLanguage({ m, b, day }: { m: AgendaModel; b: DayBlock; day: ScheduleDay }) {
+  const ex = languageBlockExercises(m.plan, day, b);
+  return (
+    <>
+      {b.note && <p className="mt-1 text-[14px] text-dim" data-testid="agenda-lang-note">{b.note}</p>}
+      <ul className="mt-2.5 space-y-1.5 border-t border-line pt-2.5" aria-label={`Ejercicios de ${b.label}`}>
+        {ex.map((e) => (
+          <li key={e.id} className="flex flex-wrap items-start gap-x-2 gap-y-1 text-[14.5px]" data-testid="agenda-exercise">
+            <span className="min-w-0 flex-1 basis-60">
+              <span className="font-medium">{e.title}</span>
+              {e.statement && <span className="mt-0.5 block text-[13.5px] text-dim">{e.statement}</span>}
+            </span>
+            {e.source === "ai" && <Chip large colour="var(--nv-accent)">Del Mentor</Chip>}
+            {e.auto && <Chip large colour="var(--nv-faint)">Automático</Chip>}
+            {e.folder && <button type="button" onClick={() => void openTopic(e.folder)} className="inline-flex min-h-8 items-center px-2 text-[14px] text-accent-text underline-offset-2 hover:underline" aria-label={`Ver el tema ${e.topicTitle}`}>Ver tema</button>}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 function BlockTopics({ m, items }: { m: AgendaModel; items: BlockItem[] }) {
   return (
     <ul className="mt-2 space-y-1.5">
@@ -125,7 +151,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2 }: { m
   const weeklyD = weeklyP ? m.deliverableById.get(weeklyP.id) : undefined;
   const monthlyD = monthly ? m.deliverableById.get(monthly.id) : undefined;
   const practiceCount = (day.practice.kata ? 1 : 0) + (day.practice.project ? 1 : 0);
-  const otherDue = due.filter((d) => !["kata", "daily_project", "weekly_project", "monthly_project"].includes(d.kind));
+  const otherDue = due.filter((d) => !["kata", "daily_project", "weekly_project", "monthly_project", "topic_project"].includes(d.kind));
   const weeklyDone = weeklyP ? weeklyP.dailyIds.filter((x) => statusOf(m, x) === "hecho").length : 0;
   const monthWeekly = monthly ? monthly.weeklyIds : [];
   const monthDone = monthWeekly.filter((x) => statusOf(m, x) === "hecho").length;
@@ -137,6 +163,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2 }: { m
         <Chip large colour="var(--nv-accent)">Semana {day.week}</Chip>
         {isToday && <Chip large colour="var(--nv-mint)">Hoy</Chip>}
         {day.focus && <FocusChip id={day.focus.id} label={day.focus.label} />}
+        {day.focus?.together && <Chip large colour="var(--nv-mint)">Áreas juntas</Chip>}
         {!day.study && <Chip large colour="var(--nv-faint)">{day.blocked ? "Bloqueado" : "Descanso"}</Chip>}
         <span className="flex-1" />
         {canPlan && practiceCount > 0 && (
@@ -155,6 +182,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2 }: { m
       )}
       <p className="text-[15px] font-medium text-text" data-testid="agenda-day-counts">
         {[topicsText(day.topics.length), day.topicMinutes ? `${hm(day.topicMinutes)} de estudio` : "sin estudio", deliverablesText(due.length)].join(" · ")}
+        <AreaCounts plan={m.plan} list={due} testid="area-counts-day" />
       </p>
       <PurposeBlock planId={m.plan.id} scope="day" keyName={date} text={purpose.text} auto={purpose.auto} manual={purpose.manual} editable={m.editable} onChanged={onChanged} label={longDateLabel(date)} />
 
@@ -188,6 +216,15 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2 }: { m
           <section aria-labelledby={`${id}-practice`} data-testid="agenda-day-practice">
             <H2 id={`${id}-practice`} className={cn(SECTION, "mb-2")}>Práctica del día</H2>
             {day.focus && <p className="mb-2 text-[14px] text-dim" data-testid="agenda-practice-note">La práctica varía según el enfoque. {day.focus.practiceNote}</p>}
+            {(day.focus?.areaIds ?? []).map((a) => areaPracticeOf(a)).filter((s): s is NonNullable<typeof s> => !!s).map((s) => (
+              <details key={s.areaId} className="mb-2 rounded-lg border border-line px-3 py-2 text-[14px]" data-testid="agenda-area-practice">
+                <summary className="cursor-pointer font-medium">Sistema de práctica de {m.plan.subplans.find((p) => p.areaId === s.areaId)?.area ?? s.areaId}: {s.name}</summary>
+                <p className="mt-1.5 text-dim">{s.daily.summary}</p>
+                <p className="mt-1 text-dim"><span className="font-medium text-text">Cada fin de semana:</span> {s.weekly.summary}</p>
+                <p className="mt-1 text-dim"><span className="font-medium text-text">Cada mes:</span> {s.monthly.summary}</p>
+                <p className="mt-1 text-dim"><span className="font-medium text-text">Demuestra:</span> {s.measure}</p>
+              </details>
+            ))}
             {practice.length === 0 ? (
               <p className="text-[14px] text-dim">Hoy no hay bloques de práctica por tema.</p>
             ) : (
@@ -198,10 +235,12 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2 }: { m
                     <li key={b.id} className="rounded-xl border border-line p-3" data-testid="agenda-block" data-block={b.id}>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="text-[15px] font-semibold">{b.label}</span>
-                        {b.status !== "topic" && <Chip large colour="var(--nv-faint)">{b.status === "review" ? "Repaso" : "Omitido"}</Chip>}
+                        {b.status !== "topic" && <Chip large colour={b.status === "free" ? "var(--nv-accent)" : "var(--nv-faint)"}>{b.status === "review" ? "Repaso" : b.status === "free" ? "Práctica diaria" : "Omitido"}</Chip>}
                         {b.minutes > 0 && <span className="text-[14px] text-dim">{hm(b.minutes)}</span>}
                       </div>
-                      {b.items.length === 0 ? (
+                      {b.status === "free" ? (
+                        <FreeLanguage m={m} b={b} day={day} />
+                      ) : b.items.length === 0 ? (
                         <p className="mt-1 text-[14px] text-dim">{b.note}</p>
                       ) : (
                         <>
@@ -256,6 +295,26 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2 }: { m
               </div>
             )}
           </section>
+
+          {/* 4b · proyecto de aplicación de los temas que se completan hoy */}
+          {(day.topicProjects?.length ?? 0) > 0 && (
+            <section aria-labelledby={`${id}-tproj`} data-testid="agenda-day-topic-projects">
+              <H2 id={`${id}-tproj`} className={cn(SECTION, "mb-2")}>Proyecto del tema <span className="font-normal normal-case tracking-normal text-dim">(hoy completas {day.topicProjects!.length === 1 ? "un tema" : "varios temas"}: aplícalo)</span></H2>
+              <ul className="space-y-2.5">
+                {day.topicProjects!.map((tp) => (
+                  <ProjectCard key={tp.id} m={m} d={m.deliverableById.get(tp.id)} kind="Proyecto del tema" onChanged={onChanged} testid="agenda-project-topic">
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px]">
+                      <Chip large colour="var(--nv-mint)">Nivel {PROJECT_LEVEL_LABEL[tp.project.level]}</Chip>
+                      <span className="text-dim">{PROJECT_BASIS_LABEL[tp.project.basis]}</span>
+                      {tp.project.language && <Chip large>{tp.project.language}</Chip>}
+                      {tp.minutes > 0 && <span className="text-dim">{hm(tp.minutes)}</span>}
+                    </p>
+                    <p className="mt-0.5 text-[14px]"><span className="font-medium">Tema:</span> {shortOf(tp.title)}{tp.project.requires.length ? <span className="text-dim"> · combina {tp.project.requires.map((r) => shortOf(r.split("/").pop() ?? r)).join(", ")}</span> : null}</p>
+                  </ProjectCard>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* 5 · proyectos, al final */}
           <section aria-labelledby={`${id}-projects`} data-testid="agenda-day-projects">
@@ -436,7 +495,7 @@ export function PracticeCurriculumBar({ plan, onChanged, announce }: { plan: Men
         if (!alive.current) return;
         onChanged(r.plan);
         useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }));
-        const msg = r.entry.summary + " Puedes deshacerlo en «Cambios».";
+        const msg = r.entry.summary + " Puedes deshacerlo en «Preguntas y ajustes».";
         setNote(msg);
         announce(msg);
       } catch (e) {

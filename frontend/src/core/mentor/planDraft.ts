@@ -317,6 +317,10 @@ export interface PlanDraft {
   compact?: boolean;
   /** «areas» = el borrador es un plan por áreas elementales (cada subplan es un área con grupos y fase) */
   structure?: "areas";
+  /** cómo se combinan las áreas, ya decidido (juntas · por fases) y la línea de justificación visible */
+  areaMode?: "together" | "phased";
+  areaModeWhy?: string;
+  areaModeBy?: "user" | "ai" | "rules";
 }
 
 /** Mes (AAAA-MM) y primer día del reparto: el mes en curso reparte desde hoy; uno futuro, desde el día 1. */

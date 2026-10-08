@@ -11,13 +11,13 @@ import { useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { addDays, daysBetween } from "../../lib/planTime";
 import { PLAN_DELIVERABLE_STATUSES, type PlanDeliverable, type PlanDeliverableKind, type PlanDeliverableStatus } from "../../lib/planAreas";
-import { countDeliverables, dateLabel, deliverablesText } from "../../lib/planSchedule";
+import { countDeliverables, dateLabel, deliverableInArea, deliverablesText } from "../../lib/planSchedule";
 import type { MentorPlan } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { Chip, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn, confirmAction } from "../ui";
-import { doneText, DSTATUS_LABEL, plural, KIND_COLOUR, KIND_LABEL, StatusChip, useAgendaModel } from "./agendaKit";
+import { AreaCounts, doneText, DSTATUS_LABEL, plural, KIND_COLOUR, KIND_LABEL, StatusChip, useAgendaModel } from "./agendaKit";
 import { SectionHeading } from "./planKit";
 import { openPractice } from "./PracticeCard";
 import { branchOf, openProjectInProyectos, type Loaded } from "./planShared";
@@ -36,6 +36,7 @@ const KINDS: Array<{ id: "" | PlanDeliverableKind; label: string }> = [
   { id: "", label: "Todos los tipos" },
   { id: "kata", label: "Katas" },
   { id: "daily_project", label: "Proyectos diarios" },
+  { id: "topic_project", label: "Proyectos de tema" },
   { id: "weekly_project", label: "Proyectos semanales" },
   { id: "monthly_project", label: "Proyectos mensuales" },
   { id: "area_project", label: "Proyectos de área" },
@@ -94,7 +95,7 @@ export function PlanDeliverables({ data, onChanged, announce, goTab }: { data: L
       answer === "yes" ? "Añadir un entregable por área" : "No quiero ningún entregable de área",
       answer === "yes"
         ? `Se añadirá a cada una de las ${n} áreas sin entregable un proyecto propio de esa área (estado «Pendiente»). Después puedes quitarlo en un área concreta o pedir cambios al Mentor.`
-        : "Se descartará la pregunta: ningún área tendrá proyecto propio. Los katas y proyectos de práctica no cambian. Si cambias de idea, añádelo después en un área o pídelo en «Cambios».",
+        : "Se descartará la pregunta: ningún área tendrá proyecto propio. Los katas y proyectos de práctica no cambian. Si cambias de idea, añádelo después en un área o pídelo en «Preguntas y ajustes».",
       answer === "yes" ? "Añadir a todas" : "No quiero ninguno",
       answer === "no",
     );
@@ -146,6 +147,7 @@ export function PlanDeliverables({ data, onChanged, announce, goTab }: { data: L
   return (
     <>
       <div ref={head} tabIndex={-1} className="outline-none" data-testid="plan-deliverables-summary">
+        <AreaCounts plan={plan} list={m.deliverables} testid="area-counts-plan" />
         <SectionHeading id="dl-title" hint={`${deliverablesText(counts.total)} · ${doneText(counts.done)} · ${plural(counts.pending, "pendiente", "pendientes")}${pendingQs.length ? ` · ${pendingQs.length === 1 && globalQ ? "1 decisión por tomar" : `${pendingQs.length} decisiones por tomar`}` : ""}.`}>
           Entregables
         </SectionHeading>
@@ -253,7 +255,7 @@ export function PlanDeliverables({ data, onChanged, announce, goTab }: { data: L
         {withDeliverable.length === 0 && (
           <p className="mt-3 rounded-xl border border-dashed border-line p-4 text-[14px] text-dim" data-testid="plan-deliverables-empty">
             Este plan aún no tiene proyectos de área.{" "}
-            <button type="button" onClick={() => goTab("cambios")} className="inline-flex min-h-8 items-center text-accent-text underline underline-offset-2">Pídele uno al Mentor en «Cambios»</button>
+            <button type="button" onClick={() => goTab("cambios")} className="inline-flex min-h-8 items-center text-accent-text underline underline-offset-2">Pídele uno al Mentor en «Preguntas y ajustes»</button>
           </p>
         )}
       </section>
@@ -282,7 +284,7 @@ function AgendaDeliverables({ m, plan, today, onChanged, announce }: { m: Return
   };
   const areas = plan.subplans.filter((s) => s.areaId);
   const list = useMemo(
-    () => m.deliverables.filter((d) => d.dueDate >= from && d.dueDate <= to && (!kind || d.kind === kind) && (!area || d.areaId === area)),
+    () => m.deliverables.filter((d) => d.dueDate >= from && d.dueDate <= to && (!kind || d.kind === kind) && (!area || (area === "practice" ? !d.areaId : deliverableInArea(d, area)))),
     [m.deliverables, from, to, kind, area],
   );
   const counts = countDeliverables(list);
@@ -323,11 +325,14 @@ function AgendaDeliverables({ m, plan, today, onChanged, announce }: { m: Return
           <select value={area} onChange={(e) => { setArea(e.target.value); setShown(PAGE); }} aria-label="Área" className="mt-0.5 block min-h-11 rounded-lg border border-line bg-surface px-2.5 text-[14px] text-text">
             <option value="">Todas las áreas</option>
             {areas.map((s) => <option key={s.areaId} value={s.areaId}>{s.area}</option>)}
+            <option value="all">Integradores (varias áreas)</option>
+            <option value="practice">Práctica (katas)</option>
           </select>
         </label>
       </div>
       <p role="status" aria-live="polite" className="mb-2 text-[14px] text-dim" data-testid="deliverable-count">
         {deliverablesText(counts.total)} · {doneText(counts.done)} · {plural(counts.pending, "pendiente", "pendientes")}
+        <AreaCounts plan={plan} list={list} testid="area-counts-filtered" />
       </p>
       {list.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line p-4 text-[14px] text-dim" data-testid="deliverable-empty">No hay entregables con esos filtros.</p>

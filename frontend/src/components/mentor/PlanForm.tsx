@@ -10,6 +10,8 @@ import { CalendarRange, ListChecks, Loader2, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
+  branchAllowed,
+  PLAN_LANGUAGE_IDS,
   BRANCH_PRESETS,
   capacityOf,
   coverage,
@@ -30,6 +32,8 @@ import {
   selectionOf,
   weeksLabel,
   type BranchPresetKey,
+  type PlanAreaMode,
+  type PlanLanguageId,
   type DeliverablesMode,
   type PeriodPresetKey,
   type PlanLevel,
@@ -38,6 +42,8 @@ import {
 } from "../../lib/planTime";
 import { api } from "../../lib/bridge";
 import { newBuildId } from "../../lib/planBuild";
+import { areaIdsOfBranches, languageName, requiredLanguages, resolveLanguages } from "../../lib/planLanguages";
+import { areaNameOf } from "../../lib/planAreas";
 import { capacityWithPractice, FOCUS_LABEL, PRACTICE_BLURB, PRACTICE_FOCUSES, PRACTICE_NAME, type PracticeFocus } from "../../lib/practiceTrack";
 import type { MentorPlanOptions } from "../../lib/types";
 import { useApp } from "../../store/app";
@@ -89,7 +95,17 @@ interface Remembered {
   practiceFocus?: "rotate" | PracticeFocus;
   /** último preset de ramas elegido (full stack, backend…) */
   branchPreset?: BranchPresetKey;
+  /** última elección de cómo combinar las áreas y lenguajes opcionales marcados */
+  areaMode?: PlanAreaMode;
+  languages?: PlanLanguageId[];
 }
+
+/** Las tres formas de combinar las áreas, con una frase de ayuda cada una. */
+export const AREA_MODE_OPTIONS: Array<{ mode: PlanAreaMode; label: string; help: string }> = [
+  { mode: "together", label: "Juntas", help: "Todas las áreas activas todo el periodo y presentes cada día: front, back y bases de datos juntos en los proyectos diarios, semanales y mensuales. Automation va al final." },
+  { mode: "phased", label: "Separadas por fases", help: "Una o dos áreas por fase (meses), como máximo 2 en paralelo: profundizas en cada una antes de pasar a la siguiente. Automation va al final." },
+  { mode: "ai", label: "Que decida el Mentor", help: "El Mentor propone cómo combinarlas, la app lo valida y calcula, y verás una línea que explica por qué." },
+];
 
 export const DELIVERABLE_OPTIONS: Array<{ mode: DeliverablesMode; label: string }> = [
   { mode: "ask", label: "Lo decidimos al armar el plan" },
@@ -163,6 +179,8 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   const [freeObjective, setFreeObjective] = useState("");
   const [levels, setLevels] = useState<Record<string, PlanLevel>>({});
   const [deliverables, setDeliverables] = useState<DeliverablesMode>(rememberedDeliverables(mem.deliverables));
+  const [areaMode, setAreaMode] = useState<PlanAreaMode>(mem.areaMode ?? "ai");
+  const [optLangs, setOptLangs] = useState<PlanLanguageId[]>(mem.languages ?? []);
   const [practiceOn, setPracticeOn] = useState(mem.practiceOn ?? false);
   const [kataMinutes, setKataMinutes] = useState(mem.kataMinutes ?? DEFAULT_PRACTICE.kataMinutes);
   const [sessionsPerWeek, setSessionsPerWeek] = useState(mem.sessionsPerWeek ?? DEFAULT_PRACTICE.sessionsPerWeek);
@@ -221,17 +239,31 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
     return out;
   }, [branchAreas, branchSel]);
   const excludedBranches = useMemo(() => branchAreas.flatMap((a) => (branches[a.id] ? a.branches!.map((b) => b.name).filter((n) => !branches[a.id]!.includes(n)) : [])), [branchAreas, branches]);
+  // áreas elementales que entran en lo elegido (por el nombre de las ramas): deciden los lenguajes obligatorios y si tiene sentido elegir cómo combinarlas
+  const scopeAreaIds = useMemo(() => {
+    if (!options) return [] as string[];
+    const g = new Set(goalIds);
+    const names = new Set<string>();
+    for (const t of options.topics) {
+      if (t.branch && ((subjects.includes(t.area) && branchAllowed(branches, t.area, t.branch)) || t.goalIds.some((x) => g.has(x)))) names.add(t.branch);
+    }
+    return areaIdsOfBranches([...names]);
+  }, [options, goalIds, subjects, branches]);
+  const languages = useMemo(() => (scopeAreaIds.length ? resolveLanguages(optLangs.map((id) => ({ id, required: false, why: "" })), scopeAreaIds) : undefined), [scopeAreaIds, optLangs]);
+  const suggestTogether = ["frontend", "backend", "databases"].every((a) => scopeAreaIds.includes(a));
   const pre: PlanPreconditions = useMemo(
     () =>
       sanitizePreconditions(
         {
           start, end, minutesPerDay: minutes, studyDays: days, blockedDates: blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes,
+          ...(scopeAreaIds.length >= 2 ? { areaMode } : {}),
+          ...(languages ? { languages } : {}),
           ...(Object.keys(branches).length ? { branches, ...(branchPreset ? { branchPreset } : {}), branchExcluded: excludedBranches } : branchPreset === "all" ? { branchPreset } : {}),
           ...(practiceOn ? { practice: { kataMinutes, sessionsPerWeek, minutesPerSession, monthly, focus: practiceFocus } } : {}),
         },
         t0,
       ),
-    [start, end, minutes, days, blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes, branches, branchPreset, excludedBranches, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, t0],
+    [areaMode, languages, scopeAreaIds, start, end, minutes, days, blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes, branches, branchPreset, excludedBranches, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, t0],
   );
   // sanitizePreconditions corrige lo inválido; para el aviso se mira lo que el estudiante escribió
   const rawProblem = !isDate(start) || !isDate(end) ? "Indica las fechas de inicio y fin del periodo." : end < start ? "La fecha de fin es anterior a la de inicio." : null;
@@ -319,7 +351,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   };
   const remember = () => {
     try {
-      localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: pre.minutesPerDay, studyDays: pre.studyDays, pace: pre.pace, deliverables: pre.deliverables, preset: preset === "custom" ? undefined : preset, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, ...(branchAreas.length && branchPreset ? { branchPreset } : {}) } satisfies Remembered));
+      localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: pre.minutesPerDay, studyDays: pre.studyDays, pace: pre.pace, deliverables: pre.deliverables, preset: preset === "custom" ? undefined : preset, areaMode, languages: optLangs, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, ...(branchAreas.length && branchPreset ? { branchPreset } : {}) } satisfies Remembered));
     } catch {
       /* sin almacenamiento: no se recuerda */
     }
@@ -608,6 +640,50 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
               </div>
             ))}
           </div>
+        </Panel>
+      )}
+
+      {scopeAreaIds.length >= 2 && (
+        <Panel title="¿Cómo combinamos las áreas?">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Cómo combinar las áreas" data-testid="plan-area-mode">
+            {AREA_MODE_OPTIONS.map((o) => (
+              <ChipToggle key={o.mode} active={areaMode === o.mode} onClick={() => setAreaMode(o.mode)} title={o.help}>
+                {o.label}
+                {o.mode === "together" && suggestTogether ? <span className="text-[13px] text-faint"> · sugerida</span> : null}
+              </ChipToggle>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[14px] text-dim" data-testid="plan-area-mode-help">{AREA_MODE_OPTIONS.find((o) => o.mode === areaMode)!.help}</p>
+          {suggestTogether && areaMode !== "together" && (
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-[14px] text-text" data-testid="plan-area-mode-suggest">
+              Elegiste {scopeAreaIds.filter((a) => ["frontend", "backend", "databases"].includes(a)).map((a) => areaNameOf(a, a)).join(", ")}: te sugerimos estudiarlas juntas cada día.
+              <GhostButton onClick={() => setAreaMode("together")}>Usar «Juntas»</GhostButton>
+            </p>
+          )}
+        </Panel>
+      )}
+
+      {scopeAreaIds.length > 0 && languages && (
+        <Panel title="Lenguajes a practicar">
+          <p className="mb-1.5 text-[14px] text-faint">Cada día de estudio lleva un bloque propio «Práctica de &lt;lenguaje&gt;» (sintaxis, lógica y resolución de problemas, ligada a lo que estudias). Python es el más frecuente.</p>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lenguajes a practicar" data-testid="plan-languages">
+            {PLAN_LANGUAGE_IDS.map((id) => {
+              const sel = languages.find((l) => l.id === id);
+              const req = requiredLanguages(scopeAreaIds).some((r) => r.id === id) || (id === "python" && !!sel?.required);
+              return (
+                <ChipToggle key={id} active={!!sel} onClick={() => !req && setOptLangs((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))} title={sel?.why || (req ? "Obligatorio" : "Opcional")}>
+                  {languageName(id)} <span className="text-[13px] text-faint">· {req ? "obligatorio" : sel ? "elegido" : "opcional"}</span>
+                </ChipToggle>
+              );
+            })}
+          </div>
+          <ul className="mt-1.5 space-y-0.5 text-[14px] text-dim" data-testid="plan-languages-why">
+            {languages.map((l) => (
+              <li key={l.id}>
+                <span className="text-text">{languageName(l.id)}</span>: {l.why}
+              </li>
+            ))}
+          </ul>
         </Panel>
       )}
 

@@ -50,11 +50,11 @@ export function practiceSummary(track: PracticeTrack): string {
 
 function PhaseChips({ week, status }: { week: PracticeWeek; status?: Record<PracticePhase, PhaseStatus> }) {
   return (
-    <ul className="grid gap-1.5 @xl:grid-cols-2" aria-label={`Fases de la semana ${week.week}`}>
+    <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-1.5" aria-label={`Fases de la semana ${week.week}`}>
       {PRACTICE_PHASES.map((ph) => {
         const st: PhaseStatus = status?.[ph] ?? "pendiente";
         return (
-          <li key={ph} className="flex items-center justify-between gap-2 rounded-lg border border-line px-2.5 py-1.5 text-[14px]">
+          <li key={ph} className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg border border-line px-2.5 py-1.5 text-[14px]">
             <span className="font-medium">{PHASE_LABEL[ph]}</span>
             <Chip large colour={PHASE_STATUS_COLOUR[st]}>
               <span aria-hidden>{PHASE_GLYPH[st]}</span> {PHASE_STATUS_LABEL[st]}

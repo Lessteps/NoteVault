@@ -7,6 +7,7 @@ import { useApp } from "../../store/app";
 import { copyText } from "../../lib/clipboard";
 import { useAssistant } from "../../store/assistant";
 import { generateTopicFrom } from "../study/StudySpaceDialog";
+import { RouteBadge, useRouteView } from "../study/RouteUi";
 import { fileMenuItems, pathFlavors, type PathFlavor } from "./fileMenu";
 import { MoveEntryDialog } from "./MoveEntryDialog";
 import { VersionHistoryDialog } from "./VersionHistoryDialog";
@@ -152,6 +153,10 @@ export function FileTree({ filter }: { filter: string }) {
   const expandedRef = useRef(expanded);
   const [index, setIndex] = useState<IndexEntry[] | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  // La ruta del Mentor: un mapa carpeta → ruta calculado una vez por plan (ninguna fila hace llamadas)
+  const route = useRouteView();
+  const routeSnap = route.available ? route.snap : null;
+  const routeOnly = route.only ? route.snap : null;
 
   const load = useCallback(async (path: string) => {
     try {
@@ -311,9 +316,20 @@ export function FileTree({ filter }: { filter: string }) {
 
   const flatItems = useMemo<FlatTreeItem[]>(() => {
     const list: FlatTreeItem[] = [];
+    // «Solo mi ruta»: solo los temas vivos del plan, sus carpetas contenedoras y lo que hay dentro de cada tema (nada se borra: solo se oculta)
+    const insideLive = (p: string): boolean => {
+      for (let q = p, i = 0; q && i < 12; i++) {
+        if (routeOnly!.liveFolders.has(q)) return true;
+        const cut = q.lastIndexOf("/");
+        q = cut < 0 ? "" : q.slice(0, cut);
+      }
+      return false;
+    };
+    const shown = (e: TreeEntry): boolean => !routeOnly || (e.type === "folder" && routeOnly.ancestors.has(e.path)) || insideLive(e.path);
     function walk(entries: TreeEntry[] | undefined, depth: number) {
       if (!entries) return;
       for (const entry of entries) {
+        if (!shown(entry)) continue;
         list.push({ entry, depth });
         if (entry.type === "folder" && expanded.has(entry.path)) {
           walk(children[entry.path], depth + 1);
@@ -322,7 +338,17 @@ export function FileTree({ filter }: { filter: string }) {
     }
     walk(children[""], 0);
     return list;
-  }, [children, expanded]);
+  }, [children, expanded, routeOnly]);
+
+  // al activar «Solo mi ruta» se abren las carpetas de materia y rama que llevan a los temas de la ruta
+  useEffect(() => {
+    if (!routeOnly) return;
+    const top = [...routeOnly.ancestors].filter((p) => p.split("/").length <= 2);
+    const missing = top.filter((p) => !expandedRef.current.has(p));
+    if (!missing.length) return;
+    setExpanded((ex) => new Set([...ex, ...missing]));
+    for (const p of missing) void load(p);
+  }, [routeOnly, load]);
 
   const treeContainerRef = useRef<HTMLDivElement>(null);
   const treeVirtual = useVirtualList({
@@ -406,6 +432,7 @@ export function FileTree({ filter }: { filter: string }) {
                       ? "bg-accent-soft text-text"
                       : "text-dim hover:bg-hover hover:text-text",
                     dropTarget === entry.path && "outline outline-1 outline-accent",
+                    isFolder && routeSnap?.byFolder.get(entry.path)?.route === "skipped" && "opacity-60",
                   )}
                   style={{ paddingLeft: 6 + depth * 14 }}
                 >
@@ -428,7 +455,11 @@ export function FileTree({ filter }: { filter: string }) {
                     />
                   </button>
                   <EntryIcon entry={entry} open={open} />
-                  <span className="truncate">{entry.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+                  {isFolder && routeSnap && (() => {
+                    const info = routeSnap.byFolder.get(entry.path);
+                    return info ? <RouteBadge info={info} compact preview={route.preview} /> : null;
+                  })()}
                 </div>
               );
             })}

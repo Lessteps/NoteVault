@@ -1071,7 +1071,7 @@ anteriores (un subplan «Programación: <objetivo>» por rama) se siguen leyendo
 - `openQuestions` en un plan por áreas: **una sola** pregunta global `{id: "deliverables", text, options}` **sin** `subplanId` (en los antiguos, una por subplan).
   `mentor_plan_answer` sin `subplanId` la responde para todo el plan (yes añade el proyecto PROPIO de cada área: «API REST con persistencia y pruebas»,
   «Esquema relacional con consultas y migraciones»…, distintos por área); las excepciones por área van con `mentor_plan_area_deliverable`.
-- **Entregables de la agenda** (`deliverables`, opcional): `PlanDeliverable {id, kind: "kata"|"weekly_project"|"monthly_project"|"area_project"|"daily_project", title, description,
+- **Entregables de la agenda** (`deliverables`, opcional): `PlanDeliverable {id, kind: "kata"|"weekly_project"|"monthly_project"|"area_project"|"daily_project"|"topic_project", title, description,
   areaId?, dueDate, files?: [{path?, note}], criteria[], status: "pendiente"|"en_curso"|"hecho", source: "practice"|"ai"}`. Los de **práctica** se DERIVAN
   del plan (un archivo de kata `kata:<fecha>` por día de estudio con kata, `wp:<semana>` por proyecto semanal, `mp:<semana>` por bloque mensual) y los de
   **área** salen de `subplan.deliverable` (`area:<subplan>`, con la fecha en que acaba el área); `Plan.deliverables` solo guarda lo editado a mano (estado,
@@ -1084,6 +1084,12 @@ anteriores (un subplan «Programación: <objetivo>» por rama) se siguen leyendo
   misplaced: [{folder, title, reason, suggestedArea?}]}]}`. La app valida la respuesta: descarta las sugerencias que ya existen como tema de la vault, las áreas que no son
   del plan y los «sobrantes» que no son temas del plan. Solo informa: no crea notas ni cambia temas. Se ignora si no es válida; deshacer un cambio la conserva.
   La **cobertura determinista** (teoría y ejercicios por tema, temas de las ramas fuera del plan; `mentor_plan_coverage`, `src/lib/planCoverage.ts`) no se guarda.
+  **Revisión con criterio y realista** (campos aditivos; las revisiones antiguas se leen igual): `criteria: {presets: [market|mid|interviews|custom], targetLevel: junior|mid|senior,
+  currentLevel: auto|none|junior|mid|senior, conditions}` (el formulario «¿Con qué criterio revisamos?»), `overall: {verdict: short|adequate|excessive, coveragePct?, text}`, `disclaimer` (la app
+  lo pone siempre: es una estimación del modelo, sin datos de mercado en vivo) y, por área, `verdict`, `verdictWhy`, `coveragePct` (múltiplos de 5), `dispensable: [{folder, title, reason}]` (temas del
+  plan sin completar que pueden pasar a «fuera de ruta») y, en cada `missing`, `priority?: high|medium|low`, `level?: junior|mid|senior` y `accepted?` (añadido al plan como PROPUESTA con
+  `mentor_plan_coverage_accept`: no crea notas ni cambia temas). Pasar prescindibles a fuera de ruta usa `mentor_plan_route_set` (deshacible, no borra nada).
+  **Historial** (`mentor_plan_history`): las entradas llevan `kind?: question|fix|adjust`; una PREGUNTA (`mentor_plan_ask`) se guarda con `status: "answered"` y `answer`, no cambia el plan ni se puede deshacer.
 - **Fases mes a mes** (no se guarda, `src/lib/planMonths.ts`): cada semana del plan cuenta en el mes de su día central; por área y mes se agregan temas (por `targetWeek`), horas, semanas activas (`phase`) y grupos.
 - **Agenda** (no se guarda: se recalcula siempre igual, `src/lib/planSchedule.ts`): reparto DIARIO determinista. Cada día de estudio no bloqueado da
   `minutesPerDay × ritmo` menos los minutos de práctica de ese día; cada semana, la capacidad se reparte entre las áreas con temas esa semana en
@@ -1180,6 +1186,44 @@ Los datos portables del módulo Web residen dentro de `.notevault/web/`:
 ├── historial/AAAA/MM/AAAA-MM-DD.json    páginas visitadas por día
 └── uso/AAAA/MM/AAAA-MM-DD.json          segundos dedicados por host/dominio por día
 ```
+
+#### Motor del plan v2: áreas juntas, lenguajes, proyecto del tema, práctica por área, ruta (aditivo; sin subir `FORMAT_VERSION`)
+
+Todo lo siguiente es opcional: un plan sin estos campos se lee y se agenda exactamente como antes (incluido el plan real del usuario).
+
+- **Cómo se combinan las áreas** — `preconditions.areaMode: "together" | "phased" | "ai"` (lo elige el estudiante AL CREAR el plan; ausente = por fases).
+  El plan guarda el modo ya decidido: `areaMode: "together" | "phased"`, `areaModeWhy` (una línea visible) y `areaModeBy: "user" | "ai" | "rules"`.
+  - `together` («juntas»): todas las áreas elegidas activas TODO el periodo (`phase` = semanas 1..N) y presentes CADA día. **Automation va siempre al final**
+    (su fase empieza cuando acaban las demás), en todos los modos. `phased`: como siempre (≤ 2 áreas en paralelo). `ai`: el esqueleto de la IA propone
+    `areaMode` + `areaModeWhy`; la app valida (solo `together`/`phased`, con justificación) y, sin propuesta válida, aplica la regla: Frontend + Backend ⇒ juntas.
+  - Día «completo» (tabla `compositeTemplate` en `src/lib/planDayFocus.ts`): una sola plantilla con los bloques de teoría y práctica de cada área activa
+    (Backend: teoría + lenguaje; Databases: teoría + SQL; Frontend: teoría + lenguaje + UI…). Cada bloque toma `share × peso del área` (peso = 50 % parejo +
+    50 % proporcional a lo que le queda a esa área) y su mínimo se divide entre las áreas; el proyecto diario sube a 40–75 min porque integra las áreas.
+    `focus = { id: "together", label: "Full stack", areaIds[], together: true }`.
+  - «Pedir cambios» puede cambiar el modo: operación `set_area_mode {mode}` (recalcula fases y reparto; deshacible con el historial).
+- **Lenguajes con práctica propia** — `preconditions.languages: [{ id: "python"|"javascript"|"typescript", required, why, weight? }]` (ausente = sin bloque
+  diario de lenguaje). Reglas (`src/lib/planLanguages.ts`, tabla `AREA_LANGUAGE_RULES`): Backend ⇒ Python + JavaScript + TypeScript obligatorios; Frontend ⇒
+  JavaScript + TypeScript; Automation ⇒ Python; Python elegido a mano es obligatorio. Cada día de estudio lleva el bloque `lang-daily` («Práctica de
+  <lenguaje>», `status: "free"`, minutos propios ≈ 18 % del día entre 15 y 35 min): sintaxis, lógica y resolución ligadas a los temas del día. El lenguaje rota
+  por peso (por defecto Python 3 · JavaScript 2 · TypeScript 2). No duplica el grupo «Lenguaje: Python» (que sigue siendo de temas).
+- **Proyecto del tema** — `topics[].topicProject: { title, description, level: "micro"|"guiado"|"aplicado"|"integrador", basis: "declarado"|"medido", requires[], language?, source: "template"|"ai" }`.
+  `calibrateTopicProject` (`src/lib/planTopicProject.ts`, pura) toma el nivel MEDIDO (progreso e intentos reales de los temas previos del grupo y del propio tema)
+  y, sin actividad, el declarado (`levels`): sin base ⇒ `micro`; con dominio ⇒ `aplicado`/`integrador`; un tema sin previos nunca pasa de `guiado`; lo medido
+  manda y no pasa de un escalón sobre lo declarado. La IA (botón «Generar la práctica del plan») puede proponer título/descripción, pero `clampProject` la recorta al nivel
+  permitido. Aparece como bloque «Proyecto del tema» el día en que se completa el tema y es un entregable `kind: "topic_project"` (`id: tp:<hash>`).
+- **Práctica por área** — tabla `AREA_PRACTICE` (`src/lib/planAreaPractice.ts`): por área `daily` (qué se practica a diario, con ejemplos), `weekly` (proyecto de fin de semana), `monthly`,
+  `measure` y `languages`. Frontend = un componente diario con Atomic Design (átomos → moléculas → organismos: botón, navbar, hero, tarjeta…) y cada semana una **página completa** que
+  los une; Backend = endpoint/servicio con pruebas y **API completa**; Databases = diseño/consultas y **esquema + consultas de un caso**; Automation = script y **automatización completa**.
+  En modo juntas los proyectos integran: diario = feature (pantalla + endpoint + tabla), semanal = **vertical completa**, mensual = **aplicación**.
+- **Entregables por área** — `PlanDeliverable.areaId` es el área propia, `"all"` en los proyectos integradores (con `areaIds[]`) y falta en los katas; kinds nuevos: `topic_project`.
+  Funciones puras en `src/lib/planSchedule.ts`: `deliverablesBy(plan, { day | week | month | area, kind?, status? })` (el filtro por área incluye los integradores que la contienen),
+  `deliverableAreaRows(list, areas)` (partición del total: «Backend 12 · Frontend 12 · Databases 5 · Integradores 8 · Práctica 60») y `deliverableInArea`.
+- **Ruta del plan** — `topics[].route: "optional" | "skipped"` (ausente = `core`) y `skippedReason`. Un tema `skipped` **no se borra** ni se quita de la vault: se conserva en el plan,
+  atenuado como «fuera de ruta», y se puede reactivar; las cuentas (temas, horas, semanas, capacidad, reparto diario, proyectos) lo excluyen.
+  API: `mentor_route({ planId? })` → `{ today, plans: [{ planId, name, status, currentWeek, counts, topics: [{ folder, title, route, skippedReason?, targetWeek, weekStart, areaId?, area, group? }] }], byFolder }`
+  (solo lee; sin `planId`, los planes activos); `mentor_plan_reduce({ id, areaId, groupId?, max })` («Reducir a lo esencial»: Bases 75 → ≤ 30; reglas: dominado/medido, nivel básico
+  declarado, lo cubre la práctica de lenguaje, lo último de la ruta; nunca salta prerrequisitos, completados, fijados ni temas en curso) y `mentor_plan_route_set({ id, folders[], route, reason?, label? })`.
+  Ambas guardan historial con instantánea previa (`mentor_plan_change_undo`). Operaciones de «Pedir cambios»: `set_route`, `reduce_essentials`.
 
 ### `marcadores.json`
 Lista de marcadores con campos `id`, `title`, `url` y fecha `created`.

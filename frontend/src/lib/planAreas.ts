@@ -33,7 +33,7 @@ export interface AreaPhase {
   toWeek: number;
 }
 
-export const AREA_DELIVERABLE_KINDS = ["kata", "weekly_project", "monthly_project", "area_project", "daily_project"] as const;
+export const AREA_DELIVERABLE_KINDS = ["kata", "weekly_project", "monthly_project", "area_project", "daily_project", "topic_project"] as const;
 export type PlanDeliverableKind = (typeof AREA_DELIVERABLE_KINDS)[number];
 export const PLAN_DELIVERABLE_STATUSES = ["pendiente", "en_curso", "hecho"] as const;
 export type PlanDeliverableStatus = (typeof PLAN_DELIVERABLE_STATUSES)[number];
@@ -48,7 +48,10 @@ export interface PlanDeliverable {
   kind: PlanDeliverableKind;
   title: string;
   description: string;
+  /** área a la que pertenece; `"all"` = proyecto integrador de varias áreas (ver `areaIds`) */
   areaId?: string;
+  /** áreas que integra un proyecto integrador (diario/semanal/mensual en modo «juntas»); cuenta en el desglose de cada una */
+  areaIds?: string[];
   /** AAAA-MM-DD */
   dueDate: string;
   files?: Array<{ path?: string; note: string }>;
@@ -377,6 +380,8 @@ export interface PhaseInput {
   weight: number;
   /** áreas consecutivas con el mismo grupo van EN PARALELO (Backend ‖ Databases · Automation ‖ Tooling); sin grupo, el área va sola */
   group?: string;
+  /** área elemental (para el modo «juntas»: Automation siempre va al final) */
+  areaId?: string;
 }
 
 /** Qué áreas van en paralelo por defecto (datos): Backend ‖ Databases · Automation ‖ Tooling · Desktop ‖ Mobile; Frontend va sola. */
@@ -461,6 +466,41 @@ export function planAreaPhases(areas: readonly PhaseInput[], weekCapacity: reado
   return out;
 }
 
+/**
+ * Fases del modo «JUNTAS» (`areaMode: "together"`): todas las áreas están activas a la vez TODO el periodo, salvo Automation, que va SIEMPRE AL
+ * FINAL (después de Backend, Databases y Frontend: «automatización es solo Python»). El corte se calcula con la capacidad semanal y los pesos:
+ * las áreas principales ocupan desde la semana 1 hasta la semana de corte y Automation el resto. Sin Automation (o solo Automation) todas
+ * ocupan el periodo entero. Con una sola semana, todas coinciden en ella.
+ */
+export function planTogetherPhases(areas: readonly PhaseInput[], weekCapacity: readonly number[]): Record<string, AreaPhase> {
+  const out: Record<string, AreaPhase> = {};
+  const W = Math.max(1, weekCapacity.length);
+  const main = areas.filter((a) => a.areaId !== "automation");
+  const tail = areas.filter((a) => a.areaId === "automation");
+  if (!main.length || !tail.length || W < 2) {
+    for (const a of areas) out[a.key] = { fromWeek: 1, toWeek: W };
+    return out;
+  }
+  const wm = main.reduce((n, a) => n + Math.max(1, a.weight), 0);
+  const wt = tail.reduce((n, a) => n + Math.max(1, a.weight), 0);
+  const frac = wm / (wm + wt);
+  const total = weekCapacity.reduce((n, c) => n + Math.max(0, c), 0);
+  let cut: number;
+  if (total > 0) {
+    let acc = 0;
+    cut = 0;
+    for (let w = 1; w <= W; w++) {
+      acc += Math.max(0, weekCapacity[w - 1] ?? 0);
+      cut = w;
+      if (acc >= total * frac - 1e-6) break;
+    }
+  } else cut = Math.round(W * frac);
+  cut = Math.min(W - 1, Math.max(1, cut));
+  for (const a of main) out[a.key] = { fromWeek: 1, toWeek: cut };
+  for (const a of tail) out[a.key] = { fromWeek: cut + 1, toWeek: W };
+  return out;
+}
+
 /** El máximo de áreas solapadas en una semana cualquiera (para validar y probar). */
 export function maxOverlap(phases: Record<string, AreaPhase>): number {
   const ws = Object.values(phases);
@@ -526,6 +566,7 @@ export function sanitizePlanDeliverables(raw: unknown): PlanDeliverable[] {
       title: oneLineOf(d.title, 140) || id,
       description: oneLineOf(d.description, 600),
       ...(oneLineOf(d.areaId, 40) ? { areaId: oneLineOf(d.areaId, 40) } : {}),
+      ...(Array.isArray(d.areaIds) && d.areaIds.length ? { areaIds: [...new Set(d.areaIds.map((a: unknown) => oneLineOf(a, 40)).filter(Boolean))].slice(0, 12) as string[] } : {}),
       dueDate: String(d.dueDate),
       ...(files.length ? { files } : {}),
       criteria,
@@ -610,4 +651,51 @@ export function splitNotes(notes: string | undefined): { note: string; rulesFall
 export function planChipLabel(name: string, max = 40): string {
   const t = name.trim();
   return t.length <= max ? t : `${t.slice(0, max - 1).trim()}…`;
+}
+
+// ── Cómo se combinan las áreas: resolución del modo ─────────────────────
+
+export type AreaModeSource = "user" | "ai" | "rules";
+export interface ResolvedAreaModeInfo {
+  mode: "together" | "phased";
+  /** una línea de justificación visible («Backend, Frontend y Databases juntas cada día porque…») */
+  why: string;
+  by: AreaModeSource;
+}
+
+const AREA_LABEL = (id: string): string => areaNameOf(id, id);
+const joinNames = (ids: readonly string[]): string => {
+  const n = ids.map(AREA_LABEL);
+  return n.length <= 1 ? (n[0] ?? "") : `${n.slice(0, -1).join(", ")} y ${n[n.length - 1]}`;
+};
+
+/** Sugerencia determinista (sin IA): Frontend + Backend (con o sin Databases) van juntas; el resto, por fases. */
+export function suggestAreaMode(areaIds: readonly string[]): "together" | "phased" {
+  return areaIds.includes("frontend") && areaIds.includes("backend") ? "together" : "phased";
+}
+
+/**
+ * Decide el modo del plan a partir de lo que el estudiante eligió al crearlo (`pre.areaMode`) y, si dejó que decida el Mentor, de su propuesta
+ * (ya validada) o de la regla `suggestAreaMode`. `undefined` = el plan no declara modo (planes antiguos: por fases como siempre).
+ * Automation siempre va al final en cualquier modo: se cuenta en el texto de justificación.
+ */
+export function resolveAreaMode(choice: string | undefined, areaIds: readonly string[], proposal?: { mode?: unknown; why?: unknown; by?: unknown } | null): ResolvedAreaModeInfo | undefined {
+  if (!choice) return undefined;
+  const real = areaIds.filter((a) => !isCustomArea(a));
+  const tail = real.includes("automation") && real.length > 1 ? " Automation va siempre al final." : "";
+  if (choice === "together") return { mode: "together", by: "user", why: `Elegiste estudiar ${joinNames(real) || "las áreas"} juntas: todas activas todo el periodo y presentes cada día.${tail}` };
+  if (choice === "phased") return { mode: "phased", by: "user", why: `Elegiste áreas separadas por fases (como máximo ${MAX_PARALLEL_AREAS} en paralelo).${tail}` };
+  if (choice !== "ai") return undefined;
+  const pm = proposal?.mode === "together" || proposal?.mode === "phased" ? proposal.mode : undefined;
+  const pw = oneLineOf(proposal?.why, 240);
+  if (pm && pw) return { mode: pm, by: proposal?.by === "rules" ? "rules" : "ai", why: pw };
+  const mode = suggestAreaMode(real);
+  return {
+    mode,
+    by: "rules",
+    why:
+      mode === "together"
+        ? `Frontend y Backend van juntas cada día (con ${real.includes("databases") ? "Databases" : "sus bases de datos"} y los proyectos integrados) porque necesitas ver el stack completo.${tail}`
+        : `Con ${joinNames(real) || "estas áreas"} lo más claro es separarlas por fases, como máximo ${MAX_PARALLEL_AREAS} en paralelo.${tail}`,
+  };
 }

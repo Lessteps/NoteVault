@@ -58,7 +58,16 @@ export interface CurriculumOpts {
   objective?: string;
 }
 
+/** Propuesta de la IA para el proyecto de un tema: la app la RECORTA al nivel que permite la calibración (nunca lo sube). */
+export interface TopicProjectProposal {
+  title: string;
+  description: string;
+  level?: string;
+}
+
 export interface CurriculumResult {
+  /** proyectos de tema propuestos por la IA, por carpeta (sin recortar: quien los aplica los pasa por `clampProject`) */
+  topicProjects: Record<string, TopicProjectProposal>;
   curriculum: PracticeCurriculum;
   aiUsed: boolean;
   calls: number;
@@ -72,7 +81,7 @@ export const CURRICULUM_SYSTEM = [
   `${PRACTICE_NAME} es una ${PRACTICE_PURPOSE}. La práctica de este plan debe estar ENFOCADA en el objetivo del plan y conectada con los temas que se estudian cada semana.`,
   "Recibes, por semana, los TEMAS REALES que se practican (carpeta exacta, título, tipo de práctica y lenguaje) y cuántos ejercicios tiene ya cada uno en la vault del estudiante.",
   "Responde SOLO un objeto JSON con esta forma (sin texto fuera del JSON):",
-  '{"weeks":[{"week":1,"exercises":[{"topic":"<carpeta EXACTA>","practice":"language|database|ui|scripting|tooling|area","language":"Python","title":"<=110 caracteres","statement":"<=250 caracteres"}],"logic":[{"title":"<=110","statement":"<=250"}],"weeklyProject":{"title":"<=90","description":"<=280"},"dailyProjects":[{"topic":"<carpeta EXACTA de un tema de teoría de esa semana>","title":"<=90","description":"<=280"}]}],"monthly":[{"month":"AAAA-MM","title":"<=90","description":"<=280"}]}',
+  '{"topicProjects":[{"topic":"<carpeta EXACTA de un tema con proyecto>","title":"<=90","description":"<=280","level":"micro|guiado|aplicado|integrador"}],"weeks":[{"week":1,"exercises":[{"topic":"<carpeta EXACTA>","practice":"language|database|ui|scripting|tooling|area","language":"Python","title":"<=110 caracteres","statement":"<=250 caracteres"}],"logic":[{"title":"<=110","statement":"<=250"}],"weeklyProject":{"title":"<=90","description":"<=280"},"dailyProjects":[{"topic":"<carpeta EXACTA de un tema de teoría de esa semana>","title":"<=90","description":"<=280"}]}],"monthly":[{"month":"AAAA-MM","title":"<=90","description":"<=280"}]}',
   "REGLAS:",
   "- `topic` debe ser EXACTAMENTE una de las carpetas listadas; no inventes temas.",
   "- Ejercicios concretos y accionables, conectados con el tema («Escribe en Python un cliente HTTP que…», «Diseña la tabla y escribe la consulta con JOIN que…»). De 1 a 2 por tema.",
@@ -80,6 +89,8 @@ export const CURRICULUM_SYSTEM = [
   "- `logic`: de 3 a 5 retos de lógica tipo entrevista técnica alineados con el enfoque de la semana (estructuras de datos, cadenas, recorridos…).",
   "- `weeklyProject`: UN proyecto semanal que acumule lo estudiado esa semana; `dailyProjects`: mini-proyectos diarios (uno por tema ancla) que apliquen la teoría y la práctica de ese día.",
   "- `monthly`: solo para los meses listados; integra los proyectos semanales del mes.",
+  "- `topicProjects`: para los temas listados bajo «PROYECTOS DE TEMA» propón un proyecto de aplicación real (una calculadora, un CRUD, una página…) al terminar el tema. El «nivel máximo» de cada tema sale de lo que el estudiante ya DOMINA (medido con su actividad): NUNCA propongas un proyecto de un nivel superior a ese máximo (micro < guiado < aplicado < integrador). Si ni siquiera sabe lo básico, pide algo mínimo («imprime tu nombre con 3 formatos»), no una calculadora.",
+  "- La práctica de lenguaje diaria (bloque «Práctica de <lenguaje>») va ligada a los temas del día: los ejercicios con `practice: \"language\"` deben escribirse en ESE lenguaje (Python, JavaScript o TypeScript) y trabajar sintaxis, lógica y resolución de problemas.",
   "- NO escribas fechas ni minutos: la app decide el reparto. Todo en español.",
 ].join("\n");
 
@@ -95,6 +106,11 @@ export function curriculumMessages(sch: PlanSchedule, weeks: readonly number[], 
     if (!topics.length) lines.push("  (sin temas de práctica esta semana)");
     for (const t of topics.slice(0, 24)) lines.push(`  - ${t.folder} · «${shortOf(t.title)}» · práctica ${t.practice}${t.language ? ` en ${t.language}` : ""}${t.existing ? ` · ya tiene ${t.existing} ejercicios` : ""}`);
   }
+  const tps = weeks.flatMap((w) => sch.days.filter((d) => d.week === w).flatMap((d) => d.topicProjects ?? []));
+  if (tps.length) {
+    lines.push("", "PROYECTOS DE TEMA (el proyecto se hace el día en que se completa el tema; respeta el nivel máximo):");
+    for (const t of tps.slice(0, 30)) lines.push(`  - ${t.folder} · «${shortOf(t.title)}» · nivel máximo: ${t.project.level} (${t.project.basis === "medido" ? "medido con su actividad" : "según su nivel declarado"})${t.project.language ? ` · en ${t.project.language}` : ""}`);
+  }
   if (months.length) lines.push("", `MESES para el proyecto mensual: ${months.map((m) => `${m} (${monthName(m)})`).join(", ")}`);
   lines.push("", `Devuelve las semanas ${weeks.join(", ")} (todas) en el JSON.`);
   return [{ role: "system", content: CURRICULUM_SYSTEM }, { role: "user", content: lines.join("\n") }];
@@ -102,6 +118,7 @@ export function curriculumMessages(sch: PlanSchedule, weeks: readonly number[], 
 
 export interface ParsedCurriculum {
   ok: boolean;
+  topicProjects?: Record<string, TopicProjectProposal>;
   weeks: CurriculumWeek[];
   monthly: CurriculumMonth[];
   reason?: string;
@@ -129,7 +146,15 @@ export function parseCurriculumReply(text: string, plan: SchedulePlan, wanted: r
       const description = oneLine(rec?.description, 320);
       if (months.includes(month) && title && !monthly.some((x) => x.month === month)) monthly.push({ month, title, ...(description ? { description } : {}), source: "ai" });
     }
-    if (weeks.length) return { ok: true, weeks, monthly };
+    const topicProjects: Record<string, TopicProjectProposal> = {};
+    for (const p of Array.isArray(obj.topicProjects) ? obj.topicProjects : []) {
+      const rec = p as Record<string, unknown>;
+      const topic = oneLine(rec?.topic, 400);
+      const title = oneLine(rec?.title, 100);
+      if (!topic || !title || !scope.folders.has(topic) || topicProjects[topic]) continue;
+      topicProjects[topic] = { title, description: oneLine(rec?.description, 320), level: oneLine(rec?.level, 20) };
+    }
+    if (weeks.length) return { ok: true, weeks, monthly, topicProjects };
   }
   return { ok: false, weeks: [], monthly: [], reason: "la IA no devolvió un currículo válido" };
 }
@@ -203,6 +228,7 @@ export async function generateCurriculum(plan: SchedulePlan, sch: PlanSchedule, 
 
   const byWeek = new Map<number, CurriculumWeek>();
   const monthly: CurriculumMonth[] = [];
+  const topicProjects: Record<string, TopicProjectProposal> = {};
   const tpl = (ws: readonly number[]): void => {
     for (const w of ws) byWeek.set(w, templateCurriculumWeek(sch, w, o.existing));
   };
@@ -245,6 +271,7 @@ export async function generateCurriculum(plan: SchedulePlan, sch: PlanSchedule, 
               byWeek.set(w, { ...got, exercises: [...vault, ...aiEx, ...filler], logic: got.logic.length ? got.logic : base.logic });
             }
             monthly.push(...parsed.monthly.filter((m) => !monthly.some((x) => x.month === m.month)));
+            Object.assign(topicProjects, parsed.topicProjects ?? {});
           } else why = parsed.reason ?? "";
         } else why = r.msg;
         if (!ok) {
@@ -261,5 +288,5 @@ export async function generateCurriculum(plan: SchedulePlan, sch: PlanSchedule, 
 
   const weeks = [...byWeek.values()].sort((a, b) => a.week - b.week);
   const source = weeks.every((w) => w.source === "ai") && weeks.length ? "ai" : weeks.some((w) => w.source === "ai") ? "mixed" : "template";
-  return { curriculum: { generatedAt: new Date(now()).toISOString(), source, weeks, monthly, ...(warnings.length ? { warnings } : {}) }, aiUsed, calls, warnings };
+  return { topicProjects, curriculum: { generatedAt: new Date(now()).toISOString(), source, weeks, monthly, ...(warnings.length ? { warnings } : {}) }, aiUsed, calls, warnings };
 }

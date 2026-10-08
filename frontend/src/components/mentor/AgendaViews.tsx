@@ -10,7 +10,7 @@ import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
-import { AreaChip, DeliverableLine, doneText, focusColour, plural, PurposeBlock, type AgendaModel } from "./agendaKit";
+import { AreaChip, AreaCounts, DeliverableLine, doneText, focusColour, plural, PurposeBlock, type AgendaModel } from "./agendaKit";
 import { DayDetailFocus, FocusStructure, MonthProjects, WeekProjects } from "./AgendaDayFocus";
 import { openTopic } from "./openTopic";
 import { hm, ProgressBar } from "./parts";
@@ -69,6 +69,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2 }: { m: Age
 
       <p className="text-[15px] font-medium text-text" data-testid="agenda-day-counts">
         {[topicsText(day.topics.length), day.topicMinutes ? `${hm(day.topicMinutes)} de estudio` : "sin estudio", deliverablesText(due.length)].join(" · ")}
+        <AreaCounts plan={m.plan} list={due} testid="area-counts-day" />
       </p>
 
       <PurposeBlock planId={m.plan.id} scope="day" keyName={date} text={purpose.text} auto={purpose.auto} manual={purpose.manual} editable={m.editable} onChanged={onChanged} label={longDateLabel(date)} />
@@ -189,6 +190,7 @@ export function WeekDetail({ m, week, onPickDay, onChanged, headingId }: { m: Ag
 
       <p className="text-[15px] font-medium text-text" data-testid="agenda-week-counts">
         {[topicsText(w.topics), `${hm(w.topicMinutes)} de estudio`, deliverablesText(w.deliverables.length)].join(" · ")}
+        <AreaCounts plan={m.plan} list={w.deliverables} testid="area-counts-week" />
       </p>
 
       <PurposeBlock planId={m.plan.id} scope="week" keyName={String(week)} text={w.purpose} auto={w.autoPurpose} manual={purposeManual} editable={m.editable} onChanged={onChanged} label={`la semana ${week}`} />
@@ -297,6 +299,7 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId }: { m:
       </header>
       <p className="text-[15px] font-medium" data-testid="agenda-month-counts">
         {[topicsText(s.topics), `${hm(s.topicMinutes)} de estudio`, deliverablesText(s.deliverables.length), plural(s.weeks.length, "semana", "semanas")].join(" · ")}
+        <AreaCounts plan={m.plan} list={s.deliverables} testid="area-counts-month" />
       </p>
       <PurposeBlock planId={m.plan.id} scope="month" keyName={month} text={s.purpose} auto={s.autoPurpose} manual={manual} editable={m.editable} onChanged={onChanged} label={s.label} />
 

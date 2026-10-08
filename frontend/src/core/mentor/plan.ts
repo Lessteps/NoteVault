@@ -17,6 +17,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   addDays,
+  areaOfFolder,
   daysBetween,
   dayMinutes,
   eachDay,
@@ -33,6 +34,8 @@ import {
   areasPlanName,
   PARALLEL_GROUP,
   planAreaPhases,
+  planTogetherPhases,
+  type AreaModeSource,
   sanitizeGroups,
   sanitizePhase,
   sanitizePlanDeliverables,
@@ -43,6 +46,8 @@ import {
   type PlanPurposes,
 } from "../../lib/planAreas.js";
 import { buildSchedule } from "../../lib/planSchedule.js";
+import { isLive, sanitizeRouteFields, type TopicRoute } from "../../lib/planRoute.js";
+import { projectsForSubplan, sanitizeTopicProject, type MasteryLookup, type TopicProject } from "../../lib/planTopicProject.js";
 import { dailyProjectOf } from "../../lib/planCurriculum.js";
 import { sanitizeCurriculum, scopeOfPlan, type PracticeCurriculum } from "../../lib/planCurriculum.js";
 import { areaKeyOf, sanitizeCoverageReview, type CoverageReview } from "../../lib/planCoverage.js";
@@ -72,6 +77,11 @@ export interface PlannedTopic {
   pinned?: boolean;
   /** grupo interno del área al que pertenece (Bases, Lenguaje: Python, Conocimientos…); ver `lib/planAreas.ts` */
   group?: string;
+  /** RUTA: `core` (por defecto, ausente) · `optional` · `skipped` (fuera de ruta: se conserva en el plan y en la vault, no cuenta ni se agenda); ver `lib/planRoute.ts` */
+  route?: Exclude<TopicRoute, "core">;
+  skippedReason?: string;
+  /** proyecto de aplicación tras el tema, calibrado al nivel medido; ver `lib/planTopicProject.ts` */
+  topicProject?: TopicProject;
 }
 
 export interface WeekSlice {
@@ -213,6 +223,11 @@ export interface Plan {
   coverageReview?: CoverageReview;
   /** currículo de práctica del plan generado por la IA bajo demanda (ejercicios por semana y proyectos); ver `lib/planCurriculum.ts` */
   practiceCurriculum?: PracticeCurriculum;
+  /** cómo se combinan las áreas, ya decidido: `together` (todas juntas cada día) o `phased` (por fases); ausente = por fases como siempre */
+  areaMode?: "together" | "phased";
+  /** la línea de justificación visible del modo y quién lo decidió */
+  areaModeWhy?: string;
+  areaModeBy?: AreaModeSource;
   subplans: Subplan[];
 }
 /** Nombre histórico: un plan mensual es un plan de periodo. */
@@ -451,7 +466,7 @@ export interface SubplanSeed {
   objective: string;
   goalId?: string;
   goalItemIds?: string[];
-  topics: Array<{ folder: string; title: string; skills?: string[]; estMinutes: number; diagnostic?: boolean; group?: string }>;
+  topics: Array<{ folder: string; title: string; skills?: string[]; estMinutes: number; diagnostic?: boolean; group?: string; route?: PlannedTopic["route"]; skippedReason?: string; topicProject?: TopicProject }>;
   requiredGoals?: RequiredGoal[];
   deliverable?: Partial<Deliverable> & { title: string };
   notes?: string;
@@ -517,6 +532,10 @@ export interface BuildOpts extends Capacity {
   openQuestions?: OpenQuestion[];
   /** false = llena primero las primeras semanas (más intenso) en vez de repartir parejo; por defecto, parejo con tiempo diario */
   spread?: boolean;
+  /** modo ya decidido de las áreas (`together` = todas juntas todo el periodo, Automation al final); sin él, por fases */
+  areaMode?: "together" | "phased";
+  areaModeWhy?: string;
+  areaModeBy?: AreaModeSource;
 }
 
 /**
@@ -526,8 +545,10 @@ export interface BuildOpts extends Capacity {
 export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): BuiltPlan {
   const now = opts.now ?? new Date().toISOString();
   const period = periodOf(opts);
-  const total = seeds.reduce((n, s) => n + s.topics.reduce((m, t) => m + t.estMinutes, 0), 0);
-  const weightOf = (s: SubplanSeed): number => (s.weight !== undefined && s.weight > 0 ? s.weight : s.topics.reduce((n, t) => n + t.estMinutes, 0));
+  // los temas «fuera de ruta» (skipped) no cuentan: ni minutos, ni capacidad, ni reparto (se conservan en el plan, atenuados)
+  const liveMinutes = (s: SubplanSeed): number => s.topics.filter(isLive).reduce((n, t) => n + t.estMinutes, 0);
+  const total = seeds.reduce((n, s) => n + liveMinutes(s), 0);
+  const weightOf = (s: SubplanSeed): number => (s.weight !== undefined && s.weight > 0 ? s.weight : liveMinutes(s));
   const weightTotal = seeds.reduce((n, s) => n + weightOf(s), 0);
   const warnings: string[] = [];
   const used = new Set<string>();
@@ -547,7 +568,10 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
       const dm = dayMinutesOf(perDayMode ? { minutesPerDay: opts.minutesPerDay, studyDays: opts.studyDays, blockedDates: opts.blockedDates, pace: opts.pace, ...(opts.reservedMinutes ? { reservedMinutes: opts.reservedMinutes } : {}) } : { hoursPerWeek: opts.hoursPerWeek });
       const from0 = opts.from && DATE_RE.test(opts.from) && opts.from > period.start ? opts.from : period.start;
       const caps = ranges.map((r) => eachDay(from0 > r.start ? (from0 > r.end ? addDays(r.end, 1) : from0) : r.start, r.end).reduce((n, d) => n + dm(d), 0));
-      const result = planAreaPhases(seeds.map((s, i) => ({ key: String(i), weight: weightOf(s), ...(s.areaId && PARALLEL_GROUP[s.areaId] ? { group: PARALLEL_GROUP[s.areaId] } : {}) })), caps);
+      const result =
+        opts.areaMode === "together"
+          ? planTogetherPhases(seeds.map((s, i) => ({ key: String(i), weight: weightOf(s), ...(s.areaId ? { areaId: s.areaId } : {}) })), caps)
+          : planAreaPhases(seeds.map((s, i) => ({ key: String(i), weight: weightOf(s), ...(s.areaId && PARALLEL_GROUP[s.areaId] ? { group: PARALLEL_GROUP[s.areaId] } : {}) })), caps);
       seeds.forEach((_, i) => phases.set(i, result[String(i)]!));
     }
   }
@@ -577,7 +601,26 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
             ...(opts.reservedMinutes ? { reservedMinutes: (d: string) => opts.reservedMinutes!(d) * share } : {}),
           }
         : { hoursPerWeek: Math.max(0.1, Number(opts.hoursPerWeek) * share) };
-    const dist = distributeTopics({ ...cap, start: period.start, end: period.end, topics: seed.topics, from: opts.from, spread: opts.spread ?? perDayMode, ...(win ? { window: win } : {}) });
+    const liveTopics = seed.topics.filter(isLive);
+    const dist = distributeTopics({ ...cap, start: period.start, end: period.end, topics: liveTopics, from: opts.from, spread: opts.spread ?? perDayMode, ...(win ? { window: win } : {}) });
+    // lo que el seed trae aparte del reparto (ruta y proyecto del tema) vuelve a su tema; los saltados se conservan con la semana del tema vivo anterior
+    const extraOf = new Map(seed.topics.map((t) => [t.folder, t] as const));
+    const withExtras = (t: PlannedTopic): PlannedTopic => {
+      const x = extraOf.get(t.folder);
+      return { ...t, ...(x?.route && x.route !== "skipped" ? { route: x.route } : {}), ...(x?.topicProject ? { topicProject: x.topicProject } : {}) };
+    };
+    const plannedBy = new Map(dist.topics.map((t) => [t.folder, t] as const));
+    let lastWeek = dist.topics[0]?.targetWeek ?? win?.fromWeek ?? 1;
+    const allTopics: PlannedTopic[] = [];
+    for (const st of seed.topics) {
+      const planned = plannedBy.get(st.folder);
+      if (planned) {
+        lastWeek = planned.targetWeek;
+        allTopics.push(withExtras(planned));
+      } else if (!isLive(st)) {
+        allTopics.push({ folder: st.folder, title: st.title, ...(st.skills?.length ? { skills: st.skills } : {}), targetWeek: lastWeek, estMinutes: st.estMinutes, ...(st.group ? { group: st.group } : {}), route: "skipped", ...(st.skippedReason ? { skippedReason: st.skippedReason } : {}), ...(st.topicProject ? { topicProject: st.topicProject } : {}) });
+      }
+    }
     totalMinutes += dist.totalMinutes;
     availableMinutes += total > 0 ? dist.availableMinutes : 0;
     let id = seed.id && /^[A-Za-z0-9_-]{1,40}$/.test(seed.id) ? seed.id : `s${i + 1}-${slugOf(seed.area)}`;
@@ -591,7 +634,7 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
       objective: oneLine(seed.objective, 200),
       ...(seed.goalId ? { goalId: seed.goalId } : {}),
       ...(seed.goalItemIds?.length ? { goalItemIds: seed.goalItemIds } : {}),
-      topics: dist.topics.map((t) => (diag.has(t.folder) ? { ...t, diagnostic: true } : t)),
+      topics: allTopics.map((t) => (diag.has(t.folder) ? { ...t, diagnostic: true } : t)),
       weeks: dist.weeks,
       requiredGoals: (seed.requiredGoals ?? []).map((g) => ({ goalId: g.goalId, ...(g.itemId ? { itemId: g.itemId } : {}), note: oneLine(g.note, 200) })),
       ...(deliverable ? { deliverable } : {}),
@@ -633,6 +676,7 @@ export function buildPlan(seeds: readonly SubplanSeed[], opts: BuildOpts): Built
       ...(opts.rationale ? { rationale: oneLine(opts.rationale, 600) } : {}),
       ...(opts.programmingPractice ? { programmingPractice: opts.programmingPractice } : {}),
       ...(byAreas ? { structure: "areas" as const } : {}),
+      ...(byAreas && opts.areaMode ? { areaMode: opts.areaMode, ...(opts.areaModeWhy ? { areaModeWhy: oneLine(opts.areaModeWhy, 300) } : {}), ...(opts.areaModeBy ? { areaModeBy: opts.areaModeBy } : {}) } : {}),
       subplans,
       ...(sanitizeOpenQuestions(opts.openQuestions, subplans).length ? { openQuestions: sanitizeOpenQuestions(opts.openQuestions, subplans) } : {}),
     },
@@ -696,6 +740,7 @@ export function mergePlans(existing: Plan | null, incoming: Plan, now: string = 
     ...(questions.length ? { openQuestions: questions } : {}),
     hoursPerWeek: incoming.hoursPerWeek ?? existing.hoursPerWeek,
     ...((incoming.preconditions ?? existing.preconditions) ? { preconditions: incoming.preconditions ?? existing.preconditions } : {}),
+    ...(incoming.areaMode ? { areaMode: incoming.areaMode, ...(incoming.areaModeWhy ? { areaModeWhy: incoming.areaModeWhy } : {}), ...(incoming.areaModeBy ? { areaModeBy: incoming.areaModeBy } : {}) } : {}),
     ...(incoming.auto ? { auto: true } : {}),
     updatedAt: now,
     subplans: merged,
@@ -748,9 +793,11 @@ export function deriveView(plan: Plan, lookup: TopicLiteLookup, today: string): 
       const pct = snap ? Math.max(0, Math.min(100, Math.round(snap.progress.completenessPct))) : 0;
       return { ...t, state, pct: state === "completo" ? 100 : pct, found: !!snap, ...(snap?.exerciseCount ? { exercises: snap.exerciseCount } : {}) };
     });
-    const done = topics.filter((t) => t.state === "completo" || !!t.completedAt).length;
-    const pct = topics.length ? Math.round(topics.reduce((n, t) => n + (t.completedAt && t.state !== "completo" ? Math.max(t.pct, 100) : t.pct), 0) / topics.length) : 0;
-    return { id: s.id, topics, total: topics.length, done, pct, currentWeek: cur };
+    // los temas fuera de ruta se muestran pero no cuentan en el avance
+    const counted = topics.filter(isLive);
+    const done = counted.filter((t) => t.state === "completo" || !!t.completedAt).length;
+    const pct = counted.length ? Math.round(counted.reduce((n, t) => n + (t.completedAt && t.state !== "completo" ? Math.max(t.pct, 100) : t.pct), 0) / counted.length) : 0;
+    return { id: s.id, topics, total: counted.length, done, pct, currentWeek: cur };
   });
   const total = subplans.reduce((n, s) => n + s.total, 0);
   const done = subplans.reduce((n, s) => n + s.done, 0);
@@ -780,6 +827,36 @@ export function refreshPlanProgress(
     }),
   }));
   return { plan: changed ? { ...plan, updatedAt: new Date().toISOString(), subplans } : plan, changed, completed };
+}
+
+/**
+ * Pone (o recalibra) el `topicProject` de cada tema vivo y pendiente del plan, calibrado con el nivel declarado de su materia y lo MEDIDO
+ * (`lookup`: progreso e intentos reales del vault). `overrides` = propuestas de la IA por carpeta: se recortan al nivel permitido. Puro; los
+ * temas fuera de ruta o completados quedan sin proyecto. Devuelve el mismo plan si no hay nada que cambiar.
+ */
+export function withTopicProjects(plan: Plan, lookup: MasteryLookup, overrides?: ReadonlyMap<string, { title?: unknown; description?: unknown; level?: unknown }>): Plan {
+  const declaredOf = (folder: string) => plan.preconditions?.levels[areaOfFolder(folder)];
+  let changed = false;
+  const subplans = plan.subplans.map((s) => {
+    const projects = projectsForSubplan(s, declaredOf, lookup, overrides);
+    return {
+      ...s,
+      topics: s.topics.map((t) => {
+        const p = projects.get(t.folder);
+        if (p) {
+          if (JSON.stringify(t.topicProject) !== JSON.stringify(p)) changed = true;
+          return { ...t, topicProject: p };
+        }
+        if (t.topicProject && (t.completedAt || !isLive(t))) {
+          changed = true;
+          const { topicProject: _tp, ...rest } = t;
+          return rest;
+        }
+        return t;
+      }),
+    };
+  });
+  return changed ? { ...plan, updatedAt: new Date().toISOString(), subplans } : plan;
 }
 
 // ── Del plan al plan diario ──────────────────────────────────────────────
@@ -857,7 +934,7 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
       const label = subplanLabel(s);
       let pending = 0;
       for (const t of s.topics) {
-        if (t.completedAt || isDone?.(t.folder)) continue;
+        if (t.completedAt || isDone?.(t.folder) || !isLive(t)) continue;
         pending++;
         if (t.targetWeek > cur) continue;
         if (seenTopics.has(t.folder)) continue;
@@ -908,6 +985,9 @@ function cleanTopic(raw: any): PlannedTopic | null {
   if (raw.pinned === true) t.pinned = true;
   const group = oneLine(raw.group, 40);
   if (group) t.group = group;
+  Object.assign(t, sanitizeRouteFields(raw));
+  const tp = sanitizeTopicProject(raw.topicProject);
+  if (tp) t.topicProject = tp;
   return t;
 }
 
@@ -940,7 +1020,7 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
     ids.add(sid);
     const topics: PlannedTopic[] = (Array.isArray(s.topics) ? s.topics : []).map(cleanTopic).filter((t: PlannedTopic | null): t is PlannedTopic => t !== null);
     const weeks: WeekSlice[] = ranges.map((r) => {
-      const inWeek = topics.filter((t) => Math.min(ranges.length, t.targetWeek) === r.week);
+      const inWeek = topics.filter((t) => isLive(t) && Math.min(ranges.length, t.targetWeek) === r.week);
       const saved = (Array.isArray(s.weeks) ? s.weeks : []).find((w: any) => Number(w?.week) === r.week);
       return {
         week: r.week,
@@ -993,6 +1073,9 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
     ...(practice ? { programmingPractice: practice } : {}),
     ...(questions.length ? { openQuestions: questions } : {}),
     ...(raw.structure === "areas" ? { structure: "areas" as const } : {}),
+    ...(raw.structure === "areas" && (raw.areaMode === "together" || raw.areaMode === "phased")
+      ? { areaMode: raw.areaMode as "together" | "phased", ...(oneLine(raw.areaModeWhy, 300) ? { areaModeWhy: oneLine(raw.areaModeWhy, 300) } : {}), ...(["user", "ai", "rules"].includes(String(raw.areaModeBy)) ? { areaModeBy: raw.areaModeBy as AreaModeSource } : {}) }
+      : {}),
     ...(sanitizePlanDeliverables(raw.deliverables).length ? { deliverables: sanitizePlanDeliverables(raw.deliverables) } : {}),
     ...(sanitizePurposes(raw.purposes) ? { purposes: sanitizePurposes(raw.purposes)! } : {}),
     ...(sanitizeCoverageReview(raw.coverageReview, subplans.map(areaKeyOf)) ? { coverageReview: sanitizeCoverageReview(raw.coverageReview, subplans.map(areaKeyOf))! } : {}),

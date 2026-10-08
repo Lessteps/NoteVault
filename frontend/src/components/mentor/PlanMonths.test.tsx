@@ -216,11 +216,11 @@ describe("Cobertura de notas y práctica", () => {
     const run = vi.spyOn(api, "mentorPlanCoverageReview").mockResolvedValue({ loading: false, source: "ai", review, plan: { ...plan(), coverageReview: review }, coverage: coverage() });
     await setValue(byTest("coverage-profile") as HTMLInputElement, "full stack especializado en automatización");
     await click(byTest("coverage-review-run"));
-    expect(run).toHaveBeenCalledWith(PID, "full stack especializado en automatización");
+    expect(run).toHaveBeenCalledWith(PID, "full stack especializado en automatización", expect.objectContaining({ presets: ["market"], targetLevel: "junior" }));
     expect(byTest("coverage-review-summary").textContent).toContain("Backend se queda corto");
     await click(button("Backend", host.querySelector("[data-testid=subplan-card]") as HTMLElement));
     const ai = byTest("area-ai-review");
-    expect(ai.textContent).toContain("Faltantes sugeridos por el Mentor");
+    expect(ai.textContent).toContain("Revisión del Mentor");
     expect(ai.querySelector("[data-testid=ai-missing]")!.textContent).toContain("Message queues");
     expect(ai.textContent).toContain("no se crean notas");
   });
@@ -232,5 +232,123 @@ describe("Cobertura de notas y práctica", () => {
     expect(byTest("coverage-note").textContent).toContain("sin IA solo se muestra la cobertura calculada");
     expect(byTest("plan-coverage-totals")).toBeTruthy();
     expect(host.querySelector("[data-testid=area-ai-review]")).toBeNull();
+  });
+});
+
+describe("Revisión realista: formulario de criterio y resultado", () => {
+  const FOLDER = be[0]!.folder;
+  const richReview = () => ({
+    at: "2026-11-10T10:00:00.000Z", source: "ai" as const, profile: "full stack", summary: "Backend se queda corto frente a un junior de hoy.", discarded: 0,
+    criteria: { presets: ["market" as const, "interviews" as const], targetLevel: "junior" as const, currentLevel: "none" as const, conditions: "prioriza testing" },
+    overall: { verdict: "short" as const, coveragePct: 70, text: "Cubres ~70 % de lo esperado de un junior hoy." },
+    disclaimer: "Estimación basada en el conocimiento del modelo de IA y su fecha de corte, sin datos del mercado en vivo: úsala como orientación, no como cifra exacta.",
+    areas: [
+      { key: "backend", area: "Backend", assessment: "Faltan tests y CI/CD.", verdict: "short" as const, verdictWhy: "Falta testing.", coveragePct: 60, missing: [{ title: "Testing de APIs", why: "se espera en un junior hoy", priority: "high" as const, level: "junior" as const }], misplaced: [], dispensable: [{ folder: FOLDER, title: be[0]!.title, reason: "demasiado básico para un junior hoy" }] },
+      { key: "frontend", area: "Frontend", assessment: "Bien.", verdict: "adequate" as const, coveragePct: 90, missing: [], misplaced: [] },
+    ],
+  });
+  const openWithReview = async () => {
+    vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue({ loading: false, coverage: coverage(), review: richReview(), aiConfigured: true });
+    await open();
+  };
+
+  it("«¿Con qué criterio revisamos?»: chips con aria-pressed, niveles y condiciones libres, y todo viaja a la API", async () => {
+    await open();
+    const group = byTest("criteria-presets");
+    const chips = [...group.querySelectorAll("button")];
+    expect(chips.map((c) => c.textContent?.replace(/^[+✓]\s*/, ""))).toEqual(["Tendencias del mercado actual (junior hoy)", "Nivel mid-level", "Entrevistas técnicas", "Lo que yo pida"]);
+    expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual(["true", "false", "false", "false"]);
+    await click(chips[2]!);
+    expect(chips[2]!.getAttribute("aria-pressed")).toBe("true");
+    await setValue(byTest("criteria-target") as HTMLSelectElement, "mid");
+    await setValue(byTest("criteria-current") as HTMLSelectElement, "junior");
+    const cond = byTest("criteria-conditions") as unknown as HTMLTextAreaElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(cond, "prioriza testing");
+      cond.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(byTest("coverage-honesty").textContent).toContain("no tiene datos del mercado en vivo");
+    expect(byTest("coverage-criteria").textContent).toContain("lo que antes se le pedía a un mid-level");
+    const run = vi.spyOn(api, "mentorPlanCoverageReview").mockResolvedValue({ loading: false, source: "none", reason: "La IA no está configurada.", coverage: coverage() });
+    await click(byTest("coverage-review-run"));
+    expect(run).toHaveBeenCalledWith(PID, undefined, { presets: ["market", "interviews", "custom"], targetLevel: "mid", currentLevel: "junior", conditions: "prioriza testing" });
+  });
+
+  it("enseña criterio usado, veredicto global y «Veredicto por área» con TEXTO (corto/adecuado) y la advertencia de estimación", async () => {
+    await openWithReview();
+    const sum = byTest("coverage-review-summary");
+    expect(byTest("review-criteria", sum).textContent).toContain("Entrevistas técnicas");
+    expect(byTest("review-overall", sum).textContent).toMatch(/Corto.*≈ 70 % de lo esperado/);
+    const rows = [...sum.querySelectorAll("[data-testid=review-verdict-row]")];
+    expect(rows.map((r) => r.textContent)).toEqual([expect.stringMatching(/Backend.*Corto.*≈ 60 %/), expect.stringMatching(/Frontend.*Adecuado.*≈ 90 %/)]);
+    expect(sum.querySelector("ul[aria-label='Veredicto por área']")).toBeTruthy();
+    expect(byTest("review-disclaimer", sum).textContent).toContain("sin datos del mercado en vivo");
+  });
+
+  it("«Añadir faltante al plan» marca la propuesta (sin crear notas) y se puede quitar", async () => {
+    await openWithReview();
+    await click(button("Backend", host.querySelector("[data-testid=subplan-card]") as HTMLElement));
+    const ai = byTest("area-ai-review");
+    expect(ai.textContent).toContain("Prioridad alta");
+    expect(ai.textContent).toContain("Junior");
+    const base = richReview();
+    const accepted = { ...base, areas: [{ ...base.areas[0]!, missing: [{ ...base.areas[0]!.missing[0]!, accepted: true }] }, base.areas[1]!] };
+    const accept = vi.spyOn(api, "mentorPlanCoverageAccept").mockResolvedValue({ review: accepted });
+    await click(byTest("missing-add", ai));
+    expect(accept).toHaveBeenCalledWith(PID, "backend", "Testing de APIs", true);
+    expect(byTest("missing-accepted").textContent).toContain("sin notas todavía");
+  });
+
+  it("«Pasar prescindibles a fuera de ruta» pide confirmación (las notas NO se borran) y llama a la ruta; cancelar no hace nada", async () => {
+    await openWithReview();
+    const route = vi.spyOn(api, "mentorPlanRouteSet").mockResolvedValue({ plan: plan(), changed: 1 });
+    ui.confirmAction.mockResolvedValueOnce(false);
+    await click(byTest("skip-all-dispensable"));
+    expect(ui.confirmAction.mock.calls[0]![1]).toContain("NO se borran");
+    expect(route).not.toHaveBeenCalled();
+    ui.confirmAction.mockResolvedValueOnce(true);
+    await click(byTest("skip-all-dispensable"));
+    expect(route).toHaveBeenCalledWith(expect.objectContaining({ id: PID, folders: [FOLDER], route: "skipped" }));
+  });
+});
+
+describe("Aviso de Bases: «Reducir a lo esencial» y desbordes", () => {
+  it("la acción sale de la ruta con confirmación («las notas NO se borran»), resume cuántos temas salta y se puede deshacer", async () => {
+    await open();
+    const reduce = vi.spyOn(api, "mentorPlanReduce").mockResolvedValue({ plan: plan(), changed: 10, skipped: Array.from({ length: 10 }, (_, i) => ({ folder: `f${i}`, reason: "r" })), live: 30 });
+    const undo = vi.spyOn(api, "mentorPlanChangeUndo").mockResolvedValue({ plan: plan(), history: [] });
+    ui.confirmAction.mockResolvedValueOnce(false);
+    await click(byTest("bases-reduce"));
+    expect(ui.confirmAction.mock.calls[0]![0]).toContain("Bases");
+    expect(ui.confirmAction.mock.calls[0]![1]).toMatch(/Se saltarán \d+ \(quedarán 30\)/);
+    expect(ui.confirmAction.mock.calls[0]![1]).toContain("NO se borran");
+    expect(reduce).not.toHaveBeenCalled();
+    ui.confirmAction.mockResolvedValueOnce(true);
+    await click(byTest("bases-reduce"));
+    expect(reduce).toHaveBeenCalledWith({ id: PID, areaId: "backend", groupId: "bases", max: 30 });
+    expect(byTest("bases-reduced").textContent).toContain("10 temas salieron de tu ruta");
+    await click(byTest("bases-undo"));
+    expect(undo).toHaveBeenCalledWith(PID);
+    expect(host.querySelector("[data-testid=bases-reduced]")).toBeNull();
+    // el chip «Pedir ajuste» sigue ahí
+    expect(byTest("bases-ask-change").textContent).toContain("Pedir ajuste");
+  });
+
+  it("regresión de desborde: el aviso y sus botones parten línea y no sobresalen de la tarjeta (clases clave)", async () => {
+    await open();
+    const warn = byTest("bases-warning");
+    expect(warn.className).toMatch(/min-w-0/);
+    expect(warn.className).toMatch(/max-w-full/);
+    expect(warn.className).toMatch(/break-words/);
+    for (const id of ["bases-reduce", "bases-ask-change"]) {
+      const b = byTest(id);
+      expect(b.className).toMatch(/max-w-full/);
+      expect(b.className).toMatch(/whitespace-normal/);
+      expect(b.className).toMatch(/h-auto/);
+      expect(b.className).not.toMatch(/whitespace-nowrap/);
+      expect(b.className.split(" ")).not.toContain("flex-none");
+    }
+    expect(warn.querySelector("div.flex-wrap")).toBeTruthy();
+    expect(byTest("subplan-card").className).toMatch(/min-w-0/);
   });
 });

@@ -32,6 +32,8 @@ function factsText(pre: PlanPreconditions, areas: readonly string[], answers: re
     `- Entregables: ${pre.deliverables === "yes" ? "sí (uno por área)" : pre.deliverables === "no" ? "no" : "a discutir (la app hace UNA pregunta global más adelante)"}.`,
     pre.practice ? `- ${PRACTICE_NAME}: incluida, es una ${PRACTICE_PURPOSE}; NO es un área del plan (minutos y fases los fija la app).` : "",
     pre.branchExcluded?.length ? `- Ramas EXCLUIDAS del alcance (NO propongas temas de ellas): ${pre.branchExcluded.join("; ")}.` : "",
+    pre.areaMode === "together" ? "- Combinación de áreas: JUNTAS (todas las áreas activas todo el periodo y presentes cada día; Automation siempre al final). HECHO FIJO." : pre.areaMode === "phased" ? "- Combinación de áreas: por FASES (como máximo 2 en paralelo; Automation al final). HECHO FIJO." : "",
+    pre.languages?.length ? `- Lenguajes con práctica diaria propia: ${pre.languages.map((l) => `${l.id}${l.required ? " (obligatorio)" : ""}`).join(", ")}. La app añade el bloque «Práctica de <lenguaje>» cada día.` : "",
   ].filter(Boolean);
   if (answers.length) {
     lines.push("", "RESPUESTAS YA DADAS POR EL ESTUDIANTE:");
@@ -188,6 +190,12 @@ export const SKELETON_SYSTEM = [
   '{ "type": "skeleton", "rationale": string, "subplans": [ { "key": string, "weight"?: number, "objective"?: string } ] }',
 ].join("\n");
 
+/** Con `areaMode: "ai"` el esqueleto también decide cómo se combinan las áreas (la app valida y calcula). */
+export const SKELETON_AREA_MODE_RULE = [
+  "ADEMÁS decide cómo se combinan las áreas (campo `areaMode`): \"together\" = todas las áreas activas todo el periodo y presentes CADA día (teoría y práctica de cada una el mismo día, con proyectos que las integran); \"phased\" = áreas separadas por fases (como máximo 2 en paralelo). Elige \"together\" si el estudiante quiere ver el stack completo a diario (Frontend + Backend + Databases) y \"phased\" si las áreas son muy distintas o hay poco tiempo. Automation va siempre al final en ambos. Añade `areaModeWhy`: UNA línea (<=140 caracteres) que justifique la elección.",
+  'Formato con modo: { "type": "skeleton", "rationale": string, "areaMode": "together" | "phased", "areaModeWhy": string, "subplans": [ ... ] }',
+].join("\n");
+
 export function skeletonMessages(brief: StudentBrief, pre: PlanPreconditions, seeds: ReadonlyArray<Pick<SubplanSeed, "area" | "objective" | "goalId" | "topics">>, answers: readonly BuildAnswer[] = []): ChatMessage[] {
   const lines = seeds.map((s) => {
     const m = s.topics.reduce((n, t) => n + t.estMinutes, 0);
@@ -197,7 +205,7 @@ export function skeletonMessages(brief: StudentBrief, pre: PlanPreconditions, se
   });
   const user = [toPromptText(brief, BRIEF_CHARS), factsText(pre, seeds.map((s) => s.area), answers), `SUBPLANES CANDIDATOS:\n${lines.join("\n")}`, "Responde con el JSON del ESQUELETO."].join("\n\n");
   return [
-    { role: "system", content: SKELETON_SYSTEM },
+    { role: "system", content: pre.areaMode === "ai" ? `${SKELETON_SYSTEM}\n${SKELETON_AREA_MODE_RULE}` : SKELETON_SYSTEM },
     { role: "user", content: user },
   ];
 }
@@ -206,6 +214,8 @@ export interface SkeletonParse {
   ok: boolean;
   reason?: string;
   rationale: string;
+  /** propuesta del modo de áreas (solo con `areaMode: "ai"`); la app la valida al resolver */
+  areaMode?: { mode: "together" | "phased"; why: string };
   /** en el orden de la IA; `weight` 1..5 */
   items: Array<{ key: string; weight: number; objective?: string }>;
   discarded: string[];
@@ -230,7 +240,9 @@ export function parseSkeletonReply(raw: string, keys: ReadonlySet<string>): Skel
     items.push({ key, weight: Number.isFinite(w) ? Math.min(5, Math.max(1, w)) : 3, ...(objective ? { objective } : {}) });
   }
   if (!items.length) return { ok: false, reason: "La IA no eligió ningún subplan válido.", rationale: "", items: [], discarded };
-  return { ok: true, rationale: oneLine(obj.rationale, 400), items, discarded };
+  const mode = obj.areaMode === "together" || obj.areaMode === "phased" ? (obj.areaMode as "together" | "phased") : undefined;
+  const why = oneLine(obj.areaModeWhy, 200);
+  return { ok: true, rationale: oneLine(obj.rationale, 400), items, discarded, ...(mode && why ? { areaMode: { mode, why } } : {}) };
 }
 
 export const TOPICS_COMPACT_SYSTEM = [

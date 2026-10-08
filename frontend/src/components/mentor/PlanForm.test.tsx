@@ -389,3 +389,69 @@ describe("PlanForm — precondiciones", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("PlanForm — cómo combinar las áreas y lenguajes", () => {
+  const br = (name: string, kind: string) => ({ name, total: 4, pending: 4, kind });
+  const stack = () =>
+    options({
+      goals: [],
+      areas: [{ id: "Programación", name: "Programación", total: 12, pending: 12, minutes: 720, branches: [br("1 Fundamentals", "fundamentals"), br("4 Backend", "backend"), br("5 Frontend", "frontend"), br("6 Databases", "databases")] }] as never,
+      topics: ["1 Fundamentals", "4 Backend", "5 Frontend", "6 Databases"].flatMap((b) => [1, 2, 3].map((i) => ({ folder: `Programación/${b}/T${i}`, area: "Programación", branch: b, minutes: 60, goalIds: [] }))),
+    } as never);
+  const generate = () =>
+    vi.spyOn(api, "mentorPlanGenerateNow").mockResolvedValue({
+      loading: false, kind: "plan_created", planId: "p1", source: "auto", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
+      planDraft: { month: "2026-10", hoursPerWeek: 6, rationale: "", subplans: [], warnings: [], fits: true, totalMinutes: 0, availableMinutes: 0, requiredHoursPerWeek: null, from: TODAY, discarded: [], why: {} },
+    });
+
+  it("sin dos áreas no hay selector de modo; con Frontend+Backend+Databases sugiere «juntas» y el modo viaja en las precondiciones", async () => {
+    await mountForm();
+    expect(host.querySelector("[data-testid=plan-area-mode]")).toBeNull();
+    vi.spyOn(api, "mentorPlanOptions").mockResolvedValue(stack());
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mountForm();
+    await click(chip("Materias", "Programación"));
+    expect(host.textContent).toContain("¿Cómo combinamos las áreas?");
+    expect(["Juntas", "Separadas por fases", "Que decida el Mentor"].every((t) => !!chip("Cómo combinar las áreas", t))).toBe(true);
+    expect(pressed(chip("Cómo combinar las áreas", "Que decida el Mentor"))).toBe(true); // por defecto: lo decide el Mentor
+    expect(host.querySelector("[data-testid=plan-area-mode-suggest]")!.textContent).toContain("te sugerimos estudiarlas juntas");
+    expect(host.querySelector("[data-testid=plan-area-mode-help]")!.textContent).toContain("El Mentor propone");
+    await click(host.querySelector("[data-testid=plan-area-mode-suggest] button")!);
+    expect(pressed(chip("Cómo combinar las áreas", "Juntas"))).toBe(true);
+    expect(host.querySelector("[data-testid=plan-area-mode-help]")!.textContent).toContain("Todas las áreas activas todo el periodo");
+    const gen = generate();
+    await click(generateBtn());
+    expect(gen.mock.calls[0]![0]).toMatchObject({ areaMode: "together" });
+    expect(JSON.parse(localStorage.getItem(PLAN_PRE_KEY)!)).toMatchObject({ areaMode: "together" });
+  });
+
+  it("lenguajes: Backend ⇒ Python, JavaScript y TypeScript obligatorios y explicados; sin Backend, los opcionales se eligen", async () => {
+    vi.spyOn(api, "mentorPlanOptions").mockResolvedValue(stack());
+    await mountForm();
+    await click(chip("Materias", "Programación"));
+    const langs = host.querySelector("[data-testid=plan-languages]")!;
+    expect([...langs.querySelectorAll("button")].map((b) => b.textContent!.replace(/\s+/g, " ").trim())).toEqual(["Python · obligatorio", "JavaScript · obligatorio", "TypeScript · obligatorio"]);
+    expect(host.querySelector("[data-testid=plan-languages-why]")!.textContent).toContain("Backend");
+    // un obligatorio no se puede quitar
+    await click(langs.querySelectorAll("button")[0]);
+    expect(pressed(langs.querySelectorAll("button")[0]!)).toBe(true);
+    const gen = generate();
+    await click(generateBtn());
+    const pre = gen.mock.calls[0]![0] as { languages: Array<{ id: string; required: boolean }> };
+    expect(pre.languages.map((l) => l.id)).toEqual(["python", "javascript", "typescript"]);
+    expect(pre.languages.every((l) => l.required)).toBe(true);
+  });
+
+  it("solo Frontend: JavaScript y TypeScript obligatorios, Python opcional (y obligatorio si lo eliges)", async () => {
+    vi.spyOn(api, "mentorPlanOptions").mockResolvedValue(stack());
+    await mountForm();
+    await click(chip("Materias", "Programación"));
+    await click(chip("Ramas de Programación", "4 Backend"));
+    await click(chip("Ramas de Programación", "6 Databases"));
+    const langs = () => [...host.querySelector("[data-testid=plan-languages]")!.querySelectorAll("button")].map((b) => b.textContent!.replace(/\s+/g, " ").trim());
+    expect(langs()).toEqual(["Python · opcional", "JavaScript · obligatorio", "TypeScript · obligatorio"]);
+    await click(host.querySelector("[data-testid=plan-languages]")!.querySelectorAll("button")[0]);
+    expect(langs()[0]).toBe("Python · obligatorio");
+  });
+});

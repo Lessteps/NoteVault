@@ -19,6 +19,8 @@
 //  Los tres cuentan como entregables en los conteos por día, semana y mes.
 
 import { weekRangesOf } from "./planTime.js";
+import { dailyPieceOf, integratedDaily, integratedMonthly, integratedWeekly, monthlyPieceOf, weeklyPieceOf } from "./planAreaPractice.js";
+import { languageIdOf, languageName } from "./planLanguages.js";
 import type { PracticeType } from "./planDayFocus.js";
 import type { PlanSchedule, ScheduleDay, SchedulePlan } from "./planSchedule.js";
 
@@ -300,6 +302,10 @@ export interface DayProject {
   weeklyPart: string;
   weeklyId: string;
   source: "ai" | "template";
+  /** áreas que integra (una en modo «por fases»; varias en modo «juntas») */
+  areaIds: string[];
+  /** nombre corto de la pieza del día (alimenta el proyecto semanal) */
+  piece: string;
 }
 
 export const dailyId = (date: string): string => `dp:${date}`;
@@ -324,11 +330,13 @@ export function dailyProjectOf(plan: Pick<SchedulePlan, "practiceCurriculum" | "
       date: day.date,
       title: `Proyecto de repaso de ${day.focus.label}`,
       description: recent.length ? `Combina en una pieza pequeña lo ya estudiado: ${recent.join(", ")}.` : `Recompón una pieza pequeña de ${day.focus.label.toLowerCase()} con lo ya estudiado.`,
-      minutes: day.projectMinutes ?? 0,
+      minutes: dailyMinutes(day),
       topics: [],
       weeklyPart: `Pieza ${weekDays.findIndex((d) => d.date === day.date) + 1} de ${weekDays.length} del proyecto semanal`,
       weeklyId: weeklyIdOf(plan, day.week),
       source: "template",
+      areaIds: day.focus.areaIds ?? [],
+      piece: `repaso de ${day.focus.label}`,
     };
   }
   const theory = topics.filter((t) => t.role === "theory");
@@ -340,25 +348,29 @@ export function dailyProjectOf(plan: Pick<SchedulePlan, "practiceCurriculum" | "
   const t0 = theory[0] ?? topics[0]!;
   let title: string;
   let description: string;
+  let piece: string;
+  // la pieza de práctica propia del área (ver `planAreaPractice.ts`): n = nº de día de ese enfoque en el plan
+  const nth = sch.days.filter((d) => d.study && d.focus && d.focus.id === day.focus!.id && d.date <= day.date).length - 1;
+  const titles = [t0.title, ...topics.filter((x) => x !== t0).map((x) => x.title)];
+  const db = day.blocks.find((b) => b.id === "db-theory")?.items[0];
+  const areaIds = day.focus.areaIds ?? [];
   if (ai) {
     title = ai.title;
     description = ai.description ?? `Aplica ${joinTitles(topics.map((t) => t.title))}.`;
-  } else if (day.focus.id === "backend") {
-    const db = day.blocks.find((b) => b.id === "db-theory")?.items[0];
-    title = `Mini-endpoint de «${shortOf(t0.title)}»${db ? ` con «${shortOf(db.title)}»` : ""}`;
-    description = `Un endpoint pequeño${lang ? ` en ${lang}` : ""} que aplica ${joinTitles(theory.map((t) => t.title))}${db ? ` y guarda o lee datos con ${shortOf(db.title)}` : ""}.`;
-  } else if (day.focus.id === "databases") {
-    title = `Esquema y consultas de «${shortOf(t0.title)}»`;
-    description = `Diseña las tablas de un caso pequeño y escribe las consultas que aplican ${joinTitles(topics.map((t) => t.title))}.`;
-  } else if (day.focus.id === "frontend") {
-    title = `Componente de «${shortOf(t0.title)}»`;
-    description = `Un componente accesible${lang ? ` en ${lang}` : ""} que aplica ${joinTitles(topics.map((t) => t.title))}.`;
-  } else if (day.focus.id === "automation") {
-    title = `Script de «${shortOf(t0.title)}»`;
-    description = `Un script${lang ? ` en ${lang}` : ""} que automatiza una tarea aplicando ${joinTitles(topics.map((t) => t.title))}, con registro de lo que hizo.`;
+    piece = ai.title;
+  } else if (day.focus.together && areaIds.length > 1) {
+    // modo «juntas»: una feature pequeña de punta a punta (pantalla + endpoint + tabla)
+    const p = integratedDaily(areaIds, titles, nth);
+    ({ title, description, piece } = p);
   } else {
-    title = `Mini-proyecto de «${shortOf(t0.title)}»`;
-    description = `Un ejercicio práctico de ${label.toLowerCase()} que aplica ${joinTitles(topics.map((t) => t.title))}.`;
+    const p = dailyPieceOf(day.focus.id, nth, titles, { ...(lang ? { lang } : {}), ...(db ? { db: db.title } : {}) });
+    if (p) {
+      ({ title, description, piece } = p);
+    } else {
+      title = `Mini-proyecto de «${shortOf(t0.title)}»`;
+      description = `Un ejercicio práctico de ${label.toLowerCase()} que aplica ${joinTitles(topics.map((t) => t.title))}.`;
+      piece = shortOf(t0.title);
+    }
   }
   const weekDays = sch.days.filter((d) => d.week === day.week && d.projectMinutes && d.focus);
   const n = weekDays.findIndex((d) => d.date === day.date) + 1;
@@ -367,14 +379,19 @@ export function dailyProjectOf(plan: Pick<SchedulePlan, "practiceCurriculum" | "
     date: day.date,
     title,
     description: description.slice(0, MAX_PROJECT_DESC),
-    minutes: day.projectMinutes ?? 0,
+    minutes: dailyMinutes(day),
     topics,
     weeklyPart: `Pieza ${n} de ${weekDays.length} del proyecto semanal`,
     weeklyId: weeklyIdOf(plan, day.week),
     source: ai ? ai.source : "template",
+    areaIds,
+    piece,
   };
   void practice;
 }
+
+/** Minutos del proyecto diario: los del proyecto del día menos lo que se lleva el proyecto de un tema que se completa ese día. */
+export const dailyMinutes = (day: Pick<ScheduleDay, "projectMinutes" | "topicProjects">): number => Math.max(0, (day.projectMinutes ?? 0) - (day.topicProjects ?? []).reduce((n, p) => n + p.minutes, 0));
 
 export interface WeeklyProject {
   id: string;
@@ -385,6 +402,8 @@ export interface WeeklyProject {
   /** mini-proyectos diarios que acumula */
   dailyIds: string[];
   dailyTitles: string[];
+  /** áreas que integra; con más de una el proyecto es integrador (`areaId: "all"` en el entregable) */
+  areaIds: string[];
 }
 
 export const weeklyProjectOf = (plan: Pick<SchedulePlan, "practiceCurriculum" | "programmingPractice" | "start" | "end">, sch: PlanSchedule, week: number): WeeklyProject | null => {
@@ -396,9 +415,16 @@ export const weeklyProjectOf = (plan: Pick<SchedulePlan, "practiceCurriculum" | 
   const focusLabels = [...new Set(days.map((d) => d.focus?.label).filter((x): x is string => !!x))];
   const id = weeklyIdOf(plan, week);
   if (!dailies.length && !cw?.weeklyProject && !pw?.sessions.length) return null;
-  const title = cw?.weeklyProject?.title ?? pw?.theme ?? `Proyecto semanal ${week}${focusLabels.length ? ` · ${focusLabels.join(" + ")}` : ""}`;
-  const description = cw?.weeklyProject?.description ?? `Integra lo que construiste cada día de la semana ${week}${focusLabels.length ? ` (${focusLabels.join(" y ")})` : ""} en un solo proyecto.`;
-  return { id, week, title, description, source: cw?.weeklyProject ? (cw.source === "ai" ? "ai" : "template") : pw?.sessions.length ? "practice" : "template", dailyIds: dailies.map((d) => d.id), dailyTitles: dailies.map((d) => d.title) };
+  const areaIds = [...new Set(days.flatMap((d) => d.focus?.areaIds ?? []))];
+  const together = days.some((d) => d.focus?.together);
+  // el sistema de práctica del área (Frontend = página completa que une los componentes de la semana; Backend = API completa…); con varias
+  // áreas juntas, una vertical completa; con enfoques distintos en la semana, el proyecto genérico
+  const focusIds = [...new Set(days.map((d) => d.focus?.id).filter((x): x is string => !!x))];
+  const pieces = dailies.map((d) => d.piece);
+  const sys = together && areaIds.length > 1 ? integratedWeekly(areaIds, week, pieces) : focusIds.length === 1 ? weeklyPieceOf(focusIds[0]!, week, pieces) : null;
+  const title = cw?.weeklyProject?.title ?? pw?.theme ?? sys?.title ?? `Proyecto semanal ${week}${focusLabels.length ? ` · ${focusLabels.join(" + ")}` : ""}`;
+  const description = cw?.weeklyProject?.description ?? sys?.description ?? `Integra lo que construiste cada día de la semana ${week}${focusLabels.length ? ` (${focusLabels.join(" y ")})` : ""} en un solo proyecto.`;
+  return { id, week, title, description, source: cw?.weeklyProject ? (cw.source === "ai" ? "ai" : "template") : pw?.sessions.length ? "practice" : "template", dailyIds: dailies.map((d) => d.id), dailyTitles: dailies.map((d) => d.title), areaIds };
 };
 
 export interface MonthlyBlock {
@@ -411,6 +437,8 @@ export interface MonthlyBlock {
   month?: string;
   source: "ai" | "template" | "practice";
   weeklyIds: string[];
+  /** áreas que integra */
+  areaIds: string[];
 }
 
 /** Bloques del proyecto mensual: los de la pista Programming practice (`mp:<semana>`) o, sin pista mensual, un proyecto por mes de calendario. */
@@ -422,6 +450,7 @@ export function monthlyBlocksOf(plan: Pick<SchedulePlan, "practiceCurriculum" | 
     for (let w = a; w <= b; w++) if (sch.days.some((d) => d.week === w)) out.push(weeklyIdOf(plan, w));
     return out;
   };
+  const areasBetween = (a: number, b: number): string[] => [...new Set(sch.days.filter((d) => d.week >= a && d.week <= b).flatMap((d) => d.focus?.areaIds ?? []))];
   const blocks = plan.programmingPractice?.monthlyProject?.blocks ?? [];
   if (blocks.length) {
     return blocks.map((b) => {
@@ -435,6 +464,7 @@ export function monthlyBlocksOf(plan: Pick<SchedulePlan, "practiceCurriculum" | 
         toWeek: b.toWeek,
         source: c ? (c.source === "ai" ? "ai" : "template") : "practice",
         weeklyIds: weeklyIdsBetween(b.fromWeek, b.toWeek),
+        areaIds: areasBetween(b.fromWeek, b.toWeek),
       } satisfies MonthlyBlock;
     });
   }
@@ -447,15 +477,20 @@ export function monthlyBlocksOf(plan: Pick<SchedulePlan, "practiceCurriculum" | 
     if (wk.length) {
       const c = cur.find((x) => x.month === key);
       const focuses = [...new Set(sch.days.filter((d) => d.date.startsWith(key) && d.focus).map((d) => d.focus!.label))];
+      const monthAreas = [...new Set(sch.days.filter((d) => d.date.startsWith(key)).flatMap((d) => d.focus?.areaIds ?? []))];
+      const focusIds = [...new Set(sch.days.filter((d) => d.date.startsWith(key) && d.focus).map((d) => d.focus!.id))];
+      const together = sch.days.some((d) => d.date.startsWith(key) && d.focus?.together);
+      const sys = together && monthAreas.length > 1 ? integratedMonthly(monthAreas, key) : focusIds.length === 1 ? monthlyPieceOf(focusIds[0]!, key) : null;
       out.push({
         id: `mm:${key}`,
-        title: c?.title ?? `Proyecto mensual · ${focuses.length ? focuses.slice(0, 2).join(" + ") : key}`,
-        description: c?.description ?? "Un proyecto mayor que integra los proyectos semanales del mes.",
+        title: c?.title ?? (sys ? `Proyecto mensual · ${sys.title.replace(/ · \d{4}-\d{2}$/, "")}` : `Proyecto mensual · ${focuses.length ? focuses.slice(0, 2).join(" + ") : key}`),
+        description: c?.description ?? sys?.description ?? "Un proyecto mayor que integra los proyectos semanales del mes.",
         fromWeek: wk[0]!,
         toWeek: wk[wk.length - 1]!,
         month: key,
         source: c ? (c.source === "ai" ? "ai" : "template") : "template",
         weeklyIds: weeklyIdsBetween(wk[0]!, wk[wk.length - 1]!),
+        areaIds: monthAreas,
       });
     }
     if (key >= plan.end.slice(0, 7)) break;
@@ -487,6 +522,16 @@ export function weekPracticeTopics(sch: PlanSchedule, week: number, existing?: E
   const seen = new Set<string>();
   for (const d of sch.days.filter((x) => x.week === week)) {
     for (const b of d.blocks ?? []) {
+      if (b.kind === "practice" && b.status === "free" && b.daily) {
+        // práctica diaria de lenguaje: la IA propone ejercicios del lenguaje del día ligados a los temas del día
+        for (const t of b.connectedTopics ?? []) {
+          const k = `${t.folder}|language|${b.languageId ?? ""}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          out.push({ folder: t.folder, title: t.title, practice: "language", ...(b.language ? { language: b.language } : {}), firstDate: d.date, existing: existing?.count(t.folder) ?? 0 });
+        }
+        continue;
+      }
       if (b.kind !== "practice" || b.status !== "topic") continue;
       for (const it of b.items) {
         const k = `${it.folder}|${b.practice ?? "area"}`;
@@ -519,3 +564,40 @@ export function templateCurriculumWeek(sch: PlanSchedule, week: number, existing
 /** Lista corta para los textos: los días con proyecto diario de una semana. */
 export const dayProjectsOf = (plan: Pick<SchedulePlan, "practiceCurriculum" | "programmingPractice">, sch: PlanSchedule, week: number): DayProject[] =>
   sch.days.filter((d) => d.week === week).map((d) => dailyProjectOf(plan, sch, d)).filter((x): x is DayProject => !!x);
+
+// ── Práctica diaria de lenguaje (bloque propio «Práctica de <lenguaje>») ──
+
+/** Ejercicios de plantilla del bloque diario de lenguaje: sintaxis, lógica y resolución, ligados a un tema del día. */
+export function languageTemplateExercises(language: string, topicTitle: string): Array<{ title: string; statement: string }> {
+  const t = shortOf(topicTitle);
+  const id = languageIdOf(language);
+  const flavour = id === "python" ? "con listas, diccionarios y f-strings" : id === "typescript" ? "con tipos explícitos e interfaces" : id === "javascript" ? "con arrays, objetos y funciones flecha" : "con las estructuras del lenguaje";
+  return [
+    { title: `Sintaxis: «${t}» en ${language}`, statement: `Escribe tres líneas de ejemplo de «${t}» en ${language} ${flavour} y explica qué hace cada una.` },
+    { title: `Lógica: resuelve un problema corto de «${t}» en ${language}`, statement: `Un problema pequeño (filtrar, contar o transformar datos) relacionado con «${t}», resuelto en ${language} ${flavour}.` },
+    { title: `Resolución: ejercicio de «${t}» con casos de prueba (${language})`, statement: `Plantea el problema, escribe la solución en ${language} y añade al menos tres casos de prueba, incluido un caso límite.` },
+  ];
+}
+
+/**
+ * Ejercicios del bloque diario de práctica de lenguaje: del currículo de la IA (de la semana del día) si propuso ejercicios de ese
+ * lenguaje para un tema del día; si no, plantillas de sintaxis, lógica y resolución ligadas a los temas del día.
+ */
+export function languageBlockExercises(plan: Pick<SchedulePlan, "practiceCurriculum">, day: Pick<ScheduleDay, "week">, block: { language?: string; connectedTopics?: ReadonlyArray<{ folder: string; title: string }> }): DayExercise[] {
+  const language = block.language ?? languageName("python");
+  const topics = block.connectedTopics ?? [];
+  const cw = plan.practiceCurriculum?.weeks.find((w) => w.week === day.week);
+  const out: DayExercise[] = [];
+  for (const t of topics.slice(0, 2)) {
+    const mine = (cw?.exercises ?? []).filter((e) => e.topic === t.folder && e.practice === "language" && languageIdOf(e.language) === languageIdOf(language));
+    if (mine.length) {
+      for (const e of mine.slice(0, 2)) out.push({ id: `${t.folder}#lang#${e.title}`, title: e.title, ...(e.statement ? { statement: e.statement } : {}), folder: t.folder, topicTitle: t.title, practice: "language", language, source: e.source, auto: e.source === "template" });
+    } else {
+      languageTemplateExercises(language, t.title).forEach((x, i) => out.push({ id: `${t.folder}#lang${i}`, title: x.title, statement: x.statement, folder: t.folder, topicTitle: t.title, practice: "language", language, source: "template", auto: true }));
+    }
+  }
+  if (!out.length) {
+    languageTemplateExercises(language, "lo que estudias hoy").forEach((x, i) => out.push({ id: `free#lang${i}`, title: x.title, statement: x.statement, folder: "", topicTitle: "", practice: "language", language, source: "template", auto: true }));
+  }
+  return out;
+}

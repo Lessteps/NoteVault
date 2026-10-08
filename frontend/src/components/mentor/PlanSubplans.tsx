@@ -8,17 +8,19 @@
 //
 // Plan de estructura antigua (un subplan por rama): la lista de temas por grupos de siempre (con «Mostrar N más»).
 
-import { ChevronRight, ExternalLink, Flame, Info, Layers, MessageSquareText, Search, TriangleAlert } from "lucide-react";
+import { ChevronRight, ExternalLink, Flame, Info, Layers, MessageSquareText, Scissors, Search, TriangleAlert, Undo2 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { splitNotes } from "../../lib/planAreas";
 import type { CoverageReview, GroupCoverage, PlanCoverage } from "../../lib/planCoverage";
-import { basesWarning, groupSummaries, monthShort, weeksText, type BasesWarning, type GroupSummary } from "../../lib/planMonths";
+import { BASES_LIMIT, basesWarning, groupSummaries, monthShort, weeksText, type BasesWarning, type GroupSummary } from "../../lib/planMonths";
+import { reduceToEssentials, type RouteTopic } from "../../lib/planRoute";
 import { shortWeekLabel } from "../../lib/planTime";
 import type { MentorDeliverableStatus, MentorPlan, MentorSubplan, MentorSubplanView, MentorTopicView } from "../../lib/types";
 import { useApp } from "../../store/app";
+import { useMentor } from "../../store/mentor";
 import { Chip, GhostButton, input } from "../common/forms";
-import { cn } from "../ui";
+import { cn, confirmAction } from "../ui";
 import { openGoalInMetas } from "./MentorGoals";
 import { openTopic } from "./openTopic";
 import { dayText, hm, ProgressBar } from "./parts";
@@ -61,10 +63,12 @@ export interface AreaExtras {
   review?: CoverageReview | null;
   /** abre «Pedir cambios» con un texto pre-rellenado (no envía nada) */
   onAskChange?: (text: string) => void;
+  /** la revisión de cobertura guardada cambió (faltante añadido a la propuesta) */
+  onReview?: (r: CoverageReview) => void;
 }
 
 /** Las áreas del plan en una rejilla de tarjetas (organizadas por área de vida o por áreas elementales). */
-export function SubplanGroups({ data, highlight, onChanged, coverage, review, onAskChange }: { data: Loaded; highlight: Set<string>; onChanged: (p: Loaded["plan"]) => void } & AreaExtras) {
+export function SubplanGroups({ data, highlight, onChanged, coverage, review, onAskChange, onReview }: { data: Loaded; highlight: Set<string>; onChanged: (p: Loaded["plan"]) => void } & AreaExtras) {
   const plan = data.plan!;
   const derived = data.derived!;
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -133,6 +137,7 @@ export function SubplanGroups({ data, highlight, onChanged, coverage, review, on
                       coverage={coverage}
                       review={review}
                       onAskChange={onAskChange}
+                      onReview={onReview}
                     />
                   </li>
                 );
@@ -191,6 +196,7 @@ export function SubplanCard({
   coverage,
   review,
   onAskChange,
+  onReview,
 }: {
   plan: MentorPlan;
   sub: MentorSubplan;
@@ -239,14 +245,14 @@ export function SubplanCard({
 
   return (
     <article
-      className="rounded-xl border border-line bg-card p-4 shadow-sm"
+      className="min-w-0 max-w-full rounded-xl border border-line bg-card p-4 shadow-sm break-words"
       style={{ borderTop: `3px solid ${colour}` }}
       data-testid="subplan-card"
       aria-label={`${byAreas ? "Área" : "Subplan"} ${title}`}
     >
-      <div className="flex items-center gap-1.5 text-[13px] font-medium uppercase tracking-wide text-faint">
-        <Layers size={15} className="text-accent-text" aria-hidden />
-        <span>{branch || sub.area}</span>
+      <div className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium uppercase tracking-wide text-faint">
+        <Layers size={15} className="flex-none text-accent-text" aria-hidden />
+        <span className="min-w-0">{branch || sub.area}</span>
       </div>
 
       <Heading className="mt-0.5 text-[16px] font-semibold leading-snug text-text">
@@ -269,10 +275,10 @@ export function SubplanCard({
       )}
 
       <div className="mt-2 flex items-center gap-3">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <ProgressBar pct={view.pct} colour={colour} label={`Avance de ${title}`} />
         </div>
-        <span className="text-[14px] font-semibold text-text">{view.pct} %</span>
+        <span className="flex-none text-[14px] font-semibold text-text">{view.pct} %</span>
       </div>
 
       <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-dim">
@@ -288,11 +294,14 @@ export function SubplanCard({
       {byAreas && sub.groups && sub.groups.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={`Grupos de ${title}`}>
           {sub.groups.map((g) => {
-            const n = sub.topics.filter((t) => t.group === g.id).length;
+            const inGroup = sub.topics.filter((t) => t.group === g.id);
+            const n = inGroup.filter((t) => t.route !== "skipped").length;
+            const out = inGroup.length - n;
             return (
-              <li key={g.id}>
+              <li key={g.id} className="min-w-0 max-w-full">
                 <Chip large>
                   {g.title} · {n}
+                  {out > 0 && <span className="font-normal opacity-90"> (+{out} fuera de ruta)</span>}
                 </Chip>
               </li>
             );
@@ -301,7 +310,7 @@ export function SubplanCard({
       )}
 
       {areaCov && <CoverageLine area={areaCov} className="mt-2" />}
-      {warning && <BasesAlert warning={warning} area={title} onAskChange={onAskChange} />}
+      {warning && <BasesAlert warning={warning} area={title} plan={plan} sub={sub} view={view} onAskChange={onAskChange} onChanged={onChanged} />}
 
       {fallback && (
         <p className="mt-2 rounded-lg border border-warn/50 bg-warn-soft px-3 py-2 text-[13.5px]" data-testid="area-fallback">
@@ -387,6 +396,7 @@ export function SubplanCard({
               reviewAt={review?.at}
               groupTitle={(id) => sub.groups?.find((g) => g.id === id)?.title ?? (id || "Temas")}
               areaName={(key) => plan.subplans.find((s) => (s.areaId || s.id) === key)?.area ?? key}
+              actions={{ planId: plan.id, onReview, onPlan: onChanged }}
             />
           )}
 
@@ -493,20 +503,102 @@ export function SubplanCard({
   );
 }
 
-/** Aviso «demasiadas Bases al principio» con la acción sugerida (pre-rellena «Pedir cambios»; no aplica nada). */
-function BasesAlert({ warning, area, onAskChange }: { warning: BasesWarning; area: string; onAskChange?: (text: string) => void }) {
+/**
+ * Aviso «demasiadas Bases al principio» con sus dos acciones: «Reducir a lo esencial» (saca de la RUTA los temas menos necesarios de Bases,
+ * con confirmación —las notas NO se borran, solo salen de tu ruta— y «Deshacer») y «Pedir ajuste» (pre-rellena «Preguntas y ajustes»; no aplica nada).
+ */
+function BasesAlert({
+  warning,
+  area,
+  plan,
+  sub,
+  view,
+  onAskChange,
+  onChanged,
+}: {
+  warning: BasesWarning;
+  area: string;
+  plan: MentorPlan;
+  sub: MentorSubplan;
+  view: MentorSubplanView;
+  onAskChange?: (text: string) => void;
+  onChanged: (p: Loaded["plan"]) => void;
+}) {
+  const toast = useApp((s) => s.toast);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<{ n: number; kept: number } | null>(null);
+  const groupId = (sub.groups ?? []).find((g) => g.kind === "bases")?.id ?? "bases";
+  const reduce = async () => {
+    if (busy) return;
+    // vista previa con la misma regla determinista del motor: cuántos temas se saltarían
+    const pcts = new Map(view.topics.map((t) => [t.folder, t.pct] as const));
+    const scope: RouteTopic[] = sub.topics
+      .filter((t) => t.group === groupId)
+      .map((t) => ({ folder: t.folder, title: t.title, group: t.group, groupKind: "bases", estMinutes: t.estMinutes, ...(t.route ? { route: t.route } : {}), ...(t.completedAt ? { completedAt: t.completedAt } : {}), ...(t.pinned ? { pinned: true } : {}), pct: pcts.get(t.folder) ?? 0 }));
+    const live = scope.filter((t) => t.route !== "skipped").length;
+    const preview = reduceToEssentials(scope, { max: BASES_LIMIT, languagePractice: !!plan.programmingPractice });
+    if (!preview.skip.length) {
+      toast("info", "No hay temas de Bases que se puedan saltar sin romper prerrequisitos o temas ya empezados.");
+      return;
+    }
+    const ok = await confirmAction(
+      `Reducir Bases de ${area} a lo esencial`,
+      `Bases tiene ${live} temas. Se saltarán ${preview.skip.length} (quedarán ${live - preview.skip.length}) y el resto se reparte mejor junto al lenguaje. Las notas NO se borran ni se mueven en NoteVault: solo salen de tu ruta, puedes volver a añadirlas y puedes deshacer el cambio.`,
+      `Saltar ${preview.skip.length} temas`,
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const r = await api.mentorPlanReduce({ id: plan.id, ...(sub.areaId ? { areaId: sub.areaId } : {}), groupId, max: BASES_LIMIT });
+      const n = r.skipped?.length ?? r.changed ?? preview.skip.length;
+      onChanged(r.plan);
+      useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }));
+      setDone({ n, kept: r.live ?? live - n });
+      toast("info", `${n} ${n === 1 ? "tema sale" : "temas salen"} de tu ruta. Las notas siguen en tu vault.`);
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const undo = async () => {
+    try {
+      const r = await api.mentorPlanChangeUndo(plan.id);
+      onChanged(r.plan);
+      useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }));
+      setDone(null);
+      toast("info", "Reducción deshecha: los temas vuelven a tu ruta.");
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
   return (
-    <div role="note" aria-label={`Aviso sobre Bases de ${area}`} className="mt-2 rounded-lg border border-warn/60 bg-warn-soft px-3 py-2 text-[13.5px]" data-testid="bases-warning">
-      <p className="flex items-start gap-2">
+    <div role="note" aria-label={`Aviso sobre Bases de ${area}`} className="mt-2 min-w-0 max-w-full rounded-lg border border-warn/60 bg-warn-soft px-3 py-2 text-[13.5px] break-words" data-testid="bases-warning">
+      <p className="flex min-w-0 items-start gap-2">
         <TriangleAlert size={15} aria-hidden className="mt-0.5 flex-none text-warn" />
-        <span>
+        <span className="min-w-0 flex-1">
           <span className="font-semibold">Muchas Bases al principio.</span> {warning.text}
         </span>
       </p>
-      {onAskChange && (
-        <GhostButton className="mt-1.5" onClick={() => onAskChange(warning.request)} data-testid="bases-ask-change">
-          <MessageSquareText size={15} aria-hidden /> Pedir cambios: «{warning.request}»
+      <div className="mt-1.5 flex min-w-0 flex-wrap gap-2">
+        <GhostButton wrap onClick={() => void reduce()} disabled={busy} data-testid="bases-reduce">
+          <Scissors size={15} aria-hidden className="flex-none" /> <span className="min-w-0">Reducir a lo esencial</span>
         </GhostButton>
+        {onAskChange && (
+          <GhostButton wrap onClick={() => onAskChange(warning.request)} data-testid="bases-ask-change">
+            <MessageSquareText size={15} aria-hidden className="flex-none" /> <span className="min-w-0">Pedir ajuste: «{warning.request}»</span>
+          </GhostButton>
+        )}
+      </div>
+      {done && (
+        <p role="status" className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-text" data-testid="bases-reduced">
+          <span className="min-w-0">
+            Listo: {done.n} {done.n === 1 ? "tema salió" : "temas salieron"} de tu ruta (siguen en tu vault; quedan {done.kept} en Bases).
+          </span>
+          <GhostButton onClick={() => void undo()} data-testid="bases-undo">
+            <Undo2 size={14} aria-hidden /> Deshacer
+          </GhostButton>
+        </p>
       )}
     </div>
   );

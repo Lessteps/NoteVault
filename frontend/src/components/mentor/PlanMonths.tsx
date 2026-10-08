@@ -38,6 +38,12 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
       <p className="text-[13.5px] text-dim" aria-hidden>
         Temas planificados (y hechos), horas, semanas activas y grupos de cada área por mes. Pulsa un mes para verlo en la Agenda.
       </p>
+      {plan.areaMode && (
+        <p className="rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-text" data-testid="plan-months-mode">
+          <span className="font-semibold">{plan.areaMode === "together" ? "Áreas juntas" : "Áreas por fases"}.</span>{" "}
+          <span className="text-dim">{plan.areaModeWhy ?? (plan.areaMode === "together" ? "Todas activas todo el periodo y presentes cada día." : "Como máximo dos en paralelo.")}</span>
+        </p>
+      )}
       <div
         role="region"
         aria-labelledby={captionId}
@@ -92,6 +98,11 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
                     {temas(r.total)}
                     {r.phase ? ` · sem. ${r.phase.fromWeek}–${r.phase.toWeek}` : ""}
                   </span>
+                  {r.skipped > 0 && (
+                    <span className="block text-[12.5px] font-normal text-faint" data-testid="plan-month-skipped">
+                      {r.skipped} {r.skipped === 1 ? "fuera de ruta" : "fuera de ruta"}
+                    </span>
+                  )}
                 </th>
                 {r.cells.map((c, i) => (
                   <Cell key={c.month} c={c} current={model.months[i]!.current} />
@@ -112,7 +123,13 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
                   </span>
                   <span className="block text-dim">
                     {hours(t.minutes)} · {t.areas} {t.areas === 1 ? "área" : "áreas"}
+                    {t.areas > 1 ? " a la vez" : ""}
                   </span>
+                  {t.areas > 1 && (
+                    <span className="block text-[12.5px] text-dim" data-testid="plan-month-simultaneous">
+                      Simultáneas: {t.areaNames.join(" + ")}
+                    </span>
+                  )}
                   {t.deliverables !== null && (
                     <span className="block text-dim">
                       {t.deliverables} {t.deliverables === 1 ? "entregable" : "entregables"}

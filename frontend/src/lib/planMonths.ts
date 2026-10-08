@@ -18,8 +18,11 @@ export interface MonthsPlanLike {
     areaId?: string;
     phase?: AreaPhase;
     groups?: readonly AreaGroup[];
-    topics: ReadonlyArray<{ folder: string; title: string; targetWeek: number; estMinutes: number; completedAt?: string; group?: string }>;
+    topics: ReadonlyArray<{ folder: string; title: string; targetWeek: number; estMinutes: number; completedAt?: string; group?: string; route?: string }>;
   }>;
+  /** cómo se combinan las áreas, ya decidido (`together` = todas a la vez todo el periodo) */
+  areaMode?: "together" | "phased";
+  areaModeWhy?: string;
 }
 
 export interface PlanMonth {
@@ -56,6 +59,8 @@ export interface MonthRow {
   area: string;
   phase?: AreaPhase;
   total: number;
+  /** temas fuera de ruta (no cuentan; la nota sigue en la vault) */
+  skipped: number;
   cells: MonthCell[];
 }
 
@@ -68,6 +73,8 @@ export interface MonthTotal {
   deliverables: number | null;
   /** áreas activas ese mes */
   areas: number;
+  /** nombres de esas áreas (en el orden del plan): con varias a la vez, el mes es «simultáneo» */
+  areaNames: string[];
 }
 
 export interface PlanByMonth {
@@ -136,8 +143,10 @@ export function phasesByMonth(
   const clampWeek = (n: number): number => Math.min(ranges.length, Math.max(1, Math.round(n) || 1));
 
   const rows: MonthRow[] = plan.subplans.map((s) => {
+    // los temas fuera de ruta no cuentan en la tabla (se conservan en el plan y en la vault)
+    const live = s.topics.filter((t) => t.route !== "skipped");
     const cells = months.map((m): MonthCell => {
-      const list = s.topics.filter((t) => wm.get(clampWeek(t.targetWeek)) === m.key);
+      const list = live.filter((t) => wm.get(clampWeek(t.targetWeek)) === m.key);
       const phaseWeeks = s.phase ? m.weeks.filter((w) => w >= s.phase!.fromWeek && w <= s.phase!.toWeek) : [...new Set(list.map((t) => clampWeek(t.targetWeek)))];
       const counts = new Map<string, number>();
       for (const t of list) counts.set(t.group ?? "", (counts.get(t.group ?? "") ?? 0) + 1);
@@ -155,7 +164,7 @@ export function phasesByMonth(
         empty: list.length === 0 && phaseWeeks.length === 0,
       };
     });
-    return { subplanId: s.id, ...(s.areaId ? { areaId: s.areaId } : {}), area: s.area, ...(s.phase ? { phase: s.phase } : {}), total: s.topics.length, cells };
+    return { subplanId: s.id, ...(s.areaId ? { areaId: s.areaId } : {}), area: s.area, ...(s.phase ? { phase: s.phase } : {}), total: live.length, skipped: s.topics.length - live.length, cells };
   });
 
   const due = opts.deliverables;
@@ -166,6 +175,7 @@ export function phasesByMonth(
     minutes: rows.reduce((n, r) => n + r.cells[i]!.minutes, 0),
     deliverables: due ? due.filter((d) => d.dueDate >= m.start && d.dueDate <= m.end).length : null,
     areas: rows.filter((r) => !r.cells[i]!.empty).length,
+    areaNames: rows.filter((r) => !r.cells[i]!.empty).map((r) => r.area),
   }));
   return { months, rows, totals, current };
 }
@@ -237,13 +247,15 @@ export interface BasesWarning {
 export function basesWarning(sub: MonthsPlanLike["subplans"][number], limit = BASES_LIMIT): BasesWarning | null {
   const basesIds = new Set((sub.groups ?? []).filter((g) => g.kind === "bases").map((g) => g.id));
   if (!basesIds.size) basesIds.add("bases");
-  const bases = sub.topics.filter((t) => basesIds.has(t.group ?? ""));
+  // los temas fuera de ruta ya no cuentan: tras «Reducir a lo esencial» el aviso desaparece
+  const liveTopics = sub.topics.filter((t) => t.route !== "skipped");
+  const bases = liveTopics.filter((t) => basesIds.has(t.group ?? ""));
   if (!bases.length) return null;
   const weeks = bases.map((t) => t.targetWeek);
   const fromWeek = Math.min(...weeks);
   const toWeek = Math.max(...weeks);
-  const first = Math.min(...sub.topics.map((t) => t.targetWeek));
-  const early = sub.topics.filter((t) => t.targetWeek < first + 4);
+  const first = Math.min(...liveTopics.map((t) => t.targetWeek));
+  const early = liveTopics.filter((t) => t.targetWeek < first + 4);
   const earlyShare = early.length ? early.filter((t) => basesIds.has(t.group ?? "")).length / early.length : 0;
   const tooMany = bases.length > limit;
   const hogs = bases.length >= 12 && toWeek - fromWeek + 1 >= 4 && earlyShare >= 0.8;

@@ -25,7 +25,7 @@ export function Chip({ children, colour, className, large }: { children: ReactNo
   const c = colour ?? "var(--nv-dim)";
   return (
     <span
-      className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-md font-medium", large ? "px-2 py-0.5 text-[13px]" : "px-1.5 py-0.5 text-[11px]", className)}
+      className={cn("inline-flex max-w-full items-center gap-1 rounded-md font-medium break-words", large ? "px-2 py-0.5 text-[13px]" : "px-1.5 py-0.5 text-[11px]", className)}
       style={{ color: large ? `color-mix(in srgb, ${c} 75%, var(--nv-text))` : c, background: `color-mix(in srgb, ${c} 16%, transparent)` }}
     >
       {children}
@@ -64,7 +64,7 @@ export function PrimaryButton({ children, onClick, disabled, className, type = "
 }) {
   return (
     <button type={type} disabled={disabled} onClick={onClick} {...rest}
-      className={cn("flex flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[var(--nv-btn,var(--nv-accent))] font-medium text-white hover:bg-[var(--nv-btn-hover,var(--nv-accent-strong))] disabled:opacity-50",
+      className={cn("flex max-w-full flex-none items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-[var(--nv-btn,var(--nv-accent))] break-words font-medium text-white hover:bg-[var(--nv-btn-hover,var(--nv-accent-strong))] disabled:opacity-50",
         large ? "min-h-11 px-4 py-2 text-[14px]" : "min-h-8 px-3 py-1.5 text-[13px]", className)}>
       {children}
     </button>
@@ -72,15 +72,20 @@ export function PrimaryButton({ children, onClick, disabled, className, type = "
 }
 
 /** `large`: objetivo de ≥44 px y texto de 14 px (acciones de las vistas accesibles); sin él, ≥32 px. */
-export function GhostButton({ children, onClick, danger, className, title, large, disabled, ...rest }: {
+export function GhostButton({ children, onClick, danger, className, title, large, disabled, wrap, ...rest }: {
   children: ReactNode; onClick?: () => void; danger?: boolean; className?: string; title?: string; large?: boolean | "md"; disabled?: boolean;
+  /** el texto parte línea y el botón nunca es más ancho que su contenedor (avisos y acciones con frases largas) */
+  wrap?: boolean;
   "aria-label"?: string; "aria-expanded"?: boolean; "aria-pressed"?: boolean;
   /** Para los `data-*` que usan los tests y el e2e. */
   [key: `data-${string}`]: unknown;
 }) {
   return (
     <button type="button" title={title} onClick={onClick} disabled={disabled} {...rest}
-      className={cn("nv-ghost flex flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-line disabled:opacity-50",
+      className={cn("nv-ghost flex items-center justify-center gap-1.5 rounded-lg border border-line disabled:opacity-50",
+        // un botón mide lo que su texto y, si el contenedor es más estrecho, parte línea (nunca sobresale)
+        "max-w-full whitespace-normal break-words",
+        wrap ? "h-auto flex-initial text-left" : "flex-none",
         large === "md" ? "min-h-10 px-3 py-1.5 text-[14px]" : large ? "min-h-11 px-3.5 py-2 text-[14px]" : "min-h-8 px-2.5 py-1.5 text-[13px]",
         danger ? "text-danger hover:bg-danger-soft" : "text-dim hover:bg-hover hover:text-text", className)}>
       {children}

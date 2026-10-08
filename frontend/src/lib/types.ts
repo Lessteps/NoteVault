@@ -1432,6 +1432,10 @@ export interface MentorPlannedTopic {
   folder: string; title: string; skills?: string[]; targetWeek: number; estMinutes: number; completedAt?: string; diagnostic?: boolean; pinned?: boolean;
   /** grupo interno del área (Bases, Lenguaje: Python, Conocimientos…) */
   group?: string;
+  /** ruta: ausente = en la ruta (`core`) · `optional` · `skipped` (fuera de ruta, atenuado; la nota NO se borra); ver `lib/planRoute.ts` */
+  route?: "optional" | "skipped"; skippedReason?: string;
+  /** proyecto de aplicación tras el tema, calibrado al nivel medido (ver `lib/planTopicProject.ts`) */
+  topicProject?: import("./planTopicProject").TopicProject;
 }
 export interface MentorWeekSlice { week: number; start: string; end: string; topics: string[]; minutes: number; capacityMinutes: number }
 export interface MentorRequiredGoal { goalId: string; itemId?: string; note: string }
@@ -1460,6 +1464,10 @@ export interface MentorPlan {
   coverageReview?: CoverageReview;
   /** currículo de práctica del plan generado por la IA (ejercicios por semana y proyectos) */
   practiceCurriculum?: MentorPracticeCurriculum;
+  /** cómo se combinan las áreas, ya decidido (`together` = todas juntas cada día · `phased` = por fases), por qué y quién lo decidió */
+  areaMode?: "together" | "phased";
+  areaModeWhy?: string;
+  areaModeBy?: "user" | "ai" | "rules";
 }
 /** currículo de práctica del plan generado por la IA (ejercicios por semana y proyectos) */
 export type MentorPracticeCurriculum = import("./planCurriculum").PracticeCurriculum;
@@ -1494,6 +1502,9 @@ export interface MentorPlanDraft {
   weights?: Record<string, number>;
   compact?: boolean;
   structure?: "areas";
+  areaMode?: "together" | "phased";
+  areaModeWhy?: string;
+  areaModeBy?: "user" | "ai" | "rules";
 }
 /** Estado derivado de la práctica de un plan (módulo `programming_practice` + registro manual de «Hoy»). */
 export interface MentorPracticeStatus {
@@ -1557,10 +1568,16 @@ export interface MentorAiStatus { busy: boolean; label: string; elapsed: number 
 export interface MentorChangeDelta { added: number; removed: number; moved: number; deliverables: number; structure?: number; texts?: number }
 export interface MentorFixOption { id: string; label: string; op: Record<string, unknown> }
 export interface MentorChangeEntry {
-  n: number; at: string; comment: string; status: "applied" | "pending" | "undone"; source: "ai" | "rules" | "none"; summary: string;
+  n: number; at: string; comment: string; status: "applied" | "pending" | "undone" | "answered"; source: "ai" | "rules" | "none"; summary: string;
+  /** pregunta, corrección o ajuste (ausente = ajuste) y, en las preguntas, la respuesta del Mentor */
+  kind?: "question" | "fix" | "adjust"; answer?: string;
   delta: MentorChangeDelta; changed: string[]; warnings: string[]; fixOptions: MentorFixOption[];
 }
 export type MentorChangeResult = { loading: true } | { loading: false; plan: MentorPlan; entry: MentorChangeEntry; history: MentorChangeEntry[]; applied: boolean };
+/** «Preguntar»: la respuesta del Mentor sobre el plan (no cambia nada). */
+export type MentorAskResult = { loading: true } | { loading: false; answer: string; source: "ai" | "rules" | "none"; understood: boolean; entry: MentorChangeEntry; history: MentorChangeEntry[] };
+/** Clasificación de lo escrito: `confident: false` trae la pregunta de aclaración. */
+export interface MentorIntentResult { intent: "question" | "fix" | "adjust"; confident: boolean; ask?: string; source: "ai" | "rules" }
 export interface MentorGoalCreated { goalId: string; name: string; items: number; schedule: MentorGoalSchedule }
 export interface MentorGoalItemSlim {
   id: string; parent: string; name: string; status: string; due: string | null; start: string | null;
@@ -1601,3 +1618,36 @@ export type MentorPanels =
         errors: { unresolved: number; repeaters: Array<{ id: string; subject: string; topic: string; skill: string; category: string; repeatCount: number; lastSeenDays: number | null }> };
       };
     };
+
+/** `mentor_route`: la ruta del plan activo (o de todos los activos) para el explorador de notas y el estudio con el Mentor. Solo lee. */
+export interface MentorRoute {
+  today: string;
+  plans: Array<{
+    planId: string;
+    name: string;
+    status: "activo" | "futuro" | "terminado" | "propuesto";
+    start: string;
+    end: string;
+    currentWeek: number;
+    counts: { core: number; optional: number; skipped: number };
+    topics: Array<import("./planRoute").RouteEntry>;
+  }>;
+  /** por carpeta de tema: core/optional si algún plan lo tiene en ruta; skipped solo si todos los que lo tienen lo saltan */
+  byFolder: Record<string, { planId: string; route: "core" | "optional" | "skipped"; targetWeek: number; weekStart: string; area: string; skippedReason?: string }>;
+}
+
+// ── Ruta del plan: pasar temas a «fuera de ruta» o devolverlos a la ruta (nunca borra nada de la vault) ──
+export interface MentorRouteChangeResult {
+  plan: MentorPlan;
+  /** la entrada del historial del plan (deshacible con `mentor_plan_change_undo`) */
+  entry?: MentorChangeEntry;
+  history?: MentorChangeEntry[];
+  /** temas que cambiaron de ruta */
+  changed: number;
+  /** los que se saltaron, con su motivo */
+  skipped?: Array<{ folder: string; reason: string }>;
+  /** los que NO se pudieron saltar (completados, prerrequisitos…), con su motivo */
+  rejected?: Array<{ folder: string; reason: string }>;
+  /** temas vivos que quedan en el alcance */
+  live?: number;
+}

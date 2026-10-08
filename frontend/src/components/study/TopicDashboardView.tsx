@@ -19,6 +19,9 @@ import { useApp } from "../../store/app";
 import { cn } from "../ui";
 import { ExamRunnerModal } from "./ExamRunnerModal";
 import { TopicConfiguratorDialog } from "./TopicConfiguratorDialog";
+import { RouteBadge, RouteNow, RouteToggle, useRouteView } from "./RouteUi";
+import { useRoute } from "../../store/mentorRoute";
+import { shortWeekLabel, weekRangesOf } from "../../lib/planTime";
 
 const SUBJECT_LABELS: Record<string, string> = {
   mathematics: "Matemáticas",
@@ -38,6 +41,10 @@ export function TopicDashboardView() {
   const [selectedArea, setSelectedArea] = useState<string>("all");
   const [selectedSkill, setSelectedSkill] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  // La ruta del Mentor: mapa carpeta → ruta (una vez por plan; ninguna tarjeta hace llamadas)
+  const route = useRouteView();
+  const sortByWeek = useRoute((s) => s.sortByWeek) && route.available;
+  const routeInfo = route.available ? route.snap!.byFolder : null;
 
   // Modals
   const [examTopic, setExamTopic] = useState<{ folder: string; manifest: TopicManifest } | null>(null);
@@ -106,6 +113,11 @@ export function TopicDashboardView() {
       if (selectedSkill !== "all" && !item.manifest.skills.includes(selectedSkill)) {
         return false;
       }
+      // «Solo mi ruta»: los temas core/optional del plan (los fuera de ruta se ocultan, no se borran)
+      if (route.only) {
+        const r = routeInfo?.get(item.folder);
+        if (!r || r.route === "skipped") return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = item.manifest.title.toLowerCase().includes(q);
@@ -114,18 +126,30 @@ export function TopicDashboardView() {
       }
       return true;
     });
-  }, [data, selectedSubject, selectedArea, selectedSkill, searchQuery]);
+  }, [data, selectedSubject, selectedArea, selectedSkill, searchQuery, route.only, routeInfo]);
 
   // Grouped by area
   const groupedByArea = useMemo(() => {
     const map = new Map<string, TopicDashboardItem[]>();
+    if (sortByWeek && routeInfo && route.snap) {
+      // orden «por semana del plan»: una sección por semana (los temas sin ruta, al final)
+      const ranges = weekRangesOf(route.snap.plan.start, route.snap.plan.end);
+      const week = (t: TopicDashboardItem): number => routeInfo.get(t.folder)?.week ?? 9999;
+      for (const t of [...filteredTopics].sort((a, b) => week(a) - week(b))) {
+        const w = week(t);
+        const r = ranges[w - 1];
+        const name = w === 9999 ? "Sin semana en el plan" : `Semana ${w}${r ? ` · ${shortWeekLabel(r.start, r.end)}` : ""}`;
+        map.set(name, [...(map.get(name) ?? []), t]);
+      }
+      return map;
+    }
     for (const t of filteredTopics) {
       const list = map.get(t.area) || [];
       list.push(t);
       map.set(t.area, list);
     }
     return map;
-  }, [filteredTopics]);
+  }, [filteredTopics, sortByWeek, routeInfo, route.snap]);
 
   // Global KPIs
   const stats = useMemo(() => {
@@ -172,6 +196,9 @@ export function TopicDashboardView() {
           <RotateCcw size={12} /> Actualizar
         </button>
       </div>
+
+      {/* Qué estudiar ahora: los temas exactos de tu ruta (no todo el catálogo) */}
+      <RouteNow className="mb-5" onOpen={handleOpenFolder} />
 
       {/* KPI Cards */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -269,6 +296,8 @@ export function TopicDashboardView() {
           </select>
         </div>
 
+        <RouteToggle showSort className="basis-full" />
+
         {/* Search Input */}
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-line bg-panel px-2 py-1">
           <Search size={12} className="text-faint" />
@@ -351,10 +380,12 @@ export function TopicDashboardView() {
                   <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-2 lg:divide-x lg:divide-y-0">
                     {topics.map((t) => {
                       const p = t.progress;
+                      const ri = routeInfo?.get(t.folder);
                       return (
                         <div
                           key={t.folder}
-                          className="flex flex-col justify-between p-4 transition-colors hover:bg-panel/30"
+                          className={cn("flex flex-col justify-between p-4 transition-colors hover:bg-panel/30", ri?.route === "skipped" && "opacity-60")}
+                          data-route={ri?.route}
                         >
                           <div>
                             {/* Card Header */}
@@ -367,6 +398,7 @@ export function TopicDashboardView() {
                                 <div className="mt-0.5 text-[11px] text-faint">
                                   {t.folder}
                                 </div>
+                                {ri && <RouteBadge info={ri} preview={route.preview} className="mt-1" />}
                               </div>
 
                               <span

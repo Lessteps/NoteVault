@@ -169,6 +169,32 @@ export function sanitizePractice(raw: unknown): PracticePrefs | undefined {
   return { kataMinutes, sessionsPerWeek, minutesPerSession, monthly: o.monthly === true && sessionsPerWeek > 0, focus };
 }
 
+/**
+ * ¿Cómo se combinan las áreas del plan? (se decide AL CREAR el plan)
+ *  - `together`: todas las áreas elegidas activas TODO el periodo y presentes CADA día (el día combina teoría y práctica de cada una).
+ *  - `phased`: áreas separadas por fases (como máximo 2 en paralelo).
+ *  - `ai`: lo decide el Mentor (propone en el esqueleto; la app valida y calcula; queda una línea de justificación).
+ * Ausente en un plan o en unas precondiciones antiguas = comportamiento de siempre (`phased`). Automation siempre va al final.
+ */
+export const AREA_MODES = ["together", "phased", "ai"] as const;
+export type PlanAreaMode = (typeof AREA_MODES)[number];
+/** El modo ya decidido de un plan (nunca `ai`). */
+export type ResolvedAreaMode = "together" | "phased";
+export const normalizeAreaMode = (v: unknown): PlanAreaMode | undefined => ((AREA_MODES as readonly string[]).includes(String(v)) ? (v as PlanAreaMode) : undefined);
+
+/** Lenguajes con práctica propia diaria. */
+export const PLAN_LANGUAGE_IDS = ["python", "javascript", "typescript"] as const;
+export type PlanLanguageId = (typeof PLAN_LANGUAGE_IDS)[number];
+export interface PlanLanguage {
+  id: PlanLanguageId;
+  /** obligatorio por las áreas del plan (o porque lo pediste): no se puede quitar */
+  required: boolean;
+  /** por qué está en el plan («Backend lo usa en TypeScript y Python») */
+  why: string;
+  /** peso de la rotación diaria (por defecto Python 3, JavaScript 2, TypeScript 2) */
+  weight?: number;
+}
+
 export interface PlanPreconditions {
   /** AAAA-MM-DD */
   start: string;
@@ -195,6 +221,10 @@ export interface PlanPreconditions {
   branchPreset?: string;
   /** ramas que quedaron fuera al aplicar `branches`: solo para mostrar «Excluí X porque pediste full stack» */
   branchExcluded?: string[];
+  /** cómo se combinan las áreas (juntas, por fases o lo decide el Mentor); ausente = por fases como siempre */
+  areaMode?: PlanAreaMode;
+  /** lenguajes con bloque de práctica propio cada día; ausente = sin bloque diario de lenguaje (planes antiguos) */
+  languages?: PlanLanguage[];
 }
 
 export const MAX_NOTES_CHARS = 1500;
@@ -240,6 +270,8 @@ export function sanitizePreconditions(raw: unknown, today: string): PlanPrecondi
   const hasBranches = Object.keys(branches).length > 0;
   const preset = String(o.branchPreset ?? "").trim().slice(0, 20);
   const excluded = strList(o.branchExcluded, 60, 120);
+  const areaMode = normalizeAreaMode(o.areaMode);
+  const languages = sanitizeLanguages(o.languages);
   return {
     start,
     end,
@@ -258,7 +290,28 @@ export function sanitizePreconditions(raw: unknown, today: string): PlanPrecondi
     // «all» (Todo) es una elección explícita sin lista de ramas: evita que el servidor vuelva a inferir un preset
     ...(preset && (hasBranches || preset === "all") ? { branchPreset: preset } : {}),
     ...(excluded.length && hasBranches ? { branchExcluded: excluded } : {}),
+    ...(areaMode ? { areaMode } : {}),
+    ...(languages ? { languages } : {}),
   };
+}
+
+/** Lenguajes válidos (ids conocidos, sin repetir); `undefined` si no hay campo (planes antiguos); `[]` = el estudiante no quiere ninguno. */
+export function sanitizeLanguages(raw: unknown): PlanLanguage[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: PlanLanguage[] = [];
+  for (const l of raw) {
+    const o = (l && typeof l === "object" ? l : {}) as Record<string, unknown>;
+    const id = String(o.id ?? "").toLowerCase();
+    if (!(PLAN_LANGUAGE_IDS as readonly string[]).includes(id) || out.some((x) => x.id === id)) continue;
+    const w = Math.round(Number(o.weight));
+    out.push({
+      id: id as PlanLanguageId,
+      required: o.required === true,
+      why: String(o.why ?? "").replace(/\s+/g, " ").trim().slice(0, 200),
+      ...(Number.isFinite(w) && w >= 1 && w <= 9 ? { weight: w } : {}),
+    });
+  }
+  return out;
 }
 
 /** Motivo por el que unas precondiciones no sirven para armar un plan, o null. */

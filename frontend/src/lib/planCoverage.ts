@@ -156,7 +156,89 @@ export interface CoverageSuggestion {
   why: string;
   /** grupo del área donde encajaría (id de `AreaGroup`), si la IA lo dijo y existe */
   groupId?: string;
+  /** cuánto importa para el criterio elegido (estimación de la IA) */
+  priority?: CoveragePriority;
+  /** nivel al que corresponde (junior · mid · senior) */
+  level?: SkillLevel;
+  /** el estudiante lo añadió al plan como PROPUESTA («Añadir faltante al plan»): no crea ninguna nota */
+  accepted?: boolean;
 }
+
+export const COVERAGE_PRIORITIES = ["high", "medium", "low"] as const;
+export type CoveragePriority = (typeof COVERAGE_PRIORITIES)[number];
+export const PRIORITY_LABEL: Record<CoveragePriority, string> = { high: "Prioridad alta", medium: "Prioridad media", low: "Prioridad baja" };
+export const SKILL_LEVELS = ["junior", "mid", "senior"] as const;
+export type SkillLevel = (typeof SKILL_LEVELS)[number];
+export const LEVEL_LABEL: Record<SkillLevel, string> = { junior: "Junior", mid: "Mid-level", senior: "Senior" };
+
+/** Veredicto de un área frente al criterio: se queda corta, es adecuada o tiene de más. */
+export const COVERAGE_VERDICTS = ["short", "adequate", "excessive"] as const;
+export type CoverageVerdict = (typeof COVERAGE_VERDICTS)[number];
+export const VERDICT_LABEL: Record<CoverageVerdict, string> = { short: "Corto", adequate: "Adecuado", excessive: "Excesivo" };
+
+/** Un tema del plan que PUEDE pasar a «fuera de ruta» (demasiado básico o poco necesario para el criterio). */
+export interface CoverageDispensable {
+  folder: string;
+  title: string;
+  reason: string;
+}
+
+// ── Criterio de la revisión («¿con qué criterio revisamos?») ──
+
+export const CRITERION_PRESETS = ["market", "mid", "interviews", "custom"] as const;
+export type CriterionPreset = (typeof CRITERION_PRESETS)[number];
+export const CRITERION_LABEL: Record<CriterionPreset, string> = {
+  market: "Tendencias del mercado actual (junior hoy)",
+  mid: "Nivel mid-level",
+  interviews: "Entrevistas técnicas",
+  custom: "Lo que yo pida",
+};
+export const CURRENT_LEVELS = ["auto", "none", "junior", "mid", "senior"] as const;
+export type CurrentLevel = (typeof CURRENT_LEVELS)[number];
+export const CURRENT_LEVEL_LABEL: Record<CurrentLevel, string> = { auto: "Que lo mida el Mentor (por mi progreso)", none: "Sin experiencia", junior: "Junior", mid: "Mid-level", senior: "Senior" };
+export const MAX_CONDITIONS_CHARS = 600;
+
+export interface CoverageCriteria {
+  presets: CriterionPreset[];
+  targetLevel: SkillLevel;
+  currentLevel: CurrentLevel;
+  /** condiciones libres del estudiante («compara con ofertas de backend en Python», «prioriza testing»…) */
+  conditions: string;
+}
+
+export const DEFAULT_CRITERIA: CoverageCriteria = { presets: ["market"], targetLevel: "junior", currentLevel: "auto", conditions: "" };
+
+/** Lectura segura del criterio (de la interfaz o de disco): valores desconocidos vuelven al por defecto; siempre al menos un preset. */
+export function sanitizeCriteria(raw: unknown): CoverageCriteria {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const presets = [...new Set((Array.isArray(o.presets) ? o.presets : []).map(String).filter((p): p is CriterionPreset => (CRITERION_PRESETS as readonly string[]).includes(p)))];
+  const conditions = String(o.conditions ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_CONDITIONS_CHARS);
+  const target = String(o.targetLevel ?? "");
+  const current = String(o.currentLevel ?? "");
+  if (conditions && !presets.includes("custom")) presets.push("custom");
+  return {
+    presets: presets.length ? presets : [...DEFAULT_CRITERIA.presets],
+    targetLevel: (SKILL_LEVELS as readonly string[]).includes(target) ? (target as SkillLevel) : DEFAULT_CRITERIA.targetLevel,
+    currentLevel: (CURRENT_LEVELS as readonly string[]).includes(current) ? (current as CurrentLevel) : DEFAULT_CRITERIA.currentLevel,
+    conditions,
+  };
+}
+
+/** El criterio en una frase legible («Tendencias del mercado actual · nivel objetivo Junior · condiciones: …»). */
+export function criteriaText(c: CoverageCriteria): string {
+  return [
+    c.presets.map((p) => CRITERION_LABEL[p]).join(" + "),
+    `nivel objetivo ${LEVEL_LABEL[c.targetLevel]}`,
+    c.currentLevel === "auto" ? "nivel actual medido por el Mentor" : `nivel actual ${CURRENT_LEVEL_LABEL[c.currentLevel].toLowerCase()}`,
+    c.conditions ? `condiciones: ${c.conditions}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** Aviso fijo que acompaña a toda revisión: la IA no tiene datos del mercado en vivo. */
+export const COVERAGE_DISCLAIMER =
+  "Estimación basada en el conocimiento del modelo de IA y su fecha de corte, sin datos del mercado en vivo: úsala como orientación, no como cifra exacta.";
 
 /** Un tema del plan que sobra o está mal ubicado. */
 export interface CoverageMisplaced {
@@ -174,6 +256,20 @@ export interface CoverageReviewArea {
   assessment: string;
   missing: CoverageSuggestion[];
   misplaced: CoverageMisplaced[];
+  /** temas que pueden pasar a «fuera de ruta» (sobran o son demasiado básicos para el criterio) */
+  dispensable?: CoverageDispensable[];
+  /** corto / adecuado / excesivo frente al criterio, y por qué */
+  verdict?: CoverageVerdict;
+  verdictWhy?: string;
+  /** estimación (múltiplos de 5) de lo esperado para el criterio que el área cubre, 0..100 */
+  coveragePct?: number;
+}
+
+export interface CoverageOverall {
+  verdict: CoverageVerdict;
+  /** estimación (múltiplos de 5) de lo esperado para el criterio que cubre el plan entero */
+  coveragePct?: number;
+  text: string;
 }
 
 export interface CoverageReview {
@@ -184,6 +280,12 @@ export interface CoverageReview {
   profile?: string;
   /** valoración global breve */
   summary: string;
+  /** el criterio con el que se revisó (aditivo; ausente en las revisiones antiguas) */
+  criteria?: CoverageCriteria;
+  /** veredicto global y % estimado de lo esperado */
+  overall?: CoverageOverall;
+  /** aviso de que es una estimación (la app lo pone siempre; no lo escribe la IA) */
+  disclaimer?: string;
   areas: CoverageReviewArea[];
   /** sugerencias descartadas por la app (ya existían como tema, área desconocida, duplicadas…) */
   discarded: number;
@@ -212,26 +314,94 @@ export function sanitizeCoverageReview(raw: unknown, keys?: readonly string[]): 
       area: oneLine(a.area, 80) || key,
       assessment: oneLine(a.assessment, 400),
       missing: (Array.isArray(a.missing) ? a.missing : [])
-        .map((m: any) => ({ title: oneLine(m?.title, 120), why: oneLine(m?.why, 300), ...(oneLine(m?.groupId, 40) ? { groupId: oneLine(m.groupId, 40) } : {}) }))
+        .map((m: any) => ({
+          title: oneLine(m?.title, 120),
+          why: oneLine(m?.why, 300),
+          ...(oneLine(m?.groupId, 40) ? { groupId: oneLine(m.groupId, 40) } : {}),
+          ...(priorityOf(m?.priority) ? { priority: priorityOf(m.priority)! } : {}),
+          ...(levelOf(m?.level) ? { level: levelOf(m.level)! } : {}),
+          ...(m?.accepted === true ? { accepted: true } : {}),
+        }))
         .filter((m: CoverageSuggestion) => m.title)
         .slice(0, MAX_SUGGESTIONS_PER_AREA),
       misplaced: (Array.isArray(a.misplaced) ? a.misplaced : [])
         .map((m: any) => ({ folder: oneLine(m?.folder, 300), title: oneLine(m?.title, 160), reason: oneLine(m?.reason, 300), ...(oneLine(m?.suggestedArea, 60) ? { suggestedArea: oneLine(m.suggestedArea, 60) } : {}) }))
         .filter((m: CoverageMisplaced) => m.folder && m.title)
         .slice(0, MAX_SUGGESTIONS_PER_AREA),
+      ...(Array.isArray(a.dispensable) && a.dispensable.length
+        ? {
+            dispensable: a.dispensable
+              .map((m: any) => ({ folder: oneLine(m?.folder, 300), title: oneLine(m?.title, 160), reason: oneLine(m?.reason, 300) }))
+              .filter((m: CoverageDispensable) => m.folder && m.title)
+              .slice(0, MAX_DISPENSABLE_PER_AREA),
+          }
+        : {}),
+      ...(verdictOf(a.verdict) ? { verdict: verdictOf(a.verdict)! } : {}),
+      ...(oneLine(a.verdictWhy, 300) ? { verdictWhy: oneLine(a.verdictWhy, 300) } : {}),
+      ...(pctOf(a.coveragePct) !== undefined ? { coveragePct: pctOf(a.coveragePct)! } : {}),
     });
   }
   const summary = oneLine(r.summary, 600);
   if (!summary && !areas.length) return undefined;
   const profile = oneLine(r.profile, MAX_PROFILE_CHARS);
-  return { at, source: "ai", ...(profile ? { profile } : {}), summary, areas, discarded: Math.max(0, Math.round(Number(r.discarded) || 0)) };
+  const overall = overallOf(r.overall);
+  const disclaimer = oneLine(r.disclaimer, 300);
+  return {
+    at,
+    source: "ai",
+    ...(profile ? { profile } : {}),
+    summary,
+    ...(r.criteria && typeof r.criteria === "object" ? { criteria: sanitizeCriteria(r.criteria) } : {}),
+    ...(overall ? { overall } : {}),
+    ...(disclaimer ? { disclaimer } : {}),
+    areas,
+    discarded: Math.max(0, Math.round(Number(r.discarded) || 0)),
+  };
 }
+
+const priorityOf = (v: unknown): CoveragePriority | undefined => {
+  const k = fold(String(v ?? ""));
+  if (/^(high|alta|alto|critica|critico|imprescindible)/.test(k)) return "high";
+  if (/^(medium|media|medio|normal)/.test(k)) return "medium";
+  if (/^(low|baja|bajo|opcional)/.test(k)) return "low";
+  return undefined;
+};
+const levelOf = (v: unknown): SkillLevel | undefined => {
+  const k = fold(String(v ?? ""));
+  if (/^(junior|jr|trainee|entry)/.test(k)) return "junior";
+  if (/^(mid|medio|intermedio|semi)/.test(k)) return "mid";
+  if (/^(senior|sr|avanzado|experto)/.test(k)) return "senior";
+  return undefined;
+};
+const verdictOf = (v: unknown): CoverageVerdict | undefined => {
+  const k = fold(String(v ?? ""));
+  if (/^(short|corto|corta|insuficiente|se queda corto|escaso|incompleto)/.test(k)) return "short";
+  if (/^(adequate|adecuad|suficiente|ok|equilibrad|bien|correct)/.test(k)) return "adequate";
+  if (/^(excessive|excesiv|sobra|demasiad|de mas)/.test(k)) return "excessive";
+  return undefined;
+};
+/** Porcentaje estimado: entero 0..100 redondeado a múltiplos de 5 (no se aparenta una precisión que la IA no tiene). */
+const pctOf = (v: unknown): number | undefined => {
+  const n = typeof v === "string" ? Number(v.replace("%", "").replace(",", ".")) : Number(v);
+  if (v === null || v === undefined || v === "" || !Number.isFinite(n)) return undefined;
+  return Math.max(0, Math.min(100, Math.round(n / 5) * 5));
+};
+function overallOf(raw: unknown): CoverageOverall | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const verdict = verdictOf(o.verdict);
+  if (!verdict) return undefined;
+  const pct = pctOf(o.coveragePct);
+  return { verdict, ...(pct !== undefined ? { coveragePct: pct } : {}), text: oneLine(o.text ?? o.assessment, 500) };
+}
+
+export const MAX_DISPENSABLE_PER_AREA = 40;
 
 export interface CoverageReplyCtx {
   /** las áreas del plan con sus grupos */
   areas: ReadonlyArray<{ key: string; area: string; groups?: readonly AreaGroup[] }>;
   /** temas del plan (para reconocer los «sobrantes o mal ubicados») con la clave de su área */
-  planTopics: ReadonlyArray<{ folder: string; title: string; key: string }>;
+  planTopics: ReadonlyArray<{ folder: string; title: string; key: string; /** completado: no se propone como prescindible */ done?: boolean }>;
   /** títulos de TODOS los temas de la vault: una sugerencia que ya existe se descarta */
   vaultTitles: readonly string[];
 }
@@ -283,6 +453,11 @@ export function parseCoverageReply(text: string, ctx: CoverageReplyCtx): { ok: t
     }
     const target = areas.find((x) => x.key === a.key) ?? (areas.push({ key: a.key, area: a.area, assessment: "", missing: [], misplaced: [] }), areas[areas.length - 1]!);
     if (!target.assessment) target.assessment = oneLine(raw?.assessment, 400);
+    const verdict = verdictOf(raw?.verdict ?? raw?.veredicto);
+    if (verdict && !target.verdict) target.verdict = verdict;
+    if (!target.verdictWhy && oneLine(raw?.verdictWhy ?? raw?.why, 300)) target.verdictWhy = oneLine(raw?.verdictWhy ?? raw?.why, 300);
+    const pct = pctOf(raw?.coveragePct ?? raw?.coverage);
+    if (pct !== undefined && target.coveragePct === undefined) target.coveragePct = pct;
     const seen = new Set(target.missing.map((m) => titleKey(m.title)));
     for (const m of Array.isArray(raw?.missing) ? raw.missing : []) {
       const title = oneLine(typeof m === "string" ? m : m?.title, 120);
@@ -295,7 +470,19 @@ export function parseCoverageReply(text: string, ctx: CoverageReplyCtx): { ok: t
       const g = fold(oneLine(m?.group ?? m?.groupId, 60));
       const groups = a.groups ?? [];
       const group = g ? groups.find((x) => fold(x.id) === g || fold(x.title) === g) ?? groups.find((x) => GROUP_WORDS.find((w) => w.re.test(g))?.kind === x.kind) : undefined;
-      target.missing.push({ title, why: oneLine(m?.why ?? m?.reason, 300), ...(group ? { groupId: group.id } : {}) });
+      const priority = priorityOf(m?.priority ?? m?.prioridad);
+      const level = levelOf(m?.level ?? m?.nivel);
+      target.missing.push({ title, why: oneLine(m?.why ?? m?.reason, 300), ...(group ? { groupId: group.id } : {}), ...(priority ? { priority } : {}), ...(level ? { level } : {}) });
+    }
+    // prescindibles: temas del plan (no completados) que pueden pasar a «fuera de ruta»
+    for (const m of Array.isArray(raw?.dispensable) ? raw.dispensable : Array.isArray(raw?.skippable) ? raw.skippable : []) {
+      const t = byFolder.get(oneLine(m?.folder, 300)) ?? byTitle.get(titleKey(oneLine(typeof m === "string" ? m : m?.title, 160)));
+      const list = (target.dispensable ??= []);
+      if (!t || t.done || list.some((x) => x.folder === t.folder) || list.length >= MAX_DISPENSABLE_PER_AREA) {
+        discarded++;
+        continue;
+      }
+      list.push({ folder: t.folder, title: t.title, reason: oneLine(m?.reason ?? m?.why, 300) });
     }
     for (const m of Array.isArray(raw?.misplaced) ? raw.misplaced : Array.isArray(raw?.extra) ? raw.extra : []) {
       const t = byFolder.get(oneLine(m?.folder, 300)) ?? byTitle.get(titleKey(oneLine(typeof m === "string" ? m : m?.title, 160)));
@@ -308,7 +495,8 @@ export function parseCoverageReply(text: string, ctx: CoverageReplyCtx): { ok: t
     }
   }
   const summary = oneLine(j.summary ?? j.assessment, 600);
-  const kept = areas.filter((a) => a.assessment || a.missing.length || a.misplaced.length);
-  if (!summary && !kept.length) return { ok: false, reason: "La IA no propuso nada útil." };
-  return { ok: true, review: { summary, areas: kept, discarded } };
+  const kept = areas.filter((a) => a.assessment || a.missing.length || a.misplaced.length || a.dispensable?.length || a.verdict);
+  const overall = overallOf(j.overall);
+  if (!summary && !kept.length && !overall) return { ok: false, reason: "La IA no propuso nada útil." };
+  return { ok: true, review: { summary: summary || overall?.text || "", ...(overall ? { overall } : {}), areas: kept, discarded } };
 }

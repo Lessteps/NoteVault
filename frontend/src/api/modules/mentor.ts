@@ -29,13 +29,17 @@ import {
   planStatus,
   refreshPlanProgress,
   topicState,
+  withTopicProjects,
   type DeliverableStatus,
   type Plan,
   type PlanItem,
   type SubplanSeed,
   type TopicLiteLookup,
 } from "../../core/mentor/plan.js";
-import { branchAllowed, branchOfFolder, classifyBranch, detectBranchIntent, periodLabel, sanitizeNotes } from "../../lib/planTime.js";
+import { branchAllowed, branchOfFolder, classifyBranch, detectBranchIntent, periodLabel, sanitizeNotes, weekRangesOf } from "../../lib/planTime.js";
+import { resolveLanguages } from "../../lib/planLanguages.js";
+import { routeOf, routeOfPlan, sanitizeRouteFields, validateSkips, type RouteEntry } from "../../lib/planRoute.js";
+import type { MasteryLookup } from "../../lib/planTopicProject.js";
 import {
   BUILD_ID_RE,
   computeBuild,
@@ -67,10 +71,10 @@ import {
 } from "../../core/mentor/planChange.js";
 import { generateByParts, PipelineCancel } from "../../core/mentor/planPipeline.js";
 import { canReorganize, reorganizeByAreas } from "../../core/mentor/planReorganize.js";
-import { PLAN_DELIVERABLE_STATUSES, sanitizeGroups, type PlanDeliverableStatus } from "../../lib/planAreas.js";
+import { PLAN_DELIVERABLE_STATUSES, resolveAreaMode, sanitizeGroups, type PlanDeliverableStatus } from "../../lib/planAreas.js";
 import { buildSchedule, deliverablesOf } from "../../lib/planSchedule.js";
 import { CurriculumCancel, generateCurriculum } from "../../core/mentor/planCurriculumAi.js";
-import { areaKeyOf, computeCoverage, MAX_PROFILE_CHARS, parseCoverageReply } from "../../lib/planCoverage.js";
+import { areaKeyOf, computeCoverage, COVERAGE_DISCLAIMER, MAX_PROFILE_CHARS, parseCoverageReply, sanitizeCriteria } from "../../lib/planCoverage.js";
 import { coverageMessages } from "../../core/mentor/planCoverageAi.js";
 import { parseScopeReply, parseTopicsReply, scopeMessages, topicsMessages } from "../../core/mentor/planBuildAi.js";
 import {
@@ -126,6 +130,8 @@ import { clampInt } from "../common.js";
 import { vaultScan } from "../vaultScan.js";
 import { parseTopicLink } from "../../core/practice/topicLinks.js";
 import { goalsApi } from "./goals.js";
+import { mentorAskApi } from "./mentorAsk.js";
+import { mentorCoverageApi } from "./mentorCoverage.js";
 import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
 
@@ -185,6 +191,15 @@ function topicSnaps(app: AppState): TopicSnap[] {
     noteRels: scan.notes.map((n) => n.rel),
     examFor: (manifest) => loadExamRecordForTopic(app.root, manifest),
   });
+}
+
+/** Lo MEDIDO de cada tema (progreso e intentos reales de la vault): calibra los proyectos de tema y «Reducir a lo esencial». */
+function masteryLookup(app: AppState): MasteryLookup {
+  const snaps = new Map(topicSnaps(app).map((t) => [t.folder, t] as const));
+  return (folder) => {
+    const s = snaps.get(folder);
+    return s ? { pct: s.progress.completenessPct, attempts: s.attemptCount } : undefined;
+  };
 }
 
 /** Cola del recomendador (la misma del hub de Estudio), resumida; vacía si falla. */
@@ -1176,6 +1191,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
             discarded: res.discarded,
             rationale: res.aiUsed ? res.rationale || "Plan armado por partes: esqueleto y temas de cada subplan elegidos por el Mentor." : `Plan automático con tus metas y materias elegidas, en su orden natural y sin lo ya completado. ${why}.`,
             ...(!res.aiUsed && !unavailable && res.warnings[0] ? { fallbackReason: res.warnings[0] } : {}),
+            ...(res.areaProposal ? { areaProposal: res.areaProposal } : {}),
           });
           if (res.warnings.length) draft = { ...draft, warnings: [...draft.warnings, ...res.warnings] };
         } else if (!unavailable) {
@@ -1347,7 +1363,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
           const skills = Array.isArray(t.skills) ? t.skills.map((x: unknown) => String(x).toLowerCase()).filter((x: string) => valid.has(x)) : [];
           const base = estimateTopicMinutes(snap);
           const group = groups.some((g) => g.id === String(t?.group)) ? String(t.group) : undefined;
-          topics.push({ folder, title: snap.title, ...(skills.length ? { skills } : {}), estMinutes: pre ? adjustedMinutes(base, areaOfFolder(folder), pre.levels) : base, ...(group ? { group } : {}) });
+          const rt = sanitizeRouteFields(t);
+          topics.push({ folder, title: snap.title, ...(skills.length ? { skills } : {}), estMinutes: pre ? adjustedMinutes(base, areaOfFolder(folder), pre.levels) : base, ...(group ? { group } : {}), ...rt });
         }
         const goalId = goalById.has(String(s?.goalId)) ? String(s.goalId) : undefined;
         const requiredGoals = (Array.isArray(s?.requiredGoals) ? s.requiredGoals : [])
@@ -1371,18 +1388,23 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const from = pre ? (today > pre.start ? today : pre.start) : win.from;
       // la pista de práctica se recalcula aquí (determinista): del borrador solo se aceptan temas y focos validados
       const practice = pre?.practice ? buildPracticeTrack(pre, { from, startFocus: practiceStartFocus(app), suggestions: suggestionsOf(sanitizePracticeTrack(d.programmingPractice, pre.start, pre.end)) }) : undefined;
-      const built = pre
+      // cómo se combinan las áreas y los lenguajes con práctica propia se resuelven aquí (la UI no decide): lo elegido, la propuesta del borrador o las reglas
+      const seedAreaIds = seeds.map((s) => s.areaId).filter((a): a is string => !!a);
+      const areaInfo = pre && seeds.length > 0 && seedAreaIds.length === seeds.length ? resolveAreaMode(pre.areaMode, seedAreaIds, { mode: d.areaMode, why: d.areaModeWhy, by: d.areaModeBy }) : undefined;
+      const preEff = pre && pre.languages !== undefined ? { ...pre, languages: resolveLanguages(pre.languages, seedAreaIds) } : pre;
+      const built = preEff
         ? buildPlan(seeds, {
-            id: `${pre.start}_${pre.end}`,
-            start: pre.start,
-            end: pre.end,
-            minutesPerDay: pre.minutesPerDay,
-            studyDays: pre.studyDays,
-            blockedDates: pre.blockedDates,
-            pace: pre.pace,
+            id: `${preEff.start}_${preEff.end}`,
+            start: preEff.start,
+            end: preEff.end,
+            minutesPerDay: preEff.minutesPerDay,
+            studyDays: preEff.studyDays,
+            blockedDates: preEff.blockedDates,
+            pace: preEff.pace,
             from,
-            preconditions: pre,
-            ...(practice ? { programmingPractice: practice, reservedMinutes: practiceDayMinutes(practice, { blockedDates: pre.blockedDates, from }) } : {}),
+            preconditions: preEff,
+            ...(areaInfo ? { areaMode: areaInfo.mode, areaModeWhy: areaInfo.why, areaModeBy: areaInfo.by } : {}),
+            ...(practice ? { programmingPractice: practice, reservedMinutes: practiceDayMinutes(practice, { blockedDates: preEff.blockedDates, from }) } : {}),
             ...(Array.isArray(d.openQuestions) ? { openQuestions: d.openQuestions } : {}),
             ...(d.auto ? { auto: true } : {}),
             ...(d.compact === true ? { spread: false } : {}),
@@ -1390,12 +1412,14 @@ export function mentorApi(app: AppState, send?: SendFn) {
           })
         : buildPlan(seeds, { month: win.month, hoursPerWeek, from, rationale: String(d.rationale ?? "") });
       let saved: Plan;
+      // el proyecto de aplicación de cada tema, calibrado con el nivel declarado y lo medido (los planes por áreas nuevos lo llevan desde el principio)
+      const planned = built.plan.structure === "areas" ? withTopicProjects(built.plan, masteryLookup(app)) : built.plan;
       if (o.proposed === true) {
         // plan real «propuesto»: nunca se fusiona con otro; si el id está ocupado, se le añade un sufijo
-        let pid = built.plan.id;
-        for (let n = 2; st.load(pid); n++) pid = `${built.plan.id}-${n}`;
-        saved = st.save({ ...built.plan, id: pid, proposed: true });
-      } else saved = st.save(mergePlans(st.load(built.plan.id), built.plan));
+        let pid = planned.id;
+        for (let n = 2; st.load(pid); n++) pid = `${planned.id}-${n}`;
+        saved = st.save({ ...planned, id: pid, proposed: true });
+      } else saved = st.save(mergePlans(st.load(planned.id), planned));
       if (turn) chatFor(o.chatId)?.patch(turn.id, { acceptedPlan: saved.id });
       return {
         id: saved.id,
@@ -1580,7 +1604,10 @@ export function mentorApi(app: AppState, send?: SendFn) {
       return guarded(`plan:${id}`, "practice", () =>
         withJob(`practice:${id}`, "Preparando la práctica del plan…", async (job) => {
           const today = localDate();
-          const sch = buildSchedule(plan);
+          // los proyectos de tema se calibran con lo MEDIDO antes de preparar la agenda (la IA ve el nivel máximo permitido de cada uno)
+          const look = masteryLookup(app);
+          const calibrated = plan.structure === "areas" ? withTopicProjects(plan, look) : plan;
+          const sch = buildSchedule(calibrated);
           const folders = new Set(plan.subplans.flatMap((s) => s.topics.map((t) => t.folder)));
           const counts = new Map<string, number>();
           for (const ex of vaultScan(app).exercises) {
@@ -1599,7 +1626,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
           const weekNow = Math.floor((Date.parse(today) - Date.parse(plan.start)) / 86400000 / 7) + 1;
           let res;
           try {
-            res = await generateCurriculum(plan, sch, {
+            res = await generateCurriculum(calibrated, sch, {
               send: (messages, so) => job.send(messages, so),
               aiOn,
               existing: { count: (f) => counts.get(f) ?? 0 },
@@ -1615,7 +1642,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
           const hist = new ChangeStore(app.root);
           const prev = plan.practiceCurriculum;
           const merged = prev && res.curriculum.weeks.length ? { ...res.curriculum, weeks: [...prev.weeks.filter((w) => !res.curriculum.weeks.some((x) => x.week === w.week)), ...res.curriculum.weeks].sort((a, b) => a.week - b.week), monthly: [...prev.monthly.filter((m) => !res.curriculum.monthly.some((x) => x.month === m.month)), ...res.curriculum.monthly] } : res.curriculum;
-          const saved = st.save({ ...plan, practiceCurriculum: merged, updatedAt: new Date().toISOString() });
+          // lo que propuso la IA para los proyectos de tema se recorta al nivel permitido (nunca lo sube)
+          const projected = plan.structure === "areas" ? withTopicProjects(calibrated, look, new Map(Object.entries(res.topicProjects))) : plan;
+          const saved = st.save({ ...projected, practiceCurriculum: merged, updatedAt: new Date().toISOString() });
           const nW = res.curriculum.weeks.length;
           const entry = hist.append(id, {
             at: new Date().toISOString(),
@@ -1668,6 +1697,165 @@ export function mentorApi(app: AppState, send?: SendFn) {
       return { plan: saved, entry: viewOf(entry), history: hist.list(id).map(viewOf), applied: true as const };
     },
 
+    // ── Ruta del plan: qué temas toca estudiar de verdad y cuáles se saltan (SIN borrar notas) ──
+
+    /**
+     * `mentor_route({ planId? })`: la RUTA del plan activo (o de todos los activos si no se indica `planId`) para el explorador de notas y el
+     * estudio con el Mentor. Por plan: cada tema con su `route` (`core` · `optional` · `skipped`), su semana objetivo y el inicio de esa semana.
+     * `byFolder` junta todos los planes por carpeta de tema: un tema cuenta como `core`/`optional` si algún plan lo tiene en ruta y como
+     * `skipped` solo si todos los que lo tienen lo saltan. Solo lee: nunca modifica ni borra notas.
+     */
+    mentor_route(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const today = localDate();
+      const st = new PlanStore(app.root);
+      let plans: Plan[];
+      if (o.planId) {
+        const id = String(o.planId);
+        if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+        const p = st.load(id);
+        if (!p) throw new ApiError("Ese plan ya no existe.");
+        plans = [p];
+      } else plans = activePlans(st.list(), today);
+      const byFolder: Record<string, { planId: string; route: "core" | "optional" | "skipped"; targetWeek: number; weekStart: string; area: string; skippedReason?: string }> = {};
+      const out = plans.map((p) => {
+        const ranges = weekRangesOf(p.start, p.end);
+        const topics: RouteEntry[] = routeOfPlan(p, (w) => ranges[Math.min(ranges.length, Math.max(1, w)) - 1]?.start ?? p.start);
+        for (const t of topics) {
+          const prev = byFolder[t.folder];
+          if (!prev || (prev.route === "skipped" && t.route !== "skipped")) byFolder[t.folder] = { planId: p.id, route: t.route, targetWeek: t.targetWeek, weekStart: t.weekStart, area: t.area, ...(t.skippedReason ? { skippedReason: t.skippedReason } : {}) };
+        }
+        const cur = Math.min(ranges.length, Math.max(1, Math.floor((Date.parse(today) - Date.parse(p.start)) / 86400000 / 7) + 1));
+        return {
+          planId: p.id,
+          name: planName(p),
+          status: planStatus(p, today),
+          start: p.start,
+          end: p.end,
+          currentWeek: cur,
+          counts: { core: topics.filter((t) => t.route === "core").length, optional: topics.filter((t) => t.route === "optional").length, skipped: topics.filter((t) => t.route === "skipped").length },
+          topics,
+        };
+      });
+      return { today, plans: out, byFolder };
+    },
+
+    /**
+     * «Reducir a lo esencial» (DETERMINISTA, bajo petición del usuario): `mentor_plan_reduce({ id, areaId, groupId?, max })` salta los temas menos
+     * necesarios de un área (o de un grupo, p. ej. Bases 75 → 30) hasta dejar como máximo `max` en la ruta, según reglas (dominado/medido, nivel
+     * básico ya declarado, lo cubre la práctica de lenguaje, lo último de la ruta) y SIN saltar nunca un prerrequisito. NO borra notas ni quita
+     * los temas del plan: quedan «fuera de ruta», atenuados y reactivables (`mentor_plan_route_set`). Las cuentas, el reparto semanal y los
+     * proyectos de tema se recalculan. Queda en el historial con la instantánea previa: «Deshacer» lo revierte (`mentor_plan_change_undo`).
+     * Devuelve `MentorRouteChangeResult`: `{ plan, entry, history, changed, skipped: [{ folder, title, reason }], live, message }`.
+     */
+    mentor_plan_reduce(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      const ref = String(o.areaId ?? o.subplanId ?? "");
+      const sub = ref ? plan.subplans.find((s) => s.areaId === ref || s.id === ref) : plan.subplans.length === 1 ? plan.subplans[0] : undefined;
+      if (!sub) throw new ApiError("Indica el área del plan que quieres reducir.");
+      const group = o.groupId ? (sub.groups ?? []).find((g) => g.id === String(o.groupId)) : undefined;
+      if (o.groupId && !group) throw new ApiError("Ese grupo no está en el área.");
+      const scopeTopics = group ? sub.topics.filter((t) => t.group === group.id) : sub.topics;
+      const max = Math.max(1, Math.min(400, Math.round(Number(o.max) || 30)));
+      const hist = new ChangeStore(app.root);
+      const label = `Reducir a lo esencial: ${group ? group.title : sub.area} → ${max} temas`;
+      const res = applyOps(plan, [{ op: "reduce_essentials", subplan: sub.id, ...(group ? { group: group.id } : {}), max }], { today: localDate(), all: [], startFocus: practiceStartFocus(app), mastery: masteryLookup(app) });
+      if (!res.applied) {
+        const live = scopeTopics.filter((t) => routeOf(t) !== "skipped").length;
+        throw new ApiError(res.warnings[0] ?? `Ya hay ${live} temas en la ruta de ${group ? group.title : sub.area}: no hace falta reducir.`);
+      }
+      const saved = st.save(res.plan);
+      const before = new Map(plan.subplans.flatMap((s) => s.topics.map((t) => [t.folder, routeOf(t)] as const)));
+      const skipped = saved.subplans.flatMap((s) => s.topics.filter((t) => routeOf(t) === "skipped" && before.get(t.folder) !== "skipped").map((t) => ({ folder: t.folder, title: t.title, reason: t.skippedReason ?? "Fuera de ruta" })));
+      const mine = saved.subplans.find((s) => s.id === sub.id)!;
+      const live = (group ? mine.topics.filter((t) => t.group === group.id) : mine.topics).filter((t) => routeOf(t) !== "skipped").length;
+      const entry = hist.append(id, {
+        at: new Date().toISOString(),
+        comment: label,
+        status: "applied",
+        source: "rules",
+        summary: `${skipped.length} ${skipped.length === 1 ? "tema queda fuera de ruta" : "temas quedan fuera de ruta"} (no se borró ninguno): quedan ${live} en la ruta de ${group ? group.title : sub.area}.`,
+        delta: res.delta,
+        changed: res.changed,
+        warnings: res.warnings,
+        fixOptions: [],
+        before: plan,
+      });
+      return { plan: saved, entry: viewOf(entry), history: hist.list(id).map(viewOf), changed: skipped.length, skipped, live, message: entry.summary, applied: true as const };
+    },
+
+    /**
+     * Cambia la ruta de unos temas del plan (`mentor_plan_route_set({ id, folders, route, reason?, label? })`): `skipped` (fuera de ruta, validado:
+     * nunca salta un prerrequisito de un tema que se queda ni un tema completado), `optional` o `core` (reactivar). No borra notas. Recalcula el
+     * reparto y los proyectos de tema; con historial y «Deshacer». Devuelve `MentorRouteChangeResult` (`rejected` = los que no se pudieron saltar).
+     */
+    mentor_plan_route_set(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const id = String(o.id ?? "");
+      if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+      const route = String(o.route ?? "");
+      if (route !== "core" && route !== "optional" && route !== "skipped") throw new ApiError("Ruta inválida (core, optional o skipped).");
+      const wanted = [...new Set((Array.isArray(o.folders) ? (o.folders as unknown[]) : []).map((f) => String(f ?? "").replace(/\\/g, "/")).filter(Boolean))].slice(0, 400);
+      if (!wanted.length) throw new ApiError("Elige al menos un tema.");
+      const st = new PlanStore(app.root);
+      const plan = st.load(id);
+      if (!plan) throw new ApiError("Ese plan ya no existe.");
+      const known = new Set(plan.subplans.flatMap((s) => s.topics.map((t) => t.folder)));
+      let ok = wanted.filter((f) => known.has(f));
+      let rejected: Array<{ folder: string; reason: string }> = wanted.filter((f) => !known.has(f)).map((folder) => ({ folder, reason: "no es un tema del plan" }));
+      if (route === "skipped") {
+        const v = validateSkips(
+          plan.subplans.flatMap((s) => s.topics.map((t) => ({ folder: t.folder, title: t.title, estMinutes: t.estMinutes, ...(t.group ? { group: t.group } : {}), ...(t.route ? { route: t.route } : {}), ...(t.completedAt ? { completedAt: t.completedAt } : {}) }))),
+          ok,
+        );
+        ok = v.ok;
+        rejected = [...rejected, ...v.rejected];
+      }
+      const current = new Map(plan.subplans.flatMap((s) => s.topics.map((t) => [t.folder, routeOf(t)] as const)));
+      ok = ok.filter((f) => current.get(f) !== route);
+      if (!ok.length) throw new ApiError(rejected.length ? `No se pudo cambiar la ruta: ${rejected[0]!.reason}.` : "Esos temas ya estaban así en tu ruta.");
+      const hist = new ChangeStore(app.root);
+      const reason = String(o.reason ?? "").replace(/\s+/g, " ").trim().slice(0, 200) || (route === "skipped" ? "Fuera de ruta por decisión tuya" : "");
+      const res = applyOps(plan, [{ op: "set_route", folders: ok, route, ...(reason ? { reason } : {}) }], { today: localDate(), all: [], startFocus: practiceStartFocus(app), mastery: masteryLookup(app) });
+      if (!res.applied) throw new ApiError("No cambió nada.");
+      const saved = st.save(res.plan);
+      const n = ok.length;
+      const summary =
+        route === "skipped"
+          ? `${n} ${n === 1 ? "tema sale" : "temas salen"} de tu ruta. Las notas siguen en tu vault: nada se borra y puedes volver a añadirlos.`
+          : route === "optional"
+            ? `${n} ${n === 1 ? "tema pasa" : "temas pasan"} a opcionales.`
+            : `${n} ${n === 1 ? "tema vuelve" : "temas vuelven"} a tu ruta.`;
+      const entry = hist.append(id, {
+        at: new Date().toISOString(),
+        comment: String(o.label ?? "").replace(/\s+/g, " ").trim().slice(0, 200) || (route === "skipped" ? `Sacar ${n} ${n === 1 ? "tema" : "temas"} de la ruta` : route === "optional" ? `Marcar ${n} ${n === 1 ? "tema" : "temas"} como opcionales` : `Añadir ${n} ${n === 1 ? "tema" : "temas"} a tu ruta`),
+        status: "applied",
+        source: "rules",
+        summary,
+        delta: res.delta,
+        changed: res.changed,
+        warnings: [...res.warnings, ...rejected.slice(0, 5).map((r) => `No se pudo cambiar «${r.folder.split("/").pop()}»: ${r.reason}.`)],
+        fixOptions: [],
+        before: plan,
+      });
+      const titleOf = new Map(saved.subplans.flatMap((s) => s.topics.map((t) => [t.folder, t.title] as const)));
+      return {
+        plan: saved,
+        entry: viewOf(entry),
+        history: hist.list(id).map(viewOf),
+        changed: n,
+        ...(route === "skipped" ? { skipped: ok.map((folder) => ({ folder, title: titleOf.get(folder) ?? folder, reason })) } : {}),
+        ...(rejected.length ? { rejected } : {}),
+        live: saved.subplans.reduce((c, s) => c + s.topics.filter((t) => routeOf(t) !== "skipped").length, 0),
+        message: summary,
+      };
+    },
+
     // ── Cobertura del plan: notas de teoría y práctica por área (determinista) + revisión con el Mentor (bajo demanda) ──
 
     /** Cobertura de teoría y práctica de cada área del plan contra la vault y la última revisión guardada. Solo lee. */
@@ -1691,31 +1879,33 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
       const plan = coveragePlan(o);
       const profile = String(o.profile ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_PROFILE_CHARS);
+      // con qué criterio se revisa (tendencias del mercado, mid-level, entrevistas, lo que pida el estudiante) y a qué nivel
+      const criteria = sanitizeCriteria(o.criteria);
       if (studyIndexCold(app)) return { loading: true as const };
       const { coverage, snaps } = coverageOf(plan);
       const none = (reason: string) => ({ loading: false as const, source: "none" as const, reason, coverage });
       if (o.noAi === true) return none("Sin IA por petición tuya: se muestra solo la cobertura calculada.");
       if (aiUnavailableReason(AIConfig.fromDict(AppConfig.get_ai_config())) !== null) return none("La IA no está configurada: sin IA solo se muestra la cobertura calculada.");
       const id = plan.id;
-      return guarded(`plan:${id}`, `coverage:${profile}`, () =>
+      return guarded(`plan:${id}`, `coverage:${profile}:${JSON.stringify(criteria)}`, () =>
         withJob(`coverage:${id}`, "Revisando la cobertura del plan con tu objetivo…", async (job) => {
           const objective = plan.preconditions?.freeObjective?.trim() || plan.subplans.map((s) => s.objective).filter(Boolean).join(" · ");
           let text: string;
           try {
-            text = await job.send(coverageMessages({ objective, profile, subplans: plan.subplans, coverage }) as ChatMessage[], { timeoutMs: 180_000 });
+            text = await job.send(coverageMessages({ objective, profile, subplans: plan.subplans, coverage, criteria, levels: plan.preconditions?.levels as Record<string, string> | undefined, today: localDate() }) as ChatMessage[], { timeoutMs: 180_000 });
           } catch (e) {
             if (e instanceof CancelError) return none(e.mode === "abort" ? "Cancelaste la revisión: se muestra solo la cobertura calculada." : "Seguiste sin IA: se muestra solo la cobertura calculada.");
             return none(`La IA falló (${e instanceof Error ? e.message : String(e)}`.slice(0, 200) + "): se muestra solo la cobertura calculada.");
           }
           const parsed = parseCoverageReply(text, {
             areas: plan.subplans.map((s) => ({ key: areaKeyOf(s), area: s.area, groups: s.groups })),
-            planTopics: plan.subplans.flatMap((s) => s.topics.map((t) => ({ folder: t.folder, title: t.title, key: areaKeyOf(s) }))),
+            planTopics: plan.subplans.flatMap((s) => s.topics.map((t) => ({ folder: t.folder, title: t.title, key: areaKeyOf(s), done: !!t.completedAt }))),
             vaultTitles: snaps.map((t) => t.title),
           });
           if (!parsed.ok) return none(`${parsed.reason} Se muestra solo la cobertura calculada.`);
           const st = new PlanStore(app.root);
           const fresh = st.load(id) ?? plan;
-          const review = { at: new Date().toISOString(), source: "ai" as const, ...(profile ? { profile } : {}), ...parsed.review };
+          const review = { at: new Date().toISOString(), source: "ai" as const, ...(profile ? { profile } : {}), criteria, disclaimer: COVERAGE_DISCLAIMER, ...parsed.review };
           const saved = st.save({ ...fresh, coverageReview: review });
           return { loading: false as const, source: "ai" as const, review: saved.coverageReview ?? review, plan: saved, coverage };
         }),
@@ -1894,6 +2084,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const plan = st.load(id);
       if (!plan) throw new ApiError("Ese plan ya no existe.");
       const comment = sanitizeNotes(o.comment, MAX_COMMENT_CHARS);
+      const kind = o.intent === "fix" ? ("fix" as const) : ("adjust" as const);
       const direct: ChangeOp[] | null = Array.isArray(o.ops)
         ? (o.ops as any[])
             .filter((x) => x && ["trim_to_fit", "extend_to", "raise_minutes", "lighter"].includes(String(x.op)))
@@ -1905,7 +2096,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
         withJob(`change:${id}`, "Aplicando tu comentario al plan…", async (job) => {
           const today = localDate();
           const all = buildTopicCatalog(topicSnaps(app), "", { max: 1_000_000 });
-          const ctx = { today, all, startFocus: practiceStartFocus(app) };
+          const ctx = { today, all, startFocus: practiceStartFocus(app), mastery: masteryLookup(app) };
           const hist = new ChangeStore(app.root);
           const label = comment || String(o.label ?? "Ajuste propuesto por la app").slice(0, 200);
           let ops: ChangeOp[] = direct ?? [];
@@ -1968,6 +2159,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
               at: now,
               comment: label,
               status: "pending",
+              kind,
               source: "none",
               summary: `${note ? `${note} ` : ""}${ops.length ? "Los cambios pedidos no modificaron nada." : "No pude aplicar este comentario: queda guardado como pendiente. Reescríbelo o usa frases como «quita desktop» o «pasa X a la semana 5»."}`.trim(),
               delta: { added: 0, removed: 0, moved: 0, deliverables: 0 },
@@ -1982,6 +2174,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
             at: now,
             comment: label,
             status: "applied",
+            kind,
             source,
             summary: summary || deltaText(res.delta),
             delta: res.delta,
@@ -2017,6 +2210,10 @@ export function mentorApi(app: AppState, send?: SendFn) {
   acceptRef = api.mentor_plan_draft_accept;
   return {
     ...api,
+    // faltantes de la revisión de cobertura añadidos a la propuesta (ver `mentorCoverage.ts`)
+    ...mentorCoverageApi(app),
+    // «Preguntas, correcciones y ajustes»: clasificar lo escrito y responder preguntas sin tocar el plan (ver `mentorAsk.ts`)
+    ...mentorAskApi(app, { withJob, guarded, cancelMode: (e) => (e instanceof CancelError ? e.mode : undefined), today: () => localDate() }),
     /** Compatibilidad: el flujo anterior (un BORRADOR en el chat que se acepta aparte); el camino principal crea el plan propuesto. */
     mentor_plan_generate_draft: (opts: unknown) => api.mentor_plan_generate({ ...((opts && typeof opts === "object" ? opts : {}) as object), asDraft: true }),
   };

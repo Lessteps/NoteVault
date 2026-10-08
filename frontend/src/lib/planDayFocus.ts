@@ -16,6 +16,13 @@
 //  - MINUTOS: capacidad del día (tiempo × ritmo − práctica reservada) − proyecto diario. Cada bloque tiene una proporción (`share`) y un
 //    mínimo (`floor`). Con holgura cada carril toma lo que necesita para terminar al final de su fase (ritmo nivelado, nunca por debajo del
 //    mínimo); con sobrecarga las proporciones reparten el día y lo sobrante de un bloque pasa a los que van atrasados.
+//  - MODO «JUNTAS» (`areaMode: "together"`): en vez de UN enfoque por día, TODOS los enfoques activos esa semana se combinan en un día
+//    «completo» (plantilla compuesta, ver `compositeTemplate`): bloques de teoría y práctica de cada área el MISMO día, con los minutos
+//    repartidos por PESOS (50 % parejo + 50 % proporcional a lo que le queda a cada área; cada mínimo se divide entre las áreas). Automation
+//    sigue al final (su fase empieza cuando acaban las demás). Con una sola área activa, el día es el de siempre.
+//  - PRÁCTICA DE LENGUAJE DIARIA (`languages`): cada día de estudio lleva un bloque propio «Práctica de <lenguaje>» (sintaxis, lógica y
+//    resolución de problemas, ligadas a los temas del día) con minutos propios; el lenguaje rota por la lista con una proporción por
+//    lenguaje (Python más frecuente). Es ADEMÁS de los bloques de temas del grupo «Lenguaje: …» (que no se duplican: siguen siendo los temas).
 //  - «NO PARTIR DESDE CERO»: los fundamentos NO se adelantan como bloque inicial. Se intercalan dentro del bloque de práctica de lenguaje
 //    («Lógica aplicada»), repartidos con el lenguaje en proporción a lo que le queda a cada uno, durante toda la fase del área que los tiene.
 //    La semana objetivo (`targetWeek`) de un tema no fijado solo ORDENA su carril; un tema fijado (`pinned`) no se coloca antes de su semana.
@@ -24,6 +31,8 @@
 
 import type { AreaGroup, GroupKind } from "./planAreas.js";
 import { areaNameOf } from "./planAreas.js";
+import { languageName, pickLanguage } from "./planLanguages.js";
+import type { PlanLanguageId } from "./planTime.js";
 import { eachDay, isoDow, weekRangesOf } from "./planTime.js";
 
 // ── Tabla de plantillas ─────────────────────────────────────────────────
@@ -52,6 +61,8 @@ export interface BlockDef {
   practice?: PracticeType;
   /** lenguaje por defecto de la práctica cuando el día no lo dice («Python», «SQL») */
   language?: string;
+  /** área dueña del bloque en una plantilla compuesta (modo «juntas») */
+  owner?: string;
 }
 
 export interface FocusTemplate {
@@ -150,6 +161,47 @@ export const FOCUS_TEMPLATES: Readonly<Record<string, FocusTemplate>> = {
   },
 };
 
+/**
+ * Plantilla COMPUESTA del modo «juntas»: los bloques de cada área activa en un solo día. Los pesos reparten el día: cada área aporta su
+ * plantilla con `share` × su peso (50 % parejo + 50 % proporcional a lo que le queda) y el mínimo de cada bloque se divide entre las áreas.
+ * Tabla del día «completo» (con 3 áreas y pesos parejos): teoría y práctica de Backend · lenguaje · teoría y SQL de Databases · teoría, lenguaje
+ * y UI de Frontend, cada bloque con ~1/3 de su proporción habitual; el proyecto diario crece (40–75 min) porque integra las áreas.
+ */
+export function compositeTemplate(parts: ReadonlyArray<{ sub: FocusSubIn; weight: number }>): FocusTemplate {
+  const sumW = parts.reduce((n, p) => n + p.weight, 0) || 1;
+  const eq = 1 / Math.max(1, parts.length);
+  const blocks: BlockDef[] = [];
+  const seen = new Set<string>();
+  const areas: string[] = [];
+  for (const p of parts) {
+    const tpl = templateFor(p.sub.areaId);
+    const w = 0.5 * eq + 0.5 * (p.weight / sumW);
+    const owner = p.sub.areaId ?? "self";
+    const own = (r: LaneRef): LaneRef => (r !== "bases" && r.area === "self" ? { ...r, area: owner } : r);
+    const areaOf = (r: LaneRef): string | null => (r === "bases" ? null : r.area);
+    for (const def of tpl.blocks) {
+      const id = tpl.id === "generic" ? `${owner}-${def.id}` : def.id;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      blocks.push({ ...def, id, share: def.share * w, floor: Math.max(10, Math.round(def.floor / parts.length)), lanes: def.lanes.map(own), ...(def.fallback ? { fallback: def.fallback.map(own) } : {}), owner });
+      for (const r of def.lanes) {
+        const a = areaOf(own(r));
+        if (a && a !== "self" && !areas.includes(a)) areas.push(a);
+      }
+    }
+  }
+  const label = areas.includes("backend") && areas.includes("frontend") ? "Full stack" : areas.map((a) => areaNameOf(a, a)).join(" + ");
+  return {
+    id: "together",
+    label,
+    companions: [],
+    language: templateFor(parts[0]?.sub.areaId).language,
+    practiceNote: `Modo «juntas»: hoy practicas ${areas.map((a) => areaNameOf(a, a)).join(", ")} el mismo día; los minutos se reparten por peso entre las áreas y el proyecto del día las integra (una feature pequeña de punta a punta).`,
+    dailyProject: { share: 0.18, min: 40, max: 75 },
+    blocks,
+  };
+}
+
 /** Minutos de un bloque de repaso (el carril ya no tiene temas pendientes). */
 export const REVIEW_MINUTES = 20;
 const MIN_CHUNK = 10;
@@ -179,6 +231,10 @@ export interface FocusPlanIn {
   start: string;
   end: string;
   subplans: FocusSubIn[];
+  /** modo «juntas»: todos los enfoques activos se combinan cada día (ver cabecera) */
+  areaMode?: "together" | "phased";
+  /** lenguajes con práctica diaria propia (rotación por peso); ausente = sin bloque diario de lenguaje */
+  languages?: ReadonlyArray<{ id: string; weight?: number }>;
 }
 
 export interface BlockItem {
@@ -204,8 +260,8 @@ export interface DayBlock {
   label: string;
   practice?: PracticeType;
   language?: string;
-  /** topic = con temas · review = repaso del área (sus temas ya están hechos o su fase aún no empieza) · omitted = el plan no tiene ese tipo de tema */
-  status: "topic" | "review" | "omitted";
+  /** topic = con temas · review = repaso del área (sus temas ya están hechos o su fase aún no empieza) · omitted = el plan no tiene ese tipo de tema · free = práctica diaria sin tema propio (lenguaje del día) */
+  status: "topic" | "review" | "omitted" | "free";
   minutes: number;
   items: BlockItem[];
   /** área de la que sale el bloque */
@@ -214,6 +270,13 @@ export interface DayBlock {
   areaId?: string;
   /** por qué es repaso u omitido */
   note?: string;
+  /** bloque diario de práctica de lenguaje (ver cabecera) y el id del lenguaje */
+  daily?: boolean;
+  languageId?: string;
+  /** títulos de los temas del día a los que se liga (bloque diario de lenguaje) */
+  connected?: string[];
+  /** esos mismos temas con su carpeta (para los ejercicios y para «Ver tema») */
+  connectedTopics?: Array<{ folder: string; title: string }>;
 }
 
 export interface DayFocus {
@@ -225,6 +288,10 @@ export interface DayFocus {
   areaId?: string;
   /** subplanes acompañantes que van dentro de este día (Databases con Backend) */
   companions: string[];
+  /** áreas elementales presentes ese día (una en modo «por fases»; varias en modo «juntas») */
+  areaIds?: string[];
+  /** el día combina varias áreas (modo «juntas») */
+  together?: boolean;
   /** «Hoy: teoría de backend + práctica de Python + teoría de bases de datos + práctica de SQL» */
   line: string;
   /** cómo varía la práctica con este enfoque */
@@ -239,6 +306,8 @@ export interface FocusDayOut {
   projectMinutes: number;
   /** minutos de bloques de repaso */
   reviewMinutes: number;
+  /** minutos del bloque diario de práctica de lenguaje */
+  languageMinutes?: number;
 }
 
 /** Un trozo de tema colocado (para construir `DayTopic` en planSchedule.ts). */
@@ -398,12 +467,14 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
   // reparto estático (para estimar cuántos días le quedan a cada carril)
   const staticDemand = new Map(plan.subplans.map((s) => [s.id, demandOf(s, false)]));
   const studyDaysOfWeek = (week: number): string[] => allDays.filter((d) => opts.weekOf(d) === week && opts.capOf(d) > 0);
+  const together = plan.areaMode === "together";
+  interface DayPlan { s: FocusSubIn; t: FocusTemplate; subs: FocusSubIn[] }
   const staticLaneFrac = new Map<string, number[]>(); // carril → fracción de días por semana
   for (let w = 1; w <= W; w++) {
     const cands = candidatesOf(w, false);
     const total = cands.reduce((n, s) => n + (staticDemand.get(s.id) ?? 1), 0);
     for (const s of cands) {
-      const f = total > 0 ? (staticDemand.get(s.id) ?? 1) / total : 0;
+      const f = together ? 1 : total > 0 ? (staticDemand.get(s.id) ?? 1) / total : 0;
       const t = templateFor(s.areaId);
       const keys = new Set<string>();
       for (const b of t.blocks) for (const ref of [...b.lanes, ...(b.fallback ?? [])]) for (const k of resolve(ref, s)) keys.add(k);
@@ -424,6 +495,7 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
     chunksBy.set(k, [...(chunksBy.get(k) ?? []), c]);
   };
 
+  let studyCounter = 0;
   let lastStudy = plan.end;
   for (const d of [...allDays].reverse()) {
     if (opts.capOf(d) > 0) {
@@ -444,8 +516,12 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
     const studyDays = studyDaysOfWeek(week);
     const cands = candidatesOf(week, true);
     // días de la semana → enfoque, en proporción a lo que le queda a cada uno (mayor resto)
-    const assign = new Map<string, FocusSubIn>();
-    if (cands.length) {
+    const assign = new Map<string, DayPlan>();
+    if (cands.length > 1 && together) {
+      // modo «juntas»: todas las áreas activas, cada día, con una plantilla compuesta por pesos
+      const dp: DayPlan = { s: cands[0]!, t: compositeTemplate(cands.map((sub) => ({ sub, weight: demandOf(sub, true) }))), subs: cands };
+      for (const d of studyDays) assign.set(d, dp);
+    } else if (cands.length) {
       const weights = cands.map((s) => demandOf(s, true));
       const tot = weights.reduce((n, x) => n + x, 0);
       const given = cands.map(() => 0);
@@ -460,15 +536,16 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
           }
         });
         given[best]!++;
-        assign.set(d, cands[best]!);
+        assign.set(d, { s: cands[best]!, t: templateFor(cands[best]!.areaId), subs: [cands[best]!] });
       });
     }
     const weekRest = (laneKey: string, fromIdx: number): number => {
       let n = 0;
       for (let i = fromIdx; i < studyDays.length; i++) {
-        const s = assign.get(studyDays[i]!);
-        if (!s) continue;
-        const t = templateFor(s.areaId);
+        const dp = assign.get(studyDays[i]!);
+        if (!dp) continue;
+        const s = dp.s;
+        const t = dp.t;
         if (t.blocks.some((b) => [...b.lanes, ...(b.fallback ?? [])].some((ref) => resolve(ref, s).includes(laneKey)))) n++;
       }
       return n;
@@ -482,11 +559,13 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
     };
 
     studyDays.forEach((date, idx) => {
-      const s = assign.get(date);
+      const dp = assign.get(date);
+      const studyN = studyCounter++;
+      const s = dp?.s;
       const out: FocusDayOut = { date, blocks: [], projectMinutes: 0, reviewMinutes: 0 };
       days.set(date, out);
-      if (!s) return;
-      const t = templateFor(s.areaId);
+      if (!s || !dp) return;
+      const t = dp.t;
       const cap = opts.capOf(date);
       const areaName = s.area || areaNameOf(s.areaId ?? "", s.area);
       // ── bloques resueltos ──
@@ -518,7 +597,10 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
       const present = rbs.filter((b) => b.status !== "omitted");
       const anyTopic = present.some((b) => b.status === "topic");
       const project = cap > 0 ? Math.min(Math.round(cap * 0.25), Math.max(t.dailyProject.min, Math.min(t.dailyProject.max, Math.round(cap * t.dailyProject.share)))) : 0;
-      const C = Math.max(0, cap - project);
+      // práctica diaria de lenguaje (si el plan la pide): su propio bloque, con minutos propios, antes de repartir los temas
+      const dailyLang = plan.languages?.length ? pickLanguage(plan.languages as ReadonlyArray<{ id: PlanLanguageId; weight?: number }>, studyN) : undefined;
+      const langMinutes = dailyLang && cap > 0 ? Math.min(Math.round(cap * 0.25), Math.max(15, Math.min(35, Math.round(cap * 0.18)))) : 0;
+      const C = Math.max(0, cap - project - langMinutes);
       const shareSum = present.reduce((n, b) => n + b.def.share, 0) || 1;
       const budgetOf = (b: RB): number => (C * b.def.share) / shareSum;
       const review = new Map<RB, number>();
@@ -639,16 +721,44 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
         for (const p of got) pushChunk(p.seg, { subplanId: p.seg.sub.id, folder: p.seg.topic.folder, date, minutes: p.minutes, ...(first ? { blockId: first.def.id, role: first.def.kind } : {}), ...(p.seg.applied ? { applied: true } : {}) });
       }
       const lang = blocks.find((b) => b.practice === "language" || b.practice === "scripting")?.language ?? t.language;
+      if (dailyLang && langMinutes > 0) {
+        const connectedTopics = [...new Map(blocks.filter((b) => b.kind === "theory").flatMap((b) => b.items.filter((i) => !i.applied).map((i) => [i.folder, { folder: i.folder, title: i.title }] as const))).values()].slice(0, 3);
+        const connected = connectedTopics.map((t) => shortTopic(t.title));
+        const name = languageName(dailyLang);
+        blocks.push({
+          id: "lang-daily",
+          kind: "practice",
+          label: `Práctica de ${name}`,
+          practice: "language",
+          language: name,
+          languageId: dailyLang,
+          status: "free",
+          minutes: langMinutes,
+          items: [],
+          daily: true,
+          connected,
+          connectedTopics,
+          subplanId: s.id,
+          area: s.area,
+          ...(s.areaId ? { areaId: s.areaId } : {}),
+          note: `Sintaxis, lógica y resolución de problemas en ${name}${connected.length ? `, ligadas a lo de hoy: ${connected.join(" · ")}` : ""}.`,
+        });
+        out.languageMinutes = langMinutes;
+      }
       out.blocks = blocks;
       out.projectMinutes = anyTopic || present.length ? project : 0;
       out.reviewMinutes = blocks.filter((b) => b.status === "review").reduce((n, b) => n + b.minutes, 0);
+      const dayAreaIds = [...new Set([...(s.areaId ? [s.areaId] : []), ...blocks.map((b) => b.areaId).filter((a): a is string => !!a)])];
+      const baseLine = focusLine(t, blocks.filter((b) => b.id !== "lang-daily"), lang, s.area);
       out.focus = {
         id: t.id,
         label: t.label || s.area,
         subplanId: s.id,
-        ...(s.areaId ? { areaId: s.areaId } : {}),
+        ...(s.areaId && t.id !== "together" ? { areaId: s.areaId } : {}),
         companions: [...new Set(blocks.map((b) => b.subplanId).filter((id): id is string => !!id && id !== s.id))],
-        line: focusLine(t, blocks, lang, s.area),
+        areaIds: dayAreaIds,
+        ...(t.id === "together" ? { together: true } : {}),
+        line: dailyLang && langMinutes > 0 ? `${baseLine} + práctica de ${languageName(dailyLang)}` : baseLine,
         practiceNote: fill(t.practiceNote, lang, s.area),
       };
     });

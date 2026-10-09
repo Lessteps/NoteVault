@@ -29,7 +29,7 @@ function factsText(pre: PlanPreconditions, areas: readonly string[], answers: re
     `- Periodo: del ${pre.start} al ${pre.end}. Tiempo diario: ${Math.round((pre.minutesPerDay / 60) * 10) / 10} h. Días: ${pre.studyDays.map((d) => DAY_NAMES[d - 1]).join(", ")}. Ritmo: ${PACE_TEXT[pre.pace]}.`,
     areas.length ? `- Áreas del plan (cada subplan es un ÁREA elemental con grupos internos: Bases, Lenguaje y Conocimientos): ${areas.join("; ")}.` : "",
     Object.keys(pre.levels).length ? `- Nivel declarado: ${Object.entries(pre.levels).map(([a, l]) => `${a} = ${l}`).join("; ")}.` : "",
-    `- Entregables: ${pre.deliverables === "yes" ? "sí (uno por área)" : pre.deliverables === "no" ? "no" : "a discutir (la app hace UNA pregunta global más adelante)"}.`,
+    `- Entregables: ${pre.deliverables === "yes" ? "sí (uno por área)" : pre.deliverables === "no" ? "por definir (se definen al ejecutar el plan; no incluyas entregables)" : "a discutir (la app hace UNA pregunta global más adelante)"}.`,
     pre.practice ? `- ${PRACTICE_NAME}: incluida, es una ${PRACTICE_PURPOSE}; NO es un área del plan (minutos y fases los fija la app).` : "",
     pre.branchExcluded?.length ? `- Ramas EXCLUIDAS del alcance (NO propongas temas de ellas): ${pre.branchExcluded.join("; ")}.` : "",
     pre.areaMode === "together" ? "- Combinación de áreas: JUNTAS (todas las áreas activas todo el periodo y presentes cada día; Automation siempre al final). HECHO FIJO." : pre.areaMode === "phased" ? "- Combinación de áreas: por FASES (como máximo 2 en paralelo; Automation al final). HECHO FIJO." : "",

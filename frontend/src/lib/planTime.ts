@@ -124,14 +124,17 @@ export const PACE_FACTOR: Record<PlanPace, number> = { suave: 0.7, normal: 0.85,
 /** El nivel declarado ajusta los minutos estimados de un tema (hipótesis, no verdad). */
 export const LEVEL_FACTOR: Record<PlanLevel, number> = { empezando: 1.2, basico: 1.1, intermedio: 1, avanzado: 0.85, no_se: 1 };
 
-/** Entregables: «ask» (por defecto) = se deciden al armar el plan; «yes» = se proponen; «no» = ninguno. */
+/**
+ * Entregables. YA NO se eligen al crear el plan: quedan «por definir» hasta que se ejecuta el plan (o se piden en «Preguntas y ajustes»).
+ * El formulario nuevo guarda «no» (nada definido todavía); «ask» y «yes» solo se LEEN en planes antiguos (compatibilidad de lectura).
+ */
 export const DELIVERABLE_MODES = ["ask", "yes", "no"] as const;
 export type DeliverablesMode = (typeof DELIVERABLE_MODES)[number];
 /** Compatibilidad de lectura: `true` → «yes», `false` → «no», ausente o desconocido → «ask». Sin migración destructiva. */
 export function normalizeDeliverables(v: unknown): DeliverablesMode {
   if (v === true || v === "true") return "yes";
   if (v === false || v === "false") return "no";
-  return (DELIVERABLE_MODES as readonly string[]).includes(String(v)) ? (v as DeliverablesMode) : "ask";
+  return (DELIVERABLE_MODES as readonly string[]).includes(String(v)) ? (v as DeliverablesMode) : "no";
 }
 
 /** Los focos del proyecto semanal de Programming practice (mismos que `core/ppractice/spec.ts`). */

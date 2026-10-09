@@ -16,11 +16,11 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { eachDay, isoDow, weekRangesOf } from "../../lib/planTime.js";
 import { kataBlockId, parseProjectBlockId, PRACTICE_PHASES, type PhaseStatus, type PracticePhase, type PracticeTrack } from "../../lib/practiceTrack.js";
+import { kataDatesOf } from "../../lib/areaPracticeDerive.js";
 import * as store from "../store.js";
 import type { PlanBlock, SessionRecord } from "./sessionLog.js";
 
 const PP_FOLDER = "programming_practice";
-const KATA_SKILL = "pp_kata";
 
 export interface PpProjectRef {
   folder: string;
@@ -101,17 +101,13 @@ export function readPpProjects(root: string): PpProjectRef[] {
   return out.filter((p) => p.date);
 }
 
-/** Fechas (AAAA-MM-DD) en que hubo algún intento del kata diario (`pp_kata`), de todos los intentos de la vault. */
-export function kataDates(attempts: Record<string, Record<string, any>>): Set<string> {
-  const out = new Set<string>();
-  for (const data of Object.values(attempts)) {
-    for (const a of Array.isArray(data?.attempts) ? data.attempts : []) {
-      if (String(a?.skill ?? "") !== KATA_SKILL && String(a?.mode ?? "") !== KATA_SKILL) continue;
-      const d = String(a?.at ?? "").slice(0, 10);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) out.add(d);
-    }
-  }
-  return out;
+/**
+ * Fechas (AAAA-MM-DD) en que hubo algún intento del kata diario (`pp_kata`), de todos los intentos de la vault.
+ * Con `area` (la carpeta del área dentro de `programming_practice`) solo cuentan los katas de ESA área (ver `lib/areaPracticeDerive.ts`).
+ * Sin `area` se comporta como siempre (todos los katas).
+ */
+export function kataDates(attempts: Record<string, Record<string, any>>, area?: { id: string; folder: string }): Set<string> {
+  return kataDatesOf(attempts, area);
 }
 
 // ── Registro manual (bloques de Hoy) ────────────────────────────────────

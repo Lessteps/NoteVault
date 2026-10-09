@@ -51,6 +51,7 @@ import {
 import { loadAllAttempts } from "../../core/practice/ledger.js";
 import { clearExerciseIndexCache, warmNoteCache } from "../../core/practice/exerciseIndex.js";
 import { AIConfig, sendChat } from "../../core/aiClient.js";
+import { currentAiSignal } from "../../core/aiAbort.js";
 import {
   applyPlanToPractica,
   buildReevaluationMessages,
@@ -291,7 +292,8 @@ export async function askStructured(
   let reply = "";
   for (const budget of STRUCTURED_BUDGETS) {
     const wide = new AIConfig({ ...cfg.toDict(), max_tokens: Math.max(cfg.max_tokens, budget), include_note: false });
-    reply = await sendChat(wide, messages as any);
+    const signal = currentAiSignal(); // «Ejecutar plan» cancela de verdad: la señal ambiental mata la petición
+    reply = signal ? await sendChat(wide, messages as any, { signal }) : await sendChat(wide, messages as any);
     if (reply.trim() && accept(reply)) return reply;
   }
   return reply;

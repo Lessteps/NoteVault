@@ -196,7 +196,7 @@ describe("etapas Práctica y Entregables", () => {
     expect(computeBuild(input(ok), ctxOf(all)).question?.kind).not.toBe("practice"); // todo definido: la etapa pasa sola
   });
 
-  it("entregables «a discutir»: UNA pregunta global para todo el plan; sí añade el proyecto de cada área, no descarta la pregunta, «salvo en…» deja una excepción, después la deja pendiente", () => {
+  it("entregables: el constructor YA NO pregunta por ellos (quedan por definir); las respuestas de planes antiguos se siguen leyendo: sí añade el proyecto de cada área, no descarta la pregunta, después la deja pendiente", () => {
     const two = [...topics("Programación", "4 Backend", 8), ...topics("Matemáticas", "1 Álgebra", 8)];
     const pre = preOf({ subjects: ["Programación", "Matemáticas"], deliverables: "ask", levels: { Programación: "basico", Matemáticas: "basico" } });
     const base = [ans("priority", "priority", "alcance", "equal"), ans("skeleton", "skeleton", "esqueleto", "ok")];
@@ -204,9 +204,8 @@ describe("etapas Práctica y Entregables", () => {
     // con holgura la capacidad pregunta antes; se deja así
     const keep = ans("capacity:1", "capacity", "capacidad", "keep");
     const d1 = computeBuild(input(pre, [...base, keep], { maxQuestions: 12 }), ctxOf(two));
-    expect(d1.question).toMatchObject({ kind: "deliverable", stage: "entregables" });
-    expect(d1.question!.id).toBe("deliverable:all");
-    expect(d1.question!.text).toContain("por cada área");
+    expect(d1.question).toBeUndefined();
+    expect(d1.status).toBe("review");
     // sí: un proyecto PROPIO por área (no el mismo texto repetido) y ya no queda nada pendiente
     const yes = computeBuild(input(pre, [...base, keep, ans("deliverable:all", "deliverable", "entregables", "yes")], { maxQuestions: 12 }), ctxOf(two));
     expect(yes.status).toBe("review");

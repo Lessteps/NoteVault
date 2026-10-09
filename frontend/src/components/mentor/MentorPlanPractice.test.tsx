@@ -151,9 +151,9 @@ describe("plan aceptado: tarjeta Programming practice", () => {
   it("fila con kata, proyecto de esta semana con sus 4 fases y estado, semanas y mensual", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    // cabecera (pestaña «Mi plan»): chip de la práctica y entregables a discutir pendientes
+    // cabecera (pestaña «Mi plan»): chip de la práctica y entregables «por definir» (no se eligen al crear el plan)
     expect(host.querySelector("[data-testid=plan-practice-chip]")!.textContent).toContain("Programming practice");
-    expect(host.querySelector("[data-testid=plan-preconditions]")!.textContent).toContain("A discutir");
+    expect(host.querySelector("[data-testid=plan-preconditions]")!.textContent).toContain("Por definir");
     await openTab("practica");
     const row = host.querySelector("[data-testid=practice-row]")!;
     expect(row).toBeTruthy();
@@ -177,7 +177,9 @@ describe("plan aceptado: tarjeta Programming practice", () => {
     // el kata muestra su semana de lunes a domingo
     expect([...row.querySelectorAll("[data-testid=practice-kata] ul[aria-label^='Días del kata'] li")]).toHaveLength(7);
     await openTab("entregables");
-    expect(host.querySelector("[data-testid=plan-open-questions]")!.textContent).toContain("1 pendiente");
+    // los entregables no se eligen al crear el plan: quedan «por definir» (la decisión antigua pendiente no se ofrece)
+    expect(host.querySelector("[data-testid=plan-deliverables-pending]")!.textContent).toContain("Aún sin definir");
+    expect(host.querySelector("[data-testid=plan-open-questions]")).toBeNull();
   });
 
   it("«Abrir práctica» abre el diálogo de práctica de programación", async () => {

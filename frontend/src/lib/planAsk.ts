@@ -137,7 +137,7 @@ export function compactPlanForAsk(plan: AskPlanLike, today: string): string {
   const lines: string[] = [
     `Periodo: ${plan.start} → ${plan.end} (${weeks} semanas). Hoy es ${today}, semana ${cur} del plan.`,
     pre ? `Dedicación: ${hours(pre.minutesPerDay)}/día, ritmo ${pre.pace}, ${pre.studyDays.length} días de estudio por semana.` : plan.hoursPerWeek ? `Carga: ~${plan.hoursPerWeek} h/semana.` : "",
-    plan.areaMode ? `Modo de las áreas: ${plan.areaMode === "together" ? "todas juntas cada día" : "por fases (como mucho dos en paralelo)"}.` : "",
+    plan.areaMode ? `Modo de las áreas: ${plan.areaMode === "together" ? "todas juntas desde el día 1 (Automation al final)" : "por fases (como mucho dos en paralelo)"}.` : "",
     plan.rationale ? `Razonamiento del Mentor al armarlo: ${oneLine(plan.rationale, 500)}` : "",
   ].filter(Boolean);
   for (const s of plan.subplans) {

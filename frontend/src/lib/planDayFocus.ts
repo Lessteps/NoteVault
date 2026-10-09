@@ -451,6 +451,15 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
   };
   const candidatesOf = (week: number, dynamic: boolean): FocusSubIn[] => {
     const list = plan.subplans.filter((s) => isCandidate(s, week, dynamic));
+    // modo «juntas»: cuando una fase posterior (Automation, al final) sigue activa, las áreas que ya terminaron NO desaparecen: siguen en el
+    // día como repaso y práctica de mantenimiento (bloques de repaso con pocos minutos)
+    if (dynamic && together && list.length) {
+      for (const s of plan.subplans) {
+        if (list.includes(s) || !s.areaId || s.areaId === "automation") continue;
+        const win = windowOf(s);
+        if (week > win.to && ownLanes(s).length) list.push(s);
+      }
+    }
     // acompañante absorbido: Databases dentro de los días de Backend
     return list.filter((s) => !list.some((p) => p !== s && s.areaId && templateFor(p.areaId).companions.includes(s.areaId)));
   };

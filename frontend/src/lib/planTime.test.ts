@@ -136,7 +136,7 @@ describe("precondiciones", () => {
     expect(p.pace).toBe("normal");
     expect(p.levels).toEqual({ Mat: "avanzado" });
     expect(p.goalIds).toEqual(["g1"]);
-    expect(p.deliverables).toBe("ask");
+    expect(p.deliverables).toBe("no");
   });
 
   it("detecta lo que no sirve", () => {

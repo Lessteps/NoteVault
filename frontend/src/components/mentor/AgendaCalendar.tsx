@@ -7,27 +7,38 @@
 
 import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import { addDays, addMonthsToDate, isoDow } from "../../lib/planTime";
-import { dateLabel, dayBlockCounts, deliverablesText, longDateLabel, monthName, topicsText } from "../../lib/planSchedule";
+import { dateLabel, deliverablesText, longDateLabel, monthName, topicsText } from "../../lib/planSchedule";
+import { areaShort, dayAreasText, dayByArea } from "../../lib/planTopicsByArea";
+import { usePersistedNav } from "../../store/navState";
 import type { MentorPlan } from "../../lib/types";
 import { cn } from "../ui";
 import { DayDetail } from "./AgendaViews";
+import { AreaDot, AreaFilter } from "./AreaViews";
 import { focusColour, type AgendaModel } from "./agendaKit";
 import { DAY_LONG, DAY_SHORT } from "./planShared";
 
 const monthStart = (d: string): string => `${d.slice(0, 7)}-01`;
 
-/** Texto accesible de un día de la rejilla. */
-export function cellLabel(m: AgendaModel, date: string): string {
+/**
+ * Texto accesible de un día de la rejilla: el desglose POR ÁREA («jueves 8 de octubre: Backend 2 temas y práctica; Frontend 2 temas y práctica…»),
+ * la práctica de lenguaje, el reto de lógica, los proyectos y —solo si hay entregables definidos— los entregables.
+ */
+export function cellLabel(m: AgendaModel, date: string, only: string | null = null): string {
   const day = m.schedule.byDate.get(date);
   if (!day) return `${longDateLabel(date)}: fuera del plan`;
   const due = m.dueByDate.get(date) ?? [];
-  const c = dayBlockCounts(day);
-  const proj = day.projectMinutes ? ["proyecto diario"] : [];
-  const bits = day.focus
-    ? [`enfoque ${day.focus.label}`, `${c.theory} ${c.theory === 1 ? "teoría" : "teorías"}`, `${c.practice} ${c.practice === 1 ? "práctica" : "prácticas"}`, ...proj, topicsText(day.topics.length), deliverablesText(due.length)]
-    : [topicsText(day.topics.length), deliverablesText(due.length)];
-  if (day.practice.kata) bits.push("kata");
-  if (day.practice.project) bits.push("sesión de proyecto");
+  const entries = dayByArea(m.plan, day, due).filter((e) => only === null || e.subplanId === only);
+  const dels = m.deliverablesDefined ? [deliverablesText(due.length)] : [];
+  const bits: string[] = [];
+  if (entries.length) bits.push(dayAreasText(entries));
+  else if (day.study) bits.push(only ? "sin nada del área elegida" : topicsText(day.topics.length));
+  if (!only) {
+    if (day.focus && day.blocks?.some((b) => b.daily)) bits.push("práctica de lenguaje");
+    if (day.projectMinutes) bits.push("proyecto diario");
+    if (day.study) bits.push(...dels);
+  }
+  if (!only && day.practice.kata) bits.push("kata");
+  if (!only && day.practice.project) bits.push("sesión de proyecto");
   if (!day.study) bits.push(day.blocked ? "día bloqueado" : "descanso");
   if (date === m.today) bits.push("hoy");
   return `${longDateLabel(date)}: ${bits.join(", ")}`;
@@ -39,6 +50,9 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
   const detailRef = useRef<HTMLDivElement>(null);
   const wantFocus = useRef(false);
   const month = anchor.slice(0, 7);
+  // filtro por área (se recuerda por plan); un valor que ya no existe equivale a «Todas»
+  const [storedArea, setStoredArea] = usePersistedNav<string>(`mentor.agendaArea.${plan.id}`, "");
+  const only = storedArea && plan.subplans.some((s) => s.id === storedArea) ? storedArea : null;
 
   // semanas (lunes a domingo) que cubren el mes
   const weeks = useMemo(() => {
@@ -91,13 +105,16 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
 
   return (
     <div className="space-y-4" data-testid="agenda-calendar">
+      <AreaFilter plan={plan} value={only} onChange={(id) => setStoredArea(id ?? "")} />
+      {/* en un contenedor estrecho la rejilla se desplaza DENTRO de su propio contenedor (las celdas con áreas necesitan sitio para su texto) */}
+      <div className="overflow-x-auto rounded-2xl" data-testid="agenda-grid-scroll">
       <div
         ref={gridRef}
         role="grid"
         aria-label={`Calendario de ${monthName(month)}`}
         aria-describedby="agenda-cal-help"
         onKeyDown={onKeyDown}
-        className="overflow-hidden rounded-2xl border border-line bg-card"
+        className="min-w-[40rem] overflow-hidden rounded-2xl border border-line bg-card"
         data-testid="agenda-grid"
       >
         <div role="row" className="grid grid-cols-[4.5rem_repeat(7,minmax(0,1fr))] border-b border-line bg-surface text-[13px] font-semibold uppercase tracking-wide text-faint @3xl:grid-cols-[7rem_repeat(7,minmax(0,1fr))]">
@@ -117,15 +134,16 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
           const wk = wkA === wkB ? String(wkA) : `${wkA}–${wkB}`;
           const topics = new Set(sumDays.flatMap((d) => d.topics.map((t) => t.folder))).size;
           const dels = row.reduce((n, d) => n + (m.dueByDate.get(d)?.length ?? 0), 0);
+          const rowTopics = only ? new Set(sumDays.flatMap((d) => d.topics.filter((t) => t.subplanId === only).map((t) => t.folder))).size : topics;
           const hasWeek = sumDays.length > 0;
           return (
             <div key={row[0]} role="row" className="grid grid-cols-[4.5rem_repeat(7,minmax(0,1fr))] border-b border-line last:border-b-0 @3xl:grid-cols-[7rem_repeat(7,minmax(0,1fr))]">
-              <div role="rowheader" className="flex flex-col justify-center border-r border-line bg-surface px-2 py-1.5 text-[13px] leading-snug" data-testid="agenda-week-margin" aria-label={hasWeek ? `${wkA === wkB ? "Semana" : "Semanas"} ${wk}: ${topicsText(topics)}, ${deliverablesText(dels)}` : "Fuera del plan"}>
+              <div role="rowheader" className="flex flex-col justify-center border-r border-line bg-surface px-2 py-1.5 text-[13px] leading-snug" data-testid="agenda-week-margin" aria-label={hasWeek ? `${wkA === wkB ? "Semana" : "Semanas"} ${wk}: ${topicsText(rowTopics)}${m.deliverablesDefined ? `, ${deliverablesText(dels)}` : ""}` : "Fuera del plan"}>
                 {hasWeek ? (
                   <>
                     <span className="font-semibold text-text">{wkA === wkB ? "Sem." : "Sems."} {wk}</span>
-                    <span className="text-dim">{topics} {topics === 1 ? "tema" : "temas"}</span>
-                    <span className="text-dim">{dels} ent.</span>
+                    <span className="text-dim">{rowTopics} {rowTopics === 1 ? "tema" : "temas"}</span>
+                    {m.deliverablesDefined && <span className="text-dim">{dels} ent.</span>}
                   </>
                 ) : (
                   <span className="text-faint">—</span>
@@ -136,10 +154,11 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
                 const ok = inPlan(date);
                 const selected = date === anchor;
                 const outsideMonth = date.slice(0, 7) !== month;
-                const due = (m.dueByDate.get(date) ?? []).filter((d) => d.kind !== "daily_project");
+                const due = m.deliverablesDefined ? (m.dueByDate.get(date) ?? []).filter((d) => d.kind !== "daily_project") : [];
                 const pendingDue = due.some((d) => d.status !== "hecho");
+                const entries = day && ok ? dayByArea(plan, day, m.dueByDate.get(date) ?? []).filter((e) => only === null || e.subplanId === only) : [];
                 return (
-                  <div key={date} role="gridcell" aria-selected={ok ? selected : undefined} aria-disabled={ok ? undefined : true} className={cn("min-h-[5.5rem] border-r border-line last:border-r-0", outsideMonth && "bg-surface/60")}>
+                  <div key={date} role="gridcell" aria-selected={ok ? selected : undefined} aria-disabled={ok ? undefined : true} className={cn("min-h-[7.5rem] border-r border-line last:border-r-0", outsideMonth && "bg-surface/60")}>
                     <button
                       type="button"
                       data-date={date}
@@ -147,10 +166,10 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
                       tabIndex={ok && selected ? 0 : -1}
                       disabled={!ok}
                       onClick={() => ok && onSelect(date)}
-                      aria-label={cellLabel(m, date)}
+                      aria-label={cellLabel(m, date, only)}
                       aria-current={date === m.today ? "date" : undefined}
                       className={cn(
-                        "flex h-full min-h-[5.5rem] w-full flex-col items-stretch gap-1 px-1.5 py-1.5 text-left text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-text focus-visible:ring-inset",
+                        "flex h-full min-h-[7.5rem] w-full flex-col items-stretch gap-1 px-1.5 py-1.5 text-left text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-text focus-visible:ring-inset",
                         !ok && "cursor-default opacity-40",
                         ok && !selected && "hover:bg-hover",
                         selected && "bg-accent-soft ring-2 ring-inset ring-accent",
@@ -160,7 +179,22 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
                         <span className={cn("grid h-6 min-w-6 place-items-center rounded-full px-1", date === m.today && "bg-[var(--nv-btn,var(--nv-accent))] text-white")}>{Number(date.slice(8))}</span>
                         {Number(date.slice(8)) === 1 && <span className="text-[13px] font-medium uppercase text-dim">{dateLabel(date).split(" ")[1]}</span>}
                       </span>
-                      {day?.focus && ok && (
+                      {entries.length > 0 && (
+                        <span className="flex flex-col gap-0.5" aria-hidden data-testid="agenda-cell-areas">
+                          {entries.map((e) => (
+                            <span key={e.subplanId} className="flex items-center gap-1 text-[12.5px] leading-tight text-text" data-testid="agenda-cell-area" data-area={e.areaId ?? e.subplanId}>
+                              <AreaDot {...(e.areaId ? { areaId: e.areaId } : {})} />
+                              <span className="truncate font-medium">{areaShort(e.areaId, e.area)}</span>
+                              <span className="whitespace-nowrap text-dim">
+                                {e.theoryTopics > 0 ? `${e.theoryTopics}t` : e.topics > 0 ? `${e.topics}t` : "rep."}
+                                {e.practiceBlocks > 0 ? " P" : ""}
+                                {e.project ? " ◆" : ""}
+                              </span>
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                      {day?.focus && ok && entries.length === 0 && !only && (
                         <span className="flex items-center gap-1 truncate text-[12.5px] font-medium text-text" aria-hidden data-testid="agenda-cell-focus">
                           <span className="inline-block h-2 w-2 flex-none rounded-sm" style={{ background: focusColour(day.focus.id) }} />
                           <span className="truncate">{day.focus.label}</span>
@@ -168,9 +202,9 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
                       )}
                       {day && ok && (
                         <span className="flex flex-wrap items-center gap-1 text-[13px]" aria-hidden>
-                          {day.topics.length > 0 && <span className="rounded bg-accent-soft px-1 font-semibold text-accent-text" title="Temas">{day.topics.length} t</span>}
-                          {day.practice.kata && <span className="rounded border border-line px-1 font-semibold text-dim" title="Kata">K</span>}
-                          {day.practice.project && <span className="rounded border border-line px-1 font-semibold text-dim" title="Sesión de proyecto">P</span>}
+                          {entries.length === 0 && day.topics.length > 0 && <span className="rounded bg-accent-soft px-1 font-semibold text-accent-text" title="Temas">{day.topics.length} t</span>}
+                          {!only && day.practice.kata && <span className="rounded border border-line px-1 font-semibold text-dim" title="Kata">K</span>}
+                          {!only && day.practice.project && <span className="rounded border border-line px-1 font-semibold text-dim" title="Sesión de proyecto">S</span>}
                           {due.length > 0 && (
                             <span className={cn("rounded px-1 font-semibold", pendingDue ? "border border-line text-dim" : "bg-mint/20 text-text")} title="Entregables">◆{due.length > 1 ? due.length : ""}</span>
                           )}
@@ -184,11 +218,12 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
           );
         })}
       </div>
+      </div>
       <p id="agenda-cal-help" className="text-[13.5px] text-dim">
-        Flechas para moverte entre días, Inicio/Fin para el lunes/domingo, Re Pág/Av Pág para cambiar de mes e Intro para abrir el día. «t» = temas, «K» = kata, «P» = sesión de proyecto, «◆» = entregables; el nombre con color es el enfoque del día.
+        Flechas para moverte entre días, Inicio/Fin para el lunes/domingo, Re Pág/Av Pág para cambiar de mes e Intro para abrir el día. Cada línea es un área (en este orden: Backend, Frontend, Databases, Tooling and Quality, Automation): «t» = temas de teoría, «P» = práctica del área, «◆» = proyecto del área; «K» = kata, «S» = sesión del proyecto semanal.
       </p>
       <div ref={detailRef} tabIndex={-1} className="rounded-2xl border border-line bg-card p-4 outline-none @3xl:p-5" data-testid="agenda-calendar-detail">
-        <DayDetail m={m} date={anchor} onChanged={onChanged} headingId="agenda-cal-detail-h" level={2} />
+        <DayDetail m={m} date={anchor} onChanged={onChanged} headingId="agenda-cal-detail-h" level={2} areaFilter={only} />
       </div>
     </div>
   );

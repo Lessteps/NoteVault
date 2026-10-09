@@ -1147,6 +1147,87 @@ anteriores (un subplan «Programación: <objetivo>» por rama) se siguen leyendo
   un reto de lógica (kata) cada día y proyectos de práctica como complemento. No es un área de estudio del plan. Si el plan excluyó Desktop y Mobile, el foco rotativo
   de sus proyectos semanales tampoco pasa por ellos.
 
+### Diseño de tema, «Ejecutar plan» y Sistema de práctica por área (aditivo)
+
+Todo lo de esta sección es **opcional y aditivo**: ningún cliente anterior necesita entenderlo y los planes antiguos se leen igual.
+
+#### Checklist de diseño de un tema completo (`src/lib/topicDesign.ts`)
+La cobertura del plan ya no mide solo «tiene alguna nota» y «tiene ejercicios»: mide cada tema contra el **sistema de skills de diseño de la vault**
+(`Programación/_skills/{resumen_teorico,mapa,practica,subtemas}_skill.md`). La detección es **determinista** (misma vault, mismo resultado), solo **lee** y vive en
+`src/core/mentor/topicDesignScan.ts`. La puntuación (0-100) es el peso de los artefactos presentes entre los que aplican; `complete` = todos los obligatorios están.
+
+| Artefacto (`id`) | Cómo se detecta | Nivel | Peso |
+|---|---|---|---|
+| Nota de teoría (`theory`) | hay un `.md` en la carpeta del tema que no es ejercicio, ni `*.practica.md`/`*.resumen.md`, ni empieza por `_` o `.` | obligatorio | 25 |
+| Estructura de la nota (`contract`) | secciones `Requires`, `Explanation` (`What it is`, `Mental model`), `Examples` (≥3 `### Example`), `Common mistakes` (≥3; la skill pide 4-5 pero las notas de la vault tienen 3 y se aceptan), `Connections`, `Cards` (≥6 `### n ·`); acepta los encabezados en español; ignora los `#` dentro de bloques de código | obligatorio (programación) · recomendado (otras materias) | 15 |
+| Mapa (`canvas`) | hay un `*.canvas` en la carpeta del tema (`<tema> — mapa.canvas`) | obligatorio (programación) · recomendado | 15 |
+| Manifiesto (`manifest`) | existe `<tema>.practica.md` o `_tema.md` con `skills` declaradas (y `topic_type`) | obligatorio | 15 |
+| Skills acordes al tipo (`skills_fit`) | teórico: solo skills de concepto (`pg_true_false`, `pg_classify`, `pg_compare`, `explain`, `find_error`); procedimental: ≥1 skill de código; mixto: concepto + código; sin `topic_type` se avisa | obligatorio (programación) | 5 |
+| Skills de la rama (`branch_skills`) | procedimental/mixto: ≥2 de las skills de código recomendadas para la rama (`practica_skill` §3: Backend = design, implement, review, debug, test, decompose…) | recomendado | 5 |
+| Práctica básica (`practice_basic`) | `Ejercicios/<skill>/` (o cualquier nota `type: exercise` del tema) tiene ≥1 ejercicio de cada skill del manifiesto | obligatorio | 15 |
+| Escalera de dificultades (`practice_ladder`) | ejercicios de cada skill en cada dificultad que pide `plan:` del manifiesto (o 1..`target_difficulty`; las skills sin dificultad 1 empiezan en 2) | recomendado | 5 |
+
+El **tipo** del tema sale del manifiesto o, si no, del frontmatter de la nota. Las materias que no son `programming` usan el perfil `generic` (teoría, manifiesto y práctica
+obligatorios; estructura y canvas recomendados). Cada faltante es una frase concreta («Falta el canvas del tema», «Sin manifiesto de skills (.practica.md)», «Sin práctica en
+la skill `design` a dificultad 2») con la acción que lo arregla (`fix`): `theory`, `canvas`, `manifest`, `practice`, `topic` (la carpeta del tema no existe) o `manual` (algo que YA
+existe y la app **nunca reescribe**: una nota que no cumple el contrato, un manifiesto con skills que no encajan).
+
+`mentor_plan_coverage` devuelve además, por grupo y por área, `design: {topics, avgScore, complete, incomplete, requiredGaps, recommendedGaps, byArtifact}` y
+`designTopics` (los temas con diseño incompleto, con sus faltantes); en `totals.design` el global.
+
+**Revisión con IA** (`coverageReview`, aditivo): el prompt recibe el checklist (`designChecklist`) y los resultados deterministas por tema (nunca las notas) y juzga la calidad del
+diseño. Se guarda `designSummary` (global) y, por área, `design: {summary, topics: [{folder, title, verdict: "good"|"incomplete"|"poor", create: [id de artefacto], note}]}`. Se
+descartan los temas que no son del plan y los ids de artefacto desconocidos.
+
+#### «Ejecutar plan» (`mentor_execution_*`)
+1. **Analizar**: «Analizar el plan» corre la revisión de la IA (si está configurada) y `mentor_execution_report({id, scope})` (solo lee) calcula el **informe**: la lista exacta de
+   tareas agrupada por área y tema, con estimación (llamadas de IA, archivos nuevos, minutos con concurrencia 2 y 60 s por llamada) y **en el orden de la agenda** (semana objetivo,
+   área, tema y paso). Tareas (`kind`): `pp_init` (instalar `programming_practice`), `area_folder` (carpeta del Sistema de práctica por área), `area_katas_ai` (katas por bloques de 4
+   semanas con IA), `topic_new` (tema nuevo, propuesto por la revisión o que ya no está en la vault), `theory` (nota + canvas, vía «Generar tema completo»), `canvas`, `manifest`
+   (skills del tema), `practice` (ejercicios por skill, vía «generar ejercicios»). Alcance: todo, solo semanas `a–b` o solo un área; opciones: incluir lo recomendado, temas nuevos, carpetas
+   de práctica por área, katas con IA.
+2. **Confirmar**: `mentor_execution_start({id, scope, confirm: true})` solo se llama desde el diálogo (también «Mantener y ejecutar» del banner del plan propuesto, que antes mantiene el
+   plan). Exige `confirm: true` e IA configurada. Con IA sin configurar el botón queda desactivado con su explicación; el análisis sigue funcionando.
+3. **Cola** `.notevault/mentor/executions/<planId>.json`: `{version: 1, planId, id, status: "running"|"paused"|"done"|"cancelled"|"failed", scope, createdAt, updatedAt, log: [línea],
+   tasks: [{id, kind, areaKey, area, folder?, title, week, required, aiCalls, files, label, dependsOn: [id], args?, status: "pending"|"running"|"done"|"failed"|"skipped"|"cancelled",
+   attempts, created: [ruta], skippedFiles: [ruta], warnings: [texto], error?, note?, startedAt?, endedAt?}]}`. Una ejecución anterior se archiva en
+   `executions/history/<planId>/<id>.json` al empezar otra. Concurrencia 2 (un mismo tema, de uno en uno; las generaciones de tema, de una en una); pausar y cancelar **abortan de
+   verdad** (`AbortSignal` ambiental → `sendChat` → mata la petición o el proceso de Claude Code); 2 intentos por tarea; una ejecución que quedó «en curso» al cerrar la app se devuelve
+   en pausa y al reanudar solo repite lo no hecho. Al terminar con algo hecho, el plan queda con `deliverablesDefinedAt`.
+4. **Nunca sobrescribe**: cada tarea fotografía la carpeta del tema y, si la generación tocó un archivo que ya existía, lo **restaura tal cual** y lo avisa; una teoría que existe no se
+   reescribe; las carpetas del área se escriben con `wx`. Cada tarea se **valida** con el checklist (el artefacto buscado debe existir) antes de darla por buena; los defectos de
+   estructura de una nota recién creada solo se avisan. `created` es el registro de las rutas creadas.
+5. API: `mentor_execution_report`, `_status`, `_start`, `_pause`, `_resume`, `_cancel`.
+
+#### Sistema de práctica por área (`src/lib/areaPracticeSystem.ts`, `AREA_SKILLS` en `src/lib/planAreaPractice.ts`)
+Cada área del plan (Backend, Frontend, Databases, Automation, Tooling and Quality y, si están, Desktop y Mobile) tiene su práctica diaria propia en
+`Programación/programming_practice/<área>/` (todo en inglés, como el espacio de Programación). **Solo lo crea «Ejecutar plan»**, con confirmación, y nunca sobrescribe:
+```
+programming_practice/
+  backend/                  (frontend/, databases/, automation/, tooling-and-quality/, desktop/, mobile/)
+    README.md               propósito del área, cómo se practica cada día y habilidades clave (type: practice_area)
+    skills.md               las habilidades más importantes y cómo se miden, con lo que pide cada nivel (type: practice_skills)
+    katas/
+      README.md             reglas de los katas
+      001 Endpoint design - loans.md   un kata por día numerado (nota de ejercicio)
+    projects/
+      README.md             el proyecto semanal y el mensual del área
+  (progreso)                DERIVADO: no se guarda ningún archivo
+```
+- **Kata** = nota de ejercicio (`type: exercise`, `subject: programming`, `discipline: programming_practice`, `skill: pp_kata`, `mode: pp_kata`, `kata_skill: pp_kata:<área>`,
+  `area`, `area_skill`, `kata_day`, `difficulty` 1-3, `minutes` 20-30) con `## Statement`, `## Hints` (`### Hint n`), `## Solution` (la solución esperada: la app la muestra al
+  calificar, no antes), `## Rubric` y `## Typical errors`. Es **individual por área**, diario y se centra en la **lógica del área** y en una de sus **habilidades clave** (`AREA_SKILLS`:
+  6 por área, cada una con «por qué importa», «cómo se mide» y qué pide cada nivel). `kataForDay(área, día, nivel)` es **determinista**: la habilidad rota en orden, el escenario cambia
+  cada vuelta y cada 7.º kata sube un nivel. El nivel (1-3) parte del declarado en `preconditions.levels` y sube uno cada 40 katas hechos.
+- **Katas por IA** (opcional): bloques de 4 semanas por área (`core/mentor/areaKatasAi.ts`); cada kata se valida (título, enunciado, 3-6 criterios, 2-3 pistas, solución) y, si no pasa
+  o falta, se usa la plantilla; los días que ya tienen archivo no se tocan.
+- **Estado derivado**: un kata está hecho el día en que hay un intento con skill `pp_kata:<área>` o con `skill: pp_kata` sobre una nota de `programming_practice/<carpeta>/katas/`
+  (`kataDates(intentos, {id, folder})`; sin área cuenta todos los katas como siempre, así que el kata global sigue funcionando), o una **marca manual**
+  `.notevault/mentor/area-practice/<plan>.json` → `{version: 1, marks: {<área>: {AAAA-MM-DD: "done"|"skipped"}}}` (solo datos de la app; la persona la pone con «Marcar hecho»).
+  Habilidad, racha, semana de lunes a domingo, proyecto de la semana, proyectos por semana y proyecto mensual de cada área salen de ahí (`mentor_area_practice`).
+- API: `mentor_area_practice({id})`, `mentor_area_practice_on({id, date})` (la práctica de cada área en una fecha: para la agenda y el calendario; función pura
+  `areaPracticeFor(plan, date)`), `mentor_area_kata_mark({id, areaId, date, status})`.
+
 ## Contrato móvil (Mobile Contract)
 
 La aplicación móvil Android (`notevault_mobile` escrita en Dart/Flutter) y la app
@@ -1191,7 +1272,7 @@ Los datos portables del módulo Web residen dentro de `.notevault/web/`:
 
 Todo lo siguiente es opcional: un plan sin estos campos se lee y se agenda exactamente como antes (incluido el plan real del usuario).
 
-- **Cómo se combinan las áreas** — `preconditions.areaMode: "together" | "phased" | "ai"` (lo elige el estudiante AL CREAR el plan; ausente = por fases).
+- **Cómo se combinan las áreas** — `preconditions.areaMode: "together" | "phased" | "ai"` (lo elige el estudiante AL CREAR el plan; ausente en un plan nuevo con 2 o más áreas = `together`; ausente en un plan ya guardado = por fases — ver «Áreas desde el día 1» más abajo).
   El plan guarda el modo ya decidido: `areaMode: "together" | "phased"`, `areaModeWhy` (una línea visible) y `areaModeBy: "user" | "ai" | "rules"`.
   - `together` («juntas»): todas las áreas elegidas activas TODO el periodo (`phase` = semanas 1..N) y presentes CADA día. **Automation va siempre al final**
     (su fase empieza cuando acaban las demás), en todos los modos. `phased`: como siempre (≤ 2 áreas en paralelo). `ai`: el esqueleto de la IA propone
@@ -1224,6 +1305,38 @@ Todo lo siguiente es opcional: un plan sin estos campos se lee y se agenda exact
   (solo lee; sin `planId`, los planes activos); `mentor_plan_reduce({ id, areaId, groupId?, max })` («Reducir a lo esencial»: Bases 75 → ≤ 30; reglas: dominado/medido, nivel básico
   declarado, lo cubre la práctica de lenguaje, lo último de la ruta; nunca salta prerrequisitos, completados, fijados ni temas en curso) y `mentor_plan_route_set({ id, folders[], route, reason?, label? })`.
   Ambas guardan historial con instantánea previa (`mentor_plan_change_undo`). Operaciones de «Pedir cambios»: `set_route`, `reduce_essentials`.
+
+#### Áreas desde el día 1, temas por semana y área, entregables por definir (aditivo; sin subir `FORMAT_VERSION`)
+
+- **Valor por defecto del modo de áreas** — un plan NUEVO con 2 o más áreas y sin elección explícita (`preconditions.areaMode` ausente) se crea en modo
+  `together` (`areaModeBy: "rules"`, `areaModeWhy` «Por defecto, … juntas desde el día 1…»). El formulario ofrece «Juntas desde el día 1 (Automation al final)»
+  (por defecto), «Separadas por fases» y «Que decida el Mentor» (la IA ya no decide por defecto). Un plan GUARDADO sin modo se lee y se recalcula **por fases**
+  (`effectiveAreaMode`; al recalcularlo por otro motivo se fija `preconditions.areaMode: "phased"`): el valor por defecto solo vale para planes nuevos.
+- **Fases del modo juntas** (`planTogetherPhases`, `src/lib/planAreas.ts`): TODAS las áreas (Backend, Frontend, Databases y **Tooling and Quality**) empiezan en la
+  semana 1; **Automation** es la única excepción y va siempre al final: ocupa las últimas semanas, al menos el 15 % de la capacidad del periodo (o su peso natural
+  si es mayor, con tope del 35 %; `AUTOMATION_TAIL_MIN/MAX`). Cuando empieza Automation las demás áreas siguen en el día como **repaso y práctica de mantenimiento**
+  (bloques `review` con pocos minutos, `planDayFocus.ts`); no desaparecen.
+- **«Poner todas las áreas desde el día 1»** — botón de «Mi plan» (aviso «Tu plan estudia las áreas por fases; ¿quieres todas desde el día 1, con Automation al final?»)
+  para planes por áreas que estudian por fases. Muestra una confirmación con el antes/después de las semanas de cada área (`areaWeeksOf` / `previewTogether`,
+  `src/lib/planTopicsByArea.ts`) y llama a `mentor_plan_change({ id, ops: [{ op: "set_area_mode", mode: "together" }], label })` (operación determinista, sin IA; también admite
+  `mode: "phased"`). Recalcula fases, reparto, agenda y la tabla mes a mes, conserva lo completado y lo fijado, queda en el historial de «Preguntas y ajustes» con la
+  instantánea previa y se deshace con `mentor_plan_change_undo` (también desde el propio aviso). No cambia nada hasta pulsar «Aplicar cambio».
+- **Temas por semana y área** — `topicsByWeekArea(plan)` (pura, `src/lib/planTopicsByArea.ts`) devuelve `{ areas, weeks: [{ week, start, end, cells: [{ subplanId, areaId?, area, topics: [{ folder, title, minutes, done, dates[] }],
+  minutes, done, active }], topics, minutes }], totals: { <subplanId>: { topics, minutes, done } } }` con las áreas en el orden fijo **Backend · Frontend · Databases · Tooling and Quality ·
+  Automation** (después las demás) y los días asignados que enseña la Agenda. Alimenta «Temas por semana y área» (Mi plan: tabla semanas × áreas expandible), la vista Semana
+  (una sección por área con color, nº de temas, horas, lista con estado y día, y el total del plan) y la vista Mes (desglose por área de cada semana y totales del mes).
+  `dayByArea(plan, day, due?)` separa un día por área (teoría, práctica del área, proyecto del área; la práctica diaria de lenguaje y los proyectos integradores van aparte).
+- **Calendario y día por área** — cada celda del calendario enseña una línea por área (color + nombre corto + `Nt` teoría · `P` práctica del área · `◆` proyecto del área; nunca
+  solo color) y su etiqueta accesible da el desglose («jueves 8 de octubre: Backend 2 temas y práctica; Frontend 2 temas y práctica…»). Filtro por área (chips con
+  `aria-pressed`, se recuerda por plan en `mentor.agendaArea.<planId>`) para calendario y detalle. El detalle del día (y la vista Día) va ordenado por área, y después
+  «Práctica de lenguaje», reto de lógica y los proyectos integradores diario/semanal/mensual. La práctica del área sale de `areaPracticeFor` del sistema de práctica propio por
+  área si existe (`src/lib/areaPracticeSystem.ts`, carga opcional y tolerante) y, si no, de la tabla `AREA_PRACTICE`.
+- **Entregables por definir** — ya NO se eligen al crear el plan (el formulario no tiene selector; envía `deliverables: "no"` y el constructor guiado no pregunta). Se leen igual los
+  valores antiguos (`"ask"`, `"yes"`, booleanos) y las preguntas `openQuestions` de planes existentes (no se borran). `deliverablesDefined(plan)` (también `summary.deliverablesDefined`
+  de `mentor_plan_get`) es verdadero si hay entregables manuales/extra (`Plan.deliverables`), entregables de área (`Subplan.deliverable`), un currículo de práctica
+  (`practiceCurriculum`) o la marca `Plan.deliverablesDefinedAt` (ISO) que fija la ejecución del plan. Mientras sea falso: la pestaña «Entregables» dice «Aún sin definir: se
+  definen al ejecutar el plan (o puedes pedirlos en «Preguntas y ajustes»)» sin botones de elegir ni «a discutir»; la Agenda no muestra contadores, chips ni listas de
+  entregables y dice «Entregables: por definir» una sola vez; los proyectos propuestos se enseñan sin estado.
 
 ### `marcadores.json`
 Lista de marcadores con campos `id`, `title`, `url` y fecha `created`.

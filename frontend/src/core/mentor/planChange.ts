@@ -212,6 +212,8 @@ export function applyOps(plan: Plan, ops: readonly ChangeOp[], ctx: ChangeCtx): 
   const weeksOf = (end: string): number => weekRangesOf(plan.start, end).length;
   let seeds: SubplanSeed[] = plan.subplans.map(seedOf);
   const byAreas = plan.structure === "areas" || (plan.subplans.length > 0 && plan.subplans.every((s) => !!s.areaId));
+  // un plan guardado sin modo declarado se lee por fases (como siempre): el valor por defecto «juntas» solo vale para planes NUEVOS
+  if (pre && byAreas && !pre.areaMode && !plan.areaMode) pre = { ...pre, areaMode: "phased" };
   const done = new Map<string, { sub: string; topic: PlannedTopic }>();
   for (const s of plan.subplans) for (const t of s.topics) if (t.completedAt) done.set(t.folder, { sub: s.id, topic: t });
   const pins = new Map<string, number>();

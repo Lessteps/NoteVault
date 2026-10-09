@@ -180,7 +180,7 @@ export function draftPeriod(d: MentorPlanDraft): string {
   return d.preconditions && d.start && d.end ? periodLabel(d.start, d.end) : monthLabel(d.month);
 }
 
-const DELIVERABLES_TEXT = { ask: "entregables a discutir", yes: "con entregables", no: "sin entregables" } as const;
+const DELIVERABLES_TEXT = { ask: "entregables a discutir", yes: "con entregables", no: "entregables por definir" } as const;
 
 export function PlanDraftCard({ draft, accepting, onAccept, onDiscard }: { draft: MentorPlanDraft; accepting: boolean; onAccept: () => void; onDiscard: () => void }) {
   const [cal, setCal] = useState(false);

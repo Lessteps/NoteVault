@@ -105,8 +105,8 @@ describe("pestañas del plan (WAI-ARIA)", () => {
       expect(panel.getAttribute("aria-labelledby")).toBe(t.id);
     }
     expect(panelsVisible()).toEqual(["plan"]);
-    expect(tab("entregables").textContent).toContain("2");
-    expect(tab("entregables").textContent).toContain("2 pendientes de decidir");
+    // los entregables quedan «por definir»: la decisión pendiente no se enseña como insignia hasta que haya entregables definidos
+    expect(tab("entregables").textContent).toBe("Entregables");
   });
 
   it("las flechas, Inicio y Fin mueven la selección y el foco; Tab entra en el panel", async () => {
@@ -222,10 +222,30 @@ describe("plan propuesto", () => {
   });
 });
 
+describe("pestaña «Entregables» sin entregables definidos", () => {
+  it("dice «Aún sin definir» y no ofrece elegir ni «a discutir» aunque el plan tenga decisiones antiguas pendientes", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    await mountEl(<MentorPlan planId={PID} />);
+    await click(tab("entregables"));
+    const pend = host.querySelector("[data-testid=plan-deliverables-pending]")!;
+    expect(pend).toBeTruthy();
+    expect(pend.textContent).toContain("Aún sin definir");
+    expect(host.querySelector("[data-testid=plan-deliverables-pending-text]")!.textContent).toBe("Aún sin definir: se definen al ejecutar el plan (o puedes pedirlos en «Preguntas y ajustes»).");
+    expect(host.querySelector("[data-testid=plan-open-questions]")).toBeNull();
+    expect(host.querySelector("[data-testid=plan-open-question]")).toBeNull();
+    expect(button("Añadir a todos")).toBeUndefined();
+    expect(button("Decidir después")).toBeUndefined();
+    expect(host.querySelector("[data-testid=plan-deliverables-agenda]")).toBeNull();
+    // ofrece pedirlos en «Preguntas y ajustes»
+    await click(host.querySelector("[data-testid=plan-deliverables-ask]"));
+    expect(tab("cambios").getAttribute("aria-selected")).toBe("true");
+  });
+});
+
 describe("pestaña «Entregables»: acciones masivas", () => {
   it("una fila por subplan con su nombre; «Añadir entregable» y «No lo quiero» responden a ese subplan", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan());
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" })));
+    const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" }));
     await mountEl(<MentorPlan planId={PID} />);
     await click(tab("entregables"));
     const rows = host.querySelectorAll("[data-testid=plan-open-question]");
@@ -239,8 +259,8 @@ describe("pestaña «Entregables»: acciones masivas", () => {
   });
 
   it("«Añadir a todos» confirma y responde «sí» en cada subplan pendiente", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan());
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" })));
+    const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" }));
     ui.confirmAction.mockResolvedValue(true);
     await mountEl(<MentorPlan planId={PID} />);
     await click(tab("entregables"));
@@ -254,8 +274,8 @@ describe("pestaña «Entregables»: acciones masivas", () => {
   });
 
   it("«No quiero ninguno» responde «no» en todos; si no se confirma no se llama a nada", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan());
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" })));
+    const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" }));
     ui.confirmAction.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     await mountEl(<MentorPlan planId={PID} />);
     await click(tab("entregables"));
@@ -266,8 +286,8 @@ describe("pestaña «Entregables»: acciones masivas", () => {
   });
 
   it("«Decidir después» no escribe nada: pliega la lista y deja pendientes las decisiones", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan());
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" })));
+    const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" }));
     await mountEl(<MentorPlan planId={PID} />);
     await click(tab("entregables"));
     await click(button("Decidir después"));
@@ -373,7 +393,7 @@ describe("estructura accesible", () => {
     const dl = host.querySelector("[data-testid=plan-preconditions] dl")!;
     expect([...dl.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(expect.arrayContaining(["Periodo", "Dedicación", "Días activos", "Ritmo", "Entregables"]));
     expect(dl.textContent).toContain("7 h/día");
-    expect(dl.textContent).toContain("A discutir");
+    expect(dl.textContent).toContain("Por definir");
     expect(dl.querySelector("ul[aria-label='Días de estudio']")!.querySelectorAll(".sr-only")).toHaveLength(7);
   });
 

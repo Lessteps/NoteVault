@@ -20,8 +20,11 @@ import {
   sanitizeCriteria,
   SKILL_LEVELS,
   VERDICT_LABEL,
+  DESIGN_VERDICT_LABEL,
   type AreaCoverage as AreaCov,
   type CoverageCriteria,
+  type DesignTopicRef,
+  type DesignVerdict,
   type CoverageRef,
   type CoverageReview,
   type CoverageReviewArea,
@@ -38,6 +41,7 @@ import { Chip, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn, confirmAction } from "../ui";
 import { openTopic } from "./openTopic";
 import { dayText, ThinkingStatus, useAiStatus } from "./parts";
+import { artifactLabel, TOPIC_TYPE_NAME } from "../../lib/topicDesign";
 
 const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
@@ -107,6 +111,7 @@ export function CoverageLine({ area, className }: { area: AreaCov; className?: s
   return (
     <p className={cn("text-[13.5px] text-dim", className)} data-testid="area-coverage-line">
       <span className="font-medium text-text">Cobertura:</span> teoría {area.theory}/{area.total} · práctica {area.practice}/{area.total}
+      {area.design && <span data-testid="area-design-line"> · diseño {area.design.avgScore} % ({area.design.complete}/{area.design.topics} completos)</span>}
       {area.notFound > 0 && <span className="text-warn"> · {area.notFound} sin encontrar en la vault</span>}
       {found > 0 && area.practice < found && <span className="sr-only"> ({pct(area.practice, found)} % con ejercicios)</span>}
     </p>
@@ -186,6 +191,43 @@ async function skipTopics(planId: string, items: Array<{ folder: string; title: 
   }
 }
 
+const DESIGN_FOLD = 6;
+const VERDICT_COLOUR: Record<DesignVerdict, string> = { good: "var(--nv-mint)", incomplete: "var(--nv-warn)", poor: "var(--nv-danger)" };
+const VERDICT_GLYPH: Record<DesignVerdict, string> = { good: "✓", incomplete: "◐", poor: "✕" };
+
+/** Los temas con el diseño incompleto frente al checklist de la vault, con sus faltantes concretos. */
+function DesignList({ topics, area }: { topics: DesignTopicRef[]; area: string }) {
+  const [open, setOpen] = useState(false);
+  const shown = open ? topics : topics.slice(0, DESIGN_FOLD);
+  return (
+    <div data-testid="area-design-list">
+      <ul className="mt-1 space-y-1.5" aria-label={`Temas de ${area} con el diseño incompleto`}>
+        {shown.map((t) => {
+          const lines = [...new Set(t.gaps.map((g) => g.text))];
+          return (
+            <li key={t.folder} className="min-w-0 rounded-md border border-line px-2.5 py-1.5 text-[13.5px]" data-testid="design-topic">
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <button type="button" onClick={() => void openTopic(t.folder)} className="inline-flex min-h-8 items-center text-left font-medium text-accent-text underline-offset-2 hover:underline" aria-label={`Ver tema ${t.title}`}>{t.title}</button>
+                <Chip colour={t.complete ? "var(--nv-mint)" : "var(--nv-warn)"}>diseño {t.score} %</Chip>
+                {t.type !== "unknown" && <Chip>{TOPIC_TYPE_NAME[t.type]}</Chip>}
+              </span>
+              <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-dim">
+                {lines.slice(0, 4).map((l) => <li key={l} className="break-words">{l.replace(/`/g, "")}</li>)}
+                {lines.length > 4 && <li>y {lines.length - 4} más</li>}
+              </ul>
+            </li>
+          );
+        })}
+      </ul>
+      {topics.length > DESIGN_FOLD && (
+        <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="mt-1 inline-flex min-h-8 items-center text-[13px] text-accent-text underline-offset-2 hover:underline">
+          {open ? "Ver menos" : `Ver los ${topics.length}`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** El detalle de cobertura de UN área: faltantes accionables y lo que sugirió el Mentor. */
 export function AreaCoverageDetail({ area, review, reviewAt, groupTitle, areaName, actions }: { area: AreaCov; review?: CoverageReviewArea; reviewAt?: string; groupTitle: (id: string) => string; areaName: (key: string) => string; actions?: ReviewActions }) {
   const uid = useId();
@@ -195,7 +237,8 @@ export function AreaCoverageDetail({ area, review, reviewAt, groupTitle, areaNam
   const short = area.groups.flatMap((g) => g.shortPractice);
   const notFound = area.groups.flatMap((g) => g.notFound);
   const pending = area.outOfPlan.filter((t) => !t.done);
-  const nothing = !noPractice.length && !noTheory.length && !short.length && !notFound.length && !pending.length;
+  const designTopics = area.groups.flatMap((g) => g.designTopics ?? []).sort((a, b) => a.score - b.score);
+  const nothing = !noPractice.length && !noTheory.length && !short.length && !notFound.length && !pending.length && !designTopics.length;
   const dispensable = review?.dispensable ?? [];
   const accept = async (title: string, accepted: boolean) => {
     if (!actions) return;
@@ -213,13 +256,22 @@ export function AreaCoverageDetail({ area, review, reviewAt, groupTitle, areaNam
         <ClipboardCheck size={16} aria-hidden className="text-accent-text" /> Cobertura de notas y práctica
       </h5>
       <p className="mt-0.5 text-[13.5px] text-dim">
-        Calculada con tu vault: un tema tiene teoría si su carpeta tiene alguna nota que no es ejercicio, y práctica si tiene ejercicios.
+        Calculada con tu vault: un tema tiene teoría si su carpeta tiene alguna nota que no es ejercicio, y práctica si tiene ejercicios. Además cada tema se mide contra el sistema de diseño de la vault (nota de teoría con su estructura, canvas, manifiesto de práctica con skills acordes y ejercicios por skill y dificultad).
       </p>
       <CoverageLine area={area} className="mt-1.5" />
       {nothing ? (
         <p className="mt-2 text-[14px] text-mint">Todos los temas del área tienen teoría y práctica, y no quedan temas pendientes de sus ramas fuera del plan.</p>
       ) : (
         <ul className="mt-2 space-y-2.5 text-[14px]" aria-label={`Faltantes de ${area.area}`} data-testid="area-coverage-gaps">
+          {designTopics.length > 0 && (
+            <li>
+              <span className="font-medium">
+                Diseño incompleto en {designTopics.length} {designTopics.length === 1 ? "tema" : "temas"} (checklist de la vault)
+                {area.design ? ` · media ${area.design.avgScore} %` : ""}
+              </span>
+              <DesignList topics={designTopics} area={area.area} />
+            </li>
+          )}
           {noPractice.map((g) => (
             <li key={`np-${g.id}`}>
               <span className="font-medium">
@@ -256,7 +308,7 @@ export function AreaCoverageDetail({ area, review, reviewAt, groupTitle, areaNam
           )}
         </ul>
       )}
-      {review && (review.assessment || review.verdict || review.missing.length > 0 || review.misplaced.length > 0 || dispensable.length > 0) && (
+      {review && (review.assessment || review.verdict || review.design || review.missing.length > 0 || review.misplaced.length > 0 || dispensable.length > 0) && (
         <div className="mt-3 min-w-0 rounded-lg border border-accent/50 bg-card p-3" data-testid="area-ai-review">
           <h6 className="flex flex-wrap items-center gap-2 text-[14px] font-semibold text-text">
             <Sparkles size={15} aria-hidden className="text-accent-text" /> Revisión del Mentor
@@ -270,6 +322,24 @@ export function AreaCoverageDetail({ area, review, reviewAt, groupTitle, areaNam
             </p>
           )}
           {review.assessment && <p className="mt-1 text-[14px] text-text">{review.assessment}</p>}
+          {review.design && (review.design.summary || review.design.topics.length > 0) && (
+            <div className="mt-2 min-w-0" data-testid="area-ai-design">
+              <p className="text-[13.5px] font-medium">Diseño de los temas según el Mentor:</p>
+              {review.design.summary && <p className="text-[14px] text-text">{review.design.summary}</p>}
+              <ul className="mt-1 space-y-1" aria-label={`Veredicto de diseño por tema en ${area.area}`}>
+                {review.design.topics.map((t) => (
+                  <li key={t.folder} className="min-w-0 text-[13.5px]" data-testid="ai-design-topic">
+                    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <button type="button" onClick={() => void openTopic(t.folder)} className="inline-flex min-h-8 items-center text-left font-medium text-accent-text underline-offset-2 hover:underline" aria-label={`Ver tema ${t.title}`}>{t.title}</button>
+                      <Chip colour={VERDICT_COLOUR[t.verdict]}><span aria-hidden>{VERDICT_GLYPH[t.verdict]}</span> {DESIGN_VERDICT_LABEL[t.verdict]}</Chip>
+                      {t.create.length > 0 && <span className="text-dim">crear: {t.create.map((c) => artifactLabel[c]).join(" · ")}</span>}
+                    </span>
+                    {t.note && <span className="block break-words text-dim">{t.note}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {review.missing.length > 0 && (
             <>
               <p className="mt-2 text-[13.5px] font-medium">Lo que falta para el criterio elegido:</p>
@@ -446,6 +516,11 @@ function ReviewSummary({ plan, review, stale, onPlan }: { plan: MentorPlan; revi
         </p>
       )}
       {review.summary && <p className="mt-1 text-text">{review.summary}</p>}
+      {review.designSummary && (
+        <p className="mt-1 text-text" data-testid="review-design-summary">
+          <span className="font-semibold">Diseño de los temas:</span> {review.designSummary}
+        </p>
+      )}
       {review.areas.some((a) => a.verdict) && (
         <div className="mt-2" data-testid="review-verdicts">
           <h5 className="text-[14px] font-semibold">Veredicto por área</h5>
@@ -554,7 +629,7 @@ export function CoveragePanel({ plan, cov, onPlan, announce }: { plan: MentorPla
         </p>
       )}
       {c && (
-        <dl className="mt-3 grid gap-2 @xl:grid-cols-2 @4xl:grid-cols-4" data-testid="plan-coverage-totals">
+        <dl className={cn("mt-3 grid gap-2 @xl:grid-cols-2", c.totals.design ? "@4xl:grid-cols-5" : "@4xl:grid-cols-4")} data-testid="plan-coverage-totals">
           <div className="rounded-lg border border-line px-3 py-2">
             <dt className="text-[12.5px] font-semibold uppercase tracking-wide text-faint">Con teoría</dt>
             <dd className="text-[16px] font-semibold">{c.totals.theory}/{c.totals.topics} <span className="text-[13px] font-normal text-dim">({pct(c.totals.theory, c.totals.topics)} %)</span></dd>
@@ -563,6 +638,13 @@ export function CoveragePanel({ plan, cov, onPlan, announce }: { plan: MentorPla
             <dt className="text-[12.5px] font-semibold uppercase tracking-wide text-faint">Con ejercicios</dt>
             <dd className="text-[16px] font-semibold">{c.totals.practice}/{c.totals.topics} <span className="text-[13px] font-normal text-dim">({pct(c.totals.practice, c.totals.topics)} %)</span></dd>
           </div>
+          {c.totals.design && (
+            <div className="rounded-lg border border-line px-3 py-2" data-testid="coverage-design-total">
+              <dt className="text-[12.5px] font-semibold uppercase tracking-wide text-faint">Diseño de temas</dt>
+              <dd className="text-[16px] font-semibold">{c.totals.design.avgScore} % <span className="text-[13px] font-normal text-dim">{c.totals.design.complete}/{c.totals.design.topics} completos</span></dd>
+              <dd className="text-[13px] text-dim">{c.totals.design.requiredGaps} faltantes obligatorios · {c.totals.design.recommendedGaps} recomendados</dd>
+            </div>
+          )}
           <div className="rounded-lg border border-line px-3 py-2">
             <dt className="text-[12.5px] font-semibold uppercase tracking-wide text-faint">Fuera del plan</dt>
             <dd className="text-[16px] font-semibold">{c.totals.outOfPlan} <span className="text-[13px] font-normal text-dim">temas de sus ramas sin completar</span></dd>

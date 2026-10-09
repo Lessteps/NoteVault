@@ -132,6 +132,9 @@ import { parseTopicLink } from "../../core/practice/topicLinks.js";
 import { goalsApi } from "./goals.js";
 import { mentorAskApi } from "./mentorAsk.js";
 import { mentorCoverageApi } from "./mentorCoverage.js";
+import { designsOf } from "./mentorDesign.js";
+import { mentorExecuteApi } from "./mentorExecute.js";
+import { mentorAreaPracticeApi } from "./mentorAreaPractice.js";
 import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
 
@@ -671,8 +674,10 @@ export function mentorApi(app: AppState, send?: SendFn) {
   /** Cobertura determinista del plan contra TODOS los temas de la vault (notas de teoría y ejercicios por tema). */
   const coverageOf = (plan: Plan) => {
     const snaps = topicSnaps(app);
-    const topics = snaps.map((t) => ({ folder: t.folder, title: t.title, theoryNotes: t.theoryNotes, exerciseCount: t.exerciseCount, ...(t.planExercises ? { planExercises: t.planExercises } : {}), completenessPct: t.progress.completenessPct }));
-    return { coverage: computeCoverage(plan, topics, { ppReady: !!ppAreaDir(app.root) }), snaps };
+    // diseño de cada tema del plan contra el checklist de la vault (solo lee; ver `lib/topicDesign.ts`)
+    const designs = designsOf(app, plan.subplans.flatMap((s) => s.topics.map((t) => ({ folder: t.folder, title: t.title, ...(snaps.find((x) => x.folder === t.folder)?.subject ? { subject: snaps.find((x) => x.folder === t.folder)!.subject } : {}) }))));
+    const topics = snaps.map((t) => ({ folder: t.folder, title: t.title, theoryNotes: t.theoryNotes, exerciseCount: t.exerciseCount, ...(t.planExercises ? { planExercises: t.planExercises } : {}), completenessPct: t.progress.completenessPct, ...(designs.get(t.folder) ? { design: designs.get(t.folder)! } : {}) }));
+    return { coverage: computeCoverage(plan, topics, { ppReady: !!ppAreaDir(app.root) }), snaps, designs };
   };
   let acceptRef: (opts: unknown) => any = () => {
     throw new ApiError("No disponible.");
@@ -2087,8 +2092,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const kind = o.intent === "fix" ? ("fix" as const) : ("adjust" as const);
       const direct: ChangeOp[] | null = Array.isArray(o.ops)
         ? (o.ops as any[])
-            .filter((x) => x && ["trim_to_fit", "extend_to", "raise_minutes", "lighter"].includes(String(x.op)))
-            .map((x) => (x.op === "extend_to" ? { op: "extend_to" as const, date: String(x.date ?? "") } : x.op === "raise_minutes" ? { op: "raise_minutes" as const, minutes: Number(x.minutes) } : { op: x.op as "trim_to_fit" | "lighter" }))
+            .filter((x) => x && ["trim_to_fit", "extend_to", "raise_minutes", "lighter", "set_area_mode"].includes(String(x.op)))
+            .map((x) => (x.op === "extend_to" ? { op: "extend_to" as const, date: String(x.date ?? "") } : x.op === "raise_minutes" ? { op: "raise_minutes" as const, minutes: Number(x.minutes) } : x.op === "set_area_mode" ? { op: "set_area_mode" as const, mode: x.mode === "phased" ? ("phased" as const) : ("together" as const) } : { op: x.op as "trim_to_fit" | "lighter" }))
         : null;
       if (!comment && !direct?.length) throw new ApiError("Escribe qué quieres cambiar en el plan.");
       if (studyIndexCold(app)) return { loading: true as const };
@@ -2212,6 +2217,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
     ...api,
     // faltantes de la revisión de cobertura añadidos a la propuesta (ver `mentorCoverage.ts`)
     ...mentorCoverageApi(app),
+    // «Ejecutar plan» (informe, cola en segundo plano, pausa/cancelación) y Sistema de práctica por área (ver mentorExecute.ts y mentorAreaPractice.ts)
+    ...mentorExecuteApi(app, { ...(send ? { send } : {}), today: () => localDate() }),
+    ...mentorAreaPracticeApi(app, { today: () => localDate() }),
     // «Preguntas, correcciones y ajustes»: clasificar lo escrito y responder preguntas sin tocar el plan (ver `mentorAsk.ts`)
     ...mentorAskApi(app, { withJob, guarded, cancelMode: (e) => (e instanceof CancelError ? e.mode : undefined), today: () => localDate() }),
     /** Compatibilidad: el flujo anterior (un BORRADOR en el chat que se acepta aparte); el camino principal crea el plan propuesto. */

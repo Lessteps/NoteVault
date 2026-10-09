@@ -31,13 +31,14 @@ const pre = (over: Partial<PlanPreconditions> = {}): PlanPreconditions => ({
 });
 
 describe("entregables en tres estados", () => {
-  it("por defecto «ask»; los booleanos antiguos se leen como yes/no sin migrar", () => {
-    expect(normalizeDeliverables(undefined)).toBe("ask");
+  it("por defecto «no» (entregables por definir); «ask» y los booleanos antiguos se leen sin migrar", () => {
+    expect(normalizeDeliverables(undefined)).toBe("no");
+    expect(normalizeDeliverables("ask")).toBe("ask");
     expect(normalizeDeliverables(true)).toBe("yes");
     expect(normalizeDeliverables(false)).toBe("no");
     expect(normalizeDeliverables("no")).toBe("no");
-    expect(normalizeDeliverables("raro")).toBe("ask");
-    expect(sanitizePreconditions({ start: "2026-10-05", end: "2026-10-18" }, "2026-10-05").deliverables).toBe("ask");
+    expect(normalizeDeliverables("raro")).toBe("no");
+    expect(sanitizePreconditions({ start: "2026-10-05", end: "2026-10-18" }, "2026-10-05").deliverables).toBe("no");
     expect(sanitizePreconditions({ deliverables: true }, "2026-10-05").deliverables).toBe("yes");
     expect(sanitizePreconditions({ deliverables: false }, "2026-10-05").deliverables).toBe("no");
   });

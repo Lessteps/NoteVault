@@ -7,6 +7,7 @@
 
 import { areaOfFolder, branchOfFolder } from "./planTime.js";
 import { isPracticeBranch, type AreaGroup } from "./planAreas.js";
+import { ARTIFACT_IDS, summarizeDesign, type ArtifactId, type DesignGap, type DesignSummary, type TopicDesign } from "./topicDesign.js";
 
 // ── Cobertura determinista ──────────────────────────────────────────────
 
@@ -21,6 +22,17 @@ export interface CoverageTopicIn {
   /** ejercicios que pide el plan de práctica del manifiesto del tema (0/ausente = sin plan) */
   planExercises?: number;
   completenessPct: number;
+  /** diseño del tema contra el checklist de la vault (ver `topicDesign.ts`); ausente = no se evaluó */
+  design?: TopicDesign;
+}
+
+/** Un tema con el diseño incompleto: lo que le falta, en frases concretas. */
+export interface DesignTopicRef extends CoverageRef {
+  score: number;
+  /** todos los artefactos obligatorios están (aunque falten recomendados) */
+  complete: boolean;
+  type: TopicDesign["topicType"];
+  gaps: DesignGap[];
 }
 
 export interface CoverageRef {
@@ -42,6 +54,10 @@ export interface GroupCoverage {
   shortPractice: CoverageRef[];
   /** temas del plan que ya no están en la vault (sin manifiesto) */
   notFound: CoverageRef[];
+  /** diseño de los temas del grupo contra el checklist de la vault (aditivo) */
+  design?: DesignSummary;
+  /** los temas del grupo con el diseño incompleto (les falta algún artefacto obligatorio) (los de menor puntuación primero; como mucho `MAX_DESIGN_TOPICS`) */
+  designTopics?: DesignTopicRef[];
 }
 
 export interface AreaCoverage {
@@ -58,11 +74,13 @@ export interface AreaCoverage {
   branches: string[];
   /** temas de esas ramas que NO están en el plan (los completados también, marcados) */
   outOfPlan: Array<CoverageRef & { branch: string; done: boolean }>;
+  /** resumen del diseño de los temas del área (aditivo) */
+  design?: DesignSummary;
 }
 
 export interface PlanCoverage {
   areas: AreaCoverage[];
-  totals: { topics: number; theory: number; practice: number; outOfPlan: number };
+  totals: { topics: number; theory: number; practice: number; outOfPlan: number; design?: DesignSummary };
   /** el módulo de práctica `programming_practice` está instalado en la vault */
   ppReady: boolean;
 }
@@ -78,6 +96,7 @@ export interface CoveragePlanLike {
 }
 
 const MAX_OUT_OF_PLAN = 200;
+export const MAX_DESIGN_TOPICS = 250;
 
 export const areaKeyOf = (s: { id: string; areaId?: string }): string => s.areaId || s.id;
 
@@ -95,6 +114,12 @@ export function computeCoverage(plan: CoveragePlanLike, topics: readonly Coverag
         const list = s.topics.filter((t) => (g.id ? t.group === g.id : !known.has(t.group ?? "")));
         const ref = (t: { folder: string; title: string }): CoverageRef => ({ folder: t.folder, title: t.title });
         const found = list.filter((t) => byFolder.has(t.folder));
+        const designs = found.map((t) => byFolder.get(t.folder)!.design).filter((d): d is TopicDesign => !!d);
+        const designTopics: DesignTopicRef[] = designs
+          .filter((d) => !d.complete)
+          .sort((a, b) => a.score - b.score || a.folder.localeCompare(b.folder, "es", { numeric: true }))
+          .slice(0, MAX_DESIGN_TOPICS)
+          .map((d) => ({ folder: d.folder, title: d.title, score: d.score, complete: d.complete, type: d.topicType, gaps: d.gaps }));
         return {
           id: g.id,
           title: g.title,
@@ -110,6 +135,7 @@ export function computeCoverage(plan: CoveragePlanLike, topics: readonly Coverag
             })
             .map(ref),
           notFound: list.filter((t) => !byFolder.has(t.folder)).map(ref),
+          ...(designs.length ? { design: summarizeDesign(designs), designTopics } : {}),
         };
       })
       .filter((g) => g.total > 0);
@@ -134,8 +160,10 @@ export function computeCoverage(plan: CoveragePlanLike, topics: readonly Coverag
       groups,
       branches: branches.map((b) => b.split("/")[1]!),
       outOfPlan,
+      ...(groups.some((g) => g.design) ? { design: mergeDesign(groups.map((g) => g.design).filter((d): d is DesignSummary => !!d)) } : {}),
     };
   });
+  const allDesign = areas.map((a) => a.design).filter((d): d is DesignSummary => !!d);
   return {
     areas,
     totals: {
@@ -143,8 +171,25 @@ export function computeCoverage(plan: CoveragePlanLike, topics: readonly Coverag
       theory: areas.reduce((n, a) => n + a.theory, 0),
       practice: areas.reduce((n, a) => n + a.practice, 0),
       outOfPlan: areas.reduce((n, a) => n + a.outOfPlan.filter((t) => !t.done).length, 0),
+      ...(allDesign.length ? { design: mergeDesign(allDesign) } : {}),
     },
     ppReady: !!opts.ppReady,
+  };
+}
+
+/** Junta resúmenes de diseño (media ponderada por nº de temas). */
+export function mergeDesign(list: readonly DesignSummary[]): DesignSummary {
+  const topics = list.reduce((n, d) => n + d.topics, 0);
+  const byArtifact: DesignSummary["byArtifact"] = {};
+  for (const d of list) for (const id of ARTIFACT_IDS) if (d.byArtifact[id]) byArtifact[id] = (byArtifact[id] ?? 0) + d.byArtifact[id]!;
+  return {
+    topics,
+    avgScore: topics ? Math.round(list.reduce((n, d) => n + d.avgScore * d.topics, 0) / topics) : 0,
+    complete: list.reduce((n, d) => n + d.complete, 0),
+    incomplete: list.reduce((n, d) => n + d.incomplete, 0),
+    requiredGaps: list.reduce((n, d) => n + d.requiredGaps, 0),
+    recommendedGaps: list.reduce((n, d) => n + d.recommendedGaps, 0),
+    byArtifact,
   };
 }
 
@@ -249,6 +294,26 @@ export interface CoverageMisplaced {
   suggestedArea?: string;
 }
 
+/** Veredicto de la IA sobre el DISEÑO de un tema frente al checklist de la vault: bien diseñado, incompleto o pobre. */
+export const DESIGN_VERDICTS = ["good", "incomplete", "poor"] as const;
+export type DesignVerdict = (typeof DESIGN_VERDICTS)[number];
+export const DESIGN_VERDICT_LABEL: Record<DesignVerdict, string> = { good: "Bien diseñado", incomplete: "Incompleto", poor: "Pobre" };
+
+export interface CoverageDesignTopic {
+  folder: string;
+  title: string;
+  verdict: DesignVerdict;
+  /** artefactos del checklist que habría que crear para este tema (ids de `ARTIFACT_IDS`) */
+  create: ArtifactId[];
+  note: string;
+}
+
+export interface CoverageDesignReview {
+  /** valoración breve del diseño del área */
+  summary: string;
+  topics: CoverageDesignTopic[];
+}
+
 export interface CoverageReviewArea {
   /** clave del área (`areaId` o id del subplan) */
   key: string;
@@ -263,6 +328,8 @@ export interface CoverageReviewArea {
   verdictWhy?: string;
   /** estimación (múltiplos de 5) de lo esperado para el criterio que el área cubre, 0..100 */
   coveragePct?: number;
+  /** juicio de la IA sobre el diseño de los temas del área (aditivo; ausente en las revisiones antiguas) */
+  design?: CoverageDesignReview;
 }
 
 export interface CoverageOverall {
@@ -286,6 +353,8 @@ export interface CoverageReview {
   overall?: CoverageOverall;
   /** aviso de que es una estimación (la app lo pone siempre; no lo escribe la IA) */
   disclaimer?: string;
+  /** valoración global del diseño de los temas (aditivo) */
+  designSummary?: string;
   areas: CoverageReviewArea[];
   /** sugerencias descartadas por la app (ya existían como tema, área desconocida, duplicadas…) */
   discarded: number;
@@ -339,6 +408,7 @@ export function sanitizeCoverageReview(raw: unknown, keys?: readonly string[]): 
       ...(verdictOf(a.verdict) ? { verdict: verdictOf(a.verdict)! } : {}),
       ...(oneLine(a.verdictWhy, 300) ? { verdictWhy: oneLine(a.verdictWhy, 300) } : {}),
       ...(pctOf(a.coveragePct) !== undefined ? { coveragePct: pctOf(a.coveragePct)! } : {}),
+      ...(designReviewOf(a.design) ? { design: designReviewOf(a.design)! } : {}),
     });
   }
   const summary = oneLine(r.summary, 600);
@@ -354,9 +424,54 @@ export function sanitizeCoverageReview(raw: unknown, keys?: readonly string[]): 
     ...(r.criteria && typeof r.criteria === "object" ? { criteria: sanitizeCriteria(r.criteria) } : {}),
     ...(overall ? { overall } : {}),
     ...(disclaimer ? { disclaimer } : {}),
+    ...(oneLine(r.designSummary, 600) ? { designSummary: oneLine(r.designSummary, 600) } : {}),
     areas,
     discarded: Math.max(0, Math.round(Number(r.discarded) || 0)),
   };
+}
+
+export const MAX_DESIGN_TOPICS_PER_AREA = 120;
+const designVerdictOf = (v: unknown): DesignVerdict | undefined => {
+  const k = fold(String(v ?? ""));
+  if (/^(good|well|bien|bueno|buen|completo|ok|adecuad)/.test(k)) return "good";
+  if (/^(incomplete|incompleto|parcial|medio|regular|falta)/.test(k)) return "incomplete";
+  if (/^(poor|pobre|malo|mal|insuficiente|vacio|ausente)/.test(k)) return "poor";
+  return undefined;
+};
+/** Artefactos del checklist que la IA dijo crear (ids exactos; se admiten alias en español y se descartan los desconocidos). */
+const artifactsOf = (v: unknown): ArtifactId[] => {
+  const alias: Array<[RegExp, ArtifactId]> = [
+    [/^(theory|teoria|nota)\b/, "theory"],
+    [/^(contract|contrato|estructura)/, "contract"],
+    [/^(canvas|mapa)/, "canvas"],
+    [/^(manifest|manifiesto|practica md)/, "manifest"],
+    [/^(skills fit|skills acordes)/, "skills_fit"],
+    [/^(branch skills)/, "branch_skills"],
+    [/^(practice basic|practica basica|practice|practica|ejercicios)/, "practice_basic"],
+    [/^(practice ladder|escalera)/, "practice_ladder"],
+  ];
+  const out: ArtifactId[] = [];
+  for (const x of Array.isArray(v) ? v : []) {
+    const k = fold(String(x ?? "")).replace(/[-_]+/g, " ").trim();
+    const id = (ARTIFACT_IDS as readonly string[]).includes(String(x)) ? (String(x) as ArtifactId) : alias.find(([re]) => re.test(k))?.[1];
+    if (id && !out.includes(id)) out.push(id);
+  }
+  return out;
+};
+function designReviewOf(raw: unknown): CoverageDesignReview | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, any>;
+  const topics: CoverageDesignTopic[] = [];
+  for (const t of Array.isArray(o.topics) ? o.topics : []) {
+    const verdict = designVerdictOf(t?.verdict);
+    const folder = oneLine(t?.folder, 300);
+    const title = oneLine(t?.title, 160);
+    if (!verdict || !folder || !title || topics.some((x) => x.folder === folder)) continue;
+    topics.push({ folder, title, verdict, create: artifactsOf(t?.create), note: oneLine(t?.note ?? t?.why, 300) });
+    if (topics.length >= MAX_DESIGN_TOPICS_PER_AREA) break;
+  }
+  const summary = oneLine(o.summary, 500);
+  return summary || topics.length ? { summary, topics } : undefined;
 }
 
 const priorityOf = (v: unknown): CoveragePriority | undefined => {
@@ -484,6 +599,22 @@ export function parseCoverageReply(text: string, ctx: CoverageReplyCtx): { ok: t
       }
       list.push({ folder: t.folder, title: t.title, reason: oneLine(m?.reason ?? m?.why, 300) });
     }
+    // diseño: veredicto de la IA por tema del plan frente al checklist (solo temas del plan; los demás se descartan)
+    if (raw?.design && typeof raw.design === "object") {
+      const dr = raw.design as Record<string, any>;
+      const topics: CoverageDesignTopic[] = target.design?.topics ?? [];
+      for (const m of Array.isArray(dr.topics) ? dr.topics : []) {
+        const t = byFolder.get(oneLine(m?.folder, 300)) ?? byTitle.get(titleKey(oneLine(m?.title, 160)));
+        const verdict = designVerdictOf(m?.verdict);
+        if (!t || !verdict || topics.some((x) => x.folder === t.folder) || topics.length >= MAX_DESIGN_TOPICS_PER_AREA) {
+          discarded++;
+          continue;
+        }
+        topics.push({ folder: t.folder, title: t.title, verdict, create: artifactsOf(m?.create), note: oneLine(m?.note ?? m?.why ?? m?.reason, 300) });
+      }
+      const dsum = oneLine(dr.summary, 500) || target.design?.summary || "";
+      if (dsum || topics.length) target.design = { summary: dsum, topics };
+    }
     for (const m of Array.isArray(raw?.misplaced) ? raw.misplaced : Array.isArray(raw?.extra) ? raw.extra : []) {
       const t = byFolder.get(oneLine(m?.folder, 300)) ?? byTitle.get(titleKey(oneLine(typeof m === "string" ? m : m?.title, 160)));
       if (!t || target.misplaced.some((x) => x.folder === t.folder) || target.misplaced.length >= MAX_SUGGESTIONS_PER_AREA) {
@@ -495,8 +626,9 @@ export function parseCoverageReply(text: string, ctx: CoverageReplyCtx): { ok: t
     }
   }
   const summary = oneLine(j.summary ?? j.assessment, 600);
-  const kept = areas.filter((a) => a.assessment || a.missing.length || a.misplaced.length || a.dispensable?.length || a.verdict);
+  const kept = areas.filter((a) => a.assessment || a.missing.length || a.misplaced.length || a.dispensable?.length || a.verdict || a.design);
   const overall = overallOf(j.overall);
+  const designSummary = oneLine(j.designSummary ?? j.design?.summary, 600);
   if (!summary && !kept.length && !overall) return { ok: false, reason: "La IA no propuso nada útil." };
-  return { ok: true, review: { summary: summary || overall?.text || "", ...(overall ? { overall } : {}), areas: kept, discarded } };
+  return { ok: true, review: { summary: summary || overall?.text || "", ...(overall ? { overall } : {}), ...(designSummary ? { designSummary } : {}), areas: kept, discarded } };
 }

@@ -8,9 +8,11 @@ import { CalendarDays } from "lucide-react";
 import { useId, useMemo } from "react";
 import { phasesByMonth, monthLong, weeksText, type MonthCell } from "../../lib/planMonths";
 import { deliverablesOf } from "../../lib/planSchedule";
+import { areaRank, deliverablesDefined } from "../../lib/planTopicsByArea";
 import type { MentorPlan } from "../../lib/types";
 import { cn } from "../ui";
 import { hm } from "./parts";
+import { focusColour } from "./agendaKit";
 import { PALETTE, type Loaded } from "./planShared";
 
 const hours = (min: number): string => (min ? hm(min).replace(".", ",") : "0 h");
@@ -22,7 +24,8 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
     const done = new Set((data.derived?.subplans ?? []).flatMap((s) => s.topics.filter((t) => t.state === "completo" || t.completedAt).map((t) => t.folder)));
     let deliverables: Array<{ dueDate: string }> | undefined;
     try {
-      deliverables = deliverablesOf(plan as never, data.practice ?? null);
+      // sin entregables definidos no se cuentan en los totales del mes (quedan «por definir»)
+      deliverables = deliverablesDefined(plan) ? deliverablesOf(plan as never, data.practice ?? null) : undefined;
     } catch {
       deliverables = undefined;
     }
@@ -30,7 +33,12 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
   }, [plan, data.derived, data.practice, data.today]);
 
   if (!model.months.length || !plan.subplans.length) return null;
-  const colourOf = (id: string) => PALETTE[plan.subplans.findIndex((s) => s.id === id) % PALETTE.length]!;
+  const colourOf = (id: string) => {
+    const s = plan.subplans.find((x) => x.id === id);
+    return s?.areaId ? focusColour(s.areaId) : PALETTE[Math.max(0, plan.subplans.findIndex((x) => x.id === id)) % PALETTE.length]!;
+  };
+  // orden fijo de las áreas: Backend · Frontend · Databases · Tooling and Quality · Automation
+  const rows = [...model.rows].sort((a, b) => areaRank(a.areaId) - areaRank(b.areaId));
   const captionId = `${uid}-cap`;
 
   return (
@@ -40,8 +48,8 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
       </p>
       {plan.areaMode && (
         <p className="rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-text" data-testid="plan-months-mode">
-          <span className="font-semibold">{plan.areaMode === "together" ? "Áreas juntas" : "Áreas por fases"}.</span>{" "}
-          <span className="text-dim">{plan.areaModeWhy ?? (plan.areaMode === "together" ? "Todas activas todo el periodo y presentes cada día." : "Como máximo dos en paralelo.")}</span>
+          <span className="font-semibold">{plan.areaMode === "together" ? "Áreas juntas desde el día 1" : "Áreas por fases"}.</span>{" "}
+          <span className="text-dim">{plan.areaModeWhy ?? (plan.areaMode === "together" ? "Todas activas desde el día 1 y presentes cada día; Automation, al final." : "Como máximo dos en paralelo.")}</span>
         </p>
       )}
       <div
@@ -87,7 +95,7 @@ export function PhaseMonthTable({ data, plan, onOpenMonth }: { data: Loaded; pla
             </tr>
           </thead>
           <tbody>
-            {model.rows.map((r) => (
+            {rows.map((r) => (
               <tr key={r.subplanId} data-testid="plan-month-row">
                 <th scope="row" className="sticky left-0 z-10 border-b border-line bg-card px-3 py-2 align-top font-medium">
                   <span className="flex items-center gap-2">

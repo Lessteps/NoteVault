@@ -94,9 +94,10 @@ describe("crear el plan con modo de áreas y lenguajes", () => {
     expect(ai.areaModeWhy).toBeTruthy();
   });
 
-  it("sin areaMode ni languages (API antigua) el plan se crea igual que antes: sin modo ni bloque diario de lenguaje", async () => {
+  it("sin areaMode (API antigua o formulario nuevo) con 2 o más áreas el modo por defecto es «juntas»; sin languages no hay bloque diario de lenguaje", async () => {
     const p = (await create()).plan();
-    expect(p.areaMode).toBeUndefined();
+    expect(p.areaMode).toBe("together");
+    expect(p.areaModeBy).toBe("rules");
     expect(p.preconditions!.languages).toBeUndefined();
     expect(buildSchedule(p).days.every((d) => !d.blocks?.some((b) => b.id === "lang-daily"))).toBe(true);
   });

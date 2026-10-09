@@ -18,6 +18,7 @@ import { useMentor } from "../../store/mentor";
 import { Chip, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn, confirmAction } from "../ui";
 import { AreaCounts, doneText, DSTATUS_LABEL, plural, KIND_COLOUR, KIND_LABEL, StatusChip, useAgendaModel } from "./agendaKit";
+import { DELIVERABLES_PENDING_TEXT } from "../../lib/planTopicsByArea";
 import { SectionHeading } from "./planKit";
 import { openPractice } from "./PracticeCard";
 import { branchOf, openProjectInProyectos, type Loaded } from "./planShared";
@@ -143,6 +144,30 @@ export function PlanDeliverables({ data, onChanged, announce, goTab }: { data: L
     refocus();
     announce(`Decidirás después: quedan ${pendingQs.length} ${pendingQs.length === 1 ? "decisión pendiente" : "decisiones pendientes"} en el plan.`);
   };
+
+  // Los entregables dependen del sistema de práctica y de los proyectos que se definen al EJECUTAR el plan: mientras no haya ninguno definido
+  // no se eligen ni se «discuten» aquí (ni siquiera una decisión antigua pendiente se ofrece): se enseña un estado claro.
+  if (!m.deliverablesDefined) {
+    return (
+      <section aria-labelledby="dl-title" data-testid="plan-deliverables-pending" className="space-y-3">
+        <SectionHeading id="dl-title" hint="Archivos prácticos que demuestran habilidad: katas, proyectos diarios, semanales, mensuales y de área.">
+          Entregables
+        </SectionHeading>
+        <div className="rounded-2xl border border-dashed border-line-strong bg-card p-4 @3xl:p-5">
+          <p className="flex flex-wrap items-center gap-2 text-[16px] font-semibold">
+            Aún sin definir <Chip large colour="var(--nv-faint)">Por definir</Chip>
+          </p>
+          <p className="mt-1 text-[15px] text-text" data-testid="plan-deliverables-pending-text">{DELIVERABLES_PENDING_TEXT}</p>
+          <p className="mt-1.5 text-[14px] text-dim">
+            Los entregables nacen del sistema de práctica de cada área y de los proyectos que se definen cuando el plan se ejecuta, así que no se eligen al crear el plan. Hasta entonces la Agenda no cuenta entregables: solo enseña los proyectos propuestos de cada día.
+          </p>
+          <GhostButton large className="mt-3" onClick={() => goTab("cambios")} data-testid="plan-deliverables-ask">
+            Pedirlos en «Preguntas y ajustes»
+          </GhostButton>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <>

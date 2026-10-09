@@ -107,3 +107,68 @@ describe("cobertura del plan (API)", () => {
     expect(new PlanStore(dir).load(id)!.coverageReview).toBeUndefined();
   });
 });
+
+describe("cobertura contra el checklist de diseño de temas", () => {
+  it("la cobertura determinista añade el diseño de cada tema: puntuación y faltantes concretos, y no escribe nada", () => {
+    const file = path.join(dir, ".notevault", "mentor", "plans", `${id}.json`);
+    const before = fs.readFileSync(file, "utf-8");
+    const r: any = mentorApi(app, vi.fn()).mentor_plan_coverage({ id });
+    const a = r.coverage.areas[0];
+    expect(a.design).toMatchObject({ topics: 3, complete: 0, incomplete: 3 });
+    expect(r.coverage.totals.design.topics).toBe(3);
+    const t = a.groups[0].designTopics;
+    expect(t).toHaveLength(3);
+    // el tema sin teoría falta teoría; los otros tienen una nota que no cumple el contrato y no tienen canvas
+    const sinTeoria = t.find((x: any) => x.title === "03 Tema" || x.folder.endsWith("03 Tema"))!;
+    expect(sinTeoria.gaps.map((g: any) => g.text)).toContain("Falta la nota de teoría");
+    const conNota = t.find((x: any) => x.folder.endsWith("01 Tema"))!;
+    expect(conNota.gaps.map((g: any) => g.text)).toEqual(expect.arrayContaining(["Falta el canvas del tema", "La nota no cumple el contrato: falta la sección Requires"]));
+    expect(conNota.score).toBeLessThan(100);
+    expect(fs.readFileSync(file, "utf-8")).toBe(before);
+  });
+
+  it("la IA recibe el checklist y los resultados por tema (nunca las notas) y su juicio de diseño se valida y se guarda", async () => {
+    Object.assign(hoisted.store, { provider: "openai", api_key: "k", model: "m", base_url: "http://x" });
+    const reply = JSON.stringify({
+      summary: "Backend flojo en diseño.",
+      designSummary: "Casi ningún tema tiene canvas.",
+      areas: [{
+        key: "backend",
+        assessment: "ok",
+        design: {
+          summary: "Faltan canvas y manifiestos",
+          topics: [
+            { folder: "Programación/4 Backend/01 Tema", title: "x", verdict: "incomplete", create: ["canvas", "manifiesto", "estructura", "inventado"], note: "Falta el mapa" },
+            { title: "4 Backend 3", verdict: "pobre", create: ["theory"], note: "Sin nota" },
+            { title: "04 Tema", verdict: "good", create: [], note: "fuera del plan: se descarta" },
+            { title: "No existe", verdict: "good", create: [] },
+          ],
+        },
+      }],
+    });
+    const send = vi.fn().mockResolvedValue(reply);
+    const r: any = await mentorApi(app, send).mentor_plan_coverage_review({ id });
+    expect(r.source).toBe("ai");
+    const prompt = JSON.stringify(send.mock.calls[0]![1]);
+    expect(prompt).toContain("designChecklist");
+    expect(prompt).toContain("Falta la nota de teoría"); // resultados deterministas del tema sin teoría
+    expect(prompt).toContain("incompleteTopics");
+    expect(prompt).toContain("canvas");
+    expect(prompt).not.toContain("# T\n"); // las notas no viajan
+    const d = r.review.areas[0].design;
+    expect(d.summary).toBe("Faltan canvas y manifiestos");
+    expect(d.topics.map((t: any) => [t.title, t.verdict])).toEqual([["4 Backend 1", "incomplete"], ["4 Backend 3", "poor"]]);
+    expect(d.topics[0].create).toEqual(["canvas", "manifest", "contract"]); // alias en español y el id inventado descartado
+    expect(d.topics[0].folder).toBe("Programación/4 Backend/01 Tema");
+    expect(r.review.designSummary).toBe("Casi ningún tema tiene canvas.");
+    expect(r.review.discarded).toBeGreaterThanOrEqual(2);
+    // se guarda y se lee de nuevo; una revisión antigua (sin diseño) sigue leyéndose
+    const saved = new PlanStore(dir).load(id)!;
+    expect(saved.coverageReview!.areas[0]!.design!.topics).toHaveLength(2);
+    expect(saved.coverageReview!.designSummary).toContain("canvas");
+    const plain = JSON.stringify({ summary: "x", areas: [{ key: "backend", assessment: "y", missing: [{ title: "Job queues", why: "z" }] }] });
+    const r2: any = await mentorApi(app, vi.fn().mockResolvedValue(plain)).mentor_plan_coverage_review({ id });
+    expect(r2.review.areas[0].design).toBeUndefined();
+    expect(r2.review.areas[0].missing).toHaveLength(1);
+  });
+});

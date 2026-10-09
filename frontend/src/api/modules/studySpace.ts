@@ -68,8 +68,11 @@ const jobs = new Map<string, SpaceJob>();
 const MAX_AREAS = 30;
 const MAX_TOPICS = 40;
 
-/** A theory note is complete when it reaches its last section; a cut-off one stops mid-way. */
-const isCompleteTheory = (text: string): boolean => /##\s*Tarjetas[\s\S]{80,}/.test(text);
+/**
+ * A theory note is complete when it reaches its last section («Tarjetas», or «Cards» in the English programming notes); a cut-off one stops
+ * mid-way. (Without «Cards», a complete English draft looked cut-off and "Generar tema completo" would have rewritten it.)
+ */
+const isCompleteTheory = (text: string): boolean => /##\s*(?:Tarjetas|Cards)[\s\S]{80,}/.test(text);
 /** A note this generator wrote (status: draft) that never got its last section. */
 const isCutDraft = (text: string): boolean => /^status:\s*draft\s*$/m.test(text) && !isCompleteTheory(text);
 
@@ -611,7 +614,7 @@ export function studySpaceApi(app: AppState) {
      * Generates ONE topic from its folder (`Space/Area/Topic`): theory, topic map and the
      * competency matrix the AI chooses for it. Missing view files are created too.
      */
-    study_topic_generate(folderRel: string, conversationId = ""): { jobId: string; conversationId: string } {
+    study_topic_generate(folderRel: string, conversationId = "", steps?: Partial<SpaceSteps>): { jobId: string; conversationId: string } {
       const parts = String(folderRel ?? "").replace(/\\/g, "/").split("/").filter(Boolean);
       const abs = path.join(app.root, ...parts);
       const dir = fs.existsSync(abs) && fs.statSync(abs).isFile() ? parts.slice(0, -1) : parts;
@@ -638,7 +641,7 @@ export function studySpaceApi(app: AppState) {
           folder: space,
           subject,
           areas: [{ name: area, topics: siblings.map((name) => ({ name })) }],
-          steps: { theory: true, practice: true, map: true },
+          steps: { theory: steps?.theory ?? true, practice: steps?.practice ?? true, map: steps?.map ?? true },
           only: topic,
         },
         conversationId || undefined,

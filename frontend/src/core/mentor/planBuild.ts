@@ -659,7 +659,7 @@ function practiceQuestion(effPre: PlanPreconditions, overflow: number): BuildQue
  * UNA sola pregunta global de entregables para todo el plan por áreas (en vez de una por subplan): «Sí, en todas las áreas», «No»,
  * «Después» y, como excepciones, «Sí, salvo en X» para las áreas donde un proyecto propio encaja menos (Tooling, Automation…).
  */
-function deliverableQuestion(seeds: readonly SubplanSeed[]): BuildQuestion {
+export function deliverableQuestion(seeds: readonly SubplanSeed[]): BuildQuestion {
   const exceptable = seeds.filter((s) => s.areaId === "tooling" || s.areaId === "automation");
   const except = (exceptable.length ? exceptable : seeds.slice(-1)).slice(0, 2).filter(() => seeds.length > 1);
   return {
@@ -833,14 +833,8 @@ export function computeBuild(b: BuildInput, ctx: BuildCtx, opts: ComputeOpts = {
       question = q;
     }
   }
-  // 6 · Entregables
-  if (!needs && !question && effPre.deliverables === "ask") {
-    const q = asm.seeds.some((s) => !s.deliverable) ? next([deliverableQuestion(asm.seeds)]) : undefined;
-    if (q) {
-      stage = "entregables";
-      question = q;
-    }
-  }
+  // 6 · Entregables: ya NO se pregunta (los entregables quedan «por definir» hasta que se ejecuta el plan). Las respuestas de planes
+  // antiguos (`deliverable:all`) se siguen leyendo en `Decisions`.
 
   const idx = stageIndex(stage);
   const summaries = summariesOf(effPre, d, asm, b.answers);
@@ -881,7 +875,7 @@ function summariesOf(effPre: PlanPreconditions, d: Decisions, a: Assembled, answ
     temas: `${topics} temas${d.weight === "light" ? " · más ligero" : d.weight === "intense" ? " · más intenso" : ""}`,
     capacidad: a.draft.fits ? "Cabe en el periodo" : "No cabe del todo",
     practica: p ? `${p.kataMinutes ? `kata ${p.kataMinutes} min` : "sin kata"} · ${p.sessionsPerWeek ? `${p.sessionsPerWeek} sesiones/semana` : "sin proyecto semanal"}` : "No incluida",
-    entregables: effPre.deliverables === "no" ? "Sin entregables" : `${del} entregable${del === 1 ? "" : "s"}${a.draft.openQuestions?.length ? ` · ${a.draft.openQuestions.length} por decidir` : ""}`,
+    entregables: effPre.deliverables === "no" && !del ? "Por definir al ejecutar el plan" : `${del} entregable${del === 1 ? "" : "s"}${a.draft.openQuestions?.length ? ` · ${a.draft.openQuestions.length} por decidir` : ""}`,
     revision: `${answers.length} ${answers.length === 1 ? "respuesta" : "respuestas"}`,
   };
 }

@@ -229,6 +229,89 @@ export function integratedWeekly(areaIds: readonly string[], week: number, piece
   };
 }
 
+// ── Habilidades clave de cada área (Sistema de práctica por área, ver docs/VAULT_FORMAT.md) ──────────────────────────────────────────
+//
+// Cada área tiene sus HABILIDADES MÁS IMPORTANTES, con una progresión de tres niveles (1 = principiante, 2 = intermedio, 3 = avanzado) que
+// sube con el nivel medido o declarado del estudiante. De aquí salen `skills.md` de la carpeta del área, la rotación de los katas diarios
+// (`areaPracticeSystem.ts`) y las barras de progreso por habilidad de la pestaña Práctica. Los textos van en inglés porque se escriben en la
+// vault de Programación; los nombres de las habilidades son las que la persona verá en `skills.md` y en los katas.
+
+export interface AreaSkill {
+  /** id estable dentro del área (`endpoint_design`) */
+  id: string;
+  name: string;
+  /** por qué importa en el área */
+  why: string;
+  /** cómo se mide (qué demuestra un kata hecho) */
+  measure: string;
+  /** qué se espera en cada nivel: principiante · intermedio · avanzado */
+  levels: readonly [string, string, string];
+}
+
+export const AREA_SKILLS: Readonly<Record<string, readonly AreaSkill[]>> = {
+  backend: [
+    { id: "endpoint_design", name: "Endpoint design", why: "An API is a contract: resources, verbs, status codes and pagination decide whether clients can use it without guessing.", measure: "The endpoint list, request and response shapes and status codes match the stated rules.", levels: ["name resources and pick the right verb and status code", "paginate, filter and version a collection", "design for backwards compatibility and partial updates"] },
+    { id: "validation_errors", name: "Validation and error contracts", why: "Most production bugs start with input nobody validated and errors nobody could read.", measure: "Every invalid input gets a stable error shape and the right 4xx code; nothing invalid reaches the service layer.", levels: ["reject missing and wrongly typed fields", "report all field errors at once with a stable shape", "separate validation, business and infrastructure errors"] },
+    { id: "state_transitions", name: "States and transitions", why: "Orders, payments and jobs are state machines; illegal transitions are where data gets corrupted.", measure: "A table of allowed transitions is enforced and every forbidden one returns a clear conflict.", levels: ["model 3 states and reject skipping one", "add a guard and a side effect to a transition", "handle concurrent transitions of the same record"] },
+    { id: "transactions_idempotency", name: "Transactions and idempotency", why: "Retries and partial failures are normal; a correct service survives them.", measure: "Running the same request twice, or failing halfway, leaves the data in a single consistent state.", levels: ["wrap two writes in one transaction", "make a POST safe to retry with an idempotency key", "reason about what happens when the process dies between steps"] },
+    { id: "auth_security", name: "Authentication and authorization", why: "Knowing who is calling and what they may touch is the first security boundary.", measure: "Anonymous, wrong-owner and wrong-role calls are rejected with 401 or 403 and never leak data.", levels: ["protect a route with a token check", "enforce ownership of a record", "design roles and scopes, and avoid leaking existence through errors"] },
+    { id: "service_testing", name: "Testing a service", why: "Tests are the only way to change a service without fear.", measure: "Tests cover the happy path, the boundaries and the failures, and fail when the code is broken.", levels: ["write a unit test for one rule", "test an endpoint with a fake repository", "write a contract test that would catch a breaking change"] },
+  ],
+  frontend: [
+    { id: "component_composition", name: "Component composition", why: "Small components with clear props are what keeps a UI changeable.", measure: "The component is reusable with different props and has no hidden dependencies.", levels: ["split a screen into 3 components", "lift shared state up and pass it down", "compose with children and render props instead of flags"] },
+    { id: "state_management", name: "State management", why: "Where state lives decides how many bugs the UI can have.", measure: "A single source of truth per piece of data; derived values are computed, not copied.", levels: ["keep a counter and a form field in local state", "derive values instead of storing them", "model a multi-step flow with a reducer or a state machine"] },
+    { id: "accessibility", name: "Accessibility", why: "A page a keyboard or a screen reader cannot use is a broken page.", measure: "Everything is reachable and operable with the keyboard, has an accessible name and enough contrast.", levels: ["label every control and keep a visible focus", "manage focus in a dialog or menu", "announce dynamic changes and respect reduced motion"] },
+    { id: "atomic_design", name: "Atomic Design", why: "Atoms, molecules and organisms give a repeatable way to build a design system.", measure: "Each piece is built only from smaller pieces and is reusable on another page.", levels: ["build an atom (button, field, icon)", "combine atoms into a molecule (search, labelled field)", "build an organism (navbar, hero, form) and place it in a template"] },
+    { id: "async_ui", name: "Loading, error and empty states", why: "Real data is slow, missing or broken; the UI must say so.", measure: "Loading, error, empty and success are all rendered and the user can retry.", levels: ["show a loading and an error message", "handle empty results and retry", "cancel stale requests and avoid showing outdated data"] },
+    { id: "responsive_layout", name: "Responsive layout", why: "Users arrive on every screen size.", measure: "No horizontal scrolling or overlapping from 320 px up; tap targets stay usable.", levels: ["make a card list reflow in one column on a phone", "use a grid with container or media queries", "handle long text, zoom 200 % and large screens"] },
+  ],
+  databases: [
+    { id: "data_modeling", name: "Data modeling", why: "A good schema prevents whole families of bugs.", measure: "Tables, keys and constraints express the rules of the case; no duplicated facts.", levels: ["design 2 related tables with keys", "normalise a flat table and add constraints", "model many-to-many, history and soft deletes"] },
+    { id: "joins_queries", name: "Queries and joins", why: "Answering a question with the right query is the daily work.", measure: "The query returns exactly the expected rows for the sample data, including the edge cases.", levels: ["filter and sort one table", "join two or three tables", "use subqueries, left joins and anti-joins correctly"] },
+    { id: "aggregation", name: "Aggregation and windows", why: "Reports and metrics are aggregations.", measure: "Group counts, sums and rankings match the expected result, including empty groups.", levels: ["count and sum with GROUP BY", "filter groups with HAVING", "rank and compare rows with window functions"] },
+    { id: "indexing", name: "Indexes and plans", why: "The same query can be fast or unusable.", measure: "You choose the right index and justify it with the query plan.", levels: ["explain what an index speeds up", "pick a composite index for a query", "read a plan and find the missing index or the bad join"] },
+    { id: "transactions_locking", name: "Transactions and isolation", why: "Concurrent writes are where data gets corrupted.", measure: "You can predict the final data of two interleaved transactions.", levels: ["use BEGIN and COMMIT for a transfer", "explain what a dirty and a non-repeatable read are", "prevent lost updates with locking or constraints"] },
+    { id: "migrations", name: "Migrations", why: "A schema changes with live data in it.", measure: "A migration applies and rolls back cleanly and keeps the existing data.", levels: ["add a column with a default", "split a column into two with a backfill", "plan a zero-downtime change"] },
+  ],
+  automation: [
+    { id: "idempotent_scripts", name: "Idempotent scripts", why: "A script that is safe to run twice is a script you can schedule.", measure: "Running the script twice produces the same result as running it once.", levels: ["skip work that is already done", "detect changes with a checksum or a marker", "recover cleanly from a run that died halfway"] },
+    { id: "parsing_text", name: "Parsing text and files", why: "Automation lives on logs, CSVs and JSON that are never clean.", measure: "Bad lines are reported, good lines are parsed, and the totals are right.", levels: ["parse a simple CSV or log line", "handle missing fields, quotes and encodings", "stream a large file without loading it all"] },
+    { id: "scheduling", name: "Scheduling and triggers", why: "Work has to start by itself at the right time.", measure: "The job runs at the expected times and does not overlap with itself.", levels: ["write a cron expression", "avoid overlapping runs with a lock", "handle missed runs, time zones and daylight saving"] },
+    { id: "retries_errors", name: "Errors, retries and partial failures", why: "Networks fail; a robust job retries what is safe and reports the rest.", measure: "Transient failures are retried with backoff, permanent ones are reported, and nothing is lost.", levels: ["catch and log an error with context", "retry with exponential backoff", "separate retryable from fatal errors and keep a dead-letter list"] },
+    { id: "api_integration", name: "API integration", why: "Most automation glues services together.", measure: "Paging, rate limits and authentication are handled and the data arrives complete.", levels: ["call an API and read the JSON", "page through all results", "respect rate limits and refresh expired tokens"] },
+    { id: "logging_alerts", name: "Logging and alerts", why: "Nobody watches a script; it has to tell you when it breaks.", measure: "A run leaves a readable log and a failure raises an alert.", levels: ["log start, end and counts", "use levels and structured fields", "alert on failure and on silence"] },
+  ],
+  tooling: [
+    { id: "git_workflow", name: "Git workflow", why: "History is how a team understands and undoes changes.", measure: "The final history and working tree match the requested state, and the commands are safe.", levels: ["branch, commit and merge", "rebase and resolve a conflict", "recover lost work with reflog and revert a pushed commit"] },
+    { id: "testing_practice", name: "Testing practice", why: "Fast tests are the safety net of every change.", measure: "Tests fail when the code is wrong and pass in one command.", levels: ["write a failing test, then make it pass", "test boundaries and errors", "isolate dependencies with fakes and keep tests deterministic"] },
+    { id: "ci_pipeline", name: "CI pipelines", why: "A change should be checked by a machine before a human reads it.", measure: "The pipeline runs tests and linters on every change and fails for the right reasons.", levels: ["run tests on push", "cache dependencies and run jobs in parallel", "gate merges and deploys on the checks"] },
+    { id: "dependencies", name: "Dependencies and environments", why: "It must build on every machine, not just yours.", measure: "A fresh clone installs and runs with one documented command.", levels: ["pin versions and use a virtual environment", "separate dev and production dependencies", "audit and update dependencies safely"] },
+    { id: "debugging_tools", name: "Debugging and the terminal", why: "Finding the cause quickly is the most valuable skill.", measure: "You state a hypothesis, collect evidence with a tool, and fix the root cause.", levels: ["read a stack trace", "use a debugger and logs to narrow down", "bisect history to find the commit that broke it"] },
+    { id: "code_quality", name: "Linting and code quality", why: "Automatic checks keep a codebase consistent.", measure: "The linter and formatter run clean and the rules are in the repository.", levels: ["configure a formatter", "add a linter and fix its warnings", "add pre-commit hooks and enforce them in CI"] },
+  ],
+  desktop: [
+    { id: "ipc_design", name: "IPC design", why: "The main and renderer processes only talk through messages you design.", measure: "Each channel has a typed request and response and validates its input.", levels: ["send a message from renderer to main", "return typed results and errors", "design channels that can be cancelled and streamed"] },
+    { id: "window_lifecycle", name: "Windows and lifecycle", why: "Apps must start, hide, restore and quit correctly.", measure: "State survives restarts and closing the last window behaves as intended.", levels: ["create a window and handle close", "restore size and position", "handle single instance, deep links and quit cleanup"] },
+    { id: "secure_preload", name: "Secure preload and isolation", why: "The renderer must never get raw access to Node.", measure: "Only a minimal allow-listed API is exposed and inputs are validated.", levels: ["expose one function through the preload", "validate every argument in the main process", "audit an API surface for privilege escalation"] },
+    { id: "file_persistence", name: "Files and persistence", why: "Users' data must never be lost or corrupted.", measure: "Writes are atomic and a corrupted file is recovered.", levels: ["save and load a JSON file", "write atomically and keep a backup", "migrate the format between versions"] },
+    { id: "packaging_updates", name: "Packaging and updates", why: "An app nobody can install does not exist.", measure: "The app installs, starts and updates without manual steps.", levels: ["build an installer", "sign and version a release", "ship an update and roll back"] },
+    { id: "native_integration", name: "Menus, shortcuts and native integration", why: "Desktop users expect native behaviour.", measure: "Menus, shortcuts, notifications and the tray work on the target OS.", levels: ["add a menu with a shortcut", "add a tray icon and a notification", "handle OS differences and accessibility"] },
+  ],
+  mobile: [
+    { id: "navigation", name: "Navigation", why: "Moving between screens is the skeleton of a mobile app.", measure: "Back, deep links and state restoration behave as users expect.", levels: ["stack navigation between two screens", "tabs and passing parameters", "deep links and restoring state after the app was killed"] },
+    { id: "app_lifecycle", name: "App lifecycle", why: "The OS can pause or kill your app at any time.", measure: "No data is lost when the app goes to background or is killed.", levels: ["react to foreground and background", "save a draft on pause", "resume long operations after a kill"] },
+    { id: "offline_storage", name: "Local storage and offline", why: "Mobile connections come and go.", measure: "The app is usable offline for the basics and syncs afterwards.", levels: ["persist a small setting", "cache a list and show it offline", "queue writes and replay them when back online"] },
+    { id: "permissions", name: "Permissions and privacy", why: "Users can refuse access, and often do.", measure: "Every denied permission leaves the app working with a clear explanation.", levels: ["request and check one permission", "explain why before asking", "degrade gracefully when permanently denied"] },
+    { id: "sync_conflicts", name: "Syncing with a backend", why: "Two devices edit the same data.", measure: "Conflicts are detected and resolved without losing an edit.", levels: ["fetch and display remote data", "push local changes with retry", "resolve conflicts with timestamps or merge rules"] },
+    { id: "mobile_performance", name: "Performance on a phone", why: "Phones are slow, small and run on battery.", measure: "Lists stay smooth and startup stays fast on a low-end device.", levels: ["render a long list efficiently", "avoid unnecessary re-renders", "profile startup and memory and fix the worst offender"] },
+  ],
+};
+
+export const areaSkillsOf = (areaId: string | undefined): readonly AreaSkill[] => AREA_SKILLS[areaId ?? ""] ?? [];
+
+/** El id lógico de skill de los katas de un área en el ledger de intentos (`pp_kata:backend`). La nota lleva `skill: pp_kata` y se atribuye al área por su carpeta. */
+export const areaKataSkillId = (areaId: string): string => `pp_kata:${areaId}`;
+
 /** El proyecto MENSUAL integrador: una aplicación. */
 export function integratedMonthly(areaIds: readonly string[], label: string): { title: string; description: string } {
   return { title: `Aplicación del mes · ${label}`, description: `Una aplicación que integra las verticales semanales del mes${areaIds.length ? ` (${areaIds.map((a) => AREA_PRACTICE[a]?.name ?? a).slice(0, 4).join(" · ")})` : ""}: interfaz, API y base de datos.` };

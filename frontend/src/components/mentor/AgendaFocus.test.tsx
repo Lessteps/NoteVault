@@ -41,6 +41,7 @@ function areasPlan(extra: Partial<PlanData> = {}): PlanData {
   return {
     id: PID, start: START, end: END, name: "Backend + Databases · 5 oct–3 ene", createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z", hoursPerWeek: 20, preconditions: PRE as never, structure: "areas",
     programmingPractice: buildPracticeTrack(PRE as never),
+    deliverablesDefinedAt: "2026-10-02T00:00:00Z", // entregables ya definidos (si no, la Agenda los enseña «por definir»)
     subplans: [
       { id: "s1-backend", area: "Backend", areaId: "backend", objective: "Servicios", topics: be, weeks: slices(be), requiredGoals: [], phase: { fromWeek: 1, toWeek: 10 },
         groups: [{ id: "bases", title: "Bases", kind: "bases", order: 0 }, { id: "lang-python", title: "Lenguaje: Python", kind: "language", order: 10 }, { id: "core", title: "Conocimientos de backend", kind: "knowledge", order: 100 }] },
@@ -65,6 +66,7 @@ const loaded = (p: PlanData, exercisesOf: (folder: string) => number = () => 0):
   goals: {}, projects: {}, items: [], practiceItems: [], practice: { ppReady: true, kata: null, kataDoneDates: [], weeks: [] }, months: [], plans: [row()], aiConfigured: true,
 });
 
+const areaSection = (areaId: string): HTMLElement => host.querySelector<HTMLElement>(`[data-testid=agenda-day-area][data-area=${areaId}]`)!;
 const focusDay = (): string => buildSchedule(areasPlan() as never).days.find((d) => d.week >= 2 && d.focus && d.practice.kata && (d.blocks ?? []).every((b) => b.status === "topic"))!.date;
 
 let host: HTMLDivElement;
@@ -127,38 +129,41 @@ describe("vista Día: secciones en orden", () => {
     expect(byTest("agenda-focus-chip").textContent).toBe("Enfoque: Backend");
     expect(byTest("agenda-day-today-line").textContent).toBe("Hoy: teoría de backend + práctica de Python + teoría y práctica de SQL");
     expect(byTest("agenda-purpose-text").textContent).toContain("Enfoque Backend");
-    const order = [...day.querySelectorAll("[data-testid=agenda-day-theory],[data-testid=agenda-day-practice],[data-testid=agenda-day-logic],[data-testid=agenda-day-projects]")].map((s) => s.getAttribute("data-testid"));
-    expect(order).toEqual(["agenda-day-theory", "agenda-day-practice", "agenda-day-logic", "agenda-day-projects"]);
+    // una sección por ÁREA (teoría y práctica de cada una), luego práctica de lenguaje, reto de lógica y los proyectos integradores
+    const order = [...day.querySelectorAll("[data-testid=agenda-day-area],[data-testid=agenda-day-language],[data-testid=agenda-day-logic],[data-testid=agenda-day-projects]")].map((s) => s.getAttribute("data-testid") + (s.getAttribute("data-area") ? `:${s.getAttribute("data-area")}` : ""));
+    expect(order).toEqual(["agenda-day-area:backend", "agenda-day-area:databases", "agenda-day-language", "agenda-day-logic", "agenda-day-projects"]);
+    const areaOrder = [...day.querySelectorAll("[data-testid=agenda-day-area] > h3")].map((h) => h.textContent);
+    expect(areaOrder[0]).toContain("Backend");
+    expect(areaOrder[1]).toContain("Databases");
     // las secciones son los últimos hijos del artículo, en ese orden, y los proyectos cierran la vista
     const sections = [...day.children].filter((c) => c.tagName === "SECTION");
     expect(sections.at(-1)!.getAttribute("data-testid")).toBe("agenda-day-projects");
     // cabecera y propósito van antes que la teoría
     const kids = [...day.children].map((c) => c.getAttribute("data-testid") ?? c.tagName);
-    expect(kids.indexOf("agenda-purpose")).toBeLessThan(kids.indexOf("agenda-day-theory"));
-    expect(byTest("agenda-day-theory").textContent).toContain("Teoría del día");
-    expect(byTest("agenda-day-practice").textContent).toContain("Práctica del día");
+    expect(kids.indexOf("agenda-purpose")).toBeLessThan(kids.indexOf("agenda-day-area"));
+    expect(byTest("agenda-day-theory").textContent).toContain("Teoría de Backend");
+    expect(byTest("agenda-day-practice").textContent).toContain("Práctica de Backend");
     expect(byTest("agenda-day-logic").textContent).toContain("Reto de lógica");
   });
 
   it("los 4 bloques obligatorios de Backend están el mismo día: teoría de backend, práctica de Python, teoría de BD y práctica de BD", async () => {
     await openDay(focusDay());
-    const theory = all("agenda-block", byTest("agenda-day-theory")).map((b) => b.getAttribute("data-block"));
-    const practice = all("agenda-block", byTest("agenda-day-practice")).map((b) => b.getAttribute("data-block"));
+    const theory = all("agenda-day-theory").flatMap((s) => all("agenda-block", s)).map((b) => b.getAttribute("data-block"));
+    const practice = all("agenda-day-practice").flatMap((s) => all("agenda-block", s)).map((b) => b.getAttribute("data-block"));
     expect(theory).toEqual(["backend-theory", "db-theory"]);
     expect(practice).toEqual(["backend-lang", "db-practice"]);
-    expect(byTest("agenda-day-practice").textContent).toContain("Práctica de lenguaje (Python)");
-    expect(byTest("agenda-day-practice").textContent).toContain("Práctica de bases de datos (SQL)");
-    expect(byTest("agenda-practice-note").textContent).toMatch(/La práctica varía según el enfoque\. Con enfoque Backend practicas cada día el lenguaje del servidor \(Python\) y SQL/);
+    expect(areaSection("backend").textContent).toContain("Práctica de lenguaje (Python)");
+    expect(areaSection("databases").textContent).toContain("Práctica de bases de datos (SQL)");
     // cada tema con minutos y «Ver tema»; los fundamentos intercalados se rotulan como lógica aplicada
     for (const t of all("agenda-topic")) expect(t.querySelector("[data-testid=agenda-topic-minutes]")!.textContent).toMatch(/\d+ min|[\d,.]+ h/);
-    expect(byTest("agenda-day-practice").textContent).toContain("Lógica aplicada (fundamentos)");
+    expect(areaSection("backend").textContent).toContain("Lógica aplicada (fundamentos)");
     expect(host.querySelector("button[aria-label^='Ver tema']")).toBeTruthy();
   });
 
   it("la práctica enseña ejercicios concretos: automáticos (plantilla) por defecto, los de la vault si el tema ya los tiene y los del Mentor si hay currículo", async () => {
     const d = focusDay();
     await openDay(d);
-    const ex = all("agenda-exercise", byTest("agenda-day-practice"));
+    const ex = all("agenda-day-practice").flatMap((s) => all("agenda-exercise", s));
     expect(ex.length).toBeGreaterThan(0);
     expect(ex.some((e) => /Practica .* en Python: 3 ejercicios del tema/.test(e.textContent!))).toBe(true);
     expect(ex.every((e) => e.textContent!.includes("Automático"))).toBe(true);
@@ -170,7 +175,7 @@ describe("vista Día: secciones en orden", () => {
     root = createRoot(host);
     // la vault ya tiene ejercicios de Databases: se priorizan y se enlazan
     await openDay(d, areasPlan(), (f) => (f.includes("6 Databases") ? 3 : 0));
-    const dbBlock = byTest("agenda-day-practice").querySelector("[data-block=db-practice]")!;
+    const dbBlock = areaSection("databases").querySelector("[data-block=db-practice]")!;
     expect(dbBlock.textContent).toContain("En tu vault");
     expect(dbBlock.textContent).toContain("3 en tu vault");
     expect(dbBlock.textContent).not.toContain("Automático");
@@ -183,8 +188,8 @@ describe("vista Día: secciones en orden", () => {
     const first = day.blocks!.find((b) => b.id === "db-practice")!.items[0]!.folder;
     const cur = sanitizeCurriculum({ weeks: [{ week: day.week, source: "ai", exercises: [{ topic: first, practice: "database", title: "Diseña la tabla clientes y escribe la consulta con JOIN que liste sus pedidos" }], logic: [{ title: "Agrupa pedidos por cliente" }] }] }, scopeOfPlan(p0 as never))!;
     await openDay(d, areasPlan({ practiceCurriculum: cur }));
-    expect(byTest("agenda-day-practice").textContent).toContain("Diseña la tabla clientes y escribe la consulta con JOIN");
-    expect(byTest("agenda-day-practice").textContent).toContain("Del Mentor");
+    expect(areaSection("databases").textContent).toContain("Diseña la tabla clientes y escribe la consulta con JOIN");
+    expect(areaSection("databases").textContent).toContain("Del Mentor");
     expect(byTest("agenda-practice-kata").textContent).toContain("Agrupa pedidos por cliente");
     expect(byTest("agenda-practice-kata").textContent).not.toContain("Automático");
   });
@@ -253,13 +258,16 @@ describe("Semana, Mes y Calendario con enfoque", () => {
     await openAgenda();
     await click(view("calendario"));
     const cell = byTest("agenda-grid").querySelector<HTMLButtonElement>("button[data-date='2026-10-14']")!;
-    expect(cell.getAttribute("aria-label")).toMatch(/^miércoles 14 de octubre: enfoque Backend, 2 teorías, 2 prácticas, proyecto diario, \d+ temas?, \d+ entregables?/);
-    expect(cell.querySelector("[data-testid=agenda-cell-focus]")!.textContent).toBe("Backend");
-    // un sábado (sin estudio) no lleva enfoque
+    // la etiqueta da el desglose POR ÁREA, en el orden fijo
+    expect(cell.getAttribute("aria-label")).toMatch(/^miércoles 14 de octubre: Backend \d+ temas? y práctica; Databases \d+ temas? y práctica, proyecto diario, \d+ entregables?/);
+    // cada día enseña un indicador por área, con texto (Back, BD): el color nunca va solo
+    expect([...cell.querySelectorAll("[data-testid=agenda-cell-area]")].map((a) => a.getAttribute("data-area"))).toEqual(["backend", "databases"]);
+    expect(cell.querySelector("[data-testid=agenda-cell-area]")!.textContent).toMatch(/^Back\d+t P/);
+    // un sábado (sin estudio) no lleva áreas
     const sat = byTest("agenda-grid").querySelector<HTMLButtonElement>("button[data-date='2026-10-10']")!;
-    expect(sat.getAttribute("aria-label")).not.toContain("enfoque");
-    expect(sat.querySelector("[data-testid=agenda-cell-focus]")).toBeNull();
-    expect(byTest("agenda-calendar").textContent).toContain("el nombre con color es el enfoque del día");
+    expect(sat.getAttribute("aria-label")).not.toContain("Backend");
+    expect(sat.querySelector("[data-testid=agenda-cell-area]")).toBeNull();
+    expect(byTest("agenda-calendar").textContent).toContain("Cada línea es un área");
   });
 });
 

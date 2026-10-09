@@ -21,7 +21,6 @@ import {
   KATA_CHOICES,
   LEVELS,
   MAX_NOTES_CHARS,
-  normalizeDeliverables,
   PACES,
   PERIOD_PRESETS,
   periodLabel,
@@ -34,7 +33,6 @@ import {
   type BranchPresetKey,
   type PlanAreaMode,
   type PlanLanguageId,
-  type DeliverablesMode,
   type PeriodPresetKey,
   type PlanLevel,
   type PlanPace,
@@ -83,8 +81,6 @@ interface Remembered {
   minutesPerDay?: number;
   studyDays?: number[];
   pace?: PlanPace;
-  /** tres estados; los valores antiguos (booleano) se leen con `normalizeDeliverables` */
-  deliverables?: DeliverablesMode | boolean;
   preset?: PeriodPresetKey;
   /** última elección explícita del interruptor de Programming practice (si no, depende de lo que cubras) */
   practiceOn?: boolean;
@@ -102,27 +98,15 @@ interface Remembered {
 
 /** Las tres formas de combinar las áreas, con una frase de ayuda cada una. */
 export const AREA_MODE_OPTIONS: Array<{ mode: PlanAreaMode; label: string; help: string }> = [
-  { mode: "together", label: "Juntas", help: "Todas las áreas activas todo el periodo y presentes cada día: front, back y bases de datos juntos en los proyectos diarios, semanales y mensuales. Automation va al final." },
+  { mode: "together", label: "Juntas desde el día 1 (Automation al final)", help: "Todas las áreas (también Tooling and Quality) activas desde el día 1 y presentes cada día: front, back y bases de datos juntos en los proyectos diarios, semanales y mensuales. Solo Automation va al final (las últimas semanas, ~15–20 %) y el resto sigue como práctica y proyectos de mantenimiento. Es la opción por defecto." },
   { mode: "phased", label: "Separadas por fases", help: "Una o dos áreas por fase (meses), como máximo 2 en paralelo: profundizas en cada una antes de pasar a la siguiente. Automation va al final." },
-  { mode: "ai", label: "Que decida el Mentor", help: "El Mentor propone cómo combinarlas, la app lo valida y calcula, y verás una línea que explica por qué." },
+  { mode: "ai", label: "Que decida el Mentor", help: "El Mentor propone cómo combinarlas, la app lo valida y calcula, y verás una línea que explica por qué. Ya no es la opción por defecto." },
 ];
 
-export const DELIVERABLE_OPTIONS: Array<{ mode: DeliverablesMode; label: string }> = [
-  { mode: "ask", label: "Lo decidimos al armar el plan" },
-  { mode: "yes", label: "Sí, incluir entregables" },
-  { mode: "no", label: "No por ahora" },
-];
 export const SESSION_CHOICES = [1, 2, 3, 4, 5] as const;
 export const SESSION_MINUTES = [45, 60, 90, 120] as const;
 /** El espacio de Programación (o su rama de práctica) entre lo que se cubre activa la práctica por defecto. */
 export const isProgrammingArea = (area: string): boolean => /programaci[oó]n|programming/i.test(area);
-
-/**
- * Lo recordado entre formularios. El formulario antiguo guardaba un booleano en cada envío (y «sí» era el valor por
- * defecto, no una elección), así que un booleano recordado NO fija nada: se vuelve a «a discutir». Solo se recuerdan
- * los tres estados nuevos. (Los planes y preferencias en disco sí se leen con `normalizeDeliverables`: true → yes.)
- */
-const rememberedDeliverables = (v: unknown): DeliverablesMode => (typeof v === "string" ? normalizeDeliverables(v) : "ask");
 
 function remembered(): Remembered {
   try {
@@ -178,8 +162,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   const [subjects, setSubjects] = useState<string[]>([]);
   const [freeObjective, setFreeObjective] = useState("");
   const [levels, setLevels] = useState<Record<string, PlanLevel>>({});
-  const [deliverables, setDeliverables] = useState<DeliverablesMode>(rememberedDeliverables(mem.deliverables));
-  const [areaMode, setAreaMode] = useState<PlanAreaMode>(mem.areaMode ?? "ai");
+  const [areaMode, setAreaMode] = useState<PlanAreaMode>(mem.areaMode === "phased" || mem.areaMode === "together" ? mem.areaMode : "together");
   const [optLangs, setOptLangs] = useState<PlanLanguageId[]>(mem.languages ?? []);
   const [practiceOn, setPracticeOn] = useState(mem.practiceOn ?? false);
   const [kataMinutes, setKataMinutes] = useState(mem.kataMinutes ?? DEFAULT_PRACTICE.kataMinutes);
@@ -255,7 +238,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
     () =>
       sanitizePreconditions(
         {
-          start, end, minutesPerDay: minutes, studyDays: days, blockedDates: blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes,
+          start, end, minutesPerDay: minutes, studyDays: days, blockedDates: blocked, pace, goalIds, subjects, freeObjective, levels, deliverables: "no", notes,
           ...(scopeAreaIds.length >= 2 ? { areaMode } : {}),
           ...(languages ? { languages } : {}),
           ...(Object.keys(branches).length ? { branches, ...(branchPreset ? { branchPreset } : {}), branchExcluded: excludedBranches } : branchPreset === "all" ? { branchPreset } : {}),
@@ -263,7 +246,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
         },
         t0,
       ),
-    [areaMode, languages, scopeAreaIds, start, end, minutes, days, blocked, pace, goalIds, subjects, freeObjective, levels, deliverables, notes, branches, branchPreset, excludedBranches, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, t0],
+    [areaMode, languages, scopeAreaIds, start, end, minutes, days, blocked, pace, goalIds, subjects, freeObjective, levels, notes, branches, branchPreset, excludedBranches, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, t0],
   );
   // sanitizePreconditions corrige lo inválido; para el aviso se mira lo que el estudiante escribió
   const rawProblem = !isDate(start) || !isDate(end) ? "Indica las fechas de inicio y fin del periodo." : end < start ? "La fecha de fin es anterior a la de inicio." : null;
@@ -351,7 +334,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
   };
   const remember = () => {
     try {
-      localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: pre.minutesPerDay, studyDays: pre.studyDays, pace: pre.pace, deliverables: pre.deliverables, preset: preset === "custom" ? undefined : preset, areaMode, languages: optLangs, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, ...(branchAreas.length && branchPreset ? { branchPreset } : {}) } satisfies Remembered));
+      localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ minutesPerDay: pre.minutesPerDay, studyDays: pre.studyDays, pace: pre.pace, preset: preset === "custom" ? undefined : preset, areaMode, languages: optLangs, practiceOn, kataMinutes, sessionsPerWeek, minutesPerSession, monthly, practiceFocus, ...(branchAreas.length && branchPreset ? { branchPreset } : {}) } satisfies Remembered));
     } catch {
       /* sin almacenamiento: no se recuerda */
     }
@@ -649,7 +632,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
             {AREA_MODE_OPTIONS.map((o) => (
               <ChipToggle key={o.mode} active={areaMode === o.mode} onClick={() => setAreaMode(o.mode)} title={o.help}>
                 {o.label}
-                {o.mode === "together" && suggestTogether ? <span className="text-[13px] text-faint"> · sugerida</span> : null}
+                {o.mode === "together" && suggestTogether ? <span className="text-[13px] text-faint"> · por defecto</span> : null}
               </ChipToggle>
             ))}
           </div>
@@ -761,15 +744,9 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
       </Panel>
 
       <Panel title="Entregables">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Entregables">
-          {DELIVERABLE_OPTIONS.map((o) => (
-            <ChipToggle key={o.mode} active={deliverables === o.mode} onClick={() => setDeliverables(o.mode)}>
-              {o.label}
-            </ChipToggle>
-          ))}
-        </div>
-        <p className="mt-1.5 text-[14px] text-faint">
-          Es una opción a discutir. Un entregable es un archivo práctico que demuestra una habilidad: los de práctica (kata del día, proyecto semanal y mensual) salen de {PRACTICE_NAME} y el proyecto de cada área lo propone la IA. Con «Lo decidimos al armar el plan» el borrador no añade proyectos de área y te hace UNA sola pregunta para todo el plan.
+        <p className="text-[14px] text-text" data-testid="plan-deliverables-deferred">
+          <span className="font-semibold">Por definir.</span>{" "}
+          <span className="text-dim">Los entregables dependen del sistema de práctica y de los proyectos que se definen al ejecutar el plan, así que no se eligen aquí: quedan sin definir hasta entonces (o puedes pedirlos después en «Preguntas y ajustes»).</span>
         </p>
       </Panel>
 

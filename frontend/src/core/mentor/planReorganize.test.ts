@@ -27,7 +27,7 @@ function legacyPlan(): Plan {
     legacySeed("9 Tooling and Quality", 4, "Mejorar calidad de código y uso de herramientas de desarrollo"),
     legacySeed("programming_practice", 1, "Avanzar en programming_practice"),
   ];
-  const built = buildPlan(seeds, { start: START, end: END, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6, 7], pace: "intenso", from: START, id: `${START}_${END}`, name: "Reforzar bases de programación necesaria +9 · 6 oct–5 abr", rationale: "Se prioriza lo que pidió el estudiante.", preconditions: { start: START, end: END, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6, 7], pace: "intenso", goalIds: [], subjects: ["Programación"], levels: {}, deliverables: "ask", notes: "Rotativo no incluirdesktop" } });
+  const built = buildPlan(seeds, { start: START, end: END, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6, 7], pace: "intenso", from: START, id: `${START}_${END}`, name: "Reforzar bases de programación necesaria +9 · 6 oct–5 abr", rationale: "Se prioriza lo que pidió el estudiante.", preconditions: { start: START, end: END, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6, 7], pace: "intenso", goalIds: [], subjects: ["Programación"], levels: {}, deliverables: "ask", areaMode: "phased", notes: "Rotativo no incluirdesktop" } });
   const plan = sanitizePlan({ ...built.plan, proposed: true, openQuestions: built.plan.subplans.filter((s) => !s.deliverable).map((s) => ({ id: "deliverables", subplanId: s.id, text: `¿Quieres un entregable para ${s.objective.slice(0, 20)}…?`, options: ["Sí", "No", "Después"] })) }, `${START}_${END}`)!;
   // estado vivo: dos temas completados y uno fijado a mano
   plan.subplans[0]!.topics[0]!.completedAt = "2026-10-08";

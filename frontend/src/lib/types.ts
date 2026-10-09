@@ -1468,6 +1468,8 @@ export interface MentorPlan {
   areaMode?: "together" | "phased";
   areaModeWhy?: string;
   areaModeBy?: "user" | "ai" | "rules";
+  /** cuándo (ISO) quedaron definidos los entregables (los fija la ejecución del plan); ausente y sin entregables propios = «por definir» */
+  deliverablesDefinedAt?: string;
 }
 /** currículo de práctica del plan generado por la IA (ejercicios por semana y proyectos) */
 export type MentorPracticeCurriculum = import("./planCurriculum").PracticeCurriculum;
@@ -1479,11 +1481,18 @@ export type MentorCoverageReviewResult =
   | { loading: true }
   | { loading: false; source: "ai"; review: CoverageReview; plan: MentorPlan; coverage: PlanCoverage }
   | { loading: false; source: "none"; reason: string; coverage: PlanCoverage };
+/** «Ejecutar plan»: informe (qué falta crear y cuánto cuesta) y estado de la cola de ejecución; ver `lib/planExecution.ts`. */
+export type MentorExecutionReport = import("./planExecution").ExecutionReport;
+export interface MentorExecutionView { state: import("./planExecution").ExecutionState; progress: import("./planExecution").ExecutionProgress }
+export type MentorExecutionReportResult = { loading: true } | { loading: false; report: MentorExecutionReport; execution: MentorExecutionView | null; aiConfigured: boolean };
+export type MentorExecutionStartResult = { loading: true } | { loading: false; execution: MentorExecutionView | null };
+/** Sistema de práctica por área de un plan (`mentor_area_practice`); ver `lib/areaPracticeView.ts`. */
+export interface MentorAreaPractice { today: string; ppReady: boolean; ppBase: string; areas: import("./areaPracticeView").AreaPracticeView[] }
 export interface MentorTopicView extends MentorPlannedTopic { state: MentorTopicState; pct: number; found: boolean; exercises?: number }
 export interface MentorSubplanView { id: string; topics: MentorTopicView[]; total: number; done: number; pct: number; currentWeek: number }
 export interface MentorPlanDerived {
   subplans: MentorSubplanView[];
-  summary: { subplans: number; topics: number; done: number; pct: number; currentWeek: number; weeks: number };
+  summary: { subplans: number; topics: number; done: number; pct: number; currentWeek: number; weeks: number; /** ¿hay entregables definidos? (si no, se muestran «por definir») */ deliverablesDefined?: boolean };
 }
 export interface MentorPlanItem {
   kind: "topic" | "deliverable" | "project"; planId: string; subplanId: string; label: string; area: string; title: string;

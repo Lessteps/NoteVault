@@ -375,6 +375,18 @@ export const api = {
   mentorPlanCoverage: (id: string) => call<import("./types").MentorPlanCoverage>("mentor_plan_coverage", { id }),
   /** «Revisar cobertura con el Mentor»: una llamada a la IA (clave de estado `coverage:<id>`); guarda `coverageReview` en el plan. */
   mentorPlanCoverageReview: (id: string, profile?: string, criteria?: import("./planCoverage").CoverageCriteria) => call<import("./types").MentorCoverageReviewResult>("mentor_plan_coverage_review", { id, ...(profile ? { profile } : {}), ...(criteria ? { criteria } : {}) }),
+  /** «Ejecutar plan»: el informe de lo que falta crear (solo lee). */
+  mentorExecutionReport: (id: string, scope?: Partial<import("./planExecution").ExecutionScope>) => call<import("./types").MentorExecutionReportResult>("mentor_execution_report", { id, ...(scope ? { scope } : {}) }),
+  mentorExecutionStatus: (id: string) => call<{ execution: import("./types").MentorExecutionView | null; active: boolean }>("mentor_execution_status", { id }),
+  /** Empieza la ejecución en segundo plano. SOLO tras la confirmación de la persona en el diálogo (`confirm: true`). */
+  mentorExecutionStart: (id: string, scope: Partial<import("./planExecution").ExecutionScope>) => call<import("./types").MentorExecutionStartResult>("mentor_execution_start", { id, scope, confirm: true }),
+  mentorExecutionPause: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_pause", { id }),
+  mentorExecutionResume: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_resume", { id }),
+  mentorExecutionCancel: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_cancel", { id }),
+  /** Sistema de práctica por área: katas, habilidades y proyectos de cada área del plan. */
+  mentorAreaPractice: (id: string) => call<import("./types").MentorAreaPractice>("mentor_area_practice", { id }),
+  mentorAreaPracticeOn: (id: string, date: string) => call<{ items: Array<{ areaId: string; label: string; day: number; rel: string; title: string; skill: string; level: number; minutes: number }> }>("mentor_area_practice_on", { id, date }),
+  mentorAreaKataMark: (id: string, areaId: string, date: string, status: "done" | "skipped" | null) => call<import("./types").MentorAreaPractice>("mentor_area_kata_mark", { id, areaId, date, status }),
   mentorPlanCoverageAccept: (id: string, areaKey: string, title: string, accepted = true) => call<{ review: import("./planCoverage").CoverageReview }>("mentor_plan_coverage_accept", { id, areaKey, title, accepted }),
   mentorPlanRouteSet: (opts: { id: string; folders: string[]; route: "core" | "optional" | "skipped"; reason?: string; label?: string }) =>
     call<import("./types").MentorRouteChangeResult>("mentor_plan_route_set", opts),

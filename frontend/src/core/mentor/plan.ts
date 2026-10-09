@@ -46,6 +46,7 @@ import {
   type PlanPurposes,
 } from "../../lib/planAreas.js";
 import { buildSchedule } from "../../lib/planSchedule.js";
+import { deliverablesDefined } from "../../lib/planTopicsByArea.js";
 import { isLive, sanitizeRouteFields, type TopicRoute } from "../../lib/planRoute.js";
 import { projectsForSubplan, sanitizeTopicProject, type MasteryLookup, type TopicProject } from "../../lib/planTopicProject.js";
 import { dailyProjectOf } from "../../lib/planCurriculum.js";
@@ -228,6 +229,11 @@ export interface Plan {
   /** la línea de justificación visible del modo y quién lo decidió */
   areaModeWhy?: string;
   areaModeBy?: AreaModeSource;
+  /**
+   * Cuándo (ISO) quedaron DEFINIDOS los entregables del plan: los fija la ejecución del plan (sistema de práctica y proyectos por área). Mientras
+   * no exista (y no haya entregables manuales, de área ni currículo), los entregables están «por definir» (ver `deliverablesDefined`).
+   */
+  deliverablesDefinedAt?: string;
   subplans: Subplan[];
 }
 /** Nombre histórico: un plan mensual es un plan de periodo. */
@@ -770,6 +776,8 @@ export interface SubplanView {
 }
 
 export interface PlanSummary {
+  /** ¿hay entregables DEFINIDOS? Mientras no, la UI los muestra «por definir» (ver `deliverablesDefined` en lib/planTopicsByArea.ts) */
+  deliverablesDefined?: boolean;
   subplans: number;
   topics: number;
   done: number;
@@ -802,7 +810,7 @@ export function deriveView(plan: Plan, lookup: TopicLiteLookup, today: string): 
   const total = subplans.reduce((n, s) => n + s.total, 0);
   const done = subplans.reduce((n, s) => n + s.done, 0);
   const pct = total ? Math.round(subplans.reduce((n, s) => n + s.pct * s.total, 0) / total) : 0;
-  return { subplans, summary: { subplans: subplans.length, topics: total, done, pct, currentWeek: cur, weeks } };
+  return { subplans, summary: { subplans: subplans.length, topics: total, done, pct, currentWeek: cur, weeks, deliverablesDefined: deliverablesDefined(plan) } };
 }
 
 /**
@@ -1080,6 +1088,7 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
     ...(sanitizePurposes(raw.purposes) ? { purposes: sanitizePurposes(raw.purposes)! } : {}),
     ...(sanitizeCoverageReview(raw.coverageReview, subplans.map(areaKeyOf)) ? { coverageReview: sanitizeCoverageReview(raw.coverageReview, subplans.map(areaKeyOf))! } : {}),
     ...(curriculum ? { practiceCurriculum: curriculum } : {}),
+    ...(typeof raw.deliverablesDefinedAt === "string" && !Number.isNaN(Date.parse(raw.deliverablesDefinedAt)) ? { deliverablesDefinedAt: raw.deliverablesDefinedAt.slice(0, 40) } : {}),
     subplans,
   };
 }

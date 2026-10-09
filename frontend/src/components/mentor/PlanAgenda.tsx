@@ -44,20 +44,22 @@ export function PlanAgenda({ data, plan, onChanged, announce }: { data: Loaded; 
   // al cambiar el plan (p. ej. tras «Reorganizar») el ancla sigue dentro de él
   useEffect(() => setAnchorRaw((a) => clampToPlan(a, plan)), [plan]);
 
+  // mientras no haya entregables definidos, el resumen dice «entregables por definir» (sin contarlos)
+  const delText = useCallback((n: number): string => (m.deliverablesDefined ? deliverablesText(n) : "entregables por definir"), [m.deliverablesDefined]);
   const summary = useMemo(() => {
     if (view === "dia") {
       const d = m.schedule.byDate.get(anchor);
       if (!d) return "fuera del plan";
       const c = dayBlockCounts(d);
-      return `${d.focus ? `enfoque ${d.focus.label}, ${c.theory} ${c.theory === 1 ? "teoría" : "teorías"}, ${c.practice} ${c.practice === 1 ? "práctica" : "prácticas"}, ` : ""}${topicsText(d.topics.length)}, ${deliverablesText((m.dueByDate.get(anchor) ?? []).length)}`;
+      return `${d.focus ? `enfoque ${d.focus.label}, ${c.theory} ${c.theory === 1 ? "teoría" : "teorías"}, ${c.practice} ${c.practice === 1 ? "práctica" : "prácticas"}, ` : ""}${topicsText(d.topics.length)}, ${delText((m.dueByDate.get(anchor) ?? []).length)}`;
     }
     if (view === "semana") {
-      const w = weekSummary(plan, m.schedule, Math.floor(daysBetween(plan.start, anchor) / 7) + 1, m.deliverables);
-      return w ? `${topicsText(w.topics)}, ${deliverablesText(w.deliverables.length)}` : "";
+      const w = weekSummary(plan, m.schedule, Math.floor(daysBetween(plan.start, anchor) / 7) + 1, m.deliverablesDefined ? m.deliverables : []);
+      return w ? `${topicsText(w.topics)}, ${delText(w.deliverables.length)}` : "";
     }
-    const s = monthSummary(plan, m.schedule, anchor.slice(0, 7), m.deliverables);
-    return s ? `${topicsText(s.topics)}, ${deliverablesText(s.deliverables.length)}` : "";
-  }, [view, anchor, m, plan]);
+    const s = monthSummary(plan, m.schedule, anchor.slice(0, 7), m.deliverablesDefined ? m.deliverables : []);
+    return s ? `${topicsText(s.topics)}, ${delText(s.deliverables.length)}` : "";
+  }, [view, anchor, m, plan, delText]);
   const title = periodTitle(view === "calendario" ? "mes" : view, anchor, plan);
 
   // anuncia el periodo mostrado cuando cambia (no en la primera pintura)

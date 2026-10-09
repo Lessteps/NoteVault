@@ -70,8 +70,12 @@ async function generate(over: Record<string, unknown> = {}, send?: any) {
 }
 
 describe("entregables a discutir en el borrador", () => {
-  it("por defecto «ask»: ningún entregable y UNA sola pregunta global pendiente; booleanos antiguos se leen", async () => {
-    const { draft } = await generate();
+  it("por defecto los entregables quedan POR DEFINIR: ni entregable ni pregunta; «ask» de planes antiguos sigue dando UNA pregunta global; booleanos antiguos se leen", async () => {
+    const fresh = (await generate()).draft;
+    expect(fresh.preconditions.deliverables).toBe("no");
+    expect(fresh.subplans.every((s: any) => !s.deliverable)).toBe(true);
+    expect(fresh.openQuestions).toBeUndefined();
+    const { draft } = await generate({ deliverables: "ask" });
     expect(draft.preconditions.deliverables).toBe("ask");
     expect(draft.subplans.every((s: any) => !s.deliverable)).toBe(true);
     expect(draft.openQuestions).toEqual([{ id: "deliverables", text: expect.stringContaining("por cada área"), options: ["Sí", "No", "Después"] }]);
@@ -85,14 +89,14 @@ describe("entregables a discutir en el borrador", () => {
     hoisted.store.model = "m";
     const reply = JSON.stringify({ type: "plan_draft", rationale: "r", hoursPerWeek: 5, subplans: [{ area: "Programación", objective: "o", topics: [{ folder: FUND }], deliverable: { title: "P", description: "d", criteria: ["c"] } }] });
     const send = vi.fn().mockResolvedValueOnce(reply);
-    const { draft } = await generate({}, send);
+    const { draft } = await generate({ deliverables: "ask" }, send);
     expect((send.mock.calls[0]![1] as any[])[0].content).toContain("Entregables: A DISCUTIR");
     expect(draft.subplans[0].deliverable).toBeUndefined();
     expect(draft.openQuestions).toHaveLength(1);
   });
 
   it("responder la pregunta global: yes añade el proyecto de cada área, no la descarta, later la deja; todo queda en el borrador", async () => {
-    const { api, res } = await generate({ subjects: ["Programación"], goalIds: [] });
+    const { api, res } = await generate({ subjects: ["Programación"], goalIds: [], deliverables: "ask" });
     const base = { turnId: res.pending, chatId: res.chatId };
     const later: any = api.mentor_plan_draft_answer({ ...base, answer: "later" });
     expect(later.planDraft.openQuestions).toHaveLength(1);
@@ -108,14 +112,14 @@ describe("entregables a discutir en el borrador", () => {
     // no escribe ningún plan
     expect(fs.existsSync(path.join(dir, ".notevault", "mentor", "plans"))).toBe(false);
 
-    const second = await generate({ end: addDays(todayIso(), 13) });
+    const second = await generate({ end: addDays(todayIso(), 13), deliverables: "ask" });
     const no: any = second.api.mentor_plan_draft_answer({ turnId: second.res.pending, chatId: second.res.chatId, answer: "no" });
     expect(no.planDraft.openQuestions).toBeUndefined();
     expect(no.planDraft.subplans[0].deliverable).toBeUndefined();
   });
 
   it("aceptar con una pregunta sin responder la deja anotada en el plan y no inventa el entregable", async () => {
-    const { api, res } = await generate();
+    const { api, res } = await generate({ deliverables: "ask" });
     const out: any = api.mentor_plan_draft_accept({ turnId: res.pending, chatId: res.chatId });
     const plan: any = (api.mentor_plan_get({ id: out.id }) as any).plan;
     expect(plan.subplans[0].deliverable).toBeUndefined();
@@ -124,7 +128,7 @@ describe("entregables a discutir en el borrador", () => {
   });
 
   it("aceptar tras responder «yes» guarda el entregable y ninguna pregunta", async () => {
-    const { api, res } = await generate();
+    const { api, res } = await generate({ deliverables: "ask" });
     api.mentor_plan_draft_answer({ turnId: res.pending, chatId: res.chatId, answer: "yes" });
     const out: any = api.mentor_plan_draft_accept({ turnId: res.pending, chatId: res.chatId });
     const plan: any = (api.mentor_plan_get({ id: out.id }) as any).plan;

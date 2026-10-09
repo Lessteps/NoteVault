@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { PlanDeliverable, PlanDeliverableStatus } from "../../lib/planAreas";
 import { dayExercisesOf, dailyProjectOf, dayLogicOf, languageBlockExercises, monthlyBlocksOf, shortOf, weeklyProjectOf, type MonthlyBlock } from "../../lib/planCurriculum";
-import { areaPracticeOf } from "../../lib/planAreaPractice";
+import { dayAreasText, dayByArea } from "../../lib/planTopicsByArea";
 import { PROJECT_BASIS_LABEL, PROJECT_LEVEL_LABEL } from "../../lib/planTopicProject";
 import type { DayBlock } from "../../lib/planDayFocus";
 import type { BlockItem } from "../../lib/planDayFocus";
@@ -23,13 +23,17 @@ import { useNavState } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { AreaChip, AreaCounts, DSTATUS_LABEL, focusColour, plural, PurposeBlock, StatusChip, type AgendaModel } from "./agendaKit";
+import { AreaDot, areaColour, areaPracticeView } from "./AreaViews";
 import { openTopic } from "./openTopic";
 import { hm, ProgressBar, ThinkingStatus, useAiStatus } from "./parts";
 import { openPractice } from "./PracticeCard";
 import { PALETTE, STATE_COLOUR, STATE_GLYPH, STATE_LABEL } from "./planShared";
 
 const SECTION = "text-[13px] font-semibold uppercase tracking-wider text-faint";
-const colourOfArea = (m: AgendaModel, subplanId: string): string => PALETTE[Math.max(0, m.plan.subplans.findIndex((s) => s.id === subplanId)) % PALETTE.length]!;
+const colourOfArea = (m: AgendaModel, subplanId: string): string => {
+  const sub = m.plan.subplans.find((s) => s.id === subplanId);
+  return sub?.areaId ? focusColour(sub.areaId) : PALETTE[Math.max(0, m.plan.subplans.findIndex((s) => s.id === subplanId)) % PALETTE.length]!;
+};
 
 /** «Enfoque: Backend» con su color como marca (el texto va en el color normal). */
 export function FocusChip({ id, label }: { id?: string; label: string }) {
@@ -64,13 +68,13 @@ function ProjectCard({ m, d, kind, onChanged, children, testid }: { m: AgendaMod
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <Chip large colour="var(--nv-practice, #c58be0)">{kind}</Chip>
         <span className="min-w-0 flex-1 basis-56 text-[15px] font-semibold">{d.title}</span>
-        <StatusChip status={d.status} />
-        {m.editable && next && (
+        {m.deliverablesDefined ? <StatusChip status={d.status} /> : <Chip large colour="var(--nv-faint)">Entregable por definir</Chip>}
+        {m.deliverablesDefined && m.editable && next && (
           <GhostButton disabled={busy} onClick={() => void set(next)} aria-label={`${next === "hecho" ? "Marcar como hecho" : "Marcar en curso"}: ${d.title}`}>
             {next === "hecho" ? "Marcar hecho" : "Marcar en curso"}
           </GhostButton>
         )}
-        {m.editable && d.status === "hecho" && (
+        {m.deliverablesDefined && m.editable && d.status === "hecho" && (
           <GhostButton disabled={busy} onClick={() => void set("pendiente")} aria-label={`Reabrir: ${d.title}`}>Reabrir</GhostButton>
         )}
       </div>
@@ -128,19 +132,21 @@ function BlockTopics({ m, items }: { m: AgendaModel; items: BlockItem[] }) {
 }
 
 /** El día por enfoque: teoría · práctica · reto de lógica · proyectos (diario, semanal, mensual) al final. */
-export function DayDetailFocus({ m, date, onChanged, headingId, level = 2 }: { m: AgendaModel; date: string; onChanged: (p: MentorPlan) => void; headingId?: string; level?: 2 | 3 }) {
+export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaFilter = null }: { m: AgendaModel; date: string; onChanged: (p: MentorPlan) => void; headingId?: string; level?: 2 | 3; /** subplan elegido en el filtro por área (null = todas) */ areaFilter?: string | null }) {
   const setPending = useMentor((s) => s.setPendingObjective);
   const day = m.schedule.byDate.get(date)!;
   const H = level === 2 ? "h2" : "h3";
   const H2 = level === 2 ? "h3" : "h4";
+  const H3 = level === 2 ? "h4" : "h5";
   const id = headingId ?? "day";
   const due = m.dueByDate.get(date) ?? [];
-  const purpose = dayPurpose(m.plan, day, due);
+  const purpose = dayPurpose(m.plan, day, m.deliverablesDefined ? due : []);
   const isToday = date === m.today;
   const canPlan = isToday && !m.plan.proposed && !m.plan.archived;
   const blocks = day.blocks ?? [];
-  const theory = blocks.filter((b) => b.kind === "theory");
-  const practice = blocks.filter((b) => b.kind === "practice");
+  // el día separado por ÁREA en el orden fijo (Backend · Frontend · Databases · Tooling and Quality · Automation)
+  const entries = dayByArea(m.plan, day, due).filter((e) => areaFilter === null || e.subplanId === areaFilter);
+  const langBlocks = blocks.filter((b) => b.daily);
   const pending = day.topics.filter((t) => !t.done);
   const done = day.topics.filter((t) => t.done);
   const logic = dayLogicOf(m.plan, m.schedule, day);
@@ -181,8 +187,8 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2 }: { m
         <p className="text-[16px] font-semibold text-text" data-testid="agenda-day-today-line">{day.focus.line}</p>
       )}
       <p className="text-[15px] font-medium text-text" data-testid="agenda-day-counts">
-        {[topicsText(day.topics.length), day.topicMinutes ? `${hm(day.topicMinutes)} de estudio` : "sin estudio", deliverablesText(due.length)].join(" · ")}
-        <AreaCounts plan={m.plan} list={due} testid="area-counts-day" />
+        {[topicsText(day.topics.length), day.topicMinutes ? `${hm(day.topicMinutes)} de estudio` : "sin estudio", m.deliverablesDefined ? deliverablesText(due.length) : "Entregables: por definir"].join(" · ")}
+        {m.deliverablesDefined && <AreaCounts plan={m.plan} list={due} testid="area-counts-day" />}
       </p>
       <PurposeBlock planId={m.plan.id} scope="day" keyName={date} text={purpose.text} auto={purpose.auto} manual={purpose.manual} editable={m.editable} onChanged={onChanged} label={longDateLabel(date)} />
 
@@ -190,81 +196,154 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2 }: { m
 
       {day.study && (
         <>
-          {/* 2 · teoría */}
-          <section aria-labelledby={`${id}-theory`} data-testid="agenda-day-theory">
-            <H2 id={`${id}-theory`} className={cn(SECTION, "mb-2")}>Teoría del día</H2>
-            {theory.length === 0 ? (
-              <p className="text-[14px] text-dim">Ningún tema de teoría repartido este día: queda para práctica, repaso o recuperar lo atrasado.</p>
-            ) : (
-              <ul className="space-y-2">
-                {theory.map((b) => (
-                  <li key={b.id} className="rounded-xl border border-line p-3" data-testid="agenda-block" data-block={b.id}>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-[15px] font-semibold">{b.label}</span>
-                      {b.status !== "topic" && <Chip large colour="var(--nv-faint)">{b.status === "review" ? "Repaso" : "Omitido"}</Chip>}
-                      {b.minutes > 0 && <span className="text-[14px] text-dim">{hm(b.minutes)}</span>}
-                    </div>
-                    {b.items.length > 0 ? <BlockTopics m={m} items={b.items} /> : <p className="mt-1 text-[14px] text-dim">{b.note}</p>}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {done.length > 0 && <p className="mt-2 text-[13.5px] text-dim">{plural(done.length, "tema completado", "temas completados")} este día: {done.map((t) => shortOf(t.title)).join(" · ")}.</p>}
-          </section>
+          {entries.length === 0 && (
+            <p className="text-[14px] text-dim" data-testid="agenda-day-no-areas">{areaFilter ? "El área elegida no tiene nada este día." : "Ningún tema repartido este día: queda para práctica, repaso o recuperar lo atrasado."}</p>
+          )}
+          {/* 2 · una sección por ÁREA, en el orden fijo: su teoría, su práctica y su proyecto */}
+          {entries.map((e) => {
+            const theory = (e.blocks ?? []).filter((b) => b.kind === "theory");
+            const practice = (e.blocks ?? []).filter((b) => b.kind === "practice");
+            const ap = areaPracticeView(m.plan, e.areaId, date);
+            const tps = (day.topicProjects ?? []).filter((tp) => tp.subplanId === e.subplanId);
+            const areaD = m.deliverablesDefined ? due.filter((d) => d.kind === "area_project" && d.areaId === e.areaId) : [];
+            const aid = `${id}-a-${e.subplanId}`;
+            return (
+              <section key={e.subplanId} aria-labelledby={aid} className="rounded-2xl border border-line bg-card p-3.5 @3xl:p-4" style={{ borderTop: `3px solid ${areaColour(e.areaId)}` }} data-testid="agenda-day-area" data-area={e.areaId ?? e.subplanId}>
+                <H2 id={aid} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[17px] font-bold">
+                  <AreaDot {...(e.areaId ? { areaId: e.areaId } : {})} /> <span className="break-words">{e.area}</span>
+                  <span className="text-[14px] font-normal text-dim">{dayAreasText([e]).slice(e.area.length + 1)}{e.theoryMinutes + e.practiceMinutes > 0 ? ` · ${hm(e.theoryMinutes + e.practiceMinutes)}` : ""}</span>
+                </H2>
 
-          {/* 3 · práctica */}
-          <section aria-labelledby={`${id}-practice`} data-testid="agenda-day-practice">
-            <H2 id={`${id}-practice`} className={cn(SECTION, "mb-2")}>Práctica del día</H2>
-            {day.focus && <p className="mb-2 text-[14px] text-dim" data-testid="agenda-practice-note">La práctica varía según el enfoque. {day.focus.practiceNote}</p>}
-            {(day.focus?.areaIds ?? []).map((a) => areaPracticeOf(a)).filter((s): s is NonNullable<typeof s> => !!s).map((s) => (
-              <details key={s.areaId} className="mb-2 rounded-lg border border-line px-3 py-2 text-[14px]" data-testid="agenda-area-practice">
-                <summary className="cursor-pointer font-medium">Sistema de práctica de {m.plan.subplans.find((p) => p.areaId === s.areaId)?.area ?? s.areaId}: {s.name}</summary>
-                <p className="mt-1.5 text-dim">{s.daily.summary}</p>
-                <p className="mt-1 text-dim"><span className="font-medium text-text">Cada fin de semana:</span> {s.weekly.summary}</p>
-                <p className="mt-1 text-dim"><span className="font-medium text-text">Cada mes:</span> {s.monthly.summary}</p>
-                <p className="mt-1 text-dim"><span className="font-medium text-text">Demuestra:</span> {s.measure}</p>
-              </details>
-            ))}
-            {practice.length === 0 ? (
-              <p className="text-[14px] text-dim">Hoy no hay bloques de práctica por tema.</p>
-            ) : (
-              <ul className="space-y-2">
-                {practice.map((b) => {
-                  const ex = dayExercisesOf(m.plan, day, b, m.existing);
-                  return (
+                <div className="mt-3" data-testid="agenda-day-theory">
+                  <H3 className={cn(SECTION, "mb-2")}>Teoría de {e.area}</H3>
+                  {theory.length === 0 ? (
+                    <p className="text-[14px] text-dim">Sin teoría de {e.area} este día.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {theory.map((b) => (
+                        <li key={b.id} className="rounded-xl border border-line p-3" data-testid="agenda-block" data-block={b.id}>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="text-[15px] font-semibold">{b.label}</span>
+                            {b.status !== "topic" && <Chip large colour="var(--nv-faint)">{b.status === "review" ? "Repaso" : "Omitido"}</Chip>}
+                            {b.minutes > 0 && <span className="text-[14px] text-dim">{hm(b.minutes)}</span>}
+                          </div>
+                          {b.items.length > 0 ? <BlockTopics m={m} items={b.items} /> : <p className="mt-1 text-[14px] text-dim">{b.note}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="mt-3" data-testid="agenda-day-practice">
+                  <H3 className={cn(SECTION, "mb-2")}>Práctica de {e.area}</H3>
+                  {ap && (
+                    <details className="mb-2 rounded-lg border border-line px-3 py-2 text-[14px]" data-testid="agenda-area-practice" data-source={ap.source}>
+                      <summary className="cursor-pointer font-medium">Sistema de práctica de {e.area}: {ap.name}</summary>
+                      <p className="mt-1.5 text-dim">{ap.daily}</p>
+                      {ap.weekly && <p className="mt-1 text-dim"><span className="font-medium text-text">Cada fin de semana:</span> {ap.weekly}</p>}
+                      {ap.monthly && <p className="mt-1 text-dim"><span className="font-medium text-text">Cada mes:</span> {ap.monthly}</p>}
+                      {ap.measure && <p className="mt-1 text-dim"><span className="font-medium text-text">Demuestra:</span> {ap.measure}</p>}
+                    </details>
+                  )}
+                  {ap?.kata && (
+                    <p className="mb-2 rounded-lg border border-line px-3 py-2 text-[14px]" data-testid="agenda-area-kata">
+                      <span className="font-medium">Kata de {e.area} de hoy:</span> {ap.kata.title}
+                      <span className="text-dim"> · {ap.kata.skill ? `${ap.kata.skill} · ` : ""}nivel {ap.kata.level}{ap.kata.minutes ? ` · ${ap.kata.minutes} min` : ""}</span>
+                      {ap.kata.statement && <span className="mt-0.5 block text-[13.5px] text-dim">{ap.kata.statement}</span>}
+                    </p>
+                  )}
+                  {practice.length === 0 ? (
+                    <p className="text-[14px] text-dim">Hoy no hay bloques de práctica por tema de {e.area}.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {practice.map((b) => {
+                        const ex = dayExercisesOf(m.plan, day, b, m.existing);
+                        return (
+                          <li key={b.id} className="rounded-xl border border-line p-3" data-testid="agenda-block" data-block={b.id}>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="text-[15px] font-semibold">{b.label}</span>
+                              {b.status !== "topic" && <Chip large colour="var(--nv-faint)">{b.status === "review" ? "Repaso" : "Omitido"}</Chip>}
+                              {b.minutes > 0 && <span className="text-[14px] text-dim">{hm(b.minutes)}</span>}
+                            </div>
+                            {b.items.length === 0 ? (
+                              <p className="mt-1 text-[14px] text-dim">{b.note}</p>
+                            ) : (
+                              <>
+                                <BlockTopics m={m} items={b.items} />
+                                <ul className="mt-2.5 space-y-1.5 border-t border-line pt-2.5" aria-label={`Ejercicios de ${b.label}`}>
+                                  {ex.map((x) => (
+                                    <li key={x.id} className="flex flex-wrap items-start gap-x-2 gap-y-1 text-[14.5px]" data-testid="agenda-exercise">
+                                      <span className="min-w-0 flex-1 basis-60">
+                                        <span className="font-medium">{x.title}</span>
+                                        {x.statement && <span className="mt-0.5 block text-[13.5px] text-dim">{x.statement}</span>}
+                                      </span>
+                                      {x.source === "vault" && <Chip large colour="var(--nv-mint)">En tu vault</Chip>}
+                                      {x.source === "ai" && <Chip large colour="var(--nv-accent)">Del Mentor</Chip>}
+                                      {x.auto && <Chip large colour="var(--nv-faint)">Automático</Chip>}
+                                      <button type="button" onClick={() => void openTopic(x.folder)} className="inline-flex min-h-8 items-center px-2 text-[14px] text-accent-text underline-offset-2 hover:underline" aria-label={`Abrir los ejercicios del tema ${x.topicTitle}`}>Abrir ejercicios</button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                {(tps.length > 0 || areaD.length > 0) && (
+                  <div className="mt-3" data-testid="agenda-day-topic-projects">
+                    <H3 className={cn(SECTION, "mb-2")}>Proyecto de {e.area} <span className="font-normal normal-case tracking-normal text-dim">(hoy completas {tps.length === 1 ? "un tema" : "temas"}: aplícalo)</span></H3>
+                    <ul className="space-y-2.5">
+                      {tps.map((tp) => (
+                        <ProjectCard key={tp.id} m={m} d={m.deliverableById.get(tp.id)} kind="Proyecto del tema" onChanged={onChanged} testid="agenda-project-topic">
+                          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px]">
+                            <Chip large colour="var(--nv-mint)">Nivel {PROJECT_LEVEL_LABEL[tp.project.level]}</Chip>
+                            <span className="text-dim">{PROJECT_BASIS_LABEL[tp.project.basis]}</span>
+                            {tp.project.language && <Chip large>{tp.project.language}</Chip>}
+                            {tp.minutes > 0 && <span className="text-dim">{hm(tp.minutes)}</span>}
+                          </p>
+                          <p className="mt-0.5 text-[14px]"><span className="font-medium">Tema:</span> {shortOf(tp.title)}{tp.project.requires.length ? <span className="text-dim"> · combina {tp.project.requires.map((r) => shortOf(r.split("/").pop() ?? r)).join(", ")}</span> : null}</p>
+                        </ProjectCard>
+                      ))}
+                      {areaD.map((d) => (
+                        <ProjectCard key={d.id} m={m} d={d} kind="Proyecto de área" onChanged={onChanged} testid="agenda-project-area">
+                          <p className="mt-1 text-[14px] text-dim">{d.description}</p>
+                        </ProjectCard>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </section>
+            );
+          })}
+
+          {done.length > 0 && <p className="text-[13.5px] text-dim">{plural(done.length, "tema completado", "temas completados")} este día: {done.map((t) => shortOf(t.title)).join(" · ")}.</p>}
+
+          {/* 3 · práctica de lenguaje (no es de ningún área) */}
+          {!areaFilter && (
+            <section aria-labelledby={`${id}-lang`} data-testid="agenda-day-language">
+              <H2 id={`${id}-lang`} className={cn(SECTION, "mb-2")}>Práctica de lenguaje <span className="font-normal normal-case tracking-normal text-dim">(todos los días, ligada a lo de hoy)</span></H2>
+              {langBlocks.length === 0 ? (
+                <p className="text-[14px] text-dim">Este plan no tiene un bloque diario de práctica de lenguaje.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {langBlocks.map((b) => (
                     <li key={b.id} className="rounded-xl border border-line p-3" data-testid="agenda-block" data-block={b.id}>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="text-[15px] font-semibold">{b.label}</span>
-                        {b.status !== "topic" && <Chip large colour={b.status === "free" ? "var(--nv-accent)" : "var(--nv-faint)"}>{b.status === "review" ? "Repaso" : b.status === "free" ? "Práctica diaria" : "Omitido"}</Chip>}
+                        <Chip large colour="var(--nv-accent)">Práctica diaria</Chip>
                         {b.minutes > 0 && <span className="text-[14px] text-dim">{hm(b.minutes)}</span>}
                       </div>
-                      {b.status === "free" ? (
-                        <FreeLanguage m={m} b={b} day={day} />
-                      ) : b.items.length === 0 ? (
-                        <p className="mt-1 text-[14px] text-dim">{b.note}</p>
-                      ) : (
-                        <>
-                          <BlockTopics m={m} items={b.items} />
-                          <ul className="mt-2.5 space-y-1.5 border-t border-line pt-2.5" aria-label={`Ejercicios de ${b.label}`}>
-                            {ex.map((e) => (
-                              <li key={e.id} className="flex flex-wrap items-start gap-x-2 gap-y-1 text-[14.5px]" data-testid="agenda-exercise">
-                                <span className="min-w-0 flex-1 basis-60">
-                                  <span className="font-medium">{e.title}</span>
-                                  {e.statement && <span className="mt-0.5 block text-[13.5px] text-dim">{e.statement}</span>}
-                                </span>
-                                {e.source === "vault" && <Chip large colour="var(--nv-mint)">En tu vault</Chip>}
-                                {e.source === "ai" && <Chip large colour="var(--nv-accent)">Del Mentor</Chip>}
-                                {e.auto && <Chip large colour="var(--nv-faint)">Automático</Chip>}
-                                <button type="button" onClick={() => void openTopic(e.folder)} className="inline-flex min-h-8 items-center px-2 text-[14px] text-accent-text underline-offset-2 hover:underline" aria-label={`Abrir los ejercicios del tema ${e.topicTitle}`}>Abrir ejercicios</button>
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                      )}
+                      <FreeLanguage m={m} b={b} day={day} />
                     </li>
-                  );
-                })}
-                {day.practice.project && (
+                  ))}
+                </ul>
+              )}
+              {day.practice.project && (
+                <ul className="mt-2">
                   <li className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line p-3" data-testid="agenda-practice-project">
                     <span className="text-[15px] font-medium">Proyecto semanal de práctica: {day.practice.project.phases.map((p: PracticePhase) => PHASE_LABEL[p]).join(" + ")}</span>
                     <Chip large colour="var(--nv-practice, #c58be0)">{PRACTICE_NAME}</Chip>
@@ -272,87 +351,71 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2 }: { m
                     <span className="text-[14px] text-dim">{hm(day.practice.project.minutes)}</span>
                     <GhostButton className="ml-auto" onClick={openPractice}>Abrir práctica</GhostButton>
                   </li>
-                )}
-              </ul>
-            )}
-          </section>
-
-          {/* 4 · reto de lógica */}
-          <section aria-labelledby={`${id}-logic`} data-testid="agenda-day-logic">
-            <H2 id={`${id}-logic`} className={cn(SECTION, "mb-2")}>Reto de lógica <span className="font-normal normal-case tracking-normal text-dim">({PRACTICE_NAME}, preparación de entrevistas)</span></H2>
-            {!logic || !day.practice.kata ? (
-              <p className="text-[14px] text-dim">{m.plan.programmingPractice ? "Hoy no toca reto de lógica." : `Este plan no incluye ${PRACTICE_NAME}.`}</p>
-            ) : (
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line p-3" data-testid="agenda-practice-kata">
-                <span className="min-w-0 flex-1 basis-60">
-                  <span className="text-[15px] font-medium">{logic.title}</span>
-                  {logic.statement && <span className="mt-0.5 block text-[13.5px] text-dim">{logic.statement}</span>}
-                </span>
-                <Chip large colour="var(--nv-practice, #c58be0)">{PRACTICE_NAME}</Chip>
-                {logic.auto && <Chip large colour="var(--nv-faint)">Automático</Chip>}
-                <span className="text-[14px] text-dim">{hm(day.practice.kata.minutes)}</span>
-                <GhostButton className="ml-auto" onClick={openPractice}>Abrir práctica</GhostButton>
-              </div>
-            )}
-          </section>
-
-          {/* 4b · proyecto de aplicación de los temas que se completan hoy */}
-          {(day.topicProjects?.length ?? 0) > 0 && (
-            <section aria-labelledby={`${id}-tproj`} data-testid="agenda-day-topic-projects">
-              <H2 id={`${id}-tproj`} className={cn(SECTION, "mb-2")}>Proyecto del tema <span className="font-normal normal-case tracking-normal text-dim">(hoy completas {day.topicProjects!.length === 1 ? "un tema" : "varios temas"}: aplícalo)</span></H2>
-              <ul className="space-y-2.5">
-                {day.topicProjects!.map((tp) => (
-                  <ProjectCard key={tp.id} m={m} d={m.deliverableById.get(tp.id)} kind="Proyecto del tema" onChanged={onChanged} testid="agenda-project-topic">
-                    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px]">
-                      <Chip large colour="var(--nv-mint)">Nivel {PROJECT_LEVEL_LABEL[tp.project.level]}</Chip>
-                      <span className="text-dim">{PROJECT_BASIS_LABEL[tp.project.basis]}</span>
-                      {tp.project.language && <Chip large>{tp.project.language}</Chip>}
-                      {tp.minutes > 0 && <span className="text-dim">{hm(tp.minutes)}</span>}
-                    </p>
-                    <p className="mt-0.5 text-[14px]"><span className="font-medium">Tema:</span> {shortOf(tp.title)}{tp.project.requires.length ? <span className="text-dim"> · combina {tp.project.requires.map((r) => shortOf(r.split("/").pop() ?? r)).join(", ")}</span> : null}</p>
-                  </ProjectCard>
-                ))}
-              </ul>
+                </ul>
+              )}
             </section>
           )}
 
-          {/* 5 · proyectos, al final */}
-          <section aria-labelledby={`${id}-projects`} data-testid="agenda-day-projects">
-            <H2 id={`${id}-projects`} className={cn(SECTION, "mb-2")}>Proyectos <span className="font-normal normal-case tracking-normal text-dim">(diario, semanal y mensual)</span></H2>
-            <ul className="space-y-2.5">
-              <ProjectCard m={m} d={dailyD} kind="Proyecto diario" onChanged={onChanged} testid="agenda-project-daily">
-                {daily && (
-                  <>
-                    <p className="mt-1.5 text-[14px]"><span className="font-medium">Conectado con:</span> {daily.topics.map((t) => shortOf(t.title)).join(" · ")}</p>
-                    <p className="mt-0.5 text-[14px] text-dim">{daily.minutes ? `${hm(daily.minutes)} · ` : ""}{daily.weeklyPart}{daily.source === "template" ? " · plantilla automática" : " · del Mentor"}</p>
-                  </>
-                )}
-              </ProjectCard>
-              <ProjectCard m={m} d={weeklyD} kind="Proyecto semanal" onChanged={onChanged} testid="agenda-project-weekly">
-                {weeklyP && (
-                  <>
-                    <p className="mt-1.5 text-[14px]"><span className="font-medium">Hoy avanza:</span> {daily ? daily.title : "repaso"} <span className="text-dim">· {weeklyDone} de {weeklyP.dailyIds.length} mini-proyectos de la semana {day.week} hechos</span></p>
-                    <div className="mt-1.5"><ProgressBar pct={weeklyP.dailyIds.length ? (weeklyDone / weeklyP.dailyIds.length) * 100 : 0} label={`Avance del proyecto semanal ${day.week}`} /></div>
-                  </>
-                )}
-              </ProjectCard>
-              <ProjectCard m={m} d={monthlyD} kind="Proyecto mensual" onChanged={onChanged} testid="agenda-project-monthly">
-                {monthly && (
-                  <p className="mt-1.5 text-[14px] text-dim">Integra {plural(monthWeekly.length, "proyecto semanal", "proyectos semanales")} (semanas {monthly.fromWeek}–{monthly.toWeek}) · {monthDone} hechos · entrega {monthlyD ? dateLabel(monthlyD.dueDate) : ""}</p>
-                )}
-              </ProjectCard>
-            </ul>
-            {otherDue.length > 0 && (
-              <div className="mt-3">
-                <H2 className={cn(SECTION, "mb-1.5")}>Otros entregables del día</H2>
-                <ul className="space-y-1.5">
-                  {otherDue.map((d) => (
-                    <li key={d.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line px-3 py-2 text-[14px]" data-testid="agenda-deliverable"><span className="min-w-0 flex-1 font-medium">{d.title}</span><StatusChip status={d.status} /></li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </section>
+          {/* 4 · reto de lógica */}
+          {!areaFilter && (
+            <section aria-labelledby={`${id}-logic`} data-testid="agenda-day-logic">
+              <H2 id={`${id}-logic`} className={cn(SECTION, "mb-2")}>Reto de lógica <span className="font-normal normal-case tracking-normal text-dim">({PRACTICE_NAME}, preparación de entrevistas)</span></H2>
+              {!logic || !day.practice.kata ? (
+                <p className="text-[14px] text-dim">{m.plan.programmingPractice ? "Hoy no toca reto de lógica." : `Este plan no incluye ${PRACTICE_NAME}.`}</p>
+              ) : (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line p-3" data-testid="agenda-practice-kata">
+                  <span className="min-w-0 flex-1 basis-60">
+                    <span className="text-[15px] font-medium">{logic.title}</span>
+                    {logic.statement && <span className="mt-0.5 block text-[13.5px] text-dim">{logic.statement}</span>}
+                  </span>
+                  <Chip large colour="var(--nv-practice, #c58be0)">{PRACTICE_NAME}</Chip>
+                  {logic.auto && <Chip large colour="var(--nv-faint)">Automático</Chip>}
+                  <span className="text-[14px] text-dim">{hm(day.practice.kata.minutes)}</span>
+                  <GhostButton className="ml-auto" onClick={openPractice}>Abrir práctica</GhostButton>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* 5 · proyectos integradores (diario, semanal, mensual), al final */}
+          {!areaFilter && (
+            <section aria-labelledby={`${id}-projects`} data-testid="agenda-day-projects">
+              <H2 id={`${id}-projects`} className={cn(SECTION, "mb-2")}>Proyectos integradores <span className="font-normal normal-case tracking-normal text-dim">(diario, semanal y mensual)</span></H2>
+              <ul className="space-y-2.5">
+                <ProjectCard m={m} d={dailyD} kind="Proyecto diario" onChanged={onChanged} testid="agenda-project-daily">
+                  {daily && (
+                    <>
+                      <p className="mt-1.5 text-[14px]"><span className="font-medium">Conectado con:</span> {daily.topics.map((t) => shortOf(t.title)).join(" · ")}</p>
+                      <p className="mt-0.5 text-[14px] text-dim">{daily.minutes ? `${hm(daily.minutes)} · ` : ""}{daily.weeklyPart}{daily.source === "template" ? " · plantilla automática" : " · del Mentor"}</p>
+                    </>
+                  )}
+                </ProjectCard>
+                <ProjectCard m={m} d={weeklyD} kind="Proyecto semanal" onChanged={onChanged} testid="agenda-project-weekly">
+                  {weeklyP && (
+                    <>
+                      <p className="mt-1.5 text-[14px]"><span className="font-medium">Hoy avanza:</span> {daily ? daily.title : "repaso"} <span className="text-dim">· {weeklyDone} de {weeklyP.dailyIds.length} mini-proyectos de la semana {day.week} hechos</span></p>
+                      <div className="mt-1.5"><ProgressBar pct={weeklyP.dailyIds.length ? (weeklyDone / weeklyP.dailyIds.length) * 100 : 0} label={`Avance del proyecto semanal ${day.week}`} /></div>
+                    </>
+                  )}
+                </ProjectCard>
+                <ProjectCard m={m} d={monthlyD} kind="Proyecto mensual" onChanged={onChanged} testid="agenda-project-monthly">
+                  {monthly && (
+                    <p className="mt-1.5 text-[14px] text-dim">Integra {plural(monthWeekly.length, "proyecto semanal", "proyectos semanales")} (semanas {monthly.fromWeek}–{monthly.toWeek}) · {monthDone} hechos · entrega {monthlyD ? dateLabel(monthlyD.dueDate) : ""}</p>
+                  )}
+                </ProjectCard>
+              </ul>
+              {m.deliverablesDefined && otherDue.length > 0 && (
+                <div className="mt-3">
+                  <H2 className={cn(SECTION, "mb-1.5")}>Otros entregables del día</H2>
+                  <ul className="space-y-1.5">
+                    {otherDue.map((d) => (
+                      <li key={d.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line px-3 py-2 text-[14px]" data-testid="agenda-deliverable"><span className="min-w-0 flex-1 font-medium">{d.title}</span><StatusChip status={d.status} /></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
         </>
       )}
     </article>

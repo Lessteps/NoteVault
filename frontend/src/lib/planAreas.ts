@@ -466,11 +466,17 @@ export function planAreaPhases(areas: readonly PhaseInput[], weekCapacity: reado
   return out;
 }
 
+/** Fracción MÍNIMA del periodo (por capacidad) que ocupa Automation al final en el modo «juntas»; si su peso natural es mayor, se respeta el peso. */
+export const AUTOMATION_TAIL_MIN = 0.15;
+/** Fracción máxima del periodo que Automation puede quitar al resto. */
+export const AUTOMATION_TAIL_MAX = 0.35;
+
 /**
- * Fases del modo «JUNTAS» (`areaMode: "together"`): todas las áreas están activas a la vez TODO el periodo, salvo Automation, que va SIEMPRE AL
- * FINAL (después de Backend, Databases y Frontend: «automatización es solo Python»). El corte se calcula con la capacidad semanal y los pesos:
- * las áreas principales ocupan desde la semana 1 hasta la semana de corte y Automation el resto. Sin Automation (o solo Automation) todas
- * ocupan el periodo entero. Con una sola semana, todas coinciden en ella.
+ * Fases del modo «JUNTAS» (`areaMode: "together"`): TODAS las áreas (Backend, Frontend, Databases y también Tooling and Quality) están activas
+ * desde la semana 1, salvo Automation, que va SIEMPRE AL FINAL («automatización es solo Python»): ocupa las últimas semanas, al menos el
+ * ~15 % de la capacidad del periodo (o su peso natural si es mayor, con un máximo del 35 %). El corte se calcula con la capacidad semanal.
+ * Cuando empieza Automation el resto sigue presente como práctica y proyectos de mantenimiento (ver `planDayFocus.ts`), no desaparece.
+ * Sin Automation (o solo Automation) todas ocupan el periodo entero. Con una sola semana, todas coinciden en ella.
  */
 export function planTogetherPhases(areas: readonly PhaseInput[], weekCapacity: readonly number[]): Record<string, AreaPhase> {
   const out: Record<string, AreaPhase> = {};
@@ -483,18 +489,20 @@ export function planTogetherPhases(areas: readonly PhaseInput[], weekCapacity: r
   }
   const wm = main.reduce((n, a) => n + Math.max(1, a.weight), 0);
   const wt = tail.reduce((n, a) => n + Math.max(1, a.weight), 0);
-  const frac = wm / (wm + wt);
+  const tailFrac = Math.min(AUTOMATION_TAIL_MAX, Math.max(AUTOMATION_TAIL_MIN, wt / (wm + wt)));
+  const frac = 1 - tailFrac;
   const total = weekCapacity.reduce((n, c) => n + Math.max(0, c), 0);
   let cut: number;
   if (total > 0) {
+    // la última semana que cabe antes de que empiece Automation: así su cola nunca es menor que la fracción pedida
     let acc = 0;
     cut = 0;
     for (let w = 1; w <= W; w++) {
       acc += Math.max(0, weekCapacity[w - 1] ?? 0);
+      if (acc > total * frac + 1e-6) break;
       cut = w;
-      if (acc >= total * frac - 1e-6) break;
     }
-  } else cut = Math.round(W * frac);
+  } else cut = Math.floor(W * frac);
   cut = Math.min(W - 1, Math.max(1, cut));
   for (const a of main) out[a.key] = { fromWeek: 1, toWeek: cut };
   for (const a of tail) out[a.key] = { fromWeek: cut + 1, toWeek: W };
@@ -680,10 +688,16 @@ export function suggestAreaMode(areaIds: readonly string[]): "together" | "phase
  * Automation siempre va al final en cualquier modo: se cuenta en el texto de justificación.
  */
 export function resolveAreaMode(choice: string | undefined, areaIds: readonly string[], proposal?: { mode?: unknown; why?: unknown; by?: unknown } | null): ResolvedAreaModeInfo | undefined {
-  if (!choice) return undefined;
   const real = areaIds.filter((a) => !isCustomArea(a));
   const tail = real.includes("automation") && real.length > 1 ? " Automation va siempre al final." : "";
-  if (choice === "together") return { mode: "together", by: "user", why: `Elegiste estudiar ${joinNames(real) || "las áreas"} juntas: todas activas todo el periodo y presentes cada día.${tail}` };
+  // sin elección explícita: con 2 o más áreas, TODAS desde el día 1 (Automation al final); con una sola no hay nada que combinar
+  if (!choice) {
+    // un plan que ya declara su modo lo conserva al recalcularse
+    const given = proposal?.mode === "together" || proposal?.mode === "phased" ? proposal.mode : undefined;
+    if (given) return { mode: given, by: proposal?.by === "ai" || proposal?.by === "user" ? proposal.by : "rules", why: oneLineOf(proposal?.why, 300) || (given === "together" ? `Todas las áreas activas desde el día 1.${tail}` : `Áreas por fases, como máximo ${MAX_PARALLEL_AREAS} en paralelo.${tail}`) };
+    return areaIds.length >= 2 ? { mode: "together", by: "rules", why: `Por defecto, ${joinNames(real) || "las áreas"} juntas desde el día 1: todas activas desde la primera semana y presentes cada día.${tail}` } : undefined;
+  }
+  if (choice === "together") return { mode: "together", by: "user", why: `Elegiste estudiar ${joinNames(real) || "las áreas"} juntas desde el día 1: todas activas desde la primera semana y presentes cada día.${tail}` };
   if (choice === "phased") return { mode: "phased", by: "user", why: `Elegiste áreas separadas por fases (como máximo ${MAX_PARALLEL_AREAS} en paralelo).${tail}` };
   if (choice !== "ai") return undefined;
   const pm = proposal?.mode === "together" || proposal?.mode === "phased" ? proposal.mode : undefined;

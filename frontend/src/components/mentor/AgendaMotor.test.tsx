@@ -118,7 +118,7 @@ function togetherPlan(): PlanData {
     { id: "s3-frontend", area: "Frontend", areaId: "frontend", objective: "UI", topics: fe, weeks: slices(fe), requiredGoals: [], phase: { fromWeek: 1, toWeek: WEEKS.length }, groups: [{ id: "core", title: "Conocimientos de frontend", kind: "knowledge" as const, order: 100 }] },
   ];
   const languages = [{ id: "python", required: true, why: "Backend", weight: 3 }, { id: "javascript", required: true, why: "Frontend", weight: 2 }, { id: "typescript", required: true, why: "Frontend", weight: 2 }];
-  return { ...p, subplans, areaMode: "together", areaModeWhy: "Elegiste estudiar Backend, Frontend y Databases juntas.", areaModeBy: "user", preconditions: { ...(p.preconditions as object), areaMode: "together", languages } as never } as PlanData;
+  return { ...p, deliverablesDefinedAt: "2026-10-02T00:00:00Z", subplans, areaMode: "together", areaModeWhy: "Elegiste estudiar Backend, Frontend y Databases juntas.", areaModeBy: "user", preconditions: { ...(p.preconditions as object), areaMode: "together", languages } as never } as PlanData;
 }
 const dayOf = (p: PlanData): string => buildSchedule(p as never).days.find((d) => d.week >= 2 && d.study && d.focus)!.date;
 

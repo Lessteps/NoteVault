@@ -8,7 +8,7 @@
 // SOLO LECTURA salvo propósitos y estados de entregables y las acciones del plan (renombrar, archivar, eliminar a la papelera, mantener,
 // reorganizar por áreas —deshacible desde «Preguntas y ajustes»—).
 
-import { Archive, ArchiveRestore, Check, LayoutGrid, MessageSquareText, Pencil, PlusCircle, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Check, LayoutGrid, MessageSquareText, Pencil, PlayCircle, PlusCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { splitNotes, tidyNotes } from "../../lib/planAreas";
@@ -27,7 +27,11 @@ import { BackToTop, PlanNotes, SectionCard, SectionHeading, SkipLink, TabPanel, 
 import { agendaDateKey, cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanTab } from "./planShared";
 import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
 import { PhaseMonthTable } from "./PlanMonths";
+import { AreaTopicsSection, TogetherBar } from "./AreaViews";
+import { useAgendaModel } from "./agendaKit";
+import { deliverablesDefined } from "../../lib/planTopicsByArea";
 import { CoveragePanel, usePlanCoverage } from "./PlanCoverage";
+import { ExecuteDialog, ExecutionPanel, EXECUTION_ID } from "./PlanExecution";
 import { monthLong } from "../../lib/planMonths";
 import { agendaViewKey } from "./PlanAgenda";
 import { PACE_LABEL } from "./PlanForm";
@@ -50,6 +54,8 @@ export function PlanView({ planId }: { planId: string }) {
   const banner = useRef<HTMLElement>(null);
   const [bannerGone, setBannerGone] = useState(typeof IntersectionObserver === "undefined");
   const [reorganizing, setReorganizing] = useState(false);
+  // «Mantener y ejecutar» (diálogo con el informe de ejecución) y la señal para que «Ejecutar plan…» del panel abra su diálogo
+  const [execOpen, setExecOpen] = useState(false);
   const toast = useApp((s) => s.toast);
   const renamePlan = useMentor((s) => s.renamePlan);
   const archivePlan = useMentor((s) => s.archivePlan);
@@ -71,7 +77,8 @@ export function PlanView({ planId }: { planId: string }) {
 
   const announce = useCallback((msg: string) => setLive((p) => (p === msg ? `${msg} ` : msg)), []);
 
-  const pendingDeliverables = (plan?.openQuestions ?? []).filter((q) => q.id === "deliverables").length;
+  // los entregables quedan «por definir» hasta que se ejecuta el plan: la decisión pendiente solo se enseña cuando ya hay entregables definidos
+  const pendingDeliverables = plan && deliverablesDefined(plan) ? (plan.openQuestions ?? []).filter((q) => q.id === "deliverables").length : 0;
   const tabs: TabDef[] = [
     { id: "plan", label: "Mi plan" },
     { id: "agenda", label: "Agenda" },
@@ -263,6 +270,9 @@ export function PlanView({ planId }: { planId: string }) {
                     <PrimaryButton large onClick={() => void keep()}>
                       <Check size={16} aria-hidden /> Mantener plan
                     </PrimaryButton>
+                    <GhostButton large onClick={() => setExecOpen(true)} data-testid="plan-keep-execute" title="Mantiene el plan y el Mentor crea lo que falta en tu vault, tras mostrarte el informe y pedirte confirmación">
+                      <PlayCircle size={16} aria-hidden /> Mantener y ejecutar
+                    </GhostButton>
                     <GhostButton large danger onClick={() => void remove()}>
                       <Trash2 size={16} aria-hidden /> Borrar
                     </GhostButton>
@@ -291,10 +301,13 @@ export function PlanView({ planId }: { planId: string }) {
                   <MessageSquareText size={16} aria-hidden /> Preguntar o ajustar
                 </GhostButton>
                 {plan.proposed && bannerGone && (
-                  <span data-testid="plan-proposed-sticky">
+                  <span data-testid="plan-proposed-sticky" className="inline-flex flex-wrap items-center gap-2">
                     <PrimaryButton large onClick={() => void keep()}>
                       <Check size={16} aria-hidden /> Mantener plan
                     </PrimaryButton>
+                    <GhostButton large onClick={() => setExecOpen(true)}>
+                      <PlayCircle size={16} aria-hidden /> Mantener y ejecutar
+                    </GhostButton>
                   </span>
                 )}
               </div>
@@ -310,6 +323,10 @@ export function PlanView({ planId }: { planId: string }) {
                     summary={summary}
                     highlight={highlight}
                     onChanged={(p) => setData((d) => (d ? { ...d, plan: p } : d))}
+                    onApplied={(p, changed) => {
+                      setData((d) => (d ? { ...d, plan: p } : d));
+                      applied(p, changed);
+                    }}
                     onOpenMonth={openMonth}
                     onAskChange={askChangesWith}
                     announce={announce}
@@ -326,7 +343,18 @@ export function PlanView({ planId }: { planId: string }) {
               </TabPanel>
               {plan.programmingPractice && (
                 <TabPanel prefix={PREFIX} id="practica" active={tab === "practica"}>
-                  {tab === "practica" && <PracticeRow track={plan.programmingPractice} status={data.practice} today={data.today} />}
+                  {tab === "practica" && (
+                    <PracticeRow
+                      track={plan.programmingPractice}
+                      status={data.practice}
+                      today={data.today}
+                      planId={plan.id}
+                      onExecute={() => {
+                        changeTab("plan");
+                        setTimeout(() => document.getElementById(EXECUTION_ID)?.scrollIntoView?.({ block: "start" }), 50);
+                      }}
+                    />
+                  )}
                 </TabPanel>
               )}
               <TabPanel prefix={PREFIX} id="entregables" active={tab === "entregables"}>
@@ -339,6 +367,18 @@ export function PlanView({ planId }: { planId: string }) {
                 <PlanChanges planId={plan.id} onApplied={applied} autoSend={autoSend} announce={announce} focusSignal={focusSignal} prefill={prefill} />
               </TabPanel>
             </div>
+            {execOpen && (
+              <ExecuteDialog
+                planId={plan.id}
+                proposed={!!plan.proposed}
+                onClose={() => setExecOpen(false)}
+                onStarted={() => {
+                  announce(plan.proposed ? "Plan mantenido. La ejecución sigue en segundo plano; mira el progreso en «Mi plan», «Ejecutar plan»." : "Ejecución en marcha en segundo plano.");
+                  useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }));
+                  changeTab("plan");
+                }}
+              />
+            )}
           </>
         )}
       </div>
@@ -350,7 +390,7 @@ export function PlanView({ planId }: { planId: string }) {
 // ── Pestaña «Mi plan» ───────────────────────────────────────────────────
 
 function MiPlan({
-  data, plan, state, summary, highlight, onChanged, onAddBranches, onOpenMonth, onAskChange, announce,
+  data, plan, state, summary, highlight, onChanged, onApplied, onAddBranches, onOpenMonth, onAskChange, announce,
 }: {
   data: Loaded;
   plan: MentorPlanData;
@@ -358,6 +398,7 @@ function MiPlan({
   summary: NonNullable<Loaded["derived"]>["summary"];
   highlight: Set<string>;
   onChanged: (p: Loaded["plan"]) => void;
+  onApplied: (p: MentorPlanData, changed: string[]) => void;
   onAddBranches: (names: string[]) => void;
   onOpenMonth: (month: string, firstDay: string) => void;
   onAskChange: (text: string) => void;
@@ -366,7 +407,9 @@ function MiPlan({
   const cov = usePlanCoverage(plan.id);
   const pre = plan.preconditions;
   const byAreas = plan.structure === "areas";
-  const pending = (plan.openQuestions ?? []).filter((q) => q.id === "deliverables").length;
+  const defined = deliverablesDefined(plan);
+  const pending = defined ? (plan.openQuestions ?? []).filter((q) => q.id === "deliverables").length : 0;
+  const agenda = useAgendaModel(data, plan);
   const weeksText = state === "propuesto" ? `del ${dayText(plan.start)} al ${dayText(plan.end)}` : state === "activo" ? `semana ${summary.currentWeek} de ${summary.weeks}` : state === "futuro" ? `empieza el ${dayText(plan.start)}` : `terminó el ${dayText(plan.end)}`;
   const excluded = pre?.branchExcluded?.map(cleanBranch) ?? [];
   const exclusionText =
@@ -401,9 +444,15 @@ function MiPlan({
     facts.push({ label: "Ritmo", value: PACE_LABEL[pre.pace] });
   }
   if (plan.hoursPerWeek) facts.push({ label: "Carga semanal", value: `~${num1(plan.hoursPerWeek)} h/semana`, hint: plan.programmingPractice ? "para temas (la práctica va aparte)" : "efectivas" });
-  if (pre) facts.push({ label: "Entregables", value: pre.deliverables === "yes" ? "Sí" : pre.deliverables === "no" ? "No" : "A discutir", hint: pending ? "1 decisión por tomar" : undefined });
+  if (pre) {
+    facts.push(
+      defined
+        ? { label: "Entregables", value: pre.deliverables === "yes" ? "Sí" : pre.deliverables === "no" ? "Definidos" : "A discutir", hint: pending ? "1 decisión por tomar" : undefined, testid: "plan-deliverables-chip" }
+        : { label: "Entregables", value: "Por definir", hint: "Se definen al ejecutar el plan", testid: "plan-deliverables-chip" },
+    );
+  }
   if (plan.programmingPractice) facts.push({ label: PRACTICE_NAME, value: "Activa", hint: practiceSummary(plan.programmingPractice), testid: "plan-practice-chip" });
-  if (plan.areaMode) facts.push({ label: "Áreas", value: plan.areaMode === "together" ? "Juntas cada día" : "Por fases", hint: plan.areaModeWhy, testid: "plan-area-mode-chip" });
+  if (plan.areaMode) facts.push({ label: "Áreas", value: plan.areaMode === "together" ? "Juntas desde el día 1" : "Por fases", hint: plan.areaModeWhy, testid: "plan-area-mode-chip" });
   if (pre?.languages?.length) facts.push({ label: "Lenguajes a practicar", value: pre.languages.map((l) => ({ python: "Python", javascript: "JavaScript", typescript: "TypeScript" })[l.id]).join(" · "), hint: "Un bloque de práctica de lenguaje cada día", testid: "plan-languages-chip" });
   const skippedN = plan.subplans.reduce((n, s) => n + s.topics.filter((t) => t.route === "skipped").length, 0);
   if (skippedN) facts.push({ label: "Ruta", value: `${skippedN} ${skippedN === 1 ? "tema fuera de ruta" : "temas fuera de ruta"}`, hint: "No se borran: siguen en tus notas y puedes reactivarlos", testid: "plan-route-chip" });
@@ -430,6 +479,8 @@ function MiPlan({
           <span className="text-[18px] font-bold">{summary.pct} %</span>
         </div>
       </SectionCard>
+
+      {byAreas && <TogetherBar plan={plan} onApplied={onApplied} announce={announce} />}
 
       <section aria-labelledby="mp-facts" data-testid="plan-preconditions">
         <SectionHeading id="mp-facts">Datos clave</SectionHeading>
@@ -488,7 +539,7 @@ function MiPlan({
 
       {byAreas && (
         <section aria-labelledby="mp-phases" data-testid="plan-phases-section">
-          <SectionHeading id="mp-phases" hint={`Qué trabaja cada área en cada mes: temas, horas y semanas activas. ${plan.areaMode === "together" ? "Todas las áreas van juntas (Automation, al final)" : "Como mucho dos áreas van en paralelo"}; el orden y el reparto los recalcula la app con tu capacidad real.`}>
+          <SectionHeading id="mp-phases" hint={`Qué trabaja cada área en cada mes: temas, horas y semanas activas. ${plan.areaMode === "together" ? "Todas las áreas van juntas desde el día 1 (Automation, al final)" : "Como mucho dos áreas van en paralelo"}; el orden y el reparto los recalcula la app con tu capacidad real.`}>
             Fases del plan, mes a mes
           </SectionHeading>
           <PhaseMonthTable data={data} plan={plan} onOpenMonth={onOpenMonth} />
@@ -501,7 +552,10 @@ function MiPlan({
         </section>
       )}
 
+      {byAreas && <AreaTopicsSection m={agenda} currentWeek={summary.currentWeek} />}
+
       <CoveragePanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} />
+      <ExecutionPanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} />
 
       <section aria-labelledby="mp-subplans" data-testid="plan-subplans">
         <SectionHeading id="mp-subplans" hint={byAreas ? "Cada tarjeta es un área con sus grupos internos (Bases, Lenguaje, Conocimientos): ábrela para ver su ruta de temas con el registro de completados, las metas enlazadas y el proyecto de área." : "Cada tarjeta resume un subplan: ábrela para ver sus semanas, sus temas con el registro de completados, las metas requeridas y el entregable."}>

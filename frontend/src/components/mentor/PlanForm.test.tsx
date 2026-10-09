@@ -113,11 +113,10 @@ describe("PlanForm — precondiciones", () => {
     expect(pressed(chip("Metas", "Meta sin temas"))).toBe(false);
     expect(chip("Metas", "Desarrollo Backend").textContent).toContain("3 temas");
     expect(pressed(chip("Ritmo", "Normal"))).toBe(true);
-    // entregables: tres estados, «a discutir» por defecto (ya no es un casi-obligatorio)
-    expect([...group("Entregables").querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Lo decidimos al armar el plan", "Sí, incluir entregables", "No por ahora"]);
-    expect(pressed(chip("Entregables", "Lo decidimos"))).toBe(true);
-    expect(pressed(chip("Entregables", "Sí, incluir"))).toBe(false);
-    expect(host.textContent).toContain("Es una opción a discutir");
+    // entregables: ya NO se eligen al crear el plan (quedan «por definir» hasta ejecutar el plan)
+    expect(host.querySelector("[role=group][aria-label='Entregables']")).toBeNull();
+    expect(host.querySelector("[data-testid=plan-deliverables-deferred]")!.textContent).toContain("Por definir");
+    expect(host.textContent).not.toContain("Lo decidimos al armar el plan");
     // Programming practice: activada por defecto porque lo elegido incluye Programación
     expect(practiceSwitch().getAttribute("aria-checked")).toBe("true");
     expect(pressed(chip("Minutos del kata diario", "30 min"))).toBe(true);
@@ -263,11 +262,11 @@ describe("PlanForm — precondiciones", () => {
       goalIds: ["g1"],
       subjects: ["Matemáticas"],
       levels: { Matemáticas: "basico" },
-      deliverables: "ask",
+      deliverables: "no",
       practice: { kataMinutes: 30, sessionsPerWeek: 3, minutesPerSession: 90, monthly: false, focus: "rotate" },
     });
     const saved = JSON.parse(localStorage.getItem(PLAN_PRE_KEY)!);
-    expect(saved).toMatchObject({ minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5], pace: "suave", preset: "2s", deliverables: "ask", practiceOn: true, kataMinutes: 30 });
+    expect(saved).toMatchObject({ minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5], pace: "suave", preset: "2s", practiceOn: true, kataMinutes: 30 });
     expect(onClose).toHaveBeenCalled();
     expect(useNavState.getState().values["mentor.view"]).toBe("plan:p1");
   });
@@ -306,24 +305,19 @@ describe("PlanForm — precondiciones", () => {
     expect(pressed(chip("Ritmo", "Intenso"))).toBe(true);
     expect(byLabel("Tiempo diario libre en minutos").value).toBe("90");
     expect([...group("Días de estudio").querySelectorAll("button")].map(pressed)).toEqual([false, true, false, true, false, false, false]);
-    expect(pressed(chip("Entregables", "Lo decidimos"))).toBe(true);
+    expect(host.querySelector("[role=group][aria-label='Entregables']")).toBeNull();
   });
 
-  it("entregables: los tres estados viajan en las precondiciones y un booleano recordado de antes no los fija", async () => {
+  it("entregables: sin selector; viajan como «no» (por definir) aunque haya un valor recordado de antes", async () => {
     const gen = vi.spyOn(api, "mentorPlanGenerateNow").mockResolvedValue({
       loading: false, kind: "plan_created", planId: "p1", source: "auto", text: "x", chatId: "c1", id: "c1", title: "t", pending: "a1", turns: [],
       planDraft: { month: "2026-10", hoursPerWeek: 6, rationale: "", subplans: [], warnings: [], fits: true, totalMinutes: 0, availableMinutes: 0, requiredHoursPerWeek: null, from: TODAY, discarded: [], why: {} },
     });
     localStorage.setItem(PLAN_PRE_KEY, JSON.stringify({ deliverables: true }));
     await mountForm();
-    expect(pressed(chip("Entregables", "Lo decidimos"))).toBe(true); // el «true» antiguo era el valor por defecto, no una elección
-    await click(chip("Entregables", "Sí, incluir"));
-    expect(pressed(chip("Entregables", "Sí, incluir"))).toBe(true);
-    await click(chip("Entregables", "No por ahora"));
-    expect(pressed(chip("Entregables", "No por ahora"))).toBe(true);
-    await click(chip("Entregables", "Lo decidimos"));
+    expect(host.querySelector("[role=group][aria-label='Entregables']")).toBeNull();
     await click(generateBtn());
-    expect(gen.mock.calls[0]![0].deliverables).toBe("ask");
+    expect(gen.mock.calls[0]![0].deliverables).toBe("no");
   });
 
   it("Programming practice: interruptor, opciones, cálculo en vivo con la práctica reservada y persistencia", async () => {
@@ -404,7 +398,7 @@ describe("PlanForm — cómo combinar las áreas y lenguajes", () => {
       planDraft: { month: "2026-10", hoursPerWeek: 6, rationale: "", subplans: [], warnings: [], fits: true, totalMinutes: 0, availableMinutes: 0, requiredHoursPerWeek: null, from: TODAY, discarded: [], why: {} },
     });
 
-  it("sin dos áreas no hay selector de modo; con Frontend+Backend+Databases sugiere «juntas» y el modo viaja en las precondiciones", async () => {
+  it("sin dos áreas no hay selector de modo; con Frontend+Backend+Databases «Juntas desde el día 1» es el valor por defecto y el modo viaja en las precondiciones", async () => {
     await mountForm();
     expect(host.querySelector("[data-testid=plan-area-mode]")).toBeNull();
     vi.spyOn(api, "mentorPlanOptions").mockResolvedValue(stack());
@@ -413,13 +407,17 @@ describe("PlanForm — cómo combinar las áreas y lenguajes", () => {
     await mountForm();
     await click(chip("Materias", "Programación"));
     expect(host.textContent).toContain("¿Cómo combinamos las áreas?");
-    expect(["Juntas", "Separadas por fases", "Que decida el Mentor"].every((t) => !!chip("Cómo combinar las áreas", t))).toBe(true);
-    expect(pressed(chip("Cómo combinar las áreas", "Que decida el Mentor"))).toBe(true); // por defecto: lo decide el Mentor
-    expect(host.querySelector("[data-testid=plan-area-mode-suggest]")!.textContent).toContain("te sugerimos estudiarlas juntas");
+    expect(["Juntas desde el día 1 (Automation al final)", "Separadas por fases", "Que decida el Mentor"].every((t) => !!chip("Cómo combinar las áreas", t))).toBe(true);
+    expect(pressed(chip("Cómo combinar las áreas", "Juntas desde el día 1"))).toBe(true); // por defecto: todas juntas desde el día 1
+    expect(host.querySelector("[data-testid=plan-area-mode-suggest]")).toBeNull();
+    expect(host.querySelector("[data-testid=plan-area-mode-help]")!.textContent).toContain("Todas las áreas (también Tooling and Quality) activas desde el día 1");
+    expect(host.querySelector("[data-testid=plan-area-mode-help]")!.textContent).toContain("Solo Automation va al final");
+    // la IA sigue disponible como opción, y entonces sí se sugiere volver a «juntas»
+    await click(chip("Cómo combinar las áreas", "Que decida el Mentor"));
     expect(host.querySelector("[data-testid=plan-area-mode-help]")!.textContent).toContain("El Mentor propone");
+    expect(host.querySelector("[data-testid=plan-area-mode-suggest]")!.textContent).toContain("te sugerimos estudiarlas juntas");
     await click(host.querySelector("[data-testid=plan-area-mode-suggest] button")!);
-    expect(pressed(chip("Cómo combinar las áreas", "Juntas"))).toBe(true);
-    expect(host.querySelector("[data-testid=plan-area-mode-help]")!.textContent).toContain("Todas las áreas activas todo el periodo");
+    expect(pressed(chip("Cómo combinar las áreas", "Juntas desde el día 1"))).toBe(true);
     const gen = generate();
     await click(generateBtn());
     expect(gen.mock.calls[0]![0]).toMatchObject({ areaMode: "together" });

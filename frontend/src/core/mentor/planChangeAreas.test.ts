@@ -14,7 +14,7 @@ const topics = (branch: string, n: number) => Array.from({ length: n }, (_, i) =
 const seed = (branch: string, n: number, extra: Partial<SubplanSeed> = {}): SubplanSeed => ({ area: "Programación", objective: `Avanzar en ${branch}`, topics: topics(branch, n), ...extra });
 
 function areasPlan(): Plan {
-  const pre = { start: START, end: END, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6, 7], pace: "intenso" as const, goalIds: [], subjects: ["Programación"], levels: {}, deliverables: "ask" as const };
+  const pre = { start: START, end: END, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5, 6, 7], pace: "intenso" as const, goalIds: [], subjects: ["Programación"], levels: {}, deliverables: "ask" as const, areaMode: "phased" as const };
   const legacy = buildPlan([seed("1 Fundamentals", 8), seed("2.1 Python", 6), seed("4 Backend", 8), seed("5 Frontend", 6), seed("6 Databases", 5), seed("2.2 JavaScript", 4)], { start: START, end: END, minutesPerDay: 240, studyDays: pre.studyDays, pace: "intenso", from: START, id: `${START}_${END}`, preconditions: pre }).plan;
   return reorganizeByAreas(legacy, { today: START })!.plan;
 }

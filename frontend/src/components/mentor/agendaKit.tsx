@@ -7,6 +7,7 @@ import { api } from "../../lib/bridge";
 import { type PlanDeliverable, type PlanDeliverableKind, type PlanDeliverableStatus } from "../../lib/planAreas";
 import { areaRowsText, buildSchedule, deliverableAreaRows, deliverablesOf, type PlanSchedule } from "../../lib/planSchedule";
 import type { ExistingExercises } from "../../lib/planCurriculum";
+import { deliverablesDefined, topicsByWeekArea, type TopicsByWeekArea } from "../../lib/planTopicsByArea";
 import type { MentorPlan, MentorTopicView } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { Chip, GhostButton, input, PrimaryButton } from "../common/forms";
@@ -49,6 +50,13 @@ export interface AgendaModel {
   existing: ExistingExercises;
   /** entregable (proyectos incluidos) por id */
   deliverableById: Map<string, PlanDeliverable>;
+  /**
+   * ¿hay entregables DEFINIDOS? Mientras no (los define la ejecución del plan o se añaden a mano), la Agenda no enseña contadores ni chips de
+   * entregables: dice «Entregables: por definir» una sola vez.
+   */
+  deliverablesDefined: boolean;
+  /** los temas de cada semana separados por área (orden fijo de las áreas) */
+  byWeekArea: TopicsByWeekArea;
 }
 
 /** Color de cada enfoque (marca; el texto siempre acompaña: el color solo no basta). */
@@ -70,7 +78,7 @@ export function useAgendaModel(data: Loaded, plan: MentorPlan): AgendaModel {
     }
     const deliverableById = new Map(deliverables.map((d) => [d.id, d] as const));
     const existing: ExistingExercises = { count: (f) => topicByFolder.get(f)?.exercises ?? 0 };
-    return { plan, today: data.today, schedule, deliverables, dueByDate, topicByFolder, pctBySubplan, practiceStatus: practice, editable: true, existing, deliverableById };
+    return { plan, today: data.today, schedule, deliverables, dueByDate, topicByFolder, pctBySubplan, practiceStatus: practice, editable: true, existing, deliverableById, deliverablesDefined: deliverablesDefined(plan), byWeekArea: topicsByWeekArea(plan, schedule) };
   }, [plan, practice, data.derived, data.today]);
 }
 

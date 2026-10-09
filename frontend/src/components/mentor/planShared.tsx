@@ -136,5 +136,21 @@ export function usePlanData(id: string | undefined) {
   useEffect(() => {
     void load();
   }, [load, planVersion]);
+  // El plan vive en un archivo de `.notevault/` que el vigilante de la vault ignora (carpetas con punto): si otra instancia o una
+  // herramienta lo cambia con la ventana abierta, la vista se quedaba con la copia vieja. Al volver a la ventana se vuelve a leer.
+  useEffect(() => {
+    let last = Date.now();
+    const refresh = (): void => {
+      if (document.visibilityState === "hidden" || Date.now() - last < 3000) return;
+      last = Date.now();
+      void load();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [load]);
   return { data, warming, error, reload: load, setData };
 }

@@ -16,6 +16,7 @@ import type { MentorChatTurn, MentorPlan as PlanData, MentorPlanDraft, MentorPla
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
+import { planModeKey } from "./planShared";
 import { usePracticeDialog } from "../practice/PracticeProjectDialog";
 import { MentorPlan } from "./MentorPlan";
 
@@ -72,7 +73,7 @@ const openTab = (id: string) => click(host.querySelector(`#plan-tabs-tab-${id}`)
 
 beforeEach(() => {
   localStorage.clear();
-  useNavState.setState({ values: {} });
+  useNavState.setState({ values: { [planModeKey(PID)]: "plan" } }); // las pruebas de la vista de plan abren la cara «plan»
   usePracticeDialog.setState({ open: false });
   useMentor.setState({ turns: [], pending: null, chatId: null, chatLoaded: true, planVersion: 0, pendingObjective: null, plans: [], plansLoaded: false, acceptingPlan: false });
   useApp.setState({ module: "mentor" });

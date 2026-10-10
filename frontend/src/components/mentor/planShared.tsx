@@ -72,6 +72,12 @@ export async function openProjectInProyectos(id: string): Promise<void> {
 
 /** Clave de la pestaña recordada de un plan (el mismo almacén que la navegación persistida). */
 export const planTabKey = (planId: string): string => `mentor.planTab.${planId}`;
+/**
+ * Las dos caras de un plan: «plan» (para armarlo y ajustarlo: pestañas) y «ejecucion» (solo lectura: qué hago hoy y cómo voy). Se recuerda por
+ * plan; sin elegir, un plan mantenido abre en ejecución y uno propuesto (aún por decidir) en plan.
+ */
+export const planModeKey = (planId: string): string => `mentor.planMode.${planId}`;
+export type PlanMode = "plan" | "ejecucion";
 export const PLAN_TABS = ["plan", "agenda", "practica", "entregables", "cambios"] as const;
 export type PlanTab = (typeof PLAN_TABS)[number];
 
@@ -79,6 +85,7 @@ export type PlanTab = (typeof PLAN_TABS)[number];
 export function openPlanTab(planId: string, tab: PlanTab): void {
   const nav = useNavState.getState();
   nav.set(planTabKey(planId), tab);
+  nav.set(planModeKey(planId), "plan");
   nav.set("mentor.view", `plan:${planId}`);
 }
 
@@ -94,6 +101,7 @@ export function openAgendaAt(planId: string, date: string, view: "dia" | "semana
   nav.set(`mentor.agendaView.${planId}`, view);
   nav.set(agendaDateKey(planId), date);
   nav.set(planTabKey(planId), "agenda");
+  nav.set(planModeKey(planId), "plan");
   nav.set("mentor.view", `plan:${planId}`);
 }
 

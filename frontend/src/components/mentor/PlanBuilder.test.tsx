@@ -18,6 +18,7 @@ import type { MentorBuildResult, MentorBuildSummary, MentorChangeEntry, MentorPl
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
+import { planModeKey } from "./planShared";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
@@ -83,7 +84,7 @@ beforeEach(() => {
   localStorage.clear();
   ui.askText.mockReset();
   ui.confirmAction.mockReset();
-  useNavState.setState({ values: {} });
+  useNavState.setState({ values: { [planModeKey(PID)]: "plan" } }); // las pruebas de la vista de plan abren la cara «plan»
   useMentor.setState({ panels: null, turns: [], pending: null, chatId: null, chatTitle: "Nueva conversación", chats: [], historyOpen: false, chatLoaded: false, sending: false, notice: null, planMode: false, composerSeed: "", acceptingPlan: false, planVersion: 0, plans: [], plansLoaded: false, generatingPlan: false, builds: [] });
   useApp.setState({ module: "mentor" });
   host = document.createElement("div");

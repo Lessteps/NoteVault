@@ -16,6 +16,7 @@ import { useApp } from "../../store/app";
 import { useAssistant } from "../../store/assistant";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
+import { planModeKey } from "./planShared";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
@@ -124,7 +125,7 @@ beforeEach(() => {
   localStorage.clear();
   ui.askText.mockReset();
   ui.confirmAction.mockReset();
-  useNavState.setState({ values: {} });
+  useNavState.setState({ values: { [planModeKey(PID)]: "plan" } }); // las pruebas de la vista de plan abren la cara «plan»
   useMentor.setState({ panels: null, turns: [], pending: null, chatId: null, chatTitle: "Nueva conversación", chats: [], historyOpen: false, chatLoaded: false, sending: false, notice: null, creating: false, createdGoalId: null, warming: false, panelsError: "", planMode: false, composerSeed: "", acceptingPlan: false, planVersion: 0, pendingObjective: null, plans: [], plansLoaded: false, generatingPlan: false });
   useApp.setState({ module: "mentor" });
   host = document.createElement("div");
@@ -497,7 +498,7 @@ describe("MentorModule: sub-interfaces de plan", () => {
   it("elegir una sub-interfaz muestra ese plan y se recuerda; si el plan ya no existe, vuelve al resumen", async () => {
     vi.mocked(api.mentorPlanList).mockResolvedValue([row("p1", "Plan 1"), row("p2", "Plan 2")]);
     const get = vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ id: "p2", plan: plan({ id: "p2" }) }));
-    useNavState.setState({ values: { "mentor.view": "plan" } });
+    useNavState.setState({ values: { "mentor.view": "plan", [planModeKey("p2")]: "plan" } });
     await mountEl(<MentorModule />);
     await click(button("Plan 2"));
     expect(useNavState.getState().values["mentor.view"]).toBe("plan:p2");

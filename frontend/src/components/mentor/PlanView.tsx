@@ -8,7 +8,7 @@
 // SOLO LECTURA salvo propósitos y estados de entregables y las acciones del plan (renombrar, archivar, eliminar a la papelera, mantener,
 // reorganizar por áreas —deshacible desde «Preguntas y ajustes»—).
 
-import { Archive, ArchiveRestore, Check, LayoutGrid, MessageSquareText, Pencil, PlayCircle, PlusCircle, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Check, ClipboardList, LayoutGrid, MessageSquareText, Pencil, PlayCircle, PlusCircle, Rocket, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { splitNotes, tidyNotes } from "../../lib/planAreas";
@@ -24,7 +24,8 @@ import { PlanAgenda } from "./PlanAgenda";
 import { PlanChanges } from "./PlanChanges";
 import { PlanDeliverables } from "./PlanDeliverables";
 import { BackToTop, PlanNotes, SectionCard, SectionHeading, SkipLink, TabPanel, Tabs, panelId, type TabDef } from "./planKit";
-import { agendaDateKey, cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanTab } from "./planShared";
+import { agendaDateKey, cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planModeKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanMode, type PlanTab } from "./planShared";
+import { PlanRun } from "./PlanRun";
 import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
 import { PhaseMonthTable } from "./PlanMonths";
 import { AreaTopicsSection, TogetherBar } from "./AreaViews";
@@ -65,6 +66,10 @@ export function PlanView({ planId }: { planId: string }) {
   const summary = data?.derived?.summary;
 
   const proposed = !!plan?.proposed;
+  // Dos caras del plan: «plan» (pestañas, para armarlo y ajustarlo) y «ejecucion» (solo lectura, para el día a día). Sin elegir, un plan
+  // mantenido y en curso abre en ejecución; uno propuesto o archivado, en plan.
+  const [storedMode, setMode] = usePersistedNav<string>(planModeKey(planId), "");
+  const mode: PlanMode = storedMode === "plan" || storedMode === "ejecucion" ? storedMode : plan && !plan.proposed && !plan.archived ? "ejecucion" : "plan";
   // el «Mantener plan» fijo junto a las pestañas solo aparece cuando el banner ya salió de la vista
   useEffect(() => {
     const el = banner.current;
@@ -92,12 +97,13 @@ export function PlanView({ planId }: { planId: string }) {
   const changeTab = useCallback(
     (id: string) => {
       setStoredTab(id);
+      setMode("plan");
       // al cambiar a un panel más corto, el scroll no se queda en el vacío: se coloca justo bajo la barra de pestañas
       const sc = scroller.current;
       const bar = tabsBar.current;
       if (sc && bar && sc.scrollTop > bar.offsetTop) sc.scrollTop = bar.offsetTop;
     },
-    [setStoredTab],
+    [setStoredTab, setMode],
   );
   const askChanges = useCallback(() => {
     changeTab("cambios");
@@ -231,6 +237,23 @@ export function PlanView({ planId }: { planId: string }) {
               </p>
             </div>
             {plan && (
+              <div className="flex flex-wrap items-center gap-1 rounded-xl border border-line bg-card p-1" role="group" aria-label="Vista del plan" data-testid="plan-mode">
+                {([["ejecucion", "Ejecución", Rocket, "Qué haces hoy y cómo vas (solo lectura)"], ["plan", "Plan", ClipboardList, "Armar y ajustar el plan: áreas, agenda, entregables y cambios"]] as const).map(([id, label, Icon, hint]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={mode === id}
+                    title={hint}
+                    onClick={() => { setMode(id); announce(id === "ejecucion" ? "Vista de ejecución: lo que toca hoy y tu avance." : "Vista de plan: pestañas para armar y ajustar el plan."); }}
+                    className={cn("inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[15px] font-semibold", mode === id ? "bg-accent text-white" : "text-dim hover:bg-hover hover:text-text")}
+                    data-testid={`plan-mode-${id}`}
+                  >
+                    <Icon size={16} aria-hidden /> {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {plan && (
               <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Acciones del plan">
                 <GhostButton large onClick={() => void rename()}>
                   <Pencil size={16} aria-hidden /> Renombrar
@@ -279,7 +302,7 @@ export function PlanView({ planId }: { planId: string }) {
                   </div>
               </section>
             )}
-            {legacy && (
+            {legacy && mode === "plan" && (
               <section aria-label="Estructura del plan" data-testid="plan-legacy-bar" className="mt-3 rounded-xl border border-line bg-card px-4 py-3">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <div className="min-w-0 flex-1 basis-64">
@@ -292,6 +315,12 @@ export function PlanView({ planId }: { planId: string }) {
                 </div>
               </section>
             )}
+            {mode === "ejecucion" ? (
+              <div id={CONTENT_ID} tabIndex={-1} className="mt-4 outline-none" data-testid="plan-content">
+                <PlanRun data={data} plan={plan} />
+              </div>
+            ) : (
+            <>
             <div ref={tabsBar} className="sticky top-0 z-20 -mx-4 mt-3 flex flex-wrap items-center justify-between gap-x-4 border-b border-line bg-surface/95 px-4 backdrop-blur @3xl:-mx-6 @3xl:px-6" data-testid="plan-sticky">
               <nav aria-label="Secciones del plan" className="min-w-0">
                 <Tabs tabs={tabs} active={tab} onChange={changeTab} prefix={PREFIX} label="Secciones del plan" />
@@ -367,6 +396,8 @@ export function PlanView({ planId }: { planId: string }) {
                 <PlanChanges planId={plan.id} onApplied={applied} autoSend={autoSend} announce={announce} focusSignal={focusSignal} prefill={prefill} />
               </TabPanel>
             </div>
+            </>
+            )}
             {execOpen && (
               <ExecuteDialog
                 planId={plan.id}

@@ -16,6 +16,7 @@ import type { MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../..
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
+import { planModeKey } from "./planShared";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
@@ -92,7 +93,7 @@ const openDay = async (date: string, p?: PlanData, exercisesOf?: (f: string) => 
 
 beforeEach(() => {
   localStorage.clear();
-  useNavState.setState({ values: {} });
+  useNavState.setState({ values: { [planModeKey(PID)]: "plan" } }); // las pruebas de la vista de plan abren la cara «plan»
   useMentor.setState({ planVersion: 0, plans: [], plansLoaded: false, pendingObjective: null });
   useApp.setState({ module: "mentor" });
   host = document.createElement("div");

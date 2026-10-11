@@ -20,6 +20,7 @@ import { parseTopicLink } from "../practice/topicLinks.js";
 import type { StudyErrorManager } from "../studyErrorManager.js";
 import type { StudySRSManager } from "../studySrsManager.js";
 import { STATUS_DONE as TASK_DONE, type TaskManager } from "../taskManager.js";
+import { memoryLines, type MentorMemory } from "./dayClose.js";
 import { adherence, type SessionRecord } from "./sessionLog.js";
 import type { TopicSnap } from "./topics.js";
 
@@ -50,6 +51,8 @@ export interface BriefContext {
   sessions?: () => SessionRecord[];
   /** cola del recomendador, para no duplicar su lógica */
   queue?: () => QueueHint[];
+  /** memoria del Mentor: lo que guardó en los cierres de día (ver dayClose.ts) */
+  memory?: () => MentorMemory | null;
 }
 
 export interface BriefOptions {
@@ -849,9 +852,39 @@ export const habitsActivityProvider: BriefProvider = {
   },
 };
 
+// ── Proveedor: memoria del Mentor (lo que guardó al cerrar cada día) ────
+
+export interface MemoryBriefData {
+  openCorrections: number;
+  studentSaid: number;
+  observations: number;
+  lastClosedDay: string | null;
+}
+
+export const memoryProvider: BriefProvider = {
+  id: "mentor_memory",
+  collect(ctx) {
+    const mem = ctx.memory?.();
+    if (!mem) return null;
+    const lines = memoryLines(mem, formatIsoDate(ctx.today));
+    if (!lines.length) return null;
+    const open = mem.corrections.filter((c) => c.status === "open" || c.status === "task").length;
+    const data: MemoryBriefData = { openCorrections: open, studentSaid: mem.studentSaid.length, observations: mem.observations.length, lastClosedDay: mem.closedDays[mem.closedDays.length - 1] ?? null };
+    return {
+      id: "mentor_memory",
+      title: "Memoria del Mentor",
+      priority: 4,
+      summary: `${plural(open, "corrección pendiente", "correcciones pendientes")}, ${plural(mem.studentSaid.length, "comentario del estudiante", "comentarios del estudiante")}`,
+      signals: open ? [`${plural(open, "corrección pendiente", "correcciones pendientes")}: conviene atenderlas antes de lo nuevo`] : [],
+      lines,
+      data,
+    };
+  },
+};
+
 // ── Registro de proveedores ─────────────────────────────────────────────
 
-const registry: BriefProvider[] = [studyPendingProvider, goalsProvider, topicsProvider, tasksProvider, habitsActivityProvider];
+const registry: BriefProvider[] = [studyPendingProvider, goalsProvider, topicsProvider, tasksProvider, habitsActivityProvider, memoryProvider];
 
 /** Añade (o sustituye por id) un proveedor: así se enchufan hábitos/finanzas sin tocar el resto. */
 export function registerBriefProvider(provider: BriefProvider): void {

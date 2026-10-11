@@ -1660,3 +1660,37 @@ export interface MentorRouteChangeResult {
   /** temas vivos que quedan en el alcance */
   live?: number;
 }
+
+// ── Cierre del día y memoria del Mentor (`mentor_day_record`, `mentor_day_close`, ver core/mentor/dayClose.ts) ──
+export type MentorCorrectionKind = "redo" | "review" | "note_fix" | "practice" | "plan";
+export type MentorCorrectionStatus = "open" | "task" | "done" | "dismissed";
+export interface MentorDayRecord {
+  date: string;
+  builtAt: string;
+  planned: { topics: number; minutes: number; done: number; pending: Array<{ folder: string; title: string }> };
+  completed: string[];
+  attempts: { total: number; counted: number; avgScore: number | null; minutes: number; wrong: number };
+  weak: Array<{ key: string; discipline: string; skill: string; attempts: number; avgScore: number; errors: number }>;
+  errorsByCategory: Record<string, number>;
+  katas: { done: number; skipped: number };
+}
+export interface MentorStudentDay { mood?: 1 | 2 | 3 | 4 | 5; feeling: string; notes: string }
+export interface MentorDayReview {
+  source: "ai" | "rules";
+  summary: string;
+  observations: string[];
+  studentSaid: string[];
+  corrections: Array<{ title: string; why: string; kind: MentorCorrectionKind; topic?: string }>;
+}
+export interface MentorCorrection { id: string; title: string; why: string; kind: MentorCorrectionKind; topic?: string; date: string; status: MentorCorrectionStatus; taskId?: string }
+export interface MentorMemory {
+  version: 1;
+  updatedAt: string;
+  closedDays: string[];
+  observations: Array<{ date: string; text: string }>;
+  studentSaid: Array<{ date: string; text: string }>;
+  corrections: MentorCorrection[];
+}
+export type MentorDayView =
+  | { loading: true }
+  | { loading: false; date: string; record: MentorDayRecord; student: MentorStudentDay | null; review: MentorDayReview | null; closedAt: string | null; memory: MentorMemory; source?: "ai" | "rules"; note?: string };

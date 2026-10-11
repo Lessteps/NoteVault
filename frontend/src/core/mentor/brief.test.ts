@@ -277,7 +277,7 @@ describe("habits_activity provider", () => {
 
 describe("registry", () => {
   it("lets a new provider plug in without touching the rest", () => {
-    expect(briefProviders().map((p) => p.id)).toEqual(["study_pending", "goals", "topics", "tasks", "habits_activity"]);
+    expect(briefProviders().map((p) => p.id)).toEqual(["study_pending", "goals", "topics", "tasks", "habits_activity", "mentor_memory"]);
     registerBriefProvider({
       id: "finance",
       collect: () => ({ id: "finance", title: "Finanzas", priority: 6, summary: "Presupuesto al día", signals: [], lines: [], data: {} }),

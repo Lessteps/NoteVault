@@ -216,6 +216,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       <p className="flex flex-wrap items-center gap-2 text-[14px] text-faint">
         Vista de solo lectura.
         <GhostButton onClick={() => openAgendaAt(plan.id, date, "dia")}>Ver el día en la Agenda</GhostButton>
+        <GhostButton onClick={() => useNavState.getState().set("mentor.view", "cierre")} data-testid="run-close-day">Cerrar el día con el Mentor</GhostButton>
       </p>
     </div>
   );

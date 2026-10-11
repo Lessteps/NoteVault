@@ -387,6 +387,12 @@ export const api = {
   mentorAreaPractice: (id: string) => call<import("./types").MentorAreaPractice>("mentor_area_practice", { id }),
   mentorAreaPracticeOn: (id: string, date: string) => call<{ items: Array<{ areaId: string; label: string; day: number; rel: string; title: string; skill: string; level: number; minutes: number }> }>("mentor_area_practice_on", { id, date }),
   mentorAreaKataMark: (id: string, areaId: string, date: string, status: "done" | "skipped" | null) => call<import("./types").MentorAreaPractice>("mentor_area_kata_mark", { id, areaId, date, status }),
+  /** Cierre del día: el registro sin IA, la revisión al cerrar y la memoria del Mentor. */
+  mentorDayRecord: (date?: string) => call<import("./types").MentorDayView>("mentor_day_record", date ? { date } : {}),
+  mentorDayClose: (opts: { date?: string; mood?: number; feeling?: string; notes?: string; noAi?: boolean }) => call<import("./types").MentorDayView>("mentor_day_close", opts),
+  mentorMemory: () => call<{ memory: import("./types").MentorMemory }>("mentor_memory_get", {}),
+  mentorCorrectionTask: (id: string) => call<{ memory: import("./types").MentorMemory; taskId: string }>("mentor_correction_task", { id }),
+  mentorCorrectionSet: (id: string, status: "open" | "done" | "dismissed") => call<{ memory: import("./types").MentorMemory }>("mentor_correction_set", { id, status }),
   mentorPlanCoverageAccept: (id: string, areaKey: string, title: string, accepted = true) => call<{ review: import("./planCoverage").CoverageReview }>("mentor_plan_coverage_accept", { id, areaKey, title, accepted }),
   mentorPlanRouteSet: (opts: { id: string; folders: string[]; route: "core" | "optional" | "skipped"; reason?: string; label?: string }) =>
     call<import("./types").MentorRouteChangeResult>("mentor_plan_route_set", opts),

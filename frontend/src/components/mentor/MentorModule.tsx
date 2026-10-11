@@ -6,12 +6,13 @@
 // editan únicamente en sus módulos (cada panel trae su botón "Abrir en …"). Lo único que escribe el
 // Mentor es lo que el estudiante confirma: aceptar el plan de hoy o "Crear meta" de un borrador.
 
-import { BookOpenCheck, CalendarCheck, CalendarRange, FolderKanban, ListChecks, Target } from "lucide-react";
+import { BookOpenCheck, CalendarCheck, CalendarRange, FolderKanban, ListChecks, Moon, Target } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePersistedNav } from "../../store/navState";
 import { planViewId, useMentor } from "../../store/mentor";
 import { PracticeProjectDialog } from "../practice/PracticeProjectDialog";
 import { ModuleSidebar } from "../ModuleSidebar";
+import { MentorDayClose } from "./MentorDayClose";
 import { MentorGoals } from "./MentorGoals";
 import { MentorPlan } from "./MentorPlan";
 import { PlanBuilder } from "./PlanBuilder";
@@ -19,7 +20,7 @@ import { MentorProjects } from "./MentorProjects";
 import { MentorStudy } from "./MentorStudy";
 import { MentorToday } from "./MentorToday";
 
-const VIEWS = ["hoy", "plan", "metas", "proyectos", "notas"] as const;
+const VIEWS = ["hoy", "plan", "cierre", "metas", "proyectos", "notas"] as const;
 type View = (typeof VIEWS)[number];
 const PLAN_PREFIX = "plan:";
 const BUILD_PREFIX = "build:";
@@ -79,6 +80,7 @@ export function MentorModule() {
               })),
             ],
           },
+          { id: "cierre", label: "Cierre del día", hint: "Qué pasó hoy y qué corregir", icon: <Moon /> },
           { id: "metas", label: "Metas", hint: "Resumen de metas y borradores", icon: <Target />, badge: hasDraft },
           { id: "proyectos", label: "Proyectos", hint: "Estado y plazos", icon: <FolderKanban /> },
           { id: "notas", label: "Notas y estudio", hint: "Temas a medias, repasos, errores", icon: <BookOpenCheck /> },
@@ -89,6 +91,8 @@ export function MentorModule() {
           <MentorToday />
         ) : view === "plan" ? (
           knownBuild ? <PlanBuilder key={knownBuild} buildId={knownBuild} /> : <MentorPlan planId={knownPlan || undefined} />
+        ) : view === "cierre" ? (
+          <MentorDayClose />
         ) : view === "metas" ? (
           <MentorGoals />
         ) : view === "proyectos" ? (

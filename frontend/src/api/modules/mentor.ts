@@ -135,6 +135,8 @@ import { mentorCoverageApi } from "./mentorCoverage.js";
 import { designsOf } from "./mentorDesign.js";
 import { mentorExecuteApi } from "./mentorExecute.js";
 import { mentorAreaPracticeApi } from "./mentorAreaPractice.js";
+import { mentorDayCloseApi } from "./mentorDayClose.js";
+import { DayCloseStore } from "../../core/mentor/dayClose.js";
 import { projectsApi } from "./projects.js";
 import { studyIndexCold } from "./study.js";
 
@@ -234,6 +236,7 @@ export function briefContext(app: AppState, log: SessionLog): BriefContext {
     topics: () => topicSnaps(app),
     sessions: () => log.recent(14),
     queue: () => studyQueue(app),
+    memory: () => new DayCloseStore(app.root).memory(),
   };
 }
 
@@ -2220,6 +2223,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
     // «Ejecutar plan» (informe, cola en segundo plano, pausa/cancelación) y Sistema de práctica por área (ver mentorExecute.ts y mentorAreaPractice.ts)
     ...mentorExecuteApi(app, { ...(send ? { send } : {}), today: () => localDate() }),
     ...mentorAreaPracticeApi(app, { today: () => localDate() }),
+    // Cierre del día y memoria del Mentor: registro sin IA + una revisión al cerrar (ver mentorDayClose.ts)
+    ...mentorDayCloseApi(app, { withJob, guarded, cancelMode: (e) => (e instanceof CancelError ? e.mode : undefined), today: () => localDate(), activePlans: (day) => activePlans(new PlanStore(app.root).list(), day), topicSnaps: () => topicSnaps(app), cold: () => studyIndexCold(app) }),
     // «Preguntas, correcciones y ajustes»: clasificar lo escrito y responder preguntas sin tocar el plan (ver `mentorAsk.ts`)
     ...mentorAskApi(app, { withJob, guarded, cancelMode: (e) => (e instanceof CancelError ? e.mode : undefined), today: () => localDate() }),
     /** Compatibilidad: el flujo anterior (un BORRADOR en el chat que se acepta aparte); el camino principal crea el plan propuesto. */

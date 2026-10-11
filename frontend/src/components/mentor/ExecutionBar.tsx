@@ -1,0 +1,107 @@
+// Mentor — barra de PROGRESO de la ejecución del plan en segundo plano.
+//
+// «Ejecutar plan» trabaja en segundo plano (crea ejercicios, entregables y carpetas). Esta barra va fija abajo de la sub-interfaz del plan, en
+// cualquier pestaña y en cualquiera de las dos vistas, para ver siempre cuánto lleva, qué está haciendo, cuánto falta y poder pausar o cancelar.
+// No inicia nada: solo lee el estado (`mentor_execution_status`) y pausa, reanuda o cancela lo que ya corre.
+
+import { Pause, Play, Square, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "../../lib/bridge";
+import { RUN_STATUS_LABEL } from "../../lib/planExecution";
+import { useApp } from "../../store/app";
+import { cn, confirmAction } from "../ui";
+import { useExecution } from "./PlanExecution";
+import { goToSection } from "./PlanToc";
+
+const FINISHED_VISIBLE_MS = 10 * 60 * 1000;
+
+/** «unos 12 min» a partir de lo que lleva y de lo que falta (estimación simple: el ritmo medio hasta ahora). */
+export function etaText(createdAt: string, finished: number, remaining: number, now: number): string {
+  const start = Date.parse(createdAt);
+  if (!Number.isFinite(start) || finished < 1 || remaining < 1) return "";
+  const msPerTask = Math.max(0, now - start) / finished;
+  const min = Math.round((msPerTask * remaining) / 60000);
+  if (min < 1) return "menos de 1 min";
+  if (min < 90) return `unos ${min} min`;
+  return `unas ${Math.round((min / 60) * 10) / 10} h`;
+}
+
+export function ExecutionBar({ planId, onOpenPlan }: { planId: string; /** lleva a la pestaña donde está el registro completo */ onOpenPlan?: () => void }) {
+  const toast = useApp((s) => s.toast);
+  const { exec, setExec } = useExecution(planId);
+  const [dismissed, setDismissed] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const st = exec?.state;
+  const running = st?.status === "running";
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [running]);
+  const eta = useMemo(() => {
+    if (!st || !exec || st.status !== "running") return "";
+    const p = exec.progress;
+    return etaText(st.createdAt, p.done + p.failed + p.skipped, p.pending + p.running, now);
+  }, [st, exec, now]);
+
+  if (!exec || !st) return null;
+  const p = exec.progress;
+  const live = st.status === "running" || st.status === "paused";
+  // una ejecución terminada se enseña un rato (con su resultado) y se puede cerrar; no se queda para siempre
+  const recent = Date.now() - Date.parse(st.updatedAt) < FINISHED_VISIBLE_MS;
+  if (!live && (!recent || dismissed === st.id)) return null;
+
+  const act = async (what: "pause" | "resume" | "cancel"): Promise<void> => {
+    if (what === "cancel" && !(await confirmAction("Cancelar la ejecución", "Se detiene lo que falta. Lo que ya se creó se queda en tu vault.", "Cancelar ejecución", true))) return;
+    setBusy(true);
+    try {
+      const r = what === "pause" ? await api.mentorExecutionPause(planId) : what === "resume" ? await api.mentorExecutionResume(planId) : await api.mentorExecutionCancel(planId);
+      setExec(r.execution);
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const colour = st.status === "failed" ? "var(--nv-danger)" : st.status === "done" ? "var(--nv-mint)" : st.status === "paused" ? "var(--nv-warn)" : "var(--nv-accent)";
+  const btn = "inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-2.5 text-[13.5px] text-dim hover:bg-hover hover:text-text disabled:opacity-50";
+  return (
+    <div className="sticky bottom-0 z-30 border-t border-line bg-surface/95 px-4 py-2.5 backdrop-blur @3xl:px-6" role="region" aria-label="Progreso de la ejecución del plan" data-testid="exec-bar">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1 basis-80">
+          <div className="flex flex-wrap items-baseline gap-x-2 text-[14px]">
+            <span className="font-semibold" style={{ color: colour }}>{RUN_STATUS_LABEL[st.status]}</span>
+            <span className="min-w-0 truncate text-dim" data-testid="exec-bar-label">{p.label}</span>
+          </div>
+          <div className="mt-1.5 flex items-center gap-3">
+            <div
+              className="h-2.5 flex-1 overflow-hidden rounded-full bg-hover"
+              role="progressbar"
+              aria-label="Progreso de la ejecución"
+              aria-valuenow={p.pct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuetext={`${p.pct} %, ${p.done} de ${p.total} tareas`}
+            >
+              <div className={cn("h-full rounded-full transition-[width] duration-500", running && "animate-pulse")} style={{ width: `${p.pct}%`, background: colour }} data-testid="exec-bar-fill" />
+            </div>
+            <span className="w-12 flex-none text-right text-[15px] font-bold" data-testid="exec-bar-pct">{p.pct} %</span>
+          </div>
+          <p className="mt-1 text-[13px] text-faint">
+            {p.done}/{p.total} tareas · {p.created} {p.created === 1 ? "archivo creado" : "archivos creados"}
+            {p.failed > 0 ? ` · ${p.failed} con error` : ""}
+            {eta ? ` · quedan ${eta}` : ""}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {st.status === "running" && <button type="button" className={btn} disabled={busy} onClick={() => void act("pause")}><Pause size={14} aria-hidden /> Pausar</button>}
+          {st.status === "paused" && <button type="button" className={btn} disabled={busy} onClick={() => void act("resume")}><Play size={14} aria-hidden /> Reanudar</button>}
+          {live && <button type="button" className={btn} disabled={busy} onClick={() => void act("cancel")}><Square size={14} aria-hidden /> Cancelar</button>}
+          <button type="button" className={btn} onClick={() => { onOpenPlan?.(); setTimeout(() => goToSection("sec-ejecutar"), 80); }} data-testid="exec-bar-open">Ver registro</button>
+          {!live && <button type="button" className={btn} aria-label="Cerrar" onClick={() => setDismissed(st.id)}><X size={14} aria-hidden /></button>}
+        </div>
+      </div>
+    </div>
+  );
+}

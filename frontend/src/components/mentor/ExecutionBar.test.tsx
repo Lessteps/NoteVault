@@ -1,0 +1,117 @@
+// @vitest-environment jsdom
+//
+// Barra de progreso de la ejecución del plan en segundo plano (siempre visible en la sub-interfaz del plan) y la sección activa de la
+// tabla de contenido.
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(window as unknown as { nv: unknown }).nv = { invoke: async () => ({}) };
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { api } from "../../lib/bridge";
+import { progressOf, type ExecutionState, type TaskState } from "../../lib/planExecution";
+import type { MentorExecutionView } from "../../lib/types";
+import { ExecutionBar, etaText } from "./ExecutionBar";
+import { activeSection } from "./PlanToc";
+
+const task = (i: number, status: TaskState["status"]): TaskState =>
+  ({ id: `t${i}`, kind: "topic_files", area: "Backend", title: `Tema ${i}`, folder: `P/${i}`, status, attempts: 0, created: status === "done" ? [`P/${i}/ej.md`] : [], skipped: [] }) as unknown as TaskState;
+const view = (statuses: TaskState["status"][], over: Partial<ExecutionState> = {}): MentorExecutionView => {
+  const state = { version: 1, planId: "p1", id: "e1", status: "running", scope: {}, createdAt: new Date(Date.now() - 10 * 60000).toISOString(), updatedAt: new Date().toISOString(), tasks: statuses.map((s, i) => task(i + 1, s)), log: [], ...over } as unknown as ExecutionState;
+  return { state, progress: progressOf(state) };
+};
+
+let host: HTMLDivElement;
+let root: Root;
+const flush = () => act(async () => { await Promise.resolve(); });
+const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
+const byTest = (id: string) => host.querySelector<HTMLElement>(`[data-testid=${id}]`);
+
+beforeEach(() => {
+  host = document.createElement("div");
+  document.body.appendChild(host);
+  root = createRoot(host);
+});
+afterEach(() => {
+  act(() => root.unmount());
+  host.remove();
+  vi.restoreAllMocks();
+});
+
+describe("ExecutionBar", () => {
+  it("muestra el avance real: porcentaje, tarea en curso, archivos creados y lo que queda", async () => {
+    vi.spyOn(api, "mentorExecutionStatus").mockResolvedValue({ execution: view(["done", "done", "running", "pending", "pending"]), active: true });
+    await mountEl(<ExecutionBar planId="p1" />);
+    const bar = byTest("exec-bar")!;
+    expect(bar).toBeTruthy();
+    expect(bar.getAttribute("role")).toBe("region");
+    expect(byTest("exec-bar-pct")!.textContent).toBe("40 %");
+    const pb = bar.querySelector("[role=progressbar]")!;
+    expect(pb.getAttribute("aria-valuenow")).toBe("40");
+    expect(byTest("exec-bar-fill")!.style.width).toBe("40%");
+    expect(bar.textContent).toContain("Ejecutando");
+    expect(bar.textContent).toContain("2/5 tareas");
+    expect(bar.textContent).toContain("2 archivos creados");
+    expect(bar.textContent).toContain("quedan");
+    expect(bar.textContent).toContain("Pausar");
+    expect(bar.textContent).toContain("Cancelar");
+  });
+
+  it("pausar llama a la API y refleja el estado en pausa con «Reanudar»", async () => {
+    vi.spyOn(api, "mentorExecutionStatus").mockResolvedValue({ execution: view(["done", "running", "pending"]), active: true });
+    const pause = vi.spyOn(api, "mentorExecutionPause").mockResolvedValue({ execution: view(["done", "pending", "pending"], { status: "paused" }) });
+    await mountEl(<ExecutionBar planId="p1" />);
+    const btn = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("Pausar"))!;
+    await act(async () => { btn.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    await flush();
+    expect(pause).toHaveBeenCalledWith("p1");
+    expect(byTest("exec-bar")!.textContent).toContain("En pausa");
+    expect(byTest("exec-bar")!.textContent).toContain("Reanudar");
+  });
+
+  it("sin ejecución, o con una terminada hace tiempo, no ocupa sitio", async () => {
+    vi.spyOn(api, "mentorExecutionStatus").mockResolvedValue({ execution: null, active: false });
+    await mountEl(<ExecutionBar planId="p1" />);
+    expect(byTest("exec-bar")).toBeNull();
+    vi.mocked(api.mentorExecutionStatus).mockResolvedValue({ execution: view(["done", "done"], { status: "done", updatedAt: new Date(Date.now() - 3 * 3600_000).toISOString() }), active: false });
+    await mountEl(<ExecutionBar planId="p2" />);
+    expect(byTest("exec-bar")).toBeNull();
+  });
+
+  it("una ejecución recién terminada se ve con su resultado y se puede cerrar", async () => {
+    vi.spyOn(api, "mentorExecutionStatus").mockResolvedValue({ execution: view(["done", "done"], { status: "done" }), active: false });
+    await mountEl(<ExecutionBar planId="p1" />);
+    expect(byTest("exec-bar")!.textContent).toContain("Terminada");
+    expect(byTest("exec-bar-pct")!.textContent).toBe("100 %");
+    const close = host.querySelector<HTMLElement>("button[aria-label=Cerrar]")!;
+    await act(async () => { close.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    expect(byTest("exec-bar")).toBeNull();
+  });
+});
+
+describe("etaText", () => {
+  const now = Date.parse("2026-10-12T12:00:00Z");
+  it("estima con el ritmo medio y no inventa sin datos", () => {
+    expect(etaText("2026-10-12T11:50:00Z", 5, 10, now)).toBe("unos 20 min");
+    expect(etaText("2026-10-12T11:59:50Z", 1, 1, now)).toBe("menos de 1 min");
+    expect(etaText("2026-10-12T08:00:00Z", 2, 100, now)).toBe("unas 200 h");
+    expect(etaText("2026-10-12T11:50:00Z", 0, 10, now)).toBe("");
+    expect(etaText("nope", 3, 3, now)).toBe("");
+  });
+});
+
+describe("tabla de contenido: sección activa", () => {
+  const tops = (xs: number[]) => xs.map((top, i) => ({ id: `s${i}`, top }));
+  it("es la última sección cuyo inicio ya pasó la línea de lectura", () => {
+    expect(activeSection(tops([300, 700, 1200]), 140, false)).toBe("s0");
+    expect(activeSection(tops([-900, 100, 800]), 140, false)).toBe("s1");
+    expect(activeSection(tops([-2000, -900, 90]), 140, false)).toBe("s2");
+  });
+  it("al llegar al final de la página gana la última aunque no haya alcanzado la línea", () => {
+    expect(activeSection(tops([-1200, -300, 600]), 140, true)).toBe("s2");
+  });
+  it("sin secciones no hay activa", () => {
+    expect(activeSection([], 140, false)).toBe("");
+  });
+});

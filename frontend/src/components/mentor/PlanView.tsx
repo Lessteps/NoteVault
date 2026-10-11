@@ -25,6 +25,7 @@ import { PlanChanges } from "./PlanChanges";
 import { PlanDeliverables } from "./PlanDeliverables";
 import { BackToTop, PlanNotes, SectionCard, SectionHeading, SkipLink, TabPanel, Tabs, panelId, type TabDef } from "./planKit";
 import { agendaDateKey, cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planModeKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanMode, type PlanTab } from "./planShared";
+import { ExecutionBar } from "./ExecutionBar";
 import { PlanRun } from "./PlanRun";
 import { GenerateNotice, TocLayout, type TocItem } from "./PlanToc";
 import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
@@ -414,6 +415,7 @@ export function PlanView({ planId }: { planId: string }) {
           </>
         )}
       </div>
+      {plan && <ExecutionBar planId={plan.id} onOpenPlan={() => changeTab("plan")} />}
       <BackToTop scroller={scroller} onTop={toTop} />
     </div>
   );

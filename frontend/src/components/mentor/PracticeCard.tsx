@@ -141,7 +141,7 @@ function PhaseChips({ week, status }: { week: PracticeWeek; status?: Record<Prac
 const PAGE_CARD_STYLE = { borderTop: `3px solid ${PRACTICE_COLOUR}` } as const;
 
 /** La pista GENERAL del plan: kata de lógica, proyecto de esta semana, semanas y proyecto mensual (como antes de separar por áreas). */
-function GeneralCards({ track, status, today }: { track: PracticeTrack; status: MentorPracticeStatus | null | undefined; today: string }) {
+export function GeneralCards({ track, status, today, only }: { track: PracticeTrack; status: MentorPracticeStatus | null | undefined; today: string; /** solo estas tarjetas (por defecto, todas) */ only?: ReadonlyArray<"kata" | "project" | "weeks" | "monthly"> }) {
   const wp = track.weeklyProject;
   const weeks = wp?.weeks ?? [];
   const thisWeek = weeks.find((w) => today >= w.start && today <= w.end) ?? weeks.find((w) => w.start > today) ?? weeks[weeks.length - 1];
@@ -253,8 +253,9 @@ function GeneralCards({ track, status, today }: { track: PracticeTrack; status: 
       </section>,
     );
   }
-  if (!cards.length) return null;
-  return <div className="grid items-start gap-4 @3xl:grid-cols-2 @6xl:grid-cols-3" data-testid="practice-general">{cards}</div>;
+  const shown = only ? cards.filter((c) => only.includes(String(c.key) as "kata")) : cards;
+  if (!shown.length) return null;
+  return <div className="grid items-start gap-4 @3xl:grid-cols-2 @6xl:grid-cols-3" data-testid="practice-general">{shown}</div>;
 }
 
 /** La semana de lunes a domingo de un área: cada día con su estado (hecho, saltado, pendiente, sin kata) y SIEMPRE con texto para lector de pantalla. */
@@ -304,7 +305,7 @@ function FolderNotice({ area, ppReady, onExecute }: { area: AreaPracticeView; pp
   );
 }
 
-function KataToday({ area, ppBase, today, mark, onExecute, ppReady }: { area: AreaPracticeView; ppBase: string; today: string; mark: AreaPracticeState["mark"]; onExecute?: () => void; ppReady: boolean }) {
+export function KataToday({ area, ppBase, today, mark, onExecute, ppReady }: { area: AreaPracticeView; ppBase: string; today: string; mark: AreaPracticeState["mark"]; onExecute?: () => void; ppReady: boolean }) {
   const toast = useApp((s) => s.toast);
   const next = area.kata.next;
   const isToday = !!next && next.date === today;

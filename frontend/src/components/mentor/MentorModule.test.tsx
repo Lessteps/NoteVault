@@ -10,6 +10,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { api } from "../../lib/bridge";
 import type { MentorOverview, MentorProposeResult, MentorSessionRecord } from "../../lib/types";
+import { useNavState } from "../../store/navState";
 import { MentorModule } from "./MentorModule";
 
 const overview = (over: Partial<Extract<MentorOverview, { loading: false }>> = {}): MentorOverview => ({
@@ -53,6 +54,8 @@ let host: HTMLDivElement;
 let root: Root;
 
 async function mount() {
+  // «Hoy» ya no está en la barra lateral: estas pruebas abren el panel como lo hace «Planear mi día»
+  useNavState.setState({ values: { "mentor.view": "hoy" } });
   await act(async () => {
     root.render(<MentorModule />);
   });

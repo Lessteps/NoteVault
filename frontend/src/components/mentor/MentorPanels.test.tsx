@@ -152,12 +152,14 @@ afterEach(() => {
 });
 
 describe("Mentor: espacio de paneles", () => {
-  it("navega entre Hoy, Plan, Metas, Proyectos y Notas; la Conversación ya no es un panel; arranca en Hoy", async () => {
+  it("navega entre Plan, Cierre del día, Metas, Proyectos y Notas; «Hoy» ya no es un panel suelto y se arranca en el plan", async () => {
     await mount();
     const nav = [...host.querySelectorAll("aside nav button")].map((b) => b.textContent ?? "");
-    expect(nav.map((t) => ["Hoy", "Plan", "Cierre del día", "Metas", "Proyectos", "Notas y estudio"].find((l) => t.includes(l)))).toEqual(["Hoy", "Plan", "Cierre del día", "Metas", "Proyectos", "Notas y estudio"]);
+    const labels = ["Plan", "Cierre del día", "Metas", "Proyectos", "Notas y estudio"];
+    expect(nav.map((t) => labels.find((l) => t.includes(l)))).toEqual(labels);
     expect(nav.some((t) => t.includes("Conversación"))).toBe(false);
-    expect(host.textContent).toContain("Mentor — Hoy");
+    expect(nav.some((t) => /^Hoy/.test(t))).toBe(false);
+    expect(host.textContent).toContain("Mentor — Planes");
 
     await go("Metas");
     expect(host.textContent).toContain("Mentor — Metas");
@@ -165,8 +167,18 @@ describe("Mentor: espacio de paneles", () => {
     expect(host.textContent).toContain("Mentor — Proyectos");
     await go("Notas y estudio");
     expect(host.textContent).toContain("Mentor — Notas y estudio");
-    await go("Hoy");
+  });
+
+  it("«Planear mi día» abre el panel Hoy con un enlace para volver al plan", async () => {
+    await mount();
+    await act(async () => { useNavState.getState().set("mentor.view", "hoy"); });
+    await flush();
     expect(host.textContent).toContain("Mentor — Hoy");
+    const back = host.querySelector<HTMLElement>("[data-testid=today-back]")!;
+    expect(back).toBeTruthy();
+    await act(async () => { back.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    await flush();
+    expect(host.textContent).not.toContain("Mentor — Hoy");
   });
 
   it("Metas: tarjeta desplegable como en el módulo Metas; colapsada resume y expandida muestra submetas, temas y enlaces rotos", async () => {

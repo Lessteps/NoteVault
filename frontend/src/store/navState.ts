@@ -21,7 +21,10 @@ function stored(): Values {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as unknown) : null;
-    return parsed && typeof parsed === "object" ? (parsed as Values) : {};
+    const values = parsed && typeof parsed === "object" ? (parsed as Values) : {};
+    // «Hoy» dejó de ser un panel de la barra lateral del Mentor: una pestaña «hoy» recordada de antes no debe reabrirlo.
+    if (values["mentor.view"] === "hoy") delete values["mentor.view"];
+    return values;
   } catch {
     return {};
   }

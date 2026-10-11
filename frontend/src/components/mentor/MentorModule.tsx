@@ -6,7 +6,7 @@
 // editan únicamente en sus módulos (cada panel trae su botón "Abrir en …"). Lo único que escribe el
 // Mentor es lo que el estudiante confirma: aceptar el plan de hoy o "Crear meta" de un borrador.
 
-import { BookOpenCheck, CalendarCheck, CalendarRange, FolderKanban, ListChecks, Moon, Target } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, CalendarRange, FolderKanban, ListChecks, Moon, Target } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePersistedNav } from "../../store/navState";
 import { planViewId, useMentor } from "../../store/mentor";
@@ -26,7 +26,7 @@ const PLAN_PREFIX = "plan:";
 const BUILD_PREFIX = "build:";
 
 export function MentorModule() {
-  const [stored, setView] = usePersistedNav("mentor.view", "hoy");
+  const [rawStored, setView] = usePersistedNav("mentor.view", "");
   const plans = useMentor((s) => s.plans);
   const plansLoaded = useMentor((s) => s.plansLoaded);
   const loadPlans = useMentor((s) => s.loadPlans);
@@ -34,6 +34,10 @@ export function MentorModule() {
   const builds = useMentor((s) => s.builds);
   const loadBuilds = useMentor((s) => s.loadBuilds);
   const [buildsLoaded, setBuildsLoaded] = useState(false);
+  // «Hoy» (proponer el día con la IA) ya no es un panel suelto de la barra lateral: el plan en ejecución es el «hoy» de la persona. Se llega a
+  // él con «Planear mi día» y se vuelve al plan con el enlace de arriba.
+  const activePlanId = plansLoaded ? plans.find((p) => p.status === "activo")?.id ?? "" : "";
+  const stored = rawStored === "" ? (activePlanId ? `${PLAN_PREFIX}${activePlanId}` : "plan") : rawStored;
   useEffect(() => {
     void loadPlans();
     void loadBuilds().then(() => setBuildsLoaded(true));
@@ -45,7 +49,7 @@ export function MentorModule() {
   const planId = stored.startsWith(PLAN_PREFIX) ? stored.slice(PLAN_PREFIX.length) : "";
   const knownPlan = planId && (!plansLoaded || plans.some((p) => p.id === planId)) ? planId : "";
   const view: View = knownPlan || knownBuild || (planId && plansLoaded) || (buildId && buildsLoaded) ? "plan" : (VIEWS as readonly string[]).includes(stored) ? (stored as View) : "hoy";
-  const activeId = knownBuild ? `${BUILD_PREFIX}${knownBuild}` : knownPlan ? planViewId(knownPlan) : view;
+  const activeId = knownBuild ? `${BUILD_PREFIX}${knownBuild}` : knownPlan ? planViewId(knownPlan) : view === "hoy" ? "plan" : view;
   const hasDraft = useMentor((s) => (s.turns.find((t) => t.id === s.pending)?.draft ? 1 : 0));
   const hasPlanDraft = useMentor((s) => (s.turns.find((t) => t.id === s.pending)?.planDraft ? 1 : 0));
 
@@ -56,7 +60,6 @@ export function MentorModule() {
         active={activeId}
         onSelect={(id) => setView(id)}
         items={[
-          { id: "hoy", label: "Hoy", hint: "El plan de estudio del día", icon: <CalendarCheck /> },
           {
             id: "plan",
             label: "Plan",
@@ -88,7 +91,14 @@ export function MentorModule() {
       />
       <main className="@container flex min-w-0 flex-1 flex-col bg-surface" aria-label={`Mentor: ${view}`}>
         {view === "hoy" ? (
-          <MentorToday />
+          <>
+            <div className="flex-none border-b border-line px-5 py-2">
+              <button type="button" onClick={() => setView(activePlanId ? `${PLAN_PREFIX}${activePlanId}` : "plan")} className="inline-flex min-h-9 items-center gap-1.5 text-[14px] text-accent-text underline-offset-2 hover:underline" data-testid="today-back">
+                <ArrowLeft size={15} aria-hidden /> Volver a mi plan
+              </button>
+            </div>
+            <MentorToday />
+          </>
         ) : view === "plan" ? (
           knownBuild ? <PlanBuilder key={knownBuild} buildId={knownBuild} /> : <MentorPlan planId={knownPlan || undefined} />
         ) : view === "cierre" ? (

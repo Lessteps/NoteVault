@@ -17,6 +17,7 @@ import { DeliverableLine, focusColour, plural, useAgendaModel } from "./agendaKi
 import { openTopic } from "./openTopic";
 import { hm, ProgressBar } from "./parts";
 import { PlanBoard } from "./PlanBoard";
+import { RunPractice, RunProjects } from "./PlanRunPractice";
 import { SectionCard, SectionHeading } from "./planKit";
 import { openAgendaAt, STATE_COLOUR, STATE_GLYPH, STATE_LABEL, type Loaded } from "./planShared";
 
@@ -174,10 +175,13 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         {late > 0 && <p className="text-[14px] text-warn" data-testid="run-late">{plural(late, "tema atrasado", "temas atrasados")} de semanas anteriores: están en «Vista de plan», dentro de cada área.</p>}
       </SectionCard>
 
-      {/* 2 · Cómo voy */}
+      {/* 2 · Práctica de hoy (daily practice por área + kata de lógica) */}
+      <RunPractice plan={plan} data={data} today={m.today} />
+
+      {/* 3 · Cómo voy */}
       <PlanBoard plan={plan} data={data} byFolder={m.topicByFolder} gate={gate} currentWeek={currentWeek} />
 
-      {/* 3 · Lo que viene */}
+      {/* 4 · Lo que viene */}
       {(upcoming.length > 0 || deliverables.length > 0) && (
         <section aria-labelledby="run-next-h" data-testid="run-next">
           <SectionHeading id="run-next-h" hint="Los próximos días de estudio y los entregables que vencen pronto.">Lo que viene</SectionHeading>
@@ -214,10 +218,13 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       )}
 
       <p className="flex flex-wrap items-center gap-2 text-[14px] text-faint">
-        Vista de solo lectura.
+        Desde aquí no se cambia el plan: solo se marca la práctica del día.
         <GhostButton onClick={() => openAgendaAt(plan.id, date, "dia")}>Ver el día en la Agenda</GhostButton>
         <GhostButton onClick={() => useNavState.getState().set("mentor.view", "cierre")} data-testid="run-close-day">Cerrar el día con el Mentor</GhostButton>
       </p>
+
+      {/* 5 · Proyectos diario y semanal, abajo del todo */}
+      <RunProjects plan={plan} data={data} m={m} />
     </div>
   );
 }

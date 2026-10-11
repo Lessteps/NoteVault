@@ -175,5 +175,45 @@ describe("vista de ejecución", () => {
     await click(pend);
     expect(all("board-topic")).toHaveLength(1); // el de Python ya está completo
   });
+
+  const areaView = (areaId: string, label: string) => ({
+    areaId, label, folder: areaId, folderReady: false, purpose: "p", name: label, languages: [], ledgerSkill: areaId, level: 1, levelSource: "declared", skills: [],
+    kata: {
+      plannedDays: 10, doneDays: 2, streak: 1, todayPlanned: true, todayDone: false, todayIndex: 3,
+      next: { kata: { id: `${areaId}-003`, areaId, day: 3, title: `Kata de ${label}`, skillId: "s", skillName: "Endpoint design", level: 1, minutes: 25, statement: "x", criteria: [], hints: [], solution: "", typicalErrors: [], file: "003.md" }, date: TODAY, rel: `${areaId}/katas/003.md`, fileReady: false, summary: "Resumen" },
+      week: [],
+    },
+    weekly: { title: "w", description: "d", week: 1, focus: false }, weeks: [], monthly: { title: "m", description: "d", blocks: [] },
+  });
+
+  it("incluye la práctica de hoy por área (reto diario) y deja marcar el kata", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "Programación/programming_practice", areas: [areaView("backend", "Backend"), areaView("databases", "Databases")] } as never);
+    const mark = vi.spyOn(api, "mentorAreaKataMark").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
+    await mountEl(<MentorPlan planId={PID} />);
+    const section = byTest("run-practice")!;
+    expect(section).toBeTruthy();
+    expect(section.textContent).toContain("Práctica de hoy");
+    expect(section.textContent).toContain("Kata de Backend");
+    expect(section.textContent).toContain("Kata de Databases");
+    expect(section.textContent).toContain("entrevistas técnicas");
+    await click(section.querySelector("[data-testid=area-kata-done]"));
+    expect(mark).toHaveBeenCalledWith(PID, "backend", TODAY, "done");
+  });
+
+  it("el proyecto diario y el semanal van al final de la vista, después de «Lo que viene»", async () => {
+    const p = plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }, { ...sub("s2", "Databases", "Consolidar", F2), areaId: "databases" }] as never });
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
+    vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
+    await mountEl(<MentorPlan planId={PID} />);
+    const run = byTest("plan-run")!;
+    const order = [...run.children].map((c) => (c as HTMLElement).dataset.testid);
+    expect(order.indexOf("run-projects")).toBe(order.length - 1);
+    expect(order.indexOf("run-next")).toBeLessThan(order.indexOf("run-projects"));
+    const projects = byTest("run-projects")!;
+    expect(byTest("run-project-daily")!.textContent).toContain("Proyecto diario");
+    expect(byTest("run-project-weekly")!.textContent).toContain("Proyecto semanal");
+    expect(projects.textContent).toContain("Entregable por definir");
+  });
 });
 

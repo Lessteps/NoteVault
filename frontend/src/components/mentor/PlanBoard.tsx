@@ -30,6 +30,8 @@ type FilterId = (typeof FILTERS)[number]["id"];
 
 export interface BoardRow {
   folder: string;
+  /** grupo del área al que pertenece (Bases, Lenguaje: Python, Conocimientos…) */
+  group?: string;
   /** texto secundario (parte, minutos…) */
   meta?: string;
   title: string;
@@ -123,6 +125,8 @@ export interface BoardPractice {
 export function PlanBoard({ plan, data, byFolder, gate, currentWeek, practice }: { plan: MentorPlan; data: Loaded; byFolder: Map<string, MentorTopicView>; gate: PlanGate; currentWeek: number; practice?: BoardPractice }) {
   const [filter, setFilter] = useState<FilterId>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  /** grupo elegido en cada área («» = todos a la vez) */
+  const [groupSel, setGroupSel] = useState<Record<string, string>>({});
   const summary = data.derived?.summary;
   const areas = orderedAreas(plan).map((a) => {
     const sub = plan.subplans.find((s) => s.id === a.subplanId)!;
@@ -132,10 +136,11 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek, practice }:
       .map((t) => {
         const live = byFolder.get(t.folder);
         const state = live?.state ?? "sin_tratar";
-        return { folder: t.folder, title: t.title, week: t.targetWeek, state, done: state === "completo" || !!t.completedAt, exercises: live?.exercises ?? 0, unlockOn: gate.locked.get(t.folder) };
+        return { folder: t.folder, ...(t.group ? { group: t.group } : {}), title: t.title, week: t.targetWeek, state, done: state === "completo" || !!t.completedAt, exercises: live?.exercises ?? 0, unlockOn: gate.locked.get(t.folder) };
       });
     const phaseFrom = (sub as { phase?: { fromWeek: number } }).phase?.fromWeek ?? 1;
-    return { a, rows, pct: view?.pct ?? 0, phaseFrom };
+    const groups = (sub.groups ?? []).map((g) => ({ id: g.id, title: g.title, n: rows.filter((r) => r.group === g.id && !r.done).length, all: rows.filter((r) => r.group === g.id).length })).filter((g) => g.all > 0);
+    return { a, rows, pct: view?.pct ?? 0, phaseFrom, groups };
   });
   if (!summary) return null;
 
@@ -191,9 +196,10 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek, practice }:
       </div>
 
       <ul className="grid gap-4 @3xl:grid-cols-2 @6xl:grid-cols-3">
-        {areas.map(({ a, rows, pct, phaseFrom }) => {
+        {areas.map(({ a, rows, pct, phaseFrom, groups }) => {
           const colour = focusColour(a.areaId);
-          const shown = rows.filter(keep);
+          const sel = groups.some((g) => g.id === groupSel[a.subplanId]) ? groupSel[a.subplanId]! : "";
+          const shown = rows.filter(keep).filter((r) => !sel || r.group === sel);
           const first = Math.max(0, shown.findIndex((r) => !r.done) - 1);
           const open = expanded.has(a.subplanId);
           const list = open ? shown : shown.slice(first, first + VISIBLE);
@@ -223,6 +229,25 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek, practice }:
                 ) : undefined
               }
             >
+              {groups.length > 1 && (
+                <div className="px-1.5 pb-2" data-testid="group-chips">
+                  <div role="group" aria-label={`Subáreas de ${a.area}`} className="flex flex-wrap gap-1">
+                    {[{ id: "", title: "Todas a la vez", n: groups.reduce((x, g) => x + g.n, 0) }, ...groups].map((g) => (
+                      <button
+                        key={g.id || "all"}
+                        type="button"
+                        aria-pressed={sel === g.id}
+                        onClick={() => setGroupSel((s) => ({ ...s, [a.subplanId]: g.id }))}
+                        className={cn("rounded-md border px-2 py-0.5 text-[12.5px]", sel === g.id ? "border-accent bg-accent-soft text-text" : "border-line text-dim hover:bg-hover")}
+                        data-testid="group-chip"
+                      >
+                        {g.title} <span className="text-faint">{g.n}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {!sel && <p className="mt-1 text-[12.5px] text-faint">Estos grupos avanzan a la vez cada día: los fundamentos se intercalan con el lenguaje, no van antes.</p>}
+                </div>
+              )}
               {list.length === 0 ? (
                 <p className="px-2.5 py-3 text-[14px] text-faint">Ningún tema con este filtro.</p>
               ) : (

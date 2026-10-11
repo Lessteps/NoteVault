@@ -26,6 +26,7 @@ import { PlanDeliverables } from "./PlanDeliverables";
 import { BackToTop, PlanNotes, SectionCard, SectionHeading, SkipLink, TabPanel, Tabs, panelId, type TabDef } from "./planKit";
 import { agendaDateKey, cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planModeKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanMode, type PlanTab } from "./planShared";
 import { PlanRun } from "./PlanRun";
+import { GenerateNotice, TocLayout, type TocItem } from "./PlanToc";
 import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
 import { PhaseMonthTable } from "./PlanMonths";
 import { AreaTopicsSection, TogetherBar } from "./AreaViews";
@@ -495,8 +496,28 @@ function MiPlan({
   const notes = pre?.notes ? tidyNotes(pre.notes) : "";
   const countLabel = byAreas ? (summary.subplans === 1 ? "área" : "áreas") : summary.subplans === 1 ? "subplan" : "subplanes";
 
+  const cov0 = cov.coverage?.totals;
+  const hasScope = fallbacks.length > 0 || excluded.length > 0 || !!plan.rationale || !!notes || !!objective;
+  const needGenerate = !!cov0 && (cov0.practice < cov0.topics || cov0.theory < cov0.topics);
+  const toc: TocItem[] = [
+    { id: "sec-resumen", label: "Resumen" },
+    ...(needGenerate ? [{ id: "sec-generar", label: "Falta generar", hint: `${cov0!.topics - cov0!.practice}` }] : []),
+    { id: "sec-datos", label: "Datos clave" },
+    ...(hasScope ? [{ id: "sec-alcance", label: "Alcance y comentarios" }] : []),
+    ...(byAreas ? [{ id: "sec-fases", label: "Fases mes a mes" }, { id: "sec-temas", label: "Temas por área" }] : []),
+    { id: "sec-cobertura", label: "Cobertura" },
+    { id: "sec-ejecutar", label: "Ejecutar plan" },
+    { id: "sec-areas", label: "Áreas del plan", hint: String(plan.subplans.length) },
+  ];
+
   return (
-    <>
+    <TocLayout items={toc}>
+      {needGenerate && cov0 && (
+        <div id="sec-generar" tabIndex={-1} className="scroll-mt-28 outline-none">
+          <GenerateNotice topics={cov0.topics} withPractice={cov0.practice} withTheory={cov0.theory} {...(cov0.design ? { designPct: cov0.design.avgScore } : {})} />
+        </div>
+      )}
+      <div id="sec-resumen" tabIndex={-1} className="scroll-mt-28 space-y-3 outline-none">
       <SectionCard labelledBy="mp-summary" testid="plan-header" className="space-y-3">
         <h2 id="mp-summary" className="sr-only">Resumen del plan</h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -512,8 +533,9 @@ function MiPlan({
       </SectionCard>
 
       {byAreas && <TogetherBar plan={plan} onApplied={onApplied} announce={announce} />}
+      </div>
 
-      <section aria-labelledby="mp-facts" data-testid="plan-preconditions">
+      <section id="sec-datos" tabIndex={-1} className="scroll-mt-28 outline-none" aria-labelledby="mp-facts" data-testid="plan-preconditions">
         <SectionHeading id="mp-facts">Datos clave</SectionHeading>
         <dl className="grid gap-3 @xl:grid-cols-2 @3xl:grid-cols-3 @6xl:grid-cols-6">
           {facts.map((f) => (
@@ -526,10 +548,11 @@ function MiPlan({
         </dl>
       </section>
 
+      {hasScope && <div id="sec-alcance" tabIndex={-1} className="scroll-mt-28 space-y-4 outline-none">
       {fallbacks.length > 0 && (
-        <section aria-labelledby="mp-fallback" className="rounded-2xl border border-warn/60 bg-card p-4 @3xl:p-5" data-testid="plan-fallback-note">
-          <h2 id="mp-fallback" className="text-[18px] font-semibold">Completado con reglas</h2>
-          <p className="mt-1 text-[14px] text-dim">La IA no pudo elegir los temas de estas áreas, así que la app los completó en el orden natural de la materia (sin la selección del Mentor). Si quieres, pídele un cambio en «Preguntas y ajustes».</p>
+        <section aria-labelledby="mp-fallback" className="rounded-2xl border border-line bg-card p-4 @3xl:p-5" data-testid="plan-fallback-note">
+          <h2 id="mp-fallback" className="text-[18px] font-semibold">Completado con reglas <span className="text-[14px] font-normal text-dim">· informativo, no es un error</span></h2>
+          <p className="mt-1 text-[14px] text-dim">Se aplica solo cuando la IA no pudo elegir los temas de un área (no estaba configurada, falló o se canceló): la app los ordena entonces según el orden natural de la materia, sin la selección del Mentor. El plan está completo igual. Si quieres que el Mentor lo reconsidere, pídeselo en «Preguntas y ajustes».</p>
           <ul className="mt-2 list-disc space-y-0.5 pl-5 text-[14px]">
             {fallbacks.map(({ s, fb }) => <li key={s.id}><span className="font-medium">{s.area}</span>: {fb!.reason}</li>)}
           </ul>
@@ -568,8 +591,10 @@ function MiPlan({
         </div>
       )}
 
+      </div>}
+
       {byAreas && (
-        <section aria-labelledby="mp-phases" data-testid="plan-phases-section">
+        <section id="sec-fases" tabIndex={-1} className="scroll-mt-28 outline-none" aria-labelledby="mp-phases" data-testid="plan-phases-section">
           <SectionHeading id="mp-phases" hint={`Qué trabaja cada área en cada mes: temas, horas y semanas activas. ${plan.areaMode === "together" ? "Todas las áreas van juntas desde el día 1 (Automation, al final)" : "Como mucho dos áreas van en paralelo"}; el orden y el reparto los recalcula la app con tu capacidad real.`}>
             Fases del plan, mes a mes
           </SectionHeading>
@@ -583,18 +608,18 @@ function MiPlan({
         </section>
       )}
 
-      {byAreas && <AreaTopicsSection m={agenda} currentWeek={summary.currentWeek} />}
+      {byAreas && <div id="sec-temas" tabIndex={-1} className="scroll-mt-28 outline-none"><AreaTopicsSection m={agenda} currentWeek={summary.currentWeek} /></div>}
 
-      <CoveragePanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} />
-      <ExecutionPanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} />
+      <div id="sec-cobertura" tabIndex={-1} className="scroll-mt-28 outline-none"><CoveragePanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} /></div>
+      <div id="sec-ejecutar" tabIndex={-1} className="scroll-mt-28 outline-none"><ExecutionPanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} /></div>
 
-      <section aria-labelledby="mp-subplans" data-testid="plan-subplans">
+      <section id="sec-areas" tabIndex={-1} className="scroll-mt-28 outline-none" aria-labelledby="mp-subplans" data-testid="plan-subplans">
         <SectionHeading id="mp-subplans" hint={byAreas ? "Cada tarjeta es un área con sus grupos internos (Bases, Lenguaje, Conocimientos): ábrela para ver su ruta de temas con el registro de completados, las metas enlazadas y el proyecto de área." : "Cada tarjeta resume un subplan: ábrela para ver sus semanas, sus temas con el registro de completados, las metas requeridas y el entregable."}>
           Áreas del plan <span className="text-[14px] font-normal text-dim">{plan.subplans.length} {plan.subplans.length === 1 ? (byAreas ? "área" : "subplan") : byAreas ? "áreas" : "subplanes"}</span>
         </SectionHeading>
         <SubplanGroups data={data} highlight={highlight} onChanged={onChanged} coverage={cov.coverage} review={cov.review} onAskChange={onAskChange} onReview={cov.setReview} />
       </section>
-    </>
+    </TocLayout>
   );
 }
 

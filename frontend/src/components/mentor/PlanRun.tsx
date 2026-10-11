@@ -122,7 +122,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
             {entries.length > 0 && (
               <ul className="grid gap-4 @3xl:grid-cols-2" aria-label="Qué estudiar hoy, por área">
                 {entries.map((e) => {
-                  const items = (e.blocks ?? []).flatMap((bl) => bl.items.filter((i) => !i.applied));
+                  const items = (e.blocks ?? []).flatMap((bl) => bl.items);
                   const seen = new Set<string>();
                   const unique = items.filter((i) => (seen.has(`${i.folder}:${i.part}`) ? false : (seen.add(`${i.folder}:${i.part}`), true)));
                   const colour = focusColour(e.areaId);
@@ -131,7 +131,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                     return {
                       folder: i.folder,
                       title: i.title,
-                      meta: `${i.parts > 1 ? `parte ${i.part}/${i.parts} · ` : ""}${hm(i.minutes)}`,
+                      meta: `${i.applied ? "Bases · " : ""}${i.parts > 1 ? `parte ${i.part}/${i.parts} · ` : ""}${hm(i.minutes)}`,
                       week: currentWeek,
                       state,
                       done: state === "completo",

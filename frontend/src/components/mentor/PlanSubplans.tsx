@@ -313,9 +313,9 @@ export function SubplanCard({
       {warning && <BasesAlert warning={warning} area={title} plan={plan} sub={sub} view={view} onAskChange={onAskChange} onChanged={onChanged} />}
 
       {fallback && (
-        <p className="mt-2 rounded-lg border border-warn/50 bg-warn-soft px-3 py-2 text-[13.5px]" data-testid="area-fallback">
-          <span className="font-semibold">{fallback.kind === "mixed" ? "Completado en parte con reglas." : "Completado con reglas."}</span>{" "}
-          {fallback.reason[0]!.toUpperCase()}{fallback.reason.slice(1)}. Los temas siguen el orden natural de la materia, sin la selección del Mentor.
+        <p className="mt-2 rounded-lg border border-line bg-surface px-3 py-2 text-[13.5px] text-dim" data-testid="area-fallback">
+          <span className="font-semibold text-text">{fallback.kind === "mixed" ? "Completado en parte con reglas." : "Completado con reglas."}</span>{" "}
+          {fallback.reason[0]!.toUpperCase()}{fallback.reason.slice(1)}. Los temas siguen el orden natural de la materia, sin la selección del Mentor (no es un error).
         </p>
       )}
 

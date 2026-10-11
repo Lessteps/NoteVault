@@ -251,3 +251,54 @@ describe("vista de ejecución", () => {
   });
 });
 
+describe("pestaña «Mi plan»: secciones, tabla de contenido y aviso de lo que falta generar", () => {
+  const coverage = (practice: number) => ({
+    loading: false as const,
+    coverage: { areas: [], totals: { topics: 2, theory: 2, practice, outOfPlan: 0 }, ppReady: true },
+    review: null,
+    aiConfigured: true,
+  });
+  const openPlanTab = async () => {
+    useNavState.setState({ values: { [planModeKey(PID)]: "plan" } });
+    await mountEl(<MentorPlan planId={PID} />);
+  };
+
+  it("avisa arriba del todo de que falta generar los ejercicios y lleva a «Ejecutar plan»", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue(coverage(0) as never);
+    await openPlanTab();
+    const notice = byTest("generate-notice")!;
+    expect(notice).toBeTruthy();
+    expect(notice.textContent).toContain("Falta generar contenido");
+    expect(notice.textContent).toContain("2 de 2 temas");
+    expect(notice.textContent).toContain("Ejecutar plan");
+    // va antes que el resumen y que el resto de secciones
+    const content = byTest("plan-content")!;
+    const ids = [...content.querySelectorAll("[id^=sec-]")].map((e) => e.id);
+    expect(ids.indexOf("sec-generar")).toBe(0);
+    expect(ids).toContain("sec-ejecutar");
+  });
+
+  it("no avisa cuando ya hay ejercicios en todos los temas", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue(coverage(2) as never);
+    await openPlanTab();
+    expect(byTest("generate-notice")).toBeNull();
+  });
+
+  it("la tabla de contenido lista las secciones y cada entrada apunta a un ancla que existe", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue(coverage(0) as never);
+    await openPlanTab();
+    const toc = byTest("plan-toc")!;
+    const labels = [...toc.querySelectorAll("button")].map((b) => b.textContent!.trim());
+    expect(labels.some((l) => l.startsWith("Resumen"))).toBe(true);
+    expect(labels.some((l) => l.startsWith("Falta generar"))).toBe(true);
+    expect(labels.some((l) => l.startsWith("Ejecutar plan"))).toBe(true);
+    for (const b of toc.querySelectorAll<HTMLElement>("button")) {
+      const id = b.dataset.testid!.replace("toc-", "");
+      expect(document.getElementById(id), id).toBeTruthy();
+    }
+  });
+});
+

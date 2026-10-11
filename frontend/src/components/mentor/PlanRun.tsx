@@ -3,9 +3,11 @@
 // Lo único que ofrece son accesos: «Ver tema» (abre la nota), «Ver en la Agenda» (el día concreto) y «Planear mi día» (el panel Hoy).
 // Todo se calcula con el mismo modelo de agenda que la vista de plan (`useAgendaModel`), así que ambas vistas nunca discrepan.
 
-import { CalendarDays, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronRight, Lock } from "lucide-react";
+import { useMemo } from "react";
+import { planGate } from "../../lib/planGate";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
-import { dayByArea, orderedAreas } from "../../lib/planTopicsByArea";
+import { dayByArea } from "../../lib/planTopicsByArea";
 import type { MentorPlan, MentorTopicView } from "../../lib/types";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
@@ -14,31 +16,32 @@ import { cn } from "../ui";
 import { DeliverableLine, focusColour, plural, useAgendaModel } from "./agendaKit";
 import { openTopic } from "./openTopic";
 import { hm, ProgressBar } from "./parts";
+import { PlanBoard } from "./PlanBoard";
 import { SectionCard, SectionHeading } from "./planKit";
 import { openAgendaAt, STATE_COLOUR, STATE_GLYPH, STATE_LABEL, type Loaded } from "./planShared";
 
-const DAY_MS = 86400000;
 const UPCOMING_DAYS = 5;
-const WEEK_TOPICS_SHOWN = 4;
 const DELIVERABLES_SHOWN = 4;
 
-const daysBetween = (from: string, to: string): number => Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS);
-
 /** Un tema con el símbolo de su estado (el color nunca va solo) y su botón «Ver tema». */
-function TopicLine({ folder, title, state, minutes, part, parts }: { folder: string; title: string; state?: MentorTopicView["state"]; minutes?: number; part?: number; parts?: number }) {
+function TopicLine({ folder, title, state, minutes, part, parts, lockedBy }: { folder: string; title: string; state?: MentorTopicView["state"]; minutes?: number; part?: number; parts?: number; /** fecha del día que hay que terminar antes (ruta sólida) */ lockedBy?: string }) {
   const s = state ?? "sin_tratar";
   return (
     <li className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px]" data-testid="run-topic">
-      <span aria-hidden className="w-5 flex-none text-center text-[16px]" style={{ color: STATE_COLOUR[s] }}>{STATE_GLYPH[s]}</span>
+      <span aria-hidden className="w-5 flex-none text-center text-[16px]" style={{ color: STATE_COLOUR[s] }}>{lockedBy ? <Lock size={14} className="mx-auto text-faint" /> : STATE_GLYPH[s]}</span>
       <span className="min-w-0 flex-1 basis-48">
         <span className="font-medium">{title}</span>
         {parts && parts > 1 ? <span className="text-dim"> · parte {part}/{parts}</span> : null}
-        <span className="sr-only">, {STATE_LABEL[s]}</span>
+        <span className="sr-only">, {lockedBy ? `bloqueado hasta terminar el ${dateLabel(lockedBy)}` : STATE_LABEL[s]}</span>
       </span>
       {minutes ? <span className="text-[14px] text-dim">{hm(minutes)}</span> : null}
-      <button type="button" onClick={() => void openTopic(folder)} aria-label={`Ver el tema ${title}`} className="inline-flex min-h-8 items-center px-2 text-[14px] text-accent-text underline-offset-2 hover:underline">
-        Ver tema
-      </button>
+      {lockedBy ? (
+        <span className="text-[13.5px] text-faint" data-testid="run-topic-locked">Bloqueado</span>
+      ) : (
+        <button type="button" onClick={() => void openTopic(folder)} aria-label={`Ver el tema ${title}`} className="inline-flex min-h-8 items-center px-2 text-[14px] text-accent-text underline-offset-2 hover:underline">
+          Ver tema
+        </button>
+      )}
     </li>
   );
 }
@@ -63,12 +66,17 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const upcoming = m.schedule.days.filter((d) => d.date > date && d.study).slice(0, UPCOMING_DAYS);
   const nextStudy = before ? m.schedule.days.find((d) => d.study) : undefined;
   const currentWeek = summary?.currentWeek ?? 1;
-  const daysLeft = Math.max(0, daysBetween(real, plan.end));
   const deliverables = m.deliverablesDefined
     ? m.deliverables.filter((d) => d.status !== "hecho" && d.dueDate >= date).sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, DELIVERABLES_SHOWN)
     : [];
+  // Ruta sólida: no se avanza sin cerrar el día pendiente más antiguo.
+  const gate = useMemo(
+    () => planGate(m.schedule.days.map((d) => ({ date: d.date, topics: d.topics.map((t) => ({ folder: t.folder, done: t.done })) })), (f) => m.topicByFolder.get(f)?.state === "completo"),
+    [m.schedule, m.topicByFolder],
+  );
+  const behind = !!gate.frontier && gate.frontier < date && !plan.proposed && !plan.archived;
+  const titleOf = (folder: string): string => m.topicByFolder.get(folder)?.title ?? folder.split("/").pop() ?? folder;
   const late = (data.derived?.subplans ?? []).reduce((n, s) => n + s.topics.filter((t) => t.route !== "skipped" && t.targetWeek < currentWeek && t.state !== "completo").length, 0);
-  const areas = orderedAreas(plan).map((a) => ({ a, sub: plan.subplans.find((s) => s.id === a.subplanId)!, view: data.derived?.subplans.find((s) => s.id === a.subplanId) }));
 
   const planToday = () => {
     setPending({ type: "plan" });
@@ -98,6 +106,13 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
           )}
         </header>
 
+        {behind && gate.blockers.length > 0 && (
+          <div role="status" className="rounded-xl border border-warn/60 bg-warn-soft px-4 py-3" data-testid="run-gate">
+            <p className="flex items-center gap-2 text-[15px] font-semibold text-warn"><Lock size={15} aria-hidden /> Ruta sólida: termina primero los temas del {longDateLabel(gate.frontier!)}</p>
+            <p className="mt-1 text-[14px] text-dim">Hasta cerrar ese día, lo que viene después queda bloqueado. Te falta: {gate.blockers.map(titleOf).join(" · ")}.</p>
+            <GhostButton className="mt-2" onClick={() => openAgendaAt(plan.id, gate.frontier!, "dia")}>Ver ese día en la Agenda</GhostButton>
+          </div>
+        )}
         {before && nextStudy && <p className="text-[15px] text-dim" data-testid="run-before">Empieza el {longDateLabel(nextStudy.date)}. Mientras, repasa el plan en «Vista de plan».</p>}
         {after && <p className="text-[15px] text-dim" data-testid="run-after">Este plan ya terminó. Revisa tu avance por área abajo.</p>}
         {day && !day.study && !before && !after && <p className="text-[15px] text-dim" data-testid="run-rest">{day.blocked ? "Día bloqueado: hoy no hay estudio programado." : "Día de descanso: hoy no hay estudio programado."}</p>}
@@ -130,7 +145,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                       {unique.length > 0 && (
                         <ul className="mt-2 space-y-1.5">
                           {unique.map((i) => (
-                            <TopicLine key={`${i.folder}:${i.part}`} folder={i.folder} title={i.title} state={m.topicByFolder.get(i.folder)?.state} minutes={i.minutes} part={i.part} parts={i.parts} />
+                            <TopicLine key={`${i.folder}:${i.part}`} folder={i.folder} title={i.title} state={m.topicByFolder.get(i.folder)?.state} minutes={i.minutes} part={i.part} parts={i.parts} lockedBy={gate.locked.get(i.folder)} />
                           ))}
                         </ul>
                       )}
@@ -160,50 +175,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       </SectionCard>
 
       {/* 2 · Cómo voy */}
-      {summary && (
-        <section aria-labelledby="run-progress-h" data-testid="run-progress">
-          <SectionHeading id="run-progress-h" hint={`Semana ${summary.currentWeek} de ${summary.weeks} · quedan ${plural(daysLeft, "día", "días")} · ${summary.done}/${summary.topics} temas completados.`}>
-            Cómo voy
-          </SectionHeading>
-          <div className="mb-4 flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3">
-            <span className="text-[15px] font-semibold">Plan completo</span>
-            <div className="flex-1"><ProgressBar pct={summary.pct} thick label="Avance global del plan" /></div>
-            <span className="text-[18px] font-bold">{summary.pct} %</span>
-          </div>
-          <ul className="grid gap-3 @xl:grid-cols-2 @5xl:grid-cols-3">
-            {areas.map(({ a, sub, view }) => {
-              const week = sub.topics.filter((t) => t.route !== "skipped" && t.targetWeek === currentWeek).slice(0, WEEK_TOPICS_SHOWN);
-              const pct = view?.pct ?? 0;
-              return (
-                <li key={a.subplanId} className="rounded-xl border border-line bg-card p-3.5" style={{ borderTop: `3px solid ${focusColour(a.areaId)}` }} data-testid="run-area-progress" data-area={a.areaId ?? a.subplanId}>
-                  <div className="flex items-baseline gap-2">
-                    <h3 className="min-w-0 flex-1 text-[16px] font-semibold">{a.area}</h3>
-                    <span className="text-[18px] font-bold">{pct} %</span>
-                  </div>
-                  <div className="mt-2"><ProgressBar pct={pct} colour={focusColour(a.areaId)} label={`Avance de ${a.area}`} /></div>
-                  <p className="mt-1.5 text-[14px] text-dim">{view ? `${view.done}/${view.total} temas` : `${sub.topics.length} temas`}</p>
-                  {week.length > 0 && (
-                    <>
-                      <p className="mt-2 text-[13px] font-semibold uppercase tracking-wider text-faint">Esta semana</p>
-                      <ul className="mt-1 space-y-0.5">
-                        {week.map((t) => {
-                          const s = m.topicByFolder.get(t.folder)?.state ?? "sin_tratar";
-                          return (
-                            <li key={t.folder} className="flex gap-2 text-[14px]">
-                              <span aria-hidden style={{ color: STATE_COLOUR[s] }}>{STATE_GLYPH[s]}</span>
-                              <span className="min-w-0 flex-1">{t.title}<span className="sr-only">, {STATE_LABEL[s]}</span></span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      <PlanBoard plan={plan} data={data} byFolder={m.topicByFolder} gate={gate} currentWeek={currentWeek} />
 
       {/* 3 · Lo que viene */}
       {(upcoming.length > 0 || deliverables.length > 0) && (

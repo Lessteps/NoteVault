@@ -13,3 +13,17 @@ export async function openTopic(folder: string, what = "tema"): Promise<void> {
     toast("error", (e as Error).message);
   }
 }
+
+/** «Abrir apunte»: el .md de teoría del tema (el que se llama igual que su carpeta). La práctica se abre con `openTopic`. */
+export async function openTopicNote(folder: string): Promise<void> {
+  const { toast, openNote } = useApp.getState();
+  const name = folder.split("/").pop() ?? folder;
+  const path = `${folder}/${name}.md`;
+  try {
+    await api.readNote(path);
+  } catch {
+    toast("info", "Este tema aún no tiene apunte (.md): usa su archivo de práctica.");
+    return;
+  }
+  await openNote(path);
+}

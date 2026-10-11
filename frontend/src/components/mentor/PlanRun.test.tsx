@@ -134,4 +134,46 @@ describe("vista de ejecución", () => {
     expect(v[planTabKey(PID)]).toBe("agenda");
     expect(host.querySelector("[role=tablist]")).toBeTruthy();
   });
+
+  const spread = (): PlanData => {
+    const A = "Programación/1 Fundamentals/1.1 A";
+    const B = "Programación/1 Fundamentals/1.2 B";
+    const big = (folder: string) => ({ folder, title: folder.split("/").pop()!, targetWeek: 1, estMinutes: 360 });
+    return plan({ subplans: [{ ...sub("s1", "Fundamentals", "Reforzar bases", A), topics: [big(A), big(B)] }] as never });
+  };
+
+  it("ruta sólida: con un día sin terminar, los temas de días posteriores salen bloqueados y sin flecha", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(spread()));
+    await mountEl(<MentorPlan planId={PID} />);
+    const rows = all("board-topic");
+    expect(rows.map((r) => r.dataset.state)).toEqual(["sin_tratar", "bloqueado"]);
+    expect(rows[1]!.querySelector("[data-testid=board-arrow]")).toBeNull();
+    // vas atrasado respecto al frente: el aviso dice qué terminar primero
+    expect(byTest("run-gate")!.textContent).toContain("termina primero");
+    expect(byTest("run-gate")!.textContent).toContain("1.1 A");
+  });
+
+  it("la flecha de un tema ofrece abrir el apunte (.md) o el archivo de práctica", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    const ensure = vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ ok: true, kind: "practica", path: "", created: [], errors: [] } as never);
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(byTest("board-menu")).toBeNull();
+    await click(all("board-arrow")[0]);
+    const menu = byTest("board-menu")!;
+    expect(menu.getAttribute("role")).toBe("menu");
+    expect([...menu.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica"]);
+    await click(byTest("board-open-practice"));
+    expect(ensure).toHaveBeenCalledWith(F1);
+    expect(byTest("board-menu")).toBeNull();
+  });
+
+  it("los filtros reducen los temas de cada área", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(all("board-topic")).toHaveLength(2);
+    const pend = [...byTest("board-filters")!.querySelectorAll("button")].find((b) => b.textContent === "Pendientes")!;
+    await click(pend);
+    expect(all("board-topic")).toHaveLength(1); // el de Python ya está completo
+  });
 });
+

@@ -11,6 +11,7 @@ import { readGpuStatus } from "../src/api/gpuStatus";
 import { browserManager } from "./browserManager";
 import { getPreloadPath } from "./windowFactory";
 import { installCrashLog, watchWindowHealth } from "./crashLog";
+import { installZoom } from "./zoom";
 
 // Allow HTML5 video and audio autoplay in embedded views
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -86,6 +87,7 @@ function createWindow() {
   if (state) state.window = win;
   browserManager.setWindow(win);
   watchWindowHealth(win);
+  installZoom(win);
   restartFileWatcher();
   // The window must never navigate away; external links open in the OS browser.
   win.webContents.setWindowOpenHandler(({ url }) => {

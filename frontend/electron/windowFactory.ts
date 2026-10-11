@@ -9,6 +9,7 @@ import { BrowserWindow, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { installZoom } from "./zoom";
 
 // The main bundle is an ES module, where __dirname is undefined (same trick as
 // main.ts).
@@ -38,6 +39,7 @@ export function openSecondaryWindow(noteRel = ""): { ok: boolean } {
   });
   win.on("maximize", () => win.webContents.send("nv-window-state", { maximized: true }));
   win.on("unmaximize", () => win.webContents.send("nv-window-state", { maximized: false }));
+  installZoom(win);
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: "deny" };

@@ -3,7 +3,7 @@
 // tablero. Respeta la ruta sólida (`lib/planGate.ts`): los temas repartidos después del primer día sin terminar salen bloqueados.
 
 import { BookOpen, ChevronRight, Dumbbell, Lock } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { PlanGate } from "../../lib/planGate";
 import { dateLabel } from "../../lib/planSchedule";
 import { orderedAreas } from "../../lib/planTopicsByArea";
@@ -24,8 +24,10 @@ const FILTERS = [
 ] as const;
 type FilterId = (typeof FILTERS)[number]["id"];
 
-interface Row {
+export interface BoardRow {
   folder: string;
+  /** texto secundario (parte, minutos…) */
+  meta?: string;
   title: string;
   week: number;
   state: MentorTopicView["state"];
@@ -34,8 +36,16 @@ interface Row {
   unlockOn?: string;
 }
 
-/** La flecha de un tema: abre un menú con «Abrir apunte (.md)» y «Abrir archivo de práctica». */
-function TopicMenu({ folder, title, disabled }: { folder: string; title: string; disabled?: boolean }) {
+export interface MenuAction {
+  id: string;
+  label: string;
+  icon?: ReactNode;
+  onClick: () => void;
+  testid?: string;
+}
+
+/** La flecha de una fila: abre un menú con sus acciones (ir al apunte, al archivo de práctica, marcar…). */
+export function RowMenu({ title, items, disabled }: { title: string; items: MenuAction[]; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -69,20 +79,32 @@ function TopicMenu({ folder, title, disabled }: { folder: string; title: string;
         <ChevronRight size={18} aria-hidden className={cn("transition-transform", open && "rotate-90")} />
       </button>
       {open && (
-        <div role="menu" aria-label={`Abrir ${title}`} className="absolute right-0 top-full z-30 mt-1 w-60 rounded-xl border border-line bg-card p-1.5 shadow-xl" data-testid="board-menu">
-          <button role="menuitem" type="button" className={item} data-testid="board-open-note" onClick={() => { setOpen(false); void openTopicNote(folder); }}>
-            <BookOpen size={16} aria-hidden className="text-accent-text" /> Abrir apunte (.md)
-          </button>
-          <button role="menuitem" type="button" className={item} data-testid="board-open-practice" onClick={() => { setOpen(false); void openTopic(folder); }}>
-            <Dumbbell size={16} aria-hidden className="text-mint" /> Abrir archivo de práctica
-          </button>
+        <div role="menu" aria-label={`Abrir ${title}`} className="absolute right-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-card p-1.5 shadow-xl" data-testid="board-menu">
+          {items.map((it) => (
+            <button key={it.id} role="menuitem" type="button" className={item} data-testid={it.testid} onClick={() => { setOpen(false); it.onClick(); }}>
+              {it.icon} {it.label}
+            </button>
+          ))}
         </div>
       )}
     </span>
   );
 }
 
-function TopicRow({ r, colour }: { r: Row; colour: string }) {
+/** El menú de un tema: ir al apunte (.md) o al archivo de práctica. */
+function TopicMenu({ folder, title }: { folder: string; title: string }) {
+  return (
+    <RowMenu
+      title={title}
+      items={[
+        { id: "note", label: "Abrir apunte (.md)", icon: <BookOpen size={16} aria-hidden className="text-accent-text" />, onClick: () => void openTopicNote(folder), testid: "board-open-note" },
+        { id: "practice", label: "Abrir archivo de práctica", icon: <Dumbbell size={16} aria-hidden className="text-mint" />, onClick: () => void openTopic(folder), testid: "board-open-practice" },
+      ]}
+    />
+  );
+}
+
+export function TopicRow({ r, colour }: { r: BoardRow; colour: string }) {
   const locked = !!r.unlockOn;
   const working = !r.done && !locked && r.state !== "sin_tratar";
   return (
@@ -100,6 +122,7 @@ function TopicRow({ r, colour }: { r: Row; colour: string }) {
       </span>
       <span className={cn("min-w-0 flex-1 text-[15px] leading-snug", r.done && "text-faint line-through decoration-faint/60")}>
         {r.title}
+        {r.meta ? <span className="text-[13.5px] font-normal text-dim"> · {r.meta}</span> : null}
         <span className="sr-only">, {locked ? `bloqueado hasta terminar el ${dateLabel(r.unlockOn!)}` : r.done ? "completado" : STATE_LABEL[r.state]}</span>
       </span>
       {working && (
@@ -119,6 +142,28 @@ function TopicRow({ r, colour }: { r: Row; colour: string }) {
   );
 }
 
+/** La tarjeta de un área, común al tablero «Cómo voy», a los temas de hoy y a la práctica de hoy. */
+export function AreaCardShell({ colour, title, badge, sub, tag, children, footer, testid, area }: { colour: string; title: string; badge?: string; sub?: string; tag?: string; children: ReactNode; footer?: ReactNode; testid?: string; area?: string }) {
+  return (
+    <li className="relative rounded-2xl border border-line bg-card" style={{ borderTop: `3px solid ${colour}`, boxShadow: `0 8px 24px -18px ${colour}` }} data-testid={testid} data-area={area}>
+      <header className="flex items-center gap-2.5 px-4 pt-3.5">
+        <span aria-hidden className="inline-block h-3 w-3 flex-none rounded-full" style={{ background: colour }} />
+        <h3 className="min-w-0 flex-1 truncate text-[17px] font-bold">{title}</h3>
+        {badge && <span className="rounded-md px-2 py-0.5 text-[14px] font-bold" style={{ color: colour, background: `${colour}22` }}>{badge}</span>}
+      </header>
+      {(sub || tag) && (
+        <div className="flex items-center gap-2 px-4 pb-2 pt-1.5 text-[13.5px] text-dim">
+          {sub && <span className="font-mono">{sub}</span>}
+          <span className="flex-1" />
+          {tag && <span className="rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide" style={{ color: colour, borderColor: `${colour}55` }}>{tag}</span>}
+        </div>
+      )}
+      <div className="border-t border-line px-2 py-2">{children}</div>
+      {footer && <footer className="flex items-center gap-2 border-t border-line px-4 py-2 text-[13.5px]">{footer}</footer>}
+    </li>
+  );
+}
+
 export function PlanBoard({ plan, data, byFolder, gate, currentWeek }: { plan: MentorPlan; data: Loaded; byFolder: Map<string, MentorTopicView>; gate: PlanGate; currentWeek: number }) {
   const [filter, setFilter] = useState<FilterId>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -126,7 +171,7 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek }: { plan: M
   const areas = orderedAreas(plan).map((a) => {
     const sub = plan.subplans.find((s) => s.id === a.subplanId)!;
     const view = data.derived?.subplans.find((s) => s.id === a.subplanId);
-    const rows: Row[] = sub.topics
+    const rows: BoardRow[] = sub.topics
       .filter((t) => t.route !== "skipped")
       .map((t) => {
         const live = byFolder.get(t.folder);
@@ -138,7 +183,7 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek }: { plan: M
   });
   if (!summary) return null;
 
-  const keep = (r: Row): boolean => (filter === "todos" ? true : filter === "semana" ? r.week === currentWeek : filter === "pendientes" ? !r.done : r.exercises > 0);
+  const keep = (r: BoardRow): boolean => (filter === "todos" ? true : filter === "semana" ? r.week === currentWeek : filter === "pendientes" ? !r.done : r.exercises > 0);
   const toggle = (id: string): void => setExpanded((s) => {
     const n = new Set(s);
     if (n.has(id)) n.delete(id);
@@ -195,36 +240,35 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek }: { plan: M
           const thisWeek = rows.some((r) => !r.done && r.week === currentWeek);
           const tag = pct >= 100 ? "Completa" : thisWeek ? "Esta semana" : phaseFrom > currentWeek ? "Próximo" : "En curso";
           return (
-            <li key={a.subplanId} className="overflow-hidden rounded-2xl border border-line bg-card" style={{ borderTop: `3px solid ${colour}`, boxShadow: `0 8px 24px -18px ${colour}` }} data-testid="run-area-progress" data-area={a.areaId ?? a.subplanId}>
-              <header className="flex items-center gap-2.5 px-4 pt-3.5">
-                <span aria-hidden className="inline-block h-3 w-3 flex-none rounded-full" style={{ background: colour }} />
-                <h3 className="min-w-0 flex-1 truncate text-[17px] font-bold">{a.area}</h3>
-                <span className="rounded-md px-2 py-0.5 text-[14px] font-bold" style={{ color: colour, background: `${colour}22` }}>{pct} %</span>
-              </header>
-              <div className="flex items-center gap-2 px-4 pb-2 pt-1.5 text-[13.5px] text-dim">
-                <span className="font-mono">{doneN}/{rows.length} temas</span>
-                <span className="flex-1" />
-                <span className="rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide" style={{ color: colour, borderColor: `${colour}55` }}>{tag}</span>
-              </div>
-              <div className="border-t border-line px-2 py-2">
-                {list.length === 0 ? (
-                  <p className="px-2.5 py-3 text-[14px] text-faint">Ningún tema con este filtro.</p>
-                ) : (
-                  <ul className="space-y-0.5" aria-label={`Temas de ${a.area}`}>
-                    {list.map((r) => <TopicRow key={r.folder} r={r} colour={colour} />)}
-                  </ul>
-                )}
-              </div>
-              {(hidden > 0 || open) && (
-                <footer className="flex items-center gap-2 border-t border-line px-4 py-2 text-[13.5px]">
-                  <span className="text-dim">{open ? `${shown.length} temas` : `+${hidden} ${hidden === 1 ? "tema" : "temas"} por revisar`}</span>
-                  <span className="flex-1" />
-                  <button type="button" onClick={() => toggle(a.subplanId)} aria-expanded={open} className="inline-flex min-h-8 items-center px-1 font-medium underline-offset-2 hover:underline" style={{ color: colour }}>
-                    {open ? "Ver menos" : "Ver todos"}
-                  </button>
-                </footer>
+            <AreaCardShell
+              key={a.subplanId}
+              colour={colour}
+              title={a.area}
+              badge={`${pct} %`}
+              sub={`${doneN}/${rows.length} temas`}
+              tag={tag}
+              testid="run-area-progress"
+              area={a.areaId ?? a.subplanId}
+              footer={
+                hidden > 0 || open ? (
+                  <>
+                    <span className="text-dim">{open ? `${shown.length} temas` : `+${hidden} ${hidden === 1 ? "tema" : "temas"} por revisar`}</span>
+                    <span className="flex-1" />
+                    <button type="button" onClick={() => toggle(a.subplanId)} aria-expanded={open} className="inline-flex min-h-8 items-center px-1 font-medium underline-offset-2 hover:underline" style={{ color: colour }}>
+                      {open ? "Ver menos" : "Ver todos"}
+                    </button>
+                  </>
+                ) : undefined
+              }
+            >
+              {list.length === 0 ? (
+                <p className="px-2.5 py-3 text-[14px] text-faint">Ningún tema con este filtro.</p>
+              ) : (
+                <ul className="space-y-0.5" aria-label={`Temas de ${a.area}`}>
+                  {list.map((r) => <TopicRow key={r.folder} r={r} colour={colour} />)}
+                </ul>
               )}
-            </li>
+            </AreaCardShell>
           );
         })}
       </ul>

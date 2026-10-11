@@ -386,6 +386,8 @@ export const api = {
   /** Sistema de práctica por área: katas, habilidades y proyectos de cada área del plan. */
   mentorAreaPractice: (id: string) => call<import("./types").MentorAreaPractice>("mentor_area_practice", { id }),
   mentorAreaPracticeOn: (id: string, date: string) => call<{ items: Array<{ areaId: string; label: string; day: number; rel: string; title: string; skill: string; level: number; minutes: number }> }>("mentor_area_practice_on", { id, date }),
+  /** Acceso directo al kata de un área: lo crea si falta (nunca sobrescribe) y devuelve su ruta en la vault. */
+  mentorAreaKataOpen: (id: string, areaId: string) => call<{ rel: string; created: boolean; date: string }>("mentor_area_kata_open", { id, areaId }),
   mentorAreaKataMark: (id: string, areaId: string, date: string, status: "done" | "skipped" | null) => call<import("./types").MentorAreaPractice>("mentor_area_kata_mark", { id, areaId, date, status }),
   /** Cierre del día: el registro sin IA, la revisión al cerrar y la memoria del Mentor. */
   mentorDayRecord: (date?: string) => call<import("./types").MentorDayView>("mentor_day_record", date ? { date } : {}),

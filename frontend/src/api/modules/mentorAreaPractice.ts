@@ -3,10 +3,14 @@
 //  - mentor_area_practice({ id }) -> { areas, ppReady, today }: por área del plan, su sistema (habilidades, kata de hoy, seguimiento de la semana,
 //    racha, proyecto de la semana, proyectos por semana y mensual) con el estado DERIVADO del ledger y de las marcas manuales. SOLO LEE.
 //  - mentor_area_practice_on({ id, date }) -> { items }: la práctica por área que toca en una fecha (un kata por área), para el calendario y la agenda.
+//  - mentor_area_kata_open({ id, areaId }) -> { rel, created }: el acceso directo al kata que toca del área. Si su archivo aún no existe lo crea (junto con
+//    la estructura mínima del área; NUNCA sobrescribe) y devuelve la ruta para abrirlo. Solo se llama cuando la persona pulsa «Abrir kata».
 //  - mentor_area_kata_mark({ id, areaId, date, status }) -> { areas }: la persona marca un kata como hecho / saltado (o lo quita con `status: null`).
 //    Escribe SOLO `.notevault/mentor/area-practice/<plan>.json` (datos de la app), nunca notas de la vault.
 
+import * as path from "node:path";
 import { ApiError } from "../../core/errors.js";
+import { createAreaPracticeFolders } from "../../core/mentor/areaPracticeFolders.js";
 import { AreaPracticeStore, deriveAreaPractice, existingAreaFiles } from "../../core/mentor/areaPracticeState.js";
 import { PLAN_ID_RE, PlanStore, type Plan } from "../../core/mentor/plan.js";
 import { ppAreaDir } from "../../core/mentor/practiceState.js";
@@ -51,6 +55,23 @@ export function mentorAreaPracticeApi(app: AppState, hooks: { today: () => strin
       const date = String((opts as Record<string, unknown>)?.date ?? "");
       if (!DATE_RE.test(date)) throw new ApiError("Fecha inválida (AAAA-MM-DD).");
       return { items: areaPracticeFor(plan, date).map((d) => ({ areaId: d.areaId, label: d.label, day: d.day, rel: d.rel, title: d.kata.title, skill: d.kata.skillName, level: d.kata.level, minutes: d.kata.minutes })) };
+    },
+
+    mentor_area_kata_open(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const plan = planOf(o);
+      const areaId = String(o.areaId ?? "");
+      if (!isPracticeAreaId(areaId) || !practiceAreasOf(plan).some((a) => a.areaId === areaId)) throw new ApiError("Esa área no está en el plan.");
+      const ppDir = ppAreaDir(app.root);
+      if (!ppDir) throw new ApiError("No se encontró la carpeta programming_practice en tu vault.");
+      const area = viewOf(plan).areas.find((a) => a.areaId === areaId);
+      const next = area?.kata.next;
+      if (!area || !next) throw new ApiError("Este plan no tiene katas en esa área.");
+      const r = createAreaPracticeFolders({ ppDir, areas: [areaId], katasPerArea: 1, fromDay: next.kata.day, levels: { [areaId]: area.level } });
+      const base = app.rel(ppDir).split(path.sep).join("/");
+      const rel = `${base}/${next.rel}`;
+      if (r.failed.length && !r.created.length && !r.skipped.length) throw new ApiError(`No se pudo crear el kata: ${r.failed[0]!.reason}`);
+      return { rel, created: r.created.includes(next.rel), date: next.date };
     },
 
     mentor_area_kata_mark(opts: unknown) {

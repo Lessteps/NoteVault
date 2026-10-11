@@ -186,18 +186,28 @@ describe("vista de ejecución", () => {
     weekly: { title: "w", description: "d", week: 1, focus: false }, weeks: [], monthly: { title: "m", description: "d", blocks: [] },
   });
 
-  it("incluye la práctica de hoy por área (reto diario) y deja marcar el kata", async () => {
+  it("la práctica de hoy sale por área con la misma tarjeta que los temas, y la flecha siempre da acceso al kata", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "Programación/programming_practice", areas: [areaView("backend", "Backend"), areaView("databases", "Databases")] } as never);
+    const open = vi.spyOn(api, "mentorAreaKataOpen").mockResolvedValue({ rel: "Programación/programming_practice/backend/katas/003.md", created: true, date: TODAY });
     const mark = vi.spyOn(api, "mentorAreaKataMark").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
     await mountEl(<MentorPlan planId={PID} />);
     const section = byTest("run-practice")!;
-    expect(section).toBeTruthy();
     expect(section.textContent).toContain("Práctica de hoy");
-    expect(section.textContent).toContain("Kata de Backend");
-    expect(section.textContent).toContain("Kata de Databases");
     expect(section.textContent).toContain("entrevistas técnicas");
-    await click(section.querySelector("[data-testid=area-kata-done]"));
+    // una tarjeta por área (+ la del kata de lógica) con su kata como fila
+    expect([...section.querySelectorAll("[data-testid=run-practice-area] h3")].map((h) => h.textContent)).toEqual(["Backend", "Databases"]);
+    const rows = [...section.querySelectorAll("[data-testid=kata-row]")];
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.textContent).toContain("Kata de Backend");
+    // el acceso directo: la flecha abre el menú aunque el archivo del kata aún no exista
+    await click(rows[0]!.querySelector("[data-testid=board-arrow]"));
+    expect([...byTest("board-menu")!.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir kata (.md)", "Marcar hecho", "Ver práctica de Backend"]);
+    await click(byTest("kata-open"));
+    expect(open).toHaveBeenCalledWith(PID, "backend");
+    // y desde el mismo menú se marca el día
+    await click(rows[0]!.querySelector("[data-testid=board-arrow]"));
+    await click(byTest("kata-mark-done"));
     expect(mark).toHaveBeenCalledWith(PID, "backend", TODAY, "done");
   });
 

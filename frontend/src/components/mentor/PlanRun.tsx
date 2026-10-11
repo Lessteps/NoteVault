@@ -8,44 +8,20 @@ import { useMemo } from "react";
 import { planGate } from "../../lib/planGate";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
 import { dayByArea } from "../../lib/planTopicsByArea";
-import type { MentorPlan, MentorTopicView } from "../../lib/types";
+import type { MentorPlan } from "../../lib/types";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { DeliverableLine, focusColour, plural, useAgendaModel } from "./agendaKit";
-import { openTopic } from "./openTopic";
 import { hm, ProgressBar } from "./parts";
-import { PlanBoard } from "./PlanBoard";
+import { AreaCardShell, PlanBoard, TopicRow, type BoardRow } from "./PlanBoard";
 import { RunPractice, RunProjects } from "./PlanRunPractice";
 import { SectionCard, SectionHeading } from "./planKit";
-import { openAgendaAt, STATE_COLOUR, STATE_GLYPH, STATE_LABEL, type Loaded } from "./planShared";
+import { openAgendaAt, type Loaded } from "./planShared";
 
 const UPCOMING_DAYS = 5;
 const DELIVERABLES_SHOWN = 4;
-
-/** Un tema con el símbolo de su estado (el color nunca va solo) y su botón «Ver tema». */
-function TopicLine({ folder, title, state, minutes, part, parts, lockedBy }: { folder: string; title: string; state?: MentorTopicView["state"]; minutes?: number; part?: number; parts?: number; /** fecha del día que hay que terminar antes (ruta sólida) */ lockedBy?: string }) {
-  const s = state ?? "sin_tratar";
-  return (
-    <li className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px]" data-testid="run-topic">
-      <span aria-hidden className="w-5 flex-none text-center text-[16px]" style={{ color: STATE_COLOUR[s] }}>{lockedBy ? <Lock size={14} className="mx-auto text-faint" /> : STATE_GLYPH[s]}</span>
-      <span className="min-w-0 flex-1 basis-48">
-        <span className="font-medium">{title}</span>
-        {parts && parts > 1 ? <span className="text-dim"> · parte {part}/{parts}</span> : null}
-        <span className="sr-only">, {lockedBy ? `bloqueado hasta terminar el ${dateLabel(lockedBy)}` : STATE_LABEL[s]}</span>
-      </span>
-      {minutes ? <span className="text-[14px] text-dim">{hm(minutes)}</span> : null}
-      {lockedBy ? (
-        <span className="text-[13.5px] text-faint" data-testid="run-topic-locked">Bloqueado</span>
-      ) : (
-        <button type="button" onClick={() => void openTopic(folder)} aria-label={`Ver el tema ${title}`} className="inline-flex min-h-8 items-center px-2 text-[14px] text-accent-text underline-offset-2 hover:underline">
-          Ver tema
-        </button>
-      )}
-    </li>
-  );
-}
 
 export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const m = useAgendaModel(data, plan);
@@ -132,26 +108,41 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
             )}
 
             {entries.length > 0 && (
-              <ul className="grid gap-3 @3xl:grid-cols-2" aria-label="Qué estudiar hoy, por área">
+              <ul className="grid gap-4 @3xl:grid-cols-2" aria-label="Qué estudiar hoy, por área">
                 {entries.map((e) => {
-                  const items = (e.blocks ?? []).flatMap((b) => b.items.filter((i) => !i.applied));
+                  const items = (e.blocks ?? []).flatMap((bl) => bl.items.filter((i) => !i.applied));
                   const seen = new Set<string>();
                   const unique = items.filter((i) => (seen.has(`${i.folder}:${i.part}`) ? false : (seen.add(`${i.folder}:${i.part}`), true)));
+                  const colour = focusColour(e.areaId);
+                  const rows: BoardRow[] = unique.map((i) => {
+                    const state = m.topicByFolder.get(i.folder)?.state ?? "sin_tratar";
+                    return {
+                      folder: i.folder,
+                      title: i.title,
+                      meta: `${i.parts > 1 ? `parte ${i.part}/${i.parts} · ` : ""}${hm(i.minutes)}`,
+                      week: currentWeek,
+                      state,
+                      done: state === "completo",
+                      exercises: 0,
+                      unlockOn: gate.locked.get(i.folder),
+                    };
+                  });
+                  const doneN = rows.filter((r) => r.done).length;
                   return (
-                    <li key={e.subplanId} className="rounded-xl border border-line bg-surface p-3.5" style={{ borderTop: `3px solid ${focusColour(e.areaId)}` }} data-testid="run-area" data-area={e.areaId ?? e.subplanId}>
-                      <div className="flex flex-wrap items-baseline gap-x-2">
-                        <h3 className="text-[16px] font-semibold">{e.area}</h3>
-                        <span className="text-[14px] text-dim">{[e.theoryMinutes ? `${hm(e.theoryMinutes)} de teoría` : "", e.practiceMinutes ? `${hm(e.practiceMinutes)} de práctica` : ""].filter(Boolean).join(" · ")}</span>
-                      </div>
-                      {unique.length > 0 && (
-                        <ul className="mt-2 space-y-1.5">
-                          {unique.map((i) => (
-                            <TopicLine key={`${i.folder}:${i.part}`} folder={i.folder} title={i.title} state={m.topicByFolder.get(i.folder)?.state} minutes={i.minutes} part={i.part} parts={i.parts} lockedBy={gate.locked.get(i.folder)} />
-                          ))}
-                        </ul>
-                      )}
-                      {e.project && <p className="mt-2 text-[14px] text-dim">Hoy toca también un proyecto de esta área.</p>}
-                    </li>
+                    <AreaCardShell
+                      key={e.subplanId}
+                      colour={colour}
+                      title={e.area}
+                      badge={`${doneN}/${rows.length}`}
+                      sub={[e.theoryMinutes ? `${hm(e.theoryMinutes)} teoría` : "", e.practiceMinutes ? `${hm(e.practiceMinutes)} práctica` : ""].filter(Boolean).join(" · ")}
+                      tag={e.project ? "Con proyecto" : undefined}
+                      testid="run-area"
+                      area={e.areaId ?? e.subplanId}
+                    >
+                      <ul className="space-y-0.5" aria-label={`Temas de hoy de ${e.area}`}>
+                        {rows.map((r) => <TopicRow key={`${r.folder}:${r.meta}`} r={r} colour={colour} />)}
+                      </ul>
+                    </AreaCardShell>
                   );
                 })}
               </ul>

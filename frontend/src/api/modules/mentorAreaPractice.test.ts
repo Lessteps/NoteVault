@@ -102,3 +102,30 @@ describe("mentor_area_kata_mark", () => {
     expect(() => api().mentor_area_kata_mark({ id, areaId: "backend", date: TODAY, status: "raro" })).toThrow(/Estado inválido/);
   });
 });
+
+describe("mentor_area_kata_open: el acceso directo al kata siempre existe", () => {
+  it("crea el kata que toca si falta (y su estructura mínima), devuelve su ruta y no sobrescribe nada", () => {
+    const pp = path.join(dir, "Programación", "programming_practice");
+    expect(fs.existsSync(path.join(pp, "backend"))).toBe(false);
+    const r: any = api().mentor_area_kata_open({ id, areaId: "backend" });
+    expect(r.created).toBe(true);
+    expect(r.date).toBe(TODAY);
+    expect(r.rel.startsWith("Programación/programming_practice/backend/katas/")).toBe(true);
+    const abs = path.join(dir, ...r.rel.split("/"));
+    expect(fs.existsSync(abs)).toBe(true);
+    expect(fs.existsSync(path.join(pp, "backend", "skills.md"))).toBe(true);
+    // el estado derivado ya ve el archivo
+    const view: any = api().mentor_area_practice({ id });
+    expect(view.areas[0].kata.next.fileReady).toBe(true);
+    // abrir otra vez no lo vuelve a crear ni lo pisa
+    fs.appendFileSync(abs, "\nmi respuesta\n", "utf-8");
+    const again: any = api().mentor_area_kata_open({ id, areaId: "backend" });
+    expect(again.created).toBe(false);
+    expect(again.rel).toBe(r.rel);
+    expect(fs.readFileSync(abs, "utf-8")).toContain("mi respuesta");
+  });
+
+  it("rechaza un área que no es del plan", () => {
+    expect(() => api().mentor_area_kata_open({ id, areaId: "mobile" })).toThrow(/no está en el plan/);
+  });
+});

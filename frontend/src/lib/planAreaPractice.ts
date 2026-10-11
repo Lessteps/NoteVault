@@ -264,6 +264,9 @@ export const AREA_SKILLS: Readonly<Record<string, readonly AreaSkill[]>> = {
     { id: "atomic_design", name: "Atomic Design", why: "Atoms, molecules and organisms give a repeatable way to build a design system.", measure: "Each piece is built only from smaller pieces and is reusable on another page.", levels: ["build an atom (button, field, icon)", "combine atoms into a molecule (search, labelled field)", "build an organism (navbar, hero, form) and place it in a template"] },
     { id: "async_ui", name: "Loading, error and empty states", why: "Real data is slow, missing or broken; the UI must say so.", measure: "Loading, error, empty and success are all rendered and the user can retry.", levels: ["show a loading and an error message", "handle empty results and retry", "cancel stale requests and avoid showing outdated data"] },
     { id: "responsive_layout", name: "Responsive layout", why: "Users arrive on every screen size.", measure: "No horizontal scrolling or overlapping from 320 px up; tap targets stay usable.", levels: ["make a card list reflow in one column on a phone", "use a grid with container or media queries", "handle long text, zoom 200 % and large screens"] },
+    { id: "forms_validation", name: "Forms and validation", why: "Almost every product is forms; a form that explains itself is what users and interviewers notice.", measure: "Validation runs on the right moment, errors are tied to their field and announced, and the form never loses what the user typed.", levels: ["validate required fields and show a message next to each one", "validate on blur and on submit, disable double submit, keep the typed values after a server error", "handle async validation (taken username), field dependencies and accessible error summaries"] },
+    { id: "ui_testing", name: "Testing a UI like a user", why: "Tests that click and read like a person survive refactors; tests of internals do not.", measure: "The tests find elements by role or label, cover the happy path and one failure, and do not depend on implementation details.", levels: ["test that a component renders its data and reacts to one click", "test a form flow with a failing and a passing submit, mocking only the network", "test loading, error and retry states and keep the suite deterministic"] },
+    { id: "web_performance", name: "Rendering performance", why: "Speed is a feature: a fast page is the cheapest way to look senior.", measure: "The cost is measured before and after (not guessed), and the fix targets the real bottleneck.", levels: ["find one unnecessary re-render or oversized image and fix it", "split a bundle or lazy-load a route and measure the change", "budget Core Web Vitals (LCP, CLS, INP) and explain which change moved which metric"] },
   ],
   databases: [
     { id: "data_modeling", name: "Data modeling", why: "A good schema prevents whole families of bugs.", measure: "Tables, keys and constraints express the rules of the case; no duplicated facts.", levels: ["design 2 related tables with keys", "normalise a flat table and add constraints", "model many-to-many, history and soft deletes"] },
@@ -315,4 +318,142 @@ export const areaKataSkillId = (areaId: string): string => `pp_kata:${areaId}`;
 /** El proyecto MENSUAL integrador: una aplicación. */
 export function integratedMonthly(areaIds: readonly string[], label: string): { title: string; description: string } {
   return { title: `Aplicación del mes · ${label}`, description: `Una aplicación que integra las verticales semanales del mes${areaIds.length ? ` (${areaIds.map((a) => AREA_PRACTICE[a]?.name ?? a).slice(0, 4).join(" · ")})` : ""}: interfaz, API y base de datos.` };
+}
+
+// ── Proyectos diario y semanal, desglosados por ÁREA: qué hay que hacer, cómo y qué resultado REAL se espera ──────────────────────────────
+//
+// Un proyecto sin resultado comprobable es una lista de buenas intenciones: cada sección dice QUÉ se construye en esa área, CÓMO se hace paso a paso
+// y qué RESULTADO REAL hay que poder enseñar (un comando que se ejecuta, una respuesta, una captura, una prueba que pasa). El diario es una pieza
+// pequeña que toca un poco de cada área; el semanal es la vertical completa, con más exigencia, sobre los temas aprendidos en la semana.
+
+export interface ProjectSection {
+  areaId: string;
+  area: string;
+  /** qué se construye en esa área */
+  what: string;
+  /** cómo hacerlo, en pasos */
+  how: string[];
+  /** el resultado real que debe poder enseñarse */
+  result: string;
+}
+
+const FALLBACK_LABEL: Record<string, string> = { backend: "Backend", frontend: "Frontend", databases: "Databases", tooling: "Tooling and Quality", automation: "Automation", desktop: "Desktop", mobile: "Mobile" };
+const ORDER = ["databases", "backend", "frontend", "tooling", "automation", "desktop", "mobile"];
+
+const ordered = (areaIds: readonly string[]): string[] => [...new Set(areaIds)].sort((a, b) => (ORDER.indexOf(a) < 0 ? 99 : ORDER.indexOf(a)) - (ORDER.indexOf(b) < 0 ? 99 : ORDER.indexOf(b)));
+
+/** El desglose del proyecto DIARIO: una pieza pequeña por área, aplicada a los temas del día. */
+export function dailyBreakdown(areaIds: readonly string[], topics: readonly string[], opts: { lang?: string; db?: string } = {}): ProjectSection[] {
+  const first = short(topics[0] ?? "") || "el tema del día";
+  const t = list(topics.slice(0, 2)) || first;
+  const lang = opts.lang ? ` en ${opts.lang}` : "";
+  const out: ProjectSection[] = [];
+  for (const id of ordered(areaIds)) {
+    const area = FALLBACK_LABEL[id] ?? id;
+    switch (id) {
+      case "databases":
+        out.push({
+          areaId: id, area,
+          what: `La tabla (o el cambio de tabla) que necesita la pieza del día y una consulta que la use, aplicando ${t}.`,
+          how: ["Escribe la migración con restricciones (NOT NULL, UNIQUE o CHECK donde corresponda).", "Carga 5 filas de prueba, incluidas un caso límite y un duplicado.", "Escribe la consulta y mira su plan con EXPLAIN."],
+          result: "La migración corre sobre una base vacía y la consulta devuelve las filas esperadas: pega el resultado y el EXPLAIN en tu README.",
+        });
+        break;
+      case "backend":
+        out.push({
+          areaId: id, area,
+          what: `Un endpoint pequeño${lang} para «${first}», con su validación y su prueba.`,
+          how: ["Define ruta, verbo y códigos de estado antes de programar.", "Valida la entrada y devuelve un error con forma fija (un 422 claro).", "Escribe una prueba del caso feliz y de un fallo."],
+          result: "Un curl real contra tu servidor devuelve el 2xx esperado y un 4xx cuando la entrada es inválida; la prueba pasa.",
+        });
+        break;
+      case "frontend":
+        out.push({
+          areaId: id, area,
+          what: `Un componente reutilizable que muestra el dato de «${first}» consumiendo tu endpoint.`,
+          how: ["Haz el componente puro: recibe datos por props.", "Cubre cuatro estados: cargando, error con reintento, vacío y con datos.", "Revisa a 320 px y con el teclado (foco visible, etiquetas)."],
+          result: "El componente se ve en el navegador con datos reales de tu API y los cuatro estados se pueden provocar a mano.",
+        });
+        break;
+      case "tooling":
+        out.push({
+          areaId: id, area,
+          what: "Que la pieza del día se pueda instalar, comprobar y ejecutar con comandos, sin pasos mentales.",
+          how: ["Añade un script `check` que corra el linter y las pruebas.", "Haz un commit pequeño con un mensaje que explique el porqué.", "Anota en el README el comando exacto para arrancarlo."],
+          result: "En un clon limpio, `check` termina en verde con un solo comando.",
+        });
+        break;
+      case "automation":
+        out.push({
+          areaId: id, area,
+          what: `Un script${lang} que automatiza una tarea repetible de la pieza (cargar datos de prueba, limpiar, exportar).`,
+          how: ["Hazlo idempotente: ejecutarlo dos veces deja el mismo estado.", "Registra qué hizo y qué falló.", "Sal con código distinto de 0 si algo falla."],
+          result: "Lo ejecutas dos veces seguidas: el segundo run no cambia nada y el log lo dice.",
+        });
+        break;
+      case "desktop":
+        out.push({ areaId: id, area, what: `Una acción de escritorio ligada a «${first}» pasando por IPC con un canal con nombre.`, how: ["Declara el canal y valida lo que llega al proceso principal.", "Expón solo esa función en el preload.", "Llama desde la interfaz y muestra el resultado."], result: "Pulsas el botón y ves el resultado del proceso principal en la ventana." });
+        break;
+      case "mobile":
+        out.push({ areaId: id, area, what: `Una pantalla móvil para «${first}» que funciona sin conexión.`, how: ["Guarda lo necesario en almacenamiento local.", "Muestra el estado sin red.", "Sincroniza al volver la conexión."], result: "Con el modo avión activado la pantalla sigue mostrando los datos guardados." });
+        break;
+      default:
+        out.push({ areaId: id, area, what: `Una pieza pequeña de ${area} aplicando ${t}.`, how: ["Define qué entrega la pieza.", "Constrúyela en un paso verificable.", "Comprueba el resultado con un comando o una captura."], result: "Puedes enseñar el resultado funcionando." });
+    }
+  }
+  return out;
+}
+
+/** El desglose del proyecto SEMANAL: la vertical completa, con más exigencia y resultados reales medibles. */
+export function weeklyBreakdown(areaIds: readonly string[], week: number, pieces: readonly string[]): ProjectSection[] {
+  const feats = list(pieces.slice(0, 3)) || "las piezas de la semana";
+  const out: ProjectSection[] = [];
+  for (const id of ordered(areaIds)) {
+    const area = FALLBACK_LABEL[id] ?? id;
+    switch (id) {
+      case "databases":
+        out.push({
+          areaId: id, area,
+          what: `El esquema completo de la semana ${week}: al menos 3 tablas relacionadas, con migraciones versionadas y los datos de ${feats}.`,
+          how: ["Modela las relaciones y las claves antes de escribir SQL.", "Añade restricciones e índices justificados por una consulta real.", "Crea un seed repetible y una consulta de reporte con agregación."],
+          result: "`migrate up` y `migrate down` funcionan sin errores; el EXPLAIN de la consulta crítica usa el índice y lo demuestras con la salida.",
+        });
+        break;
+      case "backend":
+        out.push({
+          areaId: id, area,
+          what: `Una API por capas (rutas, servicios, repositorio) con 4–6 endpoints que cubren ${feats}.`,
+          how: ["Separa HTTP, reglas y SQL en capas distintas.", "Un contrato de errores único y autenticación en las rutas de escritura.", "Pruebas de servicio sin base de datos y pruebas de ruta con ella."],
+          result: "La suite de pruebas pasa y tienes una colección de curl (o archivo .http) que recorre todos los endpoints con respuestas reales.",
+        });
+        break;
+      case "frontend":
+        out.push({
+          areaId: id, area,
+          what: `Dos o tres pantallas que consumen la API de verdad: lista, detalle y un formulario con validación para ${feats}.`,
+          how: ["Organiza en átomos, moléculas y organismos; el estado vive en un solo sitio.", "Formulario con validación por campo y errores del servidor visibles.", "Cuatro estados de datos y revisión de accesibilidad y 320 px."],
+          result: "Recorres el flujo completo en el navegador contra tu API real y grabas el recorrido (captura o GIF) sin errores en consola.",
+        });
+        break;
+      case "tooling":
+        out.push({
+          areaId: id, area,
+          what: "El proyecto listo para que otra persona lo ejecute: scripts, calidad automática y documentación.",
+          how: ["Un solo comando instala, comprueba y arranca.", "Linter, formateador y pruebas en un hook o en CI.", "README con requisitos, comandos y decisiones."],
+          result: "Un clon nuevo del repo arranca siguiendo solo el README y el pipeline local termina en verde.",
+        });
+        break;
+      case "automation":
+        out.push({
+          areaId: id, area,
+          what: "Una tarea automática de la semana (importación, copia de seguridad o reporte) con reintentos y registro.",
+          how: ["Idempotente y con reintentos con espera creciente.", "Registro estructurado de lo procesado y de los fallos.", "Programada o disparada por un comando documentado."],
+          result: "La ejecutas con datos reales, fuerzas un fallo y muestras el log con el reintento y el estado final correcto.",
+        });
+        break;
+      default:
+        out.push({ areaId: id, area, what: `Una vertical de ${area} que integra ${feats}.`, how: ["Define el alcance de la semana.", "Constrúyelo por capas verificables.", "Documenta cómo ejecutarlo."], result: "Funciona de principio a fin y puedes demostrarlo." });
+    }
+  }
+  return out;
 }

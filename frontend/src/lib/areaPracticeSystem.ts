@@ -111,6 +111,9 @@ const TEMPLATES: Readonly<Record<string, KataTemplate>> = {
   atomic_design: T("Using Atomic Design, build the card that shows a {noun} ({fields}) in a catalogue.", "The atoms, molecules and organism with their props, and the template that places the organism.", ["Atoms know nothing about {plural}; the organism knows the data.", "Each piece must be usable on another page without changes."], "Atoms: Badge, Button, Text. Molecule: LabelledValue. Organism: {Noun}Card made only of those pieces. Template: CatalogueGrid receives cards as children.", ["Putting data fetching in an atom", "Building one big component and calling it an organism"]),
   async_ui: T("A page loads the {plural} from an API. Rule: {rule}.", "The states the page can be in and what the user sees and can do in each of them, plus the code that switches between them.", ["Loading, error, empty and success are four different screens.", "A retry must be possible from the error state."], "A single status value (loading, error, empty, ready) drives the render; the error state shows the message and a Retry button; an empty list explains how to add the first {noun}; a stale response is ignored if the request changed.", ["Showing an empty list while loading", "Leaving the user stuck after an error"]),
   responsive_layout: T("Lay out a grid of {plural} cards that works from 320 px to a wide desktop screen.", "The CSS for the layout and a description of how it behaves at 320, 768 and 1280 px.", ["Let the grid decide the number of columns from the available width.", "Long text must wrap or truncate on purpose, never overflow."], "A grid with repeat(auto-fill, minmax(16rem, 1fr)), min-width: 0 on the cards, wrapped text and tap targets of at least 44 px.", ["Fixing widths in pixels", "Testing only at one screen size"]),
+  forms_validation: T("Build the form to create a {noun} with these fields: {fields}. Rule: {rule}.", "The list of validations with the moment each one runs (typing, blur, submit) and the markup of one field with its error message.", ["Show an error only after the user left the field or tried to submit, not on the first keystroke.", "Tie the message to the field (aria-describedby) and keep what the user typed after a server error."], "Each field validates on blur and on submit; the submit button is disabled while the request runs; the server 422 response is mapped to the fields; an error summary links to the first invalid field; typed values are kept.", ["Clearing the form after a failed submit", "Showing every error before the user typed anything"]),
+  ui_testing: T("Write the UI tests for the screen that lists {plural} and lets the user create one. Rule: {rule}.", "The list of test cases (name and what each one clicks and reads) and the code of the two most important ones.", ["Find elements by role or label, as a person would, never by CSS class.", "Mock the network, not the component; one test for the failure path is worth three for the happy one."], "Test 1 renders the list from a mocked response and finds it by role; test 2 submits an invalid form and expects the field error; test 3 makes the request fail and expects the error state with a Retry button that works.", ["Asserting on internal state instead of what the user sees", "Tests that pass only in a fixed order or with real time"]),
+  web_performance: T("The page that shows {plural} feels slow with 2,000 rows. Rule: {rule}.", "A measured diagnosis (what you measured and how), the two changes you would make in order and the expected effect of each.", ["Measure first with the browser profiler; do not guess the bottleneck.", "Rendering fewer rows beats rendering them faster: virtualise or paginate before memoising."], "Profile shows the list re-rendering on every keystroke: move the filter state down, virtualise the rows (render only the visible ones), memoise the row and lazy-load the heavy chart; re-measure and compare LCP and INP.", ["Wrapping everything in memo without measuring", "Optimising a component that is not on the slow path"]),
   // ── databases ──
   data_modeling: T("Design the tables for this case. {context} Rule: {rule}. Fields: {fields}.", "The CREATE TABLE statements with keys, foreign keys and constraints, and one line explaining each constraint.", ["Each fact lives in exactly one place.", "Express the rule with a constraint wherever the database can enforce it."], "Separate tables for the people, the things and the {plural} that link them, with primary and foreign keys, NOT NULL, CHECK and UNIQUE constraints that encode the rule.", ["Storing a list in one column", "Relying on the application to enforce uniqueness"]),
   joins_queries: T("Write the query that answers: which {plural} are overdue or incomplete, with the person's name? Tables hold {fields}.", "The query, the result for a sample of 5 rows you invent, and why each join type was chosen.", ["Start from the table whose rows you want in the result.", "A LEFT JOIN keeps rows with no match; an inner join silently drops them."], "SELECT with an inner join to the person and a LEFT JOIN to the related table, filtered by the condition in WHERE, with an ORDER BY that makes the result stable.", ["Using an inner join and losing rows without a match", "Filtering a LEFT JOIN in WHERE and turning it into an inner join"]),
@@ -302,7 +305,7 @@ export function kataNote(k: AreaKata): string {
 export interface AreaFileSpec {
   /** ruta relativa a `programming_practice/` (POSIX): `backend/README.md` */
   rel: string;
-  kind: "readme" | "skills" | "katas-readme" | "projects-readme" | "kata";
+  kind: "readme" | "practica" | "skills" | "katas-readme" | "projects-readme" | "kata";
   content: string;
   /** para los katas: su número */
   day?: number;
@@ -396,6 +399,44 @@ function readmeOf(sys: AreaPracticeSystemInfo): string {
   ].join("\n");
 }
 
+/**
+ * `<área>/<área>.practica.md`: la vista de práctica del área (como `kata/kata.practica.md`). Dice qué se practica en esa área, las habilidades que
+ * más pesan en una entrevista técnica y las que hacen destacar, y cómo se hace cada día. Solo se crea si no existe.
+ */
+function practicaOf(sys: AreaPracticeSystemInfo): string {
+  return [
+    "---",
+    "type: practica",
+    "subject: programming",
+    `title: ${sys.label} practice`,
+    "topic_type: procedural",
+    `skills: ["${sys.ledgerSkill}"]`,
+    "min_per_skill: 6",
+    "target_difficulty: 3",
+    "exam: none",
+    "---",
+    "",
+    `# Práctica — ${sys.label}`,
+    "",
+    `Un reto práctico por día del área de ${sys.label}: ${sys.purpose}`,
+    "",
+    "## Qué se practica aquí",
+    "",
+    "Habilidades esenciales del área, las que se piden en una entrevista técnica y las que hacen destacar:",
+    "",
+    ...sys.skills.map((s) => `- **${s.name}** — ${s.why}`),
+    "",
+    "## Cómo se practica cada día",
+    "",
+    "1. Abre el kata del día en `katas/` (la habilidad rota cada día).",
+    "2. Resuélvelo en tu editor o en papel sin abrir la solución; el enunciado trae el tiempo y el entregable.",
+    "3. Compara con la sección Solution y la rúbrica; los errores que cometas vuelven con repaso espaciado.",
+    "",
+    "> El kata de lógica general (arrays, hashing, recursión…) es de programación en general y vive en su propia área, no aquí.",
+    "",
+  ].join("\n");
+}
+
 function skillsOf(sys: AreaPracticeSystemInfo): string {
   return [
     "---",
@@ -464,6 +505,7 @@ export function areaFiles(areaId: string, opts: PlanFilesOptions = {}): AreaFile
   if (!sys) return [];
   const out: AreaFileSpec[] = [
     { rel: `${sys.folder}/README.md`, kind: "readme", content: readmeOf(sys) },
+    { rel: `${sys.folder}/${sys.folder}.practica.md`, kind: "practica", content: practicaOf(sys) },
     { rel: `${sys.folder}/skills.md`, kind: "skills", content: skillsOf(sys) },
     { rel: `${sys.folder}/katas/README.md`, kind: "katas-readme", content: katasReadme(sys) },
     { rel: `${sys.folder}/projects/README.md`, kind: "projects-readme", content: projectsReadme(sys) },

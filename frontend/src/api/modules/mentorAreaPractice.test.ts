@@ -129,3 +129,49 @@ describe("mentor_area_kata_open: el acceso directo al kata siempre existe", () =
     expect(() => api().mentor_area_kata_open({ id, areaId: "mobile" })).toThrow(/no está en el plan/);
   });
 });
+
+describe("katas atrasados y carpetas por área", () => {
+  it("lista TODOS los katas que tocaban hasta hoy (hoy primero, luego los atrasados) y un kata hecho sale de la lista", () => {
+    const r: any = api().mentor_area_practice({ id });
+    const b = r.areas[0];
+    expect(b.kata.plannedDays).toBe(10);
+    expect(b.kata.due).toHaveLength(10);
+    expect(b.kata.due[0]).toMatchObject({ date: TODAY, today: true, state: "pending" });
+    expect(b.kata.due.slice(1).map((d: any) => d.date)).toEqual([...b.kata.due.slice(1)].map((d: any) => d.date).sort());
+    expect(b.kata.due[1].date).toBe(START);
+    expect(b.kata.due[1].title).toBeTruthy();
+    // marcar un día atrasado como hecho lo saca de la lista
+    const after: any = api().mentor_area_kata_mark({ id, areaId: "backend", date: START, status: "done" });
+    const due2 = after.areas[0].kata.due;
+    expect(due2).toHaveLength(9);
+    expect(due2.some((d: any) => d.date === START)).toBe(false);
+  });
+
+  it("mentor_area_kata_open con fecha abre (y crea) ese kata atrasado, no el de hoy", () => {
+    const r: any = api().mentor_area_kata_open({ id, areaId: "backend", date: START });
+    expect(r.date).toBe(START);
+    expect(r.created).toBe(true);
+    expect(fs.existsSync(path.join(dir, ...r.rel.split("/")))).toBe(true);
+    const today: any = api().mentor_area_kata_open({ id, areaId: "backend", date: TODAY });
+    expect(today.rel).not.toBe(r.rel);
+    expect(() => api().mentor_area_kata_open({ id, areaId: "backend", date: "2020-01-01" })).toThrow(/no tiene kata/);
+  });
+
+  it("mentor_area_practice_setup deja la carpeta de CADA área con su .practica.md, sin katas y sin sobrescribir", () => {
+    const pp = path.join(dir, "Programación", "programming_practice");
+    const r: any = api().mentor_area_practice_setup({ id });
+    for (const f of ["backend", "frontend"]) {
+      expect(fs.existsSync(path.join(pp, f, "README.md"))).toBe(true);
+      expect(fs.existsSync(path.join(pp, f, `${f}.practica.md`))).toBe(true);
+      expect(fs.existsSync(path.join(pp, f, "skills.md"))).toBe(true);
+      expect(fs.readdirSync(path.join(pp, f, "katas")).filter((x) => x !== "README.md")).toEqual([]);
+    }
+    expect(fs.readFileSync(path.join(pp, "frontend", "frontend.practica.md"), "utf-8")).toContain("Accessibility");
+    expect(r.view.areas.every((a: any) => a.folderReady)).toBe(true);
+    // edita un archivo y vuelve a llamar: no lo pisa y no crea nada nuevo
+    fs.appendFileSync(path.join(pp, "backend", "README.md"), "\nmi nota\n", "utf-8");
+    const again: any = api().mentor_area_practice_setup({ id });
+    expect(again.created).toEqual([]);
+    expect(fs.readFileSync(path.join(pp, "backend", "README.md"), "utf-8")).toContain("mi nota");
+  });
+});

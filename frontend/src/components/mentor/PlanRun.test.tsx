@@ -176,39 +176,56 @@ describe("vista de ejecución", () => {
     expect(all("board-topic")).toHaveLength(1); // el de Python ya está completo
   });
 
-  const areaView = (areaId: string, label: string) => ({
-    areaId, label, folder: areaId, folderReady: false, purpose: "p", name: label, languages: [], ledgerSkill: areaId, level: 1, levelSource: "declared", skills: [],
+  const due = (areaId: string, label: string, dates: string[]) =>
+    dates.map((date, i) => ({ day: i + 1, date, state: "pending" as const, today: date === TODAY, title: `Kata ${i + 1} de ${label}`, skillName: "Endpoint design", level: 1, minutes: 20, summary: "Resumen", rel: `${areaId}/katas/00${i + 1}.md`, fileReady: false }));
+  const areaView = (areaId: string, label: string, dates: string[]) => ({
+    areaId, label, folder: areaId, folderReady: true, purpose: "p", name: label, languages: [], ledgerSkill: areaId, level: 1, levelSource: "declared", skills: [],
     kata: {
-      plannedDays: 10, doneDays: 2, streak: 1, todayPlanned: true, todayDone: false, todayIndex: 3,
-      next: { kata: { id: `${areaId}-003`, areaId, day: 3, title: `Kata de ${label}`, skillId: "s", skillName: "Endpoint design", level: 1, minutes: 25, statement: "x", criteria: [], hints: [], solution: "", typicalErrors: [], file: "003.md" }, date: TODAY, rel: `${areaId}/katas/003.md`, fileReady: false, summary: "Resumen" },
-      week: [],
+      plannedDays: dates.length, doneDays: 0, streak: 0, todayPlanned: true, todayDone: false, todayIndex: dates.length,
+      next: null, week: [], due: due(areaId, label, dates).sort((x, y) => Number(y.today) - Number(x.today) || x.date.localeCompare(y.date)),
     },
     weekly: { title: "w", description: "d", week: 1, focus: false }, weeks: [], monthly: { title: "m", description: "d", blocks: [] },
   });
+  const byArea = () => plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }, { ...sub("s2", "Databases", "Consolidar", F2), areaId: "databases" }] as never });
 
-  it("la práctica de hoy sale por área con la misma tarjeta que los temas, y la flecha siempre da acceso al kata", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "Programación/programming_practice", areas: [areaView("backend", "Backend"), areaView("databases", "Databases")] } as never);
-    const open = vi.spyOn(api, "mentorAreaKataOpen").mockResolvedValue({ rel: "Programación/programming_practice/backend/katas/003.md", created: true, date: TODAY });
+  it("la práctica diaria vive DENTRO de la tarjeta de su área y lista todos los retos por hacer, no solo el de hoy", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(byArea()));
+    const dates = ["2026-10-07", "2026-10-08", TODAY];
+    vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "Programación/programming_practice", areas: [areaView("backend", "Backend", dates), areaView("databases", "Databases", [TODAY])] } as never);
+    const open = vi.spyOn(api, "mentorAreaKataOpen").mockResolvedValue({ rel: "Programación/programming_practice/backend/katas/001.md", created: true, date: "2026-10-07" });
     const mark = vi.spyOn(api, "mentorAreaKataMark").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
     await mountEl(<MentorPlan planId={PID} />);
-    const section = byTest("run-practice")!;
-    expect(section.textContent).toContain("Práctica de hoy");
-    expect(section.textContent).toContain("entrevistas técnicas");
-    // una tarjeta por área (+ la del kata de lógica) con su kata como fila
-    expect([...section.querySelectorAll("[data-testid=run-practice-area] h3")].map((h) => h.textContent)).toEqual(["Backend", "Databases"]);
-    const rows = [...section.querySelectorAll("[data-testid=kata-row]")];
-    expect(rows).toHaveLength(2);
-    expect(rows[0]!.textContent).toContain("Kata de Backend");
-    // el acceso directo: la flecha abre el menú aunque el archivo del kata aún no exista
-    await click(rows[0]!.querySelector("[data-testid=board-arrow]"));
-    expect([...byTest("board-menu")!.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir kata (.md)", "Marcar hecho", "Ver práctica de Backend"]);
+    // ya no hay una sección «Práctica de hoy» aparte ni kata de lógica general
+    expect(byTest("run-practice")).toBeNull();
+    expect(host.textContent).not.toContain("Kata de lógica");
+    const cards = all("run-area-progress");
+    const backend = cards.find((c) => c.dataset.area === "backend")!;
+    const block = backend.querySelector("[data-testid=area-practice-block]")!;
+    expect(block).toBeTruthy();
+    // 3 retos que tocaban hasta hoy: hoy primero y luego los atrasados del más antiguo al más reciente
+    expect(block.querySelector("[data-testid=area-practice-count]")!.textContent).toContain("3 retos por hacer");
+    const rows = [...block.querySelectorAll("[data-testid=kata-row]")] as HTMLElement[];
+    expect(rows.map((r) => r.dataset.date)).toEqual([TODAY, "2026-10-07", "2026-10-08"]);
+    expect(rows[1]!.textContent).toContain("Atrasado");
+    // el acceso directo: la flecha de un kata atrasado abre ESE kata aunque su archivo aún no exista
+    await click(rows[1]!.querySelector("[data-testid=board-arrow]"));
+    expect([...byTest("board-menu")!.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir kata (.md)", "Marcar hecho", "Saltar este día", "Ver práctica de Backend"]);
     await click(byTest("kata-open"));
-    expect(open).toHaveBeenCalledWith(PID, "backend");
-    // y desde el mismo menú se marca el día
-    await click(rows[0]!.querySelector("[data-testid=board-arrow]"));
-    await click(byTest("kata-mark-done"));
-    expect(mark).toHaveBeenCalledWith(PID, "backend", TODAY, "done");
+    expect(open).toHaveBeenCalledWith(PID, "backend", "2026-10-07");
+    // y se marca el día concreto con la casilla
+    await click(rows[1]!.querySelector("[data-testid=kata-check]"));
+    expect(mark).toHaveBeenCalledWith(PID, "backend", "2026-10-07", "done");
+  });
+
+  it("si faltan las carpetas de las áreas en programming_practice las deja preparadas una sola vez", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(byArea()));
+    const missing = { ...areaView("backend", "Backend", [TODAY]), folderReady: false };
+    vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "Programación/programming_practice", areas: [missing] } as never);
+    const setup = vi.spyOn(api, "mentorAreaPracticeSetup").mockResolvedValue({ created: [], folders: [], view: { today: TODAY, ppReady: true, ppBase: "", areas: [missing] } } as never);
+    await mountEl(<MentorPlan planId={PID} />);
+    await flush();
+    expect(setup).toHaveBeenCalledTimes(1);
+    expect(setup).toHaveBeenCalledWith(PID);
   });
 
   it("el proyecto diario y el semanal van al final de la vista, después de «Lo que viene»", async () => {
@@ -224,6 +241,13 @@ describe("vista de ejecución", () => {
     expect(byTest("run-project-daily")!.textContent).toContain("Proyecto diario");
     expect(byTest("run-project-weekly")!.textContent).toContain("Proyecto semanal");
     expect(projects.textContent).toContain("Entregable por definir");
+    // desglosados por área: qué hacer, cómo hacerlo y el resultado real
+    const daily = byTest("daily-areas")!;
+    expect([...daily.querySelectorAll("[data-testid=project-area]")].map((e) => (e as HTMLElement).dataset.area)).toEqual(["databases", "backend"]);
+    expect(daily.textContent).toContain("Qué hay que hacer");
+    expect(daily.textContent).toContain("Cómo hacerlo");
+    expect(daily.querySelectorAll("[data-testid=project-result]").length).toBe(2);
+    expect(byTest("weekly-areas")!.textContent).toContain("Resultado real");
   });
 });
 

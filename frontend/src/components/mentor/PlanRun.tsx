@@ -4,7 +4,8 @@
 // Todo se calcula con el mismo modelo de agenda que la vista de plan (`useAgendaModel`), así que ambas vistas nunca discrepan.
 
 import { CalendarDays, ChevronRight, Lock } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { api } from "../../lib/bridge";
 import { planGate } from "../../lib/planGate";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
 import { dayByArea } from "../../lib/planTopicsByArea";
@@ -16,7 +17,8 @@ import { cn } from "../ui";
 import { DeliverableLine, focusColour, plural, useAgendaModel } from "./agendaKit";
 import { hm, ProgressBar } from "./parts";
 import { AreaCardShell, PlanBoard, TopicRow, type BoardRow } from "./PlanBoard";
-import { RunPractice, RunProjects } from "./PlanRunPractice";
+import { usePlanAreaPractice } from "./PracticeCard";
+import { RunProjects } from "./PlanRunPractice";
 import { SectionCard, SectionHeading } from "./planKit";
 import { openAgendaAt, type Loaded } from "./planShared";
 
@@ -39,7 +41,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const doneToday = topicsToday.filter((t) => t.done).length;
   const pctToday = topicsToday.length ? Math.round((doneToday / topicsToday.length) * 100) : 0;
   const isToday = date === real && !before && !after;
-  const canPlan = isToday && !plan.proposed && !plan.archived && (topicsToday.some((t) => !t.done) || !!day?.practice.kata || !!day?.practice.project);
+  const canPlan = isToday && !plan.proposed && !plan.archived && (topicsToday.some((t) => !t.done) || !!day?.practice.project);
   const upcoming = m.schedule.days.filter((d) => d.date > date && d.study).slice(0, UPCOMING_DAYS);
   const nextStudy = before ? m.schedule.days.find((d) => d.study) : undefined;
   const currentWeek = summary?.currentWeek ?? 1;
@@ -51,6 +53,16 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
     () => planGate(m.schedule.days.map((d) => ({ date: d.date, topics: d.topics.map((t) => ({ folder: t.folder, done: t.done })) })), (f) => m.topicByFolder.get(f)?.state === "completo"),
     [m.schedule, m.topicByFolder],
   );
+  // La práctica diaria de cada área vive en su tarjeta de «Cómo voy». Cada área debe tener su carpeta en programming_practice: si falta, se deja
+  // preparada una sola vez (solo estructura, nunca sobrescribe y sin katas: esos se crean al abrirlos).
+  const ap = usePlanAreaPractice(plan.id);
+  const setupTried = useRef(false);
+  useEffect(() => {
+    const d = ap.data;
+    if (setupTried.current || !d || !d.ppReady || !d.areas.some((a) => !a.folderReady)) return;
+    setupTried.current = true;
+    void api.mentorAreaPracticeSetup(plan.id).then(() => ap.reload()).catch(() => undefined);
+  }, [ap, plan.id]);
   const behind = !!gate.frontier && gate.frontier < date && !plan.proposed && !plan.archived;
   const titleOf = (folder: string): string => m.topicByFolder.get(folder)?.title ?? folder.split("/").pop() ?? folder;
   const late = (data.derived?.subplans ?? []).reduce((n, s) => n + s.topics.filter((t) => t.route !== "skipped" && t.targetWeek < currentWeek && t.state !== "completo").length, 0);
@@ -103,7 +115,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
               <div className="min-w-32 flex-1 basis-40"><ProgressBar pct={pctToday} thick label="Avance de hoy" /></div>
             </div>
 
-            {entries.length === 0 && langBlocks.length === 0 && !day.practice.kata && !day.practice.project && (
+            {entries.length === 0 && langBlocks.length === 0 && !day.practice.project && (
               <p className="text-[14px] text-dim">Sin temas repartidos hoy: queda para repaso o para recuperar lo atrasado.</p>
             )}
 
@@ -148,9 +160,8 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
               </ul>
             )}
 
-            {(day.practice.kata || day.practice.project || langBlocks.length > 0) && (
+            {(day.practice.project || langBlocks.length > 0) && (
               <ul className="flex flex-wrap gap-2" aria-label="Práctica del día" data-testid="run-practice">
-                {day.practice.kata && <li><Chip large colour="var(--nv-practice, #c58be0)">Kata · {hm(day.practice.kata.minutes)}</Chip></li>}
                 {day.practice.project && <li><Chip large colour="var(--nv-practice, #c58be0)">Proyecto semanal · {hm(day.practice.project.minutes)}</Chip></li>}
                 {langBlocks.map((b) => <li key={b.id}><Chip large colour="var(--nv-accent)">{b.label} · {hm(b.minutes)}</Chip></li>)}
               </ul>
@@ -166,13 +177,17 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         {late > 0 && <p className="text-[14px] text-warn" data-testid="run-late">{plural(late, "tema atrasado", "temas atrasados")} de semanas anteriores: están en «Vista de plan», dentro de cada área.</p>}
       </SectionCard>
 
-      {/* 2 · Práctica de hoy (daily practice por área + kata de lógica) */}
-      <RunPractice plan={plan} data={data} today={m.today} />
+      {/* 2 · Cómo voy: cada área con sus temas Y su práctica diaria */}
+      <PlanBoard
+        plan={plan}
+        data={data}
+        byFolder={m.topicByFolder}
+        gate={gate}
+        currentWeek={currentWeek}
+        practice={ap.data && ap.data.areas.length ? { areas: ap.data.areas, today: ap.data.today || m.today, mark: ap.mark } : undefined}
+      />
 
-      {/* 3 · Cómo voy */}
-      <PlanBoard plan={plan} data={data} byFolder={m.topicByFolder} gate={gate} currentWeek={currentWeek} />
-
-      {/* 4 · Lo que viene */}
+      {/* 3 · Lo que viene */}
       {(upcoming.length > 0 || deliverables.length > 0) && (
         <section aria-labelledby="run-next-h" data-testid="run-next">
           <SectionHeading id="run-next-h" hint="Los próximos días de estudio y los entregables que vencen pronto.">Lo que viene</SectionHeading>
@@ -214,7 +229,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         <GhostButton onClick={() => useNavState.getState().set("mentor.view", "cierre")} data-testid="run-close-day">Cerrar el día con el Mentor</GhostButton>
       </p>
 
-      {/* 5 · Proyectos diario y semanal, abajo del todo */}
+      {/* 4 · Proyectos diario y semanal, abajo del todo */}
       <RunProjects plan={plan} data={data} m={m} />
     </div>
   );

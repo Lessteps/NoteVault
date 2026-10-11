@@ -2,8 +2,8 @@
 // que ofrece ir al apunte (.md) o al archivo de práctica. Solo lectura: marcar un tema como completado lo decide la práctica, no este
 // tablero. Respeta la ruta sólida (`lib/planGate.ts`): los temas repartidos después del primer día sin terminar salen bloqueados.
 
-import { BookOpen, ChevronRight, Dumbbell, Lock } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { BookOpen, Dumbbell, ExternalLink, Lock } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import type { PlanGate } from "../../lib/planGate";
 import { dateLabel } from "../../lib/planSchedule";
 import { orderedAreas } from "../../lib/planTopicsByArea";
@@ -12,8 +12,12 @@ import { cn } from "../ui";
 import { focusColour } from "./agendaKit";
 import { openTopic, openTopicNote } from "./openTopic";
 import { ProgressBar } from "./parts";
+import { AreaPracticeBlock } from "./AreaPracticeBlock";
+import type { AreaPracticeState } from "./PracticeCard";
+import { RowMenu } from "./RowMenu";
 import { SectionHeading } from "./planKit";
-import { STATE_LABEL, type Loaded } from "./planShared";
+import { openPlanTab, STATE_LABEL, type Loaded } from "./planShared";
+import type { AreaPracticeView } from "../../lib/areaPracticeView";
 
 const VISIBLE = 4;
 const FILTERS = [
@@ -34,61 +38,6 @@ export interface BoardRow {
   done: boolean;
   exercises: number;
   unlockOn?: string;
-}
-
-export interface MenuAction {
-  id: string;
-  label: string;
-  icon?: ReactNode;
-  onClick: () => void;
-  testid?: string;
-}
-
-/** La flecha de una fila: abre un menú con sus acciones (ir al apunte, al archivo de práctica, marcar…). */
-export function RowMenu({ title, items, disabled }: { title: string; items: MenuAction[]; disabled?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent): void => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
-  const item = "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[14px] hover:bg-hover";
-  return (
-    <span ref={box} className="relative flex-none">
-      <button
-        type="button"
-        disabled={disabled}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`Abrir ${title}`}
-        onClick={() => setOpen((v) => !v)}
-        className="grid h-9 w-9 place-items-center rounded-lg text-faint transition-colors hover:bg-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
-        data-testid="board-arrow"
-      >
-        <ChevronRight size={18} aria-hidden className={cn("transition-transform", open && "rotate-90")} />
-      </button>
-      {open && (
-        <div role="menu" aria-label={`Abrir ${title}`} className="absolute right-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-card p-1.5 shadow-xl" data-testid="board-menu">
-          {items.map((it) => (
-            <button key={it.id} role="menuitem" type="button" className={item} data-testid={it.testid} onClick={() => { setOpen(false); it.onClick(); }}>
-              {it.icon} {it.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </span>
-  );
 }
 
 /** El menú de un tema: ir al apunte (.md) o al archivo de práctica. */
@@ -164,7 +113,14 @@ export function AreaCardShell({ colour, title, badge, sub, tag, children, footer
   );
 }
 
-export function PlanBoard({ plan, data, byFolder, gate, currentWeek }: { plan: MentorPlan; data: Loaded; byFolder: Map<string, MentorTopicView>; gate: PlanGate; currentWeek: number }) {
+/** La práctica diaria de cada área, que se pinta DENTRO de la tarjeta del área. */
+export interface BoardPractice {
+  areas: AreaPracticeView[];
+  today: string;
+  mark: AreaPracticeState["mark"];
+}
+
+export function PlanBoard({ plan, data, byFolder, gate, currentWeek, practice }: { plan: MentorPlan; data: Loaded; byFolder: Map<string, MentorTopicView>; gate: PlanGate; currentWeek: number; practice?: BoardPractice }) {
   const [filter, setFilter] = useState<FilterId>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const summary = data.derived?.summary;
@@ -193,7 +149,13 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek }: { plan: M
 
   return (
     <section aria-labelledby="run-progress-h" data-testid="run-progress" className="space-y-4">
-      <SectionHeading id="run-progress-h" hint={`Semana ${summary.currentWeek} de ${summary.weeks} · ${summary.done}/${summary.topics} temas completados.`}>Cómo voy</SectionHeading>
+      <SectionHeading
+        id="run-progress-h"
+        hint={`Semana ${summary.currentWeek} de ${summary.weeks} · ${summary.done}/${summary.topics} temas completados. Cada área junta sus temas y su práctica diaria.`}
+        right={practice && practice.areas.length > 0 ? <button type="button" onClick={() => openPlanTab(plan.id, "practica")} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[14px] text-dim hover:bg-hover hover:text-text" data-testid="run-practice-all"><ExternalLink size={14} aria-hidden /> Toda la práctica</button> : undefined}
+      >
+        Cómo voy
+      </SectionHeading>
 
       <div className="rounded-2xl border border-line bg-card p-4 @3xl:p-5" data-testid="board-global">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -268,6 +230,10 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek }: { plan: M
                   {list.map((r) => <TopicRow key={r.folder} r={r} colour={colour} />)}
                 </ul>
               )}
+              {practice && (() => {
+                const pa = practice.areas.find((x) => x.areaId === a.areaId);
+                return pa ? <AreaPracticeBlock planId={plan.id} area={pa} mark={practice.mark} /> : null;
+              })()}
             </AreaCardShell>
           );
         })}

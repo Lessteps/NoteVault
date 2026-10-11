@@ -123,17 +123,23 @@ describe("niveles", () => {
 });
 
 describe("archivos de la carpeta de un área", () => {
-  it("README, skills.md, katas/README, projects/README y los katas pedidos, con rutas bajo la carpeta del área", () => {
+  it("README, .practica.md, skills.md, katas/README, projects/README y los katas pedidos, con rutas bajo la carpeta del área", () => {
     const files = areaFiles("tooling", { katasPerArea: 3 });
     expect(files.map((f) => f.rel)).toEqual([
       "tooling-and-quality/README.md",
+      "tooling-and-quality/tooling-and-quality.practica.md",
       "tooling-and-quality/skills.md",
       "tooling-and-quality/katas/README.md",
       "tooling-and-quality/projects/README.md",
       ...[1, 2, 3].map((d) => `tooling-and-quality/katas/${kataForDay("tooling", d, 1)!.file}`),
     ]);
     expect(files[0]!.content).toContain("## How to practise");
-    expect(files[1]!.content).toContain("| Skill | Why it matters | How it is measured |");
+    // la vista de práctica del área (como kata/kata.practica.md): sus habilidades esenciales y cómo se practica a diario
+    expect(files[1]!.kind).toBe("practica");
+    expect(files[1]!.content).toContain("type: practica");
+    expect(files[1]!.content).toContain('skills: ["pp_kata:tooling"]');
+    expect(files[1]!.content).toContain("Linting and code quality");
+    expect(files[2]!.content).toContain("| Skill | Why it matters | How it is measured |");
     expect(areaFiles("tooling", { katasPerArea: 2, fromDay: 5 }).filter((f) => f.kind === "kata").map((f) => f.day)).toEqual([5, 6]);
     expect(areaFiles("nope")).toEqual([]);
   });

@@ -3,7 +3,7 @@
 // de las marcas y la lectura de la carpeta) y docs/VAULT_FORMAT.md.
 
 import { AREA_SKILLS } from "./planAreaPractice.js";
-import type { AreaPracticeView, AreaSkillProgress, AreaWeekDay, AreaWeeklyRow } from "./areaPracticeView.js";
+import type { AreaKataDue, AreaPracticeView, AreaSkillProgress, AreaWeekDay, AreaWeeklyRow } from "./areaPracticeView.js";
 import { areaFolderOf, areaLabelOf, areaPracticeSystem, declaredLevelOf, areaKataDates, kataForDay, kataLevel, levelFromDeclared, practiceAreasOf, skillOfDay, type AreaKata, type KataPlanLike } from "./areaPracticeSystem.js";
 import { addDays, isoDow, weekRangesOf } from "./planTime.js";
 import { weeklyPieceOf, monthlyPieceOf } from "./planAreaPractice.js";
@@ -110,6 +110,18 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
     const nextKata = nextIndex ? kataForDay(a.areaId, nextIndex, level) : null;
     const rel = nextKata ? `${folder}/katas/${nextKata.file}` : "";
 
+    // los katas que tocaban hasta hoy y siguen sin hacerse (más el de hoy, aunque esté hecho)
+    const due: AreaKataDue[] = [];
+    past.forEach((d, i) => {
+      const st = stateOf(d);
+      if (st === "done" && d !== today) return;
+      const k = kataForDay(a.areaId, i + 1, level);
+      if (!k) return;
+      const r = `${folder}/katas/${k.file}`;
+      due.push({ day: i + 1, date: d, state: st, today: d === today, title: k.title, skillName: k.skillName, level: k.level, minutes: k.minutes, summary: kataSummary(k), rel: r, fileReady: inp.existing.files.has(r) });
+    });
+    due.sort((x, y) => Number(y.today) - Number(x.today) || x.date.localeCompare(y.date));
+
     // semana de lunes a domingo que contiene hoy (o la última del plan)
     const mon = addDays(today, 1 - isoDow(today));
     const week: AreaWeekDay[] = Array.from({ length: 7 }, (_, i) => {
@@ -160,6 +172,7 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
         todayIndex: todayPlanned ? dates.indexOf(today) + 1 : 0,
         next: nextKata && nextDate ? { kata: nextKata, date: nextDate, rel, fileReady: inp.existing.files.has(rel), summary: kataSummary(nextKata) } : null,
         week,
+        due,
       },
       weekly: { title: curPiece?.title ?? sys.weekly.title, description: curPiece?.description ?? sys.weekly.summary, week: cur?.week ?? null, focus: !!cur?.focus },
       weeks,

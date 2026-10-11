@@ -41,6 +41,21 @@ export interface AreaWeeklyRow {
   katas: number;
 }
 
+/** Un kata que tocaba hasta hoy (el de hoy y los atrasados): lo que el panel del área lista, no solo el de hoy. */
+export interface AreaKataDue {
+  day: number;
+  date: string;
+  state: "done" | "skipped" | "pending";
+  today: boolean;
+  title: string;
+  skillName: string;
+  level: KataLevel;
+  minutes: number;
+  summary: string;
+  rel: string;
+  fileReady: boolean;
+}
+
 export interface AreaPracticeView {
   areaId: string;
   label: string;
@@ -65,6 +80,8 @@ export interface AreaPracticeView {
     /** el kata de hoy (o el siguiente que toca) con su ruta en la vault */
     next: { kata: AreaKata; date: string; rel: string; fileReady: boolean; summary: string } | null;
     week: AreaWeekDay[];
+    /** los katas de hoy y los atrasados (pendientes o saltados), con hoy primero y luego del más antiguo al más reciente */
+    due: AreaKataDue[];
   };
   weekly: { title: string; description: string; week: number | null; focus: boolean };
   weeks: AreaWeeklyRow[];

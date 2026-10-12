@@ -29,7 +29,17 @@ describe("financeApi", () => {
     }
   });
 
-  it("handles defaults and creates expenses", () => {
+  /** Las categorías las crea la persona; el helper deja las que usa un test. */
+  function seed(...names: Array<[string, "gasto" | "ingreso"]>): void {
+    for (const [name, kind] of names) {
+      api.fin_category_save("", { name, kind, icon: "•", colour: "#616161" });
+    }
+  }
+
+  it("starts with no categories and creates expenses", () => {
+    expect(api.fin_meta().categories).toEqual([]);
+    seed(["Comida", "gasto"], ["Transporte", "gasto"], ["Salario", "ingreso"]);
+
     const cats = api.fin_meta().categories;
     expect(cats.some((c) => c.id === "comida")).toBe(true);
 
@@ -53,6 +63,28 @@ describe("financeApi", () => {
       category: "transporte",
     });
     expect(fm.day(today)[0]!.category).toBe("transporte");
+  });
+
+  it("deletes a category to the vault trash", () => {
+    seed(["Comida", "gasto"], ["Mascotas", "gasto"]);
+    api.fin_add(today, { type: "gasto", amount_cents: 500, category: "mascotas" });
+
+    expect(api.fin_category_delete("mascotas")).toEqual({ ok: true });
+    expect(api.fin_meta().categories.some((c) => c.id === "mascotas")).toBe(false);
+    // El movimiento sigue ahí, ahora sin categoría.
+    expect((new FinanceManager(tmpDir).day(today)[0] as any).category).toBe("mascotas");
+
+    expect(() => api.fin_category_delete("mascotas")).toThrow();
+    expect(() => api.fin_category_delete("")).toThrow();
+  });
+
+  it("moves a category and refuses the edges", () => {
+    seed(["Almuerzo", "gasto"], ["Bus", "gasto"], ["Sueldo", "ingreso"]);
+    expect(api.fin_category_move("bus", -1)).toEqual({ ok: true });
+    expect(api.fin_meta().categories.map((c) => c.name)).toEqual(["Bus", "Almuerzo", "Sueldo"]);
+    expect(() => api.fin_category_move("bus", -1)).toThrow();
+    expect(() => api.fin_category_move("bus", 5)).toThrow();
+    expect(() => api.fin_category_move("no-existe", 1)).toThrow();
   });
 
   it("handles goal savings and status updates", () => {
@@ -84,6 +116,7 @@ describe("financeApi", () => {
   });
 
   it("moves movement to another day", () => {
+    seed(["Salario", "ingreso"]);
     const m = api.fin_add(today, {
       type: "ingreso",
       amount_cents: 100,
@@ -140,5 +173,85 @@ describe("financeApi", () => {
     const row = budgets.find((b: any) => b.category.id === c.id)!;
     expect(row.used).toBe(6000000);
     expect(row.budget).toBe(5000000);
+  });
+
+  it("assigns general savings to a goal", () => {
+    const g = api.fin_goal_save("", {
+      name: "Moto",
+      target_cents: 1000000,
+      suggested_cents: 500000,
+      cadence: { mode: "period", period: "week" },
+      show_in_daily: true,
+    }) as { id: string };
+
+    api.fin_add(today, { type: "ahorro", amount_cents: 200000, what: "Ahorro suelto" });
+    api.fin_add(today, { type: "retiro", amount_cents: 50000, what: "Retiro suelto" });
+    seed(["Comida", "gasto"]);
+    api.fin_add(today, { type: "gasto", amount_cents: 900000, what: "Nada que ver", category: "comida" });
+    expect(api.fin_goals().general).toBe(150000);
+
+    const r = api.fin_assign_general(g.id) as { moved: number };
+    expect(r.moved).toBe(2);
+    expect(api.fin_goals().general).toBe(0);
+    expect(api.fin_goal(g.id).pace.saved).toBe(150000);
+
+    expect(() => api.fin_assign_general("no-existe")).toThrow();
+  });
+
+  it("materializes recurrents without duplicating", () => {
+    const r = api.fin_recurring_save("", {
+      type: "gasto", amount_cents: 100000, what: "Arriendo", rule: "daily", start: today,
+    }) as { id: string; rule: string };
+    expect(r.rule).toBe("daily");
+
+    expect((api.fin_recurring_run(today) as { created: number }).created).toBe(1);
+    expect((api.fin_recurring_run(today) as { created: number }).created).toBe(0);
+    const day = new FinanceManager(tmpDir).day(today);
+    expect(day.filter((m) => m.what === "Arriendo")).toHaveLength(1);
+    expect(day[0]!.reason).toBe("Automático");
+
+    expect(() => api.fin_recurring_save("", { type: "nope", amount_cents: 1 })).toThrow();
+    expect(() => api.fin_recurring_save("rc-no-existe", { type: "gasto", amount_cents: 1 })).toThrow();
+  });
+
+  it("round-trips the monthly budget", () => {
+    expect((api.fin_budget_get() as { month_budget_cents: number }).month_budget_cents).toBe(0);
+    expect((api.fin_budget_set(500000000) as { month_budget_cents: number }).month_budget_cents).toBe(500000000);
+    expect((api.fin_budget_get() as { month_budget_cents: number }).month_budget_cents).toBe(500000000);
+    expect((api.fin_budget_set(0) as { month_budget_cents: number }).month_budget_cents).toBe(0);
+  });
+
+  it("bundles the daily view in one call", () => {
+    seed(["Comida", "gasto"]);
+    api.fin_add(today, { type: "gasto", amount_cents: 1250000, what: "Café", category: "comida" });
+    const b = api.fin_diario_bundle(today) as unknown as {
+      movements: Array<{ what: string }>; checks: unknown[]; month: { gasto: number }; budget: number;
+    };
+    expect(b.movements).toHaveLength(1);
+    expect(b.movements[0]!.what).toBe("Café");
+    expect(b.month.gasto).toBe(1250000);
+    expect(b.budget).toBe(0);
+    expect(() => api.fin_diario_bundle("no-fecha")).toThrow();
+  });
+
+  it("searches the whole history", () => {
+    seed(["Vivienda", "gasto"], ["Salario", "ingreso"]);
+    api.fin_add("2025-03-04", { type: "gasto", amount_cents: 80000000, what: "Arriendo marzo", category: "vivienda" });
+    api.fin_add("2026-01-02", { type: "gasto", amount_cents: 85000000, what: "Arriendo enero", category: "vivienda" });
+    api.fin_add("2026-01-03", { type: "ingreso", amount_cents: 300000000, what: "Salario", category: "salario" });
+
+    const all = api.fin_search("arriendo", "", "") as { total: number; movements: Array<{ what: string }> };
+    expect(all.total).toBe(2);
+    expect(all.movements.map((m) => m.what).sort()).toEqual(["Arriendo enero", "Arriendo marzo"]);
+
+    const filtered = api.fin_search("", "ingreso", "") as { total: number };
+    expect(filtered.total).toBe(1);
+
+    expect((api.fin_search("", "", "") as { total: number }).total).toBe(0);
+    expect(() => api.fin_search("x", "nope", "")).toThrow();
+
+    const page = api.fin_search("arriendo", "", "", 1) as { total: number; movements: Array<{ what: string }> };
+    expect(page.total).toBe(2);
+    expect(page.movements).toHaveLength(1);
   });
 });

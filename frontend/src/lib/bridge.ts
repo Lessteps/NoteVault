@@ -439,6 +439,10 @@ export const api = {
     call<{ budgets: Array<{ category: FinCategory; used: number; budget: number }>; this: FinTotals; prev: FinTotals }>(
       "fin_month_extras", year, month),
   finDueChecks: (day: string) => call<FinCheck[]>("fin_due_checks", day),
+  finDiarioBundle: (day: string) => call<{
+    movements: Movement[]; checks: FinCheck[];
+    month: import("./types").FinTotals; budget: number;
+  }>("fin_diario_bundle", day),
   finNewId: () => call<{ id: string }>("fin_new_id"),
   finAdd: (day: string, fields: Partial<Movement>) => call<Movement>("fin_add", day, fields),
   finUpdate: (day: string, id: string, fields: Partial<Movement>, newDay = "") =>
@@ -446,6 +450,8 @@ export const api = {
   finDelete: (day: string, id: string) => call<{ ok: boolean }>("fin_delete", day, id),
   finDeleteMany: (pairs: Array<[string, string]>) => call<{ ok: boolean }>("fin_delete_many", pairs),
   finCategorySave: (id: string, fields: Partial<FinCategory>) => call<FinCategory>("fin_category_save", id, fields),
+  finCategoryDelete: (id: string) => call<{ ok: boolean }>("fin_category_delete", id),
+  finCategoryMove: (id: string, delta: number) => call<{ ok: boolean }>("fin_category_move", id, delta),
   finGoals: () => call<{ goals: Array<FinGoal & { pace: FinPace; projection: string | null }>; general: number }>("fin_goals"),
   finGoal: (id: string) => call<{
     goal: FinGoal; pace: FinPace; projection: string | null; days: Array<{ date: string; net: number }>;
@@ -453,6 +459,16 @@ export const api = {
   }>("fin_goal", id),
   finGoalSave: (id: string, fields: Partial<FinGoal>) => call<FinGoal>("fin_goal_save", id, fields),
   finGoalDelete: (id: string) => call<{ ok: boolean }>("fin_goal_delete", id),
+  finAssignGeneral: (goal: string) => call<{ moved: number }>("fin_assign_general", goal),
+  finRecurringList: () => call<Array<import("./types").FinRecurring>>("fin_recurring_list"),
+  finRecurringSave: (id: string, fields: Partial<import("./types").FinRecurring>) =>
+    call<import("./types").FinRecurring>("fin_recurring_save", id, fields),
+  finRecurringDelete: (id: string) => call<{ ok: boolean }>("fin_recurring_delete", id),
+  finRecurringRun: (today: string) => call<{ created: number }>("fin_recurring_run", today),
+  finBudgetGet: () => call<{ month_budget_cents: number }>("fin_budget_get"),
+  finBudgetSet: (cents: number) => call<{ month_budget_cents: number }>("fin_budget_set", cents),
+  finSearch: (query: string, kind = "", category = "", offset = 0) =>
+    call<{ total: number; movements: Array<import("./types").Movement> }>("fin_search", query, kind, category, offset),
   // Ejercicio
   exMeta: () => call<{ days: Array<{ key: string; name: string; subtitle: string; glyph: string }> }>("ex_meta"),
   exList: () => call<Exercise[]>("ex_list"),

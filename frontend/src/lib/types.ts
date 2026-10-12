@@ -612,8 +612,21 @@ export interface FinGoal {
   notes: string;
 }
 
-export interface FinPace {
-  saved: number;
+export interface FinRecurring {
+  id: string;
+  type: MovementType;
+  amount_cents: number;
+  what: string;
+  category: string;
+  goal: string;
+  rule: string;
+  start: string;
+  end: string;
+  archived: boolean;
+  last: string;
+}
+
+export interface FinPace {  saved: number;
   remaining: number;
   per_day: number | null;
   per_week: number | null;
@@ -621,7 +634,7 @@ export interface FinPace {
   days_left: number | null;
 }
 
-export type FinTotals = Record<MovementType | "balance", number>;
+export type FinTotals = Record<MovementType | "balance" | "neto" | "disponible", number>;
 
 export interface FinMeta {
   types: MovementType[];

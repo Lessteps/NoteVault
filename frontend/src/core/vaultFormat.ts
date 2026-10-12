@@ -47,6 +47,8 @@ export const LAYOUT = {
   finance_goal: `${DATA_DIR}/finanzas/metas/{id}.json`,
   finance_day: `${DATA_DIR}/finanzas/{year}/{month:02d}/{date}.json`,
   finance_attachments: `${DATA_DIR}/finanzas/adjuntos/{year}/{month:02d}`,
+  finance_recurring: `${DATA_DIR}/finanzas/recurrentes.json`,
+  finance_settings: `${DATA_DIR}/finanzas/ajustes.json`,
   agenda_dir: `${DATA_DIR}/agenda`,
   agenda_routines: `${DATA_DIR}/agenda/routines.json`,
   agenda_events_dir: `${DATA_DIR}/agenda/events`,
@@ -215,7 +217,7 @@ export const MOVEMENT_KEYS = [
   "what", "reason", "time", "attachments", "created",
 ] as const;
 
-export const DEFAULT_CURRENCY = "COP";
+export const DEFAULT_CURRENCY = "USD";
 
 export const ATTACHMENT_EXTS = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".pdf"] as const;
 

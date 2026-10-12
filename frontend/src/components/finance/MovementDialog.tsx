@@ -100,7 +100,7 @@ export function MovementDialog() {
         <Field label="Fecha"><input type="date" className={input} value={day} onChange={(ev) => setDay(ev.target.value)} /></Field>
         <Field label="Hora"><input type="time" className={input} value={time} onChange={(ev) => setTime(ev.target.value)} /></Field>
       </div>
-      <Field label="En qué"><input className={input} value={what} placeholder="p. ej. Almuerzo" onChange={(ev) => setWhat(ev.target.value)} /></Field>
+      <Field label="Detalle"><input className={input} value={what} placeholder="p. ej. Almuerzo" onChange={(ev) => setWhat(ev.target.value)} /></Field>
       {kind === "gasto" || kind === "ingreso" ? (
         <Field label="Categoría">
           <select className={input} value={category} onChange={(ev) => setCategory(ev.target.value)}>
@@ -116,7 +116,7 @@ export function MovementDialog() {
           </select>
         </Field>
       )}
-      <Field label="Razón"><input className={input} value={reason} placeholder="Por qué (opcional)" onChange={(ev) => setReason(ev.target.value)} /></Field>
+      {reason && <p className="text-[11.5px] text-faint">Nota guardada: {reason}</p>}
       <div>
         <span className="mb-1 block font-mono text-[10.5px] uppercase tracking-wider text-faint">Facturas</span>
         {id ? <Attachments module="finanzas" owner={id} refs={refs} onChange={setRefs} /> : <span className="text-[12px] text-faint">…</span>}

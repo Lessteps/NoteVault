@@ -1,6 +1,6 @@
 // Categorías: expense and income categories with a monthly budget.
 
-import { Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
 import { formatMoney } from "../../lib/money";
@@ -10,6 +10,7 @@ import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
 import { BlockProgress } from "../common/charts";
 import { ColourRow, Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
+import { cn, confirmAction } from "../ui";
 import { MoneyInput } from "./parts";
 
 const COLOURS = ["#f4511e", "#039be5", "#8e24aa", "#f6bf26", "#33b679", "#3f51b5", "#e67c73", "#7986cb", "#616161", "#0b8043"];
@@ -37,16 +38,45 @@ export function CategoryDialog() {
       toast("error", (e as Error).message);
     }
   };
+  const remove = async () => {
+    const c = meta?.categories.find((x) => x.id === editing.id);
+    if (!(await confirmAction("Eliminar categoría",
+      `¿Eliminar «${c?.name ?? "esta categoría"}»? Va a la papelera del vault. Los movimientos que la usaban se quedan sin categoría (no se borran). Si solo quieres dejar de verla, archívala.`,
+      "Eliminar", true))) return;
+    try {
+      await api.finCategoryDelete(editing.id);
+      setEditing(null);
+      await changed();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
   return (
     <Modal title={editing.id ? "Editar categoría" : "Nueva categoría"} onClose={() => setEditing(null)} width={460}
       footer={<>
-        {editing.id && <GhostButton danger={!f.archived} onClick={() => void save({ archived: !f.archived })}>{f.archived ? "Reactivar" : "Archivar"}</GhostButton>}
+        {editing.id && <>
+          <GhostButton danger={!f.archived} onClick={() => void save({ archived: !f.archived })}>{f.archived ? "Reactivar" : "Archivar"}</GhostButton>
+          <GhostButton danger onClick={() => void remove()}>Eliminar</GhostButton>
+        </>}
         <span className="flex-1" /><GhostButton onClick={() => setEditing(null)}>Cancelar</GhostButton><PrimaryButton onClick={() => void save()}>Guardar</PrimaryButton></>}>
       <div className="grid grid-cols-[70px_1fr] gap-3">
         <Field label="Icono"><input className={input} value={f.icon ?? ""} placeholder="🐶" onChange={(e) => setF({ ...f, icon: e.target.value })} /></Field>
         <Field label="Nombre"><input autoFocus className={input} value={f.name ?? ""} placeholder="p. ej. Mascotas" onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
       </div>
       <Field label="Color"><ColourRow colours={COLOURS} value={f.colour ?? COLOURS[0]!} onChange={(colour) => setF({ ...f, colour })} /></Field>
+      {!editing.id && (
+        <Field label="Tipo">
+          <div className="flex gap-1.5">
+            {(["gasto", "ingreso"] as const).map((k) => (
+              <button key={k} type="button" onClick={() => setF({ ...f, kind: k })}
+                aria-pressed={f.kind === k}
+                className={cn("flex-1 rounded-lg border px-2 py-1.5 text-[12.5px]", f.kind === k ? "border-line-strong text-text" : "border-line text-dim hover:bg-hover")}>
+                {k === "gasto" ? "Gasto" : "Ingreso"}
+              </button>
+            ))}
+          </div>
+        </Field>
+      )}
       {f.kind === "gasto" && (
         <Field label="Presupuesto mensual"><MoneyInput label="Presupuesto mensual" value={f.budget_month_cents || null} onChange={(c) => setF({ ...f, budget_month_cents: c ?? 0 })} className="w-full" placeholder="Sin presupuesto" /></Field>
       )}
@@ -58,6 +88,8 @@ export function Categories() {
   const meta = useFinance((s) => s.meta);
   const version = useFinance((s) => s.version);
   const setEditing = useFinance((s) => s.setCategoryEditing);
+  const changed = useFinance((s) => s.changed);
+  const toast = useApp((s) => s.toast);
   const [used, setUsed] = useState<Record<string, number>>({});
   useEffect(() => {
     const d = new Date();
@@ -71,22 +103,48 @@ export function Categories() {
     }).catch(() => undefined);
   }, [version]);
   const groups: Array<["gasto" | "ingreso", string]> = [["gasto", "Gastos"], ["ingreso", "Ingresos"]];
+  const total = (meta?.categories ?? []).length;
   return (
     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-[21px] font-semibold text-text">🏷 Categorías</h1>
+        <h1 className="text-[21px] font-semibold text-text">Categorías</h1>
         <span className="flex-1" />
         <PrimaryButton onClick={() => setEditing({ id: "", kind: "gasto" })}><Plus size={14} /> Nueva categoría</PrimaryButton>
-        <GhostButton onClick={() => setEditing({ id: "", kind: "ingreso" })}><Plus size={13} /> De ingreso</GhostButton>
       </div>
-      {groups.map(([kind, title]) => (
+      {total === 0 && (
+        <p className="py-10 text-center text-[13px] text-faint">
+          Aún no hay categorías. Crea las tuyas: son las que aparecerán al registrar un gasto.
+        </p>
+      )}
+      {groups.map(([kind, title]) => {
+        const rows = (meta?.categories ?? []).filter((c) => c.kind === kind);
+        return (
         <section key={kind}>
           <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">{title} · este mes</div>
           <div className="divide-y divide-line rounded-xl border border-line bg-card">
-            {(meta?.categories ?? []).filter((c) => c.kind === kind).map((c) => {
+            {rows.map((c, i) => {
               const u = used[c.id] ?? 0;
+              const nudge = async (delta: number) => {
+                try {
+                  await api.finCategoryMove(c.id, delta);
+                  await changed();
+                } catch (e) {
+                  toast("error", (e as Error).message);
+                }
+              };
               return (
-                <div key={c.id} className="flex items-center gap-3 px-3 py-2">
+                <div key={c.id} data-cat-row={c.id} className="flex items-center gap-3 px-3 py-2">
+                  {/* El orden es tuyo, así que se edita desde aquí y no solo al crear. */}
+                  <span className="flex flex-none flex-col">
+                    <button type="button" data-cat-up={c.id} disabled={i === 0} title="Subir"
+                      onClick={() => void nudge(-1)} className="text-faint hover:text-text disabled:opacity-25 disabled:hover:text-faint">
+                      <ChevronUp size={12} />
+                    </button>
+                    <button type="button" data-cat-down={c.id} disabled={i === rows.length - 1} title="Bajar"
+                      onClick={() => void nudge(1)} className="text-faint hover:text-text disabled:opacity-25 disabled:hover:text-faint">
+                      <ChevronDown size={12} />
+                    </button>
+                  </span>
                   <span className="w-48 truncate text-[13px] font-semibold" style={{ color: c.colour, opacity: c.archived ? 0.5 : 1 }}>{c.icon} {c.name}{c.archived ? " (archivada)" : ""}</span>
                   {c.budget_month_cents ? (
                     <>
@@ -101,7 +159,7 @@ export function Categories() {
             })}
           </div>
         </section>
-      ))}
+      );})}
     </div>
   );
 }

@@ -377,6 +377,8 @@ export const api = {
   mentorPlanCoverageReview: (id: string, profile?: string, criteria?: import("./planCoverage").CoverageCriteria) => call<import("./types").MentorCoverageReviewResult>("mentor_plan_coverage_review", { id, ...(profile ? { profile } : {}), ...(criteria ? { criteria } : {}) }),
   /** «Ejecutar plan»: el informe de lo que falta crear (solo lee). */
   mentorExecutionReport: (id: string, scope?: Partial<import("./planExecution").ExecutionScope>) => call<import("./types").MentorExecutionReportResult>("mentor_execution_report", { id, ...(scope ? { scope } : {}) }),
+  /** «Plan para otra IA»: escribe un .md con lo que falta crear (para Antigravity, Gemini, Codex…). No usa la IA de la app. */
+  mentorExecutionHandoff: (id: string, scope?: Partial<import("./planExecution").ExecutionScope>) => call<{ loading: true } | { loading: false; path: string; rel: string; markdown: string; items: number; files: number }>("mentor_execution_handoff", { id, ...(scope ? { scope } : {}) }),
   mentorExecutionStatus: (id: string) => call<{ execution: import("./types").MentorExecutionView | null; active: boolean }>("mentor_execution_status", { id }),
   /** Empieza la ejecución en segundo plano. SOLO tras la confirmación de la persona en el diálogo (`confirm: true`). */
   mentorExecutionStart: (id: string, scope: Partial<import("./planExecution").ExecutionScope>) => call<import("./types").MentorExecutionStartResult>("mentor_execution_start", { id, scope, confirm: true }),

@@ -22,6 +22,7 @@ import { ppAreaDir } from "../../core/mentor/practiceState.js";
 import { aiUnavailableReason } from "../../core/mentor/planner.js";
 import { areaKeyOf } from "../../lib/planCoverage.js";
 import { buildExecutionReport, DEFAULT_SCOPE, progressOf, type ExecutionReport, type ExecutionScope, type ExecutionState } from "../../lib/planExecution.js";
+import { buildHandoffMarkdown } from "../../lib/planHandoff.js";
 import { weekRangesOf } from "../../lib/planTime.js";
 import * as store from "../../core/store.js";
 import { AppConfig } from "../appConfig.js";
@@ -146,6 +147,35 @@ export function mentorExecuteApi(app: AppState, hooks: MentorExecuteHooks = {}) 
       if (studyIndexCold(app)) return { loading: true as const };
       const scope = sanitizeScope((opts as Record<string, unknown>)?.scope ?? DEFAULT_SCOPE);
       return { loading: false as const, report: reportOf(plan, scope), execution: view(current(plan.id)), aiConfigured: aiOn() };
+    },
+
+    /**
+     * «Plan para otra IA»: escribe en `.notevault/mentor/handoff/<planId>.md` un documento (en inglés) con lo que falta crear, para dárselo a otra IA.
+     * No usa la IA de la app y no toca notas; solo sobrescribe SU propio documento (se regenera cada vez). Devuelve la ruta y el texto.
+     */
+    mentor_execution_handoff(opts: unknown) {
+      const plan = planOf(opts);
+      if (studyIndexCold(app)) return { loading: true as const };
+      const scope = sanitizeScope((opts as Record<string, unknown>)?.scope ?? DEFAULT_SCOPE);
+      const report = reportOf(plan, scope);
+      const space = report.tasks.find((t) => t.folder)?.folder?.split("/")[0] ?? "Programación";
+      const has = (rel: string): boolean => fs.existsSync(path.join(app.root, ...rel.split("/")));
+      const contracts = [
+        `${space}/00 Temario.md`,
+        `${space}/_skills/temario_skill.md`,
+        `${space}/_skills/resumen_teorico_skill.md`,
+        `${space}/_skills/mapa_skill.md`,
+        `${space}/_skills/practica_skill.md`,
+        "PROJECTS/NoteVault/docs/ANTIGRAVITY_PROMPT_PROGRAMMING_KB.md",
+        "PROJECTS/NoteVault/docs/ANTIGRAVITY_PLAN_CONTENT_GENERATION.md",
+      ].filter(has);
+      const toolsDir = has("PROJECTS/NoteVault/frontend/tools/programming_kb/status.mjs") ? path.join(app.root, "PROJECTS", "NoteVault", "frontend") : undefined;
+      const markdown = buildHandoffMarkdown(report, { planName: plan.name ?? plan.id, start: plan.start, end: plan.end, contracts, ...(toolsDir ? { toolsDir } : {}) });
+      const file = path.join(app.root, ".notevault", "mentor", "handoff", `${plan.id}.md`);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, markdown, "utf-8");
+      const ai = report.tasks.filter((t) => ["topic_new", "theory", "canvas", "manifest", "practice"].includes(t.kind));
+      return { loading: false as const, path: file, rel: path.relative(app.root, file).split(path.sep).join("/"), markdown, items: ai.length, files: ai.reduce((n, t) => n + t.files, 0) };
     },
 
     mentor_execution_status(opts: unknown) {

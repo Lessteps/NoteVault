@@ -7,7 +7,7 @@
 //  · el progreso de la ejecución en segundo plano (pausar, reanudar, cancelar y el registro de los archivos creados).
 // Nada se ejecuta solo: lo que crea o modifica notas ocurre únicamente cuando la persona confirma en el diálogo.
 
-import { FolderPlus, ListChecks, Pause, Play, Sparkles, Square } from "lucide-react";
+import { ClipboardCopy, FolderPlus, ListChecks, Pause, Play, Sparkles, Square } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { DEFAULT_CRITERIA, sanitizeCriteria } from "../../lib/planCoverage";
@@ -563,6 +563,38 @@ export function ExecutionPanel({ plan, cov, onPlan, announce, signal }: { plan: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope]);
 
+  /** «Plan para otra IA»: deja un .md con lo que falta crear y lo copia al portapapeles. No usa la IA de la app ni escribe notas. */
+  const handoff = async () => {
+    if (busy || ctl) return;
+    setBusy(true);
+    try {
+      let r = await api.mentorExecutionHandoff(plan.id, scopeToSend(scope));
+      for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
+        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        r = await api.mentorExecutionHandoff(plan.id, scopeToSend(scope));
+      }
+      if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo.");
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(r.markdown);
+        copied = true;
+      } catch {
+        /* sin portapapeles: queda el archivo */
+      }
+      const text = r.items
+        ? `Plan para otra IA listo: ${plural(r.items, "elemento", "elementos")} (≈ ${r.files} archivos). Guardado en ${r.rel}${copied ? " y copiado al portapapeles" : ""}. Dáselo a Antigravity, Gemini o Codex.`
+        : `No hay nada que generar con ese alcance. Se guardó igualmente en ${r.rel}.`;
+      setNote(text);
+      announce(text);
+    } catch (e) {
+      const m = `${(e as Error).message}`;
+      setNote(m);
+      announce(m);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const control = async (what: "pause" | "resume" | "cancel") => {
     if (ctl) return;
     if (what === "cancel" && !(await confirmAction("Cancelar la ejecución", "Lo ya creado se queda en tu vault y en el registro; el resto no se hace. Puedes volver a ejecutar el plan más tarde.", "Cancelar la ejecución", true))) return;
@@ -597,6 +629,9 @@ export function ExecutionPanel({ plan, cov, onPlan, announce, signal }: { plan: 
         </PrimaryButton>
         <GhostButton large onClick={() => setDialog(true)} disabled={!report || !report.tasks.length || running || !aiOn} data-testid="exec-open-dialog" title={!aiOn ? "La IA no está configurada" : undefined}>
           <FolderPlus size={16} aria-hidden className="flex-none" /> Ejecutar plan…
+        </GhostButton>
+        <GhostButton large onClick={() => void handoff()} disabled={busy} data-testid="exec-handoff" title="Genera un .md con lo que falta crear para dárselo a otra IA (no usa la IA de la app)">
+          <ClipboardCopy size={16} aria-hidden className="flex-none" /> Plan para otra IA
         </GhostButton>
         {!aiOn && <span className="text-[13.5px] text-dim" data-testid="exec-disabled-why">«Ejecutar» está desactivado: la IA no está configurada. El análisis determinista sí funciona.</span>}
       </div>

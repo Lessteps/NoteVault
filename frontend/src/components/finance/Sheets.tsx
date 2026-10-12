@@ -584,10 +584,10 @@ export function Sheet() {
             <option value="mov">Por movimiento</option><option value="cat">Por categoría</option>
           </select>
         )}
-        <select className={sel} value={fKind} onChange={(e) => setFKind(e.target.value)}>
+        <select aria-label="Filtro tipo" className={sel} value={fKind} onChange={(e) => setFKind(e.target.value)}>
           <option value="">Tipo: todos</option>{(meta?.types ?? []).map((k) => <option key={k} value={k}>{TYPE_LABELS[k]}</option>)}
         </select>
-        <select className={sel} value={fCat} onChange={(e) => setFCat(e.target.value)}>
+        <select aria-label="Filtro categoría" className={sel} value={fCat} onChange={(e) => setFCat(e.target.value)}>
           <option value="">Categoría: todas</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
         </select>
         <input className={cn(sel, "w-60")} placeholder="🔎 Buscar en qué o razón…" value={q} onChange={(e) => setQ(e.target.value)} />

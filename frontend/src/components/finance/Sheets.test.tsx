@@ -22,6 +22,7 @@ vi.mock("../../lib/bridge", () => ({
 }));
 
 import { BalanceAccumulated, CategoryTrend, FixedVsVariable, monthlyAverages, monthlySigned, Sheet } from "./Sheets";
+import { useFinance } from "../../store/finance";
 
 let host: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
@@ -214,6 +215,20 @@ describe("FixedVsVariable", () => {
     expect(text).toContain("Libre");
     expect(text).toContain("40% del ingreso");
   });
+
+  it("maneja caso sin ingresos en FixedVsVariable sin division por cero", async () => {
+    finRecurringList.mockResolvedValueOnce([{
+      id: "rc1", type: "gasto", amount_cents: 3000000, what: "Internet",
+      rule: "monthly:1", start: "2020-01-01", end: "", archived: false, last: "",
+    }]);
+    await mount(
+      <FixedVsVariable monthGasto={5000000} monthIngreso={0} firstDay="2026-10-01" />,
+    );
+    const text = host!.textContent ?? "";
+    expect(text).toContain("Sin ingresos registrados en el mes");
+    expect(text).toContain("Fijos estimados");
+    expect(text).toContain("Variables del mes");
+  });
 });
 
 describe("CategoryTrend", () => {
@@ -229,6 +244,33 @@ describe("CategoryTrend", () => {
     expect(text).toContain("Evolución de 🛒 Supermercado · Últimos 6 meses");
     expect(text).toContain("Promedio mensual");
     expect(text).toContain("Mes pico");
+  });
+
+  it("al filtrar por categoría en Periodo muestra la evolución de esa categoría", async () => {
+    useFinance.setState({
+      meta: {
+        types: ["gasto", "ingreso", "ahorro", "retiro"],
+        type_labels: { gasto: "Gasto", ingreso: "Ingreso", ahorro: "Ahorro", retiro: "Retiro" },
+        type_colours: { gasto: "#f2555a", ingreso: "#4ade80", ahorro: "#eab308", retiro: "#ff9632" },
+        goal_statuses: ["Activa"],
+        currency: "USD",
+        categories: [
+          { id: "c1", name: "Alimentación", icon: "🍎", colour: "#4ade80", kind: "gasto", budget_month_cents: 0, order: 0, archived: false },
+        ],
+        goals: [],
+      },
+    });
+    await mount();
+    const select = host!.querySelector('select[aria-label="Filtro categoría"]') as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    await act(async () => {
+      select.value = "c1";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const text = host!.textContent ?? "";
+    expect(text).toContain("Evolución de 🍎 Alimentación · Últimos 6 meses");
   });
 });
 

@@ -260,3 +260,17 @@ test("NV-F-010 historial busca en todo el historial", async () => {
   await expect(win.getByText(/resultados en todo el historial/)).toBeVisible({ timeout: 15_000 });
   await expect(win.getByRole("button", { name: new RegExp(`Gasto.*${what}`) })).toBeVisible({ timeout: 15_000 });
 });
+
+test("NV-F-012 periodo muestra estructura fijos vs variables y flujo neto", async () => {
+  await side().getByRole("button", { name: "Periodo" }).click();
+  await expect(win.getByRole("heading", { name: "Periodo" })).toBeVisible({ timeout: 15_000 });
+  // Limpiar búsqueda previa para que se muestren los extras del mes
+  await win.getByPlaceholder(/Buscar/).fill("");
+  const hist = win.getByRole("button", { name: "Historial" });
+  if ((await hist.getAttribute("aria-pressed")) === "true") {
+    await hist.click();
+  }
+  await win.getByRole("button", { name: "Mes", exact: true }).click();
+  await expect(win.getByText("Estructura de gastos · Fijos vs Variables")).toBeVisible({ timeout: 15_000 });
+  await expect(win.getByText("Flujo neto")).toBeVisible({ timeout: 15_000 });
+});

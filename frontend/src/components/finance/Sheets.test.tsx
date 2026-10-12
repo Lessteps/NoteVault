@@ -21,7 +21,7 @@ vi.mock("../../lib/bridge", () => ({
   },
 }));
 
-import { BalanceAccumulated, monthlyAverages, monthlySigned, Sheet } from "./Sheets";
+import { BalanceAccumulated, CategoryTrend, FixedVsVariable, monthlyAverages, monthlySigned, Sheet } from "./Sheets";
 
 let host: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
@@ -154,7 +154,7 @@ describe("Sheet (Periodo)", () => {
       id: "rc1", type: "gasto", amount_cents: 80000000, what: "Arriendo", category: "", goal: "",
       rule: "monthly:1", start: "2020-01-01", end, archived: false, last: "",
     });
-    finRecurringList.mockResolvedValueOnce([rec("")]);
+    finRecurringList.mockResolvedValue([rec("")]);
     await mount();
     await click("Año");
     expect(host!.textContent ?? "").toContain("800,000.00");
@@ -162,7 +162,7 @@ describe("Sheet (Periodo)", () => {
   });
 
   it("un recurrente terminado no proyecta", async () => {
-    finRecurringList.mockResolvedValueOnce([{
+    finRecurringList.mockResolvedValue([{
       id: "rc1", type: "gasto", amount_cents: 80000000, what: "Arriendo", category: "", goal: "",
       rule: "monthly:1", start: "2020-01-01", end: "2020-06-01", archived: false, last: "",
     }]);
@@ -193,6 +193,42 @@ describe("BalanceAccumulated", () => {
     await mount(<BalanceAccumulated yearRows={yearRows} />);
     const text = host!.textContent ?? "";
     expect(text).toContain("Balance acumulado");
+  });
+});
+
+describe("FixedVsVariable", () => {
+  it("muestra desglose porcentual de gastos fijos vs variables respecto a ingresos", async () => {
+    finRecurringList.mockResolvedValueOnce([{
+      id: "rc1", type: "gasto", amount_cents: 80000000, what: "Arriendo",
+      rule: "monthly:1", start: "2020-01-01", end: "", archived: false, last: "",
+    }]);
+    await mount(
+      <FixedVsVariable monthGasto={120000000} monthIngreso={200000000} firstDay="2026-10-01" />,
+    );
+    const text = host!.textContent ?? "";
+    expect(text).toContain("Estructura de gastos · Fijos vs Variables");
+    expect(text).toContain("Fijos");
+    expect(text).toContain("40% del ingreso");
+    expect(text).toContain("Variables");
+    expect(text).toContain("20% del ingreso");
+    expect(text).toContain("Libre");
+    expect(text).toContain("40% del ingreso");
+  });
+});
+
+describe("CategoryTrend", () => {
+  it("muestra historial de 6 meses con promedio y mes pico", async () => {
+    finRange.mockResolvedValueOnce([
+      { id: "m1", type: "gasto", amount_cents: 20000, category: "c1", date: "2026-06-15" },
+      { id: "m2", type: "gasto", amount_cents: 60000, category: "c1", date: "2026-08-10" },
+      { id: "m3", type: "gasto", amount_cents: 40000, category: "c1", date: "2026-10-02" },
+    ]);
+    const cat = { id: "c1", name: "Supermercado", icon: "🛒", colour: "#4ade80", kind: "gasto" as const, budget_month_cents: 0, order: 0, archived: false };
+    await mount(<CategoryTrend category={cat} anchor="2026-10-15" />);
+    const text = host!.textContent ?? "";
+    expect(text).toContain("Evolución de 🛒 Supermercado · Últimos 6 meses");
+    expect(text).toContain("Promedio mensual");
+    expect(text).toContain("Mes pico");
   });
 });
 

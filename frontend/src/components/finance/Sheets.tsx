@@ -114,7 +114,9 @@ export function CategoryMatrix({ list, columns, keyOf, cats }: {
   );
 }
 
-function MonthExtras({ first, list, cats }: { first: string; list: Movement[]; cats: FinCategory[] }) {
+function MonthExtras({ first, list, cats, onSelectCat }: {
+  first: string; list: Movement[]; cats: FinCategory[]; onSelectCat?: (id: string) => void;
+}) {
   const version = useFinance((s) => s.version);
   const [extras, setExtras] = useState<Awaited<ReturnType<typeof api.finMonthExtras>> | null>(null);
   const d = parseIso(first);
@@ -128,7 +130,7 @@ function MonthExtras({ first, list, cats }: { first: string; list: Movement[]; c
   for (const m of list) if (m.type === "gasto") byCat.set(m.category ?? "", (byCat.get(m.category ?? "") ?? 0) + m.amount_cents);
   const parts = [...byCat.entries()].sort((a, b) => b[1] - a[1]).map(([cid, v]) => {
     const c = cats.find((x) => x.id === cid);
-    return { name: `${c ? c.name : "Sin categoría"}: ${formatMoney(v)}`, value: v, colour: c?.colour ?? "#616161" };
+    return { id: cid, name: `${c ? c.name : "Sin categoría"}: ${formatMoney(v)}`, value: v, colour: c?.colour ?? "#616161" };
   });
   const cmp = (key: keyof FinTotals, label: string) => {
     if (!extras) return null;
@@ -152,7 +154,17 @@ function MonthExtras({ first, list, cats }: { first: string; list: Movement[]; c
         <Panel title="Gasto por categoría">
           <div className="flex items-center gap-4">
             <Donut parts={parts} size={140} label={formatMoney([...byCat.values()].reduce((a, b) => a + b, 0))} />
-            <ul className="min-w-0 space-y-0.5 text-[11.5px] text-dim">{parts.slice(0, 7).map((p) => <li key={p.name} className="flex items-center gap-1.5 truncate"><span className="h-2 w-2 flex-none rounded-sm" style={{ background: p.colour }} />{p.name}</li>)}</ul>
+            <ul className="min-w-0 space-y-0.5 text-[11.5px] text-dim">
+              {parts.slice(0, 7).map((p) => (
+                <li key={p.name} className="flex items-center gap-1.5 truncate">
+                  <button type="button" onClick={() => p.id && onSelectCat?.(p.id)} title="Ver evolución"
+                    className="flex items-center gap-1.5 truncate text-left hover:text-text">
+                    <span className="h-2 w-2 flex-none rounded-sm" style={{ background: p.colour }} />
+                    {p.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         </Panel>
       </div>
@@ -171,6 +183,7 @@ function MonthExtras({ first, list, cats }: { first: string; list: Movement[]; c
           <div className="space-y-1.5">{cmp("gasto", "Gastos")}{cmp("ingreso", "Ingresos")}{cmp("ahorro", "Ahorro")}{cmp("balance", "Balance")}</div>
         </Panel>
       </div>
+      <FixedVsVariable monthGasto={extras?.this.gasto ?? 0} monthIngreso={extras?.this.ingreso ?? 0} firstDay={first} />
     </>
   );
 }
@@ -267,6 +280,145 @@ export function monthlyAverages(ms: Movement[]): { n: number; gasto: number; ing
     gasto: Math.round(months.reduce((a, r) => a + r.gasto, 0) / n),
     ingreso: Math.round(months.reduce((a, r) => a + r.ingreso, 0) / n),
   };
+}
+
+/** Estructura mensual de gastos: Fijos (recurrentes) vs Variables (% de ingresos). */
+export function FixedVsVariable({ monthGasto, monthIngreso, firstDay }: {
+  monthGasto: number; monthIngreso: number; firstDay: string;
+}) {
+  const version = useFinance((s) => s.version);
+  const curr = useFinance((s) => s.meta?.currency);
+  const [fixedAmount, setFixedAmount] = useState<number | null>(null);
+
+  useEffect(() => {
+    api.finRecurringList()
+      .then((recs) => {
+        const live = recs.filter((r) => !r.archived && r.type === "gasto");
+        const sum = live.reduce((acc, r) => acc + Math.abs(monthlySigned(r.rule, r.type, r.amount_cents)), 0);
+        setFixedAmount(sum);
+      })
+      .catch(() => setFixedAmount(0));
+  }, [version, firstDay]);
+
+  if (fixedAmount === null) return null;
+
+  const fijos = fixedAmount;
+  const variables = Math.max(0, monthGasto - fijos);
+  const totalIngreso = monthIngreso;
+  const libre = Math.max(0, totalIngreso - monthGasto);
+
+  const pctFijos = totalIngreso > 0 ? Math.min(100, Math.round((fijos / totalIngreso) * 100)) : 0;
+  const pctVars = totalIngreso > 0 ? Math.min(100 - pctFijos, Math.round((variables / totalIngreso) * 100)) : 0;
+  const pctLibre = totalIngreso > 0 ? Math.max(0, 100 - pctFijos - pctVars) : 0;
+
+  return (
+    <Panel title="Estructura de gastos · Fijos vs Variables">
+      <div className="space-y-3">
+        {totalIngreso > 0 ? (
+          <>
+            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-elevated">
+              {pctFijos > 0 && <div style={{ width: `${pctFijos}%`, background: "#ff9632" }} title={`Fijos: ${formatMoney(fijos, curr)} (${pctFijos}%)`} />}
+              {pctVars > 0 && <div style={{ width: `${pctVars}%`, background: "var(--nv-danger)" }} title={`Variables: ${formatMoney(variables, curr)} (${pctVars}%)`} />}
+              {pctLibre > 0 && <div style={{ width: `${pctLibre}%`, background: "var(--nv-mint)" }} title={`Libre / Ahorro: ${formatMoney(libre, curr)} (${pctLibre}%)`} />}
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-[12px]">
+              <div>
+                <div className="flex items-center gap-1.5 font-medium text-faint">
+                  <span className="h-2 w-2 rounded-full" style={{ background: "#ff9632" }} /> Fijos
+                </div>
+                <div className="font-mono font-semibold text-text">{formatMoney(fijos, curr)}</div>
+                <div className="text-[11px] text-faint">{pctFijos}% del ingreso</div>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 font-medium text-faint">
+                  <span className="h-2 w-2 rounded-full" style={{ background: "var(--nv-danger)" }} /> Variables
+                </div>
+                <div className="font-mono font-semibold text-text">{formatMoney(variables, curr)}</div>
+                <div className="text-[11px] text-faint">{pctVars}% del ingreso</div>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 font-medium text-faint">
+                  <span className="h-2 w-2 rounded-full" style={{ background: "var(--nv-mint)" }} /> Libre
+                </div>
+                <div className="font-mono font-semibold text-text">{formatMoney(libre, curr)}</div>
+                <div className="text-[11px] text-faint">{pctLibre}% del ingreso</div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-between text-[12px]">
+            <div>
+              <span className="text-faint">Fijos estimados: </span>
+              <b className="font-mono text-text">{formatMoney(fijos, curr)}</b>
+            </div>
+            <div>
+              <span className="text-faint">Variables del mes: </span>
+              <b className="font-mono text-text">{formatMoney(variables, curr)}</b>
+            </div>
+            <span className="text-[11px] text-faint">Sin ingresos registrados en el mes</span>
+          </div>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+/** Evolución temporal de una categoría específica en los últimos 6 meses. */
+export function CategoryTrend({ category, anchor }: { category: FinCategory; anchor: string }) {
+  const version = useFinance((s) => s.version);
+  const curr = useFinance((s) => s.meta?.currency);
+  const [history, setHistory] = useState<Movement[]>([]);
+  const d = parseIso(anchor);
+
+  useEffect(() => {
+    const first = isoDate(new Date(d.getFullYear(), d.getMonth() - 5, 1));
+    const last = monthBounds(d.getFullYear(), d.getMonth())[1];
+    api.finRange(first, last)
+      .then(setHistory)
+      .catch(() => setHistory([]));
+  }, [anchor, category.id, version]);
+
+  const catMovements = history.filter((m) => m.category === category.id && m.type === "gasto");
+  const monthsData = [5, 4, 3, 2, 1, 0].map((offset) => {
+    const dt = new Date(d.getFullYear(), d.getMonth() - offset, 1);
+    const key = isoDate(dt).slice(0, 7);
+    const label = MONTHS_ES[dt.getMonth()]!.slice(0, 3);
+    const spent = catMovements.filter((m) => m.date.startsWith(key)).reduce((acc, m) => acc + m.amount_cents, 0);
+    return { key, label, spent };
+  });
+
+  const values = monthsData.map((m) => m.spent);
+  const labels = monthsData.map((m) => m.label);
+  const total = values.reduce((a, b) => a + b, 0);
+  const activeMonths = monthsData.filter((m) => m.spent > 0).length || 1;
+  const avg = Math.round(total / activeMonths);
+  const maxItem = monthsData.reduce((prev, cur) => (cur.spent > prev.spent ? cur : prev), monthsData[0]!);
+  const currentMonthSpent = values[5] ?? 0;
+  const diffPct = avg > 0 && currentMonthSpent > 0 ? Math.round(((currentMonthSpent - avg) / avg) * 100) : null;
+
+  return (
+    <Panel title={`Evolución de ${category.icon} ${category.name} · Últimos 6 meses`}>
+      <div className="space-y-3">
+        <Columns values={values} labels={labels} colour={category.colour || TYPE_COLOURS.gasto} format={(v) => formatMoney(v, curr)} height={100} />
+        <div className="grid grid-cols-3 gap-3 border-t border-line pt-2 text-[12px]">
+          <div>
+            <div className="text-[11px] text-faint">Promedio mensual</div>
+            <div className="font-mono font-semibold text-text">{formatMoney(avg, curr)}</div>
+          </div>
+          <div>
+            <div className="text-[11px] text-faint">Mes pico ({maxItem?.label})</div>
+            <div className="font-mono font-semibold text-text">{formatMoney(maxItem?.spent ?? 0, curr)}</div>
+          </div>
+          <div>
+            <div className="text-[11px] text-faint">Este mes vs promedio</div>
+            <div className="font-mono font-semibold" style={{ color: diffPct === null ? "var(--nv-dim)" : diffPct > 0 ? "var(--nv-danger)" : "var(--nv-mint)" }}>
+              {diffPct !== null ? `${diffPct >= 0 ? "+" : ""}${diffPct}%` : "—"}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
 }
 
 /** Proyección a 3 meses: promedio de los meses cerrados con datos + recurrentes activos. */
@@ -462,8 +614,11 @@ export function Sheet() {
         </>
       ) : (
         <>
-          {kind === "mensual" && <MonthExtras first={first} list={list} cats={cats} />}
+          {kind === "mensual" && <MonthExtras first={first} list={list} cats={cats} onSelectCat={setFCat} />}
           {kind !== "mensual" && <PrevCompare kind={kind} first={first} current={t} fKind={fKind} fCat={fCat} />}
+          {fCat && cats.find((c) => c.id === fCat) && (
+            <CategoryTrend category={cats.find((c) => c.id === fCat)!} anchor={anchor} />
+          )}
           {kind === "anual" ? (
             <>
               <Panel title="Gasto por mes">

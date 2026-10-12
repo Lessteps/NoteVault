@@ -68,20 +68,22 @@ milestones; do them in order after `min` is complete for the whole route.
 
 ## 3. Work order (this is the route's order, not alphabetical)
 
-### Gate A — pilot (STOP after it and show the result)
+### Gate A — pilot: DONE and APPROVED (2026-10-12). Do NOT stop here any more.
 
-1. Theory note + map for **`10.1 Problem solving method`** and **`10.3 Arrays and strings`**.
-2. Exercises phase `min` **and** `basic` for those two topics (3 per cell at difficulty 1).
-3. Run:
+The pilot (10.1 and 10.3: notes, maps, `min` + `basic` exercises) is finished and the user approved it. **Do not stop after it, do not
+ask for permission, do not report and wait.** Continue straight to WP1 and then WP2, WP3, WP4 in order. The only legitimate reasons
+to stop are: (a) the checker or a tool fails in a way you cannot fix (report it and stop), or (b) your usage limit.
 
-```
-node tools/programming_kb/exercises_check.mjs "^10\.(1|3) "
-node tools/programming_kb/status.mjs
-node tools/programming_kb/links.mjs "^10\."
-```
+### Working rhythm (this is a very large job: 26 notes + ~1450 files)
 
-4. Report: counts, and paste **one exercise per skill** (6 + 6 = at most 12 files, one each is enough) for review. **Do not
-   continue until the user says so.**
+- Work in **batches of one topic**: write all its missing files → `exercises_check` for that topic → append one line to the log →
+  next topic. Never write 100 files and check at the end.
+- Commit and push **every 5 topics** (not only per area), so nothing is lost if the session ends:
+  `git add Programación && git commit -m "vault: <area> <topics> content" && git push` from `C:\PROGRAMMING`.
+- At the start of every session run both status tools and resume at the first topic that still has missing cells. Never redo a
+  topic that the tools show as complete.
+- After every commit, run `node tools/programming_kb/exercises_status.mjs` and put the "files still to write" number in the log
+  line, so the user can see the number go down.
 
 ### WP1 — the 26 theory notes and maps
 

@@ -4,7 +4,7 @@
 // cualquier pestaña y en cualquiera de las dos vistas, para ver siempre cuánto lleva, qué está haciendo, cuánto falta y poder pausar o cancelar.
 // No inicia nada: solo lee el estado (`mentor_execution_status`) y pausa, reanuda o cancela lo que ya corre.
 
-import { Pause, Play, Square, X } from "lucide-react";
+import { ListChecks, Pause, Play, Square, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { RUN_STATUS_LABEL } from "../../lib/planExecution";
@@ -64,6 +64,18 @@ export function ExecutionBar({ planId, onOpenPlan }: { planId: string; /** lleva
       setBusy(false);
     }
   };
+  const verify = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      const r = await api.mentorExecutionVerify(planId);
+      setExec(r.execution);
+      toast("info", r.verified || r.trimmed ? `Verificado: ${r.verified} tareas ya estaban en la vault${r.trimmed ? `, ${r.trimmed} con menos por hacer` : ""}; quedan ${r.remaining}.` : `Verificado: no hay cambios; siguen pendientes ${r.remaining} tareas.`);
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const colour = st.status === "failed" ? "var(--nv-danger)" : st.status === "done" ? "var(--nv-mint)" : st.status === "paused" ? "var(--nv-warn)" : "var(--nv-accent)";
   const btn = "inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-2.5 text-[13.5px] text-dim hover:bg-hover hover:text-text disabled:opacity-50";
   return (
@@ -97,6 +109,7 @@ export function ExecutionBar({ planId, onOpenPlan }: { planId: string; /** lleva
         <div className="flex flex-wrap items-center gap-2">
           {st.status === "running" && <button type="button" className={btn} disabled={busy} onClick={() => void act("pause")}><Pause size={14} aria-hidden /> Pausar</button>}
           {st.status === "paused" && <button type="button" className={btn} disabled={busy} onClick={() => void act("resume")}><Play size={14} aria-hidden /> Reanudar</button>}
+          {(st.status === "paused" || st.status === "failed") && <button type="button" className={btn} disabled={busy} onClick={() => void verify()} title="Relee la vault y marca como hechas las tareas cuyos archivos ya existen" data-testid="exec-bar-verify"><ListChecks size={14} aria-hidden /> Verificar</button>}
           {live && <button type="button" className={btn} disabled={busy} onClick={() => void act("cancel")}><Square size={14} aria-hidden /> Cancelar</button>}
           <button type="button" className={btn} onClick={() => { onOpenPlan?.(); setTimeout(() => goToSection("sec-ejecutar"), 80); }} data-testid="exec-bar-open">Ver registro</button>
           {!live && <button type="button" className={btn} aria-label="Cerrar" onClick={() => setDismissed(st.id)}><X size={14} aria-hidden /></button>}

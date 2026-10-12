@@ -142,6 +142,49 @@ export function recoverInterrupted(s: ExecutionState): ExecutionState {
   };
 }
 
+export interface ReconcileResult {
+  state: ExecutionState;
+  /** tareas que ya estaban hechas en la vault (las marca «hecha», sin llamar a la IA) */
+  verified: number;
+  /** tareas de ejercicios a las que solo les quedan algunas celdas */
+  trimmed: number;
+  /** tareas que siguen sin estar */
+  remaining: number;
+}
+
+/**
+ * «Verificar»: contrasta una ejecución guardada con lo que HAY en la vault ahora. `fresh` es el informe recalculado con el mismo alcance:
+ * una tarea pendiente (o fallida / omitida) que ya no figura en él está cubierta (la hizo la app, otra IA o la persona) y se marca «hecha»;
+ * una de ejercicios a la que ya solo le faltan algunas celdas se recorta a las que faltan. No ejecuta nada ni toca la vault.
+ */
+export function reconcileExecution(s: ExecutionState, fresh: readonly ExecTask[], now: string): ReconcileResult {
+  const byId = new Map(fresh.map((t) => [t.id, t]));
+  let verified = 0;
+  let trimmed = 0;
+  const tasks = s.tasks.map((t): TaskState => {
+    if (t.status === "done" || t.status === "running" || t.status === "cancelled") return t;
+    const f = byId.get(t.id);
+    if (!f) {
+      verified++;
+      const { error: _e, ...rest } = t;
+      return { ...rest, status: "done", note: "Ya estaba en la vault (verificado)", endedAt: now };
+    }
+    const have = Array.isArray(t.args?.cells) ? (t.args!.cells as unknown[]).length : 0;
+    const left = Array.isArray(f.args?.cells) ? (f.args!.cells as unknown[]).length : 0;
+    if (t.kind === "practice" && have > 0 && left > 0 && left < have) {
+      trimmed++;
+      return { ...t, args: f.args, files: f.files, aiCalls: f.aiCalls, label: f.label, required: f.required };
+    }
+    return t;
+  });
+  const remaining = tasks.filter((t) => t.status === "pending" || t.status === "failed" || t.status === "skipped").length;
+  const anyOpen = tasks.some((t) => t.status === "pending" || t.status === "running");
+  const failed = tasks.some((t) => t.status === "failed" || (t.status === "skipped" && t.error));
+  const status: RunStatus = s.status === "cancelled" ? "cancelled" : anyOpen ? (s.status === "failed" ? "paused" : s.status) : failed ? "failed" : "done";
+  const line = `${now.slice(11, 19)} Verificación: ${verified} ya estaban en la vault, ${trimmed} recortadas, ${remaining} siguen pendientes.`;
+  return { state: { ...s, status, tasks, updatedAt: now, log: [...s.log, line].slice(-MAX_LOG_LINES) }, verified, trimmed, remaining };
+}
+
 // ── Dependencias del trabajo real ───────────────────────────────────────
 
 export interface TaskRunResult {

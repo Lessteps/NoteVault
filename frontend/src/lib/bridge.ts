@@ -382,6 +382,8 @@ export const api = {
   mentorExecutionStatus: (id: string) => call<{ execution: import("./types").MentorExecutionView | null; active: boolean }>("mentor_execution_status", { id }),
   /** Empieza la ejecución en segundo plano. SOLO tras la confirmación de la persona en el diálogo (`confirm: true`). */
   mentorExecutionStart: (id: string, scope: Partial<import("./planExecution").ExecutionScope>) => call<import("./types").MentorExecutionStartResult>("mentor_execution_start", { id, scope, confirm: true }),
+  /** «Verificar»: contrasta la ejecución guardada con la vault y marca como hechas las tareas ya cubiertas (sin IA). */
+  mentorExecutionVerify: (id: string) => call<{ execution: import("./types").MentorExecutionView | null; verified: number; trimmed: number; remaining: number }>("mentor_execution_verify", { id }),
   mentorExecutionPause: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_pause", { id }),
   mentorExecutionResume: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_resume", { id }),
   mentorExecutionCancel: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_cancel", { id }),

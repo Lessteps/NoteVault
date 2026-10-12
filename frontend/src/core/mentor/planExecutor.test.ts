@@ -6,7 +6,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_SCOPE, progressOf, runnable, type ExecTask } from "../../lib/planExecution.js";
-import { ExecutionRunner, ExecutionStore, newExecution, recoverInterrupted, type ExecDeps, type TaskRunResult } from "./planExecutor.js";
+import { ExecutionRunner, ExecutionStore, newExecution, reconcileExecution, recoverInterrupted, type ExecDeps, type TaskRunResult } from "./planExecutor.js";
 
 let dir: string;
 beforeEach(() => {
@@ -228,5 +228,45 @@ describe("reintentar lo que falló", () => {
     await r2.resume();
     expect(f2.calls).toEqual(["b", "c"]);
     expect(r2.state.status).toBe("done");
+  });
+});
+
+describe("verificar (reconciliar con la vault)", () => {
+  const NOW = "2026-10-12T16:00:00.000Z";
+  const base = () => {
+    const s = newExecution("p", DEFAULT_SCOPE, [task("a"), task("b"), task("c", { kind: "practice", args: { cells: [{ skill: "x", difficulty: 1 }, { skill: "y", difficulty: 1 }] }, files: 8 })], NOW);
+    s.tasks[0] = { ...s.tasks[0]!, status: "done" };
+    return { ...s, status: "paused" as const };
+  };
+
+  it("marca como hecha la tarea que ya no figura en el informe, sin tocar las hechas", () => {
+    const s = base();
+    const r = reconcileExecution(s, [task("c", { kind: "practice", args: { cells: [{ skill: "x", difficulty: 1 }, { skill: "y", difficulty: 1 }] } })], NOW);
+    expect(r.verified).toBe(1);
+    expect(r.state.tasks.find((t) => t.id === "b")).toMatchObject({ status: "done", note: "Ya estaba en la vault (verificado)" });
+    expect(r.remaining).toBe(1);
+    expect(r.state.status).toBe("paused");
+  });
+
+  it("recorta la tarea de ejercicios a las celdas que faltan", () => {
+    const r = reconcileExecution(base(), [task("b"), task("c", { kind: "practice", files: 4, args: { cells: [{ skill: "y", difficulty: 1 }] } })], NOW);
+    expect(r.trimmed).toBe(1);
+    expect(r.state.tasks.find((t) => t.id === "c")?.args?.cells).toEqual([{ skill: "y", difficulty: 1 }]);
+    expect(r.state.tasks.find((t) => t.id === "c")?.files).toBe(4);
+  });
+
+  it("si todo está cubierto la ejecución queda terminada y el progreso llega al 100 %", () => {
+    const r = reconcileExecution(base(), [], NOW);
+    expect(r.state.status).toBe("done");
+    expect(progressOf(r.state).pct).toBe(100);
+    expect(r.remaining).toBe(0);
+  });
+
+  it("no revive una ejecución cancelada ni toca una tarea en curso", () => {
+    const s = base();
+    s.tasks[1] = { ...s.tasks[1]!, status: "running" };
+    const r = reconcileExecution({ ...s, status: "cancelled" }, [], NOW);
+    expect(r.state.status).toBe("cancelled");
+    expect(r.state.tasks.find((t) => t.id === "b")?.status).toBe("running");
   });
 });

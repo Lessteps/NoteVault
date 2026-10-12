@@ -17,7 +17,7 @@ import { AIConfig } from "../../core/aiClient.js";
 import { ApiError } from "../../core/errors.js";
 import { areaFiles, areaKataDates, practiceAreasOf } from "../../lib/areaPracticeSystem.js";
 import { PLAN_ID_RE, PlanStore, type Plan } from "../../core/mentor/plan.js";
-import { ExecutionRunner, ExecutionStore, newExecution, recoverInterrupted, type ExecDeps } from "../../core/mentor/planExecutor.js";
+import { ExecutionRunner, ExecutionStore, newExecution, reconcileExecution, recoverInterrupted, type ExecDeps } from "../../core/mentor/planExecutor.js";
 import { ppAreaDir } from "../../core/mentor/practiceState.js";
 import { aiUnavailableReason } from "../../core/mentor/planner.js";
 import { areaKeyOf } from "../../lib/planCoverage.js";
@@ -26,6 +26,7 @@ import { buildHandoffMarkdown } from "../../lib/planHandoff.js";
 import { weekRangesOf } from "../../lib/planTime.js";
 import * as store from "../../core/store.js";
 import { AppConfig } from "../appConfig.js";
+import { clearVaultScanCache } from "../vaultScan.js";
 import type { AppState } from "../appState.js";
 import { designsOf } from "./mentorDesign.js";
 import { makeExecDeps, type ExecDepsOptions } from "./mentorExecuteDeps.js";
@@ -202,6 +203,24 @@ export function mentorExecuteApi(app: AppState, hooks: MentorExecuteHooks = {}) 
       const runner = runnerFor(state);
       void runner.start();
       return { loading: false as const, execution: view(runner.state) };
+    },
+
+    /**
+     * «Verificar»: relee la vault desde disco y marca como hechas las tareas de la ejecución guardada que ya están cubiertas (las creó otra IA, la
+     * persona o una ejecución anterior). No usa IA, no crea nada y no se puede hacer mientras la cola corre.
+     */
+    mentor_execution_verify(opts: unknown) {
+      const plan = planOf(opts);
+      const runner = runnersOf(app).get(plan.id);
+      if (runner?.active || runner?.state.status === "running") throw new ApiError("La ejecución está en curso: páusala antes de verificar.");
+      const s = current(plan.id);
+      if (!s) throw new ApiError("No hay una ejecución que verificar.");
+      clearVaultScanCache(); // los archivos pudieron crearse fuera de la app: se vuelve a leer la vault
+      const fresh = reportOf(plan, s.scope);
+      const r = reconcileExecution(s, fresh.tasks, now());
+      execStore().save(r.state);
+      runnersOf(app).delete(plan.id); // el estado guardado manda: el siguiente «Reanudar» crea un runner con él
+      return { execution: view(r.state), verified: r.verified, trimmed: r.trimmed, remaining: r.remaining };
     },
 
     mentor_execution_pause(opts: unknown) {

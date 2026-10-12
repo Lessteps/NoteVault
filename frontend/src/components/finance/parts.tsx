@@ -1,6 +1,6 @@
 // Pieces shared by the Finanzas views.
 
-import { Paperclip, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight, Paperclip, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 import { formatMoney, parseMoney } from "../../lib/money";
 import { todayIso } from "../../lib/tasks";
@@ -152,7 +152,16 @@ export function MovementTable({ rows, withDate }: { rows: GroupedRow[]; withDate
               <span className="truncate text-dim">{categoryText(m)}</span>
               <span className="text-right font-mono" style={{ color: TYPE_COLOURS[m.type] }}>{formatMoney(signed(m), curr, true)}</span>
               <span className="text-faint">{m.attachments.length ? <span className="flex items-center gap-0.5 text-[11px]"><Paperclip size={11} />{m.attachments.length}</span> : ""}</span>
-              <span className="text-faint opacity-0 transition-opacity group-hover:opacity-100"><Pencil size={12} /></span>
+              <span className="flex items-center justify-end text-faint">
+                {open ? (
+                  <ChevronDown size={13} className="text-dim" />
+                ) : (
+                  <span className="flex items-center">
+                    <Pencil size={11} className="mr-1 hidden transition-opacity group-hover:inline opacity-70" />
+                    <ChevronRight size={13} className="text-faint/60 transition-transform group-hover:text-text group-hover:translate-x-0.5" />
+                  </span>
+                )}
+              </span>
             </button>
             {open && (
               <div className="space-y-1.5 px-3 pb-2.5 pt-0.5 text-[12px]">

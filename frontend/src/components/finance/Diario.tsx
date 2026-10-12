@@ -11,7 +11,7 @@ import type { FinCheck, Movement, MovementType } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
 import { BlockProgress } from "../common/charts";
-import { GhostButton, inputBase } from "../common/forms";
+import { GhostButton, inputBase, PrimaryButton } from "../common/forms";
 import { cn, confirmAction } from "../ui";
 import { MoneyInput, MovementTable, Tiles, totals, TYPE_LABELS, type GroupedRow } from "./parts";
 
@@ -146,19 +146,19 @@ export function Diario() {
           className="rounded-xl border border-line bg-card px-6 py-2.5 text-[14px] font-semibold text-text hover:border-line-strong">
           + Nuevo movimiento</button>
       </div>
-      <div className="rounded-xl border border-line bg-card p-3">
-        <div className="flex items-center gap-2">
+      <div className="rounded-xl border border-line bg-card p-3 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Registro rápido</span>
           <select aria-label="Tipo rápido" className={cn(sel, "w-auto")} value={q.type}
             onChange={(e) => setQ({ ...q, type: e.target.value as MovementType, category: "" })}>
             {(["gasto", "ingreso", "ahorro", "retiro"] as const).map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
           </select>
           <MoneyInput label="Importe rápido" value={q.amount} onChange={(amount) => setQ({ ...q, amount })} className="w-32 py-1.5" onEnter={() => void quickSave()} />
-          <input className={cn(sel, "min-w-0 flex-1")} placeholder="Detalle" value={q.what} onChange={(e) => setQ({ ...q, what: e.target.value })}
+          <input className={cn(sel, "min-w-[140px] flex-1")} placeholder="Detalle" value={q.what} onChange={(e) => setQ({ ...q, what: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && void quickSave()} />
           {(q.type === "gasto" || q.type === "ingreso") && (
-            <>
-              <select className={sel} value={q.category} onChange={(e) => setQ({ ...q, category: e.target.value })}>
+            <div className="flex items-center gap-1">
+              <select className={cn(sel, "max-w-[150px]")} value={q.category} onChange={(e) => setQ({ ...q, category: e.target.value })}>
                 <option value="">Sin categoría</option>
                 {(q.type === "gasto" ? expenseCats : incomeCats).map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
               </select>
@@ -167,12 +167,12 @@ export function Diario() {
               <GhostButton title="Crear categoría" onClick={() => setCategoryEditing({ id: "", kind: q.type === "ingreso" ? "ingreso" : "gasto" })}>
                 <Plus size={13} />
               </GhostButton>
-            </>
+            </div>
           )}
           <GhostButton title="Abrir el formulario completo para adjuntar la factura"
             onClick={() => edit({ day, kind: q.type, preset: { type: q.type, amount_cents: q.amount ?? undefined, what: q.what, category: q.category },
               onSaved: () => setQ({ type: q.type, amount: null, what: "", category: q.category }) })}><Paperclip size={13} /></GhostButton>
-          <GhostButton onClick={() => void quickSave()}>Guardar ↵</GhostButton>
+          <PrimaryButton className="py-1 px-3 text-[12.5px]" onClick={() => void quickSave()}>Guardar ↵</PrimaryButton>
         </div>
         <p className="mt-1.5 text-[11px] text-faint">{hint}</p>
       </div>

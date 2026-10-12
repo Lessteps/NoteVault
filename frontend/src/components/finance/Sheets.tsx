@@ -132,6 +132,21 @@ function MonthExtras({ first, list, cats, onSelectCat }: {
     const c = cats.find((x) => x.id === cid);
     return { id: cid, name: `${c ? c.name : "Sin categoría"}: ${formatMoney(v)}`, value: v, colour: c?.colour ?? "#616161" };
   });
+  const MAX_DONUT_SLICES = 6;
+  const displayParts = parts.length <= MAX_DONUT_SLICES ? parts : (() => {
+    const top = parts.slice(0, MAX_DONUT_SLICES);
+    const rest = parts.slice(MAX_DONUT_SLICES);
+    const restVal = rest.reduce((a, b) => a + b.value, 0);
+    return [
+      ...top,
+      {
+        id: "",
+        name: `Otras (${rest.length}): ${formatMoney(restVal)}`,
+        value: restVal,
+        colour: "#71717a",
+      },
+    ];
+  })();
   const cmp = (key: keyof FinTotals, label: string) => {
     if (!extras) return null;
     const a = extras.this[key];
@@ -153,15 +168,22 @@ function MonthExtras({ first, list, cats, onSelectCat }: {
         <Panel title="Gasto por día"><Columns values={spent} labels={days.map((x) => String(Number(x.slice(8))))} colour={TYPE_COLOURS.gasto} format={formatMoney} /></Panel>
         <Panel title="Gasto por categoría">
           <div className="flex items-center gap-4">
-            <Donut parts={parts} size={140} label={formatMoney([...byCat.values()].reduce((a, b) => a + b, 0))} />
+            <Donut parts={displayParts} size={140} label={formatMoney([...byCat.values()].reduce((a, b) => a + b, 0))} />
             <ul className="min-w-0 space-y-0.5 text-[11.5px] text-dim">
-              {parts.slice(0, 7).map((p) => (
+              {displayParts.map((p) => (
                 <li key={p.name} className="flex items-center gap-1.5 truncate">
-                  <button type="button" onClick={() => p.id && onSelectCat?.(p.id)} title="Ver evolución"
-                    className="flex items-center gap-1.5 truncate text-left hover:text-text">
-                    <span className="h-2 w-2 flex-none rounded-sm" style={{ background: p.colour }} />
-                    {p.name}
-                  </button>
+                  {p.id ? (
+                    <button type="button" onClick={() => onSelectCat?.(p.id)} title="Ver evolución"
+                      className="flex items-center gap-1.5 truncate text-left hover:text-text">
+                      <span className="h-2 w-2 flex-none rounded-sm" style={{ background: p.colour }} />
+                      {p.name}
+                    </button>
+                  ) : (
+                    <span className="flex items-center gap-1.5 truncate text-faint">
+                      <span className="h-2 w-2 flex-none rounded-sm" style={{ background: p.colour }} />
+                      {p.name}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

@@ -180,7 +180,10 @@ describe("la fila de un ejercicio", () => {
   });
 
   it("tras un fallo al guardar ofrece reintentar en la fila", async () => {
-    invoke.mockRejectedValueOnce(new Error("Fallo de disco"));
+    invoke.mockImplementation(async (method: string) => {
+      if (method === "ex_mark") throw new Error("Fallo de disco");
+      return { ok: true };
+    });
     const { host, cleanup } = render(
       <ExerciseRow day="2026-10-01" ex={SIN_VIDEO} entry={{}} onChanged={() => undefined} onVideo={() => undefined} />,
     );
@@ -193,6 +196,7 @@ describe("la fila de un ejercicio", () => {
       });
       const retry = host.querySelector("[data-row-retry]") as HTMLButtonElement | null;
       expect(retry).not.toBeNull();
+      invoke.mockImplementation(async () => ({ ok: true }));
       await act(async () => {
         retry!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
         await Promise.resolve();
@@ -288,6 +292,54 @@ describe("la fila de un ejercicio", () => {
       }
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it("muestra la última sesión y al hacer clic autocompleta el peso y reps", async () => {
+    invoke.mockImplementation(async (method: string): Promise<unknown> => {
+      if (method === "ex_history") {
+        return [
+          { date: "2026-09-20", weight: 70, reps: 10 },
+          { date: "2026-09-27", weight: 75, reps: 8 },
+        ];
+      }
+      return { ok: true };
+    });
+
+    const { host, cleanup } = render(
+      <ExerciseRow
+        day="2026-10-01"
+        ex={CON_VIDEO}
+        entry={{}}
+        onChanged={() => undefined}
+        onVideo={() => undefined}
+      />,
+    );
+
+    try {
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const prevBtn = host.querySelector("[data-last-session]");
+      expect(prevBtn).not.toBeNull();
+      expect(prevBtn!.textContent).toContain("75kg");
+      expect(prevBtn!.textContent).toContain("8");
+
+      await act(async () => {
+        prevBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const weightInput = host.querySelector('input[aria-label="Peso: Bench Press"]') as HTMLInputElement;
+      const repsInput = host.querySelector('input[aria-label="Reps: Bench Press"]') as HTMLInputElement;
+      expect(weightInput.value).toBe("75");
+      expect(repsInput.value).toBe("8");
+
+      expect(invoke).toHaveBeenCalledWith("ex_mark", ["2026-10-01", "e1", false, "75", "8", ""]);
+    } finally {
+      cleanup();
     }
   });
 });

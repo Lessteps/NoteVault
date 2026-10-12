@@ -489,6 +489,13 @@ export const api = {
   exLibraryPickVideo: () => call<{ ok: boolean; video_path?: string }>("ex_library_pick_video"),
   exFavorites: () => call<string[]>("ex_favorites"),
   exFavoriteToggle: (slug: string) => call<{ slug: string; on: boolean }>("ex_favorite_toggle", slug),
+  exProfile: () => call<import("../core/exerciseManager").BodyProfile>("ex_profile"),
+  exProfileSave: (updates: Partial<import("../core/exerciseManager").BodyProfile>) =>
+    call<import("../core/exerciseManager").BodyProfile>("ex_profile_save", updates),
+  exWeightAdd: (date: string, weight: number) =>
+    call<import("../core/exerciseManager").BodyProfile>("ex_weight_add", date, weight),
+  exWeightRemove: (date: string) =>
+    call<import("../core/exerciseManager").BodyProfile>("ex_weight_remove", date),
   exVideoUrl: (id: string) => call<{ url: string; name: string }>("ex_video_url", id),
   exOpenVideo: (id: string) => call<{ ok: boolean }>("ex_open_video", id),
   exPickVideo: (id: string) => call<{ ok: boolean }>("ex_pick_video", id),

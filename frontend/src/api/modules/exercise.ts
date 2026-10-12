@@ -787,5 +787,37 @@ export function exerciseApi(app: AppState) {
       }
       return { ok: true as const, video_path: target };
     },
+
+    ex_profile() {
+      return mgr().getProfile();
+    },
+
+    ex_profile_save(updates: Record<string, unknown> = {}) {
+      const valid: Record<string, unknown> = {};
+      if (typeof updates.goal === "string") {
+        valid.goal = updates.goal;
+      }
+      if (updates.goal_note !== undefined) {
+        valid.goal_note = String(updates.goal_note || "");
+      }
+      return mgr().saveProfile(valid);
+    },
+
+    ex_weight_add(date: string, weight: number | string) {
+      const w = Number(weight);
+      if (Number.isNaN(w) || w <= 0 || w > 500) {
+        throw new ApiError("El peso debe ser un número válido en kg (ej. 75.4).");
+      }
+      const iso = String(date || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+        throw new ApiError("La fecha debe estar en formato AAAA-MM-DD.");
+      }
+      return mgr().addWeightEntry(iso, w);
+    },
+
+    ex_weight_remove(date: string) {
+      const iso = String(date || "").trim();
+      return mgr().removeWeightEntry(iso);
+    },
   };
 }

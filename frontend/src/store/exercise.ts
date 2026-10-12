@@ -7,6 +7,7 @@
 import { create } from "zustand";
 import { api } from "../lib/bridge";
 import type { Exercise, ExerciseStats } from "../lib/types";
+import type { BodyProfile } from "../core/exerciseManager";
 
 export interface ExerciseDayMeta {
   key: string;
@@ -19,29 +20,36 @@ interface ExerciseState {
   days: ExerciseDayMeta[];
   list: Exercise[];
   stats: ExerciseStats | null;
+  profile: BodyProfile | null;
   loaded: boolean;
   error: string | null;
   load: () => Promise<void>;
   /** Routine + statistics, after anything that changes what is done. */
   refresh: () => Promise<void>;
   refreshStats: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+  saveProfile: (updates: Partial<BodyProfile>) => Promise<void>;
+  addWeight: (date: string, weight: number) => Promise<void>;
+  removeWeight: (date: string) => Promise<void>;
 }
 
-export const useExercise = create<ExerciseState>((set) => ({
+export const useExercise = create<ExerciseState>((set, get) => ({
   days: [],
   list: [],
   stats: null,
+  profile: null,
   loaded: false,
   error: null,
 
   load: async () => {
     try {
-      const [meta, list, stats] = await Promise.all([
+      const [meta, list, stats, profile] = await Promise.all([
         api.exMeta(),
         api.exList(),
         api.exStats(),
+        api.exProfile(),
       ]);
-      set({ days: meta.days, list, stats, loaded: true, error: null });
+      set({ days: meta.days, list, stats, profile, loaded: true, error: null });
     } catch (e) {
       set({ loaded: true, error: (e as Error).message });
     }
@@ -61,6 +69,44 @@ export const useExercise = create<ExerciseState>((set) => ({
       set({ stats: await api.exStats() });
     } catch (e) {
       set({ error: (e as Error).message });
+    }
+  },
+
+  refreshProfile: async () => {
+    try {
+      set({ profile: await api.exProfile() });
+    } catch (e) {
+      set({ error: (e as Error).message });
+    }
+  },
+
+  saveProfile: async (updates) => {
+    try {
+      const updated = await api.exProfileSave(updates);
+      set({ profile: updated, error: null });
+    } catch (e) {
+      set({ error: (e as Error).message });
+      throw e;
+    }
+  },
+
+  addWeight: async (date, weight) => {
+    try {
+      const updated = await api.exWeightAdd(date, weight);
+      set({ profile: updated, error: null });
+    } catch (e) {
+      set({ error: (e as Error).message });
+      throw e;
+    }
+  },
+
+  removeWeight: async (date) => {
+    try {
+      const updated = await api.exWeightRemove(date);
+      set({ profile: updated, error: null });
+    } catch (e) {
+      set({ error: (e as Error).message });
+      throw e;
     }
   },
 }));

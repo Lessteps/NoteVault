@@ -129,6 +129,6 @@ describe("Recurrents", () => {
     const text = host!.textContent ?? "";
     expect(text).toContain("Fijos al mes");
     // -800.000 + 30 × 10.000 = -500.000.
-    expect(text).toContain("500.000");
+    expect(text).toContain("500,000.00");
   });
 });

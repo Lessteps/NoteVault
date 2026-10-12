@@ -10,7 +10,6 @@ import {
 import { Recurrence } from "../../core/recurrence.js";
 import { newId } from "../../core/store.js";
 import {
-  DEFAULT_CURRENCY,
   FINANCE_GOAL_STATUSES,
   MOVEMENT_TYPES,
 } from "../../core/vaultFormat.js";
@@ -214,7 +213,7 @@ export function financeApi(app: AppState) {
         type_labels: TYPE_LABELS,
         type_colours: TYPE_COLOURS,
         goal_statuses: [...FINANCE_GOAL_STATUSES],
-        currency: DEFAULT_CURRENCY,
+        currency: fm.currency(),
         categories: fm.categories(null, true),
         goals: fm.goals(),
       };

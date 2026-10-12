@@ -1,8 +1,8 @@
 // Money in integer cents: parse what people type, format like the classic app.
 
-/** "12.500", "12500", "12,5k", "$ 1.200.000", "3,5M", "12500,50" -> cents (null if unreadable). */
+/** "12.50", "1,250.50", "1250", "12,5k", "$ 1,200.00", "3.5M", "12500,50" -> cents (null if unreadable). */
 export function parseMoney(text: string): number | null {
-  let t = (text ?? "").trim().toLowerCase().replace(/\$/g, "").replace(/cop/g, "").replace(/\s/g, "");
+  let t = (text ?? "").trim().toLowerCase().replace(/\$/g, "").replace(/usd/g, "").replace(/cop/g, "").replace(/\s/g, "");
   if (!t) return null;
   let mult = 1;
   if (t.endsWith("k")) {
@@ -13,29 +13,67 @@ export function parseMoney(text: string): number | null {
     t = t.slice(0, -1);
   }
   if (!/^[\d.,]+$/.test(t)) return null;
+
   if (mult > 1) {
     if ((t.match(/[.,]/g) ?? []).length > 1) return null;
     const v = Number(t.replace(",", "."));
     return Number.isFinite(v) ? Math.round(v * mult * 100) : null;
   }
-  // Thousands use "." in Spanish; a trailing ",dd" is cents.
-  let m = /^([\d.]+)(?:,(\d{1,2}))?$/.exec(t);
-  if (m && (!m[1]!.includes(".") || /^\d{1,3}(\.\d{3})+$/.test(m[1]!))) {
-    return Number(m[1]!.replace(/\./g, "")) * 100 + Number((m[2] ?? "0").padEnd(2, "0"));
+
+  // Standard US: thousands commas, decimal dot ("1,250.50", "1,250")
+  if (/^\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(t)) {
+    const [whole, centsPart] = t.split(".");
+    const dollars = Number(whole!.replace(/,/g, ""));
+    const cents = Number((centsPart ?? "0").padEnd(2, "0"));
+    return dollars * 100 + cents;
   }
-  m = /^(\d+)\.(\d{1,2})$/.exec(t); // 12.5 typed English-style
-  if (m) return Number(m[1]) * 100 + Number(m[2]!.padEnd(2, "0"));
-  if (/^\d{1,3}(,\d{3})+$/.test(t)) return Number(t.replace(/,/g, "")) * 100;
+
+  // Pure number with decimal dot: "12.50", "12.5", "0.99"
+  if (/^\d+\.\d{1,2}$/.test(t)) {
+    const [whole, centsPart] = t.split(".");
+    return Number(whole) * 100 + Number(centsPart!.padEnd(2, "0"));
+  }
+
+  // Comma as decimal separator: "12,50", "12,5", "1250,50"
+  if (/^\d+,\d{1,2}$/.test(t)) {
+    const [whole, centsPart] = t.split(",");
+    return Number(whole) * 100 + Number(centsPart!.padEnd(2, "0"));
+  }
+
+  // European/Spanish dot thousands with comma decimal: "1.250,50", "1.250"
+  if (/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(t)) {
+    const [whole, centsPart] = t.split(",");
+    const dollars = Number(whole!.replace(/\./g, ""));
+    const cents = Number((centsPart ?? "0").padEnd(2, "0"));
+    return dollars * 100 + cents;
+  }
+
+  // Plain integer dollars: "12", "1250"
+  if (/^\d+$/.test(t)) {
+    return Number(t) * 100;
+  }
+
   return null;
 }
 
-/** "$ 12.500" for COP (no decimals, dot thousands); "$ 12,50" otherwise. */
-export function formatMoney(cents: number | null | undefined, currency = "COP", sign = false): string {
+/** "$ 1,250.00" / "$ 12.50" for USD; "$ 12.500" for COP (no decimals, dot thousands). */
+export function formatMoney(
+  cents: number | null | undefined,
+  currencyOrSign?: string | boolean,
+  sign = false,
+): string {
+  const curr = typeof currencyOrSign === "string" ? currencyOrSign : "USD";
+  const withSign = typeof currencyOrSign === "boolean" ? currencyOrSign : sign;
   let c = Math.trunc(cents ?? 0);
   const neg = c < 0;
   c = Math.abs(c);
-  const group = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  const text = currency === "COP" ? group(Math.floor((c + 50) / 100)) : `${group(Math.floor(c / 100))},${String(c % 100).padStart(2, "0")}`;
-  const prefix = neg ? "-" : sign && c ? "+" : "";
-  return `${prefix}$ ${text}`;
+  const prefix = neg ? "-" : withSign && c ? "+" : "";
+  if (curr === "COP") {
+    const group = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return `${prefix}$ ${group(Math.floor((c + 50) / 100))}`;
+  }
+  const dollars = Math.floor(c / 100);
+  const centsPart = c % 100;
+  const group = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${prefix}$ ${group(dollars)}.${String(centsPart).padStart(2, "0")}`;
 }

@@ -327,7 +327,7 @@ export function HomeModule() {
             </div>
             <div className="my-1.5 flex items-baseline">
               <span className="text-2xl font-bold tracking-tight text-white">
-                {formatMoney(monthBalance !== 0 ? Math.abs(monthBalance) : 342000, "COP", false)}
+                {formatMoney(monthBalance !== 0 ? Math.abs(monthBalance) : 342000)}
               </span>
               <span className="ml-1.5 text-xs font-medium text-slate-400">Ahorro/Mes</span>
             </div>

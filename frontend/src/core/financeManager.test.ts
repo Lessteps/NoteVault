@@ -48,7 +48,7 @@ describe("FinanceManager", () => {
             id: m.id,
             type: "gasto",
             amount_cents: 1250000,
-            currency: "COP",
+            currency: "USD",
             category: "comida",
             what: "Almuerzo",
             reason: "Oficina",
@@ -194,10 +194,11 @@ describe("FinanceManager", () => {
     });
 
     it("money format", () => {
-      expect(formatMoney(1250000)).toBe("$ 12.500");
-      expect(formatMoney(-120000000)).toBe("-$ 1.200.000");
-      expect(formatMoney(1250, "USD")).toBe("$ 12,50");
-      expect(formatMoney(0)).toBe("$ 0");
+      expect(formatMoney(1250000)).toBe("$ 12,500.00");
+      expect(formatMoney(-120000000)).toBe("-$ 1,200,000.00");
+      expect(formatMoney(1250, "USD")).toBe("$ 12.50");
+      expect(formatMoney(0)).toBe("$ 0.00");
+      expect(formatMoney(1250000, "COP")).toBe("$ 12.500");
     });
   });
 

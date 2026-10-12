@@ -823,8 +823,21 @@ export class FinanceManager {
 
   setBudgetMonth(cents: number): number {
     const v = Math.abs(cleanInt(cents));
-    writeJson(this.settingsPath(), { month_budget_cents: v });
+    const existing = loadJson<Record<string, any>>(this.settingsPath()) || {};
+    writeJson(this.settingsPath(), { ...existing, month_budget_cents: v });
     return v;
+  }
+
+  currency(): string {
+    const data = loadJson<{ currency?: unknown }>(this.settingsPath());
+    return String(data?.currency || DEFAULT_CURRENCY);
+  }
+
+  setCurrency(curr: string): string {
+    const c = String(curr || DEFAULT_CURRENCY).toUpperCase().trim();
+    const existing = loadJson<Record<string, any>>(this.settingsPath()) || {};
+    writeJson(this.settingsPath(), { ...existing, currency: c });
+    return c;
   }
 
   recurrentsPath(): string {

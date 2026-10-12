@@ -144,10 +144,10 @@ describe("CategoryMatrix", () => {
     expect(text).toContain("Gasto");
     expect(text).toContain("Ingreso");
     expect(text).not.toContain("Sin movimientos");
-    expect(text).toContain("12.500");
-    expect(text).toContain("50.000");
+    expect(text).toContain("12,500.00");
+    expect(text).toContain("50,000.00");
     // Neto = 50.000 − 12.500, no la suma bruta.
     expect(text).toContain("NETO");
-    expect(text).toContain("37.500");
+    expect(text).toContain("37,500.00");
   });
 });

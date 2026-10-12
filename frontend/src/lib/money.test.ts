@@ -10,16 +10,22 @@ describe("money", () => {
     expect(parseMoney("3,5M")).toBe(350_000_000);
     expect(parseMoney("12500,50")).toBe(1_250_050);
     expect(parseMoney("12.5")).toBe(1250);
+    expect(parseMoney("12.50")).toBe(1250);
+    expect(parseMoney("1,250.50")).toBe(125_050);
+    expect(parseMoney("$ 1,250.00")).toBe(125_000);
     expect(parseMoney("12,500")).toBe(1_250_000);
     expect(parseMoney("")).toBeNull();
     expect(parseMoney("doce")).toBeNull();
     expect(parseMoney("1.2.3k")).toBeNull();
   });
   it("formats like the classic app", () => {
-    expect(formatMoney(1_250_000)).toBe("$ 12.500");
-    expect(formatMoney(-1_250_000)).toBe("-$ 12.500");
+    expect(formatMoney(1_250_000)).toBe("$ 12,500.00");
+    expect(formatMoney(-1_250_000)).toBe("-$ 12,500.00");
+    expect(formatMoney(1250, "USD")).toBe("$ 12.50");
+    expect(formatMoney(100, "USD", true)).toBe("+$ 1.00");
+    expect(formatMoney(0, "USD", true)).toBe("$ 0.00");
+    expect(formatMoney(1_250_000, "COP")).toBe("$ 12.500");
     expect(formatMoney(100, "COP", true)).toBe("+$ 1");
-    expect(formatMoney(1250, "USD")).toBe("$ 12,50");
     expect(formatMoney(0, "COP", true)).toBe("$ 0");
   });
 });

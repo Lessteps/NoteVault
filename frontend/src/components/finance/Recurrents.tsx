@@ -175,6 +175,7 @@ export function RecurringDialog() {
 }
 
 export function Recurrents() {
+  const meta = useFinance((s) => s.meta);
   const setEditing = useFinance((s) => s.setRecurringEditing);
   const version = useFinance((s) => s.version);
   const toast = useApp((s) => s.toast);
@@ -195,7 +196,7 @@ export function Recurrents() {
       </div>
       <p className="text-[12px] text-faint">Arriendo, salario, suscripciones: se materializan solos al abrir Finanzas.</p>
       {(list?.length ?? 0) > 0 && (
-        <p className="text-[13px] text-text">Fijos al mes: <b className="font-mono">{formatMoney(netMonth, "COP", true)}</b></p>
+        <p className="text-[13px] text-text">Fijos al mes: <b className="font-mono">{formatMoney(netMonth, meta?.currency, true)}</b></p>
       )}
       {!list?.length && <p className="py-10 text-center text-[13px] text-faint">Nada que se repita. Crea el arriendo, por ejemplo.</p>}
       <div className="divide-y divide-line rounded-xl border border-line bg-card">
@@ -205,7 +206,7 @@ export function Recurrents() {
             <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: TYPE_COLOURS[r.type] }} />
             <span className="min-w-0 flex-1 truncate text-[13px] text-text">{r.what || "—"}</span>
             <span className="text-[11.5px] text-faint">{ruleText(r.rule)}</span>
-            <span className="font-mono text-[12.5px] text-text">{formatMoney(r.amount_cents, "COP", true)}</span>
+            <span className="font-mono text-[12.5px] text-text">{formatMoney(r.amount_cents, meta?.currency, true)}</span>
             {r.archived && <span className="text-[11px] text-faint">pausado</span>}
             <span className="text-faint"><Pencil size={12} /></span>
           </button>

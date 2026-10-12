@@ -68,6 +68,7 @@ function groupedRows(list: Movement[]): GroupedRow[] {
 export function CategoryMatrix({ list, columns, keyOf, cats }: {
   list: Movement[]; columns: Array<[string, string]>; keyOf: (m: Movement) => string; cats: FinCategory[];
 }) {
+  const curr = useFinance((s) => s.meta?.currency);
   const rows = new Map<string, { type: string; category: string; cells: Record<string, number> }>();
   for (const m of list) {
     const k = `${m.type}:${m.category ?? ""}`;
@@ -102,9 +103,9 @@ export function CategoryMatrix({ list, columns, keyOf, cats }: {
             <span>NETO</span>
             {columns.map(([k]) => {
               const v = colNet(k);
-              return <span key={k} className="text-right font-mono" style={{ color: v >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(v, "COP", true)}</span>;
+              return <span key={k} className="text-right font-mono" style={{ color: v >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(v, curr, true)}</span>;
             })}
-            <span className="text-right font-mono" style={{ color: grand >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(grand, "COP", true)}</span>
+            <span className="text-right font-mono" style={{ color: grand >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(grand, curr, true)}</span>
           </div>
         );
       })()}
@@ -271,6 +272,7 @@ export function monthlyAverages(ms: Movement[]): { n: number; gasto: number; ing
 /** Proyección a 3 meses: promedio de los meses cerrados con datos + recurrentes activos. */
 export function Projection3m() {
   const version = useFinance((s) => s.version);
+  const curr = useFinance((s) => s.meta?.currency);
   const [proj, setProj] = useState<{
     baseGasto: number; baseIngreso: number; basis: number; hasRec: boolean;
     recFor: (firstDay: string, lastDay: string) => { rg: number; ri: number; ro: number };
@@ -324,7 +326,7 @@ export function Projection3m() {
               return (
                 <div key={d.toISOString()} className="flex items-center gap-2 text-[12.5px]">
                   <span className="w-24 capitalize text-dim">{MONTHS_ES[d.getMonth()]}</span>
-                  <span className="font-mono text-text">{formatMoney(net, "COP", true)}</span>
+                  <span className="font-mono text-text">{formatMoney(net, curr, true)}</span>
                   <span className="text-[11px] text-faint">≈ {formatMoney(ingreso)} − {formatMoney(gasto)}</span>
                 </div>
               );
@@ -480,7 +482,7 @@ export function Sheet() {
                     <span className="text-right font-mono" style={{ color: TYPE_COLOURS.ingreso }}>{formatMoney(r.ingreso)}</span>
                     <span className="text-right font-mono" style={{ color: TYPE_COLOURS.ahorro }}>{formatMoney(r.ahorro)}</span>
                     <span className="text-right font-mono" style={{ color: TYPE_COLOURS.retiro }}>{formatMoney(r.retiro)}</span>
-                    <span className="text-right font-mono" style={{ color: r.balance >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(r.balance, "COP", true)}</span>
+                    <span className="text-right font-mono" style={{ color: r.balance >= 0 ? "var(--nv-mint)" : "var(--nv-danger)" }}>{formatMoney(r.balance, meta?.currency, true)}</span>
                   </div>
                 ))}
               </div>

@@ -214,7 +214,7 @@ export const MOVEMENT_KEYS = [
   "what", "reason", "time", "attachments", "created",
 ] as const;
 
-export const DEFAULT_CURRENCY = "COP";
+export const DEFAULT_CURRENCY = "USD";
 
 export const ATTACHMENT_EXTS = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".pdf"] as const;
 

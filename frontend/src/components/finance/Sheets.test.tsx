@@ -157,7 +157,7 @@ describe("Sheet (Periodo)", () => {
     finRecurringList.mockResolvedValueOnce([rec("")]);
     await mount();
     await click("Año");
-    expect(host!.textContent ?? "").toContain("800.000");
+    expect(host!.textContent ?? "").toContain("800,000.00");
     expect(host!.textContent ?? "").toContain("Proyección 3 meses");
   });
 
@@ -168,7 +168,7 @@ describe("Sheet (Periodo)", () => {
     }]);
     await mount();
     await click("Año");
-    expect(host!.textContent ?? "").not.toContain("800.000");
+    expect(host!.textContent ?? "").not.toContain("800,000.00");
   });
 });
 

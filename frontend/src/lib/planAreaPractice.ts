@@ -29,6 +29,18 @@ export interface AreaPracticeSystem {
 }
 
 export const AREA_PRACTICE: Readonly<Record<string, AreaPracticeSystem>> = {
+  logic: {
+    areaId: "logic",
+    name: "Problemas de entrevista por patrón y dificultad",
+    daily: {
+      summary: "Cada día resuelves un problema realista (como los de LeetCode o HackerRank, pero ligado a un caso de negocio) sin importar el lenguaje: lo planteas, escribes el razonamiento, lo resuelves y analizas su coste.",
+      examples: ["Eliminar duplicados en una pasada", "Encontrar el par que suma un objetivo", "La ventana más larga bajo un límite", "Ordenar dependencias y detectar un ciclo"],
+    },
+    weekly: { summary: "Un simulacro de entrevista: una serie de problemas de la semana, mezclando patrones, con tiempo limitado y explicando cada solución en voz alta.", title: "Simulacro de entrevista" },
+    monthly: { summary: "Un cuaderno propio con los problemas del mes por patrón, con su razonamiento, su complejidad y los errores que cometiste.", title: "Cuaderno de problemas resueltos" },
+    measure: "Problemas resueltos sin ayuda por patrón y dificultad, con su razonamiento, su complejidad y sus casos límite.",
+    languages: ["Cualquier lenguaje"],
+  },
   frontend: {
     areaId: "frontend",
     name: "Componentes con Atomic Design",
@@ -249,6 +261,18 @@ export interface AreaSkill {
 }
 
 export const AREA_SKILLS: Readonly<Record<string, readonly AreaSkill[]>> = {
+  logic: [
+    { id: "problem_framing", name: "Framing the problem", why: "Most failed interviews fail before the first line: the problem was not understood.", measure: "Inputs, outputs, examples and edge cases are written down before any code, and the assumptions are stated.", levels: ["write two examples and the empty case for a simple request", "turn a business rule into a precise contract with invalid input defined", "find the ambiguities of a vague requirement and test each assumption"] },
+    { id: "arrays_strings", name: "Arrays and strings", why: "Lists and text are in almost every question; clean single-pass solutions show control.", measure: "A correct single-pass solution with the invariant explained and the empty and one-element cases handled.", levels: ["remove duplicates or count in one pass", "find a block or a pair with a property in one pass", "normalise and group text and justify the cost"] },
+    { id: "hashing_counting", name: "Hashing and counting", why: "A map turns a quadratic search into a linear one; it is the most useful trade of memory for time.", measure: "The lookup is constant time, duplicates and self-pairs are handled, and the memory cost is stated.", levels: ["count frequencies and order them", "find a pair or a missing element in one pass", "compare two collections by multiplicity reading each once"] },
+    { id: "two_pointers_window", name: "Two pointers and sliding window", why: "It solves many array problems in linear time with constant memory.", measure: "Both pointers only move forward (or inward), the window invariant is stated and the cost is linear.", levels: ["find a pair in a sorted list", "find the longest run under a limit", "keep a moving window over a stream with bounded memory"] },
+    { id: "sorting_searching", name: "Sorting and binary search", why: "Knowing when order buys speed — and binary search on the answer — separates juniors from strong candidates.", measure: "The ordering criterion is explicit and stable, and the search space and its midpoint rule are correct.", levels: ["order by two keys and explain stability", "search in a rotated or partially ordered list", "binary search on the answer with a feasibility check"] },
+    { id: "recursion_backtracking", name: "Recursion and backtracking", why: "Recursion is how trees, combinations and many search problems are expressed.", measure: "Base case, recursive case and progress toward the base are named; duplicates and pruning are handled.", levels: ["define a recursive function with its base case", "generate combinations without repeating sets", "enumerate with pruning and justify it"] },
+    { id: "stacks_queues", name: "Stacks and queues", why: "They model nesting and ordering; many bugs are a wrong choice between them.", measure: "The right structure is chosen and justified, and operations are constant time.", levels: ["validate balanced brackets", "match start and finish events in order", "design a stack that returns its minimum in constant time"] },
+    { id: "trees_graphs", name: "Trees and graphs", why: "Real data is hierarchical or networked: categories, dependencies, routes.", measure: "The traversal fits the question (depth or breadth), visited nodes are tracked and cycles are handled.", levels: ["walk a tree and compute its depth", "order dependencies and detect a cycle", "shortest path on a grid with obstacles"] },
+    { id: "dynamic_programming", name: "Dynamic programming", why: "It is the hardest pattern to see; recognising overlapping subproblems is a clear signal of level.", measure: "State, recurrence and base cases are defined before coding, and the table meaning is explained.", levels: ["write the recurrence of a counting problem", "optimise with a table (coins, knapsack style)", "reconstruct the solution and reduce the memory"] },
+    { id: "complexity_analysis", name: "Complexity and trade-offs", why: "Explaining why a solution scales is half of every interview answer.", measure: "Time and space are correct, justified and tied to concrete input sizes, and one alternative is compared.", levels: ["state the cost of simple loops", "choose between two solutions by constraints", "predict the time at larger sizes and say what to measure"] },
+  ],
   backend: [
     { id: "endpoint_design", name: "Endpoint design", why: "An API is a contract: resources, verbs, status codes and pagination decide whether clients can use it without guessing.", measure: "The endpoint list, request and response shapes and status codes match the stated rules.", levels: ["name resources and pick the right verb and status code", "paginate, filter and version a collection", "design for backwards compatibility and partial updates"] },
     { id: "validation_errors", name: "Validation and error contracts", why: "Most production bugs start with input nobody validated and errors nobody could read.", measure: "Every invalid input gets a stable error shape and the right 4xx code; nothing invalid reaches the service layer.", levels: ["reject missing and wrongly typed fields", "report all field errors at once with a stable shape", "separate validation, business and infrastructure errors"] },
@@ -397,6 +421,14 @@ export function dailyBreakdown(areaIds: readonly string[], topics: readonly stri
       case "mobile":
         out.push({ areaId: id, area, what: `Una pantalla móvil para «${first}» que funciona sin conexión.`, how: ["Guarda lo necesario en almacenamiento local.", "Muestra el estado sin red.", "Sincroniza al volver la conexión."], result: "Con el modo avión activado la pantalla sigue mostrando los datos guardados." });
         break;
+      case "logic":
+        out.push({
+          areaId: id, area,
+          what: `Un problema de lógica ligado a la pieza del día: validar, ordenar, contar o buscar algo en los datos de «${first}», resuelto sin depender del lenguaje.`,
+          how: ["Escribe el problema con dos ejemplos y el caso vacío antes de programar.", "Elige el patrón (mapa, dos punteros, orden, recursión…) y di por qué.", "Resuélvelo y anota su coste en tiempo y memoria."],
+          result: "Tienes la función con pruebas del caso normal, el vacío y uno límite, y la complejidad escrita en el README.",
+        });
+        break;
       default:
         out.push({ areaId: id, area, what: `Una pieza pequeña de ${area} aplicando ${t}.`, how: ["Define qué entrega la pieza.", "Constrúyela en un paso verificable.", "Comprueba el resultado con un comando o una captura."], result: "Puedes enseñar el resultado funcionando." });
     }
@@ -449,6 +481,14 @@ export function weeklyBreakdown(areaIds: readonly string[], week: number, pieces
           what: "Una tarea automática de la semana (importación, copia de seguridad o reporte) con reintentos y registro.",
           how: ["Idempotente y con reintentos con espera creciente.", "Registro estructurado de lo procesado y de los fallos.", "Programada o disparada por un comando documentado."],
           result: "La ejecutas con datos reales, fuerzas un fallo y muestras el log con el reintento y el estado final correcto.",
+        });
+        break;
+      case "logic":
+        out.push({
+          areaId: id, area,
+          what: `Un simulacro de entrevista con los problemas de la semana: al menos tres, de patrones distintos y con una dificultad en aumento, resueltos con tiempo limitado.`,
+          how: ["Fija un tiempo por problema (20–30 min) y respétalo.", "Para cada uno: planteamiento, ejemplos, solución, coste y casos límite.", "Repasa los que fallaste y escribe el patrón que te faltó."],
+          result: "Un cuaderno con los problemas resueltos y, de cada uno, su razonamiento, su complejidad y el error que cometiste; al menos uno de nivel difícil sin ayuda.",
         });
         break;
       default:

@@ -412,9 +412,11 @@ export const branchAllowed = (branches: PlanPreconditions["branches"], area: str
 
 // ── Ramas de una materia: presets «Full stack web», «Backend»… (clasificación por nombre, tratada como datos) ──
 
-export type BranchClass = "fundamentals" | "language" | "backend" | "frontend" | "databases" | "desktop" | "mobile" | "automation" | "tooling" | "other";
+export type BranchClass = "fundamentals" | "language" | "logic" | "backend" | "frontend" | "databases" | "desktop" | "mobile" | "automation" | "tooling" | "other";
 const foldText = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const CLASS_RULES: Array<[BranchClass, RegExp]> = [
+  // entrenamiento de resolución de problemas (independiente del lenguaje): «Programming Logic», «Lógica de programación», «Problem solving»
+  ["logic", /^(programming logic|logica de programacion|logica|problem solving|resolucion de problemas|algorithmic)/],
   ["desktop", /desktop|electron|escritorio/],
   ["mobile", /mobile|movil|android|\bios\b|flutter|react native/],
   ["automation", /automat/],
@@ -432,7 +434,7 @@ export function classifyBranch(name: string): BranchClass {
 }
 
 export const BRANCH_PRESETS = [
-  { key: "fullstack", label: "Full stack web", classes: ["fundamentals", "language", "backend", "frontend", "databases", "tooling"] },
+  { key: "fullstack", label: "Full stack web", classes: ["fundamentals", "language", "logic", "backend", "frontend", "databases", "tooling"] },
   { key: "backend", label: "Backend", classes: ["fundamentals", "language", "backend", "databases", "tooling"] },
   { key: "frontend", label: "Frontend", classes: ["fundamentals", "language", "frontend", "tooling"] },
   { key: "desktop", label: "Desktop", classes: ["fundamentals", "language", "desktop", "tooling"] },

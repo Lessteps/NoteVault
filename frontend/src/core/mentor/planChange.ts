@@ -972,7 +972,7 @@ export const CHANGE_SYSTEM = [
   '- {"op":"move_topic_area","folder":"<carpeta del plan>","to":"<id del área destino>"}',
   '- {"op":"move_group","subplan":"<id del área origen>","group":"<id del grupo>","to":"<id del área destino>"}',
   '- {"op":"remove_subplan","subplan":"<id>"}  (quita un área entera)',
-  '- {"op":"add_area","areaId":"backend|frontend|databases|automation|tooling|desktop|mobile"}',
+  '- {"op":"add_area","areaId":"backend|frontend|databases|logic|automation|tooling|desktop|mobile"}',
   '- {"op":"set_area_order","order":["<id de área>", ...]}  (p. ej. «más SQL antes del backend»: Databases antes que Backend)',
   '- {"op":"set_phase","subplan":"<id>","fromWeek":n,"toWeek":n}  (cambia las semanas activas de un área)',
   '- {"op":"add_subplan","area":string,"objective":string,"folders":["<carpeta del catálogo>"]}  (los temas se reparten en sus áreas)',

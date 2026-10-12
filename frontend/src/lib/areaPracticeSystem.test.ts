@@ -189,3 +189,49 @@ describe("todas las áreas desde el día 1 (solo Automation puede empezar más t
     expect(wk3.find((d) => d.areaId === "frontend")!.day).toBe(11);
   });
 });
+
+describe("área de lógica de programación: problemas de entrevista por nivel", () => {
+  const ids = ["problem_framing", "arrays_strings", "hashing_counting", "two_pointers_window", "sorting_searching", "recursion_backtracking", "stacks_queues", "trees_graphs", "dynamic_programming", "complexity_analysis"];
+
+  it("tiene sus diez habilidades y cada día de kata rota por ellas, sin depender de un lenguaje", () => {
+    const sys = areaPracticeSystem("logic")!;
+    expect(sys.skills.map((x) => x.id)).toEqual(ids);
+    expect(sys.folder).toBe("programming-logic");
+    expect(sys.languages).toEqual(["Cualquier lenguaje"]);
+    expect(Array.from({ length: 10 }, (_, i) => kataForDay("logic", i + 1, 1)!.skillId)).toEqual(ids);
+    expect(kataForDay("logic", 11, 1)!.skillId).toBe("problem_framing");
+  });
+
+  it("el MISMO día cambia el problema según el nivel: fácil, medio y difícil", () => {
+    for (let d = 1; d <= 10; d++) {
+      const [e, m, h] = [1, 2, 3].map((l) => kataForDay("logic", d, l)!);
+      if (d % 7 === 0) {
+        // cada 7.º kata es un reto: un nivel por encima del habitual (el difícil no puede subir más)
+        expect([e!.level, m!.level, h!.level]).toEqual([2, 3, 3]);
+        expect(e!.statement).toContain("Stretch kata");
+        continue;
+      }
+      expect(new Set([e!.statement, m!.statement, h!.statement]).size).toBe(3);
+      expect([e!.level, m!.level, h!.level]).toEqual([1, 2, 3]);
+      expect([e!.minutes, m!.minutes, h!.minutes]).toEqual([20, 25, 30]);
+      // todos traen enunciado, solución, pistas y errores típicos
+      expect(e!.solution.length).toBeGreaterThan(40);
+      expect(e!.hints).toHaveLength(2);
+      expect(e!.typicalErrors).toHaveLength(2);
+    }
+  });
+
+  it("los katas de las demás áreas siguen igual para los tres niveles (misma tarea, cambia solo lo que pide el nivel)", () => {
+    const [a, b] = [1, 3].map((l) => kataForDay("backend", 1, l)!);
+    expect(a!.statement.split("**This level asks you to:**")[0]!.replace(/\(\w+\)/, "")).toBe(b!.statement.split("**This level asks you to:**")[0]!.replace(/\(\w+\)/, ""));
+  });
+
+  it("su carpeta lleva README, programming-logic.practica.md con las habilidades y los katas bajo katas/", () => {
+    const files = areaFiles("logic", { katasPerArea: 2 });
+    expect(files.map((f) => f.rel).slice(0, 2)).toEqual(["programming-logic/README.md", "programming-logic/programming-logic.practica.md"]);
+    const practica = files.find((f) => f.kind === "practica")!;
+    expect(practica.content).toContain('skills: ["pp_kata:logic"]');
+    expect(practica.content).toContain("Dynamic programming");
+    expect(files.filter((f) => f.kind === "kata")).toHaveLength(2);
+  });
+});

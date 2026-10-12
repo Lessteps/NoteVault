@@ -137,6 +137,19 @@ export const AREA_DEFS: readonly AreaDef[] = [
     },
   },
   {
+    id: "logic",
+    name: "Lógica de programación",
+    objective: "Entrenar la resolución de problemas y las habilidades de entrevista, sin importar el lenguaje",
+    knowledgeTitle: "Problemas y patrones",
+    goalRe: /l[oó]gica|algoritm|entrevista|leetcode|hackerrank|resoluci[oó]n de problemas|problem solving/,
+    focus: "resolución de problemas",
+    deliverable: {
+      title: "Carpeta de problemas resueltos con su análisis",
+      description: "Un conjunto de problemas de entrevista resueltos por patrón y dificultad, cada uno con su razonamiento, su complejidad y sus casos límite.",
+      criteria: ["Cada problema tiene ejemplos y casos límite probados", "Indica la complejidad en tiempo y espacio y por qué", "Hay al menos un problema difícil resuelto sin ayuda"],
+    },
+  },
+  {
     id: "tooling",
     name: "Tooling and Quality",
     objective: "Trabajar con Git, pruebas y calidad de código",
@@ -178,7 +191,7 @@ export const AREA_DEFS: readonly AreaDef[] = [
 ];
 
 /** Orden de secuencia por defecto (lo que va antes en el plan). */
-export const SEQUENCE_ORDER: readonly string[] = ["backend", "databases", "frontend", "automation", "tooling", "desktop", "mobile"];
+export const SEQUENCE_ORDER: readonly string[] = ["backend", "databases", "frontend", "logic", "automation", "tooling", "desktop", "mobile"];
 export const MAX_PARALLEL_AREAS = 2;
 
 const AREA_BY_ID = new Map(AREA_DEFS.map((a) => [a.id, a]));
@@ -199,6 +212,7 @@ export const BRANCH_AREA_TABLE: ReadonlyArray<{ klass: BranchClass; areaId: stri
   { klass: "databases", areaId: "databases" },
   { klass: "automation", areaId: "automation" },
   { klass: "tooling", areaId: "tooling" },
+  { klass: "logic", areaId: "logic" },
   { klass: "desktop", areaId: "desktop" },
   { klass: "mobile", areaId: "mobile" },
 ];

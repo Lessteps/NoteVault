@@ -131,7 +131,7 @@ describe("modo por defecto", () => {
 
 describe("orden fijo de las áreas", () => {
   it("Backend · Frontend · Databases · Tooling and Quality · Automation, aunque el plan las guarde en otro orden", () => {
-    expect(AREA_DISPLAY_ORDER.slice(0, 5)).toEqual(["backend", "frontend", "databases", "tooling", "automation"]);
+    expect(AREA_DISPLAY_ORDER.slice(0, 6)).toEqual(["backend", "frontend", "databases", "logic", "tooling", "automation"]);
     const p = phasedPlan();
     expect(p.subplans.map((s) => s.areaId)).toEqual(["backend", "databases", "frontend", "automation", "tooling"]);
     expect(orderedAreas(p).map((a) => a.areaId)).toEqual(["backend", "frontend", "databases", "tooling", "automation"]);

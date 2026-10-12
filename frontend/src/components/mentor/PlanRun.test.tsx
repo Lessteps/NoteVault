@@ -302,3 +302,44 @@ describe("pestaña «Mi plan»: secciones, tabla de contenido y aviso de lo que 
   });
 });
 
+describe("área «Lógica de programación» y proyecto semanal", () => {
+  const areasPlan = (extra: unknown[] = []) =>
+    plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }, { ...sub("s2", "Databases", "Consolidar", F2), areaId: "databases" }, ...extra] as never });
+
+  it("un plan por áreas sin lógica ofrece añadirla y lo hace con la operación add_area", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(areasPlan()));
+    vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue({ loading: false, coverage: { areas: [], totals: { topics: 2, theory: 2, practice: 2, outOfPlan: 0 }, ppReady: true }, review: null, aiConfigured: true } as never);
+    const change = vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, applied: true, plan: areasPlan(), entry: { changed: ["logic"], summary: "ok" } } as never);
+    useNavState.setState({ values: { [planModeKey(PID)]: "plan" } });
+    await mountEl(<MentorPlan planId={PID} />);
+    const offer = byTest("add-logic-area")!;
+    expect(offer.textContent).toContain("Lógica de programación");
+    await click(byTest("add-logic-btn"));
+    expect(change).toHaveBeenCalledWith(expect.objectContaining({ id: PID, ops: [{ op: "add_area", areaId: "logic" }] }));
+  });
+
+  it("si el plan ya tiene el área no se ofrece", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(areasPlan([{ ...sub("s3", "Lógica de programación", "Problemas", F1), areaId: "logic" }])));
+    vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue({ loading: false, coverage: { areas: [], totals: { topics: 3, theory: 3, practice: 3, outOfPlan: 0 }, ppReady: true }, review: null, aiConfigured: true } as never);
+    useNavState.setState({ values: { [planModeKey(PID)]: "plan" } });
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(byTest("add-logic-area")).toBeNull();
+  });
+
+  it("el proyecto full stack de programming_practice va DENTRO del proyecto semanal, no como un proyecto aparte", async () => {
+    const p = plan({
+      structure: "areas",
+      subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }] as never,
+      programmingPractice: { kata: { minutesPerDay: 30, days: [1, 2, 3, 4, 5, 6, 7] }, weeklyProject: { sessionsPerWeek: 2, minutesPerSession: 60, focusMode: "rotate", weeks: [{ week: 1, start: START, end: "2026-10-12", focus: "backend", sessions: [{ date: TODAY, minutes: 60, phases: ["spec", "construct"] }] }] } } as never,
+    });
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
+    vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
+    await mountEl(<MentorPlan planId={PID} />);
+    const weekly = byTest("run-project-weekly")!;
+    const pp = byTest("run-pp-project")!;
+    expect(pp).toBeTruthy();
+    expect(weekly.contains(pp)).toBe(true);
+    expect(pp.textContent).toContain("cuatro fases");
+  });
+});
+

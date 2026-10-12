@@ -60,7 +60,7 @@ export interface AgendaModel {
 }
 
 /** Color de cada enfoque (marca; el texto siempre acompaña: el color solo no basta). */
-export const FOCUS_COLOUR: Record<string, string> = { backend: "#2383e2", databases: "#8e24aa", frontend: "#33b679", automation: "#c28a00", tooling: "#e67c73", generic: "#039be5" };
+export const FOCUS_COLOUR: Record<string, string> = { backend: "#2383e2", databases: "#8e24aa", frontend: "#33b679", logic: "#14b8a6", automation: "#c28a00", tooling: "#e67c73", generic: "#039be5" };
 export const focusColour = (id?: string): string => FOCUS_COLOUR[id ?? ""] ?? FOCUS_COLOUR.generic!;
 
 export function useAgendaModel(data: Loaded, plan: MentorPlan): AgendaModel {

@@ -200,3 +200,34 @@ describe("validación estricta del parche de la IA", () => {
     expect(text).toContain("lang-python");
   });
 });
+
+describe("área «Lógica de programación» (logic)", () => {
+  const logicTopics = (n: number) => topics("10 Programming Logic", n).map((t) => cat(t.folder));
+
+  it("«Añade lógica de programación» la reconoce como área y la añade con sus temas, su grupo y su fase", () => {
+    const p = areasPlan();
+    expect(opsFromText("Añade lógica de programación", p, { today: START, all: logicTopics(6) }).ops).toEqual([{ op: "add_area", areaId: "logic" }]);
+    const r = applyOps(p, [{ op: "add_area", areaId: "logic" }], { today: START, all: logicTopics(6) });
+    expect(r.applied).toBe(1);
+    const lg = area(r.plan, "logic");
+    expect(lg.area).toBe("Lógica de programación");
+    expect(lg.topics).toHaveLength(6);
+    expect(lg.groups!.map((g) => g.title)).toEqual(["Problemas y patrones"]);
+    expect(lg.phase).toBeTruthy();
+    // sigue la regla de como mucho dos áreas en paralelo y no se pierde nada de las demás
+    expect(maxOverlap(Object.fromEntries(r.plan.subplans.map((s) => [s.id, s.phase!])))).toBeLessThanOrEqual(2);
+    expect(r.plan.subplans.map((s) => s.areaId)).toEqual(expect.arrayContaining(["backend", "databases", "frontend", "logic"]));
+  });
+
+  it("sin temas de esa rama en la vault no inventa el área", () => {
+    expect(applyOps(areasPlan(), [{ op: "add_area", areaId: "logic" }], ctx()).applied).toBe(0);
+  });
+
+  it("la rama no se confunde con Fundamentals ni con un lenguaje: sigue su propia clase", async () => {
+    const { classifyBranch } = await import("../../lib/planTime.js");
+    expect(classifyBranch("10 Programming Logic")).toBe("logic");
+    expect(classifyBranch("10 Lógica de programación")).toBe("logic");
+    expect(classifyBranch("1 Fundamentals")).toBe("fundamentals");
+    expect(classifyBranch("2.1 Python")).toBe("language");
+  });
+});

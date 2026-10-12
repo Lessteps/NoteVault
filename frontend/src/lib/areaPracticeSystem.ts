@@ -18,14 +18,14 @@ import { eachDay, isoDow, weekRangesOf } from "./planTime.js";
 
 export const PP_ROOT = "programming_practice";
 /** Las áreas con sistema de práctica propio. */
-export const PRACTICE_AREA_IDS = ["backend", "frontend", "databases", "automation", "tooling", "desktop", "mobile"] as const;
+export const PRACTICE_AREA_IDS = ["backend", "frontend", "databases", "logic", "automation", "tooling", "desktop", "mobile"] as const;
 export type PracticeAreaId = (typeof PRACTICE_AREA_IDS)[number];
 export const isPracticeAreaId = (id: unknown): id is PracticeAreaId => (PRACTICE_AREA_IDS as readonly string[]).includes(String(id));
 
 /** Nombre de cada área tal como se ve en la interfaz. */
-export const AREA_LABEL: Record<PracticeAreaId, string> = { backend: "Backend", frontend: "Frontend", databases: "Databases", automation: "Automation", tooling: "Tooling and Quality", desktop: "Desktop", mobile: "Mobile" };
+export const AREA_LABEL: Record<PracticeAreaId, string> = { backend: "Backend", frontend: "Frontend", databases: "Databases", logic: "Programming Logic", automation: "Automation", tooling: "Tooling and Quality", desktop: "Desktop", mobile: "Mobile" };
 /** Carpeta del área dentro de `programming_practice/` (en inglés, como todo el espacio de Programación). */
-export const AREA_FOLDER: Record<PracticeAreaId, string> = { backend: "backend", frontend: "frontend", databases: "databases", automation: "automation", tooling: "tooling-and-quality", desktop: "desktop", mobile: "mobile" };
+export const AREA_FOLDER: Record<PracticeAreaId, string> = { backend: "backend", frontend: "frontend", databases: "databases", logic: "programming-logic", automation: "automation", tooling: "tooling-and-quality", desktop: "desktop", mobile: "mobile" };
 
 export const areaFolderOf = (areaId: string): string => (isPracticeAreaId(areaId) ? AREA_FOLDER[areaId] : areaId.replace(/[^a-z0-9-]+/gi, "-").toLowerCase());
 export const areaLabelOf = (areaId: string): string => (isPracticeAreaId(areaId) ? AREA_LABEL[areaId] : areaId);
@@ -86,6 +86,8 @@ const SCENARIOS: readonly Scenario[] = [
 interface KataTemplate {
   /** el trabajo concreto; {noun} {plural} {fields} {rule} y {context} se sustituyen */
   task: string;
+  /** variante del trabajo para cada nivel (fácil, medio, difícil); si falta, `task` sirve para los tres */
+  byLevel?: readonly [string, string, string];
   /** qué hay que entregar */
   deliverable: string;
   hints: readonly [string, string];
@@ -93,10 +95,131 @@ interface KataTemplate {
   errors: readonly [string, string];
 }
 
-const T = (task: string, deliverable: string, hints: [string, string], solution: string, errors: [string, string]): KataTemplate => ({ task, deliverable, hints, solution, errors });
+const T = (task: string, deliverable: string, hints: [string, string], solution: string, errors: [string, string], byLevel?: [string, string, string]): KataTemplate => ({ task, deliverable, hints, solution, errors, ...(byLevel ? { byLevel } : {}) });
 
 /** Una plantilla por habilidad (id de `AREA_SKILLS`). */
 const TEMPLATES: Readonly<Record<string, KataTemplate>> = {
+  // ── logic (problemas de entrevista, independientes del lenguaje; cada plantilla trae su variante fácil / media / difícil) ──
+  problem_framing: T(
+    "The requirement is: «{rule}». Turn it into a precise specification before any code.",
+    "The specification: clarifying questions, input and output contract with types, three worked examples (one of them an edge case) and what happens on invalid input. No code.",
+    ["Ask first what the input size is and what counts as invalid.", "An example you cannot compute by hand means the requirement is not clear yet."],
+    "Questions about format, limits, order of the output, duplicates and empty input; a contract such as f(list of {plural}) -> list; three worked examples including the empty and a duplicate case; invalid input explicitly rejected or ignored and said so.",
+    ["Starting to code before the examples are written", "Leaving the empty and the duplicate case undefined"],
+    [
+      "You receive this request about {plural}: «list the {plural} that need attention». Before any code, write the clarifying questions you would ask, two examples with expected output and the edge cases.",
+      "A teammate gives you this requirement: «{rule}». Turn it into a precise specification: inputs and outputs with types, three examples (one an edge case) and what happens on invalid input.",
+      "The requirement «{rule}» is ambiguous on purpose. List at least five ambiguities, state the assumption you would make for each and write the test case that would fail if the assumption is wrong.",
+    ],
+  ),
+  arrays_strings: T(
+    "Given a list of {plural}, solve the problem below in a single pass and state the invariant of your loop.",
+    "The algorithm in plain steps or pseudocode, the result for two examples (one of them empty) and the time and space cost.",
+    ["Decide what is true after each step of the loop before writing it.", "For a block or a window keep a running value instead of recomputing it."],
+    "Level 1: iterate once keeping a set of seen values and keep only the unseen; removed = n - kept. Level 2: Kadane — the best sum ending here is max(x, current + x); track the best overall and the start when the current one restarts. Level 3: normalise (trim, lowercase, collapse separators), split, group by the sorted letters of each code; O(n·k log k).",
+    ["Mutating the list while iterating over it", "Forgetting the list where every number is negative"],
+    [
+      "Given a list of {plural} names, return the list without duplicates keeping the first occurrence, and how many were removed. One pass.",
+      "Given the daily totals of {plural} (they may be negative), return the start index, end index and sum of the contiguous block with the largest sum.",
+      "Given a string of comma-separated codes of {plural}, normalise it (trim, lowercase, collapse repeated separators) and return the groups of codes that are anagrams of each other. State the cost.",
+    ],
+  ),
+  hashing_counting: T(
+    "Using a map, solve the problem below on a list of {plural} and say what you keep in it and why.",
+    "The approach, the data structure you keep, the result for two examples and the cost in time and space.",
+    ["Ask yourself what you need to find in constant time.", "Store what you have already seen, not what you are looking for."],
+    "A map from value to count. For pairs, store each complement with its index while scanning and check before inserting. For equality of multisets, increment on the first stream and decrement on the second: any non-zero entry is a difference. O(n) time, O(distinct) space.",
+    ["Pairing an element with itself", "Searching a list inside the loop, which makes it quadratic"],
+    [
+      "Given the list of categories of {plural}, return how many times each appears, ordered by frequency (ties alphabetical).",
+      "Given a list of {plural} amounts and a target, return the first pair that adds up to the target, or none. It must run in a single pass.",
+      "Tell whether two long lists of {plural} contain the same elements with the same multiplicities and return the first element that differs. Each list may be read only once and must not be sorted.",
+    ],
+  ),
+  two_pointers_window: T(
+    "Solve the problem below on the {plural} with two pointers or a sliding window and state when each pointer moves.",
+    "The pointer rules in words, the trace on a small example and the cost in time and space.",
+    ["Which pointer moves when the current value is too small and which when it is too big?", "A window only stays correct if you can say how to update it when it grows and when it shrinks."],
+    "Level 1: left and right pointers moving inward depending on whether the sum is too small or too big. Level 2: grow the right end and shrink the left end while the total exceeds the limit (amounts must be non-negative). Level 3: a queue of timestamps; pop from the front while older than the window; the queue length is the answer.",
+    ["Moving both pointers on the same step", "Assuming a window shrink rule that fails with negative numbers"],
+    [
+      "Given a sorted list of {plural} prices, return whether two of them add up to exactly a budget.",
+      "Given the daily amounts of {plural}, return the longest run of consecutive days whose total does not exceed a limit.",
+      "Given a stream of timestamped events of {plural}, return for each event how many events happened in the previous 5 minutes, using memory proportional to the window, not to the stream.",
+    ],
+  ),
+  sorting_searching: T(
+    "Solve the problem below on the {plural}, saying what order or search space you rely on.",
+    "The ordering criterion or the search space, the steps, a worked example and the cost.",
+    ["State the sort key (and tie-breaker) before choosing the algorithm.", "In a binary search say what the invariant of the interval is, then the midpoint rule."],
+    "Level 1: sort by date then amount descending with a stable sort so equal keys keep their relative order. Level 2: binary search comparing the middle with the first element to know which half is ordered. Level 3: binary search on the capacity; feasible(c) greedily counts the days needed; the answer is the smallest feasible capacity; O(n log S).",
+    ["Using the wrong midpoint update and looping forever", "Sorting when only the minimum was needed"],
+    [
+      "Given {plural} with a date and an amount, order them by date and then by amount descending, and explain why the order is stable.",
+      "A sorted list of {plural} ids was rotated at an unknown point. Find a given id in less than linear time.",
+      "Packages of {plural} must be shipped in the given order within D days. Find the smallest daily capacity that works, using binary search on the answer.",
+    ],
+  ),
+  recursion_backtracking: T(
+    "Solve the problem below with recursion over the {plural} and name the base case, the recursive case and what gets smaller.",
+    "The recursive definition (base case, recursive case, progress), the call tree for a tiny input and the cost.",
+    ["Write the base case first; if you cannot, the problem is not defined yet.", "To avoid repeated sets decide an order and only ever choose later elements."],
+    "Level 1: total(node) = own amount + sum of total(child); base case: no children. Level 2: choose(start, chosen): when |chosen| = k record it; for i from start, add i, recurse with i + 1, remove i. Level 3: sort by weight, stop a branch when the running total passes the limit or the rest cannot reach it.",
+    ["A recursive case that does not get closer to the base case", "Recording the same group in a different order"],
+    [
+      "Define a recursive function that returns the total amount of a {noun} that contains sub-{plural} to any depth. Name the base case and the recursive case.",
+      "List every way to choose k of n {plural} without repeating the same set, and describe how you avoid duplicates.",
+      "Given {plural} with weights and a limit, list all the groups whose total is exactly the limit, pruning the branches that cannot work. Explain the pruning.",
+    ],
+  ),
+  stacks_queues: T(
+    "Solve the problem below choosing between a stack and a queue, and say why that structure.",
+    "The structure chosen and why, the operations in order for a small example and the cost of each.",
+    ["Last-in-first-out models nesting; first-in-first-out models fairness and order.", "Every operation of the structure should be constant time; if not, rethink it."],
+    "Level 1: push every opening bracket; on a closing one the top must match, else the position is the mistake; at the end the stack must be empty. Level 2: keep a queue of started ids; remove on finish; what remains is unfinished, in start order. Level 3: a second stack that stores the minimum so far; push the new minimum, pop both together.",
+    ["Forgetting the unclosed brackets left at the end", "Looking for the minimum by scanning the whole stack"],
+    [
+      "Check whether a text with brackets (), [] and {} is balanced and return the position of the first mistake.",
+      "Process a log of {plural} operations (start, finish) and return those that never finished, in the order they started. Say which structure you use and why.",
+      "Design a structure that supports push, pop and returning the current minimum, all in constant time, and explain how it survives pops.",
+    ],
+  ),
+  trees_graphs: T(
+    "Model the {plural} below as a tree or a graph and solve the problem, saying whether you traverse by depth or by breadth.",
+    "The model (nodes and edges), the traversal and why, the result for a small example and how you avoid visiting a node twice.",
+    ["Depth-first answers «does it exist / what is below»; breadth-first answers «what is the shortest».", "Keep a visited set from the beginning; cycles are the usual trap."],
+    "Level 1: recursive walk printing with indentation = depth; depth = 1 + max child depth. Level 2: topological order by repeatedly taking nodes with no pending dependency; if none can be taken and some remain, there is a cycle (report it). Level 3: breadth-first search from the start with a visited set and a parent map to rebuild the path; with different costs use a priority queue (Dijkstra).",
+    ["Revisiting nodes and looping forever on a cycle", "Using depth-first when the shortest path was asked"],
+    [
+      "A tree of {noun} categories is given as parent-child pairs. Print it indented and return its depth.",
+      "Given dependencies between {plural} (A needs B), decide whether they can be done in some order and return one valid order, or report the cycle.",
+      "Given a grid of connected places where some are blocked, return the fewest steps between two points and the path, and say how the answer changes if moving costs differ.",
+    ],
+  ),
+  dynamic_programming: T(
+    "Solve the problem below with dynamic programming over the {plural}: define the state, the recurrence and the base cases before any code.",
+    "The state definition, the recurrence, the base cases, the filled table for a tiny input and the cost.",
+    ["Say in one sentence what dp[i] means.", "If the same subproblem appears twice in the call tree, it is a table, not a recursion."],
+    "Level 1: ways(n) = ways(n-1) + ways(n-2), base ways(0) = 1 and ways(1) = 1. Level 2: best[a] = 1 + min(best[a - c]) for each coin c <= a, best[0] = 0, unreachable = infinity. Level 3: lcs[i][j] = lcs[i-1][j-1] + 1 if equal else max(lcs[i-1][j], lcs[i][j-1]); rebuild walking back; keep only two rows to cut memory at the cost of losing the path.",
+    ["Not defining what the table position means", "Wrong base case for amount zero or an empty text"],
+    [
+      "Count in how many ways you can reach step n of a list of {plural} taking 1 or 2 at a time. Write the recurrence and the base cases.",
+      "Given coin values for {plural} and a target amount, find the minimum number of coins and say what the table index means.",
+      "Given two texts about {plural}, find the length of their longest common subsequence and rebuild one; then reduce the memory and say what you lose.",
+    ],
+  ),
+  complexity_analysis: T(
+    "Analyse the cost of the case below on {plural} and justify it with the size of the input.",
+    "The time and space cost of each option, the input sizes where it matters and the decision, in short sentences.",
+    ["Count how many times the inner step runs as a function of n.", "A cost is only useful when you tie it to a real input size and a limit."],
+    "A single loop is O(n); a loop inside a loop over the same data is O(n²); halving the range each step is O(log n). Prefer the O(n log n) solution when n is large and memory is available, the O(n²) one when n is tiny or memory is tight. For prediction: 10x the size is about 10x for O(n), about 13x for O(n log n) and 100x for O(n²); measure by timing two sizes.",
+    ["Counting only the outer loop", "Ignoring the memory cost of the faster solution"],
+    [
+      "State the time cost and the reason for each of three snippets about {plural}: a single loop, a loop inside a loop, and a loop that halves the range.",
+      "You have two solutions for the same problem on {plural}: O(n²) with O(1) memory and O(n log n) with O(n) memory. Say for which input sizes and constraints you choose each.",
+      "A function that deduplicates {plural} takes 2 seconds for 10,000 items. Predict the time for 100,000 and 1,000,000 if it is O(n), O(n log n) or O(n²), and say what you would measure to know which one it is.",
+    ],
+  ),
   // ── backend ──
   endpoint_design: T("Design the HTTP API for {plural}: list, read, create and change one {noun}.", "A table with method, path, request body, response body and status codes for every endpoint.", ["Name the resource with a plural noun and let the HTTP verb carry the action.", "Decide what a missing {noun}, a duplicate and a bad request return before writing the table."], "GET /{plural} (200, paginated), GET /{plural}/{id} (200 or 404), POST /{plural} (201 with Location, 422 on invalid body, 409 on a rule violation), PATCH /{plural}/{id} (200, 404, 409).", ["Using verbs in paths such as /createLoan", "Returning 200 for every error"]),
   validation_errors: T("Write the validation for creating a {noun} with these fields: {fields}. Rule: {rule}.", "The list of validations and the exact JSON error response for three different invalid requests.", ["Validate shape and types first, business rules second.", "Return every field error in one response so the client fixes them in one go."], "A stable body such as {\"error\":\"validation_failed\",\"fields\":[{\"field\":\"due_on\",\"message\":\"must be after loaned_on\"}]} with status 422, and the rule violation as 409 with its own code.", ["Stopping at the first error", "Mixing a validation error with a business-rule error in the same status"]),
@@ -213,7 +336,7 @@ export function kataForDay(areaId: string, day: number, level: number): AreaKata
   const lvl = clampLevel(clampLevel(level) + (d % 7 === 0 ? 1 : 0));
   const minutes = lvl === 1 ? 20 : lvl === 2 ? 25 : 30;
   const title = `${skill.name} - ${scenario.plural}`;
-  const task = fill(tpl.task, scenario);
+  const task = fill(tpl.byLevel?.[lvl - 1] ?? tpl.task, scenario);
   const statement = [
     `**Context.** ${scenario.context}`,
     "",
@@ -329,6 +452,7 @@ export interface AreaPracticeSystemInfo {
 }
 
 const PURPOSE: Record<string, string> = {
+  logic: "Train the problem-solving skills that job interviews measure, whatever the language: patterns, data structures, complexity and clear reasoning — realistic problems by difficulty, every day.",
   backend: "Design and build the server side of an application: endpoints, validation, states, transactions and security.",
   frontend: "Build interfaces that are composable, accessible and honest about loading, errors and empty data.",
   databases: "Model data and ask it questions: schemas, joins, aggregations, indexes, transactions and migrations.",

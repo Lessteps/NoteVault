@@ -11,7 +11,7 @@ import { isLive } from "./planRoute.js";
 import { weekRangesOf } from "./planTime.js";
 
 /** Orden fijo de las áreas en todas las vistas por área: Backend · Frontend · Databases · Tooling and Quality · Automation (y luego las demás). */
-export const AREA_DISPLAY_ORDER: readonly string[] = ["backend", "frontend", "databases", "tooling", "automation", "desktop", "mobile"];
+export const AREA_DISPLAY_ORDER: readonly string[] = ["backend", "frontend", "databases", "logic", "tooling", "automation", "desktop", "mobile"];
 
 /** Posición de un área en el orden fijo (las propias del usuario van después, en el orden del plan). */
 export const areaRank = (areaId: string | undefined): number => {
@@ -206,7 +206,7 @@ export const weeksRangeText = (r: Pick<AreaWeeksRow, "fromWeek" | "toWeek">): st
 // ── El día por área ─────────────────────────────────────────────────────
 
 /** Nombre corto de un área para las celdas del calendario («Back», «Front», «BD»…): el texto siempre acompaña al color. */
-export const AREA_SHORT: Readonly<Record<string, string>> = { backend: "Back", frontend: "Front", databases: "BD", tooling: "Tool", automation: "Auto", desktop: "Desk", mobile: "Móvil" };
+export const AREA_SHORT: Readonly<Record<string, string>> = { backend: "Back", frontend: "Front", databases: "BD", logic: "Lóg", tooling: "Tool", automation: "Auto", desktop: "Desk", mobile: "Móvil" };
 export const areaShort = (areaId: string | undefined, name: string): string => (areaId && AREA_SHORT[areaId]) || name.replace(/^[\d.\s_-]+/, "").slice(0, 5);
 
 /** Lo que un área tiene en UN día: teoría, práctica del área y proyecto del área (los proyectos integradores van aparte, al final). */

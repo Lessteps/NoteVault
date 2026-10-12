@@ -25,6 +25,7 @@ import { PlanChanges } from "./PlanChanges";
 import { PlanDeliverables } from "./PlanDeliverables";
 import { BackToTop, PlanNotes, SectionCard, SectionHeading, SkipLink, TabPanel, Tabs, panelId, type TabDef } from "./planKit";
 import { agendaDateKey, cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planModeKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanMode, type PlanTab } from "./planShared";
+import { AddAreaBar } from "./AddAreaBar";
 import { ExecutionAside, ExecutionBar } from "./ExecutionBar";
 import { PlanRun } from "./PlanRun";
 import { GenerateNotice, TocLayout, type TocItem } from "./PlanToc";
@@ -535,6 +536,7 @@ function MiPlan({
       </SectionCard>
 
       {byAreas && <TogetherBar plan={plan} onApplied={onApplied} announce={announce} />}
+      {byAreas && <AddAreaBar plan={plan} onApplied={onApplied} announce={announce} />}
       </div>
 
       <section id="sec-datos" tabIndex={-1} className="scroll-mt-28 outline-none" aria-labelledby="mp-facts" data-testid="plan-preconditions">

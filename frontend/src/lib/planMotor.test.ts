@@ -231,14 +231,14 @@ describe("proyecto de tema calibrado al nivel", () => {
 });
 
 describe("sistema de práctica por área", () => {
-  it("la tabla cubre las 7 áreas con diario, semanal, mensual, medida y lenguajes", () => {
-    for (const a of ["backend", "frontend", "databases", "automation", "tooling", "desktop", "mobile"]) {
+  it("la tabla cubre las 8 áreas con diario, semanal, mensual, medida y lenguajes", () => {
+    for (const a of ["backend", "frontend", "databases", "logic", "automation", "tooling", "desktop", "mobile"]) {
       const s = areaPracticeOf(a)!;
       expect(s.daily.examples.length).toBeGreaterThan(1);
       expect(s.weekly.title && s.monthly.title && s.measure).toBeTruthy();
       expect(s.languages.length).toBeGreaterThan(0);
     }
-    expect(Object.keys(AREA_PRACTICE)).toHaveLength(7);
+    expect(Object.keys(AREA_PRACTICE)).toHaveLength(8);
   });
   it("Frontend: componente atómico diario (átomos → moléculas → organismos) y página completa semanal", () => {
     expect(atomicPieceOf(0).level).toBe("átomo");

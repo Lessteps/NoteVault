@@ -9,12 +9,14 @@
 // Same idea as Mathematics (theoretical topics: true_false, counterexample, prove, explain, find_error).
 
 /** Topic number → type. Anything not listed takes its area's default (see AREA_DEFAULT). */
-export const AREA_DEFAULT = { "1": "P", "2.1": "M", "2.2": "M", "2.3": "M", "3": "M", "4": "M", "5": "M", "6": "M", "7": "M", "8": "M", "9": "M" };
+export const AREA_DEFAULT = { "1": "P", "2.1": "M", "2.2": "M", "2.3": "M", "3": "M", "4": "M", "5": "M", "6": "M", "7": "M", "8": "M", "9": "M", "10": "P" };
 
 const T = ["1.1", "1.2", "1.3", "1.4", "1.29", "1.36", "1.63", "1.65", "1.67", "1.68", "1.69", "1.71",
   "3.1", "3.2", "3.17", "4.1", "4.2", "4.14", "5.3", "5.17", "6.1", "6.17", "7.1", "8.1", "8.3", "9.14"];
 const M = ["1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.23", "1.26", "1.27", "1.28", "1.34", "1.37", "1.42", "1.44", "1.45",
-  "1.50", "1.54", "1.55", "1.60", "1.61", "1.62", "1.70", "1.72", "1.73", "1.74"];
+  "1.50", "1.54", "1.55", "1.60", "1.61", "1.62", "1.70", "1.72", "1.73", "1.74",
+  // area 10 (Programming Logic): the method and complexity topics mix concept and practice; the interview simulation is mixed
+  "10.1", "10.2", "10.12"];
 const P = ["2.1.2", "2.1.3", "2.1.4", "2.1.5", "2.1.7", "2.1.8", "2.2.2", "2.2.3", "2.2.4", "2.2.5", "2.2.6", "2.2.8",
   "6.4", "6.5", "6.6", "7.2", "7.3", "9.1", "9.2"];
 
@@ -45,10 +47,14 @@ export const CODE_SKILLS = {
   "7": ["design", "implement", "debug", "review", "decompose"],
   "8": ["design", "analyze", "implement", "review", "port"],
   "9": ["commands", "debug", "find_error", "design", "review", "explain"],
+  // Programming Logic: language-agnostic problem solving (the manifests were written with these skills; do not run practica.mjs over area 10)
+  "10": ["explain", "trace", "implement", "decompose", "debug", "test"],
 };
 
 /** Topics that need a different set than their area's (an algorithm or data structure always asks for trace + analyze). */
 const OVERRIDE = {
+  "10.1": ["pg_true_false", "explain", "trace", "decompose", "review", "pg_compare"],
+  "10.2": ["pg_true_false", "explain", "trace", "decompose", "review", "pg_compare"],
   "1.5": ["pg_true_false", "commands", "find_error", "explain"],
   "1.46": ["trace", "implement", "analyze", "debug", "test", "pg_true_false"],
   "1.47": ["trace", "implement", "analyze", "debug", "test", "pg_true_false"],

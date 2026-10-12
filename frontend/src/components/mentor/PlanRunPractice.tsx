@@ -105,16 +105,15 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
         ) : (
           <h3 id="run-weekly-h" className="text-[16px] font-semibold">Sin proyecto semanal esta semana</h3>
         )}
+        {track?.weeklyProject && (
+          // El proyecto full stack de programming_practice ES el proyecto semanal: el semanal se alimenta de él, no es otro proyecto aparte.
+          <div className="mt-3 space-y-1.5 border-t border-line pt-3" data-testid="run-pp-project">
+            <h4 className="text-[15px] font-semibold" style={{ color: PRACTICE_COLOUR }}>Cómo se construye: las cuatro fases de programming_practice</h4>
+            <p className="text-[14px] text-dim">El proyecto semanal se alimenta del proyecto full stack de la semana: especificar, construir, defender y cerrar con el postmortem. Las piezas de cada día son las que lo van completando.</p>
+            <GeneralCards track={track} status={data.practice} today={m.today} only={["project"]} />
+          </div>
+        )}
       </SectionCard>
-
-      {track?.weeklyProject && (
-        <div data-testid="run-pp-project" className="space-y-1.5">
-          <p className="text-[14px] text-dim">
-            <span className="font-medium" style={{ color: PRACTICE_COLOUR }}>Proyecto full stack de programming_practice</span> · cuatro fases: especificar, construir, defender y cerrar con el postmortem.
-          </p>
-          <GeneralCards track={track} status={data.practice} today={m.today} only={["project"]} />
-        </div>
-      )}
     </section>
   );
 }

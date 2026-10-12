@@ -1282,7 +1282,7 @@ it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
     }
   });
 
-  it("el progreso tiene tres pestañas, no cinco", async () => {
+  it("el progreso tiene pestañas Rejilla, Músculos, Cuerpo y Año", async () => {
     const { host, cleanup } = mount(<ExerciseModule />);
     try {
       await act(async () => {
@@ -1295,8 +1295,7 @@ it("la Biblioteca y Gestionar son un apartado con dos pestañas", async () => {
       const tabs = [...host.querySelectorAll("[data-progress-tab]")].map((t) =>
         t.textContent?.trim(),
       );
-      // Semana y Mes viven en una; Mapa y Gráfica, en otra.
-      expect(tabs).toEqual(["Rejilla", "Músculos", "Año"]);
+      expect(tabs).toEqual(["Rejilla", "Músculos", "Cuerpo", "Año"]);
     } finally {
       cleanup();
     }

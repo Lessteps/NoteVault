@@ -16,12 +16,14 @@ import { ExerciseMonth, ExerciseWeek } from "./Grids";
 import { ProgressGraph } from "./ProgressGraph";
 import { ProgressMap } from "./ProgressMap";
 import { Yearly } from "./Yearly";
+import { BodyProfile } from "./BodyProfile";
 import { usePersistedNav } from "../../store/navState";
 import { cn } from "../ui";
 
 const TABS = [
   { id: "rejilla", label: "Rejilla" },
   { id: "musculos", label: "Músculos" },
+  { id: "cuerpo", label: "Cuerpo" },
   { id: "anio", label: "Año" },
 ] as const;
 
@@ -140,6 +142,8 @@ const tab: TabId =
           ) : (
             <ProgressGraph period={grid} />
           )
+        ) : tab === "cuerpo" ? (
+          <BodyProfile />
         ) : (
           <Yearly />
         )}

@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { useFinance } from "../../store/finance";
 import type { Movement } from "../../lib/types";
-import { MovementTable } from "./parts";
+import { MovementTable, Tiles, totals } from "./parts";
 import { CategoryMatrix } from "./Sheets";
 
 let host: HTMLDivElement | null = null;
@@ -95,6 +95,37 @@ describe("MovementTable", () => {
     expect(editing?.movement).toBeUndefined();
     expect(editing?.day).toBe(todayIso());
     expect(editing?.preset).toMatchObject({ type: "gasto", amount_cents: 1250000, what: "Almuerzo" });
+  });
+});
+
+describe("totals y Tiles", () => {
+  it("totals calcula neto y disponible por separado", () => {
+    const list: Movement[] = [
+      mov({ type: "ingreso", amount_cents: 3000000 }),
+      mov({ type: "gasto", amount_cents: 1800000 }),
+      mov({ type: "ahorro", amount_cents: 1200000 }),
+      mov({ type: "retiro", amount_cents: 200000 }),
+    ];
+    const t = totals(list);
+    // Flujo neto no se penaliza por ahorrar.
+    expect(t.neto).toBe(1200000);
+    expect(t.balance).toBe(1200000);
+    // Caja disponible descuenta el ahorro y suma retiros: 1.200.000 - 1.200.000 + 200.000 = 200.000
+    expect(t.disponible).toBe(200000);
+  });
+
+  it("Tiles enseña Flujo neto y Ahorro neto", async () => {
+    const t = totals([
+      mov({ type: "ingreso", amount_cents: 2000000 }),
+      mov({ type: "gasto", amount_cents: 1000000 }),
+      mov({ type: "ahorro", amount_cents: 500000 }),
+    ]);
+    await mount(<Tiles t={t} />);
+    const text = host!.textContent ?? "";
+    expect(text).toContain("Gastos");
+    expect(text).toContain("Ingresos");
+    expect(text).toContain("Ahorro neto");
+    expect(text).toContain("Flujo neto");
   });
 });
 

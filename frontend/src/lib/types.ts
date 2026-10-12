@@ -596,7 +596,7 @@ export interface FinPace {  saved: number;
   days_left: number | null;
 }
 
-export type FinTotals = Record<MovementType | "balance", number>;
+export type FinTotals = Record<MovementType | "balance" | "neto" | "disponible", number>;
 
 export interface FinMeta {
   types: MovementType[];

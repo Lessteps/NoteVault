@@ -57,33 +57,39 @@ export function MoneyInput({ value, onChange, className, placeholder = "$ 0", au
   );
 }
 
-export type TileKey = "gasto" | "ingreso" | "ahorro" | "balance";
+export type TileKey = "gasto" | "ingreso" | "ahorro" | "balance" | "disponible";
 
 const TILE_COLS: Record<number, string> = {
   1: "grid-cols-1",
   2: "grid-cols-2",
   3: "grid-cols-3",
   4: "grid-cols-4",
+  5: "grid-cols-5",
 };
 
 /** Cuatro cifras o un subconjunto (el Diario solo enseña Gastos + Ahorro). */
 export function Tiles({ t, daily, only }: { t: FinTotals; daily?: boolean; only?: TileKey[] }) {
-  const show = (k: TileKey) => !only || only.includes(k);
-  const n = (["gasto", "ingreso", "ahorro", "balance"] as const).filter(show).length;
+  const keys = only ?? (["gasto", "ingreso", "ahorro", "balance"] as TileKey[]);
+  const n = keys.length;
+  const show = (k: TileKey) => keys.includes(k);
+  const dispHint = t.ahorro > 0 || t.retiro > 0 ? `Caja disponible: ${formatMoney(t.disponible, "COP", true)}` : undefined;
   return (
     <div className={cn("grid gap-3", TILE_COLS[n] ?? "grid-cols-4")}>
       {show("gasto") && <StatTile value={formatMoney(t.gasto)} label="Gastos" colour={TYPE_COLOURS.gasto} />}
       {show("ingreso") && <StatTile value={formatMoney(t.ingreso)} label="Ingresos" colour={TYPE_COLOURS.ingreso} />}
       {show("ahorro") && <StatTile value={formatMoney(t.ahorro - t.retiro)} label={daily ? "Ahorro" : "Ahorro neto"} colour={TYPE_COLOURS.ahorro} />}
-      {show("balance") && <StatTile value={formatMoney(t.balance, "COP", true)} label={daily ? "Balance del día" : "Balance"} colour={t.balance >= 0 ? "var(--nv-mint)" : "var(--nv-danger)"} />}
+      {show("balance") && <StatTile value={formatMoney(t.balance, "COP", true)} label={daily ? "Flujo neto del día" : "Flujo neto"} colour={t.balance >= 0 ? "var(--nv-mint)" : "var(--nv-danger)"} hint={dispHint} />}
+      {show("disponible") && <StatTile value={formatMoney(t.disponible, "COP", true)} label="Caja disponible" colour={t.disponible >= 0 ? "var(--nv-mint)" : "var(--nv-danger)"} />}
     </div>
   );
 }
 
 export function totals(ms: Movement[]): FinTotals {
-  const t: FinTotals = { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 };
+  const t: FinTotals = { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0, neto: 0, disponible: 0 };
   for (const m of ms) t[m.type] += m.amount_cents;
-  t.balance = t.ingreso - t.gasto - t.ahorro + t.retiro;
+  t.neto = t.ingreso - t.gasto;
+  t.disponible = t.neto - t.ahorro + t.retiro;
+  t.balance = t.neto;
   return t;
 }
 

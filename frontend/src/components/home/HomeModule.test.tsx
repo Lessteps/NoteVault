@@ -42,9 +42,9 @@ describe("HomeModule", () => {
         active: [{ id: "p1", name: "NoteVault", icon: "⚡", colour: "#8b7cf6", progress: 0.5 }],
       },
       finance: {
-        day: { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 },
-        month: { gasto: 100, ingreso: 500, ahorro: 100, retiro: 0, balance: 342000 },
-        prev: { gasto: 80, ingreso: 400, ahorro: 50, retiro: 0, balance: 250000 },
+        day: { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0, neto: 0, disponible: 0 },
+        month: { gasto: 100, ingreso: 500, ahorro: 100, retiro: 0, balance: 342000, neto: 400, disponible: 300 },
+        prev: { gasto: 80, ingreso: 400, ahorro: 50, retiro: 0, balance: 250000, neto: 320, disponible: 270 },
         checks: [],
       },
       goals: {

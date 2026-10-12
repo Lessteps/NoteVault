@@ -82,8 +82,12 @@ describe("FinanceManager", () => {
       fm.add(D, RETIRO, 2000000);
 
       const t = totals(fm.day(D));
-      expect(t.balance).toBe(350000000 - 1 - 99999999999 - 5000000 + 2000000);
+      expect(t.balance).toBe(350000000 - 1 - 99999999999);
+      expect(t.neto).toBe(350000000 - 1 - 99999999999);
+      expect(t.disponible).toBe(350000000 - 1 - 99999999999 - 5000000 + 2000000);
       expect(totals([]).balance).toBe(0);
+      expect(totals([]).neto).toBe(0);
+      expect(totals([]).disponible).toBe(0);
     });
 
     it("update, move, and delete", () => {

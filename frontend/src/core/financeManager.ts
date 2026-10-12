@@ -65,11 +65,13 @@ export interface FinanceTotals {
   ahorro: number;
   retiro: number;
   balance: number;
+  neto: number;
+  disponible: number;
   [key: string]: number;
 }
 
 export function emptyTotals(): FinanceTotals {
-  return { [GASTO]: 0, [INGRESO]: 0, [AHORRO]: 0, [RETIRO]: 0, balance: 0 };
+  return { [GASTO]: 0, [INGRESO]: 0, [AHORRO]: 0, [RETIRO]: 0, balance: 0, neto: 0, disponible: 0 };
 }
 export const empty_totals = emptyTotals;
 
@@ -77,11 +79,13 @@ export function totals(movements: Iterable<Record<string, any>>): FinanceTotals 
   const out = emptyTotals();
   for (const m of movements) {
     const t = m?.type as string;
-    if (t && t in out && t !== "balance") {
+    if (t && t in out && t !== "balance" && t !== "neto" && t !== "disponible") {
       (out as Record<string, number>)[t] = ((out as Record<string, number>)[t] ?? 0) + Math.trunc(Number(m.amount_cents || 0));
     }
   }
-  out.balance = out[INGRESO] - out[GASTO] - out[AHORRO] + out[RETIRO];
+  out.neto = out[INGRESO] - out[GASTO];
+  out.disponible = out.neto - out[AHORRO] + out[RETIRO];
+  out.balance = out.neto;
   return out;
 }
 

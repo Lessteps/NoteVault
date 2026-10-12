@@ -253,7 +253,7 @@ export function monthlyAverages(ms: Movement[]): { n: number; gasto: number; ing
   const byMonth = new Map<string, FinTotals>();
   for (const m of ms) {
     const k = m.date.slice(0, 7);
-    const acc = byMonth.get(k) ?? { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0 };
+    const acc = byMonth.get(k) ?? { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0, neto: 0, disponible: 0 };
     const tt = totals([m]);
     acc.gasto += tt.gasto;
     acc.ingreso += tt.ingreso;

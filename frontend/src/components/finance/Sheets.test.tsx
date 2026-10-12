@@ -21,17 +21,17 @@ vi.mock("../../lib/bridge", () => ({
   },
 }));
 
-import { monthlyAverages, monthlySigned, Sheet } from "./Sheets";
+import { BalanceAccumulated, monthlyAverages, monthlySigned, Sheet } from "./Sheets";
 
 let host: HTMLDivElement | null = null;
 let root: ReturnType<typeof createRoot> | null = null;
 
-async function mount() {
+async function mount(el: React.ReactNode = <Sheet />) {
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(<Sheet />);
+    root!.render(el);
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
@@ -180,6 +180,19 @@ describe("monthlySigned", () => {
     expect(monthlySigned("monthly:1,15", "ingreso", 10000)).toBe(20000);
     expect(monthlySigned("weekly:1", "gasto", 70000)).toBe(-300000);
     expect(monthlySigned("blah", "gasto", 10000)).toBe(0);
+  });
+});
+
+describe("BalanceAccumulated", () => {
+  it("acumula los balances mensuales preservando la riqueza generada", async () => {
+    const emptyRow = { gasto: 0, ingreso: 0, ahorro: 0, retiro: 0, balance: 0, neto: 0, disponible: 0 };
+    // 3 meses con ingreso 3.000.000, gasto 1.800.000 y ahorro 1.200.000
+    // balance mensual = 1.200.000
+    const row = { gasto: 1800000, ingreso: 3000000, ahorro: 1200000, retiro: 0, balance: 1200000, neto: 1200000, disponible: 0 };
+    const yearRows = [row, row, row, ...Array(9).fill(emptyRow)];
+    await mount(<BalanceAccumulated yearRows={yearRows} />);
+    const text = host!.textContent ?? "";
+    expect(text).toContain("Balance acumulado");
   });
 });
 

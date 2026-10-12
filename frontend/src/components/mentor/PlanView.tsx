@@ -25,7 +25,7 @@ import { PlanChanges } from "./PlanChanges";
 import { PlanDeliverables } from "./PlanDeliverables";
 import { BackToTop, PlanNotes, SectionCard, SectionHeading, SkipLink, TabPanel, Tabs, panelId, type TabDef } from "./planKit";
 import { agendaDateKey, cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planModeKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanMode, type PlanTab } from "./planShared";
-import { ExecutionBar } from "./ExecutionBar";
+import { ExecutionAside, ExecutionBar } from "./ExecutionBar";
 import { PlanRun } from "./PlanRun";
 import { GenerateNotice, TocLayout, type TocItem } from "./PlanToc";
 import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
@@ -513,7 +513,7 @@ function MiPlan({
   ];
 
   return (
-    <TocLayout items={toc}>
+    <TocLayout items={toc} below={<ExecutionAside planId={plan.id} />}>
       {needGenerate && cov0 && (
         <div id="sec-generar" tabIndex={-1} className="scroll-mt-28 outline-none">
           <GenerateNotice topics={cov0.topics} withPractice={cov0.practice} withTheory={cov0.theory} {...(cov0.design ? { designPct: cov0.design.avgScore } : {})} />

@@ -168,3 +168,34 @@ describe("plan drives the competency matrix", () => {
     expect(progress.skills.explain!.mastered).toBe(false);
   });
 });
+
+describe("parseExerciseArray: enunciados con bloques de código", () => {
+  const withCode = (title: string) =>
+    JSON.stringify({
+      title,
+      statement: "Find the bug in this snippet:\n```python\nfor i in range(3):\nprint(i)\n```\nSay what is wrong.",
+      hints: ["Look at the indentation."],
+      solution: "The body of the loop is not indented:\n```python\nfor i in range(3):\n    print(i)\n```",
+      rubric: ["Names the indentation error"],
+    });
+
+  it("un array JSON sin cerco cuyo texto trae bloques ``` dentro no se rompe", async () => {
+    const { parseExerciseArray } = await import("./sessionBuilder");
+    const list = parseExerciseArray("[" + withCode("A") + "," + withCode("B") + "]");
+    expect(list.map((e) => e.title)).toEqual(["A", "B"]);
+    expect(list[0]!.statement).toContain("```python");
+  });
+
+  it("un array dentro de un cerco ```json con bloques de código en sus cadenas tampoco", async () => {
+    const { parseExerciseArray } = await import("./sessionBuilder");
+    const list = parseExerciseArray("Aquí tienes:\n```json\n[" + withCode("A") + "," + withCode("B") + "]\n```\nEspero que sirva.");
+    expect(list).toHaveLength(2);
+    expect(list[1]!.solution).toContain("print(i)");
+  });
+
+  it("un cerco normal con texto alrededor sigue funcionando", async () => {
+    const { parseExerciseArray } = await import("./sessionBuilder");
+    const plain = JSON.stringify({ title: "P", statement: "S", hints: [], solution: "x", rubric: ["r"] });
+    expect(parseExerciseArray("Claro:\n```json\n[" + plain + "]\n```")).toHaveLength(1);
+  });
+});

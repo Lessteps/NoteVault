@@ -115,3 +115,28 @@ describe("tabla de contenido: sección activa", () => {
     expect(activeSection([], 140, false)).toBe("");
   });
 });
+
+describe("ExecutionAside (debajo de la tabla de contenido)", () => {
+  it("enseña el avance, los últimos archivos creados y el registro", async () => {
+    const { ExecutionAside, fileLabel } = await import("./ExecutionBar");
+    const v = view(["done", "running", "pending"], { log: ["23:49:00 1/3 · Backend: katas", "23:50:00   Ejercicios de pg_classify (dificultad 1)…"] });
+    v.state.tasks[0]!.created = ["Programación/1 Fundamentals/1.4 From source code to execution/Ejercicios/pg_classify/ej_pg_classify_d1_1.md"];
+    vi.spyOn(api, "mentorExecutionStatus").mockResolvedValue({ execution: v, active: true });
+    await mountEl(<ExecutionAside planId="p1" />);
+    const aside = byTest("exec-aside")!;
+    expect(aside.textContent).toContain("Generación de notas");
+    expect(aside.textContent).toContain("Ejecutando");
+    expect(byTest("exec-aside-pct")!.textContent).toBe("33 %");
+    expect(byTest("exec-aside-files")!.textContent).toContain("ej_pg_classify_d1_1");
+    expect(byTest("exec-aside-files")!.textContent).toContain("1.4 From source code to execution/Ejercicios/pg_classify");
+    expect(byTest("exec-aside-log")!.textContent).toContain("Ejercicios de pg_classify");
+    expect(fileLabel("a/b/c/x.md")).toEqual({ name: "x", where: "a/b/c" });
+  });
+
+  it("sin ejecución no ocupa sitio", async () => {
+    const { ExecutionAside } = await import("./ExecutionBar");
+    vi.spyOn(api, "mentorExecutionStatus").mockResolvedValue({ execution: null, active: false });
+    await mountEl(<ExecutionAside planId="p1" />);
+    expect(byTest("exec-aside")).toBeNull();
+  });
+});

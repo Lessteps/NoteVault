@@ -126,12 +126,13 @@ export function PlanToc({ items }: { items: TocItem[] }) {
 }
 
 /** El contenido con su tabla de contenido sticky a la derecha (solo en anchos grandes). */
-export function TocLayout({ items, children }: { items: TocItem[]; children: ReactNode }) {
+export function TocLayout({ items, below, children }: { items: TocItem[]; /** debajo de la tabla (p. ej. la generación de notas) */ below?: ReactNode; children: ReactNode }) {
   return (
-    <div className="@5xl:grid @5xl:grid-cols-[minmax(0,1fr)_13.5rem] @5xl:items-start @5xl:gap-8">
+    <div className="@5xl:grid @5xl:grid-cols-[minmax(0,1fr)_15rem] @5xl:items-start @5xl:gap-8">
       <div className="min-w-0 space-y-6">{children}</div>
-      <aside className="sticky top-20 hidden self-start @5xl:block" aria-label="Navegación del plan">
+      <aside className="sticky top-20 hidden max-h-[calc(100vh-6rem)] self-start overflow-y-auto @5xl:block" aria-label="Navegación del plan">
         <PlanToc items={items} />
+        {below}
       </aside>
     </div>
   );

@@ -137,24 +137,35 @@ export interface SkillOption {
   fits: boolean;
 }
 
+/**
+ * El primer objeto JSON de una respuesta de la IA. Se prueba primero el texto entero (de la primera «{» a la última «}») y solo después el
+ * contenido del primer cerco ```: con bloques de código dentro de las cadenas, cortar por el primer cerco rompía el JSON.
+ */
+export function parseJsonObject(reply: string): any | null {
+  const text = String(reply ?? "").trim();
+  const tries = [text];
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
+  if (fence) tries.push(fence[1]!.trim());
+  for (const t of tries) {
+    const start = t.indexOf("{");
+    const end = t.lastIndexOf("}");
+    if (start < 0 || end <= start) continue;
+    try {
+      return JSON.parse(t.slice(start, end + 1));
+    } catch {
+      /* siguiente recorte */
+    }
+  }
+  return null;
+}
+
 /** The AI's checklist, completed with every catalogue skill and cleaned against the catalogue. */
 export function parseSkillOptions(
   reply: string,
   catalog: readonly CatalogSkill[],
   fallbackType?: TopicType | EnglishBranch,
 ): { options: SkillOption[]; topicType?: TopicType; summary: string } | null {
-  let text = String(reply ?? "").trim();
-  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
-  if (fence) text = fence[1]!.trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) return null;
-  let raw: any;
-  try {
-    raw = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return null;
-  }
+  const raw = parseJsonObject(reply);
   if (!raw || !Array.isArray(raw.skills)) return null;
   const english = catalog.some((s) => s.branches);
   const declared = String(raw.topic_type ?? "").trim().toLowerCase();
@@ -247,18 +258,7 @@ export function parsePracticePlan(
   /** the user ticked it themselves: a skill that "does not suit" the topic type is kept */
   keepUnfit = false,
 ): PracticePlan | null {
-  let text = String(reply ?? "").trim();
-  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
-  if (fence) text = fence[1]!.trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) return null;
-  let raw: any;
-  try {
-    raw = JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return null;
-  }
+  const raw = parseJsonObject(reply);
   if (!raw || !Array.isArray(raw.skills)) return null;
 
   // English skills carry branches: the key is the topic's branch, decided by the caller, never the AI's.

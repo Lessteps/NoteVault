@@ -105,3 +105,71 @@ export function ExecutionBar({ planId, onOpenPlan }: { planId: string; /** lleva
     </div>
   );
 }
+
+/** El nombre corto de un archivo creado y su carpeta: «ej_pg_classify_d1_….md · 1.4 From source code to execution/Ejercicios». */
+export function fileLabel(rel: string): { name: string; where: string } {
+  const parts = rel.replace(/\\/g, "/").split("/");
+  const name = parts.pop() ?? rel;
+  return { name: name.replace(/\.md$/i, ""), where: parts.slice(-3).join("/") };
+}
+
+/**
+ * La generación de notas, a la derecha de la tabla de contenido y debajo de ella: avance, qué archivos se han ido creando (clic para abrirlos)
+ * y las últimas líneas del registro. Solo lee; pausar o cancelar se hace en la barra de abajo o en «Ejecutar plan».
+ */
+export function ExecutionAside({ planId }: { planId: string }) {
+  const { exec } = useExecution(planId);
+  const st = exec?.state;
+  if (!exec || !st) return null;
+  const p = exec.progress;
+  const live = st.status === "running" || st.status === "paused";
+  if (!live && Date.now() - Date.parse(st.updatedAt) > FINISHED_VISIBLE_MS) return null;
+  const files = st.tasks.flatMap((t) => t.created).slice(-6).reverse();
+  const log = st.log.slice(-3);
+  const colour = st.status === "failed" ? "var(--nv-danger)" : st.status === "done" ? "var(--nv-mint)" : st.status === "paused" ? "var(--nv-warn)" : "var(--nv-accent)";
+  return (
+    <section aria-label="Generación de notas" data-testid="exec-aside" className="mt-5 rounded-xl border border-line bg-card p-3 text-[13.5px]">
+      <div className="flex items-center gap-2">
+        <h3 className="min-w-0 flex-1 text-[12px] font-semibold uppercase tracking-wider text-faint">Generación de notas</h3>
+        <span className="flex-none text-[12.5px] font-semibold" style={{ color: colour }}>{RUN_STATUS_LABEL[st.status]}</span>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <div className="h-2 flex-1 overflow-hidden rounded-full bg-hover" role="progressbar" aria-label="Progreso de la generación" aria-valuenow={p.pct} aria-valuemin={0} aria-valuemax={100}>
+          <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${p.pct}%`, background: colour }} data-testid="exec-aside-fill" />
+        </div>
+        <span className="w-10 flex-none text-right font-bold" data-testid="exec-aside-pct">{p.pct} %</span>
+      </div>
+      <p className="mt-1.5 break-words text-dim" data-testid="exec-aside-label">{p.label}</p>
+      <p className="mt-0.5 text-faint">
+        {p.done}/{p.total} tareas · {p.created} {p.created === 1 ? "archivo" : "archivos"}
+        {p.failed > 0 ? ` · ${p.failed} con error` : ""}
+      </p>
+      {files.length > 0 && (
+        <>
+          <p className="mt-3 text-[12px] font-semibold uppercase tracking-wider text-faint">Últimos archivos</p>
+          <ul className="mt-1 space-y-1" data-testid="exec-aside-files">
+            {files.map((f) => {
+              const l = fileLabel(f);
+              return (
+                <li key={f}>
+                  <button type="button" onClick={() => void useApp.getState().openNote(f.replace(/\\/g, "/"))} className="block w-full min-w-0 text-left hover:underline" title={f}>
+                    <span className="block truncate text-text">{l.name}</span>
+                    <span className="block truncate text-[12px] text-faint">{l.where}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+      {log.length > 0 && (
+        <>
+          <p className="mt-3 text-[12px] font-semibold uppercase tracking-wider text-faint">Registro</p>
+          <ul className="mt-1 space-y-0.5 text-[12.5px] text-dim" data-testid="exec-aside-log">
+            {log.map((l, i) => <li key={`${i}-${l}`} className="break-words">{l.trim()}</li>)}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}

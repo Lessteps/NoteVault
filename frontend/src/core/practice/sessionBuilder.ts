@@ -276,9 +276,26 @@ function objectChunks(text: string): string[] {
  * fails every well-formed object is salvaged instead of losing the whole batch.
  */
 export function parseExerciseArray(reply: string): GeneratedExercise[] {
-  let text = String(reply ?? "").trim();
+  const text = String(reply ?? "").trim();
+  // Un enunciado de programación trae bloques ``` dentro de sus cadenas: tomar «lo que hay entre el primer par de cercos» corta el JSON por la
+  // mitad y se perdía el lote entero. Por eso se prueban varios recortes y gana el que rescata más ejercicios:
+  //  1. el texto entero (de la primera «[» a la última «]»),
+  //  2. el texto sin un cerco que lo envuelve por completo,
+  //  3. el contenido del primer cerco (la respuesta clásica «```json … ```» sin código dentro).
+  const candidates: string[] = [text];
+  const wrapped = /^```[a-z]*\s*\n([\s\S]*?)\n?```\s*$/i.exec(text);
+  if (wrapped) candidates.push(wrapped[1]!.trim());
   const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
-  if (fence) text = fence[1]!.trim();
+  if (fence) candidates.push(fence[1]!.trim());
+  let best: GeneratedExercise[] = [];
+  for (const c of candidates) {
+    const got = parseExerciseBody(c);
+    if (got.length > best.length) best = got;
+  }
+  return best;
+}
+
+function parseExerciseBody(text: string): GeneratedExercise[] {
   const start = text.indexOf("[");
   const end = text.lastIndexOf("]");
   const body = start >= 0 ? text.slice(start, end > start ? end + 1 : undefined) : text;

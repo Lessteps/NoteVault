@@ -140,6 +140,8 @@ test("NV-X-012 un ejercicio propio va a la biblioteca y avisa cuando lo cambias"
   await side().getByRole("button", { name: "Ejercicios" }).click();
   // La pestaña activa se recuerda entre tests, y el anterior dejó la Biblioteca.
   await win.getByRole("tab", { name: "Tu programa" }).click();
+  const addBtn = win.locator("[data-add-exercise]").first();
+  if (await addBtn.isVisible()) await addBtn.click();
   const name = win.locator('input[aria-label="Nombre"]');
   await expect(name).toBeVisible({ timeout: 15_000 });
   // Qué había en el programa antes: guardar en la biblioteca **no** debe tocarlo.
@@ -170,6 +172,8 @@ test("NV-X-012 un ejercicio propio va a la biblioteca y avisa cuando lo cambias"
   // 4. Se le pone una serie, que es de la persona y no se toca después.
   await side().getByRole("button", { name: "Ejercicios" }).click();
   await win.getByRole("tab", { name: "Tu programa" }).click();
+  const addBtn2 = win.locator("[data-add-exercise]").first();
+  if (await addBtn2.isVisible()) await addBtn2.click();
   await win.locator('[data-library-picker] input').first().fill("Press banca propio");
   const pick = win.locator("[data-library-pick]").first();
   await expect(pick).toBeVisible({ timeout: 15_000 });
@@ -180,14 +184,16 @@ test("NV-X-012 un ejercicio propio va a la biblioteca y avisa cuando lo cambias"
 
   // 5. Se cambia en la biblioteca: salta el aviso de copia desfasada.
   //    Tras guardar en el programa el formulario queda vacío, así que se vuelve
-  //    a elegir la entrada —que rellena nombre y pasos— y luego se editan.
+  //    a abrir si se cerró, se vuelve a elegir la entrada —que rellena nombre y pasos— y luego se editan.
+  const addBtn3 = win.locator("[data-add-exercise]").first();
+  if (await addBtn3.isVisible()) await addBtn3.click();
   await win.locator('[data-library-picker] input').first().fill("Press banca propio");
   await win.locator("[data-library-pick]").first().click();
   await win.locator("textarea").first().fill("1. Baja la barra al pecho\n2. Empuja sin bloquear");
   await win.locator("[data-library-save]").click();
   // El nombre ya existe en la biblioteca, así que hay que confirmar: es la red
   // antes de pisar una entrada.
-  const avisar = win.getByRole("dialog", { name: "Actualizar en la biblioteca" });
+  const avisar = win.getByRole("alertdialog", { name: "Actualizar en la biblioteca" });
   await expect(avisar).toBeVisible({ timeout: 15_000 });
   await avisar.getByRole("button", { name: "Actualizar" }).click();
   await expect(win.locator("[data-stale-banner]")).toBeVisible({ timeout: 15_000 });
@@ -277,11 +283,15 @@ test("NV-X-013 quitar tu entrada deshace la edición de un ejercicio del catálo
   // 1. Se edita Bench Press en la biblioteca, poniéndole un solo paso.
   await side().getByRole("button", { name: "Ejercicios" }).click();
   await win.getByRole("tab", { name: "Tu programa" }).click();
+  const addBtn = win.locator("[data-add-exercise]").first();
+  if (await addBtn.isVisible()) await addBtn.click();
   await win.locator("[data-library-picker] input").first().fill("bench press");
-  await win.locator("[data-library-pick]").first().click();
+  const pick = win.locator("[data-library-pick]").first();
+  await expect(pick).toBeVisible({ timeout: 15_000 });
+  await pick.click();
   await win.locator("textarea").first().fill("PASO MÍO ÚNICO");
   await win.locator("[data-library-save]").click();
-  const avisar = win.getByRole("dialog", { name: "Actualizar en la biblioteca" });
+  const avisar = win.getByRole("alertdialog", { name: "Actualizar en la biblioteca" });
   await expect(avisar).toBeVisible({ timeout: 15_000 });
   await avisar.getByRole("button", { name: "Actualizar" }).click();
 
@@ -298,7 +308,7 @@ test("NV-X-013 quitar tu entrada deshace la edición de un ejercicio del catálo
   const quitar = win.locator("[data-library-remove]");
   await expect(quitar).toBeVisible({ timeout: 15_000 });
   await quitar.click();
-  const confirmar = win.getByRole("dialog", { name: "Quitar de la biblioteca" });
+  const confirmar = win.getByRole("alertdialog", { name: "Quitar de la biblioteca" });
   await expect(confirmar).toBeVisible({ timeout: 15_000 });
   await confirmar.getByRole("button", { name: "Quitar" }).click();
 

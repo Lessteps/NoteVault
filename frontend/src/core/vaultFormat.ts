@@ -21,6 +21,7 @@ export const LAYOUT = {
   habits_config: `${DATA_DIR}/habits/habits_config.json`,
   habits_day: `${DATA_DIR}/habits/{year}/{month:02d}/{date}.md`,
   exercise_dir: `${DATA_DIR}/ejercicio`,
+  exercise_profile: `${DATA_DIR}/ejercicio/perfil.json`,
   exercises: `${DATA_DIR}/ejercicio/exercises.json`,
   library: `${DATA_DIR}/ejercicio/biblioteca.json`,
   favorites: `${DATA_DIR}/ejercicio/biblioteca-favoritos.json`,

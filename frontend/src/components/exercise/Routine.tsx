@@ -6,7 +6,7 @@
 // «Ir a hoy». La otra mitad del apartado es la Biblioteca (`Library.tsx`).
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Library, Link2, Plus, RefreshCw, Sparkles, Sun, X } from "lucide-react";
+import { ClipboardList, Library, Link2, Plus, RefreshCw, Sparkles, Sun, X } from "lucide-react";
 import { api } from "../../lib/bridge";
 import { useApp } from "../../store/app";
 import { useExercise } from "../../store/exercise";
@@ -26,6 +26,8 @@ import { ExerciseForm } from "./ExerciseForm";
 import { HistoryPanel } from "./HistoryPanel";
 import { ORANGE, useFail } from "./parts";
 import { RoutineDaySection, confirmRemove } from "./RoutineDaySection";
+import { RoutineTemplatesDialog } from "./RoutineTemplatesDialog";
+import { fieldsFromLibrary } from "../../lib/exerciseLibrary";
 
 const EMPTY: Partial<Exercise> = {
   day: "lunes",
@@ -56,6 +58,7 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
   const [formOpen, setFormOpen] = useState(false);
   // La ficha de historial de un ejercicio, si se pidió desde su fila.
   const [historyId, setHistoryId] = useState<string | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   // Las entradas propias se cargan **aquí**, una sola vez, y se pasan al
   // formulario: el aviso de copias desfasadas y el buscador necesitan las
@@ -287,6 +290,13 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
           <GhostButton data-add-exercise onClick={() => openAdd()}>
             <Plus size={13} /> Añadir ejercicio
           </GhostButton>
+          <GhostButton
+            data-open-templates-toolbar
+            title="Cargar rutina predefinida (PPL, Torso/Pierna, Full Body)"
+            onClick={() => setTemplatesOpen(true)}
+          >
+            <ClipboardList size={13} /> Plantillas
+          </GhostButton>
           <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line/60 bg-card/40 px-2 py-1 text-[11px] text-faint transition-colors hover:text-dim" title="Si la Biblioteca cambia, las copias se actualizan solas sin preguntar">
             <input
               type="checkbox"
@@ -383,9 +393,14 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
             <p className="text-[12px] text-faint">
               302 ejercicios de catálogo, con sus músculos y sus instrucciones.
             </p>
-            <GhostButton data-go-biblioteca onClick={onGoBiblioteca} className="mt-1">
-              <Library size={13} /> Ir a la biblioteca
-            </GhostButton>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              <GhostButton data-go-biblioteca onClick={onGoBiblioteca}>
+                <Library size={13} /> Ir a la biblioteca
+              </GhostButton>
+              <GhostButton data-open-templates onClick={() => setTemplatesOpen(true)}>
+                <ClipboardList size={13} /> Cargar plantilla predefinida
+              </GhostButton>
+            </div>
           </div>
         )}
         {days.map((d) => {
@@ -494,6 +509,48 @@ export function Routine({ onGoToday, onGoBiblioteca }: { onGoToday: () => void; 
           </div>
         </div>
       )}
+      <RoutineTemplatesDialog
+        open={templatesOpen}
+        onClose={() => setTemplatesOpen(false)}
+        onSelect={(template) => {
+          void (async () => {
+            if (list.length > 0) {
+              const ok = await confirmAction(
+                "Cargar plantilla",
+                `¿Reemplazar los ${list.length} ejercicios de tu programa con la plantilla «${template.name}»?`,
+                "Cargar plantilla",
+                true,
+              );
+              if (!ok) return;
+            }
+            try {
+              for (const old of list) {
+                await api.exRemove(old.id);
+              }
+              let count = 0;
+              for (const [dayKey, exs] of Object.entries(template.days)) {
+                for (const ex of exs) {
+                  const found = libraryEntry(ex.slug, libraryEntries);
+                  const libFields = found
+                    ? fieldsFromLibrary(found, libraryEntries)
+                    : { name: ex.name, how_to: "", muscles: { primary: [], secondary: [] } };
+                  await api.exSave("", {
+                    day: dayKey,
+                    ...libFields,
+                    series_reps: ex.series_reps,
+                    rest: ex.rest,
+                  });
+                  count++;
+                }
+              }
+              toast("info", `Plantilla «${template.name}» cargada (${count} ejercicios) ✓`);
+              void refresh();
+            } catch (err) {
+              fail(err);
+            }
+          })();
+        }}
+      />
     </div>
   );
 }

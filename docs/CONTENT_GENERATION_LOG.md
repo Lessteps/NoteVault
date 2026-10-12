@@ -15,3 +15,8 @@ Format: `date | area | phase | files written | checker result`
 - 2026-10-12 | 10.10 Dynamic programming | min | 6 exercise files | 192 checks ok, 0 failing, 1401 files left
 - 2026-10-12 | 10.11 Greedy choices and intervals | min | 6 exercise files | 198 checks ok, 0 failing, 1395 files left
 - 2026-10-12 | 10.12 Interview simulation | min | 6 exercise files | 204 checks ok, 0 failing, 1389 files left (Area 10 min COMPLETE)
+- 2026-10-12 | 1.2 How a computer works | min | 5 exercise files | 209 checks ok, 0 failing, 1384 files left
+- 2026-10-12 | 1.3 Representing information | min | 5 exercise files | 214 checks ok, 0 failing, 1379 files left
+- 2026-10-12 | 1.6 The working environment | min | 6 exercise files | 220 checks ok, 0 failing, 1373 files left
+- 2026-10-12 | 1.7 Specifying a problem | min | 6 exercise files | 226 checks ok, 0 failing, 1367 files left
+- 2026-10-12 | 1.8 Algorithms and pseudocode | min | 6 exercise files | 232 checks ok, 0 failing, 1361 files left

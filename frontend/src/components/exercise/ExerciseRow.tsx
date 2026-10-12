@@ -48,6 +48,7 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
   // ruido en la fila que más se mira.
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState("");
+  const [lastSession, setLastSession] = useState<{ weight: number; reps: number; date: string } | null>(null);
   // The latest values, read by every save: a blur and a click can fire two
   // saves before React re-renders, and the second must not send stale fields.
   const latest = useRef({ done, weight, reps, notes });
@@ -62,6 +63,23 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
     setNotes(v.notes);
     setStatus("idle");
     setError("");
+    // Cargar la sesión previa completada para sobrecarga progresiva.
+    let alive = true;
+    void api.exHistory(ex.id)
+      .then((rows) => {
+        if (!alive || !Array.isArray(rows) || !rows.length) return;
+        const past = rows
+          .filter((r) => r.date < day && (r.weight > 0 || r.reps > 0))
+          .sort((a, b) => a.date.localeCompare(b.date));
+        if (past.length > 0) {
+          const l = past[past.length - 1]!;
+          setLastSession({ weight: l.weight, reps: l.reps, date: l.date });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
     // Only when another day or exercise is shown: after that the row owns its
     // values, so a reload after a save never wipes what is being typed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,6 +207,24 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
             className="flex-none rounded-md px-1 text-[11px] text-faint hover:bg-hover hover:text-text"
           >
             ⏱ {ex.rest}
+          </button>
+        )}
+        {lastSession && (
+          <button
+            type="button"
+            data-last-session
+            onClick={() => {
+              if (future) return;
+              const w = lastSession.weight ? String(lastSession.weight) : "";
+              const r = lastSession.reps ? String(lastSession.reps) : "";
+              setWeight(w);
+              setReps(r);
+              void save({ weight: w, reps: r });
+            }}
+            title={`Última sesión (${lastSession.date}): ${lastSession.weight ? `${lastSession.weight} kg` : "peso corporal"} × ${lastSession.reps} reps. Clic para copiar.`}
+            className="flex-none rounded-md px-1.5 py-0.5 font-mono text-[11px] text-faint transition-colors hover:bg-hover hover:text-dim"
+          >
+            prev: <b className="font-normal text-dim">{lastSession.weight ? `${lastSession.weight}kg` : "—"}</b> × {lastSession.reps}
           </button>
         )}
         <input className={small} placeholder="kg" aria-label={`Peso: ${ex.name}`} value={weight} disabled={future}

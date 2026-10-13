@@ -9,11 +9,18 @@
 //    devuelve en pausa).
 //  - mentor_execution_pause / _resume / _cancel({ id }) -> { execution }: pausar y cancelar ABORTAN de verdad las tareas en vuelo.
 //
+//  - mentor_handoff_scheme({ id, perCell?, maxFiles?, ladder?, ai? }) -> { scheme }: ESQUEMATIZA lo que falta (teoría, mapas y ejercicios) en paquetes de
+//    trabajo pequeños y ordenados para pasárselos a otra IA (Antigravity) poco a poco. Con `ai` la IA solo ordena y nombra los paquetes; el reparto
+//    y las listas exactas son deterministas. Lo guarda en `.notevault/mentor/handoff/<plan>.json` (conserva qué paquetes ya se escribieron).
+//  - mentor_handoff_get({ id }) -> { scheme }: el esquema guardado (sin recalcular).
+//  - mentor_handoff_write({ id, packageId }) -> { path, prompt, scheme }: escribe el documento de UN paquete en `<materia>/_handoff/<plan>/NN-<id>.md`.
+//    Solo escribe ese archivo; no toca notas ni ejercicios.
+//
 // Nada de aquí sobrescribe: ver `mentorExecuteDeps.ts` (fotografía y restauración de la carpeta del tema) y docs/VAULT_FORMAT.md.
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { AIConfig } from "../../core/aiClient.js";
+import { AIConfig, sendChat } from "../../core/aiClient.js";
 import { ApiError } from "../../core/errors.js";
 import { areaFiles, areaKataDates, practiceAreasOf } from "../../lib/areaPracticeSystem.js";
 import { PLAN_ID_RE, PlanStore, type Plan } from "../../core/mentor/plan.js";
@@ -24,6 +31,10 @@ import { areaKeyOf } from "../../lib/planCoverage.js";
 import { buildExecutionReport, DEFAULT_SCOPE, progressOf, type ExecutionReport, type ExecutionScope, type ExecutionState } from "../../lib/planExecution.js";
 import { buildHandoffMarkdown } from "../../lib/planHandoff.js";
 import { weekRangesOf } from "../../lib/planTime.js";
+import {
+  applyAiScheme, buildScheme, DEFAULT_HANDOFF, packageMarkdown, promptFor, schemeMessages, topicsFromTasks, totalsOf,
+  type HandoffOptions, type HandoffPackage,
+} from "../../lib/handoffPlan.js";
 import * as store from "../../core/store.js";
 import { AppConfig } from "../appConfig.js";
 import { clearVaultScanCache } from "../vaultScan.js";
@@ -137,6 +148,29 @@ export function mentorExecuteApi(app: AppState, hooks: MentorExecuteHooks = {}) 
     return r;
   }
 
+  // ── Esquema de traspaso (plan para otra IA) ────────────────────────────
+  interface HandoffScheme {
+    version: 1;
+    planId: string;
+    createdAt: string;
+    source: "rules" | "ai";
+    note?: string;
+    options: HandoffOptions & { ladder: boolean };
+    packages: HandoffPackage[];
+  }
+  const MASTER_DOC = "C:\\PROGRAMMING\\PROJECTS\\NoteVault\\docs\\ANTIGRAVITY_PLAN_CONTENT_GENERATION.md";
+  const TOOLS_DIR = "C:\\PROGRAMMING\\PROJECTS\\NoteVault\\frontend";
+  const handoffFile = (planId: string): string => path.join(app.root, ".notevault", "mentor", "handoff", `${planId}.json`);
+  const loadHandoff = (planId: string): HandoffScheme | null => {
+    const raw = store.loadJson<HandoffScheme>(handoffFile(planId), null);
+    return raw && raw.version === 1 && Array.isArray(raw.packages) ? raw : null;
+  };
+  const handoffView = (sc: HandoffScheme | null) => (sc ? { ...sc, totals: totalsOf(sc.packages), pending: totalsOf(sc.packages.filter((p) => !p.written)) } : null);
+  const clampInt = (v: unknown, lo: number, hi: number, d: number): number => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d;
+  };
+
   /** Guarda la ejecución terminada en el historial antes de empezar otra (el registro de lo creado no se pierde). */
   function archive(s: ExecutionState): void {
     store.writeJson(path.join(app.root, ".notevault", "mentor", "executions", "history", s.planId, `${s.id}.json`), s);
@@ -221,6 +255,66 @@ export function mentorExecuteApi(app: AppState, hooks: MentorExecuteHooks = {}) 
       execStore().save(r.state);
       runnersOf(app).delete(plan.id); // el estado guardado manda: el siguiente «Reanudar» crea un runner con él
       return { execution: view(r.state), verified: r.verified, trimmed: r.trimmed, remaining: r.remaining };
+    },
+
+    async mentor_handoff_scheme(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const plan = planOf(o);
+      if (studyIndexCold(app)) return { loading: true as const };
+      const options = { perCell: clampInt(o.perCell, 1, 5, DEFAULT_HANDOFF.perCell), maxFiles: clampInt(o.maxFiles, 30, 600, DEFAULT_HANDOFF.maxFiles), maxTheory: DEFAULT_HANDOFF.maxTheory, ladder: o.ladder === true };
+      // solo contenido que hay que escribir (teoría y ejercicios): sin carpetas de práctica, katas ni temas propuestos por la revisión
+      const report = reportOf(plan, { mode: "all", includeRecommended: options.ladder, includeNewTopics: false, includeAreaPractice: false, includeKatasAi: false });
+      const byTopic = topicsFromTasks(report.tasks, options.perCell);
+      let packages = buildScheme(byTopic, report.areas.map((a) => ({ key: a.key, area: a.area })), options);
+      let source: HandoffScheme["source"] = "rules";
+      let note = packages.length ? "" : "No falta nada por crear con estas opciones.";
+      if (o.ai === true && packages.length > 1 && aiOn()) {
+        try {
+          const cfg = AIConfig.fromDict(AppConfig.get_ai_config());
+          const reply = await (hooks.send ?? ((c, m, x) => sendChat(c, m, x)))(cfg, schemeMessages(packages) as never, { timeoutMs: 90_000 });
+          const applied = applyAiScheme(packages, reply);
+          if (applied) {
+            packages = applied;
+            source = "ai";
+          } else note = "La IA no devolvió un orden válido: se usa el orden por reglas.";
+        } catch (e) {
+          note = `La IA no pudo ordenar los paquetes (${(e as Error).message.slice(0, 120)}): se usa el orden por reglas.`;
+        }
+      } else if (o.ai === true && !aiOn()) note = "La IA no está configurada: se usa el orden por reglas.";
+      // lo ya escrito se conserva mientras el paquete siga siendo el mismo (mismo id y mismos temas)
+      const prev = loadHandoff(plan.id);
+      const same = (a: HandoffPackage, b: HandoffPackage): boolean => a.id === b.id && a.topics.map((t) => t.folder).join("|") === b.topics.map((t) => t.folder).join("|");
+      packages = packages.map((p) => {
+        const old = prev?.packages.find((x) => same(x, p));
+        return old?.written ? { ...p, written: old.written } : p;
+      });
+      const scheme: HandoffScheme = { version: 1, planId: plan.id, createdAt: now(), source, ...(note ? { note } : {}), options, packages };
+      store.writeJson(handoffFile(plan.id), scheme);
+      return { loading: false as const, scheme: handoffView(scheme) };
+    },
+
+    mentor_handoff_get(opts: unknown) {
+      const plan = planOf(opts);
+      return { scheme: handoffView(loadHandoff(plan.id)) };
+    },
+
+    mentor_handoff_write(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const plan = planOf(o);
+      const sc = loadHandoff(plan.id);
+      const pkg = sc?.packages.find((p) => p.id === String(o.packageId ?? ""));
+      if (!sc || !pkg) throw new ApiError("Ese paquete ya no está en el esquema: vuelve a esquematizar.");
+      const space = pkg.topics[0]?.folder.split("/")[0] ?? "Programación";
+      const num = String(pkg.order).padStart(2, "0");
+      const relPath = `${space}/_handoff/${plan.id}/${num}-${pkg.id}.md`;
+      const abs = path.join(app.root, ...relPath.split("/"));
+      const md = packageMarkdown(pkg, { vaultRoot: app.root, space, planName: plan.name ?? plan.id, masterDoc: MASTER_DOC, toolsDir: TOOLS_DIR, total: sc.packages.length });
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, md, "utf-8");
+      const written = { at: now(), path: abs };
+      const next: HandoffScheme = { ...sc, packages: sc.packages.map((p) => (p.id === pkg.id ? { ...p, written } : p)) };
+      store.writeJson(handoffFile(plan.id), next);
+      return { path: abs, rel: relPath, prompt: promptFor(abs), scheme: handoffView(next) };
     },
 
     mentor_execution_pause(opts: unknown) {

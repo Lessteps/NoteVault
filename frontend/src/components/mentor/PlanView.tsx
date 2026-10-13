@@ -26,6 +26,7 @@ import { PlanDeliverables } from "./PlanDeliverables";
 import { BackToTop, PlanNotes, SectionCard, SectionHeading, SkipLink, TabPanel, Tabs, panelId, type TabDef } from "./planKit";
 import { agendaDateKey, cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planModeKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanMode, type PlanTab } from "./planShared";
 import { AddAreaBar } from "./AddAreaBar";
+import { HandoffPanel } from "./HandoffPanel";
 import { ExecutionAside, ExecutionBar } from "./ExecutionBar";
 import { PlanRun } from "./PlanRun";
 import { GenerateNotice, TocLayout, type TocItem } from "./PlanToc";
@@ -510,6 +511,7 @@ function MiPlan({
     ...(byAreas ? [{ id: "sec-fases", label: "Fases mes a mes" }, { id: "sec-temas", label: "Temas por área" }] : []),
     { id: "sec-cobertura", label: "Cobertura" },
     { id: "sec-ejecutar", label: "Ejecutar plan" },
+    { id: "sec-antigravity", label: "Plan para Antigravity" },
     { id: "sec-areas", label: "Áreas del plan", hint: String(plan.subplans.length) },
   ];
 
@@ -616,6 +618,7 @@ function MiPlan({
 
       <div id="sec-cobertura" tabIndex={-1} className="scroll-mt-28 outline-none"><CoveragePanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} /></div>
       <div id="sec-ejecutar" tabIndex={-1} className="scroll-mt-28 outline-none"><ExecutionPanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} /></div>
+      <div id="sec-antigravity" tabIndex={-1} className="scroll-mt-28 outline-none"><HandoffPanel planId={plan.id} aiConfigured={cov.aiConfigured} /></div>
 
       <section id="sec-areas" tabIndex={-1} className="scroll-mt-28 outline-none" aria-labelledby="mp-subplans" data-testid="plan-subplans">
         <SectionHeading id="mp-subplans" hint={byAreas ? "Cada tarjeta es un área con sus grupos internos (Bases, Lenguaje, Conocimientos): ábrela para ver su ruta de temas con el registro de completados, las metas enlazadas y el proyecto de área." : "Cada tarjeta resume un subplan: ábrela para ver sus semanas, sus temas con el registro de completados, las metas requeridas y el entregable."}>

@@ -343,3 +343,50 @@ describe("área «Lógica de programación» y proyecto semanal", () => {
   });
 });
 
+describe("Plan para Antigravity en «Mi plan»", () => {
+  const pkg = (order: number, over: Record<string, unknown> = {}) => ({
+    id: `exercises-backend-${order}`, order, kind: "exercises", areaKey: "backend", area: "Backend", title: `Ejercicios · Backend (${order}/2)`, why: "30 ejercicios en 2 temas",
+    topics: [{ folder: F1, title: "1.1", week: 1, theory: false, cells: [{ skill: "explain", difficulty: 1, write: 3 }] }], files: 30, weeks: [1, 2] as [number, number], ...over,
+  });
+  const scheme = (written = false) => ({
+    version: 1, planId: PID, createdAt: "t", source: "rules", options: { perCell: 3, maxFiles: 150, maxTheory: 8, ladder: false },
+    packages: [pkg(1, written ? { written: { at: "t", path: "C:/V/Programación/_handoff/01.md" } } : {}), pkg(2)],
+    totals: { packages: 2, files: 60, topics: 1 }, pending: { packages: written ? 1 : 2, files: 30, topics: 1 },
+  });
+
+  it("esquematiza con las opciones elegidas, lista los planes y genera uno bajo demanda", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue({ loading: false, coverage: { areas: [], totals: { topics: 2, theory: 2, practice: 2, outOfPlan: 0 }, ppReady: true }, review: null, aiConfigured: true } as never);
+    vi.spyOn(api, "mentorHandoffGet").mockResolvedValue({ scheme: null });
+    const build = vi.spyOn(api, "mentorHandoffScheme").mockResolvedValue({ loading: false, scheme: scheme(false) } as never);
+    const write = vi.spyOn(api, "mentorHandoffWrite").mockResolvedValue({ path: "C:/V/Programación/_handoff/01.md", rel: "x", prompt: "Read it and execute it.", scheme: scheme(true) } as never);
+    useNavState.setState({ values: { [planModeKey(PID)]: "plan" } });
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(byTest("handoff-panel")).toBeTruthy();
+    expect(byTest("handoff-list")).toBeNull();
+    await click(byTest("handoff-build"));
+    expect(build).toHaveBeenCalledWith(PID, { perCell: 3, maxFiles: 150, ladder: false, ai: true });
+    const items = all("handoff-package");
+    expect(items).toHaveLength(2);
+    expect(items[0]!.textContent).toContain("Ejercicios · Backend (1/2)");
+    expect(items[0]!.textContent).toContain("30 archivos");
+    expect(byTest("handoff-list")!.textContent).toContain("2 planes");
+    await click(items[0]!.querySelector("[data-testid=handoff-write]"));
+    expect(write).toHaveBeenCalledWith(PID, "exercises-backend-1");
+    expect(all("handoff-package")[0]!.dataset.state).toBe("written");
+    expect(byTest("handoff-path")!.textContent).toContain("_handoff");
+  });
+
+  it("recuerda el último esquema guardado al abrir", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue({ loading: false, coverage: { areas: [], totals: { topics: 2, theory: 2, practice: 2, outOfPlan: 0 }, ppReady: true }, review: null, aiConfigured: false } as never);
+    vi.spyOn(api, "mentorHandoffGet").mockResolvedValue({ scheme: scheme(true) } as never);
+    useNavState.setState({ values: { [planModeKey(PID)]: "plan" } });
+    await mountEl(<MentorPlan planId={PID} />);
+    await flush();
+    expect(all("handoff-package")).toHaveLength(2);
+    expect((byTest("handoff-ai") as HTMLInputElement).disabled).toBe(true);
+    expect(byTest("handoff-all")!.textContent).toContain("1 pendientes");
+  });
+});
+

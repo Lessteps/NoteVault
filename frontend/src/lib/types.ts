@@ -1485,6 +1485,18 @@ export type MentorCoverageReviewResult =
 export type MentorExecutionReport = import("./planExecution").ExecutionReport;
 export interface MentorExecutionView { state: import("./planExecution").ExecutionState; progress: import("./planExecution").ExecutionProgress }
 export type MentorExecutionReportResult = { loading: true } | { loading: false; report: MentorExecutionReport; execution: MentorExecutionView | null; aiConfigured: boolean };
+/** Esquema de traspaso para otra IA (`mentor_handoff_*`): lo que falta por crear, repartido en planes pequeños; ver `lib/handoffPlan.ts`. */
+export interface MentorHandoffScheme {
+  version: 1;
+  planId: string;
+  createdAt: string;
+  source: "rules" | "ai";
+  note?: string;
+  options: { perCell: number; maxFiles: number; maxTheory: number; ladder: boolean };
+  packages: import("./handoffPlan").HandoffPackage[];
+  totals: { packages: number; files: number; topics: number };
+  pending: { packages: number; files: number; topics: number };
+}
 export type MentorExecutionStartResult = { loading: true } | { loading: false; execution: MentorExecutionView | null };
 /** Sistema de práctica por área de un plan (`mentor_area_practice`); ver `lib/areaPracticeView.ts`. */
 export interface MentorAreaPractice { today: string; ppReady: boolean; ppBase: string; areas: import("./areaPracticeView").AreaPracticeView[] }

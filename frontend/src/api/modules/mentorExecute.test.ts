@@ -284,3 +284,80 @@ describe("ejecutar el plan", () => {
     expect(fin.status).toBe("done");
   }, 40000);
 });
+
+describe("plan para Antigravity: esquema de lo que falta y planes bajo demanda", () => {
+  const scheme = async (opts: Record<string, unknown> = {}): Promise<any> => ((await mentorApi(app).mentor_handoff_scheme({ id, ai: false, ...opts })) as any).scheme;
+
+  it("reparte lo que falta en planes: primero la teoría y luego los ejercicios, con los archivos exactos y sin tocar la vault", async () => {
+    const notes = (): string[] => walk(dir).filter((f) => !f.includes(`${path.sep}.notevault${path.sep}`)).sort();
+    const before = notes();
+    const sc = await scheme();
+    expect(sc.packages.length).toBeGreaterThanOrEqual(2);
+    const kinds = sc.packages.map((p: any) => p.kind);
+    expect(kinds.indexOf("theory")).toBeLessThan(kinds.lastIndexOf("exercises"));
+    expect(sc.packages.map((p: any) => p.order)).toEqual(sc.packages.map((_: unknown, i: number) => i + 1));
+    expect(sc.source).toBe("rules");
+    const ex = sc.packages.filter((p: any) => p.kind === "exercises");
+    expect(ex.length).toBeGreaterThan(0);
+    // cada celda de ejercicios lleva cuántos escribir (3 por defecto) y suma los archivos del plan
+    const cell = ex[0].topics[0].cells[0];
+    expect(cell).toMatchObject({ write: 3 });
+    expect(ex[0].files).toBe(ex[0].topics.reduce((n: number, t: any) => n + t.cells.reduce((m: number, c: any) => m + c.write, 0), 0));
+    expect(sc.totals.files).toBe(sc.packages.reduce((n: number, p: any) => n + p.files, 0));
+    // solo escribió el esquema guardado: ninguna nota ni ejercicio cambió
+    expect(notes()).toEqual(before);
+    expect(exists(`.notevault/mentor/handoff/${id}.json`)).toBe(true);
+  });
+
+  it("con menos archivos por plan la práctica se parte en más planes y 1 ejercicio por celda baja el total", async () => {
+    const big = await scheme({ maxFiles: 400 });
+    const small = await scheme({ maxFiles: 30 });
+    const one = await scheme({ perCell: 1, maxFiles: 400 });
+    expect(small.packages.filter((p: any) => p.kind === "exercises").length).toBeGreaterThanOrEqual(big.packages.filter((p: any) => p.kind === "exercises").length);
+    expect(one.totals.files).toBeLessThan(big.totals.files);
+  });
+
+  it("escribe el documento de UN plan en _handoff, en inglés, con la lista exacta y la instrucción para pegar", async () => {
+    const sc = await scheme();
+    const pkg = sc.packages.find((p: any) => p.kind === "exercises");
+    const r: any = mentorApi(app).mentor_handoff_write({ id, packageId: pkg.id });
+    expect(r.rel).toMatch(new RegExp(`^Programación/_handoff/${id}/\\d\\d-${pkg.id}\\.md$`));
+    const md = read(r.rel);
+    expect(md).toContain("# Antigravity plan");
+    expect(md).toContain(pkg.topics[0].folder);
+    expect(md).toContain("exercises_check.mjs");
+    expect(md).toContain("ANTIGRAVITY_PLAN_CONTENT_GENERATION.md");
+    expect(r.prompt).toContain("execute it");
+    expect(r.scheme.packages.find((p: any) => p.id === pkg.id).written.path).toBe(r.path);
+    // los demás planes siguen sin escribir
+    expect(r.scheme.pending.packages).toBe(sc.packages.length - 1);
+    expect(() => mentorApi(app).mentor_handoff_write({ id, packageId: "nope" })).toThrow(/ya no está/);
+  });
+
+  it("volver a esquematizar conserva lo ya escrito", async () => {
+    const sc = await scheme();
+    const pkg = sc.packages[0];
+    mentorApi(app).mentor_handoff_write({ id, packageId: pkg.id });
+    const again = await scheme();
+    expect(again.packages.find((p: any) => p.id === pkg.id).written).toBeTruthy();
+    expect(((mentorApi(app).mentor_handoff_get({ id }) as any).scheme.pending.packages)).toBe(again.packages.length - 1);
+  });
+
+  it("con IA: ordena y nombra los planes; si responde algo inválido cae a reglas y lo dice", async () => {
+    const base = await scheme();
+    const ids = base.packages.map((p: any) => p.id) as string[];
+    const reversed = [...ids].reverse();
+    hoisted.chat.mockImplementation(async () => JSON.stringify({ order: reversed, packages: [{ id: ids[0], title: "Primero lo primero", why: "Desbloquea el resto" }] }));
+    const ai = await scheme({ ai: true });
+    expect(ai.source).toBe("ai");
+    expect(ai.packages.map((p: any) => p.id)).toEqual(reversed);
+    expect(ai.packages.find((p: any) => p.id === ids[0]).title).toBe("Primero lo primero");
+    // el contenido de los planes no cambia: solo el orden y el nombre
+    expect(ai.totals.files).toBe(base.totals.files);
+    hoisted.chat.mockImplementation(async () => "no es json");
+    const bad = await scheme({ ai: true });
+    expect(bad.source).toBe("rules");
+    expect(bad.note).toContain("reglas");
+  });
+});
+

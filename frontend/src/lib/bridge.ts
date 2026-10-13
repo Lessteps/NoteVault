@@ -384,6 +384,11 @@ export const api = {
   mentorExecutionStart: (id: string, scope: Partial<import("./planExecution").ExecutionScope>) => call<import("./types").MentorExecutionStartResult>("mentor_execution_start", { id, scope, confirm: true }),
   /** «Verificar»: contrasta la ejecución guardada con la vault y marca como hechas las tareas ya cubiertas (sin IA). */
   mentorExecutionVerify: (id: string) => call<{ execution: import("./types").MentorExecutionView | null; verified: number; trimmed: number; remaining: number }>("mentor_execution_verify", { id }),
+  /** Plan para Antigravity: esquematiza lo que falta en planes pequeños y escribe el documento de cada uno bajo demanda. */
+  mentorHandoffScheme: (id: string, opts: { perCell?: number; maxFiles?: number; ladder?: boolean; ai?: boolean } = {}) =>
+    call<{ loading: true } | { loading: false; scheme: import("./types").MentorHandoffScheme | null }>("mentor_handoff_scheme", { id, ...opts }),
+  mentorHandoffGet: (id: string) => call<{ scheme: import("./types").MentorHandoffScheme | null }>("mentor_handoff_get", { id }),
+  mentorHandoffWrite: (id: string, packageId: string) => call<{ path: string; rel: string; prompt: string; scheme: import("./types").MentorHandoffScheme }>("mentor_handoff_write", { id, packageId }),
   mentorExecutionPause: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_pause", { id }),
   mentorExecutionResume: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_resume", { id }),
   mentorExecutionCancel: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_cancel", { id }),

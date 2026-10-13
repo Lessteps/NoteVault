@@ -32,3 +32,9 @@ Format: `date | area | phase | files written | checker result`
 - 2026-10-12 | 1.18 Boolean logic and simplifying conditions | min | 6 exercise files | 292 checks ok, 0 failing, 1301 files left
 - 2026-10-12 | 1.19 While loops | min | 6 exercise files | 298 checks ok, 0 failing, 1295 files left
 - 2026-10-12 | 1.20 For loops and ranges | min | 6 exercise files | 304 checks ok, 0 failing, 1289 files left
+- 2026-10-13 | 1.21 Loop patterns | min | 6 exercise files | 310 checks ok, 0 failing, 1283 files left
+- 2026-10-13 | 1.22 Nested loops | min | 6 exercise files | 316 checks ok, 0 failing, 1277 files left
+- 2026-10-13 | 1.23 Invariants, termination and off-by-one errors | min | 6 exercise files | 322 checks ok, 0 failing, 1271 files left
+- 2026-10-13 | 1.24 Tracing execution by hand | min | 6 exercise files | 328 checks ok, 0 failing, 1265 files left
+- 2026-10-13 | 1.25 Functions | min | 6 exercise files | 334 checks ok, 0 failing, 1259 files left
+- 2026-10-13 | 1.26 Scope and the call stack | min | 6 exercise files | 340 checks ok, 0 failing, 1253 files left

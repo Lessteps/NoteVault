@@ -50,3 +50,9 @@ Format: `date | area | phase | files written | checker result`
 - 2026-10-13 | 1.36 Kinds of errors | min | 5 exercise files | 398 checks ok, 0 failing, 1195 files left
 - 2026-10-13 | 1.37 Reading error messages and stack traces | min | 6 exercise files | 404 checks ok, 0 failing, 1189 files left
 - 2026-10-13 | 1.38 Deliberate debugging | min | 6 exercise files | 410 checks ok, 0 failing, 1183 files left
+- 2026-10-13 | 1.39 Exceptions and error handling | min | 6 exercise files | 416 checks ok, 0 failing, 1177 files left
+- 2026-10-13 | 1.40 Input validation and defensive programming | min | 6 exercise files | 422 checks ok, 0 failing, 1171 files left
+- 2026-10-13 | 1.41 Reading and writing files | min | 6 exercise files | 428 checks ok, 0 failing, 1165 files left
+- 2026-10-13 | 1.42 Data formats | min | 6 exercise files | 434 checks ok, 0 failing, 1159 files left
+- 2026-10-13 | 1.43 Regular expressions basics | min | 6 exercise files | 440 checks ok, 0 failing, 1153 files left
+- 2026-10-13 | 1.44 Dates, times and time zones | min | 6 exercise files | 446 checks ok, 0 failing, 1147 files left

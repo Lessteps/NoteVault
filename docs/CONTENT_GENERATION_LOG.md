@@ -44,3 +44,9 @@ Format: `date | area | phase | files written | checker result`
 - 2026-10-13 | 1.30 Lists and arrays | min | 6 exercise files | 363 checks ok, 0 failing, 1230 files left
 - 2026-10-13 | 1.31 Tuples, sets and records | min | 6 exercise files | 369 checks ok, 0 failing, 1224 files left
 - 2026-10-13 | 1.32 Dictionaries and hash tables | min | 6 exercise files | 375 checks ok, 0 failing, 1218 files left
+- 2026-10-13 | 1.33 Nested data and JSON | min | 6 exercise files | 381 checks ok, 0 failing, 1212 files left
+- 2026-10-13 | 1.34 References, mutability and copies | min | 6 exercise files | 387 checks ok, 0 failing, 1206 files left
+- 2026-10-13 | 1.35 Matrices and tabular data | min | 6 exercise files | 393 checks ok, 0 failing, 1200 files left
+- 2026-10-13 | 1.36 Kinds of errors | min | 5 exercise files | 398 checks ok, 0 failing, 1195 files left
+- 2026-10-13 | 1.37 Reading error messages and stack traces | min | 6 exercise files | 404 checks ok, 0 failing, 1189 files left
+- 2026-10-13 | 1.38 Deliberate debugging | min | 6 exercise files | 410 checks ok, 0 failing, 1183 files left

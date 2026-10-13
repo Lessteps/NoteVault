@@ -26,3 +26,9 @@ Format: `date | area | phase | files written | checker result`
 - 2026-10-12 | 1.12 Arithmetic, comparison and logical operators | min | 6 exercise files | 256 checks ok, 0 failing, 1337 files left
 - 2026-10-12 | 1.13 Expressions, assignment and program state | min | 6 exercise files | 262 checks ok, 0 failing, 1331 files left
 - 2026-10-12 | 1.14 Text strings | min | 6 exercise files | 268 checks ok, 0 failing, 1325 files left
+- 2026-10-12 | 1.15 Console input and output | min | 6 exercise files | 274 checks ok, 0 failing, 1319 files left
+- 2026-10-12 | 1.16 Type conversion | min | 6 exercise files | 280 checks ok, 0 failing, 1313 files left
+- 2026-10-12 | 1.17 Conditionals | min | 6 exercise files | 286 checks ok, 0 failing, 1307 files left
+- 2026-10-12 | 1.18 Boolean logic and simplifying conditions | min | 6 exercise files | 292 checks ok, 0 failing, 1301 files left
+- 2026-10-12 | 1.19 While loops | min | 6 exercise files | 298 checks ok, 0 failing, 1295 files left
+- 2026-10-12 | 1.20 For loops and ranges | min | 6 exercise files | 304 checks ok, 0 failing, 1289 files left

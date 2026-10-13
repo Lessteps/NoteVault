@@ -38,3 +38,9 @@ Format: `date | area | phase | files written | checker result`
 - 2026-10-13 | 1.24 Tracing execution by hand | min | 6 exercise files | 328 checks ok, 0 failing, 1265 files left
 - 2026-10-13 | 1.25 Functions | min | 6 exercise files | 334 checks ok, 0 failing, 1259 files left
 - 2026-10-13 | 1.26 Scope and the call stack | min | 6 exercise files | 340 checks ok, 0 failing, 1253 files left
+- 2026-10-13 | 1.27 Pure functions and side effects | min | 6 exercise files | 346 checks ok, 0 failing, 1247 files left
+- 2026-10-13 | 1.28 Modules, imports and code reuse | min | 6 exercise files | 352 checks ok, 0 failing, 1241 files left
+- 2026-10-13 | 1.29 Naming, readability and documentation | min | 5 exercise files | 357 checks ok, 0 failing, 1236 files left
+- 2026-10-13 | 1.30 Lists and arrays | min | 6 exercise files | 363 checks ok, 0 failing, 1230 files left
+- 2026-10-13 | 1.31 Tuples, sets and records | min | 6 exercise files | 369 checks ok, 0 failing, 1224 files left
+- 2026-10-13 | 1.32 Dictionaries and hash tables | min | 6 exercise files | 375 checks ok, 0 failing, 1218 files left

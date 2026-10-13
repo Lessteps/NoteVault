@@ -20,3 +20,9 @@ Format: `date | area | phase | files written | checker result`
 - 2026-10-12 | 1.6 The working environment | min | 6 exercise files | 220 checks ok, 0 failing, 1373 files left
 - 2026-10-12 | 1.7 Specifying a problem | min | 6 exercise files | 226 checks ok, 0 failing, 1367 files left
 - 2026-10-12 | 1.8 Algorithms and pseudocode | min | 6 exercise files | 232 checks ok, 0 failing, 1361 files left
+- 2026-10-12 | 1.9 Decomposition and abstraction | min | 5 exercise files | 238 checks ok, 0 failing, 1355 files left
+- 2026-10-12 | 1.10 Examples and edge cases | min | 6 exercise files | 244 checks ok, 0 failing, 1349 files left
+- 2026-10-12 | 1.11 Variables, values and primitive types | min | 6 exercise files | 250 checks ok, 0 failing, 1343 files left
+- 2026-10-12 | 1.12 Arithmetic, comparison and logical operators | min | 6 exercise files | 256 checks ok, 0 failing, 1337 files left
+- 2026-10-12 | 1.13 Expressions, assignment and program state | min | 6 exercise files | 262 checks ok, 0 failing, 1331 files left
+- 2026-10-12 | 1.14 Text strings | min | 6 exercise files | 268 checks ok, 0 failing, 1325 files left

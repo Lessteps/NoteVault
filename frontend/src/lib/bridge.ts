@@ -12,6 +12,7 @@ import type {
 } from "./types";
 import type { LibraryUserEntry } from "./libraryTypes";
 import type { BodyProfile } from "./exerciseTypes";
+import type { FinanceContextData } from "./financeCoachTypes";
 
 type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
@@ -514,6 +515,22 @@ export const api = {
       "ex_coach_chat_stream", id, history, question,
     ),
   exCoachChatCancel: (id: string) => call<{ ok: boolean }>("ex_coach_chat_cancel", id),
+  finCoachContext: () => call<FinanceContextData>("fin_coach_context"),
+  finCoachConversations: () => call<ConversationMeta[]>("fin_coach_conversations"),
+  finCoachConversationGet: (id: string) => call<Conversation | null>("fin_coach_conversation_get", id),
+  finCoachConversationSave: (id: string | null, messages: unknown, model?: string, title?: string) =>
+    call<Conversation>("fin_coach_conversation_save", id, messages, model, title),
+  finCoachConversationRename: (id: string, title: string) =>
+    call<Conversation>("fin_coach_conversation_rename", id, title),
+  finCoachConversationDelete: (id: string) =>
+    call<{ ok: boolean }>("fin_coach_conversation_delete", id),
+  finCoachAiTitle: (id: string, question: string, answer?: string) =>
+    call<{ title: string; fallback: boolean; error?: string }>("fin_coach_ai_title", id, question, answer),
+  finCoachChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string) =>
+    call<{ reply?: string; stopped?: boolean; bridge?: boolean; prompt?: string; url?: string; label?: string }>(
+      "fin_coach_chat_stream", id, history, question,
+    ),
+  finCoachChatCancel: (id: string) => call<{ ok: boolean }>("fin_coach_chat_cancel", id),
   exVideoUrl: (id: string) => call<{ url: string; name: string }>("ex_video_url", id),
   exOpenVideo: (id: string) => call<{ ok: boolean }>("ex_open_video", id),
   exPickVideo: (id: string) => call<{ ok: boolean }>("ex_pick_video", id),

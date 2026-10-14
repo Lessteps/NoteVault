@@ -9,7 +9,7 @@ import { parseRepeat, shortDate, todayIso } from "../../lib/tasks";
 import type { FinGoal, FinPace, Movement } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
-import { BlockProgress, LineChart } from "../common/charts";
+import { LineChart } from "../common/charts";
 import { Chip, ColourRow, Field, GhostButton, input, Label, Modal, PrimaryButton } from "../common/forms";
 import { RepeatPicker } from "../common/RepeatPicker";
 import { StatTile } from "../common/StatTile";
@@ -214,7 +214,34 @@ function GoalDetail({ id }: { id: string }) {
         <Chip colour={STATUS_COLOURS[g.status]}>{g.status}</Chip>
         <span className="text-[12px] text-faint">{cadenceText(g)}</span>
       </div>
-      <BlockProgress value={g.target_cents ? p.saved / g.target_cents : 0} colour={g.colour} blocks={40} />
+      {/* Barra de progreso continua y realista */}
+      <div className="space-y-1.5" data-goal-progress>
+        <div className="flex items-center justify-between text-[12.5px]">
+          <span className="font-medium text-dim">Progreso acumulado</span>
+          <span className="font-mono text-[13px] font-bold text-text">
+            {g.target_cents ? Math.min(100, Math.round((100 * p.saved) / g.target_cents)) : 0} %
+          </span>
+        </div>
+        <div className="relative h-3 w-full overflow-hidden rounded-full bg-hover/80 border border-line">
+          <div
+            className="h-full rounded-full transition-all duration-500 ease-out shadow-xs"
+            style={{
+              width: `${g.target_cents ? Math.min(100, Math.max(0, Math.round((100 * p.saved) / g.target_cents))) : 0}%`,
+              backgroundColor: g.colour || "var(--nv-mint)",
+            }}
+          />
+        </div>
+        <div className="flex flex-wrap items-center justify-between text-[11.5px] text-faint pt-0.5">
+          <span>📅 Inicio: {shortDate(g.start)}</span>
+          {g.deadline ? (
+            <span className="font-medium text-dim">
+              ⏰ Límite: {shortDate(g.deadline)} {p.days_left !== null ? `(quedan ${p.days_left} días)` : ""}
+            </span>
+          ) : (
+            <span>Sin fecha límite</span>
+          )}
+        </div>
+      </div>
       <div className="grid grid-cols-4 gap-3">
         <StatTile value={formatMoney(p.saved)} label={`Llevas · ${g.target_cents ? Math.round((100 * p.saved) / g.target_cents) : 0} %`} colour="var(--nv-mint)" />
         <StatTile value={formatMoney(p.remaining)} label="Falta" />
@@ -281,12 +308,33 @@ export function FinGoals() {
               <span className="flex-1 text-[15px] font-semibold text-text">{g.name}</span>
               <Chip colour={STATUS_COLOURS[g.status]}>{g.status}</Chip>
             </div>
-            <BlockProgress value={g.target_cents ? g.pace.saved / g.target_cents : 0} colour={g.colour} blocks={16} className="mt-3" />
-            <div className="mt-2 text-[12.5px] text-text">Llevas {formatMoney(g.pace.saved)} de {formatMoney(g.target_cents)} ({g.target_cents ? Math.round((100 * g.pace.saved) / g.target_cents) : 0} %)</div>
-            <div className="text-[12px] text-dim">Falta {formatMoney(g.pace.remaining)}</div>
+            {/* Barra de progreso continua y realista */}
+            <div className="mt-3">
+              <div className="mb-1 flex items-center justify-between text-[11.5px]">
+                <span className="text-[12px] text-text font-medium">
+                  {formatMoney(g.pace.saved)} de {formatMoney(g.target_cents)}
+                </span>
+                <span className="font-mono font-bold text-text">
+                  {g.target_cents ? Math.min(100, Math.round((100 * g.pace.saved) / g.target_cents)) : 0} %
+                </span>
+              </div>
+              <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-hover/80 border border-line/60">
+                <div
+                  className="h-full rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: `${g.target_cents ? Math.min(100, Math.max(0, Math.round((100 * g.pace.saved) / g.target_cents))) : 0}%`,
+                    backgroundColor: g.colour || "var(--nv-accent)",
+                  }}
+                />
+              </div>
+            </div>
+            <div className="mt-2 text-[12px] text-dim">Falta {formatMoney(g.pace.remaining)}</div>
             {paceLine(g.pace) && <div className="mt-1 text-[11px] text-dim">{paceLine(g.pace)}</div>}
             <div className="mt-1 text-[11px] text-faint">{g.projection ? `Proyección: ${shortDate(g.projection)}` : "Sin ritmo reciente para proyectar"}</div>
-            <div className="mt-2 flex text-[11px] text-faint"><span>{cadenceText(g)}</span>{g.deadline && <span className="ml-auto">⏰ {shortDate(g.deadline)}</span>}</div>
+            <div className="mt-2 flex text-[11px] text-faint">
+              <span>{cadenceText(g)}</span>
+              {g.deadline ? <span className="ml-auto">⏰ {shortDate(g.deadline)}</span> : <span className="ml-auto">📅 {shortDate(g.start)}</span>}
+            </div>
           </button>
         ))}
       </div>

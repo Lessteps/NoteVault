@@ -51,13 +51,35 @@ export function Diario() {
       });
   }, [day, version, toast]);
 
-  const quickSave = async () => {    if (!q.amount) {
+  const handleWhatChange = (val: string) => {
+    let nextCat = q.category;
+    if (!nextCat && val.trim().length >= 3) {
+      const norm = val.toLowerCase().trim();
+      const available = q.type === "gasto" ? expenseCats : incomeCats;
+      const found = available.find((c) =>
+        norm.includes(c.name.toLowerCase().trim()) || c.name.toLowerCase().trim().includes(norm),
+      );
+      if (found) nextCat = found.id;
+    }
+    setQ({ ...q, what: val, category: nextCat });
+  };
+
+  const quickSave = async () => {
+    if (!q.amount) {
       setHint("Escribe un importe: 12.500, 12500 o 12,5k");
       return;
     }
     try {
-      await api.finAdd(day, { type: q.type, amount_cents: q.amount, what: q.what, category: q.type === "gasto" || q.type === "ingreso" ? q.category : "", reason: "" });
-      setHint(`Guardado: ${formatMoney(q.amount)}${q.what ? ` · ${q.what}` : ""}`);
+      await api.finAdd(day, {
+        type: q.type,
+        amount_cents: q.amount,
+        what: q.what.trim(),
+        category: q.type === "gasto" || q.type === "ingreso" ? q.category : "",
+        reason: "",
+      });
+      const savedMsg = `${TYPE_LABELS[q.type] || "Movimiento"} registrado: ${formatMoney(q.amount)}${q.what.trim() ? ` · ${q.what.trim()}` : ""}`;
+      setHint(`✓ ${savedMsg}`);
+      toast("info", savedMsg);
       setQ({ type: q.type, amount: null, what: "", category: q.category });
       await changed();
     } catch (e) {
@@ -154,7 +176,7 @@ export function Diario() {
             {(["gasto", "ingreso", "ahorro", "retiro"] as const).map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
           </select>
           <MoneyInput label="Importe rápido" value={q.amount} onChange={(amount) => setQ({ ...q, amount })} className="w-32 py-1.5" onEnter={() => void quickSave()} />
-          <input className={cn(sel, "min-w-[140px] flex-1")} placeholder="Detalle" value={q.what} onChange={(e) => setQ({ ...q, what: e.target.value })}
+          <input className={cn(sel, "min-w-[140px] flex-1")} placeholder="Detalle" value={q.what} onChange={(e) => handleWhatChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void quickSave()} />
           {(q.type === "gasto" || q.type === "ingreso") && (
             <div className="flex items-center gap-1">
@@ -174,7 +196,7 @@ export function Diario() {
               onSaved: () => setQ({ type: q.type, amount: null, what: "", category: q.category }) })}><Paperclip size={13} /></GhostButton>
           <PrimaryButton className="py-1 px-3 text-[12.5px]" onClick={() => void quickSave()}>Guardar ↵</PrimaryButton>
         </div>
-        <p className="mt-1.5 text-[11px] text-faint">{hint}</p>
+        <p className={cn("mt-1.5 text-[11px]", hint.startsWith("✓") ? "text-mint font-medium" : "text-faint")}>{hint}</p>
       </div>
       <Tiles t={t} daily only={["gasto", "ahorro"]} />
       {checks.length > 0 && (

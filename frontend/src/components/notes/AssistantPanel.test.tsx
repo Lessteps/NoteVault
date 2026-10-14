@@ -46,4 +46,13 @@ describe("AssistantPanel", () => {
     expect(host.textContent).toContain("Coach de Entrenamiento");
     expect(host.textContent).not.toContain("Pregunta sobre la nota abierta");
   });
+
+  it("despacha a FinanceCoachAssistant cuando el módulo activo es 'finanzas'", async () => {
+    useApp.setState({ module: "finanzas" });
+    await act(async () => {
+      root.render(<AssistantPanel />);
+    });
+    expect(host.textContent).toContain("Asesor Financiero");
+    expect(host.textContent).not.toContain("Pregunta sobre la nota abierta");
+  });
 });

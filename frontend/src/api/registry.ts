@@ -16,6 +16,7 @@ import { exerciseApi } from "./modules/exercise.js";
 import { exerciseCoachApi } from "./modules/exerciseCoach.js";
 import { filesApi } from "./modules/files.js";
 import { financeApi } from "./modules/finance.js";
+import { financeCoachApi } from "./modules/financeCoach.js";
 import { goalsApi } from "./modules/goals.js";
 import { habitsApi } from "./modules/habits.js";
 import { homeApi } from "./modules/home.js";
@@ -56,6 +57,7 @@ export function buildRegistry(app: AppState): Registry {
     ...exerciseApi(app),
     ...exerciseCoachApi(app),
     ...financeApi(app),
+    ...financeCoachApi(app),
     ...goalsApi(app),
     ...mentorApi(app),
     ...projectsApi(app),

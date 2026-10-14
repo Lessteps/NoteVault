@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { addDays } from "./dates";
 import {
   AHORRO,
   FinanceCalendarSource,
@@ -224,22 +225,26 @@ describe("FinanceManager", () => {
     });
 
     it("calendar source integrates with schedule", () => {
+      const today = new Date();
+      const startDay = addDays(today, -5);
+      const testDay1 = addDays(today, -2);
+      const testDay2 = today;
       const g = fm.create_goal("Ahorro Viaje", 5000000, {
         repeat: "daily",
-        start: new Date(2026, 8, 1),
+        start: startDay,
         suggested_cents: 100000,
       });
 
       const src = new FinanceCalendarSource(fm);
-      const occs = src.occurrences(new Date(2026, 8, 10), new Date(2026, 8, 12));
+      const occs = src.occurrences(testDay1, testDay2);
       expect(Object.keys(occs).length).toBe(3);
 
-      src.setDone(new Date(2026, 8, 11), `fgoal:${g.id}`, true);
-      const dayMovs = fm.day(new Date(2026, 8, 11));
+      src.setDone(testDay1, `fgoal:${g.id}`, true);
+      const dayMovs = fm.day(testDay1);
       expect(dayMovs.some((m) => m.goal === g.id && m.type === AHORRO)).toBe(true);
 
-      src.setDone(new Date(2026, 8, 11), `fgoal:${g.id}`, false);
-      const dayMovsAfter = fm.day(new Date(2026, 8, 11));
+      src.setDone(testDay1, `fgoal:${g.id}`, false);
+      const dayMovsAfter = fm.day(testDay1);
       expect(dayMovsAfter.some((m) => m.goal === g.id && m.type === AHORRO)).toBe(false);
     });
   });

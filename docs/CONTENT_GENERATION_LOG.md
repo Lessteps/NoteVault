@@ -56,3 +56,9 @@ Format: `date | area | phase | files written | checker result`
 - 2026-10-13 | 1.42 Data formats | min | 6 exercise files | 434 checks ok, 0 failing, 1159 files left
 - 2026-10-13 | 1.43 Regular expressions basics | min | 6 exercise files | 440 checks ok, 0 failing, 1153 files left
 - 2026-10-13 | 1.44 Dates, times and time zones | min | 6 exercise files | 446 checks ok, 0 failing, 1147 files left
+- 2026-10-13 | 1.45 Character encoding and UTF-8 | min | 6 exercise files | 452 checks ok, 0 failing, 1141 files left
+- 2026-10-13 | 1.46 Recursion | min | 6 exercise files | 458 checks ok, 0 failing, 1135 files left
+- 2026-10-13 | 1.47 Linear and binary search | min | 6 exercise files | 464 checks ok, 0 failing, 1129 files left
+- 2026-10-13 | 1.48 Basic sorting algorithms | min | 6 exercise files | 470 checks ok, 0 failing, 1123 files left
+- 2026-10-13 | 1.49 Efficient sorting and sorting with keys | min | 6 exercise files | 476 checks ok, 0 failing, 1117 files left
+- 2026-10-13 | 1.50 Algorithmic complexity and Big-O | min | 5 exercise files | 481 checks ok, 0 failing, 1112 files left

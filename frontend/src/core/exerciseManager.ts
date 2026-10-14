@@ -64,29 +64,10 @@ export class ExerciseLog {
 
 export const VIDEO_EXTS = [".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi"] as const;
 
-export type ExerciseGoal =
-  | "hipertrofia"
-  | "fuerza"
-  | "definicion"
-  | "resistencia"
-  | "salud";
-
-export interface WeightRecord {
-  date: string;
-  weight: number;
-}
-
-export interface BodyProfile {
-  goal: ExerciseGoal;
-  goal_note: string;
-  weight_history: WeightRecord[];
-}
-
-export const DEFAULT_BODY_PROFILE: BodyProfile = {
-  goal: "salud",
-  goal_note: "",
-  weight_history: [],
-};
+import type { ExerciseGoal, WeightRecord, BodyProfile } from "../lib/exerciseTypes.js";
+import { DEFAULT_BODY_PROFILE } from "../lib/exerciseTypes.js";
+export type { ExerciseGoal, WeightRecord, BodyProfile };
+export { DEFAULT_BODY_PROFILE };
 
 export class ExerciseManager {
   vaultRoot: string;
@@ -124,6 +105,9 @@ export class ExerciseManager {
             goal: typeof data.goal === "string" ? (data.goal as ExerciseGoal) : DEFAULT_BODY_PROFILE.goal,
             goal_note: typeof data.goal_note === "string" ? data.goal_note : "",
             weight_history: validList,
+            health_limitations: typeof data.health_limitations === "string" ? data.health_limitations : "",
+            gender: typeof data.gender === "string" ? (data.gender as any) : "",
+            age: typeof data.age === "number" && Number.isFinite(data.age) ? data.age : null,
           };
         }
       } catch {
@@ -139,6 +123,9 @@ export class ExerciseManager {
       goal: updates.goal ?? current.goal,
       goal_note: updates.goal_note !== undefined ? String(updates.goal_note) : current.goal_note,
       weight_history: updates.weight_history ?? current.weight_history,
+      health_limitations: updates.health_limitations !== undefined ? String(updates.health_limitations) : (current.health_limitations ?? ""),
+      gender: updates.gender !== undefined ? updates.gender : (current.gender ?? ""),
+      age: updates.age !== undefined ? updates.age : (current.age ?? null),
     };
     fs.mkdirSync(this.ejercicioDir, { recursive: true });
     fs.writeFileSync(this._profilePath, JSON.stringify(next, null, 2), "utf-8");
@@ -221,12 +208,12 @@ export class ExerciseManager {
     try {
       return fs
         .readdirSync(this.videosDir)
-        .filter((f) => {
+        .filter((f: string) => {
           const ext = path.extname(f).toLowerCase();
           return (VIDEO_EXTS as readonly string[]).includes(ext);
         })
         .sort()
-        .map((f) => path.join(this.videosDir, f));
+        .map((f: string) => path.join(this.videosDir, f));
     } catch {
       return [];
     }

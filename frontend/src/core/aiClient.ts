@@ -20,6 +20,7 @@ export const LM_STUDIO = "lmstudio";
 export const OLLAMA = "ollama";
 export const OPENAI_COMPATIBLE = "openai_compatible";
 export const OPENAI = "openai";
+export const GEMINI = "gemini";
 export const ANTHROPIC = "anthropic";
 export const CLAUDE_CODE = "claude_code";
 export const BRIDGE_CLAUDE = "bridge_claude";
@@ -111,6 +112,23 @@ export const PROVIDERS: ProviderInfo[] = [
       default_url: "https://api.openai.com/v1",
       default_model: "gpt-4o-mini",
       default_models: ["gpt-4o-mini", "gpt-4o"],
+    },
+  ),
+  provider(
+    GEMINI,
+    "Google Gemini (API key)",
+    "API oficial de Google Gemini (Google AI Studio). Requiere una clave que empieza por AIzaSy...",
+    {
+      needs_key: true,
+      needs_url: true,
+      default_url: "https://generativelanguage.googleapis.com/v1beta/openai",
+      default_model: "models/gemini-3.5-flash-lite",
+      default_models: [
+        "models/gemini-3.5-flash-lite",
+        "models/gemini-3.1-flash-lite",
+        "models/gemini-3.5-flash",
+        "models/gemini-3.8-flash",
+      ],
     },
   ),
   provider(

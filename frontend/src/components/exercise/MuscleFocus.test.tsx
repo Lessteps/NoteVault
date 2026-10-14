@@ -125,14 +125,12 @@ describe("enfoque muscular · el puntero", () => {
 });
 
 describe("enfoque muscular · en qué vistas", () => {
-  it("la vista general lo lleva al lado de los ejercicios", async () => {
-    // Antes lo llevaba la pantalla «Diaria», que era una copia de la mitad
-    // inferior de Vista general. Ahora vive solo en Vista general.
+  it("la vista general no lo lleva al lado de los ejercicios", async () => {
     const host = mount(
       <Overview date={todayIso()} onDate={() => undefined} onGoProgram={() => undefined} />,
     );
     await settle();
-    expect(host.querySelector("[data-muscle-focus]")).not.toBeNull();
+    expect(host.querySelector("[data-muscle-focus]")).toBeNull();
   });
 
   it("la semana pinta el cuerpo de cada día", async () => {

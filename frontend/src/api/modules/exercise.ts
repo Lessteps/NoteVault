@@ -6,7 +6,7 @@ import {
   ExerciseManager,
   VIDEO_EXTS,
 } from "../../core/exerciseManager.js";
-import { normalizeMuscles } from "../../core/exerciseMuscles.js";
+import { normalizeMuscles, mapGuideMuscle } from "../../core/exerciseMuscles.js";
 import { exercises as CATALOG } from "@bryllim/workout-guide";
 import { normalizeLibraryName, type LibraryUserEntry } from "../../lib/libraryTypes.js";
 import type { AppState } from "../appState.js";
@@ -585,6 +585,25 @@ export function exerciseApi(app: AppState) {
       const f = exFields(fields);
       const m = mgr();
       if (!exerciseId) {
+        let muscles = f.muscles;
+        let source = f.source;
+        let sourceFp = f.sourceFp;
+
+        if (!muscles.primary.length && !muscles.secondary.length) {
+          const key = normalizeLibraryName(f.name);
+          const found = CATALOG.find((c) => {
+            const cKey = normalizeLibraryName(c.name);
+            return cKey === key || key.includes(cKey) || cKey.includes(key);
+          });
+          if (found) {
+            muscles = normalizeMuscles({
+              primary: mapGuideMuscle(found.primaryMuscle),
+              secondary: found.secondaryMuscles.flatMap(mapGuideMuscle),
+            });
+            source = source || found.slug;
+          }
+        }
+
         const e = m.addExercise(
           f.name || "Ejercicio",
           f.day,
@@ -594,12 +613,12 @@ export function exerciseApi(app: AppState) {
           f.how_to
         );
         // addExercise keeps its old signature, so the muscles go in a second step.
-        if (f.muscles.primary.length || f.muscles.secondary.length) {
-          m.updateExercise(String(e.id), { muscles: f.muscles });
+        if (muscles.primary.length || muscles.secondary.length) {
+          m.updateExercise(String(e.id), { muscles });
         }
         // Y el origen, cuando la copia viene de la biblioteca.
-        if (f.source || f.sourceFp) {
-          m.updateExercise(String(e.id), { source: f.source, sourceFp: f.sourceFp });
+        if (source || sourceFp) {
+          m.updateExercise(String(e.id), { source, sourceFp });
         }
         return exDict(m, m.exercises().find((x) => x.id === e.id)!);
       }
@@ -799,6 +818,16 @@ export function exerciseApi(app: AppState) {
       }
       if (updates.goal_note !== undefined) {
         valid.goal_note = String(updates.goal_note || "");
+      }
+      if (updates.health_limitations !== undefined) {
+        valid.health_limitations = String(updates.health_limitations || "");
+      }
+      if (typeof updates.gender === "string") {
+        valid.gender = updates.gender;
+      }
+      if (updates.age !== undefined) {
+        const a = updates.age === null || updates.age === "" ? null : Number(updates.age);
+        valid.age = a !== null && Number.isFinite(a) && a > 0 && a < 130 ? Math.round(a) : null;
       }
       return mgr().saveProfile(valid);
     },

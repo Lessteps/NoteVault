@@ -3,14 +3,14 @@
 // Permite definir para qué estás entrenando (objetivo típico + nota)
 // y llevar un historial limpio de pesajes en kg sin estorbar la rutina diaria.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   Check,
-  Flame,
+  HeartPulse,
   Plus,
   Scale,
-  Sparkles,
+  ShieldAlert,
   Target,
   Trash2,
   TrendingDown,
@@ -19,7 +19,7 @@ import {
 import { todayIso, shortDate } from "../../lib/tasks";
 import { useExercise } from "../../store/exercise";
 import { useApp } from "../../store/app";
-import { type ExerciseGoal } from "../../core/exerciseManager";
+import { type ExerciseGoal } from "../../lib/types";
 import { cn } from "../ui";
 import { GhostButton, PrimaryButton } from "../common/forms";
 import { LineChart } from "../common/charts";
@@ -79,6 +79,24 @@ export function BodyProfile() {
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(profile?.goal_note ?? "");
 
+  // Edición de limitaciones de salud
+  const [editingLimitations, setEditingLimitations] = useState(false);
+  const [limitationsText, setLimitationsText] = useState(profile?.health_limitations ?? "");
+  const [savingLimitations, setSavingLimitations] = useState(false);
+
+  // Datos biológicos: edad
+  const [ageInput, setAgeInput] = useState<string>(() => (profile?.age ? String(profile.age) : ""));
+
+  useEffect(() => {
+    if (!editingLimitations) {
+      setLimitationsText(profile?.health_limitations ?? "");
+    }
+  }, [profile?.health_limitations, editingLimitations]);
+
+  useEffect(() => {
+    setAgeInput(profile?.age ? String(profile.age) : "");
+  }, [profile?.age]);
+
   const activeGoal = profile?.goal ?? "salud";
   const history = useMemo(() => {
     return [...(profile?.weight_history ?? [])].sort((a, b) => a.date.localeCompare(b.date));
@@ -111,16 +129,65 @@ export function BodyProfile() {
     }
   };
 
-  const handleAddWeight = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveLimitations = async () => {
+    setSavingLimitations(true);
+    try {
+      await saveProfile({ health_limitations: limitationsText.trim() });
+      setEditingLimitations(false);
+      toast("info", "Condiciones de salud y limitaciones actualizadas");
+    } catch (e) {
+      toast("error", (e as Error).message);
+    } finally {
+      setSavingLimitations(false);
+    }
+  };
+
+  const handleSelectGender = async (gender: "hombre" | "mujer") => {
+    const next = profile?.gender === gender ? "" : gender;
+    try {
+      await saveProfile({ gender: next });
+      toast("info", next ? `Sexo configurado: ${next}` : "Sexo restablecido");
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
+
+  const handleSaveAge = async () => {
+    const clean = ageInput.trim();
+    const val = clean === "" ? null : parseInt(clean, 10);
+    if (val !== null && (Number.isNaN(val) || val <= 5 || val > 120)) {
+      toast("error", "Ingresá una edad válida en años (ej. 25)");
+      return;
+    }
+    try {
+      await saveProfile({ age: val });
+      toast("info", val ? `Edad guardada: ${val} años` : "Edad restablecida");
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
+
+  const handleClearLimitations = async () => {
+    try {
+      await saveProfile({ health_limitations: "" });
+      setLimitationsText("");
+      setEditingLimitations(false);
+      toast("info", "Limitaciones eliminadas");
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
+
+  const handleAddWeight = async () => {
     const val = parseFloat(weightInput.replace(",", "."));
     if (Number.isNaN(val) || val <= 0 || val > 400) {
       toast("error", "Ingresá un peso válido en kg (ej. 75.5)");
       return;
     }
+    const targetDate = dateInput || todayIso();
     setIsSubmittingWeight(true);
     try {
-      await addWeight(dateInput, val);
+      await addWeight(targetDate, val);
       setWeightInput("");
       toast("info", `Peso registrado: ${val} kg`);
     } catch (err) {
@@ -259,9 +326,74 @@ export function BodyProfile() {
           </div>
         </div>
 
+        {/* Fila de Datos Biológicos: Sexo y Edad */}
+        <div className="mb-3 flex flex-wrap items-center gap-4 rounded-xl border border-line/60 bg-surface/30 px-3.5 py-2">
+          <div className="flex items-center gap-2 text-[12px]">
+            <span className="font-medium text-dim">Sexo:</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => void handleSelectGender("hombre")}
+                className={cn(
+                  "rounded-lg px-2.5 py-1 text-[11.5px] font-medium transition-colors",
+                  profile?.gender === "hombre"
+                    ? "bg-accent text-white"
+                    : "border border-line bg-surface text-dim hover:bg-hover hover:text-text",
+                )}
+              >
+                ♂ Hombre
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSelectGender("mujer")}
+                className={cn(
+                  "rounded-lg px-2.5 py-1 text-[11.5px] font-medium transition-colors",
+                  profile?.gender === "mujer"
+                    ? "bg-accent text-white"
+                    : "border border-line bg-surface text-dim hover:bg-hover hover:text-text",
+                )}
+              >
+                ♀ Mujer
+              </button>
+            </div>
+          </div>
+
+          <div className="hidden h-4 w-px bg-line/80 sm:block" />
+
+          <div className="flex items-center gap-1.5 text-[12px]">
+            <span className="font-medium text-dim">Edad:</span>
+            <input
+              type="number"
+              min={10}
+              max={120}
+              placeholder="Ej. 25"
+              value={ageInput}
+              onChange={(e) => setAgeInput(e.target.value)}
+              onBlur={() => void handleSaveAge()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void handleSaveAge();
+                }
+              }}
+              className="w-16 rounded-lg border border-line bg-surface px-2 py-1 text-center font-mono text-[12px] text-text placeholder:text-faint focus:border-accent focus:outline-none"
+            />
+            <span className="text-[11.5px] text-faint">años</span>
+          </div>
+
+          {(profile?.gender || profile?.age) && (
+            <span className="ml-auto hidden text-[11px] text-dim md:inline">
+              🛡️ El Coach de IA adapta el gasto calórico y recuperación
+            </span>
+          )}
+        </div>
+
         {/* Formulario rápido para anotar peso */}
         <form
-          onSubmit={(e) => void handleAddWeight(e)}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleAddWeight();
+          }}
           className="flex flex-wrap items-center gap-3 rounded-xl border border-line/60 bg-surface/40 p-3"
         >
           <div className="flex items-center gap-2 text-[12px] text-dim">
@@ -281,12 +413,22 @@ export function BodyProfile() {
               placeholder="Ej. 76.2"
               value={weightInput}
               onChange={(e) => setWeightInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void handleAddWeight();
+                }
+              }}
               className="w-24 rounded-lg border border-line bg-surface px-2.5 py-1 font-mono text-[12.5px] text-text placeholder:text-faint focus:border-accent focus:outline-none"
             />
             <span className="text-[12px] font-medium text-dim">kg</span>
           </div>
 
-          <PrimaryButton disabled={isSubmittingWeight || !weightInput.trim()}>
+          <PrimaryButton
+            type="submit"
+            onClick={() => void handleAddWeight()}
+            disabled={isSubmittingWeight || !weightInput.trim()}
+          >
             <Plus size={13} /> Registrar pesaje
           </PrimaryButton>
         </form>
@@ -342,6 +484,111 @@ export function BodyProfile() {
             </div>
           )}
         </div>
+      </section>
+
+      {/* 3. SECCIÓN LIMITACIONES Y CONDICIONES DE SALUD */}
+      <section className="rounded-2xl border border-line bg-card p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="grid h-7 w-7 place-items-center rounded-lg bg-danger/10 text-danger">
+              <HeartPulse size={16} />
+            </div>
+            <div>
+              <h2 className="text-[14.5px] font-semibold text-text">
+                Condiciones de salud y limitaciones físicas
+              </h2>
+              <p className="text-[11.5px] text-faint">
+                Lesiones, dolores articulares, enfermedades o contraindicaciones que el Coach de IA debe respetar.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {!editingLimitations ? (
+          <div className="rounded-xl border border-line bg-surface/50 p-4">
+            {profile?.health_limitations?.trim() ? (
+              <div className="space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <ShieldAlert size={16} className="mt-0.5 flex-none text-danger" />
+                  <div className="min-w-0 flex-1">
+                    <p className="whitespace-pre-wrap text-[12.5px] text-text leading-relaxed">
+                      {profile.health_limitations.trim()}
+                    </p>
+                    <div className="mt-2 text-[11px] text-dim">
+                      🛡️ El Coach de Entrenamiento adaptará automáticamente sus sugerencias para proteger estas zonas y evitar ejercicios lesivos.
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => void handleClearLimitations()}
+                    title="Eliminar limitaciones"
+                    className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11.5px] text-faint hover:bg-danger/10 hover:text-danger transition-colors"
+                  >
+                    <Trash2 size={12} /> Eliminar
+                  </button>
+                  <GhostButton
+                    onClick={() => {
+                      setLimitationsText(profile?.health_limitations ?? "");
+                      setEditingLimitations(true);
+                    }}
+                  >
+                    Editar limitaciones
+                  </GhostButton>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-4 text-center">
+                <p className="text-[12.5px] text-dim">
+                  No tenés ninguna lesión, enfermedad o limitación física registrada.
+                </p>
+                <p className="mt-1 text-[11px] text-faint max-w-md">
+                  Si tenés molestias en hombros, lumbalgia, asma o cualquier restricción, indicala acá para que el Coach de IA no te proponga ejercicios peligrosos.
+                </p>
+                <div className="mt-3">
+                  <GhostButton
+                    onClick={() => {
+                      setLimitationsText("");
+                      setEditingLimitations(true);
+                    }}
+                  >
+                    + Agregar limitación o condición de salud
+                  </GhostButton>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
+            <textarea
+              value={limitationsText}
+              onChange={(e) => setLimitationsText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleSaveLimitations();
+                }
+              }}
+              placeholder="Ej. Molestia en manguito rotador derecho (evitar press trasnuca), hernia discal lumbar L5-S1 (evitar carga axial pesada), asma en cardio intenso..."
+              rows={3}
+              className="w-full resize-none rounded-lg border border-line bg-panel p-2.5 text-[12.5px] text-text placeholder:text-faint focus:border-accent focus:outline-none"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-faint">
+                Enter para guardar · Shift+Enter para salto de línea · El Coach de IA lo leerá automáticamente.
+              </span>
+              <div className="flex items-center gap-2">
+                <GhostButton onClick={() => setEditingLimitations(false)}>
+                  Cancelar
+                </GhostButton>
+                <PrimaryButton onClick={() => void handleSaveLimitations()}>
+                  {savingLimitations ? "Guardando…" : "Guardar condiciones"}
+                </PrimaryButton>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

@@ -90,21 +90,27 @@ describe("ExerciseManager", () => {
         goal: "salud",
         goal_note: "",
         weight_history: [],
+        health_limitations: "",
+        gender: "",
+        age: null,
       });
     });
 
-    it("guarda y actualiza el objetivo del perfil", () => {
+    it("guarda y actualiza el objetivo del perfil y limitaciones de salud", () => {
       const updated = em.saveProfile({
         goal: "hipertrofia",
         goal_note: "Enfocado en masa muscular y tren superior",
+        health_limitations: "Molestia en manguito rotador derecho, evitar trasnuca",
       });
       expect(updated.goal).toBe("hipertrofia");
       expect(updated.goal_note).toBe("Enfocado en masa muscular y tren superior");
+      expect(updated.health_limitations).toBe("Molestia en manguito rotador derecho, evitar trasnuca");
 
       // Verificamos persistencia
       const loaded = em.getProfile();
       expect(loaded.goal).toBe("hipertrofia");
       expect(loaded.goal_note).toBe("Enfocado en masa muscular y tren superior");
+      expect(loaded.health_limitations).toBe("Molestia en manguito rotador derecho, evitar trasnuca");
     });
 
     it("registra pesajes, actualiza fecha existente y ordena cronológicamente", () => {
@@ -128,7 +134,7 @@ describe("ExerciseManager", () => {
       em.removeWeightEntry("2026-05-01");
       profile = em.getProfile();
       expect(profile.weight_history.length).toBe(2);
-      expect(profile.weight_history[0].date).toBe("2026-05-10");
+      expect(profile.weight_history[0]?.date).toBe("2026-05-10");
     });
   });
 });

@@ -215,6 +215,11 @@ export const AppConfig = {
     return path.join(APP_DATA_DIR, "conversations");
   },
 
+  /** Conversaciones del Coach de Ejercicio, totalmente aisladas de las de Notas. */
+  get_exercise_coach_conversations_dir(): string {
+    return path.join(APP_DATA_DIR, "exercise_coach_conversations");
+  },
+
   // ── Window geometry ──────────────────────────────────────────────────────
   get_window_state(): Record<string, unknown> {
     return read().window ?? {};

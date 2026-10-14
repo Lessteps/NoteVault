@@ -3,7 +3,7 @@
 // Vive en su propio fichero porque lo usan Vista general y Diaria, y porque
 // `ExerciseRow.test.tsx` lo prueba sin levantar el módulo entero.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Exercise } from "../../lib/types";
 import { inputBase } from "../common/forms";
 import { cn } from "../ui";
@@ -12,6 +12,7 @@ import { api } from "../../lib/bridge";
 import { todayIso } from "../../lib/tasks";
 import { fmtClock } from "../../lib/practiceTimer";
 import { parseRestSecs } from "../../lib/parseRest";
+import { exerciseFramesUrls, parseExerciseSteps } from "../../lib/exerciseLibrary";
 
 /** Un pitido corto al terminar el descanso. Sin audio, la línea avisa igual. */
 function beep() {
@@ -49,6 +50,8 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState("");
   const [lastSession, setLastSession] = useState<{ weight: number; reps: number; date: string } | null>(null);
+  const frames = useMemo(() => exerciseFramesUrls(ex), [ex.source, ex.name]);
+  const steps = useMemo(() => parseExerciseSteps(ex.how_to), [ex.how_to]);
   // The latest values, read by every save: a blur and a click can fire two
   // saves before React re-renders, and the second must not send stale fields.
   const latest = useRef({ done, weight, reps, notes });
@@ -174,13 +177,11 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
     }
   };
   return (
-    <div className="rounded-2xl border border-line bg-card px-3 py-2.5">
+    <div className="rounded-2xl border border-line bg-card px-3.5 py-3 space-y-3">
       <div className="flex items-center gap-3">
         <input type="checkbox" aria-label={`Hecho: ${ex.name}`} checked={done} disabled={future} style={{ accentColor: ORANGE }}
           onChange={(e) => { setDone(e.target.checked); void save({ done: e.target.checked }); }} />
-        {/* El nombre es el control del video: si tiene, se pulsa aquí. Antes
-            había además un botón «▶ Video» al final de la fila con la misma
-            acción, y se veían dos controles separados por los campos. */}
+        {/* El nombre es el control del video: si tiene, se pulsa aquí. */}
         {hasVideo ? (
           <button
             type="button"
@@ -252,7 +253,48 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
             Antes vivía detrás de `compact`, que nadie activaba, así que
             nunca se vio. Ponerlo son tres líneas si algún día hace falta. */}
       </div>
-      {ex.how_to && <p className="mt-1.5 pl-7 text-[12px] leading-relaxed text-faint">{ex.how_to}</p>}
+      {/* Las 3 imágenes de ejecución de la biblioteca */}
+      {frames.length > 0 && (
+        <div className="pl-7 pt-1">
+          <div className="flex items-center gap-2.5 overflow-x-auto pb-1" data-exercise-frames>
+            {frames.map((src, i) => (
+              <div
+                key={i}
+                className="relative flex-none overflow-hidden rounded-xl border border-line shadow-sm"
+                style={{ background: "#141414" }}
+              >
+                <img
+                  src={src}
+                  alt={`${ex.name} fase ${i + 1}`}
+                  loading="lazy"
+                  className="h-24 w-24 sm:h-28 sm:w-28 object-contain"
+                />
+                <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1.5 py-0.5 font-mono text-[9px] text-faint">
+                  {i === 0 ? "1. Inicio" : i === 1 ? "2. Ejecución" : "3. Final"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Instrucciones acomodadas paso por paso */}
+      {steps.length > 0 ? (
+        <div className="pl-7 pt-0.5" data-exercise-steps>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-faint">
+            Cómo hacerlo
+          </div>
+          <ol className="list-decimal space-y-1 pl-4 text-[12px] leading-relaxed text-dim">
+            {steps.map((step, idx) => (
+              <li key={idx} className="pl-1">
+                {step}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : ex.how_to ? (
+        <p className="pl-7 text-[12px] leading-relaxed text-faint">{ex.how_to}</p>
+      ) : null}
       {error && <p data-row-error className="mt-1 pl-7 text-[11.5px] text-danger">{error}</p>}
       {timerOpen && (
         <div data-rest-countdown className="mt-1.5 flex flex-wrap items-center gap-2 pl-7">

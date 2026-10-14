@@ -342,4 +342,32 @@ describe("la fila de un ejercicio", () => {
       cleanup();
     }
   });
+
+  it("renderiza las 3 imágenes de ejecución y los pasos de técnica ordenados", () => {
+    const exWithSteps = {
+      ...CON_VIDEO,
+      name: "Bench Press",
+      source: "bench-press",
+      how_to: "1. Retrae escápulas.\n2. Baja la barra al pecho medio.\n3. Empuja hacia arriba.",
+    };
+
+    const { host, cleanup } = render(
+      <ExerciseRow day="2026-10-01" ex={exWithSteps} entry={{}} onChanged={() => undefined} onVideo={() => undefined} />,
+    );
+    try {
+      const frames = host.querySelectorAll("[data-exercise-frames] img");
+      expect(frames).toHaveLength(3);
+      expect(frames[0]!.getAttribute("src")).toContain("workout-guide-assets/bench-press/frame-1.png");
+      expect(frames[1]!.getAttribute("src")).toContain("workout-guide-assets/bench-press/frame-2.png");
+      expect(frames[2]!.getAttribute("src")).toContain("workout-guide-assets/bench-press/frame-3.png");
+
+      const steps = host.querySelectorAll("[data-exercise-steps] li");
+      expect(steps).toHaveLength(3);
+      expect(steps[0]!.textContent).toBe("Retrae escápulas.");
+      expect(steps[1]!.textContent).toBe("Baja la barra al pecho medio.");
+      expect(steps[2]!.textContent).toBe("Empuja hacia arriba.");
+    } finally {
+      cleanup();
+    }
+  });
 });

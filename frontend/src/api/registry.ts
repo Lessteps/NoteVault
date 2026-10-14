@@ -13,6 +13,7 @@ import { codeDebugApi } from "./modules/codeDebug.js";
 import { conversationsApi } from "./modules/conversations.js";
 import { englishPlayerApi } from "./modules/englishPlayer.js";
 import { exerciseApi } from "./modules/exercise.js";
+import { exerciseCoachApi } from "./modules/exerciseCoach.js";
 import { filesApi } from "./modules/files.js";
 import { financeApi } from "./modules/finance.js";
 import { goalsApi } from "./modules/goals.js";
@@ -53,6 +54,7 @@ export function buildRegistry(app: AppState): Registry {
     ...webApi(app),
     ...habitsApi(app),
     ...exerciseApi(app),
+    ...exerciseCoachApi(app),
     ...financeApi(app),
     ...goalsApi(app),
     ...mentorApi(app),

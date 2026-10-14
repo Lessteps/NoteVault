@@ -11,6 +11,7 @@ import type {
   RenderingSettings, GpuStatus, Conversation, ConversationMeta,
 } from "./types";
 import type { LibraryUserEntry } from "./libraryTypes";
+import type { BodyProfile } from "./exerciseTypes";
 
 type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
@@ -489,13 +490,30 @@ export const api = {
   exLibraryPickVideo: () => call<{ ok: boolean; video_path?: string }>("ex_library_pick_video"),
   exFavorites: () => call<string[]>("ex_favorites"),
   exFavoriteToggle: (slug: string) => call<{ slug: string; on: boolean }>("ex_favorite_toggle", slug),
-  exProfile: () => call<import("../core/exerciseManager").BodyProfile>("ex_profile"),
-  exProfileSave: (updates: Partial<import("../core/exerciseManager").BodyProfile>) =>
-    call<import("../core/exerciseManager").BodyProfile>("ex_profile_save", updates),
+  exProfile: () => call<BodyProfile>("ex_profile"),
+  exProfileSave: (updates: Partial<BodyProfile>) =>
+    call<BodyProfile>("ex_profile_save", updates),
   exWeightAdd: (date: string, weight: number) =>
-    call<import("../core/exerciseManager").BodyProfile>("ex_weight_add", date, weight),
+    call<BodyProfile>("ex_weight_add", date, weight),
   exWeightRemove: (date: string) =>
-    call<import("../core/exerciseManager").BodyProfile>("ex_weight_remove", date),
+    call<BodyProfile>("ex_weight_remove", date),
+  exCoachContext: () =>
+    call<{ profile: BodyProfile; exercisesCount: number; currentWeight: number | null; goal: string }>("ex_coach_context"),
+  exCoachConversations: () => call<ConversationMeta[]>("ex_coach_conversations"),
+  exCoachConversationGet: (id: string) => call<Conversation | null>("ex_coach_conversation_get", id),
+  exCoachConversationSave: (id: string | null, messages: unknown, model?: string, title?: string) =>
+    call<Conversation>("ex_coach_conversation_save", id, messages, model, title),
+  exCoachConversationRename: (id: string, title: string) =>
+    call<Conversation>("ex_coach_conversation_rename", id, title),
+  exCoachConversationDelete: (id: string) =>
+    call<{ ok: boolean }>("ex_coach_conversation_delete", id),
+  exCoachAiTitle: (id: string, question: string, answer?: string) =>
+    call<{ title: string; fallback: boolean; error?: string }>("ex_coach_ai_title", id, question, answer),
+  exCoachChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string) =>
+    call<{ reply?: string; stopped?: boolean; bridge?: boolean; prompt?: string; url?: string; label?: string }>(
+      "ex_coach_chat_stream", id, history, question,
+    ),
+  exCoachChatCancel: (id: string) => call<{ ok: boolean }>("ex_coach_chat_cancel", id),
   exVideoUrl: (id: string) => call<{ url: string; name: string }>("ex_video_url", id),
   exOpenVideo: (id: string) => call<{ ok: boolean }>("ex_open_video", id),
   exPickVideo: (id: string) => call<{ ok: boolean }>("ex_pick_video", id),

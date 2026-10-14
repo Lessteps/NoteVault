@@ -82,4 +82,62 @@ describe("BodyProfile component", () => {
       cleanup();
     }
   });
+
+  it("renderiza la sección de condiciones de salud y limitaciones", () => {
+    useExercise.setState({
+      profile: {
+        goal: "hipertrofia",
+        goal_note: "",
+        weight_history: [],
+        health_limitations: "Molestia en manguito rotador derecho",
+      },
+    });
+
+    const { host, cleanup } = mount(<BodyProfile />);
+    try {
+      expect(host.textContent).toContain("Condiciones de salud y limitaciones físicas");
+      expect(host.textContent).toContain("Molestia en manguito rotador derecho");
+      expect(host.textContent).toContain("El Coach de Entrenamiento adaptará automáticamente sus sugerencias");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("renderiza los selectores de sexo biológico y edad", async () => {
+    const saveSpy = vi.fn().mockResolvedValue(undefined);
+    useExercise.setState({
+      saveProfile: saveSpy as any,
+      profile: {
+        goal: "hipertrofia",
+        goal_note: "",
+        weight_history: [],
+        gender: "hombre",
+        age: 30,
+      },
+    });
+
+    const { host, cleanup } = mount(<BodyProfile />);
+    try {
+      expect(host.textContent).toContain("Sexo:");
+      expect(host.textContent).toContain("♂ Hombre");
+      expect(host.textContent).toContain("♀ Mujer");
+      expect(host.textContent).toContain("Edad:");
+
+      const ageInput = host.querySelector('input[placeholder="Ej. 25"]') as HTMLInputElement;
+      expect(ageInput).not.toBeNull();
+      expect(ageInput.value).toBe("30");
+
+      const mujerBtn = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("♀ Mujer"));
+      expect(mujerBtn).toBeDefined();
+
+      await act(async () => {
+        mujerBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      expect(saveSpy).toHaveBeenCalledWith({ gender: "mujer" });
+    } finally {
+      cleanup();
+    }
+  });
 });

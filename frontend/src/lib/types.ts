@@ -736,6 +736,8 @@ export interface ExerciseStats {
   streak: { current: number; best: number };
 }
 
+export type { ExerciseGoal, WeightRecord, BodyProfile } from "./exerciseTypes";
+
 // ── Vista General ─────────────────────────────────────────────────────────
 
 export interface HomeOverview {

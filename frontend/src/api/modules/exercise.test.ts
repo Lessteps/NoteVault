@@ -45,10 +45,15 @@ describe("exerciseApi", () => {
     expect(profile.goal).toBe("salud");
     expect(profile.weight_history).toEqual([]);
 
-    // Guardar objetivo
-    const saved = api.ex_profile_save({ goal: "hipertrofia", goal_note: "Etapa de volumen" });
+    // Guardar objetivo y limitaciones de salud
+    const saved = api.ex_profile_save({
+      goal: "hipertrofia",
+      goal_note: "Etapa de volumen",
+      health_limitations: "Molestia en hombro derecho",
+    });
     expect(saved.goal).toBe("hipertrofia");
     expect(saved.goal_note).toBe("Etapa de volumen");
+    expect(saved.health_limitations).toBe("Molestia en hombro derecho");
 
     // Añadir peso
     const withWeight = api.ex_weight_add("2026-05-10", 76.4);

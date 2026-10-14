@@ -6,8 +6,7 @@
 
 import { create } from "zustand";
 import { api } from "../lib/bridge";
-import type { Exercise, ExerciseStats } from "../lib/types";
-import type { BodyProfile } from "../core/exerciseManager";
+import type { Exercise, ExerciseStats, BodyProfile } from "../lib/types";
 
 export interface ExerciseDayMeta {
   key: string;
@@ -33,7 +32,7 @@ interface ExerciseState {
   removeWeight: (date: string) => Promise<void>;
 }
 
-export const useExercise = create<ExerciseState>((set, get) => ({
+export const useExercise = create<ExerciseState>((set) => ({
   days: [],
   list: [],
   stats: null,

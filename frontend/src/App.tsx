@@ -13,6 +13,7 @@ import { renameEntry } from "./components/notes/FileTree";
 import { DialogHost, MenuHost } from "./components/ui";
 import { VaultDialog } from "./components/VaultDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
+import { AiSettingsDialog } from "./components/notes/AssistantPanel";
 import { NotesModule } from "./components/notes/NotesModule";
 import { QuickSwitcher } from "./components/notes/QuickSwitcher";
 import { CommandPalette, openDailyNote, ShortcutsDialog, useShortcutsDialog } from "./components/notes/CommandPalette";
@@ -319,6 +320,7 @@ export function App() {
       <ReviewCalendar />
       <VaultDialog />
       <SettingsDialog />
+      <AiSettingsDialog />
       <DialogHost />
       <MenuHost />
       <Toasts />

@@ -230,4 +230,29 @@ test("NV-NUTRI-007 estimador inteligente de platos por IA en AddFoodDialog", asy
   await expect(win.getByTestId("ai-estimator-container")).toBeVisible();
   await expect(win.getByTestId("input-ai-prompt")).toBeVisible();
   await expect(win.getByTestId("run-estimate-btn")).toBeVisible();
+  await win.keyboard.press("Escape");
+});
+
+test("NV-NUTRI-008 exportación de reporte nutricional y timing por turnos", async () => {
+  // 1. Verificar timing por turnos en Ajustes
+  await win.getByTestId("open-settings-btn").click();
+  await expect(win.getByTestId("nutrition-settings-dialog")).toBeVisible();
+  await expect(win.getByTestId("meal-distribution-container")).toBeVisible();
+  await expect(win.getByTestId("input-dist-almuerzo")).toBeVisible();
+  await win.getByTestId("save-targets-btn").click();
+
+  // 2. Ir a Tendencias y abrir Exportación
+  await win.getByTestId("tab-tendencias").click();
+  await expect(win.getByTestId("nutrition-trends-view")).toBeVisible();
+  await win.getByTestId("open-export-btn").click();
+
+  // 3. Validar diálogo de exportación
+  await expect(win.getByTestId("export-nutrition-dialog")).toBeVisible();
+  await expect(win.getByTestId("export-md-btn")).toBeVisible();
+  await expect(win.getByTestId("export-csv-btn")).toBeVisible();
+  await expect(win.getByTestId("export-vault-note-btn")).toBeVisible();
+
+  // Guardar en el Vault como nota .md
+  await win.getByTestId("export-vault-note-btn").click();
+  await expect(win.getByText("¡Guardado!")).toBeVisible({ timeout: 5_000 });
 });

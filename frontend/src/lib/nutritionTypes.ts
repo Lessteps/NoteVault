@@ -71,6 +71,8 @@ export interface NutriTargets {
   fat_g: number;        // Meta diaria de grasas (ej: 65)
   water_ml: number;     // Meta diaria de agua (ej: 2500)
   auto_calculate?: boolean; // Si deriva sugerencias del peso y objetivo de Ejercicio
+  // Distribución del timing nutricional por turnos (porcentajes que suman ~100)
+  meal_distribution?: Record<NutriMealType, number>;
 }
 
 export interface NutriFoodLibraryEntry {

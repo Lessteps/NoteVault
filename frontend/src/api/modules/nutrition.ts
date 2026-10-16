@@ -2,6 +2,10 @@ import { ApiError } from "../../core/errors.js";
 import { todayIso } from "../../core/dates.js";
 import type { AppState } from "../appState.js";
 import { oneLine, optDate } from "../common.js";
+import {
+  generateNutritionMarkdownReport,
+  generateNutritionCsvData,
+} from "../../core/nutritionReport.js";
 import type {
   NutriDaySummary,
   NutriMealType,
@@ -255,6 +259,10 @@ export function nutritionApi(app: AppState) {
         fat_g: raw.fat_g !== undefined ? Number(raw.fat_g) : undefined,
         water_ml: raw.water_ml !== undefined ? Number(raw.water_ml) : undefined,
         auto_calculate: raw.auto_calculate !== undefined ? Boolean(raw.auto_calculate) : undefined,
+        meal_distribution:
+          raw.meal_distribution && typeof raw.meal_distribution === "object"
+            ? (raw.meal_distribution as any)
+            : undefined,
       });
     },
 
@@ -331,6 +339,25 @@ export function nutritionApi(app: AppState) {
           gender,
           age,
         },
+      };
+    },
+
+    /**
+     * Genera datos de reporte (Markdown y CSV) para un período de días.
+     */
+    nutri_report_generate(days: unknown, endDate: unknown) {
+      const daysCount = Math.max(1, Math.min(90, Number(days) || 7));
+      const endD = endDate ? parseDay(endDate) : todayIso();
+      const trends = mgr().trends(daysCount, endD);
+      const profile = mgr().getProfile();
+
+      const markdown = generateNutritionMarkdownReport(trends, profile);
+      const csv = generateNutritionCsvData(trends);
+
+      return {
+        markdown,
+        csv,
+        trends,
       };
     },
   };

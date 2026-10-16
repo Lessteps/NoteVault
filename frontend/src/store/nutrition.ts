@@ -35,6 +35,7 @@ export interface NutritionState {
   editingFood: NutriFoodLibraryEntry | null;
   recipeModalOpen: boolean;
   editingRecipe: NutriRecipe | null;
+  exportModalOpen: boolean;
 
   // Acciones de navegación y carga
   setSelectedDate: (date: string) => Promise<void>;
@@ -77,6 +78,13 @@ export interface NutritionState {
   // Estimador IA de platos
   estimateDish: (description: string) => Promise<import("../lib/nutritionTypes").EstimatedDishResult>;
 
+  // Generador de reportes
+  generateReport: (days?: number) => Promise<{
+    markdown: string;
+    csv: { header: string[]; rows: Array<Array<string | number>> };
+    trends: NutriTrendsData;
+  }>;
+
   // Control de UI
   openAddMeal: (meal: NutriMealType) => void;
   closeAddMeal: () => void;
@@ -84,6 +92,7 @@ export interface NutritionState {
   setEditingFood: (food: NutriFoodLibraryEntry | null) => void;
   setRecipeModalOpen: (open: boolean) => void;
   setEditingRecipe: (recipe: NutriRecipe | null) => void;
+  setExportModalOpen: (open: boolean) => void;
 }
 
 function todayIso(): string {
@@ -121,6 +130,7 @@ export const useNutrition = create<NutritionState>((set, get) => ({
   editingFood: null,
   recipeModalOpen: false,
   editingRecipe: null,
+  exportModalOpen: false,
 
   setSelectedDate: async (date: string) => {
     set({ selectedDate: date });
@@ -420,10 +430,22 @@ export const useNutrition = create<NutritionState>((set, get) => ({
     }
   },
 
+  generateReport: async (days?: number) => {
+    const d = days || get().trendsDays;
+    const endDate = get().selectedDate;
+    try {
+      return await api.nutriReportGenerate(d, endDate);
+    } catch (e) {
+      set({ error: (e as Error).message });
+      throw e;
+    }
+  },
+
   openAddMeal: (meal: NutriMealType) => set({ addingMeal: meal }),
   closeAddMeal: () => set({ addingMeal: null }),
   setSettingsOpen: (settingsOpen: boolean) => set({ settingsOpen }),
   setEditingFood: (editingFood: NutriFoodLibraryEntry | null) => set({ editingFood }),
   setRecipeModalOpen: (recipeModalOpen: boolean) => set({ recipeModalOpen }),
   setEditingRecipe: (editingRecipe: NutriRecipe | null) => set({ editingRecipe }),
+  setExportModalOpen: (exportModalOpen: boolean) => set({ exportModalOpen }),
 }));

@@ -28,6 +28,14 @@ import type {
 } from "../lib/nutritionTypes";
 import { DEFAULT_NUTRI_PROFILE } from "../lib/nutritionTypes";
 
+export const DEFAULT_MEAL_DISTRIBUTION: Record<NutriMealType, number> = {
+  desayuno: 25,
+  almuerzo: 35,
+  merienda: 15,
+  cena: 20,
+  snacks: 5,
+};
+
 export const DEFAULT_TARGETS: NutriTargets = {
   calories: 2200,
   protein_g: 150,
@@ -35,6 +43,7 @@ export const DEFAULT_TARGETS: NutriTargets = {
   fat_g: 65,
   water_ml: 2500,
   auto_calculate: false,
+  meal_distribution: DEFAULT_MEAL_DISTRIBUTION,
 };
 
 export const DEFAULT_FOODS: Array<Omit<NutriFoodLibraryEntry, "id">> = [
@@ -247,6 +256,7 @@ export class NutritionManager {
       fat_g: updates.fat_g !== undefined ? Math.max(0, Math.round(Number(updates.fat_g))) : current.fat_g,
       water_ml: updates.water_ml !== undefined ? Math.max(0, Math.round(Number(updates.water_ml))) : current.water_ml,
       auto_calculate: updates.auto_calculate !== undefined ? Boolean(updates.auto_calculate) : current.auto_calculate,
+      meal_distribution: updates.meal_distribution ? { ...current.meal_distribution, ...updates.meal_distribution } : (current.meal_distribution || DEFAULT_MEAL_DISTRIBUTION),
     };
     writeJson(this.settingsPath(), next);
     return next;

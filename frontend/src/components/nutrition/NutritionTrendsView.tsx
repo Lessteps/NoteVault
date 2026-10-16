@@ -6,8 +6,11 @@ import {
   Target,
   Utensils,
   Calendar,
+  Download,
 } from "lucide-react";
 import { useNutrition } from "../../store/nutrition";
+import { GhostButton } from "../common/forms";
+import { ExportNutritionDialog } from "./ExportNutritionDialog";
 import type { NutriTrendDay } from "../../lib/nutritionTypes";
 
 export function NutritionTrendsView() {
@@ -15,6 +18,7 @@ export function NutritionTrendsView() {
   const trendsDays = useNutrition((s) => s.trendsDays);
   const loadTrends = useNutrition((s) => s.loadTrends);
   const setTrendsDays = useNutrition((s) => s.setTrendsDays);
+  const setExportModalOpen = useNutrition((s) => s.setExportModalOpen);
 
   const [hoveredDay, setHoveredDay] = useState<NutriTrendDay | null>(null);
 
@@ -52,23 +56,35 @@ export function NutritionTrendsView() {
           </p>
         </div>
 
-        {/* Selector de días */}
-        <div className="flex items-center gap-1 rounded-lg border border-line bg-card/60 p-1 text-[12px] font-medium">
-          {[7, 14, 30].map((num) => (
-            <button
-              key={num}
-              type="button"
-              onClick={() => void setTrendsDays(num)}
-              className={`rounded-md px-3 py-1 transition-colors ${
-                trendsDays === num
-                  ? "bg-accent text-white shadow-xs font-semibold"
-                  : "text-faint hover:text-dim"
-              }`}
-              data-testid={`range-btn-${num}`}
-            >
-              {num} días
-            </button>
-          ))}
+        {/* Selector de días y botón exportar */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-lg border border-line bg-card/60 p-1 text-[12px] font-medium">
+            {[7, 14, 30].map((num) => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => void setTrendsDays(num)}
+                className={`rounded-md px-3 py-1 transition-colors ${
+                  trendsDays === num
+                    ? "bg-accent text-white shadow-xs font-semibold"
+                    : "text-faint hover:text-dim"
+                }`}
+                data-testid={`range-btn-${num}`}
+              >
+                {num} días
+              </button>
+            ))}
+          </div>
+
+          <GhostButton
+            onClick={() => setExportModalOpen(true)}
+            className="flex items-center gap-1.5 text-[12px] font-medium text-main border border-line bg-card/60 px-3 py-1.5 hover:border-accent hover:text-accent transition-colors"
+            title="Exportar reporte en Markdown o CSV"
+            data-testid="open-export-btn"
+          >
+            <Download size={13} />
+            <span>Exportar</span>
+          </GhostButton>
         </div>
       </div>
 
@@ -382,6 +398,9 @@ export function NutritionTrendsView() {
           </div>
         )}
       </div>
+
+      {/* Modal de Exportación */}
+      <ExportNutritionDialog />
     </div>
   );
 }

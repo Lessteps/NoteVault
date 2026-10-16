@@ -861,6 +861,12 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
     call<{ ok: boolean }>("nutri_recipe_delete", id),
   nutriRecipeConsume: (date: string, meal: string, recipeId: string, servings = 1) =>
     call<import("./nutritionTypes").NutriDaySummary>("nutri_recipe_consume", date, meal, recipeId, servings),
+  nutriReportGenerate: (days = 7, endDate?: string) =>
+    call<{
+      markdown: string;
+      csv: { header: string[]; rows: Array<Array<string | number>> };
+      trends: import("./nutritionTypes").NutriTrendsData;
+    }>("nutri_report_generate", days, endDate),
   nutriSettingsGet: () =>
     call<import("./nutritionTypes").NutriTargets>("nutri_settings_get"),
   nutriSettingsSave: (settings: Partial<import("./nutritionTypes").NutriTargets>) =>

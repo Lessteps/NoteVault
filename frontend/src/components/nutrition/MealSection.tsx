@@ -21,6 +21,7 @@ export function MealSection({ meal }: { meal: NutriMealType }) {
   const removeFoodFromMeal = useNutrition((s) => s.removeFoodFromMeal);
   const updateFoodInMeal = useNutrition((s) => s.updateFoodInMeal);
   const copyMealFromYesterday = useNutrition((s) => s.copyMealFromYesterday);
+  const targets = useNutrition((s) => s.targets);
 
   const [editingItem, setEditingItem] = useState<NutriFoodItem | null>(null);
   const [editName, setEditName] = useState("");
@@ -37,6 +38,12 @@ export function MealSection({ meal }: { meal: NutriMealType }) {
   const mealTotals = summary.byMeal[meal] || { calories: 0, protein: 0, carbs: 0, fat: 0, itemsCount: 0 };
   const meta = NUTRI_MEALS.find((m) => m.id === meal);
   const Icon = ICONS[meal] || Utensils;
+
+  // Meta asignada según timing nutricional
+  const distPct = targets?.meal_distribution?.[meal];
+  const targetKcalForMeal = (distPct !== undefined && targets?.calories)
+    ? Math.round((targets.calories * distPct) / 100)
+    : null;
 
   const handleDelete = (id: string) => {
     void removeFoodFromMeal(meal, id);
@@ -92,7 +99,14 @@ export function MealSection({ meal }: { meal: NutriMealType }) {
             <Icon size={15} />
           </div>
           <div>
-            <h3 className="text-[13.5px] font-semibold text-main">{meta?.label || meal}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-[13.5px] font-semibold text-main">{meta?.label || meal}</h3>
+              {targetKcalForMeal !== null && (
+                <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-elevated/80 text-faint border border-line/40">
+                  Meta: ~{targetKcalForMeal} kcal ({distPct}%)
+                </span>
+              )}
+            </div>
             <span className="text-[11px] text-faint">
               {mealTotals.calories} kcal · {mealTotals.protein}g P · {mealTotals.carbs}g C · {mealTotals.fat}g G
             </span>

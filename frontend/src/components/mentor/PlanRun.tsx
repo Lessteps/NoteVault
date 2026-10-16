@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { planGate } from "../../lib/planGate";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
-import { dayByArea } from "../../lib/planTopicsByArea";
+import { dayByArea, orderedAreas } from "../../lib/planTopicsByArea";
 import type { MentorPlan } from "../../lib/types";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
@@ -16,7 +16,7 @@ import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { DeliverableLine, focusColour, plural, useAgendaModel } from "./agendaKit";
 import { hm, ProgressBar } from "./parts";
-import { AreaCardShell, PlanBoard, TopicRow, type BoardRow } from "./PlanBoard";
+import { AreaCardShell, PlanBoard, ProgressOverview, TopicRow, type BoardRow } from "./PlanBoard";
 import { usePlanAreaPractice } from "./PracticeCard";
 import { RunProjects } from "./PlanRunPractice";
 import { SectionCard, SectionHeading } from "./planKit";
@@ -87,8 +87,12 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
     });
     return { e, rows, colour: focusColour(e.areaId), doneN: rows.filter((r) => r.done).length };
   });
+  const areaList = orderedAreas(plan);
+  const cardOf = new Map(cards.map((c) => [c.e.subplanId, c] as const));
   const [areaSel, setAreaSel] = useState("");
-  const activeCard = cards.find((c) => c.e.subplanId === areaSel) ?? cards.find((c) => c.doneN < c.rows.length) ?? cards[0];
+  // abre en la primera área con algo pendiente hoy; si hoy no hay temas, en la primera del plan
+  const activeId = areaList.find((a) => a.subplanId === areaSel)?.subplanId ?? cards.find((c) => c.doneN < c.rows.length)?.e.subplanId ?? areaList[0]?.subplanId ?? "";
+  const activeCard = cardOf.get(activeId);
 
   const planToday = () => {
     setPending({ type: "plan" });
@@ -142,53 +146,6 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
               <p className="text-[14px] text-dim">Sin temas repartidos hoy: queda para repaso o para recuperar lo atrasado.</p>
             )}
 
-            {entries.length > 0 && (
-              <div className="space-y-3" data-testid="run-areas">
-                <nav aria-label="Áreas de hoy" data-testid="run-area-tabs" className="min-w-0">
-                  <ul className="flex gap-1 overflow-x-auto border-b border-line py-1">
-                    {cards.map((c) => {
-                      const on = c.e.subplanId === activeCard?.e.subplanId;
-                      return (
-                        <li key={c.e.subplanId} className="flex-none">
-                          <button
-                            type="button"
-                            aria-pressed={on}
-                            aria-current={on ? "page" : undefined}
-                            onClick={() => setAreaSel(c.e.subplanId)}
-                            data-testid={`run-area-tab-${c.e.areaId ?? c.e.subplanId}`}
-                            className={cn("inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-[14.5px] font-medium transition-colors", on ? "border-accent bg-accent-soft text-accent-text" : "border-transparent text-dim hover:bg-hover hover:text-text")}
-                          >
-                            <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: c.colour }} />
-                            {c.e.area}
-                            <span className="rounded-md bg-hover px-1.5 text-[12px] text-dim">
-                              <span aria-hidden>{c.doneN}/{c.rows.length}</span>
-                              <span className="sr-only"> ({c.doneN} de {c.rows.length} temas hechos)</span>
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </nav>
-                {activeCard && (
-                  <AreaCardShell
-                    key={activeCard.e.subplanId}
-                    colour={activeCard.colour}
-                    title={activeCard.e.area}
-                    badge={`${activeCard.doneN}/${activeCard.rows.length}`}
-                    sub={[activeCard.e.theoryMinutes ? `${hm(activeCard.e.theoryMinutes)} teoría` : "", activeCard.e.practiceMinutes ? `${hm(activeCard.e.practiceMinutes)} práctica` : ""].filter(Boolean).join(" · ")}
-                    tag={activeCard.e.project ? "Con proyecto" : undefined}
-                    testid="run-area"
-                    area={activeCard.e.areaId ?? activeCard.e.subplanId}
-                  >
-                    <ul className="space-y-0.5" aria-label={`Temas de hoy de ${activeCard.e.area}`}>
-                      {activeCard.rows.map((r) => <TopicRow key={`${r.folder}:${r.meta}`} r={r} colour={activeCard.colour} />)}
-                    </ul>
-                  </AreaCardShell>
-                )}
-              </div>
-            )}
-
             {(day.practice.project || langBlocks.length > 0) && (
               <ul className="flex flex-wrap gap-2" aria-label="Práctica del día" data-testid="run-practice">
                 {day.practice.project && <li><Chip large colour="var(--nv-practice, #c58be0)">Proyecto semanal · {hm(day.practice.project.minutes)}</Chip></li>}
@@ -206,15 +163,67 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         {late > 0 && <p className="text-[14px] text-warn" data-testid="run-late">{plural(late, "tema atrasado", "temas atrasados")} de semanas anteriores: están en «Vista de plan», dentro de cada área.</p>}
       </SectionCard>
 
-      {/* 2 · Cómo voy: cada área con sus temas Y su práctica diaria */}
-      <PlanBoard
-        plan={plan}
-        data={data}
-        byFolder={m.topicByFolder}
-        gate={gate}
-        currentWeek={currentWeek}
-        practice={ap.data && ap.data.areas.length ? { areas: ap.data.areas, today: ap.data.today || m.today, mark: ap.mark } : undefined}
-      />
+      {/* 2 · Áreas: una pestaña por área del plan; cada una con sus temas de hoy, todos sus temas y su práctica diaria */}
+      <section aria-labelledby="run-areas-h" data-testid="run-areas" className="space-y-3">
+        <SectionHeading id="run-areas-h" hint="Elige un área: sus temas de hoy, su ruta completa y su práctica diaria.">Áreas</SectionHeading>
+        <nav aria-label="Áreas del plan" data-testid="run-area-tabs" className="min-w-0">
+          <ul className="flex gap-1 overflow-x-auto border-b border-line py-1">
+            {areaList.map((a) => {
+              const c = cardOf.get(a.subplanId);
+              const on = a.subplanId === activeId;
+              return (
+                <li key={a.subplanId} className="flex-none">
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    aria-current={on ? "page" : undefined}
+                    onClick={() => setAreaSel(a.subplanId)}
+                    data-testid={`run-area-tab-${a.areaId ?? a.subplanId}`}
+                    className={cn("inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-[14.5px] font-medium transition-colors", on ? "border-accent bg-accent-soft text-accent-text" : "border-transparent text-dim hover:bg-hover hover:text-text")}
+                  >
+                    <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: focusColour(a.areaId) }} />
+                    {a.area}
+                    {c && (
+                      <span className="rounded-md bg-hover px-1.5 text-[12px] text-dim">
+                        <span aria-hidden>{c.doneN}/{c.rows.length}</span>
+                        <span className="sr-only"> ({c.doneN} de {c.rows.length} temas de hoy hechos)</span>
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+        {activeCard && day?.study && (
+          <ul aria-label="Qué estudiar hoy en esta área">
+            <AreaCardShell
+              key={activeCard.e.subplanId}
+              colour={activeCard.colour}
+              title={`Hoy · ${activeCard.e.area}`}
+              badge={`${activeCard.doneN}/${activeCard.rows.length}`}
+              sub={[activeCard.e.theoryMinutes ? `${hm(activeCard.e.theoryMinutes)} teoría` : "", activeCard.e.practiceMinutes ? `${hm(activeCard.e.practiceMinutes)} práctica` : ""].filter(Boolean).join(" · ")}
+              tag={activeCard.e.project ? "Con proyecto" : undefined}
+              testid="run-area"
+              area={activeCard.e.areaId ?? activeCard.e.subplanId}
+            >
+              <ul className="space-y-0.5" aria-label={`Temas de hoy de ${activeCard.e.area}`}>
+                {activeCard.rows.map((r) => <TopicRow key={`${r.folder}:${r.meta}`} r={r} colour={activeCard.colour} />)}
+              </ul>
+            </AreaCardShell>
+          </ul>
+        )}
+        {!activeCard && day?.study && <p className="text-[14px] text-dim" data-testid="run-area-rest">Hoy no toca esta área; su ruta completa está abajo.</p>}
+        <PlanBoard
+          plan={plan}
+          data={data}
+          byFolder={m.topicByFolder}
+          gate={gate}
+          currentWeek={currentWeek}
+          onlyArea={activeId}
+          practice={ap.data && ap.data.areas.length ? { areas: ap.data.areas, today: ap.data.today || m.today, mark: ap.mark } : undefined}
+        />
+      </section>
 
       {/* 3 · Lo que viene */}
       {(upcoming.length > 0 || deliverables.length > 0) && (
@@ -260,6 +269,9 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
 
       {/* 4 · Proyectos diario y semanal, abajo del todo */}
       <RunProjects plan={plan} data={data} m={m} />
+
+      {/* 4 · Vista general: solo el avance de cada área; pulsar una la abre arriba */}
+      <ProgressOverview plan={plan} data={data} onPick={(id) => { setAreaSel(id); document.getElementById("run-areas-h")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />
     </div>
   );
 }

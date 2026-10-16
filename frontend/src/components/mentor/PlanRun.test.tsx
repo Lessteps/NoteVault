@@ -86,12 +86,21 @@ describe("vista de ejecución", () => {
     // hoy, con su semana
     expect(byTest("run-today")!.textContent).toContain("Semana 1");
     expect(byTest("run-today")!.textContent).toContain("12 de octubre");
-    // un tarjeta de avance por área, con su porcentaje real
-    const areas = all("run-area-progress");
-    expect(areas.map((a) => a.querySelector("h3")!.textContent)).toEqual(["Fundamentals", "Python"]);
-    expect(areas[0]!.textContent).toContain("0 %");
-    expect(areas[1]!.textContent).toContain("100 %");
-    expect(byTest("run-progress")!.textContent).toContain("50 %");
+    // sub-barra con una pestaña por área; la elegida enseña su tarjeta con su porcentaje real
+    const tabs = [...host.querySelectorAll("[data-testid=run-area-tabs] button")];
+    expect(tabs).toHaveLength(2);
+    expect(all("run-area-progress").map((a) => a.querySelector("h3")!.textContent)).toEqual(["Fundamentals"]);
+    expect(all("run-area-progress")[0]!.textContent).toContain("0 %");
+    await click(tabs[1] as HTMLElement);
+    expect(all("run-area-progress").map((a) => a.querySelector("h3")!.textContent)).toEqual(["Python"]);
+    expect(all("run-area-progress")[0]!.textContent).toContain("100 %");
+    // abajo, la vista general solo con el avance de cada área
+    const ov = all("overview-area");
+    expect(ov).toHaveLength(2);
+    expect(ov[0]!.textContent).toContain("0 %");
+    expect(ov[1]!.textContent).toContain("100 %");
+    expect(byTest("board-global")!.textContent).toContain("50 %");
+    expect(host.textContent).not.toContain("Cómo voy");
   });
 
   it("es de solo lectura: ningún campo de texto ni acción que cambie el plan", async () => {
@@ -170,10 +179,12 @@ describe("vista de ejecución", () => {
   it("los filtros reducen los temas de cada área", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    expect(all("board-topic")).toHaveLength(2);
+    expect(all("board-topic")).toHaveLength(1); // solo el área elegida
     const pend = [...byTest("board-filters")!.querySelectorAll("button")].find((b) => b.textContent === "Pendientes")!;
     await click(pend);
-    expect(all("board-topic")).toHaveLength(1); // el de Python ya está completo
+    expect(all("board-topic")).toHaveLength(1);
+    await click(host.querySelectorAll("[data-testid=run-area-tabs] button")[1] as HTMLElement);
+    expect(all("board-topic")).toHaveLength(0); // el de Python ya está completo
   });
 
   const due = (areaId: string, label: string, dates: string[]) =>
@@ -235,7 +246,8 @@ describe("vista de ejecución", () => {
     await mountEl(<MentorPlan planId={PID} />);
     const run = byTest("plan-run")!;
     const order = [...run.children].map((c) => (c as HTMLElement).dataset.testid);
-    expect(order.indexOf("run-projects")).toBe(order.length - 1);
+    expect(order.indexOf("run-projects")).toBe(order.length - 2); // después van solo el avance general
+    expect(order[order.length - 1]).toBe("run-overview");
     expect(order.indexOf("run-next")).toBeLessThan(order.indexOf("run-projects"));
     const projects = byTest("run-projects")!;
     expect(byTest("run-project-daily")!.textContent).toContain("Proyecto diario");

@@ -122,13 +122,48 @@ export interface BoardPractice {
   mark: AreaPracticeState["mark"];
 }
 
-export function PlanBoard({ plan, data, byFolder, gate, currentWeek, practice }: { plan: MentorPlan; data: Loaded; byFolder: Map<string, MentorTopicView>; gate: PlanGate; currentWeek: number; practice?: BoardPractice }) {
+/** Progreso de cada área en la vista general (solo avance, sin listas de temas); pulsar un área la abre en su pestaña. */
+export function ProgressOverview({ plan, data, onPick }: { plan: MentorPlan; data: Loaded; onPick?: (subplanId: string) => void }) {
+  const summary = data.derived?.summary;
+  if (!summary) return null;
+  const areas = orderedAreas(plan).map((a) => {
+    const view = data.derived?.subplans.find((s) => s.id === a.subplanId);
+    return { a, pct: view?.pct ?? 0, done: view?.done ?? 0, total: view?.total ?? 0 };
+  });
+  return (
+    <section aria-labelledby="run-overview-h" data-testid="run-overview" className="space-y-3">
+      <SectionHeading id="run-overview-h" hint={`Semana ${summary.currentWeek} de ${summary.weeks} · ${summary.done}/${summary.topics} temas completados.`}>Progreso general</SectionHeading>
+      <div className="rounded-2xl border border-line bg-card p-4 @3xl:p-5" data-testid="board-global">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h3 className="text-[17px] font-semibold">Plan completo</h3>
+          <span className="flex-1" />
+          <span className="text-[26px] font-extrabold leading-none text-accent-text">{summary.pct} %</span>
+        </div>
+        <div className="mt-3"><ProgressBar pct={summary.pct} thick label="Avance global del plan" /></div>
+        <ul className="mt-4 grid gap-x-8 gap-y-2.5 @3xl:grid-cols-2" aria-label="Avance por área">
+          {areas.map(({ a, pct, done, total }) => (
+            <li key={a.subplanId}>
+              <button type="button" onClick={() => onPick?.(a.subplanId)} className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-hover" data-testid="overview-area" aria-label={`${a.area}: ${pct} %, ${done} de ${total} temas. Abrir el área`}>
+                <span aria-hidden className="inline-block h-2.5 w-2.5 flex-none rounded-full" style={{ background: focusColour(a.areaId) }} />
+                <span className="w-40 flex-none truncate text-[14.5px]">{a.area}</span>
+                <span className="min-w-0 flex-1"><ProgressBar pct={pct} label={`Avance de ${a.area}`} /></span>
+                <span className="w-24 flex-none text-right text-[13.5px] text-dim"><strong className="text-text">{pct} %</strong> · {done}/{total}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+export function PlanBoard({ plan, data, byFolder, gate, currentWeek, practice, onlyArea }: { plan: MentorPlan; data: Loaded; byFolder: Map<string, MentorTopicView>; gate: PlanGate; currentWeek: number; practice?: BoardPractice; /** muestra solo esta área (id del subplan), sin cabecera ni progreso general */ onlyArea?: string }) {
   const [filter, setFilter] = useState<FilterId>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   /** grupo elegido en cada área («» = todos a la vez) */
   const [groupSel, setGroupSel] = useState<Record<string, string>>({});
   const summary = data.derived?.summary;
-  const areas = orderedAreas(plan).map((a) => {
+  const areas = orderedAreas(plan).filter((a) => !onlyArea || a.subplanId === onlyArea).map((a) => {
     const sub = plan.subplans.find((s) => s.id === a.subplanId)!;
     const view = data.derived?.subplans.find((s) => s.id === a.subplanId);
     const rows: BoardRow[] = sub.topics
@@ -154,15 +189,15 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek, practice }:
 
   return (
     <section aria-labelledby="run-progress-h" data-testid="run-progress" className="space-y-4">
-      <SectionHeading
+      {!onlyArea && <SectionHeading
         id="run-progress-h"
         hint={`Semana ${summary.currentWeek} de ${summary.weeks} · ${summary.done}/${summary.topics} temas completados. Cada área junta sus temas y su práctica diaria.`}
         right={practice && practice.areas.length > 0 ? <button type="button" onClick={() => openPlanTab(plan.id, "practica")} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[14px] text-dim hover:bg-hover hover:text-text" data-testid="run-practice-all"><ExternalLink size={14} aria-hidden /> Toda la práctica</button> : undefined}
       >
         Cómo voy
-      </SectionHeading>
+      </SectionHeading>}
 
-      <div className="rounded-2xl border border-line bg-card p-4 @3xl:p-5" data-testid="board-global">
+      {!onlyArea && <div className="rounded-2xl border border-line bg-card p-4 @3xl:p-5" data-testid="board-global">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h3 className="text-[17px] font-semibold">Plan completo</h3>
           <span className="flex-1" />
@@ -179,7 +214,7 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek, practice }:
             </li>
           ))}
         </ul>
-      </div>
+      </div>}
 
       <div role="group" aria-label="Filtrar temas" className="inline-flex flex-wrap gap-1 rounded-xl border border-line bg-card p-1" data-testid="board-filters">
         {FILTERS.map((f) => (
@@ -195,7 +230,7 @@ export function PlanBoard({ plan, data, byFolder, gate, currentWeek, practice }:
         ))}
       </div>
 
-      <ul className="grid gap-4 @3xl:grid-cols-2 @6xl:grid-cols-3">
+      <ul className={cn("grid gap-4", !onlyArea && "@3xl:grid-cols-2 @6xl:grid-cols-3")}>
         {areas.map(({ a, rows, pct, phaseFrom, groups }) => {
           const colour = focusColour(a.areaId);
           const sel = groups.some((g) => g.id === groupSel[a.subplanId]) ? groupSel[a.subplanId]! : "";

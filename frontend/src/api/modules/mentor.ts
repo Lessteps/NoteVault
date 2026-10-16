@@ -135,6 +135,7 @@ import { mentorAskApi } from "./mentorAsk.js";
 import { mentorCoverageApi } from "./mentorCoverage.js";
 import { designsOf } from "./mentorDesign.js";
 import { mentorExecuteApi } from "./mentorExecute.js";
+import { mentorTimeLogApi } from "./mentorTimeLog.js";
 import { mentorAreaPracticeApi } from "./mentorAreaPractice.js";
 import { mentorDayCloseApi } from "./mentorDayClose.js";
 import { DayCloseStore } from "../../core/mentor/dayClose.js";
@@ -2244,6 +2245,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
     ...mentorCoverageApi(app),
     // «Ejecutar plan» (informe, cola en segundo plano, pausa/cancelación) y Sistema de práctica por área (ver mentorExecute.ts y mentorAreaPractice.ts)
     ...mentorExecuteApi(app, { ...(send ? { send } : {}), today: () => localDate() }),
+    // registro de horas por área (Pomodoro y bloques a mano)
+    ...mentorTimeLogApi(app),
     ...mentorAreaPracticeApi(app, { today: () => localDate() }),
     // Cierre del día y memoria del Mentor: registro sin IA + una revisión al cerrar (ver mentorDayClose.ts)
     ...mentorDayCloseApi(app, { withJob, guarded, cancelMode: (e) => (e instanceof CancelError ? e.mode : undefined), today: () => localDate(), activePlans: (day) => activePlans(new PlanStore(app.root).list(), day), topicSnaps: () => topicSnaps(app), cold: () => studyIndexCold(app) }),

@@ -60,11 +60,11 @@ describe("PlanAreaTopics", () => {
   it("una pestaña por área del plan; la primera abierta, con sus temas en orden de ruta y lo que falta marcado con texto", async () => {
     await mount(PLAN);
     const tabs = [...byTest("area-tabs")!.querySelectorAll("button")].map((b) => b.dataset.testid);
-    expect(tabs).toEqual(["area-tabs-s1", "area-tabs-frontend"]);
+    expect(tabs).toEqual(["area-tabs-s1", "area-tabs-frontend", "area-tabs-__bases"]); // Bases no es de ningún área: pestaña propia
     expect(byTest("area-tabs-s1")!.getAttribute("aria-pressed")).toBe("true");
     expect(byTest("area-tabs-s1")!.textContent).toContain("por generar"); // el aviso también va escrito para lectores de pantalla
-    expect(titles()).toEqual(["4.1 HTTP", "4.2 REST"]);
-    const rest = host.querySelectorAll("[data-testid=area-row]")[1]!;
+    expect(titles()).toEqual(["4.2 REST"]);
+    const rest = host.querySelectorAll("[data-testid=area-row]")[0]!;
     expect(rest.textContent).toContain("Sin mapa");
     expect(rest.textContent).toContain("Sin ejercicios");
     expect(byTest("area-summary")!.textContent).toContain("1 por generar");
@@ -78,18 +78,23 @@ describe("PlanAreaTopics", () => {
     await click("area-tabs-frontend");
     expect(titles()).toEqual(["5.1 DOM"]);
     expect(byTest("group-tabs")).toBeNull(); // sin grupos no hay segunda sub-barra
+    await click("area-tabs-__bases");
+    expect(titles()).toEqual(["4.1 HTTP"]);
+    expect(byTest("generate-area")).toBeNull(); // Bases se genera tema a tema
     await click("area-tabs-s1");
-    expect(titles()).toEqual(["4.1 HTTP", "4.2 REST"]); // al volver, el grupo se reinicia a «Todos»
+    expect(titles()).toEqual(["4.2 REST"]); // al volver, el grupo se reinicia a «Todos»
     await click("area-open");
-    expect(openTopic).toHaveBeenCalledWith("P/4/4.1 HTTP");
+    expect(openTopic).toHaveBeenCalledWith("P/4/4.2 REST");
   });
 
   it("«Generar todo» abre el diálogo con el alcance de ese tema; lo completo no se puede generar", async () => {
     await mount(PLAN);
+    await click("area-tabs-__bases");
+    expect([...host.querySelectorAll<HTMLButtonElement>("[data-testid=generate-topic]")][0]!.disabled).toBe(true); // HTTP está completo
+    await click("area-tabs-s1");
     const btns = [...host.querySelectorAll<HTMLButtonElement>("[data-testid=generate-topic]")];
-    expect(btns[0]!.disabled).toBe(true); // HTTP está completo
-    expect(btns[1]!.disabled).toBe(false);
-    await act(async () => { btns[1]!.click(); });
+    expect(btns[0]!.disabled).toBe(false);
+    await act(async () => { btns[0]!.click(); });
     await flush(); await flush();
     expect(byTest("exec-scope-topic")!.textContent).toContain("4.2 REST");
     expect(api.mentorExecutionReport).toHaveBeenCalledWith("p1", expect.objectContaining({ mode: "topic", folder: "P/4/4.2 REST", includeRecommended: true }));
@@ -107,6 +112,6 @@ describe("PlanAreaTopics", () => {
     await click("area-tabs-frontend");
     await mount({ ...PLAN, subplans: PLAN.subplans.slice(0, 1) } as MentorPlan);
     expect(byTest("area-tabs-frontend")).toBeNull();
-    expect(titles()).toEqual(["4.1 HTTP", "4.2 REST"]);
+    expect(titles()).toEqual(["4.2 REST"]);
   });
 });

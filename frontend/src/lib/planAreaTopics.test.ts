@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { areaTabsOf, areaTopicRows, groupTabsOf, pendingGenerate, rowsOfGroup } from "./planAreaTopics";
+import { areaTabsOf, areaTopicRows, basesTopicRows, groupTabsOf, pendingGenerate, rowsOfGroup } from "./planAreaTopics";
 import type { PlanTopicRow } from "./planTopicCatalog";
 import type { MentorPlan } from "./types";
 
@@ -25,17 +25,18 @@ describe("temas por área", () => {
   it("una pestaña por área del plan, con su clave de alcance, los completados y lo que falta generar", () => {
     const tabs = areaTabsOf(plan, catalog);
     expect(tabs.map((t) => [t.key, t.area])).toEqual([["s1", "Backend"], ["frontend", "Frontend"]]);
-    // a REST le falta el mapa; Sueltos está completado (no cuenta); Fuera está fuera de ruta (no cuenta)
-    expect(tabs[0]).toMatchObject({ total: 4, done: 1, missing: 1 });
+    // sin el tema de Bases (HTTP): a REST le falta el mapa; Sueltos está completado (no cuenta); Fuera está fuera de ruta (no cuenta)
+    expect(tabs[0]).toMatchObject({ total: 3, done: 1, missing: 1 });
     // DOM no está en la vault: falta todo
     expect(tabs[1]).toMatchObject({ total: 1, done: 0, missing: 1 });
   });
 
   it("las filas van en el orden de la ruta y un tema que aún no está en la vault sale con todo por hacer", () => {
     const rows = areaTopicRows(plan.subplans[0]!, catalog);
-    expect(rows.map((r) => r.title)).toEqual(["4.1 HTTP", "4.2 REST", "4.3 Sueltos", "4.4 Fuera"]);
-    expect(rows[3]).toMatchObject({ route: "skipped", exists: false, theory: false, incomplete: true });
-    expect(pendingGenerate(rows[3]!)).toBe(false);
+    expect(rows.map((r) => r.title)).toEqual(["4.2 REST", "4.3 Sueltos", "4.4 Fuera"]);
+    expect(areaTopicRows(plan.subplans[0]!, catalog, true).map((r) => r.title)).toEqual(["4.1 HTTP", "4.2 REST", "4.3 Sueltos", "4.4 Fuera"]);
+    expect(rows[2]).toMatchObject({ route: "skipped", exists: false, theory: false, incomplete: true });
+    expect(pendingGenerate(rows[2]!)).toBe(false);
     expect(areaTopicRows(plan.subplans[1]!, catalog)[0]).toMatchObject({ exists: false, exercises: 0, incomplete: true });
   });
 
@@ -43,10 +44,16 @@ describe("temas por área", () => {
     const s = plan.subplans[0]!;
     const rows = areaTopicRows(s, catalog);
     const tabs = groupTabsOf(s, rows);
-    expect(tabs.map((t) => [t.id, t.title, t.total])).toEqual([["", "Todos", 4], ["bases", "Bases", 1], ["kn", "Conocimientos", 2], ["__otros", "Otros", 1]]);
+    expect(tabs.map((t) => [t.id, t.title, t.total])).toEqual([["", "Todos", 3], ["kn", "Conocimientos", 2], ["__otros", "Otros", 1]]);
     expect(rowsOfGroup(s, rows, "kn").map((r) => r.title)).toEqual(["4.2 REST", "4.4 Fuera"]);
     expect(rowsOfGroup(s, rows, "__otros").map((r) => r.title)).toEqual(["4.3 Sueltos"]);
-    expect(rowsOfGroup(s, rows, "")).toHaveLength(4);
+    expect(rowsOfGroup(s, rows, "")).toHaveLength(3);
     expect(groupTabsOf(plan.subplans[1]!, areaTopicRows(plan.subplans[1]!, catalog))).toHaveLength(1);
+  });
+
+  it("Bases no es de ningún área: sus temas van juntos y sin repetirse aunque estén en varias áreas", () => {
+    const shared = { ...plan, subplans: [...plan.subplans, { ...plan.subplans[1]!, id: "s3", topics: [topic("P/4/4.1 HTTP", 1, { group: "bases" })], groups: [{ id: "bases", title: "Bases", kind: "bases", order: 1 }] }] } as unknown as MentorPlan;
+    expect(basesTopicRows(shared, catalog).map((r) => r.title)).toEqual(["4.1 HTTP"]);
+    expect(basesTopicRows({ subplans: [plan.subplans[1]!] } as unknown as MentorPlan, catalog)).toEqual([]);
   });
 });

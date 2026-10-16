@@ -7,7 +7,7 @@
 
 import { Check, X } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
-import { areaTabsOf, areaTopicRows, groupTabsOf, pendingGenerate, rowsOfGroup, type AreaTab, type GroupTab } from "../../lib/planAreaTopics";
+import { areaTabsOf, areaTopicRows, basesTopicRows, BASES_KEY, groupTabsOf, pendingGenerate, rowsOfGroup, type AreaTab, type GroupTab } from "../../lib/planAreaTopics";
 import { ROUTE_LABEL } from "../../lib/planRoute";
 import type { MentorPlan } from "../../lib/types";
 import { Chip } from "../common/forms";
@@ -73,13 +73,20 @@ export function PlanAreaTopics({ plan }: { plan: MentorPlan }) {
   const [groupId, setGroupId] = useState("");
 
   const cat = catalog ?? [];
-  const tabs = useMemo(() => areaTabsOf(plan, cat), [plan, cat]);
+  const baseTabs = useMemo(() => areaTabsOf(plan, cat), [plan, cat]);
+  // Bases: los fundamentos no son de la ruta de ningún área; van juntos, sin repetirse, en su propia pestaña
+  const basesRows = useMemo(() => basesTopicRows(plan, cat), [plan, cat]);
+  const basesTab: AreaTab | undefined = basesRows.length
+    ? { key: BASES_KEY, area: "Bases", subplanId: BASES_KEY, total: basesRows.length, done: basesRows.filter((r) => r.completed).length, missing: basesRows.filter(pendingGenerate).length }
+    : undefined;
+  const tabs = useMemo(() => (basesTab ? [...baseTabs, basesTab] : baseTabs), [baseTabs, basesTab]);
   const active = tabs.find((t) => t.key === areaKey) ?? tabs[0];
-  const sub = active ? plan.subplans.find((s) => s.id === active.subplanId) : undefined;
-  const areaRows = useMemo(() => (sub ? areaTopicRows(sub, cat) : []), [sub, cat]);
-  const groups = useMemo(() => (sub ? groupTabsOf(sub, areaRows) : []), [sub, areaRows]);
+  const isBases = active?.key === BASES_KEY;
+  const sub = active && !isBases ? plan.subplans.find((s) => s.id === active.subplanId) : undefined;
+  const areaRows = useMemo(() => (isBases ? basesRows : sub ? areaTopicRows(sub, cat) : []), [isBases, basesRows, sub, cat]);
+  const groups = useMemo(() => (sub ? groupTabsOf(sub, areaRows) : [{ id: "", title: "Todos", total: areaRows.length, missing: areaRows.filter(pendingGenerate).length }]), [sub, areaRows]);
   const group = groups.find((g) => g.id === groupId) ?? groups[0];
-  const shown = useMemo(() => (sub && group ? rowsOfGroup(sub, areaRows, group.id) : []), [sub, areaRows, group]);
+  const shown = useMemo(() => (sub && group ? rowsOfGroup(sub, areaRows, group.id) : areaRows), [sub, areaRows, group]);
   // si el área o el grupo elegidos desaparecen del plan, se vuelve a la primera pestaña
   useEffect(() => {
     if (active && active.key !== areaKey) setAreaKey(active.key);
@@ -102,7 +109,7 @@ export function PlanAreaTopics({ plan }: { plan: MentorPlan }) {
 
       {tabs.length === 0 && <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim">Este plan todavía no tiene áreas.</p>}
 
-      {catalog && active && sub && group && (
+      {catalog && active && group && (
         <>
           <TabBar label="Áreas del plan" tabs={areaTabsView(tabs)} active={active.key} onSelect={pickArea} level={1} testid="area-tabs" />
 
@@ -111,7 +118,7 @@ export function PlanAreaTopics({ plan }: { plan: MentorPlan }) {
               <strong>{active.area}</strong> · {active.total} {active.total === 1 ? "tema" : "temas"} · {active.done} completados ·{" "}
               {active.missing > 0 ? <span className="text-warn">{active.missing} por generar</span> : <span className="text-mint">nada por generar</span>}
             </p>
-            <GenerateButton
+            {!isBases && <GenerateButton
               planId={plan.id}
               proposed={!!plan.proposed}
               scope={areaScope(active.key)}
@@ -120,7 +127,7 @@ export function PlanAreaTopics({ plan }: { plan: MentorPlan }) {
               disabled={active.missing === 0}
               title="Crea lo que falta de todos los temas de esta área (teoría, mapa, manifiesto y ejercicios)"
               testid="generate-area"
-            />
+            />}
           </div>
 
           {groups.length > 1 && <TabBar label={`Grupos de ${active.area}`} tabs={groupTabsView(groups)} active={group.id} onSelect={setGroupId} level={2} testid="group-tabs" />}

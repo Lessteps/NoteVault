@@ -57,6 +57,10 @@ const click = async (el: Element | null | undefined) => {
 };
 const byTest = (id: string) => host.querySelector<HTMLElement>(`[data-testid=${id}]`);
 const all = (id: string) => [...host.querySelectorAll<HTMLElement>(`[data-testid=${id}]`)];
+/** la pestaña de la ejecución: `general`, `area:<subplan>`, `bases`, `proyectos` */
+const runTab = (id: string) => host.querySelector<HTMLElement>(`[data-testid="run-tab-${id}"]`);
+const route = () => byTest("run-area-route")!;
+const routeTopics = () => [...route().querySelectorAll<HTMLElement>("[data-testid=board-topic]")];
 
 beforeEach(() => {
   localStorage.clear();
@@ -86,21 +90,24 @@ describe("vista de ejecución", () => {
     // hoy, con su semana
     expect(byTest("run-today")!.textContent).toContain("Semana 1");
     expect(byTest("run-today")!.textContent).toContain("12 de octubre");
-    // sub-barra con una pestaña por área; la elegida enseña su tarjeta con su porcentaje real
-    const tabs = [...host.querySelectorAll("[data-testid=run-area-tabs] button")];
-    expect(tabs).toHaveLength(2);
-    expect(all("run-area-progress").map((a) => a.querySelector("h3")!.textContent)).toEqual(["Fundamentals"]);
-    expect(all("run-area-progress")[0]!.textContent).toContain("0 %");
-    await click(tabs[1] as HTMLElement);
-    expect(all("run-area-progress").map((a) => a.querySelector("h3")!.textContent)).toEqual(["Python"]);
-    expect(all("run-area-progress")[0]!.textContent).toContain("100 %");
-    // abajo, la vista general solo con el avance de cada área
+    // la barra de pestañas: General, una por área y Proyectos
+    expect([...host.querySelectorAll("[data-testid=run-nav] button")].map((b) => b.getAttribute("data-testid"))).toEqual(["run-tab-general", "run-tab-area:s1", "run-tab-area:s2", "run-tab-proyectos"]);
+    expect(runTab("general")!.getAttribute("aria-pressed")).toBe("true");
+    // General: solo el avance de cada área en la columna lateral, sin listas de temas ni «Cómo voy»
     const ov = all("overview-area");
     expect(ov).toHaveLength(2);
     expect(ov[0]!.textContent).toContain("0 %");
     expect(ov[1]!.textContent).toContain("100 %");
     expect(byTest("board-global")!.textContent).toContain("50 %");
     expect(host.textContent).not.toContain("Cómo voy");
+    expect(byTest("run-area-route")).toBeNull();
+    // cada área tiene su pestaña con su ruta y su porcentaje real
+    await click(runTab("area:s1"));
+    expect(all("run-area-progress").map((a) => a.querySelector("h3")!.textContent)).toEqual(["Ruta de Fundamentals"]);
+    expect(all("run-area-progress")[0]!.textContent).toContain("0 %");
+    await click(runTab("area:s2"));
+    expect(all("run-area-progress").map((a) => a.querySelector("h3")!.textContent)).toEqual(["Ruta de Python"]);
+    expect(all("run-area-progress")[0]!.textContent).toContain("100 %");
   });
 
   it("es de solo lectura: ningún campo de texto ni acción que cambie el plan", async () => {
@@ -154,10 +161,12 @@ describe("vista de ejecución", () => {
   it("ruta sólida: con un día sin terminar, los temas de días posteriores salen bloqueados y sin flecha", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(spread()));
     await mountEl(<MentorPlan planId={PID} />);
-    const rows = all("board-topic");
+    await click(runTab("area:s1"));
+    const rows = routeTopics();
     expect(rows.map((r) => r.dataset.state)).toEqual(["sin_tratar", "bloqueado"]);
     expect(rows[1]!.querySelector("[data-testid=board-arrow]")).toBeNull();
     // vas atrasado respecto al frente: el aviso dice qué terminar primero
+    await click(runTab("general"));
     expect(byTest("run-gate")!.textContent).toContain("termina primero");
     expect(byTest("run-gate")!.textContent).toContain("1.1 A");
   });
@@ -166,8 +175,9 @@ describe("vista de ejecución", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const ensure = vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ ok: true, kind: "practica", path: "", created: [], errors: [] } as never);
     await mountEl(<MentorPlan planId={PID} />);
+    await click(runTab("area:s1"));
     expect(byTest("board-menu")).toBeNull();
-    await click(all("board-arrow")[0]);
+    await click(route().querySelector("[data-testid=board-arrow]"));
     const menu = byTest("board-menu")!;
     expect(menu.getAttribute("role")).toBe("menu");
     expect([...menu.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica"]);
@@ -179,12 +189,13 @@ describe("vista de ejecución", () => {
   it("los filtros reducen los temas de cada área", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
-    expect(all("board-topic")).toHaveLength(1); // solo el área elegida
+    await click(runTab("area:s1"));
+    expect(routeTopics()).toHaveLength(1); // solo el área elegida
     const pend = [...byTest("board-filters")!.querySelectorAll("button")].find((b) => b.textContent === "Pendientes")!;
     await click(pend);
-    expect(all("board-topic")).toHaveLength(1);
-    await click(host.querySelectorAll("[data-testid=run-area-tabs] button")[1] as HTMLElement);
-    expect(all("board-topic")).toHaveLength(0); // el de Python ya está completo
+    expect(routeTopics()).toHaveLength(1);
+    await click(runTab("area:s2"));
+    expect(routeTopics()).toHaveLength(0); // el de Python ya está completo
   });
 
   const due = (areaId: string, label: string, dates: string[]) =>
@@ -206,6 +217,7 @@ describe("vista de ejecución", () => {
     const open = vi.spyOn(api, "mentorAreaKataOpen").mockResolvedValue({ rel: "Programación/programming_practice/backend/katas/001.md", created: true, date: "2026-10-07" });
     const mark = vi.spyOn(api, "mentorAreaKataMark").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
     await mountEl(<MentorPlan planId={PID} />);
+    await click(runTab("area:s1"));
     // ya no hay una sección «Práctica de hoy» aparte ni kata de lógica general
     expect(byTest("run-practice")).toBeNull();
     expect(host.textContent).not.toContain("Kata de lógica");
@@ -239,16 +251,15 @@ describe("vista de ejecución", () => {
     expect(setup).toHaveBeenCalledWith(PID);
   });
 
-  it("el proyecto diario y el semanal van al final de la vista, después de «Lo que viene»", async () => {
+  it("el proyecto diario y el semanal tienen su propia pestaña", async () => {
     const p = plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }, { ...sub("s2", "Databases", "Consolidar", F2), areaId: "databases" }] as never });
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
     vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
     await mountEl(<MentorPlan planId={PID} />);
-    const run = byTest("plan-run")!;
-    const order = [...run.children].map((c) => (c as HTMLElement).dataset.testid);
-    expect(order.indexOf("run-projects")).toBe(order.length - 2); // después van solo el avance general
-    expect(order[order.length - 1]).toBe("run-overview");
-    expect(order.indexOf("run-next")).toBeLessThan(order.indexOf("run-projects"));
+    // los proyectos tienen su propia pestaña: ni en General ni en las áreas
+    expect(byTest("run-projects")).toBeNull();
+    await click(runTab("proyectos"));
+    expect(byTest("run-next")).toBeNull(); // «Lo que viene» es solo del resumen general
     const projects = byTest("run-projects")!;
     expect(byTest("run-project-daily")!.textContent).toContain("Proyecto diario");
     expect(byTest("run-project-weekly")!.textContent).toContain("Proyecto semanal");
@@ -260,6 +271,36 @@ describe("vista de ejecución", () => {
     expect(daily.textContent).toContain("Cómo hacerlo");
     expect(daily.querySelectorAll("[data-testid=project-result]").length).toBe(2);
     expect(byTest("weekly-areas")!.textContent).toContain("Resultado real");
+  });
+});
+
+describe("Bases: no son de la ruta de ningún área", () => {
+  const B1 = "Programación/1 Fundamentals/1.7 Specifying a problem";
+  const B2 = "Programación/1 Fundamentals/1.8 Algorithms";
+  const K1 = "Programación/4 Backend/4.2 HTTP";
+  const topic = (folder: string, group: string, w = 1) => ({ folder, title: folder.split("/").pop()!, targetWeek: w, estMinutes: 30, group });
+  const groups = [{ id: "bases", title: "Bases", kind: "bases", order: 1 }, { id: "core", title: "Conocimientos de backend", kind: "knowledge", order: 2 }];
+  const withBases = () => plan({
+    structure: "areas",
+    subplans: [
+      { ...sub("s1", "Backend", "x", K1), areaId: "backend", groups, topics: [topic(B1, "bases"), topic(B2, "bases", 2), topic(K1, "core")] },
+      { ...sub("s2", "Frontend", "y", F2), areaId: "frontend", groups: [groups[0], { id: "fe", title: "Frontend", kind: "knowledge", order: 2 }], topics: [topic(B1, "bases"), topic(F2, "fe")] },
+    ] as never,
+  });
+
+  it("la ruta de un área deja fuera los temas de Bases, que van juntos y sin repetirse en su propia pestaña", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(withBases()));
+    vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(runTab("bases")).toBeTruthy();
+    await click(runTab("area:s1"));
+    expect(routeTopics().map((r) => r.textContent)).toEqual([expect.stringContaining("4.2 HTTP")]);
+    expect(route().textContent).not.toContain("Bases 70");
+    await click(runTab("bases"));
+    // 1.7 está en Backend y en Frontend: cuenta una sola vez (2 temas en total, uno ya hecho) y la ruta enseña los pendientes
+    expect(byTest("run-bases")!.textContent).toContain("1/2 hechos");
+    const listed = byTest("run-bases")!.querySelector("[aria-label='Temas de Bases']")!.querySelectorAll("[data-testid=board-topic]");
+    expect([...listed].map((r) => r.textContent)).toEqual([expect.stringContaining("1.8 Algorithms")]);
   });
 });
 
@@ -375,6 +416,7 @@ describe("área «Lógica de programación» y proyecto semanal", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
     vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
     await mountEl(<MentorPlan planId={PID} />);
+    await click(runTab("proyectos"));
     const weekly = byTest("run-project-weekly")!;
     const pp = byTest("run-pp-project")!;
     expect(pp).toBeTruthy();

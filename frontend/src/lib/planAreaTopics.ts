@@ -50,10 +50,18 @@ const routeOf = (r: string | undefined): AreaTopicRow["route"] => (r === "option
 /** Lo que le falta a una fila para poder generarse (el catálogo ya dice si está «completo» según el diseño). */
 export const needsGenerate = (r: PlanTopicRow | undefined): boolean => !r || !r.complete || !r.theory || !r.canvas || !r.manifest || r.exercises === 0;
 
-/** Las filas de un área, en el orden de la ruta (semana y luego orden del plan). */
-export function areaTopicRows(sub: MentorSubplan, catalog: ReadonlyArray<PlanTopicRow>): AreaTopicRow[] {
+/** Id del grupo «Bases» de un área (los fundamentos no son de la ruta de ningún área: van en su propia pestaña). */
+const basesGroupOf = (sub: MentorSubplan): string | undefined => (sub.groups ?? []).find((g) => g.kind === "bases")?.id;
+
+/** Clave de la pestaña virtual de Bases. */
+export const BASES_KEY = "__bases";
+
+/** Las filas de un área, en el orden de la ruta (semana y luego orden del plan). Sin los temas de Bases, salvo que se pidan. */
+export function areaTopicRows(sub: MentorSubplan, catalog: ReadonlyArray<PlanTopicRow>, withBases = false): AreaTopicRow[] {
   const by = new Map(catalog.map((r) => [r.folder, r] as const));
+  const bases = withBases ? undefined : basesGroupOf(sub);
   return sub.topics
+    .filter((t) => !(bases && t.group === bases))
     .map((t, i) => ({ t, i }))
     .sort((a, b) => a.t.targetWeek - b.t.targetWeek || a.i - b.i)
     .map(({ t }) => {
@@ -79,7 +87,22 @@ export function areaTopicRows(sub: MentorSubplan, catalog: ReadonlyArray<PlanTop
 /** Un tema cuenta como «por generar» si está en ruta, sin completar y le falta algo. */
 export const pendingGenerate = (r: AreaTopicRow): boolean => r.route !== "skipped" && !r.completed && r.incomplete;
 
-/** Las pestañas de área, en el orden del plan. */
+/** Las filas de Bases de todo el plan, juntas y sin repetirse (un mismo tema de Bases suele estar en varias áreas). */
+export function basesTopicRows(plan: Pick<MentorPlan, "subplans">, catalog: ReadonlyArray<PlanTopicRow>): AreaTopicRow[] {
+  const seen = new Set<string>();
+  const out: AreaTopicRow[] = [];
+  for (const s of plan.subplans) {
+    const id = basesGroupOf(s);
+    if (!id) continue;
+    for (const r of areaTopicRows({ ...s, topics: s.topics.filter((t) => t.group === id && !seen.has(t.folder)) }, catalog, true)) {
+      seen.add(r.folder);
+      out.push(r);
+    }
+  }
+  return out.sort((a, b) => a.week - b.week);
+}
+
+/** Las pestañas de área, en el orden del plan (sin Bases: esa tiene su pestaña aparte, `BASES_KEY`). */
 export function areaTabsOf(plan: Pick<MentorPlan, "subplans">, catalog: ReadonlyArray<PlanTopicRow>): AreaTab[] {
   return plan.subplans.map((s) => {
     const rows = areaTopicRows(s, catalog);

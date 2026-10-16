@@ -392,6 +392,10 @@ export const api = {
   mentorHandoffWrite: (id: string, packageId: string) => call<{ path: string; rel: string; prompt: string; scheme: import("./types").MentorHandoffScheme }>("mentor_handoff_write", { id, packageId }),
   mentorExecutionPause: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_pause", { id }),
   mentorExecutionResume: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_resume", { id }),
+  /** Registro de horas de estudio por área (Pomodoro y bloques a mano). */
+  mentorTimeLogGet: (id: string) => call<{ entries: import("./timeLog").TimeEntry[] }>("mentor_timelog_get", { id }),
+  mentorTimeLogAdd: (opts: { id: string; areaKey: string; date: string; minutes: number; kind?: "pomodoro" | "manual"; note?: string }) => call<{ entries: import("./timeLog").TimeEntry[]; entry: import("./timeLog").TimeEntry }>("mentor_timelog_add", opts),
+  mentorTimeLogDelete: (id: string, entryId: string) => call<{ entries: import("./timeLog").TimeEntry[] }>("mentor_timelog_delete", { id, entryId }),
   mentorExecutionCancel: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_cancel", { id }),
   /** Sistema de práctica por área: katas, habilidades y proyectos de cada área del plan. */
   mentorAreaPractice: (id: string) => call<import("./types").MentorAreaPractice>("mentor_area_practice", { id }),

@@ -21,6 +21,7 @@ const mockApi = vi.hoisted(() => ({
   nutriRecipeSave: vi.fn(),
   nutriRecipeDelete: vi.fn(),
   nutriRecipeConsume: vi.fn(),
+  nutriEstimateDish: vi.fn(),
 }));
 
 vi.mock("../lib/bridge", () => ({
@@ -311,5 +312,23 @@ describe("useNutrition store", () => {
     mockApi.nutriRecipeDelete.mockResolvedValue({ ok: true });
     await useNutrition.getState().deleteRecipe("rcp1");
     expect(mockApi.nutriRecipeDelete).toHaveBeenCalledWith("rcp1");
+  });
+
+  it("estimateDish delega la llamada a api.nutriEstimateDish", async () => {
+    const mockRes = {
+      dish_name: "Milanesa de pollo con puré",
+      confidence: "alta" as const,
+      summary: "Porción estándar",
+      total_calories: 650,
+      total_protein: 38,
+      total_carbs: 55,
+      total_fat: 24,
+      ingredients: [],
+    };
+    mockApi.nutriEstimateDish.mockResolvedValue(mockRes);
+
+    const res = await useNutrition.getState().estimateDish("Milanesa de pollo con puré");
+    expect(mockApi.nutriEstimateDish).toHaveBeenCalledWith("Milanesa de pollo con puré");
+    expect(res.total_calories).toBe(650);
   });
 });

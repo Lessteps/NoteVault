@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Search, Sparkles, BookOpen, ChefHat } from "lucide-react";
+import { Search, Sparkles, BookOpen, ChefHat, Wand2, Loader2, Check } from "lucide-react";
 import { useNutrition } from "../../store/nutrition";
 import { Modal, PrimaryButton, inputBase } from "../common/forms";
-import type { NutriFoodLibraryEntry, NutriRecipe } from "../../lib/nutritionTypes";
+import type { NutriFoodLibraryEntry, NutriRecipe, EstimatedDishResult } from "../../lib/nutritionTypes";
 import { NUTRI_MEALS } from "../../lib/nutritionTypes";
 
 export function AddFoodDialog() {
@@ -15,8 +15,9 @@ export function AddFoodDialog() {
   const addFoodToMeal = useNutrition((s) => s.addFoodToMeal);
   const saveFoodToLibrary = useNutrition((s) => s.saveFoodToLibrary);
   const quickConsumeRecipe = useNutrition((s) => s.quickConsumeRecipe);
+  const estimateDish = useNutrition((s) => s.estimateDish);
 
-  const [tab, setTab] = useState<"pantry" | "recipes" | "manual">("pantry");
+  const [tab, setTab] = useState<"pantry" | "recipes" | "ai" | "manual">("pantry");
   const [search, setSearch] = useState("");
   const [selectedFood, setSelectedFood] = useState<NutriFoodLibraryEntry | null>(null);
   const [amount, setAmount] = useState<number>(100);
@@ -24,6 +25,12 @@ export function AddFoodDialog() {
   // Selector de Receta
   const [selectedRecipe, setSelectedRecipe] = useState<NutriRecipe | null>(null);
   const [recipeServings, setRecipeServings] = useState<number>(1);
+
+  // Estimador IA
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isEstimating, setIsEstimating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [estimatedResult, setEstimatedResult] = useState<EstimatedDishResult | null>(null);
 
   // Manual inputs
   const [manualName, setManualName] = useState("");
@@ -43,6 +50,10 @@ export function AddFoodDialog() {
       setSelectedFood(null);
       setSelectedRecipe(null);
       setRecipeServings(1);
+      setAiPrompt("");
+      setIsEstimating(false);
+      setAiError(null);
+      setEstimatedResult(null);
       setManualName("");
       setManualCalories("");
       setManualProtein("");
@@ -108,6 +119,60 @@ export function AddFoodDialog() {
     closeAddMeal();
   };
 
+  const handleRunAiEstimate = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsEstimating(true);
+    setAiError(null);
+    try {
+      const res = await estimateDish(aiPrompt.trim());
+      setEstimatedResult(res);
+      // Prellenar inputs manuales por si el usuario desea editarlos
+      setManualName(res.dish_name);
+      setManualCalories(res.total_calories);
+      setManualProtein(res.total_protein);
+      setManualCarbs(res.total_carbs);
+      setManualFat(res.total_fat);
+      setManualAmount(1);
+      setManualUnit("plato");
+    } catch (err) {
+      setAiError((err as Error).message);
+    } finally {
+      setIsEstimating(false);
+    }
+  };
+
+  const handleAddEstimatedDish = async () => {
+    if (!manualName.trim()) return;
+    const cal = Math.max(0, Number(manualCalories) || 0);
+    const p = Math.max(0, Number(manualProtein) || 0);
+    const c = Math.max(0, Number(manualCarbs) || 0);
+    const f = Math.max(0, Number(manualFat) || 0);
+
+    await addFoodToMeal(addingMeal, {
+      name: manualName.trim(),
+      amount: manualAmount,
+      unit: manualUnit.trim() || "plato",
+      calories: cal,
+      protein: p,
+      carbs: c,
+      fat: f,
+    });
+
+    if (saveToPantry) {
+      await saveFoodToLibrary({
+        name: manualName.trim(),
+        serving_size: manualAmount,
+        serving_unit: manualUnit.trim() || "plato",
+        calories: cal,
+        protein: p,
+        carbs: c,
+        fat: f,
+      });
+    }
+
+    closeAddMeal();
+  };
+
   const handleAddManual = async () => {
     if (!manualName.trim()) return;
     const cal = Math.max(0, Number(manualCalories) || 0);
@@ -141,7 +206,7 @@ export function AddFoodDialog() {
   };
 
   return (
-    <Modal title={`Añadir alimento a ${mealTitle}`} onClose={closeAddMeal} width={580}>
+    <Modal title={`Añadir alimento a ${mealTitle}`} onClose={closeAddMeal} width={600}>
       <div className="space-y-4 text-main">
         {/* Selector de modo */}
         <div className="flex rounded-lg border border-line bg-elevated/40 p-1">
@@ -171,6 +236,18 @@ export function AddFoodDialog() {
           </button>
           <button
             type="button"
+            onClick={() => setTab("ai")}
+            className={`flex-1 rounded-md py-1.5 text-center text-[12px] font-medium transition-colors ${
+              tab === "ai" ? "bg-card text-accent shadow-xs font-semibold" : "text-faint hover:text-dim"
+            }`}
+            data-testid="tab-modal-ai"
+          >
+            <span className="flex items-center justify-center gap-1.5">
+              <Wand2 size={13} className="text-accent" /> Estimar con IA
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => setTab("manual")}
             className={`flex-1 rounded-md py-1.5 text-center text-[12px] font-medium transition-colors ${
               tab === "manual" ? "bg-card text-main shadow-xs font-semibold" : "text-faint hover:text-dim"
@@ -178,14 +255,14 @@ export function AddFoodDialog() {
             data-testid="tab-modal-manual"
           >
             <span className="flex items-center justify-center gap-1.5">
-              <Sparkles size={13} /> Carga Rápida
+              <Sparkles size={13} /> Carga Manual
             </span>
           </button>
         </div>
 
+        {/* 1. De mi Despensa */}
         {tab === "pantry" && (
           <div className="space-y-3">
-            {/* Buscador */}
             <div className="relative">
               <Search size={14} className="absolute left-3 top-2.5 text-faint" />
               <input
@@ -198,11 +275,10 @@ export function AddFoodDialog() {
               />
             </div>
 
-            {/* Lista de alimentos */}
             <div className="max-h-56 divide-y divide-line/40 overflow-y-auto rounded-lg border border-line bg-card/40 p-1">
               {filteredFoods.length === 0 ? (
                 <div className="py-6 text-center text-[12px] text-faint">
-                  No se encontraron alimentos en tu despensa. Podés crearlo en la pestaña de Carga Rápida.
+                  No se encontraron alimentos en tu despensa. Podés crearlo en la pestaña de Carga Rápida o Estimar con IA.
                 </div>
               ) : (
                 filteredFoods.map((f) => {
@@ -235,7 +311,6 @@ export function AddFoodDialog() {
               )}
             </div>
 
-            {/* Ajuste de cantidad del alimento seleccionado */}
             {selectedFood && (
               <div className="rounded-lg border border-line bg-card p-3 space-y-2">
                 <div className="flex items-center justify-between">
@@ -270,9 +345,9 @@ export function AddFoodDialog() {
           </div>
         )}
 
+        {/* 2. Mis Recetas */}
         {tab === "recipes" && (
           <div className="space-y-3" data-testid="modal-recipes-container">
-            {/* Buscador de recetas */}
             <div className="relative">
               <Search size={14} className="absolute left-3 top-2.5 text-faint" />
               <input
@@ -285,7 +360,6 @@ export function AddFoodDialog() {
               />
             </div>
 
-            {/* Lista de recetas */}
             <div className="max-h-56 divide-y divide-line/40 overflow-y-auto rounded-lg border border-line bg-card/40 p-1">
               {filteredRecipes.length === 0 ? (
                 <div className="py-6 text-center text-[12px] text-faint">
@@ -322,7 +396,6 @@ export function AddFoodDialog() {
               )}
             </div>
 
-            {/* Ajuste de raciones de la receta seleccionada */}
             {selectedRecipe && (
               <div className="rounded-lg border border-line bg-card p-3 space-y-2">
                 <div className="flex items-center justify-between">
@@ -362,8 +435,170 @@ export function AddFoodDialog() {
           </div>
         )}
 
+        {/* 3. Estimar con IA */}
+        {tab === "ai" && (
+          <div className="space-y-3.5" data-testid="ai-estimator-container">
+            <div>
+              <label className="mb-1 block text-[11.5px] font-medium text-dim">
+                Describe lo que comiste en lenguaje natural:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !isEstimating && aiPrompt.trim()) {
+                      void handleRunAiEstimate();
+                    }
+                  }}
+                  placeholder="Ej: Milanesa de pollo con puré de papas y un huevo frito"
+                  className={`${inputBase} text-[13px] flex-1`}
+                  data-testid="input-ai-prompt"
+                  autoFocus
+                />
+                <PrimaryButton
+                  onClick={handleRunAiEstimate}
+                  disabled={isEstimating || !aiPrompt.trim()}
+                  className="flex items-center gap-1.5 px-4 text-[12.5px] flex-none"
+                  data-testid="run-estimate-btn"
+                >
+                  {isEstimating ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Estimando…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 size={14} />
+                      <span>Estimar</span>
+                    </>
+                  )}
+                </PrimaryButton>
+              </div>
+              <p className="text-[11px] text-faint mt-1">
+                La IA desglosará los ingredientes y calculará calorías, proteínas, carbohidratos y grasas razonables.
+              </p>
+            </div>
+
+            {aiError && (
+              <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-[12px] text-rose-400">
+                {aiError}
+              </div>
+            )}
+
+            {/* Resultado estimado */}
+            {estimatedResult && (
+              <div className="rounded-xl border border-accent/40 bg-card/60 p-3.5 space-y-3" data-testid="ai-result-panel">
+                <div className="flex items-start justify-between gap-2 border-b border-line/60 pb-2">
+                  <div>
+                    <div className="font-semibold text-main text-[13.5px] flex items-center gap-1.5">
+                      <Check size={15} className="text-emerald-400" />
+                      <span>{estimatedResult.dish_name}</span>
+                    </div>
+                    {estimatedResult.summary && (
+                      <span className="text-[11px] text-dim">{estimatedResult.summary}</span>
+                    )}
+                  </div>
+                  <span className="text-[10.5px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-accent/15 text-accent">
+                    Confianza {estimatedResult.confidence}
+                  </span>
+                </div>
+
+                {/* Desglose de ingredientes detectados */}
+                {estimatedResult.ingredients.length > 0 && (
+                  <div className="space-y-1 max-h-36 overflow-y-auto">
+                    <span className="text-[11px] font-semibold text-faint uppercase">Ingredientes estimados:</span>
+                    {estimatedResult.ingredients.map((ing, i) => (
+                      <div key={i} className="flex items-center justify-between text-[11.5px] py-1 border-b border-line/30">
+                        <span className="text-main">
+                          {ing.name} ({ing.amount} {ing.unit})
+                        </span>
+                        <span className="text-dim">
+                          {ing.calories} kcal · {ing.protein}g P
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Totales editables */}
+                <div className="grid grid-cols-4 gap-2 pt-1 border-t border-line/40">
+                  <div>
+                    <label className="mb-0.5 block text-[10.5px] text-dim">Calorías:</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={manualCalories}
+                      onChange={(e) => setManualCalories(e.target.value === "" ? "" : Number(e.target.value))}
+                      className={`${inputBase} text-[12px] font-bold text-main py-0.5`}
+                      data-testid="input-ai-calories"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-0.5 block text-[10.5px] text-dim">Proteínas (g):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={manualProtein}
+                      onChange={(e) => setManualProtein(e.target.value === "" ? "" : Number(e.target.value))}
+                      className={`${inputBase} text-[12px] text-indigo-400 py-0.5`}
+                      data-testid="input-ai-protein"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-0.5 block text-[10.5px] text-dim">Carbos (g):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={manualCarbs}
+                      onChange={(e) => setManualCarbs(e.target.value === "" ? "" : Number(e.target.value))}
+                      className={`${inputBase} text-[12px] text-amber-400 py-0.5`}
+                      data-testid="input-ai-carbs"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-0.5 block text-[10.5px] text-dim">Grasas (g):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={manualFat}
+                      onChange={(e) => setManualFat(e.target.value === "" ? "" : Number(e.target.value))}
+                      className={`${inputBase} text-[12px] text-rose-400 py-0.5`}
+                      data-testid="input-ai-fat"
+                    />
+                  </div>
+                </div>
+
+                <label className="flex cursor-pointer items-center gap-2 pt-1 text-[11.5px] text-faint hover:text-dim">
+                  <input
+                    type="checkbox"
+                    checked={saveToPantry}
+                    onChange={(e) => setSaveToPantry(e.target.checked)}
+                    className="rounded border-line"
+                  />
+                  Guardar también en mi despensa para reutilizar en el futuro
+                </label>
+
+                <div className="pt-1">
+                  <PrimaryButton
+                    onClick={handleAddEstimatedDish}
+                    className="w-full justify-center text-[12.5px]"
+                    data-testid="confirm-add-estimated-dish-btn"
+                  >
+                    Aceptar y agregar a {mealTitle}
+                  </PrimaryButton>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 4. Carga Manual */}
         {tab === "manual" && (
-          /* Carga Manual */
           <div className="space-y-3">
             <div>
               <label className="mb-1 block text-[11.5px] font-medium text-dim">Nombre del alimento / plato:</label>

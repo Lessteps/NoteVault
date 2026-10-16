@@ -74,6 +74,9 @@ export interface NutritionState {
   saveTargets: (targets: Partial<NutriTargets>) => Promise<void>;
   applySuggestedTargets: () => Promise<{ weight: number; goal: string } | null>;
 
+  // Estimador IA de platos
+  estimateDish: (description: string) => Promise<import("../lib/nutritionTypes").EstimatedDishResult>;
+
   // Control de UI
   openAddMeal: (meal: NutriMealType) => void;
   closeAddMeal: () => void;
@@ -405,6 +408,15 @@ export const useNutrition = create<NutritionState>((set, get) => ({
     } catch (e) {
       set({ error: (e as Error).message });
       return null;
+    }
+  },
+
+  estimateDish: async (description: string) => {
+    try {
+      return await api.nutriEstimateDish(description);
+    } catch (e) {
+      set({ error: (e as Error).message });
+      throw e;
     }
   },
 

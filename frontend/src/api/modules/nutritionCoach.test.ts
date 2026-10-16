@@ -61,4 +61,8 @@ describe("nutritionCoachApi", () => {
     await expect(api.nutri_coach_chat_stream("", [], "hola")).rejects.toThrow();
     await expect(api.nutri_coach_chat_stream("id1", [], "")).rejects.toThrow();
   });
+
+  it("valida entradas en nutri_estimate_dish", async () => {
+    await expect(api.nutri_estimate_dish("")).rejects.toThrow(/obligatoria/);
+  });
 });

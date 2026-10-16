@@ -187,3 +187,26 @@ export interface NutriTrendsData {
   };
   topFoods: TopFoodStat[];
 }
+
+// ── Estimador Inteligente de Platos y Macros por IA ──────────────────────
+
+export interface EstimatedIngredient {
+  name: string;
+  amount: number;
+  unit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export interface EstimatedDishResult {
+  dish_name: string;
+  confidence: "alta" | "media" | "estimada";
+  summary: string;
+  total_calories: number;
+  total_protein: number;
+  total_carbs: number;
+  total_fat: number;
+  ingredients: EstimatedIngredient[];
+}

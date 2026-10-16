@@ -62,8 +62,8 @@ test("NV-NUTRI-002 registrar alimento manual en Desayuno actualiza macros y pers
   await mealSec.getByTestId("add-food-btn-desayuno").click();
   await expect(win.getByText("Añadir alimento a Desayuno")).toBeVisible({ timeout: 5_000 });
 
-  // Cambiar a pestaña Carga Rápida / Manual
-  await win.getByRole("button", { name: /Carga Rápida/ }).click();
+  // Cambiar a pestaña Carga Manual
+  await win.getByTestId("tab-modal-manual").click();
 
   const foodName = `E2E Avena con Banana ${Date.now()}`;
   await win.getByPlaceholder("Ej. Pechuga con arroz y palta").fill(foodName);
@@ -215,4 +215,19 @@ test("NV-NUTRI-006 recetas y platos compuestos: crear plato y consumirlo desde t
   expect(existsSync(recipesFile)).toBe(true);
   const data = JSON.parse(readFileSync(recipesFile, "utf-8"));
   expect(data.recipes.some((r: any) => r.name === recipeName)).toBe(true);
+});
+
+test("NV-NUTRI-007 estimador inteligente de platos por IA en AddFoodDialog", async () => {
+  await win.getByTestId("tab-diario").click();
+  const almuerzoSec = win.getByTestId("meal-section-almuerzo");
+  await expect(almuerzoSec).toBeVisible();
+
+  // Abrir diálogo de agregar comida
+  await almuerzoSec.getByTestId("add-food-btn-almuerzo").click();
+
+  // Cambiar a pestaña "Estimar con IA"
+  await win.getByTestId("tab-modal-ai").click();
+  await expect(win.getByTestId("ai-estimator-container")).toBeVisible();
+  await expect(win.getByTestId("input-ai-prompt")).toBeVisible();
+  await expect(win.getByTestId("run-estimate-btn")).toBeVisible();
 });

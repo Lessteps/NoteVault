@@ -22,6 +22,11 @@ import {
 import { todayIso } from "../../core/dates.js";
 import { ApiError } from "../../core/errors.js";
 import { buildNutritionCoachSystemPrompt } from "../../core/nutritionCoachPrompt.js";
+import type { EstimatedDishResult } from "../../lib/nutritionTypes.js";
+import {
+  ESTIMATE_DISH_SYSTEM_PROMPT,
+  parseEstimatedDishResponse,
+} from "../../core/nutritionMealEstimator.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 
@@ -285,6 +290,45 @@ export function nutritionCoachApi(app: AppState) {
       const fallback = titleFallback(q);
       store().rename(key, fallback);
       return { title: fallback };
+    },
+
+    /**
+     * Estima calorías y macros de un plato en lenguaje natural utilizando el modelo de IA configurado.
+     */
+    async nutri_estimate_dish(description: unknown): Promise<EstimatedDishResult> {
+      const text = String(description || "").trim();
+      if (!text) {
+        throw new ApiError("La descripción del plato o comida es obligatoria.");
+      }
+
+      const cfg = aiCfg();
+      if (cfg.is_bridge) {
+        throw new ApiError("La estimación automática de platos requiere un proveedor conectado (DeepSeek, OpenAI, Ollama, etc.), no en modo Puente.");
+      }
+
+      const messages: ChatMessage[] = [
+        { role: "system", content: ESTIMATE_DISH_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `Estima de forma realista este plato o comida:\n"${text.slice(0, 500)}"`,
+        },
+      ];
+
+      const raw = await sendChat(
+        new AIConfig({
+          provider: cfg.provider,
+          base_url: cfg.base_url,
+          model: cfg.model,
+          api_key: cfg.api_key,
+          temperature: 0.2,
+          max_tokens: 1500,
+          include_note: false,
+          claude_path: cfg.claude_path,
+        }),
+        messages,
+      );
+
+      return parseEstimatedDishResponse(raw, text);
     },
   };
 }

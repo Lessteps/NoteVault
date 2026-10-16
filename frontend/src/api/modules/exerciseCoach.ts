@@ -285,6 +285,92 @@ export function exerciseCoachApi(app: AppState) {
         /* sin biblioteca propia */
       }
 
+      // Volumen muscular semanal de la rutina y cumplimiento
+      const weeklyVolume: import("../../core/exerciseCoachPrompt.js").WeeklyVolumeReportItem[] = [];
+      try {
+        const todayObj = new Date();
+        const mondayOffset = weekday(todayObj);
+        const monday = addDays(todayObj, -mondayOffset);
+        const doneExIds = new Set<string>();
+
+        for (let i = 0; i <= 6; i++) {
+          const dayDate = addDays(monday, i);
+          const log = mgr.getLog(dayDate);
+          if (log && log.entries) {
+            for (const [id, e] of Object.entries(log.entries)) {
+              if ((e as any)?.done) doneExIds.add(id);
+            }
+          }
+        }
+
+        const buckets: Record<string, { planned: number; done: number }> = {
+          Pecho: { planned: 0, done: 0 },
+          Espalda: { planned: 0, done: 0 },
+          Piernas: { planned: 0, done: 0 },
+          Hombros: { planned: 0, done: 0 },
+          Brazos: { planned: 0, done: 0 },
+          Core: { planned: 0, done: 0 },
+        };
+
+        const inferGroups = (name: string, muscles?: any): string[] => {
+          const res = new Set<string>();
+          const mList: string[] = [];
+          if (Array.isArray(muscles)) mList.push(...muscles);
+          else if (muscles && typeof muscles === "object") {
+            if (Array.isArray(muscles.primary)) mList.push(...muscles.primary);
+            if (Array.isArray(muscles.secondary)) mList.push(...muscles.secondary);
+          }
+          for (const m of mList) {
+            if (m === "pectoral") res.add("Pecho");
+            if (["lats", "trapezius", "lower-back"].includes(m)) res.add("Espalda");
+            if (["quads", "hamstrings", "glutes", "calves", "adductors", "abductors"].includes(m)) res.add("Piernas");
+            if (["deltoid-front", "deltoid-rear", "neck"].includes(m)) res.add("Hombros");
+            if (["biceps", "triceps", "forearm"].includes(m)) res.add("Brazos");
+            if (["abs", "obliques"].includes(m)) res.add("Core");
+          }
+          if (res.size > 0) return Array.from(res);
+          const n = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          if (/banca|pecho|fondos|apertura|flexion/.test(n)) res.add("Pecho");
+          if (/espalda|remo|dominada|jalon|dorsal|peso muerto/.test(n)) res.add("Espalda");
+          if (/sentadilla|prensa|cuadricep|femoral|pierna|gemelo|zancada|gluteo|hip thrust/.test(n)) res.add("Piernas");
+          if (/hombro|militar|elevacion|deltoide/.test(n)) res.add("Hombros");
+          if (/bicep|tricep|curl|martillo|frances/.test(n)) res.add("Brazos");
+          if (/abdomen|abs|plancha|crunch|core/.test(n)) res.add("Core");
+          if (res.size === 0) res.add("Pecho");
+          return Array.from(res);
+        };
+
+        for (const ex of exercises) {
+          const sr = String(ex.series_reps || "");
+          const match = sr.match(/^(\d+)\s*[*xX×]\s*\d+/) || sr.match(/^(\d+)/);
+          const sets = match ? Number(match[1]) : 3;
+          const grps = inferGroups(String(ex.name || ""), (ex as any).muscles);
+          const isDone = doneExIds.has(ex.id);
+          for (const g of grps) {
+            if (buckets[g]) {
+              buckets[g]!.planned += sets;
+              if (isDone) buckets[g]!.done += sets;
+            }
+          }
+        }
+
+        for (const [group, b] of Object.entries(buckets)) {
+          let levelLabel = "Mantenimiento (<6 series)";
+          if (b.planned >= 20) levelLabel = "Volumen alto (>20 series)";
+          else if (b.planned >= 10) levelLabel = "Óptimo hipertrofia (10-20 series)";
+          else if (b.planned >= 6) levelLabel = "Estímulo base (6-9 series)";
+
+          weeklyVolume.push({
+            group,
+            plannedSets: b.planned,
+            completedSets: b.done,
+            levelLabel,
+          });
+        }
+      } catch {
+        /* sin volumen */
+      }
+
       const systemPrompt = buildCoachSystemPrompt({
         profile,
         exercises: exercises.map((e) => ({
@@ -297,6 +383,7 @@ export function exerciseCoachApi(app: AppState) {
         recentPerformances,
         recentCompletedSessions,
         librarySummary,
+        weeklyVolume,
       });
 
       const messages: ChatMessage[] = [{ role: "system", content: systemPrompt }];

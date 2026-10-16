@@ -15,6 +15,7 @@ import { Header } from "../habits/parts";
 import { ExerciseMonth, ExerciseWeek } from "./Grids";
 import { ProgressGraph } from "./ProgressGraph";
 import { ProgressMap } from "./ProgressMap";
+import { WeeklyMuscleVolume } from "./WeeklyMuscleVolume";
 import { Yearly } from "./Yearly";
 import { BodyProfile } from "./BodyProfile";
 import { usePersistedNav } from "../../store/navState";
@@ -48,7 +49,7 @@ const tab: TabId =
     : "rejilla";
   const [grid, setGrid] = usePersistedNav<GridPeriod>("ejercicio.rejilla", "semana");
   // Mapa y gráfica muestran el periodo de la rejilla; se recuerda al saltar.
-  const [muscleView, setMuscleView] = usePersistedNav<"grafica" | "mapa">(
+  const [muscleView, setMuscleView] = usePersistedNav<"grafica" | "mapa" | "volumen">(
     "ejercicio.musculos.vista",
     "grafica",
   );
@@ -88,6 +89,7 @@ const tab: TabId =
           {([
             { id: "grafica", label: "Gráfica" },
             { id: "mapa", label: "Cuerpo" },
+            { id: "volumen", label: "Volumen semanal" },
           ] as const).map((v) => (
             <button
               key={v.id}
@@ -137,7 +139,9 @@ const tab: TabId =
             {grid === "semana" ? <ExerciseWeek /> : <ExerciseMonth />}
           </>
         ) : tab === "musculos" ? (
-          muscleView === "mapa" ? (
+          muscleView === "volumen" ? (
+            <WeeklyMuscleVolume />
+          ) : muscleView === "mapa" ? (
             <ProgressMap period={grid} />
           ) : (
             <ProgressGraph period={grid} />

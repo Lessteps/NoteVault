@@ -15,6 +15,13 @@ export interface ExercisePerformanceEntry {
   e1rm?: number;
 }
 
+export interface WeeklyVolumeReportItem {
+  group: string;
+  plannedSets: number;
+  completedSets?: number;
+  levelLabel: string;
+}
+
 export interface CoachContextData {
   profile: BodyProfile;
   exercises: Array<{ day: string; name: string; series_reps?: string; rest?: string }>;
@@ -22,6 +29,7 @@ export interface CoachContextData {
   recentPerformances?: ExercisePerformanceEntry[];
   recentCompletedSessions?: number;
   librarySummary?: string[];
+  weeklyVolume?: WeeklyVolumeReportItem[];
 }
 
 const GOAL_LABELS: Record<ExerciseGoal, string> = {
@@ -111,6 +119,20 @@ export function buildCoachSystemPrompt(data: CoachContextData): string {
     libText = `\nBIBLIOTECA DE EJERCICIOS:\n${data.librarySummary.map((s) => `- ${s}`).join("\n")}\n`;
   }
 
+  // Volumen muscular semanal
+  let volumeText = "";
+  if (data.weeklyVolume && data.weeklyVolume.length > 0) {
+    const lines = ["DISTRIBUCIÓN Y VOLUMEN MUSCULAR SEMANAL (SERIES EFECTIVAS):"];
+    lines.push("- Referencia científica de hipertrofia por grupo muscular: <6 Mantenimiento | 6-9 Estímulo base (MEV) | 10-20 Óptimo hipertrofia (MAV) | >20 Fatiga alta (MRV).");
+    lines.push("- Volumen de la rutina del usuario en la semana actual:");
+    for (const v of data.weeklyVolume) {
+      const compText = v.completedSets !== undefined ? ` · hechas: ${v.completedSets}` : "";
+      lines.push(`  • ${v.group}: ${v.plannedSets} series planificadas${compText} → ${v.levelLabel}`);
+    }
+    lines.push("- Si el usuario te consulta sobre el balance de su programa, desbalances musculares o si le falta volumen, usá estos datos para asesorarlo con precisión y sugerir ejercicios específicos.");
+    volumeText = `\n${lines.join("\n")}\n`;
+  }
+
   return `Eres el Coach de Entrenamiento de NoteVault. Tu rol es actuar como un entrenador personal, preparador físico y asesor de fuerza basado en ciencia del deporte y biomecánica práctica.
 
 ESTILO Y TONO:
@@ -126,6 +148,7 @@ ${weightText}
 ${routineText}${streakText}
 ${limitationsText}
 ${progressText}
+${volumeText}
 ACCIONES EN LA RUTINA Y BIBLIOTECA:
 Si el usuario te pide añadir, programar, agregar o incluir ejercicios en su rutina semanal (por ejemplo: "añadí esto el jueves", "sumame sentadillas el viernes", "armame la rutina del lunes"), explicá tu propuesta y AL FINAL de tu respuesta generá un bloque de acción con este formato exacto:
 \`\`\`coach-action

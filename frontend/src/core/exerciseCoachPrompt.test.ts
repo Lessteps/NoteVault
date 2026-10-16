@@ -127,4 +127,27 @@ describe("exerciseCoachPrompt", () => {
     expect(prompt).toContain("Sexo: Hombre");
     expect(prompt).toContain("Edad: 28 años");
   });
+
+  it("incluye el desglose de volumen muscular semanal y referencias científicas de hipertrofia", () => {
+    const data: CoachContextData = {
+      profile: {
+        goal: "hipertrofia",
+        goal_note: "",
+        weight_history: [],
+      },
+      exercises: [],
+      weeklyVolume: [
+        { group: "Pecho", plannedSets: 14, completedSets: 8, levelLabel: "Óptimo hipertrofia (10-20 series)" },
+        { group: "Espalda", plannedSets: 12, completedSets: 4, levelLabel: "Óptimo hipertrofia (10-20 series)" },
+        { group: "Piernas", plannedSets: 4, completedSets: 0, levelLabel: "Mantenimiento (<6 series)" },
+      ],
+    };
+
+    const prompt = buildCoachSystemPrompt(data);
+
+    expect(prompt).toContain("DISTRIBUCIÓN Y VOLUMEN MUSCULAR SEMANAL");
+    expect(prompt).toContain("Pecho: 14 series planificadas · hechas: 8 → Óptimo hipertrofia");
+    expect(prompt).toContain("Piernas: 4 series planificadas · hechas: 0 → Mantenimiento");
+    expect(prompt).toContain("Referencia científica de hipertrofia");
+  });
 });

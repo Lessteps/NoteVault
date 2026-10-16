@@ -4,6 +4,7 @@
 // `ExerciseRow.test.tsx` lo prueba sin levantar el módulo entero.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Play } from "lucide-react";
 import type { Exercise } from "../../lib/types";
 import { inputBase } from "../common/forms";
 import { cn } from "../ui";
@@ -12,6 +13,7 @@ import { api } from "../../lib/bridge";
 import { todayIso } from "../../lib/tasks";
 import { fmtClock } from "../../lib/practiceTimer";
 import { parseRestSecs } from "../../lib/parseRest";
+import { parseRestSeconds, useRestTimer } from "../../store/restTimer";
 import { exerciseFramesUrls, parseExerciseSteps } from "../../lib/exerciseLibrary";
 
 /** Un pitido corto al terminar el descanso. Sin audio, la línea avisa igual. */
@@ -166,6 +168,11 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
       setManual("");
     }
     setTimerOpen(true);
+    const globalSecs = parseRestSeconds(ex.rest || "90");
+    useRestTimer.getState().start(ex.name, globalSecs, async () => {
+      setDone(true);
+      await save({ done: true });
+    });
   };
   const startManual = () => {
     const secs = Math.round(Number(String(manual).replace(",", ".")));
@@ -180,7 +187,15 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
     <div className="rounded-2xl border border-line bg-card px-3.5 py-3 space-y-3">
       <div className="flex items-center gap-3">
         <input type="checkbox" aria-label={`Hecho: ${ex.name}`} checked={done} disabled={future} style={{ accentColor: ORANGE }}
-          onChange={(e) => { setDone(e.target.checked); void save({ done: e.target.checked }); }} />
+          onChange={(e) => {
+            const isChecked = e.target.checked;
+            setDone(isChecked);
+            void save({ done: isChecked });
+            if (isChecked && ex.rest) {
+              const secs = parseRestSeconds(ex.rest);
+              useRestTimer.getState().start(ex.name, secs);
+            }
+          }} />
         {/* El nombre es el control del video: si tiene, se pulsa aquí. */}
         {hasVideo ? (
           <button
@@ -203,11 +218,16 @@ export function ExerciseRow({ day, ex, entry, onChanged, onVideo }: {
           <button
             type="button"
             data-rest-timer
-            title={`Descansar: ${ex.rest}`}
+            title={`Iniciar descanso de ${ex.rest} (se completará automáticamente al terminar)`}
             onClick={openTimer}
-            className="flex-none rounded-md px-1 text-[11px] text-faint hover:bg-hover hover:text-text"
+            className={cn(
+              "flex-none inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-medium transition-colors",
+              done
+                ? "border-line text-faint hover:text-dim"
+                : "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50",
+            )}
           >
-            ⏱ {ex.rest}
+            <Play size={10} className="fill-current" /> Iniciar ({ex.rest})
           </button>
         )}
         {lastSession && (

@@ -63,6 +63,13 @@ let host: HTMLDivElement;
 let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
+// «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
+const section = async (id: string) => {
+  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${id}]`);
+  expect(b, `sub-vista ${id}`).toBeTruthy();
+  await act(async () => { b!.click(); });
+  await flush();
+};
 const click = async (el: Element | null | undefined) => {
   expect(el, "elemento no encontrado").toBeTruthy();
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
@@ -171,6 +178,7 @@ describe("Agenda: áreas juntas, lenguaje diario, proyecto del tema y entregable
   it("Mi plan: la tabla mes a mes dice que las áreas van juntas y marca los meses con varias a la vez", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(togetherPlan()));
     await mountEl(<MentorPlan planId={PID} />);
+    await section("fases");
     expect(byTest("plan-months-mode").textContent).toContain("Áreas juntas");
     expect(byTest("plan-months-mode").textContent).toContain("Elegiste estudiar");
     const sims = all("plan-month-simultaneous").map((e) => e.textContent!);

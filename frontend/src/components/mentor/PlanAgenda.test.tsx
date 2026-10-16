@@ -75,6 +75,13 @@ let host: HTMLDivElement;
 let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
+// «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
+const section = async (id: string) => {
+  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${id}]`);
+  expect(b, `sub-vista ${id}`).toBeTruthy();
+  await act(async () => { b!.click(); });
+  await flush();
+};
 const click = async (el: Element | null | undefined) => {
   expect(el, "elemento no encontrado").toBeTruthy();
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
@@ -340,10 +347,12 @@ describe("Mi plan por áreas y «Reorganizar por áreas»", () => {
   it("un plan por áreas enseña la línea de fases, los grupos de cada área y su objetivo corto", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(areasPlan()));
     await mountEl(<MentorPlan planId={PID} />);
+    await section("fases");
     expect(host.querySelector("[data-testid=plan-legacy-bar]")).toBeNull();
     const phases = [...host.querySelectorAll("[data-testid=plan-phase]")];
     expect(phases.map((p) => p.textContent)).toEqual([expect.stringContaining("Backend"), expect.stringContaining("Databases")]);
     expect(phases[0]!.textContent).toMatch(/semanas 1–\d+/);
+    await section("areas");
     const cards = host.querySelectorAll("[data-testid=subplan-card]");
     expect(cards).toHaveLength(2);
     expect(cards[0]!.querySelector("[data-testid=area-objective]")!.textContent).toBe("Construir servicios y APIs sólidos y seguros");
@@ -362,6 +371,7 @@ describe("Mi plan por áreas y «Reorganizar por áreas»", () => {
     const bar = byTest("plan-legacy-bar");
     expect(bar.textContent).toContain("estructura antigua");
     expect(bar.textContent).toContain("No se hace solo");
+    await section("areas");
     expect(host.querySelectorAll("[data-testid=subplan-card]")).toHaveLength(4); // se pinta la estructura antigua
     expect(reorg).not.toHaveBeenCalled();
     // cancelar la confirmación no hace nada
@@ -381,6 +391,7 @@ describe("Mi plan por áreas y «Reorganizar por áreas»", () => {
     p.subplans[1] = { ...p.subplans[1]!, fallback: { kind: "rules", reason: "la IA tardó demasiado" } };
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
     await mountEl(<MentorPlan planId={PID} />);
+    await section("alcance");
     const note = byTest("plan-fallback-note");
     expect(note.textContent).toContain("Completado con reglas");
     expect(note.textContent).toContain("Databases: la IA tardó demasiado");

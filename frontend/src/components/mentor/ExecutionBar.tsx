@@ -11,7 +11,7 @@ import { RUN_STATUS_LABEL } from "../../lib/planExecution";
 import { useApp } from "../../store/app";
 import { cn, confirmAction } from "../ui";
 import { useExecution } from "./PlanExecution";
-import { goToSection } from "./PlanToc";
+import { openPlanSection } from "./planShared";
 
 const FINISHED_VISIBLE_MS = 10 * 60 * 1000;
 
@@ -111,7 +111,7 @@ export function ExecutionBar({ planId, onOpenPlan }: { planId: string; /** lleva
           {st.status === "paused" && <button type="button" className={btn} disabled={busy} onClick={() => void act("resume")}><Play size={14} aria-hidden /> Reanudar</button>}
           {(st.status === "paused" || st.status === "failed") && <button type="button" className={btn} disabled={busy} onClick={() => void verify()} title="Relee la vault y marca como hechas las tareas cuyos archivos ya existen" data-testid="exec-bar-verify"><ListChecks size={14} aria-hidden /> Verificar</button>}
           {live && <button type="button" className={btn} disabled={busy} onClick={() => void act("cancel")}><Square size={14} aria-hidden /> Cancelar</button>}
-          <button type="button" className={btn} onClick={() => { onOpenPlan?.(); setTimeout(() => goToSection("sec-ejecutar"), 80); }} data-testid="exec-bar-open">Ver registro</button>
+          <button type="button" className={btn} onClick={() => { onOpenPlan?.(); openPlanSection(planId, "ejecutar"); }} data-testid="exec-bar-open">Ver registro</button>
           {!live && <button type="button" className={btn} aria-label="Cerrar" onClick={() => setDismissed(st.id)}><X size={14} aria-hidden /></button>}
         </div>
       </div>
@@ -127,7 +127,7 @@ export function fileLabel(rel: string): { name: string; where: string } {
 }
 
 /**
- * La generación de notas, a la derecha de la tabla de contenido y debajo de ella: avance, qué archivos se han ido creando (clic para abrirlos)
+ * La generación de notas, dentro de la sub-vista «Resumen» de «Mi plan»: avance, qué archivos se han ido creando (clic para abrirlos)
  * y las últimas líneas del registro. Solo lee; pausar o cancelar se hace en la barra de abajo o en «Ejecutar plan».
  */
 export function ExecutionAside({ planId }: { planId: string }) {

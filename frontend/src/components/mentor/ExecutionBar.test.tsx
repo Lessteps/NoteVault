@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
-// Barra de progreso de la ejecución del plan en segundo plano (siempre visible en la sub-interfaz del plan) y la sección activa de la
-// tabla de contenido.
+// Barra de progreso de la ejecución del plan en segundo plano (siempre visible en la sub-interfaz del plan) y la elección de la sub-vista
+// activa de «Mi plan».
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (window as unknown as { nv: unknown }).nv = { invoke: async () => ({}) };
@@ -13,7 +13,7 @@ import { api } from "../../lib/bridge";
 import { progressOf, type ExecutionState, type TaskState } from "../../lib/planExecution";
 import type { MentorExecutionView } from "../../lib/types";
 import { ExecutionBar, etaText } from "./ExecutionBar";
-import { activeSection } from "./PlanToc";
+import { activeSectionOf, type PlanSection } from "./PlanSections";
 
 const task = (i: number, status: TaskState["status"]): TaskState =>
   ({ id: `t${i}`, kind: "topic_files", area: "Backend", title: `Tema ${i}`, folder: `P/${i}`, status, attempts: 0, created: status === "done" ? [`P/${i}/ej.md`] : [], skipped: [] }) as unknown as TaskState;
@@ -101,22 +101,24 @@ describe("etaText", () => {
   });
 });
 
-describe("tabla de contenido: sección activa", () => {
-  const tops = (xs: number[]) => xs.map((top, i) => ({ id: `s${i}`, top }));
-  it("es la última sección cuyo inicio ya pasó la línea de lectura", () => {
-    expect(activeSection(tops([300, 700, 1200]), 140, false)).toBe("s0");
-    expect(activeSection(tops([-900, 100, 800]), 140, false)).toBe("s1");
-    expect(activeSection(tops([-2000, -900, 90]), 140, false)).toBe("s2");
+describe("sub-barra de «Mi plan»: sub-vista activa", () => {
+  const secs = (...ids: string[]): PlanSection[] => ids.map((id) => ({ id, label: id, visible: true, render: () => null }));
+  it("es la guardada cuando existe y está visible", () => {
+    expect(activeSectionOf(secs("resumen", "datos", "ejecutar"), "ejecutar").id).toBe("ejecutar");
   });
-  it("al llegar al final de la página gana la última aunque no haya alcanzado la línea", () => {
-    expect(activeSection(tops([-1200, -300, 600]), 140, true)).toBe("s2");
+  it("acepta el id con prefijo de ancla («sec-ejecutar»)", () => {
+    expect(activeSectionOf(secs("resumen", "ejecutar"), "sec-ejecutar").id).toBe("ejecutar");
   });
-  it("sin secciones no hay activa", () => {
-    expect(activeSection([], 140, false)).toBe("");
+  it("una guardada desconocida u oculta vuelve al Resumen", () => {
+    expect(activeSectionOf(secs("resumen", "datos"), "fases").id).toBe("resumen");
+    expect(activeSectionOf(secs("resumen", "datos"), "").id).toBe("resumen");
+  });
+  it("sin Resumen cae en la primera", () => {
+    expect(activeSectionOf(secs("datos", "areas"), "nope").id).toBe("datos");
   });
 });
 
-describe("ExecutionAside (debajo de la tabla de contenido)", () => {
+describe("ExecutionAside (dentro del Resumen)", () => {
   it("enseña el avance, los últimos archivos creados y el registro", async () => {
     const { ExecutionAside, fileLabel } = await import("./ExecutionBar");
     const v = view(["done", "running", "pending"], { log: ["23:49:00 1/3 · Backend: katas", "23:50:00   Ejercicios de pg_classify (dificultad 1)…"] });

@@ -57,6 +57,13 @@ let host: HTMLDivElement;
 let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
+// «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
+const section = async (id: string) => {
+  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${id}]`);
+  expect(b, `sub-vista ${id}`).toBeTruthy();
+  await act(async () => { b!.click(); });
+  await flush();
+};
 const click = async (el: Element | null | undefined) => {
   expect(el, "elemento no encontrado").toBeTruthy();
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
@@ -390,6 +397,7 @@ describe("estructura accesible", () => {
   it("los datos clave son una lista de definiciones y los días activos se leen completos", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
+    await section("datos");
     const dl = host.querySelector("[data-testid=plan-preconditions] dl")!;
     expect([...dl.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(expect.arrayContaining(["Periodo", "Dedicación", "Días activos", "Ritmo", "Entregables"]));
     expect(dl.textContent).toContain("7 h/día");
@@ -400,12 +408,14 @@ describe("estructura accesible", () => {
   it("los desplegables llevan aria-expanded + aria-controls y la barra de progreso un nombre", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
+    await section("areas");
     const toggle = button("Reforzar bases")!;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     await click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(host.querySelector(`#${toggle.getAttribute("aria-controls")}`)).toBeTruthy();
     for (const p of host.querySelectorAll("[role=progressbar]")) expect(p.getAttribute("aria-label")).toBeTruthy();
+    await section("resumen");
     expect(host.querySelector("[role=progressbar][aria-label='Avance global del plan']")).toBeTruthy();
   });
 
@@ -422,6 +432,7 @@ describe("estructura accesible", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const change = vi.spyOn(api, "mentorPlanChange").mockImplementation(() => new Promise(() => undefined));
     await mountEl(<MentorPlan planId={PID} />);
+    await section("alcance");
     const excl = host.querySelector("[data-testid=plan-branch-note]")!;
     expect(excl.querySelector("h2")!.textContent).toBe("Exclusiones del alcance");
     await click(button("Añadir Desktop Apps (Electron) y Mobile", excl));
@@ -435,6 +446,7 @@ describe("estructura accesible", () => {
     const p = plan({ openQuestions: [], subplans: [{ ...sub("s1", "Muchos temas", F1), topics: many, weeks: [week(1, many.map((t) => t.folder))] }] as never });
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
     await mountEl(<MentorPlan planId={PID} />);
+    await section("areas");
     await click(button("Muchos temas"));
     expect(host.querySelectorAll("[data-testid=plan-topic]")).toHaveLength(15);
     await click(button("Mostrar 15 más"));

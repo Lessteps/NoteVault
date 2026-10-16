@@ -373,6 +373,7 @@ export const api = {
   mentorPlanReorganize: (id: string) => call<{ plan: import("./types").MentorPlan; entry: import("./types").MentorChangeEntry; history: import("./types").MentorChangeEntry[]; applied: true }>("mentor_plan_reorganize", { id }),
   /** Cobertura de teoría y práctica de cada área del plan contra la vault (determinista) y la última revisión guardada. */
   mentorPlanCoverage: (id: string) => call<import("./types").MentorPlanCoverage>("mentor_plan_coverage", { id }),
+  mentorPlanTopicCatalog: (id: string) => call<import("./types").MentorPlanTopicCatalog>("mentor_plan_topic_catalog", { id }),
   /** «Revisar cobertura con el Mentor»: una llamada a la IA (clave de estado `coverage:<id>`); guarda `coverageReview` en el plan. */
   mentorPlanCoverageReview: (id: string, profile?: string, criteria?: import("./planCoverage").CoverageCriteria) => call<import("./types").MentorCoverageReviewResult>("mentor_plan_coverage_review", { id, ...(profile ? { profile } : {}), ...(criteria ? { criteria } : {}) }),
   /** «Ejecutar plan»: el informe de lo que falta crear (solo lee). */

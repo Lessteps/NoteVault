@@ -8,10 +8,9 @@
 // SOLO LECTURA salvo propósitos y estados de entregables y las acciones del plan (renombrar, archivar, eliminar a la papelera, mantener,
 // reorganizar por áreas —deshacible desde «Preguntas y ajustes»—).
 
-import { Archive, ArchiveRestore, Check, ClipboardList, LayoutGrid, MessageSquareText, Pencil, PlayCircle, PlusCircle, Rocket, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Archive, ArchiveRestore, Check, ClipboardList, LayoutGrid, MessageSquareText, Pencil, PlayCircle, Rocket, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
-import { splitNotes, tidyNotes } from "../../lib/planAreas";
 import { periodLabel, weeksLabel } from "../../lib/planTime";
 import type { MentorPlan as MentorPlanData, MentorPlanStatus } from "../../lib/types";
 import { useApp } from "../../store/app";
@@ -19,29 +18,21 @@ import { useMentor } from "../../store/mentor";
 import { useNavState, usePersistedNav } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { askText, cn, confirmAction } from "../ui";
-import { dayText, LoadState, ProgressBar } from "./parts";
+import { LoadState } from "./parts";
 import { PlanAgenda } from "./PlanAgenda";
 import { PlanChanges } from "./PlanChanges";
 import { PlanDeliverables } from "./PlanDeliverables";
-import { BackToTop, PlanNotes, SectionCard, SectionHeading, SkipLink, TabPanel, Tabs, panelId, type TabDef } from "./planKit";
-import { agendaDateKey, cleanBranch, DAY_LONG, DAY_SHORT, num1, PLAN_TABS, planModeKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanMode, type PlanTab } from "./planShared";
-import { AddAreaBar } from "./AddAreaBar";
-import { HandoffPanel } from "./HandoffPanel";
-import { ExecutionAside, ExecutionBar } from "./ExecutionBar";
+import { BackToTop, SkipLink, TabPanel, Tabs, panelId, type TabDef } from "./planKit";
+import { agendaDateKey, openPlanSection, PLAN_TABS, planModeKey, planSectionKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type PlanMode, type PlanTab } from "./planShared";
+import { ExecutionBar } from "./ExecutionBar";
+import { activeSectionOf, DEFAULT_SECTION, PlanSubNav, planSectionsOf } from "./PlanSections";
 import { PlanRun } from "./PlanRun";
-import { GenerateNotice, TocLayout, type TocItem } from "./PlanToc";
-import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
-import { PhaseMonthTable } from "./PlanMonths";
-import { AreaTopicsSection, TogetherBar } from "./AreaViews";
-import { useAgendaModel } from "./agendaKit";
 import { deliverablesDefined } from "../../lib/planTopicsByArea";
-import { CoveragePanel, usePlanCoverage } from "./PlanCoverage";
-import { ExecuteDialog, ExecutionPanel, EXECUTION_ID } from "./PlanExecution";
+import { usePlanCoverage } from "./PlanCoverage";
+import { ExecuteDialog } from "./PlanExecution";
 import { monthLong } from "../../lib/planMonths";
 import { agendaViewKey } from "./PlanAgenda";
-import { PACE_LABEL } from "./PlanForm";
-import { PracticeRow, practiceSummary } from "./PracticeCard";
-import { PRACTICE_NAME } from "../../lib/practiceTrack";
+import { PracticeRow } from "./PracticeCard";
 
 const PREFIX = "plan-tabs";
 const CONTENT_ID = "plan-content";
@@ -49,6 +40,9 @@ const CONTENT_ID = "plan-content";
 export function PlanView({ planId }: { planId: string }) {
   const [storedTab, setStoredTab] = usePersistedNav<string>(planTabKey(planId), "plan");
   const { data, warming, error, reload, setData } = usePlanData(planId);
+  // la sub-vista elegida de «Mi plan» (por plan) y la cobertura, que alimenta tanto la sub-barra como las sub-vistas
+  const [storedSection, setStoredSection] = usePersistedNav<string>(planSectionKey(planId), DEFAULT_SECTION);
+  const cov = usePlanCoverage(planId);
   const [highlight, setHighlight] = useState<Set<string>>(new Set());
   const [autoSend, setAutoSend] = useState<{ text: string; n: number } | undefined>();
   const [focusSignal, setFocusSignal] = useState(0);
@@ -108,6 +102,16 @@ export function PlanView({ planId }: { planId: string }) {
       if (sc && bar && sc.scrollTop > bar.offsetTop) sc.scrollTop = bar.offsetTop;
     },
     [setStoredTab, setMode],
+  );
+  // cambiar de sub-vista de «Mi plan»: el scroll se coloca justo bajo la barra fija, no en el vacío de una vista más corta
+  const changeSection = useCallback(
+    (id: string) => {
+      setStoredSection(id);
+      const sc = scroller.current;
+      const bar = tabsBar.current;
+      if (sc && bar && sc.scrollTop > bar.offsetTop) sc.scrollTop = bar.offsetTop;
+    },
+    [setStoredSection],
   );
   const askChanges = useCallback(() => {
     changeTab("cambios");
@@ -215,9 +219,37 @@ export function PlanView({ planId }: { planId: string }) {
   const weeks = plan ? Math.round(((Date.parse(plan.end) - Date.parse(plan.start)) / 86400000 + 1) / 7 * 10) / 10 : 0;
   const areas = plan ? [...new Set(plan.subplans.map((s) => s.area))] : [];
   const legacy = !!plan && plan.structure !== "areas" && plan.subplans.some((s) => s.topics.length > 0);
+  const sections = useMemo(
+    () => plan && summary && state && data?.derived
+      ? planSectionsOf({
+          data,
+          plan,
+          state,
+          summary,
+          highlight,
+          cov,
+          onChanged: (p) => setData((d) => (d ? { ...d, plan: p } : d)),
+          onApplied: (p, changed) => {
+            setData((d) => (d ? { ...d, plan: p } : d));
+            applied(p, changed);
+          },
+          onOpenMonth: openMonth,
+          onAskChange: askChangesWith,
+          announce,
+          onAddBranches: (names) => {
+            setAutoSend({ text: `Añade las ramas excluidas: ${names.join(", ")}`, n: (autoSend?.n ?? 0) + 1 });
+            changeTab("cambios");
+            announce(`Pidiéndole al Mentor que añada ${names.join(" y ")}. Mira el estado en «Preguntas y ajustes».`);
+          },
+        })
+      : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plan, summary, state, data, highlight, cov, openMonth, askChangesWith, announce, applied, changeTab, autoSend?.n],
+  );
+  const section = sections.length ? activeSectionOf(sections, storedSection) : null;
 
   return (
-    <div ref={scroller} className="nv-a11y relative flex min-h-0 min-w-0 flex-1 scroll-pt-28 flex-col overflow-y-auto overflow-x-hidden bg-surface text-[14px] text-text" data-testid="plan-view">
+    <div ref={scroller} className="nv-a11y relative flex min-h-0 min-w-0 flex-1 scroll-pt-40 flex-col overflow-y-auto overflow-x-hidden bg-surface text-[14px] text-text" data-testid="plan-view">
       <SkipLink targetId={CONTENT_ID}>Saltar al contenido</SkipLink>
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only" data-testid="plan-live">{live}</div>
       <div className="mx-auto w-full min-w-0 max-w-[1400px] px-4 pb-24 @3xl:px-6">
@@ -344,32 +376,16 @@ export function PlanView({ planId }: { planId: string }) {
                   </span>
                 )}
               </div>
+              {tab === "plan" && section && (
+                <div className="basis-full border-t border-line/60">
+                  <PlanSubNav sections={sections} active={section.id} onSelect={changeSection} />
+                </div>
+              )}
             </div>
 
             <div id={CONTENT_ID} tabIndex={-1} className="outline-none" data-testid="plan-content">
               <TabPanel prefix={PREFIX} id="plan" active={tab === "plan"}>
-                {tab === "plan" && summary && data.derived && (
-                  <MiPlan
-                    data={data}
-                    plan={plan}
-                    state={state!}
-                    summary={summary}
-                    highlight={highlight}
-                    onChanged={(p) => setData((d) => (d ? { ...d, plan: p } : d))}
-                    onApplied={(p, changed) => {
-                      setData((d) => (d ? { ...d, plan: p } : d));
-                      applied(p, changed);
-                    }}
-                    onOpenMonth={openMonth}
-                    onAskChange={askChangesWith}
-                    announce={announce}
-                    onAddBranches={(names) => {
-                      setAutoSend({ text: `Añade las ramas excluidas: ${names.join(", ")}`, n: (autoSend?.n ?? 0) + 1 });
-                      changeTab("cambios");
-                      announce(`Pidiéndole al Mentor que añada ${names.join(" y ")}. Mira el estado en «Preguntas y ajustes».`);
-                    }}
-                  />
-                )}
+                {tab === "plan" && section && <div className="mt-6" data-testid={`plan-section-${section.id}`}>{section.render()}</div>}
               </TabPanel>
               <TabPanel prefix={PREFIX} id="agenda" active={tab === "agenda"}>
                 {tab === "agenda" && <PlanAgenda data={data} plan={plan} onChanged={(p) => setData((d) => (d ? { ...d, plan: p } : d))} announce={announce} />}
@@ -384,7 +400,7 @@ export function PlanView({ planId }: { planId: string }) {
                       planId={plan.id}
                       onExecute={() => {
                         changeTab("plan");
-                        setTimeout(() => document.getElementById(EXECUTION_ID)?.scrollIntoView?.({ block: "start" }), 50);
+                        openPlanSection(plan.id, "ejecutar");
                       }}
                     />
                   )}
@@ -420,213 +436,6 @@ export function PlanView({ planId }: { planId: string }) {
       {plan && <ExecutionBar planId={plan.id} onOpenPlan={() => changeTab("plan")} />}
       <BackToTop scroller={scroller} onTop={toTop} />
     </div>
-  );
-}
-
-// ── Pestaña «Mi plan» ───────────────────────────────────────────────────
-
-function MiPlan({
-  data, plan, state, summary, highlight, onChanged, onApplied, onAddBranches, onOpenMonth, onAskChange, announce,
-}: {
-  data: Loaded;
-  plan: MentorPlanData;
-  state: MentorPlanStatus;
-  summary: NonNullable<Loaded["derived"]>["summary"];
-  highlight: Set<string>;
-  onChanged: (p: Loaded["plan"]) => void;
-  onApplied: (p: MentorPlanData, changed: string[]) => void;
-  onAddBranches: (names: string[]) => void;
-  onOpenMonth: (month: string, firstDay: string) => void;
-  onAskChange: (text: string) => void;
-  announce: (msg: string) => void;
-}) {
-  const cov = usePlanCoverage(plan.id);
-  const pre = plan.preconditions;
-  const byAreas = plan.structure === "areas";
-  const defined = deliverablesDefined(plan);
-  const pending = defined ? (plan.openQuestions ?? []).filter((q) => q.id === "deliverables").length : 0;
-  const agenda = useAgendaModel(data, plan);
-  const weeksText = state === "propuesto" ? `del ${dayText(plan.start)} al ${dayText(plan.end)}` : state === "activo" ? `semana ${summary.currentWeek} de ${summary.weeks}` : state === "futuro" ? `empieza el ${dayText(plan.start)}` : `terminó el ${dayText(plan.end)}`;
-  const excluded = pre?.branchExcluded?.map(cleanBranch) ?? [];
-  const exclusionText =
-    pre?.branchPreset === "fullstack"
-      ? `Excluí ${excluded.join(" y ")} porque pediste full stack. Añádelos si los quieres.`
-      : pre?.branchPreset === "backend" || pre?.branchPreset === "frontend"
-        ? `Excluí ${excluded.join(", ")} porque tu pedido es de ${pre.branchPreset === "backend" ? "Backend" : "Frontend"}. Añádelos si los quieres.`
-        : `Ramas fuera del plan: ${excluded.join(", ")}.`;
-  const facts: Array<{ label: string; value: React.ReactNode; hint?: string; testid?: string }> = [
-    { label: "Periodo", value: periodLabel(plan.start, plan.end), hint: weeksLabel(Math.round(((Date.parse(plan.end) - Date.parse(plan.start)) / 86400000 + 1) / 7 * 10) / 10) },
-  ];
-  if (pre) {
-    facts.push({ label: "Dedicación", value: `${num1(pre.minutesPerDay / 60)} h/día`, hint: pre.blockedDates?.length ? `${pre.blockedDates.length} fechas bloqueadas` : undefined });
-    facts.push({
-      label: "Días activos",
-      value: (
-        <ul className="flex flex-wrap gap-1" aria-label="Días de estudio">
-          {DAY_SHORT.map((d, i) => {
-            const on = pre.studyDays.includes(i + 1);
-            return (
-              <li key={d} className={cn("grid h-8 w-8 place-items-center rounded-md border text-[14px] font-semibold", on ? "border-accent bg-accent-soft text-accent-text" : "border-line text-faint")}>
-                <span aria-hidden>{d}</span>
-                <span className="sr-only">{DAY_LONG[i]}{on ? ", activo" : ", sin estudio"}</span>
-              </li>
-            );
-          })}
-        </ul>
-      ),
-      hint: `${pre.studyDays.length} ${pre.studyDays.length === 1 ? "día" : "días"} por semana`,
-      testid: "plan-days",
-    });
-    facts.push({ label: "Ritmo", value: PACE_LABEL[pre.pace] });
-  }
-  if (plan.hoursPerWeek) facts.push({ label: "Carga semanal", value: `~${num1(plan.hoursPerWeek)} h/semana`, hint: plan.programmingPractice ? "para temas (la práctica va aparte)" : "efectivas" });
-  if (pre) {
-    facts.push(
-      defined
-        ? { label: "Entregables", value: pre.deliverables === "yes" ? "Sí" : pre.deliverables === "no" ? "Definidos" : "A discutir", hint: pending ? "1 decisión por tomar" : undefined, testid: "plan-deliverables-chip" }
-        : { label: "Entregables", value: "Por definir", hint: "Se definen al ejecutar el plan", testid: "plan-deliverables-chip" },
-    );
-  }
-  if (plan.programmingPractice) facts.push({ label: PRACTICE_NAME, value: "Activa", hint: practiceSummary(plan.programmingPractice), testid: "plan-practice-chip" });
-  if (plan.areaMode) facts.push({ label: "Áreas", value: plan.areaMode === "together" ? "Juntas desde el día 1" : "Por fases", hint: plan.areaModeWhy, testid: "plan-area-mode-chip" });
-  if (pre?.languages?.length) facts.push({ label: "Lenguajes a practicar", value: pre.languages.map((l) => ({ python: "Python", javascript: "JavaScript", typescript: "TypeScript" })[l.id]).join(" · "), hint: "Un bloque de práctica de lenguaje cada día", testid: "plan-languages-chip" });
-  const skippedN = plan.subplans.reduce((n, s) => n + s.topics.filter((t) => t.route === "skipped").length, 0);
-  if (skippedN) facts.push({ label: "Ruta", value: `${skippedN} ${skippedN === 1 ? "tema fuera de ruta" : "temas fuera de ruta"}`, hint: "No se borran: siguen en tus notas y puedes reactivarlos", testid: "plan-route-chip" });
-
-  const fallbacks = plan.subplans
-    .map((s) => ({ s, fb: s.fallback ?? (splitNotes(s.notes).rulesFallback ? { kind: "rules" as const, reason: "no consta el motivo (el plan se generó antes de registrarlo)" } : null) }))
-    .filter((x) => !!x.fb);
-  const objective = pre?.freeObjective ? tidyNotes(pre.freeObjective) : "";
-  const notes = pre?.notes ? tidyNotes(pre.notes) : "";
-  const countLabel = byAreas ? (summary.subplans === 1 ? "área" : "áreas") : summary.subplans === 1 ? "subplan" : "subplanes";
-
-  const cov0 = cov.coverage?.totals;
-  const hasScope = fallbacks.length > 0 || excluded.length > 0 || !!plan.rationale || !!notes || !!objective;
-  const needGenerate = !!cov0 && (cov0.practice < cov0.topics || cov0.theory < cov0.topics);
-  const toc: TocItem[] = [
-    { id: "sec-resumen", label: "Resumen" },
-    ...(needGenerate ? [{ id: "sec-generar", label: "Falta generar", hint: `${cov0!.topics - cov0!.practice}` }] : []),
-    { id: "sec-datos", label: "Datos clave" },
-    ...(hasScope ? [{ id: "sec-alcance", label: "Alcance y comentarios" }] : []),
-    ...(byAreas ? [{ id: "sec-fases", label: "Fases mes a mes" }, { id: "sec-temas", label: "Temas por área" }] : []),
-    { id: "sec-cobertura", label: "Cobertura" },
-    { id: "sec-ejecutar", label: "Ejecutar plan" },
-    { id: "sec-antigravity", label: "Plan para Antigravity" },
-    { id: "sec-areas", label: "Áreas del plan", hint: String(plan.subplans.length) },
-  ];
-
-  return (
-    <TocLayout items={toc} below={<ExecutionAside planId={plan.id} />}>
-      {needGenerate && cov0 && (
-        <div id="sec-generar" tabIndex={-1} className="scroll-mt-28 outline-none">
-          <GenerateNotice topics={cov0.topics} withPractice={cov0.practice} withTheory={cov0.theory} {...(cov0.design ? { designPct: cov0.design.avgScore } : {})} />
-        </div>
-      )}
-      <div id="sec-resumen" tabIndex={-1} className="scroll-mt-28 space-y-3 outline-none">
-      <SectionCard labelledBy="mp-summary" testid="plan-header" className="space-y-3">
-        <h2 id="mp-summary" className="sr-only">Resumen del plan</h2>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Chip large colour={STATUS_COLOUR[state]}>{plan.proposed ? "Propuesto" : plan.archived ? "Archivado" : STATUS_LABEL[state]}</Chip>
-          <p className="text-[16px] text-text" data-testid="plan-summary">
-            <strong>{summary.subplans}</strong> {countLabel} · <strong>{summary.done}/{summary.topics}</strong> temas completados · <strong>{summary.pct} %</strong> global · {weeksText}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex-1"><ProgressBar pct={summary.pct} thick label="Avance global del plan" /></div>
-          <span className="text-[18px] font-bold">{summary.pct} %</span>
-        </div>
-      </SectionCard>
-
-      {byAreas && <TogetherBar plan={plan} onApplied={onApplied} announce={announce} />}
-      {byAreas && <AddAreaBar plan={plan} onApplied={onApplied} announce={announce} />}
-      </div>
-
-      <section id="sec-datos" tabIndex={-1} className="scroll-mt-28 outline-none" aria-labelledby="mp-facts" data-testid="plan-preconditions">
-        <SectionHeading id="mp-facts">Datos clave</SectionHeading>
-        <dl className="grid gap-3 @xl:grid-cols-2 @3xl:grid-cols-3 @6xl:grid-cols-6">
-          {facts.map((f) => (
-            <div key={f.label} className="min-w-0 rounded-xl border border-line bg-card px-4 py-3" data-testid={f.testid}>
-              <dt className="mb-1 text-[13px] font-semibold uppercase tracking-wide text-faint">{f.label}</dt>
-              <dd className="text-[17px] font-semibold leading-snug text-text">{f.value}</dd>
-              {f.hint && <dd className="mt-0.5 text-[13.5px] font-normal text-dim">{f.hint}</dd>}
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      {hasScope && <div id="sec-alcance" tabIndex={-1} className="scroll-mt-28 space-y-4 outline-none">
-      {fallbacks.length > 0 && (
-        <section aria-labelledby="mp-fallback" className="rounded-2xl border border-line bg-card p-4 @3xl:p-5" data-testid="plan-fallback-note">
-          <h2 id="mp-fallback" className="text-[18px] font-semibold">Completado con reglas <span className="text-[14px] font-normal text-dim">· informativo, no es un error</span></h2>
-          <p className="mt-1 text-[14px] text-dim">Se aplica solo cuando la IA no pudo elegir los temas de un área (no estaba configurada, falló o se canceló): la app los ordena entonces según el orden natural de la materia, sin la selección del Mentor. El plan está completo igual. Si quieres que el Mentor lo reconsidere, pídeselo en «Preguntas y ajustes».</p>
-          <ul className="mt-2 list-disc space-y-0.5 pl-5 text-[14px]">
-            {fallbacks.map(({ s, fb }) => <li key={s.id}><span className="font-medium">{s.area}</span>: {fb!.reason}</li>)}
-          </ul>
-        </section>
-      )}
-
-      {(excluded.length > 0 || plan.rationale || notes || objective) && (
-        <div className="grid items-start gap-4 @4xl:grid-cols-2 [&>*]:min-w-0">
-          {excluded.length > 0 && (
-            <section aria-labelledby="mp-excl" className="rounded-2xl border border-line bg-card p-4 @3xl:p-5" data-testid="plan-branch-note">
-              <h2 id="mp-excl" className="text-[18px] font-semibold">Exclusiones del alcance</h2>
-              <p className="mt-1 text-[14px] text-dim">{exclusionText}</p>
-              <ul className="mt-3 flex flex-wrap gap-2" aria-label="Ramas fuera del plan">
-                {excluded.map((b) => (
-                  <li key={b}><Chip large colour="var(--nv-warn)">{b}</Chip></li>
-                ))}
-              </ul>
-              <GhostButton large className="mt-3" onClick={() => onAddBranches(excluded)}>
-                <PlusCircle size={16} aria-hidden /> Añadir {excluded.join(" y ")}
-              </GhostButton>
-            </section>
-          )}
-          {plan.rationale && (
-            <section aria-labelledby="mp-comments" className="space-y-3 rounded-2xl border border-line bg-card p-4 @3xl:p-5">
-              <h2 id="mp-comments" className="text-[18px] font-semibold">Comentario del Mentor</h2>
-              <p className="text-[15px] leading-relaxed text-text" data-testid="plan-rationale">{plan.rationale}</p>
-            </section>
-          )}
-          {(notes || objective) && (
-            <section aria-labelledby="mp-yours" className="space-y-3 rounded-2xl border border-line bg-card p-4 @3xl:p-5" data-testid="plan-yours">
-              <h2 id="mp-yours" className="text-[18px] font-semibold">Lo que pediste</h2>
-              {objective && <PlanNotes notes={objective} auto={false} testid="plan-objective" title="Tu objetivo" />}
-              {notes && <PlanNotes notes={notes} auto={!!plan.auto} testid="plan-notes" />}
-            </section>
-          )}
-        </div>
-      )}
-
-      </div>}
-
-      {byAreas && (
-        <section id="sec-fases" tabIndex={-1} className="scroll-mt-28 outline-none" aria-labelledby="mp-phases" data-testid="plan-phases-section">
-          <SectionHeading id="mp-phases" hint={`Qué trabaja cada área en cada mes: temas, horas y semanas activas. ${plan.areaMode === "together" ? "Todas las áreas van juntas desde el día 1 (Automation, al final)" : "Como mucho dos áreas van en paralelo"}; el orden y el reparto los recalcula la app con tu capacidad real.`}>
-            Fases del plan, mes a mes
-          </SectionHeading>
-          <PhaseMonthTable data={data} plan={plan} onOpenMonth={onOpenMonth} />
-          <details className="mt-3" data-testid="plan-phases-bars">
-            <summary className="inline-flex min-h-8 cursor-pointer items-center text-[14px] text-accent-text">Ver las fases por semanas</summary>
-            <div className="mt-2">
-              <PhaseTimeline plan={plan} currentWeek={summary.currentWeek} weeks={summary.weeks} />
-            </div>
-          </details>
-        </section>
-      )}
-
-      {byAreas && <div id="sec-temas" tabIndex={-1} className="scroll-mt-28 outline-none"><AreaTopicsSection m={agenda} currentWeek={summary.currentWeek} /></div>}
-
-      <div id="sec-cobertura" tabIndex={-1} className="scroll-mt-28 outline-none"><CoveragePanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} /></div>
-      <div id="sec-ejecutar" tabIndex={-1} className="scroll-mt-28 outline-none"><ExecutionPanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} /></div>
-      <div id="sec-antigravity" tabIndex={-1} className="scroll-mt-28 outline-none"><HandoffPanel planId={plan.id} aiConfigured={cov.aiConfigured} /></div>
-
-      <section id="sec-areas" tabIndex={-1} className="scroll-mt-28 outline-none" aria-labelledby="mp-subplans" data-testid="plan-subplans">
-        <SectionHeading id="mp-subplans" hint={byAreas ? "Cada tarjeta es un área con sus grupos internos (Bases, Lenguaje, Conocimientos): ábrela para ver su ruta de temas con el registro de completados, las metas enlazadas y el proyecto de área." : "Cada tarjeta resume un subplan: ábrela para ver sus semanas, sus temas con el registro de completados, las metas requeridas y el entregable."}>
-          Áreas del plan <span className="text-[14px] font-normal text-dim">{plan.subplans.length} {plan.subplans.length === 1 ? (byAreas ? "área" : "subplan") : byAreas ? "áreas" : "subplanes"}</span>
-        </SectionHeading>
-        <SubplanGroups data={data} highlight={highlight} onChanged={onChanged} coverage={cov.coverage} review={cov.review} onAskChange={onAskChange} onReview={cov.setReview} />
-      </section>
-    </TocLayout>
   );
 }
 

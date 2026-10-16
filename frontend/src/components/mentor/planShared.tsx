@@ -81,6 +81,24 @@ export type PlanMode = "plan" | "ejecucion";
 export const PLAN_TABS = ["plan", "agenda", "practica", "entregables", "cambios"] as const;
 export type PlanTab = (typeof PLAN_TABS)[number];
 
+/** Clave de la sub-vista recordada de «Mi plan» (Resumen, Temas, Cobertura, Ejecutar plan…), por plan. */
+export const planSectionKey = (planId: string): string => `mentor.planSection.${planId}`;
+
+/**
+ * Abre una sub-vista de «Mi plan» (`id` con o sin el prefijo `sec-`: «ejecutar», «sec-ejecutar») y, ya pintada, se coloca en ella.
+ * Sustituye al antiguo «saltar a la sección» de la tabla de contenido: ahora cada sección es una sub-vista, no un tramo de la página.
+ * Quien la llame desde otra pestaña debe cambiar también la pestaña (`openPlanTab` / `changeTab("plan")`).
+ */
+export function openPlanSection(planId: string, id: string): void {
+  const key = id.replace(/^sec-/, "");
+  useNavState.getState().set(planSectionKey(planId), key);
+  setTimeout(() => {
+    const el = document.getElementById(`sec-${key}`);
+    el?.scrollIntoView?.({ block: "start" });
+    el?.focus?.({ preventScroll: true });
+  }, 60);
+}
+
 /** Abre un plan en una pestaña concreta (enlace profundo interno: «Ver cambios», «Ver entregables»…). */
 export function openPlanTab(planId: string, tab: PlanTab): void {
   const nav = useNavState.getState();

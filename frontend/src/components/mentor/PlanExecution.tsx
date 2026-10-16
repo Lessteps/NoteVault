@@ -616,7 +616,7 @@ export function ExecutionPanel({ plan, cov, onPlan, announce, signal }: { plan: 
   const maxWeek = report?.maxWeek ?? Math.max(1, ...plan.subplans.flatMap((s) => s.topics.map((t) => t.targetWeek)));
   const running = exec?.state.status === "running" || exec?.state.status === "paused";
   return (
-    <section id={EXECUTION_ID} aria-labelledby={`${uid}-h`} className="min-w-0 scroll-mt-28 rounded-2xl border border-line bg-card p-4 @3xl:p-5" data-testid="plan-execution">
+    <section id={EXECUTION_ID} aria-labelledby={`${uid}-h`} className="min-w-0 scroll-mt-40 rounded-2xl border border-line bg-card p-4 @3xl:p-5" data-testid="plan-execution">
       <h3 id={`${uid}-h`} className="flex items-center gap-2 text-[16px] font-semibold text-text">
         <ListChecks size={17} aria-hidden className="text-accent-text" /> Ejecutar plan
       </h3>

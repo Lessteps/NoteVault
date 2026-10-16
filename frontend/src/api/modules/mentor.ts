@@ -75,6 +75,7 @@ import { PLAN_DELIVERABLE_STATUSES, resolveAreaMode, sanitizeGroups, type PlanDe
 import { buildSchedule, deliverablesOf } from "../../lib/planSchedule.js";
 import { CurriculumCancel, generateCurriculum } from "../../core/mentor/planCurriculumAi.js";
 import { areaKeyOf, computeCoverage, COVERAGE_DISCLAIMER, MAX_PROFILE_CHARS, parseCoverageReply, sanitizeCriteria } from "../../lib/planCoverage.js";
+import { buildPlanTopicRows } from "../../lib/planTopicCatalog.js";
 import { coverageMessages } from "../../core/mentor/planCoverageAi.js";
 import { parseScopeReply, parseTopicsReply, scopeMessages, topicsMessages } from "../../core/mentor/planBuildAi.js";
 import {
@@ -1876,6 +1877,27 @@ export function mentorApi(app: AppState, send?: SendFn) {
         review: plan.coverageReview ?? null,
         aiConfigured: aiUnavailableReason(AIConfig.fromDict(AppConfig.get_ai_config())) === null,
       };
+    },
+
+    /**
+     * Catálogo de TODOS los temas de la vault (no solo los del plan) con lo que existe de cada uno: nota, contrato, mapa, manifiesto,
+     * ejercicios y diseño, y su área / semana / completado si están en el plan. Los temas del plan que aún no existen en la vault también
+     * salen (sin nada creado). Solo lee.
+     */
+    mentor_plan_topic_catalog(opts: unknown) {
+      const plan = coveragePlan(opts);
+      if (studyIndexCold(app)) return { loading: true as const };
+      const snaps = topicSnaps(app);
+      const planTopics = plan.subplans.flatMap((s) => s.topics.map((t) => ({ folder: t.folder, title: t.title, area: s.area, targetWeek: t.targetWeek, ...(t.completedAt ? { completedAt: t.completedAt } : {}), ...(t.route ? { route: t.route } : {}) })));
+      const subjectOf = new Map(snaps.map((t) => [t.folder, t.subject] as const));
+      const titles = new Map<string, string>([...planTopics.map((t) => [t.folder, t.title] as const), ...snaps.map((t) => [t.folder, t.title] as const)]);
+      const designs = designsOf(app, [...titles].map(([folder, title]) => ({ folder, title, ...(subjectOf.get(folder) ? { subject: subjectOf.get(folder)! } : {}) })));
+      const rows = buildPlanTopicRows(
+        snaps.map((t) => ({ folder: t.folder, title: t.title, theoryNotes: t.theoryNotes, exerciseCount: t.exerciseCount, ...(t.planExercises ? { planExercises: t.planExercises } : {}), skills: Object.keys(t.progress.skills ?? {}).length })),
+        planTopics,
+        designs,
+      );
+      return { loading: false as const, rows };
     },
 
     /**

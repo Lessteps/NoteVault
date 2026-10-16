@@ -15,7 +15,7 @@ import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { MentorPlan } from "./MentorPlan";
-import { planModeKey, planTabKey } from "./planShared";
+import { planModeKey, planSectionKey, planTabKey } from "./planShared";
 
 const START = "2026-10-06";
 const END = "2027-04-05";
@@ -251,7 +251,7 @@ describe("vista de ejecución", () => {
   });
 });
 
-describe("pestaña «Mi plan»: secciones, tabla de contenido y aviso de lo que falta generar", () => {
+describe("pestaña «Mi plan»: sub-barra de secciones y aviso de lo que falta generar", () => {
   const coverage = (practice: number) => ({
     loading: false as const,
     coverage: { areas: [], totals: { topics: 2, theory: 2, practice, outOfPlan: 0 }, ppReady: true },
@@ -272,11 +272,21 @@ describe("pestaña «Mi plan»: secciones, tabla de contenido y aviso de lo que 
     expect(notice.textContent).toContain("Falta generar contenido");
     expect(notice.textContent).toContain("2 de 2 temas");
     expect(notice.textContent).toContain("Ejecutar plan");
-    // va antes que el resumen y que el resto de secciones
+    // vive en el Resumen (la sub-vista por defecto) y va antes que el resumen
     const content = byTest("plan-content")!;
     const ids = [...content.querySelectorAll("[id^=sec-]")].map((e) => e.id);
-    expect(ids.indexOf("sec-generar")).toBe(0);
-    expect(ids).toContain("sec-ejecutar");
+    expect(ids).toEqual(["sec-generar", "sec-resumen"]);
+  });
+
+  it("«Ir a Ejecutar plan» cambia a esa sub-vista y la recuerda", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue(coverage(0) as never);
+    await openPlanTab();
+    await act(async () => { byTest("generate-go")!.click(); });
+    expect(useNavState.getState().values[planSectionKey(PID)]).toBe("ejecutar");
+    await flush(); await flush();
+    expect(host.querySelector("#sec-ejecutar")).toBeTruthy();
+    expect(byTest("generate-notice")).toBeNull();
   });
 
   it("no avisa cuando ya hay ejercicios en todos los temas", async () => {
@@ -286,19 +296,37 @@ describe("pestaña «Mi plan»: secciones, tabla de contenido y aviso de lo que 
     expect(byTest("generate-notice")).toBeNull();
   });
 
-  it("la tabla de contenido lista las secciones y cada entrada apunta a un ancla que existe", async () => {
+  it("la sub-barra lista todas las opciones, abre en Resumen y enseña solo la sección elegida", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue(coverage(0) as never);
     await openPlanTab();
-    const toc = byTest("plan-toc")!;
-    const labels = [...toc.querySelectorAll("button")].map((b) => b.textContent!.trim());
-    expect(labels.some((l) => l.startsWith("Resumen"))).toBe(true);
-    expect(labels.some((l) => l.startsWith("Falta generar"))).toBe(true);
-    expect(labels.some((l) => l.startsWith("Ejecutar plan"))).toBe(true);
-    for (const b of toc.querySelectorAll<HTMLElement>("button")) {
-      const id = b.dataset.testid!.replace("toc-", "");
-      expect(document.getElementById(id), id).toBeTruthy();
-    }
+    const nav = byTest("plan-subnav")!;
+    // la sub-barra vive en el contenedor fijo, junto a las pestañas
+    expect(byTest("plan-sticky")!.contains(nav)).toBe(true);
+    const ids = [...nav.querySelectorAll<HTMLElement>("button")].map((b) => b.dataset.testid!.replace("subnav-", ""));
+    // el plan de prueba no es por áreas: sin «Fases mes a mes» ni «Temas por área»
+    expect(ids).toEqual(["resumen", "catalogo", "datos", "alcance", "cobertura", "ejecutar", "antigravity", "areas"]);
+    expect(byTest("subnav-resumen")!.getAttribute("aria-current")).toBe("page");
+    expect(byTest("subnav-resumen")!.textContent).toContain("2"); // temas por generar
+    expect(host.querySelector("#sec-resumen")).toBeTruthy();
+    expect(host.querySelector("#sec-datos")).toBeNull();
+
+    await act(async () => { byTest("subnav-datos")!.click(); });
+    await flush(); await flush();
+    expect(host.querySelector("#sec-datos")).toBeTruthy();
+    expect(host.querySelector("#sec-resumen")).toBeNull();
+    expect(byTest("subnav-datos")!.getAttribute("aria-current")).toBe("page");
+    expect(useNavState.getState().values[planSectionKey(PID)]).toBe("datos");
+  });
+
+  it("una sub-vista guardada que ya no es visible vuelve al Resumen", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue(coverage(2) as never);
+    useNavState.setState({ values: { [planModeKey(PID)]: "plan", [planSectionKey(PID)]: "fases" } });
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(byTest("subnav-fases")).toBeNull();
+    expect(byTest("subnav-resumen")!.getAttribute("aria-current")).toBe("page");
+    expect(host.querySelector("#sec-resumen")).toBeTruthy();
   });
 });
 
@@ -360,7 +388,7 @@ describe("Plan para Antigravity en «Mi plan»", () => {
     vi.spyOn(api, "mentorHandoffGet").mockResolvedValue({ scheme: null });
     const build = vi.spyOn(api, "mentorHandoffScheme").mockResolvedValue({ loading: false, scheme: scheme(false) } as never);
     const write = vi.spyOn(api, "mentorHandoffWrite").mockResolvedValue({ path: "C:/V/Programación/_handoff/01.md", rel: "x", prompt: "Read it and execute it.", scheme: scheme(true) } as never);
-    useNavState.setState({ values: { [planModeKey(PID)]: "plan" } });
+    useNavState.setState({ values: { [planModeKey(PID)]: "plan", [planSectionKey(PID)]: "antigravity" } });
     await mountEl(<MentorPlan planId={PID} />);
     expect(byTest("handoff-panel")).toBeTruthy();
     expect(byTest("handoff-list")).toBeNull();
@@ -381,7 +409,7 @@ describe("Plan para Antigravity en «Mi plan»", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue({ loading: false, coverage: { areas: [], totals: { topics: 2, theory: 2, practice: 2, outOfPlan: 0 }, ppReady: true }, review: null, aiConfigured: false } as never);
     vi.spyOn(api, "mentorHandoffGet").mockResolvedValue({ scheme: scheme(true) } as never);
-    useNavState.setState({ values: { [planModeKey(PID)]: "plan" } });
+    useNavState.setState({ values: { [planModeKey(PID)]: "plan", [planSectionKey(PID)]: "antigravity" } });
     await mountEl(<MentorPlan planId={PID} />);
     await flush();
     expect(all("handoff-package")).toHaveLength(2);

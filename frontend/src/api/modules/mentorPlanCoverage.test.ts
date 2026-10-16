@@ -172,3 +172,20 @@ describe("cobertura contra el checklist de diseño de temas", () => {
     expect(r2.review.areas[0].missing).toHaveLength(1);
   });
 });
+
+describe("catálogo de temas del plan (API)", () => {
+  it("lista todos los temas de la vault (también los de fuera del plan) con lo que existe de cada uno, sin escribir nada", () => {
+    const file = path.join(dir, ".notevault", "mentor", "plans", `${id}.json`);
+    const before = fs.readFileSync(file, "utf-8");
+    const r: any = mentorApi(app, vi.fn()).mentor_plan_topic_catalog({ id });
+    expect(r.loading).toBe(false);
+    expect(r.rows.map((t: any) => t.title)).toEqual(["01 Tema", "02 Tema", "03 Tema", "04 Tema"].map((n) => n));
+    const by = (n: string) => r.rows.find((t: any) => t.folder.endsWith(n));
+    expect(by("01 Tema")).toMatchObject({ inPlan: true, area: "Backend", theory: true, manifest: true, skills: 2, exercises: 0 });
+    expect(by("03 Tema")).toMatchObject({ inPlan: true, theory: false });
+    expect(by("04 Tema")).toMatchObject({ inPlan: false, theory: true, branch: "Backend" });
+    expect(by("04 Tema").area).toBeUndefined();
+    expect(fs.readFileSync(file, "utf-8")).toBe(before);
+    expect(() => mentorApi(app, vi.fn()).mentor_plan_topic_catalog({ id: "../x" })).toThrow(/Plan inválido/);
+  });
+});

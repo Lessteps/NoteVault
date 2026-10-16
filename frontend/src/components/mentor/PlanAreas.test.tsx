@@ -78,6 +78,13 @@ let host: HTMLDivElement;
 let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
+// «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
+const section = async (id: string) => {
+  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${id}]`);
+  expect(b, `sub-vista ${id}`).toBeTruthy();
+  await act(async () => { b!.click(); });
+  await flush();
+};
 const click = async (el: Element | null | undefined) => {
   expect(el, "elemento no encontrado").toBeTruthy();
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
@@ -145,6 +152,7 @@ describe("Mi plan: «Poner todas las áreas desde el día 1»", () => {
     vi.spyOn(api, "mentorAiStatus").mockResolvedValue({ busy: false, label: "", elapsed: 0 });
     await open(fivePlan("together"));
     expect(byTest("plan-together-bar")).toBeFalsy();
+    await section("datos");
     expect(byTest("plan-area-mode-chip").textContent).toContain("Juntas desde el día 1");
   });
 
@@ -181,13 +189,15 @@ describe("Mi plan: «Poner todas las áreas desde el día 1»", () => {
     expect(change).toHaveBeenCalledWith({ id: PID, ops: [{ op: "set_area_mode", mode: "together" }], label: "Poner todas las áreas desde el día 1 (Automation al final)" });
     expect(byTest("plan-together-done").textContent).toContain("todas las áreas están activas desde el día 1");
     expect(byTest("plan-live").textContent).toContain("Automation");
-    expect(byTest("plan-area-mode-chip").textContent).toContain("Juntas desde el día 1");
     // deshacer desde el propio aviso
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(fivePlan("phased")));
     await click(byTest("plan-together-undo"));
     expect(undo).toHaveBeenCalledWith(PID);
     expect(byTest("plan-together-done")).toBeFalsy();
     expect(byTest("plan-together-bar").textContent).toContain("Tu plan estudia las áreas por fases");
+    // los datos clave (otra sub-vista) ya no dicen «Juntas desde el día 1»
+    await section("datos");
+    expect(byTest("plan-preconditions").textContent).not.toContain("Juntas desde el día 1");
   });
 
   it("si la operación falla lo dice con un aviso y el aviso sigue ofreciendo el botón", async () => {
@@ -203,6 +213,7 @@ describe("Mi plan: «Poner todas las áreas desde el día 1»", () => {
 describe("Mi plan: «Temas por semana y área»", () => {
   it("tabla semanas × áreas en el orden fijo, con los totales por área y cada semana expandible a su lista de temas", async () => {
     await open(fivePlan("together"));
+    await section("temas");
     const sec = byTest("plan-area-topics");
     expect(sec.querySelector("h2")!.textContent).toBe("Temas por semana y área");
     const heads = [...sec.querySelectorAll("thead th")].map((h) => h.textContent!.trim());
@@ -233,6 +244,7 @@ describe("Mi plan: «Temas por semana y área»", () => {
 
   it("la tabla mes a mes sigue el mismo orden de áreas y no cuenta entregables mientras estén por definir", async () => {
     await open(fivePlan("together"));
+    await section("fases");
     const names = all("plan-month-row").map((r) => r.querySelector("th")!.textContent!);
     expect(names.map((n) => n.replace(/\d.*$/, "").trim())).toEqual(["Backend", "Frontend", "Databases", "Tooling and Quality", "Automation"]);
     expect(byTest("plan-month-totals").textContent).not.toContain("entregable");
@@ -361,6 +373,7 @@ describe("Entregables por definir", () => {
   it("sin entregables definidos la pestaña dice «Aún sin definir» y no ofrece elegir; la insignia de decisiones pendientes tampoco sale", async () => {
     await open(fivePlan("together"));
     expect(tab("entregables").textContent).toBe("Entregables");
+    await section("datos");
     expect(byTest("plan-deliverables-chip").textContent).toContain("Por definir");
     await click(tab("entregables"));
     expect(byTest("plan-deliverables-pending").textContent).toContain("Aún sin definir");
@@ -388,6 +401,7 @@ describe("Entregables por definir", () => {
     expect(byTest("agenda-week-deliverables")).toBeTruthy();
     expect(byTest("plan-deliverables-chip", host)).toBeFalsy(); // la ficha vive en Mi plan
     await click(tab("plan"));
+    await section("datos");
     expect(byTest("plan-deliverables-chip").textContent).not.toContain("Por definir");
     // la decisión antigua pendiente vuelve a poder resolverse
     expect(tab("entregables").textContent).toContain("1 pendiente");

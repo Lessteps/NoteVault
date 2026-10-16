@@ -15,7 +15,7 @@ import type { MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../..
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
-import { planModeKey } from "./planShared";
+import { planModeKey, planSectionKey } from "./planShared";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
@@ -76,8 +76,10 @@ const setValue = async (el: HTMLInputElement | HTMLSelectElement, v: string) => 
   });
   await flush();
 };
-const open = async () => {
+const open = async (section = "") => {
   vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+  // «Mi plan» enseña una sub-vista a la vez: se abre la que la prueba necesita
+  if (section) useNavState.setState((st) => ({ values: { ...st.values, [planSectionKey(PID)]: section } }));
   await mountEl(<MentorPlan planId={PID} />);
 };
 
@@ -101,7 +103,7 @@ afterEach(() => {
 
 describe("Fases del plan mes a mes (tabla accesible)", () => {
   it("es una tabla con caption, scope en columnas y filas, el mes actual resaltado y totales", async () => {
-    await open();
+    await open("fases");
     const table = byTest("plan-months-table") as HTMLTableElement;
     expect(table.tagName).toBe("TABLE");
     expect(table.querySelector("caption")!.textContent).toContain("mes a mes");
@@ -128,7 +130,7 @@ describe("Fases del plan mes a mes (tabla accesible)", () => {
   });
 
   it("pulsar un mes abre la Agenda en la vista Mes de ese mes", async () => {
-    await open();
+    await open("fases");
     await click(button("diciembre de 2026"));
     const v = useNavState.getState().values;
     expect(v[`mentor.planTab.${PID}`]).toBe("agenda");
@@ -143,7 +145,7 @@ describe("Fases del plan mes a mes (tabla accesible)", () => {
 
 describe("Áreas, grupos y temas como tarjetas", () => {
   it("el área abre sus grupos como tarjetas con temas, horas, semanas y cobertura; los temas son tarjetas en rejilla", async () => {
-    await open();
+    await open("areas");
     await click(button("Backend", byTest("subplan-card")));
     const groups = [...host.querySelectorAll("[data-testid=group-card]")];
     expect(groups.map((g) => g.querySelector("h6")!.textContent)).toEqual([expect.stringContaining("Bases"), expect.stringContaining("Lenguaje: Python"), expect.stringContaining("Conocimientos de backend")]);
@@ -162,7 +164,7 @@ describe("Áreas, grupos y temas como tarjetas", () => {
   });
 
   it("el filtro rápido por texto y por estado reduce la rejilla", async () => {
-    await open();
+    await open("areas");
     await click(button("Backend", byTest("subplan-card")));
     await click(button("Bases", host.querySelector("[data-testid=group-card]") as HTMLElement));
     const grid = byTest("topic-grid");
@@ -181,7 +183,7 @@ describe("Áreas, grupos y temas como tarjetas", () => {
 
 describe("Aviso de Bases", () => {
   it("avisa de las 40 Bases, ofrece «Pedir cambios» con el texto pre-rellenado y no envía nada", async () => {
-    await open();
+    await open("areas");
     const change = vi.spyOn(api, "mentorPlanChange");
     const warn = byTest("bases-warning");
     expect(warn.textContent).toContain("Muchas Bases");
@@ -196,7 +198,7 @@ describe("Aviso de Bases", () => {
 
 describe("Cobertura de notas y práctica", () => {
   it("cada tarjeta enseña «teoría X/Y · práctica X/Y» y el detalle lista faltantes con «Ver tema»", async () => {
-    await open();
+    await open("areas");
     const cards = host.querySelectorAll("[data-testid=subplan-card]");
     const line = cards[0]!.querySelector("[data-testid=area-coverage-line]")!.textContent!;
     expect(line).toMatch(/teoría \d+\/51 · práctica \d+\/51/);
@@ -205,11 +207,13 @@ describe("Cobertura de notas y práctica", () => {
     expect(cov.textContent).toContain("Faltan ejercicios en");
     expect(cov.textContent).toContain("Sin notas de teoría");
     expect(cov.querySelector("button[aria-label^='Ver tema']")).toBeTruthy();
+    // el panel «Cobertura» (totales) es otra sub-vista
+    await click(byTest("subnav-cobertura"));
     expect(byTest("plan-coverage-totals").textContent).toContain("Con ejercicios");
   });
 
   it("«Revisar cobertura con el Mentor» llama a la API, guarda y enseña los faltantes en la tarjeta del área", async () => {
-    await open();
+    await open("cobertura");
     const review = {
       at: "2026-11-10T10:00:00.000Z", source: "ai" as const, profile: "full stack especializado en automatización", summary: "Backend se queda corto para automatización.", discarded: 1,
       areas: [{ key: "backend", area: "Backend", assessment: "Faltan colas y jobs.", missing: [{ title: "Message queues", why: "trabajos en segundo plano", groupId: "core" }], misplaced: [] }],
@@ -219,6 +223,7 @@ describe("Cobertura de notas y práctica", () => {
     await click(byTest("coverage-review-run"));
     expect(run).toHaveBeenCalledWith(PID, "full stack especializado en automatización", expect.objectContaining({ presets: ["market"], targetLevel: "junior" }));
     expect(byTest("coverage-review-summary").textContent).toContain("Backend se queda corto");
+    await click(byTest("subnav-areas"));
     await click(button("Backend", host.querySelector("[data-testid=subplan-card]") as HTMLElement));
     const ai = byTest("area-ai-review");
     expect(ai.textContent).toContain("Revisión del Mentor");
@@ -227,7 +232,7 @@ describe("Cobertura de notas y práctica", () => {
   });
 
   it("sin IA no se rompe: muestra el motivo y la cobertura calculada sigue visible", async () => {
-    await open();
+    await open("cobertura");
     vi.spyOn(api, "mentorPlanCoverageReview").mockResolvedValue({ loading: false, source: "none", reason: "La IA no está configurada: sin IA solo se muestra la cobertura calculada.", coverage: coverage() });
     await click(byTest("coverage-review-run"));
     expect(byTest("coverage-note").textContent).toContain("sin IA solo se muestra la cobertura calculada");
@@ -250,11 +255,11 @@ describe("Revisión realista: formulario de criterio y resultado", () => {
   });
   const openWithReview = async () => {
     vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue({ loading: false, coverage: coverage(), review: richReview(), aiConfigured: true });
-    await open();
+    await open("cobertura");
   };
 
   it("«¿Con qué criterio revisamos?»: chips con aria-pressed, niveles y condiciones libres, y todo viaja a la API", async () => {
-    await open();
+    await open("cobertura");
     const group = byTest("criteria-presets");
     const chips = [...group.querySelectorAll("button")];
     expect(chips.map((c) => c.textContent?.replace(/^[+✓]\s*/, ""))).toEqual(["Tendencias del mercado actual (junior hoy)", "Nivel mid-level", "Entrevistas técnicas", "Lo que yo pida"]);
@@ -288,6 +293,7 @@ describe("Revisión realista: formulario de criterio y resultado", () => {
 
   it("«Añadir faltante al plan» marca la propuesta (sin crear notas) y se puede quitar", async () => {
     await openWithReview();
+    await click(byTest("subnav-areas"));
     await click(button("Backend", host.querySelector("[data-testid=subplan-card]") as HTMLElement));
     const ai = byTest("area-ai-review");
     expect(ai.textContent).toContain("Prioridad alta");
@@ -315,7 +321,7 @@ describe("Revisión realista: formulario de criterio y resultado", () => {
 
 describe("Aviso de Bases: «Reducir a lo esencial» y desbordes", () => {
   it("la acción sale de la ruta con confirmación («las notas NO se borran»), resume cuántos temas salta y se puede deshacer", async () => {
-    await open();
+    await open("areas");
     const reduce = vi.spyOn(api, "mentorPlanReduce").mockResolvedValue({ plan: plan(), changed: 10, skipped: Array.from({ length: 10 }, (_, i) => ({ folder: `f${i}`, reason: "r" })), live: 30 });
     const undo = vi.spyOn(api, "mentorPlanChangeUndo").mockResolvedValue({ plan: plan(), history: [] });
     ui.confirmAction.mockResolvedValueOnce(false);
@@ -336,7 +342,7 @@ describe("Aviso de Bases: «Reducir a lo esencial» y desbordes", () => {
   });
 
   it("regresión de desborde: el aviso y sus botones parten línea y no sobresalen de la tarjeta (clases clave)", async () => {
-    await open();
+    await open("areas");
     const warn = byTest("bases-warning");
     expect(warn.className).toMatch(/min-w-0/);
     expect(warn.className).toMatch(/max-w-full/);

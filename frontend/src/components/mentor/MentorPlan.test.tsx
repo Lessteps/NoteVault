@@ -112,6 +112,13 @@ let root: Root;
 
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
+// «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
+const section = async (id: string) => {
+  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${id}]`);
+  expect(b, `sub-vista ${id}`).toBeTruthy();
+  await act(async () => { b!.click(); });
+  await flush();
+};
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "")))!;
 const click = async (el: Element | undefined) => {
@@ -148,12 +155,14 @@ describe("Mentor — sub-interfaz de un plan", () => {
     expect(host.textContent).toContain("Backend · 6 oct–5 nov");
     const header = host.querySelector("[data-testid=plan-header]")!;
     expect(header.textContent).toContain("Activo");
+    await section("datos");
     const pre = host.querySelector("[data-testid=plan-preconditions]")!.textContent!;
     expect(pre).toContain("6 oct – 5 nov");
     expect(pre).toContain("4 h/día");
     const days = [...host.querySelectorAll("[data-testid=plan-days] li")].map((li) => li.textContent);
     expect(days).toEqual(["Llunes, activo", "Mmartes, activo", "Xmiércoles, activo", "Jjueves, activo", "Vviernes, activo", "Ssábado, activo", "Ddomingo, sin estudio"]);
     expect(pre).toContain("Normal");
+    await section("areas");
     expect(host.querySelectorAll("section[aria-label='Programación'], section[aria-label='Inglés']")).toHaveLength(2);
     const cards = host.querySelectorAll("[data-testid=subplan-card]");
     expect(cards).toHaveLength(2);
@@ -161,6 +170,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
     expect(cards[0]!.textContent).toContain("70 %");
     expect(cards[0]!.textContent).toContain("1/2 temas");
     expect(cards[0]!.textContent).toContain("Entregable: En curso");
+    await section("resumen");
     expect(host.querySelector("[data-testid=plan-summary]")!.textContent).toContain("2 subplanes · 1/2 temas completados · 70 % global · semana 2 de 5");
     expect(host.querySelector("[data-testid=subplan-detail]")).toBeNull();
   });
@@ -174,6 +184,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
   it("al desplegar muestra semanas, temas con estado y registro, metas requeridas y entregable", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
+    await section("areas");
     const toggle = button("Desarrollo Backend")!;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     await click(toggle);
@@ -204,6 +215,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const update = vi.spyOn(api, "mentorPlanUpdateDeliverable").mockResolvedValue(plan());
     await mountEl(<MentorPlan planId={PID} />);
+    await section("areas");
     await click(button("Desarrollo Backend"));
     const detail = host.querySelector("[data-testid=subplan-detail]")!;
     expect(detail.querySelectorAll("input, textarea")).toHaveLength(0);
@@ -219,6 +231,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
   it("el subplan sin proyecto lo presenta como propuesta de entregable", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
+    await section("areas");
     await click(button("Hablar con confianza"));
     const d = host.querySelector("[data-testid=plan-deliverable]")!;
     expect(d.textContent).toContain("Propuesta");
@@ -426,6 +439,7 @@ describe("Mentor: la tarjeta plan_draft en el chat", () => {
     const long = `${"quiero terminar primero lo de APIs. ".repeat(8)}\nsegunda línea`;
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plan: { ...plan(), preconditions: { ...plan().preconditions!, notes: long } } } as any));
     await mountEl(<MentorPlan planId={PID} />);
+    await section("alcance");
     const n = host.querySelector("[data-testid=plan-notes]")!;
     expect(n.textContent).not.toContain("segunda línea");
     await click(button("Ver todo", n));

@@ -62,6 +62,13 @@ let host: HTMLDivElement;
 let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
+// «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
+const section = async (id: string) => {
+  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${id}]`);
+  expect(b, `sub-vista ${id}`).toBeTruthy();
+  await act(async () => { b!.click(); });
+  await flush();
+};
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "")))!;
 const click = async (el: Element | undefined) => {
@@ -152,6 +159,7 @@ describe("plan aceptado: tarjeta Programming practice", () => {
   it("fila con kata, proyecto de esta semana con sus 4 fases y estado, semanas y mensual", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
+    await section("datos");
     // cabecera (pestaña «Mi plan»): chip de la práctica y entregables «por definir» (no se eligen al crear el plan)
     expect(host.querySelector("[data-testid=plan-practice-chip]")!.textContent).toContain("Programming practice");
     expect(host.querySelector("[data-testid=plan-preconditions]")!.textContent).toContain("Por definir");

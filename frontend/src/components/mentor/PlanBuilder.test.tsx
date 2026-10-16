@@ -64,6 +64,13 @@ let host: HTMLDivElement;
 let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
+// «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
+const section = async (id: string) => {
+  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${id}]`);
+  expect(b, `sub-vista ${id}`).toBeTruthy();
+  await act(async () => { b!.click(); });
+  await flush();
+};
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "")))!;
 const click = async (el: Element | undefined) => {
@@ -371,6 +378,7 @@ describe("plan propuesto: barra «¿lo mantienes?»", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ proposed: undefined })));
     const change = vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, plan: plan(), applied: true, history: [], entry: { n: 1, at: "2026-10-06T10:00:00Z", comment: "x", status: "applied", source: "rules", summary: "", delta: { added: 6, removed: 0, moved: 0, deliverables: 0 }, changed: [], warnings: [], fixOptions: [] } });
     await mountEl(<MentorPlan planId={PID} />);
+    await section("alcance");
     expect(host.querySelector("[data-testid=plan-proposed-bar]")).toBeNull();
     const note = host.querySelector("[data-testid=plan-branch-note]")!;
     expect(note.textContent).toContain("Excluí Desktop Apps y Mobile porque pediste full stack. Añádelos si los quieres.");
@@ -406,6 +414,7 @@ describe("«Pedir cambios al plan»", () => {
     expect(box.querySelector("[data-testid=change-notice]")!.textContent).toContain("Cambio aplicado: −4 temas");
     expect(ta.value).toBe("");
     // lo cambiado se resalta (el subplan se abre solo y el tema queda marcado)
+    await section("areas");
     expect(host.querySelector("[data-testid=plan-topic][data-changed=true]")).toBeTruthy();
   });
 

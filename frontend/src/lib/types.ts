@@ -1476,6 +1476,8 @@ export type MentorPracticeCurriculum = import("./planCurriculum").PracticeCurric
 export type MentorMonthlyPlan = MentorPlan;
 /** Cobertura de teoría y práctica del plan contra la vault, y la revisión guardada (`mentor_plan_coverage`). */
 export type MentorPlanCoverage = { loading: true } | { loading: false; coverage: PlanCoverage; review: CoverageReview | null; aiConfigured: boolean };
+/** Catálogo de TODOS los temas de la vault con lo que existe de cada uno y su lugar en el plan (`mentor_plan_topic_catalog`); ver `lib/planTopicCatalog.ts`. */
+export type MentorPlanTopicCatalog = { loading: true } | { loading: false; rows: import("./planTopicCatalog").PlanTopicRow[] };
 /** Resultado de «Revisar cobertura con el Mentor» (`mentor_plan_coverage_review`): `source: "none"` = sin IA (no se guarda nada). */
 export type MentorCoverageReviewResult =
   | { loading: true }

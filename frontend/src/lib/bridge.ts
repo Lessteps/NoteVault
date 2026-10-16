@@ -397,7 +397,7 @@ export const api = {
   /** Registro de horas de estudio por área (Pomodoro y bloques a mano). */
   mentorTimeLogGet: (id: string) => call<{ entries: import("./timeLog").TimeEntry[]; assessments?: import("./timeLog").Assessment[] }>("mentor_timelog_get", { id }),
   /** La evaluación obligatoria al acabar un bloque de foco. */
-  mentorTimeLogAssess: (opts: { id: string; areaKey: string; date: string; minutes: number; topics: string[]; understanding: number; learned: string; doubt: string }) => call<{ assessments: import("./timeLog").Assessment[]; assessment: import("./timeLog").Assessment }>("mentor_timelog_assess", opts),
+  mentorTimeLogAssess: (opts: { id: string; areaKey: string; date: string; minutes: number; topics: string[]; understanding: number; focus: number; outcomes: Array<{ title: string; status: "done" | "partial" | "none" }>; practiced: boolean; learned: string; doubt: string; errors: string }) => call<{ assessments: import("./timeLog").Assessment[]; assessment: import("./timeLog").Assessment }>("mentor_timelog_assess", opts),
   mentorTimeLogAdd: (opts: { id: string; areaKey: string; date: string; minutes: number; kind?: "pomodoro" | "manual"; note?: string }) => call<{ entries: import("./timeLog").TimeEntry[]; entry: import("./timeLog").TimeEntry }>("mentor_timelog_add", opts),
   mentorTimeLogDelete: (id: string, entryId: string) => call<{ entries: import("./timeLog").TimeEntry[] }>("mentor_timelog_delete", { id, entryId }),
   mentorExecutionCancel: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_cancel", { id }),

@@ -70,7 +70,7 @@ export interface TodayCard {
 }
 
 /** La pestaña de un área: su trabajo (hoy, semana, pendientes, repasos) a la izquierda y su sesión (Pomodoro y horas) a la derecha. */
-export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, date, practice, dailyProject, onGoProjects }: {
+export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, date, practice, dailyProject, weeklyProjectTitle, onGoProjects }: {
   plan: MentorPlan;
   area: { subplanId: string; areaId?: string; area: string };
   card: TodayCard | undefined;
@@ -82,6 +82,7 @@ export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, 
   date: string;
   practice?: BoardPractice;
   dailyProject?: DayProject | null;
+  weeklyProjectTitle?: string;
   onGoProjects: () => void;
 }) {
   const colour = card?.colour ?? "var(--nv-accent)";
@@ -127,7 +128,20 @@ export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, 
           </SectionCard>
         )}
       </div>
-      <AreaSession planId={plan.id} areaKey={areaKey} areaName={area.area} date={date} plannedMinutes={planned} colour={colour} {...(current ? { currentTopic: current } : {})} />
+      <AreaSession
+        planId={plan.id}
+        areaKey={areaKey}
+        areaName={area.area}
+        date={date}
+        plannedMinutes={planned}
+        colour={colour}
+        {...(current ? { currentTopic: current } : {})}
+        todayTopics={(card?.rows ?? []).filter((r) => !r.done).map((r) => ({ folder: r.folder, title: r.title, kind: "topic" as const }))}
+        suggestions={[
+          ...(dailyProject ? [{ folder: `project:daily:${areaKey}`, title: `Proyecto diario: ${dailyProject.title}`, kind: "project" as const }] : []),
+          ...(weeklyProjectTitle ? [{ folder: `project:weekly:${areaKey}`, title: `Proyecto semanal: ${weeklyProjectTitle}`, kind: "project" as const }] : []),
+        ]}
+      />
     </div>
   );
 }

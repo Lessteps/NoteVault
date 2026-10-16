@@ -14,7 +14,7 @@ import { planGateByArea } from "../../lib/planGate";
 import { catchUpOf } from "../../lib/planCatchUp";
 import { bucketReviews, dueText, reviewsOfTopics, type ReviewRow } from "../../lib/planReviews";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
-import { dailyProjectOf } from "../../lib/planCurriculum";
+import { dailyProjectOf, weeklyProjectOf } from "../../lib/planCurriculum";
 import { dayByArea, orderedAreas } from "../../lib/planTopicsByArea";
 import { minutesOn, minutesText } from "../../lib/timeLog";
 import type { MentorPlan } from "../../lib/types";
@@ -154,8 +154,10 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
           seen.add(t.folder);
           rows.push(rowOf(t, subplanId === null));
         }
-        return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows };
-      });
+        // los días ANTERIORES a hoy solo enseñan lo que ya se hizo (tu avance): lo que no se tocó no se ofrece como si fuera de ese día, sigue en «Pendientes»
+        return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows: d.date < date ? rows.filter((r) => r.done) : rows };
+      })
+      .filter((d) => d.date >= date || d.rows.length > 0);
   const basesRoute: BoardRow[] = [];
   const basesTopics: Array<{ folder: string; title: string }> = [];
   {
@@ -404,6 +406,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
           date={date}
           practice={ap.data && ap.data.areas.length ? { areas: ap.data.areas, today: ap.data.today || m.today, mark: ap.mark } : undefined}
           dailyProject={day ? dailyProjectOf(plan, m.schedule, day) : null}
+          {...(day && weeklyProjectOf(plan, m.schedule, day.week) ? { weeklyProjectTitle: weeklyProjectOf(plan, m.schedule, day.week)!.title } : {})}
           onGoProjects={() => go("proyectos")}
         />
       )}

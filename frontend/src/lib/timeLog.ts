@@ -63,8 +63,16 @@ export interface Assessment {
   /** títulos de los temas asignados al bloque (vacío = sesión libre) */
   topics: string[];
   understanding: number;
+  /** concentración durante el bloque (1–5); 0 en las evaluaciones antiguas */
+  focus: number;
+  /** cómo quedó cada tema, proyecto o tarea asignados al bloque */
+  outcomes: Array<{ title: string; status: "done" | "partial" | "none" }>;
+  /** ¿hubo ejercicios o un problema práctico en el bloque? */
+  practiced: boolean;
   learned: string;
   doubt: string;
+  /** errores o problemas concretos que se tuvieron (opcional): es lo que más sirve para repensar el plan */
+  errors: string;
   at: string;
 }
 
@@ -83,6 +91,15 @@ export function sanitizeAssessment(raw: unknown): Assessment | null {
   const minutes = Math.max(0, Math.min(TIMELOG_MAX_MINUTES, Math.round(Number(o.minutes) || 0)));
   if (!id || !areaKey || !DATE_RE.test(date) || !learned || !doubt || !(understanding >= 1 && understanding <= 5)) return null;
   const topics = Array.isArray(o.topics) ? o.topics.map((t) => oneLine(t, 200)).filter(Boolean).slice(0, 12) : [];
-  return { id, areaKey, date, minutes, topics, understanding, learned, doubt, at: oneLine(o.at, 40) };
+  const focus = Math.round(Number(o.focus));
+  const outcomes = (Array.isArray(o.outcomes) ? o.outcomes : [])
+    .map((x) => {
+      const r = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+      const status = r.status === "done" || r.status === "none" ? r.status : "partial";
+      return { title: oneLine(r.title, 200), status } as Assessment["outcomes"][number];
+    })
+    .filter((x) => x.title)
+    .slice(0, 12);
+  return { id, areaKey, date, minutes, topics, understanding, focus: focus >= 1 && focus <= 5 ? focus : 0, outcomes, practiced: o.practiced === true, learned, doubt, errors: oneLine(o.errors, 600), at: oneLine(o.at, 40) };
 }
 

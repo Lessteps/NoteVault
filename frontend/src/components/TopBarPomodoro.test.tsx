@@ -71,7 +71,7 @@ describe("Pomodoro de la barra superior", () => {
     expect([...host.querySelectorAll("[data-testid=pomodoro-option]")].map((o) => o.textContent)).toEqual(["4.2 HTTPBackend", "4.3 RESTBackend"]);
     await click(host.querySelector("[data-testid=pomodoro-option]"));
     expect(usePomodoro.getState().p.assignedTopics.map((t) => t.folder)).toEqual(["P/4.2 HTTP"]);
-    expect(byTest("pomodoro-assigned")!.textContent).toContain("4.2 HTTP");
+    expect(byTest("assigned-list")!.textContent).toContain("4.2 HTTP");
     await type(byTest("pomodoro-search") as HTMLInputElement, "rest");
     expect([...host.querySelectorAll("[data-testid=pomodoro-option]")].map((o) => o.textContent)).toEqual(["4.3 RESTBackend"]);
     await click(byTest("pomodoro-begin"));
@@ -113,9 +113,14 @@ describe("evaluación obligatoria", () => {
     expect(byTest("assess-submit")!.hasAttribute("disabled")).toBe(true);
     await type(byTest("assess-doubt") as HTMLTextAreaElement, "No tengo claro qué pasa cuando el token expira a mitad de la petición.");
     await click(byTest("assess-level-5"));
+    await click(byTest("assess-focus-3"));
+    await click(byTest("assess-outcome-done"));
+    await click(byTest("assess-practiced"));
+    await type(byTest("assess-errors") as HTMLTextAreaElement, "Confundí PUT con PATCH.");
     await click(byTest("assess-submit"));
     expect(assess).toHaveBeenCalledWith({
-      id: "p1", areaKey: "backend", date: "2026-10-16", minutes: 25, topics: ["4.2 HTTP"], understanding: 5,
+      id: "p1", areaKey: "backend", date: "2026-10-16", minutes: 25, topics: ["4.2 HTTP"], understanding: 5, focus: 3,
+      outcomes: [{ title: "4.2 HTTP", status: "done" }], practiced: true, errors: "Confundí PUT con PATCH.",
       learned: "Aprendí cómo se valida un 422 con un esquema y por qué no se devuelve un 500.", doubt: "No tengo claro qué pasa cuando el token expira a mitad de la petición.",
     });
     expect(usePomodoro.getState().p.pendingAssessment).toBeNull();
@@ -134,4 +139,23 @@ describe("evaluación obligatoria", () => {
     usePomodoro.getState().start("p1", "backend");
     expect(usePomodoro.getState().p.phase).toBe("idle");
   });
+
+  it("asigna a mano una tarea o un proyecto al bloque (fuera del Mentor) y los quita", async () => {
+    await mount();
+    await type(byTest("assign-text") as HTMLInputElement, "Terminar el endpoint de login");
+    await click(byTest("assign-add"));
+    const kind = byTest("assign-kind") as unknown as HTMLSelectElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(kind, "project");
+      kind.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await type(byTest("assign-text") as HTMLInputElement, "Feature del día");
+    await click(byTest("assign-add"));
+    const items = [...host.querySelectorAll("[data-testid=assigned-item]")].map((i) => i.textContent);
+    expect(items).toEqual([expect.stringContaining("Tarea"), expect.stringContaining("Proyecto")]);
+    expect(usePomodoro.getState().p.assignedTopics.map((t) => [t.kind, t.title])).toEqual([["task", "Terminar el endpoint de login"], ["project", "Feature del día"]]);
+    await click(host.querySelector("[data-testid=assigned-item] button"));
+    expect(usePomodoro.getState().p.assignedTopics.map((t) => t.title)).toEqual(["Feature del día"]);
+  });
 });
+

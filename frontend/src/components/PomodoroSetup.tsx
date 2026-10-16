@@ -1,12 +1,13 @@
 // Pomodoro fuera del Mentor: desde la barra superior se puede EMPEZAR un bloque de estudio (temporizador o cronómetro) en cualquier momento, elegir
 // el área del plan activo (o una sesión libre) y asignarle los temas que se van a trabajar. Lo que se estudia queda en el registro de horas del plan.
 
-import { Play, Search, X } from "lucide-react";
+import { Play, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/bridge";
 import { BREAK_CHOICES, FOCUS_CHOICES } from "../lib/pomodoro";
 import { useApp } from "../store/app";
 import { usePomodoro } from "../store/pomodoro";
+import { AssignPanel } from "./mentor/AssignPanel";
 import { cn } from "./ui";
 
 /** La clave del área de las sesiones sin área. */
@@ -54,7 +55,7 @@ const chip = (on: boolean): string => cn("min-h-7 rounded-md border px-2 text-[1
 export function PomodoroSetup() {
   const toast = useApp((s) => s.toast);
   const p = usePomodoro((s) => s.p);
-  const { setMode, setDurations, assignTopic, removeAssignedTopic, start } = usePomodoro.getState();
+  const { setMode, setDurations, assignTopic, start } = usePomodoro.getState();
   const { plan, loading } = useActivePlan(true);
   const [areaKey, setAreaKey] = useState("");
   const [query, setQuery] = useState("");
@@ -113,20 +114,10 @@ export function PomodoroSetup() {
 
           <div>
             <label className="relative block text-[12px] text-dim">
-              Temas de este bloque ({p.assignedTopics.length})
+              Buscar un tema del plan
               <Search size={13} aria-hidden className="pointer-events-none absolute left-2 top-[27px] text-faint" />
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Busca un tema para asignarlo…" className="mt-1 block min-h-8 w-full rounded-lg border border-line bg-surface pl-7 pr-2 text-[13px] text-text" data-testid="pomodoro-search" />
             </label>
-            {p.assignedTopics.length > 0 && (
-              <ul className="mt-1.5 flex flex-wrap gap-1" aria-label="Temas asignados" data-testid="pomodoro-assigned">
-                {p.assignedTopics.map((t) => (
-                  <li key={t.folder} className="inline-flex max-w-full items-center gap-1 rounded-md border border-warn/60 bg-warn-soft px-1.5 py-0.5 text-[12px] text-warn">
-                    <span className="truncate">{t.title}</span>
-                    <button type="button" onClick={() => removeAssignedTopic(t.folder)} aria-label={`Quitar ${t.title}`} className="text-warn hover:text-danger"><X size={11} aria-hidden /></button>
-                  </li>
-                ))}
-              </ul>
-            )}
             {options.length > 0 && (
               <ul className="mt-1.5 max-h-36 space-y-0.5 overflow-y-auto rounded-lg border border-line bg-surface p-1" aria-label="Temas por hacer" data-testid="pomodoro-options">
                 {options.map((t) => (
@@ -140,6 +131,8 @@ export function PomodoroSetup() {
               </ul>
             )}
           </div>
+
+          <AssignPanel />
 
           <button type="button" onClick={begin} disabled={!!p.pendingAssessment} className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-50" data-testid="pomodoro-begin">
             <Play size={14} aria-hidden /> {p.mode === "stopwatch" ? "Iniciar cronómetro" : "Empezar foco"}

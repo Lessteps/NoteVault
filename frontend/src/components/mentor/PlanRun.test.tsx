@@ -14,6 +14,8 @@ import type { MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../..
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
+import { idlePomodoro } from "../../lib/pomodoro";
+import { usePomodoro } from "../../store/pomodoro";
 import { MentorPlan } from "./MentorPlan";
 import { planModeKey, planSectionKey, planTabKey } from "./planShared";
 
@@ -207,8 +209,12 @@ describe("vista de ejecución", () => {
     for (const tab of ["area:s1", "area:s2"]) {
       await click(runTab(tab));
       await view("semana");
-      const week = byTest("work-week")!;
-      expect(week).toBeTruthy();
+      const week = byTest("work-week");
+      if (!week) {
+        // sin nada desde hoy en adelante (y sin avance en los días anteriores) la semana queda en blanco
+        expect(byTest("work-empty")).toBeTruthy();
+        continue;
+      }
       expect(byTest("week-summary")!.textContent).toMatch(/\d+ de \d+ temas completados esta semana/);
       expect(byTest("week-summary")!.textContent).toMatch(/Nivel de avance \d+ %/);
       const days = [...week.querySelectorAll<HTMLElement>("[data-testid=week-day]")];
@@ -218,6 +224,56 @@ describe("vista de ejecución", () => {
     }
     // el tema completado de Python sale con su aviso «Hecho»
     expect(byTest("work-week")!.textContent).toContain("Hecho");
+  });
+
+  it("en la semana, los días anteriores a hoy solo enseñan lo que ya está hecho; lo que no se tocó no aparece como de ese día", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    await mountEl(<MentorPlan planId={PID} />);
+    for (const tab of ["area:s1", "area:s2"]) {
+      await click(runTab(tab));
+      await view("semana");
+      for (const d of byTest("area-work")!.querySelectorAll<HTMLElement>("[data-testid=week-day]")) {
+        if ((d.dataset.date ?? "") >= TODAY) continue;
+        const tags = [...d.querySelectorAll("[data-testid=board-topic]")].map((r) => r.querySelector("[data-testid=board-tag]")?.textContent);
+        expect(tags.length, d.dataset.date).toBeGreaterThan(0); // un día anterior sin avance ni siquiera sale
+        expect(tags.every((t) => t === "Hecho")).toBe(true);
+      }
+    }
+  });
+
+  it("al bloque del Pomodoro se asignan los temas de hoy, el proyecto diario y tareas o proyectos escritos a mano", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    usePomodoro.setState({ p: idlePomodoro(), logVersion: 0 });
+    await mountEl(<MentorPlan planId={PID} />);
+    await click(runTab("area:s1"));
+    const panel = byTest("assign-panel")!;
+    expect(panel).toBeTruthy();
+    const today = byTest("assign-today");
+    if (today) await click(today);
+    const typeInto = async (el: HTMLInputElement, v: string) => {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, v);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    };
+    await typeInto(byTest("assign-text") as HTMLInputElement, "Repasar el 422");
+    await click(byTest("assign-add"));
+    expect(usePomodoro.getState().p.assignedTopics.some((t) => t.kind === "task" && t.title === "Repasar el 422")).toBe(true);
+    expect(host.querySelectorAll("[data-testid=assigned-item]").length).toBeGreaterThanOrEqual(1);
+    usePomodoro.setState({ p: idlePomodoro() });
+  });
+
+  it("la barra de generación en segundo plano solo sale al planificar (modo Plan), no en el día a día (Ejecución)", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    const state = { version: 1, planId: PID, id: "e1", status: "running", scope: {}, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), tasks: [{ id: "t1", kind: "practice", areaKey: "a", area: "A", title: "T", status: "running", attempts: 0, created: [], skipped: [], warnings: [], label: "x" }], log: [] };
+    vi.spyOn(api, "mentorExecutionStatus").mockResolvedValue({ execution: { state, progress: { done: 0, failed: 0, skipped: 0, pending: 0, running: 1, total: 1, pct: 0, created: 0, label: "x" } }, active: true } as never);
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(byTest("plan-run")).toBeTruthy();
+    expect(byTest("exec-bar")).toBeNull();
+    await click(byTest("plan-mode-plan"));
+    expect(byTest("exec-bar")).toBeTruthy();
+    await click(byTest("plan-mode-ejecucion"));
+    expect(byTest("exec-bar")).toBeNull();
   });
 
   it("repaso espaciado: los repasos de los temas del área salen por cajón con su acceso directo a la práctica, y la pestaña avisa", async () => {

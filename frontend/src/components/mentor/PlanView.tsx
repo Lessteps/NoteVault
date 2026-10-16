@@ -433,7 +433,8 @@ export function PlanView({ planId }: { planId: string }) {
           </>
         )}
       </div>
-      {plan && <ExecutionBar planId={plan.id} onOpenPlan={() => changeTab("plan")} />}
+      {/* la barra de generación en segundo plano es de planificar el plan: no estorba en el día a día (Ejecución) */}
+      {plan && mode === "plan" && <ExecutionBar planId={plan.id} onOpenPlan={() => changeTab("plan")} />}
       <BackToTop scroller={scroller} onTop={toTop} />
     </div>
   );

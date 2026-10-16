@@ -44,7 +44,7 @@ export function mentorTimeLogApi(app: AppState, now: () => string = () => new Da
     mentor_timelog_assess(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, unknown>;
       const id = planIdOf(o);
-      const assessment = sanitizeAssessment({ id: randomUUID().slice(0, 12), areaKey: o.areaKey, date: o.date, minutes: o.minutes, topics: o.topics, understanding: o.understanding, learned: o.learned, doubt: o.doubt, at: now() });
+      const assessment = sanitizeAssessment({ id: randomUUID().slice(0, 12), areaKey: o.areaKey, date: o.date, minutes: o.minutes, topics: o.topics, understanding: o.understanding, focus: o.focus, outcomes: o.outcomes, practiced: o.practiced, learned: o.learned, doubt: o.doubt, errors: o.errors, at: now() });
       if (!assessment) throw new ApiError("La evaluación no es válida: responde las dos preguntas y elige una comprensión de 1 a 5.");
       const all = loadAll(id);
       const next = { entries: all.entries, assessments: [...all.assessments, assessment] };

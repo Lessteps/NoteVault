@@ -4,10 +4,18 @@
 export type PomodoroPhase = "idle" | "focus" | "break";
 export type PomodoroTimerMode = "timer" | "stopwatch";
 
+/** Lo que se trabaja en un bloque: un tema del plan, una tarea manual o un proyecto. */
 export interface AssignedTopic {
+  /** carpeta del tema; en una tarea o proyecto manual, un id `manual:<tipo>:<n>` */
   folder: string;
   title: string;
+  kind?: "topic" | "task" | "project";
 }
+
+export const ASSIGN_KIND_LABEL: Record<NonNullable<AssignedTopic["kind"]>, string> = { topic: "Tema", task: "Tarea", project: "Proyecto" };
+
+/** Una tarea o proyecto escrito a mano (o sugerido): lleva un id propio para poder quitarlo. */
+export const manualAssignment = (kind: "task" | "project", title: string, seed = Date.now()): AssignedTopic => ({ folder: `manual:${kind}:${seed.toString(36)}`, title: title.replace(/\s+/g, " ").trim().slice(0, 120), kind });
 
 export interface PomodoroAssessment {
   planId: string;

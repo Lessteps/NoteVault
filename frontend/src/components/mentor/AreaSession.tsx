@@ -5,12 +5,13 @@
 import { Pause, Play, SkipForward, Square, Timer, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
-import { BREAK_CHOICES, clock, FOCUS_CHOICES, focusDoneMinutes, phaseOver, remainingMs } from "../../lib/pomodoro";
+import { BREAK_CHOICES, clock, FOCUS_CHOICES, focusDoneMinutes, phaseOver, remainingMs, type AssignedTopic } from "../../lib/pomodoro";
 import { localDay, minutesBetween, minutesOn, minutesText, type Assessment, type TimeEntry } from "../../lib/timeLog";
 import { usePomodoro } from "../../store/pomodoro";
 import { useApp } from "../../store/app";
 import { GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
+import { AssignPanel } from "./AssignPanel";
 import { ProgressBar } from "./parts";
 
 /** Las entradas del registro de horas del plan; se recargan cuando se guarda un bloque. */
@@ -84,10 +85,10 @@ export function PomodoroTicker() {
 
 const chipBtn = (on: boolean): string => cn("min-h-8 rounded-md border px-2.5 text-[13px]", on ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:bg-hover");
 
-export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, colour, currentTopic }: { planId: string; areaKey: string; areaName: string; date: string; plannedMinutes: number; colour: string; /** el tema de hoy que toca ahora, bajo el título */ currentTopic?: string }) {
+export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, colour, currentTopic, suggestions, todayTopics }: { planId: string; areaKey: string; areaName: string; date: string; plannedMinutes: number; colour: string; /** el tema de hoy que toca ahora, bajo el título */ currentTopic?: string; /** proyectos u otras piezas que se asignan al bloque con un clic */ suggestions?: AssignedTopic[]; /** los temas de hoy del área, para asignarlos todos */ todayTopics?: AssignedTopic[] }) {
   const toast = useApp((s) => s.toast);
   const p = usePomodoro((s) => s.p);
-  const { start, pause, resume, next, setDurations, setMode, removeAssignedTopic } = usePomodoro.getState();
+  const { start, pause, resume, next, setDurations, setMode } = usePomodoro.getState();
   const { entries } = useTimeLog(planId);
   const [customMin, setCustomMin] = useState(String(p.focusMin));
   const [now, setNow] = useState(() => Date.now());
@@ -243,29 +244,7 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
           </div>
         )}
 
-        {/* Temas asignados a este pomodoro */}
-        {p.assignedTopics.length > 0 && (
-          <div className="mt-4 border-t border-line/60 pt-3 text-left">
-            <div className="flex items-center justify-between text-[12px] font-semibold text-dim uppercase">
-              <span>Temas asignados a esta sesión ({p.assignedTopics.length})</span>
-            </div>
-            <ul className="mt-1.5 space-y-1">
-              {p.assignedTopics.map((t) => (
-                <li key={t.folder} className="flex items-center justify-between rounded-lg bg-card/80 px-2 py-1 text-[13px]">
-                  <span className="truncate text-text">{t.title}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeAssignedTopic(t.folder)}
-                    className="ml-2 text-faint hover:text-danger text-[12px]"
-                    title="Desasignar"
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <AssignPanel suggestions={suggestions} todayTopics={todayTopics} />
       </div>
 
       {/* Registro de horas */}

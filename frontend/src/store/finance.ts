@@ -32,6 +32,9 @@ interface FinState {
   goalEditing: string | null;    // "" = new
   categoryEditing: { id: string; kind: "gasto" | "ingreso" } | null;
   recurringEditing: { id: string } | null;    // {} = new
+  importOpen: boolean;
+  exportOpen: boolean;
+  exportScope: "month" | "year" | "all";
 
   setView: (v: FinView) => void;
   load: () => Promise<void>;
@@ -41,6 +44,8 @@ interface FinState {
   setGoalEditing: (id: string | null) => void;
   setCategoryEditing: (c: FinState["categoryEditing"]) => void;
   setRecurringEditing: (r: FinState["recurringEditing"]) => void;
+  setImportOpen: (open: boolean) => void;
+  setExportOpen: (open: boolean, scope?: "month" | "year" | "all") => void;
 }
 
 export const useFinance = create<FinState>((set, get) => ({
@@ -54,6 +59,9 @@ export const useFinance = create<FinState>((set, get) => ({
   goalEditing: null,
   categoryEditing: null,
   recurringEditing: null,
+  importOpen: false,
+  exportOpen: false,
+  exportScope: "month",
 
   setView: (view) => set({ view, goalId: null }),
   load: async () => {
@@ -84,6 +92,8 @@ export const useFinance = create<FinState>((set, get) => ({
   setGoalEditing: (goalEditing) => set({ goalEditing }),
   setCategoryEditing: (categoryEditing) => set({ categoryEditing }),
   setRecurringEditing: (recurringEditing) => set({ recurringEditing }),
+  setImportOpen: (importOpen) => set({ importOpen }),
+  setExportOpen: (exportOpen, scope = "month") => set({ exportOpen, exportScope: scope }),
 }));
 
 export function categoryOf(meta: FinMeta | null, id: string | undefined): FinCategory | undefined {

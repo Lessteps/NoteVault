@@ -472,6 +472,64 @@ export class FinanceManager {
     return mov;
   }
 
+  addBatch(
+    items: Array<{
+      date: Date | string;
+      type: string;
+      amountCents: number;
+      fields?: Record<string, any>;
+    }>,
+  ): Array<Record<string, any>> {
+    if (!items.length) return [];
+    const byDay = new Map<string, Array<{ type: string; amountCents: number; fields?: Record<string, any> }>>();
+    for (const item of items) {
+      const dStr = typeof item.date === "string" ? item.date : todayIso(item.date);
+      const list = byDay.get(dStr) ?? [];
+      list.push({ type: item.type, amountCents: item.amountCents, fields: item.fields });
+      byDay.set(dStr, list);
+    }
+
+    const createdMovements: Array<Record<string, any>> = [];
+    const goalsToRefresh = new Set<string>();
+    const nowStr = todayIso();
+
+    for (const [dStr, dayItems] of byDay.entries()) {
+      const d = parseIsoDate(dStr) || new Date();
+      const movements = this.day(d);
+      for (const it of dayItems) {
+        const mov = sanitizeMovement({
+          ...(it.fields || {}),
+          type: it.type,
+          amount_cents: it.amountCents,
+          created: it.fields?.created || `${nowStr}T${new Date().toTimeString().slice(0, 5)}`,
+        });
+        movements.push(mov);
+        createdMovements.push({ ...mov, date: dStr });
+        if (mov.goal) {
+          goalsToRefresh.add(mov.goal);
+        }
+      }
+      this._saveDay(d, movements);
+    }
+
+    for (const gid of goalsToRefresh) {
+      this.refreshGoalStatus(gid);
+    }
+
+    return createdMovements;
+  }
+
+  allMovements(): Array<Record<string, any>> {
+    const out: Array<Record<string, any>> = [];
+    for (const d of this.allDays()) {
+      const dStr = todayIso(d);
+      for (const m of this.day(d)) {
+        out.push({ ...m, date: dStr });
+      }
+    }
+    return out;
+  }
+
   get(d: Date | string, mid: string): Record<string, any> | null {
     return this.day(d).find((m) => m.id === mid) ?? null;
   }
@@ -873,6 +931,70 @@ export class FinanceManager {
   deleteRecurrent(rid: string): void {
     const list = this.recurrents().filter((r) => r.id !== String(rid));
     this._saveRecurrents(list);
+  }
+
+  // ── Reglas de Auto-Categorización ────────────────────────────────────
+
+  rulesPath(): string {
+    return path.join(this.vaultRoot, LAYOUT.finance_rules);
+  }
+
+  rules(): Record<string, any>[] {
+    const data = loadJson<{ rules?: unknown }>(this.rulesPath());
+    const raw = data && Array.isArray(data.rules) ? data.rules : [];
+    return raw.map((r: any) => ({
+      id: String(r.id || ""),
+      pattern: String(r.pattern || "").toLowerCase().trim(),
+      category: String(r.category || "").trim(),
+      ...(r.type ? { type: String(r.type) } : {}),
+      created: r.created || todayIso(),
+    }));
+  }
+
+  _saveRules(list: Record<string, any>[]): void {
+    writeJson(this.rulesPath(), { rules: list });
+  }
+
+  saveRule(fields: Record<string, any>): Record<string, any> {
+    const list = this.rules();
+    const id = String(fields.id || "");
+    const pattern = String(fields.pattern || "").toLowerCase().trim();
+    const category = String(fields.category || "").trim();
+    const type = fields.type ? String(fields.type) : undefined;
+    if (!pattern || !category) {
+      throw new Error("Patrón y categoría requeridos.");
+    }
+    if (id) {
+      const i = list.findIndex((r) => r.id === id);
+      if (i === -1) return null as unknown as Record<string, any>;
+      list[i] = { ...list[i], pattern, category, ...(type ? { type } : {}) };
+      this._saveRules(list);
+      return list[i]!;
+    }
+    const existingIndex = list.findIndex((r) => r.pattern.toLowerCase() === pattern);
+    if (existingIndex !== -1) {
+      list[existingIndex] = { ...list[existingIndex], category, ...(type ? { type } : {}) };
+      this._saveRules(list);
+      return list[existingIndex]!;
+    }
+    const r = {
+      id: newId("rl"),
+      pattern,
+      category,
+      ...(type ? { type } : {}),
+      created: todayIso(),
+    };
+    list.push(r);
+    this._saveRules(list);
+    return r;
+  }
+
+  deleteRule(id: string): boolean {
+    const list = this.rules();
+    const filtered = list.filter((r) => r.id !== String(id));
+    if (filtered.length === list.length) return false;
+    this._saveRules(filtered);
+    return true;
   }
 
   /**

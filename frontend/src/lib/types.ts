@@ -663,6 +663,44 @@ export interface FinCheck {
   last: string;
 }
 
+export interface FinImportItem {
+  date: string;
+  type: MovementType;
+  amount_cents: number;
+  what?: string;
+  category?: string;
+  goal?: string;
+  reason?: string;
+  time?: string;
+  currency?: string;
+}
+
+export interface FinExportData {
+  movements: Movement[];
+  categories: FinCategory[];
+  goals: FinGoal[];
+  currency: string;
+  total_count: number;
+}
+
+export interface FinRule {
+  id: string;
+  pattern: string;
+  category: string;
+  type?: MovementType;
+  created?: string;
+}
+
+export interface FinDuplicateMatch {
+  index: number;
+  existingId: string;
+  existingWhat: string;
+  existingAmountCents: number;
+  existingDate: string;
+  existingType: string;
+  reason: string;
+}
+
 // ── Ejercicio ──────────────────────────────────────────────────────────────
 
 export interface Exercise {

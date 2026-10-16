@@ -444,6 +444,7 @@ export const api = {
   finDiarioBundle: (day: string) => call<{
     movements: Movement[]; checks: FinCheck[];
     month: import("./types").FinTotals; budget: number;
+    budgets: Array<{ category: FinCategory; used: number; budget: number }>;
   }>("fin_diario_bundle", day),
   finNewId: () => call<{ id: string }>("fin_new_id"),
   finAdd: (day: string, fields: Partial<Movement>) => call<Movement>("fin_add", day, fields),
@@ -471,6 +472,18 @@ export const api = {
   finBudgetSet: (cents: number) => call<{ month_budget_cents: number }>("fin_budget_set", cents),
   finSearch: (query: string, kind = "", category = "", offset = 0) =>
     call<{ total: number; movements: Array<import("./types").Movement> }>("fin_search", query, kind, category, offset),
+  finImportBatch: (items: import("./types").FinImportItem[]) =>
+    call<{ imported: number; movements: Array<import("./types").Movement> }>("fin_import_batch", items),
+  finExportAll: () =>
+    call<import("./types").FinExportData>("fin_export_all"),
+  finRulesGet: () =>
+    call<{ rules: import("./types").FinRule[] }>("fin_rules_get"),
+  finRulesSave: (fields: Partial<import("./types").FinRule>) =>
+    call<import("./types").FinRule>("fin_rules_save", fields),
+  finRulesDelete: (id: string) =>
+    call<{ ok: boolean }>("fin_rules_delete", id),
+  finFindDuplicates: (candidates: Array<{ date: string; amount_cents: number; what?: string; type?: string }>) =>
+    call<{ duplicates: import("./types").FinDuplicateMatch[] }>("fin_find_duplicates", candidates),
   // Ejercicio
   exMeta: () => call<{ days: Array<{ key: string; name: string; subtitle: string; glyph: string }> }>("ex_meta"),
   exList: () => call<Exercise[]>("ex_list"),

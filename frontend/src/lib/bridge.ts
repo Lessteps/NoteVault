@@ -826,6 +826,78 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
     }
     return () => {};
   },
+
+  // ── Alimentación / Nutrición ──────────────────────────────────────────────
+  nutriDay: (date: string) => call<import("./nutritionTypes").NutriDayLog>("nutri_day", date),
+  nutriDaySummary: (date: string) => call<import("./nutritionTypes").NutriDaySummary>("nutri_day_summary", date),
+  nutriItemAdd: (date: string, meal: import("./nutritionTypes").NutriMealType, item: Partial<import("./nutritionTypes").NutriFoodItem>) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_item_add", date, meal, item),
+  nutriItemUpdate: (date: string, meal: import("./nutritionTypes").NutriMealType, itemId: string, updates: Partial<import("./nutritionTypes").NutriFoodItem>) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_item_update", date, meal, itemId, updates),
+  nutriItemDelete: (date: string, meal: import("./nutritionTypes").NutriMealType, itemId: string) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_item_delete", date, meal, itemId),
+  nutriWaterSet: (date: string, ml: number) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_water_set", date, ml),
+  nutriNotesSet: (date: string, notes: string) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_notes_set", date, notes),
+  nutriMealCopy: (fromDate: string, toDate: string, meal: import("./nutritionTypes").NutriMealType) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_meal_copy", fromDate, toDate, meal),
+  nutriDayCopy: (fromDate: string, toDate: string) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_day_copy", fromDate, toDate),
+  nutriTrends: (days = 7, endDate?: string) =>
+    call<import("./nutritionTypes").NutriTrendsData>("nutri_trends", days, endDate),
+  nutriFoodsList: () =>
+    call<{ foods: import("./nutritionTypes").NutriFoodLibraryEntry[] }>("nutri_foods_list"),
+  nutriFoodSave: (entry: Partial<import("./nutritionTypes").NutriFoodLibraryEntry>) =>
+    call<import("./nutritionTypes").NutriFoodLibraryEntry>("nutri_food_save", entry),
+  nutriFoodDelete: (id: string) =>
+    call<{ ok: boolean }>("nutri_food_delete", id),
+  nutriSettingsGet: () =>
+    call<import("./nutritionTypes").NutriTargets>("nutri_settings_get"),
+  nutriSettingsSave: (settings: Partial<import("./nutritionTypes").NutriTargets>) =>
+    call<import("./nutritionTypes").NutriTargets>("nutri_settings_save", settings),
+  nutriSuggestTargets: () =>
+    call<{
+      suggested: import("./nutritionTypes").NutriTargets;
+      profileData: { weight: number; goal: string; gender: string; age: number };
+    }>("nutri_suggest_targets"),
+  nutriProfileGet: () =>
+    call<import("./nutritionTypes").NutriProfile>("nutri_profile_get"),
+  nutriProfileSave: (fields: Partial<import("./nutritionTypes").NutriProfile>) =>
+    call<import("./nutritionTypes").NutriProfile>("nutri_profile_save", fields),
+  // Coach Nutricional IA
+  nutriCoachContext: () =>
+    call<{
+      date: string;
+      caloriesRemaining: number;
+      targetCalories: number;
+      consumedCalories: number;
+      consumedProtein: number;
+      targetProtein: number;
+      consumedWater: number;
+      targetWater: number;
+      goal: string;
+      weight: number | null;
+      foodsCount: number;
+    }>("nutri_coach_context"),
+  nutriCoachChatStream: (answerId: string, history: Array<{ role: string; content: string }>, question: string) =>
+    call<{ streaming?: boolean; id?: string; bridge?: boolean; url?: string; prompt?: string; label?: string }>(
+      "nutri_coach_chat_stream", answerId, history, question,
+    ),
+  nutriCoachChatCancel: (id: string) =>
+    call<{ ok: boolean }>("nutri_coach_chat_cancel", id),
+  nutriCoachConversations: () =>
+    call<import("./types").ConversationMeta[]>("nutri_coach_conversations"),
+  nutriCoachConversationGet: (id: string) =>
+    call<import("./types").Conversation | null>("nutri_coach_conversation_get", id),
+  nutriCoachConversationSave: (id: string | null, messages: unknown, model?: string, title?: string) =>
+    call<import("./types").Conversation>("nutri_coach_conversation_save", id, messages, model, title),
+  nutriCoachConversationRename: (id: string, title: string) =>
+    call<{ ok: boolean; title: string }>("nutri_coach_conversation_rename", id, title),
+  nutriCoachConversationDelete: (id: string) =>
+    call<{ ok: boolean }>("nutri_coach_conversation_delete", id),
+  nutriCoachAiTitle: (id: string, question: string, answer: string) =>
+    call<{ title: string }>("nutri_coach_ai_title", id, question, answer),
 };
 
 /**

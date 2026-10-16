@@ -33,6 +33,7 @@ const MODULES: Partial<Record<ModuleId, ComponentType>> = {
   proyectos: lazyModule(() => import("./components/projects/ProjectsModule"), "ProjectsModule"),
   metas: lazyModule(() => import("./components/goals/GoalsModule"), "GoalsModule"),
   ejercicio: lazyModule(() => import("./components/exercise/ExerciseModule"), "ExerciseModule"),
+  alimentacion: lazyModule(() => import("./components/nutrition/NutritionModule"), "NutritionModule"),
   finanzas: lazyModule(() => import("./components/finance/FinanceModule"), "FinanceModule"),
   web: lazyModule(() => import("./components/web/WebModule"), "WebModule"),
   player: lazyModule(() => import("./components/english/EnglishPlayer"), "EnglishPlayer"),

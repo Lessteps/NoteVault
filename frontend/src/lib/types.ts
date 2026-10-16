@@ -1713,3 +1713,7 @@ export interface MentorRouteChangeResult {
   /** temas vivos que quedan en el alcance */
   live?: number;
 }
+
+// ── Alimentación / Nutrición ──────────────────────────────────────────────
+export * from "./nutritionTypes";
+

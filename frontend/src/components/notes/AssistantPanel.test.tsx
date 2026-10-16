@@ -55,4 +55,13 @@ describe("AssistantPanel", () => {
     expect(host.textContent).toContain("Asesor Financiero");
     expect(host.textContent).not.toContain("Pregunta sobre la nota abierta");
   });
+
+  it("despacha a NutritionCoachAssistant cuando el módulo activo es 'alimentacion'", async () => {
+    useApp.setState({ module: "alimentacion" });
+    await act(async () => {
+      root.render(<AssistantPanel />);
+    });
+    expect(host.textContent).toContain("Asesor Nutricional");
+    expect(host.textContent).not.toContain("Pregunta sobre la nota abierta");
+  });
 });

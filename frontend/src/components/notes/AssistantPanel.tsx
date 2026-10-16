@@ -22,6 +22,7 @@ import { isPracticePath, usePracticeDialog } from "../practice/PracticeProjectDi
 import { MentorAssistant } from "../mentor/MentorAssistant";
 import { ExerciseCoachAssistant } from "../exercise/ExerciseCoachAssistant";
 import { FinanceCoachAssistant } from "../finance/FinanceCoachAssistant";
+import { NutritionCoachAssistant } from "../nutrition/NutritionCoachAssistant";
 import { ActionCard } from "./ActionCard";
 import { AskCard, SkillsCard } from "./ChatCards";
 import { ConversationHistory } from "./ConversationHistory";
@@ -584,6 +585,7 @@ export function AssistantPanel() {
   if (module === "mentor") return <MentorAssistant />;
   if (module === "ejercicio") return <ExerciseCoachAssistant />;
   if (module === "finanzas") return <FinanceCoachAssistant />;
+  if (module === "alimentacion") return <NutritionCoachAssistant />;
   return <NotesAssistantPanel />;
 }
 

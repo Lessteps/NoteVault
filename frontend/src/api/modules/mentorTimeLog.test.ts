@@ -45,4 +45,20 @@ describe("mentor_timelog", () => {
     expect(() => api().mentor_timelog_get({ id: "../x" })).toThrow(/Plan inválido/);
     expect(() => api().mentor_timelog_get({ id: "2020-01-01_2020-02-01" })).toThrow(/ya no existe/);
   });
+
+  it("guarda la evaluación de un bloque (qué aprendí, qué duda queda, comprensión) sin tocar los bloques, y rechaza las incompletas", () => {
+    api().mentor_timelog_add({ id, areaKey: "backend", date: "2026-10-16", minutes: 25 });
+    const r: any = api().mentor_timelog_assess({ id, areaKey: "backend", date: "2026-10-16", minutes: 25, topics: ["4.2 HTTP"], understanding: 4, learned: "Cómo funciona un 422", doubt: "Qué pasa cuando el token expira" });
+    expect(r.assessment).toMatchObject({ areaKey: "backend", minutes: 25, understanding: 4, topics: ["4.2 HTTP"], at: "2026-10-16T10:00:00.000Z" });
+    const got: any = api().mentor_timelog_get({ id });
+    expect(got.entries).toHaveLength(1);
+    expect(got.assessments.map((a: any) => a.learned)).toEqual(["Cómo funciona un 422"]);
+    // añadir o quitar bloques conserva las evaluaciones
+    api().mentor_timelog_delete({ id, entryId: got.entries[0].id });
+    expect((api().mentor_timelog_get({ id }) as any).assessments).toHaveLength(1);
+    const bad = { id, areaKey: "backend", date: "2026-10-16", minutes: 25, topics: [], understanding: 4, learned: "algo", doubt: "" };
+    expect(() => api().mentor_timelog_assess(bad)).toThrow(/no es válida/);
+    expect(() => api().mentor_timelog_assess({ ...bad, doubt: "x", understanding: 9 })).toThrow(/no es válida/);
+  });
 });
+

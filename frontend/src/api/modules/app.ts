@@ -1,6 +1,8 @@
 // Ported from the app-level methods of notevault_app/webapp/api.py
 // (app_info, stats, set_theme, open_external, set_unsaved, close_window).
 
+import fs from "node:fs";
+import path from "node:path";
 import { ApiError } from "../../core/errors.js";
 import { AppConfig, type Rendering } from "../appConfig.js";
 import { API_VERSION, type AppState } from "../appState.js";
@@ -14,6 +16,20 @@ function openInShell(url: string): boolean {
     const electron = require("electron") as { shell?: { openExternal(u: string): Promise<void> } };
     if (!electron?.shell) return false;
     void electron.shell.openExternal(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Show a file in the OS file manager (selected) or open a folder. Lazy `electron` for the same reason as above. */
+function revealInShell(abs: string, isDir: boolean): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const electron = require("electron") as { shell?: { showItemInFolder(p: string): void; openPath(p: string): Promise<string> } };
+    if (!electron?.shell) return false;
+    if (isDir) void electron.shell.openPath(abs);
+    else electron.shell.showItemInFolder(abs);
     return true;
   } catch {
     return false;
@@ -90,6 +106,17 @@ export function appApi(app: AppState) {
       }
       openInShell(u);
       return { ok: true };
+    },
+
+    /** `rel` is a vault-relative path ("" = the vault root). A folder is opened; a file is shown selected in its folder. */
+    reveal_path(rel: string): Record<string, unknown> {
+      const root = path.resolve(app.root);
+      const abs = path.resolve(root, String(rel || "").replace(/^[\\/]+/, ""));
+      if (abs !== root && !abs.startsWith(root + path.sep)) throw new ApiError("Esa ruta está fuera de la bóveda.");
+      if (!fs.existsSync(abs)) throw new ApiError("Esa ruta no existe.");
+      const isDir = fs.statSync(abs).isDirectory();
+      revealInShell(abs, isDir);
+      return { ok: true, folder: isDir };
     },
 
     set_unsaved(count: number): Record<string, unknown> {

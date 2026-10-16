@@ -165,6 +165,8 @@ export const api = {
   stats: () => call<{ notes: number }>("stats"),
   setTheme: (theme: "dark" | "light") => call<{ theme: string }>("set_theme", theme),
   openExternal: (url: string) => call<{ ok: boolean }>("open_external", url),
+  /** Show a vault file in the OS file manager, or open a vault folder ("" = the vault root). */
+  revealPath: (path: string) => call<{ ok: boolean; folder: boolean }>("reveal_path", path),
   setUnsaved: (count: number) => call<{ ok: boolean }>("set_unsaved", count),
   getRendering,
   setRendering,
@@ -393,7 +395,9 @@ export const api = {
   mentorExecutionPause: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_pause", { id }),
   mentorExecutionResume: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_resume", { id }),
   /** Registro de horas de estudio por área (Pomodoro y bloques a mano). */
-  mentorTimeLogGet: (id: string) => call<{ entries: import("./timeLog").TimeEntry[] }>("mentor_timelog_get", { id }),
+  mentorTimeLogGet: (id: string) => call<{ entries: import("./timeLog").TimeEntry[]; assessments?: import("./timeLog").Assessment[] }>("mentor_timelog_get", { id }),
+  /** La evaluación obligatoria al acabar un bloque de foco. */
+  mentorTimeLogAssess: (opts: { id: string; areaKey: string; date: string; minutes: number; topics: string[]; understanding: number; learned: string; doubt: string }) => call<{ assessments: import("./timeLog").Assessment[]; assessment: import("./timeLog").Assessment }>("mentor_timelog_assess", opts),
   mentorTimeLogAdd: (opts: { id: string; areaKey: string; date: string; minutes: number; kind?: "pomodoro" | "manual"; note?: string }) => call<{ entries: import("./timeLog").TimeEntry[]; entry: import("./timeLog").TimeEntry }>("mentor_timelog_add", opts),
   mentorTimeLogDelete: (id: string, entryId: string) => call<{ entries: import("./timeLog").TimeEntry[] }>("mentor_timelog_delete", { id, entryId }),
   mentorExecutionCancel: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_cancel", { id }),

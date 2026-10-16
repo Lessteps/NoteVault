@@ -10,9 +10,11 @@ import { CalendarDays, ChevronRight, Lock } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { areaSets } from "../../lib/planAreaLists";
-import { planGate } from "../../lib/planGate";
+import { planGateByArea } from "../../lib/planGate";
+import { catchUpOf } from "../../lib/planCatchUp";
 import { bucketReviews, dueText, reviewsOfTopics, type ReviewRow } from "../../lib/planReviews";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
+import { dailyProjectOf } from "../../lib/planCurriculum";
 import { dayByArea, orderedAreas } from "../../lib/planTopicsByArea";
 import { minutesOn, minutesText } from "../../lib/timeLog";
 import type { MentorPlan } from "../../lib/types";
@@ -20,8 +22,8 @@ import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
-import { PomodoroTicker, useTimeLog } from "./AreaSession";
-import { useReviewItems } from "./AreaWork";
+import { useTimeLog } from "./AreaSession";
+import { useReviewItems, type WeekDayView } from "./AreaWork";
 import { openTopic } from "./openTopic";
 import { DeliverableLine, focusColour, plural, useAgendaModel } from "./agendaKit";
 import { hm, ProgressBar } from "./parts";
@@ -30,7 +32,7 @@ import { usePlanAreaPractice } from "./PracticeCard";
 import { RunProjects } from "./PlanRunPractice";
 import { RunArea, RunBases, RunNav, type RunTab, type TodayCard } from "./PlanRunTabs";
 import { SectionHeading } from "./planKit";
-import { openAgendaAt, type Loaded } from "./planShared";
+import { DAY_LONG, openAgendaAt, type Loaded } from "./planShared";
 
 const UPCOMING_DAYS = 5;
 const DELIVERABLES_SHOWN = 4;
@@ -59,11 +61,17 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const deliverables = m.deliverablesDefined
     ? m.deliverables.filter((d) => d.status !== "hecho" && d.dueDate >= date).sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, DELIVERABLES_SHOWN)
     : [];
-  // Ruta sólida: no se avanza sin cerrar el día pendiente más antiguo.
+  // Ruta sólida POR ÁREA: cada área no avanza sin cerrar su día pendiente más antiguo (un atraso en Frontend no bloquea Backend).
   const gate = useMemo(
-    () => planGate(m.schedule.days.map((d) => ({ date: d.date, topics: d.topics.map((t) => ({ folder: t.folder, done: t.done })) })), (f) => m.topicByFolder.get(f)?.state === "completo"),
+    () => planGateByArea(m.schedule.days.map((d) => ({ date: d.date, topics: d.topics.map((t) => ({ folder: t.folder, done: t.done, subplanId: t.subplanId })) })), (f) => m.topicByFolder.get(f)?.state === "completo"),
     [m.schedule, m.topicByFolder],
   );
+  // Aviso de constancia: lo atrasado y el ritmo que hace falta para llegar a la fecha de fin.
+  const catchUp = useMemo(() => {
+    const study = m.schedule.days.filter((d) => d.study && d.date >= date && d.date <= plan.end);
+    const cap = study.length ? Math.round(study.reduce((n, d) => n + d.capacityMinutes, 0) / study.length) : 0;
+    return catchUpOf(m.schedule.days.map((d) => ({ date: d.date, study: d.study, topics: d.topics.map((t) => ({ folder: t.folder, title: t.title, minutes: t.minutes, done: t.done, area: t.area })) })), date, plan.end, (f) => m.topicByFolder.get(f)?.state === "completo", cap);
+  }, [m.schedule, m.topicByFolder, date, plan.end]);
   // La práctica diaria de cada área vive en la pestaña de su área. Cada área debe tener su carpeta en programming_practice: si falta, se deja
   // preparada una sola vez (solo estructura, nunca sobrescribe y sin katas: esos se crean al abrirlos).
   const ap = usePlanAreaPractice(plan.id);
@@ -95,6 +103,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       state,
       done: state === "completo",
       exercises: 0,
+      pct: m.topicByFolder.get(i.folder)?.pct ?? 0,
       unlockOn: gate.locked.get(i.folder),
     };
   };
@@ -122,7 +131,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const isBasesTopic = (sub: (typeof plan.subplans)[number], group?: string): boolean => !!group && (sub.groups ?? []).some((g) => g.kind === "bases" && g.id === group);
   const routeRowOf = (t: (typeof plan.subplans)[number]["topics"][number]): BoardRow => {
     const state = m.topicByFolder.get(t.folder)?.state ?? "sin_tratar";
-    return { folder: t.folder, title: t.title, week: t.targetWeek, state, done: state === "completo" || !!t.completedAt, exercises: m.topicByFolder.get(t.folder)?.exercises ?? 0, unlockOn: gate.locked.get(t.folder) };
+    return { folder: t.folder, title: t.title, week: t.targetWeek, state, done: state === "completo" || !!t.completedAt, exercises: m.topicByFolder.get(t.folder)?.exercises ?? 0, pct: m.topicByFolder.get(t.folder)?.pct ?? 0, unlockOn: gate.locked.get(t.folder) };
   };
   const routeOf = (subplanId: string): BoardRow[] => {
     const sub = plan.subplans.find((x) => x.id === subplanId);
@@ -132,6 +141,21 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
     const sub = plan.subplans.find((x) => x.id === subplanId);
     return sub ? reviewsOfTopics(sub.topics.filter((t) => t.route !== "skipped" && !isBasesTopic(sub, t.group)), reviewItems) : [];
   };
+  // la semana en curso día a día: los temas de un área (o, sin área, los fundamentos) repartidos cada día de estudio
+  const weekDaysOf = (subplanId: string | null): WeekDayView[] =>
+    m.schedule.days
+      .filter((d) => d.week === currentWeek && d.study)
+      .map((d) => {
+        const seen = new Set<string>();
+        const rows: BoardRow[] = [];
+        for (const t of d.topics) {
+          if (subplanId ? t.subplanId !== subplanId || t.applied : !t.applied) continue;
+          if (seen.has(t.folder)) continue;
+          seen.add(t.folder);
+          rows.push(rowOf(t, subplanId === null));
+        }
+        return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows };
+      });
   const basesRoute: BoardRow[] = [];
   const basesTopics: Array<{ folder: string; title: string }> = [];
   {
@@ -182,7 +206,6 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
 
   return (
     <div className="space-y-6 pb-4" data-testid="plan-run">
-      <PomodoroTicker />
       <RunNav tabs={tabs} active={tab} onSelect={go} />
 
       {tab === "general" && (
@@ -358,7 +381,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                 <p className="text-[13.5px] text-dim">Aún no has registrado tiempo. Abre un área y empieza un Pomodoro.</p>
               ) : (
                 <ul className="space-y-1 text-[14px]" aria-label="Horas de hoy por área">
-                  {[...areaList.map((a) => ({ key: a.areaId ?? a.subplanId, name: a.area })), { key: "bases", name: "Bases" }]
+                  {[...areaList.map((a) => ({ key: a.areaId ?? a.subplanId, name: a.area })), { key: "bases", name: "Bases" }, { key: "libre", name: "Sesión libre" }]
                     .map((a) => ({ ...a, min: minutesOn(timeEntries, date, a.key) }))
                     .filter((a) => a.min > 0)
                     .map((a) => <li key={a.key} className="flex"><span className="flex-1 text-dim">{a.name}</span><span className="font-semibold">{minutesText(a.min)}</span></li>)}
@@ -375,17 +398,37 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
           area={areaTab}
           card={cardOf.get(areaTab.subplanId)}
           routeRows={routeOf(areaTab.subplanId)}
+          weekDays={weekDaysOf(areaTab.subplanId)}
           sets={areaSets(m.schedule.days, areaTab.subplanId, date, currentWeek)}
           reviews={reviewsOf(areaTab.subplanId)}
           date={date}
           practice={ap.data && ap.data.areas.length ? { areas: ap.data.areas, today: ap.data.today || m.today, mark: ap.mark } : undefined}
+          dailyProject={day ? dailyProjectOf(plan, m.schedule, day) : null}
           onGoProjects={() => go("proyectos")}
         />
       )}
 
-      {tab === "bases" && <RunBases plan={plan} routeRows={basesRoute} todayRows={basesRows} sets={areaSets(m.schedule.days, null, date, currentWeek)} reviews={basesReviews} date={date} />}
+      {tab === "bases" && <RunBases plan={plan} routeRows={basesRoute} todayRows={basesRows} weekDays={weekDaysOf(null)} sets={areaSets(m.schedule.days, null, date, currentWeek)} reviews={basesReviews} date={date} />}
 
       {tab === "proyectos" && <RunProjects plan={plan} data={data} m={m} />}
+
+      {/* AVISO DE CONSTANCIA: al final de todo */}
+      {!plan.proposed && !plan.archived && !before && !after && catchUp.late.length > 0 && (
+        <section role="status" className="rounded-2xl border border-warn/60 bg-warn-soft p-5" data-testid="run-catchup">
+          <h2 className="text-[17px] font-bold text-warn">Vas atrasado en {plural(catchUp.late.length, "tema", "temas")}</h2>
+          <ul className="mt-1 text-[14.5px] text-dim" aria-label="Atraso por área">
+            {catchUp.lateByArea.map((a) => (
+              <li key={a.area}><strong className="text-text">{a.area}</strong>: {plural(a.count, "tema", "temas")} atrasado{a.count === 1 ? "" : "s"} ({catchUp.late.filter((l) => l.area === a.area).slice(0, 3).map((l) => l.title).join(" · ")}{a.count > 3 ? "…" : ""})</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[14.5px]">
+            Para terminar el {longDateLabel(plan.end)} debes completar {plural(catchUp.remaining, "tema pendiente", "temas pendientes")} en {plural(catchUp.daysLeft, "día de estudio", "días de estudio")}: unos <strong>{String(catchUp.perDay).replace(".", ",")} temas por día</strong> (≈ {hm(catchUp.minutesPerDay)}).
+          </p>
+          {catchUp.capacityPerDay > 0 && catchUp.minutesPerDay > catchUp.capacityPerDay && (
+            <p className="mt-1 text-[14px] text-warn">Eso supera tu tiempo diario de teoría ({hm(catchUp.capacityPerDay)}): sube el tiempo diario o mueve la fecha de fin.</p>
+          )}
+        </section>
+      )}
     </div>
   );
 }

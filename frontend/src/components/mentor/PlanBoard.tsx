@@ -2,7 +2,8 @@
 // archivo de práctica) y el avance de cada área (`ProgressOverview`). Solo lectura: marcar un tema como completado lo decide la práctica.
 // Respeta la ruta sólida (`lib/planGate.ts`): los temas repartidos después del primer día sin terminar salen bloqueados.
 
-import { BookOpen, Dumbbell, Lock } from "lucide-react";
+import { BookOpen, Dumbbell, Lock, Timer } from "lucide-react";
+import { usePomodoro } from "../../store/pomodoro";
 import { dateLabel } from "../../lib/planSchedule";
 import { orderedAreas } from "../../lib/planTopicsByArea";
 import type { MentorPlan, MentorTopicView } from "../../lib/types";
@@ -28,18 +29,22 @@ export interface BoardRow {
   done: boolean;
   exercises: number;
   unlockOn?: string;
+  /** nivel de avance del tema (0–100), para enseñarlo en la fila */
+  pct?: number;
   /** aviso a la derecha de la fila («Hoy», «Atrasado»…) */
   tag?: { text: string; colour?: string };
 }
 
-/** El menú de un tema: ir al apunte (.md) o al archivo de práctica. */
+/** El menú de un tema: ir al apunte (.md), práctica o asignar al Pomodoro. */
 function TopicMenu({ folder, title }: { folder: string; title: string }) {
+  const assignTopic = usePomodoro((s) => s.assignTopic);
   return (
     <RowMenu
       title={title}
       items={[
         { id: "note", label: "Abrir apunte (.md)", icon: <BookOpen size={16} aria-hidden className="text-accent-text" />, onClick: () => void openTopicNote(folder), testid: "board-open-note" },
         { id: "practice", label: "Abrir archivo de práctica", icon: <Dumbbell size={16} aria-hidden className="text-mint" />, onClick: () => void openTopic(folder), testid: "board-open-practice" },
+        { id: "pomodoro", label: "Asignar al Pomodoro", icon: <Timer size={16} aria-hidden className="text-warn" />, onClick: () => assignTopic({ folder, title }), testid: "board-assign-pomodoro" },
       ]}
     />
   );
@@ -47,6 +52,7 @@ function TopicMenu({ folder, title }: { folder: string; title: string }) {
 
 export function TopicRow({ r, colour }: { r: BoardRow; colour: string }) {
   const locked = !!r.unlockOn;
+  const assigned = usePomodoro((s) => s.p.assignedTopics.some((t) => t.folder === r.folder));
   const working = !r.done && !locked && r.state !== "sin_tratar";
   return (
     <li
@@ -66,12 +72,20 @@ export function TopicRow({ r, colour }: { r: BoardRow; colour: string }) {
         {r.meta ? <span className="text-[13.5px] font-normal text-dim"> · {r.meta}</span> : null}
         <span className="sr-only">, {locked ? `bloqueado hasta terminar el ${dateLabel(r.unlockOn!)}` : r.done ? "completado" : STATE_LABEL[r.state]}</span>
       </span>
+      {!r.done && !locked && (r.pct ?? 0) > 0 && (
+        <span className="flex-none font-mono text-[12px] text-dim" data-testid="board-pct" title="Nivel de avance del tema">{r.pct} %</span>
+      )}
       {r.tag && (
         <span className="flex-none rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide" style={{ color: r.tag.colour ?? colour, borderColor: `${r.tag.colour ?? colour}66`, background: `${r.tag.colour ?? colour}1a` }} data-testid="board-tag">
           {r.tag.text}
         </span>
       )}
-      {working && !r.tag && (
+      {assigned && (
+        <span className="flex-none flex items-center gap-1 rounded-md border border-warn/60 bg-warn-soft px-1.5 py-0.5 font-mono text-[11px] font-semibold text-warn uppercase tracking-wide">
+          <Timer size={11} aria-hidden /> Pomodoro
+        </span>
+      )}
+      {working && !r.tag && !assigned && (
         <span className="flex-none rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide" style={{ color: colour, borderColor: `${colour}66`, background: `${colour}1a` }}>
           {r.state === "practicando" ? "Activo" : STATE_LABEL[r.state]}
         </span>

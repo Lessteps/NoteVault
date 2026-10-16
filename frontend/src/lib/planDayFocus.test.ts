@@ -3,7 +3,7 @@
 // bloqueados, práctica reservada, bloques sin temas (repaso u omitido) y propósito con la estructura del día.
 
 import { describe, expect, it } from "vitest";
-import { FOCUS_TEMPLATES, templateFor } from "./planDayFocus";
+import { DAILY_TOPICS_PER_AREA, FOCUS_TEMPLATES, templateFor } from "./planDayFocus";
 import { buildSchedule, dayPurposeAuto, focusStatsOf, type SchedulePlan, type ScheduleTopic } from "./planSchedule";
 import { buildPracticeTrack } from "./practiceTrack";
 
@@ -80,8 +80,8 @@ describe("Backend: teoría de backend, práctica de Python, teoría de BD y prá
     const pr = d.blocks!.find((b) => b.id === "db-practice")!;
     expect(th.items[0]!.folder).toBe(pr.items[0]!.folder);
     expect(th.minutes).toBeGreaterThan(pr.minutes); // 24 % vs 18 %
-    // el tema (60 min) se reparte entre teoría y práctica sin duplicar minutos en el día
-    const dayDb = d.topics.filter((t) => t.folder === th.items[0]!.folder).reduce((n, t) => n + t.minutes, 0);
+    // los temas de BD del día se reparten entre teoría y práctica sin duplicar minutos en el día
+    const dayDb = d.topics.filter((t) => t.folder.startsWith("DB/")).reduce((n, t) => n + t.minutes, 0);
     expect(dayDb).toBe(th.minutes + pr.minutes);
   });
 
@@ -266,3 +266,41 @@ describe("otros enfoques y varios enfoques en el plan", () => {
     expect(s.days.every((d) => !d.focus && !d.blocks)).toBe(true);
   });
 });
+
+describe("4 temas por área y día (obligatorio)", () => {
+  const ownTopics = (d: { topics: Array<{ subplanId: string; folder: string; applied?: boolean }> }, sub: string): string[] => [...new Set(d.topics.filter((t) => t.subplanId === sub && !t.applied).map((t) => t.folder))];
+
+  it("cada día de estudio Backend trae 4 temas propios y Databases otros 4, repartidos entre sus carriles", () => {
+    const s = buildSchedule(backendPlan());
+    const study = s.days.filter((d) => d.study).slice(0, 4);
+    expect(DAILY_TOPICS_PER_AREA).toBe(4);
+    for (const d of study) {
+      const be = ownTopics(d, "s-backend");
+      expect(be.length, d.date).toBe(4);
+      expect(be.some((f) => f.startsWith("BE/")) && be.some((f) => f.startsWith("PY/"))).toBe(true); // 2 de conocimientos y 2 de Python
+      expect(ownTopics(d, "s-db").length, d.date).toBe(4);
+    }
+  });
+
+  it("si al área le quedan menos de 4, trabaja los que queden; y los minutos del día no pasan de la capacidad", () => {
+    const plan = backendPlan({}, { bases: 0, db: false, python: false });
+    plan.subplans[0]!.topics = nTopics("BE", 3, 30, "core");
+    const day = buildSchedule(plan).days.find((d) => d.study)!;
+    expect(ownTopics(day, "s-backend").length).toBe(3);
+    expect(day.topicMinutes + day.practiceMinutes).toBeLessThanOrEqual(day.capacityMinutes + 1);
+  });
+});
+
+describe("varios temas por día en un carril", () => {
+  it("con temas cortos un bloque de teoría reparte su tiempo entre varios temas (hasta 4) en vez de dedicarlo a uno solo", () => {
+    const plan = backendPlan({}, { bases: 0, db: false, python: false });
+    plan.subplans[0]!.topics = nTopics("BE", 12, 30, "core");
+    const day = buildSchedule(plan).days.find((d) => d.study)!;
+    const theory = day.blocks!.find((b) => b.id === "backend-theory")!;
+    expect(theory.items.length).toBeGreaterThan(1);
+    expect(theory.items.length).toBeLessThanOrEqual(4);
+    // los minutos del bloque siguen sumando lo mismo: solo se reparten
+    expect(theory.items.reduce((n, i) => n + i.minutes, 0)).toBe(theory.minutes);
+  });
+});
+

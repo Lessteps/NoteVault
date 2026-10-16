@@ -183,7 +183,7 @@ describe("vista de ejecución", () => {
     await click(work().querySelector("[data-testid=board-arrow]"));
     const menu = byTest("board-menu")!;
     expect(menu.getAttribute("role")).toBe("menu");
-    expect([...menu.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica"]);
+    expect([...menu.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica", "Asignar al Pomodoro"]);
     await click(byTest("board-open-practice"));
     expect(ensure).toHaveBeenCalledWith(F1);
     expect(byTest("board-menu")).toBeNull();
@@ -199,6 +199,25 @@ describe("vista de ejecución", () => {
     await click(runTab("area:s2"));
     await view("pendientes");
     expect(byTest("work-empty")!.textContent).toContain("nada pendiente"); // el de Python ya está completo
+  });
+
+  it("«Temas de la semana» enseña la semana día a día con lo completado y el nivel de avance, y vale igual para cada área", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    await mountEl(<MentorPlan planId={PID} />);
+    for (const tab of ["area:s1", "area:s2"]) {
+      await click(runTab(tab));
+      await view("semana");
+      const week = byTest("work-week")!;
+      expect(week).toBeTruthy();
+      expect(byTest("week-summary")!.textContent).toMatch(/\d+ de \d+ temas completados esta semana/);
+      expect(byTest("week-summary")!.textContent).toMatch(/Nivel de avance \d+ %/);
+      const days = [...week.querySelectorAll<HTMLElement>("[data-testid=week-day]")];
+      expect(days.length).toBeGreaterThan(0);
+      expect(days.map((d) => d.dataset.date)).toEqual([...days.map((d) => d.dataset.date)].sort()); // en orden de fecha
+      for (const d of days) expect(d.textContent).toMatch(/\d+\/\d+ hechos/);
+    }
+    // el tema completado de Python sale con su aviso «Hecho»
+    expect(byTest("work-week")!.textContent).toContain("Hecho");
   });
 
   it("repaso espaciado: los repasos de los temas del área salen por cajón con su acceso directo a la práctica, y la pestaña avisa", async () => {
@@ -278,26 +297,22 @@ describe("vista de ejecución", () => {
     expect(setup).toHaveBeenCalledWith(PID);
   });
 
-  it("el proyecto diario y el semanal tienen su propia pestaña", async () => {
+  it("el proyecto semanal y el mensual están en «Proyectos» y el diario en la pestaña de cada área", async () => {
     const p = plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }, { ...sub("s2", "Databases", "Consolidar", F2), areaId: "databases" }] as never });
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
     vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
     await mountEl(<MentorPlan planId={PID} />);
-    // los proyectos tienen su propia pestaña: ni en General ni en las áreas
+    // los proyectos tienen su propia pestaña: semanal y mensual
     expect(byTest("run-projects")).toBeNull();
     await click(runTab("proyectos"));
     expect(byTest("run-next")).toBeNull(); // «Lo que viene» es solo del resumen general
     const projects = byTest("run-projects")!;
-    expect(byTest("run-project-daily")!.textContent).toContain("Proyecto diario");
     expect(byTest("run-project-weekly")!.textContent).toContain("Proyecto semanal");
     expect(projects.textContent).toContain("Entregable por definir");
-    // desglosados por área: qué hacer, cómo hacerlo y el resultado real
-    const daily = byTest("daily-areas")!;
-    expect([...daily.querySelectorAll("[data-testid=project-area]")].map((e) => (e as HTMLElement).dataset.area)).toEqual(["databases", "backend"]);
-    expect(daily.textContent).toContain("Qué hay que hacer");
-    expect(daily.textContent).toContain("Cómo hacerlo");
-    expect(daily.querySelectorAll("[data-testid=project-result]").length).toBe(2);
     expect(byTest("weekly-areas")!.textContent).toContain("Resultado real");
+    // El proyecto diario está en la pestaña de CADA área (no en «Proyectos»)
+    await click(runTab("area:s1"));
+    expect(byTest("area-daily-project")).not.toBeNull();
   });
 });
 
@@ -327,10 +342,12 @@ describe("Bases: no son de la ruta de ningún área", () => {
     }
     await click(runTab("bases"));
     expect(work().querySelector("h2")!.textContent).toBe("Bases de programación");
-    // 1.7 está en Backend y en Frontend: en Bases sale una sola vez
+    // 1.7 está en Backend y en Frontend: en Bases sale una sola vez cada día (los temas largos sí se repiten en varios días)
     await view("semana");
-    const all17 = [...work().querySelectorAll("[data-testid=board-topic]")].filter((r) => r.textContent!.includes("1.7 Specifying"));
-    expect(all17.length).toBeLessThanOrEqual(1);
+    for (const day of work().querySelectorAll("[data-testid=week-day]")) {
+      const n = [...day.querySelectorAll("[data-testid=board-topic]")].filter((r) => r.textContent!.includes("1.7 Specifying")).length;
+      expect(n).toBeLessThanOrEqual(1);
+    }
     await view("pendientes");
     expect(work().textContent).toMatch(/1\.8 Algorithms|nada pendiente/);
   });

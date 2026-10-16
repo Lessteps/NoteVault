@@ -6,13 +6,13 @@
 // «Cómo voy» (ver `AreaPracticeBlock.tsx`), no aquí.
 
 import { CheckCircle2 } from "lucide-react";
-import { clampToPlan, dateLabel } from "../../lib/planSchedule";
-import { dailyProjectOf, shortOf, weeklyProjectOf } from "../../lib/planCurriculum";
-import { dailyBreakdown, weeklyBreakdown, type ProjectSection } from "../../lib/planAreaPractice";
+import { clampToPlan } from "../../lib/planSchedule";
+import { monthlyBlocksOf, shortOf, weeklyProjectOf, type MonthlyBlock } from "../../lib/planCurriculum";
+import { weeklyBreakdown, type ProjectSection } from "../../lib/planAreaPractice";
 import type { MentorPlan } from "../../lib/types";
 import { Chip } from "../common/forms";
 import { DSTATUS_COLOUR, DSTATUS_LABEL, focusColour, plural, type AgendaModel } from "./agendaKit";
-import { hm, ProgressBar } from "./parts";
+import { ProgressBar } from "./parts";
 import { GeneralCards } from "./PracticeCard";
 import { SectionCard, SectionHeading } from "./planKit";
 import type { Loaded } from "./planShared";
@@ -20,7 +20,7 @@ import type { Loaded } from "./planShared";
 const PRACTICE_COLOUR = "var(--nv-practice, #c58be0)";
 
 /** Un proyecto desglosado por área: qué hacer, cómo y el resultado real. */
-function AreaSections({ sections, testid }: { sections: ProjectSection[]; testid: string }) {
+export function AreaSections({ sections, testid }: { sections: ProjectSection[]; testid: string }) {
   if (!sections.length) return null;
   return (
     <ul className="mt-3 grid items-start gap-3 @4xl:grid-cols-2 [&>*]:min-w-0" aria-label="Desglose por área" data-testid={testid}>
@@ -46,50 +46,30 @@ function AreaSections({ sections, testid }: { sections: ProjectSection[]; testid
   );
 }
 
-/** Los proyectos al final de la vista: el del día, el de la semana y el proyecto full stack de la pista. */
+/** Los proyectos al final de la vista: el semanal (conjunción de todo) y el proyecto mensual. */
 export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded; m: AgendaModel }) {
   const date = clampToPlan(m.today, plan);
   const day = m.schedule.byDate.get(date);
-  const daily = day ? dailyProjectOf(plan, m.schedule, day) : null;
   const weekly = day ? weeklyProjectOf(plan, m.schedule, day.week) : null;
   const track = plan.programmingPractice;
-  if (!daily && !weekly && !track?.weeklyProject) return null;
+  const months = monthlyBlocksOf(plan, m.schedule);
+  const currentMonth = day ? months.find((b: MonthlyBlock) => day.week >= b.fromWeek && day.week <= b.toWeek) ?? months[0] : months[0];
+
+  if (!weekly && !track?.weeklyProject && !currentMonth) return null;
   const status = (id: string | undefined) => (id && m.deliverablesDefined ? m.deliverableById.get(id)?.status : undefined);
   const weeklyDone = weekly ? weekly.dailyIds.filter((id) => status(id) === "hecho").length : 0;
-  const dailyStatus = status(daily?.id);
   const weeklyStatus = status(weekly?.id);
-  // «un poco de cada área»: todas las áreas del plan; sin áreas (plan antiguo), las que integra la pieza
+  const monthlyStatus = currentMonth ? status(currentMonth.id) : undefined;
+
   const planAreas = [...new Set(plan.subplans.map((s) => s.areaId).filter((x): x is string => !!x))];
-  const areaIds = planAreas.length ? planAreas : daily?.areaIds ?? weekly?.areaIds ?? [];
-  const dailySections = daily ? dailyBreakdown(areaIds, daily.topics.map((t) => t.title)) : [];
+  const areaIds = planAreas.length ? planAreas : weekly?.areaIds ?? [];
   const weeklySections = weekly ? weeklyBreakdown(areaIds, weekly.week, weekly.dailyTitles.map((t) => shortOf(t))) : [];
+
   return (
     <section aria-labelledby="run-projects-h" data-testid="run-projects" className="space-y-4">
-      <SectionHeading id="run-projects-h" hint="Aplican lo que estudias y practicas: el diario es una pieza pequeña con un poco de cada área y el semanal junta las piezas en una vertical completa. Los dos se dan por buenos con un resultado real, no con una intención.">
+      <SectionHeading id="run-projects-h" hint="El proyecto semanal junta las áreas en una vertical completa y el proyecto mensual consolida el avance del mes.">
         Proyectos
       </SectionHeading>
-
-      <SectionCard labelledBy="run-daily-h" testid="run-project-daily" className="space-y-1.5">
-        <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Proyecto diario{day ? ` · ${dateLabel(date)}` : ""}</p>
-        {daily ? (
-          <>
-            <h3 id="run-daily-h" className="text-[18px] font-semibold leading-snug">{daily.title}</h3>
-            <p className="text-[14.5px] text-dim">{daily.description}</p>
-            <p className="flex flex-wrap items-center gap-2 text-[14px] text-dim">
-              {daily.minutes ? <span>{hm(daily.minutes)}</span> : null}
-              <span>{daily.weeklyPart}</span>
-              {dailyStatus ? <Chip large colour={DSTATUS_COLOUR[dailyStatus]}>{DSTATUS_LABEL[dailyStatus]}</Chip> : <Chip large colour="var(--nv-faint)">Entregable por definir</Chip>}
-            </p>
-            {daily.topics.length > 0 && <p className="text-[14px]"><span className="font-medium">Aplica:</span> {daily.topics.map((t) => shortOf(t.title)).join(" · ")}</p>}
-            <AreaSections sections={dailySections} testid="daily-areas" />
-          </>
-        ) : (
-          <>
-            <h3 id="run-daily-h" className="text-[16px] font-semibold">Hoy no hay proyecto diario</h3>
-            <p className="text-[14px] text-dim">Es un día sin estudio programado.</p>
-          </>
-        )}
-      </SectionCard>
 
       <SectionCard labelledBy="run-weekly-h" testid="run-project-weekly" className="space-y-1.5">
         <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Proyecto semanal{weekly ? ` · semana ${weekly.week}` : ""}</p>
@@ -97,7 +77,7 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
           <>
             <h3 id="run-weekly-h" className="text-[18px] font-semibold leading-snug">{weekly.title}</h3>
             <p className="text-[14.5px] text-dim">{weekly.description}</p>
-            <p className="text-[14px]"><span className="font-medium">Hoy avanza:</span> {daily ? daily.title : "repaso"} <span className="text-dim">· {weeklyDone} de {plural(weekly.dailyIds.length, "pieza", "piezas")} hechas</span></p>
+            <p className="text-[14px]"><span className="font-medium">Progreso semanal:</span> <span className="text-dim">{weeklyDone} de {plural(weekly.dailyIds.length, "pieza", "piezas")} hechas</span></p>
             <ProgressBar pct={weekly.dailyIds.length ? (weeklyDone / weekly.dailyIds.length) * 100 : 0} label={`Avance del proyecto semanal ${weekly.week}`} />
             {weeklyStatus ? <Chip large colour={DSTATUS_COLOUR[weeklyStatus]}>{DSTATUS_LABEL[weeklyStatus]}</Chip> : <Chip large colour="var(--nv-faint)">Entregable por definir</Chip>}
             <AreaSections sections={weeklySections} testid="weekly-areas" />
@@ -106,7 +86,6 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
           <h3 id="run-weekly-h" className="text-[16px] font-semibold">Sin proyecto semanal esta semana</h3>
         )}
         {track?.weeklyProject && (
-          // El proyecto full stack de programming_practice ES el proyecto semanal: el semanal se alimenta de él, no es otro proyecto aparte.
           <div className="mt-3 space-y-1.5 border-t border-line pt-3" data-testid="run-pp-project">
             <h4 className="text-[15px] font-semibold" style={{ color: PRACTICE_COLOUR }}>Cómo se construye: las cuatro fases de programming_practice</h4>
             <p className="text-[14px] text-dim">El proyecto semanal se alimenta del proyecto full stack de la semana: especificar, construir, defender y cerrar con el postmortem. Las piezas de cada día son las que lo van completando.</p>
@@ -114,6 +93,18 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
           </div>
         )}
       </SectionCard>
+
+      {currentMonth && (
+        <SectionCard labelledBy="run-monthly-h" testid="run-project-monthly" className="space-y-1.5">
+          <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Proyecto mensual{currentMonth.month ? ` · ${currentMonth.month}` : ""}</p>
+          <h3 id="run-monthly-h" className="text-[18px] font-semibold leading-snug">{currentMonth.title}</h3>
+          <p className="text-[14.5px] text-dim">{currentMonth.description}</p>
+          <p className="flex flex-wrap items-center gap-2 text-[14px] text-dim">
+            <span>Semanas {currentMonth.fromWeek} a {currentMonth.toWeek}</span>
+            {monthlyStatus ? <Chip large colour={DSTATUS_COLOUR[monthlyStatus]}>{DSTATUS_LABEL[monthlyStatus]}</Chip> : <Chip large colour="var(--nv-faint)">Entregable mensual</Chip>}
+          </p>
+        </SectionCard>
+      )}
     </section>
   );
 }

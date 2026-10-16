@@ -14,6 +14,7 @@ import { useVaultDialog } from "./VaultDialog";
 import { useTabDrag } from "../store/tabDrag";
 import { useSettingsDialog } from "./settings/SettingsDialog";
 import { newNoteIn } from "./notes/FileTree";
+import { TopBarPomodoro } from "./TopBarPomodoro";
 
 // ── Module registry ─────────────────────────────────────────────────────────
 
@@ -250,8 +251,9 @@ export function TopBar() {
       {/* Tab strip takes the remaining space */}
       <TabStrip />
 
-      {/* Sync state + window controls on the right */}
-      <div className="flex flex-none items-center gap-3 border-l border-line px-3">
+      {/* Sync state + Pomodoro global + window controls on the right */}
+      <div className="flex flex-none items-center gap-2.5 border-l border-line px-3">
+        <TopBarPomodoro />
         <SyncState />
       </div>
       <WindowControls />

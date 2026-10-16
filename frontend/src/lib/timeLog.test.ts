@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { minutesBetween, minutesOn, minutesText, sanitizeEntry, type TimeEntry } from "./timeLog";
+import { localDay, minutesBetween, minutesOn, minutesText, sanitizeAssessment, sanitizeEntry, type TimeEntry } from "./timeLog";
 
 const e = (o: Partial<TimeEntry>): TimeEntry => ({ id: "x", areaKey: "backend", date: "2026-10-16", minutes: 25, kind: "pomodoro", at: "", ...o });
 
@@ -28,4 +28,19 @@ describe("registro de horas", () => {
     expect(minutesText(60)).toBe("1 h");
     expect(minutesText(80)).toBe("1 h 20 min");
   });
+
+  it("la evaluación necesita las dos respuestas y una comprensión de 1 a 5; recorta lo largo", () => {
+    const ok = { id: "a", areaKey: "backend", date: "2026-10-16", minutes: 25, topics: ["4.2 HTTP", ""], understanding: 4.4, learned: "  idea   principal ", doubt: "una duda" };
+    expect(sanitizeAssessment(ok)).toMatchObject({ understanding: 4, learned: "idea principal", topics: ["4.2 HTTP"] });
+    expect(sanitizeAssessment({ ...ok, doubt: "" })).toBeNull();
+    expect(sanitizeAssessment({ ...ok, understanding: 0 })).toBeNull();
+    expect(sanitizeAssessment({ ...ok, understanding: 6 })).toBeNull();
+    expect(sanitizeAssessment({ ...ok, learned: "x".repeat(900) })!.learned).toHaveLength(600);
+  });
+
+  it("localDay es el día local, no el de UTC", () => {
+    expect(localDay(new Date(2026, 9, 16, 23, 30))).toBe("2026-10-16");
+    expect(localDay(new Date(2026, 0, 5, 0, 5))).toBe("2026-01-05");
+  });
 });
+

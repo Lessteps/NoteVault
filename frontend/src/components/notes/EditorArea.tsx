@@ -1,6 +1,6 @@
 import {
   ArrowLeftRight,
-  AlertTriangle, ArrowUp, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, FileText, Folder,
+  AlertTriangle, ArrowLeft, ArrowRight, ArrowUp, BookOpen, Bookmark, ChevronDown, ChevronRight, Columns2, ExternalLink, FileText, Folder, FolderOpen,
   Link2, PenLine, X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -32,21 +32,37 @@ const MODES: Array<{ id: ViewMode; label: string; icon: React.ReactNode }> = [
   { id: "split", label: "Dividido", icon: <Columns2 size={13} /> },
 ];
 
+/** Folders visited from the path bar, so the menu can go back and forward like the Windows address bar. */
+const navHist: string[] = [];
+let navIdx = -1;
+
 /**
  * The contents of a folder as a menu, like walking the file explorer from the path bar:
- * a folder drills down, a file opens, and the first entry goes one level up.
+ * a folder drills down, a file opens, and the first entries go back / forward / one level up / to the OS file manager.
  */
-function browseFolder(dir: string, at: { clientX: number; clientY: number }): void {
+function browseFolder(dir: string, at: { clientX: number; clientY: number }, fromHistory = false): void {
   void api.listDir(dir).then((entries) => {
+    if (!fromHistory && navHist[navIdx] !== dir) {
+      navHist.splice(navIdx + 1);
+      navHist.push(dir);
+      navIdx = navHist.length - 1;
+    }
     const s = useApp.getState();
     const parent = dir.includes("/") ? dir.slice(0, dir.lastIndexOf("/")) : "";
     const items: MenuItem[] = [];
-    if (dir) {
-      items.push(
-        { label: `Subir a ${parent ? parent.split("/").pop() : "la raíz del vault"}`, icon: <ArrowUp />, onSelect: () => browseFolder(parent, at) },
-        { separator: true },
-      );
-    }
+    const go = (i: number) => {
+      navIdx = i;
+      browseFolder(navHist[i]!, at, true);
+    };
+    if (navIdx > 0) items.push({ label: `Atrás a ${navHist[navIdx - 1] ? navHist[navIdx - 1]!.split("/").pop() : "la raíz del vault"}`, icon: <ArrowLeft />, onSelect: () => go(navIdx - 1) });
+    if (navIdx < navHist.length - 1) items.push({ label: `Adelante a ${navHist[navIdx + 1] ? navHist[navIdx + 1]!.split("/").pop() : "la raíz del vault"}`, icon: <ArrowRight />, onSelect: () => go(navIdx + 1) });
+    if (dir) items.push({ label: `Subir a ${parent ? parent.split("/").pop() : "la raíz del vault"}`, icon: <ArrowUp />, onSelect: () => browseFolder(parent, at) });
+    items.push({
+      label: "Abrir esta carpeta en el Explorador",
+      icon: <FolderOpen />,
+      onSelect: () => void api.revealPath(dir).catch((e: Error) => s.toast("error", e.message)),
+    });
+    items.push({ separator: true });
     const sorted = [...entries].sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name, "es", { numeric: true }) : a.type === "folder" ? -1 : 1));
     for (const e of sorted.slice(0, 80)) {
       items.push(
@@ -64,30 +80,96 @@ function browseFolder(dir: string, at: { clientX: number; clientY: number }): vo
   }).catch((e: Error) => useApp.getState().toast("error", e.message));
 }
 
+/** Go to a typed path: a vault path (`Programación/2.1 Python`) or a full Windows path inside the vault; a file opens, a folder is listed. */
+async function goToPath(raw: string, at: { clientX: number; clientY: number }): Promise<void> {
+  const s = useApp.getState();
+  let p = raw.trim().replace(/\\/g, "/").replace(/^"|"$/g, "");
+  try {
+    const root = String((await api.appInfo()).vault_path ?? "").replace(/\\/g, "/").replace(/\/+$/, "");
+    if (root && p.toLowerCase().startsWith(root.toLowerCase())) p = p.slice(root.length);
+    p = p.replace(/^\/+|\/+$/g, "");
+    try {
+      await api.listDir(p);
+      browseFolder(p, at);
+      return;
+    } catch {
+      /* not a folder: try it as a file */
+    }
+    await s.openNote(p);
+  } catch (e) {
+    s.toast("error", `No se encontró la ruta: ${(e as Error).message}`);
+  }
+}
+
 function NoteHeader({ note }: { note: OpenNote }) {
   const mode = useApp((s) => s.mode);
   const setMode = useApp((s) => s.setMode);
   const toggleBookmark = useApp((s) => s.toggleBookmark);
   const parts = note.path.split("/");
   const { openSide } = useApp.getState();
+  const [typing, setTyping] = useState(false);
+  const [typed, setTyped] = useState("");
   return (
     <div className="flex h-11 flex-none items-center gap-2 border-b border-line bg-surface px-3">
-      <nav className="flex min-w-0 items-center gap-1 font-mono text-[11.5px]" aria-label="Ruta del archivo">
-        {parts.map((p, i) => (
-          <span key={i} className="flex min-w-0 items-center gap-1">
-            {i > 0 && <span className="text-faint">/</span>}
-            {/* Every part of the path is a door: it lists that folder (the last one, its own) so you can walk back. */}
-            <button
-              type="button"
-              title={i === parts.length - 1 ? "Ver la carpeta de este archivo" : `Explorar ${p}`}
-              onClick={(e) => browseFolder(parts.slice(0, Math.min(i + 1, parts.length - 1)).join("/"), e)}
-              className={cn("truncate rounded px-0.5 hover:bg-hover hover:text-text", i === parts.length - 1 ? "font-semibold text-text" : "text-dim")}
-            >
-              {p}
-            </button>
-          </span>
-        ))}
-      </nav>
+      {typing ? (
+        <input
+          autoFocus
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          onBlur={() => setTyping(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setTyping(false);
+            if (e.key === "Enter") {
+              const r = e.currentTarget.getBoundingClientRect();
+              setTyping(false);
+              void goToPath(typed, { clientX: r.left, clientY: r.bottom });
+            }
+          }}
+          aria-label="Escribir una ruta"
+          placeholder="Escribe una ruta del vault o de Windows y pulsa Intro"
+          className="min-w-0 flex-1 rounded border border-accent bg-panel px-2 py-1 font-mono text-[11.5px] outline-none"
+        />
+      ) : (
+        <nav className="flex min-w-0 items-center gap-1 font-mono text-[11.5px]" aria-label="Ruta del archivo">
+          {parts.map((p, i) => (
+            <span key={i} className="flex min-w-0 items-center gap-1">
+              {i > 0 && <span className="text-faint">/</span>}
+              {/* Every part of the path is a door: it lists that folder (the last one, its own) so you can walk back. */}
+              <button
+                type="button"
+                title={i === parts.length - 1 ? "Ver la carpeta de este archivo" : `Explorar ${p}`}
+                onClick={(e) => browseFolder(parts.slice(0, Math.min(i + 1, parts.length - 1)).join("/"), e)}
+                className={cn("truncate rounded px-0.5 hover:bg-hover hover:text-text", i === parts.length - 1 ? "font-semibold text-text" : "text-dim")}
+              >
+                {p}
+              </button>
+            </span>
+          ))}
+        </nav>
+      )}
+      {!typing && (
+        <>
+          <button
+            type="button"
+            title="Escribir una ruta"
+            onClick={() => {
+              setTyped(note.path);
+              setTyping(true);
+            }}
+            className="grid h-6 w-6 flex-none place-items-center rounded text-faint hover:bg-hover hover:text-text"
+          >
+            <PenLine size={13} />
+          </button>
+          <button
+            type="button"
+            title="Mostrar este archivo en el Explorador"
+            onClick={() => void api.revealPath(note.path).catch((e: Error) => useApp.getState().toast("error", e.message))}
+            className="grid h-6 w-6 flex-none place-items-center rounded text-faint hover:bg-hover hover:text-text"
+          >
+            <ExternalLink size={13} />
+          </button>
+        </>
+      )}
       <div className="flex-1" />
       <IconButton
         title={note.bookmarked ? "Quitar marcador" : "Añadir marcador"}

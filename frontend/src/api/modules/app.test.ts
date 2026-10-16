@@ -37,6 +37,16 @@ describe("app-level api", () => {
     expect(api.close_window().ok).toBe(true);
   });
 
+  it("reveal_path opens vault files and folders, and refuses paths outside the vault or missing ones", () => {
+    fs.mkdirSync(path.join(dir, "Notas"));
+    fs.writeFileSync(path.join(dir, "Notas", "a.md"), "x");
+    expect(api.reveal_path("")).toMatchObject({ ok: true, folder: true });
+    expect(api.reveal_path("Notas")).toMatchObject({ ok: true, folder: true });
+    expect(api.reveal_path("/Notas/a.md")).toMatchObject({ ok: true, folder: false });
+    expect(() => api.reveal_path("../fuera")).toThrow(/fuera de la bóveda/);
+    expect(() => api.reveal_path("Notas/no-existe.md")).toThrow(/no existe/);
+  });
+
   it("app_info reports the vault path and api version", () => {
     const info = api.app_info();
     expect(info.vault_path).toBe(path.resolve(dir));

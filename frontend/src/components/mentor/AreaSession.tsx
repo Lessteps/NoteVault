@@ -6,7 +6,7 @@ import { Pause, Play, SkipForward, Square, Timer, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
 import { BREAK_CHOICES, clock, FOCUS_CHOICES, focusDoneMinutes, phaseOver, remainingMs } from "../../lib/pomodoro";
-import { minutesBetween, minutesOn, minutesText, type TimeEntry } from "../../lib/timeLog";
+import { localDay, minutesBetween, minutesOn, minutesText, type Assessment, type TimeEntry } from "../../lib/timeLog";
 import { usePomodoro } from "../../store/pomodoro";
 import { useApp } from "../../store/app";
 import { GhostButton, PrimaryButton } from "../common/forms";
@@ -17,14 +17,19 @@ import { ProgressBar } from "./parts";
 export function useTimeLog(planId: string) {
   const version = usePomodoro((s) => s.logVersion);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
   useEffect(() => {
     let alive = true;
-    void api.mentorTimeLogGet(planId).then((r) => alive && setEntries(Array.isArray(r?.entries) ? r.entries : [])).catch(() => undefined);
+    void api.mentorTimeLogGet(planId).then((r) => {
+      if (!alive) return;
+      setEntries(Array.isArray(r?.entries) ? r.entries : []);
+      setAssessments(Array.isArray(r?.assessments) ? r.assessments : []);
+    }).catch(() => undefined);
     return () => {
       alive = false;
     };
   }, [planId, version]);
-  return { entries, setEntries };
+  return { entries, setEntries, assessments };
 }
 
 const beep = (): void => {
@@ -42,8 +47,6 @@ const beep = (): void => {
   }
 };
 
-const localDay = (d = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
 /** Guarda un bloque de foco en el registro y avisa a los paneles. */
 export async function logFocus(planId: string, areaKey: string, minutes: number, note = "", kind: "pomodoro" | "manual" = "pomodoro"): Promise<void> {
   if (minutes < 1) return;
@@ -51,7 +54,10 @@ export async function logFocus(planId: string, areaKey: string, minutes: number,
   usePomodoro.getState().bump();
 }
 
-/** Vigila el reloj: al acabar un foco guarda el bloque entero y pasa al descanso; al acabar el descanso vuelve a reposo. Una sola vez en la vista. */
+/** La nota del bloque con los temas que se le asignaron: «[4.2 HTTP, 4.3 REST]». */
+export const topicsNote = (topics: ReadonlyArray<{ title: string }>): string => (topics.length ? `[${topics.map((t) => t.title).join(", ")}]` : "");
+
+/** Vigila el reloj: al acabar un foco guarda el bloque entero y pasa al descanso; al acabar el descanso vuelve a reposo. UNA sola vez en toda la app (`App.tsx`). */
 export function PomodoroTicker() {
   const toast = useApp((s) => s.toast);
   const phase = usePomodoro((s) => s.p.phase);
@@ -62,10 +68,11 @@ export function PomodoroTicker() {
       const st = usePomodoro.getState();
       if (!phaseOver(st.p, Date.now())) return;
       const was = st.p.phase;
+      const note = topicsNote(st.p.assignedTopics);
       const r = st.next();
       beep();
       if (was === "focus") {
-        void logFocus(r.planId, r.areaKey, r.minutes)
+        void logFocus(r.planId, r.areaKey, r.minutes, note)
           .then(() => toast("info", `Foco terminado: ${r.minutes} min guardados. Toca descansar.`))
           .catch((e: Error) => toast("error", `No se pudo guardar el bloque: ${e.message}`));
       } else toast("info", "Descanso terminado. ¿Otro bloque de foco?");
@@ -80,8 +87,9 @@ const chipBtn = (on: boolean): string => cn("min-h-8 rounded-md border px-2.5 te
 export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, colour, currentTopic }: { planId: string; areaKey: string; areaName: string; date: string; plannedMinutes: number; colour: string; /** el tema de hoy que toca ahora, bajo el título */ currentTopic?: string }) {
   const toast = useApp((s) => s.toast);
   const p = usePomodoro((s) => s.p);
-  const { start, pause, resume, next, setDurations } = usePomodoro.getState();
+  const { start, pause, resume, next, setDurations, setMode, removeAssignedTopic } = usePomodoro.getState();
   const { entries } = useTimeLog(planId);
+  const [customMin, setCustomMin] = useState(String(p.focusMin));
   const [now, setNow] = useState(() => Date.now());
   const [min, setMin] = useState("");
   const [note, setNote] = useState("");
@@ -108,13 +116,14 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
 
   const stop = useCallback(async () => {
     const mins = focusDoneMinutes(usePomodoro.getState().p, Date.now());
+    const assignedNote = topicsNote(usePomodoro.getState().p.assignedTopics);
     const r = next(true);
     if (mins < 1) {
       toast("info", "Detenido: no llegó a 1 minuto, no se guardó nada.");
       return;
     }
     try {
-      await logFocus(r.planId, r.areaKey, mins);
+      await logFocus(r.planId, r.areaKey, mins, assignedNote);
       toast("info", `${mins} min guardados en el registro de ${areaName}.`);
     } catch (e) {
       toast("error", (e as Error).message);
@@ -159,15 +168,37 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
 
       {/* Pomodoro */}
       <div className="rounded-xl border border-line bg-surface p-4 text-center" data-testid="pomodoro">
-        <p className="text-[12.5px] font-semibold uppercase tracking-wider text-faint" data-testid="pomodoro-phase">
-          {mine ? (p.phase === "focus" ? (p.running ? "Foco" : "Foco en pausa") : p.running ? "Descanso" : "Descanso en pausa") : "Pomodoro"}
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[12.5px] font-semibold uppercase tracking-wider text-faint" data-testid="pomodoro-phase">
+            {mine ? (p.phase === "focus" ? (p.mode === "stopwatch" ? (p.running ? "Cronómetro" : "Cronómetro en pausa") : (p.running ? "Foco" : "Foco en pausa")) : p.running ? "Descanso" : "Descanso en pausa") : "Pomodoro"}
+          </p>
+          {p.phase === "idle" && (
+            <div className="inline-flex rounded-lg border border-line p-0.5 text-[11.5px]">
+              <button
+                type="button"
+                onClick={() => setMode("timer")}
+                className={cn("rounded px-2 py-0.5 font-medium", p.mode === "timer" ? "bg-accent text-white" : "text-dim hover:text-text")}
+              >
+                Temporizador
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("stopwatch")}
+                className={cn("rounded px-2 py-0.5 font-medium", p.mode === "stopwatch" ? "bg-accent text-white" : "text-dim hover:text-text")}
+              >
+                Cronómetro
+              </button>
+            </div>
+          )}
+        </div>
+        <p className="my-1 font-mono text-[44px] font-bold leading-none tabular-nums" data-testid="pomodoro-clock" aria-live="off">
+          {clock(left)}
         </p>
-        <p className="my-1 font-mono text-[44px] font-bold leading-none tabular-nums" data-testid="pomodoro-clock" aria-live="off">{clock(left)}</p>
-        <div className="mx-auto mt-2 max-w-xs"><ProgressBar pct={pct} label="Avance de la fase" /></div>
+        {p.mode === "timer" && <div className="mx-auto mt-2 max-w-xs"><ProgressBar pct={pct} label="Avance de la fase" /></div>}
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           {!mine && (
-            <PrimaryButton large disabled={other} onClick={() => start(planId, areaKey)} data-testid="pomodoro-start">
-              <Play size={16} aria-hidden /> Empezar foco
+            <PrimaryButton large disabled={other || !!p.pendingAssessment} onClick={() => start(planId, areaKey)} data-testid="pomodoro-start">
+              <Play size={16} aria-hidden /> {p.mode === "stopwatch" ? "Iniciar cronómetro" : "Empezar foco"}
             </PrimaryButton>
           )}
           {mine && p.running && <GhostButton large onClick={() => pause()} data-testid="pomodoro-pause"><Pause size={16} aria-hidden /> Pausar</GhostButton>}
@@ -175,11 +206,64 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
           {mine && p.phase === "focus" && <GhostButton large onClick={() => void stop()} data-testid="pomodoro-stop"><Square size={16} aria-hidden /> Detener y guardar</GhostButton>}
           {mine && p.phase === "break" && <GhostButton large onClick={() => next(true)} data-testid="pomodoro-skip"><SkipForward size={16} aria-hidden /> Saltar descanso</GhostButton>}
         </div>
+        {p.pendingAssessment && <p className="mt-2 text-[13px] text-warn font-medium">Completa la evaluación post-sesión para iniciar un nuevo bloque.</p>}
         {other && <p className="mt-2 text-[13px] text-warn" data-testid="pomodoro-busy">Ya hay un Pomodoro en marcha en otra área; termínalo o detenlo primero.</p>}
-        {p.phase === "idle" && (
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[13px] text-dim">
-            <span className="inline-flex items-center gap-1">Foco {FOCUS_CHOICES.map((f) => <button key={f} type="button" aria-pressed={p.focusMin === f} onClick={() => setDurations(f, p.breakMin)} className={chipBtn(p.focusMin === f)}>{f}</button>)} min</span>
-            <span className="inline-flex items-center gap-1">Descanso {BREAK_CHOICES.map((b) => <button key={b} type="button" aria-pressed={p.breakMin === b} onClick={() => setDurations(p.focusMin, b)} className={chipBtn(p.breakMin === b)}>{b}</button>)} min</span>
+        {p.phase === "idle" && p.mode === "timer" && (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[13px] text-dim">
+            <span className="inline-flex items-center gap-1">
+              Foco:
+              {FOCUS_CHOICES.map((f) => (
+                <button key={f} type="button" aria-pressed={p.focusMin === f} onClick={() => { setDurations(f, p.breakMin); setCustomMin(String(f)); }} className={chipBtn(p.focusMin === f)}>
+                  {f}m
+                </button>
+              ))}
+              <input
+                type="number"
+                min={1}
+                max={360}
+                value={customMin}
+                onChange={(e) => {
+                  setCustomMin(e.target.value);
+                  const val = parseInt(e.target.value, 10);
+                  if (val > 0) setDurations(val, p.breakMin);
+                }}
+                className="w-14 rounded-md border border-line bg-surface px-1.5 py-1 text-center font-mono text-[12px] text-text"
+                title="Minutos personalizados"
+              />
+              min
+            </span>
+            <span className="inline-flex items-center gap-1">
+              Descanso:
+              {BREAK_CHOICES.map((b) => (
+                <button key={b} type="button" aria-pressed={p.breakMin === b} onClick={() => setDurations(p.focusMin, b)} className={chipBtn(p.breakMin === b)}>
+                  {b}m
+                </button>
+              ))}
+            </span>
+          </div>
+        )}
+
+        {/* Temas asignados a este pomodoro */}
+        {p.assignedTopics.length > 0 && (
+          <div className="mt-4 border-t border-line/60 pt-3 text-left">
+            <div className="flex items-center justify-between text-[12px] font-semibold text-dim uppercase">
+              <span>Temas asignados a esta sesión ({p.assignedTopics.length})</span>
+            </div>
+            <ul className="mt-1.5 space-y-1">
+              {p.assignedTopics.map((t) => (
+                <li key={t.folder} className="flex items-center justify-between rounded-lg bg-card/80 px-2 py-1 text-[13px]">
+                  <span className="truncate text-text">{t.title}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAssignedTopic(t.folder)}
+                    className="ml-2 text-faint hover:text-danger text-[12px]"
+                    title="Desasignar"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

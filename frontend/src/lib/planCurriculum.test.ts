@@ -118,7 +118,8 @@ describe("plantillas deterministas por tipo de tema (sin IA)", () => {
     const ex = dayExercisesOf({ practiceCurriculum: undefined }, day, block, existing);
     expect(ex[0]).toMatchObject({ source: "vault", existing: 4, folder: "DB/1", auto: false });
     expect(ex[0]!.title).toMatch(/4 en tu vault/);
-    expect(ex.filter((e) => e.source === "template")).toHaveLength(0);
+    // con 4 temas al día, los demás temas del bloque (sin ejercicios en la vault) sí llevan plantilla; el que ya tiene ejercicios, no
+    expect(ex.filter((e) => e.source === "template").every((e) => e.folder !== "DB/1")).toBe(true);
     // sin ejercicios en la vault: plantilla marcada como automática
     const auto = dayExercisesOf({ practiceCurriculum: undefined }, day, block);
     expect(auto[0]).toMatchObject({ source: "template", auto: true });

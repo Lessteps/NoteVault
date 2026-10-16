@@ -46,9 +46,20 @@ describe("pomodoro", () => {
     expect(advance(f, T0 + 20_000, true).logMinutes).toBe(0); // menos de 1 min: nada
   });
 
-  it("el reloj se escribe mm:ss y no baja de cero", () => {
+  it("soporta modo cronómetro hacia adelante (stopwatch)", () => {
+    const s = idlePomodoro("p", "a", 25, 5, "stopwatch");
+    const f = startFocus(s, "p", "a", T0);
+    expect(remainingMs(f, T0 + min(12))).toBe(min(12));
+    expect(focusDoneMinutes(f, T0 + min(12))).toBe(12);
+    expect(phaseOver(f, T0 + min(100))).toBe(false);
+    const fin = advance(f, T0 + min(12), true);
+    expect(fin.logMinutes).toBe(12);
+  });
+
+  it("el reloj se escribe mm:ss o hh:mm:ss y no baja de cero", () => {
     expect(clock(min(25))).toBe("25:00");
     expect(clock(59_001)).toBe("01:00");
     expect(clock(-5)).toBe("00:00");
+    expect(clock(3600_000)).toBe("01:00:00");
   });
 });

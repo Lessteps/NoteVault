@@ -230,7 +230,9 @@ describe("Mi plan: «Temas por semana y área»", () => {
       expect(Number(r.querySelector("td:last-child")!.firstChild!.textContent)).toBe(cells.reduce((a, b) => a + b, 0));
     }
     // expandir una semana muestra los temas de cada área con su día
-    const btn = rows[4]!.querySelector("button")!;
+    // (con 4 temas por área y día el plan de prueba se reparte en pocas semanas: se abre una semana que tenga temas)
+    const withTopics = rows.find((r) => all("area-topics-cell", r).some((c) => Number(c.textContent!.match(/^\d+/)?.[0] ?? 0) > 0))!;
+    const btn = withTopics.querySelector("button")!;
     expect(btn.getAttribute("aria-expanded")).toBe("false");
     await click(btn);
     expect(btn.getAttribute("aria-expanded")).toBe("true");

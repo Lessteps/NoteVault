@@ -47,3 +47,42 @@ export function minutesText(min: number): string {
   const r = m % 60;
   return h ? (r ? `${h} h ${r} min` : `${h} h`) : `${m} min`;
 }
+
+/** El día local de hoy (`YYYY-MM-DD`): NO el de UTC, que de noche en América ya es «mañana». */
+export function localDay(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** La evaluación obligatoria al acabar un bloque de foco: qué se aprendió, qué duda queda y cómo de bien se entendió (1–5). */
+export interface Assessment {
+  id: string;
+  areaKey: string;
+  date: string;
+  /** minutos del bloque evaluado */
+  minutes: number;
+  /** títulos de los temas asignados al bloque (vacío = sesión libre) */
+  topics: string[];
+  understanding: number;
+  learned: string;
+  doubt: string;
+  at: string;
+}
+
+const oneLine = (v: unknown, max: number): string => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+
+/** Una evaluación válida o `null`: necesita área, día, las dos respuestas y una comprensión de 1 a 5. */
+export function sanitizeAssessment(raw: unknown): Assessment | null {
+  const o = (raw && typeof raw === "object" ? raw : null) as Record<string, unknown> | null;
+  if (!o) return null;
+  const id = oneLine(o.id, 60);
+  const areaKey = oneLine(o.areaKey, 60);
+  const date = String(o.date ?? "");
+  const understanding = Math.round(Number(o.understanding));
+  const learned = oneLine(o.learned, 600);
+  const doubt = oneLine(o.doubt, 600);
+  const minutes = Math.max(0, Math.min(TIMELOG_MAX_MINUTES, Math.round(Number(o.minutes) || 0)));
+  if (!id || !areaKey || !DATE_RE.test(date) || !learned || !doubt || !(understanding >= 1 && understanding <= 5)) return null;
+  const topics = Array.isArray(o.topics) ? o.topics.map((t) => oneLine(t, 200)).filter(Boolean).slice(0, 12) : [];
+  return { id, areaKey, date, minutes, topics, understanding, learned, doubt, at: oneLine(o.at, 40) };
+}
+

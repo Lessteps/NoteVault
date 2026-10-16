@@ -10,9 +10,14 @@ import type { ReviewRow } from "../../lib/planReviews";
 import { cn } from "../ui";
 import { GhostButton } from "../common/forms";
 import { AreaSession } from "./AreaSession";
-import { AreaWork, startAreaBlock } from "./AreaWork";
+import { AreaWork, startAreaBlock, type WeekDayView } from "./AreaWork";
 import type { BoardPractice, BoardRow } from "./PlanBoard";
 import { useApp } from "../../store/app";
+import { SectionCard } from "./planKit";
+import { AreaSections } from "./PlanRunPractice";
+import { dailyBreakdown } from "../../lib/planAreaPractice";
+import { hm } from "./parts";
+import type { DayProject } from "../../lib/planCurriculum";
 
 export interface RunTab {
   id: string;
@@ -65,16 +70,18 @@ export interface TodayCard {
 }
 
 /** La pestaña de un área: su trabajo (hoy, semana, pendientes, repasos) a la izquierda y su sesión (Pomodoro y horas) a la derecha. */
-export function RunArea({ plan, area, card, routeRows, sets, reviews, date, practice, onGoProjects }: {
+export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, date, practice, dailyProject, onGoProjects }: {
   plan: MentorPlan;
   area: { subplanId: string; areaId?: string; area: string };
   card: TodayCard | undefined;
   /** toda la ruta del área, sin Bases */
   routeRows: BoardRow[];
+  weekDays: WeekDayView[];
   sets: AreaSets;
   reviews: ReviewRow[];
   date: string;
   practice?: BoardPractice;
+  dailyProject?: DayProject | null;
   onGoProjects: () => void;
 }) {
   const colour = card?.colour ?? "var(--nv-accent)";
@@ -91,6 +98,7 @@ export function RunArea({ plan, area, card, routeRows, sets, reviews, date, prac
           areaId={area.areaId}
           rows={routeRows}
           todayRows={card?.rows ?? []}
+          weekDays={weekDays}
           sets={sets}
           today={date}
           colour={colour}
@@ -105,6 +113,19 @@ export function RunArea({ plan, area, card, routeRows, sets, reviews, date, prac
             <GhostButton onClick={onGoProjects}>Ver los proyectos <ArrowRight size={14} aria-hidden /></GhostButton>
           </p>
         )}
+        {/* El proyecto diario de ESTA área, en su pestaña (no en «Proyectos»): una pieza pequeña con lo que toca hoy en el área */}
+        {dailyProject && (
+          <SectionCard labelledBy={`daily-${areaKey}-title`} testid="area-daily-project" className="space-y-2 border border-line bg-card p-4">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-accent/20 px-2 py-0.5 font-mono text-[11px] font-semibold uppercase text-accent-text">Proyecto diario · {area.area}</span>
+              {dailyProject.minutes ? <span className="text-[12.5px] text-dim">· {hm(dailyProject.minutes)}</span> : null}
+            </div>
+            <h3 id={`daily-${areaKey}-title`} className="text-[16.5px] font-bold text-text">{dailyProject.title}</h3>
+            <p className="text-[14px] text-dim">{dailyProject.description}</p>
+            {dailyProject.weeklyPart && <p className="text-[13px] font-medium text-accent-text">{dailyProject.weeklyPart}</p>}
+            <AreaSections sections={dailyBreakdown(area.areaId ? [area.areaId] : [], (card?.rows.length ? card.rows.map((r) => r.title) : dailyProject.topics.map((t: { title: string }) => t.title)))} testid="area-daily-sections" />
+          </SectionCard>
+        )}
       </div>
       <AreaSession planId={plan.id} areaKey={areaKey} areaName={area.area} date={date} plannedMinutes={planned} colour={colour} {...(current ? { currentTopic: current } : {})} />
     </div>
@@ -112,10 +133,11 @@ export function RunArea({ plan, area, card, routeRows, sets, reviews, date, prac
 }
 
 /** La pestaña de Bases: los fundamentos que se intercalan en todas las áreas. Los temas se juntan sin repetirse. */
-export function RunBases({ plan, routeRows, todayRows, sets, reviews, date }: {
+export function RunBases({ plan, routeRows, todayRows, weekDays, sets, reviews, date }: {
   plan: MentorPlan;
   routeRows: BoardRow[];
   todayRows: BoardRow[];
+  weekDays: WeekDayView[];
   sets: AreaSets;
   reviews: ReviewRow[];
   date: string;
@@ -132,6 +154,7 @@ export function RunBases({ plan, routeRows, todayRows, sets, reviews, date }: {
           areaName="Bases de programación"
           rows={routeRows}
           todayRows={todayRows}
+          weekDays={weekDays}
           sets={sets}
           today={date}
           colour={colour}

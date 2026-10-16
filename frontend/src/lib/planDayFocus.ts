@@ -205,6 +205,10 @@ export function compositeTemplate(parts: ReadonlyArray<{ sub: FocusSubIn; weight
 /** Minutos de un bloque de repaso (el carril ya no tiene temas pendientes). */
 export const REVIEW_MINUTES = 20;
 const MIN_CHUNK = 10;
+/** temas que cada área trabaja cada día de estudio (obligatorio, si le quedan) */
+export const DAILY_TOPICS_PER_AREA = 4;
+/** los fundamentos no son de ningún área: temas de Bases por día */
+const BASES_DAILY_TOPICS = 2;
 
 export const templateFor = (areaId: string | undefined): FocusTemplate => FOCUS_TEMPLATES[areaId ?? ""] ?? FOCUS_TEMPLATES.generic!;
 
@@ -648,25 +652,70 @@ export function buildFocusSchedule(plan: FocusPlanIn, opts: FocusOpts): FocusRes
         spare -= used;
       }
       // ── consumir los carriles ──
+      // OBLIGATORIO: cada área trabaja cada día de estudio DAILY_TOPICS_PER_AREA temas (si le quedan), repartidos entre sus carriles (p. ej. Backend:
+      // 2 de conocimientos y 2 de Python). Los fundamentos («Bases») no son de ningún área: 2 al día. Los temas de un carril avanzan EN PARALELO: el
+      // tiempo del carril se reparte a partes iguales entre sus temas del día (un tema largo ocupa varios días: «parte 2/4»).
+      const laneTarget = new Map<string, number>();
+      const bySub = new Map<string, string[]>();
+      for (const k of alloc.keys()) {
+        if (k === "bases") continue;
+        const sid = k.split("|")[0]!;
+        bySub.set(sid, [...(bySub.get(sid) ?? []), k]);
+      }
+      for (const ks of bySub.values()) {
+        const caps = ks.map((k) => lanes.get(k)!.queue.length);
+        const counts = ks.map(() => 0);
+        let total = 0;
+        while (total < DAILY_TOPICS_PER_AREA && counts.some((c, i) => c < caps[i]!)) {
+          for (let i = 0; i < ks.length && total < DAILY_TOPICS_PER_AREA; i++) {
+            if (counts[i]! < caps[i]!) {
+              counts[i]!++;
+              total++;
+            }
+          }
+        }
+        ks.forEach((k, i) => laneTarget.set(k, counts[i]!));
+      }
       const placed = new Map<string, Array<{ seg: Seg; minutes: number }>>();
       for (const [k, a0] of alloc) {
         const l = lanes.get(k)!;
-        let a = a0;
-        const got: Array<{ seg: Seg; minutes: number }> = [];
-        while (l.queue.length && a >= MIN_CHUNK - 0.01) {
-          const seg = l.queue[0]!;
-          // un resto pequeño se termina hoy si queda hueco (no se deja un trozo de 5 min para mañana)
-          const take = seg.remaining - a <= MIN_CHUNK && seg.remaining - a <= spare + 0.5 ? seg.remaining : Math.min(seg.remaining, a);
-          if (take > a) spare -= take - a;
-          got.push({ seg, minutes: take });
-          seg.remaining -= take;
-          a -= take;
-          if (seg.remaining < 0.5) {
-            l.queue.shift();
-            l.lastTitles.push(seg.topic.title);
+        let n = Math.min(laneTarget.get(k) ?? BASES_DAILY_TOPICS, l.queue.length);
+        if (n < 1) continue;
+        // el mínimo para que quepan sus n temas manda sobre el reparto fino de minutos, pero NUNCA pasa de la capacidad del día: en un día
+        // sobrecargado entran menos temas (los que quepan, mínimo uno)
+        const a = Math.min(Math.max(a0, n * MIN_CHUNK), a0 + Math.max(0, spare));
+        n = Math.max(1, Math.min(n, Math.floor((a + 0.01) / MIN_CHUNK)));
+        if (a > a0) spare -= a - a0;
+        const got: Array<{ seg: Seg; minutes: number }> = l.queue.slice(0, n).map((seg) => ({ seg, minutes: 0 }));
+        let left = a;
+        let cursor = n;
+        for (let guard = 0; guard < 24 && left > 0.5; guard++) {
+          const open = got.filter((g) => g.seg.remaining - g.minutes > 0.01);
+          if (!open.length) {
+            // los temas del día se acabaron y sobra tiempo: entra el siguiente de la cola
+            const nextSeg = l.queue[cursor++];
+            if (!nextSeg) break;
+            got.push({ seg: nextSeg, minutes: 0 });
+            continue;
+          }
+          const each = left / open.length;
+          for (const g of open) {
+            const add = Math.min(each, g.seg.remaining - g.minutes);
+            g.minutes += add;
+            left -= add;
           }
         }
-        if (got.length) placed.set(k, got);
+        for (const g of got) {
+          // un resto pequeño se termina hoy (no se deja un trozo de 5 min para mañana)
+          if (g.seg.remaining - g.minutes <= MIN_CHUNK * 0.5) g.minutes = g.seg.remaining;
+          g.seg.remaining -= g.minutes;
+          if (g.seg.remaining < 0.5) {
+            l.queue.splice(l.queue.indexOf(g.seg), 1);
+            l.lastTitles.push(g.seg.topic.title);
+          }
+        }
+        const done = got.filter((g) => g.minutes > 0.4);
+        if (done.length) placed.set(k, done);
       }
       // ── a bloques ──
       const blocks: DayBlock[] = rbs.map((b) => {

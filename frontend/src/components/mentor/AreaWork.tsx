@@ -18,6 +18,7 @@ import { cn } from "../ui";
 import { Chip, GhostButton } from "../common/forms";
 import { AreaPracticeBlock } from "./AreaPracticeBlock";
 import { openTopic } from "./openTopic";
+import { ProgressBar } from "./parts";
 import { TopicRow, type BoardPractice, type BoardRow } from "./PlanBoard";
 
 export type WorkView = "hoy" | "semana" | "pendientes" | "repasos";
@@ -68,7 +69,61 @@ function ReviewList({ title, rows, colour }: { title: string; rows: ReviewRow[];
   );
 }
 
-export function AreaWork({ planId, areaName, areaId, rows, todayRows, sets, today, colour, practice, reviews, plannedMinutes, onStartBlock }: {
+/** Un día de la semana de un área, con sus temas. */
+export interface WeekDayView {
+  date: string;
+  /** «Lunes 12 oct» */
+  label: string;
+  rows: BoardRow[];
+}
+
+/** La semana en curso: un cajón por día, lo completado y el nivel de avance (media del avance de cada tema; un tema hecho cuenta 100 %). */
+function WeekView({ days, today, colour }: { days: WeekDayView[]; today: string; colour: string }) {
+  const unique = new Map<string, BoardRow>();
+  for (const d of days) for (const r of d.rows) if (!unique.has(r.folder) || r.done) unique.set(r.folder, r);
+  const all = [...unique.values()];
+  const done = all.filter((r) => r.done).length;
+  const level = all.length ? Math.round(all.reduce((n, r) => n + (r.done ? 100 : r.pct ?? 0), 0) / all.length) : 0;
+  return (
+    <div className="space-y-4" data-testid="work-week">
+      <div className="rounded-2xl border border-line bg-card p-4" data-testid="week-summary">
+        <p className="flex flex-wrap items-baseline gap-x-3 text-[15px]">
+          <strong className="text-[18px]">{done} de {all.length}</strong> temas completados esta semana
+          <span className="flex-1" />
+          <span className="text-dim">Nivel de avance <strong className="text-text">{level} %</strong></span>
+        </p>
+        <div className="mt-2"><ProgressBar pct={level} thick label="Nivel de avance de la semana" /></div>
+      </div>
+      {days.map((d) => {
+        const isToday = d.date === today;
+        const doneN = d.rows.filter((r) => r.done).length;
+        const rows = d.rows.map((r) => ({
+          ...r,
+          tag: r.done ? { text: "Hecho", colour: "var(--nv-mint)" } : isToday ? { text: "Hoy", colour } : d.date < today ? { text: "Atrasado", colour: "var(--nv-warn)" } : undefined,
+        }));
+        return (
+          <section key={d.date} aria-label={d.label} className={cn("rounded-2xl border bg-card p-3", isToday ? "border-accent/60" : "border-line")} data-testid="week-day" data-date={d.date}>
+            <h4 className="mb-1.5 flex flex-wrap items-center gap-2 px-1 text-[14px] font-semibold">
+              <span className="first-letter:uppercase">{d.label}</span>
+              {isToday && <Chip colour={colour}>Hoy</Chip>}
+              <span className="flex-1" />
+              <span className="font-mono text-[12.5px] font-normal text-dim">{doneN}/{d.rows.length} hechos</span>
+            </h4>
+            {rows.length === 0 ? (
+              <p className="px-2 py-1.5 text-[13.5px] text-faint">Sin temas de esta ruta este día.</p>
+            ) : (
+              <ul className="space-y-0.5" aria-label={`Temas de ${d.label}`}>
+                {rows.map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} />)}
+              </ul>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+export function AreaWork({ planId, areaName, areaId, rows, todayRows, weekDays, sets, today, colour, practice, reviews, plannedMinutes, onStartBlock }: {
   planId: string;
   areaName: string;
   areaId?: string;
@@ -76,6 +131,8 @@ export function AreaWork({ planId, areaName, areaId, rows, todayRows, sets, toda
   rows: BoardRow[];
   /** los temas de hoy, con su parte y sus minutos */
   todayRows: BoardRow[];
+  /** la semana en curso día a día (lunes a domingo) */
+  weekDays?: WeekDayView[];
   sets: AreaSets;
   today: string;
   colour: string;
@@ -88,15 +145,24 @@ export function AreaWork({ planId, areaName, areaId, rows, todayRows, sets, toda
   const buckets = useMemo(() => bucketReviews(reviews, today), [reviews, today]);
   const todayTag = { text: "Hoy", colour };
   const lists = useMemo(() => {
-    const todayList = todayRows.map((r) => ({ ...r, tag: todayTag }));
-    const week = rows.filter((r) => sets.week.has(r.folder)).map((r) => ({ ...r, tag: sets.today.has(r.folder) ? todayTag : undefined }));
+    const todayKeys = new Set(todayRows.map((r) => r.folder));
+    // La ruta es sólida: el tiempo no la hace avanzar. «Hoy» = lo que se puede trabajar ahora, en orden de ruta: primero lo atrasado que sigue
+    // abierto (los primeros temas sin terminar) y luego lo de hoy. Lo bloqueado no se ofrece aquí: espera en «Semana» y «Pendientes».
+    const openLate = rows
+      .filter((r) => sets.pending.has(r.folder) && !r.done && !r.unlockOn && !todayKeys.has(r.folder))
+      .map((r) => ({ ...r, tag: { text: "Atrasado", colour: "var(--nv-warn)" } }));
+    const openToday = todayRows.filter((r) => r.done || !r.unlockOn).map((r) => ({ ...r, tag: todayTag }));
+    const todayList = [...openLate, ...openToday];
+    const week = rows.filter((r) => sets.week.has(r.folder)).map((r) => ({ ...r, tag: r.done ? { text: "Hecho", colour: "var(--nv-mint)" } : sets.today.has(r.folder) ? todayTag : undefined }));
     const pending = rows
       .filter((r) => sets.pending.has(r.folder) && !r.done)
-      .map((r) => ({ ...r, tag: sets.today.has(r.folder) ? todayTag : { text: "Atrasado", colour: "var(--nv-warn)" } }));
+      .map((r) => ({ ...r, tag: { text: "Atrasado", colour: "var(--nv-warn)" } }));
     return { hoy: todayList, semana: week, pendientes: pending };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, todayRows, sets, colour]);
-  const counts: Record<WorkView, number> = { hoy: lists.hoy.length, semana: lists.semana.length, pendientes: lists.pendientes.length, repasos: reviews.length };
+
+  const weekCount = weekDays ? new Set(weekDays.flatMap((d) => d.rows.map((r) => r.folder))).size : lists.semana.length;
+  const counts: Record<WorkView, number> = { hoy: lists.hoy.length, semana: weekCount, pendientes: lists.pendientes.length, repasos: reviews.length };
   const [sel, setSel] = useState<WorkView>("hoy");
   const view = sel;
   const pa = practice?.areas.find((x) => x.areaId === areaId);
@@ -132,7 +198,13 @@ export function AreaWork({ planId, areaName, areaId, rows, todayRows, sets, toda
         ))}
       </div>
 
-      {view !== "repasos" ? (
+      {view === "semana" && weekDays ? (
+        weekCount === 0 ? (
+          <p className="rounded-2xl border border-dashed border-line p-5 text-[14.5px] text-dim" data-testid="work-empty">Esta semana no hay temas repartidos en esta ruta.</p>
+        ) : (
+          <WeekView days={weekDays} today={today} colour={colour} />
+        )
+      ) : view !== "repasos" ? (
         lists[view].length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line p-5 text-[14.5px] text-dim" data-testid="work-empty">
             {view === "hoy" ? "Hoy no toca ningún tema de esta ruta." : view === "semana" ? "Esta semana no hay temas repartidos en esta ruta." : "No tienes nada pendiente: lo que tocaba hasta hoy está hecho."}

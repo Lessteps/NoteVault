@@ -9,7 +9,7 @@ import { Check, CircleDashed, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import {
-  branchesOf, catalogCounters, filterCatalog, MISSING_FILTERS, MISSING_LABEL, sortCatalog,
+  catalogCounters, filterCatalog, MISSING_FILTERS, MISSING_LABEL, routeBranchesOf, sortCatalog,
   type CatalogSort, type MissingFilter, type PlanTopicRow,
 } from "../../lib/planTopicCatalog";
 import { ROUTE_LABEL } from "../../lib/planRoute";
@@ -95,7 +95,7 @@ export function PlanTopicCatalog({ planId }: { planId: string }) {
 
   const all = rows ?? [];
   const counters = useMemo(() => catalogCounters(all), [all]);
-  const branches = useMemo(() => branchesOf(all), [all]);
+  const branches = useMemo(() => routeBranchesOf(all), [all]);
   const shown = useMemo(() => sortCatalog(filterCatalog(all, { query, branch, missing }), sort), [all, query, branch, missing, sort]);
   const toggle = (f: MissingFilter): void => setMissing((m) => (m.includes(f) ? m.filter((x) => x !== f) : [...m, f]));
   const chip = (on: boolean): string =>

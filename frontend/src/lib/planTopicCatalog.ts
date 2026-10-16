@@ -190,3 +190,6 @@ export function sortCatalog(rows: ReadonlyArray<PlanTopicRow>, by: CatalogSort):
 export function branchesOf(rows: ReadonlyArray<PlanTopicRow>): string[] {
   return [...new Set([...rows].sort((a, b) => folderCompare(a.folder, b.folder)).map((r) => r.branch))];
 }
+
+/** Las ramas conectadas a la ruta: las que tienen al menos un tema del plan. */
+export const routeBranchesOf = (rows: ReadonlyArray<PlanTopicRow>): string[] => branchesOf(rows.filter((r) => r.inPlan));

@@ -63,9 +63,11 @@ describe("PlanTopicCatalog", () => {
   });
 
   it("filtra por rama, por lo que falta y por texto, y abre el tema", async () => {
-    await click("catalog-branch-Frontend");
-    expect(titles()).toEqual(["5.1 DOM"]);
-    expect(byTest("catalog-branch-Frontend")!.getAttribute("aria-pressed")).toBe("true");
+    // solo hay chips de las ramas conectadas a la ruta: Frontend no tiene ningún tema en el plan
+    expect(byTest("catalog-branch-Frontend")).toBeNull();
+    await click("catalog-branch-Backend");
+    expect(titles()).toEqual(["4.2 REST", "4.1 HTTP"]);
+    expect(byTest("catalog-branch-Backend")!.getAttribute("aria-pressed")).toBe("true");
     await click("catalog-branch-all");
     await click("catalog-filter-sin-mapa");
     expect(titles()).toEqual(["4.2 REST", "5.1 DOM"]);

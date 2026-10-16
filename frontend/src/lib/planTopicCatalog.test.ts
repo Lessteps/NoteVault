@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evaluateTopicDesign, type TopicDesign } from "./topicDesign";
-import { branchesOf, buildPlanTopicRows, catalogCounters, filterCatalog, folderCompare, sortCatalog } from "./planTopicCatalog";
+import { branchesOf, buildPlanTopicRows, catalogCounters, filterCatalog, folderCompare, routeBranchesOf, sortCatalog } from "./planTopicCatalog";
 
 const F = (n: string) => `Programación/4 Backend/${n}`;
 const des = (folder: string, o: Partial<Parameters<typeof evaluateTopicDesign>[0]> = {}): TopicDesign =>
@@ -52,6 +52,8 @@ describe("catálogo de temas del plan", () => {
     const c = catalogCounters(rows);
     expect(c).toMatchObject({ topics: 4, withNote: 2, withCanvas: 1, withPractica: 1, withExercises: 1 });
     expect(branchesOf(rows)).toEqual(["SQL", "Backend"]);
+    // los chips de rama solo enseñan las conectadas a la ruta (SQL no tiene ningún tema en el plan)
+    expect(routeBranchesOf(rows)).toEqual(["Backend"]);
     expect(filterCatalog(rows, { branch: "Backend", missing: ["sin-mapa"] }).map((r) => r.title)).toEqual(["4.1 HTTP", "4.10 Queues"]);
     expect(filterCatalog(rows, { query: "REST" }).map((r) => r.title)).toEqual(["4.2 REST"]);
     expect(filterCatalog(rows, { query: "backend", missing: ["sin-ejercicios", "sin-practica"] }).map((r) => r.title)).toEqual(["4.1 HTTP", "4.10 Queues"]);

@@ -206,7 +206,22 @@ export async function exportCsv(name: string, header: string[], rows: Array<Arra
   const { api } = await import("../../lib/bridge");
   const res = await api.saveTextAs(name, text);
   if (res.fallback) {
-    const url = URL.createObjectURL(new Blob(["﻿" + text], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + text], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  return res;
+}
+
+export async function exportJson(name: string, data: unknown) {
+  const text = JSON.stringify(data, null, 2);
+  const { api } = await import("../../lib/bridge");
+  const res = await api.saveTextAs(name, text);
+  if (res.fallback) {
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = name;

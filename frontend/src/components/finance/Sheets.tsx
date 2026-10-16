@@ -14,7 +14,7 @@ import { BarList, Columns, Donut, LineChart } from "../common/charts";
 import { GhostButton, inputBase } from "../common/forms";
 import { Panel } from "../common/StatTile";
 import { cn } from "../ui";
-import { categoryText, exportCsv, MovementTable, signed, Tiles, totals, TYPE_COLOURS, TYPE_LABELS, type GroupedRow } from "./parts";
+import { MovementTable, Tiles, totals, TYPE_COLOURS, TYPE_LABELS, type GroupedRow } from "./parts";
 
 type Kind = "semanal" | "mensual" | "anual";
 
@@ -518,6 +518,7 @@ export function Projection3m() {
 export function Sheet() {
   const meta = useFinance((s) => s.meta);
   const version = useFinance((s) => s.version);
+  const setExportOpen = useFinance((s) => s.setExportOpen);
   const toast = useApp((s) => s.toast);
   const [kind, setKind] = useState<Kind>("mensual");
   const [anchor, setAnchor] = useState(todayIso());
@@ -560,22 +561,6 @@ export function Sheet() {
     && (!q || `${m.what ?? ""} ${m.reason ?? ""}`.toLowerCase().includes(q.toLowerCase()))), [all, fKind, fCat, q]);
   const t = totals(list);
   const sel = cn(inputBase, "py-1 text-[12px]");
-
-  const csv = async () => {
-    // Exporta lo visible: el historial trae lo cargado con "Mostrar más".
-    const global = history && q.trim() && found ? found.movements : null;
-    const source = global ?? list;
-    const rows = [...source].sort((a, b) => a.date.localeCompare(b.date)).map((m) => [
-      m.date, m.time ?? "", TYPE_LABELS[m.type], categoryText(m),
-      [m.what, m.reason].filter(Boolean).join(" — "), (signed(m) / 100).toFixed(2)]);
-    try {
-      const r = await exportCsv(global ? `finanzas_busqueda_${q.trim()}.csv` : `finanzas_${first}_${last}.csv`,
-        ["Fecha", "Hora", "Tipo", "Categoría", "Detalle", "Importe"], rows);
-      if (r.ok) toast("info", `Exportado: ${r.path}`);
-    } catch (e) {
-      toast("error", (e as Error).message);
-    }
-  };
 
   const months = Array.from({ length: 12 }, (_, i) => i);
   const yearRows = months.map((m) => totals(list.filter((x) => parseIso(x.date).getMonth() === m)));
@@ -620,7 +605,9 @@ export function Sheet() {
           Historial
         </button>
         <span className="flex-1" />
-        <GhostButton onClick={() => void csv()}>Exportar CSV</GhostButton>
+        <GhostButton onClick={() => setExportOpen(true, kind === "anual" ? "year" : "month")}>
+          Exportar / Reporte
+        </GhostButton>
       </div>
       {history && q.trim() ? (
         <>

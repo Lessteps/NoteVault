@@ -4,7 +4,9 @@ import { formatMoney } from "../../lib/money";
 import { useFinance, type FinView } from "../../store/finance";
 import { ModuleSidebar } from "../ModuleSidebar";
 import { Categories, CategoryDialog } from "./Categories";
+import { CsvImportDialog } from "./CsvImportDialog";
 import { Diario } from "./Diario";
+import { ExportDialog } from "./ExportDialog";
 import { FinGoalDialog, FinGoals } from "./Goals";
 import { MovementDialog } from "./MovementDialog";
 import { RecurringDialog, Recurrents } from "./Recurrents";
@@ -17,6 +19,11 @@ export function FinanceModule() {
   const loaded = useFinance((s) => s.loaded);
   const sidebar = useFinance((s) => s.sidebar);
   const openGoal = useFinance((s) => s.openGoal);
+  const importOpen = useFinance((s) => s.importOpen);
+  const setImportOpen = useFinance((s) => s.setImportOpen);
+  const exportOpen = useFinance((s) => s.exportOpen);
+  const setExportOpen = useFinance((s) => s.setExportOpen);
+  const exportScope = useFinance((s) => s.exportScope);
 
   useEffect(() => {
     void load();
@@ -59,6 +66,8 @@ export function FinanceModule() {
       <FinGoalDialog />
       <CategoryDialog />
       <RecurringDialog />
+      <CsvImportDialog isOpen={importOpen} onClose={() => setImportOpen(false)} />
+      <ExportDialog isOpen={exportOpen} onClose={() => setExportOpen(false)} initialScope={exportScope} />
     </div>
   );
 }

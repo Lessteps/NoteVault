@@ -12,6 +12,7 @@ import {
   catalogCounters, filterCatalog, MISSING_FILTERS, MISSING_LABEL, routeBranchesOf, sortCatalog,
   type CatalogSort, type MissingFilter, type PlanTopicRow,
 } from "../../lib/planTopicCatalog";
+import { needsGenerate } from "../../lib/planAreaTopics";
 import { ROUTE_LABEL } from "../../lib/planRoute";
 import { TOPIC_TYPE_NAME } from "../../lib/topicDesign";
 import { useMentor } from "../../store/mentor";
@@ -20,6 +21,7 @@ import { cn } from "../ui";
 import { openTopic } from "./openTopic";
 import { LoadState } from "./parts";
 import { SectionHeading } from "./planKit";
+import { GenerateTopicButton } from "./TopicGenerate";
 
 const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
@@ -85,7 +87,7 @@ const COUNTERS = [
   ["complete", "Completos"],
 ] as const;
 
-export function PlanTopicCatalog({ planId }: { planId: string }) {
+export function PlanTopicCatalog({ planId, proposed = false }: { planId: string; /** el plan aún es una propuesta: generar también lo mantiene */ proposed?: boolean }) {
   const uid = useId();
   const { rows, error, warming, reload } = usePlanTopicCatalog(planId);
   const [query, setQuery] = useState("");
@@ -155,11 +157,11 @@ export function PlanTopicCatalog({ planId }: { planId: string }) {
             </p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-line">
-              <table className="w-full min-w-[56rem] border-collapse text-left text-[14px]" data-testid="catalog-table">
+              <table className="w-full min-w-[64rem] border-collapse text-left text-[14px]" data-testid="catalog-table">
                 <caption className="sr-only">Temas de la vault y lo que existe de cada uno</caption>
                 <thead className="bg-card text-[12.5px] uppercase tracking-wide text-faint">
                   <tr>
-                    {["Tema", "Nota", "Estructura", "Mapa", ".practica", "Ejercicios", "Diseño", "En el plan"].map((h) => (
+                    {["Tema", "Nota", "Estructura", "Mapa", ".practica", "Ejercicios", "Diseño", "En el plan", "Generar"].map((h) => (
                       <th key={h} scope="col" className="px-3 py-2 font-semibold">{h}</th>
                     ))}
                   </tr>
@@ -207,6 +209,9 @@ export function PlanTopicCatalog({ planId }: { planId: string }) {
                         ) : (
                           <Chip large colour="var(--nv-warn)">Fuera del plan</Chip>
                         )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <GenerateTopicButton planId={planId} proposed={proposed} folder={r.folder} title={r.title} inPlan={r.inPlan && r.route !== "skipped"} incomplete={needsGenerate(r)} />
                       </td>
                     </tr>
                   ))}

@@ -24,6 +24,7 @@ import { CoveragePanel, type CoverageState } from "./PlanCoverage";
 import { ExecutionPanel } from "./PlanExecution";
 import { PlanNotes, SectionCard, SectionHeading } from "./planKit";
 import { PhaseMonthTable } from "./PlanMonths";
+import { PlanAreaTopics } from "./PlanAreaTopics";
 import { PlanTopicCatalog } from "./PlanTopicCatalog";
 import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
 import { PACE_LABEL } from "./PlanForm";
@@ -150,7 +151,7 @@ function ResumenView({ plan, state, summary, cov, onApplied, announce }: PlanSec
 function CatalogoView({ plan }: PlanSectionCtx) {
   return (
     <div id="sec-catalogo" tabIndex={-1} className={anchor}>
-      <PlanTopicCatalog planId={plan.id} />
+      <PlanTopicCatalog planId={plan.id} proposed={!!plan.proposed} />
     </div>
   );
 }
@@ -282,7 +283,15 @@ function FasesView({ data, plan, summary, onOpenMonth }: PlanSectionCtx) {
 
 function TemasPorAreaView({ data, plan, summary }: PlanSectionCtx) {
   const agenda = useAgendaModel(data, plan);
-  return <div id="sec-temas" tabIndex={-1} className={anchor}><AreaTopicsSection m={agenda} currentWeek={summary.currentWeek} /></div>;
+  return (
+    <div id="sec-temas" tabIndex={-1} className={cn(anchor, "space-y-6")}>
+      <PlanAreaTopics plan={plan} />
+      <details data-testid="plan-weeks-by-area">
+        <summary className="inline-flex min-h-9 cursor-pointer items-center text-[14px] text-accent-text">Ver el reparto por semanas y áreas</summary>
+        <div className="mt-3"><AreaTopicsSection m={agenda} currentWeek={summary.currentWeek} /></div>
+      </details>
+    </div>
+  );
 }
 
 function CoberturaView({ plan, cov, onChanged, announce }: PlanSectionCtx) {
@@ -319,8 +328,8 @@ export function planSectionsOf(ctx: PlanSectionCtx): PlanSection[] {
   const missing = cov0 && (cov0.practice < cov0.topics || cov0.theory < cov0.topics) ? cov0.topics - cov0.practice : 0;
   const all: PlanSection[] = [
     { id: "resumen", label: "Resumen", visible: true, ...(missing > 0 ? { hint: String(missing), hintLabel: `${missing} sin ejercicios: falta generar` } : {}), render: () => <ResumenView {...ctx} /> },
-    { id: "catalogo", label: "Temas", visible: true, render: () => <CatalogoView {...ctx} /> },
     { id: "datos", label: "Datos clave", visible: true, render: () => <DatosView {...ctx} /> },
+    { id: "catalogo", label: "Temas", visible: true, render: () => <CatalogoView {...ctx} /> },
     { id: "alcance", label: "Alcance y comentarios", visible: scopeOf(plan).hasScope, render: () => <AlcanceView {...ctx} /> },
     { id: "fases", label: "Fases mes a mes", visible: byAreas, render: () => <FasesView {...ctx} /> },
     { id: "temas", label: "Temas por área", visible: byAreas, render: () => <TemasPorAreaView {...ctx} /> },

@@ -4,7 +4,7 @@
 // Todo se calcula con el mismo modelo de agenda que la vista de plan (`useAgendaModel`), así que ambas vistas nunca discrepan.
 
 import { CalendarDays, ChevronRight, Lock } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { planGate } from "../../lib/planGate";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
@@ -67,6 +67,29 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const titleOf = (folder: string): string => m.topicByFolder.get(folder)?.title ?? folder.split("/").pop() ?? folder;
   const late = (data.derived?.subplans ?? []).reduce((n, s) => n + s.topics.filter((t) => t.route !== "skipped" && t.targetWeek < currentWeek && t.state !== "completo").length, 0);
 
+  // una pestaña por área de hoy: cada una enseña SOLO su tarjeta (temas de hoy y su práctica); abre en la primera con algo pendiente
+  const cards = entries.map((e) => {
+    const items = (e.blocks ?? []).flatMap((bl) => bl.items);
+    const seen = new Set<string>();
+    const unique = items.filter((i) => (seen.has(`${i.folder}:${i.part}`) ? false : (seen.add(`${i.folder}:${i.part}`), true)));
+    const rows: BoardRow[] = unique.map((i) => {
+      const state = m.topicByFolder.get(i.folder)?.state ?? "sin_tratar";
+      return {
+        folder: i.folder,
+        title: i.title,
+        meta: `${i.applied ? "Bases · " : ""}${i.parts > 1 ? `parte ${i.part}/${i.parts} · ` : ""}${hm(i.minutes)}`,
+        week: currentWeek,
+        state,
+        done: state === "completo",
+        exercises: 0,
+        unlockOn: gate.locked.get(i.folder),
+      };
+    });
+    return { e, rows, colour: focusColour(e.areaId), doneN: rows.filter((r) => r.done).length };
+  });
+  const [areaSel, setAreaSel] = useState("");
+  const activeCard = cards.find((c) => c.e.subplanId === areaSel) ?? cards.find((c) => c.doneN < c.rows.length) ?? cards[0];
+
   const planToday = () => {
     setPending({ type: "plan" });
     useNavState.getState().set("mentor.view", "hoy");
@@ -120,44 +143,50 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
             )}
 
             {entries.length > 0 && (
-              <ul className="grid gap-4 @3xl:grid-cols-2" aria-label="Qué estudiar hoy, por área">
-                {entries.map((e) => {
-                  const items = (e.blocks ?? []).flatMap((bl) => bl.items);
-                  const seen = new Set<string>();
-                  const unique = items.filter((i) => (seen.has(`${i.folder}:${i.part}`) ? false : (seen.add(`${i.folder}:${i.part}`), true)));
-                  const colour = focusColour(e.areaId);
-                  const rows: BoardRow[] = unique.map((i) => {
-                    const state = m.topicByFolder.get(i.folder)?.state ?? "sin_tratar";
-                    return {
-                      folder: i.folder,
-                      title: i.title,
-                      meta: `${i.applied ? "Bases · " : ""}${i.parts > 1 ? `parte ${i.part}/${i.parts} · ` : ""}${hm(i.minutes)}`,
-                      week: currentWeek,
-                      state,
-                      done: state === "completo",
-                      exercises: 0,
-                      unlockOn: gate.locked.get(i.folder),
-                    };
-                  });
-                  const doneN = rows.filter((r) => r.done).length;
-                  return (
-                    <AreaCardShell
-                      key={e.subplanId}
-                      colour={colour}
-                      title={e.area}
-                      badge={`${doneN}/${rows.length}`}
-                      sub={[e.theoryMinutes ? `${hm(e.theoryMinutes)} teoría` : "", e.practiceMinutes ? `${hm(e.practiceMinutes)} práctica` : ""].filter(Boolean).join(" · ")}
-                      tag={e.project ? "Con proyecto" : undefined}
-                      testid="run-area"
-                      area={e.areaId ?? e.subplanId}
-                    >
-                      <ul className="space-y-0.5" aria-label={`Temas de hoy de ${e.area}`}>
-                        {rows.map((r) => <TopicRow key={`${r.folder}:${r.meta}`} r={r} colour={colour} />)}
-                      </ul>
-                    </AreaCardShell>
-                  );
-                })}
-              </ul>
+              <div className="space-y-3" data-testid="run-areas">
+                <nav aria-label="Áreas de hoy" data-testid="run-area-tabs" className="min-w-0">
+                  <ul className="flex gap-1 overflow-x-auto border-b border-line py-1">
+                    {cards.map((c) => {
+                      const on = c.e.subplanId === activeCard?.e.subplanId;
+                      return (
+                        <li key={c.e.subplanId} className="flex-none">
+                          <button
+                            type="button"
+                            aria-pressed={on}
+                            aria-current={on ? "page" : undefined}
+                            onClick={() => setAreaSel(c.e.subplanId)}
+                            data-testid={`run-area-tab-${c.e.areaId ?? c.e.subplanId}`}
+                            className={cn("inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-[14.5px] font-medium transition-colors", on ? "border-accent bg-accent-soft text-accent-text" : "border-transparent text-dim hover:bg-hover hover:text-text")}
+                          >
+                            <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: c.colour }} />
+                            {c.e.area}
+                            <span className="rounded-md bg-hover px-1.5 text-[12px] text-dim">
+                              <span aria-hidden>{c.doneN}/{c.rows.length}</span>
+                              <span className="sr-only"> ({c.doneN} de {c.rows.length} temas hechos)</span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </nav>
+                {activeCard && (
+                  <AreaCardShell
+                    key={activeCard.e.subplanId}
+                    colour={activeCard.colour}
+                    title={activeCard.e.area}
+                    badge={`${activeCard.doneN}/${activeCard.rows.length}`}
+                    sub={[activeCard.e.theoryMinutes ? `${hm(activeCard.e.theoryMinutes)} teoría` : "", activeCard.e.practiceMinutes ? `${hm(activeCard.e.practiceMinutes)} práctica` : ""].filter(Boolean).join(" · ")}
+                    tag={activeCard.e.project ? "Con proyecto" : undefined}
+                    testid="run-area"
+                    area={activeCard.e.areaId ?? activeCard.e.subplanId}
+                  >
+                    <ul className="space-y-0.5" aria-label={`Temas de hoy de ${activeCard.e.area}`}>
+                      {activeCard.rows.map((r) => <TopicRow key={`${r.folder}:${r.meta}`} r={r} colour={activeCard.colour} />)}
+                    </ul>
+                  </AreaCardShell>
+                )}
+              </div>
             )}
 
             {(day.practice.project || langBlocks.length > 0) && (

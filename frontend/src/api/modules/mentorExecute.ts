@@ -59,12 +59,13 @@ const runnersOf = (app: AppState): Map<string, ExecutionRunner> => {
 
 const sanitizeScope = (raw: unknown): ExecutionScope => {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, any>;
-  const mode = o.mode === "weeks" || o.mode === "area" ? o.mode : "all";
+  const mode = o.mode === "weeks" || o.mode === "area" || o.mode === "topic" ? o.mode : "all";
   const week = (v: unknown): number | undefined => (Number.isFinite(Number(v)) && Number(v) >= 1 ? Math.min(1000, Math.round(Number(v))) : undefined);
   return {
     mode,
     ...(mode === "weeks" ? { fromWeek: week(o.fromWeek) ?? 1, toWeek: week(o.toWeek) ?? 4 } : {}),
     ...(mode === "area" ? { areaKey: String(o.areaKey ?? "").slice(0, 60) } : {}),
+    ...(mode === "topic" ? { folder: String(o.folder ?? "").slice(0, 400) } : {}),
     includeRecommended: o.includeRecommended === true,
     includeNewTopics: o.includeNewTopics === true,
     includeAreaPractice: o.includeAreaPractice !== false,

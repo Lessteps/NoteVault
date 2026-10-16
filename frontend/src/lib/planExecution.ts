@@ -55,12 +55,14 @@ export interface ExecTask {
 }
 
 export interface ExecutionScope {
-  mode: "all" | "weeks" | "area";
+  mode: "all" | "weeks" | "area" | "topic";
   /** `weeks`: semanas del plan, ambas incluidas */
   fromWeek?: number;
   toWeek?: number;
   /** `area`: la clave del área */
   areaKey?: string;
+  /** `topic`: la carpeta de UN tema (todo lo que falta de ese tema y nada más) */
+  folder?: string;
   /** incluir también lo recomendado (escalera de dificultades), no solo lo obligatorio */
   includeRecommended: boolean;
   /** crear también los temas nuevos que propuso la revisión */
@@ -163,7 +165,8 @@ export const estimateMinutes = (aiCalls: number, tasks: number): number => (task
 const slug = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
 const shortTitle = (t: string): string => t.replace(/^[\d.\s_-]+/, "").trim() || t;
 
-export function inScope(scope: ExecutionScope, t: { areaKey: string; week: number }): boolean {
+export function inScope(scope: ExecutionScope, t: { areaKey: string; week: number; folder?: string }): boolean {
+  if (scope.mode === "topic") return !!scope.folder && t.folder === scope.folder;
   if (scope.mode === "area") return t.areaKey === scope.areaKey;
   if (scope.mode === "weeks") return t.week >= (scope.fromWeek ?? 1) && t.week <= (scope.toWeek ?? 1000);
   return true;
@@ -243,7 +246,7 @@ export function buildExecutionReport(inp: ReportInput, scopeIn: Partial<Executio
   }
 
   // 2. sistema de práctica por área
-  if (scope.includeAreaPractice) {
+  if (scope.includeAreaPractice && scope.mode !== "topic") {
     const maxScopeWeek = scope.mode === "weeks" ? (scope.toWeek ?? 1000) : 1000;
     const minScopeWeek = scope.mode === "weeks" ? (scope.fromWeek ?? 1) : 1;
     let pendingInit = false;
@@ -316,7 +319,7 @@ export function buildExecutionReport(inp: ReportInput, scopeIn: Partial<Executio
     const ar = byKey.get(ra.key);
     if (!ar) continue;
     for (const m of ra.missing) {
-      const included = scope.includeNewTopics && inScope(scope, { areaKey: ra.key, week: 1000 }) && scope.mode !== "weeks";
+      const included = scope.includeNewTopics && inScope(scope, { areaKey: ra.key, week: 1000 }) && scope.mode !== "weeks" && scope.mode !== "topic";
       ar.proposals.push({ title: m.title, why: m.why, included });
       if (!included) continue;
       const t: ExecTask = {

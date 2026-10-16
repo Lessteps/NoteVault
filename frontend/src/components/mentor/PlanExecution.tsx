@@ -65,6 +65,7 @@ const scopeToSend = (s: ExecutionScope): ExecutionScope => ({
   mode: s.mode,
   ...(s.mode === "weeks" ? { fromWeek: s.fromWeek ?? 1, toWeek: s.toWeek ?? 4 } : {}),
   ...(s.mode === "area" && s.areaKey ? { areaKey: s.areaKey } : {}),
+  ...(s.mode === "topic" && s.folder ? { folder: s.folder } : {}),
   includeRecommended: s.includeRecommended,
   includeNewTopics: s.includeNewTopics,
   includeAreaPractice: s.includeAreaPractice,
@@ -75,6 +76,7 @@ const scopeToSend = (s: ExecutionScope): ExecutionScope => ({
 export function scopeText(s: ExecutionScope, areaName?: string): string {
   if (s.mode === "weeks") return `solo las semanas ${s.fromWeek ?? 1}–${s.toWeek ?? 4}`;
   if (s.mode === "area") return `solo el área ${areaName ?? s.areaKey ?? ""}`;
+  if (s.mode === "topic") return `solo el tema ${areaName ?? s.folder?.split("/").pop() ?? ""}`;
   return "todo el plan";
 }
 
@@ -308,7 +310,7 @@ export function ExecuteDialog({ planId, proposed, initialScope, onClose, onStart
       setBusy(false);
     }
   };
-  const label = proposed ? "Mantener y ejecutar" : "Ejecutar plan";
+  const label = proposed ? "Mantener y ejecutar" : initialScope?.mode === "topic" || initialScope?.mode === "area" ? "Generar" : "Ejecutar plan";
   const maxWeek = report?.maxWeek ?? 1;
   // los temas del plan no están en el diálogo: las áreas salen del informe (o de un informe sin tareas)
   const areas = report?.areas.map((a) => ({ key: a.key, area: a.area })) ?? [];
@@ -333,7 +335,18 @@ export function ExecuteDialog({ planId, proposed, initialScope, onClose, onStart
           {proposed ? "Se mantiene el plan y el Mentor crea en segundo plano lo que falta en tu vault. " : "El Mentor crea en segundo plano lo que falta en tu vault. "}
           Esto es lo que se hará con el alcance elegido; no empieza hasta que lo confirmes.
         </p>
-        <ScopeForm scope={scope} onChange={setScope} areas={areas.length ? areas : scope.areaKey ? [{ key: scope.areaKey, area: scope.areaKey }] : []} maxWeek={maxWeek} proposals={proposals} idPrefix={uid} />
+        {scope.mode === "topic" ? (
+          <fieldset className="min-w-0" data-testid="exec-scope-topic">
+            <legend className="text-[14px] font-semibold">Alcance</legend>
+            <p className="mt-1 text-[14px]">Solo este tema: <strong>{(scope.folder ?? "").split("/").pop()}</strong>. Se crea lo que falte de él (teoría, mapa, manifiesto y ejercicios) y nada más.</p>
+            <label className="mt-2 flex min-h-8 cursor-pointer items-start gap-2 text-[14px]">
+              <input type="checkbox" className="mt-1 h-4 w-4" checked={scope.includeRecommended} onChange={(e) => setScope({ ...scope, includeRecommended: e.target.checked })} />
+              <span>Incluir los ejercicios de todas las dificultades (no solo uno por skill)</span>
+            </label>
+          </fieldset>
+        ) : (
+          <ScopeForm scope={scope} onChange={setScope} areas={areas.length ? areas : scope.areaKey ? [{ key: scope.areaKey, area: scope.areaKey }] : []} maxWeek={maxWeek} proposals={proposals} idPrefix={uid} />
+        )}
         {loading && <p role="status" className="text-[14px] text-dim">Calculando lo que falta…</p>}
         {error && <p role="alert" className="text-[14px] text-danger">{error}</p>}
         {report && !loading && (

@@ -305,7 +305,7 @@ describe("pestaña «Mi plan»: sub-barra de secciones y aviso de lo que falta g
     expect(byTest("plan-sticky")!.contains(nav)).toBe(true);
     const ids = [...nav.querySelectorAll<HTMLElement>("button")].map((b) => b.dataset.testid!.replace("subnav-", ""));
     // el plan de prueba no es por áreas: sin «Fases mes a mes» ni «Temas por área»
-    expect(ids).toEqual(["resumen", "catalogo", "datos", "alcance", "cobertura", "ejecutar", "antigravity", "areas"]);
+    expect(ids).toEqual(["resumen", "datos", "catalogo", "alcance", "cobertura", "ejecutar", "antigravity", "areas"]);
     expect(byTest("subnav-resumen")!.getAttribute("aria-current")).toBe("page");
     expect(byTest("subnav-resumen")!.textContent).toContain("2"); // temas por generar
     expect(host.querySelector("#sec-resumen")).toBeTruthy();

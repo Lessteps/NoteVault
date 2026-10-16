@@ -39,12 +39,13 @@ const strs = (v: unknown, max = 200): string[] => (Array.isArray(v) ? v.map((x) 
 
 function sanitizeScope(raw: unknown): ExecutionScope {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, any>;
-  const mode = o.mode === "weeks" || o.mode === "area" ? o.mode : "all";
+  const mode = o.mode === "weeks" || o.mode === "area" || o.mode === "topic" ? o.mode : "all";
   const n = (v: unknown): number | undefined => (Number.isFinite(Number(v)) && Number(v) >= 1 ? Math.min(1000, Math.round(Number(v))) : undefined);
   return {
     mode,
     ...(mode === "weeks" ? { fromWeek: n(o.fromWeek) ?? 1, toWeek: n(o.toWeek) ?? 1000 } : {}),
     ...(mode === "area" && oneLine(o.areaKey, 60) ? { areaKey: oneLine(o.areaKey, 60) } : {}),
+    ...(mode === "topic" && oneLine(o.folder, 400) ? { folder: oneLine(o.folder, 400) } : {}),
     includeRecommended: o.includeRecommended === true,
     includeNewTopics: o.includeNewTopics === true,
     includeAreaPractice: o.includeAreaPractice !== false,

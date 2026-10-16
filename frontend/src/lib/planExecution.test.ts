@@ -127,6 +127,15 @@ describe("alcance", () => {
     expect(buildExecutionReport(input(), { includeAreaPractice: false }).tasks.some((t) => t.kind === "area_folder")).toBe(false);
   });
 
+  it("«solo un tema» crea únicamente lo de ese tema: sin práctica por área ni temas nuevos, y sin carpeta no hay nada", () => {
+    const t = buildExecutionReport(input(), { mode: "topic", folder: f("4.3 SinTeoria") });
+    expect(t.tasks.length).toBeGreaterThan(0);
+    expect(t.tasks.every((x) => x.folder === f("4.3 SinTeoria"))).toBe(true);
+    expect(t.tasks.some((x) => x.kind === "area_folder" || x.kind === "pp_init")).toBe(false);
+    expect(buildExecutionReport(input(), { mode: "topic" }).tasks).toEqual([]);
+    expect(inScope({ ...DEFAULT_SCOPE, mode: "topic", folder: "a" }, { areaKey: "x", week: 1, folder: "b" })).toBe(false);
+  });
+
   it("los katas por área se limitan (60) y la instalación del módulo va primero si no está", () => {
     const r = buildExecutionReport(input({ ppReady: false, kataWeeks: Array.from({ length: 200 }, (_, i) => Math.floor(i / 5) + 1) }));
     expect(r.tasks[0]!.id).toBe("pp_init");

@@ -9,7 +9,9 @@
 import { CalendarDays, ChevronRight, Lock } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
+import { areaSets } from "../../lib/planAreaLists";
 import { planGate } from "../../lib/planGate";
+import { bucketReviews, dueText, reviewsOfTopics, type ReviewRow } from "../../lib/planReviews";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
 import { dayByArea, orderedAreas } from "../../lib/planTopicsByArea";
 import { minutesOn, minutesText } from "../../lib/timeLog";
@@ -19,6 +21,8 @@ import { useNavState } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { PomodoroTicker, useTimeLog } from "./AreaSession";
+import { useReviewItems } from "./AreaWork";
+import { openTopic } from "./openTopic";
 import { DeliverableLine, focusColour, plural, useAgendaModel } from "./agendaKit";
 import { hm, ProgressBar } from "./parts";
 import { ProgressOverview, type BoardRow } from "./PlanBoard";
@@ -112,12 +116,53 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const areaList = orderedAreas(plan);
   const basesDone = basesRows.filter((r) => r.done).length;
   const hasBasesRoute = plan.subplans.some((s) => { const g = (s.groups ?? []).find((x) => x.kind === "bases"); return !!g && s.topics.some((t) => t.group === g.id && t.route !== "skipped"); });
+  // Repaso espaciado (el mismo calendario del módulo de estudio): los repasos de cada área, unidos con los temas del plan
+  const reviewData = useReviewItems();
+  const reviewItems = reviewData.data?.items ?? [];
+  const isBasesTopic = (sub: (typeof plan.subplans)[number], group?: string): boolean => !!group && (sub.groups ?? []).some((g) => g.kind === "bases" && g.id === group);
+  const routeRowOf = (t: (typeof plan.subplans)[number]["topics"][number]): BoardRow => {
+    const state = m.topicByFolder.get(t.folder)?.state ?? "sin_tratar";
+    return { folder: t.folder, title: t.title, week: t.targetWeek, state, done: state === "completo" || !!t.completedAt, exercises: m.topicByFolder.get(t.folder)?.exercises ?? 0, unlockOn: gate.locked.get(t.folder) };
+  };
+  const routeOf = (subplanId: string): BoardRow[] => {
+    const sub = plan.subplans.find((x) => x.id === subplanId);
+    return sub ? sub.topics.filter((t) => t.route !== "skipped" && !isBasesTopic(sub, t.group)).map(routeRowOf) : [];
+  };
+  const reviewsOf = (subplanId: string): ReviewRow[] => {
+    const sub = plan.subplans.find((x) => x.id === subplanId);
+    return sub ? reviewsOfTopics(sub.topics.filter((t) => t.route !== "skipped" && !isBasesTopic(sub, t.group)), reviewItems) : [];
+  };
+  const basesRoute: BoardRow[] = [];
+  const basesTopics: Array<{ folder: string; title: string }> = [];
+  {
+    const seenRoute = new Set<string>();
+    for (const sp of plan.subplans) {
+      for (const t of sp.topics) {
+        if (!isBasesTopic(sp, t.group) || t.route === "skipped" || seenRoute.has(t.folder)) continue;
+        seenRoute.add(t.folder);
+        basesRoute.push(routeRowOf(t));
+        basesTopics.push({ folder: t.folder, title: t.title });
+      }
+    }
+    basesRoute.sort((a, b) => a.week - b.week);
+  }
+  const basesReviews = reviewsOfTopics(basesTopics, reviewItems);
+  const allTopics = plan.subplans.flatMap((sp) => sp.topics.filter((t) => t.route !== "skipped").map((t) => ({ folder: t.folder, title: t.title })));
+  const planReviews = reviewsOfTopics(allTopics, reviewItems);
+  const planBuckets = bucketReviews(planReviews, date);
+  const dueByArea = new Map(areaList.map((a) => [a.subplanId, reviewsOf(a.subplanId).filter((r) => r.inDays <= 0).length] as const));
 
   const tabs: RunTab[] = [
-    { id: "general", label: "General" },
+    { id: "general", label: "Plan de estudio" },
     ...areaList.map((a) => {
       const c = cardOf.get(a.subplanId);
-      return { id: `area:${a.subplanId}`, label: a.area, colour: focusColour(a.areaId), ...(c && c.rows.length ? { hint: `${c.doneN}/${c.rows.length}`, hintLabel: `${c.doneN} de ${c.rows.length} temas de hoy hechos` } : {}) };
+      const due = dueByArea.get(a.subplanId) ?? 0;
+      return {
+        id: `area:${a.subplanId}`,
+        label: a.area,
+        colour: focusColour(a.areaId),
+        ...((c && c.rows.length) || due ? { hint: `${c && c.rows.length ? `${c.doneN}/${c.rows.length}` : ""}${due ? `${c && c.rows.length ? " · " : ""}${due} ⟳` : ""}`, hintLabel: `${c && c.rows.length ? `${c.doneN} de ${c.rows.length} temas de hoy hechos` : "sin temas hoy"}${due ? `, ${due} repasos para hoy` : ""}` } : {}),
+      };
     }),
     ...(basesRows.length || hasBasesRoute ? [{ id: "bases", label: "Bases", colour: "var(--nv-accent)", ...(basesRows.length ? { hint: `${basesDone}/${basesRows.length}`, hintLabel: `${basesDone} de ${basesRows.length} temas de hoy hechos` } : {}) }] : []),
     { id: "proyectos", label: "Proyectos" },
@@ -284,6 +329,25 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                 </dl>
               </section>
             )}
+            <section aria-labelledby="run-reviews-h" className={cn(card, "space-y-3")} data-testid="run-reviews">
+              <div className="flex items-baseline gap-2">
+                <h2 id="run-reviews-h" className="flex-1 text-[17px] font-bold">Repasos</h2>
+                <span className="text-[13px] text-dim">{planBuckets.today.length} hoy · {planBuckets.week.length} esta semana · {planBuckets.nextWeek.length} la próxima</span>
+              </div>
+              {planBuckets.today.length === 0 ? (
+                <p className="text-[13.5px] text-dim">No tienes repasos vencidos ni para hoy. Cada tema que practicas programa el siguiente repaso (3, 7, 14, 30, 60 y 120 días).</p>
+              ) : (
+                <ul className="space-y-1.5" aria-label="Repasos para hoy">
+                  {planBuckets.today.slice(0, 6).map((r) => (
+                    <li key={r.path} className="flex items-center gap-2 text-[14px]" data-testid="run-review-row">
+                      <span className="min-w-0 flex-1"><span className="block truncate">{r.title}</span><span className="block text-[12.5px] text-dim">{dueText(r.inDays)}</span></span>
+                      <GhostButton onClick={() => void openTopic(r.folder)} aria-label={`Ir a la práctica de repaso de ${r.title}`}>Ir al repaso</GhostButton>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {planBuckets.today.length > 6 && <p className="text-[12.5px] text-faint">Y {planBuckets.today.length - 6} más: míralos en la pestaña de cada área, en «Por repasar».</p>}
+            </section>
             <ProgressOverview plan={plan} data={data} compact onPick={(id) => go(`area:${id}`)} />
             <section aria-labelledby="run-hours-h" className={cn(card, "space-y-2")} data-testid="run-hours">
               <div className="flex items-baseline gap-2">
@@ -308,20 +372,18 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       {areaTab && (
         <RunArea
           plan={plan}
-          data={data}
           area={areaTab}
           card={cardOf.get(areaTab.subplanId)}
+          routeRows={routeOf(areaTab.subplanId)}
+          sets={areaSets(m.schedule.days, areaTab.subplanId, date, currentWeek)}
+          reviews={reviewsOf(areaTab.subplanId)}
           date={date}
-          hasStudy={!!day?.study}
-          gate={gate}
-          currentWeek={currentWeek}
-          byFolder={m.topicByFolder}
           practice={ap.data && ap.data.areas.length ? { areas: ap.data.areas, today: ap.data.today || m.today, mark: ap.mark } : undefined}
           onGoProjects={() => go("proyectos")}
         />
       )}
 
-      {tab === "bases" && <RunBases plan={plan} today={basesRows} byFolder={m.topicByFolder} gate={gate} date={date} />}
+      {tab === "bases" && <RunBases plan={plan} routeRows={basesRoute} todayRows={basesRows} sets={areaSets(m.schedule.days, null, date, currentWeek)} reviews={basesReviews} date={date} />}
 
       {tab === "proyectos" && <RunProjects plan={plan} data={data} m={m} />}
     </div>

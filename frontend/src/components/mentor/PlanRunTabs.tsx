@@ -3,16 +3,16 @@
 // (Pomodoro y registro de horas) y su ruta; la de Bases, los fundamentos que se intercalan en todas las áreas (no son de ninguna ruta en concreto).
 
 import { ArrowRight } from "lucide-react";
-import { useState } from "react";
-import type { MentorPlan, MentorTopicView } from "../../lib/types";
+import type { MentorPlan } from "../../lib/types";
 import type { DayAreaEntry } from "../../lib/planTopicsByArea";
-import type { PlanGate } from "../../lib/planGate";
+import type { AreaSets } from "../../lib/planAreaLists";
+import type { ReviewRow } from "../../lib/planReviews";
 import { cn } from "../ui";
-import { Chip, GhostButton } from "../common/forms";
+import { GhostButton } from "../common/forms";
 import { AreaSession } from "./AreaSession";
-import { hm } from "./parts";
-import { PlanBoard, TopicRow, type BoardPractice, type BoardRow } from "./PlanBoard";
-import { type Loaded } from "./planShared";
+import { AreaWork, startAreaBlock } from "./AreaWork";
+import type { BoardPractice, BoardRow } from "./PlanBoard";
+import { useApp } from "../../store/app";
 
 export interface RunTab {
   id: string;
@@ -64,111 +64,83 @@ export interface TodayCard {
   doneN: number;
 }
 
-/** El título de un bloque dentro de una pestaña. */
-const BlockTitle = ({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) => (
-  <div className="mb-3 flex flex-wrap items-center gap-2">
-    <h2 className="text-[19px] font-bold">{children}</h2>
-    <span className="flex-1" />
-    {right}
-  </div>
-);
-
-/** La pestaña de un área: qué toca hoy, la sesión (Pomodoro y horas) y la ruta completa del área. */
-export function RunArea({ plan, data, area, card, date, hasStudy, gate, currentWeek, byFolder, practice, onGoProjects }: {
+/** La pestaña de un área: su trabajo (hoy, semana, pendientes, repasos) a la izquierda y su sesión (Pomodoro y horas) a la derecha. */
+export function RunArea({ plan, area, card, routeRows, sets, reviews, date, practice, onGoProjects }: {
   plan: MentorPlan;
-  data: Loaded;
   area: { subplanId: string; areaId?: string; area: string };
   card: TodayCard | undefined;
+  /** toda la ruta del área, sin Bases */
+  routeRows: BoardRow[];
+  sets: AreaSets;
+  reviews: ReviewRow[];
   date: string;
-  hasStudy: boolean;
-  gate: PlanGate;
-  currentWeek: number;
-  byFolder: Map<string, MentorTopicView>;
   practice?: BoardPractice;
   onGoProjects: () => void;
 }) {
   const colour = card?.colour ?? "var(--nv-accent)";
   const areaKey = area.areaId ?? area.subplanId;
   const planned = card ? card.entry.theoryMinutes + card.entry.practiceMinutes : 0;
+  const current = card?.rows.find((r) => !r.done)?.title;
+  const toast = useApp.getState().toast;
   return (
-    <div className="space-y-8" data-testid="run-area-tab" data-area={areaKey}>
-      <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <section aria-labelledby={`run-today-${areaKey}`} className="min-w-0 space-y-3">
-          <BlockTitle
-            right={card ? <Chip large colour={colour}>{card.doneN}/{card.rows.length} hechos</Chip> : undefined}
-          >
-            <span id={`run-today-${areaKey}`}>Lo que toca hoy en {area.area}</span>
-          </BlockTitle>
-          {card ? (
-            <>
-              <p className="text-[14.5px] text-dim">
-                {[card.entry.theoryMinutes ? `${hm(card.entry.theoryMinutes)} de teoría` : "", card.entry.practiceMinutes ? `${hm(card.entry.practiceMinutes)} de práctica` : ""].filter(Boolean).join(" · ")}
-              </p>
-              <ul className="space-y-1 rounded-2xl border border-line bg-card p-3" aria-label={`Temas de hoy de ${area.area}`} data-testid="run-area-today">
-                {card.rows.length === 0 ? <li className="px-2 py-3 text-[14.5px] text-dim">Hoy esta área solo lleva práctica.</li> : card.rows.map((r) => <TopicRow key={`${r.folder}:${r.meta}`} r={r} colour={colour} />)}
-              </ul>
-              {card.entry.project && (
-                <p className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[14px]" data-testid="run-area-project">
-                  Hoy esta área lleva proyecto.
-                  <GhostButton onClick={onGoProjects}>Ver los proyectos <ArrowRight size={14} aria-hidden /></GhostButton>
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="rounded-2xl border border-dashed border-line p-5 text-[14.5px] text-dim" data-testid="run-area-rest">
-              {hasStudy ? `Hoy no toca ${area.area}: sigue su ruta aquí abajo cuando quieras adelantar.` : "Hoy no hay estudio programado. Puedes adelantar la ruta de esta área aquí abajo."}
-            </p>
-          )}
-        </section>
-        <AreaSession planId={plan.id} areaKey={areaKey} areaName={area.area} date={date} plannedMinutes={planned} colour={colour} />
+    <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]" data-testid="run-area-tab" data-area={areaKey}>
+      <div className="min-w-0 space-y-4">
+        <AreaWork
+          planId={plan.id}
+          areaName={area.area}
+          areaId={area.areaId}
+          rows={routeRows}
+          todayRows={card?.rows ?? []}
+          sets={sets}
+          today={date}
+          colour={colour}
+          practice={practice}
+          reviews={reviews}
+          plannedMinutes={planned}
+          onStartBlock={() => { if (!startAreaBlock(plan.id, areaKey)) toast("info", "Ya hay un Pomodoro en marcha: termínalo o detenlo primero."); }}
+        />
+        {card?.entry.project && (
+          <p className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[14px]" data-testid="run-area-project">
+            Hoy esta área lleva proyecto.
+            <GhostButton onClick={onGoProjects}>Ver los proyectos <ArrowRight size={14} aria-hidden /></GhostButton>
+          </p>
+        )}
       </div>
-
-      <section aria-label={`Ruta de ${area.area}`} data-testid="run-area-route">
-        <PlanBoard plan={plan} data={data} byFolder={byFolder} gate={gate} currentWeek={currentWeek} onlyArea={area.subplanId} excludeBases practice={practice} />
-      </section>
+      <AreaSession planId={plan.id} areaKey={areaKey} areaName={area.area} date={date} plannedMinutes={planned} colour={colour} {...(current ? { currentTopic: current } : {})} />
     </div>
   );
 }
 
 /** La pestaña de Bases: los fundamentos que se intercalan en todas las áreas. Los temas se juntan sin repetirse. */
-export function RunBases({ plan, today, byFolder, gate, date }: { plan: MentorPlan; today: BoardRow[]; byFolder: Map<string, MentorTopicView>; gate: PlanGate; date: string }) {
-  const [all, setAll] = useState(false);
-  const seen = new Set<string>();
-  const route: BoardRow[] = [];
-  for (const s of plan.subplans) {
-    const basesId = (s.groups ?? []).find((g) => g.kind === "bases")?.id;
-    if (!basesId) continue;
-    for (const t of s.topics) {
-      if (t.group !== basesId || t.route === "skipped" || seen.has(t.folder)) continue;
-      seen.add(t.folder);
-      const state = byFolder.get(t.folder)?.state ?? "sin_tratar";
-      route.push({ folder: t.folder, title: t.title, week: t.targetWeek, state, done: state === "completo" || !!t.completedAt, exercises: byFolder.get(t.folder)?.exercises ?? 0, unlockOn: gate.locked.get(t.folder) });
-    }
-  }
-  route.sort((a, b) => a.week - b.week);
-  const pending = route.filter((r) => !r.done);
-  const shown = all ? route : pending.slice(0, 12);
+export function RunBases({ plan, routeRows, todayRows, sets, reviews, date }: {
+  plan: MentorPlan;
+  routeRows: BoardRow[];
+  todayRows: BoardRow[];
+  sets: AreaSets;
+  reviews: ReviewRow[];
+  date: string;
+}) {
   const colour = "var(--nv-accent)";
-  const planned = 0;
+  const current = todayRows.find((r) => !r.done)?.title;
+  const toast = useApp.getState().toast;
   return (
-    <div className="space-y-8" data-testid="run-bases">
-      <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <section aria-labelledby="run-bases-h" className="min-w-0 space-y-3">
-          <BlockTitle right={<Chip large colour={colour}>{route.filter((r) => r.done).length}/{route.length} hechos</Chip>}><span id="run-bases-h">Bases de programación</span></BlockTitle>
-          <p className="text-[14.5px] text-dim">Los fundamentos no son de Backend ni de Frontend: se intercalan en todas las áreas. Aquí están una sola vez.</p>
-          <h3 className="text-[15px] font-semibold">Hoy</h3>
-          <ul className="space-y-1 rounded-2xl border border-line bg-card p-3" aria-label="Bases de hoy" data-testid="run-bases-today">
-            {today.length === 0 ? <li className="px-2 py-3 text-[14.5px] text-dim">Hoy no hay fundamentos programados.</li> : today.map((r) => <TopicRow key={`${r.folder}:${r.meta}`} r={r} colour={colour} />)}
-          </ul>
-        </section>
-        <AreaSession planId={plan.id} areaKey="bases" areaName="Bases" date={date} plannedMinutes={planned} colour={colour} />
+    <div className={cn("grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]")} data-testid="run-bases">
+      <div className="min-w-0 space-y-3">
+        <p className="text-[14.5px] text-dim">Los fundamentos no son de Backend ni de Frontend: se intercalan en todas las áreas. Aquí están una sola vez.</p>
+        <AreaWork
+          planId={plan.id}
+          areaName="Bases de programación"
+          rows={routeRows}
+          todayRows={todayRows}
+          sets={sets}
+          today={date}
+          colour={colour}
+          reviews={reviews}
+          plannedMinutes={0}
+          onStartBlock={() => { if (!startAreaBlock(plan.id, "bases")) toast("info", "Ya hay un Pomodoro en marcha: termínalo o detenlo primero."); }}
+        />
       </div>
-      <section aria-labelledby="run-bases-route-h">
-        <BlockTitle right={route.length > 12 ? <GhostButton onClick={() => setAll((v) => !v)} aria-pressed={all}>{all ? "Ver solo los pendientes" : `Ver los ${route.length}`}</GhostButton> : undefined}><span id="run-bases-route-h">Ruta de Bases</span></BlockTitle>
-        <ul className="space-y-1 rounded-2xl border border-line bg-card p-3" aria-label="Temas de Bases">
-          {shown.length === 0 ? <li className="px-2 py-3 text-[14.5px] text-dim">No hay temas de Bases en este plan.</li> : shown.map((r) => <TopicRow key={r.folder} r={r} colour={colour} />)}
-        </ul>
-      </section>
+      <AreaSession planId={plan.id} areaKey="bases" areaName="Bases" date={date} plannedMinutes={0} colour={colour} {...(current ? { currentTopic: current } : {})} />
     </div>
   );
 }

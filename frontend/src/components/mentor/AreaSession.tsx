@@ -77,7 +77,7 @@ export function PomodoroTicker() {
 
 const chipBtn = (on: boolean): string => cn("min-h-8 rounded-md border px-2.5 text-[13px]", on ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:bg-hover");
 
-export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, colour }: { planId: string; areaKey: string; areaName: string; date: string; plannedMinutes: number; colour: string }) {
+export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, colour, currentTopic }: { planId: string; areaKey: string; areaName: string; date: string; plannedMinutes: number; colour: string; /** el tema de hoy que toca ahora, bajo el título */ currentTopic?: string }) {
   const toast = useApp((s) => s.toast);
   const p = usePomodoro((s) => s.p);
   const { start, pause, resume, next, setDurations } = usePomodoro.getState();
@@ -150,7 +150,11 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
     <section aria-label={`Sesión de ${areaName}`} data-testid="area-session" className="space-y-4 rounded-2xl border border-line bg-card p-5">
       <header className="flex items-center gap-2">
         <Timer size={18} aria-hidden style={{ color: colour }} />
-        <h3 className="flex-1 text-[17px] font-bold">Sesión de {areaName}</h3>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[17px] font-bold">Sesión de {areaName}</h3>
+          {currentTopic && <p className="truncate text-[13px] text-dim" data-testid="session-current">{currentTopic}</p>}
+        </div>
+        {mine && p.running && <span className="flex-none rounded-md border px-2 py-0.5 text-[12px] font-semibold" style={{ color: colour, borderColor: `${colour}66` }} data-testid="session-live">En curso</span>}
       </header>
 
       {/* Pomodoro */}

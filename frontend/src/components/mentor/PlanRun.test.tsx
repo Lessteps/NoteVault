@@ -59,8 +59,9 @@ const byTest = (id: string) => host.querySelector<HTMLElement>(`[data-testid=${i
 const all = (id: string) => [...host.querySelectorAll<HTMLElement>(`[data-testid=${id}]`)];
 /** la pestaña de la ejecución: `general`, `area:<subplan>`, `bases`, `proyectos` */
 const runTab = (id: string) => host.querySelector<HTMLElement>(`[data-testid="run-tab-${id}"]`);
-const route = () => byTest("run-area-route")!;
-const routeTopics = () => [...route().querySelectorAll<HTMLElement>("[data-testid=board-topic]")];
+const work = () => byTest("area-work")!;
+const view = async (id: string) => click(byTest(`work-view-${id}`));
+const listed = () => [...work().querySelectorAll<HTMLElement>("[data-testid=work-list] [data-testid=board-topic]")];
 
 beforeEach(() => {
   localStorage.clear();
@@ -100,14 +101,14 @@ describe("vista de ejecución", () => {
     expect(ov[1]!.textContent).toContain("100 %");
     expect(byTest("board-global")!.textContent).toContain("50 %");
     expect(host.textContent).not.toContain("Cómo voy");
-    expect(byTest("run-area-route")).toBeNull();
-    // cada área tiene su pestaña con su ruta y su porcentaje real
+    expect(byTest("area-work")).toBeNull();
+    // cada área tiene su pestaña con su trabajo: cuatro vistas (hoy, semana, pendientes, repasos)
     await click(runTab("area:s1"));
-    expect(all("run-area-progress").map((a) => a.querySelector("h3")!.textContent)).toEqual(["Ruta de Fundamentals"]);
-    expect(all("run-area-progress")[0]!.textContent).toContain("0 %");
+    expect(work().querySelector("h2")!.textContent).toBe("Fundamentals");
+    expect([...byTest("work-views")!.querySelectorAll("button")].map((b) => b.getAttribute("data-testid"))).toEqual(["work-view-hoy", "work-view-semana", "work-view-pendientes", "work-view-repasos"]);
+    expect(host.textContent).not.toContain("Con práctica");
     await click(runTab("area:s2"));
-    expect(all("run-area-progress").map((a) => a.querySelector("h3")!.textContent)).toEqual(["Ruta de Python"]);
-    expect(all("run-area-progress")[0]!.textContent).toContain("100 %");
+    expect(work().querySelector("h2")!.textContent).toBe("Python");
   });
 
   it("es de solo lectura: ningún campo de texto ni acción que cambie el plan", async () => {
@@ -162,7 +163,8 @@ describe("vista de ejecución", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(spread()));
     await mountEl(<MentorPlan planId={PID} />);
     await click(runTab("area:s1"));
-    const rows = routeTopics();
+    await view("pendientes");
+    const rows = listed();
     expect(rows.map((r) => r.dataset.state)).toEqual(["sin_tratar", "bloqueado"]);
     expect(rows[1]!.querySelector("[data-testid=board-arrow]")).toBeNull();
     // vas atrasado respecto al frente: el aviso dice qué terminar primero
@@ -176,8 +178,9 @@ describe("vista de ejecución", () => {
     const ensure = vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ ok: true, kind: "practica", path: "", created: [], errors: [] } as never);
     await mountEl(<MentorPlan planId={PID} />);
     await click(runTab("area:s1"));
+    await view("pendientes");
     expect(byTest("board-menu")).toBeNull();
-    await click(route().querySelector("[data-testid=board-arrow]"));
+    await click(work().querySelector("[data-testid=board-arrow]"));
     const menu = byTest("board-menu")!;
     expect(menu.getAttribute("role")).toBe("menu");
     expect([...menu.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica"]);
@@ -186,16 +189,40 @@ describe("vista de ejecución", () => {
     expect(byTest("board-menu")).toBeNull();
   });
 
-  it("los filtros reducen los temas de cada área", async () => {
+  it("las vistas del área: pendientes enseña lo que tocaba y no se hizo, con el aviso «Atrasado»; lo hecho no sale", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
     await click(runTab("area:s1"));
-    expect(routeTopics()).toHaveLength(1); // solo el área elegida
-    const pend = [...byTest("board-filters")!.querySelectorAll("button")].find((b) => b.textContent === "Pendientes")!;
-    await click(pend);
-    expect(routeTopics()).toHaveLength(1);
+    await view("pendientes");
+    expect(listed()).toHaveLength(1);
+    expect(listed()[0]!.querySelector("[data-testid=board-tag]")!.textContent).toMatch(/Atrasado|Hoy/);
     await click(runTab("area:s2"));
-    expect(routeTopics()).toHaveLength(0); // el de Python ya está completo
+    await view("pendientes");
+    expect(byTest("work-empty")!.textContent).toContain("nada pendiente"); // el de Python ya está completo
+  });
+
+  it("repaso espaciado: los repasos de los temas del área salen por cajón con su acceso directo a la práctica, y la pestaña avisa", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    const item = (topicPath: string, inDays: number) => ({ path: `Programación/Repaso/${topicPath.split("/").pop()}.md`, topic: topicPath.split("/").pop()!, topicPath, subject: "programming", subjectFolder: "Programación", next: "2026-10-12", last: "2026-10-09", level: 1, inDays, skills: ["explain"], practicedDays: 1, upcoming: [] });
+    vi.spyOn(api, "studyReviewsList").mockResolvedValue({ today: TODAY, items: [item(F1, 0), item(F2, 5), item("Programación/9 Otro/9.1 Otro", 0)] } as never);
+    const ensure = vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ ok: true, kind: "practica", path: "", created: [], errors: [] } as never);
+    await mountEl(<MentorPlan planId={PID} />);
+    // la pestaña del área avisa y la tarjeta general lista el repaso de hoy (solo de temas del plan)
+    expect(runTab("area:s1")!.textContent).toContain("1 ⟳");
+    expect(all("run-review-row")).toHaveLength(1);
+    await click(runTab("area:s1"));
+    expect(byTest("reviews-due-chip")!.textContent).toContain("1 repaso para hoy");
+    await view("repasos");
+    const rows = [...work().querySelectorAll<HTMLElement>("[data-testid=review-row]")];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.textContent).toContain("Hoy");
+    await click(rows[0]!.querySelector("[data-testid=review-go]"));
+    expect(ensure).toHaveBeenCalledWith(F1);
+    // el repaso de Python (en 5 días) cae en la próxima semana (hoy es lunes 12)
+    await click(runTab("area:s2"));
+    await view("repasos");
+    expect(work().textContent).toContain("Esta semana");
+    expect(work().textContent).toContain("En 5 días");
   });
 
   const due = (areaId: string, label: string, dates: string[]) =>
@@ -221,8 +248,8 @@ describe("vista de ejecución", () => {
     // ya no hay una sección «Práctica de hoy» aparte ni kata de lógica general
     expect(byTest("run-practice")).toBeNull();
     expect(host.textContent).not.toContain("Kata de lógica");
-    const cards = all("run-area-progress");
-    const backend = cards.find((c) => c.dataset.area === "backend")!;
+    await view("hoy");
+    const backend = host.querySelector<HTMLElement>("[data-testid=run-area-tab][data-area=backend]")!;
     const block = backend.querySelector("[data-testid=area-practice-block]")!;
     expect(block).toBeTruthy();
     // 3 retos que tocaban hasta hoy: hoy primero y luego los atrasados del más antiguo al más reciente
@@ -294,13 +321,18 @@ describe("Bases: no son de la ruta de ningún área", () => {
     await mountEl(<MentorPlan planId={PID} />);
     expect(runTab("bases")).toBeTruthy();
     await click(runTab("area:s1"));
-    expect(routeTopics().map((r) => r.textContent)).toEqual([expect.stringContaining("4.2 HTTP")]);
-    expect(route().textContent).not.toContain("Bases 70");
+    for (const v of ["hoy", "semana", "pendientes"]) {
+      await view(v);
+      expect(work().textContent, `vista ${v}`).not.toMatch(/1\.7 Specifying|1\.8 Algorithms/); // Bases no es de la ruta de Backend
+    }
     await click(runTab("bases"));
-    // 1.7 está en Backend y en Frontend: cuenta una sola vez (2 temas en total, uno ya hecho) y la ruta enseña los pendientes
-    expect(byTest("run-bases")!.textContent).toContain("1/2 hechos");
-    const listed = byTest("run-bases")!.querySelector("[aria-label='Temas de Bases']")!.querySelectorAll("[data-testid=board-topic]");
-    expect([...listed].map((r) => r.textContent)).toEqual([expect.stringContaining("1.8 Algorithms")]);
+    expect(work().querySelector("h2")!.textContent).toBe("Bases de programación");
+    // 1.7 está en Backend y en Frontend: en Bases sale una sola vez
+    await view("semana");
+    const all17 = [...work().querySelectorAll("[data-testid=board-topic]")].filter((r) => r.textContent!.includes("1.7 Specifying"));
+    expect(all17.length).toBeLessThanOrEqual(1);
+    await view("pendientes");
+    expect(work().textContent).toMatch(/1\.8 Algorithms|nada pendiente/);
   });
 });
 

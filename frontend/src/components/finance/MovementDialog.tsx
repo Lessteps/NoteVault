@@ -1,8 +1,9 @@
 // Create or edit a movement: type, amount, day, time, what, category or goal, invoices.
 
-import { Trash2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
+import { formatMoney } from "../../lib/money";
 import type { Movement, MovementType } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
@@ -27,6 +28,7 @@ export function MovementDialog() {
   const [reason, setReason] = useState("");
   const [refs, setRefs] = useState<string[]>([]);
   const [id, setId] = useState("");
+  const [catBudgetInfo, setCatBudgetInfo] = useState<{ used: number; budget: number; name: string; icon: string } | null>(null);
 
   useEffect(() => {
     if (!e) return;
@@ -43,6 +45,31 @@ export function MovementDialog() {
     if (e.movement) setId(e.movement.id);
     else api.finNewId().then((r) => setId(r.id)).catch(() => setId(""));
   }, [e]);
+
+  // Consulta en segundo plano el presupuesto mensual de la categoría seleccionada
+  useEffect(() => {
+    if (kind !== "gasto" || !category || !day) {
+      setCatBudgetInfo(null);
+      return;
+    }
+    const d = new Date(`${day}T12:00:00`);
+    if (isNaN(d.getTime())) return;
+    api.finMonthExtras(d.getFullYear(), d.getMonth() + 1)
+      .then((res) => {
+        const found = res.budgets.find((b) => b.category.id === category);
+        if (found && found.budget > 0) {
+          setCatBudgetInfo({
+            used: found.used,
+            budget: found.budget,
+            name: found.category.name,
+            icon: found.category.icon,
+          });
+        } else {
+          setCatBudgetInfo(null);
+        }
+      })
+      .catch(() => setCatBudgetInfo(null));
+  }, [category, kind, day]);
 
   if (!e) return null;
   const cancel = () => {
@@ -107,6 +134,40 @@ export function MovementDialog() {
             <option value="">Sin categoría</option>
             {cats.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
           </select>
+          {(() => {
+            if (kind !== "gasto" || !catBudgetInfo) return null;
+            const draftCents = amount ?? 0;
+            const originalAmt = (e.movement && e.movement.category === category) ? e.movement.amount_cents : 0;
+            const totalProjected = catBudgetInfo.used - originalAmt + draftCents;
+            const limit = catBudgetInfo.budget;
+            const pct = limit > 0 ? totalProjected / limit : 0;
+            const diff = limit - totalProjected;
+            const isOver = totalProjected > limit;
+            const isWarning = pct >= 0.8 && !isOver;
+
+            if (isOver) {
+              return (
+                <div className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/30 px-2.5 py-1 text-[11px] text-red-400">
+                  <AlertTriangle size={12} className="flex-none" />
+                  <span>Supera el presupuesto de esta categoría por <b>{formatMoney(Math.abs(diff))}</b> ({formatMoney(totalProjected)} de {formatMoney(limit)})</span>
+                </div>
+              );
+            }
+            if (isWarning) {
+              return (
+                <div className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-[11px] text-amber-400">
+                  <AlertCircle size={12} className="flex-none" />
+                  <span>Cerca del límite ({Math.round(pct * 100)}%): {formatMoney(totalProjected)} de {formatMoney(limit)} · Quedan <b>{formatMoney(diff)}</b></span>
+                </div>
+              );
+            }
+            return (
+              <div className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 px-2.5 py-1 text-[11px] text-emerald-400">
+                <CheckCircle2 size={12} className="flex-none" />
+                <span>Dentro del presupuesto ({Math.round(pct * 100)}%): {formatMoney(totalProjected)} de {formatMoney(limit)} · Quedan <b>{formatMoney(diff)}</b></span>
+              </div>
+            );
+          })()}
         </Field>
       ) : (
         <Field label="Meta">

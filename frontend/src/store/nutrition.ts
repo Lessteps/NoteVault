@@ -9,6 +9,7 @@ import type {
   NutriFoodLibraryEntry,
   NutriMealType,
   NutriProfile,
+  NutriRecipe,
   NutriTargets,
   NutriTrendsData,
 } from "../lib/nutritionTypes";
@@ -19,6 +20,7 @@ export interface NutritionState {
   selectedDate: string;
   summary: NutriDaySummary | null;
   foods: NutriFoodLibraryEntry[];
+  recipes: NutriRecipe[];
   targets: NutriTargets | null;
   profile: NutriProfile | null;
   trends: NutriTrendsData | null;
@@ -31,6 +33,8 @@ export interface NutritionState {
   addingMeal: NutriMealType | null;
   settingsOpen: boolean;
   editingFood: NutriFoodLibraryEntry | null;
+  recipeModalOpen: boolean;
+  editingRecipe: NutriRecipe | null;
 
   // Acciones de navegación y carga
   setSelectedDate: (date: string) => Promise<void>;
@@ -40,6 +44,7 @@ export interface NutritionState {
   setActiveTab: (tab: NutritionTab) => void;
   loadDay: (date?: string) => Promise<void>;
   loadFoods: () => Promise<void>;
+  loadRecipes: () => Promise<void>;
   loadSettings: () => Promise<void>;
   loadProfile: () => Promise<void>;
   saveProfile: (updates: Partial<NutriProfile>) => Promise<NutriProfile>;
@@ -55,10 +60,15 @@ export interface NutritionState {
   copyMealFromYesterday: (meal: NutriMealType) => Promise<boolean>;
   copyEntireDayFromYesterday: () => Promise<boolean>;
   quickConsumeFood: (food: NutriFoodLibraryEntry, meal: NutriMealType, amountMultiplier?: number) => Promise<void>;
+  quickConsumeRecipe: (recipeId: string, meal: NutriMealType, servings?: number) => Promise<void>;
 
   // Operaciones de despensa / biblioteca
   saveFoodToLibrary: (entry: Partial<NutriFoodLibraryEntry>) => Promise<NutriFoodLibraryEntry>;
   deleteFoodFromLibrary: (id: string) => Promise<void>;
+
+  // Operaciones de recetas
+  saveRecipe: (entry: Partial<NutriRecipe>) => Promise<NutriRecipe>;
+  deleteRecipe: (id: string) => Promise<void>;
 
   // Metas
   saveTargets: (targets: Partial<NutriTargets>) => Promise<void>;
@@ -69,6 +79,8 @@ export interface NutritionState {
   closeAddMeal: () => void;
   setSettingsOpen: (open: boolean) => void;
   setEditingFood: (food: NutriFoodLibraryEntry | null) => void;
+  setRecipeModalOpen: (open: boolean) => void;
+  setEditingRecipe: (recipe: NutriRecipe | null) => void;
 }
 
 function todayIso(): string {
@@ -93,6 +105,7 @@ export const useNutrition = create<NutritionState>((set, get) => ({
   selectedDate: todayIso(),
   summary: null,
   foods: [],
+  recipes: [],
   targets: null,
   profile: null,
   trends: null,
@@ -103,6 +116,8 @@ export const useNutrition = create<NutritionState>((set, get) => ({
   addingMeal: null,
   settingsOpen: false,
   editingFood: null,
+  recipeModalOpen: false,
+  editingRecipe: null,
 
   setSelectedDate: async (date: string) => {
     set({ selectedDate: date });
@@ -126,8 +141,9 @@ export const useNutrition = create<NutritionState>((set, get) => ({
 
   setActiveTab: (tab: NutritionTab) => {
     set({ activeTab: tab });
-    if (tab === "alimentos" && get().foods.length === 0) {
-      void get().loadFoods();
+    if (tab === "alimentos") {
+      if (get().foods.length === 0) void get().loadFoods();
+      if (get().recipes.length === 0) void get().loadRecipes();
     } else if (tab === "metas" && !get().targets) {
       void get().loadSettings();
     } else if (tab === "perfil" && !get().profile) {
@@ -152,6 +168,15 @@ export const useNutrition = create<NutritionState>((set, get) => ({
     try {
       const res = await api.nutriFoodsList();
       set({ foods: res.foods || [] });
+    } catch (e) {
+      set({ error: (e as Error).message });
+    }
+  },
+
+  loadRecipes: async () => {
+    try {
+      const res = await api.nutriRecipesList();
+      set({ recipes: res.recipes || [] });
     } catch (e) {
       set({ error: (e as Error).message });
     }
@@ -300,6 +325,17 @@ export const useNutrition = create<NutritionState>((set, get) => ({
     await get().addFoodToMeal(meal, item);
   },
 
+  quickConsumeRecipe: async (recipeId: string, meal: NutriMealType, servings = 1) => {
+    const d = get().selectedDate;
+    try {
+      const updated = await api.nutriRecipeConsume(d, meal, recipeId, servings);
+      set({ summary: updated, error: null });
+    } catch (e) {
+      set({ error: (e as Error).message });
+      throw e;
+    }
+  },
+
   saveFoodToLibrary: async (entry: Partial<NutriFoodLibraryEntry>) => {
     try {
       const saved = await api.nutriFoodSave(entry);
@@ -315,6 +351,27 @@ export const useNutrition = create<NutritionState>((set, get) => ({
     try {
       await api.nutriFoodDelete(id);
       await get().loadFoods();
+    } catch (e) {
+      set({ error: (e as Error).message });
+      throw e;
+    }
+  },
+
+  saveRecipe: async (entry: Partial<NutriRecipe>) => {
+    try {
+      const saved = await api.nutriRecipeSave(entry);
+      await get().loadRecipes();
+      return saved;
+    } catch (e) {
+      set({ error: (e as Error).message });
+      throw e;
+    }
+  },
+
+  deleteRecipe: async (id: string) => {
+    try {
+      await api.nutriRecipeDelete(id);
+      await get().loadRecipes();
     } catch (e) {
       set({ error: (e as Error).message });
       throw e;
@@ -355,4 +412,6 @@ export const useNutrition = create<NutritionState>((set, get) => ({
   closeAddMeal: () => set({ addingMeal: null }),
   setSettingsOpen: (settingsOpen: boolean) => set({ settingsOpen }),
   setEditingFood: (editingFood: NutriFoodLibraryEntry | null) => set({ editingFood }),
+  setRecipeModalOpen: (recipeModalOpen: boolean) => set({ recipeModalOpen }),
+  setEditingRecipe: (editingRecipe: NutriRecipe | null) => set({ editingRecipe }),
 }));

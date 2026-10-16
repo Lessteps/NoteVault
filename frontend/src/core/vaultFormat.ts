@@ -55,6 +55,7 @@ export const LAYOUT = {
   nutrition_profile: `${DATA_DIR}/alimentacion/perfil.json`,
   nutrition_settings: `${DATA_DIR}/alimentacion/ajustes.json`,
   nutrition_foods: `${DATA_DIR}/alimentacion/alimentos.json`,
+  nutrition_recipes: `${DATA_DIR}/alimentacion/recetas.json`,
   nutrition_day: `${DATA_DIR}/alimentacion/{year}/{month:02d}/{date}.json`,
   agenda_dir: `${DATA_DIR}/agenda`,
   agenda_routines: `${DATA_DIR}/agenda/routines.json`,

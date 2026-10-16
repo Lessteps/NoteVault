@@ -19,6 +19,8 @@ import type {
   NutriFoodLibraryEntry,
   NutriMealType,
   NutriProfile,
+  NutriRecipe,
+  NutriRecipeIngredient,
   NutriTargets,
   NutriTrendsData,
   NutriTrendDay,
@@ -152,6 +154,10 @@ export class NutritionManager {
 
   foodsPath(): string {
     return path.join(this.vaultRoot, LAYOUT.nutrition_foods);
+  }
+
+  recipesPath(): string {
+    return path.join(this.vaultRoot, LAYOUT.nutrition_recipes);
   }
 
   profilePath(): string {
@@ -375,6 +381,150 @@ export class NutritionManager {
     if (filtered.length === list.length) return false;
     writeJson(this.foodsPath(), { foods: filtered });
     return true;
+  }
+
+  // ── Recetas y Platos Compuestos ──────────────────────────────────────────
+
+  recipes(): NutriRecipe[] {
+    const p = this.recipesPath();
+    const data = loadJson<{ recipes?: NutriRecipe[] }>(p);
+    if (!data || !Array.isArray(data.recipes)) {
+      return [];
+    }
+    return data.recipes.map((r) => this.normalizeRecipe(r));
+  }
+
+  getRecipe(id: string): NutriRecipe | null {
+    const list = this.recipes();
+    return list.find((r) => r.id === id) || null;
+  }
+
+  private normalizeRecipe(raw: any): NutriRecipe {
+    const servings = Math.max(0.1, Number(raw.servings) || 1);
+    const ingredients: NutriRecipeIngredient[] = Array.isArray(raw.ingredients)
+      ? raw.ingredients.map((ing: any) => ({
+          food_id: ing.food_id ? String(ing.food_id).trim() : undefined,
+          name: String(ing.name || "Ingrediente").trim(),
+          amount: Math.max(0, Number(ing.amount) || 1),
+          unit: String(ing.unit || "g").trim(),
+          calories: Math.max(0, Math.round(Number(ing.calories) || 0)),
+          protein: Math.max(0, Number((Number(ing.protein) || 0).toFixed(1))),
+          carbs: Math.max(0, Number((Number(ing.carbs) || 0).toFixed(1))),
+          fat: Math.max(0, Number((Number(ing.fat) || 0).toFixed(1))),
+        }))
+      : [];
+
+    let total_calories = 0;
+    let total_protein = 0;
+    let total_carbs = 0;
+    let total_fat = 0;
+
+    for (const ing of ingredients) {
+      total_calories += ing.calories;
+      total_protein += ing.protein;
+      total_carbs += ing.carbs;
+      total_fat += ing.fat;
+    }
+
+    total_calories = Math.round(total_calories);
+    total_protein = Number(total_protein.toFixed(1));
+    total_carbs = Number(total_carbs.toFixed(1));
+    total_fat = Number(total_fat.toFixed(1));
+
+    return {
+      id: String(raw.id || newId("rcp")),
+      name: String(raw.name || "").trim() || "Nueva Receta",
+      description: raw.description ? String(raw.description).trim() : undefined,
+      servings,
+      ingredients,
+      total_calories,
+      total_protein,
+      total_carbs,
+      total_fat,
+      per_serving: {
+        calories: Math.round(total_calories / servings),
+        protein: Number((total_protein / servings).toFixed(1)),
+        carbs: Number((total_carbs / servings).toFixed(1)),
+        fat: Number((total_fat / servings).toFixed(1)),
+      },
+      created_at: raw.created_at || todayIso(),
+      updated_at: raw.updated_at || todayIso(),
+    };
+  }
+
+  saveRecipe(entry: Partial<NutriRecipe>): NutriRecipe {
+    const name = String(entry.name || "").trim();
+    if (!name) {
+      throw new Error("El nombre de la receta es obligatorio.");
+    }
+    const list = this.recipes();
+    const id = String(entry.id || "").trim();
+
+    const normalized = this.normalizeRecipe({
+      ...entry,
+      id: id || newId("rcp"),
+      name,
+      updated_at: todayIso(),
+    });
+
+    if (id) {
+      const idx = list.findIndex((r) => r.id === id);
+      if (idx !== -1) {
+        list[idx] = normalized;
+      } else {
+        list.push(normalized);
+      }
+    } else {
+      list.push(normalized);
+    }
+
+    writeJson(this.recipesPath(), { recipes: list });
+    return normalized;
+  }
+
+  deleteRecipe(id: string): boolean {
+    const list = this.recipes();
+    const filtered = list.filter((r) => r.id !== id);
+    if (filtered.length === list.length) return false;
+    writeJson(this.recipesPath(), { recipes: filtered });
+    return true;
+  }
+
+  /**
+   * Consume una receta en un turno del día (por defecto 1 ración, o fracciones ej: 0.5 o 2 raciones)
+   */
+  consumeRecipe(
+    day: Date | string,
+    meal: NutriMealType,
+    recipeId: string,
+    servingsConsumed: number = 1,
+  ): NutriFoodItem {
+    const recipe = this.getRecipe(recipeId);
+    if (!recipe) {
+      throw new Error(`No se encontró la receta con ID ${recipeId}`);
+    }
+    const s = Math.max(0.1, Number(servingsConsumed) || 1);
+
+    const calories = Math.round(recipe.per_serving.calories * s);
+    const protein = Number((recipe.per_serving.protein * s).toFixed(1));
+    const carbs = Number((recipe.per_serving.carbs * s).toFixed(1));
+    const fat = Number((recipe.per_serving.fat * s).toFixed(1));
+
+    const item: NutriFoodItem = {
+      id: newId("fi"),
+      name: `${recipe.name}${s !== 1 ? ` (${s} ración)` : ""}`,
+      amount: s,
+      unit: s === 1 ? "ración" : "raciones",
+      calories,
+      protein,
+      carbs,
+      fat,
+      food_id: recipe.id,
+      created_at: todayIso(),
+    };
+
+    this.addMealItem(day, meal, item);
+    return item;
   }
 
   // ── Diario de Comidas ───────────────────────────────────────────────────

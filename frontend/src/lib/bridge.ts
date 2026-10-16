@@ -852,6 +852,15 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
     call<import("./nutritionTypes").NutriFoodLibraryEntry>("nutri_food_save", entry),
   nutriFoodDelete: (id: string) =>
     call<{ ok: boolean }>("nutri_food_delete", id),
+  // Recetas
+  nutriRecipesList: () =>
+    call<{ recipes: import("./nutritionTypes").NutriRecipe[] }>("nutri_recipes_list"),
+  nutriRecipeSave: (entry: Partial<import("./nutritionTypes").NutriRecipe>) =>
+    call<import("./nutritionTypes").NutriRecipe>("nutri_recipe_save", entry),
+  nutriRecipeDelete: (id: string) =>
+    call<{ ok: boolean }>("nutri_recipe_delete", id),
+  nutriRecipeConsume: (date: string, meal: string, recipeId: string, servings = 1) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_recipe_consume", date, meal, recipeId, servings),
   nutriSettingsGet: () =>
     call<import("./nutritionTypes").NutriTargets>("nutri_settings_get"),
   nutriSettingsSave: (settings: Partial<import("./nutritionTypes").NutriTargets>) =>

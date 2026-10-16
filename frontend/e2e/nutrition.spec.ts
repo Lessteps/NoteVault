@@ -156,3 +156,63 @@ test("NV-NUTRI-005 vista de Analítica de Tendencias Semanales", async () => {
   await expect(win.getByTestId("range-btn-7")).toBeVisible();
   await expect(win.getByTestId("range-btn-14")).toBeVisible();
 });
+
+test("NV-NUTRI-006 recetas y platos compuestos: crear plato y consumirlo desde turnos de comida", async () => {
+  // 1. Ir a pestaña Despensa y cambiar a la sub-pestaña Recetas
+  await win.getByTestId("tab-alimentos").click();
+  await expect(win.getByTestId("food-library-view")).toBeVisible({ timeout: 5_000 });
+  await win.getByTestId("subtab-recipes").click();
+  await expect(win.getByTestId("new-recipe-btn")).toBeVisible();
+
+  // 2. Abrir modal de nueva receta
+  await win.getByTestId("new-recipe-btn").click();
+  await expect(win.getByTestId("recipe-modal")).toBeVisible();
+
+  const recipeName = `E2E Ensalada Cesar ${Date.now()}`;
+  await win.getByTestId("input-recipe-name").fill(recipeName);
+  await win.getByTestId("input-recipe-servings").fill("2");
+
+  // 3. Agregar un ingrediente desde la despensa
+  await win.getByTestId("add-ingredient-btn").click();
+  await expect(win.getByTestId("add-ingredient-panel")).toBeVisible();
+
+  // Seleccionar el primer alimento disponible en la lista
+  const firstFoodBtn = win.getByTestId(/^select-food-/).first();
+  await expect(firstFoodBtn).toBeVisible();
+  await firstFoodBtn.click();
+  await win.getByTestId("confirm-add-ingredient-btn").click();
+
+  // Verificar que el ingrediente aparezca en la lista del modal
+  await expect(win.getByTestId("recipe-ingredient-row-0")).toBeVisible();
+
+  // Guardar la receta
+  await win.getByTestId("save-recipe-btn").click();
+  await expect(win.getByText(recipeName)).toBeVisible({ timeout: 10_000 });
+
+  // 4. Ir a Diario y agregar la receta a la Cena mediante AddFoodDialog
+  await win.getByTestId("tab-diario").click();
+  const cenaSec = win.getByTestId("meal-section-cena");
+  await expect(cenaSec).toBeVisible();
+  await cenaSec.getByTestId("add-food-btn-cena").click();
+
+  // Cambiar a la pestaña de "Mis Recetas" dentro del diálogo
+  await win.getByTestId("tab-modal-recipes").click();
+  await expect(win.getByTestId("modal-recipes-container")).toBeVisible();
+
+  // Seleccionar la receta recién creada
+  const recipeItem = win.locator("button").filter({ hasText: recipeName }).first();
+  await expect(recipeItem).toBeVisible();
+  await recipeItem.click();
+
+  // Confirmar agregado a Cena
+  await win.getByTestId("confirm-add-recipe-to-meal-btn").click();
+
+  // Verificar que aparezca en Cena y se persista
+  await expect(cenaSec.getByText(recipeName)).toBeVisible({ timeout: 10_000 });
+
+  // Verificar archivo en disco
+  const recipesFile = join(home, "NoteVault", ".notevault", "alimentacion", "recetas.json");
+  expect(existsSync(recipesFile)).toBe(true);
+  const data = JSON.parse(readFileSync(recipesFile, "utf-8"));
+  expect(data.recipes.some((r: any) => r.name === recipeName)).toBe(true);
+});

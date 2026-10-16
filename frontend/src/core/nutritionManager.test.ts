@@ -278,4 +278,74 @@ describe("NutritionManager", () => {
       expect(trends.topFoods[0]!.totalProtein).toBe(137);
     });
   });
+
+  describe("Recetas y Platos Compuestos", () => {
+    it("crea, calcula totales y guarda una receta con ingredientes", () => {
+      const r = nm.saveRecipe({
+        name: "Ensalada Proteica con Pollo",
+        description: "Almuerzo rápido y fresco",
+        servings: 2,
+        ingredients: [
+          { name: "Pechuga de pollo", amount: 200, unit: "g", calories: 330, protein: 62, carbs: 0, fat: 7.2 },
+          { name: "Arroz cocido", amount: 150, unit: "g", calories: 195, protein: 4, carbs: 42, fat: 0.5 },
+          { name: "Aceite de oliva", amount: 10, unit: "ml", calories: 88, protein: 0, carbs: 0, fat: 10 },
+        ],
+      });
+
+      expect(r.id).toBeDefined();
+      expect(r.name).toBe("Ensalada Proteica con Pollo");
+      expect(r.servings).toBe(2);
+      expect(r.ingredients).toHaveLength(3);
+
+      // Totales: 330 + 195 + 88 = 613 kcal
+      expect(r.total_calories).toBe(613);
+      expect(r.total_protein).toBe(66);
+      expect(r.total_carbs).toBe(42);
+      expect(r.total_fat).toBe(17.7);
+
+      // Porción individual (dividido entre 2 raciones)
+      // 613 / 2 = ~307 kcal, 66 / 2 = 33g P
+      expect(r.per_serving.calories).toBe(307);
+      expect(r.per_serving.protein).toBe(33);
+
+      // Persistencia en lista de recetas
+      const all = nm.recipes();
+      expect(all).toHaveLength(1);
+      expect(all[0]!.id).toBe(r.id);
+    });
+
+    it("consume una receta entera o fraccionada en un turno de comida", () => {
+      const r = nm.saveRecipe({
+        name: "Bowl de Avena con Proteína",
+        servings: 1,
+        ingredients: [
+          { name: "Avena", amount: 60, unit: "g", calories: 226, protein: 8, carbs: 40, fat: 4 },
+          { name: "Proteína Whey", amount: 30, unit: "g", calories: 120, protein: 24, carbs: 2, fat: 1 },
+        ],
+      });
+
+      // Consumir 1 ración en el desayuno
+      const item = nm.consumeRecipe("2026-10-16", "desayuno", r.id, 1);
+      expect(item.name).toBe("Bowl de Avena con Proteína");
+      expect(item.calories).toBe(346); // 226 + 120
+      expect(item.protein).toBe(32);
+
+      const day = nm.day("2026-10-16");
+      expect(day.meals.desayuno).toHaveLength(1);
+      expect(day.meals.desayuno[0]!.calories).toBe(346);
+
+      // Consumir media ración (0.5) en la merienda
+      const halfItem = nm.consumeRecipe("2026-10-16", "merienda", r.id, 0.5);
+      expect(halfItem.calories).toBe(173); // 346 * 0.5
+      expect(halfItem.protein).toBe(16);
+      expect(nm.day("2026-10-16").meals.merienda).toHaveLength(1);
+    });
+
+    it("elimina una receta", () => {
+      const r = nm.saveRecipe({ name: "Tortilla francesa", servings: 1, ingredients: [] });
+      expect(nm.recipes()).toHaveLength(1);
+      expect(nm.deleteRecipe(r.id)).toBe(true);
+      expect(nm.recipes()).toHaveLength(0);
+    });
+  });
 });

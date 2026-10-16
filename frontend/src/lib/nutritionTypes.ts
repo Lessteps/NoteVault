@@ -86,6 +86,41 @@ export interface NutriFoodLibraryEntry {
   created_at?: string;
 }
 
+// ── Recetas y Platos Compuestos ──────────────────────────────────────────
+
+export interface NutriRecipeIngredient {
+  food_id?: string;     // ID de alimento en la despensa (si existe)
+  name: string;         // Nombre del ingrediente
+  amount: number;       // Cantidad utilizada en la receta
+  unit: string;         // "g", "ml", "unidad", etc.
+  calories: number;     // kcal aportadas por esta cantidad
+  protein: number;      // g aportados
+  carbs: number;        // g aportados
+  fat: number;          // g aportados
+}
+
+export interface NutriRecipe {
+  id: string;
+  name: string;
+  description?: string;
+  servings: number;     // Raciones que rinde la preparación (por defecto 1 o ej: 2, 4)
+  ingredients: NutriRecipeIngredient[];
+  // Totales de la preparación completa
+  total_calories: number;
+  total_protein: number;
+  total_carbs: number;
+  total_fat: number;
+  // Valores por 1 ración (totales / servings)
+  per_serving: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface NutriDaySummary {
   date: string;
   log: NutriDayLog;

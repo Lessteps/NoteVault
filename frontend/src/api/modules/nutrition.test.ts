@@ -170,4 +170,38 @@ describe("nutritionApi", () => {
     expect(trends.topFoods[0]!.name).toBe("Pechuga de pollo");
     expect(trends.topFoods[0]!.count).toBe(2);
   });
+
+  it("gestiona recetas y platos compuestos (guardar, listar, consumir y eliminar)", () => {
+    // 1. Guardar receta
+    const r = api.nutri_recipe_save({
+      name: "Bowl Energético",
+      description: "Avena con Whey y Fruta",
+      servings: 2,
+      ingredients: [
+        { name: "Avena", amount: 100, unit: "g", calories: 378, protein: 13, carbs: 66, fat: 7 },
+        { name: "Proteína", amount: 60, unit: "g", calories: 240, protein: 48, carbs: 4, fat: 2 },
+      ],
+    });
+
+    expect(r.id).toBeDefined();
+    expect(r.total_calories).toBe(618);
+    expect(r.per_serving.calories).toBe(309); // 618 / 2
+
+    // 2. Listar recetas
+    const list = api.nutri_recipes_list();
+    expect(list.recipes).toHaveLength(1);
+    expect(list.recipes[0]!.name).toBe("Bowl Energético");
+
+    // 3. Consumir 1 ración en desayuno
+    const s1 = api.nutri_recipe_consume("2026-10-16", "desayuno", r.id, 1);
+    expect(s1.log.meals.desayuno).toHaveLength(1);
+    expect(s1.log.meals.desayuno[0]!.name).toBe("Bowl Energético");
+    expect(s1.log.meals.desayuno[0]!.calories).toBe(309);
+    expect(s1.totals.calories).toBe(309);
+
+    // 4. Eliminar receta
+    const delRes = api.nutri_recipe_delete(r.id);
+    expect(delRes.ok).toBe(true);
+    expect(api.nutri_recipes_list().recipes).toHaveLength(0);
+  });
 });

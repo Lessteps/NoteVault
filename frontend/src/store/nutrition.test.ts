@@ -17,6 +17,10 @@ const mockApi = vi.hoisted(() => ({
   nutriMealCopy: vi.fn(),
   nutriDayCopy: vi.fn(),
   nutriTrends: vi.fn(),
+  nutriRecipesList: vi.fn(),
+  nutriRecipeSave: vi.fn(),
+  nutriRecipeDelete: vi.fn(),
+  nutriRecipeConsume: vi.fn(),
 }));
 
 vi.mock("../lib/bridge", () => ({
@@ -273,5 +277,39 @@ describe("useNutrition store", () => {
     await useNutrition.getState().setTrendsDays(14);
     expect(mockApi.nutriTrends).toHaveBeenCalledWith(14, "2026-10-16");
     expect(useNutrition.getState().trendsDays).toBe(14);
+  });
+
+  it("gestiona recetas en el store (loadRecipes, saveRecipe, deleteRecipe y quickConsumeRecipe)", async () => {
+    const mockRecipes = [
+      {
+        id: "rcp1",
+        name: "Bowl Avena y Whey",
+        servings: 1,
+        ingredients: [],
+        total_calories: 350,
+        total_protein: 30,
+        total_carbs: 40,
+        total_fat: 5,
+        per_serving: { calories: 350, protein: 30, carbs: 40, fat: 5 },
+      },
+    ];
+
+    mockApi.nutriRecipesList.mockResolvedValue({ recipes: mockRecipes });
+    await useNutrition.getState().loadRecipes();
+    expect(useNutrition.getState().recipes).toHaveLength(1);
+
+    mockApi.nutriRecipeSave.mockResolvedValue(mockRecipes[0]);
+    await useNutrition.getState().saveRecipe({ name: "Bowl Avena y Whey" });
+    expect(mockApi.nutriRecipeSave).toHaveBeenCalled();
+
+    const updatedSummary = sampleSummary("2026-10-16");
+    mockApi.nutriRecipeConsume.mockResolvedValue(updatedSummary);
+    await useNutrition.getState().quickConsumeRecipe("rcp1", "desayuno", 1.5);
+    expect(mockApi.nutriRecipeConsume).toHaveBeenCalledWith("2026-10-16", "desayuno", "rcp1", 1.5);
+    expect(useNutrition.getState().summary).toEqual(updatedSummary);
+
+    mockApi.nutriRecipeDelete.mockResolvedValue({ ok: true });
+    await useNutrition.getState().deleteRecipe("rcp1");
+    expect(mockApi.nutriRecipeDelete).toHaveBeenCalledWith("rcp1");
   });
 });

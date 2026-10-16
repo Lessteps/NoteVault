@@ -178,6 +178,67 @@ export function nutritionApi(app: AppState) {
       return { ok: true };
     },
 
+    // ── Recetas y Platos Compuestos ────────────────────────────────────────
+
+    nutri_recipes_list() {
+      return { recipes: mgr().recipes() };
+    },
+
+    nutri_recipe_save(entry: unknown) {
+      if (!entry || typeof entry !== "object") {
+        throw new ApiError("Datos de receta requeridos.");
+      }
+      const raw = entry as Record<string, unknown>;
+      const name = oneLine(raw.name, 120);
+      if (!name) {
+        throw new ApiError("El nombre de la receta es obligatorio.");
+      }
+
+      const rawIngredients = Array.isArray(raw.ingredients) ? raw.ingredients : [];
+      const ingredients = rawIngredients.map((ing: any) => ({
+        food_id: ing.food_id ? String(ing.food_id).trim() : undefined,
+        name: oneLine(ing.name, 120) || "Ingrediente",
+        amount: Math.max(0, Number(ing.amount) || 1),
+        unit: oneLine(ing.unit, 40) || "g",
+        calories: Math.max(0, Math.round(Number(ing.calories) || 0)),
+        protein: Math.max(0, Number((Number(ing.protein) || 0).toFixed(1))),
+        carbs: Math.max(0, Number((Number(ing.carbs) || 0).toFixed(1))),
+        fat: Math.max(0, Number((Number(ing.fat) || 0).toFixed(1))),
+      }));
+
+      return mgr().saveRecipe({
+        id: raw.id ? String(raw.id).trim() : undefined,
+        name,
+        description: raw.description ? oneLine(raw.description, 300) : undefined,
+        servings: Math.max(0.1, Number(raw.servings) || 1),
+        ingredients,
+      });
+    },
+
+    nutri_recipe_delete(id: unknown) {
+      const recipeId = String(id || "").trim();
+      if (!recipeId) {
+        throw new ApiError("ID de receta requerido.");
+      }
+      const ok = mgr().deleteRecipe(recipeId);
+      if (!ok) {
+        throw new ApiError("Esa receta ya no existe.");
+      }
+      return { ok: true };
+    },
+
+    nutri_recipe_consume(date: unknown, meal: unknown, recipeId: unknown, servings: unknown) {
+      const d = parseDay(date);
+      const m = parseMeal(meal);
+      const rId = String(recipeId || "").trim();
+      if (!rId) {
+        throw new ApiError("ID de receta requerido.");
+      }
+      const s = Math.max(0.1, Number(servings) || 1);
+      mgr().consumeRecipe(d, m, rId, s);
+      return mgr().daySummary(d);
+    },
+
     nutri_settings_get() {
       return mgr().settings();
     },

@@ -2,6 +2,7 @@
 // Direct, rich dark aesthetics, full interactive fidelity across habits, exercise, projects, tasks, finance & goals.
 
 import {
+  Apple,
   CalendarDays,
   Check,
   CircleCheck,
@@ -648,6 +649,7 @@ export function HomeModule() {
               ["calendario", "Calendario", <CalendarDays size={13} key="c" />],
               ["habits", "Hábitos", <CircleCheck size={13} key="h" />],
               ["ejercicio", "Ejercicio", <Dumbbell size={13} key="e" />],
+              ["alimentacion", "Alimentación", <Apple size={13} key="a" />],
               ["tareas", "Tareas", <SquareCheck size={13} key="t" />],
               ["proyectos", "Proyectos", <Kanban size={13} key="p" />],
               ["metas", "Metas", <Flag size={13} key="m" />],

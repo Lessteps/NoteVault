@@ -10,8 +10,10 @@ import {
   BRIDGE_URLS,
   buildBridgePrompt,
   sendChat,
+  sendMultimodalChat,
   streamChat,
   type ChatMessage,
+  type MultimodalChatMessage,
 } from "../../core/aiClient.js";
 import {
   ConversationStore,
@@ -27,6 +29,11 @@ import {
   ESTIMATE_DISH_SYSTEM_PROMPT,
   parseEstimatedDishResponse,
 } from "../../core/nutritionMealEstimator.js";
+import {
+  SCAN_LABEL_SYSTEM_PROMPT,
+  parseScannedLabelResponse,
+} from "../../core/nutritionLabelScanner.js";
+import type { ScannedNutritionLabel } from "../../lib/nutritionTypes.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 
@@ -329,6 +336,48 @@ export function nutritionCoachApi(app: AppState) {
       );
 
       return parseEstimatedDishResponse(raw, text);
+    },
+
+    /**
+     * Escanea una fotografía de una etiqueta nutricional por visión multimodal y extrae los macros.
+     */
+    async nutri_scan_label(dataUrl: unknown): Promise<ScannedNutritionLabel> {
+      const img = String(dataUrl || "").trim();
+      if (!img) {
+        throw new ApiError("La imagen de la etiqueta es obligatoria.");
+      }
+
+      const cfg = aiCfg();
+      if (cfg.is_bridge) {
+        throw new ApiError("El escáner visual requiere un proveedor conectado con visión (Gemini, OpenAI, etc.), no en modo Puente.");
+      }
+
+      const messages: MultimodalChatMessage[] = [
+        { role: "system", content: SCAN_LABEL_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Lee y extrae la información nutricional de esta etiqueta o envase:" },
+            { type: "image_url", image_url: { url: img } },
+          ],
+        },
+      ];
+
+      const raw = await sendMultimodalChat(
+        new AIConfig({
+          provider: cfg.provider,
+          base_url: cfg.base_url,
+          model: cfg.model,
+          api_key: cfg.api_key,
+          temperature: 0.1,
+          max_tokens: 1500,
+          include_note: false,
+          claude_path: cfg.claude_path,
+        }),
+        messages,
+      );
+
+      return parseScannedLabelResponse(raw);
     },
   };
 }

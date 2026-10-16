@@ -202,9 +202,22 @@ export const AI_MODES: Record<string, string> = {
     "Modo Depurador: Analiza fallos de código o razonamiento paso a paso, ayudando a aislar la causa raíz y verificar la corrección.",
 };
 
+export interface ChatMessageContentPart {
+  type: "text" | "image_url";
+  text?: string;
+  image_url?: {
+    url: string; // "data:image/jpeg;base64,..." o URL pública
+  };
+}
+
 export interface ChatMessage {
   role: string;
   content: string;
+}
+
+export interface MultimodalChatMessage {
+  role: string;
+  content: string | ChatMessageContentPart[];
 }
 
 export class AIConfig {
@@ -377,6 +390,38 @@ export async function sendChat(cfg: AIConfig, messages: ChatMessage[], opts: Sen
   }
   if (cfg.provider === ANTHROPIC) return chatAnthropic(cfg, messages, opts);
   return chatOpenAiStyle(cfg, messages, opts);
+}
+
+export async function sendMultimodalChat(
+  cfg: AIConfig,
+  messages: MultimodalChatMessage[],
+  opts: SendOpts = {},
+): Promise<string> {
+  if (cfg.is_bridge) {
+    throw new AIError(
+      "Este proveedor funciona en modo puente: copia el prompt y pega la respuesta manualmente.",
+    );
+  }
+  if (opts.signal?.aborted) throw new AIError("Cancelado.");
+
+  const url = cfg.base_url.replace(/\/+$/, "") + "/chat/completions";
+  const headers: Record<string, string> = {};
+  if (cfg.api_key) headers["Authorization"] = `Bearer ${cfg.api_key}`;
+  const payload = {
+    model: cfg.model,
+    messages,
+    temperature: cfg.temperature,
+    max_tokens: cfg.max_tokens,
+    stream: false,
+  };
+  const data = (await postJson(url, payload, headers, opts.timeoutMs, opts.signal)) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content !== "string") {
+    throw new AIError(`Respuesta inesperada del servidor:\n${JSON.stringify(data).slice(0, 400)}`);
+  }
+  return content;
 }
 
 /** Ask an OpenAI-compatible server which models it has loaded. */

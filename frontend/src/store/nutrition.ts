@@ -85,6 +85,11 @@ export interface NutritionState {
     trends: NutriTrendsData;
   }>;
 
+  // Escáner visual de etiquetas
+  scanNutritionLabel: (dataUrl: string) => Promise<import("../lib/nutritionTypes").ScannedNutritionLabel>;
+  scannerModalOpen: boolean;
+  setScannerModalOpen: (open: boolean) => void;
+
   // Control de UI
   openAddMeal: (meal: NutriMealType) => void;
   closeAddMeal: () => void;
@@ -131,6 +136,7 @@ export const useNutrition = create<NutritionState>((set, get) => ({
   recipeModalOpen: false,
   editingRecipe: null,
   exportModalOpen: false,
+  scannerModalOpen: false,
 
   setSelectedDate: async (date: string) => {
     set({ selectedDate: date });
@@ -441,6 +447,15 @@ export const useNutrition = create<NutritionState>((set, get) => ({
     }
   },
 
+  scanNutritionLabel: async (dataUrl: string) => {
+    try {
+      return await api.nutriScanLabel(dataUrl);
+    } catch (e) {
+      set({ error: (e as Error).message });
+      throw e;
+    }
+  },
+
   openAddMeal: (meal: NutriMealType) => set({ addingMeal: meal }),
   closeAddMeal: () => set({ addingMeal: null }),
   setSettingsOpen: (settingsOpen: boolean) => set({ settingsOpen }),
@@ -448,4 +463,5 @@ export const useNutrition = create<NutritionState>((set, get) => ({
   setRecipeModalOpen: (recipeModalOpen: boolean) => set({ recipeModalOpen }),
   setEditingRecipe: (editingRecipe: NutriRecipe | null) => set({ editingRecipe }),
   setExportModalOpen: (exportModalOpen: boolean) => set({ exportModalOpen }),
+  setScannerModalOpen: (scannerModalOpen: boolean) => set({ scannerModalOpen }),
 }));

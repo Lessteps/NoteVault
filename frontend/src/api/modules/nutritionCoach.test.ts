@@ -65,4 +65,8 @@ describe("nutritionCoachApi", () => {
   it("valida entradas en nutri_estimate_dish", async () => {
     await expect(api.nutri_estimate_dish("")).rejects.toThrow(/obligatoria/);
   });
+
+  it("valida entradas en nutri_scan_label", async () => {
+    await expect(api.nutri_scan_label("")).rejects.toThrow(/obligatoria/);
+  });
 });

@@ -915,6 +915,8 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
     call<{ title: string }>("nutri_coach_ai_title", id, question, answer),
   nutriEstimateDish: (description: string) =>
     call<import("./nutritionTypes").EstimatedDishResult>("nutri_estimate_dish", description),
+  nutriScanLabel: (dataUrl: string) =>
+    call<import("./nutritionTypes").ScannedNutritionLabel>("nutri_scan_label", dataUrl),
 };
 
 /**

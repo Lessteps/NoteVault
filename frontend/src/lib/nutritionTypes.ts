@@ -212,3 +212,18 @@ export interface EstimatedDishResult {
   total_fat: number;
   ingredients: EstimatedIngredient[];
 }
+
+// ── Escáner de Etiquetas Nutricionales por Visión IA ─────────────────────
+
+export interface ScannedNutritionLabel {
+  product_name: string;
+  serving_size: number;
+  serving_unit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  category?: string;
+  brand?: string;
+  notes?: string;
+}

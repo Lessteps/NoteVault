@@ -22,6 +22,7 @@ const mockApi = vi.hoisted(() => ({
   nutriRecipeDelete: vi.fn(),
   nutriRecipeConsume: vi.fn(),
   nutriEstimateDish: vi.fn(),
+  nutriScanLabel: vi.fn(),
 }));
 
 vi.mock("../lib/bridge", () => ({
@@ -330,5 +331,23 @@ describe("useNutrition store", () => {
     const res = await useNutrition.getState().estimateDish("Milanesa de pollo con puré");
     expect(mockApi.nutriEstimateDish).toHaveBeenCalledWith("Milanesa de pollo con puré");
     expect(res.total_calories).toBe(650);
+  });
+
+  it("scanNutritionLabel delega la llamada a api.nutriScanLabel", async () => {
+    const mockLabel = {
+      product_name: "Yogur Griego",
+      serving_size: 150,
+      serving_unit: "g",
+      calories: 130,
+      protein: 15,
+      carbs: 6,
+      fat: 5,
+    };
+    mockApi.nutriScanLabel.mockResolvedValue(mockLabel);
+
+    const res = await useNutrition.getState().scanNutritionLabel("data:image/jpeg;base64,1234");
+    expect(mockApi.nutriScanLabel).toHaveBeenCalledWith("data:image/jpeg;base64,1234");
+    expect(res.product_name).toBe("Yogur Griego");
+    expect(res.calories).toBe(130);
   });
 });

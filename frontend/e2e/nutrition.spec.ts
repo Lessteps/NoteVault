@@ -255,4 +255,25 @@ test("NV-NUTRI-008 exportación de reporte nutricional y timing por turnos", asy
   // Guardar en el Vault como nota .md
   await win.getByTestId("export-vault-note-btn").click();
   await expect(win.getByText("¡Guardado!")).toBeVisible({ timeout: 5_000 });
+  await win.keyboard.press("Escape");
+});
+
+test("NV-NUTRI-009 escáner de etiquetas nutricionales por visión IA en Despensa", async () => {
+  await win.getByTestId("tab-alimentos").click();
+  await expect(win.getByTestId("food-library-view")).toBeVisible();
+  await win.getByTestId("subtab-foods").click();
+
+  // Abrir modal de escáner
+  const openScannerBtn = win.getByTestId("open-label-scanner-btn");
+  await expect(openScannerBtn).toBeVisible();
+  await openScannerBtn.click();
+
+  // Verificar modal y zona de captura de imagen
+  await expect(win.getByTestId("nutrition-label-scanner-modal")).toBeVisible();
+  await expect(win.getByTestId("scanner-dropzone")).toBeVisible();
+  await expect(win.getByTestId("scanner-file-input")).toBeAttached();
+
+  // Cerrar modal
+  await win.getByTestId("close-scanner-btn").click();
+  await expect(win.getByTestId("nutrition-label-scanner-modal")).not.toBeVisible();
 });

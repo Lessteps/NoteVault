@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Plus, Search, Trash2, Edit3, Utensils, BookOpen, ChefHat } from "lucide-react";
+import { Plus, Search, Trash2, Edit3, Utensils, BookOpen, ChefHat, Camera } from "lucide-react";
 import { useNutrition } from "../../store/nutrition";
 import { useApp } from "../../store/app";
 import { GhostButton, PrimaryButton, Modal, inputBase } from "../common/forms";
 import { openMenu } from "../ui";
 import { RecipeModal } from "./RecipeModal";
+import { NutritionLabelScannerModal } from "./NutritionLabelScannerModal";
 import type { NutriFoodLibraryEntry, NutriRecipe } from "../../lib/nutritionTypes";
 import { NUTRI_MEALS } from "../../lib/nutritionTypes";
 
@@ -29,6 +30,7 @@ export function FoodLibraryView() {
   const quickConsumeRecipe = useNutrition((s) => s.quickConsumeRecipe);
   const setRecipeModalOpen = useNutrition((s) => s.setRecipeModalOpen);
   const setEditingRecipe = useNutrition((s) => s.setEditingRecipe);
+  const setScannerModalOpen = useNutrition((s) => s.setScannerModalOpen);
 
   const [subTab, setSubTab] = useState<"foods" | "recipes">("foods");
   const [search, setSearch] = useState("");
@@ -183,9 +185,21 @@ export function FoodLibraryView() {
         </div>
 
         {subTab === "foods" ? (
-          <PrimaryButton onClick={openNew} className="flex items-center gap-1.5 text-[12.5px]" data-testid="new-food-btn">
-            <Plus size={14} /> Nuevo alimento
-          </PrimaryButton>
+          <div className="flex items-center gap-2">
+            <GhostButton
+              onClick={() => setScannerModalOpen(true)}
+              className="flex items-center gap-1.5 text-[12.5px] border border-line bg-card/60 px-3 py-1.5 hover:border-accent hover:text-accent transition-colors"
+              title="Escanear tabla nutricional desde foto o cámara"
+              data-testid="open-label-scanner-btn"
+            >
+              <Camera size={14} className="text-accent" />
+              <span>Escanear etiqueta</span>
+            </GhostButton>
+
+            <PrimaryButton onClick={openNew} className="flex items-center gap-1.5 text-[12.5px]" data-testid="new-food-btn">
+              <Plus size={14} /> Nuevo alimento
+            </PrimaryButton>
+          </div>
         ) : (
           <PrimaryButton
             onClick={() => {
@@ -384,6 +398,9 @@ export function FoodLibraryView() {
 
       {/* Modal de Recetas */}
       <RecipeModal />
+
+      {/* Modal de Escáner de Etiquetas Nutricionales */}
+      <NutritionLabelScannerModal />
 
       {/* Modal de Creación / Edición de Alimento Individual */}
       {isEditing && (

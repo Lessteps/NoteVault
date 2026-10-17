@@ -133,9 +133,9 @@ export function ProgressOverview({ plan, data, onPick, compact }: { plan: Mentor
             <li key={a.subplanId}>
               <button type="button" onClick={() => onPick?.(a.subplanId)} className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-hover" data-testid="overview-area" aria-label={`${a.area}: ${pct} %, ${done} de ${total} temas. Abrir el área`}>
                 <span aria-hidden className="inline-block h-2.5 w-2.5 flex-none rounded-full" style={{ background: focusColour(a.areaId) }} />
-                <span className={cn("flex-none truncate text-[14.5px]", compact ? "w-32" : "w-40")}>{a.area}</span>
+                <span className={cn("flex-none truncate text-[14.5px]", compact ? "w-24" : "w-40")}>{a.area}</span>
                 <span className="min-w-0 flex-1"><ProgressBar pct={pct} label={`Avance de ${a.area}`} /></span>
-                <span className="w-24 flex-none text-right text-[13.5px] text-dim"><strong className="text-text">{pct} %</strong> · {done}/{total}</span>
+                <span className="w-20 flex-none text-right text-[13px] text-dim"><strong className="text-text">{pct} %</strong> · {done}/{total}</span>
               </button>
             </li>
           ))}

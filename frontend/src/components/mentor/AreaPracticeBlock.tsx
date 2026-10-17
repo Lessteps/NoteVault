@@ -41,7 +41,7 @@ function KataRow({ planId, area, d, mark }: { planId: string; area: AreaPractice
     { id: "area", label: `Ver práctica de ${area.label}`, icon: <Dumbbell size={16} aria-hidden className="text-mint" />, onClick: () => { useNavState.getState().set(practiceAreaKey(planId), area.areaId); openPlanTab(planId, "practica"); }, testid: "kata-area" },
   ];
   return (
-    <li className={cn("flex items-center gap-2.5 rounded-xl border px-2.5 py-1.5", d.today ? "border-line bg-surface" : "border-transparent hover:border-line hover:bg-surface")} data-testid="kata-row" data-state={d.state} data-date={d.date}>
+    <li className={cn("flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors", d.today ? "border-accent/40 bg-surface" : "border-line bg-surface/50 hover:bg-surface")} data-testid="kata-row" data-state={d.state} data-date={d.date}>
       <button
         type="button"
         role="checkbox"
@@ -79,26 +79,25 @@ export function AreaPracticeBlock({ planId, area, mark }: { planId: string; area
       ? { day: next.kata.day, date: next.date, state: "pending", today: false, title: next.kata.title, skillName: next.kata.skillName, level: next.kata.level, minutes: next.kata.minutes, summary: next.summary, rel: next.rel, fileReady: next.fileReady }
       : null;
   return (
-    <div className="mt-1 border-t border-line px-0 pt-2" data-testid="area-practice-block" data-area={area.areaId}>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-2.5 pb-1.5">
-        <span className="font-mono text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: colour }}>Práctica diaria</span>
-        <span className="text-[13.5px] text-dim" data-testid="area-practice-count">
+    <div className="rounded-2xl border border-line bg-card p-4" data-testid="area-practice-block" data-area={area.areaId}>
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h3 className="text-[16px] font-bold" style={{ color: colour }}>Práctica diaria</h3>
+        <span className="text-[14px] text-dim" data-testid="area-practice-count">
           {pending > 0 ? `${pending} ${pending === 1 ? "reto por hacer" : "retos por hacer"}` : area.kata.todayPlanned ? "al día" : "hoy no toca"}
           {area.kata.streak > 0 ? ` · racha ${area.kata.streak}` : ""}
         </span>
+        <span className="flex-1" />
+        {area.kata.due.length > VISIBLE && (
+          <button type="button" onClick={() => setAll((v) => !v)} aria-expanded={all} className="inline-flex min-h-8 items-center text-[13.5px] font-medium underline-offset-2 hover:underline" style={{ color: colour }} data-testid="area-practice-more">
+            {all ? "Ver menos" : `Ver los ${area.kata.due.length} retos`}
+          </button>
+        )}
       </div>
-      <ul className="space-y-0.5" aria-label={`Práctica diaria de ${area.label}`}>
+      <ul className="space-y-2" aria-label={`Práctica diaria de ${area.label}`}>
         {list.map((d) => <KataRow key={d.date} planId={planId} area={area} d={d} mark={mark} />)}
         {upcoming && <KataRow planId={planId} area={area} d={upcoming} mark={mark} />}
       </ul>
       {!list.length && !upcoming && <p className="px-2.5 py-2 text-[14px] text-faint">Este plan no tiene katas en esta área.</p>}
-      {area.kata.due.length > VISIBLE && (
-        <div className="px-2.5 pt-1">
-          <button type="button" onClick={() => setAll((v) => !v)} aria-expanded={all} className="inline-flex min-h-8 items-center text-[13.5px] font-medium underline-offset-2 hover:underline" style={{ color: colour }} data-testid="area-practice-more">
-            {all ? "Ver menos" : `Ver los ${area.kata.due.length} retos`}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

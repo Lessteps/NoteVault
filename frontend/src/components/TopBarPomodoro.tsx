@@ -67,7 +67,7 @@ export function TopBarPomodoro() {
       </button>
 
       {showDropdown && (
-        <div className="absolute right-0 top-9 z-50 w-72 rounded-xl border border-line bg-card p-3 shadow-xl backdrop-blur-md space-y-2.5">
+        <div className="absolute right-0 top-9 z-50 max-h-[80vh] w-[21rem] space-y-3 overflow-y-auto rounded-2xl border border-line bg-card p-4 shadow-xl">
           <header className="flex items-center justify-between border-b border-line pb-1.5">
             <span className="font-mono text-[12px] font-bold text-text uppercase flex items-center gap-1.5">
               <Timer size={14} className="text-accent" />

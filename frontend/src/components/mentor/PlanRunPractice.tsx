@@ -11,6 +11,7 @@ import { monthlyBlocksOf, shortOf, weeklyProjectOf, type MonthlyBlock } from "..
 import { weeklyBreakdown, type ProjectSection } from "../../lib/planAreaPractice";
 import type { MentorPlan } from "../../lib/types";
 import { Chip } from "../common/forms";
+import { cn } from "../ui";
 import { DSTATUS_COLOUR, DSTATUS_LABEL, focusColour, plural, type AgendaModel } from "./agendaKit";
 import { ProgressBar } from "./parts";
 import { GeneralCards } from "./PracticeCard";
@@ -23,7 +24,7 @@ const PRACTICE_COLOUR = "var(--nv-practice, #c58be0)";
 export function AreaSections({ sections, testid }: { sections: ProjectSection[]; testid: string }) {
   if (!sections.length) return null;
   return (
-    <ul className="mt-3 grid items-start gap-3 @4xl:grid-cols-2 [&>*]:min-w-0" aria-label="Desglose por área" data-testid={testid}>
+    <ul className={cn("mt-3 grid items-start gap-3 [&>*]:min-w-0", sections.length > 1 && "@4xl:grid-cols-2")} aria-label="Desglose por área" data-testid={testid}>
       {sections.map((s) => {
         const colour = focusColour(s.areaId);
         return (

@@ -50,7 +50,7 @@ export function useActivePlan(enabled: boolean): { plan: ActivePlan | null; load
   return state;
 }
 
-const chip = (on: boolean): string => cn("min-h-7 rounded-md border px-2 text-[12px]", on ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:bg-hover");
+const chip = (on: boolean): string => cn("min-h-8 rounded-md border px-3 text-[13px]", on ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:bg-hover");
 
 export function PomodoroSetup() {
   const toast = useApp((s) => s.toast);
@@ -72,70 +72,70 @@ export function PomodoroSetup() {
   const begin = (): void => {
     if (!plan) return;
     if (p.pendingAssessment) {
-      toast("info", "Completa primero la evaluación del bloque anterior.");
+      toast("info", "Completa primero el registro de la sesión anterior.");
       return;
     }
     start(plan.id, areaKey || FREE_AREA);
   };
 
   return (
-    <div className="space-y-3" data-testid="pomodoro-setup">
-      <div className="flex items-center justify-between gap-2 text-[12px]">
-        <span className="font-mono font-bold uppercase text-text">Nuevo bloque</span>
-        <div className="inline-flex rounded-lg border border-line p-0.5 text-[11.5px]">
-          {(["timer", "stopwatch"] as const).map((m) => (
-            <button key={m} type="button" aria-pressed={p.mode === m} onClick={() => setMode(m)} className={cn("rounded px-2 py-0.5 font-medium", p.mode === m ? "bg-accent text-white" : "text-dim hover:text-text")}>
-              {m === "timer" ? "Temporizador" : "Cronómetro"}
-            </button>
-          ))}
-        </div>
+    <div className="space-y-4" data-testid="pomodoro-setup">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface p-1 text-[13px]">
+        {(["timer", "stopwatch"] as const).map((m) => (
+          <button key={m} type="button" aria-pressed={p.mode === m} onClick={() => setMode(m)} className={cn("min-h-9 rounded-lg font-medium", p.mode === m ? "bg-accent-soft text-accent-text ring-1 ring-accent/40" : "text-dim hover:text-text")}>
+            {m === "timer" ? "Temporizador" : "Cronómetro"}
+          </button>
+        ))}
       </div>
 
       {p.mode === "timer" && (
-        <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-dim">
-          Foco {FOCUS_CHOICES.map((f) => <button key={f} type="button" aria-pressed={p.focusMin === f} onClick={() => setDurations(f, p.breakMin)} className={chip(p.focusMin === f)}>{f}m</button>)}
-          · Descanso {BREAK_CHOICES.map((b) => <button key={b} type="button" aria-pressed={p.breakMin === b} onClick={() => setDurations(p.focusMin, b)} className={chip(p.breakMin === b)}>{b}m</button>)}
+        <div className="space-y-2 text-[13px] text-dim">
+          <div className="flex items-center gap-2"><span className="w-16 flex-none">Foco</span>{FOCUS_CHOICES.map((f) => <button key={f} type="button" aria-pressed={p.focusMin === f} onClick={() => setDurations(f, p.breakMin)} className={chip(p.focusMin === f)}>{f}m</button>)}</div>
+          <div className="flex items-center gap-2"><span className="w-16 flex-none">Descanso</span>{BREAK_CHOICES.map((b) => <button key={b} type="button" aria-pressed={p.breakMin === b} onClick={() => setDurations(p.focusMin, b)} className={chip(p.breakMin === b)}>{b}m</button>)}</div>
         </div>
       )}
 
-      {loading && <p className="text-[12px] text-dim">Buscando tu plan…</p>}
-      {!loading && !plan && <p className="rounded-lg border border-dashed border-line p-2 text-[12px] text-dim" data-testid="pomodoro-noplan">No hay un plan activo en el Mentor: crea uno para registrar las horas y asignar temas.</p>}
+      {loading && <p className="text-[13px] text-dim">Buscando tu plan…</p>}
+      {!loading && !plan && <p className="rounded-lg border border-dashed border-line p-3 text-[13px] text-dim" data-testid="pomodoro-noplan">No hay un plan activo en el Mentor: crea uno para registrar las horas y asignar temas.</p>}
 
       {plan && (
         <>
-          <label className="block text-[12px] text-dim">
+          <label className="block text-[13px] text-dim">
             Área o ruta
-            <select value={areaKey} onChange={(e) => setAreaKey(e.target.value)} className="mt-1 block min-h-8 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-text" data-testid="pomodoro-area">
+            <select value={areaKey} onChange={(e) => setAreaKey(e.target.value)} className="mt-1 block min-h-10 w-full rounded-lg border border-line bg-surface px-2.5 text-[14px] text-text" data-testid="pomodoro-area">
               <option value="">Sesión libre (cualquier tema)</option>
               {plan.areas.map((a) => <option key={a.key} value={a.key}>{a.name}</option>)}
               <option value={BASES_AREA}>Bases</option>
             </select>
           </label>
 
-          <div>
-            <label className="relative block text-[12px] text-dim">
-              Buscar un tema del plan
-              <Search size={13} aria-hidden className="pointer-events-none absolute left-2 top-[27px] text-faint" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Busca un tema para asignarlo…" className="mt-1 block min-h-8 w-full rounded-lg border border-line bg-surface pl-7 pr-2 text-[13px] text-text" data-testid="pomodoro-search" />
-            </label>
-            {options.length > 0 && (
-              <ul className="mt-1.5 max-h-36 space-y-0.5 overflow-y-auto rounded-lg border border-line bg-surface p-1" aria-label="Temas por hacer" data-testid="pomodoro-options">
-                {options.map((t) => (
-                  <li key={t.folder}>
-                    <button type="button" onClick={() => assignTopic({ folder: t.folder, title: t.title })} className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[12.5px] hover:bg-hover" data-testid="pomodoro-option">
-                      <span className="min-w-0 flex-1 truncate text-text">{t.title}</span>
-                      <span className="flex-none text-[11px] text-faint">{t.area}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="border-t border-line pt-4">
+            <AssignPanel defaultOpen>
+              <div>
+                <p className="mb-1.5 text-[12.5px] font-medium text-dim">Temas del plan</p>
+                <label className="relative block">
+                  <span className="sr-only">Buscar un tema del plan</span>
+                  <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-3 text-faint" />
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Busca un tema…" className="block min-h-10 w-full rounded-lg border border-line bg-card pl-9 pr-3 text-[14px] text-text outline-none focus:border-accent" data-testid="pomodoro-search" />
+                </label>
+                {options.length > 0 && (
+                  <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto" aria-label="Temas por hacer" data-testid="pomodoro-options">
+                    {options.map((t) => (
+                      <li key={t.folder}>
+                        <button type="button" onClick={() => assignTopic({ folder: t.folder, title: t.title, kind: "topic" })} className="flex w-full items-center gap-2 rounded-lg border border-line bg-card px-3 py-2 text-left text-[13.5px] hover:border-accent" data-testid="pomodoro-option">
+                          <span className="min-w-0 flex-1 truncate text-text">{t.title}</span>
+                          <span className="flex-none text-[12px] text-faint">{t.area}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </AssignPanel>
           </div>
 
-          <AssignPanel />
-
-          <button type="button" onClick={begin} disabled={!!p.pendingAssessment} className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-50" data-testid="pomodoro-begin">
-            <Play size={14} aria-hidden /> {p.mode === "stopwatch" ? "Iniciar cronómetro" : "Empezar foco"}
+          <button type="button" onClick={begin} disabled={!!p.pendingAssessment} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-3 text-[14px] font-semibold text-white hover:opacity-90 disabled:opacity-50" data-testid="pomodoro-begin">
+            <Play size={15} aria-hidden /> {p.mode === "stopwatch" ? "Iniciar cronómetro" : "Empezar foco"}
           </button>
         </>
       )}

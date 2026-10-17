@@ -264,6 +264,9 @@ describe("vista de ejecución", () => {
     await click(runTab("area:s1"));
     const panel = byTest("assign-panel")!;
     expect(panel).toBeTruthy();
+    expect(byTest("assign-empty")!.textContent).toContain("sesión libre"); // cerrado: solo un resumen de una línea
+    expect(byTest("assign-text")).toBeNull();
+    await click(byTest("assign-toggle"));
     const today = byTest("assign-today");
     if (today) await click(today);
     const typeInto = async (el: HTMLInputElement, v: string) => {

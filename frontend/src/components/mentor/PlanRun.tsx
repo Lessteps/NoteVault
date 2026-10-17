@@ -242,7 +242,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
               {behind && gate.blockers.length > 0 && (
                 <div role="status" className="rounded-xl border border-warn/60 bg-warn-soft px-4 py-3.5" data-testid="run-gate">
                   <p className="flex items-center gap-2 text-[15px] font-semibold text-warn"><Lock size={15} aria-hidden /> Ruta sólida: termina primero los temas del {longDateLabel(gate.frontier!)}</p>
-                  <p className="mt-1 text-[14px] text-dim">Hasta cerrar ese día, lo que viene después queda bloqueado. Te falta: {gate.blockers.map(titleOf).join(" · ")}.</p>
+                  <p className="mt-1 text-[14px] text-dim">Hasta cerrar ese día, lo que viene después queda bloqueado. Te falta: {gate.blockers.slice(0, 5).map(titleOf).join(" · ")}{gate.blockers.length > 5 ? ` y ${gate.blockers.length - 5} más` : ""}.</p>
                   <GhostButton className="mt-2" onClick={() => openAgendaAt(plan.id, gate.frontier!, "dia")}>Ver ese día en la Agenda</GhostButton>
                 </div>
               )}
@@ -252,7 +252,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
 
               {day?.study && (
                 <>
-                  {day.focus?.line && <p className="text-[17px] font-semibold" data-testid="run-line">{day.focus.line}</p>}
+                  {day.focus?.line && <p className="text-[14.5px] leading-relaxed text-dim" data-testid="run-line">{day.focus.line}</p>}
                   {entries.length === 0 && langBlocks.length === 0 && !day.practice.project && (
                     <p className="text-[14px] text-dim">Sin temas repartidos hoy: queda para repaso o para recuperar lo atrasado.</p>
                   )}

@@ -91,6 +91,8 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
   const { start, pause, resume, next, setDurations, setMode } = usePomodoro.getState();
   const { entries } = useTimeLog(planId);
   const [customMin, setCustomMin] = useState(String(p.focusMin));
+  const [tab, setTab] = useState<"foco" | "horas">("foco");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [min, setMin] = useState("");
   const [note, setNote] = useState("");
@@ -168,133 +170,168 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
     }
   };
 
+  const phaseLabel = mine
+    ? p.phase === "focus"
+      ? p.mode === "stopwatch" ? (p.running ? "Cronómetro" : "Cronómetro en pausa") : p.running ? "Foco" : "Foco en pausa"
+      : p.running ? "Descanso" : "Descanso en pausa"
+    : p.mode === "stopwatch" ? "Cronómetro" : "Pomodoro";
+  const summary = p.mode === "stopwatch" ? "Cronómetro libre: corre hasta que lo detengas" : `${p.focusMin} min de foco · ${p.breakMin} min de descanso`;
+  const input = "min-h-10 w-full rounded-lg border border-line bg-surface px-3 text-[14px] text-text outline-none focus:border-accent";
+
   return (
-    <section aria-label={`Sesión de ${areaName}`} data-testid="area-session" className="space-y-4 rounded-2xl border border-line bg-card p-5">
-      <header className="flex items-center gap-2">
-        <Timer size={18} aria-hidden style={{ color: colour }} />
+    <section aria-label={`Sesión de ${areaName}`} data-testid="area-session" className="overflow-hidden rounded-2xl border border-line bg-card">
+      <header className="flex items-center gap-3 px-5 pt-5">
+        <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-xl" style={{ background: `${colour}22`, color: colour }}><Timer size={19} /></span>
         <div className="min-w-0 flex-1">
-          <h3 className="text-[17px] font-bold">Sesión de {areaName}</h3>
-          {currentTopic && <p className="truncate text-[13px] text-dim" data-testid="session-current">{currentTopic}</p>}
+          <h3 className="text-[17px] font-bold leading-tight">Sesión de {areaName}</h3>
+          {currentTopic && <p className="truncate text-[13.5px] text-dim" data-testid="session-current">{currentTopic}</p>}
         </div>
-        {mine && p.running && <span className="flex-none rounded-md border px-2 py-0.5 text-[12px] font-semibold" style={{ color: colour, borderColor: `${colour}66` }} data-testid="session-live">En curso</span>}
+        {mine && p.running && <span className="flex-none rounded-full border px-2.5 py-0.5 text-[12.5px] font-semibold" style={{ color: colour, borderColor: `${colour}66` }} data-testid="session-live">En curso</span>}
       </header>
 
-      {/* Pomodoro */}
-      <div className="rounded-xl border border-line bg-surface p-4 text-center" data-testid="pomodoro">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[12.5px] font-semibold uppercase tracking-wider text-faint" data-testid="pomodoro-phase">
-            {mine ? (p.phase === "focus" ? (p.mode === "stopwatch" ? (p.running ? "Cronómetro" : "Cronómetro en pausa") : (p.running ? "Foco" : "Foco en pausa")) : p.running ? "Descanso" : "Descanso en pausa") : "Pomodoro"}
-          </p>
+      <div role="tablist" aria-label="Qué ver de la sesión" className="mx-5 mt-4 grid grid-cols-2 gap-1 rounded-xl bg-surface p-1 text-[14px]">
+        {([["foco", "Foco"], ["horas", `Horas · ${minutesText(today)}`]] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            data-testid={`session-tab-${id}`}
+            className={cn("min-h-9 rounded-lg px-3 font-medium transition-colors", tab === id ? "bg-accent-soft text-accent-text ring-1 ring-accent/40" : "text-dim hover:text-text")}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "foco" ? (
+        <div className="space-y-6 px-5 pb-5 pt-6" data-testid="pomodoro">
+          {/* El reloj */}
+          <div className="text-center">
+            <p className="text-[13px] font-medium text-dim" data-testid="pomodoro-phase">{phaseLabel}</p>
+            <p className="my-1.5 font-mono text-[56px] font-bold leading-none tabular-nums" data-testid="pomodoro-clock" aria-live="off">{clock(left)}</p>
+            {p.mode === "timer" && <div className="mx-auto mt-3 max-w-[16rem]"><ProgressBar pct={pct} label="Avance de la fase" /></div>}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {!mine && (
+              <PrimaryButton large disabled={other || !!p.pendingAssessment} onClick={() => start(planId, areaKey)} className="w-full" data-testid="pomodoro-start">
+                <Play size={16} aria-hidden /> {p.mode === "stopwatch" ? "Iniciar cronómetro" : "Empezar foco"}
+              </PrimaryButton>
+            )}
+            {mine && p.running && <GhostButton large onClick={() => pause()} data-testid="pomodoro-pause"><Pause size={16} aria-hidden /> Pausar</GhostButton>}
+            {mine && !p.running && <PrimaryButton large onClick={() => resume()} data-testid="pomodoro-resume"><Play size={16} aria-hidden /> Reanudar</PrimaryButton>}
+            {mine && p.phase === "focus" && <GhostButton large onClick={() => void stop()} data-testid="pomodoro-stop"><Square size={16} aria-hidden /> Detener y guardar</GhostButton>}
+            {mine && p.phase === "break" && <GhostButton large onClick={() => next(true)} data-testid="pomodoro-skip"><SkipForward size={16} aria-hidden /> Saltar descanso</GhostButton>}
+          </div>
+          {p.pendingAssessment && <p className="text-center text-[13.5px] font-medium text-warn">Completa el registro de la sesión anterior para empezar otro bloque.</p>}
+          {other && <p className="text-center text-[13.5px] text-warn" data-testid="pomodoro-busy">Ya hay un Pomodoro en marcha en otra área; termínalo o detenlo primero.</p>}
+
+          {/* Ajustes: una línea; el detalle solo si se pide */}
           {p.phase === "idle" && (
-            <div className="inline-flex rounded-lg border border-line p-0.5 text-[11.5px]">
-              <button
-                type="button"
-                onClick={() => setMode("timer")}
-                className={cn("rounded px-2 py-0.5 font-medium", p.mode === "timer" ? "bg-accent text-white" : "text-dim hover:text-text")}
-              >
-                Temporizador
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("stopwatch")}
-                className={cn("rounded px-2 py-0.5 font-medium", p.mode === "stopwatch" ? "bg-accent text-white" : "text-dim hover:text-text")}
-              >
-                Cronómetro
-              </button>
+            <div>
+              <div className="flex items-center justify-between gap-3 text-[13.5px]">
+                <span className="text-dim" data-testid="session-summary">{summary}</span>
+                <button type="button" onClick={() => setSettingsOpen((v) => !v)} aria-expanded={settingsOpen} className="flex-none text-accent-text hover:underline" data-testid="session-settings-toggle">{settingsOpen ? "Listo" : "Ajustar"}</button>
+              </div>
+              {settingsOpen && (
+                <div className="mt-3 space-y-3 rounded-xl bg-surface p-3.5 text-[13.5px]" data-testid="session-settings">
+                  <div className="flex items-center gap-3">
+                    <span className="w-16 flex-none text-dim">Tipo</span>
+                    <div className="inline-flex rounded-lg border border-line p-0.5">
+                      {([["timer", "Temporizador"], ["stopwatch", "Cronómetro"]] as const).map(([m, label]) => (
+                        <button key={m} type="button" aria-pressed={p.mode === m} onClick={() => setMode(m)} className={cn("min-h-8 rounded-md px-3 font-medium", p.mode === m ? "bg-accent text-white" : "text-dim hover:text-text")}>{label}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {p.mode === "timer" && (
+                    <>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="w-16 flex-none text-dim">Foco</span>
+                        {FOCUS_CHOICES.map((f) => (
+                          <button key={f} type="button" aria-pressed={p.focusMin === f} onClick={() => { setDurations(f, p.breakMin); setCustomMin(String(f)); }} className={chipBtn(p.focusMin === f)}>{f}m</button>
+                        ))}
+                        <input
+                          type="number"
+                          min={1}
+                          max={360}
+                          value={customMin}
+                          aria-label="Minutos de foco personalizados"
+                          onChange={(e) => {
+                            setCustomMin(e.target.value);
+                            const val = parseInt(e.target.value, 10);
+                            if (val > 0) setDurations(val, p.breakMin);
+                          }}
+                          className="min-h-8 w-14 rounded-md border border-line bg-card px-1.5 text-center font-mono text-[13px] text-text"
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="w-16 flex-none text-dim">Descanso</span>
+                        {BREAK_CHOICES.map((b) => (
+                          <button key={b} type="button" aria-pressed={p.breakMin === b} onClick={() => setDurations(p.focusMin, b)} className={chipBtn(p.breakMin === b)}>{b}m</button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
-        </div>
-        <p className="my-1 font-mono text-[44px] font-bold leading-none tabular-nums" data-testid="pomodoro-clock" aria-live="off">
-          {clock(left)}
-        </p>
-        {p.mode === "timer" && <div className="mx-auto mt-2 max-w-xs"><ProgressBar pct={pct} label="Avance de la fase" /></div>}
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-          {!mine && (
-            <PrimaryButton large disabled={other || !!p.pendingAssessment} onClick={() => start(planId, areaKey)} data-testid="pomodoro-start">
-              <Play size={16} aria-hidden /> {p.mode === "stopwatch" ? "Iniciar cronómetro" : "Empezar foco"}
-            </PrimaryButton>
-          )}
-          {mine && p.running && <GhostButton large onClick={() => pause()} data-testid="pomodoro-pause"><Pause size={16} aria-hidden /> Pausar</GhostButton>}
-          {mine && !p.running && <PrimaryButton large onClick={() => resume()} data-testid="pomodoro-resume"><Play size={16} aria-hidden /> Reanudar</PrimaryButton>}
-          {mine && p.phase === "focus" && <GhostButton large onClick={() => void stop()} data-testid="pomodoro-stop"><Square size={16} aria-hidden /> Detener y guardar</GhostButton>}
-          {mine && p.phase === "break" && <GhostButton large onClick={() => next(true)} data-testid="pomodoro-skip"><SkipForward size={16} aria-hidden /> Saltar descanso</GhostButton>}
-        </div>
-        {p.pendingAssessment && <p className="mt-2 text-[13px] text-warn font-medium">Completa la evaluación post-sesión para iniciar un nuevo bloque.</p>}
-        {other && <p className="mt-2 text-[13px] text-warn" data-testid="pomodoro-busy">Ya hay un Pomodoro en marcha en otra área; termínalo o detenlo primero.</p>}
-        {p.phase === "idle" && p.mode === "timer" && (
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[13px] text-dim">
-            <span className="inline-flex items-center gap-1">
-              Foco:
-              {FOCUS_CHOICES.map((f) => (
-                <button key={f} type="button" aria-pressed={p.focusMin === f} onClick={() => { setDurations(f, p.breakMin); setCustomMin(String(f)); }} className={chipBtn(p.focusMin === f)}>
-                  {f}m
-                </button>
-              ))}
-              <input
-                type="number"
-                min={1}
-                max={360}
-                value={customMin}
-                onChange={(e) => {
-                  setCustomMin(e.target.value);
-                  const val = parseInt(e.target.value, 10);
-                  if (val > 0) setDurations(val, p.breakMin);
-                }}
-                className="w-14 rounded-md border border-line bg-surface px-1.5 py-1 text-center font-mono text-[12px] text-text"
-                title="Minutos personalizados"
-              />
-              min
-            </span>
-            <span className="inline-flex items-center gap-1">
-              Descanso:
-              {BREAK_CHOICES.map((b) => (
-                <button key={b} type="button" aria-pressed={p.breakMin === b} onClick={() => setDurations(p.focusMin, b)} className={chipBtn(p.breakMin === b)}>
-                  {b}m
-                </button>
-              ))}
-            </span>
+
+          {/* Qué se trabaja en el bloque */}
+          <div className="border-t border-line pt-5">
+            <AssignPanel suggestions={suggestions} todayTopics={todayTopics} />
           </div>
-        )}
-
-        <AssignPanel suggestions={suggestions} todayTopics={todayTopics} />
-      </div>
-
-      {/* Registro de horas */}
-      <div data-testid="timelog">
-        <div className="flex flex-wrap items-baseline gap-x-3 text-[14.5px]">
-          <h4 className="font-semibold">Registro de horas</h4>
-          <span className="flex-1" />
-          <span data-testid="timelog-today"><strong>{minutesText(today)}</strong>{plannedMinutes > 0 ? <span className="text-dim"> de {minutesText(plannedMinutes)} previstos</span> : null}</span>
         </div>
-        {plannedMinutes > 0 && <div className="mt-2"><ProgressBar pct={Math.min(100, Math.round((today / plannedMinutes) * 100))} label={`Tiempo de hoy en ${areaName}`} /></div>}
-        <p className="mt-1.5 text-[13px] text-dim" data-testid="timelog-week">Esta semana: <strong className="text-text">{minutesText(week)}</strong></p>
+      ) : (
+        <div className="space-y-6 px-5 pb-5 pt-6" data-testid="timelog">
+          <div>
+            <p className="text-[13px] text-dim">Hoy en {areaName}</p>
+            <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2" data-testid="timelog-today">
+              <strong className="text-[28px] font-bold leading-tight">{minutesText(today)}</strong>
+              {plannedMinutes > 0 && <span className="text-[14px] text-dim">de {minutesText(plannedMinutes)} previstos</span>}
+            </p>
+            {plannedMinutes > 0 && <div className="mt-2"><ProgressBar pct={Math.min(100, Math.round((today / plannedMinutes) * 100))} label={`Tiempo de hoy en ${areaName}`} /></div>}
+            <p className="mt-2.5 text-[13.5px] text-dim" data-testid="timelog-week">Esta semana: <strong className="text-text">{minutesText(week)}</strong></p>
+          </div>
 
-        {todays.length > 0 && (
-          <ul className="mt-3 space-y-1" aria-label="Bloques de hoy">
-            {todays.map((e) => (
-              <li key={e.id} className="flex items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-[13.5px]" data-testid="timelog-entry">
-                <span className="font-semibold tabular-nums">{minutesText(e.minutes)}</span>
-                <span className="text-faint">{e.kind === "pomodoro" ? "Pomodoro" : "A mano"}</span>
-                <span className="min-w-0 flex-1 truncate text-dim">{e.note ?? ""}</span>
-                <button type="button" onClick={() => void remove(e.id)} aria-label={`Quitar el bloque de ${minutesText(e.minutes)}`} className="grid h-8 w-8 flex-none place-items-center rounded-md text-faint hover:bg-hover hover:text-danger"><Trash2 size={14} aria-hidden /></button>
-              </li>
-            ))}
-          </ul>
-        )}
+          {todays.length > 0 && (
+            <div>
+              <h4 className="mb-2 text-[13px] font-semibold text-text">Bloques de hoy</h4>
+              <ul className="space-y-1.5" aria-label="Bloques de hoy">
+                {todays.map((e) => (
+                  <li key={e.id} className="flex items-center gap-2.5 rounded-lg bg-surface px-3 py-2 text-[13.5px]" data-testid="timelog-entry">
+                    <span className="font-semibold tabular-nums">{minutesText(e.minutes)}</span>
+                    <span className="text-faint">{e.kind === "pomodoro" ? "Pomodoro" : "A mano"}</span>
+                    <span className="min-w-0 flex-1 truncate text-dim">{e.note ?? ""}</span>
+                    <button type="button" onClick={() => void remove(e.id)} aria-label={`Quitar el bloque de ${minutesText(e.minutes)}`} className="grid h-8 w-8 flex-none place-items-center rounded-md text-faint hover:bg-hover hover:text-danger"><Trash2 size={14} aria-hidden /></button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-        <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); void addManual(); }}>
-          <label className="text-[13px] text-dim">
-            Minutos
-            <input type="number" min={1} max={720} value={min} onChange={(e) => setMin(e.target.value)} className="mt-1 block min-h-9 w-24 rounded-lg border border-line bg-surface px-2 text-[14px] text-text" data-testid="timelog-minutes" />
-          </label>
-          <label className="min-w-0 flex-1 basis-40 text-[13px] text-dim">
-            Nota (opcional)
-            <input type="text" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} className="mt-1 block min-h-9 w-full rounded-lg border border-line bg-surface px-2 text-[14px] text-text" data-testid="timelog-note" />
-          </label>
-          <GhostButton large disabled={busy} onClick={() => void addManual()} data-testid="timelog-add">Añadir bloque</GhostButton>
-          <GhostButton large onClick={registerSession} title="Registra una sesión que hiciste sin Pomodoro: suma sus horas y abre el formulario de la sesión" data-testid="timelog-register">Registrar sesión</GhostButton>
-        </form>
-      </div>
+          <form className="space-y-3 border-t border-line pt-5" onSubmit={(e) => { e.preventDefault(); void addManual(); }}>
+            <h4 className="text-[13px] font-semibold text-text">Añadir tiempo a mano</h4>
+            <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-3">
+              <label className="text-[12.5px] text-dim">
+                Minutos
+                <input type="number" min={1} max={720} value={min} onChange={(e) => setMin(e.target.value)} className={cn(input, "mt-1")} data-testid="timelog-minutes" />
+              </label>
+              <label className="text-[12.5px] text-dim">
+                Nota (opcional)
+                <input type="text" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} className={cn(input, "mt-1")} data-testid="timelog-note" />
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <GhostButton large disabled={busy} onClick={() => void addManual()} data-testid="timelog-add">Añadir bloque</GhostButton>
+              <GhostButton large onClick={registerSession} title="Registra una sesión que hiciste sin Pomodoro: suma sus horas y abre el formulario de la sesión" data-testid="timelog-register">Registrar sesión</GhostButton>
+            </div>
+            <p className="text-[12.5px] text-faint">«Registrar sesión» abre el formulario completo (qué aprendiste, dudas, errores) y suma las horas.</p>
+          </form>
+        </div>
+      )}
     </section>
   );
 }

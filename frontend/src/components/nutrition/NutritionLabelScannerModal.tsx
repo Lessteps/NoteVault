@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Camera, Check, Loader2, RefreshCw } from "lucide-react";
+import { Camera, Loader2, RefreshCw, ShieldAlert, AlertTriangle, ThumbsUp } from "lucide-react";
 import { useNutrition } from "../../store/nutrition";
 import { useApp } from "../../store/app";
 import { Modal, PrimaryButton, GhostButton, inputBase } from "../common/forms";
@@ -100,13 +100,13 @@ export function NutritionLabelScannerModal() {
 
   return (
     <Modal
-      title="Escanear Tabla Nutricional con IA"
+      title="Escanear Tabla Nutricional y Recomendación IA"
       onClose={handleClose}
-      width={640}
+      width={680}
     >
       <div className="space-y-4 text-main" data-testid="nutrition-label-scanner-modal">
         <p className="text-[12px] text-faint">
-          Sube o toma una foto de la tabla de información nutricional de cualquier envase o alimento. La IA leerá automáticamente la porción, calorías y macronutrientes.
+          Sube o toma una foto de la tabla de información nutricional. La IA leerá la porción y macros, y evaluará si se alinea con tu objetivo y restricciones.
         </p>
 
         {/* Zona de captura / subida */}
@@ -135,137 +135,203 @@ export function NutritionLabelScannerModal() {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Vista previa de la foto */}
-            <div className="space-y-2">
-              <div className="relative rounded-xl border border-line bg-black/40 overflow-hidden max-h-60 flex items-center justify-center">
-                <img
-                  src={imagePreview}
-                  alt="Etiqueta nutricional"
-                  className="max-h-60 w-auto object-contain"
-                />
-                {scanning && (
-                  <div className="absolute inset-0 bg-background/70 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-main">
-                    <Loader2 size={24} className="animate-spin text-accent" />
-                    <span className="text-[12px] font-semibold">Leyendo tabla nutricional…</span>
+          <div className="space-y-4">
+            {/* Tarjeta de Veredicto Inteligente de la IA */}
+            {scannedData?.verdict && (
+              <div
+                className={`rounded-2xl border p-4 space-y-2.5 transition-all ${
+                  scannedData.verdict === "recomendado"
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                    : scannedData.verdict === "contraindicado"
+                      ? "border-rose-500/40 bg-rose-500/10 text-rose-400"
+                      : "border-amber-500/40 bg-amber-500/10 text-amber-400"
+                }`}
+                data-testid="scanner-verdict-card"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-[13.5px]">
+                    {scannedData.verdict === "recomendado" ? (
+                      <>
+                        <ThumbsUp size={17} />
+                        <span>Recomendado para tu objetivo</span>
+                      </>
+                    ) : scannedData.verdict === "contraindicado" ? (
+                      <>
+                        <ShieldAlert size={17} />
+                        <span>Contraindicado según tus restricciones</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle size={17} />
+                        <span>Consumir con moderación</span>
+                      </>
+                    )}
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-background/40">
+                    Veredicto IA
+                  </span>
+                </div>
+
+                {scannedData.verdict_reason && (
+                  <p className="text-[12px] text-main leading-relaxed">
+                    {scannedData.verdict_reason}
+                  </p>
+                )}
+
+                {/* Pros y Contras */}
+                {((scannedData.pros && scannedData.pros.length > 0) || (scannedData.cons && scannedData.cons.length > 0)) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-line/40 text-[11px]">
+                    {scannedData.pros && scannedData.pros.length > 0 && (
+                      <div className="space-y-0.5">
+                        <span className="font-semibold text-emerald-400">Puntos a favor:</span>
+                        <ul className="list-disc list-inside text-dim space-y-0.5">
+                          {scannedData.pros.map((p, i) => (
+                            <li key={i}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {scannedData.cons && scannedData.cons.length > 0 && (
+                      <div className="space-y-0.5">
+                        <span className="font-semibold text-amber-400">A tener en cuenta:</span>
+                        <ul className="list-disc list-inside text-dim space-y-0.5">
+                          {scannedData.cons.map((c, i) => (
+                            <li key={i}>{c}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
+            )}
 
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setImagePreview(null);
-                    setScannedData(null);
-                    setError(null);
-                  }}
-                  className="text-[11.5px] text-faint hover:text-dim flex items-center gap-1"
-                >
-                  <RefreshCw size={12} /> Cambiar imagen
-                </button>
-              </div>
-            </div>
-
-            {/* Formulario con los datos extraídos */}
-            <div className="space-y-3">
-              {error && (
-                <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-2.5 text-[11.5px] text-rose-400">
-                  {error}
-                </div>
-              )}
-
-              {scannedData && (
-                <div className="flex items-center gap-1.5 text-[11.5px] font-medium text-emerald-400">
-                  <Check size={14} /> Datos leídos con éxito
-                </div>
-              )}
-
-              <div>
-                <label className="mb-0.5 block text-[11px] font-medium text-dim">Nombre del producto:</label>
-                <input
-                  type="text"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  placeholder="Ej. Avena Instantánea"
-                  className={`${inputBase} text-[12.5px] font-semibold text-main`}
-                  data-testid="input-scanned-name"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-0.5 block text-[10.5px] text-dim">Porción base:</label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="any"
-                    value={servingSize}
-                    onChange={(e) => setServingSize(Number(e.target.value) || 100)}
-                    className={`${inputBase} text-[12px]`}
-                    data-testid="input-scanned-serving-size"
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Vista previa de la foto */}
+              <div className="space-y-2">
+                <div className="relative rounded-xl border border-line bg-black/40 overflow-hidden max-h-60 flex items-center justify-center">
+                  <img
+                    src={imagePreview}
+                    alt="Etiqueta nutricional"
+                    className="max-h-60 w-auto object-contain"
                   />
+                  {scanning && (
+                    <div className="absolute inset-0 bg-background/70 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-main">
+                      <Loader2 size={24} className="animate-spin text-accent" />
+                      <span className="text-[12px] font-semibold">Leyendo tabla y analizando perfil…</span>
+                    </div>
+                  )}
                 </div>
+
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImagePreview(null);
+                      setScannedData(null);
+                      setError(null);
+                    }}
+                    className="text-[11.5px] text-faint hover:text-dim flex items-center gap-1"
+                  >
+                    <RefreshCw size={12} /> Cambiar imagen
+                  </button>
+                </div>
+              </div>
+
+              {/* Formulario con los datos extraídos */}
+              <div className="space-y-3">
+                {error && (
+                  <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-2.5 text-[11.5px] text-rose-400">
+                    {error}
+                  </div>
+                )}
+
                 <div>
-                  <label className="mb-0.5 block text-[10.5px] text-dim">Unidad:</label>
+                  <label className="mb-0.5 block text-[11px] font-medium text-dim">Nombre del producto:</label>
                   <input
                     type="text"
-                    value={servingUnit}
-                    onChange={(e) => setServingUnit(e.target.value)}
-                    placeholder="g, ml, scoop"
-                    className={`${inputBase} text-[12px]`}
-                    data-testid="input-scanned-serving-unit"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    placeholder="Ej. Avena Instantánea"
+                    className={`${inputBase} text-[12.5px] font-semibold text-main`}
+                    data-testid="input-scanned-name"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-4 gap-2">
-                <div>
-                  <label className="mb-0.5 block text-[10.5px] text-dim">Calorías:</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={calories}
-                    onChange={(e) => setCalories(Number(e.target.value) || 0)}
-                    className={`${inputBase} text-[12px] font-bold text-main py-0.5`}
-                    data-testid="input-scanned-calories"
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-0.5 block text-[10.5px] text-dim">Porción base:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="any"
+                      value={servingSize}
+                      onChange={(e) => setServingSize(Number(e.target.value) || 100)}
+                      className={`${inputBase} text-[12px]`}
+                      data-testid="input-scanned-serving-size"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-0.5 block text-[10.5px] text-dim">Unidad:</label>
+                    <input
+                      type="text"
+                      value={servingUnit}
+                      onChange={(e) => setServingUnit(e.target.value)}
+                      placeholder="g, ml, scoop"
+                      className={`${inputBase} text-[12px]`}
+                      data-testid="input-scanned-serving-unit"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="mb-0.5 block text-[10.5px] text-dim">Proteínas (g):</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={protein}
-                    onChange={(e) => setProtein(Number(e.target.value) || 0)}
-                    className={`${inputBase} text-[12px] text-indigo-400 py-0.5`}
-                    data-testid="input-scanned-protein"
-                  />
-                </div>
-                <div>
-                  <label className="mb-0.5 block text-[10.5px] text-dim">Carbos (g):</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={carbs}
-                    onChange={(e) => setCarbs(Number(e.target.value) || 0)}
-                    className={`${inputBase} text-[12px] text-amber-400 py-0.5`}
-                    data-testid="input-scanned-carbs"
-                  />
-                </div>
-                <div>
-                  <label className="mb-0.5 block text-[10.5px] text-dim">Grasas (g):</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={fat}
-                    onChange={(e) => setFat(Number(e.target.value) || 0)}
-                    className={`${inputBase} text-[12px] text-rose-400 py-0.5`}
-                    data-testid="input-scanned-fat"
-                  />
+
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <label className="mb-0.5 block text-[10.5px] text-dim">Calorías:</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={calories}
+                      onChange={(e) => setCalories(Number(e.target.value) || 0)}
+                      className={`${inputBase} text-[12px] font-bold text-main py-0.5`}
+                      data-testid="input-scanned-calories"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-0.5 block text-[10.5px] text-dim">Proteínas (g):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={protein}
+                      onChange={(e) => setProtein(Number(e.target.value) || 0)}
+                      className={`${inputBase} text-[12px] text-indigo-400 py-0.5`}
+                      data-testid="input-scanned-protein"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-0.5 block text-[10.5px] text-dim">Carbos (g):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={carbs}
+                      onChange={(e) => setCarbs(Number(e.target.value) || 0)}
+                      className={`${inputBase} text-[12px] text-amber-400 py-0.5`}
+                      data-testid="input-scanned-carbs"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-0.5 block text-[10.5px] text-dim">Grasas (g):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={fat}
+                      onChange={(e) => setFat(Number(e.target.value) || 0)}
+                      className={`${inputBase} text-[12px] text-rose-400 py-0.5`}
+                      data-testid="input-scanned-fat"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

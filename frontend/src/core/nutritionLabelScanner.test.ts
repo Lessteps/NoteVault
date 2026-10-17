@@ -48,6 +48,28 @@ describe("nutritionLabelScanner", () => {
     expect(res.protein).toBe(24);
   });
 
+  it("parsea veredicto de recomendación, pros y contras", () => {
+    const raw = JSON.stringify({
+      product_name: "Barrita de cereal con chocolate",
+      serving_size: 45,
+      serving_unit: "g",
+      calories: 220,
+      protein: 2,
+      carbs: 32,
+      fat: 9,
+      verdict: "moderacion",
+      verdict_reason: "Aporta alta carga de azúcares y baja saciedad para tu objetivo de déficit.",
+      pros: ["Rápida digestión"],
+      cons: ["Azúcares simples altos", "Poca proteína"],
+    });
+
+    const res = parseScannedLabelResponse(raw);
+    expect(res.verdict).toBe("moderacion");
+    expect(res.verdict_reason).toContain("déficit");
+    expect(res.pros).toHaveLength(1);
+    expect(res.cons).toHaveLength(2);
+  });
+
   it("lanza un error claro si la respuesta no contiene un formato compatible", () => {
     expect(() => parseScannedLabelResponse("La imagen está demasiado borrosa para leer la tabla.")).toThrow(
       /No se pudo interpretar la respuesta visual/,

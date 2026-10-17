@@ -339,7 +339,8 @@ export function nutritionCoachApi(app: AppState) {
     },
 
     /**
-     * Escanea una fotografía de una etiqueta nutricional por visión multimodal y extrae los macros.
+     * Escanea una fotografía de una etiqueta nutricional por visión multimodal,
+     * extrae los macros y emite un veredicto personalizado según el perfil del usuario.
      */
     async nutri_scan_label(dataUrl: unknown): Promise<ScannedNutritionLabel> {
       const img = String(dataUrl || "").trim();
@@ -352,12 +353,25 @@ export function nutritionCoachApi(app: AppState) {
         throw new ApiError("El escáner visual requiere un proveedor conectado con visión (Gemini, OpenAI, etc.), no en modo Puente.");
       }
 
+      const nm = app.mgrs().nutrition;
+      const profile = nm.getProfile();
+      const settings = nm.settings();
+
+      let userContext = `PERFIL DEL USUARIO:\n`;
+      userContext += `- Objetivo: ${profile.goal || "salud_general"}\n`;
+      if (profile.weight) userContext += `- Peso: ${profile.weight} kg\n`;
+      userContext += `- Restricciones / Alimentos contraindicados: ${profile.dietary_restrictions || "Ninguno"}\n`;
+      userContext += `- Meta calórica diaria: ${settings.calories} kcal (Proteína: ${settings.protein_g}g)\n`;
+
       const messages: MultimodalChatMessage[] = [
         { role: "system", content: SCAN_LABEL_SYSTEM_PROMPT },
         {
           role: "user",
           content: [
-            { type: "text", text: "Lee y extrae la información nutricional de esta etiqueta o envase:" },
+            {
+              type: "text",
+              text: `${userContext}\nLee la tabla nutricional de la imagen, extrae porción y macros, y dime con honestidad si le recomiendas este alimento al usuario para su perfil y objetivo:`,
+            },
             { type: "image_url", image_url: { url: img } },
           ],
         },

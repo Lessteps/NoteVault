@@ -215,6 +215,8 @@ export interface EstimatedDishResult {
 
 // ── Escáner de Etiquetas Nutricionales por Visión IA ─────────────────────
 
+export type LabelVerdict = "recomendado" | "moderacion" | "contraindicado";
+
 export interface ScannedNutritionLabel {
   product_name: string;
   serving_size: number;
@@ -226,4 +228,9 @@ export interface ScannedNutritionLabel {
   category?: string;
   brand?: string;
   notes?: string;
+  // Recomendación inteligente según el perfil del usuario
+  verdict?: LabelVerdict;
+  verdict_reason?: string;
+  pros?: string[];
+  cons?: string[];
 }

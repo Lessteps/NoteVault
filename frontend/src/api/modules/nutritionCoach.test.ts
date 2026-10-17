@@ -1,23 +1,39 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const hoisted = vi.hoisted(() => ({
+  convDir: "",
+}));
+
+vi.mock("../appConfig.js", () => ({
+  AppConfig: {
+    get_ai_config: () => ({}),
+    get_nutrition_coach_conversations_dir: () => hoisted.convDir,
+  },
+}));
+
 import { AppState } from "../appState.js";
 import { nutritionCoachApi } from "./nutritionCoach.js";
 
 describe("nutritionCoachApi", () => {
   let tmpDir: string;
+  let convDir: string;
   let app: AppState;
   let api: ReturnType<typeof nutritionCoachApi>;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nv-nutri-coach-test-"));
+    convDir = fs.mkdtempSync(path.join(os.tmpdir(), "nv-nutri-convs-test-"));
+    hoisted.convDir = convDir;
     app = new AppState(tmpDir);
     api = nutritionCoachApi(app);
   });
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(convDir, { recursive: true, force: true });
   });
 
   it("nutri_coach_context retorna el contexto diario y perfil de entrenamiento", () => {

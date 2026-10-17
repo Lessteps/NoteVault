@@ -882,6 +882,36 @@ ignorarlo, y no sube `FORMAT_VERSION`.
   plan de hoy (no se copia a la cola de estudio ni a la agenda).
 - El informe que ve la IA se calcula al vuelo y no se guarda.
 
+### Registros de sesión de estudio (opcional, aditivo)
+
+Cada bloque de estudio (Pomodoro, cronómetro o sesión registrada a mano) deja un **registro** que el Mentor puede leer después para repensar el plan. Son datos de la app
+(nunca notas) más unas **notas derivadas** legibles. Todo es opcional: una vault sin estas rutas es válida y un cliente que no las conoce puede ignorarlas.
+
+| Ruta | Qué es |
+|---|---|
+| `.notevault/mentor/timelog/<plan>.json` | `{ version: 1, entries: [...], assessments: [...] }`: los bloques de tiempo por área y la evaluación obligatoria de cada bloque |
+| `.notevault/mentor/records/<plan>/<AAAA-MM-DD>/<id>.json` | UNA sesión: lo asignado (temas, tareas, proyectos), la evaluación y la **evidencia** calculada por la app (intentos, errores, repasos y archivos tocados en la ventana de la sesión). Es el dato canónico |
+| `.notevault/mentor/records/<plan>/_weeks/<AAAA-Www>.json` | resumen de una semana: es lo que se conserva cuando el detalle pasa de **90 días** |
+| `.notevault/mentor/records/<plan>/_proposals.json` | las propuestas del Mentor («Repensar el plan con mis registros») y su estado: `open` · `dismissed` · `applied` (con línea base para medir si funcionó) |
+| `<Materia>/_registro/<AAAA-MM-DD>/<hhmm> <Área>.md` | nota legible de una sesión (derivada del JSON: editarla no cambia nada) |
+| `<Materia>/_registro/puntos-debiles.md` | los temas con menor dominio y los patrones abiertos (se recalcula al guardar cada sesión) |
+| `<Materia>/_registro/semana-<AAAA-Www>.md` | resumen de la semana (sobrevive a los 90 días) |
+| `<tema>/_Refuerzo — <tema>.md` · `<tema>/_Nota puente — <tema>.md` | nota creada **solo cuando la persona acepta una propuesta**; nunca sobrescribe (si existe, añade « (2)») |
+
+Las notas de `_registro/` usan un frontmatter propio — `registro: sesion | semana | puntos-debiles | refuerzo` — y **no** la clave `type`, para no chocar con los tipos de la vault.
+Los nombres que empiezan por `_` quedan fuera del recuento de teoría de los temas y de los escáneres de diseño.
+
+```json
+{"version": 1, "id": "r-<evaluación>", "planId": "2026-10-06_2027-04-05", "areaKey": "backend", "areaName": "Backend", "date": "2026-10-16",
+ "start": "14:30", "startedAt": "2026-10-16T19:30:00.000Z", "minutes": 52, "mode": "timer",
+ "assigned": [{"kind": "topic", "folder": "Programación/4 Backend/4.2 HTTP in depth", "title": "4.2 HTTP in depth", "status": "partial"}],
+ "assessment": {"understanding": 3, "focus": 4, "practiced": true, "learned": "…", "doubt": "…", "errors": "…"},
+ "evidence": {"attempts": [], "errors": [], "katas": [], "reviewsDone": [], "filesTouched": []}, "at": "2026-10-16T20:22:00.000Z"}
+```
+
+Lo medido pesa más que lo declarado: el dominio por tema mezcla la nota de los intentos (peso 0,5), el resultado de las sesiones (0,2), la comprensión declarada (0,2) y los errores (0,1).
+La IA solo **propone** (`reinforce`, `bridge_note`, `move_review`, `optional`, `lighten`); nada se aplica sin confirmación. Ver `docs/MENTOR_SESSION_RECORDS_PLAN.md`.
+
 ### Conversaciones del Mentor (`chats/<id>.json`)
 
 El Mentor tiene su **propio historial de conversaciones**, aparte del historial del asistente (que

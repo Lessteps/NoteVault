@@ -400,6 +400,15 @@ export const api = {
   mentorTimeLogAssess: (opts: { id: string; areaKey: string; date: string; minutes: number; topics: string[]; understanding: number; focus: number; outcomes: Array<{ title: string; status: "done" | "partial" | "none" }>; practiced: boolean; learned: string; doubt: string; errors: string }) => call<{ assessments: import("./timeLog").Assessment[]; assessment: import("./timeLog").Assessment }>("mentor_timelog_assess", opts),
   mentorTimeLogAdd: (opts: { id: string; areaKey: string; date: string; minutes: number; kind?: "pomodoro" | "manual"; note?: string }) => call<{ entries: import("./timeLog").TimeEntry[]; entry: import("./timeLog").TimeEntry }>("mentor_timelog_add", opts),
   mentorTimeLogDelete: (id: string, entryId: string) => call<{ entries: import("./timeLog").TimeEntry[] }>("mentor_timelog_delete", { id, entryId }),
+  /** Registros de sesión: la sesión con su evidencia y su nota legible en `_registro/`. */
+  mentorRecordSave: (opts: { id: string; areaKey: string; areaName?: string; date: string; startedAt: number; minutes: number; mode: string; assigned: Array<{ kind: string; folder: string; title: string; status: string }>; assessmentId?: string; assessment?: { understanding: number; focus: number; practiced: boolean; learned: string; doubt: string; errors: string } }) =>
+    call<{ record: import("./sessionRecords").SessionRecord; rel: string; duplicate: boolean }>("mentor_record_save", opts),
+  mentorRecordsList: (id: string) => call<import("./sessionRecords").RecordsList>("mentor_records_list", { id }),
+  /** «Repensar el plan con mis registros»: propone (una llamada de IA o por reglas); no cambia nada. */
+  mentorRecordsRethink: (id: string, noAi = false) => call<{ proposals: import("./sessionRecords").ProposalView[]; source: "ai" | "rules"; note?: string }>("mentor_records_rethink", { id, ...(noAi ? { noAi: true } : {}) }),
+  mentorProposalSet: (id: string, proposalId: string, status: "open" | "dismissed" | "applied") => call<{ proposals: import("./sessionRecords").ProposalView[] }>("mentor_proposal_set", { id, proposalId, status }),
+  /** Crea la nota de refuerzo o la nota puente de una propuesta (nunca sobrescribe); con `preview` solo dice qué crearía. */
+  mentorProposalApply: (id: string, proposalId: string, preview = false) => call<{ rel: string; created: boolean; source: "ai" | "rules"; aiCalls?: number }>("mentor_proposal_apply", { id, proposalId, ...(preview ? { preview: true } : {}) }),
   mentorExecutionCancel: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_cancel", { id }),
   /** Sistema de práctica por área: katas, habilidades y proyectos de cada área del plan. */
   mentorAreaPractice: (id: string) => call<import("./types").MentorAreaPractice>("mentor_area_practice", { id }),

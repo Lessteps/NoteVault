@@ -1687,6 +1687,7 @@ export interface MentorDayRecord {
   weak: Array<{ key: string; discipline: string; skill: string; attempts: number; avgScore: number; errors: number }>;
   errorsByCategory: Record<string, number>;
   katas: { done: number; skipped: number };
+  sessions?: { count: number; minutes: number; avgUnderstanding: number | null; avgFocus: number | null; doubts: string[]; errors: string[]; openTopics: number };
 }
 export interface MentorStudentDay { mood?: 1 | 2 | 3 | 4 | 5; feeling: string; notes: string }
 export interface MentorDayReview {

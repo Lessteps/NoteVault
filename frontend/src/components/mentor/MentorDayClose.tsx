@@ -156,6 +156,7 @@ export function MentorDayClose() {
             <Stat label="Intentos" value={String(rec.attempts.total)} hint={rec.attempts.total ? `${rec.attempts.counted} cuentan · ${rec.attempts.wrong} con fallos${rec.attempts.avgScore !== null ? ` · media ${rec.attempts.avgScore}` : ""}` : "Sin práctica registrada"} />
             <Stat label="Temas completados" value={String(rec.completed.length)} hint={rec.completed.slice(0, 2).join(" · ") || undefined} />
             <Stat label="Katas" value={`${rec.katas.done}`} hint={rec.katas.skipped ? `${rec.katas.skipped} saltados` : "hechos hoy"} />
+            {rec.sessions && <Stat label="Sesiones de estudio" value={String(rec.sessions.count)} hint={`${hm(rec.sessions.minutes)}${rec.sessions.avgUnderstanding !== null ? ` · comprensión ${rec.sessions.avgUnderstanding}/5` : ""}${rec.sessions.avgFocus !== null ? ` · concentración ${rec.sessions.avgFocus}/5` : ""}`} />}
           </dl>
           {rec.planned.topics > 0 && <div className="mt-3"><ProgressBar pct={(rec.planned.done / rec.planned.topics) * 100} thick label="Temas previstos terminados hoy" /></div>}
           {rec.planned.pending.length > 0 && (

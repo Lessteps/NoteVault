@@ -70,7 +70,7 @@ export function PomodoroAssessmentModal() {
     if (!ready || busy) return;
     setBusy(true);
     try {
-      await api.mentorTimeLogAssess({
+      const saved = await api.mentorTimeLogAssess({
         id: assessment.planId,
         areaKey: assessment.areaKey,
         date: localDay(new Date(assessment.finishedAt)),
@@ -84,6 +84,26 @@ export function PomodoroAssessmentModal() {
         doubt: doubt.trim(),
         errors: errors.trim(),
       });
+      // una sesión registrada a mano todavía no tiene sus horas en el registro: se suman ahora
+      if (assessment.mode === "manual") {
+        await api.mentorTimeLogAdd({ id: assessment.planId, areaKey: assessment.areaKey, date: localDay(new Date(assessment.finishedAt)), minutes: assessment.minutes, kind: "manual", ...(items.length ? { note: `[${items.map((t) => t.title).join(", ")}]` } : {}) });
+      }
+      // el REGISTRO de la sesión (evidencia + nota legible en `_registro/`): si falla, la evaluación ya está a salvo y se avisa
+      try {
+        await api.mentorRecordSave({
+          id: assessment.planId,
+          areaKey: assessment.areaKey,
+          date: localDay(new Date(assessment.finishedAt)),
+          startedAt: assessment.startedAt,
+          minutes: assessment.minutes,
+          mode: assessment.mode,
+          assigned: items.map((t) => ({ kind: t.kind ?? "topic", folder: t.folder, title: t.title, status: statusOf(t.folder) })),
+          assessmentId: saved.assessment.id,
+          assessment: { understanding, focus, practiced, learned: learned.trim(), doubt: doubt.trim(), errors: errors.trim() },
+        });
+      } catch (err) {
+        toast("error", `La evaluación se guardó, pero no el registro de la sesión: ${(err as Error).message}`);
+      }
       usePomodoro.getState().bump();
       clearAssessment();
     } catch (err) {

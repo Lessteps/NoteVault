@@ -23,6 +23,8 @@ interface PomodoroStore {
   next: (stop?: boolean) => { planId: string; areaKey: string; minutes: number; assessment: PomodoroAssessment | null };
   bump: () => void;
   clearAssessment: () => void;
+  /** abre la evaluación para una sesión hecha sin Pomodoro (el botón «Registrar sesión») */
+  requestAssessment: (a: PomodoroAssessment) => void;
 }
 
 export const usePomodoro = create<PomodoroStore>((set, get) => ({
@@ -55,4 +57,5 @@ export const usePomodoro = create<PomodoroStore>((set, get) => ({
   },
   bump: () => set((s) => ({ logVersion: s.logVersion + 1 })),
   clearAssessment: () => set((s) => ({ p: { ...s.p, pendingAssessment: null } })),
+  requestAssessment: (a) => set((s) => (s.p.pendingAssessment ? s : { p: { ...s.p, pendingAssessment: a } })),
 }));

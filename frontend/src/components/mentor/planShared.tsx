@@ -107,6 +107,12 @@ export function openPlanTab(planId: string, tab: PlanTab): void {
   nav.set("mentor.view", `plan:${planId}`);
 }
 
+/** Abre la sub-vista «Registros» del plan (desde la Ejecución, el botón «Registros»). */
+export function openPlanRecords(planId: string): void {
+  openPlanTab(planId, "plan");
+  openPlanSection(planId, "registros");
+}
+
 /**
  * Fecha pedida para la Agenda de un plan (AAAA-MM-DD), escrita por un enlace profundo («ver este mes en la Agenda») y consumida una sola
  * vez: la Agenda puede leerla al montarse; si no lo hace, la sub-interfaz del plan la aplica con el selector «Ir a la fecha».

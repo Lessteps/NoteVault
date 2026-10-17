@@ -9,7 +9,8 @@ import type { AreaSets } from "../../lib/planAreaLists";
 import type { ReviewRow } from "../../lib/planReviews";
 import { cn } from "../ui";
 import { GhostButton } from "../common/forms";
-import { AreaSession } from "./AreaSession";
+import { AreaSession, useTimeLog } from "./AreaSession";
+import { minutesOn } from "../../lib/timeLog";
 import { AreaWork, startAreaBlock, type WeekDayView } from "./AreaWork";
 import type { BoardPractice, BoardRow } from "./PlanBoard";
 import { useApp } from "../../store/app";
@@ -28,10 +29,10 @@ export interface RunTab {
 }
 
 /** La barra de pestañas de la ejecución: se desplaza en horizontal en anchos estrechos. */
-export function RunNav({ tabs, active, onSelect }: { tabs: ReadonlyArray<RunTab>; active: string; onSelect: (id: string) => void }) {
+export function RunNav({ tabs, active, onSelect, right }: { tabs: ReadonlyArray<RunTab>; active: string; onSelect: (id: string) => void; /** acciones fijas a la derecha de la barra (p. ej. «Registros») */ right?: React.ReactNode }) {
   return (
-    <nav aria-label="Secciones de la ejecución" data-testid="run-nav" className="min-w-0 border-b border-line">
-      <ul className="flex gap-1 overflow-x-auto py-1.5">
+    <nav aria-label="Secciones de la ejecución" data-testid="run-nav" className="flex min-w-0 items-center gap-2 border-b border-line">
+      <ul className="flex min-w-0 flex-1 gap-1 overflow-x-auto py-1.5">
         {tabs.map((t) => {
           const on = t.id === active;
           return (
@@ -57,6 +58,7 @@ export function RunNav({ tabs, active, onSelect }: { tabs: ReadonlyArray<RunTab>
           );
         })}
       </ul>
+      {right && <div className="flex-none py-1.5">{right}</div>}
     </nav>
   );
 }
@@ -87,6 +89,8 @@ export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, 
 }) {
   const colour = card?.colour ?? "var(--nv-accent)";
   const areaKey = area.areaId ?? area.subplanId;
+  const { entries: timeEntries } = useTimeLog(plan.id);
+  const objective = plan.subplans.find((s) => s.id === area.subplanId)?.objective;
   const planned = card ? card.entry.theoryMinutes + card.entry.practiceMinutes : 0;
   const current = card?.rows.find((r) => !r.done)?.title;
   const toast = useApp.getState().toast;
@@ -97,6 +101,8 @@ export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, 
           planId={plan.id}
           areaName={area.area}
           areaId={area.areaId}
+          {...(objective ? { subtitle: objective } : {})}
+          loggedMinutes={minutesOn(timeEntries, date, areaKey)}
           rows={routeRows}
           todayRows={card?.rows ?? []}
           weekDays={weekDays}

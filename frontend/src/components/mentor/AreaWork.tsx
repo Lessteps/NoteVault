@@ -15,7 +15,7 @@ import type { AreaSets } from "../../lib/planAreaLists";
 import { useMentor } from "../../store/mentor";
 import { usePomodoro } from "../../store/pomodoro";
 import { cn } from "../ui";
-import { Chip, GhostButton } from "../common/forms";
+import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { AreaPracticeBlock } from "./AreaPracticeBlock";
 import { openTopic } from "./openTopic";
 import { ProgressBar } from "./parts";
@@ -123,10 +123,14 @@ function WeekView({ days, today, colour }: { days: WeekDayView[]; today: string;
   );
 }
 
-export function AreaWork({ planId, areaName, areaId, rows, todayRows, weekDays, sets, today, colour, practice, reviews, plannedMinutes, onStartBlock }: {
+export function AreaWork({ planId, areaName, areaId, subtitle, loggedMinutes = 0, rows, todayRows, weekDays, sets, today, colour, practice, reviews, plannedMinutes, onStartBlock }: {
   planId: string;
   areaName: string;
   areaId?: string;
+  /** el objetivo del área, bajo el título */
+  subtitle?: string;
+  /** minutos ya registrados hoy en esta área */
+  loggedMinutes?: number;
   /** todos los temas de la ruta (sin Bases en un área) */
   rows: BoardRow[];
   /** los temas de hoy, con su parte y sus minutos */
@@ -167,20 +171,33 @@ export function AreaWork({ planId, areaName, areaId, rows, todayRows, weekDays, 
   const view = sel;
   const pa = practice?.areas.find((x) => x.areaId === areaId);
   const reviewsDue = buckets.today.length;
+  const pendingToday = todayRows.filter((r) => !r.done).length;
 
   return (
     <section aria-label={`Trabajo de ${areaName}`} data-testid="area-work" className="min-w-0 space-y-4">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 className="text-[19px] font-bold">{areaName}</h2>
-        {plannedMinutes > 0 && <span className="text-[14px] text-dim">{plannedMinutes} min previstos hoy</span>}
-        <span className="flex-1" />
-        {reviewsDue > 0 && (
-          <button type="button" onClick={() => setSel("repasos")} className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-warn/60 bg-warn-soft px-2.5 text-[13px] font-semibold text-warn" data-testid="reviews-due-chip">
-            <CalendarClock size={14} aria-hidden /> {reviewsDue} {reviewsDue === 1 ? "repaso" : "repasos"} para hoy
-          </button>
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-3" data-testid="area-header">
+        <span aria-hidden className="grid h-11 w-11 flex-none place-items-center rounded-xl text-[18px] font-bold text-white" style={{ background: colour }}>{areaName.slice(0, 1).toUpperCase()}</span>
+        <div className="min-w-0 flex-1 basis-60">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-[22px] font-bold leading-tight">{areaName}</h2>
+            <Chip colour={pendingToday > 0 ? colour : "var(--nv-mint)"}>{pendingToday > 0 ? "En curso" : todayRows.length ? "Al día" : "Sin temas hoy"}</Chip>
+            {reviewsDue > 0 && (
+              <button type="button" onClick={() => setSel("repasos")} className="inline-flex min-h-7 items-center gap-1.5 rounded-md border border-warn/60 bg-warn-soft px-2 text-[12.5px] font-semibold text-warn" data-testid="reviews-due-chip">
+                <CalendarClock size={13} aria-hidden /> {reviewsDue} {reviewsDue === 1 ? "repaso" : "repasos"} para hoy
+              </button>
+            )}
+          </div>
+          {subtitle && <p className="mt-0.5 line-clamp-2 text-[14px] text-dim" data-testid="area-subtitle">{subtitle}</p>}
+        </div>
+        {plannedMinutes > 0 && (
+          <div className="min-w-44 rounded-xl border border-line bg-card px-3.5 py-2" data-testid="area-today-progress">
+            <p className="text-[12px] text-dim">Progreso de hoy</p>
+            <p className="font-mono text-[15px] font-bold">{loggedMinutes} / {plannedMinutes} min</p>
+            <div className="mt-1"><ProgressBar pct={Math.min(100, Math.round((loggedMinutes / plannedMinutes) * 100))} label="Tiempo registrado hoy frente al previsto" /></div>
+          </div>
         )}
-        {onStartBlock && <GhostButton large onClick={onStartBlock} data-testid="start-block"><Play size={14} aria-hidden /> Iniciar bloque</GhostButton>}
-      </div>
+        {onStartBlock && <PrimaryButton large onClick={onStartBlock} data-testid="start-block"><Play size={14} aria-hidden /> Iniciar bloque</PrimaryButton>}
+      </header>
 
       <div role="group" aria-label="Qué ver" className="inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-line bg-card p-1" data-testid="work-views">
         {VIEWS.map((v) => (
@@ -210,9 +227,18 @@ export function AreaWork({ planId, areaName, areaId, rows, todayRows, weekDays, 
             {view === "hoy" ? "Hoy no toca ningún tema de esta ruta." : view === "semana" ? "Esta semana no hay temas repartidos en esta ruta." : "No tienes nada pendiente: lo que tocaba hasta hoy está hecho."}
           </p>
         ) : (
-          <ul className="space-y-1 rounded-2xl border border-line bg-card p-3" aria-label={VIEWS.find((v) => v.id === view)!.label} data-testid="work-list">
-            {lists[view].map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} />)}
-          </ul>
+          <div className="rounded-2xl border border-line bg-card p-3">
+            {view === "hoy" && (
+              <p className="mb-1.5 flex items-center gap-2 px-1.5 pt-0.5 font-mono text-[12px] font-semibold uppercase tracking-wider text-dim" data-testid="session-plan-header">
+                <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: colour }} /> Plan de sesión de hoy
+                <span className="flex-1" />
+                {plannedMinutes > 0 && <span className="normal-case tracking-normal">{plannedMinutes} min en total</span>}
+              </p>
+            )}
+            <ul className="space-y-1" aria-label={VIEWS.find((v) => v.id === view)!.label} data-testid="work-list">
+              {lists[view].map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} />)}
+            </ul>
+          </div>
         )
       ) : reviews.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-line p-5 text-[14.5px] text-dim" data-testid="work-empty">

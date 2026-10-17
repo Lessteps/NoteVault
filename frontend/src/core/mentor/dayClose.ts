@@ -36,6 +36,8 @@ export interface DayRecordInput {
   errors: ReadonlyArray<{ category: string; subject: string; topic: string; skill: string; repeat: number }>;
   /** katas por área marcados ese día */
   katas: ReadonlyArray<{ areaId: string; status: string }>;
+  /** sesiones de estudio (Pomodoro) de ese día, con su registro */
+  sessions?: ReadonlyArray<{ areaName: string; minutes: number; understanding: number; focus: number; doubt: string; errors: string; open: number }>;
 }
 
 export interface WeakSpot {
@@ -56,6 +58,8 @@ export interface DayRecord {
   weak: WeakSpot[];
   errorsByCategory: Record<string, number>;
   katas: { done: number; skipped: number };
+  /** lo que dejaron las sesiones de estudio del día (solo si hubo): tiempo, medias y lo que la persona escribió */
+  sessions?: { count: number; minutes: number; avgUnderstanding: number | null; avgFocus: number | null; doubts: string[]; errors: string[]; openTopics: number };
 }
 
 const round = (n: number): number => Math.round(n * 10) / 10;
@@ -97,12 +101,27 @@ export function buildDayRecord(input: DayRecordInput, builtAt = new Date().toISO
     weak,
     errorsByCategory,
     katas: { done: input.katas.filter((k) => k.status === "done").length, skipped: input.katas.filter((k) => k.status === "skipped").length },
+    ...(input.sessions?.length
+      ? {
+          sessions: {
+            count: input.sessions.length,
+            minutes: input.sessions.reduce((n, s) => n + s.minutes, 0),
+            avgUnderstanding: mean(input.sessions.filter((s) => s.understanding > 0).map((s) => s.understanding)),
+            avgFocus: mean(input.sessions.filter((s) => s.focus > 0).map((s) => s.focus)),
+            doubts: input.sessions.map((s) => s.doubt).filter(Boolean).slice(0, 5),
+            errors: input.sessions.map((s) => s.errors).filter(Boolean).slice(0, 5),
+            openTopics: input.sessions.reduce((n, s) => n + s.open, 0),
+          },
+        }
+      : {}),
   };
 }
 
+const mean = (xs: readonly number[]): number | null => (xs.length ? Math.round((xs.reduce((n, x) => n + x, 0) / xs.length) * 10) / 10 : null);
+
 /** ¿Pasó algo registrable ese día? (un día vacío no merece una llamada a la IA). */
 export function dayHasActivity(r: DayRecord, student: StudentDay): boolean {
-  return r.completed.length > 0 || r.attempts.total > 0 || r.katas.done + r.katas.skipped > 0 || r.planned.topics > 0 || !!student.feeling || !!student.notes;
+  return r.completed.length > 0 || r.attempts.total > 0 || (r.sessions?.count ?? 0) > 0 || r.katas.done + r.katas.skipped > 0 || r.planned.topics > 0 || !!student.feeling || !!student.notes;
 }
 
 // ── Lo que dice el estudiante ───────────────────────────────────────────

@@ -23,6 +23,9 @@ export interface PomodoroAssessment {
   minutes: number;
   topics: AssignedTopic[];
   finishedAt: number;
+  /** cuándo empezó el bloque (ms) y cómo se hizo: lo necesita el registro de la sesión para unir la evidencia de esa ventana */
+  startedAt: number;
+  mode: PomodoroTimerMode | "manual";
 }
 
 export interface PomodoroState {
@@ -147,6 +150,8 @@ export function advance(s: PomodoroState, now: number, stop = false): { state: P
       minutes: mins,
       topics: [...s.assignedTopics],
       finishedAt: now,
+      startedAt: now - mins * 60_000,
+      mode: s.mode,
     } : null;
 
     if (stop || s.mode === "stopwatch") {

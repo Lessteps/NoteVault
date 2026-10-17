@@ -147,6 +147,18 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
       setBusy(false);
     }
   };
+  /** Una sesión hecha SIN Pomodoro también se registra con el formulario (qué aprendí, dudas, errores…) y suma sus horas. */
+  const registerSession = (): void => {
+    const n = Math.round(Number(min));
+    if (!Number.isFinite(n) || n < 1 || n > 720) {
+      toast("error", "Pon los minutos de la sesión (entre 1 y 720) para registrarla.");
+      return;
+    }
+    const at = Date.now();
+    usePomodoro.getState().requestAssessment({ planId, areaKey, minutes: n, topics: usePomodoro.getState().p.assignedTopics, finishedAt: at, startedAt: at - n * 60_000, mode: "manual" });
+    setMin("");
+    setNote("");
+  };
   const remove = async (id: string): Promise<void> => {
     try {
       await api.mentorTimeLogDelete(planId, id);
@@ -280,6 +292,7 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
             <input type="text" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} className="mt-1 block min-h-9 w-full rounded-lg border border-line bg-surface px-2 text-[14px] text-text" data-testid="timelog-note" />
           </label>
           <GhostButton large disabled={busy} onClick={() => void addManual()} data-testid="timelog-add">Añadir bloque</GhostButton>
+          <GhostButton large onClick={registerSession} title="Registra una sesión que hiciste sin Pomodoro: suma sus horas y abre el formulario de la sesión" data-testid="timelog-register">Registrar sesión</GhostButton>
         </form>
       </div>
     </section>

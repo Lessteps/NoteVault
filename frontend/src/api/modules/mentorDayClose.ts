@@ -16,6 +16,7 @@ import {
   type CorrectionStatus, type DayRecord, type DayRecordInput, type DayReview, type StoredDay, type StudentDay,
 } from "../../core/mentor/dayClose.js";
 import { AreaPracticeStore } from "../../core/mentor/areaPracticeState.js";
+import { SessionRecordStore } from "../../core/mentor/sessionRecordStore.js";
 import { refreshPlanProgress, PlanStore, type Plan, type TopicLiteLookup } from "../../core/mentor/plan.js";
 import { aiUnavailableReason } from "../../core/mentor/planner.js";
 import type { TopicSnap } from "../../core/mentor/topics.js";
@@ -125,7 +126,15 @@ export function mentorDayCloseApi(app: AppState, deps: DayCloseDeps) {
       .errors()
       .filter((e) => String(e.occurred_at ?? "").startsWith(date))
       .map((e) => ({ category: e.category, subject: e.subject, topic: e.topic, skill: e.skill, repeat: e.repeat_count || 1 }));
-    return buildDayRecord({ date, planned, completed, attempts, errors, katas });
+    // las sesiones de estudio del día (Pomodoro): lo que la persona escribió al acabar cada bloque
+    const sessions: NonNullable<DayRecordInput["sessions"]>[number][] = [];
+    for (const p of plans) {
+      for (const r of new SessionRecordStore(app.root, p.id).list()) {
+        if (r.date !== date) continue;
+        sessions.push({ areaName: r.areaName, minutes: r.minutes, understanding: r.assessment?.understanding ?? 0, focus: r.assessment?.focus ?? 0, doubt: r.assessment?.doubt ?? "", errors: r.assessment?.errors ?? "", open: r.assigned.filter((t) => t.status !== "done").length });
+      }
+    }
+    return buildDayRecord({ date, planned, completed, attempts, errors, katas, sessions });
   }
 
   const view = (day: StoredDay) => ({
@@ -147,6 +156,12 @@ export function mentorDayCloseApi(app: AppState, deps: DayCloseDeps) {
     for (const w of record.weak) lines.push(`Punto flojo: ${w.skill || w.discipline} — ${w.attempts} intentos, media ${w.avgScore}, ${w.errors} errores.`);
     if (Object.keys(record.errorsByCategory).length) lines.push(`Errores por tipo: ${Object.entries(record.errorsByCategory).map(([k, v]) => `${k} ${v}`).join(", ")}`);
     lines.push(`Katas: ${record.katas.done} hechos, ${record.katas.skipped} saltados.`);
+    if (record.sessions) {
+      const s = record.sessions;
+      lines.push(`Sesiones de estudio: ${s.count} (${s.minutes} min)${s.avgUnderstanding !== null ? `, comprensión media ${s.avgUnderstanding}/5` : ""}${s.avgFocus !== null ? `, concentración media ${s.avgFocus}/5` : ""}, ${s.openTopics} temas o tareas sin terminar.`);
+      for (const d of s.doubts) lines.push(`Duda anotada en una sesión: ${d}`);
+      for (const e of s.errors) lines.push(`Errores anotados en una sesión: ${e}`);
+    }
     lines.push("");
     lines.push(`El estudiante dice${student.mood ? ` (ánimo ${student.mood}/5)` : ""}: ${student.feeling || "(nada)"}`);
     if (student.notes) lines.push(`Quiere que tengas en cuenta: ${student.notes}`);

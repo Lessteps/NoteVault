@@ -25,6 +25,7 @@ import { ExecutionPanel } from "./PlanExecution";
 import { PlanNotes, SectionCard, SectionHeading } from "./planKit";
 import { PhaseMonthTable } from "./PlanMonths";
 import { PlanAreaTopics } from "./PlanAreaTopics";
+import { PlanRecords } from "./PlanRecords";
 import { PlanTopicCatalog } from "./PlanTopicCatalog";
 import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
 import { PACE_LABEL } from "./PlanForm";
@@ -294,6 +295,10 @@ function TemasPorAreaView({ data, plan, summary }: PlanSectionCtx) {
   );
 }
 
+function RegistrosView({ plan }: PlanSectionCtx) {
+  return <div id="sec-registros" tabIndex={-1} className={anchor}><PlanRecords planId={plan.id} /></div>;
+}
+
 function CoberturaView({ plan, cov, onChanged, announce }: PlanSectionCtx) {
   return <div id="sec-cobertura" tabIndex={-1} className={anchor}><CoveragePanel plan={plan} cov={cov} onPlan={onChanged} announce={announce} /></div>;
 }
@@ -333,6 +338,7 @@ export function planSectionsOf(ctx: PlanSectionCtx): PlanSection[] {
     { id: "alcance", label: "Alcance y comentarios", visible: scopeOf(plan).hasScope, render: () => <AlcanceView {...ctx} /> },
     { id: "fases", label: "Fases mes a mes", visible: byAreas, render: () => <FasesView {...ctx} /> },
     { id: "temas", label: "Temas por área", visible: byAreas, render: () => <TemasPorAreaView {...ctx} /> },
+    { id: "registros", label: "Registros", visible: true, render: () => <RegistrosView {...ctx} /> },
     { id: "cobertura", label: "Cobertura", visible: true, render: () => <CoberturaView {...ctx} /> },
     { id: "ejecutar", label: "Ejecutar plan", visible: true, render: () => <EjecutarView {...ctx} /> },
     { id: "antigravity", label: "Plan para Antigravity", visible: true, render: () => <AntigravityView {...ctx} /> },

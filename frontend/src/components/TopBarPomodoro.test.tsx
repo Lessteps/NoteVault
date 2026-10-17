@@ -101,11 +101,12 @@ describe("Pomodoro de la barra superior", () => {
 
 describe("evaluación obligatoria", () => {
   const pending = () => usePomodoro.setState({
-    p: { ...idlePomodoro("p1", "backend", 25, 5), pendingAssessment: { planId: "p1", areaKey: "backend", minutes: 25, topics: [{ folder: "P/4.2 HTTP", title: "4.2 HTTP" }], finishedAt: new Date(2026, 9, 16, 22, 30).getTime() } },
+    p: { ...idlePomodoro("p1", "backend", 25, 5), pendingAssessment: { planId: "p1", areaKey: "backend", minutes: 25, topics: [{ folder: "P/4.2 HTTP", title: "4.2 HTTP" }], finishedAt: new Date(2026, 9, 16, 22, 30).getTime(), startedAt: new Date(2026, 9, 16, 22, 5).getTime(), mode: "timer" } },
   });
 
   it("no se puede enviar sin las dos respuestas; al enviar se guarda COMPLETA con el día local y se desbloquea", async () => {
-    const assess = vi.spyOn(api, "mentorTimeLogAssess").mockResolvedValue({ assessments: [], assessment: {} as never });
+    const assess = vi.spyOn(api, "mentorTimeLogAssess").mockResolvedValue({ assessments: [], assessment: { id: "as1" } as never });
+    const rec = vi.spyOn(api, "mentorRecordSave").mockResolvedValue({ record: {} as never, rel: "Programación/_registro/x.md", duplicate: false });
     pending();
     await act(async () => { root.render(<PomodoroAssessmentModal />); });
     expect(byTest("assess-submit")!.hasAttribute("disabled")).toBe(true);
@@ -123,8 +124,40 @@ describe("evaluación obligatoria", () => {
       outcomes: [{ title: "4.2 HTTP", status: "done" }], practiced: true, errors: "Confundí PUT con PATCH.",
       learned: "Aprendí cómo se valida un 422 con un esquema y por qué no se devuelve un 500.", doubt: "No tengo claro qué pasa cuando el token expira a mitad de la petición.",
     });
+    // y se guarda el REGISTRO de la sesión, unido a la evaluación y con la ventana de tiempo del bloque
+    expect(rec).toHaveBeenCalledWith(expect.objectContaining({
+      id: "p1", areaKey: "backend", date: "2026-10-16", startedAt: new Date(2026, 9, 16, 22, 5).getTime(), minutes: 25, mode: "timer", assessmentId: "as1",
+      assigned: [{ kind: "topic", folder: "P/4.2 HTTP", title: "4.2 HTTP", status: "done" }],
+      assessment: expect.objectContaining({ understanding: 5, focus: 3, practiced: true, errors: "Confundí PUT con PATCH." }),
+    }));
     expect(usePomodoro.getState().p.pendingAssessment).toBeNull();
     expect(byTest("assessment-modal")).toBeNull();
+  });
+
+  it("si el registro de la sesión no se puede guardar, la evaluación ya está a salvo: se desbloquea y se avisa", async () => {
+    vi.spyOn(api, "mentorTimeLogAssess").mockResolvedValue({ assessments: [], assessment: { id: "as2" } as never });
+    vi.spyOn(api, "mentorRecordSave").mockRejectedValue(new Error("disco lleno"));
+    pending();
+    await act(async () => { root.render(<PomodoroAssessmentModal />); });
+    await type(byTest("assess-learned") as HTMLTextAreaElement, "algo");
+    await type(byTest("assess-doubt") as HTMLTextAreaElement, "otra cosa");
+    await click(byTest("assess-submit"));
+    expect(usePomodoro.getState().p.pendingAssessment).toBeNull();
+  });
+
+  it("una sesión registrada a mano también suma sus horas al registro (las de un Pomodoro ya se sumaron al acabar)", async () => {
+    vi.spyOn(api, "mentorTimeLogAssess").mockResolvedValue({ assessments: [], assessment: { id: "as3" } as never });
+    vi.spyOn(api, "mentorRecordSave").mockResolvedValue({ record: {} as never, rel: "x", duplicate: false });
+    const add = vi.spyOn(api, "mentorTimeLogAdd").mockResolvedValue({ entries: [], entry: {} as never });
+    usePomodoro.getState().requestAssessment({ planId: "p1", areaKey: "backend", minutes: 40, topics: [{ folder: "P/4.2 HTTP", title: "4.2 HTTP" }], finishedAt: new Date(2026, 9, 16, 20, 0).getTime(), startedAt: new Date(2026, 9, 16, 19, 20).getTime(), mode: "manual" });
+    // mientras hay una evaluación pendiente no se abre otra encima
+    usePomodoro.getState().requestAssessment({ planId: "p9", areaKey: "x", minutes: 5, topics: [], finishedAt: 1, startedAt: 0, mode: "manual" });
+    expect(usePomodoro.getState().p.pendingAssessment!.planId).toBe("p1");
+    await act(async () => { root.render(<PomodoroAssessmentModal />); });
+    await type(byTest("assess-learned") as HTMLTextAreaElement, "algo");
+    await type(byTest("assess-doubt") as HTMLTextAreaElement, "otra cosa");
+    await click(byTest("assess-submit"));
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ id: "p1", areaKey: "backend", minutes: 40, kind: "manual", date: "2026-10-16", note: "[4.2 HTTP]" }));
   });
 
   it("si no se puede guardar se queda abierto (no se pierde en silencio) y mientras tanto no se puede empezar otro bloque", async () => {

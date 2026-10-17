@@ -6,7 +6,7 @@
 // Es de SOLO LECTURA sobre el plan: no renombra, no reparte, no ajusta, no ejecuta. Todo se calcula con el mismo modelo de agenda que la
 // vista de plan (`useAgendaModel`), así que ambas vistas nunca discrepan.
 
-import { CalendarDays, ChevronRight, Lock } from "lucide-react";
+import { CalendarDays, ChevronRight, Lock, NotebookText } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { areaSets } from "../../lib/planAreaLists";
@@ -32,7 +32,7 @@ import { usePlanAreaPractice } from "./PracticeCard";
 import { RunProjects } from "./PlanRunPractice";
 import { RunArea, RunBases, RunNav, type RunTab, type TodayCard } from "./PlanRunTabs";
 import { SectionHeading } from "./planKit";
-import { DAY_LONG, openAgendaAt, type Loaded } from "./planShared";
+import { DAY_LONG, openAgendaAt, openPlanRecords, type Loaded } from "./planShared";
 
 const UPCOMING_DAYS = 5;
 const DELIVERABLES_SHOWN = 4;
@@ -208,7 +208,12 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
 
   return (
     <div className="space-y-6 pb-4" data-testid="plan-run">
-      <RunNav tabs={tabs} active={tab} onSelect={go} />
+      <RunNav
+        tabs={tabs}
+        active={tab}
+        onSelect={go}
+        right={<GhostButton onClick={() => openPlanRecords(plan.id)} data-testid="run-records"><NotebookText size={14} aria-hidden /> Registros</GhostButton>}
+      />
 
       {tab === "general" && (
         <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]" data-testid="run-general">

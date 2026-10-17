@@ -44,6 +44,25 @@ describe("registro determinista del día (sin IA)", () => {
   });
 });
 
+describe("sesiones de estudio en el cierre del día", () => {
+  const sessions = [
+    { areaName: "Backend", minutes: 50, understanding: 2, focus: 4, doubt: "El token expira", errors: "PUT vs PATCH", open: 1 },
+    { areaName: "Frontend", minutes: 25, understanding: 4, focus: 3, doubt: "", errors: "", open: 0 },
+  ];
+
+  it("resume tiempo, medias y lo que la persona escribió; sin sesiones el registro no cambia", () => {
+    const r = buildDayRecord(base({ sessions }), "t");
+    expect(r.sessions).toEqual({ count: 2, minutes: 75, avgUnderstanding: 3, avgFocus: 3.5, doubts: ["El token expira"], errors: ["PUT vs PATCH"], openTopics: 1 });
+    expect("sessions" in buildDayRecord(base(), "t")).toBe(false);
+    expect("sessions" in buildDayRecord(base({ sessions: [] }), "t")).toBe(false);
+  });
+
+  it("un día solo con sesiones ya es actividad: merece revisión", () => {
+    const r = buildDayRecord(base({ planned: [], completed: [], attempts: [], errors: [], katas: [], sessions }));
+    expect(dayHasActivity(r, sanitizeStudentDay({}))).toBe(true);
+  });
+});
+
 describe("revisión del cierre", () => {
   it("sin IA hay revisión por reglas con correcciones sobre lo pendiente y lo flojo", () => {
     const rev = reviewByRules(buildDayRecord(base()), sanitizeStudentDay({ feeling: "No entendí las rutas" }));

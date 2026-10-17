@@ -1,6 +1,6 @@
 # Plan: registros de sesión para que el Mentor se automejore
 
-Estado: **plan priorizado, sin implementar** (salvo la captura mínima, ver «Qué ya existe»). Pedido del usuario: que cada sesión de estudio deje un
+Estado: **implementado P0–P6** (ver «Estado de la implementación» al final). Decisiones de la persona: los registros son **visibles como notas** con un botón para verlos todos; el detalle se conserva **90 días**; las notas de refuerzo **siempre se proponen** y nunca se crean sin confirmar. Pedido del usuario: que cada sesión de estudio deje un
 registro que el propio programa pueda leer, y que al entrar en **Plan** la IA lea esos registros y repiense el plan «a menor escala» (por ejemplo:
 «se pueden regenerar estas notas para resolver este problema»), aprovechando la estructura de NoteVault.
 
@@ -87,9 +87,9 @@ Botón «Repensar el plan con mis registros» (una llamada, con presupuesto fijo
 2. **Salida validada** (JSON con esquema; lo inválido cae a reglas y lo dice): lista de **propuestas tipadas**, cada una con `evidence` (ids de sesión e intentos), motivo, coste (llamadas de IA, archivos) y efecto en el plan:
    - `reinforce` — generar ejercicios dirigidos a un error o skill de un tema (alcance «un solo tema», ya existe en «Generar»).
    - `bridge_note` — crear una nota puente corta (`Refuerzo — …`) cuando la duda se repite y la nota actual no la cubre.
-   - `split_topic` — partir un tema que siempre queda «a medias» en dos.
-   - `move_review` — adelantar o añadir un repaso.
-   - `lighten` / `reorder` / `optional` — bajar carga, reordenar o mover a opcional (operaciones que ya entiende `mentor_plan_change`).
+   - `move_review` — adelantar un repaso a mañana.
+   - `lighten` / `optional` — bajar la carga o mover un tema a opcional (operaciones que ya entiende `mentor_plan_change`).
+   - Quedan para más adelante `split_topic` (partir un tema) y `reorder`: no existe todavía una operación del plan que los aplique de forma segura.
 3. **La persona acepta o descarta cada una.** «Aplicar» pasa por el diálogo de confirmación existente (informe exacto de lo que se crea, sin sobrescribir).
 4. **Seguimiento**: cada propuesta aplicada guarda su línea base; a las 2 semanas el Mentor compara (¿bajó el error?, ¿subió el dominio?) y lo muestra. Si no mejoró, no insiste con lo mismo.
 
@@ -115,13 +115,35 @@ Camino crítico: **P1 → P2 → P4**. P3 puede ir en paralelo con P2. P5 y P6 s
 - **Privacidad.** Todo queda en la vault local; nada sale salvo la llamada de IA ya configurada, y solo con resúmenes.
 - **Doble fuente.** JSON canónico y Markdown derivado: si divergen manda el JSON y el Markdown se regenera.
 
-**Decisiones que necesito de ti**
+**Decisiones tomadas por la persona**
 
-1. ¿Quieres los registros **visibles como notas** en la vault (`_registro/`) o prefieres que vivan solo en `.notevault/` y verlos desde la app?
-2. ¿Retención de 90 días para el detalle, o más?
-3. ¿Las propuestas de «regenerar notas» deben poder **crear notas nuevas** sin pedir confirmación cuando son de bajo coste, o siempre con confirmación (propuesto)?
+1. Los registros son **visibles como notas** (`<Materia>/_registro/`) y hay un botón («Registros») para verlos todos desde la app.
+2. El detalle se conserva **90 días**; después queda el resumen de la semana.
+3. Las notas de refuerzo **siempre se proponen** y se crean solo tras confirmar (la confirmación dice la ruta exacta y si usa IA).
 
-## 8. Qué ya existe (para no rehacerlo)
+## 8. Estado de la implementación
+
+| # | Qué | Dónde está |
+|---|---|---|
+| P0 | Formulario obligatorio + registro de horas | `lib/timeLog.ts`, `api/modules/mentorTimeLog.ts`, `PomodoroAssessmentModal.tsx` |
+| P1 | Registro unificado con evidencia por ventana de tiempo y carpetas | `lib/sessionRecords.ts` (puro), `core/mentor/sessionRecordStore.ts`, `api/modules/mentorRecords.ts` → `mentor_record_save` |
+| P2 | Notas `_registro/` y agregados deterministas (dominio, patrones, semana, retención de 90 días) | `lib/sessionRecords.ts` (`renderSessionMarkdown`, `masteryByTopic`, `patternsOf`, `weekAggregate`) |
+| P3 | El cierre del día lee las sesiones | `core/mentor/dayClose.ts` (`sessions`), `mentorDayClose.ts`, tarjeta «Sesiones de estudio» en el cierre |
+| P4 | «Repensar el plan con mis registros» (una llamada de IA o reglas; salida validada) | `mentor_records_rethink` |
+| P5 | Aplicar: notas de refuerzo y puente, adelantar repaso, mover a opcional, aligerar | `mentor_proposal_apply` + `PlanRecords.tsx` (todo con confirmación) |
+| P6 | Seguimiento: línea base al aplicar y comparación a los 14 días con ≥ 2 sesiones | `baselineFor`, `followUpOf` |
+| UI | Sub-vista **Registros** del plan y botón «Registros» en la Ejecución | `PlanRecords.tsx`, `PlanSections.tsx`, `PlanRun.tsx` |
+
+Pruebas: `lib/sessionRecords.test.ts`, `api/modules/mentorRecords.test.ts`, `components/mentor/PlanRecords.test.tsx`, `components/TopBarPomodoro.test.tsx`, `core/mentor/dayClose.test.ts`.
+
+**Límites conocidos**
+
+- La evidencia une por **ventana de tiempo y carpetas**: si estudias dos cosas a la vez, un intento puede caer en la sesión que no toca.
+- Los intentos solo llevan la hora si se calificaron en la app.
+- `split_topic` y `reorder` no están (ver sección 5).
+- El seguimiento necesita ≥ 14 días y ≥ 2 sesiones del tema después de aplicar: antes es «Midiendo…».
+
+## 9. Qué ya existía (para no rehacerlo)
 
 - `core/mentor/dayClose.ts` y `api/modules/mentorDayClose.ts`: registro determinista del día, memoria y correcciones.
 - `core/mentor/sessionLog.ts`: plan del día aceptado y su cumplimiento (adherencia).

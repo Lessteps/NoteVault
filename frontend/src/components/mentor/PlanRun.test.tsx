@@ -94,7 +94,8 @@ describe("vista de ejecución", () => {
     expect(byTest("run-today")!.textContent).toContain("Semana 1");
     expect(byTest("run-today")!.textContent).toContain("12 de octubre");
     // la barra de pestañas: General, una por área y Proyectos
-    expect([...host.querySelectorAll("[data-testid=run-nav] button")].map((b) => b.getAttribute("data-testid"))).toEqual(["run-tab-general", "run-tab-area:s1", "run-tab-area:s2", "run-tab-proyectos"]);
+    expect([...host.querySelectorAll("[data-testid=run-nav] button[data-testid^=run-tab-]")].map((b) => b.getAttribute("data-testid"))).toEqual(["run-tab-general", "run-tab-area:s1", "run-tab-area:s2", "run-tab-proyectos"]);
+    expect(byTest("run-records")).toBeTruthy(); // el botón fijo «Registros» a la derecha de la barra
     expect(runTab("general")!.getAttribute("aria-pressed")).toBe("true");
     // General: solo el avance de cada área en la columna lateral, sin listas de temas ni «Cómo voy»
     const ov = all("overview-area");
@@ -224,6 +225,21 @@ describe("vista de ejecución", () => {
     }
     // el tema completado de Python sale con su aviso «Hecho»
     expect(byTest("work-week")!.textContent).toContain("Hecho");
+  });
+
+  it("la cabecera del área enseña su objetivo y su estado; el botón «Registros» lleva a la sub-vista de registros del plan", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    await mountEl(<MentorPlan planId={PID} />);
+    await click(runTab("area:s1"));
+    expect(byTest("area-header")!.textContent).toContain("Fundamentals");
+    expect(byTest("area-subtitle")!.textContent).toBe("Reforzar bases");
+    await click(byTest("run-records"));
+    const v = useNavState.getState().values;
+    expect(v[planModeKey(PID)]).toBe("plan");
+    expect(v[planSectionKey(PID)]).toBe("registros");
+    await flush(); await flush();
+    expect(byTest("plan-records")).toBeTruthy();
+    expect(byTest("run-records")).toBeNull(); // ya no estamos en la Ejecución
   });
 
   it("en la semana, los días anteriores a hoy solo enseñan lo que ya está hecho; lo que no se tocó no aparece como de ese día", async () => {
@@ -463,7 +479,7 @@ describe("pestaña «Mi plan»: sub-barra de secciones y aviso de lo que falta g
     expect(byTest("plan-sticky")!.contains(nav)).toBe(true);
     const ids = [...nav.querySelectorAll<HTMLElement>("button")].map((b) => b.dataset.testid!.replace("subnav-", ""));
     // el plan de prueba no es por áreas: sin «Fases mes a mes» ni «Temas por área»
-    expect(ids).toEqual(["resumen", "datos", "catalogo", "alcance", "cobertura", "ejecutar", "antigravity", "areas"]);
+    expect(ids).toEqual(["resumen", "datos", "catalogo", "alcance", "registros", "cobertura", "ejecutar", "antigravity", "areas"]);
     expect(byTest("subnav-resumen")!.getAttribute("aria-current")).toBe("page");
     expect(byTest("subnav-resumen")!.textContent).toContain("2"); // temas por generar
     expect(host.querySelector("#sec-resumen")).toBeTruthy();

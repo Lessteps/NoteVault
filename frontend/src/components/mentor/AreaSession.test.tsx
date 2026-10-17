@@ -98,6 +98,18 @@ describe("AreaSession", () => {
     expect(usePomodoro.getState().p.phase).toBe("break");
   });
 
+  it("«Registrar sesión» abre el formulario de una sesión hecha sin Pomodoro, con los minutos y lo asignado; sin minutos no hace nada", async () => {
+    usePomodoro.setState({ p: { ...idlePomodoro(), assignedTopics: [{ folder: "P/4.2", title: "4.2 HTTP", kind: "topic" }] } });
+    await mount();
+    await click(byTest("timelog-register"));
+    expect(usePomodoro.getState().p.pendingAssessment).toBeNull();
+    await typeInto(byTest("timelog-minutes") as HTMLInputElement, "40");
+    await click(byTest("timelog-register"));
+    expect(usePomodoro.getState().p.pendingAssessment).toMatchObject({ planId: "p1", areaKey: "backend", minutes: 40, mode: "manual", topics: [{ folder: "P/4.2", title: "4.2 HTTP" }] });
+    const a = usePomodoro.getState().p.pendingAssessment!;
+    expect(a.finishedAt - a.startedAt).toBe(40 * 60_000);
+  });
+
   it("añade un bloque a mano (con validación) y quita uno", async () => {
     const add = vi.spyOn(api, "mentorTimeLogAdd").mockResolvedValue({ entries: [], entry: entry({}) });
     const del = vi.spyOn(api, "mentorTimeLogDelete").mockResolvedValue({ entries: [] });

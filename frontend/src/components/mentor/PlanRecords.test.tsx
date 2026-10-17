@@ -101,7 +101,7 @@ describe("PlanRecords", () => {
     expect(detail.textContent).toContain("Duda pendiente: El token expira");
     expect(detail.textContent).toContain("PUT vs PATCH");
     await click(byTest("record-open-note"));
-    expect(note).toHaveBeenCalledWith(expect.stringMatching(/^Programación\/_registro\/\d{4}-\d{2}-\d{2}\/1430 Backend\.md$/));
+    expect(note).toHaveBeenCalledWith(expect.stringMatching(/^Programación\/_registro\/4\.2 HTTP in depth\/\d{4}-\d{2}-\d{2} 1430 Backend\.md$/)); // la carpeta lleva el nombre del tema
   });
 
   it("sin sesiones lo explica y no deja repensar", async () => {

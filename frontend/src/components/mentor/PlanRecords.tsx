@@ -8,7 +8,7 @@
 import { BookOpenCheck, ChevronDown, ChevronRight, FolderOpen, NotebookText, RefreshCw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
-import { PROPOSAL_LABEL, sessionNoteRel, type ProposalView, type RecordsList, type SessionRecord } from "../../lib/sessionRecords";
+import { PROPOSAL_LABEL, registryIndexRel, sessionNoteTargets, topicDossierRel, type ProposalView, type RecordsList, type SessionRecord } from "../../lib/sessionRecords";
 import { minutesText } from "../../lib/timeLog";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
@@ -93,9 +93,13 @@ function SessionRow({ r, space }: { r: SessionRecord; space: string }) {
             {r.evidence.attempts.length ? ` (media ${Math.round(r.evidence.attempts.reduce((n, x) => n + x.score, 0) / r.evidence.attempts.length)})` : ""}
             {` · ${r.evidence.errors.length} ${r.evidence.errors.length === 1 ? "error" : "errores"} · ${r.evidence.filesTouched.length} ${r.evidence.filesTouched.length === 1 ? "archivo tocado" : "archivos tocados"}`}
           </p>
-          <GhostButton onClick={() => void openNote(sessionNoteRel(space, r)).catch((e: Error) => toast("error", e.message))} data-testid="record-open-note">
-            <NotebookText size={14} aria-hidden /> Abrir la nota de esta sesión
-          </GhostButton>
+          <div className="flex flex-wrap gap-2" data-testid="record-notes">
+            {sessionNoteTargets(space, r).map((t) => (
+              <GhostButton key={t.rel} onClick={() => void openNote(t.rel).catch((e: Error) => toast("error", e.message))} title={t.rel} data-testid="record-open-note">
+                <NotebookText size={14} aria-hidden /> {t.topic ? `Nota en la carpeta de ${t.topic.title}` : "Nota de la sesión libre"}
+              </GhostButton>
+            ))}
+          </div>
         </div>
       )}
     </li>
@@ -226,6 +230,7 @@ export function PlanRecords({ planId }: { planId: string }) {
         </div>
         <GhostButton large onClick={() => void api.revealPath(data.noteDir).catch((e: Error) => toast("error", e.message))} data-testid="records-folder"><FolderOpen size={15} aria-hidden /> Abrir la carpeta de registros</GhostButton>
         <GhostButton large onClick={() => void openNote(`${data.noteDir}/puntos-debiles.md`).catch(() => toast("info", "Aún no hay puntos débiles: se crean al guardar tu primera sesión."))} data-testid="records-weak"><BookOpenCheck size={15} aria-hidden /> Puntos débiles</GhostButton>
+        <GhostButton large onClick={() => void openNote(registryIndexRel(data.space)).catch(() => toast("info", "Aún no hay índice: se crea al guardar tu primera sesión."))} data-testid="records-index"><NotebookText size={15} aria-hidden /> Índice por temas</GhostButton>
       </div>
 
       {/* 1 · Repensar el plan */}
@@ -258,7 +263,7 @@ export function PlanRecords({ planId }: { planId: string }) {
             <ul className="space-y-1.5">
               {weak.map((m) => (
                 <li key={m.folder} className="flex items-center gap-3 rounded-lg border border-line bg-card px-3 py-2 text-[14px]" data-testid="mastery-row">
-                  <span className="min-w-0 flex-1 truncate">{m.title}</span>
+                  <button type="button" onClick={() => void openNote(topicDossierRel(data.space, m.folder, m.title)).catch(() => toast("info", "Ese tema aún no tiene resumen de registros."))} title="Abrir el resumen de registros de este tema" className="min-w-0 flex-1 truncate text-left hover:underline" data-testid="mastery-open">{m.title}</button>
                   <span className="hidden w-28 flex-none @xl:block"><ProgressBar pct={m.mastery} label={`Dominio de ${m.title}`} /></span>
                   <strong className="w-12 flex-none text-right">{m.mastery} %</strong>
                   <span className="w-28 flex-none text-right text-[12.5px] text-dim">{m.sessions} ses. · {m.errors} err.</span>

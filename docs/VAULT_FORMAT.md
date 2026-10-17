@@ -893,12 +893,15 @@ Cada bloque de estudio (Pomodoro, cronómetro o sesión registrada a mano) deja 
 | `.notevault/mentor/records/<plan>/<AAAA-MM-DD>/<id>.json` | UNA sesión: lo asignado (temas, tareas, proyectos), la evaluación y la **evidencia** calculada por la app (intentos, errores, repasos y archivos tocados en la ventana de la sesión). Es el dato canónico |
 | `.notevault/mentor/records/<plan>/_weeks/<AAAA-Www>.json` | resumen de una semana: es lo que se conserva cuando el detalle pasa de **90 días** |
 | `.notevault/mentor/records/<plan>/_proposals.json` | las propuestas del Mentor («Repensar el plan con mis registros») y su estado: `open` · `dismissed` · `applied` (con línea base para medir si funcionó) |
-| `<Materia>/_registro/<AAAA-MM-DD>/<hhmm> <Área>.md` | nota legible de una sesión (derivada del JSON: editarla no cambia nada) |
+| `<Materia>/_registro/<nombre del tema>/<AAAA-MM-DD> <hhmm> <Área>.md` | nota legible de una sesión, **una carpeta por tema** (una sesión con varios temas deja una nota en cada carpeta, desde la mirada de ese tema). Lleva una `descripcion` en el frontmatter y en el cuerpo. Derivada del JSON: editarla no cambia nada |
+| `<Materia>/_registro/<nombre del tema>/Resumen.md` | el dossier del tema (estado, dominio, dudas abiertas, errores que se repiten, lista de sesiones); se reescribe solo |
+| `<Materia>/_registro/Sesiones libres/…` | las sesiones sin tema (tareas, proyectos o sesión libre) |
+| `<Materia>/_registro/Índice.md` | un enlace al resumen de cada tema con sesiones |
 | `<Materia>/_registro/puntos-debiles.md` | los temas con menor dominio y los patrones abiertos (se recalcula al guardar cada sesión) |
 | `<Materia>/_registro/semana-<AAAA-Www>.md` | resumen de la semana (sobrevive a los 90 días) |
 | `<tema>/_Refuerzo — <tema>.md` · `<tema>/_Nota puente — <tema>.md` | nota creada **solo cuando la persona acepta una propuesta**; nunca sobrescribe (si existe, añade « (2)») |
 
-Las notas de `_registro/` usan un frontmatter propio — `registro: sesion | semana | puntos-debiles | refuerzo` — y **no** la clave `type`, para no chocar con los tipos de la vault.
+Las notas de `_registro/` usan un frontmatter propio — `registro: sesion | tema | indice | semana | puntos-debiles | refuerzo` — y **no** la clave `type`, para no chocar con los tipos de la vault.
 Los nombres que empiezan por `_` quedan fuera del recuento de teoría de los temas y de los escáneres de diseño.
 
 ```json

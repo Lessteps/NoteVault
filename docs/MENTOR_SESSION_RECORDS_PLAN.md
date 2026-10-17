@@ -43,7 +43,9 @@ registro que el propio programa pueda leer, y que al entrar en **Plan** la IA le
 ## 3. El registro de sesión
 
 Un archivo por sesión: `.notevault/mentor/records/<plan>/<AAAA-MM-DD>/<hhmm>-<area>.json` (máquina) y su proyección
-`<Materia>/_registro/<AAAA-MM-DD>/<hhmm> <área>.md` (lectura).
+`<Materia>/_registro/<nombre del tema>/<AAAA-MM-DD> <hhmm> <Área>.md` (lectura): **una carpeta por tema**, una nota por cada tema trabajado en la sesión (cada una desde la
+mirada de ese tema y con su `descripcion`), más `<nombre del tema>/Resumen.md` (el dossier del tema, que se reescribe solo) y `_registro/Índice.md`. Las sesiones sin tema
+(tareas, proyectos, sesión libre) van a `_registro/Sesiones libres/`.
 
 ```jsonc
 {

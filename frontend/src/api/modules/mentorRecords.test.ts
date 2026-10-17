@@ -75,11 +75,21 @@ describe("guardar una sesión", () => {
     expect(r.record.evidence.errors).toHaveLength(1);
     expect(r.record.evidence.errors[0]).toMatchObject({ folder: A, repeat: 2, category: "conceptual" });
     expect(r.record.evidence.filesTouched).toEqual([]);
-    expect(r.rel).toBe("Programación/_registro/2026-10-16/1430 Backend.md");
+    // la nota va a la carpeta CON EL NOMBRE DEL TEMA
+    expect(r.rel).toBe("Programación/_registro/4.1 Uno/2026-10-16 1430 Backend.md");
+    expect(r.rels).toEqual([r.rel]);
     const md = read(r.rel);
     expect(md).toContain("registro: sesion");
+    expect(md).toContain("tema: \"4.1 Uno\"");
+    expect(md).toContain("descripcion: \"Sesión de 50 min de Backend");
     expect(md).toContain("[[4.1 Uno]] — a medias");
     expect(md).toContain("Intentos: 2");
+    // el resumen del tema y el índice se escriben solos
+    const dossier = read("Programación/_registro/4.1 Uno/Resumen.md");
+    expect(dossier).toContain("registro: tema");
+    expect(dossier).toContain("sesiones: 1");
+    expect(dossier).toContain("El token expira");
+    expect(read("Programación/_registro/Índice.md")).toContain("[[4.1 Uno/Resumen|4.1 Uno]]");
     expect(exists("Programación/_registro/puntos-debiles.md")).toBe(true);
     expect(exists("Programación/_registro/semana-2026-W42.md")).toBe(true);
     // el JSON de la app existe y es el canónico
@@ -113,15 +123,56 @@ describe("guardar una sesión", () => {
     save({ date: old, startedAt: ms(10, 0, old), assessmentId: "old1" }); // ya está fuera de los 90 días: se guarda y caduca en el acto
     const st = new SessionRecordStore(dir, id);
     expect(st.list()).toEqual([]);
-    expect(exists("Programación/_registro/2026-06-01/1000 Backend.md")).toBe(false);
+    expect(exists("Programación/_registro/4.1 Uno/2026-06-01 1000 Backend.md")).toBe(false);
+    expect(exists("Programación/_registro/4.1 Uno/Resumen.md")).toBe(false); // al tema no le queda ninguna sesión: su resumen se quita
     expect(st.weeks().map((w) => w.week)).toContain("2026-W23");
     expect(read("Programación/_registro/semana-2026-W23.md")).toContain("Sesiones: **1**");
     save({ assessmentId: "new1" }); // una sesión de hoy no toca el resumen viejo
     expect(st.list().map((r) => r.date)).toEqual([TODAY]);
+    expect(exists("Programación/_registro/4.1 Uno/Resumen.md")).toBe(true);
     expect(read("Programación/_registro/semana-2026-W23.md")).toContain("Sesiones: **1**");
     // 80 días: aún dentro de la retención
     save({ date: "2026-07-28", startedAt: ms(9, 0, "2026-07-28"), assessmentId: "mid1" });
     expect(st.list().map((r) => r.date)).toContain("2026-07-28");
+  });
+});
+
+describe("notas por tema", () => {
+  it("una sesión con dos temas deja una nota en CADA carpeta, cada una con la evidencia de su tema, y un resumen por tema", () => {
+    attempt("a1", `${A}/Ejercicios/design/ej_1.md`, at(14, 40), 30);
+    attempt("b1", `${B}/Ejercicios/implement/ej_1.md`, at(14, 50), 90);
+    error("e1", `${A}/Ejercicios/design/ej_1.md`, at(14, 41));
+    const r = save({ assigned: [{ kind: "topic", folder: A, title: "4.1 Uno", status: "partial" }, { kind: "topic", folder: B, title: "4.2 Dos", status: "done" }, { kind: "project", folder: "manual:project:p", title: "Feature del día", status: "done" }] });
+    expect(r.rels).toEqual(["Programación/_registro/4.1 Uno/2026-10-16 1430 Backend.md", "Programación/_registro/4.2 Dos/2026-10-16 1430 Backend.md"]);
+    const one = read(r.rels[0]);
+    const two = read(r.rels[1]);
+    expect(one).toContain("Intentos: 1 (nota media 30)");
+    expect(one).toContain("conceptual (design) ×2");
+    expect(two).toContain("Intentos: 1 (nota media 90)");
+    expect(two).not.toContain("conceptual (design)");
+    expect(one).toContain("- [[4.2 Dos]] — completado (también en esta sesión)");
+    expect(exists("Programación/_registro/4.1 Uno/Resumen.md") && exists("Programación/_registro/4.2 Dos/Resumen.md")).toBe(true);
+    expect(read("Programación/_registro/Índice.md")).toMatch(/4\.1 Uno[\s\S]*4\.2 Dos|4\.2 Dos[\s\S]*4\.1 Uno/);
+    // dos sesiones del mismo tema: el resumen las junta
+    save({ assessmentId: "as2", startedAt: ms(16, 0), date: TODAY });
+    expect(read("Programación/_registro/4.1 Uno/Resumen.md")).toContain("sesiones: 2");
+  });
+
+  it("una sesión sin tema (tarea o proyecto) va a «Sesiones libres» y no crea resumen de tema", () => {
+    const r = save({ assigned: [{ kind: "task", folder: "manual:task:x", title: "Terminar login", status: "done" }] });
+    expect(r.rel).toBe("Programación/_registro/Sesiones libres/2026-10-16 1430 Backend.md");
+    expect(read(r.rel)).toContain("Tarea: Terminar login — completado");
+    expect(fs.readdirSync(path.join(dir, "Programación", "_registro", "Sesiones libres"))).toEqual(["2026-10-16 1430 Backend.md"]);
+  });
+
+  it("al caducar el detalle se quitan TODAS las notas de la sesión (una por tema)", () => {
+    const old = "2026-06-01";
+    const two = [{ kind: "topic", folder: A, title: "4.1 Uno", status: "partial" }, { kind: "topic", folder: B, title: "4.2 Dos", status: "done" }];
+    const st = new SessionRecordStore(dir, id);
+    save({ date: old, startedAt: ms(10, 0, old), assessmentId: "o2", assigned: two });
+    expect(st.list()).toEqual([]);
+    expect(exists("Programación/_registro/4.1 Uno/2026-06-01 1000 Backend.md")).toBe(false);
+    expect(exists("Programación/_registro/4.2 Dos/2026-06-01 1000 Backend.md")).toBe(false);
   });
 });
 

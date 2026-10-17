@@ -28,7 +28,7 @@ import { StudyErrorManager } from "../../core/studyErrorManager.js";
 import { areaKeyOf } from "../../lib/planCoverage.js";
 import {
   baselineFor, buildSessionRecord, expiredRecords, followUpOf, isoWeekOf, masteryByTopic, patternsOf, proposalId, proposalsFromPatterns, renderSessionMarkdown,
-  renderWeakPointsMarkdown, renderWeekMarkdown, sessionNoteRel, weekAggregate, RECORD_RETENTION_DAYS, type Pattern, type Proposal, type ProposalKind, type SessionRecord,
+  recordsOfTopic, registryIndexRel, renderRegistryIndex, renderTopicDossier, renderWeakPointsMarkdown, renderWeekMarkdown, sessionNoteTargets, topicDirName, topicDossierRel, weekAggregate, RECORD_RETENTION_DAYS, type Pattern, type Proposal, type ProposalKind, type SessionRecord,
 } from "../../lib/sessionRecords.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
@@ -156,11 +156,26 @@ export function mentorRecordsApi(app: AppState, hooks: RecordsHooks = {}) {
     return { attempts, errors, katas, reviewsDone, filesTouched };
   }
 
-  /** Recalcula las notas derivadas (puntos débiles y la semana) y aplica los 90 días: el detalle caduca, el agregado semanal queda. */
-  function refreshNotes(plan: Plan, st: SessionRecordStore, touchedDate: string): void {
+  /** Escribe la nota de la sesión en la carpeta de CADA tema que se trabajó (o en «Sesiones libres»). */
+  function writeRecordNotes(plan: Plan, record: SessionRecord): string[] {
+    return sessionNoteTargets(spaceOf(plan), record).map((t) => {
+      writeNote(t.rel, renderSessionMarkdown(record, t.topic));
+      return t.rel;
+    });
+  }
+
+  /**
+   * Recalcula las notas derivadas y aplica los 90 días. Por cada tema tocado reescribe su `Resumen.md` (y lo quita si ya no le quedan sesiones), reescribe el
+   * índice de `_registro/`, los puntos débiles y la semana. Cuando el detalle caduca, el agregado semanal queda.
+   */
+  function refreshNotes(plan: Plan, st: SessionRecordStore, touched: SessionRecord): void {
+    const space = spaceOf(plan);
     let records = st.list();
     const gone = expiredRecords(records, today());
     const pruned = new Set(gone.map((r) => isoWeekOf(r.date)));
+    const affected = new Map<string, string>(); // carpeta del tema → título
+    const note = (r: SessionRecord): void => r.assigned.filter((t) => t.kind === "topic" && t.folder).forEach((t) => affected.set(t.folder, t.title));
+    note(touched);
     if (gone.length) {
       for (const w of pruned) {
         const agg = weekAggregate(w, records);
@@ -168,19 +183,44 @@ export function mentorRecordsApi(app: AppState, hooks: RecordsHooks = {}) {
         writeNote(`${noteDir(plan)}/semana-${w}.md`, renderWeekMarkdown(agg));
       }
       for (const r of gone) {
+        note(r);
         st.remove(r);
-        try {
-          fs.rmSync(path.join(app.root, ...sessionNoteRel(spaceOf(plan), r).split("/")), { force: true });
-        } catch {
-          /* ya no estaba */
+        for (const t of sessionNoteTargets(space, r)) {
+          try {
+            fs.rmSync(path.join(app.root, ...t.rel.split("/")), { force: true });
+          } catch {
+            /* ya no estaba */
+          }
         }
       }
       records = st.list();
     }
+    const mastery = masteryByTopic(records);
+    for (const [folder, title] of affected) {
+      const rel = topicDossierRel(space, folder, title);
+      if (recordsOfTopic(records, folder).length) writeNote(rel, renderTopicDossier({ folder, title }, records, mastery.find((m) => m.folder === folder)));
+      else {
+        try {
+          fs.rmSync(path.join(app.root, ...rel.split("/")), { force: true });
+        } catch {
+          /* ya no estaba */
+        }
+      }
+    }
+    // el índice: un renglón por tema con sesiones
+    const topics = new Map<string, { title: string; rs: SessionRecord[] }>();
+    for (const r of records) for (const t of r.assigned) if (t.kind === "topic" && t.folder) topics.set(t.folder, { title: t.title, rs: recordsOfTopic(records, t.folder) });
+    writeNote(
+      registryIndexRel(space),
+      renderRegistryIndex(
+        [...topics].map(([folder, v]) => ({ dir: topicDirName(folder, v.title), title: v.title, sessions: v.rs.length, minutes: v.rs.reduce((n, r) => n + r.minutes, 0), mastery: mastery.find((m) => m.folder === folder)?.mastery ?? null, last: v.rs[0]?.date ?? "" })),
+        today(),
+      ),
+    );
     // la semana de una sesión que ya caducó conserva su resumen: no se reescribe con lo que queda (nada)
-    const week = isoWeekOf(touchedDate);
+    const week = isoWeekOf(touched.date);
     if (!pruned.has(week)) writeNote(`${noteDir(plan)}/semana-${week}.md`, renderWeekMarkdown(weekAggregate(week, records)));
-    writeNote(`${noteDir(plan)}/puntos-debiles.md`, renderWeakPointsMarkdown(masteryByTopic(records), patternsOf(records, { today: today() }), today()));
+    writeNote(`${noteDir(plan)}/puntos-debiles.md`, renderWeakPointsMarkdown(mastery, patternsOf(records, { today: today() }), today()));
   }
 
   function overdueOf(plan: Plan): Array<{ folder: string; title: string; inDays: number }> {
@@ -273,7 +313,10 @@ export function mentorRecordsApi(app: AppState, hooks: RecordsHooks = {}) {
       const id = o.assessmentId ? `r-${String(o.assessmentId).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40)}` : `r-${date.replace(/-/g, "")}-${randomUUID().slice(0, 8)}`;
       // reintentar el guardado de la misma evaluación no duplica la sesión
       const dup = st.has(id, date) ? st.load(id, date) : null;
-      if (dup) return { record: dup, rel: sessionNoteRel(spaceOf(plan), dup), duplicate: true };
+      if (dup) {
+        const rels = sessionNoteTargets(spaceOf(plan), dup).map((t) => t.rel);
+        return { record: dup, rel: rels[0]!, rels, duplicate: true };
+      }
       const sub = plan.subplans.find((s) => areaKeyOf(s) === areaKey);
       const areaName = String(o.areaName ?? "").trim() || sub?.area || (areaKey === "bases" ? "Bases" : areaKey === "libre" ? "Sesión libre" : areaKey);
       const ev = Number.isFinite(startedAt) && startedAt > 0 ? evidenceFor(plan, areaKey, date, startedAt, minutes, assigned) : { attempts: [], errors: [], katas: [], reviewsDone: [], filesTouched: [] };
@@ -283,10 +326,9 @@ export function mentorRecordsApi(app: AppState, hooks: RecordsHooks = {}) {
       });
       if (!record) throw new ApiError("La sesión no es válida: indica el área, el día y al menos 1 minuto.");
       st.save(record);
-      const rel = sessionNoteRel(spaceOf(plan), record);
-      writeNote(rel, renderSessionMarkdown(record));
-      refreshNotes(plan, st, date);
-      return { record, rel, duplicate: false };
+      const rels = writeRecordNotes(plan, record);
+      refreshNotes(plan, st, record);
+      return { record, rel: rels[0]!, rels, duplicate: false };
     },
 
     mentor_records_list(opts: unknown) {

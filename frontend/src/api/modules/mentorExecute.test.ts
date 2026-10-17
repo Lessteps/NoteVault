@@ -17,6 +17,8 @@ vi.mock("../appConfig.js", () => ({
 vi.mock("../../core/aiClient.js", async (orig) => ({ ...(await orig<typeof import("../../core/aiClient.js")>()), sendChat: (...a: unknown[]) => hoisted.chat(...a) }));
 
 import { buildPlan, PlanStore } from "../../core/mentor/plan.js";
+import { ExecutionStore, newExecution } from "../../core/mentor/planExecutor.js";
+import { mentorExecuteApi } from "./mentorExecute.js";
 import { THEORY, PRACTICA } from "../../core/mentor/designFixtures.js";
 import { addDays } from "../../lib/planTime.js";
 import { AppState } from "../appState.js";
@@ -358,6 +360,53 @@ describe("plan para Antigravity: esquema de lo que falta y planes bajo demanda",
     const bad = await scheme({ ai: true });
     expect(bad.source).toBe("rules");
     expect(bad.note).toContain("reglas");
+  });
+});
+
+describe("reanudar sola al abrir la app", () => {
+  const savedRunning = (status: "running" | "paused") => {
+    const rep: any = api().mentor_execution_report({ id });
+    const st = { ...newExecution(id, rep.report.scope, rep.report.tasks, new Date().toISOString()), status };
+    new ExecutionStore(dir).save(st);
+    return st;
+  };
+  const untilDone = async (app2: AppState, ms = 20000) => {
+    const t0 = Date.now();
+    for (;;) {
+      const s = new ExecutionStore(dir).load(id);
+      if (s && s.status !== "running") return s;
+      if (Date.now() - t0 > ms) throw new Error("no terminó");
+      await new Promise((ok) => setTimeout(ok, 40));
+    }
+    void app2;
+  };
+
+  it("una ejecución que quedó «en curso» en disco (la app se cerró a medias) se reanuda sola y termina", async () => {
+    savedRunning("running");
+    const app2 = new AppState(dir); // la app se vuelve a abrir: no hay ningún runner en memoria
+    mentorExecuteApi(app2, { autoResume: true, autoResumeDelayMs: 5, retryDelayMs: 1 });
+    const done = await untilDone(app2);
+    expect(done.status).toBe("done");
+    expect(done.tasks.some((t) => t.status === "done")).toBe(true);
+  }, 40_000);
+
+  it("una pausada por la persona (o por un límite de uso) NO se toca", async () => {
+    savedRunning("paused");
+    const app2 = new AppState(dir);
+    mentorExecuteApi(app2, { autoResume: true, autoResumeDelayMs: 5, retryDelayMs: 1 });
+    await new Promise((ok) => setTimeout(ok, 150));
+    expect(new ExecutionStore(dir).load(id)!.status).toBe("paused");
+    expect(hoisted.chat).not.toHaveBeenCalled();
+  });
+
+  it("sin IA configurada no arranca nada", async () => {
+    savedRunning("running");
+    for (const k of Object.keys(hoisted.store)) delete hoisted.store[k];
+    const app2 = new AppState(dir);
+    mentorExecuteApi(app2, { autoResume: true, autoResumeDelayMs: 5, retryDelayMs: 1 });
+    await new Promise((ok) => setTimeout(ok, 150));
+    expect(hoisted.chat).not.toHaveBeenCalled();
+    expect(new ExecutionStore(dir).load(id)!.status).toBe("running"); // sigue figurando en curso: se reanudará cuando haya IA
   });
 });
 

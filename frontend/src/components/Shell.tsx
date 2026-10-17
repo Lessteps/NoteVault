@@ -15,6 +15,7 @@ import { useTabDrag } from "../store/tabDrag";
 import { useSettingsDialog } from "./settings/SettingsDialog";
 import { newNoteIn } from "./notes/FileTree";
 import { TopBarPomodoro } from "./TopBarPomodoro";
+import { BUILD_STAMP } from "../buildInfo";
 
 // ── Module registry ─────────────────────────────────────────────────────────
 
@@ -467,7 +468,7 @@ export function StatusBar() {
           </span>
         </>
       )}
-      <span className="ml-auto">{note ? note.path : "Sin nota abierta"}</span>
+      <span className="ml-auto flex items-center gap-3"><span title="Cuándo se compiló esta versión de NoteVault" data-testid="build-stamp">compilado {BUILD_STAMP}</span><span>{note ? note.path : "Sin nota abierta"}</span></span>
     </footer>
   );
 }

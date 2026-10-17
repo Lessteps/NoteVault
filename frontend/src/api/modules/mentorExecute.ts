@@ -44,12 +44,16 @@ import { makeExecDeps, type ExecDepsOptions } from "./mentorExecuteDeps.js";
 import { studyIndexCold } from "./study.js";
 
 export interface MentorExecuteHooks extends ExecDepsOptions {
+  /** reanudar sola, al abrir la app, la ejecución que quedó «en curso» en disco (por defecto sí; las pruebas lo apagan) */
+  autoResume?: boolean;
+  autoResumeDelayMs?: number;
   /** reemplaza las dependencias reales (tests con IA simulada) */
   depsFor?: (planId: string) => ExecDeps;
   retryDelayMs?: number;
   now?: () => string;
 }
 
+const AUTO_RESUMED = new WeakSet<AppState>();
 const RUNNERS = new WeakMap<AppState, Map<string, ExecutionRunner>>();
 const runnersOf = (app: AppState): Map<string, ExecutionRunner> => {
   let m = RUNNERS.get(app);
@@ -115,6 +119,35 @@ export function mentorExecuteApi(app: AppState, hooks: MentorExecuteHooks = {}) 
       scope,
     );
   }
+
+  /**
+   * Una ejecución que en disco figura «en curso» quedó a medias porque la app se cerró (o el PC se apagó) con la cola trabajando: se REANUDA sola un
+   * momento después de abrir la app, sin que haya que acordarse de pulsar «Reanudar». Una que la persona pausó, o que se paró sola por un límite de
+   * uso, figura «en pausa» y NO se toca.
+   */
+  function scheduleAutoResume(): void {
+    if (AUTO_RESUMED.has(app)) return;
+    AUTO_RESUMED.add(app);
+    const timer = setTimeout(() => {
+      try {
+        const dir = path.join(app.root, ".notevault", "mentor", "executions");
+        for (const f of fs.readdirSync(dir)) {
+          if (!f.endsWith(".json")) continue;
+          const planId = f.slice(0, -5);
+          if (!PLAN_ID_RE.test(planId) || runnersOf(app).has(planId)) continue;
+          const s = execStore().load(planId);
+          if (!s || s.status !== "running" || !aiOn()) continue;
+          const recovered = recoverInterrupted(s);
+          execStore().save(recovered);
+          void runnerFor(recovered).resume();
+        }
+      } catch {
+        /* sin ejecuciones guardadas */
+      }
+    }, hooks.autoResumeDelayMs ?? 4000);
+    (timer as { unref?: () => void }).unref?.();
+  }
+  if (hooks.autoResume ?? !process.env.VITEST) scheduleAutoResume();
 
   const view = (s: ExecutionState | null) => (s ? { state: s, progress: progressOf(s) } : null);
 

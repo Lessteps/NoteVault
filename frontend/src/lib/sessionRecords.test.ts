@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeSession, NO_TOPIC_FOLDER, recordsOfTopic, registryIndexRel, renderRegistryIndex, renderTopicDossier, sessionNoteTargets, topicDirName, topicDossierRel,
   baselineFor, buildSessionRecord, expiredRecords, followUpOf, isoWeekOf, masteryByTopic, parseSessionRecord, patternsOf, proposalId, proposalsFromPatterns,
   renderSessionMarkdown, renderWeakPointsMarkdown, renderWeekMarkdown, sessionNoteRel, weekAggregate, type Proposal, type SessionRecord,
 } from "./sessionRecords";
@@ -55,7 +56,73 @@ describe("registro de sesión", () => {
     expect(md).toContain("Intentos: 1 (nota media 55)");
     expect(md).toContain("conceptual (design) · 4.2 HTTP in depth ×2 — PUT vs PATCH");
     expect(md).not.toMatch(/^type:/m);
-    expect(sessionNoteRel("Programación", rec())).toBe("Programación/_registro/2026-10-16/1430 Backend.md");
+    expect(sessionNoteRel("Programación", rec())).toBe("Programación/_registro/4.2 HTTP in depth/2026-10-16 1430 Backend.md");
+  });
+});
+
+describe("notas legibles: una carpeta por tema", () => {
+  const two = (): SessionRecord => rec({
+    assigned: [{ kind: "topic", folder: HTTP, title: "4.2 HTTP in depth", status: "partial" }, { kind: "topic", folder: REST, title: "4.3 REST", status: "done" }, { kind: "project", folder: "manual:project:p", title: "Feature del día", status: "done" }],
+    attempts: [{ exercise: "a.md", topic: HTTP, skill: "design", score: 30, verdict: "incorrect" }, { exercise: "b.md", topic: REST, skill: "implement", score: 90, verdict: "correct" }],
+    errors: [{ category: "conceptual", skill: "design", topic: "4.2", folder: HTTP, repeat: 2 }],
+  });
+
+  it("la carpeta lleva el nombre del tema y una sesión con varios temas deja una nota en CADA carpeta; los proyectos y tareas no crean carpeta", () => {
+    expect(topicDirName(HTTP)).toBe("4.2 HTTP in depth");
+    expect(topicDirName("Programación/4 Backend/a:b?c")).toBe("abc"); // sin caracteres que Windows no admite
+    const t = sessionNoteTargets("Programación", two());
+    expect(t.map((x) => x.rel)).toEqual(["Programación/_registro/4.2 HTTP in depth/2026-10-16 1430 Backend.md", "Programación/_registro/4.3 REST/2026-10-16 1430 Backend.md"]);
+    expect(t.map((x) => x.topic?.title)).toEqual(["4.2 HTTP in depth", "4.3 REST"]);
+  });
+
+  it("sin tema (tareas, proyectos o sesión libre) la nota va a «Sesiones libres»", () => {
+    const free = rec({ assigned: [{ kind: "task", folder: "manual:task:a", title: "Terminar el login", status: "done" }] });
+    const t = sessionNoteTargets("Programación", free);
+    expect(t).toEqual([{ rel: `Programación/_registro/${NO_TOPIC_FOLDER}/2026-10-16 1430 Backend.md` }]);
+    expect(sessionNoteTargets("P", rec({ assigned: [] }))[0]!.rel).toContain(NO_TOPIC_FOLDER);
+  });
+
+  it("la nota de un tema se escribe desde SU mirada: su resultado, su evidencia y los demás temas como «también en esta sesión»", () => {
+    const r = two();
+    const http = renderSessionMarkdown(r, r.assigned[0]!);
+    expect(http).toContain("tema: \"4.2 HTTP in depth\"");
+    expect(http).toContain("resultado: partial");
+    expect(http).toContain("descripcion:");
+    expect(http).toContain("Intentos: 1 (nota media 30)"); // solo el intento de ESTE tema
+    expect(http).toContain("conceptual (design) ×2");
+    expect(http).toContain("- [[4.3 REST]] — completado (también en esta sesión)");
+    const rest = renderSessionMarkdown(r, r.assigned[1]!);
+    expect(rest).toContain("Intentos: 1 (nota media 90)");
+    expect(rest).not.toContain("conceptual (design)"); // el error era del otro tema
+  });
+
+  it("la descripción cuenta en una frase qué pasó", () => {
+    const r = two();
+    expect(describeSession(r, r.assigned[0]!)).toBe("Sesión de 52 min de Backend el 2026-10-16 a las 14:30 sobre «4.2 HTTP in depth»; el tema quedó a medias; comprensión 3/5, concentración 4/5; 2 intentos (media 60); 2 errores.");
+    expect(describeSession(rec({ assigned: [], attempts: [], errors: [] }))).toContain("sin tema asignado");
+  });
+
+  it("el resumen del tema junta estado, dudas abiertas, errores que se repiten y la lista de sesiones con enlaces", () => {
+    const rs = [rec({ id: "a", date: "2026-10-14", startedAtMs: new Date(2026, 9, 14, 10, 0).getTime() }), rec({ id: "b" }), rec({ id: "c", assigned: [{ kind: "topic", folder: REST, title: "4.3 REST", status: "done" }] })];
+    expect(recordsOfTopic(rs, HTTP).map((r) => r.id)).toEqual(["b", "a"]); // la más reciente primero
+    const md = renderTopicDossier({ folder: HTTP, title: "4.2 HTTP in depth" }, rs, masteryByTopic(rs).find((m) => m.folder === HTTP));
+    expect(md).toContain("registro: tema");
+    expect(md).toContain("sesiones: 2");
+    expect(md).toContain("[[4.2 HTTP in depth]] · Práctica: [[4.2 HTTP in depth.practica]]");
+    expect(md).toContain("2026-10-16: Qué pasa si el token expira");
+    expect(md).toContain("×4 conceptual (design) — PUT vs PATCH"); // 2 sesiones × 2 repeticiones
+    expect(md).toContain("[[2026-10-16 1430 Backend]] — 52 min · a medias");
+    expect(md).not.toContain("4.3 REST");
+    expect(topicDossierRel("Programación", HTTP)).toBe("Programación/_registro/4.2 HTTP in depth/Resumen.md");
+  });
+
+  it("el índice enlaza con el resumen de cada tema, los más recientes primero", () => {
+    const md = renderRegistryIndex([{ dir: "4.1 Uno", title: "4.1 Uno", sessions: 1, minutes: 30, mastery: 55, last: "2026-10-10" }, { dir: "4.2 Dos", title: "4.2 Dos", sessions: 3, minutes: 120, mastery: null, last: "2026-10-16" }], "2026-10-16");
+    expect(md.indexOf("4.2 Dos")).toBeLessThan(md.indexOf("4.1 Uno"));
+    expect(md).toContain("- [[4.2 Dos/Resumen|4.2 Dos]] — 3 sesiones · 120 min · última 2026-10-16");
+    expect(md).toContain("dominio 55 %");
+    expect(registryIndexRel("Programación")).toBe("Programación/_registro/Índice.md");
+    expect(renderRegistryIndex([], "x")).toContain("Todavía no hay sesiones");
   });
 });
 

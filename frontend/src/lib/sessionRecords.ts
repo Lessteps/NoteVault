@@ -159,38 +159,94 @@ export function parseSessionRecord(raw: unknown): SessionRecord | null {
   });
 }
 
-// ── Nota legible ───────────────────────────────────────────────────────
+// ── Notas legibles: UNA CARPETA POR TEMA ───────────────────────────────
+//
+// `<Materia>/_registro/<nombre del tema>/` guarda la historia de ese tema: una nota por sesión (`<fecha> <hhmm> <Área>.md`, con su descripción) y un
+// `Resumen.md` que se reescribe solo (estado, dudas abiertas, errores que se repiten, lista de sesiones). Una sesión con varios temas deja una nota en
+// CADA carpeta, escrita desde la mirada de ese tema. Las sesiones sin tema (tareas, proyectos, sesión libre) van a «Sesiones libres».
 
 const OUTCOME_TEXT: Record<OutcomeStatus, string> = { done: "completado", partial: "a medias", none: "no se tocó" };
 const yamlStr = (s: string): string => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 const nameOf = (folder: string): string => folder.split("/").pop() ?? folder;
 const avg = (xs: readonly number[]): number | null => (xs.length ? Math.round((xs.reduce((n, x) => n + x, 0) / xs.length) * 10) / 10 : null);
+const safeName = (s: string): string => s.replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, " ").trim().slice(0, 90);
 
-/** La nota Markdown de una sesión (derivada del JSON: si se edita a mano no cambia nada). */
-export function renderSessionMarkdown(r: SessionRecord): string {
+export const NO_TOPIC_FOLDER = "Sesiones libres";
+
+/** El nombre de la carpeta de un tema dentro de `_registro/`: el del propio tema («4.2 HTTP in depth»). */
+export const topicDirName = (folder: string, title = ""): string => safeName(nameOf(folder) || title) || NO_TOPIC_FOLDER;
+
+export interface NoteTarget {
+  rel: string;
+  /** el tema al que pertenece esta copia de la nota; ausente = sesión sin tema */
+  topic?: AssignedItem;
+}
+
+/** Dónde se escribe la nota de una sesión: una por tema trabajado (o una en «Sesiones libres»). */
+export function sessionNoteTargets(space: string, r: Pick<SessionRecord, "date" | "start" | "areaName" | "assigned">): NoteTarget[] {
+  const stamp = `${r.date} ${r.start.replace(":", "")} ${safeName(r.areaName) || "sesion"}.md`;
+  const topics = r.assigned.filter((t) => t.kind === "topic" && t.folder);
+  if (!topics.length) return [{ rel: `${space}/_registro/${NO_TOPIC_FOLDER}/${stamp}` }];
+  const seen = new Set<string>();
+  const out: NoteTarget[] = [];
+  for (const t of topics) {
+    const dir = topicDirName(t.folder, t.title);
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+    out.push({ rel: `${space}/_registro/${dir}/${stamp}`, topic: t });
+  }
+  return out;
+}
+
+/** La nota principal de una sesión (la del primer tema). */
+export const sessionNoteRel = (space: string, r: Pick<SessionRecord, "date" | "start" | "areaName" | "assigned">): string => sessionNoteTargets(space, r)[0]!.rel;
+export const topicDossierRel = (space: string, folder: string, title = ""): string => `${space}/_registro/${topicDirName(folder, title)}/Resumen.md`;
+export const registryIndexRel = (space: string): string => `${space}/_registro/Índice.md`;
+
+/** La descripción de una sesión en una frase (determinista), desde la mirada de un tema si se da. */
+export function describeSession(r: SessionRecord, topic?: Pick<AssignedItem, "title" | "status">): string {
   const a = r.assessment;
+  const parts: string[] = [`Sesión de ${r.minutes} min de ${r.areaName} el ${r.date} a las ${r.start}${topic ? ` sobre «${topic.title}»` : r.assigned.length ? ` (${r.assigned.map((t) => t.title).join(", ")})` : ", sin tema asignado"}`];
+  if (topic) parts.push(`el tema quedó ${OUTCOME_TEXT[topic.status]}`);
+  if (a?.understanding) parts.push(`comprensión ${a.understanding}/5${a.focus ? `, concentración ${a.focus}/5` : ""}`);
+  const ev = r.evidence;
+  if (ev.attempts.length) parts.push(`${ev.attempts.length} ${ev.attempts.length === 1 ? "intento" : "intentos"} (media ${avg(ev.attempts.map((x) => x.score))})`);
+  const nErr = ev.errors.reduce((n, e) => n + e.repeat, 0);
+  if (nErr) parts.push(`${nErr} ${nErr === 1 ? "error" : "errores"}`);
+  return `${parts.join("; ")}.`;
+}
+
+/** La nota Markdown de una sesión (derivada del JSON: si se edita a mano no cambia nada). Con `topic`, desde la mirada de ese tema. */
+export function renderSessionMarkdown(r: SessionRecord, topic?: AssignedItem): string {
+  const a = r.assessment;
+  const mine = (folder: string): boolean => !topic || !folder || folder === topic.folder;
   const L: string[] = [];
   L.push("---");
   L.push("registro: sesion");
+  if (topic) L.push(`tema: ${yamlStr(topic.title)}`);
   L.push(`plan: ${yamlStr(r.planId)}`);
   L.push(`area: ${yamlStr(r.areaName)}`);
   L.push(`fecha: ${r.date}`);
   L.push(`inicio: ${yamlStr(r.start)}`);
   L.push(`minutos: ${r.minutes}`);
   L.push(`modo: ${r.mode}`);
+  if (topic) L.push(`resultado: ${topic.status}`);
   if (a?.understanding) L.push(`comprension: ${a.understanding}`);
   if (a?.focus) L.push(`concentracion: ${a.focus}`);
+  L.push(`descripcion: ${yamlStr(describeSession(r, topic))}`);
   L.push(`id: ${yamlStr(r.id)}`);
   L.push("---");
-  L.push(`# Sesión de ${r.areaName} · ${r.date} ${r.start} (${r.minutes} min)`);
+  L.push(`# ${topic ? topic.title : `Sesión de ${r.areaName}`} · ${r.date} ${r.start} (${r.minutes} min)`);
   L.push("");
+  L.push(`> ${describeSession(r, topic)}`);
   L.push("> Nota generada por el Mentor a partir del registro de la sesión. Es derivada: editarla aquí no cambia nada (el dato vive en `.notevault/mentor/records/`).");
   L.push("");
   L.push("## Qué se trabajó");
   if (!r.assigned.length) L.push("- Sesión libre (sin temas asignados).");
-  for (const t of r.assigned) {
+  const ordered = topic ? [topic, ...r.assigned.filter((t) => t.folder !== topic.folder || t.kind !== "topic")] : r.assigned;
+  for (const t of ordered) {
     const label = t.kind === "topic" ? `[[${nameOf(t.folder)}]]` : `${t.kind === "project" ? "Proyecto" : "Tarea"}: ${t.title}`;
-    L.push(`- ${label} — ${OUTCOME_TEXT[t.status]}`);
+    L.push(`- ${label} — ${OUTCOME_TEXT[t.status]}${topic && t !== topic ? " (también en esta sesión)" : ""}`);
   }
   L.push("");
   if (a) {
@@ -201,17 +257,19 @@ export function renderSessionMarkdown(r: SessionRecord): string {
     L.push(`- Comprensión ${a.understanding || "—"}/5 · Concentración ${a.focus || "—"}/5 · Ejercicios o práctica: ${a.practiced ? "sí" : "no"}`);
     L.push("");
   }
+  const attempts = r.evidence.attempts.filter((x) => mine(x.topic));
+  const errors = r.evidence.errors.filter((x) => mine(x.folder));
   const ev = r.evidence;
   L.push("## Evidencia (calculada por la app)");
-  if (!ev.attempts.length && !ev.errors.length && !ev.reviewsDone.length && !ev.filesTouched.length && !ev.katas.length) L.push("- Sin intentos, errores ni archivos tocados en esta ventana de tiempo.");
-  if (ev.attempts.length) {
-    const m = avg(ev.attempts.map((x) => x.score));
-    L.push(`- Intentos: ${ev.attempts.length}${m !== null ? ` (nota media ${m})` : ""}`);
-    for (const x of ev.attempts.slice(0, 8)) L.push(`  - ${x.skill || "—"} · ${x.score} · ${x.verdict || "sin calificar"}${x.topic ? ` · [[${nameOf(x.topic)}]]` : ""}`);
+  if (!attempts.length && !errors.length && !ev.reviewsDone.length && !ev.filesTouched.length && !ev.katas.length) L.push("- Sin intentos, errores ni archivos tocados en esta ventana de tiempo.");
+  if (attempts.length) {
+    const m = avg(attempts.map((x) => x.score));
+    L.push(`- Intentos: ${attempts.length}${m !== null ? ` (nota media ${m})` : ""}`);
+    for (const x of attempts.slice(0, 8)) L.push(`  - ${x.skill || "—"} · ${x.score} · ${x.verdict || "sin calificar"}${x.topic && !topic ? ` · [[${nameOf(x.topic)}]]` : ""}`);
   }
-  if (ev.errors.length) {
-    L.push(`- Errores registrados: ${ev.errors.reduce((n, x) => n + x.repeat, 0)}`);
-    for (const x of ev.errors.slice(0, 8)) L.push(`  - ${x.category}${x.skill ? ` (${x.skill})` : ""}${x.topic ? ` · ${x.topic}` : ""}${x.repeat > 1 ? ` ×${x.repeat}` : ""}${x.description ? ` — ${x.description}` : ""}`);
+  if (errors.length) {
+    L.push(`- Errores registrados: ${errors.reduce((n, x) => n + x.repeat, 0)}`);
+    for (const x of errors.slice(0, 8)) L.push(`  - ${x.category}${x.skill ? ` (${x.skill})` : ""}${x.topic && !topic ? ` · ${x.topic}` : ""}${x.repeat > 1 ? ` ×${x.repeat}` : ""}${x.description ? ` — ${x.description}` : ""}`);
   }
   if (ev.katas.length) L.push(`- Katas: ${ev.katas.map((k) => `${k.areaId} ${k.status}`).join(", ")}`);
   if (ev.reviewsDone.length) L.push(`- Repasos hechos: ${ev.reviewsDone.map((x) => `[[${nameOf(x).replace(/\.md$/i, "")}]]`).join(", ")}`);
@@ -220,10 +278,70 @@ export function renderSessionMarkdown(r: SessionRecord): string {
   return L.join("\n");
 }
 
-/** La carpeta de la nota de una sesión dentro de la materia: `_registro/<fecha>/<hhmm> <Área>.md`. */
-export function sessionNoteRel(space: string, r: Pick<SessionRecord, "date" | "start" | "areaName">): string {
-  const safe = r.areaName.replace(/[\\/:*?"<>|]/g, "").trim() || "sesion";
-  return `${space}/_registro/${r.date}/${r.start.replace(":", "")} ${safe}.md`;
+/** Las sesiones que tocaron un tema, la más reciente primero. */
+export const recordsOfTopic = (records: ReadonlyArray<SessionRecord>, folder: string): SessionRecord[] =>
+  records.filter((r) => r.assigned.some((t) => t.kind === "topic" && t.folder === folder)).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+
+/** El `Resumen.md` de un tema: estado, dudas abiertas, errores que se repiten y la lista de sus sesiones (se reescribe solo). */
+export function renderTopicDossier(topic: { folder: string; title: string }, records: ReadonlyArray<SessionRecord>, mastery?: TopicMastery): string {
+  const mine = recordsOfTopic(records, topic.folder);
+  const minutes = mine.reduce((n, r) => n + r.minutes, 0);
+  const name = nameOf(topic.folder);
+  const L: string[] = ["---", "registro: tema", `tema: ${yamlStr(topic.title)}`, `carpeta: ${yamlStr(topic.folder)}`, `sesiones: ${mine.length}`, `minutos: ${minutes}`];
+  if (mastery) L.push(`dominio: ${mastery.mastery}`);
+  if (mine[0]) L.push(`ultima: ${mine[0].date}`);
+  L.push("---", `# Registro del tema — ${topic.title}`, "");
+  L.push(`> ${mine.length} ${mine.length === 1 ? "sesión" : "sesiones"} y ${Math.floor(minutes / 60)} h ${minutes % 60} min de estudio de este tema${mine[0] ? `; la última fue el ${mine[0].date}` : ""}. Se reescribe sola cada vez que guardas una sesión.`, "");
+  L.push("## Estado", `- Nota del tema: [[${name}]] · Práctica: [[${name}.practica]]`);
+  if (mastery) L.push(`- Dominio: **${mastery.mastery} %** (lo medido pesa más que lo declarado)${mastery.avgScore !== null ? ` · nota media de los intentos ${mastery.avgScore}` : ""}${mastery.avgUnderstanding !== null ? ` · comprensión declarada ${mastery.avgUnderstanding}/5` : ""}`);
+  if (mastery) L.push(`- Sesiones en las que quedó a medias o sin tocar: ${mastery.openSessions} de ${mastery.sessions}`);
+  L.push("");
+  const doubts = mine.filter((r) => r.assessment?.doubt).slice(0, 6);
+  L.push("## Dudas abiertas (las más recientes)");
+  if (!doubts.length) L.push("- Ninguna anotada.");
+  for (const r of doubts) L.push(`- ${r.date}: ${r.assessment!.doubt}`);
+  L.push("");
+  const errs = new Map<string, { n: number; text: string }>();
+  for (const r of mine) {
+    for (const e of r.evidence.errors) {
+      if (e.folder && e.folder !== topic.folder) continue;
+      const k = `${e.category}|${e.skill}`;
+      const x = errs.get(k) ?? { n: 0, text: `${e.category}${e.skill ? ` (${e.skill})` : ""}${e.description ? ` — ${e.description}` : ""}` };
+      x.n += e.repeat;
+      errs.set(k, x);
+    }
+    if (r.assessment?.errors) {
+      const k = `dicho|${r.assessment.errors.toLowerCase()}`;
+      const x = errs.get(k) ?? { n: 0, text: `${r.assessment.errors} (lo anotaste tú)` };
+      x.n += 1;
+      errs.set(k, x);
+    }
+  }
+  L.push("## Errores que se repiten");
+  const top = [...errs.values()].filter((x) => x.n >= 2).sort((a, b) => b.n - a.n).slice(0, 6);
+  if (!top.length) L.push("- Ninguno se repite todavía.");
+  for (const x of top) L.push(`- ×${x.n} ${x.text}`);
+  L.push("", "## Sesiones");
+  for (const r of mine.slice(0, 40)) {
+    const t = r.assigned.find((x) => x.folder === topic.folder);
+    const m = avg(r.evidence.attempts.filter((x) => !x.topic || x.topic === topic.folder).map((x) => x.score));
+    const file = sessionNoteTargets("", r).find((x) => x.topic?.folder === topic.folder)!.rel.split("/").pop()!.replace(/\.md$/i, "");
+    L.push(`- [[${file}]] — ${r.minutes} min · ${t ? OUTCOME_TEXT[t.status] : "—"}${r.assessment?.understanding ? ` · comprensión ${r.assessment.understanding}/5` : ""}${m !== null ? ` · nota media ${m}` : ""}`);
+  }
+  L.push("");
+  return L.join("\n");
+}
+
+/** El índice de `_registro/`: un enlace al resumen de cada tema con sesiones. */
+export function renderRegistryIndex(entries: ReadonlyArray<{ dir: string; title: string; sessions: number; minutes: number; mastery: number | null; last: string }>, today: string): string {
+  const L: string[] = ["---", "registro: indice", `actualizado: ${today}`, "---", "# Registros de estudio", "", "> Una carpeta por tema con sus sesiones y su resumen. Generada por el Mentor: se actualiza sola al guardar cada sesión.", ""];
+  L.push("## Temas con sesiones (los más recientes primero)");
+  if (!entries.length) L.push("- Todavía no hay sesiones registradas.");
+  for (const e of [...entries].sort((a, b) => b.last.localeCompare(a.last) || a.title.localeCompare(b.title, "es", { numeric: true }))) {
+    L.push(`- [[${e.dir}/Resumen|${e.title}]] — ${e.sessions} ${e.sessions === 1 ? "sesión" : "sesiones"} · ${e.minutes} min${e.mastery !== null ? ` · dominio ${e.mastery} %` : ""} · última ${e.last}`);
+  }
+  L.push("", "## Otros", "- [[puntos-debiles]] · semanas: notas `semana-AAAA-Www`", "");
+  return L.join("\n");
 }
 
 // ── Agregados deterministas ────────────────────────────────────────────

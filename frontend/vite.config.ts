@@ -5,8 +5,12 @@ import electron from "vite-plugin-electron/simple";
 
 // The built files are loaded from disk by pywebview or electron, so every
 // asset path must be relative.
+// La hora de la compilación, visible en la barra de estado: así se ve de un vistazo si la ventana abierta es la versión recién compilada.
+const BUILD_STAMP = new Date().toLocaleString("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+
 export default defineConfig({
   base: "./",
+  define: { __BUILD_STAMP__: JSON.stringify(BUILD_STAMP) },
   plugins: [
     react(),
     tailwindcss(),

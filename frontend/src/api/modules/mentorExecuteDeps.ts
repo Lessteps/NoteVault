@@ -17,7 +17,6 @@ import { kataBlockMessages, mergeAiKata, parseKataBlock } from "../../core/mento
 import type { ExecDeps, TaskRunResult } from "../../core/mentor/planExecutor.js";
 import { ppAreaDir } from "../../core/mentor/practiceState.js";
 import { diskExercises, scanTopicDesigns } from "../../core/mentor/topicDesignScan.js";
-import { clearExerciseIndexCache } from "../../core/practice/exerciseIndex.js";
 import { ensureTopicViewFiles } from "../../core/practice/viewFiles.js";
 import { safeName } from "../../core/assistantActions.js";
 import { PlanStore } from "../../core/mentor/plan.js";
@@ -100,8 +99,9 @@ export function makeExecDeps(app: AppState, planId: string, o: ExecDepsOptions =
   const study = studyApi(app);
   const space = studySpaceApi(app);
   const plan = () => new PlanStore(app.root).load(planId);
+  // La lectura por archivo (`exerciseIndex`) se valida sola con la fecha y el tamaño de cada nota, así que NO se vacía: vaciarla obligaba a
+  // releer las ~3 000 notas del vault, de forma síncrona, tras cada tarea y cada ejercicio, y dejaba la app colgada mientras corría la ejecución.
   const caches = (): void => {
-    clearExerciseIndexCache();
     clearStudySnapshotCache();
   };
 

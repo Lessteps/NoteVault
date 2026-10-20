@@ -6,7 +6,7 @@
 // Es de SOLO LECTURA sobre el plan: no renombra, no reparte, no ajusta, no ejecuta. Todo se calcula con el mismo modelo de agenda que la
 // vista de plan (`useAgendaModel`), así que ambas vistas nunca discrepan.
 
-import { CalendarDays, ChevronRight, Lock, NotebookText } from "lucide-react";
+import { CalendarDays, Info, ListPlus, Lock, NotebookText } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { areaSets } from "../../lib/planAreaLists";
@@ -15,11 +15,13 @@ import { catchUpOf } from "../../lib/planCatchUp";
 import { bucketReviews, dueText, reviewsOfTopics, type ReviewRow } from "../../lib/planReviews";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
 import { dailyProjectOf, weeklyProjectOf } from "../../lib/planCurriculum";
-import { dayByArea, orderedAreas } from "../../lib/planTopicsByArea";
+import { dayByArea, orderedAreas, type DayAreaEntry } from "../../lib/planTopicsByArea";
 import { routeStarted, timeTagOf, topicTimes } from "../../lib/planTopicTime";
 import { minutesOn, minutesText } from "../../lib/timeLog";
 import type { MentorPlan } from "../../lib/types";
+import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
+import { usePomodoro } from "../../store/pomodoro";
 import { useNavState } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
@@ -32,6 +34,7 @@ import { ProgressOverview, type BoardRow } from "./PlanBoard";
 import { usePlanAreaPractice } from "./PracticeCard";
 import { RunProjects } from "./PlanRunPractice";
 import { RunArea, RunBases, RunNav, type RunTab, type TodayCard } from "./PlanRunTabs";
+import { AreaFolds, CatchUpCard, FocusCard, foldItemOf, ReviewIntervals, UpcomingCard, type FoldItem, type LateArea } from "./PlanRunGeneral";
 import { SectionHeading } from "./planKit";
 import { DAY_LONG, openAgendaAt, openPlanRecords, type Loaded } from "./planShared";
 
@@ -101,11 +104,13 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   };
 
   // Lo de hoy por área. Los fundamentos («Bases») NO son de ningún área: se sacan de las tarjetas de área y van juntos, sin repetirse, a su pestaña.
-  const rowOf = (i: { folder: string; title: string; part: number; parts: number; minutes: number }, withBases: boolean): BoardRow => {
+  const rowOf = (i: { folder: string; title: string; part: number; parts: number; minutes: number }, withBases: boolean, sub?: string): BoardRow => {
     const state = m.topicByFolder.get(i.folder)?.state ?? "sin_tratar";
     const time = timeOf(i.folder, state === "completo");
     return {
       ...(time ? { time } : {}),
+      ...(sub ? { sub } : {}),
+      minutes: i.minutes,
       folder: i.folder,
       title: i.title,
       meta: `${withBases ? "Bases · " : ""}${i.parts > 1 ? `parte ${i.part}/${i.parts} · ` : ""}${hm(i.minutes)}`,
@@ -117,20 +122,39 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       unlockOn: gate.locked.get(i.folder),
     };
   };
+  const kindText = (k: Set<string>): string => (k.has("theory") && k.has("practice") ? "Teoría + Práctica" : k.has("practice") ? "Práctica" : k.has("theory") ? "Teoría" : "");
+  /** Las tarjetas de área de un día. `bases` recoge los fundamentos (van juntos, sin repetirse); `planned` = proyección (sin bloqueo de la ruta sólida). */
+  const cardsOf = (ents: DayAreaEntry[], bases?: { seen: Set<string>; rows: BoardRow[] }, planned = false): TodayCard[] =>
+    ents.map((e) => {
+      const flat = (e.blocks ?? []).flatMap((bl) => bl.items.map((it) => ({ it, kind: bl.kind })));
+      const kinds = new Map<string, Set<string>>();
+      for (const { it, kind } of flat) {
+        const key = `${it.folder}:${it.part}`;
+        (kinds.get(key) ?? kinds.set(key, new Set()).get(key)!).add(kind);
+      }
+      const subOf = (i: { folder: string; part: number; parts: number }): string => [kindText(kinds.get(`${i.folder}:${i.part}`) ?? new Set()), i.parts > 1 ? `Parte ${i.part} de ${i.parts}` : ""].filter(Boolean).join(" · ");
+      const mk = (i: (typeof flat)[number]["it"], withBases: boolean): BoardRow => {
+        const row = rowOf(i, withBases, subOf(i));
+        if (!planned) return row;
+        const { unlockOn: _unlock, ...rest } = row;
+        return rest;
+      };
+      const items = flat.map((x) => x.it);
+      const seen = new Set<string>();
+      const own = items.filter((i) => !i.applied && (seen.has(`${i.folder}:${i.part}`) ? false : (seen.add(`${i.folder}:${i.part}`), true)));
+      if (bases) {
+        for (const i of items.filter((x) => x.applied)) {
+          if (bases.seen.has(`${i.folder}:${i.part}`)) continue;
+          bases.seen.add(`${i.folder}:${i.part}`);
+          bases.rows.push(mk(i, true));
+        }
+      }
+      const rows = own.map((i) => mk(i, false));
+      return { entry: e, rows, colour: focusColour(e.areaId), doneN: rows.filter((r) => r.done).length };
+    });
   const seenBases = new Set<string>();
   const basesRows: BoardRow[] = [];
-  const cards: TodayCard[] = entries.map((e) => {
-    const items = (e.blocks ?? []).flatMap((bl) => bl.items);
-    const seen = new Set<string>();
-    const own = items.filter((i) => !i.applied && (seen.has(`${i.folder}:${i.part}`) ? false : (seen.add(`${i.folder}:${i.part}`), true)));
-    for (const i of items.filter((x) => x.applied)) {
-      if (seenBases.has(`${i.folder}:${i.part}`)) continue;
-      seenBases.add(`${i.folder}:${i.part}`);
-      basesRows.push(rowOf(i, true));
-    }
-    const rows = own.map((i) => rowOf(i, false));
-    return { entry: e, rows, colour: focusColour(e.areaId), doneN: rows.filter((r) => r.done).length };
-  });
+  const cards: TodayCard[] = cardsOf(entries, { seen: seenBases, rows: basesRows });
   const cardOf = new Map(cards.map((c) => [c.entry.subplanId, c] as const));
   const areaList = orderedAreas(plan);
   const basesDone = basesRows.filter((r) => r.done).length;
@@ -229,6 +253,9 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
     ...(basesRows.length || hasBasesRoute ? [{ id: "bases", label: "Bases", colour: "var(--nv-accent)", ...(basesRows.length ? { hint: `${basesDone}/${basesRows.length}`, hintLabel: `${basesDone} de ${basesRows.length} temas de hoy hechos` } : {}) }] : []),
     { id: "proyectos", label: "Proyectos" },
   ];
+  const [upSel, setUpSel] = useState("");
+  const upDay = upcoming.find((d) => d.date === upSel) ?? upcoming[0];
+  const upCards = upDay ? cardsOf(dayByArea(plan, upDay, m.dueByDate.get(upDay.date) ?? []), undefined, true) : [];
   const [tabSel, setTabSel] = useState("general");
   const tab = tabs.some((t) => t.id === tabSel) ? tabSel : "general";
   const go = (id: string): void => {
@@ -241,6 +268,26 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const capacity = day?.capacityMinutes ?? 0;
   const excess = planned - capacity;
   const loggedToday = minutesOn(timeEntries, date);
+  // tarjetas plegables de hoy: las áreas con temas o práctica y, aparte, los fundamentos (Bases)
+  const todayFolds: FoldItem[] = [
+    ...cards.filter((c) => c.rows.length > 0 || c.entry.practiceMinutes > 0).map(foldItemOf),
+    ...(basesRows.length ? [{ key: "bases", name: "Bases", colour: "var(--nv-accent)", rows: basesRows, minutes: basesRows.reduce((n, r) => n + (r.minutes ?? 0), 0) }] : []),
+  ];
+  const pendingToday = todayFolds.flatMap((f) => f.rows).filter((r) => !r.done);
+  const assignToday = (): void => {
+    const { assignTopic } = usePomodoro.getState();
+    for (const r of pendingToday) assignTopic({ folder: r.folder, title: r.title, kind: "topic" });
+    useApp.getState().toast("info", `${plural(pendingToday.length, "tema asignado", "temas asignados")} al Pomodoro.`);
+  };
+  const firstPending = cards.find((c) => c.rows.some((r) => !r.done));
+  const focusAreaKey = firstPending?.entry.areaId ?? firstPending?.entry.subplanId ?? "libre";
+  const lateMinutes = new Map<string, number>();
+  for (const d of m.schedule.days) for (const t of d.topics) if (!t.done) lateMinutes.set(t.folder, (lateMinutes.get(t.folder) ?? 0) + t.minutes);
+  const lateAreas: LateArea[] = catchUp.lateByArea.map((a) => {
+    const topics = catchUp.late.filter((l) => l.area === a.area);
+    const sp = plan.subplans.find((x) => x.area === a.area);
+    return { area: a.area, colour: focusColour(sp?.areaId), topics: topics.map((t) => ({ folder: t.folder, title: t.title })), minutes: Math.round(topics.reduce((n, t) => n + (lateMinutes.get(t.folder) ?? 0), 0)) };
+  });
 
   return (
     <div className="space-y-6 pb-4" data-testid="plan-run">
@@ -255,24 +302,31 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]" data-testid="run-general">
           <div className="min-w-0 space-y-6">
             {/* HOY */}
-            <section aria-labelledby="run-today-h" data-testid="run-today" className={cn(card, "space-y-5 border-2 border-accent/50")}>
-              <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <section aria-labelledby="run-today-h" data-testid="run-today" className={cn(card, "space-y-5")}>
+              <header className="flex flex-wrap items-start gap-x-3 gap-y-3">
                 <div className="min-w-0 flex-1 basis-64">
-                  <p className="font-mono text-[13px] uppercase tracking-wider text-faint">{isToday ? "Hoy" : before ? "El plan aún no empieza" : after ? "El plan terminó" : "Día del plan"}</p>
+                  <p className="font-mono text-[11.5px] font-semibold uppercase tracking-[0.12em] text-faint">
+                    {isToday ? "Hoy" : before ? "El plan aún no empieza" : after ? "El plan terminó" : "Día del plan"}
+                    {day && <> · Semana {day.week}</>}
+                  </p>
                   <h2 id="run-today-h" className="text-[26px] font-bold leading-tight first-letter:uppercase">{longDateLabel(date)}</h2>
                 </div>
-                {day && <Chip large colour="var(--nv-accent)">Semana {day.week}</Chip>}
-                {day?.focus && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 py-1 text-[14px] font-semibold">
-                    <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: focusColour(day.focus.id) }} />
-                    Enfoque: {day.focus.label}
-                  </span>
-                )}
-                {canPlan && (
-                  <PrimaryButton large onClick={planToday} data-testid="run-plan-day">
-                    <CalendarDays size={16} aria-hidden /> Planear mi día
-                  </PrimaryButton>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {day?.focus && (
+                    <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold">
+                      <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: focusColour(day.focus.id) }} />
+                      Enfoque: {day.focus.label}
+                    </span>
+                  )}
+                  {day?.study && pendingToday.length > 0 && (
+                    <GhostButton large onClick={assignToday} data-testid="run-assign-today"><ListPlus size={15} aria-hidden /> Asignar temas</GhostButton>
+                  )}
+                  {canPlan && (
+                    <PrimaryButton large onClick={planToday} data-testid="run-plan-day">
+                      <CalendarDays size={16} aria-hidden /> Planear mi día
+                    </PrimaryButton>
+                  )}
+                </div>
               </header>
 
               {behind && gate.blockers.length > 0 && (
@@ -288,43 +342,38 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
 
               {day?.study && (
                 <>
-                  {day.focus?.line && <p className="text-[14.5px] leading-relaxed text-dim" data-testid="run-line">{day.focus.line}</p>}
                   {entries.length === 0 && langBlocks.length === 0 && !day.practice.project && (
                     <p className="text-[14px] text-dim">Sin temas repartidos hoy: queda para repaso o para recuperar lo atrasado.</p>
                   )}
-                  {(cards.length > 0 || basesRows.length > 0) && (
-                    <div data-testid="run-composition">
-                      <p className="mb-2 text-[14px] text-dim">Lo programado para hoy, por área (pulsa una para abrirla):</p>
-                      <ul className="flex flex-wrap gap-2" aria-label="Áreas de hoy">
-                        {cards.filter((c) => c.rows.length > 0 || c.entry.practiceMinutes > 0).map((c) => (
-                          <li key={c.entry.subplanId}>
-                            <button type="button" onClick={() => go(`area:${c.entry.subplanId}`)} className="inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-[14px] hover:bg-hover" style={{ borderColor: `${c.colour}66` }} data-testid="run-composition-chip">
-                              <span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: c.colour }} />
-                              <span className="text-text">{c.entry.area}</span>
-                              <span className="text-dim">{plural(c.rows.length, "tema", "temas")} · {hm(c.entry.theoryMinutes + c.entry.practiceMinutes)}</span>
-                            </button>
-                          </li>
-                        ))}
-                        {basesRows.length > 0 && (
-                          <li>
-                            <button type="button" onClick={() => go("bases")} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-accent/50 px-3 text-[14px] hover:bg-hover" data-testid="run-composition-chip">
-                              <span className="text-text">Bases</span>
-                              <span className="text-dim">{plural(basesRows.length, "tema", "temas")}</span>
-                            </button>
-                          </li>
-                        )}
-                      </ul>
+                  {todayFolds.length > 0 && (
+                    <div data-testid="run-composition" className="space-y-3">
+                      <p className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-[11.5px] font-semibold uppercase tracking-[0.12em] text-faint">Áreas programadas para hoy</span>
+                        <span className="flex-1" />
+                        <Chip colour="var(--nv-faint)">{plural(todayFolds.length, "módulo", "módulos")} · {plural(topicsToday.length, "tema", "temas")}</Chip>
+                      </p>
+                      <AreaFolds items={todayFolds} />
                     </div>
                   )}
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-dim">
-                    <span><strong className="text-text">{doneToday}/{topicsToday.length}</strong> {topicsToday.length === 1 ? "tema hecho" : "temas hechos"}</span>
-                    <div className="min-w-32 flex-1 basis-40"><ProgressBar pct={pctToday} thick label="Avance de hoy" /></div>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[14.5px] text-dim">
+                      <span><strong className="text-text">{doneToday}/{topicsToday.length}</strong> {topicsToday.length === 1 ? "tema hecho" : "temas hechos"} hoy</span>
+                      <span className="flex-1" />
+                      <span className="text-[13px]">{pctToday} % completado</span>
+                    </div>
+                    <ProgressBar pct={pctToday} thick label="Avance de hoy" />
                   </div>
-                  {(day.practice.project || langBlocks.length > 0) && (
-                    <ul className="flex flex-wrap gap-2" aria-label="Práctica del día" data-testid="run-practice">
-                      {day.practice.project && <li><Chip large colour="var(--nv-practice, #c58be0)">Proyecto semanal · {hm(day.practice.project.minutes)}</Chip></li>}
-                      {langBlocks.map((b) => <li key={b.id}><Chip large colour="var(--nv-accent)">{b.label} · {hm(b.minutes)}</Chip></li>)}
-                    </ul>
+                  {(day.practice.project || langBlocks.length > 0 || late > 0) && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      {(day.practice.project || langBlocks.length > 0) && (
+                        <ul className="flex flex-wrap gap-2" aria-label="Práctica del día" data-testid="run-practice">
+                          {day.practice.project && <li><Chip large colour="var(--nv-practice, #c58be0)">Proyecto semanal · {hm(day.practice.project.minutes)}</Chip></li>}
+                          {langBlocks.map((b) => <li key={b.id}><Chip large colour="var(--nv-accent)">{b.label} · {hm(b.minutes)}</Chip></li>)}
+                        </ul>
+                      )}
+                      <span className="flex-1" />
+                      {late > 0 && <p className="text-[13px] text-warn" data-testid="run-late">{plural(late, "tema atrasado", "temas atrasados")} de semanas anteriores: están en «Vista de plan», dentro de cada área.</p>}
+                    </div>
                   )}
                   {due.length > 0 && m.deliverablesDefined && (
                     <ul className="space-y-2" aria-label="Entregables de hoy">
@@ -333,59 +382,55 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                   )}
                 </>
               )}
-              {late > 0 && <p className="text-[14px] text-warn" data-testid="run-late">{plural(late, "tema atrasado", "temas atrasados")} de semanas anteriores: están en «Vista de plan», dentro de cada área.</p>}
+              {!day?.study && late > 0 && <p className="text-[13px] text-warn" data-testid="run-late">{plural(late, "tema atrasado", "temas atrasados")} de semanas anteriores: están en «Vista de plan», dentro de cada área.</p>}
             </section>
 
             {/* LO QUE VIENE: solo en la vista general */}
-            {(upcoming.length > 0 || deliverables.length > 0) && (
-              <section aria-labelledby="run-next-h" data-testid="run-next">
-                <SectionHeading id="run-next-h" hint="Los próximos días de estudio y los entregables que vencen pronto.">Lo que viene</SectionHeading>
-                <div className="grid items-start gap-4 @3xl:grid-cols-2 [&>*]:min-w-0">
-                  {upcoming.length > 0 && (
-                    <ul className="space-y-2" aria-label="Próximos días">
-                      {upcoming.map((d) => (
-                        <li key={d.date}>
-                          <button
-                            type="button"
-                            onClick={() => openAgendaAt(plan.id, d.date, "dia")}
-                            aria-label={`Ver en la Agenda: ${longDateLabel(d.date)}`}
-                            className="nv-ghost flex w-full items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-3 text-left hover:border-accent"
-                            data-testid="run-upcoming-day"
-                          >
-                            <span className="w-16 flex-none text-[14px] font-semibold">{dateLabel(d.date)}</span>
-                            <span className="min-w-0 flex-1 text-[14px]">
-                              <span className="font-medium">{d.focus?.label ?? "Estudio"}</span>
-                              <span className="text-dim"> · {plural(d.topics.length, "tema", "temas")} · {hm(d.topicMinutes + d.practiceMinutes)}</span>
-                            </span>
-                            <ChevronRight size={16} aria-hidden className="flex-none text-faint" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {deliverables.length > 0 && (
-                    <ul className="space-y-2" aria-label="Próximos entregables">
-                      {deliverables.map((d) => <DeliverableLine key={d.id} d={d} showDate={dateLabel(d.dueDate)} />)}
-                    </ul>
-                  )}
-                </div>
+            {upDay ? (
+              <UpcomingCard days={upcoming} selected={upDay.date} onSelect={setUpSel} cards={upCards} onOpenAgenda={(d) => openAgendaAt(plan.id, d, "dia")}>
+                {deliverables.length > 0 && (
+                  <ul className="space-y-2" aria-label="Próximos entregables">
+                    {deliverables.map((d) => <DeliverableLine key={d.id} d={d} showDate={dateLabel(d.dueDate)} />)}
+                  </ul>
+                )}
+              </UpcomingCard>
+            ) : deliverables.length > 0 ? (
+              <section aria-labelledby="run-next-h" data-testid="run-next" className={cn(card, "space-y-3")}>
+                <SectionHeading id="run-next-h" hint="Los entregables que vencen pronto.">Lo que viene</SectionHeading>
+                <ul className="space-y-2" aria-label="Próximos entregables">
+                  {deliverables.map((d) => <DeliverableLine key={d.id} d={d} showDate={dateLabel(d.dueDate)} />)}
+                </ul>
               </section>
+            ) : null}
+
+            {/* AVISO DE CONSTANCIA */}
+            {!plan.proposed && !plan.archived && !before && !after && catchUp.late.length > 0 && (
+              <CatchUpCard
+                total={catchUp.late.length}
+                areas={lateAreas}
+                summary={<>Para terminar el {longDateLabel(plan.end)} debes completar <strong>{plural(catchUp.remaining, "tema pendiente", "temas pendientes")}</strong> en {plural(catchUp.daysLeft, "día de estudio", "días de estudio")}: unos <strong>{String(catchUp.perDay).replace(".", ",")} temas por día</strong> (≈ {hm(catchUp.minutesPerDay)}).</>}
+                warning={catchUp.capacityPerDay > 0 && catchUp.minutesPerDay > catchUp.capacityPerDay ? <p className="text-[13.5px] text-warn">Eso supera tu tiempo diario de teoría ({hm(catchUp.capacityPerDay)}): sube el tiempo diario o mueve la fecha de fin.</p> : undefined}
+              />
             )}
 
-            <p className="flex flex-wrap items-center gap-2 text-[14px] text-faint">
-              Desde aquí no se cambia el plan: solo se marca la práctica del día.
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card px-4 py-3">
+              <Info size={15} aria-hidden className="flex-none text-faint" />
+              <p className="min-w-0 flex-1 basis-60 text-[13px] text-faint">Desde aquí no se cambia el plan: solo se marca la práctica del día.</p>
               <GhostButton onClick={() => openAgendaAt(plan.id, date, "dia")}>Ver el día en la Agenda</GhostButton>
-              <GhostButton onClick={() => useNavState.getState().set("mentor.view", "cierre")} data-testid="run-close-day">Cerrar el día con el Mentor</GhostButton>
-            </p>
+              <PrimaryButton onClick={() => useNavState.getState().set("mentor.view", "cierre")} data-testid="run-close-day">Cerrar el día con el Mentor</PrimaryButton>
+            </div>
           </div>
 
-          {/* Columna lateral: presupuesto, avance de cada área y horas de hoy */}
+          {/* Columna lateral: presupuesto, repasos, avance de cada área y tiempo de enfoque */}
           <aside aria-label="Resumen del día" className="min-w-0 space-y-5">
             {day?.study && (
               <section aria-labelledby="run-budget-h" className={cn(card, "space-y-3")} data-testid="run-budget">
-                <div className="flex items-center gap-2">
-                  <h2 id="run-budget-h" className="flex-1 text-[17px] font-bold">Presupuesto de estudio</h2>
-                  {excess > 0 && <Chip colour="var(--nv-warn)">+{excess} min exceso</Chip>}
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Objetivo diario</p>
+                    <h2 id="run-budget-h" className="text-[17px] font-bold">Presupuesto de estudio</h2>
+                  </div>
+                  {excess > 0 ? <Chip colour="var(--nv-warn)">+{excess} min exceso</Chip> : <Chip colour="var(--nv-mint)">{minutesText(loggedToday)} · Al día</Chip>}
                 </div>
                 <p className="flex items-baseline gap-2 text-[14.5px] text-dim">Tiempo estimado hoy <span className="flex-1" /><strong className="text-[19px] text-text">{hm(planned)}</strong> / {hm(capacity)}</p>
                 <ProgressBar pct={capacity ? Math.min(100, Math.round((planned / capacity) * 100)) : 0} thick label="Tiempo estimado de hoy frente al disponible" />
@@ -396,12 +441,12 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
               </section>
             )}
             <section aria-labelledby="run-reviews-h" className={cn(card, "space-y-3")} data-testid="run-reviews">
-              <div className="flex items-baseline gap-2">
-                <h2 id="run-reviews-h" className="flex-1 text-[17px] font-bold">Repasos</h2>
-                <span className="text-[13px] text-dim">{planBuckets.today.length} hoy · {planBuckets.week.length} esta semana · {planBuckets.nextWeek.length} la próxima</span>
+              <div className="flex items-center gap-2">
+                <h2 id="run-reviews-h" className="flex-1 text-[17px] font-bold">Repasos espaciados</h2>
+                <Chip colour="var(--nv-faint)">{planBuckets.today.length} hoy</Chip>
               </div>
               {planBuckets.today.length === 0 ? (
-                <p className="text-[13.5px] text-dim">No tienes repasos vencidos ni para hoy. Cada tema que practicas programa el siguiente repaso (3, 7, 14, 30, 60 y 120 días).</p>
+                <p className="text-[13.5px] text-dim">No tienes repasos vencidos ni para hoy. Cada tema que practicas programa el siguiente repaso en intervalos óptimos.</p>
               ) : (
                 <ul className="space-y-1.5" aria-label="Repasos para hoy">
                   {planBuckets.today.slice(0, 6).map((r) => (
@@ -413,24 +458,32 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                 </ul>
               )}
               {planBuckets.today.length > 6 && <p className="text-[12.5px] text-faint">Y {planBuckets.today.length - 6} más: míralos en la pestaña de cada área, en «Por repasar».</p>}
+              <p className="text-[12.5px] text-faint">{planBuckets.week.length} esta semana · {planBuckets.nextWeek.length} la próxima</p>
+              <ReviewIntervals />
             </section>
             <ProgressOverview plan={plan} data={data} compact onPick={(id) => go(`area:${id}`)} />
-            <section aria-labelledby="run-hours-h" className={cn(card, "space-y-2")} data-testid="run-hours">
-              <div className="flex items-baseline gap-2">
-                <h2 id="run-hours-h" className="flex-1 text-[17px] font-bold">Horas de hoy</h2>
-                <strong className="text-[17px]">{minutesText(loggedToday)}</strong>
-              </div>
-              {loggedToday === 0 ? (
-                <p className="text-[13.5px] text-dim">Aún no has registrado tiempo. Abre un área y empieza un Pomodoro.</p>
-              ) : (
+            <FocusCard
+              planId={plan.id}
+              areaKey={focusAreaKey}
+              session={timeEntries.filter((e) => e.date === date).length + 1}
+              loggedMinutes={loggedToday}
+              goalMinutes={capacity}
+              onBusy={() => useApp.getState().toast("info", "Termina la evaluación del bloque anterior para empezar otro.")}
+            />
+            {loggedToday > 0 && (
+              <section aria-labelledby="run-hours-h" className={cn(card, "space-y-2")} data-testid="run-hours">
+                <div className="flex items-baseline gap-2">
+                  <h2 id="run-hours-h" className="flex-1 text-[17px] font-bold">Horas de hoy</h2>
+                  <strong className="text-[17px]">{minutesText(loggedToday)}</strong>
+                </div>
                 <ul className="space-y-1 text-[14px]" aria-label="Horas de hoy por área">
                   {[...areaList.map((a) => ({ key: a.areaId ?? a.subplanId, name: a.area })), { key: "bases", name: "Bases" }, { key: "libre", name: "Sesión libre" }]
                     .map((a) => ({ ...a, min: minutesOn(timeEntries, date, a.key) }))
                     .filter((a) => a.min > 0)
                     .map((a) => <li key={a.key} className="flex"><span className="flex-1 text-dim">{a.name}</span><span className="font-semibold">{minutesText(a.min)}</span></li>)}
                 </ul>
-              )}
-            </section>
+              </section>
+            )}
           </aside>
         </div>
       )}
@@ -456,24 +509,6 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       {tab === "bases" && <RunBases plan={plan} routeRows={basesRoute} todayRows={basesRows} weekDays={weekDaysOf(null)} upcoming={upcomingWeeksOf(null)} sets={areaSets(m.schedule.days, null, date, currentWeek, started)} reviews={basesReviews} date={date} />}
 
       {tab === "proyectos" && <RunProjects plan={plan} data={data} m={m} />}
-
-      {/* AVISO DE CONSTANCIA: al final de todo */}
-      {!plan.proposed && !plan.archived && !before && !after && catchUp.late.length > 0 && (
-        <section role="status" className="rounded-2xl border border-warn/60 bg-warn-soft p-5" data-testid="run-catchup">
-          <h2 className="text-[17px] font-bold text-warn">Vas atrasado en {plural(catchUp.late.length, "tema", "temas")}</h2>
-          <ul className="mt-1 text-[14.5px] text-dim" aria-label="Atraso por área">
-            {catchUp.lateByArea.map((a) => (
-              <li key={a.area}><strong className="text-text">{a.area}</strong>: {plural(a.count, "tema", "temas")} atrasado{a.count === 1 ? "" : "s"} ({catchUp.late.filter((l) => l.area === a.area).slice(0, 3).map((l) => l.title).join(" · ")}{a.count > 3 ? "…" : ""})</li>
-            ))}
-          </ul>
-          <p className="mt-2 text-[14.5px]">
-            Para terminar el {longDateLabel(plan.end)} debes completar {plural(catchUp.remaining, "tema pendiente", "temas pendientes")} en {plural(catchUp.daysLeft, "día de estudio", "días de estudio")}: unos <strong>{String(catchUp.perDay).replace(".", ",")} temas por día</strong> (≈ {hm(catchUp.minutesPerDay)}).
-          </p>
-          {catchUp.capacityPerDay > 0 && catchUp.minutesPerDay > catchUp.capacityPerDay && (
-            <p className="mt-1 text-[14px] text-warn">Eso supera tu tiempo diario de teoría ({hm(catchUp.capacityPerDay)}): sube el tiempo diario o mueve la fecha de fin.</p>
-          )}
-        </section>
-      )}
     </div>
   );
 }

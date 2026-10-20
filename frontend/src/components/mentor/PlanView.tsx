@@ -290,16 +290,16 @@ export function PlanView({ planId }: { planId: string }) {
               </div>
             )}
             {plan && (
-              <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Acciones del plan">
-                <GhostButton large onClick={() => void rename()}>
-                  <Pencil size={16} aria-hidden /> Renombrar
-                </GhostButton>
-                <GhostButton large onClick={() => { const a = !plan.archived; void archivePlan(plan.id, a); announce(a ? "Plan archivado." : "Plan reactivado."); }}>
-                  {plan.archived ? <ArchiveRestore size={16} aria-hidden /> : <Archive size={16} aria-hidden />} {plan.archived ? "Reactivar" : "Terminar / archivar"}
-                </GhostButton>
-                <GhostButton large danger onClick={() => void remove()}>
-                  <Trash2 size={16} aria-hidden /> Eliminar
-                </GhostButton>
+              <div className="flex items-center gap-1 rounded-xl border border-line bg-card p-1" role="group" aria-label="Acciones del plan">
+                {([
+                  { id: "rename", label: "Renombrar", Icon: Pencil, run: () => void rename(), danger: false },
+                  { id: "archive", label: plan.archived ? "Reactivar" : "Terminar / archivar", Icon: plan.archived ? ArchiveRestore : Archive, run: () => { const a = !plan.archived; void archivePlan(plan.id, a); announce(a ? "Plan archivado." : "Plan reactivado."); }, danger: false },
+                  { id: "delete", label: "Eliminar", Icon: Trash2, run: () => void remove(), danger: true },
+                ] as const).map(({ id, label, Icon, run, danger }) => (
+                  <button key={id} type="button" aria-label={label} title={label} onClick={run} data-testid={`plan-action-${id}`} className={cn("grid h-10 w-10 place-items-center rounded-lg text-dim hover:bg-hover", danger ? "hover:text-danger" : "hover:text-text")}>
+                    <Icon size={16} aria-hidden />
+                  </button>
+                ))}
               </div>
             )}
           </div>

@@ -115,6 +115,21 @@ describe("vista de ejecución", () => {
     expect(work().querySelector("h2")!.textContent).toBe("Python");
   });
 
+  it("la vista general: áreas de hoy plegables, «Lo que viene» por día, tarjeta de Pomodoro y «Asignar temas»", async () => {
+    const p = plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }, { ...sub("s2", "Databases", "Consolidar", F2), areaId: "databases" }] as never });
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
+    await mountEl(<MentorPlan planId={PID} />);
+    const folds = all("area-fold");
+    expect(folds.length).toBeGreaterThan(0);
+    expect(folds[0]!.dataset.open).toBe("true");
+    expect(folds.slice(1).every((f) => f.dataset.open === "false")).toBe(true);
+    await click(folds[0]!.querySelector("button"));
+    expect(all("area-fold")[0]!.dataset.open).toBe("false");
+    expect(byTest("run-focus-clock")!.textContent).toBe("25:00");
+    expect(byTest("run-focus-start")).toBeTruthy();
+    expect(byTest("board-global")!.textContent).toContain("Progreso global");
+  });
+
   it("es de solo lectura: ningún campo de texto ni acción que cambie el plan", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);
@@ -149,7 +164,10 @@ describe("vista de ejecución", () => {
     await mountEl(<MentorPlan planId={PID} />);
     const next = all("run-upcoming-day");
     expect(next.length).toBeGreaterThan(0);
-    await click(next[0]);
+    await click(next[1]); // elegir otro día de «Lo que viene» solo cambia el día mostrado
+    expect(byTest("run-upcoming-areas")).toBeTruthy();
+    expect(useNavState.getState().values[planModeKey(PID)]).not.toBe("plan");
+    await click(byTest("run-upcoming-open"));
     const v = useNavState.getState().values;
     expect(v[planModeKey(PID)]).toBe("plan");
     expect(v[planTabKey(PID)]).toBe("agenda");

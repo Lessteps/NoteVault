@@ -612,8 +612,21 @@ export interface FinGoal {
   notes: string;
 }
 
-export interface FinPace {
-  saved: number;
+export interface FinRecurring {
+  id: string;
+  type: MovementType;
+  amount_cents: number;
+  what: string;
+  category: string;
+  goal: string;
+  rule: string;
+  start: string;
+  end: string;
+  archived: boolean;
+  last: string;
+}
+
+export interface FinPace {  saved: number;
   remaining: number;
   per_day: number | null;
   per_week: number | null;
@@ -621,7 +634,7 @@ export interface FinPace {
   days_left: number | null;
 }
 
-export type FinTotals = Record<MovementType | "balance", number>;
+export type FinTotals = Record<MovementType | "balance" | "neto" | "disponible", number>;
 
 export interface FinMeta {
   types: MovementType[];
@@ -648,6 +661,44 @@ export interface FinCheck {
   pace: FinPace;
   first: string;
   last: string;
+}
+
+export interface FinImportItem {
+  date: string;
+  type: MovementType;
+  amount_cents: number;
+  what?: string;
+  category?: string;
+  goal?: string;
+  reason?: string;
+  time?: string;
+  currency?: string;
+}
+
+export interface FinExportData {
+  movements: Movement[];
+  categories: FinCategory[];
+  goals: FinGoal[];
+  currency: string;
+  total_count: number;
+}
+
+export interface FinRule {
+  id: string;
+  pattern: string;
+  category: string;
+  type?: MovementType;
+  created?: string;
+}
+
+export interface FinDuplicateMatch {
+  index: number;
+  existingId: string;
+  existingWhat: string;
+  existingAmountCents: number;
+  existingDate: string;
+  existingType: string;
+  reason: string;
 }
 
 // ── Ejercicio ──────────────────────────────────────────────────────────────
@@ -722,6 +773,8 @@ export interface ExerciseStats {
   /** `current` is the run ending today; `best`, the longest of the year. */
   streak: { current: number; best: number };
 }
+
+export type { ExerciseGoal, WeightRecord, BodyProfile } from "./exerciseTypes";
 
 // ── Vista General ─────────────────────────────────────────────────────────
 
@@ -1709,3 +1762,6 @@ export interface MentorMemory {
 export type MentorDayView =
   | { loading: true }
   | { loading: false; date: string; record: MentorDayRecord; student: MentorStudentDay | null; review: MentorDayReview | null; closedAt: string | null; memory: MentorMemory; source?: "ai" | "rules"; note?: string };
+// ── Alimentación / Nutrición ──────────────────────────────────────────────
+export * from "./nutritionTypes";
+

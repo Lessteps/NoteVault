@@ -10,7 +10,6 @@ import {
 import { Recurrence } from "../../core/recurrence.js";
 import { newId } from "../../core/store.js";
 import {
-  DEFAULT_CURRENCY,
   FINANCE_GOAL_STATUSES,
   MOVEMENT_TYPES,
 } from "../../core/vaultFormat.js";
@@ -49,6 +48,44 @@ function pairs(
   items: Array<[Date, Record<string, any>]>
 ): Array<Record<string, unknown>> {
   return items.map(([d, m]) => ({ ...m, date: todayIso(d) }));
+}
+
+function monthExtrasFor(fm: FinanceManager, y: number, m: number) {
+  const [thisMonth, prevMonth] = fm.compareMonth(y, m);
+  return {
+    budgets: fm.budgetUsed(y, m).map(([c, used, budget]) => ({
+      category: c,
+      used,
+      budget,
+    })),
+    this: thisMonth,
+    prev: prevMonth,
+  };
+}
+
+function dueChecksFor(fm: FinanceManager, d: Date): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+  for (const [goal, checked, ids] of fm.dueChecks(d)) {
+    let first: Date;
+    let last: Date;
+    if (goal.cadence?.mode === "period") {
+      const p = (fm as any)._period(goal, d) as [Date, Date];
+      first = p[0];
+      last = p[1];
+    } else {
+      first = d;
+      last = d;
+    }
+    out.push({
+      goal,
+      checked,
+      ids,
+      pace: fm.pace(goal.id),
+      first: todayIso(first),
+      last: todayIso(last),
+    });
+  }
+  return out;
 }
 
 export function financeApi(app: AppState) {
@@ -176,7 +213,7 @@ export function financeApi(app: AppState) {
         type_labels: TYPE_LABELS,
         type_colours: TYPE_COLOURS,
         goal_statuses: [...FINANCE_GOAL_STATUSES],
-        currency: DEFAULT_CURRENCY,
+        currency: fm.currency(),
         categories: fm.categories(null, true),
         goals: fm.goals(),
       };
@@ -223,44 +260,30 @@ export function financeApi(app: AppState) {
       const today = new Date();
       const y = clampInt(year, 1970, 3000, today.getFullYear());
       const m = clampInt(month, 1, 12, 1);
-      const fm = getFm();
-      const [thisMonth, prevMonth] = fm.compareMonth(y, m);
-      return {
-        budgets: fm.budgetUsed(y, m).map(([c, used, budget]) => ({
-          category: c,
-          used,
-          budget,
-        })),
-        this: thisMonth,
-        prev: prevMonth,
-      };
+      return monthExtrasFor(getFm(), y, m);
     },
 
     fin_due_checks(day: string) {
       const fm = getFm();
+      return dueChecksFor(fm, finDate(day));
+    },
+
+    /**
+     * Todo lo que pinta el Diario en una sola llamada (día, casillas de
+     * ahorro, totales del mes y presupuesto). 9 idas y vueltas en 3 tandas
+     * se vuelven 1.
+     */
+    fin_diario_bundle(day: string) {
+      const fm = getFm();
       const d = finDate(day);
-      const out: Array<Record<string, unknown>> = [];
-      for (const [goal, checked, ids] of fm.dueChecks(d)) {
-        let first: Date;
-        let last: Date;
-        if (goal.cadence?.mode === "period") {
-          const p = (fm as any)._period(goal, d) as [Date, Date];
-          first = p[0];
-          last = p[1];
-        } else {
-          first = d;
-          last = d;
-        }
-        out.push({
-          goal,
-          checked,
-          ids,
-          pace: fm.pace(goal.id),
-          first: todayIso(first),
-          last: todayIso(last),
-        });
-      }
-      return out;
+      const ex = monthExtrasFor(fm, d.getFullYear(), d.getMonth() + 1);
+      return {
+        movements: pairs(fm.range(d, d)),
+        checks: dueChecksFor(fm, d),
+        month: ex.this,
+        budget: fm.budgetMonth(),
+        budgets: ex.budgets,
+      };
     },
 
     fin_add(day: string, fields: unknown) {
@@ -359,6 +382,32 @@ export function financeApi(app: AppState) {
       return fm.updateCategory(String(cid), patch);
     },
 
+    /**
+     * Borra la categoría (a la papelera del vault). Los movimientos que la
+     * usaban quedan sin categoría: no se borran ni se reasignan.
+     */
+    fin_category_delete(cid: string) {
+      const s = String(cid || "");
+      if (!s) throw new ApiError("Categoría inválida.");
+      if (!(s in getFm().categoryMap())) {
+        throw new ApiError("Esa categoría ya no existe.");
+      }
+      return { ok: getFm().deleteCategory(s) };
+    },
+
+    /** Sube (−1) o baja (1) la categoría dentro de su tipo. */
+    fin_category_move(cid: string, delta: number) {
+      const s = String(cid || "");
+      const d = Number(delta);
+      if (!s) throw new ApiError("Categoría inválida.");
+      if (d !== 1 && d !== -1) throw new ApiError("Desplazamiento inválido.");
+      if (!(s in getFm().categoryMap())) throw new ApiError("Esa categoría ya no existe.");
+      if (!getFm().moveCategory(s, d)) {
+        throw new ApiError("Ya está en el extremo de la lista.");
+      }
+      return { ok: true };
+    },
+
     fin_goals() {
       const fm = getFm();
       const today = new Date();
@@ -424,6 +473,310 @@ export function financeApi(app: AppState) {
       }
       fm.deleteGoal(String(gid));
       return { ok: true };
+    },
+
+    /**
+     * Mueve todo el ahorro general (ahorros y retiros sin meta) a una meta.
+     * Después el general queda en cero; deshacer es editar cada movimiento.
+     */
+    fin_assign_general(gid: string) {
+      const fm = getFm();
+      if (!fm.getGoal(String(gid))) {
+        throw new ApiError("Esa meta de ahorro ya no existe.");
+      }
+      let moved = 0;
+      for (const d of fm.allDays()) {
+        for (const m of fm.day(d)) {
+          if (!m.goal && (m.type === "ahorro" || m.type === "retiro")) {
+            fm.update(d, m.id, { goal: String(gid) });
+            moved++;
+          }
+        }
+      }
+      return { moved };
+    },
+
+    fin_recurring_list() {
+      return getFm().recurrents();
+    },
+
+    fin_recurring_save(id: string, fields: unknown) {
+      const fm = getFm();
+      const rid = String(id || "");
+      if (rid && !fm.recurrents().some((r) => r.id === rid)) {
+        throw new ApiError("Ese recurrente ya no existe.");
+      }
+      const f = fields && typeof fields === "object" ? (fields as Record<string, unknown>) : {};
+      const type = String(f.type ?? GASTO);
+      if (!(MOVEMENT_TYPES as readonly string[]).includes(type)) {
+        throw new ApiError("Tipo inválido.");
+      }
+      const amount_cents = cents(f.amount_cents);
+      if (!amount_cents) throw new ApiError("Escribe un importe mayor que cero.");
+      const rule = Recurrence.parse(oneLine(f.rule, 60)).toString();
+      if (!rule) throw new ApiError("Regla de repetición inválida.");
+      const startD = optDate(f.start);
+      const endD = optDate(f.end);
+      const saved = fm.saveRecurrent({
+        id: rid,
+        type,
+        amount_cents,
+        what: oneLine(f.what, 120),
+        category: String(f.category || ""),
+        goal: String(f.goal || ""),
+        rule,
+        start: startD ? todayIso(startD) : todayIso(),
+        end: endD ? todayIso(endD) : "",
+        archived: Boolean(f.archived),
+      });
+      if (!saved) throw new ApiError("Ese recurrente ya no existe.");
+      return saved;
+    },
+
+    fin_recurring_delete(rid: string) {
+      getFm().deleteRecurrent(String(rid));
+      return { ok: true };
+    },
+
+    fin_recurring_run(today: string) {
+      const day = optDate(today);
+      return { created: getFm().runRecurrents(day ? todayIso(day) : todayIso()) };
+    },
+
+    fin_budget_get() {
+      return { month_budget_cents: getFm().budgetMonth() };
+    },
+
+    fin_budget_set(amount: unknown) {
+      return { month_budget_cents: getFm().setBudgetMonth(cents(amount, true)) };
+    },
+
+    /**
+     * Búsqueda en todo el historial (el buscador de Periodo solo ve el rango
+     * cargado). Página de 100 + total para corte explícito.
+     */
+    fin_search(query: string, kind = "", category = "", offset = 0) {
+      const fm = getFm();
+      const q = String(query ?? "").trim();
+      const k = String(kind || "");
+      if (k && !(MOVEMENT_TYPES as readonly string[]).includes(k)) {
+        throw new ApiError("Tipo inválido.");
+      }
+      if (!q && !k && !category) return { total: 0, movements: [] as Array<Record<string, unknown>> };
+      const all: Array<[Date, Record<string, any>]> = [];
+      for (const d of fm.allDays()) {
+        for (const m of fm.day(d)) all.push([d, m]);
+      }
+      const found = fm.search(all, q, k, String(category || ""));
+      const start = Math.max(0, Math.floor(Number(offset) || 0));
+      return { total: found.length, movements: pairs(found.slice(start, start + 100)) };
+    },
+
+    /**
+     * Importación por lotes de movimientos bancarios validados.
+     * Agrupa escrituras por día para persistencia atómica y rápida.
+     */
+    fin_import_batch(items: unknown) {
+      if (!Array.isArray(items)) {
+        throw new ApiError("Se esperaba una lista de movimientos.");
+      }
+      if (items.length === 0) {
+        return { imported: 0, movements: [] };
+      }
+      if (items.length > 5000) {
+        throw new ApiError("El lote excede el límite de 5.000 movimientos.");
+      }
+
+      const fm = getFm();
+      const prepared = items.map((raw, idx) => {
+        if (!raw || typeof raw !== "object") {
+          throw new ApiError(`Movimiento en índice ${idx} inválido.`);
+        }
+        const r = raw as Record<string, unknown>;
+        const d = finDate(String(r.date || ""));
+        const type = String(r.type || GASTO);
+        if (!(MOVEMENT_TYPES as readonly string[]).includes(type)) {
+          throw new ApiError(`Tipo inválido en índice ${idx}: ${type}`);
+        }
+        const amountCents = cents(r.amount_cents);
+        const what = oneLine(r.what, 140);
+        const category = String(r.category || "");
+        const goal = String(r.goal || "");
+        const reason = oneLine(r.reason, 140);
+        const time = optTime(r.time);
+        const currency = String(r.currency || "");
+
+        return {
+          date: todayIso(d),
+          type,
+          amountCents,
+          fields: {
+            what,
+            ...(category ? { category } : {}),
+            ...(goal ? { goal } : {}),
+            ...(reason ? { reason } : {}),
+            ...(time ? { time } : {}),
+            ...(currency ? { currency } : {}),
+          },
+        };
+      });
+
+      const saved = fm.addBatch(prepared);
+      return {
+        imported: saved.length,
+        movements: saved,
+      };
+    },
+
+    /**
+     * Exportación de todo el historial sin límite de rango de fechas,
+     * para backups, reportes y cierres contables.
+     */
+    fin_export_all() {
+      const fm = getFm();
+      const movements = fm.allMovements();
+      const categories = fm.categories(null, true);
+      const goals = fm.goals();
+      return {
+        movements,
+        categories,
+        goals,
+        currency: fm.currency() || "USD",
+        total_count: movements.length,
+      };
+    },
+
+    /**
+     * Reglas de auto-categorización para importación bancaria y carga rápida.
+     */
+    fin_rules_get() {
+      return { rules: getFm().rules() };
+    },
+
+    fin_rules_save(fields: unknown) {
+      if (!fields || typeof fields !== "object") {
+        throw new ApiError("Datos de regla inválidos.");
+      }
+      const f = fields as Record<string, unknown>;
+      const pattern = oneLine(f.pattern, 80).toLowerCase().trim();
+      if (!pattern) {
+        throw new ApiError("El patrón de búsqueda es obligatorio.");
+      }
+      const category = String(f.category || "").trim();
+      if (!category) {
+        throw new ApiError("La categoría es obligatoria.");
+      }
+      const type = f.type ? String(f.type) : undefined;
+      if (type && !(MOVEMENT_TYPES as readonly string[]).includes(type)) {
+        throw new ApiError("Tipo inválido.");
+      }
+      return getFm().saveRule({
+        id: String(f.id || ""),
+        pattern,
+        category,
+        ...(type ? { type } : {}),
+      });
+    },
+
+    fin_rules_delete(id: string) {
+      const ok = getFm().deleteRule(String(id));
+      if (!ok) {
+        throw new ApiError("Esa regla ya no existe.");
+      }
+      return { ok: true };
+    },
+
+    /**
+     * Detección de duplicados para importación CSV.
+     * Evalúa si en la misma fecha existe un movimiento con idéntico importe y tipo/concepto compatible.
+     */
+    fin_find_duplicates(candidates: unknown) {
+      if (!Array.isArray(candidates)) {
+        throw new ApiError("Se esperaba una lista de candidatos.");
+      }
+      const fm = getFm();
+      const matchedExistingIds = new Set<string>();
+      const duplicates: Array<{
+        index: number;
+        existingId: string;
+        existingWhat: string;
+        existingAmountCents: number;
+        existingDate: string;
+        existingType: string;
+        reason: string;
+      }> = [];
+
+      // Agrupamos candidatos válidos por día para evitar leer el mismo archivo múltiples veces
+      const byDay = new Map<string, Array<{ index: number; amount_cents: number; what: string; type: string }>>();
+      candidates.forEach((raw, idx) => {
+        if (!raw || typeof raw !== "object") return;
+        const r = raw as Record<string, unknown>;
+        let dateStr = "";
+        try {
+          const d = finDate(String(r.date || ""));
+          dateStr = todayIso(d);
+        } catch {
+          return;
+        }
+        let amt = 0;
+        try {
+          amt = cents(r.amount_cents);
+        } catch {
+          return;
+        }
+        if (amt <= 0) return;
+        const what = String(r.what || "").trim();
+        const type = String(r.type || GASTO);
+
+        const list = byDay.get(dateStr) ?? [];
+        list.push({ index: idx, amount_cents: amt, what, type });
+        byDay.set(dateStr, list);
+      });
+
+      for (const [dateStr, items] of byDay.entries()) {
+        let d: Date;
+        try {
+          d = finDate(dateStr);
+        } catch {
+          continue;
+        }
+        const existingMovements = fm.day(d);
+        if (existingMovements.length === 0) continue;
+
+        for (const cand of items) {
+          const candNorm = cand.what.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+          const found = existingMovements.find((ex) => {
+            if (matchedExistingIds.has(ex.id)) return false;
+            if (ex.amount_cents !== cand.amount_cents) return false;
+
+            // Mismo tipo
+            const sameType = ex.type === cand.type;
+            // O coincidencia en concepto
+            const exNorm = (ex.what || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+            const textMatch =
+              (candNorm && exNorm && (candNorm.includes(exNorm) || exNorm.includes(candNorm))) ||
+              (candNorm.length >= 3 && exNorm.length >= 3 && candNorm.slice(0, 5) === exNorm.slice(0, 5));
+
+            return sameType || textMatch;
+          });
+
+          if (found) {
+            matchedExistingIds.add(found.id);
+            duplicates.push({
+              index: cand.index,
+              existingId: found.id,
+              existingWhat: found.what || "Movimiento",
+              existingAmountCents: found.amount_cents,
+              existingDate: dateStr,
+              existingType: found.type,
+              reason: `Mismo importe (${(found.amount_cents / 100).toFixed(2)}) y fecha en el Vault`,
+            });
+          }
+        }
+      }
+
+      return { duplicates };
     },
   };
 }

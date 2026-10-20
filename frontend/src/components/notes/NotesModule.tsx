@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../store/app";
 import { EditorArea } from "./EditorArea";
 import { Explorer } from "./Explorer";
-import { AiSettingsDialog } from "./AssistantPanel";
 import { EnglishAudioDialog } from "./EnglishAudio";
 import { PropertiesDialog } from "./PropertiesDialog";
 import { useCanvas } from "../../store/canvas";
@@ -69,7 +68,6 @@ export function NotesModule() {
       {canvasPath ? <CanvasView /> : <EditorArea />}
       {/* El panel derecho vive en el armazón: es el mismo en todas las
           funcionalidades. */}
-      <AiSettingsDialog />
       <PropertiesDialog />
       <ConceptMapDialog />
       <StudyFoldersDialog />

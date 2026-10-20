@@ -6,6 +6,10 @@ const { apiMock } = vi.hoisted(() => ({
     exMeta: vi.fn(),
     exList: vi.fn(),
     exStats: vi.fn(),
+    exProfile: vi.fn(),
+    exProfileSave: vi.fn(),
+    exWeightAdd: vi.fn(),
+    exWeightRemove: vi.fn(),
   },
 }));
 
@@ -37,7 +41,7 @@ function stats(): ExerciseStats {
 
 function reset() {
   vi.clearAllMocks();
-  useExercise.setState({ days: [], list: [], stats: null, loaded: false, error: null });
+  useExercise.setState({ days: [], list: [], stats: null, profile: null, loaded: false, error: null });
 }
 
 beforeEach(reset);
@@ -54,6 +58,16 @@ describe("load", () => {
     expect(s.stats?.streak.best).toBe(5);
     expect(s.loaded).toBe(true);
     expect(s.error).toBeNull();
+  });
+  it("carga perfil junto con el resto", async () => {
+    apiMock.exMeta.mockResolvedValue({ days: [] });
+    apiMock.exList.mockResolvedValue([]);
+    apiMock.exStats.mockResolvedValue(stats());
+    apiMock.exProfile.mockResolvedValue({ goal: "hipertrofia", goal_note: "Volumen", weight_history: [] });
+    await useExercise.getState().load();
+    const s = useExercise.getState();
+    expect(s.profile?.goal).toBe("hipertrofia");
+    expect(s.profile?.goal_note).toBe("Volumen");
   });
   it("a failure still marks loaded and keeps the message in state", async () => {
     apiMock.exMeta.mockRejectedValue(new Error("caído"));
@@ -100,5 +114,35 @@ describe("refreshStats", () => {
     apiMock.exStats.mockRejectedValue(new Error("no"));
     await useExercise.getState().refreshStats();
     expect(useExercise.getState().error).toContain("no");
+  });
+});
+
+describe("profile and weight methods", () => {
+  it("saveProfile updates profile", async () => {
+    apiMock.exProfileSave.mockResolvedValue({ goal: "fuerza", goal_note: "", weight_history: [] });
+    await useExercise.getState().saveProfile({ goal: "fuerza" });
+    expect(useExercise.getState().profile?.goal).toBe("fuerza");
+  });
+
+  it("addWeight updates profile history", async () => {
+    apiMock.exWeightAdd.mockResolvedValue({
+      goal: "salud",
+      goal_note: "",
+      weight_history: [{ date: "2026-05-10", weight: 75.5 }],
+    });
+    await useExercise.getState().addWeight("2026-05-10", 75.5);
+    expect(useExercise.getState().profile?.weight_history).toEqual([
+      { date: "2026-05-10", weight: 75.5 },
+    ]);
+  });
+
+  it("removeWeight updates profile history", async () => {
+    apiMock.exWeightRemove.mockResolvedValue({
+      goal: "salud",
+      goal_note: "",
+      weight_history: [],
+    });
+    await useExercise.getState().removeWeight("2026-05-10");
+    expect(useExercise.getState().profile?.weight_history).toEqual([]);
   });
 });

@@ -82,4 +82,60 @@ describe("ExerciseManager", () => {
       expect(generatedBuf.equals(goldenBuf)).toBe(true);
     });
   });
+
+  describe("perfil y registro de pesos", () => {
+    it("devuelve valores por defecto cuando no existe perfil", () => {
+      const profile = em.getProfile();
+      expect(profile).toEqual({
+        goal: "salud",
+        goal_note: "",
+        weight_history: [],
+        health_limitations: "",
+        gender: "",
+        age: null,
+      });
+    });
+
+    it("guarda y actualiza el objetivo del perfil y limitaciones de salud", () => {
+      const updated = em.saveProfile({
+        goal: "hipertrofia",
+        goal_note: "Enfocado en masa muscular y tren superior",
+        health_limitations: "Molestia en manguito rotador derecho, evitar trasnuca",
+      });
+      expect(updated.goal).toBe("hipertrofia");
+      expect(updated.goal_note).toBe("Enfocado en masa muscular y tren superior");
+      expect(updated.health_limitations).toBe("Molestia en manguito rotador derecho, evitar trasnuca");
+
+      // Verificamos persistencia
+      const loaded = em.getProfile();
+      expect(loaded.goal).toBe("hipertrofia");
+      expect(loaded.goal_note).toBe("Enfocado en masa muscular y tren superior");
+      expect(loaded.health_limitations).toBe("Molestia en manguito rotador derecho, evitar trasnuca");
+    });
+
+    it("registra pesajes, actualiza fecha existente y ordena cronológicamente", () => {
+      em.addWeightEntry("2026-05-10", 75.2);
+      em.addWeightEntry("2026-05-01", 76.0);
+      em.addWeightEntry("2026-05-15", 74.8);
+
+      let profile = em.getProfile();
+      expect(profile.weight_history).toEqual([
+        { date: "2026-05-01", weight: 76.0 },
+        { date: "2026-05-10", weight: 75.2 },
+        { date: "2026-05-15", weight: 74.8 },
+      ]);
+
+      // Sobreescribir pesaje del mismo día
+      em.addWeightEntry("2026-05-10", 75.0);
+      profile = em.getProfile();
+      expect(profile.weight_history.find((w) => w.date === "2026-05-10")?.weight).toBe(75.0);
+
+      // Eliminar un pesaje
+      em.removeWeightEntry("2026-05-01");
+      profile = em.getProfile();
+      expect(profile.weight_history.length).toBe(2);
+      expect(profile.weight_history[0]?.date).toBe("2026-05-10");
+    });
+  });
 });
+

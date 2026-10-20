@@ -215,6 +215,21 @@ export const AppConfig = {
     return path.join(APP_DATA_DIR, "conversations");
   },
 
+  /** Conversaciones del Coach de Ejercicio, totalmente aisladas de las de Notas. */
+  get_exercise_coach_conversations_dir(): string {
+    return path.join(APP_DATA_DIR, "exercise_coach_conversations");
+  },
+
+  /** Conversaciones del Coach de Finanzas, totalmente aisladas de Notas, Mentor y Ejercicio. */
+  get_finance_coach_conversations_dir(): string {
+    return path.join(APP_DATA_DIR, "finance_coach_conversations");
+  },
+
+  /** Conversaciones del Asesor Nutricional, totalmente aisladas de Notas, Mentor, Ejercicio y Finanzas. */
+  get_nutrition_coach_conversations_dir(): string {
+    return path.join(APP_DATA_DIR, "nutrition_coach_conversations");
+  },
+
   // ── Window geometry ──────────────────────────────────────────────────────
   get_window_state(): Record<string, unknown> {
     return read().window ?? {};

@@ -48,6 +48,34 @@ export const MUSCLE_GROUPS: string[] = [
   "Piernas",
 ];
 
+/** Mapeo guía (Workout Guide) → músculos locales. */
+export const GUIDE_TO_LOCAL: Record<string, string[]> = {
+  Chest: ["pectoral"],
+  Shoulders: ["deltoid-front"],
+  Biceps: ["biceps"],
+  Forearms: ["forearm"],
+  Core: ["abs", "obliques"],
+  Quads: ["quads"],
+  Adductors: ["adductors"],
+  "Rear Delts": ["deltoid-rear"],
+  Triceps: ["triceps"],
+  Lats: ["lats"],
+  "Lower Back": ["lower-back"],
+  Glutes: ["glutes"],
+  Hamstrings: ["hamstrings"],
+  Calves: ["calves"],
+  Back: ["lats", "trapezius"],
+  "Upper Back": ["trapezius"],
+  Hips: ["glutes", "abductors"],
+  Legs: ["quads", "hamstrings", "glutes", "calves"],
+  "Posterior Chain": ["glutes", "hamstrings", "lower-back"],
+  Mobility: [],
+};
+
+export function mapGuideMuscle(primary: string): string[] {
+  return GUIDE_TO_LOCAL[primary] ?? [];
+}
+
 /**
  * Cleans whatever came from the UI: unknown ids are dropped, duplicates are
  * collapsed, a muscle cannot be primary and secondary at once (primary wins) and

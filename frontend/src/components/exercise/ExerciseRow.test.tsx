@@ -180,7 +180,10 @@ describe("la fila de un ejercicio", () => {
   });
 
   it("tras un fallo al guardar ofrece reintentar en la fila", async () => {
-    invoke.mockRejectedValueOnce(new Error("Fallo de disco"));
+    invoke.mockImplementation(async (method: string) => {
+      if (method === "ex_mark") throw new Error("Fallo de disco");
+      return { ok: true };
+    });
     const { host, cleanup } = render(
       <ExerciseRow day="2026-10-01" ex={SIN_VIDEO} entry={{}} onChanged={() => undefined} onVideo={() => undefined} />,
     );
@@ -193,6 +196,7 @@ describe("la fila de un ejercicio", () => {
       });
       const retry = host.querySelector("[data-row-retry]") as HTMLButtonElement | null;
       expect(retry).not.toBeNull();
+      invoke.mockImplementation(async () => ({ ok: true }));
       await act(async () => {
         retry!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
         await Promise.resolve();
@@ -288,6 +292,82 @@ describe("la fila de un ejercicio", () => {
       }
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it("muestra la última sesión y al hacer clic autocompleta el peso y reps", async () => {
+    invoke.mockImplementation(async (method: string): Promise<unknown> => {
+      if (method === "ex_history") {
+        return [
+          { date: "2026-09-20", weight: 70, reps: 10 },
+          { date: "2026-09-27", weight: 75, reps: 8 },
+        ];
+      }
+      return { ok: true };
+    });
+
+    const { host, cleanup } = render(
+      <ExerciseRow
+        day="2026-10-01"
+        ex={CON_VIDEO}
+        entry={{}}
+        onChanged={() => undefined}
+        onVideo={() => undefined}
+      />,
+    );
+
+    try {
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const prevBtn = host.querySelector("[data-last-session]");
+      expect(prevBtn).not.toBeNull();
+      expect(prevBtn!.textContent).toContain("75kg");
+      expect(prevBtn!.textContent).toContain("8");
+
+      await act(async () => {
+        prevBtn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      const weightInput = host.querySelector('input[aria-label="Peso: Bench Press"]') as HTMLInputElement;
+      const repsInput = host.querySelector('input[aria-label="Reps: Bench Press"]') as HTMLInputElement;
+      expect(weightInput.value).toBe("75");
+      expect(repsInput.value).toBe("8");
+
+      expect(invoke).toHaveBeenCalledWith("ex_mark", ["2026-10-01", "e1", false, "75", "8", ""]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("renderiza las 3 imágenes de ejecución y los pasos de técnica ordenados", () => {
+    const exWithSteps = {
+      ...CON_VIDEO,
+      name: "Bench Press",
+      source: "bench-press",
+      how_to: "1. Retrae escápulas.\n2. Baja la barra al pecho medio.\n3. Empuja hacia arriba.",
+    };
+
+    const { host, cleanup } = render(
+      <ExerciseRow day="2026-10-01" ex={exWithSteps} entry={{}} onChanged={() => undefined} onVideo={() => undefined} />,
+    );
+    try {
+      const frames = host.querySelectorAll("[data-exercise-frames] img");
+      expect(frames).toHaveLength(3);
+      expect(frames[0]!.getAttribute("src")).toContain("workout-guide-assets/bench-press/frame-1.png");
+      expect(frames[1]!.getAttribute("src")).toContain("workout-guide-assets/bench-press/frame-2.png");
+      expect(frames[2]!.getAttribute("src")).toContain("workout-guide-assets/bench-press/frame-3.png");
+
+      const steps = host.querySelectorAll("[data-exercise-steps] li");
+      expect(steps).toHaveLength(3);
+      expect(steps[0]!.textContent).toBe("Retrae escápulas.");
+      expect(steps[1]!.textContent).toBe("Baja la barra al pecho medio.");
+      expect(steps[2]!.textContent).toBe("Empuja hacia arriba.");
+    } finally {
+      cleanup();
     }
   });
 });

@@ -5,6 +5,7 @@ const { apiMock } = vi.hoisted(() => ({
   apiMock: {
     finMeta: vi.fn(),
     finSidebar: vi.fn(),
+    finRecurringRun: vi.fn(),
   },
 }));
 
@@ -23,7 +24,7 @@ function category(over: Partial<FinCategory> = {}): FinCategory {
 function goal(over: Partial<FinGoal> = {}): FinGoal {
   return {
     id: "f1", name: "Moto", icon: "🏍", colour: "#33b679", target_cents: 1200000000,
-    currency: "COP", start: "2026-09-14", deadline: "2027-06-30", show_in_daily: true,
+    currency: "USD", start: "2026-09-14", deadline: "2027-06-30", show_in_daily: true,
     cadence: { mode: "rule", rule: "weekly:4" }, suggested_cents: 5000000,
     status: "Activa", created: "2026-09-14", notes: "", ...over,
   };
@@ -34,7 +35,7 @@ function meta(): FinMeta {
     types: ["gasto", "ingreso", "ahorro", "retiro"],
     type_labels: { gasto: "Gasto", ingreso: "Ingreso", ahorro: "Ahorro", retiro: "Retiro" },
     type_colours: { gasto: "#f4511e", ingreso: "#33b679", ahorro: "#039be5", retiro: "#e67c73" },
-    goal_statuses: ["Activa"], currency: "COP",
+    goal_statuses: ["Activa"], currency: "USD",
     categories: [category()], goals: [goal()],
   };
 }
@@ -48,6 +49,7 @@ function reset() {
   useFinance.setState({
     view: "diario", meta: null, sidebar: null, loaded: false, version: 0,
     editing: null, goalId: null, goalEditing: null, categoryEditing: null,
+    recurringEditing: null,
   });
   useApp.setState({ toasts: [] });
 }
@@ -60,7 +62,7 @@ describe("load", () => {
     apiMock.finSidebar.mockResolvedValue(sidebar());
     await useFinance.getState().load();
     const s = useFinance.getState();
-    expect(s.meta?.currency).toBe("COP");
+    expect(s.meta?.currency).toBe("USD");
     expect(s.loaded).toBe(true);
     expect(s.version).toBe(1);
   });
@@ -77,6 +79,39 @@ describe("load", () => {
     await useFinance.getState().load();
     expect(useFinance.getState().loaded).toBe(false);
     expect(useApp.getState().toasts.at(-1)?.text).toContain("caído");
+  });
+  it("runs recurrents on load", async () => {
+    apiMock.finMeta.mockResolvedValue(meta());
+    apiMock.finSidebar.mockResolvedValue(sidebar());
+    apiMock.finRecurringRun.mockResolvedValue({ created: 2 });
+    const { todayIso } = await import("../lib/tasks");
+    await useFinance.getState().load();
+    expect(apiMock.finRecurringRun).toHaveBeenCalledWith(todayIso());
+    expect(useFinance.getState().loaded).toBe(true);
+  });
+  it("toasts when recurrents materialize, silent when none", async () => {
+    apiMock.finMeta.mockResolvedValue(meta());
+    apiMock.finSidebar.mockResolvedValue(sidebar());
+    apiMock.finRecurringRun.mockResolvedValue({ created: 2 });
+    await useFinance.getState().load();
+    expect(useApp.getState().toasts.at(-1)?.text).toContain("2 movimientos automáticos");
+    useApp.setState({ toasts: [] });
+    apiMock.finRecurringRun.mockResolvedValue({ created: 0 });
+    await useFinance.getState().load();
+    expect(useApp.getState().toasts).toHaveLength(0);
+  });
+  it("migrates legacy semanal/mensual/anual views to periodo", async () => {
+    apiMock.finMeta.mockResolvedValue(meta());
+    apiMock.finSidebar.mockResolvedValue(sidebar());
+    apiMock.finRecurringRun.mockResolvedValue({ created: 0 });
+    for (const legacy of ["semanal", "mensual", "anual"]) {
+      useFinance.setState({ view: legacy as "diario", loaded: false });
+      await useFinance.getState().load();
+      expect(useFinance.getState().view).toBe("periodo");
+    }
+    useFinance.setState({ view: "diario", loaded: false });
+    await useFinance.getState().load();
+    expect(useFinance.getState().view).toBe("diario");
   });
 });
 
@@ -96,8 +131,10 @@ describe("sync actions", () => {
     expect(useFinance.getState()).toMatchObject({ goalId: "f1", view: "metas" });
     s().setGoalEditing("");
     s().setCategoryEditing({ id: "comida", kind: "gasto" });
+    s().setRecurringEditing({ id: "" });
     expect(useFinance.getState()).toMatchObject({
       goalEditing: "", categoryEditing: { id: "comida", kind: "gasto" },
+      recurringEditing: { id: "" },
     });
   });
 });

@@ -40,6 +40,34 @@ describe("exerciseApi", () => {
     expect(api.ex_favorites()).toEqual([]);
   });
 
+  it("gestiona perfil atlético y registro de peso", () => {
+    const profile = api.ex_profile();
+    expect(profile.goal).toBe("salud");
+    expect(profile.weight_history).toEqual([]);
+
+    // Guardar objetivo y limitaciones de salud
+    const saved = api.ex_profile_save({
+      goal: "hipertrofia",
+      goal_note: "Etapa de volumen",
+      health_limitations: "Molestia en hombro derecho",
+    });
+    expect(saved.goal).toBe("hipertrofia");
+    expect(saved.goal_note).toBe("Etapa de volumen");
+    expect(saved.health_limitations).toBe("Molestia en hombro derecho");
+
+    // Añadir peso
+    const withWeight = api.ex_weight_add("2026-05-10", 76.4);
+    expect(withWeight.weight_history).toEqual([{ date: "2026-05-10", weight: 76.4 }]);
+
+    // Rechaza peso o fecha inválida
+    expect(() => api.ex_weight_add("fecha-mala", 70)).toThrow(ApiError);
+    expect(() => api.ex_weight_add("2026-05-10", -5)).toThrow(ApiError);
+
+    // Eliminar peso
+    const removed = api.ex_weight_remove("2026-05-10");
+    expect(removed.weight_history).toEqual([]);
+  });
+
   let tmpDir: string;
   let app: AppState;
   let api: ReturnType<typeof exerciseApi>;

@@ -222,4 +222,6 @@ test("NV-X-021 con auto-sync las copias se actualizan solas", async () => {
   await expect.poll(() => readRoutine().find((e) => e.id === "e-auto1")?.sourceFp).not.toBe("vieja");
   await expect(win.locator("[data-stale-banner]")).toHaveCount(0, { timeout: 15_000 });
   expect(existsSync(routinesFile())).toBe(true);
+  // Limpieza: desmarcar auto-sync para no contaminar tests siguientes
+  await win.locator("[data-sync-auto]").uncheck();
 });

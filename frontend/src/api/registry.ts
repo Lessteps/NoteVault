@@ -13,8 +13,10 @@ import { codeDebugApi } from "./modules/codeDebug.js";
 import { conversationsApi } from "./modules/conversations.js";
 import { englishPlayerApi } from "./modules/englishPlayer.js";
 import { exerciseApi } from "./modules/exercise.js";
+import { exerciseCoachApi } from "./modules/exerciseCoach.js";
 import { filesApi } from "./modules/files.js";
 import { financeApi } from "./modules/finance.js";
+import { financeCoachApi } from "./modules/financeCoach.js";
 import { goalsApi } from "./modules/goals.js";
 import { habitsApi } from "./modules/habits.js";
 import { homeApi } from "./modules/home.js";
@@ -23,6 +25,8 @@ import { mediaApi } from "./modules/media.js";
 import { mentorApi } from "./modules/mentor.js";
 import { notesApi } from "./modules/notes.js";
 import { notesExtrasApi } from "./modules/notes_extras.js";
+import { nutritionApi } from "./modules/nutrition.js";
+import { nutritionCoachApi } from "./modules/nutritionCoach.js";
 import { ppApi } from "./modules/pp.js";
 import { practiceApi } from "./modules/practice.js";
 import { projectsApi } from "./modules/projects.js";
@@ -53,7 +57,11 @@ export function buildRegistry(app: AppState): Registry {
     ...webApi(app),
     ...habitsApi(app),
     ...exerciseApi(app),
+    ...exerciseCoachApi(app),
     ...financeApi(app),
+    ...financeCoachApi(app),
+    ...nutritionApi(app),
+    ...nutritionCoachApi(app),
     ...goalsApi(app),
     ...mentorApi(app),
     ...projectsApi(app),

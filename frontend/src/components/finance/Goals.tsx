@@ -3,12 +3,13 @@
 import { ChevronLeft, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
+import { daysBetween } from "../../lib/habits";
 import { formatMoney } from "../../lib/money";
 import { parseRepeat, shortDate, todayIso } from "../../lib/tasks";
 import type { FinGoal, FinPace, Movement } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useFinance } from "../../store/finance";
-import { BlockProgress, LineChart } from "../common/charts";
+import { LineChart } from "../common/charts";
 import { Chip, ColourRow, Field, GhostButton, input, Label, Modal, PrimaryButton } from "../common/forms";
 import { RepeatPicker } from "../common/RepeatPicker";
 import { StatTile } from "../common/StatTile";
@@ -32,6 +33,13 @@ function paceLine(p: FinPace): string {
   return p.per_day ? `Ritmo necesario: ${formatMoney(p.per_day)}/día · ${formatMoney(p.per_week)}/semana · ${formatMoney(p.per_month)}/mes` : "";
 }
 
+/** Aporte diario para llegar: lo que falta / días hasta el límite. */
+export function suggestedFor(target_cents: number, start: string, deadline: string): number | null {
+  if (!target_cents || !deadline) return null;
+  const days = Math.max(1, daysBetween(start || todayIso(), deadline).length);
+  return Math.ceil(target_cents / days);
+}
+
 export function FinGoalDialog() {
   const editing = useFinance((s) => s.goalEditing);
   const setEditing = useFinance((s) => s.setGoalEditing);
@@ -39,20 +47,40 @@ export function FinGoalDialog() {
   const changed = useFinance((s) => s.changed);
   const toast = useApp((s) => s.toast);
   const [f, setF] = useState<Partial<FinGoal>>({});
+  // Asistente de 2 pasos solo al crear (editar conserva el formulario completo).
+  const [step, setStep] = useState(1);
+  const [touchedSuggested, setTouchedSuggested] = useState(false);
+  const isNew = !editing;
   useEffect(() => {
     if (editing === null) return;
     const g = editing ? meta?.goals.find((x) => x.id === editing) : undefined;
     setF(g ? { ...g } : { name: "", icon: "💰", target_cents: 0, suggested_cents: 0, start: todayIso(), deadline: "",
       colour: GOAL_COLOURS[0], show_in_daily: true, cadence: { mode: "rule", rule: "daily" }, status: "Activa", notes: "" });
+    setStep(1);
+    setTouchedSuggested(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
   if (editing === null) return null;
   const set = (p: Partial<FinGoal>) => setF((x) => ({ ...x, ...p }));
+  // Sin deadline no hay ritmo que calcular: el aporte lo pone la persona.
+  const autoSuggested = isNew && !touchedSuggested
+    ? suggestedFor(f.target_cents ?? 0, f.start ?? todayIso(), f.deadline ?? "")
+    : null;
+  const finalSuggested = autoSuggested ?? f.suggested_cents ?? 0;
   const save = async () => {
     if (!f.name?.trim()) return toast("error", "La meta necesita un nombre.");
     if (!f.target_cents) return toast("error", "Escribe el objetivo.");
     try {
-      await api.finGoalSave(editing, f);
+      if (isNew) {
+        await api.finGoalSave("", {
+          name: f.name.trim(), icon: f.icon || "💰", target_cents: f.target_cents, suggested_cents: finalSuggested,
+          start: f.start || todayIso(), deadline: f.deadline || "", colour: f.colour ?? GOAL_COLOURS[0]!,
+          show_in_daily: f.show_in_daily ?? true, cadence: f.cadence ?? { mode: "rule", rule: "daily" },
+          status: "Activa", notes: "",
+        });
+      } else {
+        await api.finGoalSave(editing, f);
+      }
       setEditing(null);
       await changed();
     } catch (e) {
@@ -60,6 +88,57 @@ export function FinGoalDialog() {
     }
   };
   const mode = f.cadence?.mode === "period" ? f.cadence.period : "rule";
+  if (isNew) {
+    return (
+      <Modal title={step === 1 ? "Nueva meta · qué y cuánto" : "Nueva meta · cuándo y ritmo"} onClose={() => setEditing(null)} width={520}
+        footer={<>
+          {step === 2 && <GhostButton onClick={() => setStep(1)}>Atrás</GhostButton>}
+          <span className="flex-1" /><GhostButton onClick={() => setEditing(null)}>Cancelar</GhostButton>
+          {step === 1
+            ? <PrimaryButton onClick={() => {
+              if (!f.name?.trim()) return toast("error", "La meta necesita un nombre.");
+              if (!f.target_cents) return toast("error", "Escribe el objetivo.");
+              setStep(2);
+            }}>Siguiente</PrimaryButton>
+            : <PrimaryButton onClick={() => void save()}>Crear meta</PrimaryButton>}</>}>
+        <p className="mb-3 font-mono text-[10.5px] uppercase tracking-wider text-faint">Paso {step} de 2</p>
+        {step === 1 ? (
+          <>
+            <div className="grid grid-cols-[70px_1fr] gap-3">
+              <Field label="Icono"><input className={input} value={f.icon ?? ""} onChange={(e) => set({ icon: e.target.value })} /></Field>
+              <Field label="Nombre"><input autoFocus className={input} value={f.name ?? ""} placeholder="p. ej. Moto" onChange={(e) => set({ name: e.target.value })} /></Field>
+            </div>
+            <Field label="Objetivo"><MoneyInput label="Objetivo" value={f.target_cents || null} onChange={(c) => set({ target_cents: c ?? 0 })} className="w-full" /></Field>
+            <Field label="Color"><ColourRow colours={GOAL_COLOURS} value={f.colour ?? GOAL_COLOURS[0]!} onChange={(colour) => set({ colour })} /></Field>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Inicio"><input type="date" aria-label="Inicio" className={input} value={f.start ?? ""} onChange={(e) => set({ start: e.target.value })} /></Field>
+              <Field label="Fecha límite"><input type="date" aria-label="Fecha límite" className={input} value={f.deadline ?? ""} onChange={(e) => set({ deadline: e.target.value })} /></Field>
+            </div>
+            <Field label="Aporte sugerido">
+              <MoneyInput label="Aporte sugerido" value={finalSuggested || null}
+                onChange={(c) => { setTouchedSuggested(true); set({ suggested_cents: c ?? 0 }); }} className="w-full" />
+            </Field>
+            {autoSuggested !== null && !touchedSuggested && (
+              <p className="text-[11.5px] text-faint">Calculado del objetivo y la fecha límite: edítalo si quieres otro ritmo.</p>
+            )}
+            <label className="flex items-center gap-2 text-[12.5px] text-dim">
+              <input type="checkbox" checked={f.show_in_daily ?? true} onChange={(e) => set({ show_in_daily: e.target.checked })} />
+              Mostrar en Diario (aparece «Ahorro …» con casilla)
+            </label>
+            <Field label="Casilla">
+              <select aria-label="Casilla" className={input} value={mode} onChange={(e) => set({ cadence: e.target.value === "rule" ? { mode: "rule", rule: "daily" } : { mode: "period", period: e.target.value as "week" | "month" } })}>
+                <option value="rule">Días concretos (regla)</option><option value="week">Una vez por semana</option><option value="month">Una vez por mes</option>
+              </select>
+            </Field>
+            {f.cadence?.mode === "rule" && <RepeatPicker value={f.cadence.rule} onChange={(rule) => set({ cadence: { mode: "rule", rule: rule || "daily" } })} />}
+          </>
+        )}
+      </Modal>
+    );
+  }
   return (
     <Modal title={editing ? "Editar meta de ahorro" : "Nueva meta de ahorro"} onClose={() => setEditing(null)} width={560}
       footer={<><span className="flex-1" /><GhostButton onClick={() => setEditing(null)}>Cancelar</GhostButton><PrimaryButton onClick={() => void save()}>Guardar</PrimaryButton></>}>
@@ -135,7 +214,34 @@ function GoalDetail({ id }: { id: string }) {
         <Chip colour={STATUS_COLOURS[g.status]}>{g.status}</Chip>
         <span className="text-[12px] text-faint">{cadenceText(g)}</span>
       </div>
-      <BlockProgress value={g.target_cents ? p.saved / g.target_cents : 0} colour={g.colour} blocks={40} />
+      {/* Barra de progreso continua y realista */}
+      <div className="space-y-1.5" data-goal-progress>
+        <div className="flex items-center justify-between text-[12.5px]">
+          <span className="font-medium text-dim">Progreso acumulado</span>
+          <span className="font-mono text-[13px] font-bold text-text">
+            {g.target_cents ? Math.min(100, Math.round((100 * p.saved) / g.target_cents)) : 0} %
+          </span>
+        </div>
+        <div className="relative h-3 w-full overflow-hidden rounded-full bg-hover/80 border border-line">
+          <div
+            className="h-full rounded-full transition-all duration-500 ease-out shadow-xs"
+            style={{
+              width: `${g.target_cents ? Math.min(100, Math.max(0, Math.round((100 * p.saved) / g.target_cents))) : 0}%`,
+              backgroundColor: g.colour || "var(--nv-mint)",
+            }}
+          />
+        </div>
+        <div className="flex flex-wrap items-center justify-between text-[11.5px] text-faint pt-0.5">
+          <span>📅 Inicio: {shortDate(g.start)}</span>
+          {g.deadline ? (
+            <span className="font-medium text-dim">
+              ⏰ Límite: {shortDate(g.deadline)} {p.days_left !== null ? `(quedan ${p.days_left} días)` : ""}
+            </span>
+          ) : (
+            <span>Sin fecha límite</span>
+          )}
+        </div>
+      </div>
       <div className="grid grid-cols-4 gap-3">
         <StatTile value={formatMoney(p.saved)} label={`Llevas · ${g.target_cents ? Math.round((100 * p.saved) / g.target_cents) : 0} %`} colour="var(--nv-mint)" />
         <StatTile value={formatMoney(p.remaining)} label="Falta" />
@@ -161,17 +267,34 @@ export function FinGoals() {
   const goalId = useFinance((s) => s.goalId);
   const openGoal = useFinance((s) => s.openGoal);
   const setEditing = useFinance((s) => s.setGoalEditing);
+  const changed = useFinance((s) => s.changed);
   const version = useFinance((s) => s.version);
   const toast = useApp((s) => s.toast);
   const [data, setData] = useState<Awaited<ReturnType<typeof api.finGoals>> | null>(null);
+  const [assignGoal, setAssignGoal] = useState("");
   useEffect(() => {
     api.finGoals().then(setData).catch((e) => toast("error", (e as Error).message));
   }, [version, toast]);
   if (goalId) return <GoalDetail id={goalId} />;
+  const assignAll = async () => {
+    if (!data || !assignGoal) return;
+    const g = data.goals.find((x) => x.id === assignGoal);
+    if (!g) return;
+    if (!(await confirmAction("Asignar ahorro general",
+      `¿Mover ${formatMoney(data.general)} sin asignar a «${g.name}»? El general queda en cero; para deshacer edita cada movimiento.`,
+      "Asignar", false))) return;
+    try {
+      await api.finAssignGeneral(assignGoal);
+      setAssignGoal("");
+      await changed();
+    } catch (e) {
+      toast("error", (e as Error).message);
+    }
+  };
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-[21px] font-semibold text-text">🎯 Metas financieras</h1>
+        <h1 className="text-[21px] font-semibold text-text">Metas financieras</h1>
         <span className="flex-1" />
         <PrimaryButton onClick={() => setEditing("")}><Plus size={14} /> Nueva meta</PrimaryButton>
       </div>
@@ -185,16 +308,52 @@ export function FinGoals() {
               <span className="flex-1 text-[15px] font-semibold text-text">{g.name}</span>
               <Chip colour={STATUS_COLOURS[g.status]}>{g.status}</Chip>
             </div>
-            <BlockProgress value={g.target_cents ? g.pace.saved / g.target_cents : 0} colour={g.colour} blocks={16} className="mt-3" />
-            <div className="mt-2 text-[12.5px] text-text">Llevas {formatMoney(g.pace.saved)} de {formatMoney(g.target_cents)} ({g.target_cents ? Math.round((100 * g.pace.saved) / g.target_cents) : 0} %)</div>
-            <div className="text-[12px] text-dim">Falta {formatMoney(g.pace.remaining)}</div>
+            {/* Barra de progreso continua y realista */}
+            <div className="mt-3">
+              <div className="mb-1 flex items-center justify-between text-[11.5px]">
+                <span className="text-[12px] text-text font-medium">
+                  {formatMoney(g.pace.saved)} de {formatMoney(g.target_cents)}
+                </span>
+                <span className="font-mono font-bold text-text">
+                  {g.target_cents ? Math.min(100, Math.round((100 * g.pace.saved) / g.target_cents)) : 0} %
+                </span>
+              </div>
+              <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-hover/80 border border-line/60">
+                <div
+                  className="h-full rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: `${g.target_cents ? Math.min(100, Math.max(0, Math.round((100 * g.pace.saved) / g.target_cents))) : 0}%`,
+                    backgroundColor: g.colour || "var(--nv-accent)",
+                  }}
+                />
+              </div>
+            </div>
+            <div className="mt-2 text-[12px] text-dim">Falta {formatMoney(g.pace.remaining)}</div>
             {paceLine(g.pace) && <div className="mt-1 text-[11px] text-dim">{paceLine(g.pace)}</div>}
             <div className="mt-1 text-[11px] text-faint">{g.projection ? `Proyección: ${shortDate(g.projection)}` : "Sin ritmo reciente para proyectar"}</div>
-            <div className="mt-2 flex text-[11px] text-faint"><span>{cadenceText(g)}</span>{g.deadline && <span className="ml-auto">⏰ {shortDate(g.deadline)}</span>}</div>
+            <div className="mt-2 flex text-[11px] text-faint">
+              <span>{cadenceText(g)}</span>
+              {g.deadline ? <span className="ml-auto">⏰ {shortDate(g.deadline)}</span> : <span className="ml-auto">📅 {shortDate(g.start)}</span>}
+            </div>
           </button>
         ))}
       </div>
-      {data && <p className="text-[12.5px] text-dim">Ahorro general (sin meta): {formatMoney(data.general)}</p>}
+      {data && data.general > 0 && (
+        <section aria-label="Ahorro sin asignar" className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-card px-4 py-3">
+          <span className="text-[13px] text-text">Sin asignar: <b className="font-mono">{formatMoney(data.general)}</b></span>
+          {data.goals.length > 0 ? (
+            <>
+              <select aria-label="Meta destino" className={input} value={assignGoal} onChange={(e) => setAssignGoal(e.target.value)}>
+                <option value="">Elige meta…</option>
+                {data.goals.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
+              </select>
+              <PrimaryButton disabled={!assignGoal} onClick={() => void assignAll()}>Asignar todo</PrimaryButton>
+            </>
+          ) : (
+            <span className="text-[12px] text-faint">Crea una meta para asignarlo.</span>
+          )}
+        </section>
+      )}
     </div>
   );
 }

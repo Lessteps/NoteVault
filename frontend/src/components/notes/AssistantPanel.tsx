@@ -20,6 +20,9 @@ import { askText, cn, IconButton, openMenu } from "../ui";
 import { generateTopicFrom, useStudySpaceDialog } from "../study/StudySpaceDialog";
 import { isPracticePath, usePracticeDialog } from "../practice/PracticeProjectDialog";
 import { MentorAssistant } from "../mentor/MentorAssistant";
+import { ExerciseCoachAssistant } from "../exercise/ExerciseCoachAssistant";
+import { FinanceCoachAssistant } from "../finance/FinanceCoachAssistant";
+import { NutritionCoachAssistant } from "../nutrition/NutritionCoachAssistant";
 import { ActionCard } from "./ActionCard";
 import { AskCard, SkillsCard } from "./ChatCards";
 import { ConversationHistory } from "./ConversationHistory";
@@ -575,10 +578,15 @@ function Composer() {
   );
 }
 
-/** El panel derecho es el mismo en toda la app, pero en la pestaña del Mentor conversa con el Mentor. */
+/** El panel derecho es el mismo en toda la app, pero en la pestaña del Mentor conversa con el Mentor,
+ * en Ejercicio conversa con el Coach de Entrenamiento y en Finanzas con el Asesor Financiero. */
 export function AssistantPanel() {
-  const inMentor = useApp((s) => s.module === "mentor");
-  return inMentor ? <MentorAssistant /> : <NotesAssistantPanel />;
+  const module = useApp((s) => s.module);
+  if (module === "mentor") return <MentorAssistant />;
+  if (module === "ejercicio") return <ExerciseCoachAssistant />;
+  if (module === "finanzas") return <FinanceCoachAssistant />;
+  if (module === "alimentacion") return <NutritionCoachAssistant />;
+  return <NotesAssistantPanel />;
 }
 
 function NotesAssistantPanel() {

@@ -26,9 +26,8 @@ import { GhostButton } from "../common/forms";
 import { useExercise } from "../../store/exercise";
 import type { Exercise, ExerciseDay } from "../../lib/types";
 import { ExerciseRow } from "./ExerciseRow";
-import { MuscleFocusCard, muscleRows } from "./MuscleFocus";
 import { MuscleMap } from "./MuscleMap";
-import { ORANGE, StreakLine, seriesOf, useFail } from "./parts";
+import { ORANGE, StreakLine, useFail } from "./parts";
 
 export function Overview({
   date,
@@ -63,13 +62,9 @@ export function Overview({
   }, [date]);
 
   const byId = useMemo(() => new Map(list.map((e) => [e.id, e])), [list]);
-  /** La fecha abierta, con los identificadores que pinta el cuerpo. */
-  const rows = useMemo(() => muscleRows(day, list), [day, list]);
-
   const total = day?.exercises.length ?? 0;
   const done = day ? day.exercises.filter((e) => day.log[e.id]?.done).length : 0;
   const pending = Math.max(0, total - done);
-  const series = (day?.exercises ?? []).reduce((sum, e) => sum + seriesOf(byId.get(e.id)?.series_reps), 0);
 
   const reload = () => {
     void load();
@@ -131,73 +126,67 @@ export function Overview({
             solo desde esta. */}
         <StreakLine />
 
-        {/* La sesión del día abierto y, a la derecha, lo que trabaja. */}
-        <div className="grid items-start gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 372px" }}>
-          <section className="rounded-2xl border border-line bg-card" data-session-date={date}>
-            <div className="flex flex-wrap items-center gap-2 px-4 pb-1 pt-3">
-              <span className="text-[15px] font-semibold text-text">
-                {meta ? `${meta.glyph} ${meta.name}` : "Hoy"}
-              </span>
-              {meta?.subtitle && <span className="text-[12px] text-faint">· {meta.subtitle}</span>}
-              <span className="flex-1" />
-              {total > 0 && (
-                <button type="button" onClick={() => setMap(true)} title="Mapa muscular del día"
-                  className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">
-                  <MapIcon size={13} /> Mapa
-                </button>
-              )}
-            </div>
-            {/* El avance del día como barra fina, no como píldora «1/2»: se ve
-                de un vistazo cuánto queda, con los números como valores. */}
+        {/* La sesión del día abierto. */}
+        <section className="rounded-2xl border border-line bg-card" data-session-date={date}>
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-1 pt-3">
+            <span className="text-[15px] font-semibold text-text">
+              {meta ? `${meta.glyph} ${meta.name}` : "Hoy"}
+            </span>
+            {meta?.subtitle && <span className="text-[12px] text-faint">· {meta.subtitle}</span>}
+            <span className="flex-1" />
             {total > 0 && (
-              <div className="flex items-center gap-2 border-b border-line px-4 pb-3">
-                <div
-                  data-session-progress
-                  role="progressbar"
-                  aria-label="Progreso del día"
-                  aria-valuemin={0}
-                  aria-valuemax={total}
-                  aria-valuenow={done}
-                  className="h-1.5 flex-1 overflow-hidden rounded-full"
-                  style={{ background: "var(--nv-elevated)" }}
-                >
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${total ? Math.round((100 * done) / total) : 0}%`, background: ORANGE }}
-                  />
-                </div>
-                <span className="font-mono text-[12px] text-dim">{done}/{total}</span>
-              </div>
+              <button type="button" onClick={() => setMap(true)} title="Mapa muscular del día"
+                className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[12px] text-dim hover:bg-hover hover:text-text">
+                <MapIcon size={13} /> Mapa
+              </button>
             )}
-            <div className="space-y-2 p-3">
-              {!day || !day.exercises.length ? (
-                <p className="py-8 text-center text-[13px] text-faint">
-                  {total === 0 && !day
-                    ? "Cargando…"
-                    : isToday
-                      ? "Día de descanso: hoy no hay ejercicios programados."
-                      : "Ese día no hay ejercicios programados."}
-                </p>
-              ) : (
-                day.exercises.map((ex) => {
-                  const full = byId.get(ex.id);
-                  return full ? (
-                    <ExerciseRow key={ex.id} day={date} ex={full} entry={day.log[ex.id] ?? {}}
-                      onVideo={onVideo} onChanged={reload} />
-                  ) : (
-                    <div key={ex.id} className="rounded-2xl border border-line px-3 py-2 text-[13px] text-dim">
-                      {ex.name}
-                    </div>
-                  );
-                })
-              )}
+          </div>
+          {/* El avance del día como barra fina, no como píldora «1/2»: se ve
+              de un vistazo cuánto queda, con los números como valores. */}
+          {total > 0 && (
+            <div className="flex items-center gap-2 border-b border-line px-4 pb-3">
+              <div
+                data-session-progress
+                role="progressbar"
+                aria-label="Progreso del día"
+                aria-valuemin={0}
+                aria-valuemax={total}
+                aria-valuenow={done}
+                className="h-1.5 flex-1 overflow-hidden rounded-full"
+                style={{ background: "var(--nv-elevated)" }}
+              >
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${total ? Math.round((100 * done) / total) : 0}%`, background: ORANGE }}
+                />
+              </div>
+              <span className="font-mono text-[12px] text-dim">{done}/{total}</span>
             </div>
-          </section>
-
-          <section className="rounded-2xl border border-line bg-card">
-            <MuscleFocusCard rows={rows} series={series} />
-          </section>
-        </div>
+          )}
+          <div className="space-y-2 p-3">
+            {!day || !day.exercises.length ? (
+              <p className="py-8 text-center text-[13px] text-faint">
+                {total === 0 && !day
+                  ? "Cargando…"
+                  : isToday
+                    ? "Día de descanso: hoy no hay ejercicios programados."
+                    : "Ese día no hay ejercicios programados."}
+              </p>
+            ) : (
+              day.exercises.map((ex) => {
+                const full = byId.get(ex.id);
+                return full ? (
+                  <ExerciseRow key={ex.id} day={date} ex={full} entry={day.log[ex.id] ?? {}}
+                    onVideo={onVideo} onChanged={reload} />
+                ) : (
+                  <div key={ex.id} className="rounded-2xl border border-line px-3 py-2 text-[13px] text-dim">
+                    {ex.name}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
       </div>
 
       {map && (

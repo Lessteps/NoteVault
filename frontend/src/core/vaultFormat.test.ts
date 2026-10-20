@@ -28,7 +28,7 @@ describe("vaultFormat", () => {
     expect(RESERVED_DIRS).toEqual([".notevault"]);
     expect(LEGACY_DIRS).toEqual(["habits", "ejercicio", "tareas", "proyectos"]);
     expect(BOOKMARKS_FILE).toBe(".notevault-bookmarks.json");
-    expect(DEFAULT_CURRENCY).toBe("COP");
+    expect(DEFAULT_CURRENCY).toBe("USD");
   });
 
   it("has exact layout paths", () => {

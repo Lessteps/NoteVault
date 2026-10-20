@@ -460,3 +460,53 @@ export function libraryFingerprint(e: {
   }
   return (h >>> 0).toString(36);
 }
+
+/**
+ * Divide el texto de instrucciones en pasos limpios numerados.
+ */
+export function parseExerciseSteps(howTo: string): string[] {
+  if (!howTo || typeof howTo !== "string") return [];
+  return howTo
+    .split(/\r?\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^\d+[\.\-\)]\s*/, ""));
+}
+
+/**
+ * Resuelve las 3 imágenes de fases del ejercicio (`frame-1.png`, `frame-2.png`, `frame-3.png`).
+ */
+export function exerciseFramesUrls(ex: { source?: string; name: string }): string[] {
+  let slug = String(ex.source || "").trim();
+  if (!slug || slug.startsWith("mia-")) {
+    const key = normalizeLibraryName(ex.name);
+    if (!key) return [];
+    const found = CATALOG_EXERCISES.find((c) => {
+      const cKey = normalizeLibraryName(c.name);
+      return cKey === key || key.includes(cKey) || cKey.includes(key);
+    });
+    slug = found?.slug ?? "";
+  }
+  return slug
+    ? [1, 2, 3].map((i) => `workout-guide-assets/${slug}/frame-${i}.png`)
+    : [];
+}
+
+/**
+ * Resuelve la ruta local de la imagen de miniatura (`frame-1.png`) para un ejercicio.
+ * Si el ejercicio tiene `source` (slug de biblioteca), lo usa directamente.
+ * Si no lo tiene o es propio, busca coincidencia en el catálogo de Workout Guide por nombre.
+ */
+export function exerciseThumbnailUrl(ex: { source?: string; name: string }): string | null {
+  let slug = String(ex.source || "").trim();
+  if (!slug || slug.startsWith("mia-")) {
+    const key = normalizeLibraryName(ex.name);
+    if (!key) return null;
+    const found = CATALOG_EXERCISES.find((c) => {
+      const cKey = normalizeLibraryName(c.name);
+      return cKey === key || key.includes(cKey) || cKey.includes(key);
+    });
+    slug = found?.slug ?? "";
+  }
+  return slug ? `workout-guide-assets/${slug}/frame-1.png` : null;
+}

@@ -25,6 +25,7 @@ import { useFail } from "./parts";
 import { Exercises } from "./Exercises";
 import { Overview } from "./Overview";
 import { Progress } from "./Progress";
+import { RestTimerBar } from "./RestTimerBar";
 import { SideStats } from "./parts";
 
 /** El reproductor del módulo: el video se ajusta a la tarjeta, sin desbordar. */
@@ -164,6 +165,7 @@ const [storedView, setView] = usePersistedNav("ejercicio.view", "general");
           <Exercises onGoToday={goToday} />
         )}
       </main>
+      <RestTimerBar />
     </div>
   );
 }

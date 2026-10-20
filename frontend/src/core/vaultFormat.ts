@@ -21,6 +21,7 @@ export const LAYOUT = {
   habits_config: `${DATA_DIR}/habits/habits_config.json`,
   habits_day: `${DATA_DIR}/habits/{year}/{month:02d}/{date}.md`,
   exercise_dir: `${DATA_DIR}/ejercicio`,
+  exercise_profile: `${DATA_DIR}/ejercicio/perfil.json`,
   exercises: `${DATA_DIR}/ejercicio/exercises.json`,
   library: `${DATA_DIR}/ejercicio/biblioteca.json`,
   favorites: `${DATA_DIR}/ejercicio/biblioteca-favoritos.json`,
@@ -47,6 +48,15 @@ export const LAYOUT = {
   finance_goal: `${DATA_DIR}/finanzas/metas/{id}.json`,
   finance_day: `${DATA_DIR}/finanzas/{year}/{month:02d}/{date}.json`,
   finance_attachments: `${DATA_DIR}/finanzas/adjuntos/{year}/{month:02d}`,
+  finance_recurring: `${DATA_DIR}/finanzas/recurrentes.json`,
+  finance_rules: `${DATA_DIR}/finanzas/reglas.json`,
+  finance_settings: `${DATA_DIR}/finanzas/ajustes.json`,
+  nutrition_dir: `${DATA_DIR}/alimentacion`,
+  nutrition_profile: `${DATA_DIR}/alimentacion/perfil.json`,
+  nutrition_settings: `${DATA_DIR}/alimentacion/ajustes.json`,
+  nutrition_foods: `${DATA_DIR}/alimentacion/alimentos.json`,
+  nutrition_recipes: `${DATA_DIR}/alimentacion/recetas.json`,
+  nutrition_day: `${DATA_DIR}/alimentacion/{year}/{month:02d}/{date}.json`,
   agenda_dir: `${DATA_DIR}/agenda`,
   agenda_routines: `${DATA_DIR}/agenda/routines.json`,
   agenda_events_dir: `${DATA_DIR}/agenda/events`,
@@ -215,7 +225,7 @@ export const MOVEMENT_KEYS = [
   "what", "reason", "time", "attachments", "created",
 ] as const;
 
-export const DEFAULT_CURRENCY = "COP";
+export const DEFAULT_CURRENCY = "USD";
 
 export const ATTACHMENT_EXTS = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".pdf"] as const;
 

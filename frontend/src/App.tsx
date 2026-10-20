@@ -15,6 +15,7 @@ import { VaultDialog } from "./components/VaultDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
 import { PomodoroTicker } from "./components/mentor/AreaSession";
 import { PomodoroAssessmentModal } from "./components/mentor/PomodoroAssessmentModal";
+import { AiSettingsDialog } from "./components/notes/AssistantPanel";
 import { NotesModule } from "./components/notes/NotesModule";
 import { QuickSwitcher } from "./components/notes/QuickSwitcher";
 import { CommandPalette, openDailyNote, ShortcutsDialog, useShortcutsDialog } from "./components/notes/CommandPalette";
@@ -34,6 +35,7 @@ const MODULES: Partial<Record<ModuleId, ComponentType>> = {
   proyectos: lazyModule(() => import("./components/projects/ProjectsModule"), "ProjectsModule"),
   metas: lazyModule(() => import("./components/goals/GoalsModule"), "GoalsModule"),
   ejercicio: lazyModule(() => import("./components/exercise/ExerciseModule"), "ExerciseModule"),
+  alimentacion: lazyModule(() => import("./components/nutrition/NutritionModule"), "NutritionModule"),
   finanzas: lazyModule(() => import("./components/finance/FinanceModule"), "FinanceModule"),
   web: lazyModule(() => import("./components/web/WebModule"), "WebModule"),
   player: lazyModule(() => import("./components/english/EnglishPlayer"), "EnglishPlayer"),
@@ -323,6 +325,7 @@ export function App() {
       <SettingsDialog />
       <PomodoroTicker />
       <PomodoroAssessmentModal />
+      <AiSettingsDialog />
       <DialogHost />
       <MenuHost />
       <Toasts />

@@ -11,6 +11,8 @@ import type {
   RenderingSettings, GpuStatus, Conversation, ConversationMeta,
 } from "./types";
 import type { LibraryUserEntry } from "./libraryTypes";
+import type { BodyProfile } from "./exerciseTypes";
+import type { FinanceContextData } from "./financeCoachTypes";
 
 type PyApi = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
@@ -481,6 +483,11 @@ export const api = {
     call<{ budgets: Array<{ category: FinCategory; used: number; budget: number }>; this: FinTotals; prev: FinTotals }>(
       "fin_month_extras", year, month),
   finDueChecks: (day: string) => call<FinCheck[]>("fin_due_checks", day),
+  finDiarioBundle: (day: string) => call<{
+    movements: Movement[]; checks: FinCheck[];
+    month: import("./types").FinTotals; budget: number;
+    budgets: Array<{ category: FinCategory; used: number; budget: number }>;
+  }>("fin_diario_bundle", day),
   finNewId: () => call<{ id: string }>("fin_new_id"),
   finAdd: (day: string, fields: Partial<Movement>) => call<Movement>("fin_add", day, fields),
   finUpdate: (day: string, id: string, fields: Partial<Movement>, newDay = "") =>
@@ -488,6 +495,8 @@ export const api = {
   finDelete: (day: string, id: string) => call<{ ok: boolean }>("fin_delete", day, id),
   finDeleteMany: (pairs: Array<[string, string]>) => call<{ ok: boolean }>("fin_delete_many", pairs),
   finCategorySave: (id: string, fields: Partial<FinCategory>) => call<FinCategory>("fin_category_save", id, fields),
+  finCategoryDelete: (id: string) => call<{ ok: boolean }>("fin_category_delete", id),
+  finCategoryMove: (id: string, delta: number) => call<{ ok: boolean }>("fin_category_move", id, delta),
   finGoals: () => call<{ goals: Array<FinGoal & { pace: FinPace; projection: string | null }>; general: number }>("fin_goals"),
   finGoal: (id: string) => call<{
     goal: FinGoal; pace: FinPace; projection: string | null; days: Array<{ date: string; net: number }>;
@@ -495,6 +504,28 @@ export const api = {
   }>("fin_goal", id),
   finGoalSave: (id: string, fields: Partial<FinGoal>) => call<FinGoal>("fin_goal_save", id, fields),
   finGoalDelete: (id: string) => call<{ ok: boolean }>("fin_goal_delete", id),
+  finAssignGeneral: (goal: string) => call<{ moved: number }>("fin_assign_general", goal),
+  finRecurringList: () => call<Array<import("./types").FinRecurring>>("fin_recurring_list"),
+  finRecurringSave: (id: string, fields: Partial<import("./types").FinRecurring>) =>
+    call<import("./types").FinRecurring>("fin_recurring_save", id, fields),
+  finRecurringDelete: (id: string) => call<{ ok: boolean }>("fin_recurring_delete", id),
+  finRecurringRun: (today: string) => call<{ created: number }>("fin_recurring_run", today),
+  finBudgetGet: () => call<{ month_budget_cents: number }>("fin_budget_get"),
+  finBudgetSet: (cents: number) => call<{ month_budget_cents: number }>("fin_budget_set", cents),
+  finSearch: (query: string, kind = "", category = "", offset = 0) =>
+    call<{ total: number; movements: Array<import("./types").Movement> }>("fin_search", query, kind, category, offset),
+  finImportBatch: (items: import("./types").FinImportItem[]) =>
+    call<{ imported: number; movements: Array<import("./types").Movement> }>("fin_import_batch", items),
+  finExportAll: () =>
+    call<import("./types").FinExportData>("fin_export_all"),
+  finRulesGet: () =>
+    call<{ rules: import("./types").FinRule[] }>("fin_rules_get"),
+  finRulesSave: (fields: Partial<import("./types").FinRule>) =>
+    call<import("./types").FinRule>("fin_rules_save", fields),
+  finRulesDelete: (id: string) =>
+    call<{ ok: boolean }>("fin_rules_delete", id),
+  finFindDuplicates: (candidates: Array<{ date: string; amount_cents: number; what?: string; type?: string }>) =>
+    call<{ duplicates: import("./types").FinDuplicateMatch[] }>("fin_find_duplicates", candidates),
   // Ejercicio
   exMeta: () => call<{ days: Array<{ key: string; name: string; subtitle: string; glyph: string }> }>("ex_meta"),
   exList: () => call<Exercise[]>("ex_list"),
@@ -515,6 +546,46 @@ export const api = {
   exLibraryPickVideo: () => call<{ ok: boolean; video_path?: string }>("ex_library_pick_video"),
   exFavorites: () => call<string[]>("ex_favorites"),
   exFavoriteToggle: (slug: string) => call<{ slug: string; on: boolean }>("ex_favorite_toggle", slug),
+  exProfile: () => call<BodyProfile>("ex_profile"),
+  exProfileSave: (updates: Partial<BodyProfile>) =>
+    call<BodyProfile>("ex_profile_save", updates),
+  exWeightAdd: (date: string, weight: number) =>
+    call<BodyProfile>("ex_weight_add", date, weight),
+  exWeightRemove: (date: string) =>
+    call<BodyProfile>("ex_weight_remove", date),
+  exCoachContext: () =>
+    call<{ profile: BodyProfile; exercisesCount: number; currentWeight: number | null; goal: string }>("ex_coach_context"),
+  exCoachConversations: () => call<ConversationMeta[]>("ex_coach_conversations"),
+  exCoachConversationGet: (id: string) => call<Conversation | null>("ex_coach_conversation_get", id),
+  exCoachConversationSave: (id: string | null, messages: unknown, model?: string, title?: string) =>
+    call<Conversation>("ex_coach_conversation_save", id, messages, model, title),
+  exCoachConversationRename: (id: string, title: string) =>
+    call<Conversation>("ex_coach_conversation_rename", id, title),
+  exCoachConversationDelete: (id: string) =>
+    call<{ ok: boolean }>("ex_coach_conversation_delete", id),
+  exCoachAiTitle: (id: string, question: string, answer?: string) =>
+    call<{ title: string; fallback: boolean; error?: string }>("ex_coach_ai_title", id, question, answer),
+  exCoachChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string) =>
+    call<{ reply?: string; stopped?: boolean; bridge?: boolean; prompt?: string; url?: string; label?: string }>(
+      "ex_coach_chat_stream", id, history, question,
+    ),
+  exCoachChatCancel: (id: string) => call<{ ok: boolean }>("ex_coach_chat_cancel", id),
+  finCoachContext: () => call<FinanceContextData>("fin_coach_context"),
+  finCoachConversations: () => call<ConversationMeta[]>("fin_coach_conversations"),
+  finCoachConversationGet: (id: string) => call<Conversation | null>("fin_coach_conversation_get", id),
+  finCoachConversationSave: (id: string | null, messages: unknown, model?: string, title?: string) =>
+    call<Conversation>("fin_coach_conversation_save", id, messages, model, title),
+  finCoachConversationRename: (id: string, title: string) =>
+    call<Conversation>("fin_coach_conversation_rename", id, title),
+  finCoachConversationDelete: (id: string) =>
+    call<{ ok: boolean }>("fin_coach_conversation_delete", id),
+  finCoachAiTitle: (id: string, question: string, answer?: string) =>
+    call<{ title: string; fallback: boolean; error?: string }>("fin_coach_ai_title", id, question, answer),
+  finCoachChatStream: (id: string, history: Array<{ role: string; content: string }>, question: string) =>
+    call<{ reply?: string; stopped?: boolean; bridge?: boolean; prompt?: string; url?: string; label?: string }>(
+      "fin_coach_chat_stream", id, history, question,
+    ),
+  finCoachChatCancel: (id: string) => call<{ ok: boolean }>("fin_coach_chat_cancel", id),
   exVideoUrl: (id: string) => call<{ url: string; name: string }>("ex_video_url", id),
   exOpenVideo: (id: string) => call<{ ok: boolean }>("ex_open_video", id),
   exPickVideo: (id: string) => call<{ ok: boolean }>("ex_pick_video", id),
@@ -797,6 +868,97 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
     }
     return () => {};
   },
+
+  // ── Alimentación / Nutrición ──────────────────────────────────────────────
+  nutriDay: (date: string) => call<import("./nutritionTypes").NutriDayLog>("nutri_day", date),
+  nutriDaySummary: (date: string) => call<import("./nutritionTypes").NutriDaySummary>("nutri_day_summary", date),
+  nutriItemAdd: (date: string, meal: import("./nutritionTypes").NutriMealType, item: Partial<import("./nutritionTypes").NutriFoodItem>) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_item_add", date, meal, item),
+  nutriItemUpdate: (date: string, meal: import("./nutritionTypes").NutriMealType, itemId: string, updates: Partial<import("./nutritionTypes").NutriFoodItem>) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_item_update", date, meal, itemId, updates),
+  nutriItemDelete: (date: string, meal: import("./nutritionTypes").NutriMealType, itemId: string) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_item_delete", date, meal, itemId),
+  nutriWaterSet: (date: string, ml: number) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_water_set", date, ml),
+  nutriNotesSet: (date: string, notes: string) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_notes_set", date, notes),
+  nutriMealCopy: (fromDate: string, toDate: string, meal: import("./nutritionTypes").NutriMealType) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_meal_copy", fromDate, toDate, meal),
+  nutriDayCopy: (fromDate: string, toDate: string) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_day_copy", fromDate, toDate),
+  nutriTrends: (days = 7, endDate?: string) =>
+    call<import("./nutritionTypes").NutriTrendsData>("nutri_trends", days, endDate),
+  nutriFoodsList: () =>
+    call<{ foods: import("./nutritionTypes").NutriFoodLibraryEntry[] }>("nutri_foods_list"),
+  nutriFoodSave: (entry: Partial<import("./nutritionTypes").NutriFoodLibraryEntry>) =>
+    call<import("./nutritionTypes").NutriFoodLibraryEntry>("nutri_food_save", entry),
+  nutriFoodDelete: (id: string) =>
+    call<{ ok: boolean }>("nutri_food_delete", id),
+  // Recetas
+  nutriRecipesList: () =>
+    call<{ recipes: import("./nutritionTypes").NutriRecipe[] }>("nutri_recipes_list"),
+  nutriRecipeSave: (entry: Partial<import("./nutritionTypes").NutriRecipe>) =>
+    call<import("./nutritionTypes").NutriRecipe>("nutri_recipe_save", entry),
+  nutriRecipeDelete: (id: string) =>
+    call<{ ok: boolean }>("nutri_recipe_delete", id),
+  nutriRecipeConsume: (date: string, meal: string, recipeId: string, servings = 1) =>
+    call<import("./nutritionTypes").NutriDaySummary>("nutri_recipe_consume", date, meal, recipeId, servings),
+  nutriReportGenerate: (days = 7, endDate?: string) =>
+    call<{
+      markdown: string;
+      csv: { header: string[]; rows: Array<Array<string | number>> };
+      trends: import("./nutritionTypes").NutriTrendsData;
+    }>("nutri_report_generate", days, endDate),
+  nutriSettingsGet: () =>
+    call<import("./nutritionTypes").NutriTargets>("nutri_settings_get"),
+  nutriSettingsSave: (settings: Partial<import("./nutritionTypes").NutriTargets>) =>
+    call<import("./nutritionTypes").NutriTargets>("nutri_settings_save", settings),
+  nutriSuggestTargets: () =>
+    call<{
+      suggested: import("./nutritionTypes").NutriTargets;
+      profileData: { weight: number; goal: string; gender: string; age: number };
+    }>("nutri_suggest_targets"),
+  nutriProfileGet: () =>
+    call<import("./nutritionTypes").NutriProfile>("nutri_profile_get"),
+  nutriProfileSave: (fields: Partial<import("./nutritionTypes").NutriProfile>) =>
+    call<import("./nutritionTypes").NutriProfile>("nutri_profile_save", fields),
+  // Coach Nutricional IA
+  nutriCoachContext: () =>
+    call<{
+      date: string;
+      caloriesRemaining: number;
+      targetCalories: number;
+      consumedCalories: number;
+      consumedProtein: number;
+      targetProtein: number;
+      consumedWater: number;
+      targetWater: number;
+      goal: string;
+      weight: number | null;
+      foodsCount: number;
+    }>("nutri_coach_context"),
+  nutriCoachChatStream: (answerId: string, history: Array<{ role: string; content: string }>, question: string) =>
+    call<{ streaming?: boolean; id?: string; bridge?: boolean; url?: string; prompt?: string; label?: string }>(
+      "nutri_coach_chat_stream", answerId, history, question,
+    ),
+  nutriCoachChatCancel: (id: string) =>
+    call<{ ok: boolean }>("nutri_coach_chat_cancel", id),
+  nutriCoachConversations: () =>
+    call<import("./types").ConversationMeta[]>("nutri_coach_conversations"),
+  nutriCoachConversationGet: (id: string) =>
+    call<import("./types").Conversation | null>("nutri_coach_conversation_get", id),
+  nutriCoachConversationSave: (id: string | null, messages: unknown, model?: string, title?: string) =>
+    call<import("./types").Conversation>("nutri_coach_conversation_save", id, messages, model, title),
+  nutriCoachConversationRename: (id: string, title: string) =>
+    call<{ ok: boolean; title: string }>("nutri_coach_conversation_rename", id, title),
+  nutriCoachConversationDelete: (id: string) =>
+    call<{ ok: boolean }>("nutri_coach_conversation_delete", id),
+  nutriCoachAiTitle: (id: string, question: string, answer: string) =>
+    call<{ title: string }>("nutri_coach_ai_title", id, question, answer),
+  nutriEstimateDish: (description: string) =>
+    call<import("./nutritionTypes").EstimatedDishResult>("nutri_estimate_dish", description),
+  nutriScanLabel: (dataUrl: string) =>
+    call<import("./nutritionTypes").ScannedNutritionLabel>("nutri_scan_label", dataUrl),
 };
 
 /**

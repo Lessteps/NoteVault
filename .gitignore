@@ -70,3 +70,7 @@ frontend/coverage/
 # -- Workout-guide assets (se regeneran con postinstall)
 frontend/public/workout-guide-assets/
 
+# ── ODD planning artifacts (local only) ───────────────────────────
+odd/
+
+

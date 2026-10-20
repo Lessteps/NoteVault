@@ -15,6 +15,7 @@ import {
   staleCopies,
   orphanCopies,
   fieldsFromLibrary,
+  exerciseThumbnailUrl,
 } from "./exerciseLibrary";
 
 describe("exerciseLibrary (workout-guide)", () => {
@@ -527,6 +528,23 @@ describe("la biblioteca como capa editable", () => {
       const antes = fpOf();
       const editada = [{ ...MIA, video_path: "ejercicio/videos/nuevo.mp4" }];
       expect(staleCopies([{ source: "mia-1", sourceFp: antes }], editada)).toEqual([]);
+    });
+  });
+
+  describe("miniaturas automáticas", () => {
+    test("resuelve por source si existe", () => {
+      expect(exerciseThumbnailUrl({ source: "bench-press", name: "Press de banca" })).toBe(
+        "workout-guide-assets/bench-press/frame-1.png",
+      );
+    });
+
+    test("resuelve por coincidencia de nombre si no tiene source", () => {
+      expect(exerciseThumbnailUrl({ name: "Squat" })).toBe(
+        "workout-guide-assets/squat/frame-1.png",
+      );
+      expect(exerciseThumbnailUrl({ name: "Rear Delt Fly con Mancuernas" })).toBe(
+        "workout-guide-assets/rear-delt-fly/frame-1.png",
+      );
     });
   });
 });

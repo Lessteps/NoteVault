@@ -6,7 +6,10 @@ import { api } from "../lib/bridge";
 import type { FinCategory, FinGoal, FinMeta, FinSidebar, Movement, MovementType } from "../lib/types";
 import { useApp } from "./app";
 
-export type FinView = "diario" | "semanal" | "mensual" | "anual" | "metas" | "categorias";
+export type FinView = "diario" | "periodo" | "metas" | "categorias" | "recurrentes";
+
+/** Vistas 2A: semanal/mensual/anual se fundieron en "periodo". */
+const LEGACY_VIEWS = new Set(["semanal", "mensual", "anual"]);
 
 export interface MovementEdit {
   day: string;
@@ -28,6 +31,10 @@ interface FinState {
   goalId: string | null;
   goalEditing: string | null;    // "" = new
   categoryEditing: { id: string; kind: "gasto" | "ingreso" } | null;
+  recurringEditing: { id: string } | null;    // {} = new
+  importOpen: boolean;
+  exportOpen: boolean;
+  exportScope: "month" | "year" | "all";
 
   setView: (v: FinView) => void;
   load: () => Promise<void>;
@@ -36,6 +43,9 @@ interface FinState {
   openGoal: (id: string | null) => void;
   setGoalEditing: (id: string | null) => void;
   setCategoryEditing: (c: FinState["categoryEditing"]) => void;
+  setRecurringEditing: (r: FinState["recurringEditing"]) => void;
+  setImportOpen: (open: boolean) => void;
+  setExportOpen: (open: boolean, scope?: "month" | "year" | "all") => void;
 }
 
 export const useFinance = create<FinState>((set, get) => ({
@@ -48,12 +58,30 @@ export const useFinance = create<FinState>((set, get) => ({
   goalId: null,
   goalEditing: null,
   categoryEditing: null,
+  recurringEditing: null,
+  importOpen: false,
+  exportOpen: false,
+  exportScope: "month",
 
   setView: (view) => set({ view, goalId: null }),
   load: async () => {
     try {
       const [meta, sidebar] = await Promise.all([api.finMeta(), api.finSidebar()]);
-      set((s) => ({ meta, sidebar, loaded: true, version: s.version + 1 }));
+      // Materializa recurrentes vencidos antes de pintar: el Diario los ve ya creados.
+      let auto = 0;
+      try {
+        const { todayIso } = await import("../lib/tasks");
+        auto = (await api.finRecurringRun(todayIso()))?.created ?? 0;
+      } catch {
+        /* sin recurrentes no se rompe nada */
+      }
+      if (auto > 0) {
+        useApp.getState().toast("info", auto === 1
+          ? "Se creó 1 movimiento automático (recurrente)."
+          : `Se crearon ${auto} movimientos automáticos (recurrentes).`);
+      }
+      // Migra la vista guardada por versiones viejas (semanal/mensual/anual).
+      set((s) => ({ meta, sidebar, loaded: true, version: s.version + 1, view: LEGACY_VIEWS.has(s.view as string) ? "periodo" : s.view }));
     } catch (e) {
       useApp.getState().toast("error", (e as Error).message);
     }
@@ -63,6 +91,9 @@ export const useFinance = create<FinState>((set, get) => ({
   openGoal: (goalId) => set({ goalId, view: "metas" }),
   setGoalEditing: (goalEditing) => set({ goalEditing }),
   setCategoryEditing: (categoryEditing) => set({ categoryEditing }),
+  setRecurringEditing: (recurringEditing) => set({ recurringEditing }),
+  setImportOpen: (importOpen) => set({ importOpen }),
+  setExportOpen: (exportOpen, scope = "month") => set({ exportOpen, exportScope: scope }),
 }));
 
 export function categoryOf(meta: FinMeta | null, id: string | undefined): FinCategory | undefined {

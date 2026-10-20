@@ -64,10 +64,16 @@ export class ExerciseLog {
 
 export const VIDEO_EXTS = [".mp4", ".mov", ".webm", ".mkv", ".m4v", ".avi"] as const;
 
+import type { ExerciseGoal, WeightRecord, BodyProfile } from "../lib/exerciseTypes.js";
+import { DEFAULT_BODY_PROFILE } from "../lib/exerciseTypes.js";
+export type { ExerciseGoal, WeightRecord, BodyProfile };
+export { DEFAULT_BODY_PROFILE };
+
 export class ExerciseManager {
   vaultRoot: string;
   ejercicioDir: string;
   _configPath: string;
+  _profilePath: string;
   videosDir: string;
   private _exercises: Record<string, any>[] | null = null;
   private _logCache: Map<string, ExerciseLog> = new Map();
@@ -76,7 +82,69 @@ export class ExerciseManager {
     this.vaultRoot = path.resolve(vaultRoot);
     this.ejercicioDir = path.join(this.vaultRoot, LAYOUT.exercise_dir);
     this._configPath = path.join(this.vaultRoot, LAYOUT.exercises);
+    this._profilePath = path.join(this.vaultRoot, LAYOUT.exercise_profile);
     this.videosDir = path.join(this.vaultRoot, LAYOUT.exercise_videos_dir);
+  }
+
+  getProfile(): BodyProfile {
+    if (fs.existsSync(this._profilePath)) {
+      try {
+        const text = fs.readFileSync(this._profilePath, "utf-8");
+        const data = JSON.parse(text);
+        if (data && typeof data === "object") {
+          const rawList = Array.isArray(data.weight_history) ? data.weight_history : [];
+          const validList: WeightRecord[] = rawList
+            .filter((w: any) => w && typeof w.date === "string" && typeof w.weight === "number" && !Number.isNaN(w.weight))
+            .map((w: any) => ({
+              date: String(w.date),
+              weight: Math.round(Number(w.weight) * 10) / 10,
+            }))
+            .sort((a: WeightRecord, b: WeightRecord) => a.date.localeCompare(b.date));
+
+          return {
+            goal: typeof data.goal === "string" ? (data.goal as ExerciseGoal) : DEFAULT_BODY_PROFILE.goal,
+            goal_note: typeof data.goal_note === "string" ? data.goal_note : "",
+            weight_history: validList,
+            health_limitations: typeof data.health_limitations === "string" ? data.health_limitations : "",
+            gender: typeof data.gender === "string" ? (data.gender as any) : "",
+            age: typeof data.age === "number" && Number.isFinite(data.age) ? data.age : null,
+          };
+        }
+      } catch {
+        // En caso de corrupción o fallo, devolvemos default
+      }
+    }
+    return { ...DEFAULT_BODY_PROFILE, weight_history: [] };
+  }
+
+  saveProfile(updates: Partial<BodyProfile>): BodyProfile {
+    const current = this.getProfile();
+    const next: BodyProfile = {
+      goal: updates.goal ?? current.goal,
+      goal_note: updates.goal_note !== undefined ? String(updates.goal_note) : current.goal_note,
+      weight_history: updates.weight_history ?? current.weight_history,
+      health_limitations: updates.health_limitations !== undefined ? String(updates.health_limitations) : (current.health_limitations ?? ""),
+      gender: updates.gender !== undefined ? updates.gender : (current.gender ?? ""),
+      age: updates.age !== undefined ? updates.age : (current.age ?? null),
+    };
+    fs.mkdirSync(this.ejercicioDir, { recursive: true });
+    fs.writeFileSync(this._profilePath, JSON.stringify(next, null, 2), "utf-8");
+    return next;
+  }
+
+  addWeightEntry(date: string, weight: number): BodyProfile {
+    const current = this.getProfile();
+    const numWeight = Math.round(Number(weight) * 10) / 10;
+    const history = current.weight_history.filter((w) => w.date !== date);
+    history.push({ date, weight: numWeight });
+    history.sort((a, b) => a.date.localeCompare(b.date));
+    return this.saveProfile({ weight_history: history });
+  }
+
+  removeWeightEntry(date: string): BodyProfile {
+    const current = this.getProfile();
+    const history = current.weight_history.filter((w) => w.date !== date);
+    return this.saveProfile({ weight_history: history });
   }
 
   exercises(): Record<string, any>[] {
@@ -140,12 +208,12 @@ export class ExerciseManager {
     try {
       return fs
         .readdirSync(this.videosDir)
-        .filter((f) => {
+        .filter((f: string) => {
           const ext = path.extname(f).toLowerCase();
           return (VIDEO_EXTS as readonly string[]).includes(ext);
         })
         .sort()
-        .map((f) => path.join(this.videosDir, f));
+        .map((f: string) => path.join(this.videosDir, f));
     } catch {
       return [];
     }

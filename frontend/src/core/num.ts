@@ -30,21 +30,25 @@ export function toInt(x: unknown, fallback = 0): number {
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
-/** "$ 12.500" for COP (no decimals, dot thousands); "$ 12,50" otherwise. */
+/** "$ 1,250.00" / "$ 12.50" for USD; "$ 12.500" for COP (no decimals, dot thousands). */
 export function formatMoney(
   cents: number | null | undefined,
-  currency = "COP",
+  currencyOrSign?: string | boolean,
   sign = false,
 ): string {
+  const curr = typeof currencyOrSign === "string" ? currencyOrSign : "USD";
+  const withSign = typeof currencyOrSign === "boolean" ? currencyOrSign : sign;
   let c = Math.trunc(cents ?? 0);
   const neg = c < 0;
   c = Math.abs(c);
-  const group = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  const text =
-    currency === "COP"
-      ? group(Math.floor((c + 50) / 100))
-      : `${group(Math.floor(c / 100))},${String(c % 100).padStart(2, "0")}`;
-  const prefix = neg ? "-" : sign && c ? "+" : "";
-  return `${prefix}$ ${text}`;
+  const prefix = neg ? "-" : withSign && c ? "+" : "";
+  if (curr === "COP") {
+    const group = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return `${prefix}$ ${group(Math.floor((c + 50) / 100))}`;
+  }
+  const dollars = Math.floor(c / 100);
+  const centsPart = c % 100;
+  const group = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${prefix}$ ${group(dollars)}.${String(centsPart).padStart(2, "0")}`;
 }
 export const format_money = formatMoney;

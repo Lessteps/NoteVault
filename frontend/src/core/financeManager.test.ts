@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { addDays } from "./dates";
 import {
   AHORRO,
   FinanceCalendarSource,
@@ -48,7 +49,7 @@ describe("FinanceManager", () => {
             id: m.id,
             type: "gasto",
             amount_cents: 1250000,
-            currency: "COP",
+            currency: "USD",
             category: "comida",
             what: "Almuerzo",
             reason: "Oficina",
@@ -82,8 +83,12 @@ describe("FinanceManager", () => {
       fm.add(D, RETIRO, 2000000);
 
       const t = totals(fm.day(D));
-      expect(t.balance).toBe(350000000 - 1 - 99999999999 - 5000000 + 2000000);
+      expect(t.balance).toBe(350000000 - 1 - 99999999999);
+      expect(t.neto).toBe(350000000 - 1 - 99999999999);
+      expect(t.disponible).toBe(350000000 - 1 - 99999999999 - 5000000 + 2000000);
       expect(totals([]).balance).toBe(0);
+      expect(totals([]).neto).toBe(0);
+      expect(totals([]).disponible).toBe(0);
     });
 
     it("update, move, and delete", () => {
@@ -125,26 +130,76 @@ describe("FinanceManager", () => {
       expect(prevM[GASTO]).toBe(100);
     });
 
-    it("default categories and budget", () => {
-      expect(fm.ensure_defaults()).toBe(true);
+    it("no siembra categorías y no inventa nada", () => {
+      // Un vault nace vacío: las categorías son las que crea la persona.
       expect(fm.ensure_defaults()).toBe(false);
+      expect(fm.categories(null, true)).toEqual([]);
+      // Idempotente aunque se insista.
+      expect(fm.ensure_defaults()).toBe(false);
+      expect(fm.categories(null, true)).toEqual([]);
+    });
 
-      const names = fm.categories(GASTO).map((c) => c.name);
-      expect(names[0]).toBe("Comida");
-      expect(fm.categories(INGRESO).length).toBe(3);
+    it("categoría creada a mano y presupuesto", () => {
+      fm.create_category("Comida", GASTO, "🍽", "#f4511e", 60000000);
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["Comida"]);
+      expect(fm.categories(INGRESO)).toEqual([]);
 
-      fm.update_category("comida", { budget_month_cents: 60000000 });
       fm.add(D, GASTO, 1000000, { category: "comida" });
-
       const used = fm.budget_used(2026, 9).map(([c, u, b]) => [c.id, u, b]);
       expect(used).toEqual([["comida", 1000000, 60000000]]);
     });
 
+    it("eliminar una categoría la manda a la papelera", () => {
+      fm.create_category("Comida", GASTO, "🍽", "#f4511e", 0);
+      fm.add(D, GASTO, 1000000, { category: "comida" });
+
+      expect(fm.delete_category("comida")).toBe(true);
+      expect(fm.categories(null, true)).toEqual([]);
+      expect(fm.delete_category("comida")).toBe(false);
+      // El movimiento sobrevive y queda sin categoría.
+      expect(fm.day(D)[0]!.category).toBe("comida");
+      // Y no vuelve sola al vaciarse la carpeta.
+      expect(fm.ensure_defaults()).toBe(false);
+    });
+
+    it("reordena categorías dentro de su tipo", () => {
+      fm.create_category("Almuerzo", GASTO);
+      fm.create_category("Bus", GASTO);
+      fm.create_category("Sueldo", INGRESO);
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["Almuerzo", "Bus"]);
+
+      expect(fm.move_category("bus", -1)).toBe(true);
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["Bus", "Almuerzo"]);
+      // Los bordes no se mueven…
+      expect(fm.move_category("bus", -1)).toBe(false);
+      expect(fm.move_category("almuerzo", 1)).toBe(false);
+      // …y se puede volver a bajar.
+      expect(fm.move_category("bus", 1)).toBe(true);
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["Almuerzo", "Bus"]);
+      // El ingreso no se mezcla con los gastos.
+      expect(fm.move_category("sueldo", 1)).toBe(false);
+      expect(fm.categories(INGRESO).map((c) => c.name)).toEqual(["Sueldo"]);
+      expect(fm.move_category("no-existe", 1)).toBe(false);
+    });
+
+    it("reordena aunque dos categorías compartan order", () => {
+      fm.create_category("A", GASTO);
+      fm.create_category("B", GASTO);
+      // A mano, dos con el mismo order: el orden estable cae al nombre.
+      fm.update_category("a", { order: 1 });
+      fm.update_category("b", { order: 1 });
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["A", "B"]);
+
+      expect(fm.move_category("b", -1)).toBe(true);
+      expect(fm.categories(GASTO).map((c) => c.name)).toEqual(["B", "A"]);
+    });
+
     it("money format", () => {
-      expect(formatMoney(1250000)).toBe("$ 12.500");
-      expect(formatMoney(-120000000)).toBe("-$ 1.200.000");
-      expect(formatMoney(1250, "USD")).toBe("$ 12,50");
-      expect(formatMoney(0)).toBe("$ 0");
+      expect(formatMoney(1250000)).toBe("$ 12,500.00");
+      expect(formatMoney(-120000000)).toBe("-$ 1,200,000.00");
+      expect(formatMoney(1250, "USD")).toBe("$ 12.50");
+      expect(formatMoney(0)).toBe("$ 0.00");
+      expect(formatMoney(1250000, "COP")).toBe("$ 12.500");
     });
   });
 
@@ -170,22 +225,26 @@ describe("FinanceManager", () => {
     });
 
     it("calendar source integrates with schedule", () => {
+      const today = new Date();
+      const startDay = addDays(today, -5);
+      const testDay1 = addDays(today, -2);
+      const testDay2 = today;
       const g = fm.create_goal("Ahorro Viaje", 5000000, {
         repeat: "daily",
-        start: new Date(2026, 8, 1),
+        start: startDay,
         suggested_cents: 100000,
       });
 
       const src = new FinanceCalendarSource(fm);
-      const occs = src.occurrences(new Date(2026, 8, 10), new Date(2026, 8, 12));
+      const occs = src.occurrences(testDay1, testDay2);
       expect(Object.keys(occs).length).toBe(3);
 
-      src.setDone(new Date(2026, 8, 11), `fgoal:${g.id}`, true);
-      const dayMovs = fm.day(new Date(2026, 8, 11));
+      src.setDone(testDay1, `fgoal:${g.id}`, true);
+      const dayMovs = fm.day(testDay1);
       expect(dayMovs.some((m) => m.goal === g.id && m.type === AHORRO)).toBe(true);
 
-      src.setDone(new Date(2026, 8, 11), `fgoal:${g.id}`, false);
-      const dayMovsAfter = fm.day(new Date(2026, 8, 11));
+      src.setDone(testDay1, `fgoal:${g.id}`, false);
+      const dayMovsAfter = fm.day(testDay1);
       expect(dayMovsAfter.some((m) => m.goal === g.id && m.type === AHORRO)).toBe(false);
     });
   });

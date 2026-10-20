@@ -3,7 +3,7 @@
 import {
   Calendar, CircleCheck, Copy, Dumbbell, Flag, Globe, House, Kanban, Minus, Moon, PanelLeft,
   PenLine, Pin, PinOff, Plus, Square, SquareCheck, Sun, Wallet, X, Cloud, CloudUpload,
-  CircleAlert, Settings, FileCode2, FileText, LayoutDashboard, GraduationCap,
+  CircleAlert, Settings, FileCode2, FileText, LayoutDashboard, GraduationCap, Apple,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -24,6 +24,7 @@ export const MODULES: Array<{ id: ModuleId; label: string; Icon: ComponentType<{
   { id: "calendario", label: "Calendario", Icon: Calendar },
   { id: "habits", label: "Hábitos", Icon: CircleCheck },
   { id: "ejercicio", label: "Ejercicio", Icon: Dumbbell },
+  { id: "alimentacion", label: "Alimentación", Icon: Apple },
   { id: "proyectos", label: "Proyectos", Icon: Kanban },
   { id: "metas", label: "Metas", Icon: Flag },
   { id: "finanzas", label: "Finanzas", Icon: Wallet },

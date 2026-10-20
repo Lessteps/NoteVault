@@ -48,20 +48,14 @@ export const TYPE_COLOURS: Record<string, string> = {
   [RETIRO]: "#ff9632",
 };
 
-export const DEFAULT_CATEGORIES: readonly [string, string, string, string][] = [
-  ["Comida", "🍽", "#f4511e", GASTO],
-  ["Transporte", "🚌", "#039be5", GASTO],
-  ["Vivienda", "🏠", "#8e24aa", GASTO],
-  ["Servicios", "💡", "#f6bf26", GASTO],
-  ["Salud", "💊", "#33b679", GASTO],
-  ["Educación", "📚", "#3f51b5", GASTO],
-  ["Ocio", "🎮", "#e67c73", GASTO],
-  ["Compras", "🛍", "#7986cb", GASTO],
-  ["Otros", "•", "#616161", GASTO],
-  ["Salario", "💼", "#0b8043", INGRESO],
-  ["Extra", "✨", "#33b679", INGRESO],
-  ["Regalo", "🎁", "#e67c73", INGRESO],
-];
+/**
+ * Categorías con las que nace un vault. Vacío a propósito: las suyas las
+ * creas tú en Finanzas › Categorías. Antes sembraba 9 gastos y 3 ingresos, y
+ * quien no usaba la mitad terminaba con selectores llenos de cosas suyas.
+ * Añade aquí una entrada `[nombre, icono, color, tipo]` solo si *de verdad*
+ * quieres que toda vault nueva la reciba.
+ */
+export const DEFAULT_CATEGORIES: readonly [string, string, string, string][] = [];
 
 export { formatMoney, format_money };
 
@@ -71,11 +65,13 @@ export interface FinanceTotals {
   ahorro: number;
   retiro: number;
   balance: number;
+  neto: number;
+  disponible: number;
   [key: string]: number;
 }
 
 export function emptyTotals(): FinanceTotals {
-  return { [GASTO]: 0, [INGRESO]: 0, [AHORRO]: 0, [RETIRO]: 0, balance: 0 };
+  return { [GASTO]: 0, [INGRESO]: 0, [AHORRO]: 0, [RETIRO]: 0, balance: 0, neto: 0, disponible: 0 };
 }
 export const empty_totals = emptyTotals;
 
@@ -83,11 +79,13 @@ export function totals(movements: Iterable<Record<string, any>>): FinanceTotals 
   const out = emptyTotals();
   for (const m of movements) {
     const t = m?.type as string;
-    if (t && t in out && t !== "balance") {
+    if (t && t in out && t !== "balance" && t !== "neto" && t !== "disponible") {
       (out as Record<string, number>)[t] = ((out as Record<string, number>)[t] ?? 0) + Math.trunc(Number(m.amount_cents || 0));
     }
   }
-  out.balance = out[INGRESO] - out[GASTO] - out[AHORRO] + out[RETIRO];
+  out.neto = out[INGRESO] - out[GASTO];
+  out.disponible = out.neto - out[AHORRO] + out[RETIRO];
+  out.balance = out.neto;
   return out;
 }
 
@@ -175,6 +173,32 @@ export function sanitizeGoal(raw: Record<string, any>, fallbackId = ""): Record<
 }
 export const sanitize_goal = sanitizeGoal;
 
+/** 6 hex deterministas: el id del movimiento generado es estable e idempotente. */
+function hash6(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(16).padStart(8, "0").slice(0, 6);
+}
+
+export function sanitizeRecurrent(raw: Record<string, any>, fallbackId = ""): Record<string, any> {
+  const r = raw && typeof raw === "object" ? raw : {};
+  return {
+    id: String(r.id || fallbackId),
+    type: (MOVEMENT_TYPES as readonly string[]).includes(r.type) ? r.type : GASTO,
+    amount_cents: Math.abs(cleanInt(r.amount_cents)),
+    what: String(r.what || ""),
+    category: String(r.category || ""),
+    goal: String(r.goal || ""),
+    rule: Recurrence.parse(r.rule).toString() || "daily",
+    start: parseDay(r.start) || todayIso(),
+    end: parseDay(r.end) || "",
+    archived: Boolean(r.archived),
+    last: parseDay(r.last) || "",
+  };
+}
+
 export class FinanceManager {
   vaultRoot: string;
   dir: string;
@@ -252,6 +276,10 @@ export class FinanceManager {
     if (this.categories(null, true).length > 0) {
       return false;
     }
+    // Sin catálogo por defecto no hay nada que sembrar: no se dice que sí.
+    if (DEFAULT_CATEGORIES.length === 0) {
+      return false;
+    }
     let n = 1;
     for (const [name, icon, colour, kind] of DEFAULT_CATEGORIES) {
       this._saveCategory(
@@ -281,7 +309,7 @@ export class FinanceManager {
 
   createCategory(
     name: string,
-    kind = GASTO,
+    kind: string = GASTO,
     icon = "",
     colour = "#616161",
     budgetMonthCents = 0,
@@ -311,7 +339,7 @@ export class FinanceManager {
   }
   create_category(
     name: string,
-    kind = GASTO,
+    kind: string = GASTO,
     icon = "",
     colour = "#616161",
     budgetMonthCents = 0,
@@ -339,6 +367,49 @@ export class FinanceManager {
   }
   archive_category(cid: string, archived = true): Record<string, any> | null {
     return this.archiveCategory(cid, archived);
+  }
+
+  /**
+   * Borra la categoría moviendo su fichero a la papelera del vault. Los
+   * movimientos que la usaban se quedan apuntando a un id que ya no existe y
+   * se muestran como «Sin categoría»; no se reasignan ni se borran.
+   */
+  deleteCategory(cid: string): boolean {
+    return toTrash(this.vaultRoot, this.categoryPath(String(cid)), "finanzas-categorias") !== null;
+  }
+  delete_category(cid: string): boolean {
+    return this.deleteCategory(cid);
+  }
+
+  /**
+   * Sube o baja la categoría dentro de su tipo (gastos / ingresos).
+   * Intercambia el `order` con la vecina: no renumera la lista entera.
+   * Devuelve false si no existe o si ya está en el borde.
+   */
+  moveCategory(cid: string, delta: number): boolean {
+    const cat = this.categoryMap()[String(cid)];
+    if (!cat || delta !== 1 && delta !== -1) return false;
+    const siblings = this.categories(cat.kind as string, true);
+    const i = siblings.findIndex((c) => c.id === cat.id);
+    const j = i + delta;
+    if (i === -1 || j < 0 || j >= siblings.length) return false;
+    const other = siblings[j]!;
+    const orderA = cat.order;
+    const orderB = other.order;
+    // Si el borde comparte order (los creados a mano pueden), renumera el tramo.
+    if (orderA === orderB) {
+      const ordered = [...siblings].sort((x, y) => x.order - y.order);
+      ordered.forEach((c, n) => this.updateCategory(c.id, { order: n + 1 }));
+      this.updateCategory(cat.id, { order: j + 1 });
+      this.updateCategory(other.id, { order: i + 1 });
+      return true;
+    }
+    this.updateCategory(cat.id, { order: orderB });
+    this.updateCategory(other.id, { order: orderA });
+    return true;
+  }
+  move_category(cid: string, delta: number): boolean {
+    return this.moveCategory(cid, delta);
   }
 
   // ── Movements ─────────────────────────────────────────────────────────
@@ -399,6 +470,64 @@ export class FinanceManager {
       this.refreshGoalStatus(mov.goal);
     }
     return mov;
+  }
+
+  addBatch(
+    items: Array<{
+      date: Date | string;
+      type: string;
+      amountCents: number;
+      fields?: Record<string, any>;
+    }>,
+  ): Array<Record<string, any>> {
+    if (!items.length) return [];
+    const byDay = new Map<string, Array<{ type: string; amountCents: number; fields?: Record<string, any> }>>();
+    for (const item of items) {
+      const dStr = typeof item.date === "string" ? item.date : todayIso(item.date);
+      const list = byDay.get(dStr) ?? [];
+      list.push({ type: item.type, amountCents: item.amountCents, fields: item.fields });
+      byDay.set(dStr, list);
+    }
+
+    const createdMovements: Array<Record<string, any>> = [];
+    const goalsToRefresh = new Set<string>();
+    const nowStr = todayIso();
+
+    for (const [dStr, dayItems] of byDay.entries()) {
+      const d = parseIsoDate(dStr) || new Date();
+      const movements = this.day(d);
+      for (const it of dayItems) {
+        const mov = sanitizeMovement({
+          ...(it.fields || {}),
+          type: it.type,
+          amount_cents: it.amountCents,
+          created: it.fields?.created || `${nowStr}T${new Date().toTimeString().slice(0, 5)}`,
+        });
+        movements.push(mov);
+        createdMovements.push({ ...mov, date: dStr });
+        if (mov.goal) {
+          goalsToRefresh.add(mov.goal);
+        }
+      }
+      this._saveDay(d, movements);
+    }
+
+    for (const gid of goalsToRefresh) {
+      this.refreshGoalStatus(gid);
+    }
+
+    return createdMovements;
+  }
+
+  allMovements(): Array<Record<string, any>> {
+    const out: Array<Record<string, any>> = [];
+    for (const d of this.allDays()) {
+      const dStr = todayIso(d);
+      for (const m of this.day(d)) {
+        out.push({ ...m, date: dStr });
+      }
+    }
+    return out;
   }
 
   get(d: Date | string, mid: string): Record<string, any> | null {
@@ -732,6 +861,187 @@ export class FinanceManager {
   }
   delete_goal(gid: string): void {
     this.deleteGoal(gid);
+  }
+
+  // ── Recurrents ──────────────────────────────────────────────────────
+  // Gastos/ingresos que se materializan solos (arriendo, salario...).
+  // Un solo fichero: son pocos y viajan juntos por Syncthing.
+
+  // ── Presupuesto global mensual ──────────────────────────────────────
+
+  settingsPath(): string {
+    return path.join(this.vaultRoot, LAYOUT.finance_settings);
+  }
+
+  /** Tope mensual de gasto. 0 = sin definir. */
+  budgetMonth(): number {
+    const data = loadJson<{ month_budget_cents?: unknown }>(this.settingsPath());
+    return Math.abs(cleanInt(data?.month_budget_cents));
+  }
+
+  setBudgetMonth(cents: number): number {
+    const v = Math.abs(cleanInt(cents));
+    const existing = loadJson<Record<string, any>>(this.settingsPath()) || {};
+    writeJson(this.settingsPath(), { ...existing, month_budget_cents: v });
+    return v;
+  }
+
+  currency(): string {
+    const data = loadJson<{ currency?: unknown }>(this.settingsPath());
+    return String(data?.currency || DEFAULT_CURRENCY);
+  }
+
+  setCurrency(curr: string): string {
+    const c = String(curr || DEFAULT_CURRENCY).toUpperCase().trim();
+    const existing = loadJson<Record<string, any>>(this.settingsPath()) || {};
+    writeJson(this.settingsPath(), { ...existing, currency: c });
+    return c;
+  }
+
+  recurrentsPath(): string {
+    return path.join(this.vaultRoot, LAYOUT.finance_recurring);
+  }
+
+  recurrents(): Record<string, any>[] {
+    const data = loadJson<{ recurrents?: unknown }>(this.recurrentsPath());
+    const raw = data && Array.isArray(data.recurrents) ? data.recurrents : [];
+    return raw.map((r) => sanitizeRecurrent(r as Record<string, any>));
+  }
+
+  _saveRecurrents(list: Record<string, any>[]): void {
+    writeJson(this.recurrentsPath(), { recurrents: list.map((r) => sanitizeRecurrent(r, r.id)) });
+  }
+
+  saveRecurrent(fields: Record<string, any>): Record<string, any> {
+    const list = this.recurrents();
+    const id = String(fields.id || "");
+    if (id) {
+      const i = list.findIndex((r) => r.id === id);
+      if (i === -1) return null as unknown as Record<string, any>;
+      list[i] = sanitizeRecurrent({ ...list[i], ...fields, id });
+      this._saveRecurrents(list);
+      return list[i]!;
+    }
+    const r = sanitizeRecurrent({ ...fields, id: newId("rc") });
+    list.push(r);
+    this._saveRecurrents(list);
+    return r;
+  }
+
+  deleteRecurrent(rid: string): void {
+    const list = this.recurrents().filter((r) => r.id !== String(rid));
+    this._saveRecurrents(list);
+  }
+
+  // ── Reglas de Auto-Categorización ────────────────────────────────────
+
+  rulesPath(): string {
+    return path.join(this.vaultRoot, LAYOUT.finance_rules);
+  }
+
+  rules(): Record<string, any>[] {
+    const data = loadJson<{ rules?: unknown }>(this.rulesPath());
+    const raw = data && Array.isArray(data.rules) ? data.rules : [];
+    return raw.map((r: any) => ({
+      id: String(r.id || ""),
+      pattern: String(r.pattern || "").toLowerCase().trim(),
+      category: String(r.category || "").trim(),
+      ...(r.type ? { type: String(r.type) } : {}),
+      created: r.created || todayIso(),
+    }));
+  }
+
+  _saveRules(list: Record<string, any>[]): void {
+    writeJson(this.rulesPath(), { rules: list });
+  }
+
+  saveRule(fields: Record<string, any>): Record<string, any> {
+    const list = this.rules();
+    const id = String(fields.id || "");
+    const pattern = String(fields.pattern || "").toLowerCase().trim();
+    const category = String(fields.category || "").trim();
+    const type = fields.type ? String(fields.type) : undefined;
+    if (!pattern || !category) {
+      throw new Error("Patrón y categoría requeridos.");
+    }
+    if (id) {
+      const i = list.findIndex((r) => r.id === id);
+      if (i === -1) return null as unknown as Record<string, any>;
+      list[i] = { ...list[i], pattern, category, ...(type ? { type } : {}) };
+      this._saveRules(list);
+      return list[i]!;
+    }
+    const existingIndex = list.findIndex((r) => r.pattern.toLowerCase() === pattern);
+    if (existingIndex !== -1) {
+      list[existingIndex] = { ...list[existingIndex], category, ...(type ? { type } : {}) };
+      this._saveRules(list);
+      return list[existingIndex]!;
+    }
+    const r = {
+      id: newId("rl"),
+      pattern,
+      category,
+      ...(type ? { type } : {}),
+      created: todayIso(),
+    };
+    list.push(r);
+    this._saveRules(list);
+    return r;
+  }
+
+  deleteRule(id: string): boolean {
+    const list = this.rules();
+    const filtered = list.filter((r) => r.id !== String(id));
+    if (filtered.length === list.length) return false;
+    this._saveRules(filtered);
+    return true;
+  }
+
+  /**
+   * Crea los movimientos vencidos hasta hoy. Idempotente: el id deriva del
+   * recurrente y la fecha, así que repetir no duplica. `last` evita releer
+   * años; el primer run no resucita más de 62 días.
+   */
+  runRecurrents(todayStr: string): number {
+    const todayD = parseIsoDate(todayStr) ?? new Date();
+    const today = todayIso(todayD);
+    const backstop = todayIso(addDays(todayD, -62));
+    const list = this.recurrents();
+    let created = 0;
+    let touched = false;
+    for (const r of list) {
+      if (r.archived) continue;
+      const start: string = r.start || today;
+      if (start > today) continue;
+      const floor = r.last && r.last >= start ? todayIso(addDays(parseIsoDate(r.last) ?? todayD, 1)) : start;
+      let d = floor < backstop ? backstop : floor;
+      if (d < start) d = start;
+      const end: string = r.end || "";
+      const rule = Recurrence.parse(r.rule);
+      const startD = parseIsoDate(start) ?? todayD;
+      const endD = end ? (parseIsoDate(end) ?? undefined) : undefined;
+      for (; d <= today; d = todayIso(addDays(parseIsoDate(d) ?? todayD, 1))) {
+        if (end && d > end) break;
+        const dd = parseIsoDate(d) ?? todayD;
+        if (!rule.occursOn(dd, startD, endD)) continue;
+        const id = `mv${d.replace(/-/g, "")}-${hash6(`${r.id}:${d}`)}`;
+        if (this.get(d, id)) continue;
+        this.add(d, r.type, r.amount_cents, {
+          id,
+          what: r.what,
+          category: r.category || undefined,
+          goal: r.goal || undefined,
+          reason: "Automático",
+        });
+        created++;
+      }
+      if (r.last !== today) {
+        r.last = today;
+        touched = true;
+      }
+    }
+    if (touched) this._saveRecurrents(list);
+    return created;
   }
 
   goalMovements(gid: string): [Date, Record<string, any>][] {

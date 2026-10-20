@@ -138,10 +138,23 @@ export function StreakLine({ compact }: { compact?: boolean }) {
  * del módulo y no solo desde Vista general.
  */
 export function SideStats({ collapsed }: { collapsed?: boolean }) {
+  const profile = useExercise((s) => s.profile);
+  const latestWeight =
+    profile?.weight_history && profile.weight_history.length > 0
+      ? profile.weight_history[profile.weight_history.length - 1]?.weight
+      : null;
+
   return (
     <div className="space-y-3 px-4 pt-4">
       {!collapsed && (
-        <div className="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Estadísticas</div>
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint">Estadísticas</span>
+          {latestWeight && (
+            <span className="rounded-full bg-elevated px-2 py-0.5 font-mono text-[10px] font-medium text-dim">
+              ⚖️ {latestWeight} kg
+            </span>
+          )}
+        </div>
       )}
       <PeriodRings size={collapsed ? 40 : 60} thickness={7} columns={collapsed ? "one" : "two"} />
       {!collapsed && <StreakLine compact />}

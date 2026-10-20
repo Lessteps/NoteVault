@@ -74,6 +74,7 @@ beforeEach(() => {
   document.body.appendChild(host);
   root = createRoot(host);
   vi.spyOn(api, "mentorPlanChanges").mockResolvedValue([]);
+  vi.spyOn(api, "mentorProjectsList").mockResolvedValue({ route: "Programación/Mentor/Ruta X", exists: false, areas: [] });
   vi.spyOn(api, "mentorPlanList").mockResolvedValue([row()]);
 });
 afterEach(() => {

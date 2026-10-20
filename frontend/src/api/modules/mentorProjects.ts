@@ -10,7 +10,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { ApiError } from "../../core/errors.js";
 import { PLAN_ID_RE, PlanStore, type Plan } from "../../core/mentor/plan.js";
-import { areaDirs, areaReadme, projectFiles, projectFolderName, routeDirName, routeReadme, sanitizeProject, type AreaRef, type ProjectKind } from "../../lib/projectTemplates.js";
+import { areaDirs, areaReadme, projectFiles, projectFolderName, routeDirName, routeReadme, sanitizeProject, type AreaRef, type ProjectKind, type ProjectListArea, type ProjectListItem } from "../../lib/projectTemplates.js";
 import { orderedAreas } from "../../lib/planTopicsByArea.js";
 import type { AppState } from "../appState.js";
 
@@ -51,7 +51,48 @@ export function mentorProjectsApi(app: AppState) {
     }
   };
 
+  const KIND_LABEL: Record<ProjectKind, string> = { daily: "Diarios", weekly: "Semanales", monthly: "Mensuales" };
+  const inspect = (dir: string, name: string): ProjectListItem => {
+    const full = abs(dir);
+    const files = fs.readdirSync(full, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith(".md")).map((e) => e.name).sort();
+    let done = 0;
+    let total = 0;
+    let modified = fs.statSync(full).mtimeMs;
+    for (const f of files) {
+      const file = path.join(full, f);
+      modified = Math.max(modified, fs.statSync(file).mtimeMs);
+      for (const m of fs.readFileSync(file, "utf-8").matchAll(/^\s*[-*] \[( |x|X)\]/gm)) {
+        total++;
+        if (m[1] !== " ") done++;
+      }
+    }
+    return { name, dir, readme: `${dir}/README.md`, files, done, total, status: total === 0 || done === 0 ? "new" : done >= total ? "done" : "doing", modified: Math.round(modified) };
+  };
+
   return {
+    /** Lo que ya hay en disco bajo la carpeta de la ruta: áreas → tipos → proyectos con su avance (casillas marcadas). No escribe nada. */
+    mentor_projects_list(opts: unknown) {
+      const plan = planOf(opts);
+      const space = plan.subplans.flatMap((s) => s.topics)[0]?.folder.split("/")[0] ?? "Programación";
+      const areas = orderedAreas(plan).map((a) => ({ key: a.areaId ?? a.subplanId, name: a.area }));
+      const route = routeDirName(plan.name ?? "", plan.id);
+      const base = `${space}/Mentor/${route}`;
+      const exists = fs.existsSync(abs(base));
+      const out: ProjectListArea[] = areas.map((a, i) => {
+        const d = areaDirs(i, a.name);
+        const kinds = (Object.keys(d.kinds) as ProjectKind[]).map((k) => {
+          const dir = `${base}/${d.dir}/${d.kinds[k]}`;
+          let projects: ProjectListItem[] = [];
+          if (exists && fs.existsSync(abs(dir))) {
+            projects = fs.readdirSync(abs(dir), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => inspect(`${dir}/${e.name}`, e.name)).sort((x, y) => y.name.localeCompare(x.name));
+          }
+          return { kind: k, label: KIND_LABEL[k], dir, projects };
+        });
+        return { areaKey: a.key, area: a.name, dir: `${base}/${d.dir}`, kinds };
+      });
+      return { route: base, exists, areas: out };
+    },
+
     mentor_projects_scaffold(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
       const plan = planOf(o);

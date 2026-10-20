@@ -42,7 +42,15 @@ describe("ProjectFolder", () => {
     expect(toast).toHaveBeenCalledWith("info", expect.stringContaining("Carpeta creada"));
     await click("pf-readme");
     expect(open).toHaveBeenCalledWith(`${DIR}/README.md`);
-    await click("pf-reveal");
+    // «Ver carpeta» ofrece dos caminos: dentro de NoteVault o en el Explorador de Windows
+    const showFolder = vi.fn();
+    useApp.setState({ showFolder } as never);
+    await click("pf-folder-toggle");
+    await click("pf-folder-vault");
+    expect(showFolder).toHaveBeenCalledWith(DIR);
+    expect(reveal).not.toHaveBeenCalled();
+    await click("pf-folder-toggle");
+    await click("pf-folder-windows");
     expect(reveal).toHaveBeenCalledWith(DIR);
   });
 

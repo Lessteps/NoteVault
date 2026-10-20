@@ -198,6 +198,9 @@ interface State {
   pathDeleted: (path: string) => void;
   refreshTree: () => void;
   clearReveal: (path: string) => void;
+  /** Carpeta que el explorador de notas debe abrir y resaltar (la pone «Ver en NoteVault»; el árbol la consume). */
+  revealFolder: { path: string; n: number } | null;
+  showFolder: (path: string) => void;
 
   toast: (kind: Toast["kind"], text: string) => void;
   dismiss: (id: number) => void;
@@ -346,6 +349,7 @@ export const useApp = create<State>((setState, get) => {
   mode: "read",
   explorerTab: "files",
   explorerOpen: true,
+  revealFolder: null,
   inspectorOpen: true,
   muscleOpen: false,
   openTabs: [],
@@ -402,6 +406,10 @@ export const useApp = create<State>((setState, get) => {
 
   setMode: (mode) => set({ mode }),
   setExplorerTab: (explorerTab) => set({ explorerTab, explorerOpen: true }),
+  showFolder: (path) => {
+    get().setModule("notas");
+    set((st) => ({ explorerTab: "files", explorerOpen: true, revealFolder: { path, n: (st.revealFolder?.n ?? 0) + 1 } }));
+  },
   toggleExplorer: () => set((s) => ({ explorerOpen: !s.explorerOpen })),
   toggleInspector: () => set((s) => ({ inspectorOpen: !s.inspectorOpen })),
   setMuscleOpen: (muscleOpen) => set({ muscleOpen }),

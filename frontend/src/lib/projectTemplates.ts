@@ -284,3 +284,36 @@ export function areaReadme(index: number, area: AreaRef, route: string): string 
   const d = areaDirs(index, area.name);
   return ["---", "mentor: proyectos-area", `area: ${yaml(area.name)}`, `ruta: ${yaml(route)}`, "---", `# ${d.dir}`, "", `Proyectos de **${area.name}** de la ruta ${route}.`, "", ...(Object.keys(KIND_DIR) as ProjectKind[]).map((k) => `- **${d.kinds[k]}**`), ""].join("\n");
 }
+
+// ── Lo que hay en disco (lo devuelve `mentor_projects_list`) ─────────────
+
+export interface ProjectListItem {
+  name: string;
+  dir: string;
+  readme: string;
+  /** archivos .md de la carpeta (sin contar subcarpetas), en orden */
+  files: string[];
+  /** casillas `- [x]` / `- [ ]` de todos sus .md */
+  done: number;
+  total: number;
+  status: "new" | "doing" | "done";
+  modified: number;
+}
+export interface ProjectListKind {
+  kind: ProjectKind;
+  label: string;
+  dir: string;
+  projects: ProjectListItem[];
+}
+export interface ProjectListArea {
+  areaKey: string;
+  area: string;
+  dir: string;
+  kinds: ProjectListKind[];
+}
+
+export interface ProjectsListing {
+  route: string;
+  exists: boolean;
+  areas: ProjectListArea[];
+}

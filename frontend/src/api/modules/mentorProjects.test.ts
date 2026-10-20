@@ -121,3 +121,30 @@ describe("carpeta de un proyecto", () => {
     expect(exists(`${r.route}/README.md`)).toBe(true);
   });
 });
+
+describe("listado de proyectos", () => {
+  it("sin carpeta de ruta dice que no existe y no crea nada", () => {
+    const r = api().mentor_projects_list({ id });
+    expect(r.exists).toBe(false);
+    expect(r.areas.map((a) => a.area)).toEqual(["Backend", "Frontend", "Databases"]);
+    expect(exists(BASE)).toBe(false);
+  });
+
+  it("lista los proyectos por área y tipo con su avance según las casillas marcadas", () => {
+    const p = api().mentor_projects_scaffold({ id, areaKeys: ["backend"], project: daily }).projects[0]!;
+    const before = api().mentor_projects_list({ id });
+    const proj = before.areas[0]!.kinds[0]!.projects[0]!;
+    expect(before.exists).toBe(true);
+    expect(proj).toMatchObject({ name: "2026-10-19 Feature del día", dir: p.dir, status: "new", done: 0 });
+    expect(proj.total).toBeGreaterThan(0);
+    expect(proj.files[0]).toBe("01 Especificación.md");
+    // marcar una casilla pone el proyecto «en curso»
+    const spec = path.join(dir, ...`${p.dir}/02 Plan de trabajo.md`.split("/"));
+    fs.writeFileSync(spec, fs.readFileSync(spec, "utf-8").replace("- [ ]", "- [x]"), "utf-8");
+    const after = api().mentor_projects_list({ id }).areas[0]!.kinds[0]!.projects[0]!;
+    expect(after.done).toBe(1);
+    expect(after.status).toBe("doing");
+    // otras áreas y tipos siguen vacíos
+    expect(api().mentor_projects_list({ id }).areas[1]!.kinds.every((k) => k.projects.length === 0)).toBe(true);
+  });
+});

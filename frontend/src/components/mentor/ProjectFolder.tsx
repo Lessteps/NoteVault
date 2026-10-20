@@ -1,11 +1,12 @@
 // Mentor — botón «Crear carpeta del proyecto»: deja el proyecto como carpeta propia dentro de la ruta (`<Materia>/Mentor/Ruta …/<n>. <Área>/<n>.k <tipo>/<proyecto>/`)
 // con su plantilla de archivos .md (README, especificación, plan, bitácora, entrega…). Nunca sobrescribe: si ya existe, solo la abre.
 
-import { FolderPlus, FolderOpen, FileText } from "lucide-react";
+import { FolderPlus, FileText } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../lib/bridge";
 import { useApp } from "../../store/app";
 import { GhostButton } from "../common/forms";
+import { FolderOpenMenu } from "./FolderOpenMenu";
 
 type Project = Record<string, unknown>;
 
@@ -28,6 +29,7 @@ export function ProjectFolder({ planId, areaKeys, project, label = "Crear carpet
       const dirs = r.projects.map((p) => p.dir);
       const readme = r.projects[0]?.readme ?? `${r.route}/README.md`;
       const fresh = r.projects.some((p) => p.created.length > 0);
+      useApp.getState().refreshTree?.();
       setMade({ dirs: dirs.length ? dirs : [r.route], readme, existed: !!project && !fresh });
       toast("info", !project ? "Estructura de la ruta lista en Mentor." : fresh ? `Carpeta creada en ${r.projects.length === 1 ? r.projects[0]!.area : `${r.projects.length} áreas`}.` : "La carpeta ya existía: no se tocó nada.");
     } catch (e) {
@@ -47,9 +49,7 @@ export function ProjectFolder({ planId, areaKeys, project, label = "Crear carpet
           <GhostButton onClick={() => void useApp.getState().openNote(made.readme)} data-testid={`${testid}-readme`}>
             <FileText size={15} aria-hidden /> Abrir README
           </GhostButton>
-          <GhostButton onClick={() => void api.revealPath(made.dirs[0]!)} data-testid={`${testid}-reveal`}>
-            <FolderOpen size={15} aria-hidden /> Abrir carpeta
-          </GhostButton>
+          <FolderOpenMenu dir={made.dirs[0]!} testid={`${testid}-folder`} />
           {made.existed && <span className="text-[12.5px] text-dim">Ya existía; no se sobrescribió.</span>}
         </>
       )}

@@ -15,6 +15,7 @@ import { cn } from "../ui";
 import { DSTATUS_COLOUR, DSTATUS_LABEL, focusColour, plural, type AgendaModel } from "./agendaKit";
 import { ProgressBar } from "./parts";
 import { ProjectFolder } from "./ProjectFolder";
+import { ProjectsHub } from "./ProjectsHub";
 import { GeneralCards } from "./PracticeCard";
 import { SectionCard, SectionHeading } from "./planKit";
 import type { Loaded } from "./planShared";
@@ -73,10 +74,7 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
       <SectionHeading id="run-projects-h" hint="El proyecto semanal junta las áreas en una vertical completa y el proyecto mensual consolida el avance del mes.">
         Proyectos
       </SectionHeading>
-      <div className="flex flex-wrap items-center gap-2 text-[13.5px] text-dim">
-        <ProjectFolder planId={plan.id} areaKeys={[]} testid="route-folders" label="Crear la estructura de carpetas de la ruta" />
-        <span>Una carpeta por área con proyectos diarios, semanales y mensuales; cada proyecto tiene la suya con su plantilla.</span>
-      </div>
+      <ProjectsHub planId={plan.id} />
 
       <SectionCard labelledBy="run-weekly-h" testid="run-project-weekly" className="space-y-1.5">
         <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Proyecto semanal{weekly ? ` · semana ${weekly.week}` : ""}</p>

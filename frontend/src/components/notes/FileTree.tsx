@@ -177,6 +177,16 @@ export function FileTree({ filter }: { filter: string }) {
     localStorage.setItem(EXPANDED_KEY, JSON.stringify([...expanded]));
   }, [expanded]);
 
+  // «Ver en NoteVault»: abre todas las carpetas hasta la pedida, la carga y la resalta.
+  const revealFolder = useApp((st) => st.revealFolder);
+  useEffect(() => {
+    if (!revealFolder) return;
+    const parts = revealFolder.path.split("/").filter(Boolean);
+    const chain = parts.map((_, i) => parts.slice(0, i + 1).join("/"));
+    setExpanded((ex) => new Set([...ex, ...chain]));
+    for (const c of chain) void load(c);
+  }, [revealFolder, load]);
+
   // (Re)load the root and every open folder whenever the tree changes.
   useEffect(() => {
     void load("");
@@ -351,6 +361,17 @@ export function FileTree({ filter }: { filter: string }) {
   }, [routeOnly, load]);
 
   const treeContainerRef = useRef<HTMLDivElement>(null);
+  // …y se desplaza hasta ella (una sola vez por petición, cuando la carpeta ya está en la lista plana)
+  const scrolledFor = useRef(0);
+  useEffect(() => {
+    if (!revealFolder || scrolledFor.current === revealFolder.n) return;
+    const i = flatItems.findIndex((it) => it.entry.path === revealFolder.path);
+    if (i < 0) return;
+    scrolledFor.current = revealFolder.n;
+    const el = treeContainerRef.current;
+    if (el) el.scrollTop = Math.max(0, i * 30 - 90);
+  }, [revealFolder, flatItems]);
+
   const treeVirtual = useVirtualList({
     itemCount: flatItems.length,
     itemHeight: 30,
@@ -432,6 +453,7 @@ export function FileTree({ filter }: { filter: string }) {
                       ? "bg-accent-soft text-text"
                       : "text-dim hover:bg-hover hover:text-text",
                     dropTarget === entry.path && "outline outline-1 outline-accent",
+                    isFolder && revealFolder?.path === entry.path && "ring-1 ring-accent bg-accent-soft",
                     isFolder && routeSnap?.byFolder.get(entry.path)?.route === "skipped" && "opacity-60",
                   )}
                   style={{ paddingLeft: 6 + depth * 14 }}

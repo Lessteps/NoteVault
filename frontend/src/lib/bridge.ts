@@ -409,6 +409,9 @@ export const api = {
   mentorProposalSet: (id: string, proposalId: string, status: "open" | "dismissed" | "applied") => call<{ proposals: import("./sessionRecords").ProposalView[] }>("mentor_proposal_set", { id, proposalId, status }),
   /** Crea la nota de refuerzo o la nota puente de una propuesta (nunca sobrescribe); con `preview` solo dice qué crearía. */
   mentorProposalApply: (id: string, proposalId: string, preview = false) => call<{ rel: string; created: boolean; source: "ai" | "rules"; aiCalls?: number }>("mentor_proposal_apply", { id, proposalId, ...(preview ? { preview: true } : {}) }),
+  /** Crea la estructura de carpetas de proyectos de la ruta y, si se pasa un proyecto, su carpeta con la plantilla de archivos (nunca sobrescribe). */
+  mentorProjectsScaffold: (opts: { id: string; areaKeys?: string[]; project?: Record<string, unknown> }) =>
+    call<{ route: string; skeleton: string[]; projects: Array<{ areaKey: string; area: string; dir: string; readme: string; created: string[]; existed: string[] }>; created: string[]; existed: string[] }>("mentor_projects_scaffold", opts),
   mentorExecutionCancel: (id: string) => call<{ execution: import("./types").MentorExecutionView | null }>("mentor_execution_cancel", { id }),
   /** Sistema de práctica por área: katas, habilidades y proyectos de cada área del plan. */
   mentorAreaPractice: (id: string) => call<import("./types").MentorAreaPractice>("mentor_area_practice", { id }),

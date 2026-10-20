@@ -16,6 +16,7 @@ import type { BoardPractice, BoardRow } from "./PlanBoard";
 import { useApp } from "../../store/app";
 import { SectionCard } from "./planKit";
 import { AreaSections } from "./PlanRunPractice";
+import { ProjectFolder } from "./ProjectFolder";
 import { dailyBreakdown } from "../../lib/planAreaPractice";
 import { hm } from "./parts";
 import type { DayProject } from "../../lib/planCurriculum";
@@ -94,6 +95,7 @@ export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, 
   const planned = card ? card.entry.theoryMinutes + card.entry.practiceMinutes : 0;
   const current = card?.rows.find((r) => !r.done)?.title;
   const toast = useApp.getState().toast;
+  const dailySections = dailyProject ? dailyBreakdown(area.areaId ? [area.areaId] : [], card?.rows.length ? card.rows.map((r) => r.title) : dailyProject.topics.map((t: { title: string }) => t.title)) : [];
   return (
     <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]" data-testid="run-area-tab" data-area={areaKey}>
       <div className="min-w-0 space-y-4">
@@ -130,7 +132,13 @@ export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, 
             <h3 id={`daily-${areaKey}-title`} className="text-[16.5px] font-bold text-text">{dailyProject.title}</h3>
             <p className="text-[14px] text-dim">{dailyProject.description}</p>
             {dailyProject.weeklyPart && <p className="text-[13px] font-medium text-accent-text">{dailyProject.weeklyPart}</p>}
-            <AreaSections sections={dailyBreakdown(area.areaId ? [area.areaId] : [], (card?.rows.length ? card.rows.map((r) => r.title) : dailyProject.topics.map((t: { title: string }) => t.title)))} testid="area-daily-sections" />
+            <AreaSections sections={dailySections} testid="area-daily-sections" />
+            <ProjectFolder
+              planId={plan.id}
+              areaKeys={[areaKey]}
+              testid="daily-project-folder"
+              project={{ kind: "daily", title: dailyProject.title, description: dailyProject.description, minutes: dailyProject.minutes, weeklyPart: dailyProject.weeklyPart, date: dailyProject.date, topics: dailyProject.topics.map((t: { title: string }) => t.title), sections: dailySections }}
+            />
           </SectionCard>
         )}
       </div>

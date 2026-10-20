@@ -899,6 +899,8 @@ Cada bloque de estudio (Pomodoro, cronómetro o sesión registrada a mano) deja 
 | `<Materia>/_registro/Índice.md` | un enlace al resumen de cada tema con sesiones |
 | `<Materia>/_registro/puntos-debiles.md` | los temas con menor dominio y los patrones abiertos (se recalcula al guardar cada sesión) |
 | `<Materia>/_registro/semana-<AAAA-Www>.md` | resumen de la semana (sobrevive a los 90 días) |
+| `<Materia>/Mentor/Ruta <plan>/README.md` · `<n>. <Área>/README.md` | estructura de proyectos de la ruta (botón «Crear carpeta del proyecto» / «Crear la estructura de carpetas»): una carpeta por área del plan, en el orden del plan |
+| `<Materia>/Mentor/Ruta <plan>/<n>. <Área>/<n>.1 Proyectos diarios · <n>.2 Proyectos semanales · <n>.3 Proyectos mensuales/<proyecto>/` | una carpeta por proyecto (`AAAA-MM-DD Título` · `Semana NN - Título` · `AAAA-MM - Título`) con `README.md`, `01 Especificación.md`, `02 Plan de trabajo.md`, `03 Bitácora.md`, `04 Entrega.md` (+ `05 Defensa y postmortem.md` en semanales, `05 Retrospectiva.md` en mensuales) y `Código/LEEME.md`. Un proyecto de varias áreas deja su carpeta en cada área, con solo la parte de esa área. **Nunca se sobrescribe**: lo que ya existe se respeta |
 | `<tema>/_Refuerzo — <tema>.md` · `<tema>/_Nota puente — <tema>.md` | nota creada **solo cuando la persona acepta una propuesta**; nunca sobrescribe (si existe, añade « (2)») |
 
 Las notas de `_registro/` usan un frontmatter propio — `registro: sesion | tema | indice | semana | puntos-debiles | refuerzo` — y **no** la clave `type`, para no chocar con los tipos de la vault.

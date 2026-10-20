@@ -137,6 +137,7 @@ import { designsOf } from "./mentorDesign.js";
 import { mentorExecuteApi } from "./mentorExecute.js";
 import { mentorTimeLogApi } from "./mentorTimeLog.js";
 import { mentorRecordsApi } from "./mentorRecords.js";
+import { mentorProjectsApi } from "./mentorProjects.js";
 import { mentorAreaPracticeApi } from "./mentorAreaPractice.js";
 import { mentorDayCloseApi } from "./mentorDayClose.js";
 import { DayCloseStore } from "../../core/mentor/dayClose.js";
@@ -2248,6 +2249,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
     ...mentorExecuteApi(app, { ...(send ? { send } : {}), today: () => localDate() }),
     // registro de horas por área (Pomodoro y bloques a mano)
     ...mentorTimeLogApi(app),
+    // carpetas de proyectos por ruta y área, con su plantilla de archivos (nunca sobrescribe)
+    ...mentorProjectsApi(app),
     // registros de sesión: evidencia, notas legibles en `_registro/`, patrones y propuestas del Mentor (solo propone)
     ...mentorRecordsApi(app, { ...(send ? { send: send as never } : {}), today: () => localDate() }),
     ...mentorAreaPracticeApi(app, { today: () => localDate() }),

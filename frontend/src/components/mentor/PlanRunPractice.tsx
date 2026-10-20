@@ -14,6 +14,7 @@ import { Chip } from "../common/forms";
 import { cn } from "../ui";
 import { DSTATUS_COLOUR, DSTATUS_LABEL, focusColour, plural, type AgendaModel } from "./agendaKit";
 import { ProgressBar } from "./parts";
+import { ProjectFolder } from "./ProjectFolder";
 import { GeneralCards } from "./PracticeCard";
 import { SectionCard, SectionHeading } from "./planKit";
 import type { Loaded } from "./planShared";
@@ -64,6 +65,7 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
 
   const planAreas = [...new Set(plan.subplans.map((s) => s.areaId).filter((x): x is string => !!x))];
   const areaIds = planAreas.length ? planAreas : weekly?.areaIds ?? [];
+  const allKeys = plan.subplans.map((x) => x.areaId ?? x.id);
   const weeklySections = weekly ? weeklyBreakdown(areaIds, weekly.week, weekly.dailyTitles.map((t) => shortOf(t))) : [];
 
   return (
@@ -71,6 +73,10 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
       <SectionHeading id="run-projects-h" hint="El proyecto semanal junta las áreas en una vertical completa y el proyecto mensual consolida el avance del mes.">
         Proyectos
       </SectionHeading>
+      <div className="flex flex-wrap items-center gap-2 text-[13.5px] text-dim">
+        <ProjectFolder planId={plan.id} areaKeys={[]} testid="route-folders" label="Crear la estructura de carpetas de la ruta" />
+        <span>Una carpeta por área con proyectos diarios, semanales y mensuales; cada proyecto tiene la suya con su plantilla.</span>
+      </div>
 
       <SectionCard labelledBy="run-weekly-h" testid="run-project-weekly" className="space-y-1.5">
         <p className="text-[13px] font-medium uppercase tracking-wide text-faint">Proyecto semanal{weekly ? ` · semana ${weekly.week}` : ""}</p>
@@ -82,6 +88,12 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
             <ProgressBar pct={weekly.dailyIds.length ? (weeklyDone / weekly.dailyIds.length) * 100 : 0} label={`Avance del proyecto semanal ${weekly.week}`} />
             {weeklyStatus ? <Chip large colour={DSTATUS_COLOUR[weeklyStatus]}>{DSTATUS_LABEL[weeklyStatus]}</Chip> : <Chip large colour="var(--nv-faint)">Entregable por definir</Chip>}
             <AreaSections sections={weeklySections} testid="weekly-areas" />
+            <ProjectFolder
+              planId={plan.id}
+              areaKeys={allKeys}
+              testid="weekly-project-folder"
+              project={{ kind: "weekly", title: weekly.title, description: weekly.description, week: weekly.week, topics: [], sections: weeklySections }}
+            />
           </>
         ) : (
           <h3 id="run-weekly-h" className="text-[16px] font-semibold">Sin proyecto semanal esta semana</h3>
@@ -104,6 +116,12 @@ export function RunProjects({ plan, data, m }: { plan: MentorPlan; data: Loaded;
             <span>Semanas {currentMonth.fromWeek} a {currentMonth.toWeek}</span>
             {monthlyStatus ? <Chip large colour={DSTATUS_COLOUR[monthlyStatus]}>{DSTATUS_LABEL[monthlyStatus]}</Chip> : <Chip large colour="var(--nv-faint)">Entregable mensual</Chip>}
           </p>
+          <ProjectFolder
+            planId={plan.id}
+            areaKeys={allKeys}
+            testid="monthly-project-folder"
+            project={{ kind: "monthly", title: currentMonth.title, description: currentMonth.description, ...(currentMonth.month ? { month: currentMonth.month } : {}), topics: [], sections: [] }}
+          />
         </SectionCard>
       )}
     </section>

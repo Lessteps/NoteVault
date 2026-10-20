@@ -13,7 +13,7 @@ import type { PlanTopicRow } from "../../lib/planTopicCatalog";
 import type { MentorPlan } from "../../lib/types";
 
 const openTopic = vi.fn();
-vi.mock("./openTopic", () => ({ openTopic: (f: string) => openTopic(f) }));
+vi.mock("./openTopic", () => ({ openTopic: (f: string) => openTopic(f), openTopicNote: vi.fn(), openTopicCanvas: vi.fn() }));
 import { PlanAreaTopics } from "./PlanAreaTopics";
 
 const topic = (folder: string, week: number, over: Record<string, unknown> = {}) => ({ folder, title: folder.split("/").pop()!, targetWeek: week, estMinutes: 30, ...over });
@@ -83,7 +83,10 @@ describe("PlanAreaTopics", () => {
     expect(byTest("generate-area")).toBeNull(); // Bases se genera tema a tema
     await click("area-tabs-s1");
     expect(titles()).toEqual(["4.2 REST"]); // al volver, el grupo se reinicia a «Todos»
+    // pulsar el tema ofrece sus opciones: apunte, archivo de práctica, canvas y Pomodoro
     await click("area-open");
+    expect([...document.querySelectorAll("[data-testid=board-menu] [role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica", "Abrir canvas explicativo", "Asignar al Pomodoro"]);
+    await click("board-open-practice");
     expect(openTopic).toHaveBeenCalledWith("P/4/4.2 REST");
   });
 

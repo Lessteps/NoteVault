@@ -7,7 +7,9 @@
 //    la estructura mínima del área; NUNCA sobrescribe) y devuelve la ruta para abrirlo. Solo se llama cuando la persona pulsa «Abrir kata».
 //  - mentor_area_practice_setup({ id }) -> { created, view }: deja en `programming_practice/` la carpeta de CADA área del plan con su README, su
 //    `<área>.practica.md`, sus habilidades y la estructura de katas y proyectos. Nunca sobrescribe y no crea katas (esos salen al abrirlos).
-//  - mentor_area_kata_mark({ id, areaId, date, status }) -> { areas }: la persona marca un kata como hecho / saltado (o lo quita con `status: null`).
+//  - mentor_area_kata_mark({ id, areaId, date, status }) -> { areas }: marca un kata como hecho / saltado (o quita la marca con `status: null`).
+//    «Hecho» solo se acepta si el kata está VERIFICADO: hay un intento calificado (por la IA o por la corrección interna de NoteVault) con nota
+//    suficiente, sin haber visto la solución. «Saltado» solo con el 70 % de los katas que tocaban hasta hoy hechos y verificados.
 //    Escribe SOLO `.notevault/mentor/area-practice/<plan>.json` (datos de la app), nunca notas de la vault.
 
 import * as path from "node:path";
@@ -17,7 +19,8 @@ import { AreaPracticeStore, deriveAreaPractice, existingAreaFiles } from "../../
 import { PLAN_ID_RE, PlanStore, type Plan } from "../../core/mentor/plan.js";
 import { ppAreaDir } from "../../core/mentor/practiceState.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
-import { areaPracticeFor, isPracticeAreaId, practiceAreasOf } from "../../lib/areaPracticeSystem.js";
+import { kataDatesOf } from "../../lib/areaPracticeDerive.js";
+import { areaFolderOf, areaPracticeFor, isPracticeAreaId, practiceAreasOf } from "../../lib/areaPracticeSystem.js";
 import type { AppState } from "../appState.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -102,6 +105,17 @@ export function mentorAreaPracticeApi(app: AppState, hooks: { today: () => strin
       if (!DATE_RE.test(date) || date > hooks.today()) throw new ApiError("Solo se pueden marcar katas de hoy o de días pasados.");
       const status = o.status === "done" || o.status === "skipped" ? o.status : o.status === null || o.status === undefined ? null : undefined;
       if (status === undefined) throw new ApiError("Estado inválido.");
+      if (status === "done") {
+        const verified = kataDatesOf(loadAllAttempts(app.root), { id: areaId, folder: areaFolderOf(areaId) }).has(date);
+        if (!verified) {
+          throw new ApiError("Este kata aún no está verificado: hace falta un intento calificado (nota de 75 o más, sin ver la solución). Resuélvelo en su archivo y pide la revisión; cuando la corrección lo dé por bueno, queda hecho.");
+        }
+      } else if (status === "skipped") {
+        const rule = viewOf(plan).areas.find((a) => a.areaId === areaId)?.kata.skip;
+        if (rule && !rule.allowed) {
+          throw new ApiError(`No se puede saltar este kata: hace falta haber hecho al menos el ${rule.neededPct} % de los katas que tocaban hasta hoy y llevas el ${rule.pct} %.`);
+        }
+      }
       new AreaPracticeStore(app.root).mark(plan.id, areaId, date, status);
       return viewOf(plan);
     },

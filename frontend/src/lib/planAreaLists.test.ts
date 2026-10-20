@@ -12,11 +12,15 @@ const days = [
 ];
 
 describe("conjuntos de la ruta de un área", () => {
-  it("hoy, esta semana y pendientes (lo que tocaba hasta hoy y no se terminó) de un área", () => {
+  it("hoy, esta semana y pendientes (su tiempo previsto ya pasó y no se terminó) de un área", () => {
     const s = areaSets(days, "s1", "2026-10-16", 2);
     expect([...s.today].sort()).toEqual(["B", "D"]);
     expect([...s.week].sort()).toEqual(["A", "B", "C", "D"]);
-    expect([...s.pending].sort()).toEqual(["B", "C", "D"]); // A está hecho; E es de la semana que viene
+    expect([...s.pending].sort()).toEqual(["B", "C"]); // A está hecho; D toca justo hoy (aún en su tiempo); E es de la semana que viene
+  });
+
+  it("mientras la ruta no ha empezado nada está pendiente", () => {
+    expect(areaSets(days, "s1", "2026-10-16", 2, false).pending.size).toBe(0);
   });
 
   it("sin área cuenta todo el plan", () => {

@@ -177,7 +177,7 @@ export function GeneralCards({ track, status, today, only }: { track: PracticeTr
         <p className="mt-2 text-[13.5px] text-faint">
           {status?.ppReady === false
             ? "No se encontró la carpeta programming_practice: el estado se anota a mano en los bloques de «Hoy»."
-            : "Hecho = hay un intento del kata ese día en tu práctica, o lo marcaste en «Hoy»."}
+            : "Hecho = hay un intento calificado del kata (nota de 75 o más, sin ver la solución)."}
         </p>
       </section>,
     );
@@ -349,10 +349,10 @@ export function KataToday({ area, ppBase, today, mark, onExecute, ppReady }: { a
               <span className="text-[13.5px] text-faint" data-testid="area-kata-nofile">El archivo del kata aún no existe: {ppReady ? "se crea al ejecutar el plan." : "se crea al ejecutar el plan."}</span>
             )}
             {isToday && todayState !== "done" && (
-              <GhostButton onClick={() => void mark(area.areaId, today, "done")} data-testid="area-kata-done"><Check size={15} aria-hidden /> Marcar hecho</GhostButton>
+              <GhostButton onClick={() => void mark(area.areaId, today, "done")} data-testid="area-kata-done"><Check size={15} aria-hidden /> Verificar y marcar hecho</GhostButton>
             )}
             {isToday && todayState === "pending" && (
-              <GhostButton onClick={() => void mark(area.areaId, today, "skipped")}><SkipForward size={15} aria-hidden /> Saltar hoy</GhostButton>
+              <GhostButton onClick={() => void mark(area.areaId, today, "skipped")} disabled={!area.kata.skip.allowed} title={area.kata.skip.allowed ? undefined : `Para saltar hace falta el ${area.kata.skip.neededPct} % de los katas hechos; llevas el ${area.kata.skip.pct} %`} data-testid="area-kata-skip"><SkipForward size={15} aria-hidden /> Saltar hoy</GhostButton>
             )}
             {isToday && (todayState === "done" || todayState === "skipped") && (
               <GhostButton onClick={() => void mark(area.areaId, today, null)}><Undo2 size={15} aria-hidden /> Quitar marca</GhostButton>
@@ -363,7 +363,7 @@ export function KataToday({ area, ppBase, today, mark, onExecute, ppReady }: { a
       <div className="mt-3">
         <FolderNotice area={area} ppReady={ppReady} onExecute={onExecute} />
       </div>
-      <p className="mt-2 text-[13.5px] text-faint">Hecho = hay un intento del kata ese día en tu práctica, o lo marcaste aquí.</p>
+      <p className="mt-2 text-[13.5px] text-faint">Hecho = hay un intento calificado del kata (nota de 75 o más, sin ver la solución). No se puede marcar a mano sin esa verificación.</p>
     </section>
   );
 }

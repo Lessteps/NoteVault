@@ -24,6 +24,7 @@ function KataRow({ planId, area, d, mark }: { planId: string; area: AreaPractice
   const colour = focusColour(area.areaId);
   const done = d.state === "done";
   const late = !d.today && d.state === "pending";
+  const skipOk = area.kata.skip.allowed;
   const open = async (): Promise<void> => {
     try {
       const r = await api.mentorAreaKataOpen(planId, area.areaId, d.date);
@@ -35,8 +36,8 @@ function KataRow({ planId, area, d, mark }: { planId: string; area: AreaPractice
   };
   const items: MenuAction[] = [
     { id: "open", label: "Abrir kata (.md)", icon: <BookOpen size={16} aria-hidden className="text-accent-text" />, onClick: () => void open(), testid: "kata-open" },
-    ...(!done ? [{ id: "done", label: "Marcar hecho", icon: <Check size={16} aria-hidden className="text-mint" />, onClick: () => void mark(area.areaId, d.date, "done"), testid: "kata-mark-done" }] : []),
-    ...(d.state === "pending" ? [{ id: "skip", label: d.today ? "Saltar hoy" : "Saltar este día", icon: <SkipForward size={16} aria-hidden />, onClick: () => void mark(area.areaId, d.date, "skipped"), testid: "kata-mark-skip" }] : []),
+    ...(!done ? [{ id: "done", label: "Verificar y marcar hecho", icon: <Check size={16} aria-hidden className="text-mint" />, onClick: () => void mark(area.areaId, d.date, "done"), testid: "kata-mark-done" }] : []),
+    ...(d.state === "pending" ? [{ id: "skip", label: `${d.today ? "Saltar hoy" : "Saltar este día"}${skipOk ? "" : ` (pide ${area.kata.skip.neededPct} %)`}`, icon: <SkipForward size={16} aria-hidden />, onClick: () => { if (skipOk) void mark(area.areaId, d.date, "skipped"); else toast("info", `Para saltar un kata hace falta haber hecho al menos el ${area.kata.skip.neededPct} % de los que tocaban hasta hoy: llevas el ${area.kata.skip.pct} %.`); }, testid: "kata-mark-skip" }] : []),
     ...(done || d.state === "skipped" ? [{ id: "undo", label: "Quitar marca", icon: <Undo2 size={16} aria-hidden />, onClick: () => void mark(area.areaId, d.date, null), testid: "kata-mark-undo" }] : []),
     { id: "area", label: `Ver práctica de ${area.label}`, icon: <Dumbbell size={16} aria-hidden className="text-mint" />, onClick: () => { useNavState.getState().set(practiceAreaKey(planId), area.areaId); openPlanTab(planId, "practica"); }, testid: "kata-area" },
   ];
@@ -46,7 +47,8 @@ function KataRow({ planId, area, d, mark }: { planId: string; area: AreaPractice
         type="button"
         role="checkbox"
         aria-checked={done}
-        aria-label={`${done ? "Quitar la marca de" : "Marcar como hecho"}: ${d.title}`}
+        aria-label={`${done ? "Quitar la marca de" : "Verificar y marcar como hecho"}: ${d.title}`}
+        title={done ? undefined : "Se marca solo si hay un intento calificado de este kata (nota de 75 o más)"}
         onClick={() => void mark(area.areaId, d.date, done ? null : "done")}
         className="grid h-5 w-5 flex-none place-items-center rounded-md border text-[12px] font-bold text-white"
         style={done ? { background: colour, borderColor: colour } : { borderColor: "var(--nv-line, currentColor)" }}

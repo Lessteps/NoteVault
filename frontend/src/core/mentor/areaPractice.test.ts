@@ -70,10 +70,10 @@ describe("createAreaPracticeFolders", () => {
 
 describe("kataDates: el kata global sigue igual y cada área filtra los suyos", () => {
   const attempts = {
-    g: { note_id: "g", note_path: "Programación/programming_practice/kata/Ejercicios/pp_kata/a.md", attempts: [{ at: "2026-10-05T10:00:00", skill: "pp_kata", mode: "pp_kata" }] },
-    b: { note_id: "b", note_path: "Programación/programming_practice/backend/katas/001 x.md", attempts: [{ at: "2026-10-06T10:00:00", skill: "pp_kata", mode: "pp_kata" }] },
-    f: { note_id: "f", note_path: "Programación/programming_practice/frontend/katas/001 y.md", attempts: [{ at: "2026-10-07T10:00:00", skill: "pp_kata", mode: "pp_kata" }] },
-    l: { note_id: "l", note_path: "otra/nota.md", attempts: [{ at: "2026-10-08T10:00:00", skill: "pp_kata:backend" }, { at: "2026-10-09T10:00:00", skill: "implement" }] },
+    g: { note_id: "g", note_path: "Programación/programming_practice/kata/Ejercicios/pp_kata/a.md", attempts: [{ at: "2026-10-05T10:00:00", skill: "pp_kata", mode: "pp_kata", verdict: "correct", score: 90 }] },
+    b: { note_id: "b", note_path: "Programación/programming_practice/backend/katas/001 x.md", attempts: [{ at: "2026-10-06T10:00:00", skill: "pp_kata", mode: "pp_kata", verdict: "correct", score: 90 }] },
+    f: { note_id: "f", note_path: "Programación/programming_practice/frontend/katas/001 y.md", attempts: [{ at: "2026-10-07T10:00:00", skill: "pp_kata", mode: "pp_kata", verdict: "correct", score: 90 }] },
+    l: { note_id: "l", note_path: "otra/nota.md", attempts: [{ at: "2026-10-08T10:00:00", skill: "pp_kata:backend", verdict: "correct", score: 90 }, { at: "2026-10-09T10:00:00", skill: "implement" }] },
   };
   it("sin área cuenta todos los katas (comportamiento de siempre) y no el resto de skills", () => {
     expect([...kataDates(attempts)].sort()).toEqual(["2026-10-05", "2026-10-06", "2026-10-07"]);
@@ -94,7 +94,7 @@ describe("estado derivado por área", () => {
     preconditions: { blockedDates: [], levels: { Programación: "basico" } },
     subplans: [{ area: "Backend", areaId: "backend" }, { area: "Frontend", areaId: "frontend" }],
   };
-  const att = (note: string, ...dates: string[]) => ({ note_id: note, note_path: `Programación/programming_practice/${note}/katas/001 x.md`, attempts: dates.map((d) => ({ at: `${d}T10:00:00`, skill: "pp_kata", mode: "pp_kata" })) });
+  const att = (note: string, ...dates: string[]) => ({ note_id: note, note_path: `Programación/programming_practice/${note}/katas/001 x.md`, attempts: dates.map((d) => ({ at: `${d}T10:00:00`, skill: "pp_kata", mode: "pp_kata", verdict: "correct", score: 90 })) });
   const base = { plan, attempts: { b: att("backend", "2026-10-05", "2026-10-06", "2026-10-08"), f: att("frontend", "2026-10-05") }, marks: {}, existing: { folders: new Set(["backend"]), files: new Set<string>() } };
 
   it("katas hechos, racha, progreso por habilidad y semana de lunes a domingo", () => {

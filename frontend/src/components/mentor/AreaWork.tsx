@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AreaPracticeView } from "../../lib/areaPracticeView";
 import { api } from "../../lib/bridge";
 import { bucketReviews, dueText, type ReviewRow } from "../../lib/planReviews";
+import { dateLabel } from "../../lib/planSchedule";
 import type { AreaSets } from "../../lib/planAreaLists";
 import { useMentor } from "../../store/mentor";
 import { usePomodoro } from "../../store/pomodoro";
@@ -77,8 +78,50 @@ export interface WeekDayView {
   rows: BoardRow[];
 }
 
+/** Una semana futura del plan (proyección), día a día. */
+export interface UpcomingWeekView {
+  week: number;
+  start: string;
+  end: string;
+  days: WeekDayView[];
+}
+
+const UPCOMING_STEP = 4;
+
+/** «Lo que viene»: los temas de las semanas siguientes, con su etiqueta de tiempo. Es la proyección del plan: se ve aunque la ruta sólida aún no los desbloquee. */
+function UpcomingWeeks({ weeks, colour }: { weeks: UpcomingWeekView[]; colour: string }) {
+  const [shown, setShown] = useState(UPCOMING_STEP);
+  if (!weeks.length) return null;
+  return (
+    <section aria-label="Lo que viene" className="space-y-3" data-testid="work-upcoming">
+      <h3 className="px-1 text-[13px] font-semibold uppercase tracking-wider text-faint">
+        Lo que viene <span className="font-normal normal-case tracking-normal text-dim">· proyección de las próximas semanas</span>
+      </h3>
+      {weeks.slice(0, shown).map((w) => (
+        <section key={w.week} aria-label={`Semana ${w.week}`} className="rounded-2xl border border-line bg-card p-3" data-testid="upcoming-week" data-week={w.week}>
+          <h4 className="mb-1.5 flex flex-wrap items-center gap-2 px-1 text-[14px] font-semibold">
+            Semana {w.week}
+            <span className="font-mono text-[12.5px] font-normal text-dim">{dateLabel(w.start)} – {dateLabel(w.end)}</span>
+          </h4>
+          {w.days.map((d) => (
+            <div key={d.date} data-date={d.date}>
+              <p className="px-1 pt-1 text-[12.5px] font-medium text-dim first-letter:uppercase">{d.label}</p>
+              <ul className="space-y-0.5" aria-label={`Temas de ${d.label}`}>
+                {d.rows.map((r) => <TopicRow key={`${r.folder}:${r.meta ?? ""}`} r={r} colour={colour} />)}
+              </ul>
+            </div>
+          ))}
+        </section>
+      ))}
+      {shown < weeks.length && (
+        <GhostButton large="md" onClick={() => setShown((n) => n + UPCOMING_STEP)} data-testid="upcoming-more">Ver {Math.min(UPCOMING_STEP, weeks.length - shown)} semanas más</GhostButton>
+      )}
+    </section>
+  );
+}
+
 /** La semana en curso: un cajón por día, lo completado y el nivel de avance (media del avance de cada tema; un tema hecho cuenta 100 %). */
-function WeekView({ days, today, colour }: { days: WeekDayView[]; today: string; colour: string }) {
+function WeekView({ days, today, colour, upcoming }: { days: WeekDayView[]; today: string; colour: string; upcoming?: UpcomingWeekView[] }) {
   const unique = new Map<string, BoardRow>();
   for (const d of days) for (const r of d.rows) if (!unique.has(r.folder) || r.done) unique.set(r.folder, r);
   const all = [...unique.values()];
@@ -119,11 +162,12 @@ function WeekView({ days, today, colour }: { days: WeekDayView[]; today: string;
           </section>
         );
       })}
+      {upcoming && <UpcomingWeeks weeks={upcoming} colour={colour} />}
     </div>
   );
 }
 
-export function AreaWork({ planId, areaName, areaId, subtitle, loggedMinutes = 0, rows, todayRows, weekDays, sets, today, colour, practice, reviews, plannedMinutes, onStartBlock }: {
+export function AreaWork({ planId, areaName, areaId, subtitle, loggedMinutes = 0, rows, todayRows, weekDays, upcoming, sets, today, colour, practice, reviews, plannedMinutes, onStartBlock }: {
   planId: string;
   areaName: string;
   areaId?: string;
@@ -137,6 +181,8 @@ export function AreaWork({ planId, areaName, areaId, subtitle, loggedMinutes = 0
   todayRows: BoardRow[];
   /** la semana en curso día a día (lunes a domingo) */
   weekDays?: WeekDayView[];
+  /** las semanas siguientes (proyección), debajo de la semana en curso */
+  upcoming?: UpcomingWeekView[];
   sets: AreaSets;
   today: string;
   colour: string;
@@ -217,14 +263,17 @@ export function AreaWork({ planId, areaName, areaId, subtitle, loggedMinutes = 0
 
       {view === "semana" && weekDays ? (
         weekCount === 0 ? (
-          <p className="rounded-2xl border border-dashed border-line p-5 text-[14.5px] text-dim" data-testid="work-empty">Esta semana no hay temas repartidos en esta ruta.</p>
+          <div className="space-y-4">
+            <p className="rounded-2xl border border-dashed border-line p-5 text-[14.5px] text-dim" data-testid="work-empty">Esta semana no hay temas repartidos en esta ruta.</p>
+            {upcoming && <UpcomingWeeks weeks={upcoming} colour={colour} />}
+          </div>
         ) : (
-          <WeekView days={weekDays} today={today} colour={colour} />
+          <WeekView days={weekDays} today={today} colour={colour} {...(upcoming ? { upcoming } : {})} />
         )
       ) : view !== "repasos" ? (
         lists[view].length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line p-5 text-[14.5px] text-dim" data-testid="work-empty">
-            {view === "hoy" ? "Hoy no toca ningún tema de esta ruta." : view === "semana" ? "Esta semana no hay temas repartidos en esta ruta." : "No tienes nada pendiente: lo que tocaba hasta hoy está hecho."}
+            {view === "hoy" ? "Hoy no toca ningún tema de esta ruta." : view === "semana" ? "Esta semana no hay temas repartidos en esta ruta." : "No tienes nada pendiente: un tema pasa aquí solo cuando se acaba su tiempo previsto sin completarlo."}
           </p>
         ) : (
           <div className="rounded-2xl border border-line bg-card p-3">

@@ -46,6 +46,15 @@ afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const api = () => mentorApi(app, vi.fn());
 
+/** Deja en el ledger un intento del kata de un área: calificado (por defecto, aprobado) o sin calificar. */
+let seq = 0;
+function attempt(areaId: string, date: string, extra: Record<string, unknown> = { verdict: "correct", score: 90 }): void {
+  const folder = path.join(dir, ".notevault", "estudio", "intentos");
+  fs.mkdirSync(folder, { recursive: true });
+  const noteId = `k${seq++}`;
+  fs.writeFileSync(path.join(folder, `${noteId}.json`), JSON.stringify({ note_id: noteId, note_path: `Programación/programming_practice/${areaId}/katas/001 x.md`, attempts: [{ at: `${date}T10:00:00`, skill: "pp_kata", mode: "pp_kata", ...extra }] }), "utf-8");
+}
+
 describe("mentor_area_practice", () => {
   it("devuelve el sistema de cada área del plan: carpeta aún no creada, katas, habilidades y semanas; solo lee", () => {
     const before = fs.readdirSync(path.join(dir, "Programación", "programming_practice")).length;
@@ -84,14 +93,45 @@ describe("mentor_area_practice", () => {
 });
 
 describe("mentor_area_kata_mark", () => {
+  it("«hecho» solo se acepta si el kata está verificado: un intento calificado con nota suficiente", () => {
+    const err = /aún no está verificado/;
+    expect(() => api().mentor_area_kata_mark({ id, areaId: "frontend", date: TODAY, status: "done" })).toThrow(err);
+    attempt("frontend", TODAY, {}); // sin calificar
+    expect(() => api().mentor_area_kata_mark({ id, areaId: "frontend", date: TODAY, status: "done" })).toThrow(err);
+    attempt("frontend", TODAY, { verdict: "partial", score: 60 }); // calificado, pero por debajo del aprobado
+    expect(() => api().mentor_area_kata_mark({ id, areaId: "frontend", date: TODAY, status: "done" })).toThrow(err);
+    attempt("frontend", TODAY, { verdict: "correct", score: 95, solution_seen: true }); // aprobado viendo la solución
+    expect(() => api().mentor_area_kata_mark({ id, areaId: "frontend", date: TODAY, status: "done" })).toThrow(err);
+    attempt("backend", TODAY); // el intento de otra área no sirve
+    expect(() => api().mentor_area_kata_mark({ id, areaId: "frontend", date: TODAY, status: "done" })).toThrow(err);
+    attempt("frontend", TODAY);
+    const ok: any = api().mentor_area_kata_mark({ id, areaId: "frontend", date: TODAY, status: "done" });
+    expect(ok.areas.find((a: any) => a.areaId === "frontend").kata).toMatchObject({ doneDays: 1, todayDone: true });
+  });
+
+  it("un kata solo se puede saltar con el 70 % de los que tocaban hasta hoy hechos y verificados", () => {
+    const view = () => (api().mentor_area_practice({ id }) as any).areas.find((a: any) => a.areaId === "backend").kata;
+    expect(view().skip).toMatchObject({ allowed: false, pct: 0, neededPct: 70 });
+    expect(() => api().mentor_area_kata_mark({ id, areaId: "backend", date: START, status: "skipped" })).toThrow(/al menos el 70 %/);
+    // 7 de los 10 katas hechos y verificados: ya se puede saltar uno
+    for (let i = 0; i < 7; i++) attempt("backend", addDays(START, i + 1));
+    expect(view().skip).toMatchObject({ allowed: true, pct: 70 });
+    const r: any = api().mentor_area_kata_mark({ id, areaId: "backend", date: START, status: "skipped" });
+    expect(r.areas.find((a: any) => a.areaId === "backend").kata.due.find((d: any) => d.date === START)).toMatchObject({ state: "skipped" });
+  });
+
   it("marca hecho / saltado, se refleja en el estado y se quita; solo escribe datos de la app", () => {
+    attempt("frontend", TODAY);
+    attempt("backend", START);
+    for (let i = 1; i <= 6; i++) attempt("backend", addDays(START, i + 1));
     const done: any = api().mentor_area_kata_mark({ id, areaId: "frontend", date: TODAY, status: "done" });
     const f = done.areas.find((a: any) => a.areaId === "frontend");
     expect(f.kata).toMatchObject({ doneDays: 1, todayDone: true });
-    expect(done.areas.find((a: any) => a.areaId === "backend").kata.doneDays).toBe(0);
+    expect(done.areas.find((a: any) => a.areaId === "backend").kata.doneDays).toBe(7);
     expect(fs.existsSync(path.join(dir, ".notevault", "mentor", "area-practice", `${id}.json`))).toBe(true);
     const gone: any = api().mentor_area_kata_mark({ id, areaId: "frontend", date: TODAY, status: null });
-    expect(gone.areas.find((a: any) => a.areaId === "frontend").kata.doneDays).toBe(0);
+    // quitar la marca no borra el intento verificado: el kata sigue hecho porque lo dice el ledger
+    expect(gone.areas.find((a: any) => a.areaId === "frontend").kata.doneDays).toBe(1);
     // ninguna nota de la vault se tocó
     expect(fs.readdirSync(path.join(dir, "Programación")).sort()).toEqual(["Programación.resumen.md", "programming_practice"]);
   });
@@ -140,7 +180,8 @@ describe("katas atrasados y carpetas por área", () => {
     expect(b.kata.due.slice(1).map((d: any) => d.date)).toEqual([...b.kata.due.slice(1)].map((d: any) => d.date).sort());
     expect(b.kata.due[1].date).toBe(START);
     expect(b.kata.due[1].title).toBeTruthy();
-    // marcar un día atrasado como hecho lo saca de la lista
+    // un día atrasado con un intento verificado sale de la lista
+    attempt("backend", START);
     const after: any = api().mentor_area_kata_mark({ id, areaId: "backend", date: START, status: "done" });
     const due2 = after.areas[0].kata.due;
     expect(due2).toHaveLength(9);

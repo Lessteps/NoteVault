@@ -30,7 +30,9 @@ import type { MentorPlan } from "../../lib/types";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { focusColour, plural, type AgendaModel } from "./agendaKit";
+import { routeStarted, timeTagOf, topicTimes, type TopicTime } from "../../lib/planTopicTime";
 import { hm } from "./parts";
+import { TimeChip, TopicMenu } from "./PlanBoard";
 import { SectionHeading } from "./planKit";
 import { DAY_LONG, DAY_SHORT, STATE_COLOUR, STATE_GLYPH, STATE_LABEL } from "./planShared";
 
@@ -125,14 +127,28 @@ const dayLong = (iso: string): string => {
   return `${DAY_LONG[dow]} ${Number(iso.slice(8))}`;
 };
 
+const timesCache = new WeakMap<object, Map<string, TopicTime>>();
+/** La etiqueta de tiempo de un tema según el reparto del plan (los ventanas por tema se calculan una vez por reparto). */
+function timeTagFor(m: AgendaModel, folder: string, done: boolean) {
+  let times = timesCache.get(m.schedule);
+  if (!times) {
+    times = topicTimes(m.schedule.days.map((d) => ({ date: d.date, topics: d.topics.map((x) => ({ folder: x.folder, done: x.done || m.topicByFolder.get(x.folder)?.state === "completo" })) })));
+    timesCache.set(m.schedule, times);
+  }
+  const started = routeStarted([...m.topicByFolder.values()].map((x) => x.state), m.plan.subplans.some((sp) => sp.topics.some((x) => x.completedAt)));
+  return timeTagOf(times.get(folder), done, m.today, started);
+}
+
 function TopicLine({ m, t }: { m: AgendaModel; t: WeekAreaTopic }) {
   const live = m.topicByFolder.get(t.folder);
   const state = t.done ? "completo" : (live?.state ?? "sin_tratar");
+  const time = timeTagFor(m, t.folder, state === "completo");
   return (
     <li className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px]" data-testid="area-topic">
-      <span className="min-w-0 flex-1 basis-44 break-words font-medium" title={t.folder}>{t.title}</span>
+      <span className="flex min-w-0 flex-1 basis-44" title={t.folder}><TopicMenu folder={t.folder} title={t.title} trigger={<span className="break-words font-medium">{t.title}</span>} className="hover:text-accent-text hover:underline" /></span>
       <span className="whitespace-nowrap text-dim" aria-label={`Día asignado: ${t.dates.map(dayLong).join(", ")}`}>{t.dates.map(dayWord).join(", ")}</span>
       <span className="whitespace-nowrap text-dim">{hm(t.minutes)}</span>
+      {time && <TimeChip time={time} />}
       <Chip large colour={STATE_COLOUR[state]}><span aria-hidden>{STATE_GLYPH[state]}</span> {STATE_LABEL[state]}</Chip>
     </li>
   );
@@ -299,7 +315,7 @@ export function AreaTopicsTable({ m, currentWeek, headingId }: { m: AgendaModel;
                               <ul className="mt-1.5 space-y-1">
                                 {c.topics.map((t) => (
                                   <li key={t.folder} className="flex flex-wrap items-baseline gap-x-2 text-[13.5px]">
-                                    <span className="min-w-0 flex-1 basis-36 break-words">{t.done ? "● " : "○ "}{t.title}<span className="sr-only">{t.done ? " (hecho)" : " (pendiente)"}</span></span>
+                                    <span className="min-w-0 flex-1 basis-36 break-words">{t.done ? "● " : "○ "}<TopicMenu folder={t.folder} title={t.title} trigger={<span className="break-words">{t.title}</span>} className="inline hover:text-accent-text hover:underline" /><span className="sr-only">{t.done ? " (hecho)" : ` (${(timeTagFor(m, t.folder, false)?.text ?? "programado").toLowerCase()})`}</span></span>
                                     <span className="whitespace-nowrap text-dim">{t.dates.map(dayWord).join(", ")}</span>
                                   </li>
                                 ))}

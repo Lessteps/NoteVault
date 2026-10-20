@@ -12,7 +12,10 @@ export interface MenuAction {
   testid?: string;
 }
 
-export function RowMenu({ title, items, disabled }: { title: string; items: MenuAction[]; disabled?: boolean }) {
+/**
+ * `trigger`: en vez de la flecha, el propio contenido (el título del tema) abre el menú al pulsarlo; `className` es el de ese botón.
+ */
+export function RowMenu({ title, items, disabled, trigger, className }: { title: string; items: MenuAction[]; disabled?: boolean; trigger?: ReactNode; className?: string }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -32,7 +35,7 @@ export function RowMenu({ title, items, disabled }: { title: string; items: Menu
   }, [open]);
   const item = "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[14px] hover:bg-hover";
   return (
-    <span ref={box} className="relative flex-none">
+    <span ref={box} className={cn("relative", trigger ? "min-w-0 flex-1" : "flex-none")}>
       <button
         type="button"
         disabled={disabled}
@@ -40,13 +43,13 @@ export function RowMenu({ title, items, disabled }: { title: string; items: Menu
         aria-expanded={open}
         aria-label={`Abrir ${title}`}
         onClick={() => setOpen((v) => !v)}
-        className="grid h-9 w-9 place-items-center rounded-lg text-faint transition-colors hover:bg-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
-        data-testid="board-arrow"
+        className={trigger ? cn("block max-w-full text-left", className) : "grid h-9 w-9 place-items-center rounded-lg text-faint transition-colors hover:bg-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"}
+        data-testid={trigger ? "board-topic-trigger" : "board-arrow"}
       >
-        <ChevronRight size={18} aria-hidden className={cn("transition-transform", open && "rotate-90")} />
+        {trigger ?? <ChevronRight size={18} aria-hidden className={cn("transition-transform", open && "rotate-90")} />}
       </button>
       {open && (
-        <div role="menu" aria-label={`Abrir ${title}`} className="absolute right-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-card p-1.5 shadow-xl" data-testid="board-menu">
+        <div role="menu" aria-label={`Abrir ${title}`} className={cn("absolute top-full z-30 mt-1 w-64 rounded-xl border border-line bg-card p-1.5 shadow-xl", trigger ? "left-0" : "right-0")} data-testid="board-menu">
           {items.map((it) => (
             <button key={it.id} role="menuitem" type="button" className={item} data-testid={it.testid} onClick={() => { setOpen(false); it.onClick(); }}>
               {it.icon} {it.label}

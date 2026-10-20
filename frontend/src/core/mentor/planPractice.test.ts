@@ -284,7 +284,7 @@ describe("estado derivado del módulo pp y registro manual", () => {
   });
 
   it("kataDates sale de los intentos con la skill pp_kata", () => {
-    const attempts = { a: { attempts: [{ skill: "pp_kata", at: "2026-10-06T08:00:00" }, { skill: "implement", at: "2026-10-07T08:00:00" }, { mode: "pp_kata", at: "2026-10-08T09:00:00" }] } };
+    const attempts = { a: { attempts: [{ skill: "pp_kata", at: "2026-10-06T08:00:00", verdict: "correct", score: 90 }, { skill: "pp_kata", at: "2026-10-09T08:00:00" }, { skill: "implement", at: "2026-10-07T08:00:00" }, { mode: "pp_kata", at: "2026-10-08T09:00:00", verdict: "correct", score: 80 }] } };
     expect([...kataDates(attempts)].sort()).toEqual(["2026-10-06", "2026-10-08"]);
   });
 

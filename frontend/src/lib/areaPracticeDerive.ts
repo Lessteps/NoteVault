@@ -15,8 +15,26 @@ export type AreaMarks = Record<string, Record<string, DayMark>>;
 const PP_FOLDER = "programming_practice";
 const KATA_SKILL = "pp_kata";
 
+/** Nota mínima (0–100) de un intento calificado para dar el kata por bueno: la misma que el ledger (`PASS_SCORE`). */
+export const KATA_PASS_SCORE = 75;
+/** Un kata solo se puede saltar si ya se hizo esta parte de los katas que tocaban hasta hoy (70 %). */
+export const KATA_SKIP_MIN_RATIO = 0.7;
+
 /**
- * Fechas (AAAA-MM-DD) en que hubo algún intento del kata diario (`pp_kata`), de todos los intentos de la vault.
+ * ¿Este intento VERIFICA el kata? Solo cuenta un intento calificado (por la IA o por la corrección interna de NoteVault, da igual: ambos dejan
+ * `verdict` y `score` en el ledger) con nota suficiente, sin haber visto la solución ni haberse rendido. Un intento sin calificar, o fallido,
+ * es práctica pero no da el kata por hecho.
+ */
+export function kataAttemptVerified(a: Record<string, any> | undefined): boolean {
+  if (!a) return false;
+  const verdict = String(a.verdict ?? "ungraded").trim().toLowerCase();
+  if (!verdict || verdict === "ungraded") return false;
+  if (a.solution_seen || a.gave_up || String(a.outcome ?? "").trim().toLowerCase() === "gave_up") return false;
+  return (parseInt(String(a.score), 10) || 0) >= KATA_PASS_SCORE;
+}
+
+/**
+ * Fechas (AAAA-MM-DD) en que hubo un intento VERIFICADO del kata diario (`pp_kata`; ver `kataAttemptVerified`), de todos los intentos de la vault.
  * Con `area` solo cuentan los katas de ESA área: los intentos cuya skill es `pp_kata:<área>` o cuya nota vive en `programming_practice/<carpeta>/katas/`.
  * Sin `area` cuenta todos los katas (el kata global de siempre).
  */
@@ -32,6 +50,7 @@ export function kataDatesOf(attempts: Record<string, Record<string, any>>, area?
         const mine = skill === `${KATA_SKILL}:${area.id}` || mode === `${KATA_SKILL}:${area.id}` || ((skill === KATA_SKILL || mode === KATA_SKILL) && notePath.includes(marker));
         if (!mine) continue;
       } else if (skill !== KATA_SKILL && mode !== KATA_SKILL) continue;
+      if (!kataAttemptVerified(a)) continue;
       const d = String(a?.at ?? "").slice(0, 10);
       if (/^\d{4}-\d{2}-\d{2}$/.test(d)) out.add(d);
     }
@@ -71,6 +90,12 @@ export const kataSummary = (k: AreaKata): string => {
   const m = /\*\*Task \([^)]*\)\.\*\*\s*([^\n]+)/.exec(k.statement);
   return (m?.[1] ?? k.title).slice(0, 220);
 };
+
+/** La regla para saltar un kata: hace falta haber hecho (verificado) al menos el 70 % de los que tocaban hasta hoy. */
+export function kataSkipRule(done: number, planned: number): { allowed: boolean; pct: number; neededPct: number } {
+  const ratio = planned > 0 ? done / planned : 1;
+  return { allowed: ratio >= KATA_SKIP_MIN_RATIO, pct: Math.round(ratio * 100), neededPct: Math.round(KATA_SKIP_MIN_RATIO * 100) };
+}
 
 export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
   const { plan, today } = inp;
@@ -164,6 +189,7 @@ export function deriveAreaPractice(inp: AreaPracticeInput): AreaPracticeView[] {
       levelSource: doneDates.length >= 40 && level > levelFromDeclared(declared) ? "measured" : "declared",
       skills,
       kata: {
+        skip: kataSkipRule(doneDates.length, past.length),
         plannedDays: past.length,
         doneDays: doneDates.length,
         streak,

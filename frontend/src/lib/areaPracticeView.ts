@@ -80,6 +80,8 @@ export interface AreaPracticeView {
     /** el kata de hoy (o el siguiente que toca) con su ruta en la vault */
     next: { kata: AreaKata; date: string; rel: string; fileReady: boolean; summary: string } | null;
     week: AreaWeekDay[];
+    /** ¿se puede saltar un kata? Solo con el 70 % de los katas que tocaban hasta hoy hechos y verificados */
+    skip: { allowed: boolean; pct: number; neededPct: number };
     /** los katas de hoy y los atrasados (pendientes o saltados), con hoy primero y luego del más antiguo al más reciente */
     due: AreaKataDue[];
   };

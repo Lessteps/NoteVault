@@ -11,7 +11,7 @@ import { cn } from "../ui";
 import { GhostButton } from "../common/forms";
 import { AreaSession, useTimeLog } from "./AreaSession";
 import { minutesOn } from "../../lib/timeLog";
-import { AreaWork, startAreaBlock, type WeekDayView } from "./AreaWork";
+import { AreaWork, startAreaBlock, type UpcomingWeekView, type WeekDayView } from "./AreaWork";
 import type { BoardPractice, BoardRow } from "./PlanBoard";
 import { useApp } from "../../store/app";
 import { SectionCard } from "./planKit";
@@ -73,13 +73,15 @@ export interface TodayCard {
 }
 
 /** La pestaña de un área: su trabajo (hoy, semana, pendientes, repasos) a la izquierda y su sesión (Pomodoro y horas) a la derecha. */
-export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, date, practice, dailyProject, weeklyProjectTitle, onGoProjects }: {
+export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets, reviews, date, practice, dailyProject, weeklyProjectTitle, onGoProjects }: {
   plan: MentorPlan;
   area: { subplanId: string; areaId?: string; area: string };
   card: TodayCard | undefined;
   /** toda la ruta del área, sin Bases */
   routeRows: BoardRow[];
   weekDays: WeekDayView[];
+  /** las semanas siguientes (proyección) */
+  upcoming?: UpcomingWeekView[];
   sets: AreaSets;
   reviews: ReviewRow[];
   date: string;
@@ -108,6 +110,7 @@ export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, 
           rows={routeRows}
           todayRows={card?.rows ?? []}
           weekDays={weekDays}
+          {...(upcoming ? { upcoming } : {})}
           sets={sets}
           today={date}
           colour={colour}
@@ -161,11 +164,12 @@ export function RunArea({ plan, area, card, routeRows, weekDays, sets, reviews, 
 }
 
 /** La pestaña de Bases: los fundamentos que se intercalan en todas las áreas. Los temas se juntan sin repetirse. */
-export function RunBases({ plan, routeRows, todayRows, weekDays, sets, reviews, date }: {
+export function RunBases({ plan, routeRows, todayRows, weekDays, upcoming, sets, reviews, date }: {
   plan: MentorPlan;
   routeRows: BoardRow[];
   todayRows: BoardRow[];
   weekDays: WeekDayView[];
+  upcoming?: UpcomingWeekView[];
   sets: AreaSets;
   reviews: ReviewRow[];
   date: string;
@@ -183,6 +187,7 @@ export function RunBases({ plan, routeRows, todayRows, weekDays, sets, reviews, 
           rows={routeRows}
           todayRows={todayRows}
           weekDays={weekDays}
+          {...(upcoming ? { upcoming } : {})}
           sets={sets}
           today={date}
           colour={colour}

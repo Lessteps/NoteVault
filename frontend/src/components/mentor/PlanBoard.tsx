@@ -2,14 +2,15 @@
 // archivo de práctica) y el avance de cada área (`ProgressOverview`). Solo lectura: marcar un tema como completado lo decide la práctica.
 // Respeta la ruta sólida (`lib/planGate.ts`): los temas repartidos después del primer día sin terminar salen bloqueados.
 
-import { BookOpen, Dumbbell, Lock, Timer } from "lucide-react";
+import { BookOpen, Dumbbell, Lock, Network, Timer } from "lucide-react";
 import { usePomodoro } from "../../store/pomodoro";
 import { dateLabel } from "../../lib/planSchedule";
 import { orderedAreas } from "../../lib/planTopicsByArea";
+import type { TopicTimeTag } from "../../lib/planTopicTime";
 import type { MentorPlan, MentorTopicView } from "../../lib/types";
 import { cn } from "../ui";
 import { focusColour } from "./agendaKit";
-import { openTopic, openTopicNote } from "./openTopic";
+import { openTopic, openTopicCanvas, openTopicNote } from "./openTopic";
 import { ProgressBar } from "./parts";
 import type { AreaPracticeState } from "./PracticeCard";
 import { RowMenu } from "./RowMenu";
@@ -33,17 +34,35 @@ export interface BoardRow {
   pct?: number;
   /** aviso a la derecha de la fila («Hoy», «Atrasado»…) */
   tag?: { text: string; colour?: string };
+  /** etiqueta de tiempo: cuándo toca el tema y si ya pasó su tiempo (pendiente) */
+  time?: TopicTimeTag;
 }
 
-/** El menú de un tema: ir al apunte (.md), práctica o asignar al Pomodoro. */
-function TopicMenu({ folder, title }: { folder: string; title: string }) {
+const TIME_COLOUR: Record<TopicTimeTag["status"], string> = { done: "var(--nv-mint)", scheduled: "var(--nv-faint, #888)", current: "var(--nv-accent)", pending: "var(--nv-warn)" };
+
+/** La etiqueta de tiempo de un tema: «Programado · 22 oct», «En su tiempo · 20 oct» o «Pendiente · 15 – 16 oct» (la fecha es la de su reparto). */
+export function TimeChip({ time }: { time: TopicTimeTag }) {
+  if (time.status === "done") return null;
+  const c = TIME_COLOUR[time.status];
+  return (
+    <span className="flex-none whitespace-nowrap rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide" style={{ color: c, borderColor: `${c}66`, background: `${c}1a` }} data-testid="board-time" data-time-status={time.status}>
+      {time.text} · {time.label}
+    </span>
+  );
+}
+
+/** El menú de un tema: apunte (.md), archivo de práctica, canvas explicativo o asignarlo al Pomodoro. */
+export function TopicMenu({ folder, title, trigger, className }: { folder: string; title: string; trigger?: React.ReactNode; className?: string }) {
   const assignTopic = usePomodoro((s) => s.assignTopic);
   return (
     <RowMenu
       title={title}
+      {...(trigger ? { trigger } : {})}
+      {...(className ? { className } : {})}
       items={[
         { id: "note", label: "Abrir apunte (.md)", icon: <BookOpen size={16} aria-hidden className="text-accent-text" />, onClick: () => void openTopicNote(folder), testid: "board-open-note" },
         { id: "practice", label: "Abrir archivo de práctica", icon: <Dumbbell size={16} aria-hidden className="text-mint" />, onClick: () => void openTopic(folder), testid: "board-open-practice" },
+        { id: "canvas", label: "Abrir canvas explicativo", icon: <Network size={16} aria-hidden className="text-accent-text" />, onClick: () => void openTopicCanvas(folder), testid: "board-open-canvas" },
         { id: "pomodoro", label: "Asignar al Pomodoro", icon: <Timer size={16} aria-hidden className="text-warn" />, onClick: () => assignTopic({ folder, title }), testid: "board-assign-pomodoro" },
       ]}
     />
@@ -67,11 +86,19 @@ export function TopicRow({ r, colour }: { r: BoardRow; colour: string }) {
       >
         {r.done ? "✓" : locked ? <Lock size={11} className="text-faint" /> : null}
       </span>
-      <span className={cn("min-w-0 flex-1 text-[15px] leading-snug", r.done && "text-faint line-through decoration-faint/60")}>
-        {r.title}
-        {r.meta ? <span className="text-[13.5px] font-normal text-dim"> · {r.meta}</span> : null}
-        <span className="sr-only">, {locked ? `bloqueado hasta terminar el ${dateLabel(r.unlockOn!)}` : r.done ? "completado" : STATE_LABEL[r.state]}</span>
-      </span>
+      {(() => {
+        const label = (
+          <>
+            {r.title}
+            {r.meta ? <span className="text-[13.5px] font-normal text-dim"> · {r.meta}</span> : null}
+            <span className="sr-only">, {locked ? `bloqueado hasta terminar el ${dateLabel(r.unlockOn!)}` : r.done ? "completado" : STATE_LABEL[r.state]}</span>
+          </>
+        );
+        const cls = cn("min-w-0 flex-1 text-[15px] leading-snug", r.done && "text-faint line-through decoration-faint/60");
+        // pulsar el tema abre sus opciones: apunte (.md), archivo de práctica, canvas y Pomodoro
+        return locked ? <span className={cls}>{label}</span> : <span className={cls}><TopicMenu folder={r.folder} title={r.title} trigger={label} className="w-full rounded-md hover:text-accent-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" /></span>;
+      })()}
+      {r.time && <TimeChip time={r.time} />}
       {!r.done && !locked && (r.pct ?? 0) > 0 && (
         <span className="flex-none font-mono text-[12px] text-dim" data-testid="board-pct" title="Nivel de avance del tema">{r.pct} %</span>
       )}

@@ -163,13 +163,52 @@ describe("vista de ejecución", () => {
     return plan({ subplans: [{ ...sub("s1", "Fundamentals", "Reforzar bases", A), topics: [big(A), big(B)] }] as never });
   };
 
-  it("ruta sólida: con un día sin terminar, los temas de días posteriores salen bloqueados y sin flecha", async () => {
+  /** la ruta ya empezó: el primer tema está en curso (sin eso nada puede estar pendiente) */
+  const started = (p: PlanData): MentorPlanGet => {
+    const l = loaded(p) as Extract<MentorPlanGet, { loading: false }>;
+    l.derived!.subplans[0]!.topics[0]!.state = "practicando";
+    return l;
+  };
+
+  it("sin haber empezado la ruta nada está pendiente, aunque el tiempo previsto de los temas ya haya pasado", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(spread()));
     await mountEl(<MentorPlan planId={PID} />);
     await click(runTab("area:s1"));
     await view("pendientes");
+    expect(listed()).toHaveLength(0);
+    expect(byTest("work-empty")!.textContent).toContain("nada pendiente");
+    await view("semana");
+    expect(work().querySelector("[data-testid=board-time]")!.getAttribute("data-time-status")).toBe("scheduled");
+  });
+
+  it("con la ruta empezada, un tema pasa a pendiente solo cuando se acaba su tiempo previsto, y su etiqueta lo dice", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(started(spread()));
+    await mountEl(<MentorPlan planId={PID} />);
+    await click(runTab("area:s1"));
+    await view("pendientes");
+    expect(listed().length).toBeGreaterThan(0);
+    expect(listed()[0]!.querySelector("[data-testid=board-time]")!.getAttribute("data-time-status")).toBe("pending");
+  });
+
+  it("la vista de la semana enseña debajo «Lo que viene»: la proyección de las semanas siguientes", async () => {
+    const later = "Programación/1 Fundamentals/1.9 Later";
+    const p = plan({ subplans: [{ ...sub("s1", "Fundamentals", "Reforzar bases", F1), topics: [{ folder: F1, title: "1.1", targetWeek: 1, estMinutes: 60 }, { folder: later, title: "1.9 Later", targetWeek: 3, estMinutes: 60 }] }] as never });
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
+    await mountEl(<MentorPlan planId={PID} />);
+    await click(runTab("area:s1"));
+    await view("semana");
+    const up = byTest("work-upcoming");
+    expect(up).toBeTruthy();
+    expect([...up!.querySelectorAll("[data-testid=upcoming-week]")].every((w) => Number(w.getAttribute("data-week")) > 1)).toBe(true);
+  });
+
+  it("ruta sólida: con un día sin terminar, los temas de días posteriores salen bloqueados y sin flecha", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(started(spread()));
+    await mountEl(<MentorPlan planId={PID} />);
+    await click(runTab("area:s1"));
+    await view("pendientes");
     const rows = listed();
-    expect(rows.map((r) => r.dataset.state)).toEqual(["sin_tratar", "bloqueado"]);
+    expect(rows.map((r) => r.dataset.state)).toEqual(["practicando", "bloqueado"]);
     expect(rows[1]!.querySelector("[data-testid=board-arrow]")).toBeNull();
     // vas atrasado respecto al frente: el aviso dice qué terminar primero
     await click(runTab("general"));
@@ -187,7 +226,7 @@ describe("vista de ejecución", () => {
     await click(work().querySelector("[data-testid=board-arrow]"));
     const menu = byTest("board-menu")!;
     expect(menu.getAttribute("role")).toBe("menu");
-    expect([...menu.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica", "Asignar al Pomodoro"]);
+    expect([...menu.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir apunte (.md)", "Abrir archivo de práctica", "Abrir canvas explicativo", "Asignar al Pomodoro"]);
     await click(byTest("board-open-practice"));
     expect(ensure).toHaveBeenCalledWith(F1);
     expect(byTest("board-menu")).toBeNull();
@@ -325,7 +364,7 @@ describe("vista de ejecución", () => {
   const areaView = (areaId: string, label: string, dates: string[]) => ({
     areaId, label, folder: areaId, folderReady: true, purpose: "p", name: label, languages: [], ledgerSkill: areaId, level: 1, levelSource: "declared", skills: [],
     kata: {
-      plannedDays: dates.length, doneDays: 0, streak: 0, todayPlanned: true, todayDone: false, todayIndex: dates.length,
+      skip: { allowed: false, pct: 0, neededPct: 70 }, plannedDays: dates.length, doneDays: 0, streak: 0, todayPlanned: true, todayDone: false, todayIndex: dates.length,
       next: null, week: [], due: due(areaId, label, dates).sort((x, y) => Number(y.today) - Number(x.today) || x.date.localeCompare(y.date)),
     },
     weekly: { title: "w", description: "d", week: 1, focus: false }, weeks: [], monthly: { title: "m", description: "d", blocks: [] },
@@ -354,7 +393,7 @@ describe("vista de ejecución", () => {
     expect(rows[1]!.textContent).toContain("Atrasado");
     // el acceso directo: la flecha de un kata atrasado abre ESE kata aunque su archivo aún no exista
     await click(rows[1]!.querySelector("[data-testid=board-arrow]"));
-    expect([...byTest("board-menu")!.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir kata (.md)", "Marcar hecho", "Saltar este día", "Ver práctica de Backend"]);
+    expect([...byTest("board-menu")!.querySelectorAll("[role=menuitem]")].map((b) => b.textContent!.trim())).toEqual(["Abrir kata (.md)", "Verificar y marcar hecho", "Saltar este día (pide 70 %)", "Ver práctica de Backend"]);
     await click(byTest("kata-open"));
     expect(open).toHaveBeenCalledWith(PID, "backend", "2026-10-07");
     // y se marca el día concreto con la casilla

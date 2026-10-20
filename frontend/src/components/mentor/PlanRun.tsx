@@ -16,6 +16,7 @@ import { bucketReviews, dueText, reviewsOfTopics, type ReviewRow } from "../../l
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
 import { dailyProjectOf, weeklyProjectOf } from "../../lib/planCurriculum";
 import { dayByArea, orderedAreas } from "../../lib/planTopicsByArea";
+import { routeStarted, timeTagOf, topicTimes } from "../../lib/planTopicTime";
 import { minutesOn, minutesText } from "../../lib/timeLog";
 import type { MentorPlan } from "../../lib/types";
 import { useMentor } from "../../store/mentor";
@@ -23,7 +24,7 @@ import { useNavState } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { useTimeLog } from "./AreaSession";
-import { useReviewItems, type WeekDayView } from "./AreaWork";
+import { useReviewItems, type UpcomingWeekView, type WeekDayView } from "./AreaWork";
 import { openTopic } from "./openTopic";
 import { DeliverableLine, focusColour, plural, useAgendaModel } from "./agendaKit";
 import { hm, ProgressBar } from "./parts";
@@ -82,6 +83,13 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
     setupTried.current = true;
     void api.mentorAreaPracticeSetup(plan.id).then(() => ap.reload()).catch(() => undefined);
   }, [ap, plan.id]);
+  // Etiqueta de tiempo de cada tema: su ventana de reparto. Nada está pendiente hasta que la ruta empieza y su tiempo pasa.
+  const started = useMemo(() => routeStarted([...m.topicByFolder.values()].map((t) => t.state), plan.subplans.some((s) => s.topics.some((t) => t.completedAt))), [m.topicByFolder, plan.subplans]);
+  const times = useMemo(
+    () => topicTimes(m.schedule.days.map((d) => ({ date: d.date, topics: d.topics.map((t) => ({ folder: t.folder, done: t.done || m.topicByFolder.get(t.folder)?.state === "completo" })) }))),
+    [m.schedule, m.topicByFolder],
+  );
+  const timeOf = (folder: string, done: boolean) => timeTagOf(times.get(folder), done, date, started);
   const behind = !!gate.frontier && gate.frontier < date && !plan.proposed && !plan.archived;
   const titleOf = (folder: string): string => m.topicByFolder.get(folder)?.title ?? folder.split("/").pop() ?? folder;
   const late = (data.derived?.subplans ?? []).reduce((n, s) => n + s.topics.filter((t) => t.route !== "skipped" && t.targetWeek < currentWeek && t.state !== "completo").length, 0);
@@ -95,7 +103,9 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   // Lo de hoy por área. Los fundamentos («Bases») NO son de ningún área: se sacan de las tarjetas de área y van juntos, sin repetirse, a su pestaña.
   const rowOf = (i: { folder: string; title: string; part: number; parts: number; minutes: number }, withBases: boolean): BoardRow => {
     const state = m.topicByFolder.get(i.folder)?.state ?? "sin_tratar";
+    const time = timeOf(i.folder, state === "completo");
     return {
+      ...(time ? { time } : {}),
       folder: i.folder,
       title: i.title,
       meta: `${withBases ? "Bases · " : ""}${i.parts > 1 ? `parte ${i.part}/${i.parts} · ` : ""}${hm(i.minutes)}`,
@@ -131,7 +141,9 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const isBasesTopic = (sub: (typeof plan.subplans)[number], group?: string): boolean => !!group && (sub.groups ?? []).some((g) => g.kind === "bases" && g.id === group);
   const routeRowOf = (t: (typeof plan.subplans)[number]["topics"][number]): BoardRow => {
     const state = m.topicByFolder.get(t.folder)?.state ?? "sin_tratar";
-    return { folder: t.folder, title: t.title, week: t.targetWeek, state, done: state === "completo" || !!t.completedAt, exercises: m.topicByFolder.get(t.folder)?.exercises ?? 0, pct: m.topicByFolder.get(t.folder)?.pct ?? 0, unlockOn: gate.locked.get(t.folder) };
+    const isDone = state === "completo" || !!t.completedAt;
+    const time = timeOf(t.folder, isDone);
+    return { ...(time ? { time } : {}), folder: t.folder, title: t.title, week: t.targetWeek, state, done: isDone, exercises: m.topicByFolder.get(t.folder)?.exercises ?? 0, pct: m.topicByFolder.get(t.folder)?.pct ?? 0, unlockOn: gate.locked.get(t.folder) };
   };
   const routeOf = (subplanId: string): BoardRow[] => {
     const sub = plan.subplans.find((x) => x.id === subplanId);
@@ -158,6 +170,30 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows: d.date < date ? rows.filter((r) => r.done) : rows };
       })
       .filter((d) => d.date >= date || d.rows.length > 0);
+  // lo que viene: las semanas siguientes a la actual, tal como las reparte el plan (proyección; no se bloquea por la ruta sólida)
+  const upcomingWeeksOf = (subplanId: string | null): UpcomingWeekView[] => {
+    const byWeek = new Map<number, ScheduleDay[]>();
+    for (const d of m.schedule.days) if (d.week > currentWeek && d.study) byWeek.set(d.week, [...(byWeek.get(d.week) ?? []), d]);
+    const out: UpcomingWeekView[] = [];
+    for (const [week, days] of [...byWeek].sort((a, b) => a[0] - b[0])) {
+      const views = days
+        .map((d) => {
+          const seen = new Set<string>();
+          const rows: BoardRow[] = [];
+          for (const t of d.topics) {
+            if (t.done || (subplanId ? t.subplanId !== subplanId || t.applied : !t.applied)) continue;
+            if (seen.has(t.folder)) continue;
+            seen.add(t.folder);
+            const { unlockOn: _unlock, ...row } = rowOf(t, subplanId === null);
+            rows.push({ ...row, week });
+          }
+          return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows };
+        })
+        .filter((d) => d.rows.length > 0);
+      if (views.length) out.push({ week, start: days[0]!.date, end: days[days.length - 1]!.date, days: views });
+    }
+    return out;
+  };
   const basesRoute: BoardRow[] = [];
   const basesTopics: Array<{ folder: string; title: string }> = [];
   {
@@ -406,7 +442,8 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
           card={cardOf.get(areaTab.subplanId)}
           routeRows={routeOf(areaTab.subplanId)}
           weekDays={weekDaysOf(areaTab.subplanId)}
-          sets={areaSets(m.schedule.days, areaTab.subplanId, date, currentWeek)}
+          upcoming={upcomingWeeksOf(areaTab.subplanId)}
+          sets={areaSets(m.schedule.days, areaTab.subplanId, date, currentWeek, started)}
           reviews={reviewsOf(areaTab.subplanId)}
           date={date}
           practice={ap.data && ap.data.areas.length ? { areas: ap.data.areas, today: ap.data.today || m.today, mark: ap.mark } : undefined}
@@ -416,7 +453,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         />
       )}
 
-      {tab === "bases" && <RunBases plan={plan} routeRows={basesRoute} todayRows={basesRows} weekDays={weekDaysOf(null)} sets={areaSets(m.schedule.days, null, date, currentWeek)} reviews={basesReviews} date={date} />}
+      {tab === "bases" && <RunBases plan={plan} routeRows={basesRoute} todayRows={basesRows} weekDays={weekDaysOf(null)} upcoming={upcomingWeeksOf(null)} sets={areaSets(m.schedule.days, null, date, currentWeek, started)} reviews={basesReviews} date={date} />}
 
       {tab === "proyectos" && <RunProjects plan={plan} data={data} m={m} />}
 

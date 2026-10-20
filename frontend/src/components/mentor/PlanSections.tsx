@@ -25,6 +25,7 @@ import { ExecutionPanel } from "./PlanExecution";
 import { PlanNotes, SectionCard, SectionHeading } from "./planKit";
 import { PhaseMonthTable } from "./PlanMonths";
 import { PlanAreaTopics } from "./PlanAreaTopics";
+import { routeStarted } from "../../lib/planTopicTime";
 import { PlanRecords } from "./PlanRecords";
 import { PlanTopicCatalog } from "./PlanTopicCatalog";
 import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
@@ -286,7 +287,7 @@ function TemasPorAreaView({ data, plan, summary }: PlanSectionCtx) {
   const agenda = useAgendaModel(data, plan);
   return (
     <div id="sec-temas" tabIndex={-1} className={cn(anchor, "space-y-6")}>
-      <PlanAreaTopics plan={plan} />
+      <PlanAreaTopics plan={plan} schedule={agenda.schedule} today={agenda.today} started={routeStarted([...agenda.topicByFolder.values()].map((t) => t.state), plan.subplans.some((s) => s.topics.some((t) => t.completedAt)))} />
       <details data-testid="plan-weeks-by-area">
         <summary className="inline-flex min-h-9 cursor-pointer items-center text-[14px] text-accent-text">Ver el reparto por semanas y áreas</summary>
         <div className="mt-3"><AreaTopicsSection m={agenda} currentWeek={summary.currentWeek} /></div>

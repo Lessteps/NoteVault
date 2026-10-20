@@ -27,3 +27,21 @@ export async function openTopicNote(folder: string): Promise<void> {
   }
   await openNote(path);
 }
+
+/** «Abrir canvas explicativo»: el mapa `.canvas` de la carpeta del tema (el que se llama igual que ella, si no el primero). */
+export async function openTopicCanvas(folder: string): Promise<void> {
+  const { toast, openTab } = useApp.getState();
+  try {
+    const entries = await api.listDir(folder);
+    const name = folder.split("/").pop() ?? folder;
+    const canvases = entries.filter((e) => e.type === "note" && (e.kind === "canvas" || e.name.toLowerCase().endsWith(".canvas")));
+    const pick = canvases.find((e) => e.name.startsWith(name) && !e.name.toLowerCase().includes(".nuevo")) ?? canvases[0];
+    if (!pick) {
+      toast("info", "Este tema aún no tiene canvas explicativo: se crea al generarlo desde «Ejecutar plan».");
+      return;
+    }
+    openTab({ kind: "canvas", path: pick.path });
+  } catch (e) {
+    toast("error", (e as Error).message);
+  }
+}

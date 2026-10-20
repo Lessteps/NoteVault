@@ -26,7 +26,7 @@ const TODAY = "2026-10-08";
 const pre = { start: START, end: END, minutesPerDay: 240, studyDays: [1, 2, 3, 4, 5], pace: "normal" as const, goalIds: [], subjects: ["Programación"], levels: {}, deliverables: "ask" as const, practice: { kataMinutes: 30, sessionsPerWeek: 3, minutesPerSession: 90, monthly: true, focus: "rotate" as const } };
 const track = buildPracticeTrack(pre)!;
 const KPLAN = { id: PID, start: START, end: END, programmingPractice: track, preconditions: { levels: { Programación: "basico" } }, subplans: [{ area: "Backend", areaId: "backend" }, { area: "Frontend", areaId: "frontend" }, { area: "Databases", areaId: "databases" }] };
-const att = (area: string, ...dates: string[]) => ({ note_id: area, note_path: `Programación/programming_practice/${area}/katas/001 x.md`, attempts: dates.map((d) => ({ at: `${d}T10:00:00`, skill: "pp_kata", mode: "pp_kata" })) });
+const att = (area: string, ...dates: string[]) => ({ note_id: area, note_path: `Programación/programming_practice/${area}/katas/001 x.md`, attempts: dates.map((d) => ({ at: `${d}T10:00:00`, skill: "pp_kata", mode: "pp_kata", verdict: "correct", score: 90 })) });
 
 /** Datos reales derivados (backend con carpeta y katas; frontend sin carpeta). */
 function areaData(over: { marks?: Record<string, Record<string, "done" | "skipped">>; folders?: string[] } = {}): MentorAreaPractice {

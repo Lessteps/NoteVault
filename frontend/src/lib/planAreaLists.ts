@@ -7,12 +7,15 @@ import type { ScheduleDay } from "./planSchedule.js";
 export interface AreaSets {
   today: Set<string>;
   week: Set<string>;
-  /** tocaban hasta hoy (hoy incluido) y siguen sin completarse */
+  /** su tiempo previsto ya pasó (días anteriores a hoy) y siguen sin completarse; vacío mientras la ruta no ha empezado */
   pending: Set<string>;
 }
 
-/** Los conjuntos de un área (`subplanId`) o, sin él, de todo el plan. */
-export function areaSets(days: ReadonlyArray<ScheduleDay>, subplanId: string | null, today: string, week: number): AreaSets {
+/**
+ * Los conjuntos de un área (`subplanId`) o, sin él, de todo el plan. Un tema solo queda PENDIENTE cuando pasa su tiempo previsto (un día anterior
+ * a hoy) y la ruta ya empezó (`started`): sin haber empezado, nada está pendiente.
+ */
+export function areaSets(days: ReadonlyArray<ScheduleDay>, subplanId: string | null, today: string, week: number, started = true): AreaSets {
   const out: AreaSets = { today: new Set(), week: new Set(), pending: new Set() };
   const done = new Set<string>();
   for (const d of days) {
@@ -21,7 +24,7 @@ export function areaSets(days: ReadonlyArray<ScheduleDay>, subplanId: string | n
       if (t.done) done.add(t.folder);
       if (d.date === today) out.today.add(t.folder);
       if (d.week === week) out.week.add(t.folder);
-      if (d.date <= today) out.pending.add(t.folder);
+      if (started && d.date < today) out.pending.add(t.folder);
     }
   }
   // un tema ya completado (en cualquier día de su reparto) no queda pendiente

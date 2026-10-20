@@ -178,7 +178,7 @@ describe("Programming practice en el plan", () => {
     fs.mkdirSync(path.join(pp, "Gastos"), { recursive: true });
     fs.writeFileSync(path.join(pp, "Gastos", ".pp.json"), JSON.stringify({ version: 1, state: "defended", createdAt: new Date().toISOString(), spec: { title: "Gastos", focus: "backend", client: "web" }, defense: { final: { score: 70 } } }));
     fs.mkdirSync(path.join(dir, ".notevault", "estudio", "intentos"), { recursive: true });
-    fs.writeFileSync(path.join(dir, ".notevault", "estudio", "intentos", "att_k.json"), JSON.stringify({ note_id: "k1", note_path: "k1.md", draft: "", attempts: [{ skill: "pp_kata", at: `${todayIso()}T08:00:00`, score: 1 }] }));
+    fs.writeFileSync(path.join(dir, ".notevault", "estudio", "intentos", "att_k.json"), JSON.stringify({ note_id: "k1", note_path: "k1.md", draft: "", attempts: [{ skill: "pp_kata", at: `${todayIso()}T08:00:00`, verdict: "correct", score: 90 }] }));
     got = api.mentor_plan_get({ id: out.id });
     expect(got.practice.ppReady).toBe(true);
     expect(got.practice.kata).toMatchObject({ todayDone: true, streak: 1 });

@@ -9,10 +9,13 @@ import { Check, X } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { areaTabsOf, areaTopicRows, basesTopicRows, BASES_KEY, groupTabsOf, pendingGenerate, rowsOfGroup, type AreaTab, type GroupTab } from "../../lib/planAreaTopics";
 import { ROUTE_LABEL } from "../../lib/planRoute";
+import { buildSchedule, type PlanSchedule } from "../../lib/planSchedule";
+import { timeTagOf, topicTimes } from "../../lib/planTopicTime";
+import { todayIso } from "../../lib/tasks";
 import type { MentorPlan } from "../../lib/types";
 import { Chip } from "../common/forms";
 import { cn } from "../ui";
-import { openTopic } from "./openTopic";
+import { TimeChip, TopicMenu } from "./PlanBoard";
 import { LoadState } from "./parts";
 import { SectionHeading } from "./planKit";
 import { usePlanTopicCatalog } from "./PlanTopicCatalog";
@@ -66,8 +69,11 @@ function Mark({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   );
 }
 
-export function PlanAreaTopics({ plan }: { plan: MentorPlan }) {
+export function PlanAreaTopics({ plan, schedule, today, started }: { plan: MentorPlan; /** el reparto del plan (si no se da, se calcula) */ schedule?: PlanSchedule; today?: string; /** ¿ha empezado la ruta? (si no se da, cuando hay algún tema completado) */ started?: boolean }) {
   const uid = useId();
+  const day = today ?? todayIso();
+  const begun = started ?? plan.subplans.some((s) => s.topics.some((t) => t.completedAt));
+  const times = useMemo(() => topicTimes((schedule ?? (plan.start && plan.end ? buildSchedule(plan) : null))?.days ?? []), [schedule, plan]);
   const { rows: catalog, error, warming, reload } = usePlanTopicCatalog(plan.id);
   const [areaKey, setAreaKey] = useState("");
   const [groupId, setGroupId] = useState("");
@@ -136,11 +142,11 @@ export function PlanAreaTopics({ plan }: { plan: MentorPlan }) {
             <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-empty">Esta sección no tiene temas.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-line">
-              <table className="w-full min-w-[56rem] border-collapse text-left text-[14px]" data-testid="area-table">
+              <table className="w-full min-w-[62rem] border-collapse text-left text-[14px]" data-testid="area-table">
                 <caption className="sr-only">Temas de {active.area}{group.id ? `, grupo ${group.title}` : ""}</caption>
                 <thead className="bg-card text-[12.5px] uppercase tracking-wide text-faint">
                   <tr>
-                    {["Sem.", "Tema", "Nota", "Mapa", ".practica", "Ejercicios", "Estado", "Generar"].map((h) => (
+                    {["Sem.", "Tema", "Previsto", "Nota", "Mapa", ".practica", "Ejercicios", "Estado", "Generar"].map((h) => (
                       <th key={h} scope="col" className="px-3 py-2 font-semibold">{h}</th>
                     ))}
                   </tr>
@@ -150,11 +156,10 @@ export function PlanAreaTopics({ plan }: { plan: MentorPlan }) {
                     <tr key={r.folder} className={cn("border-t border-line align-top", r.route === "skipped" && "opacity-60")} data-testid="area-row" data-folder={r.folder}>
                       <td className="px-3 py-2 tabular-nums text-dim">{r.week}</td>
                       <th scope="row" className="min-w-0 max-w-[24rem] px-3 py-2 font-normal">
-                        <button type="button" onClick={() => void openTopic(r.folder)} className="block max-w-full truncate text-left font-semibold text-accent-text underline-offset-2 hover:underline" title={r.folder} data-testid="area-open">
-                          {r.title}
-                        </button>
+                        <TopicMenu folder={r.folder} title={r.title} trigger={<span className="block truncate" title={r.folder} data-testid="area-open">{r.title}</span>} className="font-semibold text-accent-text underline-offset-2 hover:underline" />
                         {!r.exists && <span className="block text-[12.5px] text-faint">Aún no existe en la vault</span>}
                       </th>
+                      <td className="px-3 py-2">{(() => { const t = timeTagOf(times.get(r.folder), r.completed, day, begun); return t && t.status !== "done" ? <TimeChip time={t} /> : <span className="text-dim">—</span>; })()}</td>
                       <td className="px-3 py-2"><Mark ok={r.theory} yes="Nota" no="Sin nota" /></td>
                       <td className="px-3 py-2"><Mark ok={r.canvas} yes="Mapa" no="Sin mapa" /></td>
                       <td className="px-3 py-2"><Mark ok={r.manifest} yes="Sí" no="Sin .practica" /></td>
@@ -166,7 +171,12 @@ export function PlanAreaTopics({ plan }: { plan: MentorPlan }) {
                         )}
                       </td>
                       <td className="px-3 py-2 text-[13.5px]">
-                        {r.completed ? <Chip large colour="var(--nv-mint)"><Check size={12} aria-hidden /> Completado</Chip> : <span className="text-dim">Pendiente</span>}
+                        {(() => {
+                          if (r.completed) return <Chip large colour="var(--nv-mint)"><Check size={12} aria-hidden /> Completado</Chip>;
+                          const t = timeTagOf(times.get(r.folder), false, day, begun);
+                          // pendiente solo cuando la ruta empezó y su tiempo previsto ya pasó
+                          return t?.status === "pending" ? <Chip large colour="var(--nv-warn)">Pendiente</Chip> : <span className="text-dim">{t?.status === "current" ? "En su tiempo" : "Programado"}</span>;
+                        })()}
                         {r.route !== "core" && <span className="block text-dim">{ROUTE_LABEL[r.route]}</span>}
                       </td>
                       <td className="px-3 py-2">

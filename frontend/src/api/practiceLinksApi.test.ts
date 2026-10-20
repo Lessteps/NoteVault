@@ -33,7 +33,7 @@ function seedPractice(opts: { kata?: boolean; project?: boolean } = { kata: true
   if (opts.kata) {
     const f = path.join(dir, ".notevault", "estudio", "intentos");
     fs.mkdirSync(f, { recursive: true });
-    fs.writeFileSync(path.join(f, "kata.json"), JSON.stringify({ note_id: "kata-1", attempts: [{ skill: "pp_kata", at: `${ISO}T09:00:00` }] }));
+    fs.writeFileSync(path.join(f, "kata.json"), JSON.stringify({ note_id: "kata-1", attempts: [{ skill: "pp_kata", at: `${ISO}T09:00:00`, verdict: "correct", score: 90 }] }));
   }
   if (opts.project) {
     const p = path.join(area, "projects", "shop");

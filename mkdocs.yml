@@ -1,0 +1,163 @@
+site_name: NoteVault — Documentación Full Stack Multiplataforma
+site_description: "Portal Canónico de Arquitectura, Diseño Técnico y Guía de Desarrollo Multiplataforma (PC, Android, iOS, Mac)"
+site_author: "NoteVault Engineering"
+docs_dir: docs_site
+site_dir: site_build
+use_directory_urls: false
+
+theme:
+  name: material
+  language: es
+  palette:
+    - scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Cambiar a modo claro
+    - scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Cambiar a modo oscuro
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_css:
+  - stylesheets/custom.css
+
+nav:
+  - Inicio: index.md
+  - 00. Reconocimiento del Problema:
+      - 01. Declaración del Problema: 00-reconocimiento-del-problema/01. Declaración del Problema.md
+      - 02. Clasificación del Problema: 00-reconocimiento-del-problema/02. Clasificación del Problema.md
+      - 03. Estimación de Impacto: 00-reconocimiento-del-problema/03. Estimación de Impacto.md
+      - 04. Matriz de Impacto: 00-reconocimiento-del-problema/04. Matriz de Impacto.md
+      - 05. Objetivos del Proyecto: 00-reconocimiento-del-problema/05. Objetivos del Proyecto.md
+      - 06. Mapa de Interesados: 00-reconocimiento-del-problema/06. Mapa de Interesados.md
+      - 07. Registro de Riesgos: 00-reconocimiento-del-problema/07. Registro de Riesgos.md
+      - 08. Go No-Go Signal: 00-reconocimiento-del-problema/08. Go No-Go Signal.md
+      - 09. Brief: 00-reconocimiento-del-problema/09. Brief.md
+  - 01. Viabilidad Temprana:
+      - 01. Perfil de Usuario: 01-viabilidad-temprana/01. Perfil de Usuario.md
+      - 02. Validación de Mercado: 01-viabilidad-temprana/02. Validación de Mercado.md
+      - 03. Análisis Competitivo: 01-viabilidad-temprana/03. Análisis Competitivo.md
+      - 04. Mapa de Partes Interesadas: 01-viabilidad-temprana/04. Mapa de Partes Interesadas.md
+      - 05. Registro de Factibilidad Técnica: 01-viabilidad-temprana/05. Registro de Factibilidad Técnica.md
+      - 06. Accesibilidad de Datos: 01-viabilidad-temprana/06. Accesibilidad de Datos.md
+      - 07. Despeje Legal y Regulatorio: 01-viabilidad-temprana/07. Despeje Legal y Regulatorio.md
+      - 08. Capacidad del Equipo: 01-viabilidad-temprana/08. Capacidad del Equipo.md
+      - 09. Viabilidad de la Solución: 01-viabilidad-temprana/09. Viabilidad de la Solucion.md
+      - 10. Registro de Riesgos: 01-viabilidad-temprana/10. Registro de Riesgos.md
+      - 11. Supuestos Críticos: 01-viabilidad-temprana/11. Supuestos Criticos.md
+      - 12. Definición del MVP: 01-viabilidad-temprana/12. Definicion del MVP.md
+      - 13. Lean Canvas: 01-viabilidad-temprana/13. Lean Canvas.md
+      - 14. OKRs y Objetivos: 01-viabilidad-temprana/14. OKRs y Objetivos.md
+      - 15. Plan Inicial de Proyecto: 01-viabilidad-temprana/15. Plan Inicial de Proyecto.md
+      - 16. Proceso de Trabajo y Herramientas: 01-viabilidad-temprana/16. Proceso de Trabajo y Herramientas.md
+      - 17. Decisión Go-NoGo: 01-viabilidad-temprana/17. Decision Go-NoGo.md
+      - 18. Resumen Ejecutivo Fase 1: 01-viabilidad-temprana/18. Resumen Ejecutivo Fase 1.md
+  - 02. Project Kickoff:
+      - 01. Identidad del Proyecto: 02-project-kickoff/01. Identidad del Proyecto.md
+      - 02. Restricciones No Funcionales: 02-project-kickoff/02. Restricciones No Funcionales.md
+      - 03. Decisión de Stack: 02-project-kickoff/03. Decision de Stack.md
+      - 04. Estructura del Repositorio: 02-project-kickoff/04. Estructura del Repositorio.md
+      - 05. Branching Strategy: 02-project-kickoff/05. Branching Strategy.md
+      - 06. Definición de Entornos: 02-project-kickoff/06. Entornos.md
+      - 07. Estándares de Codificación: 02-project-kickoff/07. Estandares de Codificacion.md
+      - 08. Estrategia de Pruebas: 02-project-kickoff/08. Estrategia de Pruebas.md
+      - 09. Definition of Done & Ready: 02-project-kickoff/09. Definition of Done.md
+      - 10. Tooling: 02-project-kickoff/10. Tooling.md
+      - 11. Protocolos de Comunicación: 02-project-kickoff/11. Protocolos de Comunicacion.md
+      - 12. Actualización Registro de Riesgos: 02-project-kickoff/12. Actualizacion Registro de Riesgos.md
+      - 13. Resumen Ejecutivo Fase 2: 02-project-kickoff/13. Resumen Ejecutivo Fase 2.md
+  - 03. Ingeniería de Requisitos:
+      - 01. Diagrama de Contexto del Sistema: 03-requirements/01. Diagrama de Contexto del Sistema.md
+      - 02. Definición de Actores y Roles: 03-requirements/02. Definicion de Actores y Roles.md
+      - 03. Glosario de Dominio: 03-requirements/03. Glosario de Dominio.md
+      - 04. Elicitación de Requerimientos: 03-requirements/04. Elicitacion de Requerimientos.md
+      - 05. Descomposición Modular Funcional: 03-requirements/05. Descomposicion Modular Funcional.md
+      - 06. Requerimientos No Funcionales: 03-requirements/06. Requerimientos No Funcionales.md
+      - 07. Especificaciones de Módulos:
+          - MOD-NOTES (Notas y Markdown): 03-requirements/07. Module Specifications/MOD-NOTES.md
+          - MOD-HABITS (Hábitos y Journal): 03-requirements/07. Module Specifications/MOD-HABITS.md
+          - MOD-EXERCISE (Ejercicio y Series): 03-requirements/07. Module Specifications/MOD-EXERCISE.md
+          - MOD-TASKS (Tareas y Agenda): 03-requirements/07. Module Specifications/MOD-TASKS.md
+          - MOD-PROJECTS (Proyectos Jira): 03-requirements/07. Module Specifications/MOD-PROJECTS.md
+          - MOD-FINANCE (Finanzas y Presupuesto): 03-requirements/07. Module Specifications/MOD-FINANCE.md
+          - MOD-STUDY (Estudio, SRS y Matemáticas): 03-requirements/07. Module Specifications/MOD-STUDY.md
+          - MOD-MENTOR (Mentor IA y Planes): 03-requirements/07. Module Specifications/MOD-MENTOR.md
+          - MOD-WEB (Navegador y Enfoque): 03-requirements/07. Module Specifications/MOD-WEB.md
+      - 08. System Requirements Specification (SRS): 03-requirements/08. System Requirements Specification.md
+  - 04. Modelado del Sistema:
+      - 01. Content Strategy & Information Architecture: 04-system-modeling/01. Content Strategy & Information Architecture.md
+      - 02. User Flows & Task Flows: 04-system-modeling/02. User Flows & Task Flows.md
+      - 03. Design System UI Kit: 04-system-modeling/03. Design System UI Kit.md
+      - 04. Domain Model and ERD: 04-system-modeling/04. Domain Model and ERD.md
+      - 05. System Sequence Diagrams: 04-system-modeling/05. System Sequence Diagrams.md
+      - 06. State Machine Diagrams: 04-system-modeling/06. State Machine Diagrams.md
+      - 07. API Conceptual Design: 04-system-modeling/07. API Conceptual Design.md
+      - 08. Security & Authorization Model: 04-system-modeling/08. Security & Authorization Model.md
+      - 09. Accessibility Standards (WCAG 2.1 AA): 04-system-modeling/09. Accessibility Standards.md
+  - 05. Diseño Arquitectónico:
+      - 01. Quality Attributes Map: 05-architectural-design/01-quality-attributes-map.md
+      - 02. Bounded Context Formalization: 05-architectural-design/02-bounded-context-formalization.md
+      - 03. Deployment Topology Decision: 05-architectural-design/03-deployment-topology-decision.md
+      - 04. System Decomposition Decision: 05-architectural-design/04-system-decomposition-decision.md
+      - 05. Architectural Style Selection: 05-architectural-design/05-architectural-style-selection.md
+      - 06. Communication Pattern Decision: 05-architectural-design/06-communication-pattern-decision.md
+      - 07. Cross-Cutting Concerns: 05-architectural-design/07-cross-cutting-concerns.md
+      - 08. CI-CD & Environments Strategy: 05-architectural-design/08-ci-cd-&-environments-strategy.md
+      - 09. Component Diagram (C4 Nivel 3): 05-architectural-design/09-component-diagram.md
+      - 10. ADR Consolidation: 05-architectural-design/10-adr-consolidation.md
+      - 11. Phase 5 RTM Update & Brief: 05-architectural-design/11-phase-5-rtm-update-&-brief.md
+  - 06. Diseño Técnico:
+      - 01. Codebase & Folder Architecture: 06-technical-design/01-codebase-&-folder-architecture.md
+      - 02. Physical Data Modeling (Vault Format v4): 06-technical-design/02-physical-data-modeling.md
+      - 03. Configuration & Environment Secrets: 06-technical-design/03-configuration-&-environment-secrets.md
+      - 04. Security Implementation & Middleware: 06-technical-design/04-security-implementation-&-middleware.md
+      - 05. Class & Entity Diagrams: 06-technical-design/05-class-&-entity-diagrams.md
+      - 06. Data Access & Repositories: 06-technical-design/06-data-access-&-repositories.md
+      - 07. API Contracts (IPC Specification): 06-technical-design/07-api-contracts-(ipc-specification).md
+      - 08. Third-Party Integrations & Sync: 06-technical-design/08-third-party-integrations-&-sync.md
+      - 09. Frontend Component & State Architecture: 06-technical-design/09-frontend-component-&-state-architecture.md
+      - 10. Async Workers & Job Scheduling: 06-technical-design/10-async-workers-&-job-scheduling.md
+      - 11. Semantic HTML & ARIA Contracts: 06-technical-design/11-semantic-html-&-aria-contracts.md
+      - 12. i18n Technical Implementation: 06-technical-design/12-i18n-technical-implementation.md
+      - 13. Data Seeding & Legacy Migration Plan: 06-technical-design/13-data-seeding-&-legacy-migration-plan.md
+      - 14. Phase 6 RTM Update & Brief: 06-technical-design/14-phase-6-rtm-update-&-brief.md
+  - 07. Implementación y Multiplataforma:
+      - 01. Onboarding de Desarrolladores (Day 1): 07-implementation-y-multiplataforma/01-onboarding-desarrollador-day-1.md
+      - 02. Expansión Multiplataforma (PC, Android, iOS, Mac): 07-implementation-y-multiplataforma/02-expansion-multiplataforma-pc-android-ios-mac.md
+      - 03. Guía de Contribución y Nuevos Módulos: 07-implementation-y-multiplataforma/03-guia-de-contribucion-paso-a-paso.md
+  - 08. Operaciones y Calidad:
+      - 01. Los 7 Pilares de Calidad: 08-operaciones-y-calidad/01-los-7-pilares-de-calidad.md
+      - 02. Estrategia de Testing y Resiliencia: 08-operaciones-y-calidad/02-estrategia-de-testing-y-resiliencia.md

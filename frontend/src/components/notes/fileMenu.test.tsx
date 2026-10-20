@@ -5,7 +5,7 @@
 // without a vault.
 
 import { describe, expect, it, vi } from "vitest";
-import { fileMenuItems, pathFlavors, type FileMenuActions } from "./fileMenu";
+import { fileMenuItems, pathFlavors, treeRootMenuItems, type FileMenuActions } from "./fileMenu";
 import type { MenuItem } from "../ui";
 
 function actions(): FileMenuActions {
@@ -113,5 +113,56 @@ describe("path flavours", () => {
   it("joins the system path with the separator the vault root uses", () => {
     expect(pathFlavors("a/b.md", "C:\\PROGRAMMING", "PROGRAMMING").system).toBe("C:\\PROGRAMMING\\a\\b.md");
     expect(pathFlavors("a/b.md", "C:/PROGRAMMING/", "PROGRAMMING").system).toBe("C:/PROGRAMMING/a/b.md");
+  });
+});
+
+describe("treeRootMenuItems", () => {
+  it("provides root creation, reload, collapse and explorer actions", () => {
+    const a = {
+      newNote: vi.fn(),
+      newFolder: vi.fn(),
+      newCanvas: vi.fn(),
+      refresh: vi.fn(),
+      collapseAll: vi.fn(),
+      revealInExplorer: vi.fn(),
+    };
+    const items = treeRootMenuItems(a);
+    expect(labels(items)).toEqual([
+      "Nueva nota",
+      "Nueva carpeta",
+      "Nuevo canvas",
+      "—",
+      "Recargar explorador",
+      "Colapsar carpetas",
+      "—",
+      "Mostrar en el Explorador de archivos",
+    ]);
+
+    items.find((i) => i.label === "Nueva nota")!.onSelect?.();
+    expect(a.newNote).toHaveBeenCalledTimes(1);
+
+    items.find((i) => i.label === "Nueva carpeta")!.onSelect?.();
+    expect(a.newFolder).toHaveBeenCalledTimes(1);
+
+    items.find((i) => i.label === "Nuevo canvas")!.onSelect?.();
+    expect(a.newCanvas).toHaveBeenCalledTimes(1);
+
+    items.find((i) => i.label === "Recargar explorador")!.onSelect?.();
+    expect(a.refresh).toHaveBeenCalledTimes(1);
+
+    items.find((i) => i.label === "Colapsar carpetas")!.onSelect?.();
+    expect(a.collapseAll).toHaveBeenCalledTimes(1);
+
+    items.find((i) => i.label === "Mostrar en el Explorador de archivos")!.onSelect?.();
+    expect(a.revealInExplorer).toHaveBeenCalledTimes(1);
+  });
+
+  it("can omit optional actions when not provided", () => {
+    const items = treeRootMenuItems({
+      newNote: vi.fn(),
+      newFolder: vi.fn(),
+      newCanvas: vi.fn(),
+    });
+    expect(labels(items)).toEqual(["Nueva nota", "Nueva carpeta", "Nuevo canvas"]);
   });
 });

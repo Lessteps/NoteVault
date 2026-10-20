@@ -10,7 +10,8 @@ import { useVirtualList } from "../../lib/useVirtualList";
 import { useApp, type OpenNote, type ViewMode } from "../../store/app";
 import { cn, IconButton, Kbd, openMenu, type MenuItem } from "../ui";
 import { ErrorBoundary } from "../common/ErrorBoundary";
-import { newNoteIn } from "./FileTree";
+import { newCanvasIn, newFolderIn, newNoteIn } from "./FileTree";
+import { treeRootMenuItems } from "./fileMenu";
 import { ReadView } from "./ReadView";
 import { RouteBanner } from "../study/RouteUi";
 import { PracticeView } from "../practice/PracticeView";
@@ -364,8 +365,20 @@ function Editor({ note }: { note: OpenNote }) {
 }
 
 function EmptyState() {
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    openMenu(
+      e,
+      treeRootMenuItems({
+        newNote: () => void newNoteIn(""),
+        newFolder: () => void newFolderIn(""),
+        newCanvas: () => void newCanvasIn(""),
+      }),
+    );
+  };
+
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col" onContextMenu={onContextMenu}>
       <div className="flex h-11 flex-none items-center gap-2 border-b border-line bg-surface px-3">
         <span className="text-[12px] text-faint">Notas</span>
       </div>

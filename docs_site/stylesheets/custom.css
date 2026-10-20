@@ -1,0 +1,68 @@
+/* NoteVault Custom MkDocs Styling */
+:root {
+  --md-primary-fg-color: #3f51b5;
+  --md-accent-fg-color: #7c4dff;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #5c6bc0;
+  --md-accent-fg-color: #b388ff;
+}
+
+/* Enhanced conceptual framework cards */
+.entity-card {
+  border-left: 4px solid var(--md-primary-fg-color);
+  background-color: rgba(63, 81, 181, 0.04);
+  padding: 1rem 1.25rem;
+  border-radius: 4px;
+  margin: 1.2rem 0;
+}
+
+.platform-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-right: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.badge-pc {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.badge-android {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.badge-ios {
+  background-color: #f3e8ff;
+  color: #7e22ce;
+}
+
+.badge-mac {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+
+/* Tables styling */
+.md-typeset table:not([class]) {
+  width: 100%;
+  display: table;
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: rgba(63, 81, 181, 0.08);
+}
+
+/* Diagram styling */
+.mermaid {
+  background-color: transparent !important;
+  text-align: center;
+  margin: 1.5rem 0;
+}

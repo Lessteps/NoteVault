@@ -10,6 +10,7 @@ import {
   AppWindow,
   Bookmark,
   BookmarkMinus,
+  ChevronsDownUp,
   Clock,
   Columns2,
   Copy,
@@ -23,6 +24,7 @@ import {
   Link2,
   MessageSquarePlus,
   Pencil,
+  RefreshCw,
   Sparkles,
   SquareArrowOutUpRight,
   Trash2,
@@ -152,5 +154,33 @@ export function fileMenuItems(opts: FileMenuOptions, a: FileMenuActions): MenuIt
     { label: "Mover a la papelera", icon: <Trash2 />, danger: true, onSelect: a.trash },
   );
 
+  return items;
+}
+
+export interface TreeRootMenuActions {
+  newNote: () => void;
+  newFolder: () => void;
+  newCanvas: () => void;
+  refresh?: () => void;
+  collapseAll?: () => void;
+  revealInExplorer?: () => void;
+}
+
+/** Right-click menu for empty space in the file tree / notes explorer. */
+export function treeRootMenuItems(a: TreeRootMenuActions): MenuItem[] {
+  const items: MenuItem[] = [
+    { label: "Nueva nota", icon: <FilePlus />, onSelect: a.newNote },
+    { label: "Nueva carpeta", icon: <FolderPlus />, onSelect: a.newFolder },
+    { label: "Nuevo canvas", icon: <LayoutDashboard />, onSelect: a.newCanvas },
+  ];
+  if (a.refresh || a.collapseAll) {
+    items.push({ separator: true });
+    if (a.refresh) items.push({ label: "Recargar explorador", icon: <RefreshCw />, onSelect: a.refresh });
+    if (a.collapseAll) items.push({ label: "Colapsar carpetas", icon: <ChevronsDownUp />, onSelect: a.collapseAll });
+  }
+  if (a.revealInExplorer) {
+    items.push({ separator: true });
+    items.push({ label: "Mostrar en el Explorador de archivos", icon: <FolderOpen />, onSelect: a.revealInExplorer });
+  }
   return items;
 }

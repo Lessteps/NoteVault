@@ -8,7 +8,7 @@ import { copyText } from "../../lib/clipboard";
 import { useAssistant } from "../../store/assistant";
 import { generateTopicFrom } from "../study/StudySpaceDialog";
 import { RouteBadge, useRouteView } from "../study/RouteUi";
-import { fileMenuItems, pathFlavors, type PathFlavor } from "./fileMenu";
+import { fileMenuItems, pathFlavors, treeRootMenuItems, type PathFlavor } from "./fileMenu";
 import { MoveEntryDialog } from "./MoveEntryDialog";
 import { VersionHistoryDialog } from "./VersionHistoryDialog";
 import { askText, cn, confirmAction, openMenu } from "../ui";
@@ -309,6 +309,7 @@ export function FileTree({ filter }: { filter: string }) {
   };
 
   const menuFor = (entry: TreeEntry) => (e: React.MouseEvent) => {
+    e.stopPropagation();
     const known = useApp.getState().notes[entry.path]?.bookmarked;
     openMenu(
       e,
@@ -316,6 +317,26 @@ export function FileTree({ filter }: { filter: string }) {
         { entry, bookmarked: known, canCopy: entry.type !== "folder", inChat: useAssistant.getState().folders.includes(entry.path) || useAssistant.getState().files.includes(entry.path) },
         menuActions(entry),
       ),
+    );
+  };
+
+  const onEmptyContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const s = useApp.getState();
+    const collapseAll = () => {
+      localStorage.setItem(EXPANDED_KEY, "[]");
+      s.refreshTree();
+    };
+    openMenu(
+      e,
+      treeRootMenuItems({
+        newNote: () => void newNoteIn(""),
+        newFolder: () => void newFolderIn(""),
+        newCanvas: () => void newCanvasIn(""),
+        refresh: s.refreshTree,
+        collapseAll,
+        revealInExplorer: () => void api.revealPath("").catch((err: Error) => s.toast("error", err.message)),
+      }),
     );
   };
 
@@ -398,7 +419,11 @@ export function FileTree({ filter }: { filter: string }) {
   if (filtered) {
     const visibleFiltered = filtered.slice(filteredVirtual.startIndex, filteredVirtual.endIndex);
     return (
-      <div ref={filteredContainerRef} className="h-full overflow-y-auto px-2 py-1">
+      <div
+        ref={filteredContainerRef}
+        className="h-full overflow-y-auto px-2 py-1"
+        onContextMenu={onEmptyContextMenu}
+      >
         {filtered.length === 0 && <div className="px-2 py-3 text-[12px] text-faint">Sin coincidencias.</div>}
         <div style={{ height: filteredVirtual.totalHeight, position: "relative" }}>
           <div style={{ transform: `translateY(${filteredVirtual.startOffset}px)` }}>
@@ -407,6 +432,14 @@ export function FileTree({ filter }: { filter: string }) {
                 key={n.path}
                 type="button"
                 onClick={() => void useApp.getState().openNote(n.path)}
+                onContextMenu={(e) => {
+                  menuFor({
+                    type: "note",
+                    name: n.title,
+                    path: n.path,
+                    kind: n.path.endsWith(".canvas") ? "canvas" : "note",
+                  })(e);
+                }}
                 className={cn(
                   "flex h-[46px] w-full flex-col justify-center rounded-md px-2 py-1 text-left",
                   active === n.path ? "bg-accent-soft" : "hover:bg-hover",
@@ -427,7 +460,13 @@ export function FileTree({ filter }: { filter: string }) {
   const visibleTree = flatItems.slice(treeVirtual.startIndex, treeVirtual.endIndex);
 
   return (
-    <div ref={treeContainerRef} role="tree" className="h-full overflow-y-auto px-2 py-1" {...dropProps("")}>
+    <div
+      ref={treeContainerRef}
+      role="tree"
+      className="h-full overflow-y-auto px-2 py-1"
+      onContextMenu={onEmptyContextMenu}
+      {...dropProps("")}
+    >
       {children[""]?.length === 0 ? (
         <div className="px-2 py-3 text-[12px] text-faint">El vault está vacío. Crea tu primera nota.</div>
       ) : (
@@ -488,6 +527,7 @@ export function FileTree({ filter }: { filter: string }) {
           </div>
         </div>
       )}
+      <div className="h-28 w-full cursor-default" aria-hidden="true" />
       {moveEntry && (
         <MoveEntryDialog
           entry={{ path: moveEntry.path, name: moveEntry.name, type: moveEntry.type }}

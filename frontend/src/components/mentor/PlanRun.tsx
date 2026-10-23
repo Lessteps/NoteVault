@@ -269,12 +269,24 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const capacity = day?.capacityMinutes ?? 0;
   const excess = planned - capacity;
   const loggedToday = minutesOn(timeEntries, date);
+  const lateMinutes = new Map<string, number>();
+  for (const d of m.schedule.days) for (const t of d.topics) if (!t.done) lateMinutes.set(t.folder, (lateMinutes.get(t.folder) ?? 0) + t.minutes);
   // tarjetas plegables de hoy: las áreas con temas o práctica y, aparte, los fundamentos (Bases)
   const todayFolds: FoldItem[] = [
     ...cards.filter((c) => c.rows.length > 0 || c.entry.practiceMinutes > 0).map(foldItemOf),
     ...(basesRows.length ? [{ key: "bases", name: "Bases", colour: "var(--nv-accent)", rows: basesRows, minutes: basesRows.reduce((n, r) => n + (r.minutes ?? 0), 0) }] : []),
   ];
-  const pendingToday = todayFolds.flatMap((f) => f.rows).filter((r) => !r.done);
+  // Si TODOS los temas de hoy de un área están bloqueados por la ruta sólida (hay un día anterior sin cerrar), «hoy» es lo que sí se puede trabajar:
+  // los primeros temas abiertos de su ruta. Sin esto el área salía con temas que no se pueden abrir (o vacía).
+  const hoyFolds: FoldItem[] = todayFolds.map((f) => {
+    if (f.key === "bases" || !f.rows.length || !f.rows.every((r) => r.done || r.unlockOn)) return f;
+    const sets = areaSets(m.schedule.days, f.key, date, currentWeek, started);
+    const open = routeOf(f.key).filter((r) => sets.available.has(r.folder) && !r.done && !r.unlockOn).slice(0, 6);
+    if (!open.length) return f;
+    const rows = open.map((r) => ({ ...r, sub: "Toca ahora en la ruta", minutes: Math.round((lateMinutes.get(r.folder) ?? 0) / 1) || undefined }));
+    return { ...f, rows, minutes: rows.reduce((n, r) => n + (r.minutes ?? 0), 0) };
+  });
+  const pendingToday = hoyFolds.flatMap((f) => f.rows).filter((r) => !r.done);
   const assignToday = (): void => {
     const { assignTopic } = usePomodoro.getState();
     for (const r of pendingToday) assignTopic({ folder: r.folder, title: r.title, kind: "topic" });
@@ -282,8 +294,6 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   };
   const firstPending = cards.find((c) => c.rows.some((r) => !r.done));
   const focusAreaKey = firstPending?.entry.areaId ?? firstPending?.entry.subplanId ?? "libre";
-  const lateMinutes = new Map<string, number>();
-  for (const d of m.schedule.days) for (const t of d.topics) if (!t.done) lateMinutes.set(t.folder, (lateMinutes.get(t.folder) ?? 0) + t.minutes);
   const lateAreas: LateArea[] = catchUp.lateByArea.map((a) => {
     const topics = catchUp.late.filter((l) => l.area === a.area);
     const sp = plan.subplans.find((x) => x.area === a.area);
@@ -349,14 +359,14 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                   {entries.length === 0 && langBlocks.length === 0 && !day.practice.project && (
                     <p className="text-[14px] text-dim">Sin temas repartidos hoy: queda para repaso o para recuperar lo atrasado.</p>
                   )}
-                  {todayFolds.length > 0 && (
+                  {hoyFolds.length > 0 && (
                     <div data-testid="run-composition" className="space-y-3">
                       <p className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-[11.5px] font-semibold uppercase tracking-[0.12em] text-faint">Áreas programadas para hoy</span>
                         <span className="flex-1" />
                         <Chip colour="var(--nv-faint)">{plural(todayFolds.length, "módulo", "módulos")} · {plural(topicsToday.length, "tema", "temas")}</Chip>
                       </p>
-                      <AreaFolds items={todayFolds} />
+                      <AreaFolds items={hoyFolds} />
                     </div>
                   )}
                   <div className="space-y-2">

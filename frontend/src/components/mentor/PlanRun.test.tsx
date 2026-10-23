@@ -225,6 +225,26 @@ describe("vista de ejecución", () => {
     expect(listed()[0]!.querySelector("[data-testid=board-time]")!.getAttribute("data-time-status")).toBe("pending");
   });
 
+  it("«Temas de hoy» nunca queda vacío por la ruta sólida: sin haber empezado ofrece los primeros temas abiertos de la ruta («Toca ahora»)", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(spread()));
+    await mountEl(<MentorPlan planId={PID} />);
+    await click(runTab("area:s1"));
+    const rows = listed();
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]!.dataset.state).not.toBe("bloqueado");
+    expect(rows[0]!.querySelector("[data-testid=board-tag]")!.textContent).toBe("Toca ahora");
+  });
+
+  it("la pestaña general tampoco ofrece temas bloqueados: sin haber empezado, las áreas enseñan lo que sí se puede trabajar", async () => {
+    const p = plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }] as never });
+    const l = loaded(p) as Extract<MentorPlanGet, { loading: false }>;
+    l.derived!.subplans[0]!.topics[0]!.state = "sin_tratar";
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(l);
+    await mountEl(<MentorPlan planId={PID} />);
+    const topics = [...host.querySelectorAll<HTMLElement>("[data-testid=day-topic]")];
+    expect(topics.every((g) => g.dataset.state !== "bloqueado")).toBe(true);
+  });
+
   it("la vista de la semana enseña debajo «Lo que viene»: la proyección de las semanas siguientes", async () => {
     const later = "Programación/1 Fundamentals/1.9 Later";
     const p = plan({ subplans: [{ ...sub("s1", "Fundamentals", "Reforzar bases", F1), topics: [{ folder: F1, title: "1.1", targetWeek: 1, estMinutes: 60 }, { folder: later, title: "1.9 Later", targetWeek: 3, estMinutes: 60 }] }] as never });

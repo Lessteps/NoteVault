@@ -7,6 +7,8 @@ import type { ScheduleDay } from "./planSchedule.js";
 export interface AreaSets {
   today: Set<string>;
   week: Set<string>;
+  /** tocaban hasta hoy (hoy incluido) y siguen sin completarse: lo que se puede trabajar ahora si la ruta lo desbloquea. NO depende de que la ruta haya empezado */
+  available: Set<string>;
   /** su tiempo previsto ya pasó (días anteriores a hoy) y siguen sin completarse; vacío mientras la ruta no ha empezado */
   pending: Set<string>;
 }
@@ -16,7 +18,7 @@ export interface AreaSets {
  * a hoy) y la ruta ya empezó (`started`): sin haber empezado, nada está pendiente.
  */
 export function areaSets(days: ReadonlyArray<ScheduleDay>, subplanId: string | null, today: string, week: number, started = true): AreaSets {
-  const out: AreaSets = { today: new Set(), week: new Set(), pending: new Set() };
+  const out: AreaSets = { today: new Set(), week: new Set(), pending: new Set(), available: new Set() };
   const done = new Set<string>();
   for (const d of days) {
     for (const t of d.topics) {
@@ -25,9 +27,13 @@ export function areaSets(days: ReadonlyArray<ScheduleDay>, subplanId: string | n
       if (d.date === today) out.today.add(t.folder);
       if (d.week === week) out.week.add(t.folder);
       if (started && d.date < today) out.pending.add(t.folder);
+      if (d.date <= today) out.available.add(t.folder);
     }
   }
   // un tema ya completado (en cualquier día de su reparto) no queda pendiente
-  for (const f of done) out.pending.delete(f);
+  for (const f of done) {
+    out.pending.delete(f);
+    out.available.delete(f);
+  }
   return out;
 }

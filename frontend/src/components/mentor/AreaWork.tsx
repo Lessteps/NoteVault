@@ -199,8 +199,9 @@ export function AreaWork({ planId, areaName, areaId, subtitle, loggedMinutes = 0
     // La ruta es sólida: el tiempo no la hace avanzar. «Hoy» = lo que se puede trabajar ahora, en orden de ruta: primero lo atrasado que sigue
     // abierto (los primeros temas sin terminar) y luego lo de hoy. Lo bloqueado no se ofrece aquí: espera en «Semana» y «Pendientes».
     const openLate = rows
-      .filter((r) => sets.pending.has(r.folder) && !r.done && !r.unlockOn && !todayKeys.has(r.folder))
-      .map((r) => ({ ...r, tag: { text: "Atrasado", colour: "var(--nv-warn)" } }));
+      .filter((r) => sets.available.has(r.folder) && !r.done && !r.unlockOn && !todayKeys.has(r.folder))
+      // «Atrasado» solo si su tiempo ya pasó con la ruta empezada; si no, es simplemente lo que toca ahora en el orden de la ruta
+      .map((r) => ({ ...r, tag: r.time?.status === "pending" ? { text: "Atrasado", colour: "var(--nv-warn)" } : { text: "Toca ahora", colour } }));
     const openToday = todayRows.filter((r) => r.done || !r.unlockOn).map((r) => ({ ...r, tag: todayTag }));
     const todayList = [...openLate, ...openToday];
     const week = rows.filter((r) => sets.week.has(r.folder)).map((r) => ({ ...r, tag: r.done ? { text: "Hecho", colour: "var(--nv-mint)" } : sets.today.has(r.folder) ? todayTag : undefined }));

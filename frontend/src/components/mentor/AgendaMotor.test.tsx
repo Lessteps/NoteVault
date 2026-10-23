@@ -64,11 +64,26 @@ let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
 // «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
+const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
 const section = async (id: string) => {
-  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${id}]`);
+  // «Fases mes a mes» vive ahora en la Agenda, vista Mes
+  if (id === "fases") {
+    await act(async () => { host.querySelector<HTMLElement>("#plan-tabs-tab-agenda")!.click(); });
+    await flush();
+    await act(async () => { host.querySelector<HTMLElement>("#agenda-view-tab-mes")!.click(); });
+    await flush();
+    return;
+  }
+  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${SECTION_ALIAS[id] ?? id}]`);
   expect(b, `sub-vista ${id}`).toBeTruthy();
   await act(async () => { b!.click(); });
   await flush();
+  // «Preparar» agrupa ejecutar · cobertura · antigravity; el detalle de las áreas vive dentro de «Temas por área»
+  if (id === "ejecutar" || id === "cobertura" || id === "antigravity") {
+    const t = host.querySelector<HTMLElement>(`[data-testid=prepare-${id}]`);
+    if (t) { await act(async () => { t.click(); }); await flush(); }
+  }
+  if (id === "areas") host.querySelector("[data-testid=plan-areas-detail]")?.setAttribute("open", "");
 };
 const click = async (el: Element | null | undefined) => {
   expect(el, "elemento no encontrado").toBeTruthy();

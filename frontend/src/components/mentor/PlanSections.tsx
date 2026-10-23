@@ -8,6 +8,7 @@
 
 import { ArrowDown, PlusCircle } from "lucide-react";
 import type { ReactNode } from "react";
+import { usePersistedNav } from "../../store/navState";
 import { splitNotes, tidyNotes } from "../../lib/planAreas";
 import { periodLabel, weeksLabel } from "../../lib/planTime";
 import { PRACTICE_NAME } from "../../lib/practiceTrack";
@@ -23,15 +24,13 @@ import { dayText, ProgressBar } from "./parts";
 import { CoveragePanel, type CoverageState } from "./PlanCoverage";
 import { ExecutionPanel } from "./PlanExecution";
 import { PlanNotes, SectionCard, SectionHeading } from "./planKit";
-import { PhaseMonthTable } from "./PlanMonths";
 import { PlanAreaTopics } from "./PlanAreaTopics";
 import { routeStarted } from "../../lib/planTopicTime";
 import { PlanRecords } from "./PlanRecords";
-import { PlanTopicCatalog } from "./PlanTopicCatalog";
-import { PhaseTimeline, SubplanGroups } from "./PlanSubplans";
+import { SubplanGroups } from "./PlanSubplans";
 import { PACE_LABEL } from "./PlanForm";
 import { practiceSummary } from "./PracticeCard";
-import { cleanBranch, DAY_LONG, DAY_SHORT, num1, openPlanSection, STATUS_COLOUR, STATUS_LABEL, type Loaded } from "./planShared";
+import { cleanBranch, DAY_LONG, DAY_SHORT, num1, openPlanSection, planSectionKey, prepareTabKey, STATUS_COLOUR, STATUS_LABEL, type Loaded } from "./planShared";
 import { deliverablesDefined } from "../../lib/planTopicsByArea";
 
 /** Todo lo que necesita una sub-vista de «Mi plan». */
@@ -150,13 +149,6 @@ function ResumenView({ plan, state, summary, cov, onApplied, announce }: PlanSec
   );
 }
 
-function CatalogoView({ plan }: PlanSectionCtx) {
-  return (
-    <div id="sec-catalogo" tabIndex={-1} className={anchor}>
-      <PlanTopicCatalog planId={plan.id} proposed={!!plan.proposed} />
-    </div>
-  );
-}
 
 function DatosView({ plan }: PlanSectionCtx) {
   const pre = plan.preconditions;
@@ -266,24 +258,9 @@ function AlcanceView({ plan, onAddBranches }: PlanSectionCtx) {
   );
 }
 
-function FasesView({ data, plan, summary, onOpenMonth }: PlanSectionCtx) {
-  return (
-    <section id="sec-fases" tabIndex={-1} className={anchor} aria-labelledby="mp-phases" data-testid="plan-phases-section">
-      <SectionHeading id="mp-phases" hint={`Qué trabaja cada área en cada mes: temas, horas y semanas activas. ${plan.areaMode === "together" ? "Todas las áreas van juntas desde el día 1 (Automation, al final)" : "Como mucho dos áreas van en paralelo"}; el orden y el reparto los recalcula la app con tu capacidad real.`}>
-        Fases del plan, mes a mes
-      </SectionHeading>
-      <PhaseMonthTable data={data} plan={plan} onOpenMonth={onOpenMonth} />
-      <details className="mt-3" data-testid="plan-phases-bars">
-        <summary className="inline-flex min-h-8 cursor-pointer items-center text-[14px] text-accent-text">Ver las fases por semanas</summary>
-        <div className="mt-2">
-          <PhaseTimeline plan={plan} currentWeek={summary.currentWeek} weeks={summary.weeks} />
-        </div>
-      </details>
-    </section>
-  );
-}
 
-function TemasPorAreaView({ data, plan, summary }: PlanSectionCtx) {
+function TemasPorAreaView(ctx: PlanSectionCtx) {
+  const { data, plan, summary } = ctx;
   const agenda = useAgendaModel(data, plan);
   return (
     <div id="sec-temas" tabIndex={-1} className={cn(anchor, "space-y-6")}>
@@ -292,6 +269,51 @@ function TemasPorAreaView({ data, plan, summary }: PlanSectionCtx) {
         <summary className="inline-flex min-h-9 cursor-pointer items-center text-[14px] text-accent-text">Ver el reparto por semanas y áreas</summary>
         <div className="mt-3"><AreaTopicsSection m={agenda} currentWeek={summary.currentWeek} /></div>
       </details>
+      <details data-testid="plan-areas-detail">
+        <summary className="inline-flex min-h-9 cursor-pointer items-center text-[14px] text-accent-text">Detalle de cada área: objetivo, metas enlazadas, grupos y proyecto</summary>
+        <div className="mt-3"><AreasView {...ctx} /></div>
+      </details>
+    </div>
+  );
+}
+
+/** «Resumen»: el centro de progreso + los datos clave del plan y, si lo hay, su alcance y comentarios (antes eran sub-vistas aparte). */
+function ResumenCompletoView(ctx: PlanSectionCtx) {
+  return (
+    <div className="space-y-8" data-testid="plan-resumen-full">
+      <ResumenView {...ctx} />
+      <DatosView {...ctx} />
+      {scopeOf(ctx.plan).hasScope && <AlcanceView {...ctx} />}
+    </div>
+  );
+}
+
+const PREPARE_TABS = [
+  { id: "ejecutar", label: "Ejecutar plan", hint: "Crear lo que falta: teoría, mapas y ejercicios" },
+  { id: "cobertura", label: "Cobertura", hint: "Qué tiene cada tema de la vault frente al plan" },
+  { id: "antigravity", label: "Plan para Antigravity", hint: "Traspaso a otra IA de lo que falta por crear" },
+] as const;
+
+/** «Preparar»: lo técnico que no se usa para estudiar cada día (generar contenido, revisar cobertura, traspasar a otra IA), en una sola sub-vista. */
+function PrepararView(ctx: PlanSectionCtx) {
+  const [stored, setStored] = usePersistedNav<string>(prepareTabKey(ctx.plan.id), "ejecutar");
+  // un enlace profundo antiguo («ejecutar», «cobertura», «antigravity») llega como la sub-vista recordada: manda hasta que se elija otra opción
+  const [section, setSection] = usePersistedNav<string>(planSectionKey(ctx.plan.id), DEFAULT_SECTION);
+  const deep = PREPARE_TABS.find((t) => t.id === section)?.id;
+  const active = deep ?? PREPARE_TABS.find((t) => t.id === stored)?.id ?? "ejecutar";
+  return (
+    <div id="sec-preparar" tabIndex={-1} className={cn(anchor, "space-y-5")} data-testid="plan-prepare">
+      <p className="text-[14px] text-dim">Lo que prepara el contenido del plan. Para estudiar no hace falta entrar aquí: está todo en «Ejecución».</p>
+      <div role="group" aria-label="Qué preparar" className="inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-line bg-card p-1">
+        {PREPARE_TABS.map((t) => (
+          <button key={t.id} type="button" aria-pressed={active === t.id} title={t.hint} onClick={() => { setStored(t.id); setSection("preparar"); }} data-testid={`prepare-${t.id}`} className={cn("inline-flex min-h-9 items-center rounded-lg px-3 text-[14px] font-medium", active === t.id ? "bg-accent text-white" : "text-dim hover:bg-hover hover:text-text")}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {active === "ejecutar" && <EjecutarView {...ctx} />}
+      {active === "cobertura" && <CoberturaView {...ctx} />}
+      {active === "antigravity" && <AntigravityView {...ctx} />}
     </div>
   );
 }
@@ -329,29 +351,25 @@ function AreasView({ data, plan, highlight, cov, onChanged, onAskChange }: PlanS
 /** Las sub-vistas de «Mi plan», en el orden de la sub-barra (las no visibles se omiten). */
 export function planSectionsOf(ctx: PlanSectionCtx): PlanSection[] {
   const { plan, cov } = ctx;
-  const byAreas = plan.structure === "areas";
   const cov0 = cov.coverage?.totals;
   const missing = cov0 && (cov0.practice < cov0.topics || cov0.theory < cov0.topics) ? cov0.topics - cov0.practice : 0;
   const all: PlanSection[] = [
-    { id: "resumen", label: "Resumen", visible: true, ...(missing > 0 ? { hint: String(missing), hintLabel: `${missing} sin ejercicios: falta generar` } : {}), render: () => <ResumenView {...ctx} /> },
-    { id: "datos", label: "Datos clave", visible: true, render: () => <DatosView {...ctx} /> },
-    { id: "catalogo", label: "Temas", visible: true, render: () => <CatalogoView {...ctx} /> },
-    { id: "alcance", label: "Alcance y comentarios", visible: scopeOf(plan).hasScope, render: () => <AlcanceView {...ctx} /> },
-    { id: "fases", label: "Fases mes a mes", visible: byAreas, render: () => <FasesView {...ctx} /> },
-    { id: "temas", label: "Temas por área", visible: byAreas, render: () => <TemasPorAreaView {...ctx} /> },
+    { id: "resumen", label: "Resumen", visible: true, ...(missing > 0 ? { hint: String(missing), hintLabel: `${missing} sin ejercicios: falta generar` } : {}), render: () => <ResumenCompletoView {...ctx} /> },
+    { id: "temas", label: "Temas por área", visible: true, hint: String(plan.subplans.length), hintLabel: `${plan.subplans.length} ${plan.subplans.length === 1 ? "área" : "áreas"}`, render: () => <TemasPorAreaView {...ctx} /> },
     { id: "registros", label: "Registros", visible: true, render: () => <RegistrosView {...ctx} /> },
-    { id: "cobertura", label: "Cobertura", visible: true, render: () => <CoberturaView {...ctx} /> },
-    { id: "ejecutar", label: "Ejecutar plan", visible: true, render: () => <EjecutarView {...ctx} /> },
-    { id: "antigravity", label: "Plan para Antigravity", visible: true, render: () => <AntigravityView {...ctx} /> },
-    { id: "areas", label: "Áreas del plan", visible: true, hint: String(plan.subplans.length), hintLabel: `${plan.subplans.length} ${plan.subplans.length === 1 ? "área" : "áreas"}`, render: () => <AreasView {...ctx} /> },
+    { id: "preparar", label: "Preparar", visible: true, render: () => <PrepararView {...ctx} /> },
   ];
   return all.filter((s) => s.visible);
 }
 
+/** Las sub-vistas que se fundieron en otras siguen abriéndose con su id antiguo (enlaces profundos y lo recordado por plan). */
+const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", fases: "resumen", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
+export const sectionAlias = (id: string): string => SECTION_ALIAS[id] ?? id;
+
 /** La sub-vista a enseñar: la guardada si existe y es visible; si no, el Resumen. */
 export function activeSectionOf(sections: ReadonlyArray<PlanSection>, stored: string): PlanSection {
-  const id = stored.replace(/^sec-/, "");
-  return sections.find((s) => s.id === id) ?? sections.find((s) => s.id === DEFAULT_SECTION) ?? sections[0]!;
+  const raw = stored.replace(/^sec-/, "");
+  return sections.find((s) => s.id === raw) ?? sections.find((s) => s.id === sectionAlias(raw)) ?? sections.find((s) => s.id === DEFAULT_SECTION) ?? sections[0]!;
 }
 
 // ── Sub-barra ──────────────────────────────────────────────────────────

@@ -182,7 +182,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2, areaFilter
 }
 
 /** Una semana: cuántos temas por área, horas, progreso, práctica, entregables y sus días. */
-export function WeekDetail({ m, week, onPickDay, onChanged, headingId }: { m: AgendaModel; week: number; onPickDay: (date: string) => void; onChanged: (p: MentorPlan) => void; headingId?: string }) {
+export function WeekDetail({ m, week, onPickDay, onChanged, headingId, only = null }: { m: AgendaModel; week: number; onPickDay: (date: string) => void; onChanged: (p: MentorPlan) => void; headingId?: string; /** subplan elegido en las pestañas por área (null = todas) */ only?: string | null }) {
   const w = weekSummary(m.plan, m.schedule, week, m.deliverablesDefined ? m.deliverables : []);
   if (!w) return <p className="text-[14px] text-dim">Esa semana no existe en el plan.</p>;
   const days = m.schedule.days.filter((d) => d.week === week);
@@ -225,7 +225,7 @@ export function WeekDetail({ m, week, onPickDay, onChanged, headingId }: { m: Ag
 
       {m.schedule.mode === "focus" && <FocusStructure days={days} headingId={`${headingId ?? "wk"}-focus`} label={`de la semana ${week}`} />}
 
-      <WeekAreaColumns m={m} week={week} headingId={`${headingId ?? "wk"}-areas`} byWeekArea={m.byWeekArea} />
+      <WeekAreaColumns m={m} week={week} headingId={`${headingId ?? "wk"}-areas`} byWeekArea={m.byWeekArea} only={only} />
 
       {m.schedule.mode === "focus" && <WeekProjects m={m} week={week} headingId={`${headingId ?? "wk"}-projects`} onChanged={onChanged} />}
 
@@ -288,13 +288,13 @@ function WeekDayRow({ m, day, onPick }: { m: AgendaModel; day: ScheduleDay; onPi
 }
 
 /** Un mes: áreas en foco, temas por semana, hitos y entregables. */
-export function MonthDetail({ m, month, onPickWeek, onChanged, headingId }: { m: AgendaModel; month: string; onPickWeek: (date: string) => void; onChanged: (p: MentorPlan) => void; headingId?: string }) {
+export function MonthDetail({ m, month, onPickWeek, onChanged, headingId, only = null }: { m: AgendaModel; month: string; onPickWeek: (date: string) => void; onChanged: (p: MentorPlan) => void; headingId?: string; /** subplan elegido en las pestañas por área (null = todas) */ only?: string | null }) {
   const s = monthSummary(m.plan, m.schedule, month, m.deliverablesDefined ? m.deliverables : []);
   if (!s) return <p className="text-[14px] text-dim">Ese mes queda fuera del plan.</p>;
   const manual = !!m.plan.purposes?.month?.[month];
   const real = s.deliverables.filter((d) => d.kind !== "kata" && d.kind !== "daily_project");
   const maxMin = Math.max(1, ...s.byArea.map((a) => a.minutes));
-  const monthAreas = [...s.byArea].sort((a, b) => areaRank(a.areaId) - areaRank(b.areaId));
+  const monthAreas = [...s.byArea].filter((a) => only === null || a.subplanId === only).sort((a, b) => areaRank(a.areaId) - areaRank(b.areaId));
   return (
     <article className="space-y-4" data-testid="agenda-month" aria-labelledby={headingId}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -339,7 +339,7 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId }: { m:
       <section aria-labelledby={`${headingId ?? "mo"}-weeks`} data-testid="agenda-month-weeks">
         <h3 id={`${headingId ?? "mo"}-weeks`} className={cn(SECTION, "mb-2")}>Temas por semana, separados por área</h3>
         <div className="mb-2">
-          <MonthAreaTotals weeks={s.weeks.map((x) => x.week)} data={m.byWeekArea} />
+          <MonthAreaTotals weeks={s.weeks.map((x) => x.week)} data={m.byWeekArea} only={only} />
         </div>
         <ol className="space-y-2">
           {s.weeks.map((w) => (
@@ -351,7 +351,7 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId }: { m:
                 <span className="flex-1" />
                 <GhostButton aria-label={`Ver la semana ${w.week}`} onClick={() => onPickWeek(w.start)}>Ver semana</GhostButton>
               </div>
-              <WeekAreaChips week={w.week} data={m.byWeekArea} />
+              <WeekAreaChips week={w.week} data={m.byWeekArea} only={only} />
               <p className="mt-1 text-dim">{w.purpose}</p>
             </li>
           ))}

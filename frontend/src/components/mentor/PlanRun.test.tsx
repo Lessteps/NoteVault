@@ -527,7 +527,7 @@ describe("pestaña «Mi plan»: sub-barra de secciones y aviso de lo que falta g
     // vive en el Resumen (la sub-vista por defecto) y va antes que el resumen
     const content = byTest("plan-content")!;
     const ids = [...content.querySelectorAll("[id^=sec-]")].map((e) => e.id);
-    expect(ids).toEqual(["sec-generar", "sec-resumen"]);
+    expect(ids).toEqual(["sec-generar", "sec-resumen", "sec-datos", "sec-alcance"]); // los datos clave y el alcance van dentro del Resumen
   });
 
   it("«Ir a Ejecutar plan» cambia a esa sub-vista y la recuerda", async () => {
@@ -556,19 +556,19 @@ describe("pestaña «Mi plan»: sub-barra de secciones y aviso de lo que falta g
     // la sub-barra vive en el contenedor fijo, junto a las pestañas
     expect(byTest("plan-sticky")!.contains(nav)).toBe(true);
     const ids = [...nav.querySelectorAll<HTMLElement>("button")].map((b) => b.dataset.testid!.replace("subnav-", ""));
-    // el plan de prueba no es por áreas: sin «Fases mes a mes» ni «Temas por área»
-    expect(ids).toEqual(["resumen", "datos", "catalogo", "alcance", "registros", "cobertura", "ejecutar", "antigravity", "areas"]);
+    // cuatro sub-vistas: lo demás se fundió (datos y alcance en el Resumen, catálogo y áreas en «Temas por área», lo técnico en «Preparar», las fases en la Agenda)
+    expect(ids).toEqual(["resumen", "temas", "registros", "preparar"]);
     expect(byTest("subnav-resumen")!.getAttribute("aria-current")).toBe("page");
     expect(byTest("subnav-resumen")!.textContent).toContain("2"); // temas por generar
     expect(host.querySelector("#sec-resumen")).toBeTruthy();
-    expect(host.querySelector("#sec-datos")).toBeNull();
+    expect(host.querySelector("#sec-datos")).toBeTruthy(); // los datos clave están dentro del Resumen
 
-    await act(async () => { byTest("subnav-datos")!.click(); });
+    await act(async () => { byTest("subnav-preparar")!.click(); });
     await flush(); await flush();
-    expect(host.querySelector("#sec-datos")).toBeTruthy();
+    expect(host.querySelector("#sec-preparar")).toBeTruthy();
     expect(host.querySelector("#sec-resumen")).toBeNull();
-    expect(byTest("subnav-datos")!.getAttribute("aria-current")).toBe("page");
-    expect(useNavState.getState().values[planSectionKey(PID)]).toBe("datos");
+    expect(byTest("subnav-preparar")!.getAttribute("aria-current")).toBe("page");
+    expect(useNavState.getState().values[planSectionKey(PID)]).toBe("preparar");
   });
 
   it("una sub-vista guardada que ya no es visible vuelve al Resumen", async () => {

@@ -44,7 +44,7 @@ export function cellLabel(m: AgendaModel, date: string, only: string | null = nu
   return `${longDateLabel(date)}: ${bits.join(", ")}`;
 }
 
-export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaModel; anchor: string; onSelect: (date: string) => void; onChanged: (p: MentorPlan) => void }) {
+export function AgendaCalendar({ m, anchor, onSelect, onChanged, hideFilter = false }: { m: AgendaModel; anchor: string; onSelect: (date: string) => void; onChanged: (p: MentorPlan) => void; /** las pestañas por área de la Agenda ya eligen el área (la misma clave): no se repiten las fichas */ hideFilter?: boolean }) {
   const { plan } = m;
   const gridRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
@@ -105,7 +105,7 @@ export function AgendaCalendar({ m, anchor, onSelect, onChanged }: { m: AgendaMo
 
   return (
     <div className="space-y-4" data-testid="agenda-calendar">
-      <AreaFilter plan={plan} value={only} onChange={(id) => setStoredArea(id ?? "")} />
+      {!hideFilter && <AreaFilter plan={plan} value={only} onChange={(id) => setStoredArea(id ?? "")} />}
       {/* en un contenedor estrecho la rejilla se desplaza DENTRO de su propio contenedor (las celdas con áreas necesitan sitio para su texto) */}
       <div className="overflow-x-auto rounded-2xl" data-testid="agenda-grid-scroll">
       <div

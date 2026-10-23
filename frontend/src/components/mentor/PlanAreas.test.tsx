@@ -79,11 +79,26 @@ let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
 // «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
+const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
 const section = async (id: string) => {
-  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${id}]`);
+  // «Fases mes a mes» vive ahora en la Agenda, vista Mes
+  if (id === "fases") {
+    await act(async () => { host.querySelector<HTMLElement>("#plan-tabs-tab-agenda")!.click(); });
+    await flush();
+    await act(async () => { host.querySelector<HTMLElement>("#agenda-view-tab-mes")!.click(); });
+    await flush();
+    return;
+  }
+  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${SECTION_ALIAS[id] ?? id}]`);
   expect(b, `sub-vista ${id}`).toBeTruthy();
   await act(async () => { b!.click(); });
   await flush();
+  // «Preparar» agrupa ejecutar · cobertura · antigravity; el detalle de las áreas vive dentro de «Temas por área»
+  if (id === "ejecutar" || id === "cobertura" || id === "antigravity") {
+    const t = host.querySelector<HTMLElement>(`[data-testid=prepare-${id}]`);
+    if (t) { await act(async () => { t.click(); }); await flush(); }
+  }
+  if (id === "areas") host.querySelector("[data-testid=plan-areas-detail]")?.setAttribute("open", "");
 };
 const click = async (el: Element | null | undefined) => {
   expect(el, "elemento no encontrado").toBeTruthy();
@@ -310,27 +325,28 @@ describe("Calendario por áreas", () => {
     expect(byTest("agenda-calendar").textContent).toContain("Cada línea es un área");
   });
 
-  it("el filtro por área (chips con aria-pressed) deja solo esa área en el calendario y en el detalle, y se puede quitar", async () => {
+  it("las pestañas por área de la Agenda (aria-pressed) dejan solo esa área en el calendario y en el detalle, y se puede volver a «Todas»", async () => {
     const p = fivePlan("together");
     await openAgenda(p, "calendario");
     const d = firstStudyDay(p);
-    const group = byTest("area-filter");
-    expect(group.getAttribute("role")).toBe("group");
-    const chips = all("area-filter-chip", group);
+    const group = byTest("agenda-area-tabs");
+    const chips = all("agenda-area-tab", group).slice(1); // la primera es «Todas las áreas»
+    const allTab = all("agenda-area-tab", group)[0]!;
     expect(chips.map((c) => c.textContent!.trim())).toEqual(["Backend", "Frontend", "Databases", "Tooling and Quality", "Automation"]);
-    expect(byTest("area-filter-all").getAttribute("aria-pressed")).toBe("true");
+    expect(allTab.getAttribute("aria-pressed")).toBe("true");
+    expect(host.querySelector("[data-testid=area-filter]")).toBeNull(); // las pestañas sustituyen a las fichas del calendario
     await click(cellOf(d));
     expect(all("agenda-day-area", byTest("agenda-calendar-detail")).map((s) => s.getAttribute("data-area"))).toEqual(["backend", "frontend", "databases", "tooling"]);
     await click(chips[1]!); // Frontend
     expect(chips[1]!.getAttribute("aria-pressed")).toBe("true");
-    expect(byTest("area-filter-all").getAttribute("aria-pressed")).toBe("false");
+    expect(allTab.getAttribute("aria-pressed")).toBe("false");
     expect([...cellOf(d).querySelectorAll("[data-testid=agenda-cell-area]")].map((a) => a.getAttribute("data-area"))).toEqual(["frontend"]);
     expect(cellOf(d).getAttribute("aria-label")).toMatch(/Frontend \d+ temas? y práctica/);
     expect(cellOf(d).getAttribute("aria-label")).not.toContain("Backend");
     expect(all("agenda-day-area", byTest("agenda-calendar-detail")).map((s) => s.getAttribute("data-area"))).toEqual(["frontend"]);
     // con filtro no se ven los proyectos integradores ni el reto de lógica
     expect(byTest("agenda-day-projects", byTest("agenda-calendar-detail"))).toBeFalsy();
-    await click(byTest("area-filter-all"));
+    await click(allTab);
     expect(all("agenda-day-area", byTest("agenda-calendar-detail"))).toHaveLength(4);
     expect(byTest("agenda-day-projects", byTest("agenda-calendar-detail"))).toBeTruthy();
   });

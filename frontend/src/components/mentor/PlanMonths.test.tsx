@@ -76,10 +76,24 @@ const setValue = async (el: HTMLInputElement | HTMLSelectElement, v: string) => 
   });
   await flush();
 };
+const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
+const section = async (id: string) => {
+  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${SECTION_ALIAS[id] ?? id}]`);
+  expect(b, `sub-vista ${id}`).toBeTruthy();
+  await act(async () => { b!.click(); });
+  await flush();
+  if (id === "ejecutar" || id === "cobertura" || id === "antigravity") {
+    const t = host.querySelector<HTMLElement>(`[data-testid=prepare-${id}]`);
+    if (t) { await act(async () => { t.click(); }); await flush(); }
+  }
+  if (id === "areas") host.querySelector("[data-testid=plan-areas-detail]")?.setAttribute("open", "");
+};
 const open = async (section = "") => {
   vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
   // «Mi plan» enseña una sub-vista a la vez: se abre la que la prueba necesita
-  if (section) useNavState.setState((st) => ({ values: { ...st.values, [planSectionKey(PID)]: section } }));
+  // «Fases mes a mes» vive ahora en la Agenda, vista Mes (con las pestañas por área)
+  if (section === "fases") useNavState.setState((st) => ({ values: { ...st.values, [`mentor.planTab.${PID}`]: "agenda", [`mentor.agendaView.${PID}`]: "mes" } }));
+  else if (section) useNavState.setState((st) => ({ values: { ...st.values, [planSectionKey(PID)]: section } }));
   await mountEl(<MentorPlan planId={PID} />);
 };
 
@@ -129,7 +143,7 @@ describe("Fases del plan mes a mes (tabla accesible)", () => {
     expect(table.querySelector("thead th")!.className).toContain("sticky");
   });
 
-  it("pulsar un mes abre la Agenda en la vista Mes de ese mes", async () => {
+  it("pulsar un mes de la tabla lleva la vista Mes de la Agenda a ese mes", async () => {
     await open("fases");
     await click(button("diciembre de 2026"));
     const v = useNavState.getState().values;
@@ -208,7 +222,7 @@ describe("Cobertura de notas y práctica", () => {
     expect(cov.textContent).toContain("Sin notas de teoría");
     expect(cov.querySelector("button[aria-label^='Ver tema']")).toBeTruthy();
     // el panel «Cobertura» (totales) es otra sub-vista
-    await click(byTest("subnav-cobertura"));
+    await section("cobertura");
     expect(byTest("plan-coverage-totals").textContent).toContain("Con ejercicios");
   });
 
@@ -223,7 +237,7 @@ describe("Cobertura de notas y práctica", () => {
     await click(byTest("coverage-review-run"));
     expect(run).toHaveBeenCalledWith(PID, "full stack especializado en automatización", expect.objectContaining({ presets: ["market"], targetLevel: "junior" }));
     expect(byTest("coverage-review-summary").textContent).toContain("Backend se queda corto");
-    await click(byTest("subnav-areas"));
+    await section("areas");
     await click(button("Backend", host.querySelector("[data-testid=subplan-card]") as HTMLElement));
     const ai = byTest("area-ai-review");
     expect(ai.textContent).toContain("Revisión del Mentor");
@@ -293,7 +307,7 @@ describe("Revisión realista: formulario de criterio y resultado", () => {
 
   it("«Añadir faltante al plan» marca la propuesta (sin crear notas) y se puede quitar", async () => {
     await openWithReview();
-    await click(byTest("subnav-areas"));
+    await section("areas");
     await click(button("Backend", host.querySelector("[data-testid=subplan-card]") as HTMLElement));
     const ai = byTest("area-ai-review");
     expect(ai.textContent).toContain("Prioridad alta");

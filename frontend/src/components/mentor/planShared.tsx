@@ -83,6 +83,8 @@ export type PlanTab = (typeof PLAN_TABS)[number];
 
 /** Clave de la sub-vista recordada de «Mi plan» (Resumen, Temas, Cobertura, Ejecutar plan…), por plan. */
 export const planSectionKey = (planId: string): string => `mentor.planSection.${planId}`;
+/** La opción elegida dentro de «Preparar» (ejecutar · cobertura · antigravity), por plan. */
+export const prepareTabKey = (planId: string): string => `mentor.prepareTab.${planId}`;
 
 /**
  * Abre una sub-vista de «Mi plan» (`id` con o sin el prefijo `sec-`: «ejecutar», «sec-ejecutar») y, ya pintada, se coloca en ella.
@@ -92,6 +94,7 @@ export const planSectionKey = (planId: string): string => `mentor.planSection.${
 export function openPlanSection(planId: string, id: string): void {
   const key = id.replace(/^sec-/, "");
   useNavState.getState().set(planSectionKey(planId), key);
+  if (key === "ejecutar" || key === "cobertura" || key === "antigravity") useNavState.getState().set(prepareTabKey(planId), key);
   setTimeout(() => {
     const el = document.getElementById(`sec-${key}`);
     el?.scrollIntoView?.({ block: "start" });

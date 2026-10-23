@@ -45,7 +45,7 @@ import {
   type PlanDeliverable,
   type PlanPurposes,
 } from "../../lib/planAreas.js";
-import { buildSchedule } from "../../lib/planSchedule.js";
+import { buildSchedule, progressPlan } from "../../lib/planSchedule.js";
 import { deliverablesDefined } from "../../lib/planTopicsByArea.js";
 import { isLive, sanitizeRouteFields, type TopicRoute } from "../../lib/planRoute.js";
 import { projectsForSubplan, sanitizeTopicProject, type MasteryLookup, type TopicProject } from "../../lib/planTopicProject.js";
@@ -909,9 +909,10 @@ export function subplanLabel(s: Pick<Subplan, "area" | "objective"> & { areaId?:
  * Lo que los planes activos dicen que toca el día `date`: los temas aún sin completar cuya semana objetivo
  * es esta semana o una anterior (atrasados primero), y el entregable en la última semana (o cuando ya no
  * quedan temas) si no está hecho. Con planes solapados se combinan sin repetir un mismo tema.
- * `isDone` permite descartar temas ya completos en vivo.
+ * `isDone` permite descartar temas ya completos en vivo. `byProgress` (cuando `date` es HOY) usa el reparto por avance: lo que toca hoy es
+ * lo primero que falta de la ruta de cada área (el mismo que enseñan la Agenda y la Ejecución).
  */
-export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (folder: string) => boolean): PlanItem[] {
+export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (folder: string) => boolean, byProgress = false): PlanItem[] {
   const out: PlanItem[] = [];
   const seenTopics = new Set<string>();
   const ordered = [...plans].sort((a, b) => a.start.localeCompare(b.start) || a.createdAt.localeCompare(b.createdAt));
@@ -926,7 +927,7 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
     let focusToday = "";
     let dailyToday: { title: string; minutes: number; topics: string[] } | null = null;
     try {
-      const sch = buildSchedule(plan);
+      const sch = buildSchedule(byProgress ? progressPlan(plan, { today: date, ...(isDone ? { isDone } : {}) }) : plan);
       const day = sch.byDate.get(date);
       for (const b of day?.blocks ?? []) for (const it of b.items) roleOf.set(it.folder, roleOf.has(it.folder) && roleOf.get(it.folder) !== b.kind ? "both" : b.kind);
       focusToday = day?.focus?.label ?? "";

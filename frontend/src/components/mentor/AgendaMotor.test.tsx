@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { api } from "../../lib/bridge";
-import { buildSchedule } from "../../lib/planSchedule";
+import { buildSchedule, progressPlan } from "../../lib/planSchedule";
 import { weekRangesOf } from "../../lib/planTime";
 import { buildPracticeTrack } from "../../lib/practiceTrack";
 import type { MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../../lib/types";
@@ -143,7 +143,7 @@ function togetherPlan(): PlanData {
   const languages = [{ id: "python", required: true, why: "Backend", weight: 3 }, { id: "javascript", required: true, why: "Frontend", weight: 2 }, { id: "typescript", required: true, why: "Frontend", weight: 2 }];
   return { ...p, deliverablesDefinedAt: "2026-10-02T00:00:00Z", subplans, areaMode: "together", areaModeWhy: "Elegiste estudiar Backend, Frontend y Databases juntas.", areaModeBy: "user", preconditions: { ...(p.preconditions as object), areaMode: "together", languages } as never } as PlanData;
 }
-const dayOf = (p: PlanData): string => buildSchedule(p as never).days.find((d) => d.week >= 2 && d.study && d.focus)!.date;
+const dayOf = (p: PlanData): string => buildSchedule(progressPlan(p as never, { today: TODAY })).days.find((d) => d.week >= 2 && d.study && d.focus)!.date;
 
 describe("Agenda: áreas juntas, lenguaje diario, proyecto del tema y entregables por área", () => {
   it("el día muestra todas las áreas, la práctica de lenguaje, su sistema de práctica y el desglose por área", async () => {
@@ -169,7 +169,7 @@ describe("Agenda: áreas juntas, lenguaje diario, proyecto del tema y entregable
 
   it("el día en que se completa un tema aparece «Proyecto del tema» con su nivel y cuenta como entregable", async () => {
     const p = togetherPlan();
-    const sch = buildSchedule(p as never);
+    const sch = buildSchedule(progressPlan(p as never, { today: TODAY }));
     const withTp = sch.days.find((d) => d.topicProjects?.length)!;
     expect(withTp).toBeTruthy();
     await openDay(withTp.date, p);

@@ -165,15 +165,15 @@ export interface LateArea {
   minutes: number;
 }
 
-export function CatchUpCard({ total, areas, summary, warning }: { total: number; areas: LateArea[]; summary: ReactNode; warning?: ReactNode }) {
+export function CatchUpCard({ heading, total, areas, summary, warning }: { heading?: string; total: number; areas: LateArea[]; summary: ReactNode; warning?: ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
     <section role="status" className="space-y-3 rounded-2xl border border-warn/50 bg-warn-soft p-5" data-testid="run-catchup">
       <header className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="grid h-9 w-9 flex-none place-items-center rounded-full bg-warn text-white"><AlertTriangle size={18} /></span>
         <div className="min-w-0 flex-1 basis-56">
-          <h2 className="flex flex-wrap items-center gap-2 text-[17px] font-bold">Vas atrasado en {plural(total, "tema", "temas")} <Chip colour="var(--nv-warn)">Ajuste necesario</Chip></h2>
-          <p className="text-[13px] text-dim">Pulsa para desplegar y ocultar los temas atrasados por área.</p>
+          <h2 className="flex flex-wrap items-center gap-2 text-[17px] font-bold">{heading ?? `Vas atrasado en ${plural(total, "tema", "temas")}`} <Chip colour="var(--nv-warn)">Ajuste necesario</Chip></h2>
+          <p className="text-[13px] text-dim">Pulsa para desplegar y ocultar los temas por área.</p>
         </div>
         <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="inline-flex min-h-9 items-center gap-1 text-[13px] text-dim hover:text-text" data-testid="run-catchup-toggle">
           {open ? "Ocultar detalles" : "Ver detalles"} <ChevronDown size={14} aria-hidden className={cn("transition-transform", open && "rotate-180")} />

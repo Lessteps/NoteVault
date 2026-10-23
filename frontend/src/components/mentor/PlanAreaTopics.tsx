@@ -9,7 +9,7 @@ import { Check, X } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { areaTabsOf, areaTopicRows, basesTopicRows, BASES_KEY, groupTabsOf, pendingGenerate, rowsOfGroup, type AreaTab, type GroupTab } from "../../lib/planAreaTopics";
 import { ROUTE_LABEL } from "../../lib/planRoute";
-import { buildSchedule, type PlanSchedule } from "../../lib/planSchedule";
+import { buildSchedule, progressPlan, type PlanSchedule } from "../../lib/planSchedule";
 import { timeTagOf, topicTimes } from "../../lib/planTopicTime";
 import { todayIso } from "../../lib/tasks";
 import type { MentorPlan } from "../../lib/types";
@@ -89,7 +89,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
   const uid = useId();
   const day = today ?? todayIso();
   const begun = started ?? plan.subplans.some((s) => s.topics.some((t) => t.completedAt));
-  const times = useMemo(() => topicTimes((schedule ?? (plan.start && plan.end ? buildSchedule(plan) : null))?.days ?? []), [schedule, plan]);
+  const times = useMemo(() => topicTimes((schedule ?? (plan.start && plan.end ? buildSchedule(progressPlan(plan, { today: day })) : null))?.days ?? []), [schedule, plan, day]);
   const { rows: catalog, error, warming, reload } = usePlanTopicCatalog(plan.id);
   const [areaKey, setAreaKey] = useState("");
   const [groupId, setGroupId] = useState("");

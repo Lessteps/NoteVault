@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { api } from "../../lib/bridge";
-import { buildSchedule } from "../../lib/planSchedule";
+import { buildSchedule, progressPlan } from "../../lib/planSchedule";
 import { weekRangesOf } from "../../lib/planTime";
 import { buildPracticeTrack } from "../../lib/practiceTrack";
 import type { MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../../lib/types";
@@ -69,7 +69,7 @@ const loaded = (p: PlanData, over: Partial<Extract<MentorPlanGet, { loading: fal
 });
 
 /** Un día del plan con temas (el reparto diario nivela, así que no todos los días tienen). */
-const busyDay = (): string => buildSchedule(areasPlan() as never).days.find((d) => d.week >= 2 && d.topics.length >= 1 && d.practice.kata)!.date;
+const busyDay = (): string => buildSchedule(progressPlan(areasPlan() as never, { today: TODAY })).days.find((d) => d.week >= 2 && d.topics.length >= 1 && d.practice.kata)!.date;
 
 let host: HTMLDivElement;
 let root: Root;
@@ -311,7 +311,7 @@ describe("calendario accesible", () => {
     const margins = grid.querySelectorAll("[data-testid=agenda-week-margin]");
     expect(margins.length).toBeGreaterThanOrEqual(4);
     // el margen resume la fila lunes–domingo y dice qué semana(s) del plan toca
-    expect(margins[0]!.getAttribute("aria-label")).toMatch(/^Semana 1: \d+ temas?, \d+ entregables?/);
+    expect(margins[0]!.getAttribute("aria-label")).toMatch(/^Semana 1: (\d+ temas?|sin temas), \d+ entregables?/);
     // indicadores compactos: nº de temas, kata, entregable
     expect(cell.textContent).toMatch(/Back\d+t/);
     expect(cell.textContent).toContain("K");

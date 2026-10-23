@@ -12,7 +12,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { api } from "../../lib/bridge";
 import { planTogetherPhases } from "../../lib/planAreas";
-import { buildSchedule } from "../../lib/planSchedule";
+import { buildSchedule, progressPlan } from "../../lib/planSchedule";
 import { weekRangesOf } from "../../lib/planTime";
 import type { MentorChangeEntry, MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../../lib/types";
 import { useApp } from "../../store/app";
@@ -127,7 +127,7 @@ const openAgenda = async (p: PlanData, v?: string) => {
   await click(tab("agenda"));
   if (v) await click(view(v));
 };
-const firstStudyDay = (p: PlanData, week = 2): string => buildSchedule(p as never).days.find((d) => d.week === week && d.study && (d.blocks ?? []).length > 0)!.date;
+const firstStudyDay = (p: PlanData, week = 2): string => buildSchedule(progressPlan(p as never, { today: TODAY })).days.find((d) => d.week === week && d.study && (d.blocks ?? []).length > 0)!.date;
 
 beforeEach(() => {
   localStorage.clear();
@@ -246,7 +246,7 @@ describe("Mi plan: «Temas por semana y área»", () => {
     }
     // expandir una semana muestra los temas de cada área con su día
     // (con 4 temas por área y día el plan de prueba se reparte en pocas semanas: se abre una semana que tenga temas)
-    const withTopics = rows.find((r) => all("area-topics-cell", r).some((c) => Number(c.textContent!.match(/^\d+/)?.[0] ?? 0) > 0))!;
+    const withTopics = rows.find((r) => r.querySelector("button")!.getAttribute("aria-expanded") === "false" && all("area-topics-cell", r).some((c) => Number(c.textContent!.match(/^\d+/)?.[0] ?? 0) > 0))!;
     const btn = withTopics.querySelector("button")!;
     expect(btn.getAttribute("aria-expanded")).toBe("false");
     await click(btn);
@@ -443,7 +443,7 @@ describe("Práctica del área en el día (sistema de práctica propio, si existe
     const { areaPracticeFor } = await import("../../lib/areaPracticeSystem");
     const pre = { ...PRE, practice: { kataMinutes: 30, sessionsPerWeek: 2, minutesPerSession: 60, monthly: false, focus: "rotate" as const } };
     const p = fivePlan("together", { programmingPractice: buildPracticeTrack(pre as never), preconditions: pre as never });
-    const withKata = buildSchedule(p as never).days.find((d) => d.week === 2 && d.study && areaPracticeFor(p as never, d.date).length > 0)!;
+    const withKata = buildSchedule(progressPlan(p as never, { today: TODAY })).days.find((d) => d.week === 2 && d.date >= TODAY && d.study && areaPracticeFor(p as never, d.date).length > 0)!;
     await openAgenda(p, "dia");
     await setValue(byTest("agenda-date") as HTMLInputElement, withKata.date);
     const be = host.querySelector<HTMLElement>("[data-testid=agenda-day-area][data-area=backend]")!;

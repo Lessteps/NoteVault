@@ -133,21 +133,18 @@ describe("vista de ejecución", () => {
     expect(byTest("board-global")!.textContent).toContain("Progreso global");
   });
 
-  it("«Empezar hoy»: sin haber empezado y con el plan ya en marcha se ofrece mover el comienzo, con confirmación, y se aplica la operación restart", async () => {
-    const l = loaded(spread());
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(l);
+  it("ya no hay «Empezar hoy»: el reparto por avance coloca lo que falta desde hoy, en el orden de la ruta, sin que nadie lo pida", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(spreadAreas()));
     const change = vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, applied: true, entry: { changed: [] } } as never);
     await mountEl(<PlanWorkspace planId={PID} />);
-    expect(byTest("run-restart")).toBeTruthy();
-    // sin empezar la ruta no hay «Vas atrasado» ni aviso de ruta sólida
+    expect(byTest("run-restart")).toBeNull();
+    expect(byTest("run-restart-open")).toBeNull();
     expect(byTest("run-catchup")).toBeNull();
     expect(byTest("run-gate")).toBeNull();
-    await click(byTest("run-restart-open"));
     expect(change).not.toHaveBeenCalled();
-    expect(byTest("run-restart-confirm")).toBeTruthy();
-    await click(byTest("run-restart-apply"));
-    expect(change).toHaveBeenCalledWith(expect.objectContaining({ id: PID, ops: [{ op: "restart", date: TODAY }] }));
-    expect(byTest("run-restart-done")).toBeTruthy();
+    // el primer tema de la ruta toca HOY (aunque el plan arrancó el 6 de octubre y hoy es 12)
+    await click(runTab("area:s1"));
+    expect(listed().map((r) => r.textContent).join(" ")).toContain("1.1 A");
   });
 
   it("es de solo lectura: ningún campo de texto ni acción que cambie el plan", async () => {
@@ -203,6 +200,16 @@ describe("vista de ejecución", () => {
     return plan({ subplans: [{ ...sub("s1", "Fundamentals", "Reforzar bases", A), topics: [big(A), big(B)] }] as never });
   };
 
+  /** plan por áreas (agenda por enfoque): dos temas largos de Backend en orden de ruta */
+  const spreadAreas = (): PlanData => {
+    const A = "Programación/1 Fundamentals/1.1 A";
+    const B = "Programación/1 Fundamentals/1.2 B";
+    const big = (folder: string) => ({ folder, title: folder.split("/").pop()!, targetWeek: 1, estMinutes: 360 });
+    return plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", A), areaId: "backend", topics: [big(A), big(B)] }] as never });
+  };
+  /** Backend con un tema sin hacer y Databases con su tema ya completo */
+  const twoAreas = (): PlanData => plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }, { ...sub("s2", "Databases", "Consolidar", F2), areaId: "databases" }] as never });
+
   /** la ruta ya empezó: el primer tema está en curso (sin eso nada puede estar pendiente) */
   const started = (p: PlanData): MentorPlanGet => {
     const l = loaded(p) as Extract<MentorPlanGet, { loading: false }>;
@@ -221,13 +228,16 @@ describe("vista de ejecución", () => {
     expect(work().querySelector("[data-testid=board-time]")!.getAttribute("data-time-status")).toBe("scheduled");
   });
 
-  it("con la ruta empezada, un tema pasa a pendiente solo cuando se acaba su tiempo previsto, y su etiqueta lo dice", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(started(spread()));
+  it("con la ruta empezada, nada queda «pendiente» ni «atrasado» por haber pasado los días: lo que falta se coloca desde hoy", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(started(spreadAreas()));
     await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     await view("pendientes");
+    expect(listed()).toHaveLength(0);
+    await view("hoy");
     expect(listed().length).toBeGreaterThan(0);
-    expect(listed()[0]!.querySelector("[data-testid=board-time]")!.getAttribute("data-time-status")).toBe("pending");
+    expect(listed().every((r) => r.querySelector("[data-testid=board-time]")?.getAttribute("data-time-status") !== "pending")).toBe(true);
+    expect(byTest("run-catchup")).toBeNull();
   });
 
   it("«Temas de hoy» es exactamente lo que reparte la Agenda hoy: sin haber empezado no hay ruta bloqueada ni «Toca ahora» mezclado", async () => {
@@ -262,26 +272,24 @@ describe("vista de ejecución", () => {
     expect([...up!.querySelectorAll("[data-testid=upcoming-week]")].every((w) => Number(w.getAttribute("data-week")) > 1)).toBe(true);
   });
 
-  it("ruta sólida: con un día sin terminar, los temas de días posteriores salen bloqueados y sin flecha", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(started(spread()));
+  it("ruta sólida por avance: hoy sale el primer tema sin terminar de la ruta; el siguiente no se adelanta ni hay aviso de atraso", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(started(spreadAreas()));
     await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
-    await view("pendientes");
+    await view("hoy");
     const rows = listed();
-    expect(rows.map((r) => r.dataset.state)).toEqual(["practicando", "bloqueado"]);
-    expect(rows[1]!.querySelector("[data-testid=board-arrow]")).toBeNull();
-    // vas atrasado respecto al frente: el aviso dice qué terminar primero
+    expect(rows[0]!.textContent).toContain("1.1 A");
+    expect(rows[0]!.dataset.state).toBe("practicando");
     await click(runTab("general"));
-    expect(byTest("run-gate")!.textContent).toContain("termina primero");
-    expect(byTest("run-gate")!.textContent).toContain("1.1 A");
+    expect(byTest("run-gate")).toBeNull();
   });
 
   it("la flecha de un tema ofrece abrir el apunte (.md) o el archivo de práctica", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(twoAreas()));
     const ensure = vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ ok: true, kind: "practica", path: "", created: [], errors: [] } as never);
     await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
-    await view("pendientes");
+    await view("hoy");
     expect(byTest("board-menu")).toBeNull();
     await click(work().querySelector("[data-testid=board-arrow]"));
     const menu = byTest("board-menu")!;
@@ -292,13 +300,15 @@ describe("vista de ejecución", () => {
     expect(byTest("board-menu")).toBeNull();
   });
 
-  it("las vistas del área: pendientes enseña lo que tocaba y no se hizo, con el aviso «Atrasado»; lo hecho no sale", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
+  it("las vistas del área: «Pendientes» queda vacío (nada se atrasa: lo que falta toca hoy) y lo hecho no sale", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(twoAreas()));
     await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     await view("pendientes");
+    expect(listed()).toHaveLength(0);
+    await view("hoy");
     expect(listed()).toHaveLength(1);
-    expect(listed()[0]!.querySelector("[data-testid=board-tag]")!.textContent).toMatch(/Atrasado|Hoy/);
+    expect(listed()[0]!.querySelector("[data-testid=board-tag]")!.textContent).toMatch(/Hoy/);
     await click(runTab("area:s2"));
     await view("pendientes");
     expect(byTest("work-empty")!.textContent).toContain("nada pendiente"); // el de Python ya está completo

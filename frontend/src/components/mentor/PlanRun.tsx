@@ -18,7 +18,6 @@ import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../l
 import { dailyProjectOf, weeklyProjectOf } from "../../lib/planCurriculum";
 import { areaRouteTopics, basesClassifier, basesRouteTopics, dayBases, dayByArea, orderedAreas, type DayAreaEntry } from "../../lib/planTopicsByArea";
 import type { PlanDeliverable } from "../../lib/planAreas";
-import { daysBetween } from "../../lib/planTime";
 import { routeStarted, timeTagOf, topicTimes } from "../../lib/planTopicTime";
 import { minutesOn, minutesText } from "../../lib/timeLog";
 import type { MentorPlan } from "../../lib/types";
@@ -37,7 +36,7 @@ import { ProgressOverview, type BoardRow } from "./PlanBoard";
 import { usePlanAreaPractice } from "./PracticeCard";
 import { RunProjects } from "./PlanRunPractice";
 import { RunArea, RunBases, type TodayCard } from "./PlanRunTabs";
-import { AreaFolds, CatchUpCard, RestartBar, FocusCard, foldItemOf, ReviewIntervals, UpcomingCard, type FoldItem, type LateArea } from "./PlanRunGeneral";
+import { AreaFolds, CatchUpCard, FocusCard, foldItemOf, ReviewIntervals, UpcomingCard, type FoldItem, type LateArea } from "./PlanRunGeneral";
 import { SectionHeading } from "./planKit";
 import { DAY_LONG, openAgendaAt, type Loaded } from "./planShared";
 import { hasBasesRoute as planHasBasesRoute, RUN_TAB_GENERAL, RUN_TAB_RECORDS, runAreaTab, runTabKey } from "./mentorNav";
@@ -101,7 +100,13 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   );
   const behind = started && !!gate.frontier && gate.frontier < date && !plan.proposed && !plan.archived;
   const titleOf = (folder: string): string => m.topicByFolder.get(folder)?.title ?? folder.split("/").pop() ?? folder;
-  const late = !started ? 0 : (data.derived?.subplans ?? []).reduce((n, s) => n + s.topics.filter((t) => t.route !== "skipped" && t.targetWeek < currentWeek && t.state !== "completo").length, 0);
+  // El reparto es POR AVANCE (ver `lib/planSchedule`): lo pendiente se coloca siempre desde hoy y en el orden de la ruta, así que nada queda
+  // «atrasado» por haber pasado los días. Lo único que se avisa es lo que de verdad no cabe antes de la fecha de fin (desbordado).
+  const overflow = useMemo(() => {
+    const seen = new Map<string, { folder: string; title: string; area: string }>();
+    for (const d of m.schedule.days) for (const t of d.topics) if (t.overflow && !t.done && m.topicByFolder.get(t.folder)?.state !== "completo" && !seen.has(t.folder)) seen.set(t.folder, { folder: t.folder, title: t.title, area: t.area });
+    return [...seen.values()];
+  }, [m.schedule, m.topicByFolder]);
   const { entries: timeEntries } = useTimeLog(plan.id);
 
   const planToday = () => {
@@ -266,8 +271,9 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   };
   const firstPending = cards.find((c) => c.rows.some((r) => !r.done));
   const focusAreaKey = firstPending?.entry.areaId ?? firstPending?.entry.subplanId ?? "libre";
-  const lateAreas: LateArea[] = catchUp.lateByArea.map((a) => {
-    const topics = catchUp.late.filter((l) => l.area === a.area);
+  const overflowByArea = [...new Set(overflow.map((o) => o.area))].map((area) => ({ area, count: overflow.filter((o) => o.area === area).length }));
+  const lateAreas: LateArea[] = overflowByArea.map((a) => {
+    const topics = overflow.filter((l) => l.area === a.area);
     const sp = plan.subplans.find((x) => x.area === a.area);
     return { area: a.area, colour: focusColour(sp?.areaId), topics: topics.map((t) => ({ folder: t.folder, title: t.title })), minutes: Math.round(topics.reduce((n, t) => n + (lateMinutes.get(t.folder) ?? 0), 0)) };
   });
@@ -277,9 +283,6 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       {tab === "general" && (
         <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]" data-testid="run-general">
           <div className="min-w-0 space-y-6">
-            {!plan.proposed && !plan.archived && real > plan.start && daysBetween(real, plan.end) >= 14 && (!started || catchUp.late.length > 0) && (
-              <RestartBar planId={plan.id} start={plan.start} end={plan.end} today={real} late={catchUp.late.length} started={started} onDone={() => useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }))} />
-            )}
             {/* HOY */}
             <section aria-labelledby="run-today-h" data-testid="run-today" className={cn(card, "space-y-5")}>
               <header className="flex flex-wrap items-start gap-x-3 gap-y-3">
@@ -347,7 +350,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                     </div>
                     <ProgressBar pct={pctToday} thick label="Avance de hoy" />
                   </div>
-                  {(day.practice.project || langBlocks.length > 0 || late > 0) && (
+                  {(day.practice.project || langBlocks.length > 0) && (
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                       {(day.practice.project || langBlocks.length > 0) && (
                         <ul className="flex flex-wrap gap-2" aria-label="Práctica del día" data-testid="run-practice">
@@ -356,7 +359,6 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                         </ul>
                       )}
                       <span className="flex-1" />
-                      {late > 0 && <p className="text-[13px] text-warn" data-testid="run-late">{plural(late, "tema atrasado", "temas atrasados")} de semanas anteriores: están en «Vista de plan», dentro de cada área.</p>}
                     </div>
                   )}
                   {due.length > 0 && m.deliverablesDefined && (
@@ -366,7 +368,6 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                   )}
                 </>
               )}
-              {!day?.study && late > 0 && <p className="text-[13px] text-warn" data-testid="run-late">{plural(late, "tema atrasado", "temas atrasados")} de semanas anteriores: están en «Vista de plan», dentro de cada área.</p>}
             </section>
 
             {/* LO QUE VIENE: solo en la vista general */}
@@ -388,9 +389,10 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
             ) : null}
 
             {/* AVISO DE CONSTANCIA */}
-            {!plan.proposed && !plan.archived && !before && !after && started && catchUp.late.length > 0 && (
+            {!plan.proposed && !plan.archived && !before && !after && overflow.length > 0 && (
               <CatchUpCard
-                total={catchUp.late.length}
+                heading={`${plural(overflow.length, "tema no cabe", "temas no caben")} antes de la fecha de fin`}
+                total={overflow.length}
                 areas={lateAreas}
                 summary={<>Para terminar el {longDateLabel(plan.end)} debes completar <strong>{plural(catchUp.remaining, "tema pendiente", "temas pendientes")}</strong> en {plural(catchUp.daysLeft, "día de estudio", "días de estudio")}: unos <strong>{String(catchUp.perDay).replace(".", ",")} temas por día</strong> (≈ {hm(catchUp.minutesPerDay)}).</>}
                 warning={catchUp.capacityPerDay > 0 && catchUp.minutesPerDay > catchUp.capacityPerDay ? <p className="text-[13.5px] text-warn">Eso supera tu tiempo diario de teoría ({hm(catchUp.capacityPerDay)}): sube el tiempo diario o mueve la fecha de fin.</p> : undefined}

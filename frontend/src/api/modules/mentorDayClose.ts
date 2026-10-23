@@ -22,7 +22,7 @@ import { aiUnavailableReason } from "../../core/mentor/planner.js";
 import type { TopicSnap } from "../../core/mentor/topics.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
 import { StudyErrorManager } from "../../core/studyErrorManager.js";
-import { buildSchedule } from "../../lib/planSchedule.js";
+import { buildSchedule, progressPlan, type SchedulePlan } from "../../lib/planSchedule.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 
@@ -94,7 +94,7 @@ export function mentorDayCloseApi(app: AppState, deps: DayCloseDeps) {
     for (const p of plans) {
       const doneAt = new Map(p.subplans.flatMap((s) => s.topics.map((t) => [t.folder, t.completedAt ?? ""] as const)));
       for (const s of p.subplans) for (const t of s.topics) if (t.completedAt === date && !completed.includes(t.title)) completed.push(t.title);
-      const day = buildSchedule(p as never).byDate.get(date);
+      const day = buildSchedule(date === today ? progressPlan(p as unknown as SchedulePlan, { today }) : (p as never)).byDate.get(date);
       for (const t of day?.topics ?? []) {
         if (seen.has(t.folder)) continue;
         seen.add(t.folder);

@@ -73,7 +73,7 @@ import {
 import { generateByParts, PipelineCancel } from "../../core/mentor/planPipeline.js";
 import { canReorganize, reorganizeByAreas } from "../../core/mentor/planReorganize.js";
 import { PLAN_DELIVERABLE_STATUSES, resolveAreaMode, sanitizeGroups, type PlanDeliverableStatus } from "../../lib/planAreas.js";
-import { buildSchedule, deliverablesOf } from "../../lib/planSchedule.js";
+import { buildSchedule, deliverablesOf, progressPlan } from "../../lib/planSchedule.js";
 import { CurriculumCancel, generateCurriculum } from "../../core/mentor/planCurriculumAi.js";
 import { areaKeyOf, computeCoverage, COVERAGE_DISCLAIMER, MAX_PROFILE_CHARS, parseCoverageReply, sanitizeCriteria } from "../../lib/planCoverage.js";
 import { buildPlanTopicRows } from "../../lib/planTopicCatalog.js";
@@ -309,7 +309,7 @@ function planContext(app: AppState, today: string): PlanContext {
 
 /** Lo que el plan del mes dice que toca hoy (solo lee el plan). */
 function todaysPlanItems(app: AppState, day: string = localDate()): PlanItem[] {
-  return planItemsFor(day, new PlanStore(app.root).list());
+  return planItemsFor(day, new PlanStore(app.root).list(), undefined, day === localDate());
 }
 
 /** Estado derivado de la práctica de un plan (módulo `programming_practice` + registro manual de «Hoy»). */
@@ -1308,7 +1308,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const lookup = (folder: string) => snaps.get(folder);
       const active = activePlans(plans, today);
       const done = new Set(active.flatMap((p) => p.subplans.flatMap((s) => s.topics.filter((t) => topicState(lookup(t.folder) ?? null) === "completo").map((t) => t.folder))));
-      const items = planItemsFor(today, active, (f) => done.has(f));
+      const items = planItemsFor(today, active, (f) => done.has(f), true);
       const practiceItems = todaysPracticeItems(app, today);
       const months = st.months();
       if (!plan) {
@@ -1647,7 +1647,7 @@ export function mentorApi(app: AppState, send?: SendFn) {
           // los proyectos de tema se calibran con lo MEDIDO antes de preparar la agenda (la IA ve el nivel máximo permitido de cada uno)
           const look = masteryLookup(app);
           const calibrated = plan.structure === "areas" ? withTopicProjects(plan, look) : plan;
-          const sch = buildSchedule(calibrated);
+          const sch = buildSchedule(progressPlan(calibrated, { today }));
           const folders = new Set(plan.subplans.flatMap((s) => s.topics.map((t) => t.folder)));
           const counts = new Map<string, number>();
           for (const ex of vaultScan(app).exercises) {

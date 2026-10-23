@@ -5,7 +5,7 @@ import { Pencil, RotateCcw } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
 import { type PlanDeliverable, type PlanDeliverableKind, type PlanDeliverableStatus } from "../../lib/planAreas";
-import { areaRowsText, buildSchedule, deliverableAreaRows, deliverablesOf, type PlanSchedule } from "../../lib/planSchedule";
+import { areaRowsText, buildSchedule, deliverableAreaRows, deliverablesOf, progressPlan, type PlanSchedule } from "../../lib/planSchedule";
 import type { ExistingExercises } from "../../lib/planCurriculum";
 import { deliverablesDefined, topicsByWeekArea, type TopicsByWeekArea } from "../../lib/planTopicsByArea";
 import type { MentorPlan, MentorTopicView } from "../../lib/types";
@@ -63,22 +63,44 @@ export interface AgendaModel {
 export const FOCUS_COLOUR: Record<string, string> = { backend: "#2383e2", databases: "#8e24aa", frontend: "#33b679", logic: "#14b8a6", automation: "#c28a00", tooling: "#e67c73", generic: "#039be5" };
 export const focusColour = (id?: string): string => FOCUS_COLOUR[id ?? ""] ?? FOCUS_COLOUR.generic!;
 
-// El reparto y los temas por semana y área solo dependen del PLAN: se guardan por objeto de plan, así que Ejecución y Agenda (y cada cambio de
-// modo o de pestaña) comparten el mismo cálculo y solo se rehace cuando el plan cambia de verdad.
-const scheduleCache = new WeakMap<object, { schedule: PlanSchedule; byWeekArea: TopicsByWeekArea }>();
-export function scheduleOf(plan: MentorPlan): { schedule: PlanSchedule; byWeekArea: TopicsByWeekArea } {
-  let hit = scheduleCache.get(plan);
+// El reparto y los temas por semana y área dependen del PLAN y del AVANCE REAL (qué temas están completos y qué día es hoy): lo pendiente se
+// coloca siempre desde hoy y en el orden de la ruta de cada área (ver `progressPlan`). Se guardan por objeto de plan y por avance, así que
+// Ejecución y Agenda (y cada cambio de modo o de pestaña) comparten el mismo cálculo, y se rehace en cuanto cambia el plan, el día o el avance.
+type ScheduleHit = { schedule: PlanSchedule; byWeekArea: TopicsByWeekArea };
+const scheduleCache = new WeakMap<object, Map<string, ScheduleHit>>();
+
+/** Los temas completos en vivo (estado de la práctica) que el plan aún no tiene anotados como completados, en orden estable. */
+export function liveDoneOf(plan: MentorPlan, topicByFolder: ReadonlyMap<string, { state: string }>): string[] {
+  const out: string[] = [];
+  for (const s of plan.subplans) for (const t of s.topics) if (!t.completedAt && topicByFolder.get(t.folder)?.state === "completo") out.push(t.folder);
+  return out.sort();
+}
+
+export function scheduleOf(plan: MentorPlan, today?: string, liveDone: readonly string[] = []): ScheduleHit {
+  const key = `${today ?? ""}|${liveDone.join(",")}`;
+  let per = scheduleCache.get(plan);
+  if (!per) scheduleCache.set(plan, (per = new Map()));
+  let hit = per.get(key);
   if (!hit) {
-    const schedule = buildSchedule(plan);
+    const done = new Set(liveDone);
+    const schedule = buildSchedule(today ? progressPlan(plan, { today, isDone: (f) => done.has(f) }) : plan);
     hit = { schedule, byWeekArea: topicsByWeekArea(plan, schedule) };
-    scheduleCache.set(plan, hit);
+    if (per.size > 8) per.clear();
+    per.set(key, hit);
   }
   return hit;
 }
 
 export function useAgendaModel(data: Loaded, plan: MentorPlan): AgendaModel {
   const practice = data.practice ?? null;
-  const { schedule, byWeekArea } = useMemo(() => scheduleOf(plan), [plan]);
+  // el avance real manda: los temas completos en vivo y el día de hoy colocan lo que falta (sin que nadie lo ejecute)
+  const liveDone = useMemo(() => {
+    const st = new Map<string, { state: string }>();
+    for (const s of data.derived?.subplans ?? []) for (const t of s.topics) st.set(t.folder, t);
+    return liveDoneOf(plan, st);
+  }, [plan, data.derived]);
+  const liveKey = liveDone.join(",");
+  const { schedule, byWeekArea } = useMemo(() => scheduleOf(plan, data.today, liveDone), [plan, data.today, liveKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const del = useMemo(() => {
     const deliverables = deliverablesOf(plan, practice, schedule);
     const dueByDate = new Map<string, PlanDeliverable[]>();

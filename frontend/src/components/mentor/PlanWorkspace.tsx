@@ -7,7 +7,7 @@ import { clampToPlan } from "../../lib/planSchedule";
 import { dayBases, deliverablesDefined } from "../../lib/planTopicsByArea";
 import { useMentor } from "../../store/mentor";
 import { usePersistedNav } from "../../store/navState";
-import { scheduleOf } from "./agendaKit";
+import { liveDoneOf, scheduleOf } from "./agendaKit";
 import { useReviewItems } from "./AreaWork";
 import { MentorSidebar } from "./MentorSidebar";
 import {
@@ -42,7 +42,9 @@ export function PlanWorkspace({ planId }: { planId: string }) {
     const hints = runHints(plan, (t) => state.get(t.folder) === "completo" || !!t.completedAt, reviews.data?.items ?? []);
     let basesToday = false;
     if (today) {
-      const day = scheduleOf(plan).schedule.byDate.get(clampToPlan(today, plan));
+      const live = new Map<string, { state: string }>();
+      for (const sp of derived?.subplans ?? []) for (const t of sp.topics) live.set(t.folder, t);
+      const day = scheduleOf(plan, today, liveDoneOf(plan, live)).schedule.byDate.get(clampToPlan(today, plan));
       basesToday = !!day && dayBases(plan, day).length > 0;
     }
     return { hints, basesToday };

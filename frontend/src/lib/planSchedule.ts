@@ -15,6 +15,13 @@
 //  5. En la última semana, lo que no cabe se amontona en el último día de estudio (marcado como desbordado).
 //  Los temas ya completados (`completedAt`) se anotan en el día en que se completaron y no consumen capacidad.
 //
+// REPARTO POR AVANCE (`asOf`, ver `progressPlan`): cuando el plan lleva una fecha «hoy», los días anteriores NO reparten trabajo pendiente: lo que
+// falta se coloca desde hoy hacia delante, SIEMPRE en el orden de la ruta de cada área (nunca un tema posterior antes de uno anterior sin
+// terminar) y con las mismas reglas de capacidad. Lo hecho se queda donde se hizo; lo pendiente nunca queda «atrasado» por haber pasado los días:
+// se recalcula en cada carga a partir del avance real, sin IA y sin que nadie lo ejecute. Si lo que falta no cabe antes de la fecha de fin, se
+// mantiene el orden, se reparte hasta donde llega la capacidad y el resto se amontona en el último día (desbordado); el aviso de constancia
+// (`planCatchUp`) dice el ritmo que hace falta.
+//
 // Planes POR ÁREAS (`structure: "areas"`): el reparto es POR ENFOQUE (ver `planDayFocus.ts`): cada día tiene un enfoque (Backend…) y sus
 // bloques obligatorios de teoría y práctica (Backend = teoría de backend + práctica de Python + teoría y práctica de bases de datos el MISMO
 // día), los fundamentos se intercalan como lógica aplicada (no se adelantan) y cada día lleva su proyecto diario. Los planes antiguos
@@ -80,6 +87,26 @@ export interface SchedulePlan {
   structure?: "areas";
   /** currículo de práctica del plan generado por la IA (opcional); ver `planCurriculum.ts` */
   practiceCurriculum?: PracticeCurriculum;
+  /** «hoy» del reparto por avance: lo pendiente se coloca desde esta fecha (ver `progressPlan`); ausente = reparto por calendario */
+  asOf?: string;
+}
+
+/**
+ * El plan listo para el reparto POR AVANCE: fija «hoy» y da por completos los temas que `isDone` dice que lo están (avance real de la práctica)
+ * aunque aún no tengan `completedAt` (se anotan hoy). Puro; devuelve el mismo plan si no hay nada que cambiar.
+ */
+export function progressPlan<P extends SchedulePlan>(plan: P, o: { today: string; isDone?: (folder: string) => boolean }): P {
+  let changed = false;
+  const subplans = plan.subplans.map((s) => ({
+    ...s,
+    topics: s.topics.map((t) => {
+      if (t.completedAt || !o.isDone?.(t.folder)) return t;
+      changed = true;
+      return { ...t, completedAt: o.today };
+    }),
+  }));
+  if (plan.asOf === o.today && !changed) return plan;
+  return { ...plan, asOf: o.today, ...(changed ? { subplans } : {}) };
 }
 
 // ── Salida ──────────────────────────────────────────────────────────────
@@ -230,7 +257,9 @@ export function buildSchedule(planIn: SchedulePlan): PlanSchedule {
     };
   });
   const byDate = new Map(days.map((d) => [d.date, d]));
-  const capOf = (d: string): number => Math.max(0, base(d) - (base(d) > 0 ? practiceMin(d) : 0));
+  // reparto por avance: los días anteriores a «hoy» ya no reparten trabajo pendiente (lo que falta empieza hoy, o el siguiente día de estudio)
+  const asOf = plan.asOf && plan.asOf > plan.start && plan.asOf <= plan.end ? plan.asOf : undefined;
+  const capOf = (d: string): number => (asOf && d < asOf ? 0 : Math.max(0, base(d) - (base(d) > 0 ? practiceMin(d) : 0)));
 
   // posición de cada tema en la ruta de su área (por semana objetivo y orden guardado)
   const groupTitle = new Map<string, Map<string, string>>();

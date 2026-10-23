@@ -8,7 +8,8 @@
 import { create } from "zustand";
 import { api } from "../lib/bridge";
 import { routeOf, type TopicRoute } from "../lib/planRoute";
-import { buildSchedule, type SchedulePlan } from "../lib/planSchedule";
+import { buildSchedule, progressPlan, type SchedulePlan } from "../lib/planSchedule";
+import { todayIso } from "../lib/tasks";
 import { weekRangesOf } from "../lib/planTime";
 import type { MentorPlan } from "../lib/types";
 import { useMentor } from "./mentor";
@@ -230,7 +231,7 @@ export function topicOfPath(snap: RouteSnapshot, path: string): { folder: string
 /** Día del plan en que se estudia el tema (calculado una vez con la agenda del plan; null si no se pudo). */
 export function dayOfTopic(snap: RouteSnapshot, folder: string): { date: string; dayInWeek: number } | null {
   try {
-    if (snap.schedule === undefined) snap.schedule = buildSchedule(snap.plan as unknown as SchedulePlan);
+    if (snap.schedule === undefined) snap.schedule = buildSchedule(progressPlan(snap.plan as unknown as SchedulePlan, { today: todayIso() }));
     const day = snap.schedule?.days.find((d) => d.topics.some((t) => t.folder === folder));
     if (!day) return null;
     const info = snap.byFolder.get(folder);

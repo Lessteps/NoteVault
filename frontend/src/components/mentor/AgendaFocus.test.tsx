@@ -12,7 +12,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { api } from "../../lib/bridge";
 import { sanitizeCurriculum, scopeOfPlan } from "../../lib/planCurriculum";
-import { buildSchedule } from "../../lib/planSchedule";
+import { buildSchedule, progressPlan } from "../../lib/planSchedule";
 import { weekRangesOf } from "../../lib/planTime";
 import { buildPracticeTrack } from "../../lib/practiceTrack";
 import type { MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../../lib/types";
@@ -68,7 +68,7 @@ const loaded = (p: PlanData, exercisesOf: (folder: string) => number = () => 0):
 });
 
 const areaSection = (areaId: string): HTMLElement => host.querySelector<HTMLElement>(`[data-testid=agenda-day-area][data-area=${areaId}]`)!;
-const focusDay = (): string => buildSchedule(areasPlan() as never).days.find((d) => d.week >= 2 && d.focus && d.practice.kata && (d.blocks ?? []).every((b) => b.status === "topic"))!.date;
+const focusDay = (): string => buildSchedule(progressPlan(areasPlan() as never, { today: TODAY })).days.find((d) => d.week >= 2 && d.focus && d.practice.kata && (d.blocks ?? []).every((b) => b.status === "topic"))!.date;
 
 let host: HTMLDivElement;
 let root: Root;
@@ -187,7 +187,7 @@ describe("vista Día: secciones en orden", () => {
   it("con currículo del Mentor, el ejercicio del tema lleva la marca «Del Mentor» y el reto de lógica es el suyo", async () => {
     const d = focusDay();
     const p0 = areasPlan();
-    const day = buildSchedule(p0 as never).byDate.get(d)!;
+    const day = buildSchedule(progressPlan(p0 as never, { today: TODAY })).byDate.get(d)!;
     const first = day.blocks!.find((b) => b.id === "db-practice")!.items[0]!.folder;
     const cur = sanitizeCurriculum({ weeks: [{ week: day.week, source: "ai", exercises: [{ topic: first, practice: "database", title: "Diseña la tabla clientes y escribe la consulta con JOIN que liste sus pedidos" }], logic: [{ title: "Agrupa pedidos por cliente" }] }] }, scopeOfPlan(p0 as never))!;
     await openDay(d, areasPlan({ practiceCurriculum: cur }));
@@ -236,13 +236,13 @@ describe("Semana, Mes y Calendario con enfoque", () => {
     await openAgenda();
     const focus = byTest("agenda-focus-structure");
     expect(focus.querySelector("h3")!.textContent).toBe("Estructura por enfoque");
-    expect(all("agenda-focus-count", focus).map((x) => x.textContent)).toEqual([expect.stringMatching(/Backend 5 días/)]);
+    expect(all("agenda-focus-count", focus).map((x) => x.textContent)).toEqual([expect.stringMatching(/Backend 3 días/)]);
     const hours = all("agenda-focus-hours", focus).map((x) => x.textContent!);
     expect(hours[0]).toMatch(/Teoría.*\d+(,\d+)? h|Teoría.*\d+ min/);
     expect(hours[1]).toContain("Práctica");
     const wp = byTest("agenda-week-projects");
-    expect(wp.querySelectorAll("ol[aria-label='Mini-proyectos diarios de la semana'] li")).toHaveLength(5);
-    expect(byTest("agenda-project-weekly", wp).textContent).toMatch(/0 de 5 mini-proyectos diarios hechos/);
+    expect(wp.querySelectorAll("ol[aria-label='Mini-proyectos diarios de la semana'] li")).toHaveLength(3); // hoy es miércoles: el reparto por avance empieza hoy (miércoles a viernes)
+    expect(byTest("agenda-project-weekly", wp).textContent).toMatch(/0 de 3 mini-proyectos diarios hechos/);
     expect(all("agenda-week-day-focus")[0]!.textContent).toBe("Enfoque: Backend");
     expect(byTest("agenda-week-counts").textContent).toMatch(/\d+ entregables/);
   });

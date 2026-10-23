@@ -80,20 +80,24 @@ Acuerdos de trabajo, convenciones de código y matriz de herramientas (13 entreg
 - **13. Resumen Ejecutivo Fase 2**
 
 ### [03. Ingeniería de Requisitos](03-requirements/01.%20Diagrama%20de%20Contexto%20del%20Sistema.md)
-Especificación de frontera, lenguaje ubicuo, los 9 módulos funcionales y Libro Blanco SRS:
+Especificación de frontera, lenguaje ubicuo, los 15 módulos funcionales y Libro Blanco SRS:
 - **01. Diagrama de Contexto del Sistema (C4 Nivel 1)** | **02. Definición de Actores y Roles**
 - **03. Glosario de Dominio (Lenguaje Ubicuo)** | **04. Elicitación de Requerimientos (FURPS+)**
-- **05. Descomposición Modular Funcional** | **06. Requerimientos No Funcionales (ISO 25010)**
-- **07. Especificaciones de Módulos:** `MOD-NOTES`, `MOD-HABITS`, `MOD-EXERCISE`, `MOD-TASKS`, `MOD-PROJECTS`, `MOD-FINANCE`, `MOD-STUDY`, `MOD-MENTOR`, `MOD-WEB`
-- **08. System Requirements Specification (SRS) & Matriz RTM**
+- **05. Descomposición Modular Funcional (15 Módulos)** | **06. Requerimientos No Funcionales (ISO 25010)**
+- **07. Especificaciones de Módulos:** `MOD-NOTES`, `MOD-HOME`, `MOD-CANVAS`, `MOD-CALENDAR`, `MOD-HABITS`, `MOD-EXERCISE`, `MOD-NUTRITION`, `MOD-TASKS`, `MOD-PROJECTS`, `MOD-GOALS`, `MOD-FINANCE`, `MOD-STUDY`, `MOD-ENGLISH`, `MOD-MENTOR`, `MOD-WEB`
+- **08. System Requirements Specification (SRS) & Matriz RTM (39 Requisitos Trazados)**
+- **09. Phase 3 Brief (Gate 3 Closure)**
 
 ### [04. Modelado del Sistema](04-system-modeling/01.%20Content%20Strategy%20&%20Information%20Architecture.md)
-Diseño conceptual, experiencia de usuario y arquitectura de datos:
+Diseño conceptual, experiencia de usuario y arquitectura de datos (15 entregables):
 - **01. Content Strategy & Information Architecture** | **02. User Flows & Task Flows**
-- **03. Design System UI Kit** | **04. Domain Model and ERD Conceptual**
-- **05. System Sequence Diagrams** | **06. State Machine Diagrams**
-- **07. API Conceptual Design** | **08. Security & Authorization Model**
-- **09. Accessibility Standards (WCAG 2.1 AA)**
+- **03. Design System UI Kit** | **04. Domain Model and ERD (15 Entidades)**
+- **05. System Sequence Diagrams (5 Flujos Críticos)** | **06. State Machine Diagrams**
+- **07. API Conceptual Design (IPC Contracts)** | **08. Security & Authorization Model**
+- **09. Accessibility Standards (WCAG 2.1 AA)** | **10. Notification Matrix**
+- **11. Wireframes & Spatial Layout** | **12. Architectural Signals hacia Fase 5**
+- **13. Localization Strategy (i18n)** | **14. High-Fidelity Mockups**
+- **15. Phase 4 RTM Update & Brief (Gate 4 Closure)**
 
 ### [05. Diseño Arquitectónico](05-architectural-design/01-quality-attributes-map.md)
 Macro-decisiones técnicas, topología distribuida y registro inmutable de ADRs:

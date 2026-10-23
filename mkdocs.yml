@@ -108,15 +108,22 @@ nav:
       - 06. Requerimientos No Funcionales: 03-requirements/06. Requerimientos No Funcionales.md
       - 07. Especificaciones de Módulos:
           - MOD-NOTES (Notas y Markdown): 03-requirements/07. Module Specifications/MOD-NOTES.md
+          - MOD-HOME (Vista General y Hub Diario): 03-requirements/07. Module Specifications/MOD-HOME.md
+          - MOD-CANVAS (Lienzo Infinito 2D): 03-requirements/07. Module Specifications/MOD-CANVAS.md
+          - MOD-CALENDAR (Calendario y Agenda): 03-requirements/07. Module Specifications/MOD-CALENDAR.md
           - MOD-HABITS (Hábitos y Journal): 03-requirements/07. Module Specifications/MOD-HABITS.md
           - MOD-EXERCISE (Ejercicio y Series): 03-requirements/07. Module Specifications/MOD-EXERCISE.md
+          - MOD-NUTRITION (Alimentación y Macros): 03-requirements/07. Module Specifications/MOD-NUTRITION.md
           - MOD-TASKS (Tareas y Agenda): 03-requirements/07. Module Specifications/MOD-TASKS.md
-          - MOD-PROJECTS (Proyectos Jira): 03-requirements/07. Module Specifications/MOD-PROJECTS.md
+          - MOD-PROJECTS (Proyectos Fullstack SDLC): 03-requirements/07. Module Specifications/MOD-PROJECTS.md
+          - MOD-GOALS (Metas y OKRs): 03-requirements/07. Module Specifications/MOD-GOALS.md
           - MOD-FINANCE (Finanzas y Presupuesto): 03-requirements/07. Module Specifications/MOD-FINANCE.md
           - MOD-STUDY (Estudio, SRS y Matemáticas): 03-requirements/07. Module Specifications/MOD-STUDY.md
+          - MOD-ENGLISH (Inglés y Shadowing): 03-requirements/07. Module Specifications/MOD-ENGLISH.md
           - MOD-MENTOR (Mentor IA y Planes): 03-requirements/07. Module Specifications/MOD-MENTOR.md
           - MOD-WEB (Navegador y Enfoque): 03-requirements/07. Module Specifications/MOD-WEB.md
       - 08. System Requirements Specification (SRS): 03-requirements/08. System Requirements Specification.md
+      - 09. Phase 3 Brief (Gate 3 Closure): 03-requirements/09. Phase 3 Brief.md
   - 04. Modelado del Sistema:
       - 01. Content Strategy & Information Architecture: 04-system-modeling/01. Content Strategy & Information Architecture.md
       - 02. User Flows & Task Flows: 04-system-modeling/02. User Flows & Task Flows.md
@@ -127,6 +134,12 @@ nav:
       - 07. API Conceptual Design: 04-system-modeling/07. API Conceptual Design.md
       - 08. Security & Authorization Model: 04-system-modeling/08. Security & Authorization Model.md
       - 09. Accessibility Standards (WCAG 2.1 AA): 04-system-modeling/09. Accessibility Standards.md
+      - 10. Notification Matrix: 04-system-modeling/10. Notification Matrix.md
+      - 11. Wireframes & Spatial Layout: 04-system-modeling/11. Wireframes & Layout.md
+      - 12. Architectural Signals: 04-system-modeling/12. Architectural Signals.md
+      - 13. Localization Strategy (i18n): 04-system-modeling/13. Localization Strategy.md
+      - 14. High-Fidelity Mockups: 04-system-modeling/14. High-Fidelity Mockups.md
+      - 15. Phase 4 RTM Update & Brief (Gate 4): 04-system-modeling/15. Phase 4 RTM Update.md
   - 05. Diseño Arquitectónico:
       - 01. Quality Attributes Map: 05-architectural-design/01-quality-attributes-map.md
       - 02. Bounded Context Formalization: 05-architectural-design/02-bounded-context-formalization.md

@@ -264,7 +264,7 @@ function TemasPorAreaView(ctx: PlanSectionCtx) {
   const agenda = useAgendaModel(data, plan);
   return (
     <div id="sec-temas" tabIndex={-1} className={cn(anchor, "space-y-6")}>
-      <PlanAreaTopics plan={plan} schedule={agenda.schedule} today={agenda.today} started={routeStarted([...agenda.topicByFolder.values()].map((t) => t.state), plan.subplans.some((s) => s.topics.some((t) => t.completedAt)))} />
+      <PlanAreaTopics plan={plan} progress={new Map([...agenda.topicByFolder].map(([f, t]) => [f, t.pct] as const))} schedule={agenda.schedule} today={agenda.today} started={routeStarted([...agenda.topicByFolder.values()].map((t) => t.state), plan.subplans.some((s) => s.topics.some((t) => t.completedAt)))} />
       <details data-testid="plan-weeks-by-area">
         <summary className="inline-flex min-h-9 cursor-pointer items-center text-[14px] text-accent-text">Ver el reparto por semanas y áreas</summary>
         <div className="mt-3"><AreaTopicsSection m={agenda} currentWeek={summary.currentWeek} /></div>

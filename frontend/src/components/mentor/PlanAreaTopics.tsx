@@ -16,7 +16,7 @@ import type { MentorPlan } from "../../lib/types";
 import { Chip } from "../common/forms";
 import { cn } from "../ui";
 import { TimeChip, TopicMenu } from "./PlanBoard";
-import { LoadState } from "./parts";
+import { LoadState, ProgressBar } from "./parts";
 import { SectionHeading } from "./planKit";
 import { usePlanTopicCatalog } from "./PlanTopicCatalog";
 import { areaScope, GenerateButton, GenerateTopicButton } from "./TopicGenerate";
@@ -61,6 +61,22 @@ function TabBar<T extends { key: string; label: string; hint?: string; hintLabel
 const areaTabsView = (tabs: AreaTab[]) => tabs.map((t) => ({ key: t.key, label: t.area, ...(t.missing > 0 ? { hint: String(t.missing), hintLabel: `${t.missing} por generar` } : {}) }));
 const groupTabsView = (tabs: GroupTab[]) => tabs.map((t) => ({ key: t.id, label: t.title, hint: String(t.total), hintLabel: `${t.total} ${t.total === 1 ? "tema" : "temas"}${t.missing ? `, ${t.missing} por generar` : ""}` }));
 
+/** Anillo de avance de un tema (el mismo lenguaje visual que el resumen del área): el número va dentro y el color solo acompaña. */
+function Ring({ pct, done }: { pct: number; done: boolean }) {
+  const v = done ? 100 : Math.max(0, Math.min(100, Math.round(pct)));
+  const r = 14;
+  const c = 2 * Math.PI * r;
+  return (
+    <span className="relative inline-grid h-9 w-9 place-items-center" data-testid="topic-ring" data-pct={v} role="img" aria-label={`Avance ${v} %`}>
+      <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90" aria-hidden>
+        <circle cx="18" cy="18" r={r} fill="none" strokeWidth="3.5" className="stroke-hover" />
+        <circle cx="18" cy="18" r={r} fill="none" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${(c * v) / 100} ${c}`} style={{ stroke: v >= 100 ? "var(--nv-mint)" : "var(--nv-accent)" }} />
+      </svg>
+      <span className="text-[10px] font-semibold tabular-nums" aria-hidden>{v}%</span>
+    </span>
+  );
+}
+
 function Mark({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   return ok ? (
     <span className="inline-flex items-center gap-1"><Check size={14} aria-hidden className="text-mint" /> {yes}</span>
@@ -69,7 +85,7 @@ function Mark({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   );
 }
 
-export function PlanAreaTopics({ plan, schedule, today, started }: { plan: MentorPlan; /** el reparto del plan (si no se da, se calcula) */ schedule?: PlanSchedule; today?: string; /** ¿ha empezado la ruta? (si no se da, cuando hay algún tema completado) */ started?: boolean }) {
+export function PlanAreaTopics({ plan, schedule, today, started, progress }: { plan: MentorPlan; /** avance (0–100) de cada tema, de la práctica: el mismo que enseña el resumen del área */ progress?: ReadonlyMap<string, number>; /** el reparto del plan (si no se da, se calcula) */ schedule?: PlanSchedule; today?: string; /** ¿ha empezado la ruta? (si no se da, cuando hay algún tema completado) */ started?: boolean }) {
   const uid = useId();
   const day = today ?? todayIso();
   const begun = started ?? plan.subplans.some((s) => s.topics.some((t) => t.completedAt));
@@ -123,6 +139,7 @@ export function PlanAreaTopics({ plan, schedule, today, started }: { plan: Mento
             <p className="min-w-0 flex-1 basis-72 text-[14.5px]">
               <strong>{active.area}</strong> · {active.total} {active.total === 1 ? "tema" : "temas"} · {active.done} completados ·{" "}
               {active.missing > 0 ? <span className="text-warn">{active.missing} por generar</span> : <span className="text-mint">nada por generar</span>}
+              <span className="mt-1.5 block max-w-md"><ProgressBar pct={active.total ? Math.round((active.done / active.total) * 100) : 0} label={`Avance de ${active.area}`} /></span>
             </p>
             {!isBases && <GenerateButton
               planId={plan.id}
@@ -142,11 +159,11 @@ export function PlanAreaTopics({ plan, schedule, today, started }: { plan: Mento
             <p className="rounded-xl border border-dashed border-line p-4 text-center text-[14px] text-dim" data-testid="area-empty">Esta sección no tiene temas.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-line">
-              <table className="w-full min-w-[62rem] border-collapse text-left text-[14px]" data-testid="area-table">
+              <table className="w-full min-w-[66rem] border-collapse text-left text-[14px]" data-testid="area-table">
                 <caption className="sr-only">Temas de {active.area}{group.id ? `, grupo ${group.title}` : ""}</caption>
                 <thead className="bg-card text-[12.5px] uppercase tracking-wide text-faint">
                   <tr>
-                    {["Sem.", "Tema", "Previsto", "Nota", "Mapa", ".practica", "Ejercicios", "Estado", "Generar"].map((h) => (
+                    {["Sem.", "Tema", "Avance", "Previsto", "Nota", "Mapa", ".practica", "Ejercicios", "Estado", "Generar"].map((h) => (
                       <th key={h} scope="col" className="px-3 py-2 font-semibold">{h}</th>
                     ))}
                   </tr>
@@ -159,6 +176,7 @@ export function PlanAreaTopics({ plan, schedule, today, started }: { plan: Mento
                         <TopicMenu folder={r.folder} title={r.title} trigger={<span className="block truncate" title={r.folder} data-testid="area-open">{r.title}</span>} className="font-semibold text-accent-text underline-offset-2 hover:underline" />
                         {!r.exists && <span className="block text-[12.5px] text-faint">Aún no existe en la vault</span>}
                       </th>
+                      <td className="px-3 py-2"><Ring pct={progress?.get(r.folder) ?? 0} done={r.completed} /></td>
                       <td className="px-3 py-2">{(() => { const t = timeTagOf(times.get(r.folder), r.completed, day, begun); return t && t.status !== "done" ? <TimeChip time={t} /> : <span className="text-dim">—</span>; })()}</td>
                       <td className="px-3 py-2"><Mark ok={r.theory} yes="Nota" no="Sin nota" /></td>
                       <td className="px-3 py-2"><Mark ok={r.canvas} yes="Mapa" no="Sin mapa" /></td>

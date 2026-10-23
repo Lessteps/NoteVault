@@ -7,7 +7,8 @@
 //  · `ReviewIntervals`: los intervalos del repaso espaciado.
 
 import { AlertTriangle, ChevronDown, Pause, Play, Settings2, Timer } from "lucide-react";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { api } from "../../lib/bridge";
 import { clock, FOCUS_CHOICES, remainingMs } from "../../lib/pomodoro";
 import { dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
 import { usePomodoro } from "../../store/pomodoro";
@@ -275,6 +276,97 @@ export function FocusCard({ areaKey, planId, session, loggedMinutes, goalMinutes
         <div className="mt-1.5"><ProgressBar pct={pct} label="Tiempo registrado hoy frente a la meta" /></div>
       </div>
       <p className="text-[12.5px] text-faint">{loggedMinutes === 0 ? "Aún no has registrado tiempo. Abre un área y empieza un Pomodoro para sincronizar tus avances automáticamente." : "Cada bloque que guardas queda en el registro de horas del área."}</p>
+    </section>
+  );
+}
+
+// ── «Empezar hoy» ───────────────────────────────────────────────────────
+
+const COLD_RETRY_MS = 1500;
+const COLD_RETRY_MAX = 40;
+
+/**
+ * Aviso de la vista general cuando el plan arrancó antes de que empieces a estudiar (o vas atrasado): ofrece mover el comienzo a hoy.
+ * Aplica la operación determinista `restart` (repartir todo lo que falta desde hoy hasta la misma fecha de fin; lo completado se conserva),
+ * pide confirmación y se puede deshacer, aquí mismo o en «Preguntas y ajustes».
+ */
+export function RestartBar({ planId, start, end, today, late, started, onDone }: { planId: string; start: string; end: string; today: string; late: number; started: boolean; onDone: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const apply = async (): Promise<void> => {
+    setBusy(true);
+    setError("");
+    try {
+      const body = { id: planId, ops: [{ op: "restart", date: today }], label: "Empezar el plan hoy" };
+      let r = await api.mentorPlanChange(body);
+      for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
+        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        r = await api.mentorPlanChange(body);
+      }
+      if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
+      if (!alive.current) return;
+      if (!r.applied) {
+        setError("No se pudo mover el comienzo: quedan menos de dos semanas de plan o la fecha ya es la de inicio.");
+        return;
+      }
+      setConfirming(false);
+      setDone(true);
+      onDone();
+    } catch (e) {
+      if (alive.current) setError((e as Error).message);
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  };
+  const undo = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      await api.mentorPlanChangeUndo(planId);
+      if (!alive.current) return;
+      setDone(false);
+      onDone();
+    } catch (e) {
+      if (alive.current) setError((e as Error).message);
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  };
+  if (done) {
+    return (
+      <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-mint/50 bg-card px-4 py-3" data-testid="run-restart-done">
+        <p role="status" className="min-w-0 flex-1 basis-64 text-[14px]"><strong>Listo: tu plan empieza hoy.</strong> Los temas que faltan se repartieron desde {dateLabel(today)} hasta el {dateLabel(end)}.</p>
+        <GhostButton disabled={busy} onClick={() => void undo()} data-testid="run-restart-undo">Deshacer</GhostButton>
+      </section>
+    );
+  }
+  return (
+    <section className="space-y-3 rounded-2xl border-2 border-accent/50 bg-card px-4 py-3.5" data-testid="run-restart">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1 basis-64">
+          <h2 className="text-[16px] font-semibold">{started ? `Vas atrasado en ${plural(late, "tema", "temas")}: ¿replanificar desde hoy?` : "Tu plan empezó antes de que empezaras a estudiar"}</h2>
+          <p className="text-[14px] text-dim">
+            El plan arrancó el {dateLabel(start)}. {started ? "Replanificar" : "Empezar hoy"} reparte lo que falta desde {dateLabel(today)} hasta el {dateLabel(end)}, empezando por el primer tema de la ruta. No pierdes nada de lo hecho.
+          </p>
+        </div>
+        <PrimaryButton large disabled={busy || confirming} onClick={() => setConfirming(true)} data-testid="run-restart-open">{started ? "Replanificar desde hoy" : "Empezar hoy"}</PrimaryButton>
+      </div>
+      {confirming && (
+        <div role="group" aria-label="Confirmar" className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-3" data-testid="run-restart-confirm" onKeyDown={(e) => { if (e.key === "Escape") setConfirming(false); }}>
+          <p className="min-w-0 flex-1 basis-64 text-[14px]">Cambia las fechas de todos los temas pendientes. Queda en «Preguntas y ajustes» y se puede deshacer.</p>
+          <PrimaryButton disabled={busy} onClick={() => void apply()} data-testid="run-restart-apply">Aplicar</PrimaryButton>
+          <GhostButton disabled={busy} onClick={() => setConfirming(false)}>Cancelar</GhostButton>
+        </div>
+      )}
+      {error && <p role="alert" className="rounded-lg border border-danger/40 bg-danger-soft px-3 py-2 text-[14px] text-danger">{error}</p>}
     </section>
   );
 }

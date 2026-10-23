@@ -90,6 +90,8 @@ export type ChangeOp =
   | { op: "lighter" }
   | { op: "trim_to_fit" }
   | { op: "extend_to"; date: string }
+  /** «Empezar hoy»: el plan arranca en esa fecha (la fecha de fin no cambia) y todo lo que falta se reparte desde ahí; lo completado se conserva */
+  | { op: "restart"; date: string }
   | { op: "raise_minutes"; minutes: number };
 
 export interface ChangeCtx {
@@ -208,8 +210,9 @@ function syncGroups(seed: SubplanSeed, extra: readonly AreaGroup[] = []): Subpla
 
 /** Aplica las operaciones sobre un plan y recalcula TODO el reparto con la capacidad real. No escribe nada. */
 export function applyOps(plan: Plan, ops: readonly ChangeOp[], ctx: ChangeCtx): ApplyResult {
+  let start = plan.start;
   let pre: PlanPreconditions | undefined = plan.preconditions ? { ...plan.preconditions, start: plan.start, end: plan.end } : undefined;
-  const weeksOf = (end: string): number => weekRangesOf(plan.start, end).length;
+  const weeksOf = (end: string): number => weekRangesOf(start, end).length;
   let seeds: SubplanSeed[] = plan.subplans.map(seedOf);
   const byAreas = plan.structure === "areas" || (plan.subplans.length > 0 && plan.subplans.every((s) => !!s.areaId));
   // un plan guardado sin modo declarado se lee por fases (como siempre): el valor por defecto «juntas» solo vale para planes NUEVOS
@@ -596,6 +599,17 @@ export function applyOps(plan: Plan, ops: readonly ChangeOp[], ctx: ChangeCtx): 
         }
         break;
       }
+      case "restart": {
+        // solo hacia delante, dentro del plan y dejando al menos dos semanas de margen
+        if (!pre || !isDate(op.date) || op.date <= start || daysBetween(op.date, pre.end) < 14) break;
+        start = op.date;
+        pre = { ...pre, start: op.date };
+        weeks = weeksOf(pre.end);
+        rephase = true;
+        structural();
+        applied++;
+        break;
+      }
       case "extend_to": {
         if (!pre || !isDate(op.date) || op.date < pre.end || daysBetween(pre.start, op.date) + 1 > MAX_PERIOD_DAYS) break;
         pre = { ...pre, end: op.date };
@@ -632,7 +646,7 @@ export function applyOps(plan: Plan, ops: readonly ChangeOp[], ctx: ChangeCtx): 
   }
 
   // ── recálculo determinista ──
-  const from = ctx.today > plan.start ? ctx.today : plan.start;
+  const from = ctx.today > start ? ctx.today : start;
   const end = pre?.end ?? plan.end;
   let subplans: Subplan[];
   let fits: boolean;
@@ -687,7 +701,7 @@ export function applyOps(plan: Plan, ops: readonly ChangeOp[], ctx: ChangeCtx): 
       if (!openQuestions.length) openQuestions = undefined;
     } else openQuestions = undefined;
   } else {
-    const built = buildPlan(seedsFor(), { start: plan.start, end, hoursPerWeek: plan.hoursPerWeek ?? 10, from });
+    const built = buildPlan(seedsFor(), { start, end, hoursPerWeek: plan.hoursPerWeek ?? 10, from });
     subplans = built.plan.subplans;
     fits = built.fits;
     totalMinutes = built.totalMinutes;
@@ -703,6 +717,7 @@ export function applyOps(plan: Plan, ops: readonly ChangeOp[], ctx: ChangeCtx): 
   }));
   const next: Plan = {
     ...plan,
+    start,
     end,
     ...(pre ? { preconditions: pre } : {}),
     ...(hoursPerWeek ? { hoursPerWeek } : {}),

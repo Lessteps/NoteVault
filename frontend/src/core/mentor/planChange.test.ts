@@ -95,6 +95,20 @@ describe("applyOps: parche + recálculo semanal determinista", () => {
     expect(r.plan).toBe(base);
   });
 
+  it("«restart» (empezar hoy) mueve el comienzo hacia delante, conserva el fin y reparte desde ahí; fuera de rango no hace nada", () => {
+    const r = applyOps(base, [{ op: "restart", date: "2026-10-13" }], { ...ctx, today: "2026-10-13" });
+    expect(r.applied).toBe(1);
+    expect(r.plan.start).toBe("2026-10-13");
+    expect(r.plan.end).toBe(base.end);
+    expect(r.plan.preconditions!.start).toBe("2026-10-13");
+    // todos los temas siguen ahí y caben en las semanas que quedan
+    expect(r.plan.subplans.flatMap((s) => s.topics).length).toBe(base.subplans.flatMap((s) => s.topics).length);
+    // hacia atrás, el mismo día o con menos de dos semanas de margen: nada
+    expect(applyOps(base, [{ op: "restart", date: "2026-10-01" }], ctx).applied).toBe(0);
+    expect(applyOps(base, [{ op: "restart", date: base.start }], ctx).applied).toBe(0);
+    expect(applyOps(base, [{ op: "restart", date: "2026-11-01" }], ctx).applied).toBe(0);
+  });
+
   it("subir el tiempo diario o ampliar el periodo respeta los límites", () => {
     const raised = applyOps(base, [{ op: "raise_minutes", minutes: 180 }, { op: "raise_minutes", minutes: 5000 }], ctx);
     expect(raised.plan.preconditions!.minutesPerDay).toBe(180);

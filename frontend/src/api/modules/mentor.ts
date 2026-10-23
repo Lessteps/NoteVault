@@ -2120,8 +2120,8 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const kind = o.intent === "fix" ? ("fix" as const) : ("adjust" as const);
       const direct: ChangeOp[] | null = Array.isArray(o.ops)
         ? (o.ops as any[])
-            .filter((x) => x && ["trim_to_fit", "extend_to", "raise_minutes", "lighter", "set_area_mode", "add_area"].includes(String(x.op)))
-            .map((x) => (x.op === "add_area" ? { op: "add_area" as const, areaId: String(x.areaId ?? "").slice(0, 40) } : x.op === "extend_to" ? { op: "extend_to" as const, date: String(x.date ?? "") } : x.op === "raise_minutes" ? { op: "raise_minutes" as const, minutes: Number(x.minutes) } : x.op === "set_area_mode" ? { op: "set_area_mode" as const, mode: x.mode === "phased" ? ("phased" as const) : ("together" as const) } : { op: x.op as "trim_to_fit" | "lighter" }))
+            .filter((x) => x && ["trim_to_fit", "extend_to", "restart", "raise_minutes", "lighter", "set_area_mode", "add_area"].includes(String(x.op)))
+            .map((x) => (x.op === "add_area" ? { op: "add_area" as const, areaId: String(x.areaId ?? "").slice(0, 40) } : x.op === "extend_to" ? { op: "extend_to" as const, date: String(x.date ?? "") } : x.op === "restart" ? { op: "restart" as const, date: String(x.date ?? "") } : x.op === "raise_minutes" ? { op: "raise_minutes" as const, minutes: Number(x.minutes) } : x.op === "set_area_mode" ? { op: "set_area_mode" as const, mode: x.mode === "phased" ? ("phased" as const) : ("together" as const) } : { op: x.op as "trim_to_fit" | "lighter" }))
         : null;
       if (!comment && !direct?.length) throw new ApiError("Escribe qué quieres cambiar en el plan.");
       if (studyIndexCold(app)) return { loading: true as const };

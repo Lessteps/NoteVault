@@ -16,6 +16,7 @@ import { bucketReviews, dueText, reviewsOfTopics, type ReviewRow } from "../../l
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
 import { dailyProjectOf, weeklyProjectOf } from "../../lib/planCurriculum";
 import { dayByArea, orderedAreas, type DayAreaEntry } from "../../lib/planTopicsByArea";
+import { daysBetween } from "../../lib/planTime";
 import { routeStarted, timeTagOf, topicTimes } from "../../lib/planTopicTime";
 import { minutesOn, minutesText } from "../../lib/timeLog";
 import type { MentorPlan } from "../../lib/types";
@@ -34,7 +35,7 @@ import { ProgressOverview, type BoardRow } from "./PlanBoard";
 import { usePlanAreaPractice } from "./PracticeCard";
 import { RunProjects } from "./PlanRunPractice";
 import { RunArea, RunBases, RunNav, type RunTab, type TodayCard } from "./PlanRunTabs";
-import { AreaFolds, CatchUpCard, FocusCard, foldItemOf, ReviewIntervals, UpcomingCard, type FoldItem, type LateArea } from "./PlanRunGeneral";
+import { AreaFolds, CatchUpCard, RestartBar, FocusCard, foldItemOf, ReviewIntervals, UpcomingCard, type FoldItem, type LateArea } from "./PlanRunGeneral";
 import { SectionHeading } from "./planKit";
 import { DAY_LONG, openAgendaAt, openPlanRecords, type Loaded } from "./planShared";
 
@@ -93,9 +94,9 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
     [m.schedule, m.topicByFolder],
   );
   const timeOf = (folder: string, done: boolean) => timeTagOf(times.get(folder), done, date, started);
-  const behind = !!gate.frontier && gate.frontier < date && !plan.proposed && !plan.archived;
+  const behind = started && !!gate.frontier && gate.frontier < date && !plan.proposed && !plan.archived;
   const titleOf = (folder: string): string => m.topicByFolder.get(folder)?.title ?? folder.split("/").pop() ?? folder;
-  const late = (data.derived?.subplans ?? []).reduce((n, s) => n + s.topics.filter((t) => t.route !== "skipped" && t.targetWeek < currentWeek && t.state !== "completo").length, 0);
+  const late = !started ? 0 : (data.derived?.subplans ?? []).reduce((n, s) => n + s.topics.filter((t) => t.route !== "skipped" && t.targetWeek < currentWeek && t.state !== "completo").length, 0);
   const { entries: timeEntries } = useTimeLog(plan.id);
 
   const planToday = () => {
@@ -301,6 +302,9 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       {tab === "general" && (
         <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]" data-testid="run-general">
           <div className="min-w-0 space-y-6">
+            {!plan.proposed && !plan.archived && real > plan.start && daysBetween(real, plan.end) >= 14 && (!started || catchUp.late.length > 0) && (
+              <RestartBar planId={plan.id} start={plan.start} end={plan.end} today={real} late={catchUp.late.length} started={started} onDone={() => useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }))} />
+            )}
             {/* HOY */}
             <section aria-labelledby="run-today-h" data-testid="run-today" className={cn(card, "space-y-5")}>
               <header className="flex flex-wrap items-start gap-x-3 gap-y-3">
@@ -404,7 +408,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
             ) : null}
 
             {/* AVISO DE CONSTANCIA */}
-            {!plan.proposed && !plan.archived && !before && !after && catchUp.late.length > 0 && (
+            {!plan.proposed && !plan.archived && !before && !after && started && catchUp.late.length > 0 && (
               <CatchUpCard
                 total={catchUp.late.length}
                 areas={lateAreas}

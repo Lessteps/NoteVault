@@ -130,6 +130,23 @@ describe("vista de ejecución", () => {
     expect(byTest("board-global")!.textContent).toContain("Progreso global");
   });
 
+  it("«Empezar hoy»: sin haber empezado y con el plan ya en marcha se ofrece mover el comienzo, con confirmación, y se aplica la operación restart", async () => {
+    const l = loaded(spread());
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(l);
+    const change = vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, applied: true, entry: { changed: [] } } as never);
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(byTest("run-restart")).toBeTruthy();
+    // sin empezar la ruta no hay «Vas atrasado» ni aviso de ruta sólida
+    expect(byTest("run-catchup")).toBeNull();
+    expect(byTest("run-gate")).toBeNull();
+    await click(byTest("run-restart-open"));
+    expect(change).not.toHaveBeenCalled();
+    expect(byTest("run-restart-confirm")).toBeTruthy();
+    await click(byTest("run-restart-apply"));
+    expect(change).toHaveBeenCalledWith(expect.objectContaining({ id: PID, ops: [{ op: "restart", date: TODAY }] }));
+    expect(byTest("run-restart-done")).toBeTruthy();
+  });
+
   it("es de solo lectura: ningún campo de texto ni acción que cambie el plan", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<MentorPlan planId={PID} />);

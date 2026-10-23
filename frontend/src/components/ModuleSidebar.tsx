@@ -54,7 +54,7 @@ export function ModuleSidebar({
           </button>
         )}
       </div>
-      <nav className="flex min-h-0 flex-col gap-0.5 overflow-y-auto p-2">
+      <nav aria-label={title} className="flex min-h-0 flex-col gap-0.5 overflow-y-auto p-2">
         {items.map((it) => (
           <div key={it.id} className="flex flex-col gap-0.5">
             <SidebarButton it={it} active={active === it.id} onSelect={onSelect} collapsed={isCollapsed} />
@@ -79,6 +79,7 @@ function SidebarButton({ it, active, onSelect, sub, collapsed }: { it: SidebarIt
     <button
       type="button"
       onClick={() => onSelect(it.id)}
+      data-testid={`nav-${it.id}`}
       aria-current={active ? "page" : undefined}
       title={collapsed ? it.label : sub ? it.hint : undefined}
       aria-label={collapsed ? it.label : undefined}

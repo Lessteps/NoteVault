@@ -765,6 +765,7 @@ function loadByArea(days: readonly ScheduleDay[]): AreaLoad[] {
   const m = new Map<string, AreaLoad & { folders: Map<string, string> }>();
   for (const d of days) {
     for (const t of d.topics) {
+      if (t.applied) continue; // los fundamentos (Bases) no son de ningún área: ver `lib/planTopicsByArea`
       const e = m.get(t.subplanId) ?? { ...(t.areaId ? { areaId: t.areaId } : {}), area: t.area, subplanId: t.subplanId, topics: 0, minutes: 0, titles: [], folders: new Map<string, string>() };
       e.folders.set(t.folder, t.title);
       e.minutes += t.minutes;

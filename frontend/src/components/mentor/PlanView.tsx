@@ -1,14 +1,13 @@
 // Mentor — Plan: la sub-interfaz de UN plan. Cabecera (título, periodo, estado y acciones), un banner «¿lo mantienes?» mientras el plan
-// es solo propuesto, un aviso «Reorganizar por áreas» si el plan usa la estructura antigua, y una barra de pestañas fija:
-// Mi plan · Agenda · Práctica · Entregables · Cambios. La Agenda integra las vistas Día · Semana · Mes · Calendario sin una página larga.
-// Cada pestaña es un panel; la activa se recuerda por plan. Accesible: landmarks con nombre, encabezados ordenados, pestañas WAI-ARIA con
-// flechas, región `aria-live` para los cambios de estado, enlace «Saltar al contenido», «Volver arriba» y un acceso «Pedir cambios» siempre
-// visible junto a las pestañas.
+// es solo propuesto y un aviso «Reorganizar por áreas» si el plan usa la estructura antigua. Lo que enseña lo manda la BARRA LATERAL del
+// Mentor (`PlanWorkspace`): en modo Planeación, Mi plan · Agenda · Práctica · Entregables · Preguntas y ajustes (la activa se recuerda por plan);
+// en modo Ejecución, `PlanRun`. Accesible: landmarks con nombre, encabezados ordenados, región `aria-live` para los cambios de estado, enlace
+// «Saltar al contenido», «Volver arriba» y un acceso «Preguntar o ajustar» siempre visible.
 //
 // SOLO LECTURA salvo propósitos y estados de entregables y las acciones del plan (renombrar, archivar, eliminar a la papelera, mantener,
 // reorganizar por áreas —deshacible desde «Preguntas y ajustes»—).
 
-import { Archive, ArchiveRestore, Check, ClipboardList, LayoutGrid, MessageSquareText, Pencil, PlayCircle, Rocket, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Check, LayoutGrid, MessageSquareText, Pencil, PlayCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { periodLabel, weeksLabel } from "../../lib/planTime";
@@ -22,34 +21,34 @@ import { LoadState } from "./parts";
 import { PlanAgenda } from "./PlanAgenda";
 import { PlanChanges } from "./PlanChanges";
 import { PlanDeliverables } from "./PlanDeliverables";
-import { BackToTop, SkipLink, TabPanel, Tabs, panelId, type TabDef } from "./planKit";
-import { agendaDateKey, openPlanSection, PLAN_TABS, planModeKey, planSectionKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type PlanMode, type PlanTab } from "./planShared";
+import { BackToTop, SkipLink, TabPanel, panelId } from "./planKit";
+import { agendaDateKey, agendaViewKey, openPlanSection, planSectionKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type PlanTab } from "./planShared";
+import { modeSubject, normalizeTab, useMentorMode } from "./mentorNav";
 import { ExecutionBar } from "./ExecutionBar";
-import { activeSectionOf, DEFAULT_SECTION, PlanSubNav, planSectionsOf } from "./PlanSections";
+import { activeSectionOf, DEFAULT_SECTION, planSectionsOf } from "./PlanSections";
 import { PlanRun } from "./PlanRun";
-import { deliverablesDefined } from "../../lib/planTopicsByArea";
 import { usePlanCoverage } from "./PlanCoverage";
 import { ExecuteDialog } from "./PlanExecution";
 import { monthLong } from "../../lib/planMonths";
-import { agendaViewKey } from "./PlanAgenda";
 import { PracticeRow } from "./PracticeCard";
 
 const PREFIX = "plan-tabs";
 const CONTENT_ID = "plan-content";
 
-export function PlanView({ planId }: { planId: string }) {
+/** Lo que devuelve `usePlanData`: lo carga quien monta la vista (la barra lateral también lo necesita), no la vista. */
+export type PlanSource = ReturnType<typeof usePlanData>;
+
+export function PlanView({ planId, source }: { planId: string; source: PlanSource }) {
   const [storedTab, setStoredTab] = usePersistedNav<string>(planTabKey(planId), "plan");
-  const { data, warming, error, reload, setData } = usePlanData(planId);
-  // la sub-vista elegida de «Mi plan» (por plan) y la cobertura, que alimenta tanto la sub-barra como las sub-vistas
-  const [storedSection, setStoredSection] = usePersistedNav<string>(planSectionKey(planId), DEFAULT_SECTION);
-  const cov = usePlanCoverage(planId);
+  const { data, warming, error, reload, setData } = source;
+  // la sub-vista elegida de «Mi plan» (por plan)
+  const [storedSection] = usePersistedNav<string>(planSectionKey(planId), DEFAULT_SECTION);
   const [highlight, setHighlight] = useState<Set<string>>(new Set());
   const [autoSend, setAutoSend] = useState<{ text: string; n: number } | undefined>();
   const [focusSignal, setFocusSignal] = useState(0);
   const [live, setLive] = useState("");
   const hlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
-  const tabsBar = useRef<HTMLDivElement>(null);
   const banner = useRef<HTMLElement>(null);
   const [bannerGone, setBannerGone] = useState(typeof IntersectionObserver === "undefined");
   const [reorganizing, setReorganizing] = useState(false);
@@ -64,10 +63,9 @@ export function PlanView({ planId }: { planId: string }) {
   const summary = data?.derived?.summary;
 
   const proposed = !!plan?.proposed;
-  // Dos caras del plan: «plan» (pestañas, para armarlo y ajustarlo) y «ejecucion» (solo lectura, para el día a día). Sin elegir, un plan
-  // mantenido y en curso abre en ejecución; uno propuesto o archivado, en plan.
-  const [storedMode, setMode] = usePersistedNav<string>(planModeKey(planId), "");
-  const mode: PlanMode = storedMode === "plan" || storedMode === "ejecucion" ? storedMode : plan && !plan.proposed && !plan.archived ? "ejecucion" : "plan";
+  // Dos caras: Planeación (armarlo y ajustarlo) y Ejecución (solo lectura, el día a día). El modo es global y lo elige la barra lateral.
+  const row0 = useMentor((s) => s.plans.find((p) => p.id === planId));
+  const [mode, setMode] = useMentorMode(modeSubject(row0, plan), planId);
   // el «Mantener plan» fijo junto a las pestañas solo aparece cuando el banner ya salió de la vista
   useEffect(() => {
     const el = banner.current;
@@ -80,38 +78,15 @@ export function PlanView({ planId }: { planId: string }) {
 
   const announce = useCallback((msg: string) => setLive((p) => (p === msg ? `${msg} ` : msg)), []);
 
-  // los entregables quedan «por definir» hasta que se ejecuta el plan: la decisión pendiente solo se enseña cuando ya hay entregables definidos
-  const pendingDeliverables = plan && deliverablesDefined(plan) ? (plan.openQuestions ?? []).filter((q) => q.id === "deliverables").length : 0;
-  const tabs: TabDef[] = [
-    { id: "plan", label: "Mi plan" },
-    { id: "agenda", label: "Agenda" },
-    ...(plan?.programmingPractice ? [{ id: "practica", label: "Práctica", short: "Práctica" }] : []),
-    { id: "entregables", label: "Entregables", badge: pendingDeliverables, badgeLabel: `${pendingDeliverables} ${pendingDeliverables === 1 ? "pendiente" : "pendientes"} de decidir` },
-    { id: "cambios", label: "Preguntas y ajustes", short: "Preguntas" },
-  ];
-  // la antigua pestaña «Semana actual» ahora es la Agenda
-  const stored = storedTab === "semana" ? "agenda" : storedTab;
-  const tab: PlanTab = (PLAN_TABS as readonly string[]).includes(stored) && tabs.some((t) => t.id === stored) ? (stored as PlanTab) : "plan";
+  const tab: PlanTab = normalizeTab(storedTab, !!plan?.programmingPractice);
+  // La cobertura solo la enseñan las sub-vistas de «Mi plan» (Planeación): en Ejecución, Agenda, Práctica… no se calcula (es cara).
+  const cov = usePlanCoverage(planId, mode === "planeacion" && tab === "plan");
   const changeTab = useCallback(
     (id: string) => {
       setStoredTab(id);
-      setMode("plan");
-      // al cambiar a un panel más corto, el scroll no se queda en el vacío: se coloca justo bajo la barra de pestañas
-      const sc = scroller.current;
-      const bar = tabsBar.current;
-      if (sc && bar && sc.scrollTop > bar.offsetTop) sc.scrollTop = bar.offsetTop;
+      setMode("planeacion");
     },
     [setStoredTab, setMode],
-  );
-  // cambiar de sub-vista de «Mi plan»: el scroll se coloca justo bajo la barra fija, no en el vacío de una vista más corta
-  const changeSection = useCallback(
-    (id: string) => {
-      setStoredSection(id);
-      const sc = scroller.current;
-      const bar = tabsBar.current;
-      if (sc && bar && sc.scrollTop > bar.offsetTop) sc.scrollTop = bar.offsetTop;
-    },
-    [setStoredSection],
   );
   const askChanges = useCallback(() => {
     changeTab("cambios");
@@ -273,23 +248,6 @@ export function PlanView({ planId }: { planId: string }) {
               </p>
             </div>
             {plan && (
-              <div className="flex flex-wrap items-center gap-1 rounded-xl border border-line bg-card p-1" role="group" aria-label="Vista del plan" data-testid="plan-mode">
-                {([["ejecucion", "Ejecución", Rocket, "Qué haces hoy y cómo vas (solo lectura)"], ["plan", "Plan", ClipboardList, "Armar y ajustar el plan: áreas, agenda, entregables y cambios"]] as const).map(([id, label, Icon, hint]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    aria-pressed={mode === id}
-                    title={hint}
-                    onClick={() => { setMode(id); announce(id === "ejecucion" ? "Vista de ejecución: lo que toca hoy y tu avance." : "Vista de plan: pestañas para armar y ajustar el plan."); }}
-                    className={cn("inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[15px] font-semibold", mode === id ? "bg-accent text-white" : "text-dim hover:bg-hover hover:text-text")}
-                    data-testid={`plan-mode-${id}`}
-                  >
-                    <Icon size={16} aria-hidden /> {label}
-                  </button>
-                ))}
-              </div>
-            )}
-            {plan && (
               <div className="flex items-center gap-1 rounded-xl border border-line bg-card p-1" role="group" aria-label="Acciones del plan">
                 {([
                   { id: "rename", label: "Renombrar", Icon: Pencil, run: () => void rename(), danger: false },
@@ -338,7 +296,7 @@ export function PlanView({ planId }: { planId: string }) {
                   </div>
               </section>
             )}
-            {legacy && mode === "plan" && (
+            {legacy && mode === "planeacion" && (
               <section aria-label="Estructura del plan" data-testid="plan-legacy-bar" className="mt-3 rounded-xl border border-line bg-card px-4 py-3">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <div className="min-w-0 flex-1 basis-64">
@@ -357,41 +315,31 @@ export function PlanView({ planId }: { planId: string }) {
               </div>
             ) : (
             <>
-            <div ref={tabsBar} className="sticky top-0 z-20 -mx-4 mt-3 flex flex-wrap items-center justify-between gap-x-4 border-b border-line bg-surface/95 px-4 backdrop-blur @3xl:-mx-6 @3xl:px-6" data-testid="plan-sticky">
-              <nav aria-label="Secciones del plan" className="min-w-0">
-                <Tabs tabs={tabs} active={tab} onChange={changeTab} prefix={PREFIX} label="Secciones del plan" />
-              </nav>
-              <div className="flex flex-wrap items-center gap-2 py-1" role="group" aria-label="Accesos rápidos">
-                <GhostButton large onClick={askChanges} data-testid="plan-ask-changes" title="Pregunta algo sobre el plan, corrígelo o ajústalo con un comentario">
-                  <MessageSquareText size={16} aria-hidden /> Preguntar o ajustar
-                </GhostButton>
-                {plan.proposed && bannerGone && (
-                  <span data-testid="plan-proposed-sticky" className="inline-flex flex-wrap items-center gap-2">
-                    <PrimaryButton large onClick={() => void keep()}>
-                      <Check size={16} aria-hidden /> Mantener plan
-                    </PrimaryButton>
-                    <GhostButton large onClick={() => setExecOpen(true)}>
-                      <PlayCircle size={16} aria-hidden /> Mantener y ejecutar
-                    </GhostButton>
-                  </span>
-                )}
-              </div>
-              {tab === "plan" && section && (
-                <div className="basis-full border-t border-line/60">
-                  <PlanSubNav sections={sections} active={section.id} onSelect={changeSection} />
-                </div>
+            <div className="sticky top-0 z-20 -mx-4 mt-3 flex flex-wrap items-center justify-end gap-2 border-b border-line bg-surface/95 px-4 py-1 backdrop-blur @3xl:-mx-6 @3xl:px-6" data-testid="plan-sticky" role="group" aria-label="Accesos rápidos">
+              <GhostButton large onClick={askChanges} data-testid="plan-ask-changes" title="Pregunta algo sobre el plan, corrígelo o ajústalo con un comentario">
+                <MessageSquareText size={16} aria-hidden /> Preguntar o ajustar
+              </GhostButton>
+              {plan.proposed && bannerGone && (
+                <span data-testid="plan-proposed-sticky" className="inline-flex flex-wrap items-center gap-2">
+                  <PrimaryButton large onClick={() => void keep()}>
+                    <Check size={16} aria-hidden /> Mantener plan
+                  </PrimaryButton>
+                  <GhostButton large onClick={() => setExecOpen(true)}>
+                    <PlayCircle size={16} aria-hidden /> Mantener y ejecutar
+                  </GhostButton>
+                </span>
               )}
             </div>
 
             <div id={CONTENT_ID} tabIndex={-1} className="outline-none" data-testid="plan-content">
-              <TabPanel prefix={PREFIX} id="plan" active={tab === "plan"}>
+              <TabPanel bare prefix={PREFIX} id="plan" active={tab === "plan"}>
                 {tab === "plan" && section && <div className="mt-6" data-testid={`plan-section-${section.id}`}>{section.render()}</div>}
               </TabPanel>
-              <TabPanel prefix={PREFIX} id="agenda" active={tab === "agenda"}>
+              <TabPanel bare prefix={PREFIX} id="agenda" active={tab === "agenda"}>
                 {tab === "agenda" && <PlanAgenda data={data} plan={plan} onChanged={(p) => setData((d) => (d ? { ...d, plan: p } : d))} announce={announce} />}
               </TabPanel>
               {plan.programmingPractice && (
-                <TabPanel prefix={PREFIX} id="practica" active={tab === "practica"}>
+                <TabPanel bare prefix={PREFIX} id="practica" active={tab === "practica"}>
                   {tab === "practica" && (
                     <PracticeRow
                       track={plan.programmingPractice}
@@ -406,13 +354,13 @@ export function PlanView({ planId }: { planId: string }) {
                   )}
                 </TabPanel>
               )}
-              <TabPanel prefix={PREFIX} id="entregables" active={tab === "entregables"}>
+              <TabPanel bare prefix={PREFIX} id="entregables" active={tab === "entregables"}>
                 {tab === "entregables" && (
                   <PlanDeliverables data={data} onChanged={(p) => setData((d) => (d ? { ...d, plan: p } : d))} announce={announce} goTab={changeTab} />
                 )}
               </TabPanel>
               {/* «Cambios» siempre montado: conserva el texto a medias, el historial y el «Pensando…» al cambiar de pestaña */}
-              <TabPanel prefix={PREFIX} id="cambios" active={tab === "cambios"}>
+              <TabPanel bare prefix={PREFIX} id="cambios" active={tab === "cambios"}>
                 <PlanChanges planId={plan.id} onApplied={applied} autoSend={autoSend} announce={announce} focusSignal={focusSignal} prefill={prefill} />
               </TabPanel>
             </div>
@@ -434,7 +382,7 @@ export function PlanView({ planId }: { planId: string }) {
         )}
       </div>
       {/* la barra de generación en segundo plano es de planificar el plan: no estorba en el día a día (Ejecución) */}
-      {plan && mode === "plan" && <ExecutionBar planId={plan.id} onOpenPlan={() => changeTab("plan")} />}
+      {plan && mode === "planeacion" && <ExecutionBar planId={plan.id} onOpenPlan={() => changeTab("plan")} />}
       <BackToTop scroller={scroller} onTop={toTop} />
     </div>
   );

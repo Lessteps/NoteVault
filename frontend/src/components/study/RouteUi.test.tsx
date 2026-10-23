@@ -88,7 +88,7 @@ afterEach(() => {
 });
 
 describe("insignia de ruta", () => {
-  const info = (route: "core" | "optional" | "skipped") => ({ route, week: 4, weekStart: "2026-10-26", title: "T", area: "Backend", done: false, ...(route === "skipped" ? { reason: "Ya lo dominas" } : {}) });
+  const info = (route: "core" | "optional" | "skipped") => ({ route, week: 4, weekStart: "2026-10-26", title: "T", area: "Backend", subplanId: "s1", done: false, ...(route === "skipped" ? { reason: "Ya lo dominas" } : {}) });
   it("lleva texto e icono (nunca solo color) y un nombre accesible completo, también en su versión compacta", () => {
     act(() => root.render(<><RouteBadge info={info("core")} /><RouteBadge info={info("optional")} /><RouteBadge info={info("skipped")} /><RouteBadge info={info("core")} compact /><RouteBadge info={info("core")} preview /></>));
     const badges = [...host.querySelectorAll("[data-testid=route-badge]")];
@@ -202,7 +202,7 @@ describe("árbol de notas con insignias y filtro", () => {
 });
 
 describe("banner de la nota", () => {
-  it("«Mentor: este tema está en tu ruta · semana N · área Backend» con enlace «Ver en el plan» que abre la Agenda del Mentor", async () => {
+  it("«Mentor: este tema está en tu ruta · semana N · área Backend» con «Ver en Agenda» que abre la Agenda del Mentor", async () => {
     setup("activo");
     const setModule = vi.spyOn(useApp.getState(), "setModule").mockImplementation(() => undefined);
     await mountEl(<RouteBanner path={`${T(1)}/Tema 1.practica.md`} />);
@@ -219,6 +219,30 @@ describe("banner de la nota", () => {
     expect(String(nav[`mentor.agendaDate.${PID}`])).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(nav[`mentor.planTab.${PID}`]).toBe("agenda");
     expect(nav["mentor.view"]).toBe(`plan:${PID}`);
+    expect(nav["mentor.mode"]).toBe("planeacion");
+  });
+
+  it("enseña fecha prevista y estado, y «Ver en Ejecución» abre la vista de su área en modo Ejecución", async () => {
+    setup("activo");
+    const setModule = vi.spyOn(useApp.getState(), "setModule").mockImplementation(() => undefined);
+    await mountEl(<RouteBanner path={`${T(1)}/Tema 1.practica.md`} />);
+    expect(byTest("route-banner-text").textContent).toMatch(/previsto el /);
+    expect(byTest("route-status").textContent).toBe("pendiente");
+    expect(byTest("route-agenda-link").textContent).toBe("Ver en Agenda");
+    await click(byTest("route-run-link"));
+    expect(setModule).toHaveBeenCalledWith("mentor");
+    const nav = useNavState.getState().values;
+    expect(nav["mentor.mode"]).toBe("ejecucion");
+    expect(nav[`mentor.runTab.${PID}`]).toBe("area:s1");
+    expect(nav["mentor.view"]).toBe(`plan:${PID}`);
+  });
+
+  it("en la vista previa de un plan propuesto no ofrece «Ver en Ejecución»", async () => {
+    setup("propuesto");
+    useRoute.getState().setPreviewOn(true);
+    await mountEl(<RouteBanner path={`${T(1)}/nota.md`} />);
+    expect(host.querySelector("[data-testid=route-run-link]")).toBeNull();
+    expect(byTest("route-agenda-link")).toBeTruthy();
   });
 
   it("no aparece en una nota que no es de la ruta", async () => {

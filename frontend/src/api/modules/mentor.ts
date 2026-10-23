@@ -8,6 +8,7 @@ import { AIConfig, sendChat, type ChatMessage, type SendOpts } from "../../core/
 import { ApiError } from "../../core/errors.js";
 import { loadExamRecordForTopic } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
+import { cachedTopicSnaps } from "./topicSnapCache.js";
 import { hubSnapshot } from "../../core/practice/recommender.js";
 import { manifestsFromNotes, type TopicManifest } from "../../core/practice/topic.js";
 import { FILTER_ACTIVE, ITEM_DONE } from "../../core/goalManager.js";
@@ -183,9 +184,16 @@ function needDate(value: unknown): string {
   return d;
 }
 
-/** Foto de todos los temas de la vault (misma fuente que `study_topic_dashboard`). */
+/**
+ * Foto de todos los temas de la vault (misma fuente que `study_topic_dashboard`). Se reutiliza mientras no cambien el escaneo de la vault ni los
+ * intentos y exámenes en disco (ver `topicSnapCache.ts`): el Mentor la pide en cada cambio de vista.
+ */
 function topicSnaps(app: AppState): TopicSnap[] {
   const scan = vaultScan(app);
+  return cachedTopicSnaps(app.root, scan, () => buildTopicSnaps(app, scan)).slice();
+}
+
+function buildTopicSnaps(app: AppState, scan: ReturnType<typeof vaultScan>): TopicSnap[] {
   const byFolder = new Map<string, { folder: string; manifest: TopicManifest }>();
   for (const found of manifestsFromNotes(scan.notes)) {
     const folder = app.rel(found.topicFolder).replace(/\\/g, "/");

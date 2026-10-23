@@ -20,11 +20,11 @@ import { AreaDot } from "./AreaViews";
 import { PhaseMonthTable } from "./PlanMonths";
 import { PhaseTimeline } from "./PlanSubplans";
 import { useAgendaModel } from "./agendaKit";
-import { TabPanel, Tabs } from "./planKit";
-import { agendaDateKey, type Loaded } from "./planShared";
+import { TabPanel } from "./planKit";
+import { agendaDateKey, agendaViewKey, type Loaded } from "./planShared";
 
 const PREFIX = "agenda-view";
-export const agendaViewKey = (planId: string): string => `mentor.agendaView.${planId}`;
+export { agendaViewKey };
 
 const VIEW_NOUN: Record<AgendaView, string> = { dia: "Día", semana: "Semana", mes: "Mes", calendario: "Mes" };
 
@@ -107,9 +107,6 @@ export function PlanAgenda({ data, plan, onChanged, announce }: { data: Loaded; 
     <div className="space-y-4" data-testid="plan-agenda">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 id={`${uid}-h`} className="text-[18px] font-semibold">Agenda del plan</h2>
-        <nav aria-label="Vista de la agenda" className="min-w-0">
-          <Tabs tabs={AGENDA_VIEWS.map((v) => ({ id: v.id, label: v.label }))} active={view} onChange={setView} prefix={PREFIX} label="Vista de la agenda" />
-        </nav>
       </div>
       {status && <p className="text-[14px] text-dim" data-testid="agenda-status">{status}</p>}
       {plan.structure === "areas" && <PracticeCurriculumBar plan={plan} onChanged={onChanged} announce={announce} />}
@@ -162,11 +159,11 @@ export function PlanAgenda({ data, plan, onChanged, announce }: { data: Loaded; 
         {title} · {summary}
       </p>
 
-      <TabPanel prefix={PREFIX} id="dia" active={view === "dia"} className="pt-0"><>{view === "dia" && <DayDetail m={m} date={anchor} onChanged={onChanged} headingId={`${uid}-d`} areaFilter={only} />}</></TabPanel>
-      <TabPanel prefix={PREFIX} id="semana" active={view === "semana"} className="pt-0">
+      <TabPanel bare prefix={PREFIX} id="dia" active={view === "dia"} className="pt-0"><>{view === "dia" && <DayDetail m={m} date={anchor} onChanged={onChanged} headingId={`${uid}-d`} areaFilter={only} />}</></TabPanel>
+      <TabPanel bare prefix={PREFIX} id="semana" active={view === "semana"} className="pt-0">
         <>{view === "semana" && <WeekDetail m={m} week={Math.floor(daysBetween(plan.start, anchor) / 7) + 1} onPickDay={pickDay} onChanged={onChanged} headingId={`${uid}-w`} only={only} />}</>
       </TabPanel>
-      <TabPanel prefix={PREFIX} id="mes" active={view === "mes"} className="pt-0">
+      <TabPanel bare prefix={PREFIX} id="mes" active={view === "mes"} className="pt-0">
         <>{view === "mes" && <MonthDetail m={m} month={anchor.slice(0, 7)} onPickWeek={pickWeek} onChanged={onChanged} headingId={`${uid}-m`} only={only} />}</>
       </TabPanel>
       {view === "mes" && summary0 && (
@@ -181,7 +178,7 @@ export function PlanAgenda({ data, plan, onChanged, announce }: { data: Loaded; 
         </details>
       )}
 
-      <TabPanel prefix={PREFIX} id="calendario" active={view === "calendario"} className="pt-0">
+      <TabPanel bare prefix={PREFIX} id="calendario" active={view === "calendario"} className="pt-0">
         <>{view === "calendario" && <AgendaCalendar m={m} anchor={anchor} onSelect={setAnchor} onChanged={onChanged} hideFilter={areaTabs.length > 1} />}</>
       </TabPanel>
     </div>

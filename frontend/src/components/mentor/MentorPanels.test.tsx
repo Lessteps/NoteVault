@@ -131,7 +131,9 @@ const click = async (el: Element | undefined) => {
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   await flush();
 };
-const go = (label: string) => click([...host.querySelectorAll("aside nav button")].find((b) => b.textContent?.includes(label)));
+// Plan / Cierre del día / Metas / Proyectos / Notas ya no están en la barra lateral: se abren como rutas ocultas (botones de otras vistas, enlaces profundos)
+const ROUTES: Record<string, string> = { Metas: "metas", Proyectos: "proyectos", "Notas y estudio": "notas", "Cierre del día": "cierre" };
+const go = async (label: string) => { await act(async () => { useNavState.getState().set("mentor.view", Object.entries(ROUTES).find(([k]) => k.includes(label))![1]); }); await flush(); };
 
 beforeEach(() => {
   localStorage.clear();
@@ -152,13 +154,14 @@ afterEach(() => {
 });
 
 describe("Mentor: espacio de paneles", () => {
-  it("navega entre Plan, Cierre del día, Metas, Proyectos y Notas; «Hoy» ya no es un panel suelto y se arranca en el plan", async () => {
+  it("la barra ya no lista Plan, Cierre del día, Metas, Proyectos ni Notas; sus rutas siguen abriéndose y se vuelve con «Volver a mi plan»", async () => {
     await mount();
     const nav = [...host.querySelectorAll("aside nav button")].map((b) => b.textContent ?? "");
-    const labels = ["Plan", "Cierre del día", "Metas", "Proyectos", "Notas y estudio"];
-    expect(nav.map((t) => labels.find((l) => t.includes(l)))).toEqual(labels);
-    expect(nav.some((t) => t.includes("Conversación"))).toBe(false);
-    expect(nav.some((t) => /^Hoy/.test(t))).toBe(false);
+    for (const l of ["Plan", "Cierre del día", "Metas", "Proyectos", "Notas y estudio", "Conversación"]) expect(nav.some((t) => t.includes(l))).toBe(false);
+    // sin ningún plan la barra solo lleva el interruptor de modo y el selector de plan, y el panel el estado vacío
+    expect(nav).toEqual([]);
+    expect(host.querySelector("[data-testid=mentor-mode]")).toBeTruthy();
+    expect(host.querySelector("[data-testid=mentor-plan-selector]")).toBeTruthy();
     expect(host.textContent).toContain("Mentor — Planes");
 
     await go("Metas");
@@ -167,6 +170,8 @@ describe("Mentor: espacio de paneles", () => {
     expect(host.textContent).toContain("Mentor — Proyectos");
     await go("Notas y estudio");
     expect(host.textContent).toContain("Mentor — Notas y estudio");
+    await go("Cierre del día");
+    expect(host.querySelector("[data-testid=today-back]")).toBeTruthy();
   });
 
   it("«Planear mi día» abre el panel Hoy con un enlace para volver al plan", async () => {

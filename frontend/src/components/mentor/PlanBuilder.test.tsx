@@ -18,14 +18,14 @@ import type { MentorBuildResult, MentorBuildSummary, MentorChangeEntry, MentorPl
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
-import { planModeKey } from "./planShared";
+import { MODE_KEY } from "./mentorNav";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
 
 import { MentorAssistant } from "./MentorAssistant";
 import { MentorModule } from "./MentorModule";
-import { MentorPlan } from "./MentorPlan";
+import { PlanWorkspace } from "./PlanWorkspace";
 import { PlanBuilder } from "./PlanBuilder";
 import { PlanForm } from "./PlanForm";
 
@@ -67,7 +67,7 @@ const mountEl = async (el: React.ReactNode) => { await act(async () => { root.re
 // «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
 const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
 const section = async (id: string) => {
-  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${SECTION_ALIAS[id] ?? id}]`);
+  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
   expect(b, `sub-vista ${id}`).toBeTruthy();
   await act(async () => { b!.click(); });
   await flush();
@@ -98,7 +98,7 @@ beforeEach(() => {
   localStorage.clear();
   ui.askText.mockReset();
   ui.confirmAction.mockReset();
-  useNavState.setState({ values: { [planModeKey(PID)]: "plan" } }); // las pruebas de la vista de plan abren la cara «plan»
+  useNavState.setState({ values: { [MODE_KEY]: "planeacion" } }); // las pruebas de la vista de plan abren la cara «plan»
   useMentor.setState({ panels: null, turns: [], pending: null, chatId: null, chatTitle: "Nueva conversación", chats: [], historyOpen: false, chatLoaded: false, sending: false, notice: null, planMode: false, composerSeed: "", acceptingPlan: false, planVersion: 0, plans: [], plansLoaded: false, generatingPlan: false, builds: [] });
   useApp.setState({ module: "mentor" });
   host = document.createElement("div");
@@ -305,25 +305,27 @@ describe("estado de espera: pensando, contador, cancelar y reanudar", () => {
   });
 });
 
-describe("«en construcción» en la barra lateral, el resumen y el chat", () => {
+describe("«en construcción» en el selector de plan, el resumen y el chat", () => {
   const b = summary(build({ stage: "esqueleto", steps: STEPS(1), openQuestion: q({ id: "skeleton", stage: "esqueleto", kind: "skeleton", text: "¿Lo ajustamos?" }) }));
 
-  it("sub-ítem bajo Plan con el indicador, tarjeta destacada con «Continuar» y el constructor al elegirlo", async () => {
+  it("opción en el selector de plan con el indicador, tarjeta destacada con «Continuar» y el constructor al elegirla", async () => {
     vi.mocked(api.mentorPlanBuildList).mockResolvedValue([b]);
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue({ loading: false, id: null, month: "2026-10", today: TODAY, plan: null, derived: null, goals: {}, projects: {}, items: [], months: [], plans: [], aiConfigured: true } as MentorPlanGet);
     vi.spyOn(api, "mentorPlanBuildGet").mockResolvedValue(result(build({ stage: "esqueleto", steps: STEPS(1) })));
     useNavState.setState({ values: { "mentor.view": "plan" } });
     await mountEl(<MentorModule />);
-    const sub = [...host.querySelectorAll("aside nav [role=group] button")].find((x) => x.textContent?.includes("Programación · 6 oct–5 nov"))!;
-    expect(sub.textContent).toContain("en construcción · etapa 2/7");
+    await click(host.querySelector("[data-testid=mentor-plan-selector-btn]")!);
+    const opt = host.querySelector("[data-testid=plan-option-build-b1]")!;
+    expect(opt.textContent).toContain("Programación · 6 oct–5 nov");
+    expect(opt.textContent).toContain("en construcción · etapa 2/7");
     const card = host.querySelector("[data-testid=plan-build-card]")!;
     expect(card.textContent).toContain("En construcción · etapa 2/7");
     expect(card.textContent).toContain("Te pregunto: ¿Lo ajustamos?");
     expect(card.textContent).toContain("Continuar");
-    await click(sub);
+    await click(opt);
     expect(useNavState.getState().values["mentor.view"]).toBe("build:b1");
     expect(host.querySelector("[data-testid=build-stages]")).toBeTruthy();
-    expect(sub.getAttribute("aria-current")).toBe("page");
+    expect(host.querySelector("[data-testid=mentor-plan-current]")!.textContent).toContain("Programación · 6 oct–5 nov");
   });
 
   it("tarjeta compacta en el chat «Construyendo … · etapa X · te pregunto …» con «Ir al plan»", async () => {
@@ -370,7 +372,7 @@ describe("plan propuesto: barra «¿lo mantienes?»", () => {
     const keep = vi.spyOn(api, "mentorPlanKeep").mockResolvedValue(plan({ proposed: undefined }));
     const del = vi.spyOn(api, "mentorPlanDelete").mockResolvedValue({ id: PID, plans: [] });
     ui.confirmAction.mockResolvedValueOnce(true);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     const bar = host.querySelector("[data-testid=plan-proposed-bar]")!;
     expect(bar.textContent).toContain("Plan propuesto por el Mentor — ¿lo mantienes?");
     expect(host.querySelector("[data-testid=plan-header]")!.textContent).toContain("Propuesto");
@@ -384,7 +386,7 @@ describe("plan propuesto: barra «¿lo mantienes?»", () => {
   it("un plan mantenido no muestra la barra; la sub-interfaz explica las ramas excluidas y permite añadirlas con un comentario", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ proposed: undefined })));
     const change = vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, plan: plan(), applied: true, history: [], entry: { n: 1, at: "2026-10-06T10:00:00Z", comment: "x", status: "applied", source: "rules", summary: "", delta: { added: 6, removed: 0, moved: 0, deliverables: 0 }, changed: [], warnings: [], fixOptions: [] } });
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await section("alcance");
     expect(host.querySelector("[data-testid=plan-proposed-bar]")).toBeNull();
     const note = host.querySelector("[data-testid=plan-branch-note]")!;
@@ -406,7 +408,7 @@ describe("«Pedir cambios al plan»", () => {
   it("cuadro fijo con ejemplos, Ctrl/Cmd+Enter aplica, muestra el resumen del cambio y resalta lo cambiado", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(getResult());
     const change = vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, applied: true, plan: planData, history: [entry()], entry: entry({ changed: ["P/A"] }) });
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     const box = host.querySelector("[data-testid=plan-changes]")!;
     const ta = box.querySelector<HTMLTextAreaElement>("textarea")!;
     // el cuadro tiene una etiqueta visible asociada y los ejemplos son chips clicables
@@ -429,7 +431,7 @@ describe("«Pedir cambios al plan»", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(getResult());
     vi.spyOn(api, "mentorPlanChanges").mockResolvedValue([entry({ n: 1 }), entry({ n: 2, comment: "Más SQL", delta: { added: 5, removed: 3, moved: 0, deliverables: 1 } }), entry({ n: 3, comment: "hazlo bonito", status: "pending", source: "none", summary: "No pude aplicar este comentario: queda guardado como pendiente." })]);
     const undo = vi.spyOn(api, "mentorPlanChangeUndo").mockResolvedValue({ plan: planData, history: [] });
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     const items = [...host.querySelectorAll("[data-testid=change-entry]")];
     expect(items).toHaveLength(3);
     expect(items[0]!.textContent).toContain("hazlo bonito");
@@ -447,7 +449,7 @@ describe("«Pedir cambios al plan»", () => {
     const change = vi.spyOn(api, "mentorPlanChange")
       .mockResolvedValueOnce({ loading: false, applied: true, plan: planData, history: [], entry: entry({ warnings: ["El cambio no cabe del todo: necesitas 90 h y hay 70 h de capacidad."], fixOptions: [fix] }) })
       .mockResolvedValueOnce({ loading: false, applied: true, plan: planData, history: [], entry: entry({ n: 2, comment: fix.label }) });
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await type(host.querySelector<HTMLTextAreaElement>("[data-testid=plan-changes] textarea")!, "añade todo lo de tooling");
     await click(button("Aplicar cambios"));
     expect(host.querySelector("[data-testid=change-notice]")!.textContent).toContain("no cabe del todo");
@@ -460,7 +462,7 @@ describe("«Pedir cambios al plan»", () => {
     vi.spyOn(api, "mentorAiStatus").mockResolvedValue({ busy: true, label: "Aplicando tu comentario al plan…", elapsed: 7 });
     const cancel = vi.spyOn(api, "mentorAiCancel").mockResolvedValue({ cancelled: true });
     const change = vi.spyOn(api, "mentorPlanChange").mockImplementation(() => new Promise(() => undefined));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await type(host.querySelector<HTMLTextAreaElement>("[data-testid=plan-changes] textarea")!, "hazlo más ligero");
     const apply = button("Aplicar cambios");
     await click(apply);

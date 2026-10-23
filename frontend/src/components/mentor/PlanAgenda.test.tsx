@@ -17,12 +17,12 @@ import type { MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../..
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
-import { planModeKey } from "./planShared";
+import { MODE_KEY } from "./mentorNav";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
 
-import { MentorPlan } from "./MentorPlan";
+import { PlanWorkspace } from "./PlanWorkspace";
 
 const START = "2026-10-05"; // lunes
 const END = "2027-01-03";
@@ -80,18 +80,18 @@ const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resu
 const section = async (id: string) => {
   // «Fases mes a mes» vive ahora en la Agenda, vista Mes
   if (id === "fases") {
-    await act(async () => { host.querySelector<HTMLElement>("#plan-tabs-tab-agenda")!.click(); });
+    await act(async () => { host.querySelector<HTMLElement>("[data-testid='nav-pl:agenda']")!.click(); });
     await flush();
-    await act(async () => { host.querySelector<HTMLElement>("#agenda-view-tab-mes")!.click(); });
+    await act(async () => { host.querySelector<HTMLElement>("[data-testid='nav-pl:agenda/mes']")!.click(); });
     await flush();
     return;
   }
   // si se estaba en la Agenda, se vuelve a «Mi plan» antes de elegir la sub-vista
-  if (!host.querySelector(`[data-testid=subnav-${SECTION_ALIAS[id] ?? id}]`)) {
-    await act(async () => { host.querySelector<HTMLElement>("#plan-tabs-tab-plan")?.click(); });
+  if (!host.querySelector(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`)) {
+    await act(async () => { host.querySelector<HTMLElement>("[data-testid='nav-pl:plan']")?.click(); });
     await flush();
   }
-  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${SECTION_ALIAS[id] ?? id}]`);
+  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
   expect(b, `sub-vista ${id}`).toBeTruthy();
   await act(async () => { b!.click(); });
   await flush();
@@ -108,8 +108,8 @@ const click = async (el: Element | null | undefined) => {
   await flush();
 };
 const byTest = (id: string, within: ParentNode = host) => within.querySelector<HTMLElement>(`[data-testid=${id}]`)!;
-const tab = (id: string) => host.querySelector<HTMLButtonElement>(`#plan-tabs-tab-${id}`)!;
-const view = (id: string) => host.querySelector<HTMLButtonElement>(`#agenda-view-tab-${id}`)!;
+const tab = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:${id}']`)!;
+const view = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:agenda/${id}']`)!;
 const key = async (el: Element, k: string) => { await act(async () => { el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })); }); await flush(); };
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "")))!;
@@ -124,7 +124,7 @@ const setValue = async (el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectE
 };
 const openAgenda = async (p: PlanData = areasPlan(), over: Partial<Extract<MentorPlanGet, { loading: false }>> = {}) => {
   vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p, over));
-  await mountEl(<MentorPlan planId={PID} />);
+  await mountEl(<PlanWorkspace planId={PID} />);
   await click(tab("agenda"));
 };
 
@@ -132,7 +132,7 @@ beforeEach(() => {
   localStorage.clear();
   ui.askText.mockReset();
   ui.confirmAction.mockReset();
-  useNavState.setState({ values: { [planModeKey(PID)]: "plan" } }); // las pruebas de la vista de plan abren la cara «plan»
+  useNavState.setState({ values: { [MODE_KEY]: "planeacion" } }); // las pruebas de la vista de plan abren la cara «plan»
   useMentor.setState({ planVersion: 0, plans: [], plansLoaded: false, pendingObjective: null });
   useApp.setState({ module: "mentor" });
   host = document.createElement("div");
@@ -148,24 +148,26 @@ afterEach(() => {
 });
 
 describe("estructura de la Agenda", () => {
-  it("un control segmentado Día · Semana · Mes · Calendario (pestañas WAI-ARIA con flechas) y la semana actual por defecto", async () => {
+  it("la barra lateral ofrece Día · Semana · Mes · Calendario bajo Agenda y la semana actual por defecto", async () => {
     await openAgenda();
-    const list = host.querySelector("[role=tablist][aria-label='Vista de la agenda']")!;
-    expect([...list.querySelectorAll("[role=tab]")].map((t) => t.textContent)).toEqual(["Día", "Semana", "Mes", "Calendario"]);
-    expect(view("semana").getAttribute("aria-selected")).toBe("true");
+    const subs = [...host.querySelectorAll("[data-testid='nav-pl:agenda']")][0]!.parentElement!.querySelectorAll("[role=group] button");
+    expect([...subs].map((t) => t.textContent)).toEqual(["Día", "Semana", "Mes", "Calendario"]);
+    // la página ya no repite la barra de vistas
+    expect(host.querySelector("[role=tablist][aria-label='Vista de la agenda']")).toBeNull();
+    expect(view("semana").getAttribute("aria-current")).toBe("page");
     expect(byTest("agenda-title").textContent).toContain("Semana 2");
-    view("semana").focus();
-    await key(view("semana"), "ArrowRight");
-    expect(view("mes").getAttribute("aria-selected")).toBe("true");
-    expect(document.activeElement).toBe(view("mes"));
+    await click(view("mes"));
+    expect(view("mes").getAttribute("aria-current")).toBe("page");
     expect(byTest("agenda-month")).toBeTruthy();
     // la vista elegida se recuerda por plan
     expect(useNavState.getState().values[`mentor.agendaView.${PID}`]).toBe("mes");
   });
 
-  it("las pestañas del plan son Mi plan · Agenda · Práctica · Entregables · Cambios", async () => {
+  it("la barra lateral (modo Planeación) lista Mi plan · Agenda · Práctica · Entregables · Preguntas y ajustes, sin pestañas en la página", async () => {
     await openAgenda();
-    expect([...host.querySelectorAll("[role=tablist][aria-label='Secciones del plan'] [role=tab]")].map((t) => t.id.replace("plan-tabs-tab-", ""))).toEqual(["plan", "agenda", "practica", "entregables", "cambios"]);
+    const top = [...host.querySelectorAll("aside nav > div > button")].map((b) => b.getAttribute("data-testid")!.replace("nav-pl:", ""));
+    expect(top).toEqual(["plan", "agenda", "practica", "entregables", "cambios"]);
+    expect(host.querySelector("[role=tablist]")).toBeNull();
   });
 });
 
@@ -199,12 +201,12 @@ describe("navegación por el tiempo", () => {
     await setValue(byTest("agenda-date") as HTMLInputElement, "2026-12-24");
     expect(byTest("agenda-title").textContent).toContain("jueves 24 de diciembre");
     await click(byTest("agenda-this-week"));
-    expect(view("semana").getAttribute("aria-selected")).toBe("true");
+    expect(view("semana").getAttribute("aria-current")).toBe("page");
     expect(byTest("agenda-title").textContent).toContain("Semana 2");
     await setValue(byTest("agenda-date") as HTMLInputElement, "2026-11-20");
     expect(byTest("agenda-title").textContent).toContain("Semana 7");
     await click(byTest("agenda-this-month"));
-    expect(view("mes").getAttribute("aria-selected")).toBe("true");
+    expect(view("mes").getAttribute("aria-current")).toBe("page");
     expect(byTest("agenda-title").textContent).toContain("Octubre 2026");
     // pasado: la primera semana del plan
     await setValue(byTest("agenda-date") as HTMLInputElement, START);
@@ -260,7 +262,7 @@ describe("conteos visibles de temas y entregables", () => {
     expect(byTest("agenda-week-areas").querySelectorAll("li").length).toBeGreaterThan(0);
     expect(byTest("agenda-week-deliverables").textContent).toMatch(/\d+ entregables/);
     await click(button("Ver el día miércoles 14 de octubre", w));
-    expect(view("dia").getAttribute("aria-selected")).toBe("true");
+    expect(view("dia").getAttribute("aria-current")).toBe("page");
     expect(byTest("agenda-title").textContent).toContain("miércoles 14 de octubre");
   });
 
@@ -273,7 +275,7 @@ describe("conteos visibles de temas y entregables", () => {
     expect(byTest("agenda-month-deliverables").textContent).toMatch(/\d+ katas/);
     expect(byTest("agenda-purpose-text").textContent).toContain("Octubre 2026");
     await click(button("Ver la semana 3", byTest("agenda-month")));
-    expect(view("semana").getAttribute("aria-selected")).toBe("true");
+    expect(view("semana").getAttribute("aria-current")).toBe("page");
     expect(byTest("agenda-title").textContent).toContain("Semana 3");
   });
 });
@@ -366,7 +368,7 @@ describe("calendario accesible", () => {
 describe("Mi plan por áreas y «Reorganizar por áreas»", () => {
   it("un plan por áreas enseña la línea de fases, los grupos de cada área y su objetivo corto", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(areasPlan()));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await section("fases");
     expect(host.querySelector("[data-testid=plan-legacy-bar]")).toBeNull();
     const phases = [...host.querySelectorAll("[data-testid=plan-phase]")];
@@ -387,7 +389,7 @@ describe("Mi plan por áreas y «Reorganizar por áreas»", () => {
     const old = legacy();
     const get = vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(old));
     const reorg = vi.spyOn(api, "mentorPlanReorganize").mockResolvedValue({ plan: areasPlan(), entry: { n: 1, at: "2026-10-14T10:00:00Z", comment: "Reorganizar por áreas", status: "applied", source: "rules", summary: "ok", delta: { added: 0, removed: 0, moved: 3, deliverables: 0, structure: 2 }, changed: [], warnings: [], fixOptions: [] }, history: [], applied: true });
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     const bar = byTest("plan-legacy-bar");
     expect(bar.textContent).toContain("estructura antigua");
     expect(bar.textContent).toContain("No se hace solo");
@@ -410,7 +412,7 @@ describe("Mi plan por áreas y «Reorganizar por áreas»", () => {
     const p = areasPlan();
     p.subplans[1] = { ...p.subplans[1]!, fallback: { kind: "rules", reason: "la IA tardó demasiado" } };
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await section("alcance");
     const note = byTest("plan-fallback-note");
     expect(note.textContent).toContain("Completado con reglas");
@@ -423,7 +425,7 @@ describe("Mi plan por áreas y «Reorganizar por áreas»", () => {
     act(() => root.unmount());
     root = createRoot(host);
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(clean));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     expect(host.querySelector("[data-testid=plan-fallback-note]")).toBeNull();
   });
 });

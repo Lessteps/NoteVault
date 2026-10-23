@@ -23,7 +23,7 @@ import type { CoverageState } from "./PlanCoverage";
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
 
-import { MentorPlan } from "./MentorPlan";
+import { PlanWorkspace } from "./PlanWorkspace";
 
 const START = "2026-10-06";
 const END = "2027-04-05";
@@ -284,7 +284,7 @@ describe("«Mantener y ejecutar» en el plan propuesto", () => {
     vi.spyOn(api, "mentorExecutionReport").mockImplementation(async (_id, scope) => ({ loading: false, report: report(scope ?? {}), execution: null, aiConfigured: true }));
     const keep = vi.spyOn(api, "mentorPlanKeep").mockResolvedValue({} as never);
     const start = vi.spyOn(api, "mentorExecutionStart").mockResolvedValue({ loading: false, execution: view() });
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     const bar = host.querySelector("[data-testid=plan-proposed-bar]")!;
     expect(button("Mantener plan", bar)).toBeTruthy();
     const both = host.querySelector("[data-testid=plan-keep-execute]")!;
@@ -307,7 +307,7 @@ describe("«Mantener y ejecutar» en el plan propuesto", () => {
     vi.spyOn(api, "mentorExecutionReport").mockImplementation(async (_id, scope) => ({ loading: false, report: report(scope ?? {}), execution: null, aiConfigured: true }));
     const keep = vi.spyOn(api, "mentorPlanKeep").mockResolvedValue({} as never);
     const start = vi.spyOn(api, "mentorExecutionStart");
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(host.querySelector("[data-testid=plan-keep-execute]"));
     await click(button("Cancelar", document.querySelector("[role=dialog]")!));
     expect(document.querySelector("[role=dialog]")).toBeNull();

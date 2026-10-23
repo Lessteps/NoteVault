@@ -7,12 +7,12 @@
 // Debajo va la práctica diaria del área (katas). Solo lectura sobre el plan.
 
 import { CalendarClock, Play } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AreaPracticeView } from "../../lib/areaPracticeView";
 import { api } from "../../lib/bridge";
 import { bucketReviews, dueText, type ReviewRow } from "../../lib/planReviews";
 import { dateLabel } from "../../lib/planSchedule";
-import type { AreaSets } from "../../lib/planAreaLists";
+import { executionLists, type AreaSets } from "../../lib/planAreaLists";
 import { useMentor } from "../../store/mentor";
 import { usePomodoro } from "../../store/pomodoro";
 import { cn } from "../ui";
@@ -30,16 +30,39 @@ const VIEWS: ReadonlyArray<{ id: WorkView; label: string }> = [
   { id: "repasos", label: "Por repasar" },
 ];
 
-/** Los repasos del módulo de estudio, leídos una vez y recargados cuando cambia el plan. */
-export function useReviewItems() {
+type ReviewsData = { today: string; items: import("../../lib/types").ReviewItem[] };
+// La barra lateral (hints de la Ejecución) y `PlanRun` piden los repasos a la vez: una sola lectura en vuelo, compartida.
+let reviewsInflight: Promise<ReviewsData> | null = null;
+function fetchReviews(): Promise<ReviewsData> {
+  if (!reviewsInflight) {
+    reviewsInflight = api
+      .studyReviewsList()
+      .then((r): ReviewsData => (r && Array.isArray(r.items) ? r : { today: "", items: [] }))
+      .catch((): ReviewsData => ({ today: "", items: [] }))
+      .finally(() => {
+        reviewsInflight = null;
+      });
+  }
+  return reviewsInflight;
+}
+
+/** Los repasos del módulo de estudio, leídos una vez y recargados cuando cambia el plan. `enabled=false` no lee nada (p. ej. en Planeación). */
+export function useReviewItems(enabled = true) {
   const planVersion = useMentor((s) => s.planVersion);
-  const [data, setData] = useState<{ today: string; items: import("../../lib/types").ReviewItem[] } | null>(null);
+  const [data, setData] = useState<ReviewsData | null>(null);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const load = useCallback(() => {
-    void api.studyReviewsList().then((r) => setData(r && Array.isArray(r.items) ? r : { today: "", items: [] })).catch(() => setData({ today: "", items: [] }));
+    void fetchReviews().then((r) => alive.current && setData(r));
   }, []);
   useEffect(() => {
-    load();
-  }, [load, planVersion]);
+    if (enabled) load();
+  }, [load, planVersion, enabled]);
   return { data, reload: load };
 }
 
@@ -142,7 +165,7 @@ function WeekView({ days, today, colour, upcoming }: { days: WeekDayView[]; toda
         const doneN = d.rows.filter((r) => r.done).length;
         const rows = d.rows.map((r) => ({
           ...r,
-          tag: r.done ? { text: "Hecho", colour: "var(--nv-mint)" } : isToday ? { text: "Hoy", colour } : d.date < today ? { text: "Atrasado", colour: "var(--nv-warn)" } : undefined,
+          tag: r.done ? { text: "Hecho", colour: "var(--nv-mint)" } : isToday ? { text: "Hoy", colour } : d.date < today && r.time?.status === "pending" ? { text: "Atrasado", colour: "var(--nv-warn)" } : undefined,
         }));
         return (
           <section key={d.date} aria-label={d.label} className={cn("rounded-2xl border bg-card p-3", isToday ? "border-accent/60" : "border-line")} data-testid="week-day" data-date={d.date}>
@@ -195,19 +218,11 @@ export function AreaWork({ planId, areaName, areaId, subtitle, loggedMinutes = 0
   const buckets = useMemo(() => bucketReviews(reviews, today), [reviews, today]);
   const todayTag = { text: "Hoy", colour };
   const lists = useMemo(() => {
-    const todayKeys = new Set(todayRows.map((r) => r.folder));
-    // La ruta es sólida: el tiempo no la hace avanzar. «Hoy» = lo que se puede trabajar ahora, en orden de ruta: primero lo atrasado que sigue
-    // abierto (los primeros temas sin terminar) y luego lo de hoy. Lo bloqueado no se ofrece aquí: espera en «Semana» y «Pendientes».
-    const openLate = rows
-      .filter((r) => sets.available.has(r.folder) && !r.done && !r.unlockOn && !todayKeys.has(r.folder))
-      // «Atrasado» solo si su tiempo ya pasó con la ruta empezada; si no, es simplemente lo que toca ahora en el orden de la ruta
-      .map((r) => ({ ...r, tag: r.time?.status === "pending" ? { text: "Atrasado", colour: "var(--nv-warn)" } : { text: "Toca ahora", colour } }));
-    const openToday = todayRows.filter((r) => r.done || !r.unlockOn).map((r) => ({ ...r, tag: todayTag }));
-    const todayList = [...openLate, ...openToday];
-    const week = rows.filter((r) => sets.week.has(r.folder)).map((r) => ({ ...r, tag: r.done ? { text: "Hecho", colour: "var(--nv-mint)" } : sets.today.has(r.folder) ? todayTag : undefined }));
-    const pending = rows
-      .filter((r) => sets.pending.has(r.folder) && !r.done)
-      .map((r) => ({ ...r, tag: { text: "Atrasado", colour: "var(--nv-warn)" } }));
+    // UNA sola definición (`executionLists`): Hoy = lo que la Agenda reparte hoy a esta ruta; lo atrasado va a «Pendientes», no se mezcla en «Hoy»
+    const l = executionLists(rows, todayRows, sets);
+    const todayList = l.hoy.map((r) => ({ ...r, tag: todayTag }));
+    const week = l.semana.map((r) => ({ ...r, tag: r.done ? { text: "Hecho", colour: "var(--nv-mint)" } : sets.today.has(r.folder) ? todayTag : undefined }));
+    const pending = l.pendientes.map((r) => ({ ...r, tag: { text: "Atrasado", colour: "var(--nv-warn)" } }));
     return { hoy: todayList, semana: week, pendientes: pending };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, todayRows, sets, colour]);

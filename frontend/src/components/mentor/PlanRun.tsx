@@ -1,13 +1,14 @@
-// Mentor — Plan, VISTA DE EJECUCIÓN: la cara del plan para el día a día. Es una barra de pestañas y cada una enseña SOLO lo suyo:
-//   · General: el resumen de hoy (qué toca, la ruta sólida), el presupuesto de estudio, el avance de cada área y lo que viene.
+// Mentor — Plan, VISTA DE EJECUCIÓN: la cara del plan para el día a día. La barra lateral (modo Ejecución) elige la vista y cada una enseña SOLO lo suyo:
+//   · Hoy (general): el resumen de hoy (qué toca, la ruta sólida), el presupuesto de estudio, el avance de cada área y lo que viene.
 //   · una pestaña por área: lo que toca hoy en esa área, su sesión (Pomodoro y registro de horas) y su ruta completa.
 //   · Bases: los fundamentos que se intercalan en todas las áreas (no son de la ruta de Backend ni de ninguna otra).
 //   · Proyectos: el proyecto diario y el semanal.
+//   · Registros: el historial de lo practicado (PlanRecords).
 // Es de SOLO LECTURA sobre el plan: no renombra, no reparte, no ajusta, no ejecuta. Todo se calcula con el mismo modelo de agenda que la
 // vista de plan (`useAgendaModel`), así que ambas vistas nunca discrepan.
 
-import { CalendarDays, Info, ListPlus, Lock, NotebookText } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, Info, ListPlus, Lock } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { areaSets } from "../../lib/planAreaLists";
 import { planGateByArea } from "../../lib/planGate";
@@ -15,7 +16,8 @@ import { catchUpOf } from "../../lib/planCatchUp";
 import { bucketReviews, dueText, reviewsOfTopics, type ReviewRow } from "../../lib/planReviews";
 import { clampToPlan, dateLabel, longDateLabel, type ScheduleDay } from "../../lib/planSchedule";
 import { dailyProjectOf, weeklyProjectOf } from "../../lib/planCurriculum";
-import { dayByArea, orderedAreas, type DayAreaEntry } from "../../lib/planTopicsByArea";
+import { areaRouteTopics, basesClassifier, basesRouteTopics, dayBases, dayByArea, orderedAreas, type DayAreaEntry } from "../../lib/planTopicsByArea";
+import type { PlanDeliverable } from "../../lib/planAreas";
 import { daysBetween } from "../../lib/planTime";
 import { routeStarted, timeTagOf, topicTimes } from "../../lib/planTopicTime";
 import { minutesOn, minutesText } from "../../lib/timeLog";
@@ -23,7 +25,7 @@ import type { MentorPlan } from "../../lib/types";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { usePomodoro } from "../../store/pomodoro";
-import { useNavState } from "../../store/navState";
+import { useNavState, usePersistedNav } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { useTimeLog } from "./AreaSession";
@@ -34,13 +36,16 @@ import { hm, ProgressBar } from "./parts";
 import { ProgressOverview, type BoardRow } from "./PlanBoard";
 import { usePlanAreaPractice } from "./PracticeCard";
 import { RunProjects } from "./PlanRunPractice";
-import { RunArea, RunBases, RunNav, type RunTab, type TodayCard } from "./PlanRunTabs";
+import { RunArea, RunBases, type TodayCard } from "./PlanRunTabs";
 import { AreaFolds, CatchUpCard, RestartBar, FocusCard, foldItemOf, ReviewIntervals, UpcomingCard, type FoldItem, type LateArea } from "./PlanRunGeneral";
 import { SectionHeading } from "./planKit";
-import { DAY_LONG, openAgendaAt, openPlanRecords, type Loaded } from "./planShared";
+import { DAY_LONG, openAgendaAt, type Loaded } from "./planShared";
+import { hasBasesRoute as planHasBasesRoute, RUN_TAB_GENERAL, RUN_TAB_RECORDS, runAreaTab, runTabKey } from "./mentorNav";
+import { PlanRecords } from "./PlanRecords";
 
 const UPCOMING_DAYS = 5;
 const DELIVERABLES_SHOWN = 4;
+const NO_DUE: readonly PlanDeliverable[] = [];
 const card = "rounded-2xl border border-line bg-card p-5";
 
 export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
@@ -52,25 +57,27 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const after = real > plan.end;
   const date = clampToPlan(real, plan);
   const day: ScheduleDay | undefined = m.schedule.byDate.get(date);
-  const due = m.dueByDate.get(date) ?? [];
-  const entries = day ? dayByArea(plan, day, due) : [];
+  const due = m.dueByDate.get(date) ?? NO_DUE;
   const langBlocks = (day?.blocks ?? []).filter((b) => b.daily && b.status !== "omitted");
   const topicsToday = day?.topics ?? [];
   const doneToday = topicsToday.filter((t) => t.done).length;
   const pctToday = topicsToday.length ? Math.round((doneToday / topicsToday.length) * 100) : 0;
   const isToday = date === real && !before && !after;
   const canPlan = isToday && !plan.proposed && !plan.archived && (topicsToday.some((t) => !t.done) || !!day?.practice.project);
-  const upcoming = m.schedule.days.filter((d) => d.date > date && d.study).slice(0, UPCOMING_DAYS);
+  const upcoming = useMemo(() => m.schedule.days.filter((d) => d.date > date && d.study).slice(0, UPCOMING_DAYS), [m.schedule, date]);
   const nextStudy = before ? m.schedule.days.find((d) => d.study) : undefined;
   const currentWeek = summary?.currentWeek ?? 1;
   const deliverables = m.deliverablesDefined
     ? m.deliverables.filter((d) => d.status !== "hecho" && d.dueDate >= date).sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, DELIVERABLES_SHOWN)
     : [];
+  // La ruta ha empezado cuando hay algún tema trabajado; mientras no, no hay atrasos ni ruta bloqueada.
+  const started = useMemo(() => routeStarted([...m.topicByFolder.values()].map((t) => t.state), plan.subplans.some((s) => s.topics.some((t) => t.completedAt))), [m.topicByFolder, plan.subplans]);
   // Ruta sólida POR ÁREA: cada área no avanza sin cerrar su día pendiente más antiguo (un atraso en Frontend no bloquea Backend).
-  const gate = useMemo(
-    () => planGateByArea(m.schedule.days.map((d) => ({ date: d.date, topics: d.topics.map((t) => ({ folder: t.folder, done: t.done, subplanId: t.subplanId })) })), (f) => m.topicByFolder.get(f)?.state === "completo"),
-    [m.schedule, m.topicByFolder],
-  );
+  const gate = useMemo(() => {
+    const g = planGateByArea(m.schedule.days.map((d) => ({ date: d.date, topics: d.topics.map((t) => ({ folder: t.folder, done: t.done, subplanId: t.subplanId })) })), (f) => m.topicByFolder.get(f)?.state === "completo");
+    // sin empezar la ruta no hay ruta bloqueada: lo de hoy se puede abrir tal como lo reparte la Agenda
+    return started ? g : { ...g, locked: new Map<string, string>() };
+  }, [m.schedule, m.topicByFolder, started]);
   // Aviso de constancia: lo atrasado y el ritmo que hace falta para llegar a la fecha de fin.
   const catchUp = useMemo(() => {
     const study = m.schedule.days.filter((d) => d.study && d.date >= date && d.date <= plan.end);
@@ -88,12 +95,10 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
     void api.mentorAreaPracticeSetup(plan.id).then(() => ap.reload()).catch(() => undefined);
   }, [ap, plan.id]);
   // Etiqueta de tiempo de cada tema: su ventana de reparto. Nada está pendiente hasta que la ruta empieza y su tiempo pasa.
-  const started = useMemo(() => routeStarted([...m.topicByFolder.values()].map((t) => t.state), plan.subplans.some((s) => s.topics.some((t) => t.completedAt))), [m.topicByFolder, plan.subplans]);
   const times = useMemo(
     () => topicTimes(m.schedule.days.map((d) => ({ date: d.date, topics: d.topics.map((t) => ({ folder: t.folder, done: t.done || m.topicByFolder.get(t.folder)?.state === "completo" })) }))),
     [m.schedule, m.topicByFolder],
   );
-  const timeOf = (folder: string, done: boolean) => timeTagOf(times.get(folder), done, date, started);
   const behind = started && !!gate.frontier && gate.frontier < date && !plan.proposed && !plan.archived;
   const titleOf = (folder: string): string => m.topicByFolder.get(folder)?.title ?? folder.split("/").pop() ?? folder;
   const late = !started ? 0 : (data.derived?.subplans ?? []).reduce((n, s) => n + s.topics.filter((t) => t.route !== "skipped" && t.targetWeek < currentWeek && t.state !== "completo").length, 0);
@@ -104,10 +109,16 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
     useNavState.getState().set("mentor.view", "hoy");
   };
 
-  // Lo de hoy por área. Los fundamentos («Bases») NO son de ningún área: se sacan de las tarjetas de área y van juntos, sin repetirse, a su pestaña.
-  const rowOf = (i: { folder: string; title: string; part: number; parts: number; minutes: number }, withBases: boolean, sub?: string): BoardRow => {
-    const state = m.topicByFolder.get(i.folder)?.state ?? "sin_tratar";
-    const time = timeOf(i.folder, state === "completo");
+  // Lo de hoy por área. Los fundamentos («Bases») NO son de ningún área: se sacan de las tarjetas de área (`dayByArea` ya no los trae) y van
+  // juntos, sin repetirse, a su pestaña (`dayBases`). La regla de qué tema es de qué área es UNA sola, la de `lib/planTopicsByArea`.
+  const isBases = useMemo(() => basesClassifier(plan), [plan]);
+  const notBases = useCallback((t: { subplanId: string; group?: string; applied?: boolean }) => !isBases(t), [isBases]);
+  const reviewData = useReviewItems();
+  const reviewItems = useMemo(() => reviewData.data?.items ?? [], [reviewData.data]);
+  const topicByFolder = m.topicByFolder;
+  const rowOf = useCallback((i: { folder: string; title: string; part: number; parts: number; minutes: number }, withBases: boolean, sub?: string): BoardRow => {
+    const state = topicByFolder.get(i.folder)?.state ?? "sin_tratar";
+    const time = timeTagOf(times.get(i.folder), state === "completo", date, started);
     return {
       ...(time ? { time } : {}),
       ...(sub ? { sub } : {}),
@@ -119,13 +130,13 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       state,
       done: state === "completo",
       exercises: 0,
-      pct: m.topicByFolder.get(i.folder)?.pct ?? 0,
+      pct: topicByFolder.get(i.folder)?.pct ?? 0,
       unlockOn: gate.locked.get(i.folder),
     };
-  };
+  }, [topicByFolder, times, date, started, currentWeek, gate]);
   const kindText = (k: Set<string>): string => (k.has("theory") && k.has("practice") ? "Teoría + Práctica" : k.has("practice") ? "Práctica" : k.has("theory") ? "Teoría" : "");
-  /** Las tarjetas de área de un día. `bases` recoge los fundamentos (van juntos, sin repetirse); `planned` = proyección (sin bloqueo de la ruta sólida). */
-  const cardsOf = (ents: DayAreaEntry[], bases?: { seen: Set<string>; rows: BoardRow[] }, planned = false): TodayCard[] =>
+  /** Las tarjetas de área de un día (sin fundamentos); `planned` = proyección (sin bloqueo de la ruta sólida). */
+  const cardsOf = useCallback((ents: DayAreaEntry[], planned = false): TodayCard[] =>
     ents.map((e) => {
       const flat = (e.blocks ?? []).flatMap((bl) => bl.items.map((it) => ({ it, kind: bl.kind })));
       const kinds = new Map<string, Set<string>>();
@@ -134,69 +145,54 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         (kinds.get(key) ?? kinds.set(key, new Set()).get(key)!).add(kind);
       }
       const subOf = (i: { folder: string; part: number; parts: number }): string => [kindText(kinds.get(`${i.folder}:${i.part}`) ?? new Set()), i.parts > 1 ? `Parte ${i.part} de ${i.parts}` : ""].filter(Boolean).join(" · ");
-      const mk = (i: (typeof flat)[number]["it"], withBases: boolean): BoardRow => {
-        const row = rowOf(i, withBases, subOf(i));
+      const seen = new Set<string>();
+      const own = flat.map((x) => x.it).filter((i) => (seen.has(`${i.folder}:${i.part}`) ? false : (seen.add(`${i.folder}:${i.part}`), true)));
+      const rows = own.map((i) => {
+        const row = rowOf(i, false, subOf(i));
         if (!planned) return row;
         const { unlockOn: _unlock, ...rest } = row;
         return rest;
-      };
-      const items = flat.map((x) => x.it);
-      const seen = new Set<string>();
-      const own = items.filter((i) => !i.applied && (seen.has(`${i.folder}:${i.part}`) ? false : (seen.add(`${i.folder}:${i.part}`), true)));
-      if (bases) {
-        for (const i of items.filter((x) => x.applied)) {
-          if (bases.seen.has(`${i.folder}:${i.part}`)) continue;
-          bases.seen.add(`${i.folder}:${i.part}`);
-          bases.rows.push(mk(i, true));
-        }
-      }
-      const rows = own.map((i) => mk(i, false));
+      });
       return { entry: e, rows, colour: focusColour(e.areaId), doneN: rows.filter((r) => r.done).length };
-    });
-  const seenBases = new Set<string>();
-  const basesRows: BoardRow[] = [];
-  const cards: TodayCard[] = cardsOf(entries, { seen: seenBases, rows: basesRows });
-  const cardOf = new Map(cards.map((c) => [c.entry.subplanId, c] as const));
-  const areaList = orderedAreas(plan);
-  const basesDone = basesRows.filter((r) => r.done).length;
-  const hasBasesRoute = plan.subplans.some((s) => { const g = (s.groups ?? []).find((x) => x.kind === "bases"); return !!g && s.topics.some((t) => t.group === g.id && t.route !== "skipped"); });
-  // Repaso espaciado (el mismo calendario del módulo de estudio): los repasos de cada área, unidos con los temas del plan
-  const reviewData = useReviewItems();
-  const reviewItems = reviewData.data?.items ?? [];
-  const isBasesTopic = (sub: (typeof plan.subplans)[number], group?: string): boolean => !!group && (sub.groups ?? []).some((g) => g.kind === "bases" && g.id === group);
-  const routeRowOf = (t: (typeof plan.subplans)[number]["topics"][number]): BoardRow => {
-    const state = m.topicByFolder.get(t.folder)?.state ?? "sin_tratar";
+    }), [rowOf]);
+  const entries = useMemo(() => (day ? dayByArea(plan, day, due) : []), [plan, day, due]);
+  const cards: TodayCard[] = useMemo(() => cardsOf(entries), [cardsOf, entries]);
+  const basesRows: BoardRow[] = useMemo(
+    () => (day ? dayBases(plan, day).map((i) => rowOf(i, true, [kindText(new Set(i.kinds)), i.parts > 1 ? `Parte ${i.part} de ${i.parts}` : ""].filter(Boolean).join(" · "))) : []),
+    [plan, day, rowOf],
+  );
+  const cardOf = useMemo(() => new Map(cards.map((c) => [c.entry.subplanId, c] as const)), [cards]);
+  const areaList = useMemo(() => orderedAreas(plan), [plan]);
+  const hasBasesRoute = planHasBasesRoute(plan);
+  const routeRowOf = useCallback((t: { folder: string; title: string; targetWeek: number; completedAt?: string }): BoardRow => {
+    const state = topicByFolder.get(t.folder)?.state ?? "sin_tratar";
     const isDone = state === "completo" || !!t.completedAt;
-    const time = timeOf(t.folder, isDone);
-    return { ...(time ? { time } : {}), folder: t.folder, title: t.title, week: t.targetWeek, state, done: isDone, exercises: m.topicByFolder.get(t.folder)?.exercises ?? 0, pct: m.topicByFolder.get(t.folder)?.pct ?? 0, unlockOn: gate.locked.get(t.folder) };
-  };
-  const routeOf = (subplanId: string): BoardRow[] => {
-    const sub = plan.subplans.find((x) => x.id === subplanId);
-    return sub ? sub.topics.filter((t) => t.route !== "skipped" && !isBasesTopic(sub, t.group)).map(routeRowOf) : [];
-  };
-  const reviewsOf = (subplanId: string): ReviewRow[] => {
-    const sub = plan.subplans.find((x) => x.id === subplanId);
-    return sub ? reviewsOfTopics(sub.topics.filter((t) => t.route !== "skipped" && !isBasesTopic(sub, t.group)), reviewItems) : [];
-  };
+    const time = timeTagOf(times.get(t.folder), isDone, date, started);
+    return { ...(time ? { time } : {}), folder: t.folder, title: t.title, week: t.targetWeek, state, done: isDone, exercises: topicByFolder.get(t.folder)?.exercises ?? 0, pct: topicByFolder.get(t.folder)?.pct ?? 0, unlockOn: gate.locked.get(t.folder) };
+  }, [topicByFolder, times, date, started, gate]);
+  // la ruta de un área: su pertenencia sale de `areaRouteTopics` (sin fundamentos), igual que los totales de la Agenda
+  const routeOf = useCallback((subplanId: string): BoardRow[] => areaRouteTopics(plan, subplanId).map(routeRowOf), [plan, routeRowOf]);
+  // Repaso espaciado (el mismo calendario del módulo de estudio): los repasos de cada área, unidos con los temas del plan
+  const reviewsOf = useCallback((subplanId: string): ReviewRow[] => reviewsOfTopics(areaRouteTopics(plan, subplanId), reviewItems), [plan, reviewItems]);
   // la semana en curso día a día: los temas de un área (o, sin área, los fundamentos) repartidos cada día de estudio
-  const weekDaysOf = (subplanId: string | null): WeekDayView[] =>
+  const weekDaysOf = useCallback((subplanId: string | null): WeekDayView[] =>
     m.schedule.days
       .filter((d) => d.week === currentWeek && d.study)
       .map((d) => {
         const seen = new Set<string>();
         const rows: BoardRow[] = [];
         for (const t of d.topics) {
-          if (subplanId ? t.subplanId !== subplanId || t.applied : !t.applied) continue;
+          if (subplanId ? t.subplanId !== subplanId || isBases(t) : !isBases(t)) continue;
           if (seen.has(t.folder)) continue;
           seen.add(t.folder);
           rows.push(rowOf(t, subplanId === null));
         }
-        // los días ANTERIORES a hoy solo enseñan lo que ya se hizo (tu avance): lo que no se tocó no se ofrece como si fuera de ese día, sigue en «Pendientes»
-        return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows: d.date < date ? rows.filter((r) => r.done) : rows };
+        // la Semana enseña lo MISMO que la Agenda (Semana): cada día con sus temas repartidos, también los de días anteriores (lo no terminado va además a «Pendientes»)
+        return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows };
       })
-      .filter((d) => d.date >= date || d.rows.length > 0);
+      .filter((d) => d.rows.length > 0 || d.date >= date), [m.schedule, currentWeek, isBases, rowOf, date]);
   // lo que viene: las semanas siguientes a la actual, tal como las reparte el plan (proyección; no se bloquea por la ruta sólida)
-  const upcomingWeeksOf = (subplanId: string | null): UpcomingWeekView[] => {
+  const upcomingWeeksOf = useCallback((subplanId: string | null): UpcomingWeekView[] => {
     const byWeek = new Map<number, ScheduleDay[]>();
     for (const d of m.schedule.days) if (d.week > currentWeek && d.study) byWeek.set(d.week, [...(byWeek.get(d.week) ?? []), d]);
     const out: UpcomingWeekView[] = [];
@@ -206,7 +202,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
           const seen = new Set<string>();
           const rows: BoardRow[] = [];
           for (const t of d.topics) {
-            if (t.done || (subplanId ? t.subplanId !== subplanId || t.applied : !t.applied)) continue;
+            if (t.done || (subplanId ? t.subplanId !== subplanId || isBases(t) : !isBases(t))) continue;
             if (seen.has(t.folder)) continue;
             seen.add(t.folder);
             const { unlockOn: _unlock, ...row } = rowOf(t, subplanId === null);
@@ -218,74 +214,50 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       if (views.length) out.push({ week, start: days[0]!.date, end: days[days.length - 1]!.date, days: views });
     }
     return out;
-  };
-  const basesRoute: BoardRow[] = [];
-  const basesTopics: Array<{ folder: string; title: string }> = [];
-  {
-    const seenRoute = new Set<string>();
-    for (const sp of plan.subplans) {
-      for (const t of sp.topics) {
-        if (!isBasesTopic(sp, t.group) || t.route === "skipped" || seenRoute.has(t.folder)) continue;
-        seenRoute.add(t.folder);
-        basesRoute.push(routeRowOf(t));
-        basesTopics.push({ folder: t.folder, title: t.title });
-      }
-    }
-    basesRoute.sort((a, b) => a.week - b.week);
-  }
-  const basesReviews = reviewsOfTopics(basesTopics, reviewItems);
-  const allTopics = plan.subplans.flatMap((sp) => sp.topics.filter((t) => t.route !== "skipped").map((t) => ({ folder: t.folder, title: t.title })));
-  const planReviews = reviewsOfTopics(allTopics, reviewItems);
-  const planBuckets = bucketReviews(planReviews, date);
-  const dueByArea = new Map(areaList.map((a) => [a.subplanId, reviewsOf(a.subplanId).filter((r) => r.inDays <= 0).length] as const));
+  }, [m.schedule, currentWeek, isBases, rowOf]);
+  const basesTopicList = useMemo(() => basesRouteTopics(plan), [plan]);
+  const basesRoute: BoardRow[] = useMemo(() => basesTopicList.map(routeRowOf).sort((a, b) => a.week - b.week), [basesTopicList, routeRowOf]);
+  const basesReviews = useMemo(() => reviewsOfTopics(basesTopicList, reviewItems), [basesTopicList, reviewItems]);
+  const planBuckets = useMemo(() => {
+    const allTopics = plan.subplans.flatMap((sp) => sp.topics.filter((t) => t.route !== "skipped").map((t) => ({ folder: t.folder, title: t.title })));
+    return bucketReviews(reviewsOfTopics(allTopics, reviewItems), date);
+  }, [plan, reviewItems, date]);
 
-  const tabs: RunTab[] = [
-    { id: "general", label: "Plan de estudio" },
-    ...areaList.map((a) => {
-      const c = cardOf.get(a.subplanId);
-      const due = dueByArea.get(a.subplanId) ?? 0;
-      return {
-        id: `area:${a.subplanId}`,
-        label: a.area,
-        colour: focusColour(a.areaId),
-        ...((c && c.rows.length) || due ? { hint: `${c && c.rows.length ? `${c.doneN}/${c.rows.length}` : ""}${due ? `${c && c.rows.length ? " · " : ""}${due} ⟳` : ""}`, hintLabel: `${c && c.rows.length ? `${c.doneN} de ${c.rows.length} temas de hoy hechos` : "sin temas hoy"}${due ? `, ${due} repasos para hoy` : ""}` } : {}),
-      };
-    }),
-    ...(basesRows.length || hasBasesRoute ? [{ id: "bases", label: "Bases", colour: "var(--nv-accent)", ...(basesRows.length ? { hint: `${basesDone}/${basesRows.length}`, hintLabel: `${basesDone} de ${basesRows.length} temas de hoy hechos` } : {}) }] : []),
-    { id: "proyectos", label: "Proyectos" },
-  ];
   const [upSel, setUpSel] = useState("");
   const upDay = upcoming.find((d) => d.date === upSel) ?? upcoming[0];
-  const upCards = upDay ? cardsOf(dayByArea(plan, upDay, m.dueByDate.get(upDay.date) ?? []), undefined, true) : [];
-  const [tabSel, setTabSel] = useState("general");
-  const tab = tabs.some((t) => t.id === tabSel) ? tabSel : "general";
-  const go = (id: string): void => {
-    setTabSel(id);
-    document.querySelector("[data-testid=run-nav]")?.scrollIntoView?.({ block: "start" });
-  };
-  const areaTab = tab.startsWith("area:") ? areaList.find((a) => `area:${a.subplanId}` === tab) : undefined;
+  const upCards = useMemo(() => (upDay ? cardsOf(dayByArea(plan, upDay, m.dueByDate.get(upDay.date) ?? []), true) : []), [upDay, plan, m.dueByDate, cardsOf]);
+  // la vista de la Ejecución la elige la barra lateral (ítems de `ejecucionLinks`) y se recuerda por plan
+  const [tabSel, setTabSel] = usePersistedNav<string>(runTabKey(plan.id), RUN_TAB_GENERAL);
+  const tab = tabSel === RUN_TAB_GENERAL || tabSel === RUN_TAB_RECORDS || tabSel === "proyectos" || (tabSel === "bases" && (basesRows.length > 0 || hasBasesRoute)) || areaList.some((a) => runAreaTab(a.subplanId) === tabSel) ? tabSel : RUN_TAB_GENERAL;
+  const go = (id: string): void => setTabSel(id);
+  const areaTab = tab.startsWith("area:") ? areaList.find((a) => runAreaTab(a.subplanId) === tab) : undefined;
+  // lo pesado de cada vista se calcula solo cuando esa vista está abierta (y no al cambiar de pestaña o de modo)
+  const areaView = useMemo(() => {
+    if (!areaTab) return undefined;
+    const id = areaTab.subplanId;
+    return { routeRows: routeOf(id), weekDays: weekDaysOf(id), upcoming: upcomingWeeksOf(id), sets: areaSets(m.schedule.days, id, date, currentWeek, started, notBases), reviews: reviewsOf(id) };
+  }, [areaTab, routeOf, weekDaysOf, upcomingWeeksOf, m.schedule, date, currentWeek, started, notBases, reviewsOf]);
+  const basesView = useMemo(() => {
+    if (tab !== "bases") return undefined;
+    return { weekDays: weekDaysOf(null), upcoming: upcomingWeeksOf(null), sets: areaSets(m.schedule.days, null, date, currentWeek, started, isBases) };
+  }, [tab, weekDaysOf, upcomingWeeksOf, m.schedule, date, currentWeek, started, isBases]);
 
   const planned = day ? day.topicMinutes + day.practiceMinutes : 0;
   const capacity = day?.capacityMinutes ?? 0;
   const excess = planned - capacity;
   const loggedToday = minutesOn(timeEntries, date);
-  const lateMinutes = new Map<string, number>();
-  for (const d of m.schedule.days) for (const t of d.topics) if (!t.done) lateMinutes.set(t.folder, (lateMinutes.get(t.folder) ?? 0) + t.minutes);
+  const lateMinutes = useMemo(() => {
+    const out = new Map<string, number>();
+    for (const d of m.schedule.days) for (const t of d.topics) if (!t.done) out.set(t.folder, (out.get(t.folder) ?? 0) + t.minutes);
+    return out;
+  }, [m.schedule]);
   // tarjetas plegables de hoy: las áreas con temas o práctica y, aparte, los fundamentos (Bases)
-  const todayFolds: FoldItem[] = [
+  const todayFolds: FoldItem[] = useMemo(() => [
     ...cards.filter((c) => c.rows.length > 0 || c.entry.practiceMinutes > 0).map(foldItemOf),
     ...(basesRows.length ? [{ key: "bases", name: "Bases", colour: "var(--nv-accent)", rows: basesRows, minutes: basesRows.reduce((n, r) => n + (r.minutes ?? 0), 0) }] : []),
-  ];
-  // Si TODOS los temas de hoy de un área están bloqueados por la ruta sólida (hay un día anterior sin cerrar), «hoy» es lo que sí se puede trabajar:
-  // los primeros temas abiertos de su ruta. Sin esto el área salía con temas que no se pueden abrir (o vacía).
-  const hoyFolds: FoldItem[] = todayFolds.map((f) => {
-    if (f.key === "bases" || !f.rows.length || !f.rows.every((r) => r.done || r.unlockOn)) return f;
-    const sets = areaSets(m.schedule.days, f.key, date, currentWeek, started);
-    const open = routeOf(f.key).filter((r) => sets.available.has(r.folder) && !r.done && !r.unlockOn).slice(0, 6);
-    if (!open.length) return f;
-    const rows = open.map((r) => ({ ...r, sub: "Toca ahora en la ruta", minutes: Math.round((lateMinutes.get(r.folder) ?? 0) / 1) || undefined }));
-    return { ...f, rows, minutes: rows.reduce((n, r) => n + (r.minutes ?? 0), 0) };
-  });
+  ], [cards, basesRows]);
+  // «Hoy» es EXACTAMENTE lo que la Agenda reparte hoy (sin sustituirlo por lo atrasado): lo atrasado va a «Pendientes» de cada área.
+  const hoyFolds = todayFolds;
   const pendingToday = hoyFolds.flatMap((f) => f.rows).filter((r) => !r.done);
   const assignToday = (): void => {
     const { assignTopic } = usePomodoro.getState();
@@ -302,13 +274,6 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
 
   return (
     <div className="space-y-6 pb-4" data-testid="plan-run">
-      <RunNav
-        tabs={tabs}
-        active={tab}
-        onSelect={go}
-        right={<GhostButton onClick={() => openPlanRecords(plan.id)} data-testid="run-records"><NotebookText size={14} aria-hidden /> Registros</GhostButton>}
-      />
-
       {tab === "general" && (
         <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]" data-testid="run-general">
           <div className="min-w-0 space-y-6">
@@ -502,16 +467,16 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         </div>
       )}
 
-      {areaTab && (
+      {areaTab && areaView && (
         <RunArea
           plan={plan}
           area={areaTab}
           card={cardOf.get(areaTab.subplanId)}
-          routeRows={routeOf(areaTab.subplanId)}
-          weekDays={weekDaysOf(areaTab.subplanId)}
-          upcoming={upcomingWeeksOf(areaTab.subplanId)}
-          sets={areaSets(m.schedule.days, areaTab.subplanId, date, currentWeek, started)}
-          reviews={reviewsOf(areaTab.subplanId)}
+          routeRows={areaView.routeRows}
+          weekDays={areaView.weekDays}
+          upcoming={areaView.upcoming}
+          sets={areaView.sets}
+          reviews={areaView.reviews}
           date={date}
           practice={ap.data && ap.data.areas.length ? { areas: ap.data.areas, today: ap.data.today || m.today, mark: ap.mark } : undefined}
           dailyProject={day ? dailyProjectOf(plan, m.schedule, day) : null}
@@ -520,9 +485,11 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
         />
       )}
 
-      {tab === "bases" && <RunBases plan={plan} routeRows={basesRoute} todayRows={basesRows} weekDays={weekDaysOf(null)} upcoming={upcomingWeeksOf(null)} sets={areaSets(m.schedule.days, null, date, currentWeek, started)} reviews={basesReviews} date={date} />}
+      {tab === "bases" && basesView && <RunBases plan={plan} routeRows={basesRoute} todayRows={basesRows} weekDays={basesView.weekDays} upcoming={basesView.upcoming} sets={basesView.sets} reviews={basesReviews} date={date} />}
 
       {tab === "proyectos" && <RunProjects plan={plan} data={data} m={m} />}
+
+      {tab === RUN_TAB_RECORDS && <PlanRecords planId={plan.id} />}
     </div>
   );
 }

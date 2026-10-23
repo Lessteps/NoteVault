@@ -21,6 +21,7 @@ import { useNavState } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { Disclosure, hm, LoadState, PanelPage, ProgressBar, ThinkingStatus, useAiStatus } from "./parts";
+import { CREATE_VIEW, OVERVIEW_VIEW } from "./mentorNav";
 import { PlanForm } from "./PlanForm";
 import { PlanNotes } from "./planKit";
 import { DAY_SHORT, monthLabel, num1, STATUS_COLOUR, STATUS_LABEL, usePlanData } from "./planShared";
@@ -29,15 +30,26 @@ import { ThisWeek } from "./PlanWeek";
 import { practiceSummary, PracticeWeekLines } from "./PracticeCard";
 
 /** El panel Plan del Mentor: `planId` = la sub-interfaz de ese plan; sin él, el resumen de todos los planes. */
-export function MentorPlan({ planId }: { planId?: string }) {
-  return planId ? <PlanView key={planId} planId={planId} /> : <PlansOverview />;
+export function MentorPlan({ planId, creating }: { planId?: string; /** abre el formulario de plan nuevo al entrar (el botón «Crear plan» del selector) */ creating?: boolean }) {
+  return planId ? <LoadedPlanView key={planId} planId={planId} /> : <PlansOverview creating={!!creating} />;
+}
+
+/** La vista de un plan con sus propios datos (cuando no la monta la barra lateral del Mentor, que ya los carga). */
+function LoadedPlanView({ planId }: { planId: string }) {
+  const source = usePlanData(planId);
+  return <PlanView planId={planId} source={source} />;
 }
 
 // ── Resumen de planes ────────────────────────────────────────────────────
 
-function PlansOverview() {
+function PlansOverview({ creating: startCreating }: { creating: boolean }) {
   const { data, warming, error, reload } = usePlanData(undefined);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(startCreating);
+  // al cerrar el formulario abierto desde «Crear plan» (ruta «nuevo») se vuelve al resumen, para que «Crear plan» pueda abrirlo otra vez
+  const closeForm = () => {
+    setCreating(false);
+    if (useNavState.getState().values["mentor.view"] === CREATE_VIEW) useNavState.getState().set("mentor.view", OVERVIEW_VIEW);
+  };
   const chatLoaded = useMentor((s) => s.chatLoaded);
   const loadChat = useMentor((s) => s.loadChat);
   const turns = useMentor((s) => s.turns);
@@ -76,7 +88,7 @@ function PlansOverview() {
     >
       <LoadState warming={warming} error={error} empty={!data} onRetry={() => void reload()} />
 
-      {creating && <PlanForm onClose={() => setCreating(false)} />}
+      {creating && <PlanForm onClose={closeForm} />}
 
       {generatingPlan && !creating && (
         <ThinkingStatus label={gen.label || "Generando el plan completo…"} elapsed={gen.elapsed} onCancel={() => void api.mentorAiCancel("generate", "abort")} onAuto={() => void api.mentorAiCancel("generate", "auto")} autoLabel="Generar con plan automático (sin IA)" />

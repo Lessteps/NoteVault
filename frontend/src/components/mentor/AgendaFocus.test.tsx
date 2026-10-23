@@ -19,12 +19,12 @@ import type { MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../..
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
-import { planModeKey } from "./planShared";
+import { MODE_KEY } from "./mentorNav";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
 
-import { MentorPlan } from "./MentorPlan";
+import { PlanWorkspace } from "./PlanWorkspace";
 
 const START = "2026-10-05";
 const END = "2027-01-03";
@@ -81,8 +81,8 @@ const click = async (el: Element | null | undefined) => {
 };
 const byTest = (id: string, within: ParentNode = host) => within.querySelector<HTMLElement>(`[data-testid=${id}]`)!;
 const all = (id: string, within: ParentNode = host) => [...within.querySelectorAll<HTMLElement>(`[data-testid=${id}]`)];
-const tab = (id: string) => host.querySelector<HTMLButtonElement>(`#plan-tabs-tab-${id}`)!;
-const view = (id: string) => host.querySelector<HTMLButtonElement>(`#agenda-view-tab-${id}`)!;
+const tab = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:${id}']`)!;
+const view = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:agenda/${id}']`)!;
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "") || label.test(b.getAttribute("aria-label") ?? "")))!;
 const setValue = async (el: HTMLInputElement, v: string) => {
@@ -95,7 +95,7 @@ const setValue = async (el: HTMLInputElement, v: string) => {
 };
 const openAgenda = async (p: PlanData = areasPlan(), exercisesOf?: (f: string) => number) => {
   vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p, exercisesOf));
-  await mountEl(<MentorPlan planId={PID} />);
+  await mountEl(<PlanWorkspace planId={PID} />);
   await click(tab("agenda"));
 };
 const openDay = async (date: string, p?: PlanData, exercisesOf?: (f: string) => number) => {
@@ -106,7 +106,7 @@ const openDay = async (date: string, p?: PlanData, exercisesOf?: (f: string) => 
 
 beforeEach(() => {
   localStorage.clear();
-  useNavState.setState({ values: { [planModeKey(PID)]: "plan" } }); // las pruebas de la vista de plan abren la cara «plan»
+  useNavState.setState({ values: { [MODE_KEY]: "planeacion" } }); // las pruebas de la vista de plan abren la cara «plan»
   useMentor.setState({ planVersion: 0, plans: [], plansLoaded: false, pendingObjective: null });
   useApp.setState({ module: "mentor" });
   host = document.createElement("div");
@@ -157,7 +157,9 @@ describe("vista Día: secciones en orden", () => {
     expect(areaSection("databases").textContent).toContain("Práctica de bases de datos (SQL)");
     // cada tema con minutos y «Ver tema»; los fundamentos intercalados se rotulan como lógica aplicada
     for (const t of all("agenda-topic")) expect(t.querySelector("[data-testid=agenda-topic-minutes]")!.textContent).toMatch(/\d+ min|[\d,.]+ h/);
-    expect(areaSection("backend").textContent).toContain("Lógica aplicada (fundamentos)");
+    // los fundamentos NO van dentro de un área: tienen su propia sección «Bases»
+    expect(areaSection("backend").textContent).not.toContain("Lógica aplicada (fundamentos)");
+    expect(byTest("agenda-day-bases").textContent).toContain("Lógica aplicada (fundamentos)");
     expect(host.querySelector("button[aria-label^='Ver tema']")).toBeTruthy();
   });
 

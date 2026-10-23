@@ -5,8 +5,9 @@
 // asignado» de cada tema es exactamente el que enseña la Agenda.
 
 import { planTogetherPhases, type AreaPhase } from "./planAreas.js";
-import { buildSchedule, type PlanSchedule, type SchedulePlan, type ScheduleDay } from "./planSchedule.js";
+import { buildSchedule, type PlanSchedule, type SchedulePlan, type ScheduleDay, type ScheduleTopic } from "./planSchedule.js";
 import type { PlanDeliverable } from "./planAreas.js";
+import type { BlockItem, BlockKind } from "./planDayFocus.js";
 import { isLive } from "./planRoute.js";
 import { weekRangesOf } from "./planTime.js";
 
@@ -31,6 +32,53 @@ export function orderedAreas(plan: Pick<SchedulePlan, "subplans">): OrderedArea[
     .map((s, i) => ({ s, i }))
     .sort((a, b) => areaRank(a.s.areaId) - areaRank(b.s.areaId) || a.i - b.i)
     .map(({ s }) => ({ subplanId: s.id, ...(s.areaId ? { areaId: s.areaId } : {}), area: s.area }));
+}
+
+// ── Atribución de temas: UNA sola regla para la Agenda y la Ejecución ───
+
+/**
+ * LA REGLA (la deciden estas funciones y nadie más): los temas de un ÁREA son los de su propio subplan (`subplanId` de origen) SIN los
+ * fundamentos; los fundamentos («Bases»: temas de un grupo de tipo `bases`, que el reparto marca `applied`) forman un cubo aparte y se intercalan
+ * en todas las áreas sin ser de ninguna. La Agenda (Día, Semana, Mes, Calendario) y la Ejecución (Hoy, Temas de hoy/semana, Bases) usan esto.
+ *
+ * Canónico: el REPARTO manda en las FECHAS (qué día toca cada tema) y la RUTA (`areaRouteTopics`) en la PERTENENCIA (qué temas son del área).
+ * Todo tema de la ruta aparece en el reparto (los completados, el día en que se completaron; los que no caben, apilados al final del plan);
+ * `unscheduled` recoge los que, aun así, no tienen ningún día. Lo único propio de la Ejecución es «Toca ahora»: temas YA repartidos en días
+ * anteriores que siguen abiertos (la Agenda los enseña en su día original).
+ */
+export interface TopicRef {
+  subplanId: string;
+  group?: string;
+  applied?: boolean;
+}
+
+/** ¿Es un tema de fundamentos (Bases)? Marcado por el reparto (`applied`) o por su grupo en el plan (así vale también sin agenda por enfoque). */
+export function basesClassifier(plan: Pick<SchedulePlan, "subplans">): (t: TopicRef) => boolean {
+  const bases = new Set(plan.subplans.flatMap((s) => (s.groups ?? []).filter((g) => g.kind === "bases").map((g) => `${s.id}|${g.id}`)));
+  return (t) => !!t.applied || (!!t.group && bases.has(`${t.subplanId}|${t.group}`));
+}
+
+/** La ruta de un área: sus temas vivos (no omitidos) sin los fundamentos, en el orden guardado. */
+export function areaRouteTopics(plan: Pick<SchedulePlan, "subplans">, subplanId: string): ScheduleTopic[] {
+  const sub = plan.subplans.find((x) => x.id === subplanId);
+  if (!sub) return [];
+  const isBases = basesClassifier(plan);
+  return sub.topics.filter((t) => isLive(t) && !isBases({ subplanId, ...(t.group ? { group: t.group } : {}) }));
+}
+
+/** La ruta de los fundamentos (Bases): los temas vivos de los grupos `bases` de todos los subplans, sin repetirse. */
+export function basesRouteTopics(plan: Pick<SchedulePlan, "subplans">): ScheduleTopic[] {
+  const isBases = basesClassifier(plan);
+  const seen = new Set<string>();
+  const out: ScheduleTopic[] = [];
+  for (const s of plan.subplans) {
+    for (const t of s.topics) {
+      if (!isLive(t) || seen.has(t.folder) || !isBases({ subplanId: s.id, ...(t.group ? { group: t.group } : {}) })) continue;
+      seen.add(t.folder);
+      out.push(t);
+    }
+  }
+  return out;
 }
 
 // ── Temas por semana y área ─────────────────────────────────────────────
@@ -62,6 +110,8 @@ export interface WeekAreas {
   start: string;
   end: string;
   cells: WeekAreaCell[];
+  /** los fundamentos (Bases) de la semana: cubo aparte, no cuentan en ningún área */
+  bases: WeekAreaTopic[];
   /** temas distintos de la semana (suma de las celdas) */
   topics: number;
   minutes: number;
@@ -72,6 +122,10 @@ export interface TopicsByWeekArea {
   weeks: WeekAreas[];
   /** totales por área (subplanId): temas distintos del plan y minutos repartidos */
   totals: Record<string, { topics: number; minutes: number; done: number }>;
+  /** totales de los fundamentos (Bases) del plan */
+  basesTotal: { topics: number; minutes: number; done: number };
+  /** temas de la ruta de cada área (y de `bases`) que el reparto no coloca en ningún día (normalmente vacío) */
+  unscheduled: Record<string, Array<{ folder: string; title: string }>>;
 }
 
 /**
@@ -84,27 +138,32 @@ export function topicsByWeekArea(plan: SchedulePlan, schedule?: PlanSchedule): T
   const areas = orderedAreas(plan);
   const ranges = weekRangesOf(plan.start, plan.end);
   const phaseOf = new Map(plan.subplans.map((s) => [s.id, s.phase] as const));
+  const isBases = basesClassifier(plan);
+  /** los temas distintos de los días de una semana que cumplen `pick` (un tema que abarca varios días suma sus minutos) */
+  const collect = (days: ScheduleDay[], pick: (t: ScheduleDay["topics"][number]) => boolean): WeekAreaTopic[] => {
+    const byFolder = new Map<string, WeekAreaTopic>();
+    for (const d of days) {
+      for (const t of d.topics) {
+        if (!pick(t)) continue;
+        const e = byFolder.get(t.folder) ?? { folder: t.folder, title: t.title, minutes: 0, done: t.done, dates: [], ...(t.group ? { group: t.group, groupTitle: t.groupTitle ?? t.group } : {}) };
+        e.minutes += t.minutes;
+        e.done = e.done && t.done;
+        if (!e.dates.includes(d.date)) e.dates.push(d.date);
+        byFolder.set(t.folder, e);
+      }
+    }
+    return [...byFolder.values()].sort((x, y) => (x.dates[0] ?? "").localeCompare(y.dates[0] ?? ""));
+  };
   const weeks: WeekAreas[] = ranges.map((r, wi) => {
     const week = wi + 1;
     const days = sch.days.filter((d) => d.week === week);
     const cells: WeekAreaCell[] = areas.map((a) => {
-      const byFolder = new Map<string, WeekAreaTopic>();
-      for (const d of days) {
-        for (const t of d.topics) {
-          if (t.subplanId !== a.subplanId) continue;
-          const e = byFolder.get(t.folder) ?? { folder: t.folder, title: t.title, minutes: 0, done: t.done, dates: [], ...(t.group ? { group: t.group, groupTitle: t.groupTitle ?? t.group } : {}) };
-          e.minutes += t.minutes;
-          e.done = e.done && t.done;
-          if (!e.dates.includes(d.date)) e.dates.push(d.date);
-          byFolder.set(t.folder, e);
-        }
-      }
-      const topics = [...byFolder.values()].sort((x, y) => (x.dates[0] ?? "").localeCompare(y.dates[0] ?? ""));
+      const topics = collect(days, (t) => t.subplanId === a.subplanId && !isBases(t));
       const ph = phaseOf.get(a.subplanId);
       const review = topics.length === 0 && days.some((d) => (d.blocks ?? []).some((b) => b.subplanId === a.subplanId && b.status === "review" && b.minutes > 0));
       return { ...a, review, topics, minutes: topics.reduce((n, t) => n + t.minutes, 0), done: topics.filter((t) => t.done).length, active: !ph || (week >= ph.fromWeek && week <= ph.toWeek) };
     });
-    return { week, start: r.start, end: r.end, cells, topics: cells.reduce((n, c) => n + c.topics.length, 0), minutes: cells.reduce((n, c) => n + c.minutes, 0) };
+    return { week, start: r.start, end: r.end, cells, bases: collect(days, isBases), topics: cells.reduce((n, c) => n + c.topics.length, 0), minutes: cells.reduce((n, c) => n + c.minutes, 0) };
   });
   const totals: TopicsByWeekArea["totals"] = {};
   for (const a of areas) {
@@ -117,7 +176,20 @@ export function topicsByWeekArea(plan: SchedulePlan, schedule?: PlanSchedule): T
     }
     totals[a.subplanId] = { topics: folders.size, minutes, done: [...folders.values()].filter(Boolean).length };
   }
-  return { areas, weeks, totals };
+  const baseFolders = new Map<string, boolean>();
+  let baseMinutes = 0;
+  for (const w of weeks) {
+    for (const t of w.bases) {
+      baseMinutes += t.minutes;
+      baseFolders.set(t.folder, (baseFolders.get(t.folder) ?? true) && t.done);
+    }
+  }
+  // pertenencia por la ruta: todo tema de la ruta debe tener algún día en el reparto
+  const placed = new Set(sch.days.flatMap((d) => d.topics.map((t) => t.folder)));
+  const lost = (list: ScheduleTopic[]): Array<{ folder: string; title: string }> => list.filter((t) => !placed.has(t.folder)).map((t) => ({ folder: t.folder, title: t.title }));
+  const unscheduled: TopicsByWeekArea["unscheduled"] = { bases: lost(basesRouteTopics(plan)) };
+  for (const a of areas) unscheduled[a.subplanId] = lost(areaRouteTopics(plan, a.subplanId));
+  return { areas, weeks, totals, basesTotal: { topics: baseFolders.size, minutes: baseMinutes, done: [...baseFolders.values()].filter(Boolean).length }, unscheduled };
 }
 
 /** Los temas de UNA semana separados por área (atajo de `topicsByWeekArea` para las vistas Semana y Mes). */
@@ -235,14 +307,23 @@ export function dayByArea(plan: Pick<SchedulePlan, "subplans">, day: ScheduleDay
   const bySub = new Map(areas.map((a) => [a.subplanId, a] as const));
   const byAreaId = new Map(areas.filter((a) => a.areaId).map((a) => [a.areaId!, a] as const));
   const ownerOf = (b: { subplanId?: string; areaId?: string }): OrderedArea | undefined => (b.subplanId ? bySub.get(b.subplanId) : undefined) ?? (b.areaId ? byAreaId.get(b.areaId) : undefined);
+  const isBases = basesClassifier(plan);
   const out: DayAreaEntry[] = [];
   for (const a of areas) {
-    const blocks = (day.blocks ?? []).filter((b) => !b.daily && b.status !== "omitted" && ownerOf(b)?.subplanId === a.subplanId);
-    const topicsOnly = !day.blocks?.length ? day.topics.filter((t) => t.subplanId === a.subplanId && !t.done) : [];
+    // los bloques del área llevan SOLO temas del área: los fundamentos intercalados en ellos van al cubo de `dayBases` (un bloque que solo
+    // llevaba fundamentos desaparece del área y sus minutos se descuentan)
+    const blocks = (day.blocks ?? [])
+      .filter((b) => !b.daily && b.status !== "omitted" && ownerOf(b)?.subplanId === a.subplanId)
+      .map((b) => {
+        const items = b.items.filter((i) => !isBases(i));
+        return items.length === b.items.length ? b : { ...b, items, minutes: items.reduce((n, i) => n + i.minutes, 0) };
+      })
+      .filter((b) => b.items.length > 0 || b.status !== "topic");
+    const topicsOnly = !day.blocks?.length ? day.topics.filter((t) => t.subplanId === a.subplanId && !t.done && !isBases(t)) : [];
     if (!blocks.length && !topicsOnly.length) continue;
     const theory = blocks.filter((b) => b.kind === "theory");
     const practice = blocks.filter((b) => b.kind === "practice");
-    const folders = new Set(blocks.flatMap((b) => b.items.filter((i) => !i.applied).map((i) => i.folder)));
+    const folders = new Set(blocks.flatMap((b) => b.items.map((i) => i.folder)));
     for (const t of topicsOnly) folders.add(t.folder);
     const theoryFolders = new Set(theory.flatMap((b) => b.items.map((i) => i.folder)));
     out.push({
@@ -259,7 +340,39 @@ export function dayByArea(plan: Pick<SchedulePlan, "subplans">, day: ScheduleDay
   return out;
 }
 
-const plural1 = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+/** Un fundamento (Bases) de un día: el tema (una vez por parte) y el tipo de bloque en que se trabaja (teoría, práctica o ambos). */
+export interface DayBasesItem extends BlockItem {
+  kinds: BlockKind[];
+}
+
+/**
+ * Los fundamentos (Bases) de UN día, sin repetirse: el cubo aparte de `dayByArea` (que los saca de los bloques de cada área). Sin agenda por
+ * enfoque (planes antiguos) salen de los temas del día.
+ */
+export function dayBases(plan: Pick<SchedulePlan, "subplans">, day: ScheduleDay): DayBasesItem[] {
+  const isBases = basesClassifier(plan);
+  const out = new Map<string, DayBasesItem>();
+  if (day.blocks?.length) {
+    for (const b of day.blocks) {
+      if (b.daily || b.status === "omitted") continue;
+      for (const i of b.items) {
+        if (!isBases(i)) continue;
+        const key = `${i.folder}:${i.part}`;
+        const e = out.get(key) ?? { ...i, kinds: [] };
+        if (!e.kinds.includes(b.kind)) e.kinds.push(b.kind);
+        out.set(key, e);
+      }
+    }
+  } else {
+    for (const t of day.topics) {
+      if (!isBases(t) || t.done) continue;
+      out.set(`${t.folder}:${t.part}`, { subplanId: t.subplanId, area: t.area, ...(t.areaId ? { areaId: t.areaId } : {}), folder: t.folder, title: t.title, minutes: t.minutes, part: t.part, parts: t.parts, ...(t.group ? { group: t.group } : {}), applied: true, kinds: [] });
+    }
+  }
+  return [...out.values()];
+}
+
+const plural1 =(n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 /** «Backend 2 temas y práctica; Frontend 1 tema y práctica» (etiqueta accesible de un día: el desglose por área). */
 export function dayAreasText(entries: readonly DayAreaEntry[]): string {

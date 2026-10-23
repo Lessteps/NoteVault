@@ -17,6 +17,7 @@ import { cn } from "../ui";
 import { plural } from "./agendaKit";
 import { hm, ProgressBar } from "./parts";
 import { TimeChip, TopicMenu, type BoardRow } from "./PlanBoard";
+import { TopicNoteLinks } from "./TopicNoteLinks";
 import { STATE_LABEL } from "./planShared";
 import type { TodayCard } from "./PlanRunTabs";
 
@@ -41,6 +42,7 @@ export function DayTopicRow({ r, colour }: { r: BoardRow; colour: string }) {
         <span className="sr-only">{locked ? "bloqueado" : r.done ? "completado" : STATE_LABEL[r.state]}</span>
       </span>
       {r.time && <TimeChip time={r.time} />}
+      {!locked && <TopicNoteLinks folder={r.folder} title={r.title} />}
       {r.minutes ? <span className="flex-none whitespace-nowrap rounded-md bg-hover px-2 py-0.5 font-mono text-[12px] text-dim">{r.minutes} min</span> : null}
     </li>
   );

@@ -15,6 +15,7 @@ import { AreaChip, AreaCounts, DeliverableLine, doneText, focusColour, plural, P
 import { DayDetailFocus, FocusStructure, MonthProjects, WeekProjects } from "./AgendaDayFocus";
 import { AreaDot, MonthAreaTotals, WeekAreaChips, WeekAreaColumns } from "./AreaViews";
 import { openTopic } from "./openTopic";
+import { TopicNoteLinks } from "./TopicNoteLinks";
 import { hm, ProgressBar } from "./parts";
 import { openPractice } from "./PracticeCard";
 import { DAY_LONG, DAY_SHORT, PALETTE, STATE_COLOUR, STATE_GLYPH, STATE_LABEL } from "./planShared";
@@ -102,6 +103,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2, areaFilter
                   {live?.found && (
                     <button type="button" onClick={() => void openTopic(t.folder)} className="inline-flex min-h-8 items-center px-2 text-[14px] text-accent-text underline-offset-2 hover:underline" aria-label={`Ver tema ${t.title}`}>Ver tema</button>
                   )}
+                  {live?.found && <TopicNoteLinks folder={t.folder} title={t.title} practice={false} />}
                 </li>
               );
             })}

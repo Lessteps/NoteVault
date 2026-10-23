@@ -15,12 +15,13 @@ import type { MentorPlan as PlanData, MentorPlanGet, MentorPlanRow } from "../..
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
-import { planModeKey, planSectionKey } from "./planShared";
+import { planSectionKey } from "./planShared";
+import { MODE_KEY } from "./mentorNav";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
 
-import { MentorPlan } from "./MentorPlan";
+import { PlanWorkspace } from "./PlanWorkspace";
 
 const START = "2026-10-06";
 const END = "2027-04-05";
@@ -78,7 +79,7 @@ const setValue = async (el: HTMLInputElement | HTMLSelectElement, v: string) => 
 };
 const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
 const section = async (id: string) => {
-  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${SECTION_ALIAS[id] ?? id}]`);
+  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
   expect(b, `sub-vista ${id}`).toBeTruthy();
   await act(async () => { b!.click(); });
   await flush();
@@ -94,12 +95,12 @@ const open = async (section = "") => {
   // «Fases mes a mes» vive ahora en la Agenda, vista Mes (con las pestañas por área)
   if (section === "fases") useNavState.setState((st) => ({ values: { ...st.values, [`mentor.planTab.${PID}`]: "agenda", [`mentor.agendaView.${PID}`]: "mes" } }));
   else if (section) useNavState.setState((st) => ({ values: { ...st.values, [planSectionKey(PID)]: section } }));
-  await mountEl(<MentorPlan planId={PID} />);
+  await mountEl(<PlanWorkspace planId={PID} />);
 };
 
 beforeEach(() => {
   localStorage.clear();
-  useNavState.setState({ values: { [planModeKey(PID)]: "plan" } }); // las pruebas de la vista de plan abren la cara «plan»
+  useNavState.setState({ values: { [MODE_KEY]: "planeacion" } }); // las pruebas de la vista de plan abren la cara «plan»
   useMentor.setState({ planVersion: 0, plans: [], plansLoaded: false, pendingObjective: null });
   useApp.setState({ module: "mentor" });
   host = document.createElement("div");
@@ -153,7 +154,7 @@ describe("Fases del plan mes a mes (tabla accesible)", () => {
     await flush();
     expect(byTest("agenda-date").getAttribute("value") ?? (byTest("agenda-date") as HTMLInputElement).value).toBe("2026-12-01");
     expect(byTest("agenda-title").textContent!.toLowerCase()).toContain("diciembre");
-    expect(host.querySelector("#plan-tabs-tab-agenda")!.getAttribute("aria-selected")).toBe("true");
+    expect(host.querySelector("[data-testid='nav-pl:agenda/mes']")!.getAttribute("aria-current")).toBe("page");
   });
 });
 
@@ -203,7 +204,7 @@ describe("Aviso de Bases", () => {
     expect(warn.textContent).toContain("Muchas Bases");
     expect(host.querySelectorAll("[data-testid=bases-warning]")).toHaveLength(1); // Frontend no tiene Bases
     await click(byTest("bases-ask-change"));
-    expect(host.querySelector("#plan-tabs-tab-cambios")!.getAttribute("aria-selected")).toBe("true");
+    expect(host.querySelector("[data-testid='nav-pl:cambios']")!.getAttribute("aria-current")).toBe("page");
     const box = host.querySelector<HTMLTextAreaElement>("[data-testid=plan-changes] textarea")!;
     expect(box.value).toBe("Reduce Bases a lo esencial y aplícalas junto al lenguaje");
     expect(change).not.toHaveBeenCalled();

@@ -63,23 +63,43 @@ export interface AgendaModel {
 export const FOCUS_COLOUR: Record<string, string> = { backend: "#2383e2", databases: "#8e24aa", frontend: "#33b679", logic: "#14b8a6", automation: "#c28a00", tooling: "#e67c73", generic: "#039be5" };
 export const focusColour = (id?: string): string => FOCUS_COLOUR[id ?? ""] ?? FOCUS_COLOUR.generic!;
 
+// El reparto y los temas por semana y área solo dependen del PLAN: se guardan por objeto de plan, así que Ejecución y Agenda (y cada cambio de
+// modo o de pestaña) comparten el mismo cálculo y solo se rehace cuando el plan cambia de verdad.
+const scheduleCache = new WeakMap<object, { schedule: PlanSchedule; byWeekArea: TopicsByWeekArea }>();
+export function scheduleOf(plan: MentorPlan): { schedule: PlanSchedule; byWeekArea: TopicsByWeekArea } {
+  let hit = scheduleCache.get(plan);
+  if (!hit) {
+    const schedule = buildSchedule(plan);
+    hit = { schedule, byWeekArea: topicsByWeekArea(plan, schedule) };
+    scheduleCache.set(plan, hit);
+  }
+  return hit;
+}
+
 export function useAgendaModel(data: Loaded, plan: MentorPlan): AgendaModel {
   const practice = data.practice ?? null;
-  return useMemo(() => {
-    const schedule = buildSchedule(plan);
+  const { schedule, byWeekArea } = useMemo(() => scheduleOf(plan), [plan]);
+  const del = useMemo(() => {
     const deliverables = deliverablesOf(plan, practice, schedule);
     const dueByDate = new Map<string, PlanDeliverable[]>();
     for (const d of deliverables) dueByDate.set(d.dueDate, [...(dueByDate.get(d.dueDate) ?? []), d]);
+    return { deliverables, dueByDate, deliverableById: new Map(deliverables.map((d) => [d.id, d] as const)), deliverablesDefined: deliverablesDefined(plan) };
+  }, [plan, practice, schedule]);
+  // el estado en vivo (`data.derived`) cambia de objeto en cada recarga: solo esto se rehace, no el reparto
+  const live = useMemo(() => {
     const topicByFolder = new Map<string, MentorTopicView>();
     const pctBySubplan = new Map<string, number>();
     for (const s of data.derived?.subplans ?? []) {
       pctBySubplan.set(s.id, s.pct);
       for (const t of s.topics) topicByFolder.set(t.folder, t);
     }
-    const deliverableById = new Map(deliverables.map((d) => [d.id, d] as const));
     const existing: ExistingExercises = { count: (f) => topicByFolder.get(f)?.exercises ?? 0 };
-    return { plan, today: data.today, schedule, deliverables, dueByDate, topicByFolder, pctBySubplan, practiceStatus: practice, editable: true, existing, deliverableById, deliverablesDefined: deliverablesDefined(plan), byWeekArea: topicsByWeekArea(plan, schedule) };
-  }, [plan, practice, data.derived, data.today]);
+    return { topicByFolder, pctBySubplan, existing };
+  }, [data.derived]);
+  return useMemo(
+    () => ({ plan, today: data.today, schedule, ...del, ...live, practiceStatus: practice, editable: true, byWeekArea }),
+    [plan, data.today, schedule, del, live, practice, byWeekArea],
+  );
 }
 
 export function StatusChip({ status }: { status: PlanDeliverableStatus }) {

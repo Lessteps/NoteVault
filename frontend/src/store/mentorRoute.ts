@@ -22,6 +22,10 @@ export interface RouteInfo {
   title: string;
   area: string;
   areaId?: string;
+  /** subplan (área) de origen: con él la Ejecución abre la vista de su área */
+  subplanId: string;
+  /** es un tema de fundamentos (Bases): en la Ejecución va a su vista aparte */
+  bases?: boolean;
   group?: string;
   /** motivo por el que está fuera de ruta */
   reason?: string;
@@ -120,6 +124,8 @@ export function buildRouteSnapshot(plan: MentorPlan, currentWeek: number): Route
         weekStart: startOf(t.targetWeek),
         title: t.title,
         area: s.area,
+        subplanId: s.id,
+        ...(t.group && s.groups?.some((g) => g.id === t.group && g.kind === "bases") ? { bases: true } : {}),
         ...(s.areaId ? { areaId: s.areaId } : {}),
         ...(t.group ? { group: s.groups?.find((g) => g.id === t.group)?.title ?? t.group } : {}),
         ...(route === "skipped" && t.skippedReason ? { reason: t.skippedReason } : {}),
@@ -235,4 +241,38 @@ export function dayOfTopic(snap: RouteSnapshot, folder: string): { date: string;
     snap.schedule = null;
     return null;
   }
+}
+
+export type MentorTopicStatus = "hecho" | "pendiente" | "fuera";
+/** Lo que la nota abierta enseña de su tema en el plan (puro: sale del mapa ya cargado, sin lecturas nuevas). */
+export interface MentorTopicLink {
+  planId: string;
+  folder: string;
+  title: string;
+  area: string;
+  week: number;
+  /** día asignado por el reparto (AAAA-MM-DD); null si está fuera de ruta o no se pudo calcular */
+  date: string | null;
+  dayInWeek: number | null;
+  route: TopicRoute;
+  status: MentorTopicStatus;
+  info: RouteInfo;
+}
+export function mentorLinkOf(snap: RouteSnapshot, path: string): MentorTopicLink | null {
+  const hit = topicOfPath(snap, path);
+  if (!hit) return null;
+  const { info, folder } = hit;
+  const day = info.route === "skipped" ? null : dayOfTopic(snap, folder);
+  return {
+    planId: snap.planId,
+    folder,
+    title: info.title,
+    area: info.area,
+    week: info.week,
+    date: day?.date ?? null,
+    dayInWeek: day?.dayInWeek ?? null,
+    route: info.route,
+    status: info.route === "skipped" ? "fuera" : info.done ? "hecho" : "pendiente",
+    info,
+  };
 }

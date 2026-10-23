@@ -18,12 +18,12 @@ import type { MentorChangeEntry, MentorPlan as PlanData, MentorPlanGet, MentorPl
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
-import { planModeKey } from "./planShared";
+import { MODE_KEY } from "./mentorNav";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
 
-import { MentorPlan } from "./MentorPlan";
+import { PlanWorkspace } from "./PlanWorkspace";
 
 const START = "2026-10-05";
 const END = "2027-01-03";
@@ -83,13 +83,13 @@ const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resu
 const section = async (id: string) => {
   // «Fases mes a mes» vive ahora en la Agenda, vista Mes
   if (id === "fases") {
-    await act(async () => { host.querySelector<HTMLElement>("#plan-tabs-tab-agenda")!.click(); });
+    await act(async () => { host.querySelector<HTMLElement>("[data-testid='nav-pl:agenda']")!.click(); });
     await flush();
-    await act(async () => { host.querySelector<HTMLElement>("#agenda-view-tab-mes")!.click(); });
+    await act(async () => { host.querySelector<HTMLElement>("[data-testid='nav-pl:agenda/mes']")!.click(); });
     await flush();
     return;
   }
-  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${SECTION_ALIAS[id] ?? id}]`);
+  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
   expect(b, `sub-vista ${id}`).toBeTruthy();
   await act(async () => { b!.click(); });
   await flush();
@@ -108,8 +108,8 @@ const click = async (el: Element | null | undefined) => {
 const key = async (el: Element, k: string) => { await act(async () => { el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })); }); await flush(); };
 const byTest = (id: string, within: ParentNode = host) => within.querySelector<HTMLElement>(`[data-testid=${id}]`)!;
 const all = (id: string, within: ParentNode = host) => [...within.querySelectorAll<HTMLElement>(`[data-testid=${id}]`)];
-const tab = (id: string) => host.querySelector<HTMLButtonElement>(`#plan-tabs-tab-${id}`)!;
-const view = (id: string) => host.querySelector<HTMLButtonElement>(`#agenda-view-tab-${id}`)!;
+const tab = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:${id}']`)!;
+const view = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:agenda/${id}']`)!;
 const setValue = async (el: HTMLInputElement, v: string) => {
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, v);
@@ -120,7 +120,7 @@ const setValue = async (el: HTMLInputElement, v: string) => {
 };
 const open = async (p: PlanData) => {
   vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
-  await mountEl(<MentorPlan planId={PID} />);
+  await mountEl(<PlanWorkspace planId={PID} />);
 };
 const openAgenda = async (p: PlanData, v?: string) => {
   await open(p);
@@ -132,7 +132,7 @@ const firstStudyDay = (p: PlanData, week = 2): string => buildSchedule(p as neve
 beforeEach(() => {
   localStorage.clear();
   ui.confirmAction.mockReset();
-  useNavState.setState({ values: { [planModeKey(PID)]: "plan" } }); // las pruebas de la vista de plan abren la cara «plan»
+  useNavState.setState({ values: { [MODE_KEY]: "planeacion" } }); // las pruebas de la vista de plan abren la cara «plan»
   useMentor.setState({ planVersion: 0, plans: [], plansLoaded: false, pendingObjective: null });
   useApp.setState({ module: "mentor" });
   host = document.createElement("div");

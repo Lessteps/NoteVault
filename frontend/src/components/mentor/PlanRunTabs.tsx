@@ -21,49 +21,6 @@ import { dailyBreakdown } from "../../lib/planAreaPractice";
 import { hm } from "./parts";
 import type { DayProject } from "../../lib/planCurriculum";
 
-export interface RunTab {
-  id: string;
-  label: string;
-  colour?: string;
-  hint?: string;
-  hintLabel?: string;
-}
-
-/** La barra de pestañas de la ejecución: se desplaza en horizontal en anchos estrechos. */
-export function RunNav({ tabs, active, onSelect, right }: { tabs: ReadonlyArray<RunTab>; active: string; onSelect: (id: string) => void; /** acciones fijas a la derecha de la barra (p. ej. «Registros») */ right?: React.ReactNode }) {
-  return (
-    <nav aria-label="Secciones de la ejecución" data-testid="run-nav" className="flex min-w-0 items-center gap-2 border-b border-line">
-      <ul className="flex min-w-0 flex-1 gap-1 overflow-x-auto py-1.5">
-        {tabs.map((t) => {
-          const on = t.id === active;
-          return (
-            <li key={t.id} className="flex-none">
-              <button
-                type="button"
-                aria-pressed={on}
-                aria-current={on ? "page" : undefined}
-                onClick={() => onSelect(t.id)}
-                data-testid={`run-tab-${t.id}`}
-                className={cn("inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg border px-3.5 text-[14.5px] font-medium transition-colors", on ? "border-accent bg-accent-soft text-accent-text" : "border-transparent text-dim hover:bg-hover hover:text-text")}
-              >
-                {t.colour && <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: t.colour }} />}
-                {t.label}
-                {t.hint && (
-                  <span className="rounded-md bg-hover px-1.5 text-[12px] text-dim">
-                    <span aria-hidden>{t.hint}</span>
-                    <span className="sr-only"> ({t.hintLabel ?? t.hint})</span>
-                  </span>
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      {right && <div className="flex-none py-1.5">{right}</div>}
-    </nav>
-  );
-}
-
 /** Lo de hoy de un área (o de las Bases): sus filas ya calculadas. */
 export interface TodayCard {
   entry: DayAreaEntry;

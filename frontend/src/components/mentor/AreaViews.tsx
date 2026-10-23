@@ -154,7 +154,7 @@ function TopicLine({ m, t }: { m: AgendaModel; t: WeekAreaTopic }) {
   );
 }
 
-function AreaCard({ m, cell, planTotal, headingTag: H = "h4" }: { m: AgendaModel; cell: WeekAreaCell; planTotal?: { topics: number; minutes: number; done: number }; headingTag?: "h3" | "h4" }) {
+function AreaCard({ m, cell, planTotal, lost, headingTag: H = "h4" }: { m: AgendaModel; cell: WeekAreaCell; planTotal?: { topics: number; minutes: number; done: number }; lost?: ReadonlyArray<unknown>; headingTag?: "h3" | "h4" }) {
   const uid = useId();
   return (
     <li className="min-w-0 rounded-xl border border-line bg-card p-3.5" style={{ borderTop: `3px solid ${areaColour(cell.areaId)}` }} data-testid="week-area" data-area={cell.areaId ?? cell.subplanId} aria-labelledby={`${uid}-h`}>
@@ -168,7 +168,7 @@ function AreaCard({ m, cell, planTotal, headingTag: H = "h4" }: { m: AgendaModel
       ) : (
         <ul className="mt-2 space-y-1.5">{cell.topics.map((t) => <TopicLine key={t.folder} m={m} t={t} />)}</ul>
       )}
-      {planTotal && <p className="mt-2 border-t border-line pt-1.5 text-[13.5px] text-dim" data-testid="week-area-total">En todo el plan: {plural(planTotal.topics, "tema", "temas")} · {hm(planTotal.minutes)} ({planTotal.done} hechos)</p>}
+      {planTotal && <p className="mt-2 border-t border-line pt-1.5 text-[13.5px] text-dim" data-testid="week-area-total">En todo el plan: {plural(planTotal.topics, "tema", "temas")} · {hm(planTotal.minutes)} ({planTotal.done} hechos){lost && lost.length > 0 ? ` · ${plural(lost.length, "tema sin día", "temas sin día")} en el reparto` : ""}</p>}
     </li>
   );
 }
@@ -182,10 +182,16 @@ export function WeekAreaColumns({ m, week, headingId, only = null, byWeekArea }:
   return (
     <section aria-labelledby={headingId} data-testid="agenda-week-areas">
       <h3 id={headingId} className={cn(SECTION, "mb-2")}>Temas por semana, separados por área <span className="font-normal normal-case tracking-normal text-dim">({plural(w.topics, "tema", "temas")} esta semana)</span></h3>
-      {cells.every((c) => c.topics.length === 0) && <p className="mb-2 text-[14px] text-dim">Esta semana no tiene temas repartidos.</p>}
+      {cells.every((c) => c.topics.length === 0) && (only !== null || w.bases.length === 0) && <p className="mb-2 text-[14px] text-dim">Esta semana no tiene temas repartidos.</p>}
       <ul className="grid items-start gap-3 @3xl:grid-cols-2 @6xl:grid-cols-3" aria-label="Temas de la semana por área">
-        {cells.map((c) => <AreaCard key={c.subplanId} m={m} cell={c} planTotal={data.totals[c.subplanId]!} />)}
+        {cells.map((c) => <AreaCard key={c.subplanId} m={m} cell={c} planTotal={data.totals[c.subplanId]!} lost={data.unscheduled[c.subplanId]} />)}
       </ul>
+      {only === null && w.bases.length > 0 && (
+        <section className="mt-3 rounded-xl border border-line bg-card p-3.5" style={{ borderTop: "3px solid var(--nv-accent)" }} data-testid="week-bases" aria-label="Bases de la semana">
+          <p className="flex flex-wrap items-center gap-x-2 text-[15px] font-semibold">Bases <span className="text-[14px] font-normal text-dim">{plural(w.bases.length, "fundamento", "fundamentos")} · {hm(w.bases.reduce((n, t) => n + t.minutes, 0))} · no son de ningún área</span></p>
+          <ul className="mt-2 space-y-1.5">{w.bases.map((t) => <TopicLine key={t.folder} m={m} t={t} />)}</ul>
+        </section>
+      )}
     </section>
   );
 }

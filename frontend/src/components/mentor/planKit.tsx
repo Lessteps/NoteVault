@@ -83,9 +83,9 @@ export function Tabs({ tabs, active, onChange, prefix, label }: { tabs: TabDef[]
 }
 
 /** Cuerpo de una pestaña: siempre en el DOM (para que `aria-controls` apunte a algo) pero oculto si no es la activa. */
-export function TabPanel({ prefix, id, active, children, className }: { prefix: string; id: string; active: boolean; children: ReactNode; className?: string }) {
+export function TabPanel({ prefix, id, active, children, className, bare }: { prefix: string; id: string; active: boolean; children: ReactNode; className?: string; /** sin pestañas en la página (las elige la barra lateral): un panel simple, sin rol de pestaña */ bare?: boolean }) {
   return (
-    <div role="tabpanel" id={panelId(prefix, id)} aria-labelledby={tabId(prefix, id)} hidden={!active} className={cn("min-w-0 space-y-6 pt-4", className)}>
+    <div {...(bare ? {} : { role: "tabpanel", "aria-labelledby": tabId(prefix, id) })} id={panelId(prefix, id)} hidden={!active} className={cn("min-w-0 space-y-6 pt-4", className)}>
       {children}
     </div>
   );

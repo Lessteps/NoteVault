@@ -19,7 +19,7 @@ import { useNavState } from "../../store/navState";
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
 
-import { MentorPlan } from "./MentorPlan";
+import { PlanWorkspace } from "./PlanWorkspace";
 
 const START = "2026-10-06";
 const END = "2027-04-05";
@@ -60,7 +60,7 @@ const mountEl = async (el: React.ReactNode) => { await act(async () => { root.re
 // «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
 const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
 const section = async (id: string) => {
-  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${SECTION_ALIAS[id] ?? id}]`);
+  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
   expect(b, `sub-vista ${id}`).toBeTruthy();
   await act(async () => { b!.click(); });
   await flush();
@@ -78,9 +78,13 @@ const click = async (el: Element | null | undefined) => {
 };
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "")))!;
-const tab = (id: string) => host.querySelector<HTMLButtonElement>(`#plan-tabs-tab-${id}`)!;
-const key = async (el: Element, k: string) => { await act(async () => { el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })); }); await flush(); };
-const panelsVisible = () => [...host.querySelectorAll("[role=tabpanel][id^=plan-tabs-panel-]")].filter((p) => !(p as HTMLElement).hidden).map((p) => p.id.replace("plan-tabs-panel-", ""));
+const tab = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:${id}']`)!;
+/** ¿está la pestaña activa? (el ítem de la barra lateral o, en «Mi plan» y «Agenda», una de sus sub-vistas) */
+const tabOn = (id: string): boolean => {
+  const el = tab(id);
+  return el.getAttribute("aria-current") === "page" || !!el.parentElement!.querySelector("[role=group] [aria-current=page]");
+};
+const panelsVisible = () => [...host.querySelectorAll("[id^=plan-tabs-panel-]")].filter((p) => !(p as HTMLElement).hidden).map((p) => p.id.replace("plan-tabs-panel-", ""));
 
 beforeEach(() => {
   localStorage.clear();
@@ -101,71 +105,46 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("pestañas del plan (WAI-ARIA)", () => {
-  it("tablist con sus pestañas, aria-selected, aria-controls y solo el panel activo visible", async () => {
+describe("pestañas del plan (barra lateral)", () => {
+  it("la barra lista las pestañas con su estado actual (aria-current) y solo el panel activo es visible; la página no lleva pestañas", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
-    const list = host.querySelector("[role=tablist]")!;
-    expect(list.getAttribute("aria-label")).toBeTruthy();
+    await mountEl(<PlanWorkspace planId={PID} />);
+    expect(host.querySelector("[role=tablist]")).toBeNull();
     // sin pista Programming practice no hay «Práctica»
-    expect([...list.querySelectorAll("[role=tab]")].map((t) => t.id.replace("plan-tabs-tab-", ""))).toEqual(["plan", "agenda", "entregables", "cambios"]);
-    expect(tab("plan").getAttribute("aria-selected")).toBe("true");
-    expect(tab("agenda").getAttribute("aria-selected")).toBe("false");
-    // solo la pestaña activa entra en el orden de Tab (roving tabindex)
-    expect([...list.querySelectorAll("[role=tab]")].map((t) => (t as HTMLElement).tabIndex)).toEqual([0, -1, -1, -1]);
-    for (const t of list.querySelectorAll("[role=tab]")) {
-      const panel = host.querySelector(`#${t.getAttribute("aria-controls")}`)!;
-      expect(panel.getAttribute("role")).toBe("tabpanel");
-      expect(panel.getAttribute("aria-labelledby")).toBe(t.id);
-    }
+    expect([...host.querySelectorAll("aside nav > div > button")].map((t) => t.getAttribute("data-testid")!.replace("nav-pl:", ""))).toEqual(["plan", "agenda", "entregables", "cambios"]);
+    expect(tabOn("plan")).toBe(true);
+    expect(tabOn("agenda")).toBe(false);
     expect(panelsVisible()).toEqual(["plan"]);
     // los entregables quedan «por definir»: la decisión pendiente no se enseña como insignia hasta que haya entregables definidos
     expect(tab("entregables").textContent).toBe("Entregables");
-  });
-
-  it("las flechas, Inicio y Fin mueven la selección y el foco; Tab entra en el panel", async () => {
-    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
-    tab("plan").focus();
-    await key(tab("plan"), "ArrowRight");
-    expect(tab("agenda").getAttribute("aria-selected")).toBe("true");
-    expect(document.activeElement).toBe(tab("agenda"));
+    await click(tab("agenda"));
     expect(panelsVisible()).toEqual(["agenda"]);
-    await key(tab("agenda"), "End");
-    expect(document.activeElement).toBe(tab("cambios"));
-    await key(tab("cambios"), "ArrowRight"); // vuelve al principio
-    expect(document.activeElement).toBe(tab("plan"));
-    await key(tab("plan"), "ArrowLeft"); // y al final
-    expect(document.activeElement).toBe(tab("cambios"));
-    await key(tab("cambios"), "Home");
-    expect(document.activeElement).toBe(tab("plan"));
-    expect(panelsVisible()).toEqual(["plan"]);
   });
 
   it("recuerda la pestaña activa por plan y un enlace interno puede abrir otra", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("entregables"));
     expect(useNavState.getState().values[`mentor.planTab.${PID}`]).toBe("entregables");
     act(() => root.unmount());
     root = createRoot(host);
-    await mountEl(<MentorPlan planId={PID} />);
-    expect(tab("entregables").getAttribute("aria-selected")).toBe("true");
+    await mountEl(<PlanWorkspace planId={PID} />);
+    expect(tabOn("entregables")).toBe(true);
     // enlace profundo interno
     const { openPlanTab } = await import("./planShared");
     await act(async () => { openPlanTab(PID, "cambios"); });
     await flush();
-    expect(tab("cambios").getAttribute("aria-selected")).toBe("true");
+    expect(tabOn("cambios")).toBe(true);
     expect(useNavState.getState().values["mentor.view"]).toBe(`plan:${PID}`);
     // una pestaña recordada que ya no existe vuelve a «Mi plan»
     useNavState.getState().set(`mentor.planTab.${PID}`, "inventada");
     await flush();
-    expect(tab("plan").getAttribute("aria-selected")).toBe("true");
+    expect(tabOn("plan")).toBe(true);
   });
 
   it("el estado de la pestaña «Cambios» (texto a medias) sobrevive al cambiar de pestaña", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("cambios"));
     const ta = host.querySelector<HTMLTextAreaElement>("[data-testid=plan-changes] textarea")!;
     await act(async () => {
@@ -182,7 +161,7 @@ describe("plan propuesto", () => {
   it("el banner «¿lo mantienes?» está en todas las pestañas y «Mantener plan» lo anuncia en la región aria-live", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const keep = vi.spyOn(api, "mentorPlanKeep").mockResolvedValue(plan({ proposed: false }));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     for (const t of ["plan", "agenda", "entregables", "cambios"]) {
       await click(tab(t));
       const bar = host.querySelector("[data-testid=plan-proposed-bar]")!;
@@ -202,7 +181,7 @@ describe("plan propuesto", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const del = vi.spyOn(api, "mentorPlanDelete").mockResolvedValue({ id: PID, plans: [] });
     ui.confirmAction.mockResolvedValue(true);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(button("Borrar", host.querySelector("[data-testid=plan-proposed-bar]")!));
     expect(ui.confirmAction).toHaveBeenCalled();
     expect(del).toHaveBeenCalledWith(PID);
@@ -210,19 +189,19 @@ describe("plan propuesto", () => {
 
   it("la Agenda de un plan propuesto muestra su propia semana (no la de los planes activos) y no ofrece «Planear mi día»", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("agenda"));
     const week = host.querySelector("[data-testid=agenda-week]")!;
     expect(week.querySelector("h2")!.textContent).toContain("Semana 1");
     expect(week.textContent).toContain("1.1 What programming is");
     expect(host.querySelector("[data-testid=plan-this-week]")).toBeNull();
-    await click(host.querySelector("#agenda-view-tab-dia")!);
+    await click(host.querySelector("[data-testid='nav-pl:agenda/dia']")!);
     expect(button("Planear mi día con esto")).toBeUndefined();
   });
 
   it("«Preguntar o ajustar» está siempre visible junto a las pestañas: abre «Cambios» y deja el cursor en el cuadro", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     for (const t of ["plan", "agenda", "entregables"]) {
       await click(tab(t));
       const ask = host.querySelector<HTMLButtonElement>("[data-testid=plan-ask-changes]")!;
@@ -230,7 +209,7 @@ describe("plan propuesto", () => {
       expect(ask.closest("[data-testid=plan-sticky]")).toBeTruthy();
     }
     await click(host.querySelector("[data-testid=plan-ask-changes]"));
-    expect(tab("cambios").getAttribute("aria-selected")).toBe("true");
+    expect(tabOn("cambios")).toBe(true);
     await act(async () => { await new Promise((ok) => setTimeout(ok, 5)); });
     expect(document.activeElement).toBe(host.querySelector("[data-testid=plan-changes] textarea"));
   });
@@ -239,7 +218,7 @@ describe("plan propuesto", () => {
 describe("pestaña «Entregables» sin entregables definidos", () => {
   it("dice «Aún sin definir» y no ofrece elegir ni «a discutir» aunque el plan tenga decisiones antiguas pendientes", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("entregables"));
     const pend = host.querySelector("[data-testid=plan-deliverables-pending]")!;
     expect(pend).toBeTruthy();
@@ -252,7 +231,7 @@ describe("pestaña «Entregables» sin entregables definidos", () => {
     expect(host.querySelector("[data-testid=plan-deliverables-agenda]")).toBeNull();
     // ofrece pedirlos en «Preguntas y ajustes»
     await click(host.querySelector("[data-testid=plan-deliverables-ask]"));
-    expect(tab("cambios").getAttribute("aria-selected")).toBe("true");
+    expect(tabOn("cambios")).toBe(true);
   });
 });
 
@@ -260,7 +239,7 @@ describe("pestaña «Entregables»: acciones masivas", () => {
   it("una fila por subplan con su nombre; «Añadir entregable» y «No lo quiero» responden a ese subplan", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" })));
     const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" }));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("entregables"));
     const rows = host.querySelectorAll("[data-testid=plan-open-question]");
     expect(rows).toHaveLength(2);
@@ -276,7 +255,7 @@ describe("pestaña «Entregables»: acciones masivas", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" })));
     const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" }));
     ui.confirmAction.mockResolvedValue(true);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("entregables"));
     await click(button("Añadir a todos"));
     expect(ui.confirmAction).toHaveBeenCalledTimes(1);
@@ -291,7 +270,7 @@ describe("pestaña «Entregables»: acciones masivas", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" })));
     const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" }));
     ui.confirmAction.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("entregables"));
     await click(button("No quiero ninguno"));
     expect(ans).not.toHaveBeenCalled();
@@ -302,7 +281,7 @@ describe("pestaña «Entregables»: acciones masivas", () => {
   it("«Decidir después» no escribe nada: pliega la lista y deja pendientes las decisiones", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" })));
     const ans = vi.spyOn(api, "mentorPlanAnswer").mockResolvedValue(plan({ deliverablesDefinedAt: "2026-10-07T00:00:00Z" }));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("entregables"));
     await click(button("Decidir después"));
     expect(ans).not.toHaveBeenCalled();
@@ -319,7 +298,7 @@ describe("pestaña «Entregables»: acciones masivas", () => {
       subplans: [sub("s1", "Reforzar bases", F1, { deliverable: { title: "API de inventario", description: "CRUD con tests", criteria: ["CRUD completo"], projectId: "p1", status: "en_curso" } })] as never,
     });
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue({ ...(loaded(withDel) as Extract<MentorPlanGet, { loading: false }>), projects: { p1: { id: "p1", name: "Inventario", status: "En curso" } } });
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("entregables"));
     const card = host.querySelector("[data-testid=plan-deliverable-card]")!;
     expect(card.textContent).toContain("API de inventario");
@@ -344,7 +323,7 @@ describe("pestaña «Preguntas y ajustes»: sugerencias", () => {
   it("los chips rellenan el cuadro (acumulan si ya hay texto) sin enviar nada", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const change = vi.spyOn(api, "mentorPlanChange");
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("cambios"));
     const box = host.querySelector("[data-testid=plan-changes]")!;
     const chips = [...box.querySelectorAll("[data-testid=change-suggestions] button")];
@@ -362,7 +341,7 @@ describe("pestaña «Preguntas y ajustes»: sugerencias", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const entry = { n: 1, at: "2026-10-06T10:00:00Z", comment: "Quita lo de desktop", status: "applied" as const, source: "ai" as const, summary: "Quité Desktop.", delta: { added: 0, removed: 4, moved: 0, deliverables: 0 }, changed: [], warnings: [], fixOptions: [] };
     vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, applied: true, plan: plan(), history: [entry], entry });
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(tab("cambios"));
     await click([...host.querySelectorAll("[data-testid=change-suggestions] button")][4]!);
     await click(button("Aplicar cambios"));
@@ -373,7 +352,7 @@ describe("pestaña «Preguntas y ajustes»: sugerencias", () => {
 describe("estructura accesible", () => {
   it("«Saltar al contenido» es el primer elemento enfocable y lleva el foco al contenido", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     const link = host.querySelector<HTMLAnchorElement>("[data-testid=plan-view] a[href='#plan-content']")!;
     expect(link.textContent).toBe("Saltar al contenido");
     expect(host.querySelector("[data-testid=plan-view]")!.querySelector("a,button")).toBe(link);
@@ -383,7 +362,7 @@ describe("estructura accesible", () => {
 
   it("un solo h1 y los encabezados nunca saltan de nivel; las regiones tienen nombre", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     for (const t of ["plan", "agenda", "entregables", "cambios"]) {
       await click(tab(t));
       const hs = [...host.querySelectorAll("h1,h2,h3,h4,h5,h6")].filter((h) => !h.closest("[hidden]"));
@@ -398,12 +377,12 @@ describe("estructura accesible", () => {
     for (const r of host.querySelectorAll("section")) {
       expect(r.getAttribute("aria-label") || r.getAttribute("aria-labelledby"), `sección sin nombre: ${r.outerHTML.slice(0, 80)}`).toBeTruthy();
     }
-    expect(host.querySelector("nav[aria-label='Secciones del plan']")).toBeTruthy();
+    expect(host.querySelector("aside nav[aria-label='Mentor']")).toBeTruthy();
   });
 
   it("los datos clave son una lista de definiciones y los días activos se leen completos", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await section("datos");
     const dl = host.querySelector("[data-testid=plan-preconditions] dl")!;
     expect([...dl.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(expect.arrayContaining(["Periodo", "Dedicación", "Días activos", "Ritmo", "Entregables"]));
@@ -414,7 +393,7 @@ describe("estructura accesible", () => {
 
   it("los desplegables llevan aria-expanded + aria-controls y la barra de progreso un nombre", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await section("areas");
     const toggle = button("Reforzar bases")!;
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
@@ -428,7 +407,7 @@ describe("estructura accesible", () => {
 
   it("no hay métricas inventadas (solo datos reales del plan)", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     for (const t of ["plan", "agenda", "entregables", "cambios"]) {
       await click(tab(t));
       for (const fake of ["Auditoría IA", "Mentor IA", "Latencia IA", "Sistemas operativos", "CM-8842", "sub-hitos", "Factibilidad"]) expect(host.textContent).not.toContain(fake);
@@ -438,13 +417,13 @@ describe("estructura accesible", () => {
   it("«Añadir Desktop Apps y Mobile» pide el cambio al Mentor y lleva a la pestaña «Cambios»", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const change = vi.spyOn(api, "mentorPlanChange").mockImplementation(() => new Promise(() => undefined));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await section("alcance");
     const excl = host.querySelector("[data-testid=plan-branch-note]")!;
     expect(excl.querySelector("h2")!.textContent).toBe("Exclusiones del alcance");
     await click(button("Añadir Desktop Apps (Electron) y Mobile", excl));
     expect(change).toHaveBeenCalledWith({ id: PID, comment: "Añade las ramas excluidas: Desktop Apps (Electron), Mobile" });
-    expect(tab("cambios").getAttribute("aria-selected")).toBe("true");
+    expect(tabOn("cambios")).toBe(true);
     expect(host.querySelector("[data-testid=plan-changes] [data-testid=ai-thinking]")).toBeTruthy();
   });
 
@@ -452,7 +431,7 @@ describe("estructura accesible", () => {
     const many = Array.from({ length: 40 }, (_, i) => ({ folder: `Programación/Tema ${i + 1}`, title: `Tema ${i + 1}`, targetWeek: 1, estMinutes: 30 }));
     const p = plan({ openQuestions: [], subplans: [{ ...sub("s1", "Muchos temas", F1), topics: many, weeks: [week(1, many.map((t) => t.folder))] }] as never });
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await section("areas");
     await click(button("Muchos temas"));
     expect(host.querySelectorAll("[data-testid=plan-topic]")).toHaveLength(15);

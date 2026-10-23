@@ -11,6 +11,7 @@ import type { MentorPlan, MentorTopicView } from "../../lib/types";
 import { cn } from "../ui";
 import { focusColour } from "./agendaKit";
 import { openTopic, openTopicCanvas, openTopicNote } from "./openTopic";
+import { TopicNoteLinks } from "./TopicNoteLinks";
 import { ProgressBar } from "./parts";
 import type { AreaPracticeState } from "./PracticeCard";
 import { RowMenu } from "./RowMenu";
@@ -102,6 +103,7 @@ export function TopicRow({ r, colour }: { r: BoardRow; colour: string }) {
         return locked ? <span className={cls}>{label}</span> : <span className={cls}><TopicMenu folder={r.folder} title={r.title} trigger={label} className="w-full rounded-md hover:text-accent-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" /></span>;
       })()}
       {r.time && <TimeChip time={r.time} />}
+      {!locked && <TopicNoteLinks folder={r.folder} title={r.title} />}
       {!r.done && !locked && (r.pct ?? 0) > 0 && (
         <span className="flex-none font-mono text-[12px] text-dim" data-testid="board-pct" title="Nivel de avance del tema">{r.pct} %</span>
       )}

@@ -1,32 +1,33 @@
-// Mentor: un espacio con varios paneles (Hoy, Plan, Metas, Proyectos y Notas y estudio). La conversación con
+// Mentor: un espacio centrado en UN plan. La barra lateral lleva, arriba, los ítems del modo en curso (Planeación o Ejecución) y, al pie, el
+// interruptor de modo y el selector de plan (ver `MentorSidebar.tsx`); el panel enseña el plan elegido (`PlanWorkspace.tsx`). La conversación con
 // el Mentor NO es un panel: ocurre en el panel del asistente (columna derecha), que en esta pestaña
 // se pone en contexto Mentor (ver `components/mentor/MentorAssistant.tsx`).
 //
-// Todos los paneles de datos son de SOLO previsualización: las metas, los proyectos y las notas se
-// editan únicamente en sus módulos (cada panel trae su botón "Abrir en …"). Lo único que escribe el
-// Mentor es lo que el estudiante confirma: aceptar el plan de hoy o "Crear meta" de un borrador.
+// Los antiguos paneles «Plan» (resumen), «Cierre del día», «Metas», «Proyectos» y «Notas y estudio» ya no están en la barra, pero siguen existiendo
+// como rutas ocultas (`mentor.view`): se llega a ellos desde botones de otras vistas y se vuelve con «Volver a mi plan».
+// Todos los paneles de datos son de SOLO previsualización: las metas, los proyectos y las notas se editan únicamente en sus módulos.
+// Lo único que escribe el Mentor es lo que el estudiante confirma: aceptar el plan o «Crear meta» de un borrador.
 
-import { ArrowLeft, BookOpenCheck, CalendarRange, FolderKanban, ListChecks, Moon, Target } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePersistedNav } from "../../store/navState";
-import { planViewId, useMentor } from "../../store/mentor";
+import { useMentor } from "../../store/mentor";
 import { PracticeProjectDialog } from "../practice/PracticeProjectDialog";
-import { ModuleSidebar } from "../ModuleSidebar";
 import { MentorDayClose } from "./MentorDayClose";
 import { MentorGoals } from "./MentorGoals";
 import { MentorPlan } from "./MentorPlan";
+import { MentorSidebar } from "./MentorSidebar";
 import { PlanBuilder } from "./PlanBuilder";
 import { MentorProjects } from "./MentorProjects";
 import { MentorStudy } from "./MentorStudy";
 import { MentorToday } from "./MentorToday";
+import { PlanWorkspace } from "./PlanWorkspace";
+import { PLAN_PREFIX, resolveRoute, useMentorMode, type AuxView } from "./mentorNav";
 
-const VIEWS = ["hoy", "plan", "cierre", "metas", "proyectos", "notas"] as const;
-type View = (typeof VIEWS)[number];
-const PLAN_PREFIX = "plan:";
-const BUILD_PREFIX = "build:";
+const AUX_LABEL: Record<AuxView, string> = { hoy: "Hoy", cierre: "Cierre del día", metas: "Metas", proyectos: "Proyectos", notas: "Notas y estudio" };
 
 export function MentorModule() {
-  const [rawStored, setView] = usePersistedNav("mentor.view", "");
+  const [stored, setView] = usePersistedNav("mentor.view", "");
   const plans = useMentor((s) => s.plans);
   const plansLoaded = useMentor((s) => s.plansLoaded);
   const loadPlans = useMentor((s) => s.loadPlans);
@@ -34,82 +35,50 @@ export function MentorModule() {
   const builds = useMentor((s) => s.builds);
   const loadBuilds = useMentor((s) => s.loadBuilds);
   const [buildsLoaded, setBuildsLoaded] = useState(false);
-  // «Hoy» (proponer el día con la IA) ya no es un panel suelto de la barra lateral: el plan en ejecución es el «hoy» de la persona. Se llega a
-  // él con «Planear mi día» y se vuelve al plan con el enlace de arriba.
-  const activePlanId = plansLoaded ? plans.find((p) => p.status === "activo")?.id ?? "" : "";
-  const stored = rawStored === "" ? (activePlanId ? `${PLAN_PREFIX}${activePlanId}` : "plan") : rawStored;
   useEffect(() => {
     void loadPlans();
     void loadBuilds().then(() => setBuildsLoaded(true));
   }, [loadPlans, loadBuilds, planVersion]);
-  // «build:<id>» es un plan en construcción (constructor guiado)
-  const buildId = stored.startsWith(BUILD_PREFIX) ? stored.slice(BUILD_PREFIX.length) : "";
-  const knownBuild = buildId && (!buildsLoaded || builds.some((b) => b.id === buildId)) ? buildId : "";
-  // «plan:<id>» es la sub-interfaz de un plan; si ese plan ya no existe, se vuelve al resumen
-  const planId = stored.startsWith(PLAN_PREFIX) ? stored.slice(PLAN_PREFIX.length) : "";
-  const knownPlan = planId && (!plansLoaded || plans.some((p) => p.id === planId)) ? planId : "";
-  const view: View = knownPlan || knownBuild || (planId && plansLoaded) || (buildId && buildsLoaded) ? "plan" : (VIEWS as readonly string[]).includes(stored) ? (stored as View) : "hoy";
-  const activeId = knownBuild ? `${BUILD_PREFIX}${knownBuild}` : knownPlan ? planViewId(knownPlan) : view === "hoy" ? "plan" : view;
-  const hasDraft = useMentor((s) => (s.turns.find((t) => t.id === s.pending)?.draft ? 1 : 0));
-  const hasPlanDraft = useMentor((s) => (s.turns.find((t) => t.id === s.pending)?.planDraft ? 1 : 0));
+  const route = resolveRoute({ stored, plans, plansLoaded, builds, buildsLoaded });
+  const [mode, setMode] = useMentorMode(route.kind === "plan" ? plans.find((p) => p.id === route.planId) : undefined, route.kind === "plan" ? route.planId : undefined);
+  // el plan al que vuelven «Volver a mi plan» y el interruptor de modo desde fuera de un plan: el que está en curso, o el primero
+  const home = plansLoaded ? plans.find((p) => p.status === "activo") ?? plans[0] : undefined;
+  const homeView = home ? `${PLAN_PREFIX}${home.id}` : "plan";
 
+  if (route.kind === "plan") {
+    return (
+      <div className="flex min-w-0 flex-1">
+        <PlanWorkspace key={route.planId} planId={route.planId} />
+        <PracticeProjectDialog />
+      </div>
+    );
+  }
   return (
     <div className="flex min-w-0 flex-1">
-      <ModuleSidebar
-        title="Mentor"
-        active={activeId}
-        onSelect={(id) => setView(id)}
-        items={[
-          {
-            id: "plan",
-            label: "Plan",
-            hint: plans.length ? `Resumen de planes · ${plans.length}` : "Resumen de planes",
-            icon: <CalendarRange />,
-            badge: hasPlanDraft,
-            subItems: [
-              ...builds.map((b) => ({
-                id: `${BUILD_PREFIX}${b.id}`,
-                label: b.name,
-                hint: `en construcción · etapa ${b.stageNumber}/${b.stages}`,
-                icon: <ListChecks />,
-                badge: `${b.stageNumber}/${b.stages}`,
-              })),
-              ...plans.map((p) => ({
-                id: planViewId(p.id),
-                label: p.name,
-                hint: `${p.period} · ${p.status} · ${p.pct} %`,
-                icon: <CalendarRange />,
-                ...(p.status === "propuesto" ? { badge: "propuesto" } : {}),
-              })),
-            ],
-          },
-          { id: "cierre", label: "Cierre del día", hint: "Qué pasó hoy y qué corregir", icon: <Moon /> },
-          { id: "metas", label: "Metas", hint: "Resumen de metas y borradores", icon: <Target />, badge: hasDraft },
-          { id: "proyectos", label: "Proyectos", hint: "Estado y plazos", icon: <FolderKanban /> },
-          { id: "notas", label: "Notas y estudio", hint: "Temas a medias, repasos, errores", icon: <BookOpenCheck /> },
-        ]}
+      <MentorSidebar
+        items={[]}
+        active=""
+        onSelect={setView}
+        mode={mode}
+        onMode={(m) => {
+          setMode(m);
+          if (route.kind !== "build") setView(homeView);
+        }}
+        {...(route.kind === "build" ? { currentBuildId: route.buildId } : {})}
       />
-      <main className="@container flex min-w-0 flex-1 flex-col bg-surface" aria-label={`Mentor: ${view}`}>
-        {view === "hoy" ? (
+      <main className="@container flex min-w-0 flex-1 flex-col bg-surface" aria-label={`Mentor: ${route.kind === "aux" ? route.view : route.kind}`}>
+        {route.kind === "aux" && (
           <>
             <div className="flex-none border-b border-line px-5 py-2">
-              <button type="button" onClick={() => setView(activePlanId ? `${PLAN_PREFIX}${activePlanId}` : "plan")} className="inline-flex min-h-9 items-center gap-1.5 text-[14px] text-accent-text underline-offset-2 hover:underline" data-testid="today-back">
+              <button type="button" onClick={() => setView(homeView)} className="inline-flex min-h-9 items-center gap-1.5 text-[14px] text-accent-text underline-offset-2 hover:underline" data-testid="today-back" title={AUX_LABEL[route.view]}>
                 <ArrowLeft size={15} aria-hidden /> Volver a mi plan
               </button>
             </div>
-            <MentorToday />
+            {route.view === "hoy" ? <MentorToday /> : route.view === "cierre" ? <MentorDayClose /> : route.view === "metas" ? <MentorGoals /> : route.view === "proyectos" ? <MentorProjects /> : <MentorStudy />}
           </>
-        ) : view === "plan" ? (
-          knownBuild ? <PlanBuilder key={knownBuild} buildId={knownBuild} /> : <MentorPlan planId={knownPlan || undefined} />
-        ) : view === "cierre" ? (
-          <MentorDayClose />
-        ) : view === "metas" ? (
-          <MentorGoals />
-        ) : view === "proyectos" ? (
-          <MentorProjects />
-        ) : (
-          <MentorStudy />
         )}
+        {route.kind === "build" && <PlanBuilder key={route.buildId} buildId={route.buildId} />}
+        {route.kind === "overview" && <MentorPlan key={route.creating ? "nuevo" : "resumen"} creating={route.creating} />}
       </main>
       <PracticeProjectDialog />
     </div>

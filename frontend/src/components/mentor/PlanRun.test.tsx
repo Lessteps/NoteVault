@@ -16,8 +16,9 @@ import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { idlePomodoro } from "../../lib/pomodoro";
 import { usePomodoro } from "../../store/pomodoro";
-import { MentorPlan } from "./MentorPlan";
-import { planModeKey, planSectionKey, planTabKey } from "./planShared";
+import { PlanWorkspace } from "./PlanWorkspace";
+import { planSectionKey, planTabKey } from "./planShared";
+import { MODE_KEY } from "./mentorNav";
 
 const START = "2026-10-06";
 const END = "2027-04-05";
@@ -60,7 +61,8 @@ const click = async (el: Element | null | undefined) => {
 const byTest = (id: string) => host.querySelector<HTMLElement>(`[data-testid=${id}]`);
 const all = (id: string) => [...host.querySelectorAll<HTMLElement>(`[data-testid=${id}]`)];
 /** la pestaña de la ejecución: `general`, `area:<subplan>`, `bases`, `proyectos` */
-const runTab = (id: string) => host.querySelector<HTMLElement>(`[data-testid="run-tab-${id}"]`);
+const runTab = (id: string) => host.querySelector<HTMLElement>(`[data-testid="nav-ej:${id}"]`);
+const subItem = (id: string) => host.querySelector<HTMLElement>(`[data-testid="nav-pl:${id}"]`);
 const work = () => byTest("area-work")!;
 const view = async (id: string) => click(byTest(`work-view-${id}`));
 const listed = () => [...work().querySelectorAll<HTMLElement>("[data-testid=work-list] [data-testid=board-topic]")];
@@ -86,18 +88,19 @@ afterEach(() => {
 describe("vista de ejecución", () => {
   it("un plan mantenido abre en ejecución: hoy, avance por área y sin pestañas", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     expect(byTest("plan-run")).toBeTruthy();
     expect(host.querySelector("[role=tablist]")).toBeNull();
-    expect(byTest("plan-mode-ejecucion")!.getAttribute("aria-pressed")).toBe("true");
-    expect(byTest("plan-mode-plan")!.getAttribute("aria-pressed")).toBe("false");
+    expect(byTest("mentor-mode-ejecucion")!.getAttribute("aria-checked")).toBe("true");
+    expect(byTest("mentor-mode-planeacion")!.getAttribute("aria-checked")).toBe("false");
+    expect(byTest("plan-mode")).toBeNull(); // el interruptor por plan de la cabecera ya no existe
     // hoy, con su semana
     expect(byTest("run-today")!.textContent).toContain("Semana 1");
     expect(byTest("run-today")!.textContent).toContain("12 de octubre");
-    // la barra de pestañas: General, una por área y Proyectos
-    expect([...host.querySelectorAll("[data-testid=run-nav] button[data-testid^=run-tab-]")].map((b) => b.getAttribute("data-testid"))).toEqual(["run-tab-general", "run-tab-area:s1", "run-tab-area:s2", "run-tab-proyectos"]);
-    expect(byTest("run-records")).toBeTruthy(); // el botón fijo «Registros» a la derecha de la barra
-    expect(runTab("general")!.getAttribute("aria-pressed")).toBe("true");
+    // la barra lateral (modo Ejecución): Hoy, una por área, Proyectos y Registros; la página no repite la barra
+    expect([...host.querySelectorAll("aside nav > div > button")].map((b) => b.getAttribute("data-testid"))).toEqual(["nav-ej:general", "nav-ej:area:s1", "nav-ej:area:s2", "nav-ej:proyectos", "nav-ej:registros"]);
+    expect(byTest("run-nav")).toBeNull();
+    expect(runTab("general")!.getAttribute("aria-current")).toBe("page");
     // General: solo el avance de cada área en la columna lateral, sin listas de temas ni «Cómo voy»
     const ov = all("overview-area");
     expect(ov).toHaveLength(2);
@@ -118,7 +121,7 @@ describe("vista de ejecución", () => {
   it("la vista general: áreas de hoy plegables, «Lo que viene» por día, tarjeta de Pomodoro y «Asignar temas»", async () => {
     const p = plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }, { ...sub("s2", "Databases", "Consolidar", F2), areaId: "databases" }] as never });
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     const folds = all("area-fold");
     expect(folds.length).toBeGreaterThan(0);
     expect(folds[0]!.dataset.open).toBe("true");
@@ -134,7 +137,7 @@ describe("vista de ejecución", () => {
     const l = loaded(spread());
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(l);
     const change = vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, applied: true, entry: { changed: [] } } as never);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     expect(byTest("run-restart")).toBeTruthy();
     // sin empezar la ruta no hay «Vas atrasado» ni aviso de ruta sólida
     expect(byTest("run-catchup")).toBeNull();
@@ -149,46 +152,48 @@ describe("vista de ejecución", () => {
 
   it("es de solo lectura: ningún campo de texto ni acción que cambie el plan", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     const run = byTest("plan-run")!;
     expect(run.querySelector("textarea, input, select")).toBeNull();
     const labels = [...run.querySelectorAll("button")].map((b) => b.textContent ?? "");
     expect(labels.some((l) => /guardar|aplicar|ejecutar|eliminar|renombrar|mantener/i.test(l))).toBe(false);
   });
 
-  it("alterna con la vista de plan, que recupera sus pestañas, y lo recuerda por plan", async () => {
+  it("el interruptor global alterna Ejecución y Planeación (cambia la barra y el panel) y lo recuerda para todos los planes", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
-    await click(byTest("plan-mode-plan"));
-    expect(host.querySelector("[role=tablist]")).toBeTruthy();
+    await mountEl(<PlanWorkspace planId={PID} />);
+    await click(byTest("mentor-mode-planeacion"));
+    expect(host.querySelector("[data-testid='nav-pl:agenda']")).toBeTruthy();
+    expect(runTab("general")).toBeNull();
     expect(byTest("plan-run")).toBeNull();
-    expect(useNavState.getState().values[planModeKey(PID)]).toBe("plan");
-    await click(byTest("plan-mode-ejecucion"));
+    expect(useNavState.getState().values[MODE_KEY]).toBe("planeacion");
+    await click(byTest("mentor-mode-ejecucion"));
     expect(byTest("plan-run")).toBeTruthy();
-    expect(useNavState.getState().values[planModeKey(PID)]).toBe("ejecucion");
+    expect(host.querySelector("[data-testid='nav-pl:agenda']")).toBeNull();
+    expect(useNavState.getState().values[MODE_KEY]).toBe("ejecucion");
   });
 
   it("un plan propuesto abre en la vista de plan (aún hay que decidir si se mantiene)", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ proposed: true })));
-    await mountEl(<MentorPlan planId={PID} />);
-    expect(host.querySelector("[role=tablist]")).toBeTruthy();
+    await mountEl(<PlanWorkspace planId={PID} />);
+    expect(host.querySelector("[data-testid='nav-pl:plan']")).toBeTruthy();
     expect(byTest("plan-run")).toBeNull();
     expect(byTest("plan-proposed-bar")).toBeTruthy();
   });
 
   it("«Ver en la Agenda» de un próximo día cambia a la vista de plan, pestaña Agenda", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     const next = all("run-upcoming-day");
     expect(next.length).toBeGreaterThan(0);
     await click(next[1]); // elegir otro día de «Lo que viene» solo cambia el día mostrado
     expect(byTest("run-upcoming-areas")).toBeTruthy();
-    expect(useNavState.getState().values[planModeKey(PID)]).not.toBe("plan");
+    expect(useNavState.getState().values[MODE_KEY]).not.toBe("planeacion");
     await click(byTest("run-upcoming-open"));
     const v = useNavState.getState().values;
-    expect(v[planModeKey(PID)]).toBe("plan");
+    expect(v[MODE_KEY]).toBe("planeacion");
     expect(v[planTabKey(PID)]).toBe("agenda");
-    expect(host.querySelector("[role=tablist]")).toBeTruthy();
+    expect(host.querySelector("[data-testid='nav-pl:agenda']")!.parentElement!.querySelector("[aria-current=page]")).toBeTruthy();
   });
 
   const spread = (): PlanData => {
@@ -207,7 +212,7 @@ describe("vista de ejecución", () => {
 
   it("sin haber empezado la ruta nada está pendiente, aunque el tiempo previsto de los temas ya haya pasado", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(spread()));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     await view("pendientes");
     expect(listed()).toHaveLength(0);
@@ -218,21 +223,21 @@ describe("vista de ejecución", () => {
 
   it("con la ruta empezada, un tema pasa a pendiente solo cuando se acaba su tiempo previsto, y su etiqueta lo dice", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(started(spread()));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     await view("pendientes");
     expect(listed().length).toBeGreaterThan(0);
     expect(listed()[0]!.querySelector("[data-testid=board-time]")!.getAttribute("data-time-status")).toBe("pending");
   });
 
-  it("«Temas de hoy» nunca queda vacío por la ruta sólida: sin haber empezado ofrece los primeros temas abiertos de la ruta («Toca ahora»)", async () => {
+  it("«Temas de hoy» es exactamente lo que reparte la Agenda hoy: sin haber empezado no hay ruta bloqueada ni «Toca ahora» mezclado", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(spread()));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
-    const rows = listed();
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows[0]!.dataset.state).not.toBe("bloqueado");
-    expect(rows[0]!.querySelector("[data-testid=board-tag]")!.textContent).toBe("Toca ahora");
+    // nada se reparte hoy a esta ruta (sus temas eran de días anteriores): «Hoy» queda vacío como la Agenda; lo anterior no se mezcla ni se bloquea
+    expect(listed()).toHaveLength(0);
+    expect(byTest("work-empty")!.textContent).toContain("Hoy no toca");
+    expect(work().textContent).not.toContain("Toca ahora");
   });
 
   it("la pestaña general tampoco ofrece temas bloqueados: sin haber empezado, las áreas enseñan lo que sí se puede trabajar", async () => {
@@ -240,7 +245,7 @@ describe("vista de ejecución", () => {
     const l = loaded(p) as Extract<MentorPlanGet, { loading: false }>;
     l.derived!.subplans[0]!.topics[0]!.state = "sin_tratar";
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(l);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     const topics = [...host.querySelectorAll<HTMLElement>("[data-testid=day-topic]")];
     expect(topics.every((g) => g.dataset.state !== "bloqueado")).toBe(true);
   });
@@ -249,7 +254,7 @@ describe("vista de ejecución", () => {
     const later = "Programación/1 Fundamentals/1.9 Later";
     const p = plan({ subplans: [{ ...sub("s1", "Fundamentals", "Reforzar bases", F1), topics: [{ folder: F1, title: "1.1", targetWeek: 1, estMinutes: 60 }, { folder: later, title: "1.9 Later", targetWeek: 3, estMinutes: 60 }] }] as never });
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     await view("semana");
     const up = byTest("work-upcoming");
@@ -259,7 +264,7 @@ describe("vista de ejecución", () => {
 
   it("ruta sólida: con un día sin terminar, los temas de días posteriores salen bloqueados y sin flecha", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(started(spread()));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     await view("pendientes");
     const rows = listed();
@@ -274,7 +279,7 @@ describe("vista de ejecución", () => {
   it("la flecha de un tema ofrece abrir el apunte (.md) o el archivo de práctica", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const ensure = vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ ok: true, kind: "practica", path: "", created: [], errors: [] } as never);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     await view("pendientes");
     expect(byTest("board-menu")).toBeNull();
@@ -289,7 +294,7 @@ describe("vista de ejecución", () => {
 
   it("las vistas del área: pendientes enseña lo que tocaba y no se hizo, con el aviso «Atrasado»; lo hecho no sale", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     await view("pendientes");
     expect(listed()).toHaveLength(1);
@@ -301,7 +306,7 @@ describe("vista de ejecución", () => {
 
   it("«Temas de la semana» enseña la semana día a día con lo completado y el nivel de avance, y vale igual para cada área", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     for (const tab of ["area:s1", "area:s2"]) {
       await click(runTab(tab));
       await view("semana");
@@ -322,32 +327,31 @@ describe("vista de ejecución", () => {
     expect(byTest("work-week")!.textContent).toContain("Hecho");
   });
 
-  it("la cabecera del área enseña su objetivo y su estado; el botón «Registros» lleva a la sub-vista de registros del plan", async () => {
+  it("la cabecera del área enseña su objetivo y su estado; «Registros» de la barra abre el historial sin salir de la Ejecución", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     expect(byTest("area-header")!.textContent).toContain("Fundamentals");
     expect(byTest("area-subtitle")!.textContent).toBe("Reforzar bases");
-    await click(byTest("run-records"));
-    const v = useNavState.getState().values;
-    expect(v[planModeKey(PID)]).toBe("plan");
-    expect(v[planSectionKey(PID)]).toBe("registros");
+    await click(runTab("registros"));
     await flush(); await flush();
     expect(byTest("plan-records")).toBeTruthy();
-    expect(byTest("run-records")).toBeNull(); // ya no estamos en la Ejecución
+    expect(byTest("plan-run")).toBeTruthy(); // seguimos en la Ejecución
+    expect(runTab("registros")!.getAttribute("aria-current")).toBe("page");
+    expect(useNavState.getState().values[MODE_KEY]).not.toBe("planeacion");
   });
 
-  it("en la semana, los días anteriores a hoy solo enseñan lo que ya está hecho; lo que no se tocó no aparece como de ese día", async () => {
+  it("en la semana, los días anteriores a hoy enseñan lo mismo que la Agenda (hechos o atrasados, no se ocultan)", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     for (const tab of ["area:s1", "area:s2"]) {
       await click(runTab(tab));
       await view("semana");
       for (const d of byTest("area-work")!.querySelectorAll<HTMLElement>("[data-testid=week-day]")) {
         if ((d.dataset.date ?? "") >= TODAY) continue;
         const tags = [...d.querySelectorAll("[data-testid=board-topic]")].map((r) => r.querySelector("[data-testid=board-tag]")?.textContent);
-        expect(tags.length, d.dataset.date).toBeGreaterThan(0); // un día anterior sin avance ni siquiera sale
-        expect(tags.every((t) => t === "Hecho")).toBe(true);
+        expect(tags.length, d.dataset.date).toBeGreaterThan(0);
+        expect(tags.every((t) => t === "Hecho" || t === "Atrasado")).toBe(true); // s1 sin avance pero s2 hecha: la ruta ya empezó, lo no hecho es «Atrasado»
       }
     }
   });
@@ -355,7 +359,7 @@ describe("vista de ejecución", () => {
   it("al bloque del Pomodoro se asignan los temas de hoy, el proyecto diario y tareas o proyectos escritos a mano", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     usePomodoro.setState({ p: idlePomodoro(), logVersion: 0 });
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     const panel = byTest("assign-panel")!;
     expect(panel).toBeTruthy();
@@ -381,12 +385,12 @@ describe("vista de ejecución", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const state = { version: 1, planId: PID, id: "e1", status: "running", scope: {}, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), tasks: [{ id: "t1", kind: "practice", areaKey: "a", area: "A", title: "T", status: "running", attempts: 0, created: [], skipped: [], warnings: [], label: "x" }], log: [] };
     vi.spyOn(api, "mentorExecutionStatus").mockResolvedValue({ execution: { state, progress: { done: 0, failed: 0, skipped: 0, pending: 0, running: 1, total: 1, pct: 0, created: 0, label: "x" } }, active: true } as never);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     expect(byTest("plan-run")).toBeTruthy();
     expect(byTest("exec-bar")).toBeNull();
-    await click(byTest("plan-mode-plan"));
+    await click(byTest("mentor-mode-planeacion"));
     expect(byTest("exec-bar")).toBeTruthy();
-    await click(byTest("plan-mode-ejecucion"));
+    await click(byTest("mentor-mode-ejecucion"));
     expect(byTest("exec-bar")).toBeNull();
   });
 
@@ -395,9 +399,8 @@ describe("vista de ejecución", () => {
     const item = (topicPath: string, inDays: number) => ({ path: `Programación/Repaso/${topicPath.split("/").pop()}.md`, topic: topicPath.split("/").pop()!, topicPath, subject: "programming", subjectFolder: "Programación", next: "2026-10-12", last: "2026-10-09", level: 1, inDays, skills: ["explain"], practicedDays: 1, upcoming: [] });
     vi.spyOn(api, "studyReviewsList").mockResolvedValue({ today: TODAY, items: [item(F1, 0), item(F2, 5), item("Programación/9 Otro/9.1 Otro", 0)] } as never);
     const ensure = vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ ok: true, kind: "practica", path: "", created: [], errors: [] } as never);
-    await mountEl(<MentorPlan planId={PID} />);
-    // la pestaña del área avisa y la tarjeta general lista el repaso de hoy (solo de temas del plan)
-    expect(runTab("area:s1")!.textContent).toContain("1 ⟳");
+    await mountEl(<PlanWorkspace planId={PID} />);
+    // la tarjeta general lista el repaso de hoy (solo de temas del plan)
     expect(all("run-review-row")).toHaveLength(1);
     await click(runTab("area:s1"));
     expect(byTest("reviews-due-chip")!.textContent).toContain("1 repaso para hoy");
@@ -432,7 +435,7 @@ describe("vista de ejecución", () => {
     vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "Programación/programming_practice", areas: [areaView("backend", "Backend", dates), areaView("databases", "Databases", [TODAY])] } as never);
     const open = vi.spyOn(api, "mentorAreaKataOpen").mockResolvedValue({ rel: "Programación/programming_practice/backend/katas/001.md", created: true, date: "2026-10-07" });
     const mark = vi.spyOn(api, "mentorAreaKataMark").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("area:s1"));
     // ya no hay una sección «Práctica de hoy» aparte ni kata de lógica general
     expect(byTest("run-practice")).toBeNull();
@@ -461,7 +464,7 @@ describe("vista de ejecución", () => {
     const missing = { ...areaView("backend", "Backend", [TODAY]), folderReady: false };
     vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "Programación/programming_practice", areas: [missing] } as never);
     const setup = vi.spyOn(api, "mentorAreaPracticeSetup").mockResolvedValue({ created: [], folders: [], view: { today: TODAY, ppReady: true, ppBase: "", areas: [missing] } } as never);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await flush();
     expect(setup).toHaveBeenCalledTimes(1);
     expect(setup).toHaveBeenCalledWith(PID);
@@ -471,7 +474,7 @@ describe("vista de ejecución", () => {
     const p = plan({ structure: "areas", subplans: [{ ...sub("s1", "Backend", "Reforzar bases", F1), areaId: "backend" }, { ...sub("s2", "Databases", "Consolidar", F2), areaId: "databases" }] as never });
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
     vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     // los proyectos tienen su propia pestaña: semanal y mensual
     expect(byTest("run-projects")).toBeNull();
     await click(runTab("proyectos"));
@@ -503,7 +506,7 @@ describe("Bases: no son de la ruta de ningún área", () => {
   it("la ruta de un área deja fuera los temas de Bases, que van juntos y sin repetirse en su propia pestaña", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(withBases()));
     vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     expect(runTab("bases")).toBeTruthy();
     await click(runTab("area:s1"));
     for (const v of ["hoy", "semana", "pendientes"]) {
@@ -531,8 +534,8 @@ describe("pestaña «Mi plan»: sub-barra de secciones y aviso de lo que falta g
     aiConfigured: true,
   });
   const openPlanTab = async () => {
-    useNavState.setState({ values: { [planModeKey(PID)]: "plan" } });
-    await mountEl(<MentorPlan planId={PID} />);
+    useNavState.setState({ values: { [MODE_KEY]: "planeacion" } });
+    await mountEl(<PlanWorkspace planId={PID} />);
   };
 
   it("avisa arriba del todo de que falta generar los ejercicios y lleva a «Ejecutar plan»", async () => {
@@ -572,32 +575,30 @@ describe("pestaña «Mi plan»: sub-barra de secciones y aviso de lo que falta g
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue(coverage(0) as never);
     await openPlanTab();
-    const nav = byTest("plan-subnav")!;
-    // la sub-barra vive en el contenedor fijo, junto a las pestañas
-    expect(byTest("plan-sticky")!.contains(nav)).toBe(true);
-    const ids = [...nav.querySelectorAll<HTMLElement>("button")].map((b) => b.dataset.testid!.replace("subnav-", ""));
+    // las sub-vistas son los sub-ítems de «Mi plan» en la barra lateral; la página ya no lleva sub-barra
+    expect(byTest("plan-subnav")).toBeNull();
+    const ids = [...subItem("plan/resumen")!.parentElement!.querySelectorAll<HTMLElement>("button")].map((b) => b.dataset.testid!.replace("nav-pl:plan/", ""));
     // cuatro sub-vistas: lo demás se fundió (datos y alcance en el Resumen, catálogo y áreas en «Temas por área», lo técnico en «Preparar», las fases en la Agenda)
     expect(ids).toEqual(["resumen", "temas", "registros", "preparar"]);
-    expect(byTest("subnav-resumen")!.getAttribute("aria-current")).toBe("page");
-    expect(byTest("subnav-resumen")!.textContent).toContain("2"); // temas por generar
+    expect(subItem("plan/resumen")!.getAttribute("aria-current")).toBe("page");
     expect(host.querySelector("#sec-resumen")).toBeTruthy();
     expect(host.querySelector("#sec-datos")).toBeTruthy(); // los datos clave están dentro del Resumen
 
-    await act(async () => { byTest("subnav-preparar")!.click(); });
+    await act(async () => { subItem("plan/preparar")!.click(); });
     await flush(); await flush();
     expect(host.querySelector("#sec-preparar")).toBeTruthy();
     expect(host.querySelector("#sec-resumen")).toBeNull();
-    expect(byTest("subnav-preparar")!.getAttribute("aria-current")).toBe("page");
+    expect(subItem("plan/preparar")!.getAttribute("aria-current")).toBe("page");
     expect(useNavState.getState().values[planSectionKey(PID)]).toBe("preparar");
   });
 
   it("una sub-vista guardada que ya no es visible vuelve al Resumen", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue(coverage(2) as never);
-    useNavState.setState({ values: { [planModeKey(PID)]: "plan", [planSectionKey(PID)]: "fases" } });
-    await mountEl(<MentorPlan planId={PID} />);
-    expect(byTest("subnav-fases")).toBeNull();
-    expect(byTest("subnav-resumen")!.getAttribute("aria-current")).toBe("page");
+    useNavState.setState({ values: { [MODE_KEY]: "planeacion", [planSectionKey(PID)]: "fases" } });
+    await mountEl(<PlanWorkspace planId={PID} />);
+    expect(subItem("plan/fases")).toBeNull();
+    expect(subItem("plan/resumen")!.getAttribute("aria-current")).toBe("page");
     expect(host.querySelector("#sec-resumen")).toBeTruthy();
   });
 });
@@ -610,8 +611,8 @@ describe("área «Lógica de programación» y proyecto semanal", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(areasPlan()));
     vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue({ loading: false, coverage: { areas: [], totals: { topics: 2, theory: 2, practice: 2, outOfPlan: 0 }, ppReady: true }, review: null, aiConfigured: true } as never);
     const change = vi.spyOn(api, "mentorPlanChange").mockResolvedValue({ loading: false, applied: true, plan: areasPlan(), entry: { changed: ["logic"], summary: "ok" } } as never);
-    useNavState.setState({ values: { [planModeKey(PID)]: "plan" } });
-    await mountEl(<MentorPlan planId={PID} />);
+    useNavState.setState({ values: { [MODE_KEY]: "planeacion" } });
+    await mountEl(<PlanWorkspace planId={PID} />);
     const offer = byTest("add-logic-area")!;
     expect(offer.textContent).toContain("Lógica de programación");
     await click(byTest("add-logic-btn"));
@@ -621,8 +622,8 @@ describe("área «Lógica de programación» y proyecto semanal", () => {
   it("si el plan ya tiene el área no se ofrece", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(areasPlan([{ ...sub("s3", "Lógica de programación", "Problemas", F1), areaId: "logic" }])));
     vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue({ loading: false, coverage: { areas: [], totals: { topics: 3, theory: 3, practice: 3, outOfPlan: 0 }, ppReady: true }, review: null, aiConfigured: true } as never);
-    useNavState.setState({ values: { [planModeKey(PID)]: "plan" } });
-    await mountEl(<MentorPlan planId={PID} />);
+    useNavState.setState({ values: { [MODE_KEY]: "planeacion" } });
+    await mountEl(<PlanWorkspace planId={PID} />);
     expect(byTest("add-logic-area")).toBeNull();
   });
 
@@ -634,7 +635,7 @@ describe("área «Lógica de programación» y proyecto semanal", () => {
     });
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(p));
     vi.spyOn(api, "mentorAreaPractice").mockResolvedValue({ today: TODAY, ppReady: true, ppBase: "", areas: [] } as never);
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await click(runTab("proyectos"));
     const weekly = byTest("run-project-weekly")!;
     const pp = byTest("run-pp-project")!;
@@ -661,8 +662,8 @@ describe("Plan para Antigravity en «Mi plan»", () => {
     vi.spyOn(api, "mentorHandoffGet").mockResolvedValue({ scheme: null });
     const build = vi.spyOn(api, "mentorHandoffScheme").mockResolvedValue({ loading: false, scheme: scheme(false) } as never);
     const write = vi.spyOn(api, "mentorHandoffWrite").mockResolvedValue({ path: "C:/V/Programación/_handoff/01.md", rel: "x", prompt: "Read it and execute it.", scheme: scheme(true) } as never);
-    useNavState.setState({ values: { [planModeKey(PID)]: "plan", [planSectionKey(PID)]: "antigravity" } });
-    await mountEl(<MentorPlan planId={PID} />);
+    useNavState.setState({ values: { [MODE_KEY]: "planeacion", [planSectionKey(PID)]: "antigravity" } });
+    await mountEl(<PlanWorkspace planId={PID} />);
     expect(byTest("handoff-panel")).toBeTruthy();
     expect(byTest("handoff-list")).toBeNull();
     await click(byTest("handoff-build"));
@@ -682,8 +683,8 @@ describe("Plan para Antigravity en «Mi plan»", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue({ loading: false, coverage: { areas: [], totals: { topics: 2, theory: 2, practice: 2, outOfPlan: 0 }, ppReady: true }, review: null, aiConfigured: false } as never);
     vi.spyOn(api, "mentorHandoffGet").mockResolvedValue({ scheme: scheme(true) } as never);
-    useNavState.setState({ values: { [planModeKey(PID)]: "plan", [planSectionKey(PID)]: "antigravity" } });
-    await mountEl(<MentorPlan planId={PID} />);
+    useNavState.setState({ values: { [MODE_KEY]: "planeacion", [planSectionKey(PID)]: "antigravity" } });
+    await mountEl(<PlanWorkspace planId={PID} />);
     await flush();
     expect(all("handoff-package")).toHaveLength(2);
     expect((byTest("handoff-ai") as HTMLInputElement).disabled).toBe(true);

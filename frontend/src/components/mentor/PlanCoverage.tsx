@@ -57,8 +57,11 @@ export interface CoverageState {
   setReview: (r: CoverageReview | null) => void;
 }
 
-/** Carga la cobertura del plan (con el reintento de la vault fría); se recarga cuando cambia el plan. */
-export function usePlanCoverage(planId: string): CoverageState {
+/**
+ * Carga la cobertura del plan (con el reintento de la vault fría); se recarga cuando cambia el plan. Es PEREZOSA: solo se pide cuando `enabled`
+ * (las vistas que la enseñan están abiertas) y, si ya se cargó para esta versión del plan, no se vuelve a pedir al volver a entrar.
+ */
+export function usePlanCoverage(planId: string, enabled = true): CoverageState {
   const planVersion = useMentor((s) => s.planVersion);
   const [coverage, setCoverage] = useState<PlanCoverage | null>(null);
   const [review, setReview] = useState<CoverageReview | null>(null);
@@ -66,6 +69,7 @@ export function usePlanCoverage(planId: string): CoverageState {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const alive = useRef(true);
+  const loadedFor = useRef("");
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -86,11 +90,13 @@ export function usePlanCoverage(planId: string): CoverageState {
           setLoading(false);
           return;
         }
+        loadedFor.current = "";
         await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
         if (!alive.current) return;
       }
       throw new Error("El índice de la vault tarda demasiado en estar listo.");
     } catch (e) {
+      loadedFor.current = "";
       if (alive.current) {
         setError((e as Error).message || "No se pudo calcular la cobertura.");
         setLoading(false);
@@ -98,8 +104,12 @@ export function usePlanCoverage(planId: string): CoverageState {
     }
   }, [planId]);
   useEffect(() => {
+    if (!enabled) return;
+    const key = `${planId}:${planVersion}`;
+    if (loadedFor.current === key) return;
+    loadedFor.current = key;
     void load();
-  }, [load, planVersion]);
+  }, [load, planVersion, enabled, planId]);
   return { coverage, review, aiConfigured, loading, error, reload: () => void load(), setReview };
 }
 

@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ModuleHost } from "./ModuleHost";
-import { useNavState, usePersistedNav } from "../store/navState";
+import { flushNavState, useNavState, usePersistedNav } from "../store/navState";
 import type { ModuleId } from "../store/app";
 
 /** A stand-in module with an internal sub-tab, like Ejercicio has. */
@@ -112,6 +112,7 @@ describe("usePersistedNav", () => {
     const second = mount(<Nav />);
     expect(second.container.textContent).toBe("lunes");
     // …and it is on disk for the next start.
+    flushNavState(); // the write is coalesced; it is flushed on a short timer and when the window closes
     expect(localStorage.getItem("nv.navState")).toContain("lunes");
   });
 

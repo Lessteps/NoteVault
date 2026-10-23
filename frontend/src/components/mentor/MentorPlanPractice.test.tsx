@@ -16,9 +16,10 @@ import type { MentorChatTurn, MentorPlan as PlanData, MentorPlanDraft, MentorPla
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
-import { planModeKey } from "./planShared";
+import { MODE_KEY } from "./mentorNav";
 import { usePracticeDialog } from "../practice/PracticeProjectDialog";
 import { MentorPlan } from "./MentorPlan";
+import { PlanWorkspace } from "./PlanWorkspace";
 
 const START = "2026-10-05";
 const END = "2026-11-01";
@@ -65,7 +66,7 @@ const mountEl = async (el: React.ReactNode) => { await act(async () => { root.re
 // «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
 const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
 const section = async (id: string) => {
-  const b = host.querySelector<HTMLElement>(`[data-testid=subnav-${SECTION_ALIAS[id] ?? id}]`);
+  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
   expect(b, `sub-vista ${id}`).toBeTruthy();
   await act(async () => { b!.click(); });
   await flush();
@@ -83,11 +84,11 @@ const click = async (el: Element | undefined) => {
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   await flush();
 };
-const openTab = (id: string) => click(host.querySelector(`#plan-tabs-tab-${id}`)!);
+const openTab = (id: string) => click(host.querySelector(`[data-testid='nav-pl:${id}']`)!);
 
 beforeEach(() => {
   localStorage.clear();
-  useNavState.setState({ values: { [planModeKey(PID)]: "plan" } }); // las pruebas de la vista de plan abren la cara «plan»
+  useNavState.setState({ values: { [MODE_KEY]: "planeacion" } }); // las pruebas de la vista de plan abren la cara «plan»
   usePracticeDialog.setState({ open: false });
   useMentor.setState({ turns: [], pending: null, chatId: null, chatLoaded: true, planVersion: 0, pendingObjective: null, plans: [], plansLoaded: false, acceptingPlan: false });
   useApp.setState({ module: "mentor" });
@@ -165,7 +166,7 @@ describe("borrador: por decidir y práctica", () => {
 describe("plan aceptado: tarjeta Programming practice", () => {
   it("fila con kata, proyecto de esta semana con sus 4 fases y estado, semanas y mensual", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await section("datos");
     // cabecera (pestaña «Mi plan»): chip de la práctica y entregables «por definir» (no se eligen al crear el plan)
     expect(host.querySelector("[data-testid=plan-practice-chip]")!.textContent).toContain("Programming practice");
@@ -200,7 +201,7 @@ describe("plan aceptado: tarjeta Programming practice", () => {
 
   it("«Abrir práctica» abre el diálogo de práctica de programación", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await openTab("practica");
     await click(button("Abrir práctica", host.querySelector("[data-testid=practice-row]")!));
     expect(usePracticeDialog.getState().open).toBe(true);
@@ -208,22 +209,22 @@ describe("plan aceptado: tarjeta Programming practice", () => {
 
   it("sin el módulo programming_practice lo dice y el estado es manual; sin pista no hay tarjeta", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ practice: status({ ppReady: false, weeks: [] }) }));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await openTab("practica");
     expect(host.querySelector("[data-testid=practice-kata]")!.textContent).toContain("se anota a mano en los bloques de «Hoy»");
     act(() => root.unmount());
     root = createRoot(host);
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plan: plan({ programmingPractice: undefined, openQuestions: undefined }), practice: null, practiceItems: [] }));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     expect(host.querySelector("[data-testid=practice-row]")).toBeNull();
     expect(host.querySelector("[data-testid=plan-practice-chip]")).toBeNull();
     // sin pista no hay pestaña «Práctica diaria»
-    expect(host.querySelector("#plan-tabs-tab-practica")).toBeNull();
+    expect(host.querySelector("[data-testid='nav-pl:practica']")).toBeNull();
   });
 
   it("un plan anterior (sin pista ni práctica en las precondiciones) se lee y se pinta igual", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plan: plan({ programmingPractice: undefined, openQuestions: undefined, preconditions: { ...pre, practice: undefined, deliverables: "yes" } }), practice: undefined, practiceItems: undefined }));
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     expect(host.querySelector("[data-testid=plan-header]")).toBeTruthy();
     expect(host.querySelector("[data-testid=practice-row]")).toBeNull();
   });
@@ -232,9 +233,9 @@ describe("plan aceptado: tarjeta Programming practice", () => {
 describe("esta semana y hoy: la práctica del día", () => {
   it("la Agenda del día lista el kata y la sesión del proyecto; «Planear mi día con esto» y el atajo de práctica dejan el objetivo", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
-    await mountEl(<MentorPlan planId={PID} />);
+    await mountEl(<PlanWorkspace planId={PID} />);
     await openTab("agenda");
-    await click(host.querySelector("#agenda-view-tab-dia")!);
+    await click(host.querySelector("[data-testid='nav-pl:agenda/dia']")!);
     const kata = host.querySelector("[data-testid=agenda-practice-kata]")!;
     expect(kata.textContent).toContain("Reto diario");
     expect(kata.textContent).toContain("Programming practice");

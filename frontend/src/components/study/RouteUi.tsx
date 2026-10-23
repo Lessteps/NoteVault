@@ -6,13 +6,14 @@
 import { CircleDashed, EyeOff, Route as RouteIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/bridge";
+import { dateLabel } from "../../lib/planSchedule";
 import { shortWeekLabel, weekRangesOf } from "../../lib/planTime";
 import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
-import { dayOfTopic, routeAvailable, topicOfPath, useRoute, type RouteInfo, type RouteKind, type RouteSnapshot } from "../../store/mentorRoute";
-import { useNavState } from "../../store/navState";
+import { mentorLinkOf, type MentorTopicStatus, routeAvailable, useRoute, type RouteInfo, type RouteKind, type RouteSnapshot } from "../../store/mentorRoute";
 import { cn } from "../ui";
-import { agendaDateKey, planTabKey } from "../mentor/planShared";
+import { openRunView, runTabOfTopic } from "../mentor/mentorNav";
+import { openAgendaAt } from "../mentor/planShared";
 
 export interface RouteView {
   kind: RouteKind;
@@ -159,13 +160,17 @@ export function RouteToggle({ showSort = false, className }: { showSort?: boolea
 
 // ── Qué estudiar ahora ──────────────────────────────────────────────────
 
+const STATUS_TEXT: Record<MentorTopicStatus, string> = { hecho: "hecho", pendiente: "pendiente", fuera: "fuera de ruta" };
+
 /** Abre la Agenda del Mentor en una fecha (enlace profundo interno). */
 export function openRouteAgenda(planId: string, date: string): void {
-  const nav = useNavState.getState();
-  nav.set(`mentor.agendaView.${planId}`, "dia");
-  nav.set(agendaDateKey(planId), date);
-  nav.set(planTabKey(planId), "agenda");
-  nav.set("mentor.view", `plan:${planId}`);
+  openAgendaAt(planId, date, "dia");
+  useApp.getState().setModule("mentor");
+}
+
+/** Abre la Ejecución del plan en la vista del tema (su área, o Bases) y va al Mentor. */
+export function openRouteRun(planId: string, tab: string): void {
+  openRunView(planId, tab);
   useApp.getState().setModule("mentor");
 }
 
@@ -237,12 +242,11 @@ export function RouteBanner({ path }: { path: string }) {
   const toast = useApp((s) => s.toast);
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
-  const hit = useMemo(() => (view.available && view.snap ? topicOfPath(view.snap, path) : null), [view.available, view.snap, path]);
+  const link = useMemo(() => (view.available && view.snap ? mentorLinkOf(view.snap, path) : null), [view.available, view.snap, path]);
   useEffect(() => setAdded(null), [path]);
-  if (!view.available || !view.snap || !hit) return null;
-  const { info, folder } = hit;
+  if (!view.available || !view.snap || !link) return null;
+  const { info, folder } = link;
   const snap = view.snap;
-  const day = info.route === "skipped" ? null : dayOfTopic(snap, folder);
   const pre = view.preview ? "Vista previa del plan propuesto · " : "";
 
   const add = async () => {
@@ -298,11 +302,17 @@ export function RouteBanner({ path }: { path: string }) {
         <>
           <span className="min-w-0 flex-1 break-words" data-testid="route-banner-text">
             {pre}Mentor: este tema {info.route === "optional" ? "es opcional en tu ruta" : "está en tu ruta"} · semana {info.week}
-            {day ? ` · día ${day.dayInWeek}` : ""} · área {info.area}
+            {link.dayInWeek ? ` · día ${link.dayInWeek}` : ""}
+            {link.date ? ` · previsto el ${dateLabel(link.date)}` : ""} · área {info.area} · <span data-testid="route-status">{STATUS_TEXT[link.status]}</span>
           </span>
-          <button type="button" onClick={() => openRouteAgenda(snap.planId, day?.date ?? info.weekStart)} className={btn} data-testid="route-agenda-link">
-            Ver en el plan
+          <button type="button" onClick={() => openRouteAgenda(snap.planId, link.date ?? info.weekStart)} className={btn} data-testid="route-agenda-link">
+            Ver en Agenda
           </button>
+          {!view.preview && (
+            <button type="button" onClick={() => openRouteRun(snap.planId, runTabOfTopic(info))} className={btn} data-testid="route-run-link">
+              Ver en Ejecución
+            </button>
+          )}
         </>
       )}
     </div>

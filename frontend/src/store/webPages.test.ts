@@ -93,13 +93,14 @@ describe("persisting a module store's view", () => {
     localStorage.clear();
     useNavState.setState({ values: {} });
     const { createStore } = await import("zustand/vanilla");
-    const { persistField } = await import("./navState");
+    const { persistField, flushNavState } = await import("./navState");
 
     type S = { view: string; other: number };
     const store = createStore<S>(() => ({ view: "semana", other: 1 }));
     persistField(store, "view", "prueba.view");
 
     store.setState({ view: "mes" });
+    flushNavState(); // the write is coalesced; it is flushed on a short timer and when the window closes
     const saved = JSON.parse(localStorage.getItem("nv.navState")!) as Record<string, string>;
     expect(saved["prueba.view"]).toBe("mes");
 

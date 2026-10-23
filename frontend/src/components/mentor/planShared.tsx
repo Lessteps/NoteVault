@@ -73,13 +73,15 @@ export async function openProjectInProyectos(id: string): Promise<void> {
 /** Clave de la pestaña recordada de un plan (el mismo almacén que la navegación persistida). */
 export const planTabKey = (planId: string): string => `mentor.planTab.${planId}`;
 /**
- * Las dos caras de un plan: «plan» (para armarlo y ajustarlo: pestañas) y «ejecucion» (solo lectura: qué hago hoy y cómo voy). Se recuerda por
- * plan; sin elegir, un plan mantenido abre en ejecución y uno propuesto (aún por decidir) en plan.
+ * Modo GLOBAL del Mentor («planeacion» | «ejecucion»), elegido en la barra lateral: manda sobre todos los planes. Sin elegir, un plan
+ * mantenido abre en ejecución y uno propuesto (aún por decidir) en planeación (ver `defaultModeOf` en mentorNav.ts).
  */
-export const planModeKey = (planId: string): string => `mentor.planMode.${planId}`;
-export type PlanMode = "plan" | "ejecucion";
+export const MODE_KEY = "mentor.mode";
 export const PLAN_TABS = ["plan", "agenda", "practica", "entregables", "cambios"] as const;
 export type PlanTab = (typeof PLAN_TABS)[number];
+
+/** Clave de la vista recordada de la Agenda (dia · semana · mes · calendario), por plan. */
+export const agendaViewKey = (planId: string): string => `mentor.agendaView.${planId}`;
 
 /** Clave de la sub-vista recordada de «Mi plan» (Resumen, Temas, Cobertura, Ejecutar plan…), por plan. */
 export const planSectionKey = (planId: string): string => `mentor.planSection.${planId}`;
@@ -106,7 +108,7 @@ export function openPlanSection(planId: string, id: string): void {
 export function openPlanTab(planId: string, tab: PlanTab): void {
   const nav = useNavState.getState();
   nav.set(planTabKey(planId), tab);
-  nav.set(planModeKey(planId), "plan");
+  nav.set(MODE_KEY, "planeacion");
   nav.set("mentor.view", `plan:${planId}`);
 }
 
@@ -125,12 +127,15 @@ export const agendaDateKey = (planId: string): string => `mentor.agendaDate.${pl
 /** Abre la pestaña Agenda de un plan en una fecha y una vista (por defecto, la vista Mes de ese mes). */
 export function openAgendaAt(planId: string, date: string, view: "dia" | "semana" | "mes" | "calendario" = "mes"): void {
   const nav = useNavState.getState();
-  nav.set(`mentor.agendaView.${planId}`, view);
+  nav.set(agendaViewKey(planId), view);
   nav.set(agendaDateKey(planId), date);
   nav.set(planTabKey(planId), "agenda");
-  nav.set(planModeKey(planId), "plan");
+  nav.set(MODE_KEY, "planeacion");
   nav.set("mentor.view", `plan:${planId}`);
 }
+
+/** Entre dos recargas por volver a la ventana pasa al menos esto (focus y visibilitychange saltan juntos). */
+const REFOCUS_MIN_MS = 10_000;
 
 /** Carga un plan (o, sin id, el resumen: el plan por defecto con todos los planes) con el reintento de la vault fría. */
 export function usePlanData(id: string | undefined) {
@@ -139,6 +144,10 @@ export function usePlanData(id: string | undefined) {
   const [warming, setWarming] = useState(false);
   const [error, setError] = useState("");
   const alive = useRef(true);
+  // petición en curso y número de la última: una lectura más nueva manda (no se pisa con una vieja que llega tarde) y el refresco al volver
+  // a la ventana no lanza otra mientras hay una en vuelo
+  const inflight = useRef(0);
+  const seq = useRef(0);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -146,11 +155,14 @@ export function usePlanData(id: string | undefined) {
     };
   }, []);
   const load = useCallback(async () => {
+    const mine = ++seq.current;
+    const current = (): boolean => alive.current && seq.current === mine;
+    inflight.current++;
     setError("");
     try {
       for (let i = 0; i < COLD_RETRY_MAX; i++) {
         const r = await api.mentorPlanGet(id);
-        if (!alive.current) return;
+        if (!current()) return;
         if (!r.loading) {
           setData(r);
           setWarming(false);
@@ -158,14 +170,16 @@ export function usePlanData(id: string | undefined) {
         }
         setWarming(true);
         await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
-        if (!alive.current) return;
+        if (!current()) return;
       }
       throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
     } catch (e) {
-      if (alive.current) {
+      if (current()) {
         setWarming(false);
         setError((e as Error).message);
       }
+    } finally {
+      inflight.current--;
     }
   }, [id]);
   useEffect(() => {
@@ -176,7 +190,7 @@ export function usePlanData(id: string | undefined) {
   useEffect(() => {
     let last = Date.now();
     const refresh = (): void => {
-      if (document.visibilityState === "hidden" || Date.now() - last < 3000) return;
+      if (document.visibilityState === "hidden" || Date.now() - last < REFOCUS_MIN_MS || inflight.current > 0) return;
       last = Date.now();
       void load();
     };

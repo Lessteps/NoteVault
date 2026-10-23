@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import type { PlanDeliverable, PlanDeliverableStatus } from "../../lib/planAreas";
 import { dayExercisesOf, dailyProjectOf, dayLogicOf, languageBlockExercises, monthlyBlocksOf, shortOf, weeklyProjectOf, type MonthlyBlock } from "../../lib/planCurriculum";
-import { dayAreasText, dayByArea } from "../../lib/planTopicsByArea";
+import { dayAreasText, dayBases, dayByArea } from "../../lib/planTopicsByArea";
 import { PROJECT_BASIS_LABEL, PROJECT_LEVEL_LABEL } from "../../lib/planTopicProject";
 import type { DayBlock } from "../../lib/planDayFocus";
 import type { BlockItem } from "../../lib/planDayFocus";
@@ -25,6 +25,7 @@ import { cn } from "../ui";
 import { AreaChip, AreaCounts, DSTATUS_LABEL, focusColour, plural, PurposeBlock, StatusChip, type AgendaModel } from "./agendaKit";
 import { AreaDot, areaColour, areaPracticeView } from "./AreaViews";
 import { openTopic } from "./openTopic";
+import { TopicNoteLinks } from "./TopicNoteLinks";
 import { hm, ProgressBar, ThinkingStatus, useAiStatus } from "./parts";
 import { openPractice } from "./PracticeCard";
 import { PALETTE, STATE_COLOUR, STATE_GLYPH, STATE_LABEL } from "./planShared";
@@ -124,6 +125,7 @@ function BlockTopics({ m, items }: { m: AgendaModel; items: BlockItem[] }) {
             {live?.found && (
               <button type="button" onClick={() => void openTopic(t.folder)} className="inline-flex min-h-8 items-center px-2 text-[14px] text-accent-text underline-offset-2 hover:underline" aria-label={`Ver tema ${t.title}`}>Ver tema</button>
             )}
+            {live?.found && <TopicNoteLinks folder={t.folder} title={t.title} practice={false} />}
           </li>
         );
       })}
@@ -146,6 +148,8 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
   const blocks = day.blocks ?? [];
   // el día separado por ÁREA en el orden fijo (Backend · Frontend · Databases · Tooling and Quality · Automation)
   const entries = dayByArea(m.plan, day, due).filter((e) => areaFilter === null || e.subplanId === areaFilter);
+  // los fundamentos (Bases) no son de ningún área: van aparte, igual que en la pestaña «Bases» de la Ejecución
+  const bases = areaFilter === null ? dayBases(m.plan, day) : [];
   const langBlocks = blocks.filter((b) => b.daily);
   const pending = day.topics.filter((t) => !t.done);
   const done = day.topics.filter((t) => t.done);
@@ -196,7 +200,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
 
       {day.study && (
         <>
-          {entries.length === 0 && (
+          {entries.length === 0 && bases.length === 0 && (
             <p className="text-[14px] text-dim" data-testid="agenda-day-no-areas">{areaFilter ? "El área elegida no tiene nada este día." : "Ningún tema repartido este día: queda para práctica, repaso o recuperar lo atrasado."}</p>
           )}
           {/* 2 · una sección por ÁREA, en el orden fijo: su teoría, su práctica y su proyecto */}
@@ -319,6 +323,15 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
               </section>
             );
           })}
+
+          {bases.length > 0 && (
+            <section aria-labelledby={`${id}-bases`} className="rounded-2xl border border-line bg-card p-3.5 @3xl:p-4" style={{ borderTop: "3px solid var(--nv-accent)" }} data-testid="agenda-day-bases">
+              <H2 id={`${id}-bases`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[17px] font-bold">
+                Bases <span className="text-[14px] font-normal text-dim">{plural(new Set(bases.map((b) => b.folder)).size, "fundamento", "fundamentos")} intercalados en las áreas · {hm(bases.reduce((n, b) => n + b.minutes, 0))}</span>
+              </H2>
+              <BlockTopics m={m} items={bases} />
+            </section>
+          )}
 
           {done.length > 0 && <p className="text-[13.5px] text-dim">{plural(done.length, "tema completado", "temas completados")} este día: {done.map((t) => shortOf(t.title)).join(" · ")}.</p>}
 

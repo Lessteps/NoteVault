@@ -167,8 +167,11 @@ describe("topicsByWeekArea", () => {
       for (const c of w.cells) expect(c.minutes).toBe(c.topics.reduce((n, t) => n + t.minutes, 0));
     }
     const be = p.subplans.find((s) => s.areaId === "backend")!;
-    expect(data.totals[be.id]!.topics).toBe(be.topics.length);
-    expect(data.totals[be.id]!.minutes).toBeGreaterThanOrEqual(be.topics.length * 59);
+    // los fundamentos (Bases) no cuentan en el área: van a su propio cubo
+    const own = be.topics.filter((t) => t.group !== "bases");
+    expect(data.totals[be.id]!.topics).toBe(own.length);
+    expect(data.totals[be.id]!.minutes).toBeGreaterThanOrEqual(own.length * 59);
+    expect(data.basesTotal.topics).toBe(be.topics.length - own.length);
     expect(data.areas).toHaveLength(5);
   });
 
@@ -196,7 +199,8 @@ describe("topicsByWeekArea", () => {
 
   it("los temas hechos se marcan como tales y las áreas fuera de fase quedan sin temas", () => {
     const done = phasedPlan();
-    done.subplans[0]!.topics[0] = { ...done.subplans[0]!.topics[0]!, completedAt: "2026-10-06" };
+    const i = done.subplans[0]!.topics.findIndex((t) => t.group === "core");
+    done.subplans[0]!.topics[i] = { ...done.subplans[0]!.topics[i]!, completedAt: "2026-10-06" };
     const d = topicsByWeekArea(done);
     expect(d.weeks[0]!.cells.find((c) => c.areaId === "backend")!.topics.some((t) => t.done)).toBe(true);
     const w1auto = d.weeks[0]!.cells.find((c) => c.areaId === "automation")!;

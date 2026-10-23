@@ -30,12 +30,39 @@ function stored(): Values {
   }
 }
 
-function persist(values: Values): void {
+function write(values: Values): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(values));
   } catch {
     // Best effort: a full quota must never break navigation.
   }
+}
+
+// Every navigation click used to JSON.stringify the whole map and hit localStorage synchronously. Writes are now coalesced: the latest map is
+// flushed on a short timer, and always when the window is closing or hidden, so nothing is lost.
+const PERSIST_DELAY_MS = 250;
+let pending: Values | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
+
+/** Writes any pending navigation state to localStorage right now. */
+export function flushNavState(): void {
+  if (timer) clearTimeout(timer);
+  timer = null;
+  if (!pending) return;
+  const values = pending;
+  pending = null;
+  write(values);
+}
+
+function persist(values: Values): void {
+  pending = values;
+  if (!timer) timer = setTimeout(flushNavState, PERSIST_DELAY_MS);
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", flushNavState);
+  window.addEventListener("pagehide", flushNavState);
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flushNavState());
 }
 
 interface NavState {

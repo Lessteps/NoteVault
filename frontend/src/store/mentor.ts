@@ -15,8 +15,9 @@ import { useNavState } from "./navState";
 /** Vista del módulo Mentor de un plan concreto: `plan:<id>` (`plan` = resumen de planes). */
 export const planViewId = (id: string): string => `plan:${id}`;
 
-const COLD_RETRY_MS = 1500;
-const COLD_RETRY_MAX = 40;
+export const COLD_RETRY_MS = 1500;
+export const COLD_RETRY_MAX = 40;
+export const coldRetryDelay = (attempt: number): number => Math.min(800, 100 + attempt * 120);
 
 export type PanelsData = Extract<MentorPanels, { loading: false }>;
 
@@ -141,7 +142,7 @@ export const useMentor = create<MentorState>((set, get) => ({
           return;
         }
         set({ warming: true });
-        await sleep(COLD_RETRY_MS);
+        await sleep(coldRetryDelay(i));
       }
       throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
     } catch (e) {
@@ -168,7 +169,7 @@ export const useMentor = create<MentorState>((set, get) => ({
     try {
       let r = await (get().planMode ? api.mentorChat(text, get().chatId ?? undefined, "plan") : api.mentorChat(text, get().chatId ?? undefined));
       for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-        await sleep(COLD_RETRY_MS);
+        await sleep(coldRetryDelay(i));
         r = await (get().planMode ? api.mentorChat(text, get().chatId ?? undefined, "plan") : api.mentorChat(text, get().chatId ?? undefined));
       }
       if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
@@ -337,7 +338,7 @@ export const useMentor = create<MentorState>((set, get) => ({
     try {
       let r = await api.mentorPlanGenerateNow(pre, noAi);
       for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-        await sleep(COLD_RETRY_MS);
+        await sleep(coldRetryDelay(i));
         r = await api.mentorPlanGenerateNow(pre, noAi);
       }
       if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
@@ -360,7 +361,7 @@ export const useMentor = create<MentorState>((set, get) => ({
     try {
       let r = await api.mentorPlanGenerate(pre);
       for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-        await sleep(COLD_RETRY_MS);
+        await sleep(coldRetryDelay(i));
         r = await api.mentorPlanGenerate(pre);
       }
       if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");

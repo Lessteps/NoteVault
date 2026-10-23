@@ -23,6 +23,7 @@ import { Chip, GhostButton, input, Label, PrimaryButton } from "../common/forms"
 import { Panel } from "../common/StatTile";
 import { cn } from "../ui";
 import { openTopic } from "./openTopic";
+import { coldRetryDelay } from "./planShared";
 
 /** Chips de tiempo: de 1 h a 8 h. */
 export const PRESETS = [60, 120, 180, 240, 300, 360, 420, 480];
@@ -36,7 +37,6 @@ function savedMinutes(): number {
     return 120;
   }
 }
-const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
 
 const KIND_LABEL: Record<string, string> = {
@@ -136,7 +136,7 @@ export function MentorToday() {
         return r as Exclude<T, { loading: true }>;
       }
       if (alive.current) setWarming(true);
-      await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+      await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
       if (!alive.current) return null;
     }
     if (alive.current) setWarming(false);

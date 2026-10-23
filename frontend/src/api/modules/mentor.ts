@@ -6,9 +6,9 @@
 
 import { AIConfig, sendChat, type ChatMessage, type SendOpts } from "../../core/aiClient.js";
 import { ApiError } from "../../core/errors.js";
-import { loadExamRecordForTopic } from "../../core/practice/exams.js";
+import { examSlug, listExamRecords } from "../../core/practice/exams.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
-import { cachedTopicSnaps } from "./topicSnapCache.js";
+import { cachedTopicSnaps, clearTopicSnapCache } from "./topicSnapCache.js";
 import { hubSnapshot } from "../../core/practice/recommender.js";
 import { manifestsFromNotes, type TopicManifest } from "../../core/practice/topic.js";
 import { FILTER_ACTIVE, ITEM_DONE } from "../../core/goalManager.js";
@@ -129,7 +129,7 @@ import { StudySRSManager } from "../../core/studySrsManager.js";
 import { AppConfig } from "../appConfig.js";
 import type { AppState } from "../appState.js";
 import { clampInt } from "../common.js";
-import { vaultScan } from "../vaultScan.js";
+import { registerScanInvalidation, vaultScan } from "../vaultScan.js";
 import { parseTopicLink } from "../../core/practice/topicLinks.js";
 import { goalsApi } from "./goals.js";
 import { mentorAskApi } from "./mentorAsk.js";
@@ -184,6 +184,11 @@ function needDate(value: unknown): string {
   return d;
 }
 
+export function clearTopicSnapsCache(): void {
+  clearTopicSnapCache();
+}
+registerScanInvalidation(clearTopicSnapsCache);
+
 /**
  * Foto de todos los temas de la vault (misma fuente que `study_topic_dashboard`). Se reutiliza mientras no cambien el escaneo de la vault ni los
  * intentos y exámenes en disco (ver `topicSnapCache.ts`): el Mentor la pide en cada cambio de vista.
@@ -201,13 +206,28 @@ function buildTopicSnaps(app: AppState, scan: ReturnType<typeof vaultScan>): Top
       byFolder.set(folder, { folder, manifest: { ...found.manifest, path: app.rel(found.manifestPath), folder } });
     }
   }
-  return snapshotTopics({
+  const examMap = new Map<string, any>();
+  for (const rec of listExamRecords(app.root)) {
+    examMap.set(examSlug(rec.topic_or_group), rec);
+  }
+  const examFor = (manifest: TopicManifest) => {
+    const byTitle = examMap.get(examSlug(manifest.title));
+    if (byTitle?.passed) return byTitle;
+    if (manifest.exam_group) {
+      const byGroup = examMap.get(examSlug(manifest.exam_group));
+      if (byGroup?.passed) return byGroup;
+      if (byGroup && !byTitle) return byGroup;
+    }
+    return byTitle ?? null;
+  };
+  const snaps = snapshotTopics({
     manifests: [...byFolder.values()],
     exercises: scan.exercises,
     attempts: loadAllAttempts(app.root),
     noteRels: scan.notes.map((n) => n.rel),
-    examFor: (manifest) => loadExamRecordForTopic(app.root, manifest),
+    examFor,
   });
+  return snaps;
 }
 
 /** Lo MEDIDO de cada tema (progreso e intentos reales de la vault): calibra los proyectos de tema y «Reducir a lo esencial». */

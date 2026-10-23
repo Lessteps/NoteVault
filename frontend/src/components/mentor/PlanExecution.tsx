@@ -32,8 +32,9 @@ import { openTopic } from "./openTopic";
 import type { CoverageState } from "./PlanCoverage";
 import { ProgressBar, ThinkingStatus, useAiStatus } from "./parts";
 
+import { coldRetryDelay } from "./planShared";
+
 const MENTOR_NOTE = "calculado con tu vault; la IA solo ve títulos y resultados, nunca tus notas";
-const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
 const POLL_MS = 1500;
 const LIST_FOLD = 6;
@@ -55,7 +56,7 @@ async function fetchReport(planId: string, scope: ExecutionScope) {
   for (let i = 0; i < COLD_RETRY_MAX; i++) {
     const r = await api.mentorExecutionReport(planId, scope);
     if (!r.loading) return r;
-    await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+    await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
   }
   throw new Error("El índice de la vault tarda demasiado en estar listo.");
 }
@@ -297,7 +298,7 @@ export function ExecuteDialog({ planId, proposed, initialScope, onClose, onStart
       if (proposed) await api.mentorPlanKeep(planId);
       let r = await api.mentorExecutionStart(planId, scopeToSend(scope));
       for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
         r = await api.mentorExecutionStart(planId, scopeToSend(scope));
       }
       useMentor.setState((s) => ({ planVersion: s.planVersion + 1 }));
@@ -543,7 +544,7 @@ export function ExecutionPanel({ plan, cov, onPlan, announce, signal }: { plan: 
         const criteria = sanitizeCriteria(cov.review?.criteria ?? DEFAULT_CRITERIA);
         let r = await api.mentorPlanCoverageReview(plan.id, cov.review?.profile, criteria);
         for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-          await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+          await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
           r = await api.mentorPlanCoverageReview(plan.id, cov.review?.profile, criteria);
         }
         if (!r.loading && r.source === "ai") {
@@ -583,7 +584,7 @@ export function ExecutionPanel({ plan, cov, onPlan, announce, signal }: { plan: 
     try {
       let r = await api.mentorExecutionHandoff(plan.id, scopeToSend(scope));
       for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
         r = await api.mentorExecutionHandoff(plan.id, scopeToSend(scope));
       }
       if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo.");

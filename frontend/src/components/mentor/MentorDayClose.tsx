@@ -13,8 +13,8 @@ import { Chip, GhostButton, input, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { hm, LoadState, PanelPage, ProgressBar, ThinkingStatus, useAiStatus } from "./parts";
 import { openTopic } from "./openTopic";
+import { coldRetryDelay } from "./planShared";
 
-const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
 const MOODS = [
   { n: 1, label: "Fatal" },
@@ -86,7 +86,7 @@ export function MentorDayClose() {
           return;
         }
         setWarming(true);
-        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
       }
       throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
     } catch (e) {
@@ -108,7 +108,7 @@ export function MentorDayClose() {
     try {
       let r = await api.mentorDayClose({ date, ...(mood ? { mood } : {}), feeling, notes, ...(noAi ? { noAi: true } : {}) });
       for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
         r = await api.mentorDayClose({ date, ...(mood ? { mood } : {}), feeling, notes, ...(noAi ? { noAi: true } : {}) });
       }
       if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo.");

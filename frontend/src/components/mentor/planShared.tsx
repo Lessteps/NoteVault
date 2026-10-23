@@ -11,8 +11,9 @@ import { useProjects } from "../../store/projects";
 
 export type Loaded = Extract<MentorPlanGet, { loading: false }>;
 
-const COLD_RETRY_MS = 1500;
-const COLD_RETRY_MAX = 40;
+export const COLD_RETRY_MS = 1500;
+export const COLD_RETRY_MAX = 40;
+export const coldRetryDelay = (attempt: number): number => Math.min(800, 100 + attempt * 120);
 
 export const PALETTE = ["#2383e2", "#33b679", "#e67c73", "#f6bf26", "#8e24aa", "#0b8043", "#d50000", "#039be5"];
 
@@ -169,7 +170,7 @@ export function usePlanData(id: string | undefined) {
           return;
         }
         setWarming(true);
-        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
         if (!current()) return;
       }
       throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");

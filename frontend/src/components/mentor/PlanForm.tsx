@@ -57,7 +57,7 @@ type Loaded = Extract<MentorPlanOptions, { loading: false }>;
 
 export const PLAN_PRE_KEY = "nv.mentor.planPre";
 const MINUTES_KEY = "nv.mentor.minutes";
-const COLD_RETRY_MS = 1500;
+import { coldRetryDelay } from "./planShared";
 const COLD_RETRY_MAX = 40;
 
 const DAYS: Array<{ n: number; short: string; name: string }> = [
@@ -195,7 +195,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
             return;
           }
           setWarming(true);
-          await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+          await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
         }
         throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
       } catch (e) {
@@ -350,7 +350,7 @@ export function PlanForm({ onClose }: { onClose: () => void }) {
     try {
       let r = await api.mentorPlanBuildStart(pre, id);
       for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
         r = await api.mentorPlanBuildStart(pre, id);
       }
       if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");

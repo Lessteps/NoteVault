@@ -221,6 +221,9 @@ export async function warmStudyIndex(): Promise<{ notes: number; ms: number }> {
   if (!app) return { notes: 0, ms: 0 };
   const started = Date.now();
   const notes = await warmNoteCache(app.vault.notePaths());
+  try {
+    vaultScan(app);
+  } catch {}
   _indexWarmed = true;
   return { notes, ms: Date.now() - started };
 }

@@ -142,7 +142,7 @@ app.whenReady().then(() => {
     void warmStudyIndex()
       .then((r) => console.log(`study index warm: ${r.notes} notes in ${r.ms} ms`))
       .catch((e) => console.warn("study index warm failed:", e));
-  }, 4000);
+  }, 300);
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

@@ -21,8 +21,9 @@ import { cn, confirmAction } from "../ui";
 import { AreaRow, CARD_CLASS, ChipToggle, Disclosure, hm, LoadState, PanelPage, ProgressBar, ThinkingStatus, useAiStatus } from "./parts";
 import { practiceSummary } from "./PracticeCard";
 
+import { coldRetryDelay } from "./planShared";
+
 const PALETTE = ["#2383e2", "#33b679", "#e67c73", "#f6bf26", "#8e24aa", "#0b8043", "#d50000", "#039be5"];
-const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
 const cleanBranch = (n: string): string => n.replace(/^[\d.\s_-]+/, "");
 
@@ -59,7 +60,7 @@ export function PlanBuilder({ buildId }: { buildId: string }) {
       try {
         let r = await fn();
         for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-          await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+          await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
           r = await fn();
         }
         if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
@@ -91,7 +92,7 @@ export function PlanBuilder({ buildId }: { buildId: string }) {
         let s = await api.mentorAiStatus(key);
         if (s.busy) setBusy("Retomando lo que el Mentor estaba haciendo…");
         while (s.busy && !stop) {
-          await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+          await new Promise((ok) => setTimeout(ok, 300));
           s = await api.mentorAiStatus(key);
         }
         if (stop) return;
@@ -136,7 +137,7 @@ export function PlanBuilder({ buildId }: { buildId: string }) {
     try {
       let r = await api.mentorPlanBuildAccept(buildId);
       for (let i = 0; "loading" in r && r.loading && i < COLD_RETRY_MAX; i++) {
-        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
         r = await api.mentorPlanBuildAccept(buildId);
       }
       if ("loading" in r) throw new Error("El índice de la vault tarda demasiado en estar listo.");

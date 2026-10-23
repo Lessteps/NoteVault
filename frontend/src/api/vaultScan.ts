@@ -11,6 +11,15 @@ export const SCAN_CACHE_TTL_MS = 30_000;
 
 const _scanCache = new Map<string, { data: VaultScan; timestamp: number }>();
 
+const _invalidationListeners = new Set<() => void>();
+
+export function registerScanInvalidation(listener: () => void): () => void {
+  _invalidationListeners.add(listener);
+  return () => {
+    _invalidationListeners.delete(listener);
+  };
+}
+
 export function vaultScan(app: AppState): VaultScan {
   const hit = _scanCache.get(app.root);
   if (hit && Date.now() - hit.timestamp < SCAN_CACHE_TTL_MS) return hit.data;
@@ -25,4 +34,9 @@ export function hasVaultScan(root: string): boolean {
 
 export function clearVaultScanCache(): void {
   _scanCache.clear();
+  for (const listener of _invalidationListeners) {
+    try {
+      listener();
+    } catch {}
+  }
 }

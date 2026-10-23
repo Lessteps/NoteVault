@@ -18,7 +18,7 @@ import { cn } from "../ui";
 import { SectionHeading } from "./planKit";
 import { ThinkingStatus, useAiStatus } from "./parts";
 
-const COLD_RETRY_MS = 1500;
+import { coldRetryDelay } from "./planShared";
 const COLD_RETRY_MAX = 40;
 export const CHANGE_PLACEHOLDER = "Ej.: ¿Por qué Databases va después de Backend? · Más SQL antes del backend; pasa el lenguaje Python a Automation; condensa Docker en dos semanas…";
 /** Sugerencias de AJUSTE clicables: rellenan el cuadro (no envían nada). */
@@ -105,7 +105,7 @@ export function PlanChanges({ planId, onApplied, autoSend, announce, focusSignal
       try {
         let r: MentorChangeResult = await api.mentorPlanChange({ id: planId, ...opts });
         for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-          await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+          await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
           r = await api.mentorPlanChange({ id: planId, ...opts });
         }
         if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");

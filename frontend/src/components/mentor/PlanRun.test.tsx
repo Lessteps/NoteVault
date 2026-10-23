@@ -276,6 +276,16 @@ describe("vista de ejecución", () => {
     expect(byTest("run-gate")!.textContent).toContain("1.1 A");
   });
 
+  it("cuando el estudiante va atrasado respecto al calendario, el plan de estudio enseña los temas de inicio de ruta y cada área ofrece sus temas abiertos", async () => {
+    vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(spread()));
+    await mountEl(<MentorPlan planId={PID} />);
+    expect(byTest("run-resuming-frontier")).toBeTruthy();
+    expect(byTest("run-resuming-frontier")!.textContent).toContain("Retomando ruta desde");
+    await click(runTab("area:s1"));
+    await view("hoy");
+    expect(listed().length).toBeGreaterThan(0);
+  });
+
   it("la flecha de un tema ofrece abrir el apunte (.md) o el archivo de práctica", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     const ensure = vi.spyOn(api, "studyViewEnsure").mockResolvedValue({ ok: true, kind: "practica", path: "", created: [], errors: [] } as never);

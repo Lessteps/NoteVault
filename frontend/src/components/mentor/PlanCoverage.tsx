@@ -42,8 +42,7 @@ import { cn, confirmAction } from "../ui";
 import { openTopic } from "./openTopic";
 import { dayText, ThinkingStatus, useAiStatus } from "./parts";
 import { artifactLabel, TOPIC_TYPE_NAME } from "../../lib/topicDesign";
-
-const COLD_RETRY_MS = 1500;
+import { coldRetryDelay } from "./planShared";
 const COLD_RETRY_MAX = 40;
 const LIST_FOLD = 8;
 
@@ -91,7 +90,7 @@ export function usePlanCoverage(planId: string, enabled = true): CoverageState {
           return;
         }
         loadedFor.current = "";
-        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
         if (!alive.current) return;
       }
       throw new Error("El índice de la vault tarda demasiado en estar listo.");
@@ -592,7 +591,7 @@ export function CoveragePanel({ plan, cov, onPlan, announce }: { plan: MentorPla
     try {
       let r = await api.mentorPlanCoverageReview(plan.id, profile.trim() || undefined, used);
       for (let i = 0; r.loading && i < COLD_RETRY_MAX; i++) {
-        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
         r = await api.mentorPlanCoverageReview(plan.id, profile.trim() || undefined, used);
       }
       if (r.loading) throw new Error("El índice de la vault tarda demasiado en estar listo.");

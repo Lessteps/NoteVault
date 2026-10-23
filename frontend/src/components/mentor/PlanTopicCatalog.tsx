@@ -23,7 +23,7 @@ import { LoadState } from "./parts";
 import { SectionHeading } from "./planKit";
 import { GenerateTopicButton } from "./TopicGenerate";
 
-const COLD_RETRY_MS = 1500;
+import { coldRetryDelay } from "./planShared";
 const COLD_RETRY_MAX = 40;
 
 /** Carga el catálogo (con el reintento de la vault fría); se recarga cuando cambia el plan. */
@@ -51,7 +51,7 @@ export function usePlanTopicCatalog(planId: string) {
           return;
         }
         setWarming(true);
-        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        await new Promise((ok) => setTimeout(ok, coldRetryDelay(i)));
         if (!alive.current) return;
       }
       throw new Error("El índice de la vault tarda demasiado en estar listo.");

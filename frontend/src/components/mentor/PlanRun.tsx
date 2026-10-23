@@ -66,7 +66,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const canPlan = isToday && !plan.proposed && !plan.archived && (topicsToday.some((t) => !t.done) || !!day?.practice.project);
   const upcoming = useMemo(() => m.schedule.days.filter((d) => d.date > date && d.study).slice(0, UPCOMING_DAYS), [m.schedule, date]);
   const nextStudy = before ? m.schedule.days.find((d) => d.study) : undefined;
-  const currentWeek = summary?.currentWeek ?? 1;
+  const currentWeek = day?.week ?? summary?.currentWeek ?? 1;
   const deliverables = m.deliverablesDefined
     ? m.deliverables.filter((d) => d.status !== "hecho" && d.dueDate >= date).sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, DELIVERABLES_SHOWN)
     : [];
@@ -289,6 +289,11 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                     {day && <> · Semana {day.week}</>}
                   </p>
                   <h2 id="run-today-h" className="text-[26px] font-bold leading-tight first-letter:uppercase">{longDateLabel(date)}</h2>
+                  {behind && gate.frontier && (
+                    <p className="mt-0.5 text-[13px] font-medium text-warn" data-testid="run-resuming-frontier">
+                      Retomando ruta desde el {longDateLabel(gate.frontier)} · Semana {day?.week ?? 1}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {day?.focus && (

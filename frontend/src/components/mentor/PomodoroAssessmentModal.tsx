@@ -6,10 +6,11 @@
 import { CheckCircle2, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
-import { localDay } from "../../lib/timeLog";
+import { localDay, type WorkKind } from "../../lib/timeLog";
 import { useApp } from "../../store/app";
 import { usePomodoro } from "../../store/pomodoro";
 import { PrimaryButton } from "../common/forms";
+import { WorkPicker } from "./WorkPicker";
 
 type Status = "done" | "partial" | "none";
 const STATUS_LABEL: Record<Status, string> = { done: "Completado", partial: "A medias", none: "No lo toqué" };
@@ -45,6 +46,7 @@ export function PomodoroAssessmentModal() {
   const [focus, setFocus] = useState(4);
   const [practiced, setPracticed] = useState(false);
   const [outcomes, setOutcomes] = useState<Record<string, Status>>({});
+  const [work, setWork] = useState<WorkKind | null>(null);
   const [busy, setBusy] = useState(false);
   const finishedAt = assessment?.finishedAt;
   // cada evaluación nueva empieza limpia
@@ -56,7 +58,8 @@ export function PomodoroAssessmentModal() {
     setUnderstanding(4);
     setFocus(4);
     setPracticed(false);
-  }, [finishedAt]);
+    setWork(assessment?.work ?? null);
+  }, [finishedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!assessment) return null;
 
@@ -83,10 +86,11 @@ export function PomodoroAssessmentModal() {
         learned: learned.trim(),
         doubt: doubt.trim(),
         errors: errors.trim(),
+        ...(work ? { work } : {}),
       });
       // una sesión registrada a mano todavía no tiene sus horas en el registro: se suman ahora
       if (assessment.mode === "manual") {
-        await api.mentorTimeLogAdd({ id: assessment.planId, areaKey: assessment.areaKey, date: localDay(new Date(assessment.finishedAt)), minutes: assessment.minutes, kind: "manual", ...(items.length ? { note: `[${items.map((t) => t.title).join(", ")}]` } : {}) });
+        await api.mentorTimeLogAdd({ id: assessment.planId, areaKey: assessment.areaKey, date: localDay(new Date(assessment.finishedAt)), minutes: assessment.minutes, kind: "manual", ...(work ? { work } : {}), ...(items.some((t) => !t.folder.startsWith("manual:")) ? { topics: items.filter((t) => !t.folder.startsWith("manual:")).map((t) => t.folder) } : {}), ...(items.length ? { note: `[${items.map((t) => t.title).join(", ")}]` } : {}) });
       }
       // el REGISTRO de la sesión (evidencia + nota legible en `_registro/`): si falla, la evaluación ya está a salvo y se avisa
       try {
@@ -129,9 +133,11 @@ export function PomodoroAssessmentModal() {
         </header>
 
         <form onSubmit={(e) => void submit(e)} className="space-y-4 text-[14px]">
+          <WorkPicker value={work} onChange={setWork} label="Qué tipo de trabajo fue" />
+
           {items.length > 0 && (
             <fieldset className="space-y-2" data-testid="assess-outcomes">
-              <legend className="font-medium text-text">1. ¿Cómo quedó cada cosa que asignaste a este bloque?</legend>
+              <legend className="font-medium text-text">1. ¿Qué completaste de lo que asignaste a este bloque? (no se marca el avance solo: lo confirmas tú)</legend>
               <ul className="space-y-1.5">
                 {items.map((t) => (
                   <li key={t.folder} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line px-2.5 py-1.5">

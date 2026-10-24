@@ -7,7 +7,6 @@ import { areaRouteTopics, basesRouteTopics, orderedAreas } from "../../lib/planT
 import type { MentorBuildSummary, MentorPlan, MentorPlanRow } from "../../lib/types";
 import { useEffect } from "react";
 import { useNavState, usePersistedNav } from "../../store/navState";
-import { areaEmoji, BASES_EMOJI, GENERAL_EMOJI } from "./mentorAreas";
 import { sectionAlias } from "./PlanSections";
 import { agendaAreaKey, MODE_KEY, PLAN_TABS, planSectionKey, planTabKey, type PlanTab } from "./planShared";
 
@@ -110,8 +109,8 @@ export interface NavLink {
   subs?: ReadonlyArray<NavLink>;
   /** rótulo de sección que se pinta encima del ítem («Planificación», «Más») */
   section?: string;
-  /** el emoji del ítem (cada área lleva el suyo) */
-  emoji?: string;
+  /** el área del ítem (la barra le pone un punto de su color; nunca un emoji) */
+  areaId?: string;
 }
 
 export const PLAN_NAV_PREFIX = "pl:";
@@ -142,9 +141,9 @@ export function planeacionLinks(plan: Pick<MentorPlan, "programmingPractice" | "
   };
   const more = (id: string, label: string, extra: Partial<NavLink> = {}): NavLink => ({ id: `${PLAN_NAV_PREFIX}${id}`, label, ...extra });
   const out: NavLink[] = [
-    { id: `${PLAN_NAV_PREFIX}${PAGE_GENERAL}`, label: "Vista general", emoji: GENERAL_EMOJI, section: "Planificación" },
-    ...orderedAreas(plan).map((a): NavLink => ({ id: `${PLAN_NAV_PREFIX}${pageAreaId(a.subplanId)}`, label: a.area, emoji: areaEmoji(a.areaId), ...hint(runAreaTab(a.subplanId)) })),
-    ...(hasBasesRoute(plan) ? [{ id: `${PLAN_NAV_PREFIX}${PAGE_BASES}`, label: "Bases", emoji: BASES_EMOJI, ...hint("bases") } as NavLink] : []),
+    { id: `${PLAN_NAV_PREFIX}${PAGE_GENERAL}`, label: "Vista general", section: "Planificación" },
+    ...orderedAreas(plan).map((a): NavLink => ({ id: `${PLAN_NAV_PREFIX}${pageAreaId(a.subplanId)}`, label: a.area, areaId: a.areaId ?? a.subplanId, ...hint(runAreaTab(a.subplanId)) })),
+    ...(hasBasesRoute(plan) ? [{ id: `${PLAN_NAV_PREFIX}${PAGE_BASES}`, label: "Bases", ...hint("bases") } as NavLink] : []),
   ];
   const pend = pendingDeliverables ? { badge: pendingDeliverables, hint: `${pendingDeliverables} ${pendingDeliverables === 1 ? "pendiente" : "pendientes"} de decidir` } : {};
   out.push(

@@ -1,29 +1,14 @@
-// Mentor — Planeación: las PÁGINAS del plan (Vista general, una por área y Bases). Módulo PURO (sin React): el icono de cada área, el alcance de
+// Mentor — Planeación: las PÁGINAS del plan (Vista general, una por área y Bases). Módulo PURO (sin React): el alcance de
 // una página y las cifras de su semana, calculadas con los MISMOS selectores que la Agenda y la Ejecución (`byWeekArea`, `dayByArea`,
 // `dayBases`, `areaRouteTopics`), de modo que los números de una página coinciden con los de los demás sitios.
 
 import { BASES_KEY } from "../../lib/planAreaTopics";
 import { deliverableInArea, type ScheduleDay, type WeekSummary } from "../../lib/planSchedule";
 import { addDays } from "../../lib/planTime";
-import { areaRouteTopics, basesRouteTopics, dayBases, dayByArea, orderedAreas, type DayAreaEntry, type DayBasesItem } from "../../lib/planTopicsByArea";
+import { areaRouteTopics, basesClassifier, basesRouteTopics, dayBases, dayByArea, orderedAreas, type DayAreaEntry, type DayBasesItem } from "../../lib/planTopicsByArea";
 import type { PlanDeliverable } from "../../lib/planAreas";
 import type { MentorPlan } from "../../lib/types";
 import type { AgendaModel } from "./agendaKit";
-
-/** El emoji de cada área (los de la referencia); un área propia sin emoji usa la carpeta. */
-export const AREA_EMOJI: Readonly<Record<string, string>> = {
-  backend: "⚙️",
-  databases: "🗄️",
-  frontend: "🎨",
-  automation: "🤖",
-  tooling: "🛠️",
-  logic: "💡",
-  desktop: "🖥️",
-  mobile: "📱",
-};
-export const BASES_EMOJI = "📦";
-export const GENERAL_EMOJI = "📋";
-export const areaEmoji = (areaId?: string): string => (areaId && AREA_EMOJI[areaId]) || "📁";
 
 /** De qué trata una página: todo el plan, un área (por su subplan) o los fundamentos (Bases). */
 export type PageScope = { kind: "all" } | { kind: "area"; subplanId: string } | { kind: "bases" };
@@ -51,18 +36,17 @@ export function scopeFromStored(stored: string, plan: Pick<MentorPlan, "subplans
 
 export interface ScopeInfo {
   title: string;
-  emoji: string;
   areaId?: string;
   /** nombre corto para «Temas Backend», «Práctica de Backend»… */
   name: string;
 }
 export function scopeInfo(plan: Pick<MentorPlan, "subplans" | "name">, s: PageScope, planName?: string): ScopeInfo {
-  if (s.kind === "bases") return { title: "Bases", emoji: BASES_EMOJI, name: "Bases" };
+  if (s.kind === "bases") return { title: "Bases", name: "Bases" };
   if (s.kind === "area") {
     const sub = plan.subplans.find((x) => x.id === s.subplanId);
-    return { title: sub?.area ?? "Área", emoji: areaEmoji(sub?.areaId), ...(sub?.areaId ? { areaId: sub.areaId } : {}), name: sub?.area ?? "Área" };
+    return { title: sub?.area ?? "Área", ...(sub?.areaId ? { areaId: sub.areaId } : {}), name: sub?.area ?? "Área" };
   }
-  return { title: planName ?? plan.name ?? "Plan de estudio", emoji: GENERAL_EMOJI, name: "Plan" };
+  return { title: planName ?? plan.name ?? "Plan de estudio", name: "Plan" };
 }
 
 /** Los temas de la ruta del alcance (para el plan entero no se usa: solo áreas y Bases). */
@@ -210,4 +194,98 @@ export function scopeDayRow(m: AgendaModel, s: PageScope, day: ScheduleDay): Sco
   if (!e) return { date: day.date, count: 0, titles: [], theoryMinutes: 0, practiceMinutes: 0, project: false };
   const titles = [...new Set((e.blocks ?? []).flatMap((b) => b.items.map((i) => i.title)))];
   return { date: day.date, count: e.topics, titles, theoryMinutes: e.theoryMinutes, practiceMinutes: e.practiceMinutes, project: e.project };
+}
+
+// ── Días con actividad y cifras de CUMPLIMIENTO (no de horas) ───────────
+
+/**
+ * ¿Pasó algo hecho ese día? Un tema completado ese día, el kata del día hecho o un entregable (proyecto) entregado. `only` es el filtro del
+ * alcance (`scopeOnly`): null = todo el plan, un subplan, o `BASES_KEY`.
+ */
+export function dayHasDone(m: AgendaModel, day: ScheduleDay, only: string | null = null): boolean {
+  const isBases = basesClassifier(m.plan);
+  for (const t of day.topics) {
+    if (!t.done) continue;
+    const bases = isBases(t);
+    if (only === null || (only === BASES_KEY ? bases : !bases && t.subplanId === only)) return true;
+  }
+  if (only === null && (m.practiceStatus?.kataDoneDates ?? []).includes(day.date)) return true;
+  const areaId = only && only !== BASES_KEY ? m.plan.subplans.find((s) => s.id === only)?.areaId : undefined;
+  for (const d of m.dueByDate.get(day.date) ?? []) {
+    if (d.status !== "hecho") continue;
+    if (only === null || (areaId ? deliverableInArea(d, areaId) : false)) return true;
+  }
+  return false;
+}
+
+/** «Ver día» solo existe para hoy, los días futuros y los pasados en que se hizo algo: un día pasado vacío no tiene nada que ver. */
+export const dayViewable = (m: AgendaModel, day: ScheduleDay, only: string | null = null): boolean => day.date >= m.today || dayHasDone(m, day, only);
+
+export type TopicKind = "theory" | "practice";
+/** Qué tipos de trabajo (teoría, práctica) tiene cada tema de la semana, según los bloques del reparto (sin bloques: teoría). */
+export function topicKindsByFolder(m: Pick<AgendaModel, "schedule">, week: number): Map<string, Set<TopicKind>> {
+  const out = new Map<string, Set<TopicKind>>();
+  for (const d of m.schedule.days) {
+    if (d.week !== week) continue;
+    for (const b of d.blocks ?? []) for (const i of b.items) (out.get(i.folder) ?? out.set(i.folder, new Set()).get(i.folder)!).add(b.kind === "practice" ? "practice" : "theory");
+  }
+  return out;
+}
+
+export interface Fraction {
+  done: number;
+  total: number;
+}
+export interface WeekCompletion {
+  topics: Fraction;
+  theory: Fraction;
+  practice: Fraction;
+  katas: Fraction;
+  /** proyectos diarios (entregables de ese tipo de la semana) */
+  projects: Fraction;
+}
+
+/** El tema cuenta como hecho si el reparto lo da por hecho o la práctica lo marca completo (la misma regla que la lista de la semana). */
+export const weekTopicDone = (m: Pick<AgendaModel, "topicByFolder">, t: { folder: string; done: boolean }): boolean => t.done || m.topicByFolder.get(t.folder)?.state === "completo";
+
+/**
+ * Las cifras de CUMPLIMIENTO de una semana: cuántos temas están hechos (en total, con teoría y con práctica), katas hechos y proyectos diarios
+ * entregados. Salen del reparto compartido (`byWeekArea`) y de los entregables; nunca de horas planeadas. `only` = `scopeOnly` del alcance.
+ */
+export function weekCompletion(m: AgendaModel, only: string | null, week: number): WeekCompletion {
+  const w = m.byWeekArea.weeks[week - 1];
+  const empty: WeekCompletion = { topics: { done: 0, total: 0 }, theory: { done: 0, total: 0 }, practice: { done: 0, total: 0 }, katas: { done: 0, total: 0 }, projects: { done: 0, total: 0 } };
+  if (!w) return empty;
+  const list = [...(only === BASES_KEY ? [] : w.cells.filter((c) => only === null || c.subplanId === only).flatMap((c) => c.topics)), ...(only === null || only === BASES_KEY ? w.bases : [])];
+  const kinds = topicKindsByFolder(m, week);
+  const count = (pick: (t: (typeof list)[number]) => boolean): Fraction => {
+    const sel = list.filter(pick);
+    return { total: sel.length, done: sel.filter((t) => weekTopicDone(m, t)).length };
+  };
+  const has = (k: TopicKind) => (t: { folder: string }): boolean => {
+    const ks = kinds.get(t.folder);
+    return k === "theory" ? !ks || ks.size === 0 || ks.has("theory") : !!ks?.has("practice");
+  };
+  const days = m.schedule.days.filter((d) => d.week === week);
+  const katas: Fraction = { done: 0, total: 0 };
+  if (only === null) {
+    for (const d of days) {
+      if (!d.practice.kata) continue;
+      katas.total++;
+      if ((m.practiceStatus?.kataDoneDates ?? []).includes(d.date)) katas.done++;
+    }
+  }
+  const projects: Fraction = { done: 0, total: 0 };
+  if (m.deliverablesDefined && days.length && only !== BASES_KEY) {
+    const from = days[0]!.date;
+    const to = days[days.length - 1]!.date;
+    const areaId = only ? m.plan.subplans.find((s) => s.id === only)?.areaId : undefined;
+    for (const d of m.deliverables) {
+      if (d.kind !== "daily_project" || d.dueDate < from || d.dueDate > to) continue;
+      if (only !== null && !(areaId && deliverableInArea(d, areaId))) continue;
+      projects.total++;
+      if (d.status === "hecho") projects.done++;
+    }
+  }
+  return { topics: count(() => true), theory: count(has("theory")), practice: count(has("practice")), katas, projects };
 }

@@ -1,17 +1,18 @@
-// Mentor — Ejecución: la SESIÓN de estudio de un área. Un Pomodoro (foco y descanso) y el registro de horas del área: lo que se hizo hoy frente a
-// lo previsto, la semana, y cada bloque guardado (con «Detener y guardar», o a mano). El reloj es global (`store/pomodoro.ts`): no se pierde al
+// Mentor — Ejecución: la SESIÓN de estudio de un área. Un Pomodoro (foco y descanso) y el registro de horas del área: lo que se hizo hoy (solo tiempo REAL registrado, nunca lo previsto), la semana, y cada bloque guardado (con «Detener y guardar», o a mano). El reloj es global (`store/pomodoro.ts`): no se pierde al
 // cambiar de pestaña. `PomodoroTicker` va montado una vez en la vista de ejecución y guarda el foco cuando termina aunque no se esté mirando.
 
 import { Pause, Play, SkipForward, Square, Timer, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/bridge";
-import { BREAK_CHOICES, clock, FOCUS_CHOICES, focusDoneMinutes, phaseOver, remainingMs, type AssignedTopic } from "../../lib/pomodoro";
-import { localDay, minutesBetween, minutesOn, minutesText, type Assessment, type TimeEntry } from "../../lib/timeLog";
+import { BREAK_CHOICES, clock, FOCUS_CHOICES, focusDoneMinutes, inferWork, phaseOver, remainingMs, type AssignedTopic } from "../../lib/pomodoro";
+import { localDay, minutesBetween, minutesOn, minutesText, type Assessment, type TimeEntry, type WorkKind, WORK_LABEL } from "../../lib/timeLog";
+import { WorkPicker } from "./WorkPicker";
 import { usePomodoro } from "../../store/pomodoro";
 import { useApp } from "../../store/app";
 import { GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { AssignPanel } from "./AssignPanel";
+import { LoggedTime } from "./LoggedTime";
 import { ProgressBar } from "./parts";
 
 /** Las entradas del registro de horas del plan; se recargan cuando se guarda un bloque. */
@@ -49,9 +50,10 @@ const beep = (): void => {
 };
 
 /** Guarda un bloque de foco en el registro y avisa a los paneles. */
-export async function logFocus(planId: string, areaKey: string, minutes: number, note = "", kind: "pomodoro" | "manual" = "pomodoro"): Promise<void> {
+export async function logFocus(planId: string, areaKey: string, minutes: number, note = "", kind: "pomodoro" | "manual" = "pomodoro", extra: { work?: WorkKind | null; topics?: ReadonlyArray<{ folder: string }> } = {}): Promise<void> {
   if (minutes < 1) return;
-  await api.mentorTimeLogAdd({ id: planId, areaKey, date: localDay(), minutes, kind, ...(note ? { note } : {}) });
+  const folders = (extra.topics ?? []).filter((t) => !t.folder.startsWith("manual:")).map((t) => t.folder);
+  await api.mentorTimeLogAdd({ id: planId, areaKey, date: localDay(), minutes, kind, ...(note ? { note } : {}), ...(extra.work ? { work: extra.work } : {}), ...(folders.length ? { topics: folders } : {}) });
   usePomodoro.getState().bump();
 }
 
@@ -73,7 +75,7 @@ export function PomodoroTicker() {
       const r = st.next();
       beep();
       if (was === "focus") {
-        void logFocus(r.planId, r.areaKey, r.minutes, note)
+        void logFocus(r.planId, r.areaKey, r.minutes, note, "pomodoro", { work: r.work, topics: r.topics })
           .then(() => toast("info", `Foco terminado: ${r.minutes} min guardados. Toca descansar.`))
           .catch((e: Error) => toast("error", `No se pudo guardar el bloque: ${e.message}`));
       } else toast("info", "Descanso terminado. ¿Otro bloque de foco?");
@@ -85,7 +87,7 @@ export function PomodoroTicker() {
 
 const chipBtn = (on: boolean): string => cn("min-h-8 rounded-md border px-2.5 text-[13px]", on ? "border-accent bg-accent-soft text-accent-text" : "border-line text-dim hover:bg-hover");
 
-export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, colour, currentTopic, suggestions, todayTopics }: { planId: string; areaKey: string; areaName: string; date: string; plannedMinutes: number; colour: string; /** el tema de hoy que toca ahora, bajo el título */ currentTopic?: string; /** proyectos u otras piezas que se asignan al bloque con un clic */ suggestions?: AssignedTopic[]; /** los temas de hoy del área, para asignarlos todos */ todayTopics?: AssignedTopic[] }) {
+export function AreaSession({ planId, areaKey, areaName, date, colour, currentTopic, suggestions, todayTopics, defaultWork }: { /** tipo de trabajo que se preselecciona al empezar desde aquí (si no, se deduce de lo asignado) */ defaultWork?: WorkKind; planId: string; areaKey: string; areaName: string; date: string; /** ya no se usa: el tiempo previsto no se presenta como estudiado */ plannedMinutes?: number; colour: string; /** el tema de hoy que toca ahora, bajo el título */ currentTopic?: string; /** proyectos u otras piezas que se asignan al bloque con un clic */ suggestions?: AssignedTopic[]; /** los temas de hoy del área, para asignarlos todos */ todayTopics?: AssignedTopic[] }) {
   const toast = useApp((s) => s.toast);
   const p = usePomodoro((s) => s.p);
   const { start, pause, resume, next, setDurations, setMode } = usePomodoro.getState();
@@ -126,7 +128,7 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
       return;
     }
     try {
-      await logFocus(r.planId, r.areaKey, mins, assignedNote);
+      await logFocus(r.planId, r.areaKey, mins, assignedNote, "pomodoro", { work: r.work, topics: r.topics });
       toast("info", `${mins} min guardados en el registro de ${areaName}.`);
     } catch (e) {
       toast("error", (e as Error).message);
@@ -157,7 +159,7 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
       return;
     }
     const at = Date.now();
-    usePomodoro.getState().requestAssessment({ planId, areaKey, minutes: n, topics: usePomodoro.getState().p.assignedTopics, finishedAt: at, startedAt: at - n * 60_000, mode: "manual" });
+    usePomodoro.getState().requestAssessment({ planId, areaKey, minutes: n, topics: usePomodoro.getState().p.assignedTopics, finishedAt: at, startedAt: at - n * 60_000, mode: "manual", work: usePomodoro.getState().p.work ?? inferWork(usePomodoro.getState().p.assignedTopics) ?? defaultWork ?? null });
     setMin("");
     setNote("");
   };
@@ -216,7 +218,7 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
 
           <div className="flex flex-wrap items-center justify-center gap-2.5">
             {!mine && (
-              <PrimaryButton large disabled={other || !!p.pendingAssessment} onClick={() => start(planId, areaKey)} className="w-full" data-testid="pomodoro-start">
+              <PrimaryButton large disabled={other || !!p.pendingAssessment} onClick={() => start(planId, areaKey, p.work ?? inferWork(p.assignedTopics) ?? defaultWork ?? null)} className="w-full" data-testid="pomodoro-start">
                 <Play size={16} aria-hidden /> {p.mode === "stopwatch" ? "Iniciar cronómetro" : "Empezar foco"}
               </PrimaryButton>
             )}
@@ -279,6 +281,9 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
             </div>
           )}
 
+          {/* Qué tipo de trabajo es: Teoría / Práctica / Proyecto / Repaso */}
+          {(p.phase === "idle" || mine) && <WorkPicker value={p.work ?? (p.phase === "idle" ? inferWork(p.assignedTopics) ?? defaultWork ?? null : null)} onChange={(w) => usePomodoro.getState().setWork(w)} disabled={p.phase !== "idle"} />}
+
           {/* Qué se trabaja en el bloque */}
           <div className="border-t border-line pt-5">
             <AssignPanel suggestions={suggestions} todayTopics={todayTopics} />
@@ -290,9 +295,8 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
             <p className="text-[13px] text-dim">Hoy en {areaName}</p>
             <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2" data-testid="timelog-today">
               <strong className="text-[28px] font-bold leading-tight">{minutesText(today)}</strong>
-              {plannedMinutes > 0 && <span className="text-[14px] text-dim">de {minutesText(plannedMinutes)} previstos</span>}
             </p>
-            {plannedMinutes > 0 && <div className="mt-2"><ProgressBar pct={Math.min(100, Math.round((today / plannedMinutes) * 100))} label={`Tiempo de hoy en ${areaName}`} /></div>}
+            <LoggedTime entries={entries} areaKey={areaKey} from={date} to={date} className="mt-1.5 text-[13px] text-dim" />
             <p className="mt-2.5 text-[13.5px] text-dim" data-testid="timelog-week">Esta semana: <strong className="text-text">{minutesText(week)}</strong></p>
           </div>
 
@@ -303,7 +307,7 @@ export function AreaSession({ planId, areaKey, areaName, date, plannedMinutes, c
                 {todays.map((e) => (
                   <li key={e.id} className="flex items-center gap-2.5 rounded-lg bg-surface px-3 py-2 text-[13.5px]" data-testid="timelog-entry">
                     <span className="font-semibold tabular-nums">{minutesText(e.minutes)}</span>
-                    <span className="text-faint">{e.kind === "pomodoro" ? "Pomodoro" : "A mano"}</span>
+                    <span className="text-faint">{e.kind === "pomodoro" ? "Pomodoro" : "A mano"}{e.work ? ` · ${WORK_LABEL[e.work]}` : ""}</span>
                     <span className="min-w-0 flex-1 truncate text-dim">{e.note ?? ""}</span>
                     <button type="button" onClick={() => void remove(e.id)} aria-label={`Quitar el bloque de ${minutesText(e.minutes)}`} className="grid h-8 w-8 flex-none place-items-center rounded-md text-faint hover:bg-hover hover:text-danger"><Trash2 size={14} aria-hidden /></button>
                   </li>

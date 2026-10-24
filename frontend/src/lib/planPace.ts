@@ -3,9 +3,9 @@
 //  · RITMO (`Plan.pace`): cuántos TEMAS estudiar cada día de estudio, por área (`perDay`), y un mínimo diario (`minPerDay`). Sin ritmo manda el
 //    reparto automático por minutos de siempre. Un valor por ÁREA (`areas[subplanId]`) gana sobre el global campo a campo; `0` en el valor de
 //    un área = «automático» para ese campo aunque haya un global.
-//  · TEMAS EXTRA (`Plan.extraTopics`): temas que el estudiante añade a mano a un día (uno de la ruta que está más adelante o cualquier tema de
-//    la vault que no está en el plan). Se cuentan en el día y no alteran el orden estricto del resto.
-//  · PRÁCTICA EXTRA (`Plan.extraPractice`): elementos de práctica diaria añadidos a mano (texto libre o ligados al ejercicio de un tema).
+//  · TEMAS EXTRA (`Plan.extraTopics`): temas que el estudiante ADELANTA a un día (los siguientes de la ruta; la API admite además un tema de la vault
+//    fuera del plan, que la interfaz ya no ofrece). Se cuentan en el día y no alteran el orden estricto del resto.
+//  · PRÁCTICA EXTRA (`Plan.extraPractice`): elementos de práctica diaria añadidos a mano (los katas y ejercicios YA PLANEADOS que se adelantan; la API sigue aceptando texto libre).
 //
 // Módulo PURO y compartido (núcleo, API y renderer): sin node:* ni DOM. El reparto que usa todo esto está en `planPaceSchedule.ts`.
 
@@ -59,6 +59,10 @@ export interface ExtraPractice {
   done?: boolean;
   /** carpeta del tema cuyo ejercicio se practica (opcional) */
   folder?: string;
+  /** archivo de la vault al que está ligada (un ejercicio de un tema: su nota; un kata: su archivo) */
+  rel?: string;
+  /** kata planeado del área que se adelantó: la fecha en que le tocaba (con `area` basta para abrirlo) */
+  kataDate?: string;
 }
 
 const DATE_OK = /^\d{4}-\d{2}-\d{2}$/;
@@ -219,6 +223,7 @@ export function sanitizeExtraPractice(raw: unknown): ExtraPractice[] {
     const area = oneLine(o.area, 60);
     const note = oneLine(o.note, 400);
     const folder = cleanFolder(o.folder);
+    const rel = cleanFolder(o.rel);
     out.push({
       id,
       date: o.date,
@@ -229,6 +234,8 @@ export function sanitizeExtraPractice(raw: unknown): ExtraPractice[] {
       kind,
       ...(o.done === true ? { done: true } : {}),
       ...(folder ? { folder } : {}),
+      ...(rel ? { rel } : {}),
+      ...(isIsoDate(o.kataDate) ? { kataDate: o.kataDate } : {}),
     });
   });
   return out;

@@ -31,6 +31,8 @@ import { hm, ProgressBar, ThinkingStatus, useAiStatus } from "./parts";
 import { openPractice } from "./PracticeCard";
 import { PALETTE, STATE_COLOUR, STATE_GLYPH, STATE_LABEL } from "./planShared";
 
+/** Los minutos de un tema o bloque son los PLANEADOS: se muestran solo como pista pequeña («est.»), nunca como tiempo estudiado. */
+const est = (min: number): string => `est. ${hm(min)}`;
 const SECTION = "text-[13px] font-semibold uppercase tracking-wider text-faint";
 const colourOfArea = (m: AgendaModel, subplanId: string): string => {
   const sub = m.plan.subplans.find((s) => s.id === subplanId);
@@ -122,7 +124,7 @@ function BlockTopics({ m, items, date, onChanged }: { m: AgendaModel; items: Blo
             {t.extra && <ExtraTag title={t.title} onRemove={() => void removeExtraTopic(m.plan.id, date, t.folder, onChanged)} />}
             {t.applied ? <Chip large>Lógica aplicada (fundamentos)</Chip> : t.groupTitle ? <Chip large>{t.groupTitle}</Chip> : null}
             {t.parts > 1 && <span className="text-[13.5px] text-dim">parte {t.part} de {t.parts}</span>}
-            <span className="text-[14px] font-medium" data-testid="agenda-topic-minutes">{hm(t.minutes)}</span>
+            <span className="text-[14px] font-medium" data-testid="agenda-topic-minutes">{est(t.minutes)}</span>
             <Chip large colour={STATE_COLOUR[state]}><span aria-hidden>{STATE_GLYPH[state]}</span> {STATE_LABEL[state]}</Chip>
             {live?.found && (
               <button type="button" onClick={() => void openTopic(t.folder)} className="inline-flex min-h-8 items-center px-2 text-[14px] text-accent-text underline-offset-2 hover:underline" aria-label={`Ver tema ${t.title}`}>Ver tema</button>
@@ -193,7 +195,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
         <p className="text-[16px] font-semibold text-text" data-testid="agenda-day-today-line">{day.focus.line}</p>
       )}
       <p className="text-[15px] font-medium text-text" data-testid="agenda-day-counts">
-        {[topicsText(day.topics.length), day.topicMinutes ? `${hm(day.topicMinutes)} de estudio` : "sin estudio", m.deliverablesDefined ? deliverablesText(due.length) : "Entregables: por definir"].join(" · ")}
+        {[topicsText(day.topics.length), ...(day.study ? [] : [day.blocked ? "bloqueado" : "descanso"]), m.deliverablesDefined ? deliverablesText(due.length) : "Entregables: por definir"].join(" · ")}
         {m.deliverablesDefined && <AreaCounts plan={m.plan} list={due} testid="area-counts-day" />}
       </p>
       <PurposeBlock planId={m.plan.id} scope="day" keyName={date} text={purpose.text} auto={purpose.auto} manual={purpose.manual} editable={m.editable} onChanged={onChanged} label={longDateLabel(date)} />
@@ -217,7 +219,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
               <section key={e.subplanId} aria-labelledby={aid} className="rounded-2xl border border-line bg-card p-3.5 @3xl:p-4" style={{ borderTop: `3px solid ${areaColour(e.areaId)}` }} data-testid="agenda-day-area" data-area={e.areaId ?? e.subplanId}>
                 <H2 id={aid} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[17px] font-bold">
                   <AreaDot {...(e.areaId ? { areaId: e.areaId } : {})} /> <span className="break-words">{e.area}</span>
-                  <span className="text-[14px] font-normal text-dim">{dayAreasText([e]).slice(e.area.length + 1)}{e.theoryMinutes + e.practiceMinutes > 0 ? ` · ${hm(e.theoryMinutes + e.practiceMinutes)}` : ""}</span>
+                  <span className="text-[14px] font-normal text-dim">{dayAreasText([e]).slice(e.area.length + 1)}</span>
                 </H2>
 
                 <div className="mt-3" data-testid="agenda-day-theory">
@@ -231,7 +233,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span className="text-[15px] font-semibold">{b.label}</span>
                             {b.status !== "topic" && <Chip large colour="var(--nv-faint)">{b.status === "review" ? "Repaso" : "Omitido"}</Chip>}
-                            {b.minutes > 0 && <span className="text-[14px] text-dim">{hm(b.minutes)}</span>}
+                            {b.minutes > 0 && <span className="text-[14px] text-dim">{est(b.minutes)}</span>}
                           </div>
                           {b.items.length > 0 ? <BlockTopics m={m} items={b.items} date={date} onChanged={onChanged} /> : <p className="mt-1 text-[14px] text-dim">{b.note}</p>}
                         </li>
@@ -269,7 +271,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                               <span className="text-[15px] font-semibold">{b.label}</span>
                               {b.status !== "topic" && <Chip large colour="var(--nv-faint)">{b.status === "review" ? "Repaso" : "Omitido"}</Chip>}
-                              {b.minutes > 0 && <span className="text-[14px] text-dim">{hm(b.minutes)}</span>}
+                              {b.minutes > 0 && <span className="text-[14px] text-dim">{est(b.minutes)}</span>}
                             </div>
                             {b.items.length === 0 ? (
                               <p className="mt-1 text-[14px] text-dim">{b.note}</p>
@@ -309,7 +311,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
                             <Chip large colour="var(--nv-mint)">Nivel {PROJECT_LEVEL_LABEL[tp.project.level]}</Chip>
                             <span className="text-dim">{PROJECT_BASIS_LABEL[tp.project.basis]}</span>
                             {tp.project.language && <Chip large>{tp.project.language}</Chip>}
-                            {tp.minutes > 0 && <span className="text-dim">{hm(tp.minutes)}</span>}
+                            {tp.minutes > 0 && <span className="text-dim">{est(tp.minutes)}</span>}
                           </p>
                           <p className="mt-0.5 text-[14px]"><span className="font-medium">Tema:</span> {shortOf(tp.title)}{tp.project.requires.length ? <span className="text-dim"> · combina {tp.project.requires.map((r) => shortOf(r.split("/").pop() ?? r)).join(", ")}</span> : null}</p>
                         </ProjectCard>
@@ -329,7 +331,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
           {bases.length > 0 && (
             <section aria-labelledby={`${id}-bases`} className="rounded-2xl border border-line bg-card p-3.5 @3xl:p-4" style={{ borderTop: "3px solid var(--nv-accent)" }} data-testid="agenda-day-bases">
               <H2 id={`${id}-bases`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[17px] font-bold">
-                Bases <span className="text-[14px] font-normal text-dim">{plural(new Set(bases.map((b) => b.folder)).size, "fundamento", "fundamentos")} intercalados en las áreas · {hm(bases.reduce((n, b) => n + b.minutes, 0))}</span>
+                Bases <span className="text-[14px] font-normal text-dim">{plural(new Set(bases.map((b) => b.folder)).size, "fundamento", "fundamentos")} intercalados en las áreas</span>
               </H2>
               <BlockTopics m={m} items={bases} date={date} onChanged={onChanged} />
             </section>
@@ -350,7 +352,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="text-[15px] font-semibold">{b.label}</span>
                         <Chip large colour="var(--nv-accent)">Práctica diaria</Chip>
-                        {b.minutes > 0 && <span className="text-[14px] text-dim">{hm(b.minutes)}</span>}
+                        {b.minutes > 0 && <span className="text-[14px] text-dim">{est(b.minutes)}</span>}
                       </div>
                       <FreeLanguage m={m} b={b} day={day} />
                     </li>
@@ -363,7 +365,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
                     <span className="text-[15px] font-medium">Proyecto semanal de práctica: {day.practice.project.phases.map((p: PracticePhase) => PHASE_LABEL[p]).join(" + ")}</span>
                     <Chip large colour="var(--nv-practice, #c58be0)">{PRACTICE_NAME}</Chip>
                     <Chip large colour="var(--nv-accent)">Semana {day.practice.project.week} · foco {day.practice.project.focus}</Chip>
-                    <span className="text-[14px] text-dim">{hm(day.practice.project.minutes)}</span>
+                    <span className="text-[14px] text-dim">{est(day.practice.project.minutes)}</span>
                     <GhostButton className="ml-auto" onClick={openPractice}>Abrir práctica</GhostButton>
                   </li>
                 </ul>
@@ -385,7 +387,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
                   </span>
                   <Chip large colour="var(--nv-practice, #c58be0)">{PRACTICE_NAME}</Chip>
                   {logic.auto && <Chip large colour="var(--nv-faint)">Automático</Chip>}
-                  <span className="text-[14px] text-dim">{hm(day.practice.kata.minutes)}</span>
+                  <span className="text-[14px] text-dim">{est(day.practice.kata.minutes)}</span>
                   <GhostButton className="ml-auto" onClick={openPractice}>Abrir práctica</GhostButton>
                 </div>
               )}
@@ -401,7 +403,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
                   {daily && (
                     <>
                       <p className="mt-1.5 text-[14px]"><span className="font-medium">Conectado con:</span> {daily.topics.map((t) => shortOf(t.title)).join(" · ")}</p>
-                      <p className="mt-0.5 text-[14px] text-dim">{daily.minutes ? `${hm(daily.minutes)} · ` : ""}{daily.weeklyPart}{daily.source === "template" ? " · plantilla automática" : " · del Mentor"}</p>
+                      <p className="mt-0.5 text-[14px] text-dim">{daily.minutes ? `${est(daily.minutes)} · ` : ""}{daily.weeklyPart}{daily.source === "template" ? " · plantilla automática" : " · del Mentor"}</p>
                     </>
                   )}
                 </ProjectCard>
@@ -545,7 +547,7 @@ export function MonthProjects({ m, month, headingId, onChanged }: { m: AgendaMod
 const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
 
-export function PracticeCurriculumBar({ plan, onChanged, announce, tip }: { plan: MentorPlan; onChanged: (p: MentorPlan) => void; announce: (msg: string) => void; /** versión «nota» de las páginas del plan (tarjeta suave con 💡); `area` = el nombre del área de la página */ tip?: { area?: string } }) {
+export function PracticeCurriculumBar({ plan, onChanged, announce, tip }: { plan: MentorPlan; onChanged: (p: MentorPlan) => void; announce: (msg: string) => void; /** versión «nota» de las páginas del plan (tarjeta suave, sin iconos); `area` = el nombre del área de la página */ tip?: { area?: string } }) {
   const toast = useApp((s) => s.toast);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
@@ -594,7 +596,6 @@ export function PracticeCurriculumBar({ plan, onChanged, announce, tip }: { plan
   return (
     <section aria-labelledby="pc-bar-h" className={tip ? "rounded-2xl bg-hover px-4 py-3.5" : "rounded-xl border border-line bg-card px-4 py-3"} data-testid="practice-curriculum-bar">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        {tip && <span aria-hidden className="text-[22px] leading-none">💡</span>}
         <div className="min-w-0 flex-1 basis-72">
           <h3 id="pc-bar-h" className="text-[16px] font-semibold">{tip ? (area ? `Práctica de ${area} con Mentor IA` : "Práctica del plan con Mentor IA") : "Práctica del plan"}</h3>
           <p className="text-[14px] text-dim" data-testid="practice-curriculum-state">

@@ -10,7 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { api } from "../lib/bridge";
-import { idlePomodoro, startFocus } from "../lib/pomodoro";
+import { idlePomodoro, inferWork, startFocus } from "../lib/pomodoro";
+import { FREE_AREA as FREE } from "./PomodoroSetup";
 import { usePomodoro } from "../store/pomodoro";
 import { PomodoroAssessmentModal } from "./mentor/PomodoroAssessmentModal";
 import { TopBarPomodoro } from "./TopBarPomodoro";
@@ -96,6 +97,44 @@ describe("Pomodoro de la barra superior", () => {
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ id: "p1", areaKey: "backend", minutes: 9, kind: "pomodoro", note: "[4.2 HTTP]" }));
     expect(usePomodoro.getState().p.pendingAssessment).toMatchObject({ minutes: 9, areaKey: "backend" });
     expect(byTest("assessment-modal")).toBeTruthy();
+  });
+});
+
+describe("clasificación del bloque", () => {
+  it("el selector Teoría/Práctica/Proyecto/Repaso fija el tipo; sin elegir se deduce de lo asignado y se guarda en la entrada al detener", async () => {
+    const add = vi.spyOn(api, "mentorTimeLogAdd").mockResolvedValue({ entries: [], entry: {} as never });
+    await mount();
+    // un tema asignado sugiere Teoría (preselección)
+    await act(async () => { usePomodoro.getState().assignTopic({ folder: "P/4.2 HTTP", title: "4.2 HTTP", kind: "topic" }); });
+    expect(byTest("work-theory")!.getAttribute("aria-pressed")).toBe("true");
+    await click(byTest("work-practice"));
+    expect(usePomodoro.getState().p.work).toBe("practice");
+    await click(byTest("pomodoro-begin"));
+    expect(usePomodoro.getState().p).toMatchObject({ phase: "focus", work: "practice" });
+    // simula 9 min de foco y detiene
+    usePomodoro.setState({ p: startFocus(usePomodoro.getState().p, "p1", FREE, Date.now() - 9 * 60_000 - 5_000) });
+    await click(byTest("topbar-pomodoro-stop"));
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ id: "p1", areaKey: FREE, minutes: 9, work: "practice", topics: ["P/4.2 HTTP"] }));
+    expect(usePomodoro.getState().p.pendingAssessment).toMatchObject({ work: "practice" });
+  });
+
+  it("una sesión iniciada desde el Mentor con un proyecto preselecciona Proyecto", () => {
+    usePomodoro.getState().assignTopic({ folder: "manual:project:1", title: "Feature", kind: "project" });
+    usePomodoro.getState().start("p1", "backend", inferWork(usePomodoro.getState().p.assignedTopics));
+    expect(usePomodoro.getState().p.work).toBe("project");
+  });
+
+  it("el modal propone el tipo del bloque, deja corregirlo y lo guarda en la evaluación", async () => {
+    const assess = vi.spyOn(api, "mentorTimeLogAssess").mockResolvedValue({ assessments: [], assessment: { id: "a" } as never });
+    vi.spyOn(api, "mentorRecordSave").mockResolvedValue({ record: {} as never, rel: "x", duplicate: false });
+    usePomodoro.setState({ p: { ...idlePomodoro("p1", "backend"), pendingAssessment: { planId: "p1", areaKey: "backend", minutes: 25, topics: [], work: "theory", finishedAt: new Date(2026, 9, 16, 22, 30).getTime(), startedAt: new Date(2026, 9, 16, 22, 5).getTime(), mode: "timer" } } });
+    await act(async () => { root.render(<PomodoroAssessmentModal />); });
+    expect(byTest("work-theory")!.getAttribute("aria-pressed")).toBe("true");
+    await click(byTest("work-review"));
+    await type(byTest("assess-learned") as HTMLTextAreaElement, "algo");
+    await type(byTest("assess-doubt") as HTMLTextAreaElement, "otra cosa");
+    await click(byTest("assess-submit"));
+    expect(assess).toHaveBeenCalledWith(expect.objectContaining({ work: "review" }));
   });
 });
 

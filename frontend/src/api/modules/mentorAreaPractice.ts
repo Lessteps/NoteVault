@@ -20,7 +20,7 @@ import { PLAN_ID_RE, PlanStore, type Plan } from "../../core/mentor/plan.js";
 import { ppAreaDir } from "../../core/mentor/practiceState.js";
 import { loadAllAttempts } from "../../core/practice/ledger.js";
 import { kataDatesOf } from "../../lib/areaPracticeDerive.js";
-import { areaFolderOf, areaPracticeFor, isPracticeAreaId, practiceAreasOf } from "../../lib/areaPracticeSystem.js";
+import { areaFolderOf, areaKataDates, areaPracticeFor, isPracticeAreaId, kataForDay, practiceAreasOf } from "../../lib/areaPracticeSystem.js";
 import type { AppState } from "../appState.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -88,12 +88,20 @@ export function mentorAreaPracticeApi(app: AppState, hooks: { today: () => strin
         : area.kata.next
           ? { day: area.kata.next.kata.day, date: area.kata.next.date, rel: area.kata.next.rel }
           : undefined;
-      if (!target) throw new ApiError("Ese día no tiene kata en esta área.");
-      const r = createAreaPracticeFolders({ ppDir, areas: [areaId], katasPerArea: 1, fromDay: target.day, levels: { [areaId]: area.level } });
+      // un kata PLANEADO más adelante (el estudiante lo adelantó): el kata nº N del área es el día N de sus fechas
+      const later = (() => {
+        if (target || !wanted || wanted < hooks.today()) return undefined;
+        const day = areaKataDates(plan, areaId).indexOf(wanted) + 1;
+        const k = day > 0 ? kataForDay(areaId, day, area.level) : null;
+        return k ? { day, date: wanted, rel: `${areaFolderOf(areaId)}/katas/${k.file}` } : undefined;
+      })();
+      const found = target ?? later;
+      if (!found) throw new ApiError("Ese día no tiene kata en esta área.");
+      const r = createAreaPracticeFolders({ ppDir, areas: [areaId], katasPerArea: 1, fromDay: found.day, levels: { [areaId]: area.level } });
       const base = app.rel(ppDir).split(path.sep).join("/");
-      const rel = `${base}/${target.rel}`;
+      const rel = `${base}/${found.rel}`;
       if (r.failed.length && !r.created.length && !r.skipped.length) throw new ApiError(`No se pudo crear el kata: ${r.failed[0]!.reason}`);
-      return { rel, created: r.created.includes(target.rel), date: target.date };
+      return { rel, created: r.created.includes(found.rel), date: found.date };
     },
 
     mentor_area_kata_mark(opts: unknown) {

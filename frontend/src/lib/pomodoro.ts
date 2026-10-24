@@ -1,6 +1,8 @@
 // Mentor — Pomodoro de una sesión de estudio. Estado puro basado en marcas de tiempo (no en un contador que se pierde al cambiar de
 // pestaña): `endsAt` si corre, `leftMs` si está en pausa. Las funciones devuelven estados nuevos; el reloj lo pone quien llama.
 
+import type { WorkKind } from "./timeLog";
+
 export type PomodoroPhase = "idle" | "focus" | "break";
 export type PomodoroTimerMode = "timer" | "stopwatch";
 
@@ -17,11 +19,17 @@ export const ASSIGN_KIND_LABEL: Record<NonNullable<AssignedTopic["kind"]>, strin
 /** Una tarea o proyecto escrito a mano (o sugerido): lleva un id propio para poder quitarlo. */
 export const manualAssignment = (kind: "task" | "project", title: string, seed = Date.now()): AssignedTopic => ({ folder: `manual:${kind}:${seed.toString(36)}`, title: title.replace(/\s+/g, " ").trim().slice(0, 120), kind });
 
+/** El tipo de trabajo que se deduce de lo asignado al bloque: un proyecto → Proyecto; temas del plan → Teoría; si no hay pista, `null` (que lo elija la persona). */
+export const inferWork = (topics: ReadonlyArray<AssignedTopic>): WorkKind | null =>
+  topics.some((t) => t.kind === "project") ? "project" : topics.some((t) => (t.kind ?? "topic") === "topic") ? "theory" : topics.some((t) => t.kind === "task") ? "practice" : null;
+
 export interface PomodoroAssessment {
   planId: string;
   areaKey: string;
   minutes: number;
   topics: AssignedTopic[];
+  /** tipo de trabajo elegido al empezar (o `null` = sin clasificar) */
+  work?: WorkKind | null;
   finishedAt: number;
   /** cuándo empezó el bloque (ms) y cómo se hizo: lo necesita el registro de la sesión para unir la evidencia de esa ventana */
   startedAt: number;
@@ -47,6 +55,8 @@ export interface PomodoroState {
   elapsedMs: number;
   /** temas asignados al bloque actual */
   assignedTopics: AssignedTopic[];
+  /** qué se trabaja en el bloque: Teoría / Práctica / Proyecto / Repaso (`null` = sin clasificar) */
+  work: WorkKind | null;
   /** evaluación pendiente obligatoria al acabar foco */
   pendingAssessment: PomodoroAssessment | null;
 }
@@ -67,6 +77,7 @@ export const idlePomodoro = (planId = "", areaKey = "", focusMin = 25, breakMin 
   startedAt: 0,
   elapsedMs: 0,
   assignedTopics: [],
+  work: null,
   pendingAssessment: null,
 });
 
@@ -149,6 +160,7 @@ export function advance(s: PomodoroState, now: number, stop = false): { state: P
       areaKey: s.areaKey,
       minutes: mins,
       topics: [...s.assignedTopics],
+      work: s.work,
       finishedAt: now,
       startedAt: now - mins * 60_000,
       mode: s.mode,

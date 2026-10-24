@@ -13,9 +13,19 @@ export interface TimeEntry {
   minutes: number;
   kind: "pomodoro" | "manual";
   note?: string;
+  /** QUÉ tipo de trabajo fue (Teoría / Práctica / Proyecto / Repaso); sin él la entrada es «sin clasificar» (entradas antiguas) */
+  work?: WorkKind;
+  /** carpetas de los temas trabajados en el bloque (opcional) */
+  topics?: string[];
   /** cuándo se guardó (ISO) */
   at: string;
 }
+
+/** Qué se hizo en un bloque de estudio. */
+export const WORK_KINDS = ["theory", "practice", "project", "review"] as const;
+export type WorkKind = (typeof WORK_KINDS)[number];
+export const WORK_LABEL: Record<WorkKind, string> = { theory: "Teoría", practice: "Práctica", project: "Proyecto", review: "Repaso" };
+export const isWorkKind = (v: unknown): v is WorkKind => typeof v === "string" && (WORK_KINDS as readonly string[]).includes(v);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -29,7 +39,32 @@ export function sanitizeEntry(raw: unknown): TimeEntry | null {
   const id = String(o.id ?? "").slice(0, 60);
   if (!id || !areaKey || !DATE_RE.test(date) || !Number.isFinite(minutes) || minutes < 1 || minutes > TIMELOG_MAX_MINUTES) return null;
   const note = String(o.note ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
-  return { id, areaKey, date, minutes, kind: o.kind === "pomodoro" ? "pomodoro" : "manual", ...(note ? { note } : {}), at: String(o.at ?? "").slice(0, 40) };
+  const topics = Array.isArray(o.topics) ? o.topics.map((t) => String(t ?? "").replace(/\s+/g, " ").trim().slice(0, 200)).filter(Boolean).slice(0, 12) : [];
+  return { id, areaKey, date, minutes, kind: o.kind === "pomodoro" ? "pomodoro" : "manual", ...(note ? { note } : {}), ...(isWorkKind(o.work) ? { work: o.work } : {}), ...(topics.length ? { topics } : {}), at: String(o.at ?? "").slice(0, 40) };
+}
+
+/** Resumen de tiempo REAL registrado (nunca estimado): minutos por área y por tipo de trabajo en un rango de fechas. */
+export interface TimeLogSummary {
+  totalMinutes: number;
+  sessions: number;
+  byArea: Record<string, number>;
+  byKind: Record<WorkKind | "unclassified", number>;
+  /** ¿hay algún bloque registrado en el rango? */
+  hasAny: boolean;
+}
+
+/** Suma los bloques registrados entre `from` y `to` (ambas incluidas; sin rango, todos), de un área o de todas. */
+export function summarizeTimeLog(entries: ReadonlyArray<TimeEntry>, opts: { from?: string; to?: string; areaKey?: string } = {}): TimeLogSummary {
+  const out: TimeLogSummary = { totalMinutes: 0, sessions: 0, byArea: {}, byKind: { theory: 0, practice: 0, project: 0, review: 0, unclassified: 0 }, hasAny: false };
+  for (const e of entries) {
+    if ((opts.from && e.date < opts.from) || (opts.to && e.date > opts.to) || (opts.areaKey && e.areaKey !== opts.areaKey)) continue;
+    out.totalMinutes += e.minutes;
+    out.sessions += 1;
+    out.byArea[e.areaKey] = (out.byArea[e.areaKey] ?? 0) + e.minutes;
+    out.byKind[e.work ?? "unclassified"] += e.minutes;
+  }
+  out.hasAny = out.sessions > 0;
+  return out;
 }
 
 /** Minutos de un día, en total o de un área. */
@@ -73,6 +108,8 @@ export interface Assessment {
   doubt: string;
   /** errores o problemas concretos que se tuvieron (opcional): es lo que más sirve para repensar el plan */
   errors: string;
+  /** tipo de trabajo del bloque (opcional; las evaluaciones antiguas no lo tienen) */
+  work?: WorkKind;
   at: string;
 }
 
@@ -100,6 +137,6 @@ export function sanitizeAssessment(raw: unknown): Assessment | null {
     })
     .filter((x) => x.title)
     .slice(0, 12);
-  return { id, areaKey, date, minutes, topics, understanding, focus: focus >= 1 && focus <= 5 ? focus : 0, outcomes, practiced: o.practiced === true, learned, doubt, errors: oneLine(o.errors, 600), at: oneLine(o.at, 40) };
+  return { id, areaKey, date, minutes, topics, understanding, focus: focus >= 1 && focus <= 5 ? focus : 0, outcomes, practiced: o.practiced === true, learned, doubt, errors: oneLine(o.errors, 600), ...(isWorkKind(o.work) ? { work: o.work } : {}), at: oneLine(o.at, 40) };
 }
 

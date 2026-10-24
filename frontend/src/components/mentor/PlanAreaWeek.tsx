@@ -10,7 +10,7 @@ import { Chip, GhostButton } from "../common/forms";
 import { cn } from "../ui";
 import { plural, PurposeBlock, type AgendaModel } from "./agendaKit";
 import { WeekCategories } from "./AgendaBoards";
-import { scopeDayRow, scopeInfo, scopeOnly, scopeWeekStats, type PageScope } from "./mentorAreas";
+import { dayViewable, scopeDayRow, scopeInfo, scopeOnly, scopeWeekStats, type PageScope } from "./mentorAreas";
 import { hm } from "./parts";
 import { pagePace } from "./PlanPageSlots";
 import { DAY_LONG, DAY_SHORT } from "./planShared";
@@ -81,7 +81,7 @@ export function ScopeDayRow({ m, scope, date, onPick, extra }: { m: AgendaModel;
       {r.practiceMinutes > 0 && <Chip large colour="var(--nv-practice, #c58be0)">Práctica {hm(r.practiceMinutes)}</Chip>}
       {nExtra > 0 && <Chip large colour="var(--nv-accent)">Extra {nExtra}</Chip>}
       {r.project && <Chip large colour="var(--nv-practice, #c58be0)">Proyecto</Chip>}
-      <GhostButton aria-label={`Ver el día ${longDateLabel(date)}`} onClick={() => onPick(date)}>Ver día</GhostButton>
+      {dayViewable(m, day, scopeOnly(scope)) && <GhostButton aria-label={`Ver el día ${longDateLabel(date)}`} onClick={() => onPick(date)}>Ver día</GhostButton>}
       {extra}
     </li>
   );

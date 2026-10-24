@@ -731,6 +731,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
     if (area && !plan.subplans.some((s) => s.id === area)) throw new ApiError("Ese área ya no existe en el plan.");
     const note = o.note !== undefined ? String(o.note ?? "").replace(/\s+/g, " ").trim().slice(0, 400) : base.note ?? "";
     const folder = o.folder !== undefined ? String(o.folder ?? "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").trim() : base.folder ?? "";
+    const rel = o.rel !== undefined ? String(o.rel ?? "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").trim().slice(0, 300) : base.rel ?? "";
+    const kataDate = o.kataDate !== undefined ? String(o.kataDate ?? "").trim() : base.kataDate ?? "";
+    if (kataDate && !isIsoDate(kataDate)) throw new ApiError("Fecha de kata inválida (AAAA-MM-DD).");
     const date = o.date !== undefined && !create ? extraDate(plan, o.date) : base.date;
     const done = o.done !== undefined ? o.done === true : base.done === true;
     return {
@@ -743,7 +746,77 @@ export function mentorApi(app: AppState, send?: SendFn) {
       kind: kind as ExtraPracticeKind,
       ...(done ? { done: true } : {}),
       ...(folder ? { folder } : {}),
+      ...(rel ? { rel } : {}),
+      ...(kataDate ? { kataDate } : {}),
     };
+  };
+  /** Dónde cae cada tema pendiente en el reparto del plan (primera fecha y semana fuera de los extras) y el rango de cada semana. */
+  const placementOf = (plan: Plan) => {
+    const placed = new Map<string, { date: string; week: number }>();
+    const weeks = new Map<number, { from: string; to: string }>();
+    let sch: ReturnType<typeof buildSchedule> | null = null;
+    try {
+      sch = buildSchedule(progressPlan(plan, { today: localDate() }));
+    } catch {
+      sch = null;
+    }
+    if (sch) {
+      for (const d of sch.days) {
+        const w = weeks.get(d.week);
+        weeks.set(d.week, { from: w?.from ?? d.date, to: d.date });
+        for (const t of d.topics) if (!t.extra && !placed.has(t.folder)) placed.set(t.folder, { date: d.date, week: d.week });
+      }
+    }
+    return { sch, placed, weeks };
+  };
+  /**
+   * «Próximos temas»: los temas pendientes de la ruta de cada área, en su orden, con la semana y el día en que caen, su estado y, si aún no se pueden
+   * adelantar, el tema que va antes (`blockedBy`). Un tema se puede adelantar a `date` cuando todos los anteriores de su área están completos, ya
+   * adelantados o ya caen ese día o antes. `horizon` = semanas por delante de la actual (por defecto 4). Solo lee.
+   */
+  const upcomingTopics = (plan: Plan, area: string, o: Record<string, any>) => {
+    const date = o.date === undefined || o.date === null || o.date === "" ? localDate() : String(o.date);
+    if (!isIsoDate(date)) throw new ApiError("Fecha inválida (AAAA-MM-DD).");
+    const horizon = Math.max(1, Math.min(26, Math.round(Number(o.horizon)) || 4));
+    const { sch, placed, weeks } = placementOf(plan);
+    const added = new Map<string, string[]>();
+    for (const e of plan.extraTopics ?? []) added.set(e.folder, [...(added.get(e.folder) ?? []), e.date]);
+    const weekOfDate = (d: string): number | undefined => sch?.byDate.get(d)?.week;
+    const nowWeek = weekOfDate(localDate()) ?? weekOfDate(date) ?? 1;
+    const ahead: Array<Record<string, unknown>> = [];
+    const plannedByArea: Record<string, number> = {};
+    for (const s of plan.subplans) {
+      if (area && s.id !== area) continue;
+      plannedByArea[s.id] = (sch?.byDate.get(date)?.topics ?? []).filter((t) => t.subplanId === s.id).length;
+      const live = s.topics.filter((t) => isLive(t));
+      let blocker: string | undefined;
+      live.forEach((t, i) => {
+        if (t.completedAt) return;
+        const dates = added.get(t.folder) ?? [];
+        const p = placed.get(t.folder);
+        const week = p?.week ?? (dates[0] ? weekOfDate(dates[0]) : undefined) ?? t.targetWeek;
+        const onDay = dates.includes(date) || p?.date === date;
+        const satisfied = dates.some((d) => d <= date) || (!!p && p.date <= date);
+        const state = dates.length ? "adelantado" : p && p.date <= date ? "planeado" : "pendiente";
+        if (week >= nowWeek && week <= nowWeek + horizon) {
+          const group = t.group ? s.groups?.find((g) => g.id === t.group)?.title : undefined;
+          ahead.push({
+            folder: t.folder, title: t.title, inPlan: true, area: s.area, subplanId: s.id, position: i + 1, total: live.length, estMinutes: t.estMinutes,
+            targetWeek: t.targetWeek, addedDates: dates, week, state, onDay,
+            ...(p?.date ? { plannedDate: p.date } : {}),
+            ...(group ? { group } : {}),
+            ...(!satisfied && blocker ? { blockedBy: blocker } : {}),
+          });
+        }
+        if (!satisfied && !blocker) blocker = t.title;
+      });
+    }
+    const range: Record<string, { from: string; to: string }> = {};
+    for (const r of ahead) {
+      const w = weeks.get(r.week as number);
+      if (w) range[String(r.week)] = w;
+    }
+    return { loading: false as const, ahead, vault: [] as unknown[], weeks: range, plannedByArea, date, currentWeek: nowWeek };
   };
   /** El plan de una petición de cobertura (`{ id }`), o error claro. */
   const coveragePlan = (opts: unknown): Plan => {
@@ -1743,6 +1816,9 @@ export function mentorApi(app: AppState, send?: SendFn) {
       const { st, plan } = paceTarget(o);
       const date = extraDate(plan, o.date);
       const item = extraPracticeFields(plan, o, { date, id: `xp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` }, true);
+      // la práctica ligada a un archivo o a un kata planeado no se repite en el mismo día
+      const same = (plan.extraPractice ?? []).some((x) => x.date === date && ((item.rel && x.rel === item.rel) || (item.kataDate && x.kataDate === item.kataDate && (x.area ?? "") === (item.area ?? ""))));
+      if (same) throw new ApiError("Esa práctica ya está añadida a ese día.");
       return st.save({ ...plan, extraPractice: [...(plan.extraPractice ?? []), item], updatedAt: new Date().toISOString() });
     },
 
@@ -1774,9 +1850,10 @@ export function mentorApi(app: AppState, send?: SendFn) {
     mentor_plan_topic_candidates(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
       const { plan } = paceTarget(o);
+      const area = String(o.area ?? "").trim();
+      if (o.upcoming === true) return upcomingTopics(plan, area, o);
       if (studyIndexCold(app)) return { loading: true as const };
       const q = fold(String(o.query ?? "").trim());
-      const area = String(o.area ?? "").trim();
       const limit = Math.max(1, Math.min(100, Math.round(Number(o.limit)) || 30));
       const match = (title: string, folder: string): boolean => !q || fold(title).includes(q) || fold(folder).includes(q);
       const added = new Map<string, string[]>();
@@ -1802,6 +1879,44 @@ export function mentorApi(app: AppState, send?: SendFn) {
         .slice(0, limit)
         .map((t) => ({ folder: t.folder, title: t.title, subject: t.subject, inPlan: false as const, addedDates: added.get(t.folder) ?? [] }));
       return { loading: false as const, ahead, vault };
+    },
+
+    /**
+     * «Más práctica»: los ejercicios YA PLANEADOS de los temas de la ruta (las notas de ejercicio de la carpeta de cada tema) que aún no tienen ningún
+     * intento, en el orden de la ruta de cada área y con el día en que cae su tema. `area` (id de subplan) acota; `limit` por área (8). Solo lee.
+     */
+    mentor_plan_exercise_candidates(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const { plan } = paceTarget(o);
+      if (studyIndexCold(app)) return { loading: true as const };
+      const area = String(o.area ?? "").trim();
+      const limit = Math.max(1, Math.min(40, Math.round(Number(o.limit)) || 8));
+      const { placed } = placementOf(plan);
+      const attempts = loadAllAttempts(app.root);
+      const tried = (id: string): boolean => {
+        const e = (attempts as Record<string, any>)[id];
+        return (Array.isArray(e) ? e : Array.isArray(e?.attempts) ? e.attempts : []).length > 0;
+      };
+      const exercises = vaultScan(app).exercises.map((e) => ({ ...e, relp: (e.rel || e.path).replace(/\\/g, "/") }));
+      const added = new Map<string, string[]>();
+      for (const x of plan.extraPractice ?? []) if (x.rel) added.set(x.rel, [...(added.get(x.rel) ?? []), x.date]);
+      const out: Array<Record<string, unknown>> = [];
+      for (const s of plan.subplans) {
+        if (area && s.id !== area) continue;
+        let n = 0;
+        for (const t of s.topics.filter((x) => isLive(x) && !x.completedAt)) {
+          const prefix = `${t.folder}/`;
+          for (const ex of exercises.filter((e) => e.relp.startsWith(prefix)).sort((a, b) => a.relp.localeCompare(b.relp))) {
+            if (n >= limit) break;
+            if (tried(ex.note_id)) continue;
+            n++;
+            const date = placed.get(t.folder)?.date;
+            out.push({ subplanId: s.id, area: s.area, folder: t.folder, topic: t.title, rel: ex.relp, title: ex.title, difficulty: ex.difficulty, addedDates: added.get(ex.relp) ?? [], ...(date ? { date } : {}) });
+          }
+          if (n >= limit) break;
+        }
+      }
+      return { loading: false as const, exercises: out };
     },
 
     /**

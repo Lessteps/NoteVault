@@ -15,7 +15,8 @@ import { cn } from "../ui";
 import { AreaChip, AreaCounts, DeliverableLine, doneText, focusColour, plural, PurposeBlock, type AgendaModel } from "./agendaKit";
 import { DayDetailFocus, FocusStructure, MonthProjects, WeekProjects } from "./AgendaDayFocus";
 import { AreaDot, MonthAreaTotals } from "./AreaViews";
-import { MonthLegend, MonthStats, MonthWeekBlock, topicsPerDay, WeekCategories, WeekDayStrip, WeekStats } from "./AgendaBoards";
+import { MonthLegend, MonthStats, MonthWeekBlock, RegisteredTime, topicsPerDay, WeekCategories, WeekDayStrip, WeekStats } from "./AgendaBoards";
+import { dayViewable } from "./mentorAreas";
 import { ExtraTag, removeExtraTopic } from "./extraKit";
 import { openTopic } from "./openTopic";
 import { TopicNoteLinks } from "./TopicNoteLinks";
@@ -79,7 +80,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2, areaFilter
       </header>
 
       <p className="text-[15px] font-medium text-text" data-testid="agenda-day-counts">
-        {countsLine(m, [topicsText(day.topics.length), day.topicMinutes ? `${hm(day.topicMinutes)} de estudio` : "sin estudio"], due.length)}
+        {countsLine(m, [topicsText(day.topics.length), ...(day.study ? [] : [day.blocked ? "bloqueado" : "descanso"])], due.length)}
         {m.deliverablesDefined && <AreaCounts plan={m.plan} list={due} testid="area-counts-day" />}
       </p>
 
@@ -102,7 +103,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2, areaFilter
                   {t.groupTitle && <Chip large>{t.groupTitle}</Chip>}
                   {t.parts > 1 && <span className="text-[13.5px] text-dim">parte {t.part} de {t.parts}</span>}
                   {t.overflow && <Chip large colour="var(--nv-warn)">No cabe: amontonado</Chip>}
-                  <span className="text-[14px] font-medium" data-testid="agenda-topic-minutes">{hm(t.minutes)}</span>
+                  <span className="text-[14px] font-medium" data-testid="agenda-topic-minutes">est. {hm(t.minutes)}</span>
                   <Chip large colour={STATE_COLOUR[state]}><span aria-hidden>{STATE_GLYPH[state]}</span> {STATE_LABEL[state]}</Chip>
                   {live?.found && (
                     <button type="button" onClick={() => void openTopic(t.folder)} className="inline-flex min-h-8 items-center px-2 text-[14px] text-accent-text underline-offset-2 hover:underline" aria-label={`Ver tema ${t.title}`}>Ver tema</button>
@@ -134,7 +135,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2, areaFilter
                   <span className="text-[14px] font-semibold">{m.pctBySubplan.get(sid) ?? 0} %</span>
                 </div>
                 <ul className="mt-2 list-disc space-y-0.5 pl-5 text-[14px]">
-                  {mine.map((t) => <li key={`${t.folder}:${t.part}`}>{t.title} <span className="text-dim">· {hm(t.minutes)}</span></li>)}
+                  {mine.map((t) => <li key={`${t.folder}:${t.part}`}>{t.title} </li>)}
                 </ul>
                 {next.length > 0 && <p className="mt-1.5 text-[13.5px] text-dim">Después: {next.map((t) => t.title).join(" · ")}</p>}
               </li>
@@ -153,7 +154,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2, areaFilter
               <li className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line p-3" data-testid="agenda-practice-kata">
                 <span className="text-[15px] font-medium">Reto diario (kata de lógica)</span>
                 <Chip large colour="var(--nv-practice, #c58be0)">{PRACTICE_NAME}</Chip>
-                <span className="text-[14px] text-dim">{hm(day.practice.kata.minutes)}</span>
+                <span className="text-[14px] text-dim">est. {hm(day.practice.kata.minutes)}</span>
                 <GhostButton className="ml-auto" onClick={openPractice}>Abrir práctica</GhostButton>
               </li>
             )}
@@ -162,7 +163,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2, areaFilter
                 <span className="text-[15px] font-medium">Proyecto semanal: {day.practice.project.phases.map((p: PracticePhase) => PHASE_LABEL[p]).join(" + ")}</span>
                 <Chip large colour="var(--nv-practice, #c58be0)">{PRACTICE_NAME}</Chip>
                 <Chip large colour="var(--nv-accent)">Semana {day.practice.project.week} · foco {day.practice.project.focus}</Chip>
-                <span className="text-[14px] text-dim">{hm(day.practice.project.minutes)}</span>
+                <span className="text-[14px] text-dim">est. {hm(day.practice.project.minutes)}</span>
                 {day.practice.project.theme && <span className="basis-full text-[14px] text-dim">{day.practice.project.theme}</span>}
                 <GhostButton className="ml-auto" onClick={openPractice}>Abrir práctica</GhostButton>
               </li>
@@ -204,19 +205,20 @@ export function WeekDetail({ m, week, onPickDay, onChanged, headingId, only = nu
       </header>
 
       <p className="text-[15px] font-medium text-text" data-testid="agenda-week-counts">
-        {countsLine(m, [topicsText(w.topics), `${hm(w.topicMinutes)} de estudio`], w.deliverables.length)}
+        {countsLine(m, [topicsText(w.topics)], w.deliverables.length)}
         {m.deliverablesDefined && <AreaCounts plan={m.plan} list={w.deliverables} testid="area-counts-week" />}
       </p>
 
       <PurposeBlock planId={m.plan.id} scope="week" keyName={String(week)} text={w.purpose} auto={w.autoPurpose} manual={purposeManual} editable={m.editable} onChanged={onChanged} label={`la semana ${week}`} />
 
-      <WeekStats w={w} days={days} />
+      <WeekStats m={m} week={week} only={only} />
+      <RegisteredTime planId={m.plan.id} from={w.start} to={w.end} />
       <div className="flex items-center gap-3">
         <div className="flex-1"><ProgressBar pct={pct} thick label={`Temas completados de la semana ${week}`} /></div>
         <span className="text-[14px] font-semibold">{pct} %</span>
       </div>
 
-      <WeekDayStrip m={m} days={days} counts={topicsPerDay(m.byWeekArea.weeks[week - 1]!)} onPick={onPickDay} />
+      <WeekDayStrip m={m} days={days} counts={topicsPerDay(m.byWeekArea.weeks[week - 1]!)} onPick={onPickDay} only={only} />
 
       {m.schedule.mode === "focus" && <FocusStructure days={days} headingId={`${headingId ?? "wk"}-focus`} label={`de la semana ${week}`} />}
 
@@ -245,14 +247,14 @@ export function WeekDetail({ m, week, onPickDay, onChanged, headingId, only = nu
       <section aria-labelledby={`${headingId ?? "wk"}-days`} data-testid="agenda-week-days">
         <h3 id={`${headingId ?? "wk"}-days`} className={cn(SECTION, "mb-2")}>Días de la semana (plan diario)</h3>
         <ol className="space-y-1.5">
-          {days.map((d) => <WeekDayRow key={d.date} m={m} day={d} onPick={onPickDay} {...(dayExtra ? { extra: dayExtra(d.date) } : {})} />)}
+          {days.map((d) => <WeekDayRow key={d.date} m={m} day={d} onPick={onPickDay} only={only} {...(dayExtra ? { extra: dayExtra(d.date) } : {})} />)}
         </ol>
       </section>
     </article>
   );
 }
 
-export function WeekDayRow({ m, day, onPick, extra }: { m: AgendaModel; day: ScheduleDay; onPick: (d: string) => void; extra?: ReactNode }) {
+export function WeekDayRow({ m, day, onPick, extra, only = null }: { m: AgendaModel; day: ScheduleDay; onPick: (d: string) => void; extra?: ReactNode; /** filtro del alcance (null = todo el plan) */ only?: string | null }) {
   const due = m.dueByDate.get(day.date) ?? [];
   const areas = dayByArea(m.plan, day, due);
   const bases = new Set(dayBases(m.plan, day).map((b) => b.folder)).size;
@@ -274,7 +276,7 @@ export function WeekDayRow({ m, day, onPick, extra }: { m: AgendaModel; day: Sch
       {day.topics.some((t) => t.extra) && <Chip large colour="var(--nv-accent)">Extra {new Set(day.topics.filter((t) => t.extra).map((t) => t.folder)).size}</Chip>}
       {day.practice.kata && <Chip large colour="var(--nv-practice, #c58be0)">Kata</Chip>}
       {day.practice.project && <Chip large colour="var(--nv-practice, #c58be0)">Proyecto</Chip>}
-      <GhostButton aria-label={`Ver el día ${longDateLabel(day.date)}`} onClick={() => onPick(day.date)}>Ver día</GhostButton>
+      {dayViewable(m, day, only) && <GhostButton aria-label={`Ver el día ${longDateLabel(day.date)}`} onClick={() => onPick(day.date)}>Ver día</GhostButton>}
       {extra}
     </li>
   );
@@ -293,14 +295,14 @@ export function MonthDetail({ m, month, onPickWeek, onChanged, headingId, only =
         {m.today.slice(0, 7) === month && <Chip large colour="var(--nv-mint)">Este mes</Chip>}
       </header>
       <p className="text-[15px] font-medium" data-testid="agenda-month-counts">
-        {countsLine(m, [topicsText(s.topics), `${hm(s.topicMinutes)} de estudio`], s.deliverables.length)} · {plural(s.weeks.length, "semana", "semanas")}
+        {countsLine(m, [topicsText(s.topics)], s.deliverables.length)} · {plural(s.weeks.length, "semana", "semanas")}
         {m.deliverablesDefined && <AreaCounts plan={m.plan} list={s.deliverables} testid="area-counts-month" />}
       </p>
       <PurposeBlock planId={m.plan.id} scope="month" keyName={month} text={s.purpose} auto={s.autoPurpose} manual={manual} editable={m.editable} onChanged={onChanged} label={s.label} />
 
       {m.schedule.mode === "focus" && <FocusStructure days={m.schedule.days.filter((d) => d.date >= s.start && d.date <= s.end)} headingId={`${headingId ?? "mo"}-focus`} label={`de ${s.label}`} />}
 
-      <MonthStats weeks={s.weeks.map((x) => x.week)} data={m.byWeekArea} topicMinutes={s.topicMinutes} topics={s.topics} />
+      <MonthStats weeks={s.weeks.map((x) => x.week)} data={m.byWeekArea} topics={s.topics} />
 
       <section aria-labelledby={`${headingId ?? "mo"}-areas`} data-testid="agenda-month-areas">
         <h3 id={`${headingId ?? "mo"}-areas`} className={cn(SECTION, "mb-2")}>El mes por categoría</h3>

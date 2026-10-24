@@ -55,7 +55,6 @@ describe("AreaSession", () => {
     expect(byTest("session-tab-horas")!.textContent).toContain("25 min");
     await click(byTest("session-tab-horas"));
     expect(byTest("timelog-today")!.textContent).toContain("25 min");
-    expect(byTest("timelog-today")!.textContent).toContain("1 h previstos");
     expect(byTest("timelog-week")!.textContent).toContain("55 min"); // 25 de hoy + 30 del martes; lo de Frontend no cuenta
     expect(host.querySelectorAll("[data-testid=timelog-entry]")).toHaveLength(1);
   });

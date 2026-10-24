@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { localDay, minutesBetween, minutesOn, minutesText, sanitizeAssessment, sanitizeEntry, type TimeEntry } from "./timeLog";
+import { localDay, minutesBetween, minutesOn, minutesText, sanitizeAssessment, sanitizeEntry, summarizeTimeLog, type TimeEntry } from "./timeLog";
 
 const e = (o: Partial<TimeEntry>): TimeEntry => ({ id: "x", areaKey: "backend", date: "2026-10-16", minutes: 25, kind: "pomodoro", at: "", ...o });
 
@@ -44,3 +44,26 @@ describe("registro de horas", () => {
   });
 });
 
+
+describe("clasificación del tiempo registrado", () => {
+  it("una entrada antigua sin tipo sigue siendo válida (sin clasificar) y el tipo/temas se limpian", () => {
+    const old = sanitizeEntry({ id: "a", areaKey: "backend", date: "2026-10-16", minutes: 25, kind: "pomodoro" })!;
+    expect(old.work).toBeUndefined();
+    expect(old.topics).toBeUndefined();
+    expect(sanitizeEntry({ id: "a", areaKey: "backend", date: "2026-10-16", minutes: 25, work: "theory", topics: ["P/4.2 HTTP", "  "] })).toMatchObject({ work: "theory", topics: ["P/4.2 HTTP"] });
+    expect(sanitizeEntry({ id: "a", areaKey: "backend", date: "2026-10-16", minutes: 25, work: "otro" })!.work).toBeUndefined();
+  });
+
+  it("suma el tiempo REAL por área y tipo dentro del rango, con sesiones y sin clasificar", () => {
+    const list = [
+      e({ id: "1", work: "theory", minutes: 45 }),
+      e({ id: "2", work: "practice", minutes: 35, areaKey: "frontend" }),
+      e({ id: "3", minutes: 10 }),
+      e({ id: "4", work: "theory", minutes: 30, date: "2026-10-30" }),
+    ];
+    const week = summarizeTimeLog(list, { from: "2026-10-12", to: "2026-10-18" });
+    expect(week).toMatchObject({ totalMinutes: 90, sessions: 3, hasAny: true, byArea: { backend: 55, frontend: 35 }, byKind: { theory: 45, practice: 35, project: 0, review: 0, unclassified: 10 } });
+    expect(summarizeTimeLog(list, { areaKey: "frontend" }).totalMinutes).toBe(35);
+    expect(summarizeTimeLog(list, { from: "2026-11-01" })).toMatchObject({ totalMinutes: 0, sessions: 0, hasAny: false });
+  });
+});

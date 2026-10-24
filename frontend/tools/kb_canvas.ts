@@ -402,6 +402,26 @@ const arrowInto = (fieldLabel: string, lang: Lang): string => ARROW_INTO[norm(fi
 const gapFor = (labels: string[]): number =>
   Math.max(GAP_X_MIN, ...labels.map((l) => labelWidth(l) + 64));
 
+/**
+ * Width needed by a card: PANEL_W (460 px) for prose/math, or widened for code blocks up to 860 px so lines do not clip.
+ */
+export function cardWidth(text: string): number {
+  const fenceMatch = /```[\s\S]*?```/g;
+  let maxCodeLine = 0;
+  for (const block of text.matchAll(fenceMatch)) {
+    const lines = block[0].split(/\r?\n/).slice(1, -1);
+    for (const line of lines) {
+      if (line.length > maxCodeLine) maxCodeLine = line.length;
+    }
+  }
+  if (maxCodeLine > 0) {
+    // 13px mono font is ~8.4px/char. Add 56px for container padding and borders.
+    const needed = Math.ceil(maxCodeLine * 8.4 + 56);
+    return Math.max(PANEL_W, Math.min(860, needed));
+  }
+  return PANEL_W;
+}
+
 function group(label: string, members: cf.CanvasNode[], color: string, z: number): cf.CanvasNode {
   const x = Math.min(...members.map((m) => m.x)) - PAD;
   const y = Math.min(...members.map((m) => m.y)) - TOP;
@@ -493,6 +513,10 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
   const crossLabels = [L.appliedIn, L.failsWhen, L.anotherCase];
   const x3 = explicacionGroup.x + explicacionGroup.width + gapFor(crossLabels);
 
+  const exTexts = c.examples.flatMap((ex) => ex.fields.map((f) => f.text));
+  const errTexts = c.errors.map((err) => err.fields.map((f) => `- **${f.label}:** ${f.text}`).join("\n"));
+  const col3W = Math.max(PANEL_W, ...[...exTexts, ...errTexts].map(cardWidth));
+
   const exampleGroups: cf.CanvasNode[] = [];
   const exampleFirst: cf.CanvasNode[] = [];
   const exampleLast: cf.CanvasNode[] = [];
@@ -502,7 +526,7 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
     const cards: Array<{ field: Field; node: cf.CanvasNode }> = [];
     let y = y3;
     for (const f of ex.fields) {
-      const card = b.text(x3, y, PANEL_W, `### ${f.label}\n\n${f.text}`);
+      const card = b.text(x3, y, col3W, `### ${f.label}\n\n${f.text}`);
       cards.push({ field: f, node: card });
       y = card.y + card.height + GAP_Y;
     }
@@ -531,7 +555,7 @@ export function buildConceptCanvas(c: Concept): cf.CanvasDoc {
     const md =
       `**${err.title}**\n\n` +
       err.fields.map((f) => `- **${f.label}:** ${f.text}`).join("\n");
-    const card = b.text(x3, yErr, PANEL_W, md, C_ERROR);
+    const card = b.text(x3, yErr, col3W, md, C_ERROR);
     errorCards.push(card);
     errorGroups.push(b.add(group(err.title, [card], C_ERROR, -2)));
     yErr = card.y + card.height + GROUP_GAP;

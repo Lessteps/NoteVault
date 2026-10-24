@@ -84,18 +84,18 @@ describe("ítems de Planeación", () => {
     expect(l.map((x) => x.id)).toEqual(["pl:general", "pl:area/s1", "pl:area/s2", "pl:entregables", "pl:registros", "pl:preparar", "pl:cambios"]);
     // sin sub-ítems anidados: ya no hay «Agenda › Día · Semana · Mes · Calendario» ni «Mi plan› Resumen…»
     expect(l.every((x) => !x.subs)).toBe(true);
-    // los rótulos de sección y los emojis de la referencia
-    expect(l.find((x) => x.id === "pl:general")).toMatchObject({ section: "Planificación", emoji: "📋" });
+    // los rótulos de sección y las áreas
+    expect(l.find((x) => x.id === "pl:general")).toMatchObject({ section: "Planificación" });
     expect(l.find((x) => x.id === "pl:entregables")!.section).toBe("Más");
     expect(l.filter((x) => x.section).length).toBe(2);
-    expect(l.find((x) => x.id === "pl:area/s1")!.emoji).toBe("⚙️");
-    expect(l.find((x) => x.id === "pl:area/s2")!.emoji).toBe("🎨");
+    expect(l.find((x) => x.id === "pl:area/s1")!.areaId).toBe("backend");
+    expect(l.find((x) => x.id === "pl:area/s2")!.areaId).toBe("frontend");
   });
 
   it("«Bases» va la última de las áreas solo si el plan tiene fundamentos; «Práctica» solo si tiene la pista", () => {
     const l = planeacionLinks(planWith([sub("s1", "Backend", "backend", true)], true));
     expect(l.map((x) => x.label)).toEqual(["Vista general", "Backend", "Bases", "Entregables", "Registros", "Preparar plan", "Práctica", "Preguntas y ajustes"]);
-    expect(l.find((x) => x.id === "pl:bases")!.emoji).toBe("📦");
+    expect(l.some((x) => x.id === "pl:bases")).toBe(true);
   });
 
   it("la pista de cada área es su avance «hechos/ruta» (el mismo de la Ejecución)", () => {

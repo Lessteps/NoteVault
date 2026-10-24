@@ -107,13 +107,12 @@ afterEach(() => {
 });
 
 describe("página de un área", () => {
-  it("cabecera: emoji, título grande, propiedades (Estado, Fechas, Progreso), la nota de práctica con el Mentor y las pestañas del área", async () => {
+  it("cabecera: título grande, propiedades (Estado, Fechas, Progreso), la nota de práctica con el Mentor y las pestañas del área", async () => {
     await open();
     await click(nav("area/s1-backend"));
     expect(nav("area/s1-backend").getAttribute("aria-current")).toBe("page");
     expect(byTest("plan-page-title").tagName).toBe("H1");
     expect(byTest("plan-page-title").textContent).toBe("Backend");
-    expect(byTest("plan-head").textContent).toContain("⚙️");
     const props = byTest("plan-props").textContent!;
     expect(props).toContain("Estado");
     expect(props).toContain("Activo");
@@ -122,9 +121,8 @@ describe("página de un área", () => {
     expect(props).toContain("10 semanas");
     expect(props).toContain("Progreso");
     expect(byTest("prop-progress-text").textContent).toMatch(/^Semana 2 · \d+ temas pendientes$/);
-    // la nota de práctica (💡) con sus dos acciones
+    // la nota de práctica con sus dos acciones
     const tip = byTest("practice-curriculum-bar");
-    expect(tip.textContent).toContain("💡");
     expect(tip.textContent).toContain("Práctica de Backend con Mentor IA");
     expect(byTest("practice-curriculum-generate").textContent).toContain("Backend");
     expect(byTest("practice-curriculum-templates").textContent).toContain("Solo plantillas de Backend");
@@ -226,7 +224,7 @@ describe("Vista general", () => {
     expect(byTest("practice-curriculum-bar").textContent).toContain("Práctica del plan con Mentor IA");
     expect(byTest("practice-curriculum-templates").textContent).toBe("Solo plantillas (sin IA)");
     const chips = [...host.querySelectorAll("[data-testid=prop-area-chip]")];
-    expect(chips.map((c) => c.textContent!.trim())).toEqual(["⚙️ Backend", "🗄️ Databases", "📦 Bases"]);
+    expect(chips.map((c) => c.textContent!.trim())).toEqual(["Backend", "Databases", "Bases"]);
     await click(chips[1]!);
     expect(byTest("plan-page-title").textContent).toBe("Databases");
     expect(nav("area/s2-databases").getAttribute("aria-current")).toBe("page");

@@ -19,8 +19,8 @@ import { cn } from "../ui";
 import { AgendaCalendar } from "./AgendaCalendar";
 import { PracticeCurriculumBar, MonthProjects, WeekProjects } from "./AgendaDayFocus";
 import { DayDetail, MonthDetail, WeekDetail } from "./AgendaViews";
-import { DeliverablesPendingNote } from "./AreaViews";
-import { activeAreas, areaEmoji, areaState, BASES_EMOJI, normalizePageTab, scopeDates, scopeInfo, scopeKey, scopeProgress, type PageScope } from "./mentorAreas";
+import { AreaDot, DeliverablesPendingNote } from "./AreaViews";
+import { activeAreas, areaState, normalizePageTab, scopeDates, scopeInfo, scopeKey, scopeProgress, type PageScope } from "./mentorAreas";
 import { hasBasesRoute, PAGE_BASES, pageAreaId, PLAN_NAV_PREFIX } from "./mentorNav";
 import { DeliverableLine, useAgendaModel, type AgendaModel } from "./agendaKit";
 import { AreaWeek } from "./PlanAreaWeek";
@@ -213,17 +213,18 @@ export function PlanScopePage(props: PlanScopePageProps) {
   return (
     <div className="space-y-5 pt-4" data-testid="plan-agenda" data-scope={key}>
       <header data-testid="plan-head" className="space-y-3">
-        <div aria-hidden className="text-[56px] leading-none">{info.emoji}</div>
         <h1 id="plan-title" tabIndex={-1} className="font-serif text-[34px] font-bold leading-tight tracking-tight outline-none @3xl:text-[44px]" data-testid="plan-page-title">{info.title}</h1>
-        <dl className="max-w-3xl divide-y divide-line rounded-2xl border border-line bg-card px-4 py-2" aria-label="Propiedades" data-testid="plan-props">
+        <dl className="divide-y divide-line py-1" aria-label="Propiedades" data-testid="plan-props">
           <Prop label="Estado" testid="prop-state">{stateChip}{plan.auto && scope.kind === "all" && <Chip large colour="var(--nv-warn)">Plan automático</Chip>}</Prop>
           <Prop label="Fechas" testid="prop-dates">
             <span>{rangeLabel(dates.start, dates.end)}</span>
             <Chip large>{weeksLabel(weeks)}</Chip>
           </Prop>
           <Prop label="Progreso" testid="prop-progress">
-            <span className="min-w-24 max-w-xs flex-1"><ProgressBar pct={pct} label={`Avance de ${info.title}`} /></span>
-            <span className="text-[14px] text-dim" data-testid="prop-progress-text">Semana {currentWeek} · {pending} {pending === 1 ? "tema pendiente" : "temas pendientes"}</span>
+            <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+              <div className="min-w-0 flex-1"><ProgressBar pct={pct} label={`Avance de ${info.title}`} /></div>
+              <span className="whitespace-nowrap text-[14px] text-dim" data-testid="prop-progress-text">Semana {currentWeek} · {pending} {pending === 1 ? "tema pendiente" : "temas pendientes"}</span>
+            </div>
           </Prop>
           {scope.kind === "all" && (
             <Prop label="Áreas activas" testid="prop-areas">
@@ -231,14 +232,14 @@ export function PlanScopePage(props: PlanScopePageProps) {
                 {areas.map((a) => (
                   <li key={a.subplanId}>
                     <button type="button" onClick={() => onOpenPage(`${PLAN_NAV_PREFIX}${pageAreaId(a.subplanId)}`)} className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[14px] font-medium hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" data-testid="prop-area-chip" data-area={a.areaId ?? a.subplanId}>
-                      <span aria-hidden>{areaEmoji(a.areaId)}</span> {a.area}
+                      <AreaDot {...(a.areaId ? { areaId: a.areaId } : {})} /> {a.area}
                     </button>
                   </li>
                 ))}
                 {showBases && (
                   <li>
                     <button type="button" onClick={() => onOpenPage(`${PLAN_NAV_PREFIX}${PAGE_BASES}`)} className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[14px] font-medium hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" data-testid="prop-area-chip" data-area="bases">
-                      <span aria-hidden>{BASES_EMOJI}</span> Bases
+                      <AreaDot colour="var(--nv-accent)" /> Bases
                     </button>
                   </li>
                 )}
@@ -367,9 +368,9 @@ export function PlanScopePage(props: PlanScopePageProps) {
 
 /** «Por área»: una tarjeta por área (y Bases) con su avance, que abre su página. */
 function AreaCards({ plan, m, onOpenPage, showBases }: { plan: MentorPlan; m: AgendaModel; onOpenPage: (navId: string) => void; showBases: boolean }) {
-  const items: Array<{ id: string; navId: string; emoji: string; name: string; scope: PageScope }> = [
-    ...orderedAreas(plan).map((a) => ({ id: a.subplanId, navId: `${PLAN_NAV_PREFIX}${pageAreaId(a.subplanId)}`, emoji: areaEmoji(a.areaId), name: a.area, scope: { kind: "area", subplanId: a.subplanId } as PageScope })),
-    ...(showBases ? [{ id: "bases", navId: `${PLAN_NAV_PREFIX}${PAGE_BASES}`, emoji: BASES_EMOJI, name: "Bases", scope: { kind: "bases" } as PageScope }] : []),
+  const items: Array<{ id: string; navId: string; areaId?: string; name: string; scope: PageScope }> = [
+    ...orderedAreas(plan).map((a) => ({ id: a.subplanId, navId: `${PLAN_NAV_PREFIX}${pageAreaId(a.subplanId)}`, areaId: a.areaId, name: a.area, scope: { kind: "area", subplanId: a.subplanId } as PageScope })),
+    ...(showBases ? [{ id: "bases", navId: `${PLAN_NAV_PREFIX}${PAGE_BASES}`, name: "Bases", scope: { kind: "bases" } as PageScope }] : []),
   ];
   return (
     <section aria-label="Áreas del plan" data-testid="plan-area-cards">
@@ -380,7 +381,7 @@ function AreaCards({ plan, m, onOpenPage, showBases }: { plan: MentorPlan; m: Ag
           return (
             <li key={it.id}>
               <button type="button" onClick={() => onOpenPage(it.navId)} className="flex w-full flex-col gap-2 rounded-2xl border border-line bg-card p-3.5 text-left hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" data-testid="plan-area-card" data-area={it.id} aria-label={`Abrir ${it.name}: ${p.done} de ${p.total} temas hechos`}>
-                <span className="flex items-center gap-2 text-[16px] font-semibold"><span aria-hidden className="text-[20px]">{it.emoji}</span>{it.name}</span>
+                <span className="flex items-center gap-2 text-[16px] font-semibold"><AreaDot {...(it.areaId ? { areaId: it.areaId } : it.id === "bases" ? { colour: "var(--nv-accent)" } : {})} />{it.name}</span>
                 <ProgressBar pct={p.pct} label={`Avance de ${it.name}`} />
                 <span className="text-[13.5px] text-dim">{p.done}/{p.total} temas · {p.pending} {p.pending === 1 ? "pendiente" : "pendientes"}</span>
               </button>

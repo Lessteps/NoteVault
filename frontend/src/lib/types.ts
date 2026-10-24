@@ -1545,8 +1545,41 @@ export interface MentorTopicCandidate {
   subject?: string;
   /** fechas a las que ya se añadió como extra */
   addedDates: string[];
+  /** solo con `upcoming`: semana del plan en que cae, día planeado, tipo (grupo), estado y el tema que va antes si aún no se puede adelantar */
+  week?: number;
+  plannedDate?: string;
+  group?: string;
+  state?: "pendiente" | "planeado" | "adelantado";
+  /** ya está en el día pedido (planeado o adelantado) */
+  onDay?: boolean;
+  blockedBy?: string;
 }
-export type MentorTopicCandidates = { loading: true } | { loading: false; ahead: MentorTopicCandidate[]; vault: MentorTopicCandidate[] };
+export type MentorTopicCandidates =
+  | { loading: true }
+  | {
+      loading: false;
+      ahead: MentorTopicCandidate[];
+      vault: MentorTopicCandidate[];
+      /** solo con `upcoming`: rango de fechas de cada semana, temas ya planeados ese día por área, el día pedido y la semana actual */
+      weeks?: Record<string, { from: string; to: string }>;
+      plannedByArea?: Record<string, number>;
+      date?: string;
+      currentWeek?: number;
+    };
+/** Un ejercicio ya planeado de un tema de la ruta, aún sin intentos (`mentor_plan_exercise_candidates`). */
+export interface MentorExerciseCandidate {
+  subplanId: string;
+  area: string;
+  folder: string;
+  topic: string;
+  rel: string;
+  title: string;
+  difficulty?: number;
+  /** día en que cae el tema en el reparto */
+  date?: string;
+  addedDates: string[];
+}
+export type MentorExerciseCandidates = { loading: true } | { loading: false; exercises: MentorExerciseCandidate[] };
 /** currículo de práctica del plan generado por la IA (ejercicios por semana y proyectos) */
 export type MentorPracticeCurriculum = import("./planCurriculum").PracticeCurriculum;
 export type MentorMonthlyPlan = MentorPlan;

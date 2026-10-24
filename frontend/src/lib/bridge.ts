@@ -379,11 +379,12 @@ export const api = {
   mentorPlanExtraTopicAdd: (opts: { id: string; folder: string; date?: string; area?: string; estMinutes?: number }) => call<import("./types").MentorPlan>("mentor_plan_extra_topic_add", opts),
   mentorPlanExtraTopicRemove: (opts: { id: string; folder: string; date: string }) => call<import("./types").MentorPlan>("mentor_plan_extra_topic_remove", opts),
   /** Práctica diaria extra de un día (kata, ejercicio o texto libre). */
-  mentorPlanExtraPracticeAdd: (opts: { id: string; title: string; kind?: import("./planPace").ExtraPracticeKind; date?: string; minutes?: number; note?: string; area?: string; folder?: string }) => call<import("./types").MentorPlan>("mentor_plan_extra_practice_add", opts),
+  mentorPlanExtraPracticeAdd: (opts: { id: string; title: string; kind?: import("./planPace").ExtraPracticeKind; date?: string; minutes?: number; note?: string; area?: string; folder?: string; rel?: string; kataDate?: string }) => call<import("./types").MentorPlan>("mentor_plan_extra_practice_add", opts),
   mentorPlanExtraPracticeUpdate: (opts: { id: string; practiceId: string; title?: string; kind?: import("./planPace").ExtraPracticeKind; date?: string; minutes?: number | null; note?: string; area?: string; folder?: string; done?: boolean }) => call<import("./types").MentorPlan>("mentor_plan_extra_practice_update", opts),
   mentorPlanExtraPracticeRemove: (opts: { id: string; practiceId: string }) => call<import("./types").MentorPlan>("mentor_plan_extra_practice_remove", opts),
   /** Candidatos para añadir como tema extra: los siguientes de la ruta y los temas de la vault fuera del plan. */
-  mentorPlanTopicCandidates: (opts: { id: string; query?: string; area?: string; limit?: number }) => call<import("./types").MentorTopicCandidates>("mentor_plan_topic_candidates", opts),
+  mentorPlanExerciseCandidates: (opts: { id: string; area?: string; limit?: number }) => call<import("./types").MentorExerciseCandidates>("mentor_plan_exercise_candidates", opts),
+  mentorPlanTopicCandidates: (opts: { id: string; query?: string; area?: string; limit?: number; upcoming?: boolean; date?: string; horizon?: number }) => call<import("./types").MentorTopicCandidates>("mentor_plan_topic_candidates", opts),
   /** «Reorganizar por áreas»: convierte un plan de estructura antigua; queda en el historial y se puede deshacer. */
   mentorPlanReorganize: (id: string) => call<{ plan: import("./types").MentorPlan; entry: import("./types").MentorChangeEntry; history: import("./types").MentorChangeEntry[]; applied: true }>("mentor_plan_reorganize", { id }),
   /** Cobertura de teoría y práctica de cada área del plan contra la vault (determinista) y la última revisión guardada. */
@@ -410,8 +411,10 @@ export const api = {
   /** Registro de horas de estudio por área (Pomodoro y bloques a mano). */
   mentorTimeLogGet: (id: string) => call<{ entries: import("./timeLog").TimeEntry[]; assessments?: import("./timeLog").Assessment[] }>("mentor_timelog_get", { id }),
   /** La evaluación obligatoria al acabar un bloque de foco. */
-  mentorTimeLogAssess: (opts: { id: string; areaKey: string; date: string; minutes: number; topics: string[]; understanding: number; focus: number; outcomes: Array<{ title: string; status: "done" | "partial" | "none" }>; practiced: boolean; learned: string; doubt: string; errors: string }) => call<{ assessments: import("./timeLog").Assessment[]; assessment: import("./timeLog").Assessment }>("mentor_timelog_assess", opts),
-  mentorTimeLogAdd: (opts: { id: string; areaKey: string; date: string; minutes: number; kind?: "pomodoro" | "manual"; note?: string }) => call<{ entries: import("./timeLog").TimeEntry[]; entry: import("./timeLog").TimeEntry }>("mentor_timelog_add", opts),
+  mentorTimeLogAssess: (opts: { id: string; areaKey: string; date: string; minutes: number; topics: string[]; understanding: number; focus: number; outcomes: Array<{ title: string; status: "done" | "partial" | "none" }>; practiced: boolean; learned: string; doubt: string; errors: string; work?: import("./timeLog").WorkKind }) => call<{ assessments: import("./timeLog").Assessment[]; assessment: import("./timeLog").Assessment }>("mentor_timelog_assess", opts),
+  mentorTimeLogAdd: (opts: { id: string; areaKey: string; date: string; minutes: number; kind?: "pomodoro" | "manual"; note?: string; work?: import("./timeLog").WorkKind; topics?: string[] }) => call<{ entries: import("./timeLog").TimeEntry[]; entry: import("./timeLog").TimeEntry }>("mentor_timelog_add", opts),
+  /** Tiempo REAL registrado (nunca estimado) por área y tipo de trabajo, en un rango de fechas. */
+  mentorTimeLogSummary: (id: string, opts: { from?: string; to?: string; areaKey?: string } = {}) => call<import("./timeLog").TimeLogSummary>("mentor_timelog_summary", { id, ...opts }),
   mentorTimeLogDelete: (id: string, entryId: string) => call<{ entries: import("./timeLog").TimeEntry[] }>("mentor_timelog_delete", { id, entryId }),
   /** Registros de sesión: la sesión con su evidencia y su nota legible en `_registro/`. */
   mentorRecordSave: (opts: { id: string; areaKey: string; areaName?: string; date: string; startedAt: number; minutes: number; mode: string; assigned: Array<{ kind: string; folder: string; title: string; status: string }>; assessmentId?: string; assessment?: { understanding: number; focus: number; practiced: boolean; learned: string; doubt: string; errors: string } }) =>
@@ -921,7 +924,7 @@ studyTopicMap: (rel: string) => call<{ ok: boolean; path: string }>("study_topic
   nutriReportGenerate: (days = 7, endDate?: string) =>
     call<{
       markdown: string;
-      csv: { header: string[]; rows: Array<Array<string | number>> };
+      csv: { header: string[]; rows: (string | number)[][] };
       trends: import("./nutritionTypes").NutriTrendsData;
     }>("nutri_report_generate", days, endDate),
   nutriSettingsGet: () =>

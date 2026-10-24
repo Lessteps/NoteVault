@@ -135,98 +135,75 @@ describe("DailyPaceControl", () => {
 describe("AddExtraTopic", () => {
   const cands: MentorTopicCandidates = {
     loading: false,
-    ahead: [{ folder: "A/5", title: "A 5", inPlan: true, area: "Alfa", subplanId: "s-a", position: 5, total: 12, estMinutes: 40, addedDates: [] }],
-    vault: [{ folder: "Vault/Rust/Ownership", title: "Ownership", inPlan: false, subject: "programming", addedDates: [] }],
+    ahead: [{ folder: "A/5", title: "A 5", inPlan: true, area: "Alfa", subplanId: "s-a", position: 5, total: 12, estMinutes: 40, addedDates: [], week: 2, state: "pendiente" }],
+    vault: [],
+    weeks: { "2": { from: "2026-10-12", to: "2026-10-18" } },
+    plannedByArea: { "s-a": 0 },
   };
 
-  it("abre el diálogo con los siguientes de la ruta y los temas de la vault, y añade el elegido a la fecha", async () => {
+  it("abre el diálogo con los temas de las siguientes semanas y añade el elegido a la fecha", async () => {
     const list = vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue(cands);
     const add = vi.spyOn(api, "mentorPlanExtraTopicAdd").mockResolvedValue(plan({ extraTopics: [{ date: "2026-10-06", folder: "A/5", addedAt: "x", source: "manual" }] }));
     const onChanged = vi.fn();
     await render(<AddExtraTopic planId="p" date="2026-10-06" onChanged={onChanged} />);
     await click(document.querySelector('[data-testid="add-extra-topic"]'));
     expect(document.querySelector('[role="dialog"]')).toBeTruthy();
-    expect(list).toHaveBeenCalledWith({ id: "p" });
+    expect(list).toHaveBeenCalledWith({ id: "p", upcoming: true, date: "2026-10-06" });
     const rows = [...document.querySelectorAll('[data-testid="extra-topic-candidate"]')].map((r) => r.textContent);
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toMatch(/A 5.*Alfa · tema 5 de 12/);
-    await click(byLabel("Añadir A 5"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatch(/A 5/);
+    await click(byLabel("Adelantar A 5"));
     expect(add).toHaveBeenCalledWith({ id: "p", folder: "A/5", date: "2026-10-06" });
     expect(onChanged).toHaveBeenCalledTimes(1);
-    expect(document.querySelector('[data-testid="extra-topic-candidate"]')!.textContent).toMatch(/Añadido/);
   });
 
-  it("busca con el texto escrito, atribuye al área los temas de la vault y permite cambiar el día", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      const list = vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue(cands);
-      const add = vi.spyOn(api, "mentorPlanExtraTopicAdd").mockResolvedValue(plan());
-      await render(<AddExtraTopic planId="p" date="2026-10-06" area="s-a" minDate="2026-10-05" maxDate="2026-10-30" onChanged={() => {}} />);
-      await click(document.querySelector('[data-testid="add-extra-topic"]'));
-      await typeInto(byLabel("Buscar tema"), "owner");
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(300);
-      });
-      await flush();
-      expect(list).toHaveBeenLastCalledWith({ id: "p", query: "owner", area: "s-a" });
-      await typeInto(byLabel("Día"), "2026-10-08");
-      await click(byLabel("Añadir Ownership"));
-      expect(add).toHaveBeenCalledWith({ id: "p", folder: "Vault/Rust/Ownership", date: "2026-10-08", area: "s-a" });
-    } finally {
-      vi.useRealTimers();
-    }
+  it("permite filtrar por esta área o todas las áreas y cambiar el día", async () => {
+    const list = vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue(cands);
+    await render(<AddExtraTopic planId="p" date="2026-10-06" area="s-a" minDate="2026-10-05" maxDate="2026-10-30" onChanged={() => {}} />);
+    await click(document.querySelector('[data-testid="add-extra-topic"]'));
+    expect(list).toHaveBeenCalledWith({ id: "p", upcoming: true, date: "2026-10-06", area: "s-a" });
+    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Todas las áreas"));
+    expect(list).toHaveBeenLastCalledWith({ id: "p", upcoming: true, date: "2026-10-06" });
   });
 
-  it("muestra el error si falla la búsqueda o el alta", async () => {
+  it("muestra el error si falla el alta", async () => {
     vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue(cands);
     vi.spyOn(api, "mentorPlanExtraTopicAdd").mockRejectedValue(new Error("Ese tema ya está añadido a ese día."));
     await render(<AddExtraTopic planId="p" date="2026-10-06" onChanged={() => {}} />);
     await click(document.querySelector('[data-testid="add-extra-topic"]'));
-    await click(byLabel("Añadir A 5"));
+    await click(byLabel("Adelantar A 5"));
     expect(useApp.getState().toasts.some((t) => /ya está añadido/.test(t.text))).toBe(true);
   });
 });
 
 describe("AddExtraPractice", () => {
-  it("añade una práctica libre con minutos y nota a la fecha", async () => {
+  const cands = {
+    loading: false as const,
+    exercises: [{ subplanId: "s-a", area: "Alfa", folder: "A/1", topic: "Variables", rel: "A/1/ej1.md", title: "Ejercicios de Variables", difficulty: 2, addedDates: [] }],
+  };
+
+  it("abre el diálogo con los ejercicios planificados de la ruta y adelanta el elegido a la fecha", async () => {
+    const list = vi.spyOn(api, "mentorPlanExerciseCandidates").mockResolvedValue(cands);
     const add = vi.spyOn(api, "mentorPlanExtraPracticeAdd").mockResolvedValue(plan());
     const onChanged = vi.fn();
     await render(<AddExtraPractice planId="p" date="2026-10-06" area="s-a" onChanged={onChanged} />);
     await click(document.querySelector('[data-testid="add-extra-practice"]'));
-    await typeInto(byLabel("Título de la práctica"), "Repasar SQL");
-    await typeInto(byLabel("Minutos"), "25");
-    await typeInto(byLabel("Nota"), "joins");
-    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Añadir práctica" && b.closest('[role="dialog"]')));
-    expect(add).toHaveBeenCalledWith({ id: "p", title: "Repasar SQL", kind: "custom", date: "2026-10-06", minutes: 25, note: "joins", area: "s-a" });
+    expect(document.querySelector('[role="dialog"]')).toBeTruthy();
+    expect(list).toHaveBeenCalledWith({ id: "p", area: "s-a" });
+    const rows = [...document.querySelectorAll('[data-testid="extra-practice-candidate"]')].map((r) => r.textContent);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatch(/Ejercicios de Variables/);
+    await click(byLabel("Adelantar Ejercicios de Variables"));
+    expect(add).toHaveBeenCalledWith({ id: "p", title: "Ejercicios de Variables", kind: "exercise", date: "2026-10-06", area: "s-a", folder: "A/1", rel: "A/1/ej1.md" });
     expect(onChanged).toHaveBeenCalledTimes(1);
-    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it("un ejercicio de un tema se liga a su carpeta y toma el título del tema", async () => {
-    const add = vi.spyOn(api, "mentorPlanExtraPracticeAdd").mockResolvedValue(plan());
-    await render(<AddExtraPractice planId="p" date="2026-10-06" topics={[{ folder: "A/1", title: "Variables" }]} onChanged={() => {}} />);
-    await click(document.querySelector('[data-testid="add-extra-practice"]'));
-    await click([...document.querySelectorAll('input[type="radio"]')].find((r) => r.parentElement?.textContent === "Ejercicio de un tema"));
-    const sel = byLabel("Tema del ejercicio") as HTMLSelectElement;
-    await act(async () => {
-      sel.value = "A/1";
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    await click([...document.querySelectorAll("button")].find((b) => b.textContent === "Añadir práctica" && b.closest('[role="dialog"]')));
-    expect(add).toHaveBeenCalledWith({ id: "p", title: "Ejercicios de Variables", kind: "exercise", date: "2026-10-06", folder: "A/1" });
-  });
-
-  it("no envía sin título ni con minutos inválidos", async () => {
-    const add = vi.spyOn(api, "mentorPlanExtraPracticeAdd").mockResolvedValue(plan());
+  it("muestra el error si falla el alta", async () => {
+    vi.spyOn(api, "mentorPlanExerciseCandidates").mockResolvedValue(cands);
+    vi.spyOn(api, "mentorPlanExtraPracticeAdd").mockRejectedValue(new Error("Esa práctica ya está añadida a ese día."));
     await render(<AddExtraPractice planId="p" date="2026-10-06" onChanged={() => {}} />);
     await click(document.querySelector('[data-testid="add-extra-practice"]'));
-    const submit = () => [...document.querySelectorAll("button")].find((b) => b.textContent === "Añadir práctica" && b.closest('[role="dialog"]'));
-    await click(submit());
-    expect(document.querySelector('[role="alert"]')!.textContent).toMatch(/título/);
-    await typeInto(byLabel("Título de la práctica"), "x");
-    await typeInto(byLabel("Minutos"), "0");
-    await click(submit());
-    expect(document.querySelector('[role="alert"]')!.textContent).toMatch(/minutos/);
-    expect(add).not.toHaveBeenCalled();
+    await click(byLabel("Adelantar Ejercicios de Variables"));
+    expect(useApp.getState().toasts.some((t) => /ya está añadida/.test(t.text))).toBe(true);
   });
 });

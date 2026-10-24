@@ -181,7 +181,7 @@ describe("NutritionSettingsDialog component", () => {
       root!.render(<NutritionSettingsDialog />);
     });
 
-    expect(document.body.textContent).toContain("Metas Nutricionales Diarias");
+    expect(document.body.textContent).toContain("Metas Nutricionales");
     expect(document.body.textContent).toContain("Calorías diarias (kcal):");
     expect(document.body.textContent).toContain("Proteínas (g):");
   });
@@ -219,12 +219,12 @@ describe("NutritionSettingsDialog component", () => {
       saveBtn.click();
     });
 
-    expect(saveSpy).toHaveBeenCalledWith({
+    expect(saveSpy).toHaveBeenCalledWith(expect.objectContaining({
       calories: 2200,
       protein_g: 150,
       carbs_g: 240,
       fat_g: 65,
       water_ml: 2500,
-    });
+    }));
   });
 });

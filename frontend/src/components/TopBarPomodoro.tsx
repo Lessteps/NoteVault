@@ -37,7 +37,7 @@ export function TopBarPomodoro() {
     if (wasBreak) return; // saltar el descanso no guarda nada
     if (r.minutes >= 1) {
       try {
-        await logFocus(r.planId, r.areaKey, r.minutes, note);
+        await logFocus(r.planId, r.areaKey, r.minutes, note, "pomodoro", { work: r.work, topics: r.topics });
         toast("info", `${r.minutes} min guardados en ${r.areaKey}.`);
       } catch (e) {
         toast("error", `No se pudo guardar el bloque: ${(e as Error).message}`);

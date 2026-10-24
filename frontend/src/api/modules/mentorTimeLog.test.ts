@@ -60,5 +60,21 @@ describe("mentor_timelog", () => {
     expect(() => api().mentor_timelog_assess(bad)).toThrow(/no es válida/);
     expect(() => api().mentor_timelog_assess({ ...bad, doubt: "x", understanding: 9 })).toThrow(/no es válida/);
   });
+
+  it("guarda el tipo de trabajo y los temas, conserva las entradas antiguas sin tipo y resume por área, tipo y rango", () => {
+    // entrada antigua escrita a mano en el archivo: sin `work`
+    fs.mkdirSync(path.dirname(file()), { recursive: true });
+    fs.writeFileSync(file(), JSON.stringify({ version: 1, entries: [{ id: "old", areaKey: "backend", date: "2026-10-15", minutes: 20, kind: "pomodoro", at: "x" }] }));
+    api().mentor_timelog_add({ id, areaKey: "backend", date: "2026-10-16", minutes: 45, kind: "pomodoro", work: "theory", topics: ["P/4.2 HTTP"] });
+    api().mentor_timelog_add({ id, areaKey: "frontend", date: "2026-10-16", minutes: 35, kind: "pomodoro", work: "practice" });
+    const got: any = api().mentor_timelog_get({ id });
+    expect(got.entries[0].work).toBeUndefined();
+    expect(got.entries[1]).toMatchObject({ work: "theory", topics: ["P/4.2 HTTP"] });
+    const s: any = api().mentor_timelog_summary({ id, from: "2026-10-16", to: "2026-10-16" });
+    expect(s).toMatchObject({ totalMinutes: 80, sessions: 2, byArea: { backend: 45, frontend: 35 }, byKind: { theory: 45, practice: 35, unclassified: 0 } });
+    expect(api().mentor_timelog_summary({ id }) as any).toMatchObject({ totalMinutes: 100, byKind: { unclassified: 20 } });
+    expect(api().mentor_timelog_summary({ id, areaKey: "frontend" }) as any).toMatchObject({ totalMinutes: 35 });
+    expect((api().mentor_timelog_summary({ id, from: "2027-01-01" }) as any).hasAny).toBe(false);
+  });
 });
 

@@ -1,22 +1,24 @@
-// Mentor — «Añadir práctica»: añade a mano un elemento de PRÁCTICA DIARIA a un día (hoy por defecto): un kata, el ejercicio de un tema o texto libre.
+// Mentor — «Más práctica» / «Adelantar práctica»: enseña QUÉ EJERCICIOS VIENEN (los ya planificados de los temas de la ruta que aún no
+// tienen intentos) y deja ADELANTAR uno a un día (hoy por defecto). Ya no pide qué practicar ni inventa títulos: ofrece adelantar las
+// notas de ejercicio ya programadas en la ruta.
 // Botón + diálogo; guarda con `mentor_plan_extra_practice_add`. Pieza reutilizable por props: quien la monte recoge el plan nuevo en `onChanged`.
 
-import { Plus } from "lucide-react";
-import { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
-import type { ExtraPracticeKind } from "../../lib/planPace";
-import type { MentorPlan } from "../../lib/types";
+import { dateLabel } from "../../lib/planSchedule";
+import type { MentorExerciseCandidate, MentorPlan } from "../../lib/types";
 import { useApp } from "../../store/app";
-import { Field, GhostButton, input, Modal, PrimaryButton } from "../common/forms";
+import { Chip, Field, GhostButton, input, Modal } from "../common/forms";
 import { cn } from "../ui";
 
 export interface AddExtraPracticeProps {
   planId: string;
-  /** día al que se añade (AAAA-MM-DD); en el diálogo se puede cambiar */
+  /** día al que se adelanta (AAAA-MM-DD); en el panel se puede cambiar */
   date: string;
-  /** el área (id de subplan) a la que pertenece la práctica; sin él es práctica general del día */
+  /** abre el panel en los ejercicios de esta área (id de subplan); sin él, de todas las áreas */
   area?: string;
-  /** temas entre los que elegir el ejercicio a practicar (los de hoy, por ejemplo) */
+  /** compatibilidad hacia atrás: si la vista pasa temas ya no se usa como selector manual */
   topics?: ReadonlyArray<{ folder: string; title: string }>;
   minDate?: string;
   maxDate?: string;
@@ -25,112 +27,147 @@ export interface AddExtraPracticeProps {
   className?: string;
 }
 
-const KINDS: ReadonlyArray<{ id: ExtraPracticeKind; label: string }> = [
-  { id: "custom", label: "Libre" },
-  { id: "kata", label: "Kata" },
-  { id: "exercise", label: "Ejercicio de un tema" },
-];
+const COLD_RETRY_MS = 700;
 
-export function AddExtraPractice({ planId, date, area, topics = [], minDate, maxDate, onChanged, label = "Añadir práctica", className }: AddExtraPracticeProps) {
+const localToday = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const fileNameOf = (rel: string): string => rel.split("/").pop() ?? rel;
+
+interface Data {
+  exercises: MentorExerciseCandidate[];
+}
+
+function ExerciseRow({ ex, day, busy, onAdd, dayText }: { ex: MentorExerciseCandidate; day: string; busy: boolean; onAdd: () => void; dayText: string }) {
+  const here = ex.addedDates.includes(day);
+  const hint = here ? `Ya adelantado a ${dateLabel(day)}` : ex.date ? `Planeado el ${dateLabel(ex.date)}` : "";
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2" data-testid="extra-practice-candidate" data-rel={ex.rel} data-blocked={here ? "true" : "false"}>
+      <span className="min-w-0 flex-1 basis-44">
+        <span className="block text-[14px] font-medium text-text">{ex.title}</span>
+        <span className="block text-[13px] text-dim">
+          <span>{ex.topic}</span>
+          <span className="font-mono text-[12px] text-faint"> · {fileNameOf(ex.rel)}</span>
+          {ex.difficulty !== undefined ? ` · Dificultad ${ex.difficulty}` : ""}
+          {hint ? ` · ${hint}` : ""}
+        </span>
+      </span>
+      <Chip large colour={here ? "var(--nv-accent)" : "var(--nv-faint)"}>{here ? "Adelantado" : "Pendiente"}</Chip>
+      <GhostButton aria-label={`Adelantar ${ex.title}`} disabled={busy || here} onClick={onAdd} title={here ? `Ya añadido el ${dateLabel(day)}` : undefined}>
+        <ArrowUpRight size={14} aria-hidden /> {dayText}
+      </GhostButton>
+    </li>
+  );
+}
+
+export function AddExtraPractice({ planId, date, area, minDate, maxDate, onChanged, label = "Más práctica", className }: AddExtraPracticeProps) {
   const toast = useApp((s) => s.toast);
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<ExtraPracticeKind>("custom");
-  const [title, setTitle] = useState("");
-  const [minutes, setMinutes] = useState("");
-  const [note, setNote] = useState("");
-  const [folder, setFolder] = useState("");
   const [day, setDay] = useState(date);
-  const [busy, setBusy] = useState(false);
+  const [allAreas, setAllAreas] = useState(!area);
+  const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const seq = useRef(0);
+  useEffect(() => setDay(date), [date]);
 
-  const reset = (): void => {
-    setKind("custom");
-    setTitle("");
-    setMinutes("");
-    setNote("");
-    setFolder("");
+  const scope = allAreas ? undefined : area;
+  const load = useCallback(async () => {
+    const mine = ++seq.current;
     setError("");
-  };
-  const close = (): void => {
-    setOpen(false);
-    reset();
-  };
-  const submit = async (): Promise<void> => {
-    const m = minutes.trim() === "" ? undefined : Number(minutes);
-    if (!title.trim() && !(kind === "exercise" && folder)) return void setError("Escribe un título para la práctica.");
-    if (m !== undefined && (!Number.isInteger(m) || m < 1 || m > 600)) return void setError("Los minutos deben ser un entero de 1 a 600.");
-    const linked = topics.find((t) => t.folder === folder);
-    const finalTitle = title.trim() || (linked ? `Ejercicios de ${linked.title}` : "");
+    try {
+      for (let i = 0; i < 40; i++) {
+        const r = await api.mentorPlanExerciseCandidates({ id: planId, ...(scope ? { area: scope } : {}) });
+        if (seq.current !== mine) return;
+        if (!r.loading) return void setData({ exercises: r.exercises });
+        await new Promise((ok) => setTimeout(ok, COLD_RETRY_MS));
+        if (seq.current !== mine) return;
+      }
+      setError("El índice de la vault tarda demasiado en estar listo. Inténtalo de nuevo en un momento.");
+    } catch (e) {
+      if (seq.current === mine) setError((e as Error).message);
+    }
+  }, [planId, scope]);
+  useEffect(() => {
+    if (open) void load();
+  }, [open, load]);
+
+  const add = async (ex: MentorExerciseCandidate): Promise<void> => {
     setBusy(true);
-    setError("");
     try {
       const plan = await api.mentorPlanExtraPracticeAdd({
         id: planId,
-        title: finalTitle,
-        kind,
+        title: ex.title,
+        kind: "exercise",
         date: day,
-        ...(m ? { minutes: m } : {}),
-        ...(note.trim() ? { note: note.trim() } : {}),
-        ...(area ? { area } : {}),
-        ...(kind === "exercise" && folder ? { folder } : {}),
+        area: ex.subplanId,
+        folder: ex.folder,
+        rel: ex.rel,
       });
       onChanged(plan);
-      toast("info", `Práctica añadida al ${day}.`);
-      close();
+      toast("info", `«${ex.title}» adelantado al ${day}.`);
+      await load();
     } catch (e) {
-      setError((e as Error).message);
+      toast("error", (e as Error).message);
     } finally {
       setBusy(false);
     }
   };
+  const close = (): void => {
+    setOpen(false);
+    setData(null);
+  };
+
+  // área → carpeta de tema → ejercicios
+  const groups = useMemo(() => {
+    const byArea = new Map<string, { name: string; topics: Map<string, { topic: string; rows: MentorExerciseCandidate[] }> }>();
+    for (const ex of data?.exercises ?? []) {
+      const g = byArea.get(ex.subplanId) ?? { name: ex.area, topics: new Map() };
+      const t = g.topics.get(ex.folder) ?? { topic: ex.topic, rows: [] };
+      t.rows.push(ex);
+      g.topics.set(ex.folder, t);
+      byArea.set(ex.subplanId, g);
+    }
+    return [...byArea.entries()];
+  }, [data]);
+
+  const dayText = day === localToday() ? "Adelantar a hoy" : `Adelantar al ${dateLabel(day)}`;
 
   return (
     <>
-      <GhostButton large="md" className={cn(className)} onClick={() => { setDay(date); setOpen(true); }} aria-expanded={open} data-testid="add-extra-practice">
-        <Plus size={15} aria-hidden /> {label}
+      <GhostButton large="md" className={cn(className)} onClick={() => { setDay(date); setAllAreas(!area); setOpen(true); }} aria-expanded={open} data-testid="add-extra-practice">
+        <ArrowUpRight size={15} aria-hidden /> {label}
       </GhostButton>
       {open && (
-        <Modal
-          title="Añadir práctica diaria"
-          onClose={close}
-          footer={
-            <>
-              <PrimaryButton large disabled={busy} onClick={() => void submit()}>Añadir práctica</PrimaryButton>
-              <GhostButton large onClick={close}>Cancelar</GhostButton>
-            </>
-          }
-        >
-          <div role="radiogroup" aria-label="Tipo de práctica" className="flex flex-wrap gap-2">
-            {KINDS.map((k) => (
-              <label key={k.id} className={cn("flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border px-3 text-[14px]", kind === k.id ? "border-accent bg-accent-soft text-text" : "border-line text-dim")}>
-                <input type="radio" name="extra-practice-kind" className="sr-only" checked={kind === k.id} onChange={() => setKind(k.id)} />
-                {k.label}
-              </label>
-            ))}
-          </div>
-          {kind === "exercise" && topics.length > 0 && (
-            <Field label="Tema">
-              <select className={input} value={folder} onChange={(e) => setFolder(e.target.value)} aria-label="Tema del ejercicio">
-                <option value="">Elige un tema…</option>
-                {topics.map((t) => <option key={t.folder} value={t.folder}>{t.title}</option>)}
-              </select>
-            </Field>
-          )}
-          <Field label="Título">
-            <input autoFocus className={input} value={title} maxLength={160} onChange={(e) => setTitle(e.target.value)} placeholder={kind === "kata" ? "Kata de listas…" : "Qué vas a practicar"} aria-label="Título de la práctica" />
-          </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Minutos (opcional)">
-              <input type="number" min={1} max={600} className={input} value={minutes} onChange={(e) => setMinutes(e.target.value)} aria-label="Minutos" />
-            </Field>
+        <Modal title="Más práctica planificada" onClose={close} width={760}>
+          <p className="text-[14px] text-dim">Estos son los ejercicios ya planificados de los temas de la ruta que aún no tienen intentos. Puedes adelantarlos al día que elijas.</p>
+          <div className="grid items-end gap-3 sm:grid-cols-[auto_1fr]">
             <Field label="Día">
               <input type="date" className={input} value={day} min={minDate} max={maxDate} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Día" />
             </Field>
+            {area && (
+              <div className="flex flex-wrap items-center gap-2">
+                <GhostButton large="md" aria-pressed={!allAreas} onClick={() => setAllAreas(false)} className={cn(!allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Esta área</GhostButton>
+                <GhostButton large="md" aria-pressed={allAreas} onClick={() => setAllAreas(true)} className={cn(allAreas && "border-accent bg-accent-soft font-semibold text-accent-text")}>Todas las áreas</GhostButton>
+              </div>
+            )}
           </div>
-          <Field label="Nota (opcional)">
-            <textarea className={cn(input, "min-h-16 resize-y")} value={note} maxLength={400} onChange={(e) => setNote(e.target.value)} aria-label="Nota" />
-          </Field>
           {error && <p role="alert" className="text-[14px] text-danger">{error}</p>}
+          {!data && !error && <p className="text-[14px] text-dim" role="status">Buscando los ejercicios planificados…</p>}
+          {data && groups.length === 0 && <p className="text-[14px] text-dim">No quedan ejercicios pendientes en los temas planificados.</p>}
+          {data &&
+            groups.map(([subId, g]) => (
+              <section key={subId} aria-label={g.name} className="space-y-3" data-testid="next-practice-area" data-area={subId}>
+                <h4 className="text-[13px] font-semibold uppercase tracking-wider text-faint">{g.name}</h4>
+                {[...g.topics.entries()].map(([folder, t]) => (
+                  <div key={folder} className="space-y-1.5" data-testid="next-practice-topic" data-folder={folder}>
+                    <p className="text-[13.5px] font-semibold text-text">{t.topic}</p>
+                    <ul className="space-y-1.5">{t.rows.map((ex) => <ExerciseRow key={ex.rel} ex={ex} day={day} busy={busy} dayText={dayText} onAdd={() => void add(ex)} />)}</ul>
+                  </div>
+                ))}
+              </section>
+            ))}
         </Modal>
       )}
     </>

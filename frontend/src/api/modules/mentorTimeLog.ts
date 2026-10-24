@@ -3,6 +3,7 @@
 //  - mentor_timelog_get({ id }) -> { entries, assessments }: todas las entradas y evaluaciones del plan.
 //  - mentor_timelog_assess({ id, areaKey, date, minutes, topics, understanding, learned, doubt }) -> { assessments, assessment }: la evaluación de un bloque.
 //  - mentor_timelog_add({ id, areaKey, date, minutes, kind?, note? }) -> { entries, entry }: guarda un bloque de estudio ya hecho.
+//  - mentor_timelog_summary({ id, from?, to?, areaKey? }) -> TimeLogSummary: minutos reales por área y por tipo de trabajo.
 //  - mentor_timelog_delete({ id, entryId }) -> { entries }: quita una entrada.
 // Escribe SOLO `.notevault/mentor/timelog/<plan>.json`. Nunca notas ni el plan.
 
@@ -11,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { ApiError } from "../../core/errors.js";
 import { PLAN_ID_RE, PlanStore } from "../../core/mentor/plan.js";
 import * as store from "../../core/store.js";
-import { sanitizeAssessment, sanitizeEntry, type Assessment, type TimeEntry } from "../../lib/timeLog.js";
+import { sanitizeAssessment, sanitizeEntry, summarizeTimeLog, type Assessment, type TimeEntry } from "../../lib/timeLog.js";
 import type { AppState } from "../appState.js";
 
 interface TimeLogFile { version: 1; entries: TimeEntry[]; assessments?: Assessment[] }
@@ -44,7 +45,7 @@ export function mentorTimeLogApi(app: AppState, now: () => string = () => new Da
     mentor_timelog_assess(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, unknown>;
       const id = planIdOf(o);
-      const assessment = sanitizeAssessment({ id: randomUUID().slice(0, 12), areaKey: o.areaKey, date: o.date, minutes: o.minutes, topics: o.topics, understanding: o.understanding, focus: o.focus, outcomes: o.outcomes, practiced: o.practiced, learned: o.learned, doubt: o.doubt, errors: o.errors, at: now() });
+      const assessment = sanitizeAssessment({ id: randomUUID().slice(0, 12), areaKey: o.areaKey, date: o.date, minutes: o.minutes, topics: o.topics, understanding: o.understanding, focus: o.focus, outcomes: o.outcomes, practiced: o.practiced, learned: o.learned, doubt: o.doubt, errors: o.errors, work: o.work, at: now() });
       if (!assessment) throw new ApiError("La evaluación no es válida: responde las dos preguntas y elige una comprensión de 1 a 5.");
       const all = loadAll(id);
       const next = { entries: all.entries, assessments: [...all.assessments, assessment] };
@@ -55,11 +56,22 @@ export function mentorTimeLogApi(app: AppState, now: () => string = () => new Da
     mentor_timelog_add(opts: unknown) {
       const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, unknown>;
       const id = planIdOf(o);
-      const entry = sanitizeEntry({ id: randomUUID().slice(0, 12), areaKey: o.areaKey, date: o.date, minutes: o.minutes, kind: o.kind, note: o.note, at: now() });
+      const entry = sanitizeEntry({ id: randomUUID().slice(0, 12), areaKey: o.areaKey, date: o.date, minutes: o.minutes, kind: o.kind, note: o.note, work: o.work, topics: o.topics, at: now() });
       if (!entry) throw new ApiError("El bloque no es válido: indica el área, el día y entre 1 y 720 minutos.");
       const entries = [...load(id), entry];
       save(id, entries);
       return { entries, entry };
+    },
+
+    /** Tiempo REAL registrado entre `from` y `to` (opcional) por área y tipo de trabajo; `areaKey` limita a un área. Nunca estima. */
+    mentor_timelog_summary(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, unknown>;
+      const id = planIdOf(o);
+      const date = (v: unknown): string | undefined => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? "")) ? String(v) : undefined);
+      const from = date(o.from);
+      const to = date(o.to);
+      const areaKey = typeof o.areaKey === "string" && o.areaKey ? o.areaKey : undefined;
+      return summarizeTimeLog(load(id), { ...(from ? { from } : {}), ...(to ? { to } : {}), ...(areaKey ? { areaKey } : {}) });
     },
 
     mentor_timelog_delete(opts: unknown) {

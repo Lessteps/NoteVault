@@ -15,6 +15,7 @@ import * as path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   buildConceptCanvas,
+  cardWidth,
   findConceptFolders,
   findNote,
   findVaultRoot,
@@ -367,6 +368,36 @@ describe("code inside a concept note", () => {
     expect(caso).toContain("total = 0\n\n# suma\nfor n in [1, 2, 3]:\n    total += n");
     expect(concept.examples[0]!.fields.map((f) => f.label)).toEqual(["Contexto", "Caso", "Resultado esperado", "Por qué funciona"]);
     expect(verifyCanvas(buildConceptCanvas(concept))).toEqual([]);
+  });
+
+  it("widens code cards and ensures example groups wrap their cards with padding", () => {
+    expect(cardWidth("texto simple sin codigo")).toBe(460);
+    expect(cardWidth("```python\n" + "x".repeat(80) + "\n```")).toBeGreaterThan(700);
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "nv_kbcode_wrap_"));
+    tmpRoots.push(root);
+    fs.mkdirSync(path.join(root, ".notevault"), { recursive: true });
+    const folder = path.join(root, "Programación", "1 Fundamentos", "1.19 Bucles");
+    fs.mkdirSync(folder, { recursive: true });
+    const noteWithWideCode = NOTE.replace(
+      "total = 0",
+      "total_processed_accumulator = 0  # this is a long didactic comment explaining state",
+    );
+    fs.writeFileSync(path.join(folder, "1.19 Bucles.md"), noteWithWideCode, "utf-8");
+    const concept = readConcept(folder, root);
+    const doc = buildConceptCanvas(concept);
+    expect(verifyCanvas(doc)).toEqual([]);
+
+    const caseCard = doc.nodes.find((n) => n.type === "text" && (n.text ?? "").includes("total_processed_accumulator"));
+    expect(caseCard).toBeDefined();
+    expect(caseCard!.width).toBeGreaterThan(460);
+
+    const exGroup = doc.nodes.find((n) => n.type === "group" && n.label.includes("Ejemplo 1"));
+    expect(exGroup).toBeDefined();
+    // Group must wrap the card and be strictly wider than the card (with padding)
+    expect(exGroup!.width).toBe(caseCard!.width + 48);
+    expect(caseCard!.x).toBeGreaterThanOrEqual(exGroup!.x + 24);
+    expect(caseCard!.x + caseCard!.width).toBeLessThanOrEqual(exGroup!.x + exGroup!.width - 24);
   });
 });
 

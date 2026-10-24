@@ -1,7 +1,7 @@
 // Mentor — páginas del plan: iconos de las áreas, alcance de una página, pestañas por página y fechas de un área (módulo puro).
 
 import { describe, expect, it } from "vitest";
-import { activeAreas, areaEmoji, areaState, BASES_EMOJI, normalizePageTab, scopeDates, scopeFromStored, scopeInfo, scopeKey, scopeOnly, SCOPE_ALL, SCOPE_BASES } from "./mentorAreas";
+import { activeAreas, areaState, normalizePageTab, scopeDates, scopeFromStored, scopeInfo, scopeKey, scopeOnly, SCOPE_ALL, SCOPE_BASES } from "./mentorAreas";
 
 const plan = {
   start: "2026-10-05",
@@ -15,12 +15,6 @@ const plan = {
 } as never;
 
 describe("mentorAreas", () => {
-  it("cada área lleva el emoji de la referencia; las propias, la carpeta", () => {
-    expect([ "backend", "databases", "frontend", "automation", "tooling", "logic" ].map(areaEmoji)).toEqual(["⚙️", "🗄️", "🎨", "🤖", "🛠️", "💡"]);
-    expect(areaEmoji(undefined)).toBe("📁");
-    expect(BASES_EMOJI).toBe("📦");
-  });
-
   it("el alcance de una página sale del filtro guardado; lo desconocido es la Vista general", () => {
     expect(scopeFromStored("", plan)).toEqual(SCOPE_ALL);
     expect(scopeFromStored("s-be", plan)).toEqual({ kind: "area", subplanId: "s-be" });
@@ -28,7 +22,7 @@ describe("mentorAreas", () => {
     expect(scopeFromStored("fantasma", plan)).toEqual(SCOPE_ALL);
     expect([scopeKey(SCOPE_ALL), scopeKey(SCOPE_BASES), scopeKey({ kind: "area", subplanId: "s-be" })]).toEqual(["all", "__bases", "s-be"]);
     expect([scopeOnly(SCOPE_ALL), scopeOnly(SCOPE_BASES), scopeOnly({ kind: "area", subplanId: "s-be" })]).toEqual([null, "__bases", "s-be"]);
-    expect(scopeInfo(plan, { kind: "area", subplanId: "s-be" })).toMatchObject({ title: "Backend", emoji: "⚙️", name: "Backend" });
+    expect(scopeInfo(plan, { kind: "area", subplanId: "s-be" })).toMatchObject({ title: "Backend", name: "Backend" });
     expect(scopeInfo(plan, SCOPE_ALL, "Mi plan").title).toBe("Mi plan");
   });
 

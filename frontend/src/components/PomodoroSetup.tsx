@@ -4,10 +4,11 @@
 import { Play, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/bridge";
-import { BREAK_CHOICES, FOCUS_CHOICES } from "../lib/pomodoro";
+import { BREAK_CHOICES, FOCUS_CHOICES, inferWork } from "../lib/pomodoro";
 import { useApp } from "../store/app";
 import { usePomodoro } from "../store/pomodoro";
 import { AssignPanel } from "./mentor/AssignPanel";
+import { WorkPicker } from "./mentor/WorkPicker";
 import { cn } from "./ui";
 
 /** La clave del área de las sesiones sin área. */
@@ -75,7 +76,7 @@ export function PomodoroSetup() {
       toast("info", "Completa primero el registro de la sesión anterior.");
       return;
     }
-    start(plan.id, areaKey || FREE_AREA);
+    start(plan.id, areaKey || FREE_AREA, p.work ?? inferWork(p.assignedTopics));
   };
 
   return (
@@ -108,6 +109,8 @@ export function PomodoroSetup() {
               <option value={BASES_AREA}>Bases</option>
             </select>
           </label>
+
+          <WorkPicker value={p.work ?? inferWork(p.assignedTopics)} onChange={(w) => usePomodoro.getState().setWork(w)} />
 
           <div className="border-t border-line pt-4">
             <AssignPanel defaultOpen>

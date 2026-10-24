@@ -3,6 +3,7 @@
 
 import { create } from "zustand";
 import { advance, idlePomodoro, pause, resume, startFocus, type AssignedTopic, type PomodoroAssessment, type PomodoroState, type PomodoroTimerMode } from "../lib/pomodoro";
+import type { WorkKind } from "../lib/timeLog";
 
 interface PomodoroStore {
   p: PomodoroState;
@@ -16,11 +17,14 @@ interface PomodoroStore {
   assignTopic: (topic: AssignedTopic) => void;
   removeAssignedTopic: (folder: string) => void;
   clearAssignedTopics: () => void;
-  start: (planId: string, areaKey: string) => void;
+  /** el tipo de trabajo del próximo bloque (o `null`) */
+  setWork: (work: WorkKind | null) => void;
+  /** `work` (si se da) fija el tipo; si no, se conserva el que ya estuviera elegido */
+  start: (planId: string, areaKey: string, work?: WorkKind | null) => void;
   pause: () => void;
   resume: () => void;
   /** pasa de fase; devuelve los minutos de foco a guardar (0 si no hay) */
-  next: (stop?: boolean) => { planId: string; areaKey: string; minutes: number; assessment: PomodoroAssessment | null };
+  next: (stop?: boolean) => { planId: string; areaKey: string; minutes: number; work: WorkKind | null; topics: AssignedTopic[]; assessment: PomodoroAssessment | null };
   bump: () => void;
   clearAssessment: () => void;
   /** abre la evaluación para una sesión hecha sin Pomodoro (el botón «Registrar sesión») */
@@ -42,10 +46,11 @@ export const usePomodoro = create<PomodoroStore>((set, get) => ({
     p: { ...s.p, assignedTopics: s.p.assignedTopics.filter((t) => t.folder !== folder) },
   })),
   clearAssignedTopics: () => set((s) => ({ p: { ...s.p, assignedTopics: [] } })),
-  start: (planId, areaKey) => {
+  setWork: (work) => set((s) => ({ p: { ...s.p, work } })),
+  start: (planId, areaKey, work) => {
     const cur = get().p;
     if (cur.pendingAssessment) return; // Bloqueado hasta completar evaluación
-    set((s) => ({ p: startFocus(s.p, planId, areaKey, Date.now()) }));
+    set((s) => ({ p: startFocus(work === undefined ? s.p : { ...s.p, work }, planId, areaKey, Date.now()) }));
   },
   pause: () => set((s) => ({ p: pause(s.p, Date.now()) })),
   resume: () => set((s) => ({ p: resume(s.p, Date.now()) })),
@@ -53,7 +58,7 @@ export const usePomodoro = create<PomodoroStore>((set, get) => ({
     const cur = get().p;
     const r = advance(cur, Date.now(), stop);
     set({ p: r.state });
-    return { planId: cur.planId, areaKey: cur.areaKey, minutes: r.logMinutes, assessment: r.assessment };
+    return { planId: cur.planId, areaKey: cur.areaKey, minutes: r.logMinutes, work: cur.work, topics: cur.assignedTopics, assessment: r.assessment };
   },
   bump: () => set((s) => ({ logVersion: s.logVersion + 1 })),
   clearAssessment: () => set((s) => ({ p: { ...s.p, pendingAssessment: null } })),

@@ -33,7 +33,8 @@ import { FOCUS_LABEL, PHASE_LABEL, PRACTICE_PHASES, practiceDayMinutes, weekTitl
 import { buildFocusSchedule, type BlockKind, type DayBlock, type DayFocus } from "./planDayFocus.js";
 import { isLive } from "./planRoute.js";
 import { topicProjectId, type TopicProject } from "./planTopicProject.js";
-import { dailyProjectOf, monthlyBlocksOf, shortOf, weeklyProjectOf, type PracticeCurriculum } from "./planCurriculum.js";
+import { dailyId, dailyProjectOf, shortOf, weeklyProjectOf, type PracticeCurriculum } from "./planCurriculum.js";
+import { chainIndex, planChain, type ChainSignals } from "./planChain.js";
 import type { DailyPace, ExtraPractice, ExtraTopic } from "./planPace.js";
 import { applyOverlay, planOverlay, planWithoutExtraRoute, validAsOf } from "./planPaceSchedule.js";
 
@@ -537,6 +538,8 @@ function finishDays(plan: SchedulePlan, days: ScheduleDay[]): void {
 export interface PracticeStatusLike {
   /** fechas (AAAA-MM-DD) con kata hecho */
   kataDoneDates?: string[];
+  /** por fecha (AAAA-MM-DD): áreas cuya carpeta de proyecto diario de ese día está completa (la señal del avance de la cadena diario → semanal → mensual) */
+  dailyProjectDone?: Record<string, string[]>;
   weeks: Array<{ week: number; phases: Record<PracticePhase, PhaseStatus> }>;
 }
 
@@ -553,7 +556,10 @@ export const monthName = (month: string): string => {
 const RANK: Record<PlanDeliverableStatus, number> = { pendiente: 0, en_curso: 1, hecho: 2 };
 const bestStatus = (a: PlanDeliverableStatus, b: PlanDeliverableStatus): PlanDeliverableStatus => (RANK[b] > RANK[a] ? b : a);
 const fromPhaseStatuses = (st: PhaseStatus[]): PlanDeliverableStatus => (st.length && st.every((s) => s === "hecho") ? "hecho" : st.some((s) => s === "hecho" || s === "en_curso") ? "en_curso" : "pendiente");
-const AREA_STATUS: Record<"idea" | "en_curso" | "hecho", PlanDeliverableStatus> = { idea: "pendiente", en_curso: "en_curso", hecho: "hecho" };
+function areaProjectStatus(areaId: string | undefined, chain: { months: ReadonlyArray<{ areaIds: string[]; status: PlanDeliverableStatus; done: number }> } | null): PlanDeliverableStatus {
+  const ms = (chain?.months ?? []).filter((m) => !areaId || m.areaIds.includes(areaId));
+  return ms.length && ms.every((m) => m.status === "hecho") ? "hecho" : ms.some((m) => m.done > 0) ? "en_curso" : "pendiente";
+}
 
 /**
  * Todos los entregables del plan: los de PRÁCTICA derivados de la pista (un archivo de kata por día con kata, un proyecto por semana,
@@ -567,7 +573,7 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
   const push = (d: PlanDeliverable): void => {
     const man = stored.get(d.id);
     used.add(d.id);
-    // el proyecto diario se deriva siempre del reparto actual: solo se conserva lo anotado a mano (estado y archivos)
+    // el proyecto diario se deriva siempre del reparto actual: del guardado solo se conservan los archivos; se preserva lo completado
     if (!man) return void out.push(d);
     const merged: PlanDeliverable = { ...d, ...man, status: bestStatus(d.status, man.status), kind: d.kind, source: d.source, ...(d.kind === "daily_project" || d.kind === "topic_project" ? { title: d.title, description: d.description, dueDate: d.dueDate, criteria: d.criteria } : {}) };
     // el área sale siempre de lo derivado (lo anotado a mano no la fija)
@@ -580,6 +586,15 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
   const track = plan.programmingPractice;
   const blocked = new Set(plan.preconditions?.blockedDates ?? []);
   const kataDone = new Set(practice?.kataDoneDates ?? []);
+  // la cadena diario → semanal → mensual (planes por áreas): su avance sale SOLO de lo que el estudiante completa
+  const areasPlan = plan.structure === "areas";
+  const sch0 = areasPlan ? (schedule ?? buildSchedule(plan)) : schedule;
+  const signals: ChainSignals = {
+    ...(practice?.dailyProjectDone ? { dailyProjectDone: practice.dailyProjectDone } : {}),
+    weeksDone: new Set((practice?.weeks ?? []).filter((x) => PRACTICE_PHASES.every((p) => x.phases[p] === "hecho")).map((x) => x.week)),
+  };
+  const chainModel = areasPlan && sch0 ? planChain(plan, sch0, signals) : null;
+  const chain = chainModel ? chainIndex(chainModel) : null;
   if (track?.kata) {
     const kd = new Set(track.kata.days);
     for (const date of eachDay(plan.start, plan.end)) {
@@ -609,11 +624,12 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
       dueDate: w.sessions[w.sessions.length - 1]!.date,
       criteria: PRACTICE_PHASES.map((p) => `${PHASE_LABEL[p]} hecha`),
       areaId: "all",
-      status: st ? fromPhaseStatuses(PRACTICE_PHASES.map((p) => st.phases[p])) : "pendiente",
+      status: bestStatus(st ? fromPhaseStatuses(PRACTICE_PHASES.map((p) => st.phases[p])) : "pendiente", chain?.weeks.get(`wp:${w.week}`)?.status ?? "pendiente"),
       source: "practice",
     });
   }
   const ranges = weekRangesOf(plan.start, plan.end);
+  // si la pista trae bloque mensual de Programming practice, se incluye ese proyecto mensual
   for (const b of track?.monthlyProject?.blocks ?? []) {
     const lastWeek = weeks.filter((w) => w.week >= b.fromWeek && w.week <= b.toWeek && w.sessions.length).at(-1);
     const due = lastWeek?.sessions.at(-1)?.date ?? ranges[Math.min(ranges.length, b.toWeek) - 1]?.end ?? plan.end;
@@ -634,11 +650,11 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
   }
   // agenda por enfoque: proyecto DIARIO (todos los días de estudio), SEMANAL (sin pista) y MENSUAL (sin pista mensual)
   if (plan.structure === "areas") {
-    const sch = schedule ?? buildSchedule(plan);
+    const sch = sch0!;
     for (const day of sch.days) {
       const p = dailyProjectOf(plan, sch, day);
       if (!p) continue;
-      push({ id: p.id, kind: "daily_project", title: p.title, description: p.description, dueDate: day.date, ...areaFields(p.areaIds), criteria: ["Aplica los temas de teoría y práctica del día", "Se puede ejecutar y explicar", "Suma una pieza al proyecto semanal"], status: "pendiente", source: p.source === "ai" ? "ai" : "practice" });
+      push({ id: p.id, kind: "daily_project", title: p.title, description: p.description, dueDate: day.date, ...areaFields(p.areaIds), criteria: ["Aplica los temas de teoría y práctica del día", "Se puede ejecutar y explicar", "Suma una pieza al proyecto semanal"], status: chain?.pieces.get(p.id)?.status ?? "pendiente", source: p.source === "ai" ? "ai" : "practice" });
       // proyecto de aplicación de los temas que se completan este día (calibrado al nivel; cuenta como entregable)
       for (const tp of day.topicProjects ?? []) {
         push({
@@ -649,7 +665,8 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
           dueDate: day.date,
           ...areaFields(tp.areaId ? [tp.areaId] : []),
           criteria: [`Aplica «${shortOf(tp.title)}» de forma real`, `Nivel ${tp.project.level}: no pidas más de lo que ya dominas`, "Funciona y puedes explicarlo"],
-          status: "pendiente",
+          // sin señal propia: se completa con la pieza de su día
+          status: chain?.pieces.get(dailyId(day.date))?.status ?? "pendiente",
           source: tp.project.source === "ai" ? "ai" : "practice",
         });
       }
@@ -659,13 +676,12 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
       const wp = weeklyProjectOf(plan, sch, w);
       const last = sch.days.filter((d) => d.week === w && d.study).at(-1);
       if (!wp || !last) continue;
-      push({ id: wp.id, kind: "weekly_project", title: wp.title, description: wp.description, dueDate: last.date, ...areaFields(wp.areaIds), criteria: ["Integra los mini-proyectos diarios de la semana", "Se puede ejecutar de principio a fin"], status: "pendiente", source: wp.source === "ai" ? "ai" : "practice" });
+      push({ id: wp.id, kind: "weekly_project", title: wp.title, description: wp.description, dueDate: last.date, ...areaFields(wp.areaIds), criteria: ["Integra los mini-proyectos diarios de la semana", "Se puede ejecutar de principio a fin"], status: chain?.weeks.get(wp.id)?.status ?? "pendiente", source: wp.source === "ai" ? "ai" : "practice" });
     }
-    if (!track?.monthlyProject?.blocks.length) {
-      for (const b of monthlyBlocksOf(plan, sch)) {
-        const lastDay = sch.days.filter((d) => d.study && (b.month ? d.date.startsWith(b.month) : d.week >= b.fromWeek && d.week <= b.toWeek)).at(-1);
-        if (!lastDay) continue;
-        push({ id: b.id, kind: "monthly_project", title: b.title, description: b.description, dueDate: lastDay.date, ...areaFields(b.areaIds), criteria: ["Integra lo hecho en los proyectos semanales del mes", "Se puede ejecutar y explicar de principio a fin"], status: "pendiente", source: b.source === "ai" ? "ai" : "practice" });
+    // UN proyecto mensual (= el entregable del mes) por mes del plan, con su estado derivado de sus semanas (si no viene de la pista)
+    if (!track?.monthlyProject?.blocks?.length) {
+      for (const mth of chain ? [...chain.months.values()] : []) {
+        push({ id: mth.id, kind: "monthly_project", title: mth.title, description: mth.goal, dueDate: mth.dueDate, ...areaFields(mth.areaIds), criteria: mth.criteria, status: mth.status, source: mth.source === "ai" ? "ai" : "practice" });
       }
     }
   }
@@ -681,7 +697,8 @@ export function deliverablesOf(plan: SchedulePlan, practice?: PracticeStatusLike
       ...(sub.areaId ? { areaId: sub.areaId } : {}),
       dueDate: ranges[toWeek - 1]?.end ?? plan.end,
       criteria: d.criteria,
-      status: AREA_STATUS[d.status],
+      // el proyecto de área también se deriva: hecho cuando lo están los meses en que participa el área
+      status: bestStatus(d.status ?? "pendiente", areaProjectStatus(sub.areaId, chainModel)),
       source: "ai",
     });
   }

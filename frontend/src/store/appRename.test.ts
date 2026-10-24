@@ -40,9 +40,9 @@ beforeEach(reset);
 
 describe("renombrar un fichero abierto", () => {
   it("la nota activa sigue activa con su ruta nueva", async () => {
-    await app().openNote("a.md");
-    await app().openNote("b.md");
-    await app().openNote("c.md");
+    await app().openNote("a.md", { pin: true });
+    await app().openNote("b.md", { pin: true });
+    await app().openNote("c.md", { pin: true });
     app().setActiveTab("note:b.md");
 
     app().pathRenamed("b.md", "b2.md");
@@ -55,8 +55,8 @@ describe("renombrar un fichero abierto", () => {
   });
 
   it("renombrar otra nota no mueve la activa", async () => {
-    await app().openNote("a.md");
-    await app().openNote("b.md");
+    await app().openNote("a.md", { pin: true });
+    await app().openNote("b.md", { pin: true });
     app().setActiveTab("note:b.md");
 
     app().pathRenamed("a.md", "a2.md");
@@ -75,8 +75,8 @@ describe("renombrar un fichero abierto", () => {
 
 describe("renombrar una carpeta", () => {
   it("mueve la activa al archivo con la misma ruta dentro de la carpeta nueva", async () => {
-    await app().openNote("curso/a.md");
-    await app().openNote("curso/b.md");
+    await app().openNote("curso/a.md", { pin: true });
+    await app().openNote("curso/b.md", { pin: true });
     app().setActiveTab("note:curso/b.md");
 
     app().pathRenamed("curso", "2026");
@@ -113,8 +113,8 @@ describe("tipos de pestaña", () => {
   });
 
   it("los pines siguen a la nota renombrada y se van con la borrada", async () => {
-    await app().openNote("a.md");
-    await app().openNote("curso/b.md");
+    await app().openNote("a.md", { pin: true });
+    await app().openNote("curso/b.md", { pin: true });
     app().pinTab("note:a.md");
     app().pinTab("note:curso/b.md");
 

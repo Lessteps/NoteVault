@@ -72,7 +72,7 @@ function browseFolder(dir: string, at: { clientX: number; clientY: number }, fro
           : {
               label: e.name,
               icon: <FileText />,
-              onSelect: () => (e.kind === "canvas" ? s.openTab({ kind: "canvas", path: e.path }) : void s.openNote(e.path)),
+              onSelect: () => (e.kind === "canvas" ? s.openTab({ kind: "canvas", path: e.path }, { preview: true }) : void s.openNote(e.path)),
             },
       );
     }

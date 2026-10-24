@@ -1,5 +1,5 @@
 import { ChevronRight, FileCode2, FileText, Folder, FolderOpen, LayoutDashboard } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 import { api } from "../../lib/bridge";
 import type { IndexEntry, TreeEntry } from "../../lib/types";
 import { useVirtualList } from "../../lib/useVirtualList";
@@ -8,6 +8,7 @@ import { copyText } from "../../lib/clipboard";
 import { useAssistant } from "../../store/assistant";
 import { generateTopicFrom } from "../study/StudySpaceDialog";
 import { RouteBadge, useRouteView } from "../study/RouteUi";
+import type { RouteInfo } from "../../store/mentorRoute";
 import { fileMenuItems, pathFlavors, treeRootMenuItems, type PathFlavor } from "./fileMenu";
 import { MoveEntryDialog } from "./MoveEntryDialog";
 import { VersionHistoryDialog } from "./VersionHistoryDialog";
@@ -124,14 +125,20 @@ export async function openFolderView(entry: TreeEntry, toggle: (path: string) =>
   toggle(entry.path);
 }
 
-function openEntry(entry: TreeEntry) {
+/** Un clic abre en la pestaña de vista previa; `pin` (Ctrl+clic, rueda, menú) la abre como pestaña permanente. */
+function openEntry(entry: TreeEntry, pin = false) {
   const s = useApp.getState();
   if (entry.kind === "canvas") {
     // A canvas is a tab like any other target; NotesModule loads it.
-    s.openTab({ kind: "canvas", path: entry.path });
+    s.openTab({ kind: "canvas", path: entry.path }, pin ? undefined : { preview: true });
     return;
   }
-  void s.openNote(entry.path);
+  void s.openNote(entry.path, pin ? { pin: true } : undefined);
+}
+
+/** Doble clic: la pestaña de vista previa del archivo pasa a ser permanente. */
+function keepEntry(entry: TreeEntry) {
+  useApp.getState().keepTab(`${entry.kind === "canvas" ? "canvas" : "note"}:${entry.path}`);
 }
 
 function EntryIcon({ entry, open }: { entry: TreeEntry; open: boolean }) {
@@ -145,6 +152,110 @@ function EntryIcon({ entry, open }: { entry: TreeEntry; open: boolean }) {
   return <FileText className={cn(cls, "text-accent-text")} strokeWidth={1.7} />;
 }
 
+/**
+ * Drop-target highlight lives outside React state: dragging over rows only
+ * re-renders the rows whose highlight changes, never the whole tree.
+ */
+let dropTargetPath: string | null = null;
+const dropListeners = new Set<() => void>();
+function setDropTargetPath(next: string | null | ((t: string | null) => string | null)) {
+  const v = typeof next === "function" ? next(dropTargetPath) : next;
+  if (v === dropTargetPath) return;
+  dropTargetPath = v;
+  dropListeners.forEach((l) => l());
+}
+function subscribeDrop(cb: () => void) {
+  dropListeners.add(cb);
+  return () => void dropListeners.delete(cb);
+}
+function useIsDropTarget(path: string): boolean {
+  return useSyncExternalStore(subscribeDrop, () => dropTargetPath === path);
+}
+
+function dropHandlers(folder: string, onDropInto: (src: string, folder: string) => void) {
+  return {
+    "data-dropzone": "1",
+    onDragOver: (e: DragEvent) => {
+      if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setDropTargetPath(folder);
+    },
+    onDragLeave: () => setDropTargetPath((t) => (t === folder ? null : t)),
+    onDrop: (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDropTargetPath(null);
+      onDropInto(e.dataTransfer.getData(DRAG_MIME), folder);
+    },
+  };
+}
+
+export interface TreeRowProps {
+  entry: TreeEntry;
+  depth: number;
+  open: boolean;
+  isActive: boolean;
+  isRevealed: boolean;
+  routeInfo: RouteInfo | undefined;
+  routePreview: boolean;
+  toggle: (path: string) => void;
+  onMenu: (entry: TreeEntry, e: React.MouseEvent) => void;
+  onDropInto: (src: string, folder: string) => void;
+}
+
+/** One explorer row. Memoized: hovering is pure CSS and never touches React. */
+export const TreeRow = memo(function TreeRow({
+  entry, depth, open, isActive, isRevealed, routeInfo, routePreview, toggle, onMenu, onDropInto,
+}: TreeRowProps) {
+  const isFolder = entry.type === "folder";
+  const isDrop = useIsDropTarget(entry.path);
+  return (
+    <div
+      role="treeitem"
+      aria-expanded={isFolder ? open : undefined}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_MIME, entry.path);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      {...(isFolder ? dropHandlers(entry.path, onDropInto) : {})}
+      onClick={(e) => (isFolder ? void openFolderView(entry, toggle, open) : openEntry(entry, e.ctrlKey || e.metaKey))}
+      onDoubleClick={() => !isFolder && keepEntry(entry)}
+      onAuxClick={(e) => e.button === 1 && !isFolder && openEntry(entry, true)}
+      onContextMenu={(e) => onMenu(entry, e)}
+      className={cn(
+        "group flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md pr-2 text-[13px] [contain:layout_style]",
+        isActive ? "bg-accent-soft text-text" : "text-dim hover:bg-hover hover:text-text",
+        isDrop && "outline outline-1 outline-accent",
+        isFolder && isRevealed && "ring-1 ring-accent bg-accent-soft",
+        isFolder && routeInfo?.route === "skipped" && "opacity-60",
+      )}
+      style={{ paddingLeft: 6 + depth * 14 }}
+    >
+      <button
+        type="button"
+        title={open ? "Contraer" : "Expandir"}
+        aria-label={open ? `Contraer ${entry.name}` : `Expandir ${entry.name}`}
+        onClick={(e) => {
+          // The chevron expands; the name opens the folder's view.
+          e.stopPropagation();
+          if (isFolder) toggle(entry.path);
+        }}
+        className={cn(
+          "grid h-4 w-4 flex-none place-items-center rounded",
+          !isFolder || entry.has_children === false ? "invisible" : "hover:bg-hover",
+        )}
+      >
+        <ChevronRight className={cn("h-3.5 w-3.5 text-faint transition-transform", open && "rotate-90")} />
+      </button>
+      <EntryIcon entry={entry} open={open} />
+      <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+      {isFolder && routeInfo && <RouteBadge info={routeInfo} compact preview={routePreview} />}
+    </div>
+  );
+});
+
 export function FileTree({ filter }: { filter: string }) {
   const version = useApp((s) => s.treeVersion);
   const active = useApp((s) => s.active);
@@ -152,7 +263,6 @@ export function FileTree({ filter }: { filter: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(loadExpanded);
   const expandedRef = useRef(expanded);
   const [index, setIndex] = useState<IndexEntry[] | null>(null);
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
   // La ruta del Mentor: un mapa carpeta → ruta calculado una vez por plan (ninguna fila hace llamadas)
   const route = useRouteView();
   const routeSnap = route.available ? route.snap : null;
@@ -201,7 +311,7 @@ export function FileTree({ filter }: { filter: string }) {
     }
   }, [filter, index]);
 
-  const toggle = (path: string) => {
+  const toggle = useCallback((path: string) => {
     setExpanded((ex) => {
       const next = new Set(ex);
       if (next.has(path)) next.delete(path);
@@ -211,9 +321,9 @@ export function FileTree({ filter }: { filter: string }) {
       }
       return next;
     });
-  };
+  }, [load]);
 
-  const moveInto = async (src: string, destFolder: string) => {
+  const moveInto = useCallback(async (src: string, destFolder: string) => {
     if (!src || parentOf(src) === destFolder || src === destFolder) return;
     const s = useApp.getState();
     try {
@@ -232,37 +342,18 @@ export function FileTree({ filter }: { filter: string }) {
     } catch (e) {
       s.toast("error", (e as Error).message);
     }
-  };
+  }, [load]);
 
-  const onDragStart = (e: DragEvent, path: string) => {
-    e.dataTransfer.setData(DRAG_MIME, path);
-    e.dataTransfer.effectAllowed = "move";
-  };
-  const dropProps = (folder: string) => ({
-    "data-dropzone": "1",
-    onDragOver: (e: DragEvent) => {
-      if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setDropTarget(folder);
-    },
-    onDragLeave: () => setDropTarget((t) => (t === folder ? null : t)),
-    onDrop: (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setDropTarget(null);
-      void moveInto(e.dataTransfer.getData(DRAG_MIME), folder);
-    },
-  });
+  const onDropInto = useCallback((src: string, folder: string) => void moveInto(src, folder), [moveInto]);
 
   /** Every action the right-click menu offers for an entry. */
   const [moveEntry, setMoveEntry] = useState<TreeEntry | null>(null);
   const [historyEntry, setHistoryEntry] = useState<string | null>(null);
 
-  const menuActions = (entry: TreeEntry) => {
+  const menuActions = useCallback((entry: TreeEntry) => {
     const s = useApp.getState();
     return {
-      openInNewTab: () => openEntry(entry),
+      openInNewTab: () => openEntry(entry, true),
       openToTheRight: () => void s.openSide(entry.path),
       openInNewWindow: () => {
         void api.openInNewWindow(entry.path).catch((e: Error) => s.toast("error", e.message));
@@ -306,9 +397,9 @@ export function FileTree({ filter }: { filter: string }) {
       },
       generateTopic: () => void generateTopicFrom(entry.path),
     };
-  };
+  }, []);
 
-  const menuFor = (entry: TreeEntry) => (e: React.MouseEvent) => {
+  const openEntryMenu = useCallback((entry: TreeEntry, e: React.MouseEvent) => {
     e.stopPropagation();
     const known = useApp.getState().notes[entry.path]?.bookmarked;
     openMenu(
@@ -318,7 +409,8 @@ export function FileTree({ filter }: { filter: string }) {
         menuActions(entry),
       ),
     );
-  };
+  }, [menuActions]);
+  const menuFor = (entry: TreeEntry) => (e: React.MouseEvent) => openEntryMenu(entry, e);
 
   const onEmptyContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -465,65 +557,28 @@ export function FileTree({ filter }: { filter: string }) {
       role="tree"
       className="h-full overflow-y-auto px-2 py-1"
       onContextMenu={onEmptyContextMenu}
-      {...dropProps("")}
+      {...dropHandlers("", onDropInto)}
     >
       {children[""]?.length === 0 ? (
         <div className="px-2 py-3 text-[12px] text-faint">El vault está vacío. Crea tu primera nota.</div>
       ) : (
         <div style={{ height: treeVirtual.totalHeight, position: "relative" }}>
           <div style={{ transform: `translateY(${treeVirtual.startOffset}px)` }}>
-            {visibleTree.map(({ entry, depth }) => {
-              const isFolder = entry.type === "folder";
-              const open = isFolder && expanded.has(entry.path);
-              return (
-                <div
-                  key={entry.path}
-                  role="treeitem"
-                  aria-expanded={isFolder ? open : undefined}
-                  draggable
-                  onDragStart={(e) => onDragStart(e, entry.path)}
-                  {...(isFolder ? dropProps(entry.path) : {})}
-                  onClick={() => (isFolder ? void openFolderView(entry, toggle, open) : openEntry(entry))}
-                  onAuxClick={(e) => e.button === 1 && !isFolder && openEntry(entry)}
-                  onContextMenu={menuFor(entry)}
-                  className={cn(
-                    "group flex h-[30px] cursor-pointer items-center gap-1.5 rounded-md pr-2 text-[13px]",
-                    active === entry.path
-                      ? "bg-accent-soft text-text"
-                      : "text-dim hover:bg-hover hover:text-text",
-                    dropTarget === entry.path && "outline outline-1 outline-accent",
-                    isFolder && revealFolder?.path === entry.path && "ring-1 ring-accent bg-accent-soft",
-                    isFolder && routeSnap?.byFolder.get(entry.path)?.route === "skipped" && "opacity-60",
-                  )}
-                  style={{ paddingLeft: 6 + depth * 14 }}
-                >
-                  <button
-                    type="button"
-                    title={open ? "Contraer" : "Expandir"}
-                    aria-label={open ? `Contraer ${entry.name}` : `Expandir ${entry.name}`}
-                    onClick={(e) => {
-                      // The chevron expands; the name opens the folder's view.
-                      e.stopPropagation();
-                      if (isFolder) toggle(entry.path);
-                    }}
-                    className={cn(
-                      "grid h-4 w-4 flex-none place-items-center rounded",
-                      !isFolder || entry.has_children === false ? "invisible" : "hover:bg-hover",
-                    )}
-                  >
-                    <ChevronRight
-                      className={cn("h-3.5 w-3.5 text-faint transition-transform", open && "rotate-90")}
-                    />
-                  </button>
-                  <EntryIcon entry={entry} open={open} />
-                  <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                  {isFolder && routeSnap && (() => {
-                    const info = routeSnap.byFolder.get(entry.path);
-                    return info ? <RouteBadge info={info} compact preview={route.preview} /> : null;
-                  })()}
-                </div>
-              );
-            })}
+            {visibleTree.map(({ entry, depth }) => (
+              <TreeRow
+                key={entry.path}
+                entry={entry}
+                depth={depth}
+                open={entry.type === "folder" && expanded.has(entry.path)}
+                isActive={active === entry.path}
+                isRevealed={revealFolder?.path === entry.path}
+                routeInfo={entry.type === "folder" ? routeSnap?.byFolder.get(entry.path) : undefined}
+                routePreview={route.preview}
+                toggle={toggle}
+                onMenu={openEntryMenu}
+                onDropInto={onDropInto}
+              />
+            ))}
           </div>
         </div>
       )}

@@ -133,6 +133,12 @@ interface State {
   openTabs: AppTab[];
   activeTabId: string | null;
   pinnedTabIds: Set<string>;
+  /**
+   * The one reusable "preview" tab (italic title): what explorer clicks, links and
+   * Mentor actions open. The next navigation replaces it; editing it, double-clicking
+   * it or opening it explicitly in a new tab makes it permanent. Not persisted.
+   */
+  previewTabId: string | null;
 
   // ── Note state (notes open in note/canvas tabs) ────────────────────
   /** Note data keyed by vault-relative path. */
@@ -179,14 +185,18 @@ interface State {
   setCursor: (c: { line: number; col: number } | null) => void;
 
   // ── Tab actions ────────────────────────────────────────────────────
-  openTab: (tab: TabSpec) => void;
+  /** Notes and canvases opened with `preview` reuse the preview tab; the rest are permanent. */
+  openTab: (tab: TabSpec, opts?: { preview?: boolean }) => void;
   closeTab: (tabId: string) => Promise<void>;
   setActiveTab: (tabId: string) => void;
+  /** Makes the preview tab a permanent one (double-click, edit). */
+  keepTab: (tabId: string) => void;
   pinTab: (tabId: string) => void;
   unpinTab: (tabId: string) => void;
 
   // ── Note actions ───────────────────────────────────────────────────
-  openNote: (path: string, opts?: { line?: number }) => Promise<void>;
+  /** Opens in the preview tab; `pin: true` opens (or keeps) it as a permanent tab ("Abrir en pestaña nueva"). */
+  openNote: (path: string, opts?: { line?: number; pin?: boolean }) => Promise<void>;
   /** Close a note tab by note path (legacy alias used by EditorArea). */
   closeNoteTab: (path: string) => Promise<void>;
   setActive: (path: string) => void;
@@ -305,6 +315,50 @@ function pickSurvivor(before: AppTab[], remaining: AppTab[], closedId: string): 
   return positions[0]!.tab.tabId;
 }
 
+/**
+ * Puts `tab` in the strip the way a desktop editor does. A *preview* tab (what a
+ * single click in the explorer, a link or a Mentor action opens) takes the place
+ * of the previous preview instead of piling up; a permanent one is just added.
+ * A tab that is already open is only focused (and made permanent if asked to).
+ * The preview is never replaced when it is locked, edited or unsaved: it stays.
+ */
+function placeTab(
+  st: Pick<State, "openTabs" | "previewTabId" | "pinnedTabIds" | "notes" | "side">,
+  tab: AppTab,
+  preview: boolean,
+): Pick<State, "openTabs" | "previewTabId" | "notes" | "side"> {
+  const { openTabs, previewTabId } = st;
+  if (openTabs.some((t) => t.tabId === tab.tabId)) {
+    return {
+      openTabs,
+      previewTabId: !preview && previewTabId === tab.tabId ? null : previewTabId,
+      notes: st.notes,
+      side: st.side,
+    };
+  }
+  if (!preview) return { openTabs: [...openTabs, tab], previewTabId, notes: st.notes, side: st.side };
+  const old = previewTabId ? openTabs.find((t) => t.tabId === previewTabId) : undefined;
+  const replaceable =
+    old &&
+    !st.pinnedTabIds.has(old.tabId) &&
+    (old.kind === "note" || old.kind === "canvas") &&
+    !(old.kind === "note" && (st.notes[old.path]?.dirty || st.notes[old.path]?.saving));
+  if (!old || !replaceable) {
+    return { openTabs: [...openTabs, tab], previewTabId: tab.tabId, notes: st.notes, side: st.side };
+  }
+  let notes = st.notes;
+  if (old.kind === "note") {
+    notes = { ...st.notes };
+    delete notes[old.path];
+  }
+  return {
+    openTabs: openTabs.map((t) => (t.tabId === old.tabId ? tab : t)),
+    previewTabId: tab.tabId,
+    notes,
+    side: old.kind === "note" && st.side === old.path ? null : st.side,
+  };
+}
+
 /** A state update: a partial state, or a function of the current state. */
 type Patch = Partial<State> | ((state: State) => State | Partial<State>);
 
@@ -355,6 +409,7 @@ export const useApp = create<State>((setState, get) => {
   openTabs: [],
   activeTabId: null,
   pinnedTabIds: new Set<string>(),
+  previewTabId: null,
   notes: {},
   treeVersion: 0,
   bookmarkVersion: 0,
@@ -489,7 +544,11 @@ export const useApp = create<State>((setState, get) => {
       }
     }
     const active = get().active;
-    set({ side: path, inkDraft: null, module: "notas" });
+    // A note shown in the split pane is one you are working with: keep its tab.
+    set((st) => ({
+      side: path, inkDraft: null, module: "notas",
+      previewTabId: st.previewTabId === `note:${path}` ? null : st.previewTabId,
+    }));
     if (!active || active === path) {
       // Activate a different note tab if possible
       const other = get().openTabs.find((t) => (t.kind === "note" || t.kind === "canvas") && t.tabId !== `note:${path}`);
@@ -500,7 +559,7 @@ export const useApp = create<State>((setState, get) => {
   setCursor: (cursor) => set({ cursor }),
 
   // ── Generic tab ops ──────────────────────────────────────────────────
-  openTab: (tabSpec) => {
+  openTab: (tabSpec, opts) => {
     let newTab: AppTab;
     let id: string;
     const kind = tabSpec.kind;
@@ -522,11 +581,13 @@ export const useApp = create<State>((setState, get) => {
     }
     const { openTabs } = get();
     const exists = openTabs.find((t) => t.tabId === id);
-    if (exists) {
-      set({ activeTabId: id, module: tabModuleId(exists) });
-      return;
-    }
-    set({ openTabs: [...openTabs, newTab], activeTabId: id, module: tabModuleId(newTab) });
+    const file = newTab.kind === "note" || newTab.kind === "canvas";
+    const placed = placeTab(get(), newTab, file && opts?.preview === true);
+    set({ ...placed, activeTabId: id, module: tabModuleId(exists ?? newTab) });
+  },
+
+  keepTab: (id) => {
+    if (get().previewTabId === id) set({ previewTabId: null });
   },
 
   closeTab: async (tabIdToClose) => {
@@ -557,6 +618,7 @@ export const useApp = create<State>((setState, get) => {
         openTabs: newTabs,
         notes: newNotes,
         activeTabId: nextId,
+        previewTabId: st.previewTabId === tabIdToClose ? null : st.previewTabId,
         module: nextTab ? tabModuleId(nextTab) : st.module,
         side: tab.kind === "note" && st.side === tab.path ? null : st.side,
       };
@@ -573,7 +635,7 @@ export const useApp = create<State>((setState, get) => {
     const pinned = new Set(get().pinnedTabIds);
     pinned.add(id);
     savePinned(get().vault, pinned);
-    set({ pinnedTabIds: pinned });
+    set({ pinnedTabIds: pinned, previewTabId: get().previewTabId === id ? null : get().previewTabId });
   },
 
   unpinTab: (id) => {
@@ -588,29 +650,36 @@ export const useApp = create<State>((setState, get) => {
     pathEvents.opened.forEach((f) => f(path));
     const s = get();
     const noteTabId = `note:${path}`;
+    const preview = opts?.pin !== true;
+    const newTab: AppTab = { kind: "note", path, tabId: noteTabId };
     if (s.notes[path]) {
-      const existing = s.openTabs.find((t) => t.tabId === noteTabId);
-      set((st) => ({
-        activeTabId: noteTabId,
-        module: "notas",
-        side: st.side === path ? st.active : st.side,
-        openTabs: existing ? st.openTabs : [...st.openTabs, { kind: "note", path, tabId: noteTabId }],
-        notes: opts?.line !== undefined
-          ? { ...st.notes, [path]: { ...st.notes[path]!, revealLine: opts.line } }
-          : st.notes,
-      }));
+      set((st) => {
+        const placed = placeTab(st, newTab, preview);
+        const notes = placed.notes[path] ? placed.notes : st.notes;
+        return {
+          ...placed,
+          activeTabId: noteTabId,
+          module: "notas",
+          side: placed.side === path ? st.active : placed.side,
+          notes: opts?.line !== undefined
+            ? { ...notes, [path]: { ...notes[path]!, revealLine: opts.line } }
+            : notes,
+        };
+      });
       return;
     }
     try {
       const data = await api.readNote(path);
-      set((st) => ({
-        module: "notas",
-        notes: { ...st.notes, [path]: fromData(data, opts?.line) },
-        openTabs: st.openTabs.some((t) => t.tabId === noteTabId)
-          ? st.openTabs
-          : [...st.openTabs, { kind: "note", path, tabId: noteTabId }],
-        activeTabId: noteTabId,
-      }));
+      set((st) => {
+        // The note may have been opened while the file was being read.
+        const placed = placeTab(st, newTab, preview);
+        return {
+          ...placed,
+          module: "notas",
+          notes: { ...placed.notes, [path]: st.notes[path] ?? fromData(data, opts?.line) },
+          activeTabId: noteTabId,
+        };
+      });
     } catch (e) {
       get().toast("error", (e as Error).message);
     }
@@ -635,7 +704,11 @@ export const useApp = create<State>((setState, get) => {
     set((st) => {
       const n = st.notes[path];
       if (!n || n.raw === raw) return st;
-      return { notes: { ...st.notes, [path]: { ...n, raw, dirty: true } } };
+      // Editing a note makes its preview tab permanent.
+      return {
+        notes: { ...st.notes, [path]: { ...n, raw, dirty: true } },
+        previewTabId: st.previewTabId === `note:${path}` ? null : st.previewTabId,
+      };
     });
     const prev = saveTimers.get(path);
     if (prev) clearTimeout(prev);
@@ -784,6 +857,7 @@ export const useApp = create<State>((setState, get) => {
         openTabs,
         activeTabId,
         pinnedTabIds,
+        previewTabId: st.previewTabId ? remapTabId(st.previewTabId) : null,
         side: st.side ? remap(st.side) : null,
         treeVersion: st.treeVersion + 1,
       };
@@ -817,6 +891,7 @@ export const useApp = create<State>((setState, get) => {
         notes,
         activeTabId,
         pinnedTabIds,
+        previewTabId: st.previewTabId && openTabs.some((t) => t.tabId === st.previewTabId) ? st.previewTabId : null,
         module: activeTab ? tabModuleId(activeTab) : st.module,
         side: st.side && gone(st.side) ? null : st.side,
         treeVersion: st.treeVersion + 1,

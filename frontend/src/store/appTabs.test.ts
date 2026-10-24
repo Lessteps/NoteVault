@@ -42,12 +42,83 @@ function reset() {
     active: null,
     tabs: [],
     pinnedTabIds: new Set<string>(),
+    previewTabId: null,
     notes: {},
     toasts: [],
   });
 }
 
 beforeEach(reset);
+
+// Standard editor behaviour: navigating reuses one italic preview tab.
+describe("preview tab", () => {
+  const ids = () => app().openTabs.map((t) => t.tabId);
+
+  it("navigating A → B → C leaves a single preview tab", async () => {
+    await app().openNote("a.md");
+    await app().openNote("b.md");
+    await app().openNote("c.md");
+    expect(ids()).toEqual(["note:c.md"]);
+    expect(app().previewTabId).toBe("note:c.md");
+    expect(app().activeTabId).toBe("note:c.md");
+    expect(Object.keys(app().notes)).toEqual(["c.md"]);
+  });
+
+  it("opening the same file twice never duplicates it", async () => {
+    await app().openNote("a.md");
+    await app().openNote("a.md");
+    await app().openNote("a.md", { pin: true });
+    expect(ids()).toEqual(["note:a.md"]);
+    expect(app().previewTabId).toBeNull();
+  });
+
+  it("double-click (keepTab) pins the preview; the next file gets a new preview", async () => {
+    await app().openNote("a.md");
+    app().keepTab("note:a.md");
+    await app().openNote("b.md");
+    await app().openNote("c.md");
+    expect(ids()).toEqual(["note:a.md", "note:c.md"]);
+    expect(app().previewTabId).toBe("note:c.md");
+  });
+
+  it("editing a note makes its tab permanent", async () => {
+    await app().openNote("a.md");
+    app().editRaw("a.md", "# cambiado\n");
+    await app().openNote("b.md");
+    expect(ids()).toEqual(["note:a.md", "note:b.md"]);
+    expect(app().previewTabId).toBe("note:b.md");
+  });
+
+  it("an explicit new tab (pin) is permanent and is not replaced", async () => {
+    await app().openNote("a.md", { pin: true });
+    await app().openNote("b.md");
+    await app().openNote("c.md");
+    expect(ids()).toEqual(["note:a.md", "note:c.md"]);
+  });
+
+  it("a locked (fijada) preview is not replaced", async () => {
+    await app().openNote("a.md");
+    app().pinTab("note:a.md");
+    await app().openNote("b.md");
+    expect(ids()).toEqual(["note:a.md", "note:b.md"]);
+  });
+
+  it("canvases share the preview slot and closing clears it", async () => {
+    await app().openNote("a.md");
+    app().openTab({ kind: "canvas", path: "m.canvas" }, { preview: true });
+    expect(ids()).toEqual(["canvas:m.canvas"]);
+    await app().closeTab("canvas:m.canvas");
+    expect(app().previewTabId).toBeNull();
+  });
+
+  it("Mentor open actions reuse the preview tab", async () => {
+    const { openTopicNote } = await import("../components/mentor/openTopic");
+    await app().openNote("a.md");
+    await openTopicNote("Tema");
+    await openTopicNote("Otro");
+    expect(ids()).toEqual(["note:Otro/Otro.md"]);
+  });
+});
 
 describe("unified tab strip", () => {
   it("reports the active note on every tab change (it must not freeze)", () => {
@@ -178,8 +249,8 @@ describe("unified tab strip", () => {
   });
 
   it("keeps one tab per note and follows the note that is shown", async () => {
-    await app().openNote("a.md");
-    await app().openNote("b.md");
+    await app().openNote("a.md", { pin: true });
+    await app().openNote("b.md", { pin: true });
     await app().openNote("a.md");
 
     expect(app().openTabs.map((t) => t.tabId)).toEqual(["note:a.md", "note:b.md"]);

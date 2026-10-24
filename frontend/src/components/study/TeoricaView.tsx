@@ -45,7 +45,7 @@ export function TeoricaView({ note }: { note: OpenNote }) {
         {mapPath && (
           <button
             type="button"
-            onClick={() => openTab({ kind: "canvas", path: mapPath })}
+            onClick={() => openTab({ kind: "canvas", path: mapPath }, { preview: true })}
             className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-[12.5px] text-dim hover:border-accent hover:text-text"
           >
             <LayoutDashboard size={14} className="text-mint" /> Abrir mapa

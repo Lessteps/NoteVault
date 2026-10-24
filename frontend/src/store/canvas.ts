@@ -92,6 +92,9 @@ export const useCanvas = create<CanvasState>((set, get) => {
       set((s) => (record
         ? { doc, dirty: true, past: [...s.past, s.doc].slice(-HISTORY), future: [] }
         : { doc, dirty: true }));
+      // Editing a canvas makes its preview tab permanent.
+      const p = get().path;
+      if (p) useApp.getState().keepTab(`canvas:${p}`);
       schedule();
     },
 

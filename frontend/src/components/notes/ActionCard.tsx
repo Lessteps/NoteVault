@@ -68,7 +68,7 @@ export function ActionCard({ action: proposed }: { action: ParsedAction }) {
       app.refreshTree();
       app.toast("info", `${res.written.length} archivo(s) creado(s)${res.skipped.length ? `, ${res.skipped.length} ya existían` : ""}.`);
       if (res.open) {
-        if (res.open.toLowerCase().endsWith(".canvas")) app.openTab({ kind: "canvas", path: res.open });
+        if (res.open.toLowerCase().endsWith(".canvas")) app.openTab({ kind: "canvas", path: res.open }, { preview: true });
         else await app.openNote(res.open);
       }
     } catch (e) {

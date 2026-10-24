@@ -81,7 +81,8 @@ function TabStrip() {
   const activeTabId = useApp((s) => s.activeTabId);
   const pinnedTabIds = useApp((s) => s.pinnedTabIds);
   const notes = useApp((s) => s.notes);
-  const { setActiveTab, closeTab, pinTab, unpinTab } = useApp.getState();
+  const previewTabId = useApp((s) => s.previewTabId);
+  const { setActiveTab, closeTab, pinTab, unpinTab, keepTab } = useApp.getState();
   const stripRef = useRef<HTMLDivElement>(null);
   const drag = useTabDrag((s) => s.drag);
   const dragging = useTabDrag((s) => s.draggingTabId);
@@ -132,6 +133,7 @@ function TabStrip() {
             aria-selected={isActive}
             title={tab.kind === "note" || tab.kind === "canvas" ? tab.path : label}
             onClick={() => setActiveTab(tab.tabId)}
+            onDoubleClick={() => keepTab(tab.tabId)}
             onAuxClick={(e) => e.button === 1 && !isPinned && void closeTab(tab.tabId)}
             draggable
             onDragStart={(e) => {
@@ -160,6 +162,7 @@ function TabStrip() {
               if (draggedId) useApp.getState().splitTab(draggedId, tab.tabId, side);
             }}
             onContextMenu={(e) => openMenu(e, [
+              ...(tab.tabId === previewTabId ? [{ label: "Mantener abierta", icon: <Pin />, onSelect: () => keepTab(tab.tabId) }] : []),
               isPinned
                 ? { label: "Dejar de fijar", icon: <PinOff />, onSelect: () => unpinTab(tab.tabId) }
                 : { label: "Fijar", icon: <Pin />, onSelect: () => pinTab(tab.tabId) },
@@ -186,7 +189,7 @@ function TabStrip() {
             )}
           >
             <TabIcon tab={tab} notes={notes as Record<string, { kind: string }>} />
-            <span className="min-w-0 flex-1 truncate">{label}</span>
+            <span className={cn("min-w-0 flex-1 truncate", tab.tabId === previewTabId && "italic")} data-preview={tab.tabId === previewTabId ? "true" : undefined}>{label}</span>
             {isPinned ? (
               <Pin size={11} className="flex-none text-accent-text" />
             ) : (

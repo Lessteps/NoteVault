@@ -42,7 +42,7 @@ export async function openTopicCanvas(folder: string): Promise<void> {
       toast("info", "Este tema aún no tiene canvas explicativo: se crea al generarlo desde «Ejecutar plan».");
       return;
     }
-    openTab({ kind: "canvas", path: pick.path });
+    openTab({ kind: "canvas", path: pick.path }, { preview: true });
   } catch (e) {
     toast("error", (e as Error).message);
   }

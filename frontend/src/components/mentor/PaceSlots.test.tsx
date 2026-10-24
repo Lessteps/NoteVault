@@ -150,14 +150,15 @@ describe("AddTopicSlot: «+ Tema» en cada día", () => {
     const rows = all("agenda-week-day");
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((r) => r.querySelector("[data-testid=add-extra-topic]"))).toBe(true);
-    // «Ver día» sigue siendo el primer botón de la fila (los atajos y las pruebas lo esperan)
-    expect(rows[0]!.querySelector("button")!.textContent).toBe("Ver día");
+    // el día de hoy tiene «Ver día» como su primer botón
+    const todayRow = rows.find((r) => r.dataset.date === TODAY)!;
+    expect(todayRow.querySelector("button")!.textContent).toBe("Ver día");
     vi.spyOn(api, "mentorPlanTopicCandidates").mockResolvedValue(candidates("P/Back/T25", "Back 25"));
     const add = vi.spyOn(api, "mentorPlanExtraTopicAdd").mockImplementation(async (o) => (saved = { ...basePlan(), extraTopics: [{ date: o.date!, folder: o.folder, addedAt: "x", source: "manual" }] }));
     const date = rows[2]!.dataset.date!;
     await click(rows[2]!.querySelector("[data-testid=add-extra-topic]"));
     const v0 = version();
-    await click(byLabel("Añadir Back 25"));
+    await click(byLabel("Adelantar Back 25"));
     expect(add).toHaveBeenCalledWith({ id: PID, folder: "P/Back/T25", date });
     expect(version()).toBeGreaterThan(v0);
   });
@@ -220,7 +221,7 @@ describe("Ejecución: añadir tema y práctica", () => {
     const addTopic = vi.spyOn(api, "mentorPlanExtraTopicAdd").mockImplementation(async (o) => (saved = { ...basePlan(), extraTopics: [{ date: o.date!, folder: o.folder, addedAt: "x", source: "manual" }] }));
     await click(addT);
     const v0 = version();
-    await click(byLabel("Añadir Back 26"));
+    await click(byLabel("Adelantar Back 26"));
     expect(addTopic).toHaveBeenCalledWith({ id: PID, folder: "P/Back/T26", date: TODAY });
     expect(version()).toBeGreaterThan(v0);
     await click(document.querySelector("[role=dialog] button[title=Cerrar]"));
@@ -228,12 +229,11 @@ describe("Ejecución: añadir tema y práctica", () => {
     // práctica
     const block = byTest("extra-practice")!;
     expect(block.textContent).toContain("Práctica diaria");
-    const addP = vi.spyOn(api, "mentorPlanExtraPracticeAdd").mockImplementation(async (o) => (saved = { ...basePlan(), extraPractice: [{ id: "xp-1", date: o.date!, title: o.title, kind: o.kind ?? "custom", area: o.area } as never] }));
+    vi.spyOn(api, "mentorPlanExerciseCandidates").mockResolvedValue({ loading: false, exercises: [{ subplanId: "s-be", area: "Backend", folder: "P/Back/T1", topic: "Back 1", rel: "P/Back/T1/e1.md", title: "Kata de listas", difficulty: 1, addedDates: [] }] });
+    const addP = vi.spyOn(api, "mentorPlanExtraPracticeAdd").mockImplementation(async (o) => (saved = { ...basePlan(), extraPractice: [{ id: "xp-1", date: o.date!, title: o.title, kind: o.kind ?? "exercise", area: o.area } as never] }));
     await click(block.querySelector("[data-testid=add-extra-practice]"));
-    await typeInto(byLabel("Título de la práctica"), "Kata de listas");
-    const submit = [...document.querySelectorAll("[role=dialog] button")].find((b) => b.textContent === "Añadir práctica")!;
-    await click(submit);
-    expect(addP).toHaveBeenCalledWith({ id: PID, title: "Kata de listas", kind: "custom", date: TODAY, area: "s-be" });
+    await click(byLabel("Adelantar Kata de listas"));
+    expect(addP).toHaveBeenCalledWith({ id: PID, title: "Kata de listas", kind: "exercise", date: TODAY, area: "s-be", folder: "P/Back/T1", rel: "P/Back/T1/e1.md" });
     const rowEl = byTest("extra-practice-row")!;
     expect(rowEl.textContent).toContain("Kata de listas");
     const upd = vi.spyOn(api, "mentorPlanExtraPracticeUpdate").mockImplementation(async () => (saved = { ...saved, extraPractice: [{ ...saved.extraPractice![0]!, done: true }] }));

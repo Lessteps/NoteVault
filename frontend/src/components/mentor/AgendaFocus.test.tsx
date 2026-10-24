@@ -20,6 +20,7 @@ import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { MODE_KEY } from "./mentorNav";
+import { navTab, navView } from "./mentorTestNav";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
@@ -81,8 +82,8 @@ const click = async (el: Element | null | undefined) => {
 };
 const byTest = (id: string, within: ParentNode = host) => within.querySelector<HTMLElement>(`[data-testid=${id}]`)!;
 const all = (id: string, within: ParentNode = host) => [...within.querySelectorAll<HTMLElement>(`[data-testid=${id}]`)];
-const tab = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:${id}']`)!;
-const view = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:agenda/${id}']`)!;
+const tab = (id: string) => navTab(host, id) as HTMLButtonElement;
+const view = (id: string) => navView(host, id) as HTMLButtonElement;
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "") || label.test(b.getAttribute("aria-label") ?? "")))!;
 const setValue = async (el: HTMLInputElement, v: string) => {

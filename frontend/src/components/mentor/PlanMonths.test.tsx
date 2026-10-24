@@ -17,6 +17,7 @@ import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { planSectionKey } from "./planShared";
 import { MODE_KEY } from "./mentorNav";
+import { gotoSection } from "./mentorTestNav";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
@@ -77,18 +78,7 @@ const setValue = async (el: HTMLInputElement | HTMLSelectElement, v: string) => 
   });
   await flush();
 };
-const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
-const section = async (id: string) => {
-  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
-  expect(b, `sub-vista ${id}`).toBeTruthy();
-  await act(async () => { b!.click(); });
-  await flush();
-  if (id === "ejecutar" || id === "cobertura" || id === "antigravity") {
-    const t = host.querySelector<HTMLElement>(`[data-testid=prepare-${id}]`);
-    if (t) { await act(async () => { t.click(); }); await flush(); }
-  }
-  if (id === "areas") host.querySelector("[data-testid=plan-areas-detail]")?.setAttribute("open", "");
-};
+const section = (id: string) => gotoSection(host, id, click);
 const open = async (section = "") => {
   vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
   // «Mi plan» enseña una sub-vista a la vez: se abre la que la prueba necesita
@@ -154,7 +144,7 @@ describe("Fases del plan mes a mes (tabla accesible)", () => {
     await flush();
     expect(byTest("agenda-date").getAttribute("value") ?? (byTest("agenda-date") as HTMLInputElement).value).toBe("2026-12-01");
     expect(byTest("agenda-title").textContent!.toLowerCase()).toContain("diciembre");
-    expect(host.querySelector("[data-testid='nav-pl:agenda/mes']")!.getAttribute("aria-current")).toBe("page");
+    expect(host.querySelector("[data-testid=agenda-period-mes]")!.getAttribute("aria-pressed")).toBe("true");
   });
 });
 

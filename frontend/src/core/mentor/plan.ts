@@ -53,6 +53,7 @@ import { dailyProjectOf } from "../../lib/planCurriculum.js";
 import { sanitizeCurriculum, scopeOfPlan, type PracticeCurriculum } from "../../lib/planCurriculum.js";
 import { areaKeyOf, sanitizeCoverageReview, type CoverageReview } from "../../lib/planCoverage.js";
 import { sanitizePracticeTrack, type PracticeTrack } from "../../lib/practiceTrack.js";
+import { sanitizeExtraPractice, sanitizeExtraTopics, sanitizePace, type ExtraPractice, type ExtraTopic, type DailyPace } from "../../lib/planPace.js";
 import * as store from "../store.js";
 import { formatLayout, isSyncConflict, LAYOUT } from "../vaultFormat.js";
 import type { TopicProgressSnap } from "./topics.js";
@@ -234,6 +235,11 @@ export interface Plan {
    * no exista (y no haya entregables manuales, de área ni currículo), los entregables están «por definir» (ver `deliverablesDefined`).
    */
   deliverablesDefinedAt?: string;
+  /** ritmo diario manual: temas por día y mínimo diario (global y por área); ausente = reparto automático por minutos; ver `lib/planPace.ts` */
+  pace?: DailyPace;
+  /** temas añadidos a mano a un día (de la ruta, más adelante, o de la vault) y práctica diaria extra */
+  extraTopics?: ExtraTopic[];
+  extraPractice?: ExtraPractice[];
   subplans: Subplan[];
 }
 /** Nombre histórico: un plan mensual es un plan de periodo. */
@@ -926,6 +932,8 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
     const roleOf = new Map<string, "theory" | "practice" | "both">();
     let focusToday = "";
     let dailyToday: { title: string; minutes: number; topics: string[] } | null = null;
+    // temas extra de hoy que no son de la ruta (de la vault): los añade el estudiante a mano y también se asignan
+    const vaultExtras: Array<{ folder: string; title: string; minutes: number; subplanId: string; area: string }> = [];
     try {
       const sch = buildSchedule(byProgress ? progressPlan(plan, { today: date, ...(isDone ? { isDone } : {}) }) : plan);
       const day = sch.byDate.get(date);
@@ -933,6 +941,13 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
       focusToday = day?.focus?.label ?? "";
       const dp = day && sch.mode === "focus" ? dailyProjectOf(plan, sch, day) : null;
       if (dp) dailyToday = { title: dp.title, minutes: dp.minutes, topics: dp.topics.map((t) => t.title) };
+      const inPlan = new Set(plan.subplans.flatMap((x) => x.topics.map((t) => t.folder)));
+      const seenExtra = new Set<string>();
+      for (const t of day?.topics ?? []) {
+        if (!t.extra || t.done || inPlan.has(t.folder) || seenExtra.has(t.folder)) continue;
+        seenExtra.add(t.folder);
+        vaultExtras.push({ folder: t.folder, title: t.title, minutes: t.minutes, subplanId: t.subplanId, area: t.area });
+      }
       todayOf = new Map(
         [...new Set((day?.topics ?? []).filter((t) => !t.done).map((t) => t.folder))].map((f) => [f, (day?.topics ?? []).filter((t) => t.folder === f && !t.done).reduce((n, t) => n + t.minutes, 0)] as const),
       );
@@ -945,7 +960,8 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
       for (const t of s.topics) {
         if (t.completedAt || isDone?.(t.folder) || !isLive(t)) continue;
         pending++;
-        if (t.targetWeek > cur) continue;
+        // un tema que el estudiante adelantó a hoy (extra) o que el ritmo diario coloca hoy cuenta aunque su semana objetivo sea posterior
+        if (t.targetWeek > cur && !todayOf.has(t.folder)) continue;
         if (seenTopics.has(t.folder)) continue;
         seenTopics.add(t.folder);
         out.push({
@@ -969,6 +985,12 @@ export function planItemsFor(date: string, plans: readonly Plan[], isDone?: (fol
       if (d && d.status !== "hecho" && (cur >= weeks || (pending === 0 && s.topics.length > 0))) {
         out.push({ kind: "deliverable", planId: plan.id, subplanId: s.id, label, area: s.area, title: d.title, estMinutes: DELIVERABLE_MINUTES, targetWeek: weeks, overdue: false });
       }
+    }
+    for (const x of vaultExtras) {
+      if (seenTopics.has(x.folder)) continue;
+      seenTopics.add(x.folder);
+      const own = plan.subplans.find((sp) => sp.id === x.subplanId);
+      out.push({ kind: "topic", planId: plan.id, subplanId: x.subplanId, label: own ? subplanLabel(own) : x.area, area: x.area, title: x.title, folder: x.folder, estMinutes: x.minutes, targetWeek: cur, overdue: false, scheduledToday: true, todayMinutes: x.minutes });
     }
     if (dailyToday) out.push({ kind: "project", planId: plan.id, subplanId: plan.subplans[0]?.id ?? "", label: plan.name ?? plan.id, area: focusToday || "Plan", title: dailyToday.title, estMinutes: dailyToday.minutes, targetWeek: cur, overdue: false, scheduledToday: true, todayMinutes: dailyToday.minutes, connected: dailyToday.topics, ...(focusToday ? { focus: focusToday } : {}) });
   }
@@ -1065,6 +1087,13 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
   const questions = sanitizeOpenQuestions(raw.openQuestions, subplans);
   const curriculum = sanitizeCurriculum(raw.practiceCurriculum, scopeOfPlan({ start, end, subplans }));
   const pre = raw.preconditions && typeof raw.preconditions === "object" ? sanitizePreconditions({ ...raw.preconditions, start, end }, start) : undefined;
+  const subIds = new Set(subplans.map((s) => s.id));
+  const pace0 = sanitizePace(raw.pace);
+  const paceAreas = pace0?.areas ? Object.fromEntries(Object.entries(pace0.areas).filter(([id]) => subIds.has(id))) : undefined;
+  const { areas: _a, ...paceGlobal } = pace0 ?? {};
+  const pace = pace0 && (paceGlobal.perDay || paceGlobal.minPerDay || (paceAreas && Object.keys(paceAreas).length)) ? { ...paceGlobal, ...(paceAreas && Object.keys(paceAreas).length ? { areas: paceAreas } : {}) } : undefined;
+  const extraTopics = sanitizeExtraTopics(raw.extraTopics).filter((e) => e.date >= start && e.date <= end);
+  const extraPractice = sanitizeExtraPractice(raw.extraPractice).filter((e) => e.date >= start && e.date <= end);
   return {
     id,
     start,
@@ -1089,6 +1118,9 @@ export function sanitizePlan(raw: any, fileId?: string): Plan | null {
     ...(sanitizePurposes(raw.purposes) ? { purposes: sanitizePurposes(raw.purposes)! } : {}),
     ...(sanitizeCoverageReview(raw.coverageReview, subplans.map(areaKeyOf)) ? { coverageReview: sanitizeCoverageReview(raw.coverageReview, subplans.map(areaKeyOf))! } : {}),
     ...(curriculum ? { practiceCurriculum: curriculum } : {}),
+    ...(pace ? { pace } : {}),
+    ...(extraTopics.length ? { extraTopics } : {}),
+    ...(extraPractice.length ? { extraPractice } : {}),
     ...(typeof raw.deliverablesDefinedAt === "string" && !Number.isNaN(Date.parse(raw.deliverablesDefinedAt)) ? { deliverablesDefinedAt: raw.deliverablesDefinedAt.slice(0, 40) } : {}),
     subplans,
   };

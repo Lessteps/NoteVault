@@ -77,3 +77,25 @@ describe("el currículo de práctica se lee y se guarda de forma aditiva", () =>
     expect(JSON.parse(JSON.stringify(p)).practiceCurriculum.source).toBe("ai");
   });
 });
+
+describe("planItemsFor con temas extra de hoy", () => {
+  const TODAY = "2026-10-14";
+  it("un tema de la ruta adelantado a hoy y un tema de la vault añadido a hoy salen en «Hoy» (para planear el día y el Pomodoro)", () => {
+    const p = plan({ extraTopics: [
+      { date: TODAY, folder: "P/BE4", addedAt: "2026-10-14T08:00:00Z", source: "manual" },
+      { date: TODAY, folder: "Vault/Redis", area: "s-be", title: "Redis básico", estMinutes: 30, addedAt: "2026-10-14T08:00:00Z", source: "manual" },
+      { date: TODAY, folder: "Vault/Suelto", title: "Tema suelto", estMinutes: 30, addedAt: "2026-10-14T08:00:00Z", source: "manual" },
+    ] });
+    // el tema de la ruta está en una semana posterior a la de hoy: sin extra no saldría
+    const moved = sanitizePlan({ ...raw(), subplans: raw().subplans.map((s) => ({ ...s, topics: s.topics.map((t) => (t.folder === "P/BE4" ? { ...t, targetWeek: 6 } : t)) })), extraTopics: p.extraTopics })!;
+    const without = sanitizePlan({ ...raw(), subplans: moved.subplans })!;
+    expect(planItemsFor(TODAY, [without], undefined, true).some((i) => i.folder === "P/BE4" && i.scheduledToday)).toBe(false);
+    const items = planItemsFor(TODAY, [moved], undefined, true).filter((i) => i.kind === "topic");
+    const by = new Map(items.map((i) => [i.folder, i]));
+    expect(by.get("P/BE4")).toMatchObject({ scheduledToday: true });
+    expect(by.get("Vault/Redis")).toMatchObject({ scheduledToday: true, area: "Backend", title: "Redis básico", estMinutes: 30 });
+    expect(by.get("Vault/Suelto")).toMatchObject({ scheduledToday: true, area: "Extra", subplanId: "extra" });
+    // si ya está completo en vivo, no se ofrece
+    expect(planItemsFor(TODAY, [moved], (f) => f === "Vault/Redis", true).some((i) => i.folder === "Vault/Redis")).toBe(false);
+  });
+});

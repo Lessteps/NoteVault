@@ -84,6 +84,11 @@ export type PlanTab = (typeof PLAN_TABS)[number];
 /** Clave de la vista recordada de la Agenda (dia · semana · mes · calendario), por plan. */
 export const agendaViewKey = (planId: string): string => `mentor.agendaView.${planId}`;
 
+/** Clave del área elegida en la barra (subplan o «__bases»; vacío = Vista general): la misma que usaba el filtro de la Agenda. */
+export const agendaAreaKey = (planId: string): string => `mentor.agendaArea.${planId}`;
+/** Clave de la pestaña de una página del plan (Vista general, un área o Bases): `semana` · `calendario` · `temas`/`area` · `proyectos` · `detalles`. */
+export const pageTabKey = (planId: string, scope: string): string => `mentor.pageTab.${planId}.${scope}`;
+
 /** Clave de la sub-vista recordada de «Mi plan» (Resumen, Temas, Cobertura, Ejecutar plan…), por plan. */
 export const planSectionKey = (planId: string): string => `mentor.planSection.${planId}`;
 /** La opción elegida dentro de «Preparar» (ejecutar · cobertura · antigravity), por plan. */

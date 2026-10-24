@@ -58,6 +58,8 @@ export interface PlanSection {
   hintLabel?: string;
   visible: boolean;
   render: () => ReactNode;
+  /** avisos que la Vista general enseña bajo el título (solo el Resumen los lleva) */
+  notices?: () => ReactNode;
 }
 
 export const DEFAULT_SECTION = "resumen";
@@ -113,19 +115,30 @@ function scopeOf(plan: MentorPlanData) {
 
 // ── Sub-vistas ─────────────────────────────────────────────────────────
 
-function ResumenView({ plan, state, summary, cov, onApplied, announce }: PlanSectionCtx) {
+/** Lo que pide atención en la Vista general, justo bajo el título: lo que falta generar, «todas las áreas desde el día 1» y «Añadir un área». */
+function ResumenNotices({ plan, cov, onApplied, announce }: PlanSectionCtx) {
   const byAreas = plan.structure === "areas";
-  const countLabel = byAreas ? (summary.subplans === 1 ? "área" : "áreas") : summary.subplans === 1 ? "subplan" : "subplanes";
-  const weeksText = state === "propuesto" ? `del ${dayText(plan.start)} al ${dayText(plan.end)}` : state === "activo" ? `semana ${summary.currentWeek} de ${summary.weeks}` : state === "futuro" ? `empieza el ${dayText(plan.start)}` : `terminó el ${dayText(plan.end)}`;
   const cov0 = cov.coverage?.totals;
   const needGenerate = !!cov0 && (cov0.practice < cov0.topics || cov0.theory < cov0.topics);
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 empty:hidden" data-testid="plan-notices">
       {needGenerate && cov0 && (
         <div id="sec-generar" tabIndex={-1} className={anchor}>
           <GenerateNotice topics={cov0.topics} withPractice={cov0.practice} withTheory={cov0.theory} {...(cov0.design ? { designPct: cov0.design.avgScore } : {})} onGo={() => openPlanSection(plan.id, "ejecutar")} />
         </div>
       )}
+      {byAreas && <TogetherBar plan={plan} onApplied={onApplied} announce={announce} />}
+      {byAreas && <AddAreaBar plan={plan} onApplied={onApplied} announce={announce} />}
+    </div>
+  );
+}
+
+function ResumenView({ plan, state, summary }: PlanSectionCtx) {
+  const byAreas = plan.structure === "areas";
+  const countLabel = byAreas ? (summary.subplans === 1 ? "área" : "áreas") : summary.subplans === 1 ? "subplan" : "subplanes";
+  const weeksText = state === "propuesto" ? `del ${dayText(plan.start)} al ${dayText(plan.end)}` : state === "activo" ? `semana ${summary.currentWeek} de ${summary.weeks}` : state === "futuro" ? `empieza el ${dayText(plan.start)}` : `terminó el ${dayText(plan.end)}`;
+  return (
+    <div className="space-y-6">
       <div id="sec-resumen" tabIndex={-1} className={cn(anchor, "space-y-3")}>
         <SectionCard labelledBy="mp-summary" testid="plan-header" className="space-y-3">
           <h2 id="mp-summary" className="sr-only">Resumen del plan</h2>
@@ -140,9 +153,6 @@ function ResumenView({ plan, state, summary, cov, onApplied, announce }: PlanSec
             <span className="text-[18px] font-bold">{summary.pct} %</span>
           </div>
         </SectionCard>
-
-        {byAreas && <TogetherBar plan={plan} onApplied={onApplied} announce={announce} />}
-        {byAreas && <AddAreaBar plan={plan} onApplied={onApplied} announce={announce} />}
       </div>
       <ExecutionAside planId={plan.id} />
     </div>
@@ -354,7 +364,7 @@ export function planSectionsOf(ctx: PlanSectionCtx): PlanSection[] {
   const cov0 = cov.coverage?.totals;
   const missing = cov0 && (cov0.practice < cov0.topics || cov0.theory < cov0.topics) ? cov0.topics - cov0.practice : 0;
   const all: PlanSection[] = [
-    { id: "resumen", label: "Resumen", visible: true, ...(missing > 0 ? { hint: String(missing), hintLabel: `${missing} sin ejercicios: falta generar` } : {}), render: () => <ResumenCompletoView {...ctx} /> },
+    { id: "resumen", label: "Resumen", visible: true, ...(missing > 0 ? { hint: String(missing), hintLabel: `${missing} sin ejercicios: falta generar` } : {}), render: () => <ResumenCompletoView {...ctx} />, notices: () => <ResumenNotices {...ctx} /> },
     { id: "temas", label: "Temas por área", visible: true, hint: String(plan.subplans.length), hintLabel: `${plan.subplans.length} ${plan.subplans.length === 1 ? "área" : "áreas"}`, render: () => <TemasPorAreaView {...ctx} /> },
     { id: "registros", label: "Registros", visible: true, render: () => <RegistrosView {...ctx} /> },
     { id: "preparar", label: "Preparar", visible: true, render: () => <PrepararView {...ctx} /> },

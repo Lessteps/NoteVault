@@ -34,6 +34,8 @@ import { buildFocusSchedule, type BlockKind, type DayBlock, type DayFocus } from
 import { isLive } from "./planRoute.js";
 import { topicProjectId, type TopicProject } from "./planTopicProject.js";
 import { dailyProjectOf, monthlyBlocksOf, shortOf, weeklyProjectOf, type PracticeCurriculum } from "./planCurriculum.js";
+import type { DailyPace, ExtraPractice, ExtraTopic } from "./planPace.js";
+import { applyOverlay, planOverlay, planWithoutExtraRoute, validAsOf } from "./planPaceSchedule.js";
 
 // ── Entrada estructural (la cumplen `Plan` del núcleo y `MentorPlan` del renderer) ──
 
@@ -89,6 +91,11 @@ export interface SchedulePlan {
   practiceCurriculum?: PracticeCurriculum;
   /** «hoy» del reparto por avance: lo pendiente se coloca desde esta fecha (ver `progressPlan`); ausente = reparto por calendario */
   asOf?: string;
+  /** ritmo diario manual (temas por día y mínimo, global y por área); ausente = reparto automático por minutos (ver `planPace.ts`) */
+  pace?: DailyPace;
+  /** temas añadidos a mano a un día (de la ruta, más adelante, o de la vault) y práctica extra del día */
+  extraTopics?: ExtraTopic[];
+  extraPractice?: ExtraPractice[];
 }
 
 /**
@@ -105,8 +112,12 @@ export function progressPlan<P extends SchedulePlan>(plan: P, o: { today: string
       return { ...t, completedAt: o.today };
     }),
   }));
+  // los temas extra de la vault (fuera del plan) se dan por hechos con el avance real, igual que los de la ruta
+  const extraDone = plan.extraTopics?.some((e) => !e.doneAt && o.isDone?.(e.folder)) ?? false;
+  if (extraDone) changed = true;
+  const extraTopics = extraDone ? plan.extraTopics!.map((e) => (!e.doneAt && o.isDone?.(e.folder) ? { ...e, doneAt: o.today } : e)) : undefined;
   if (plan.asOf === o.today && !changed) return plan;
-  return { ...plan, asOf: o.today, ...(changed ? { subplans } : {}) };
+  return { ...plan, asOf: o.today, ...(changed ? { subplans } : {}), ...(extraTopics ? { extraTopics } : {}) };
 }
 
 // ── Salida ──────────────────────────────────────────────────────────────
@@ -136,6 +147,10 @@ export interface DayTopic {
   role?: BlockKind;
   /** fundamento intercalado como lógica aplicada al lenguaje */
   applied?: boolean;
+  /** el estudiante lo añadió a mano a este día (tema extra) */
+  extra?: boolean;
+  /** lo colocó el ritmo diario manual (temas por día), no el reparto por minutos */
+  paced?: boolean;
 }
 
 /** El proyecto de aplicación de un tema, colocado el día en que se completa el tema. */
@@ -152,6 +167,8 @@ export interface DayTopicProject {
 }
 
 export interface DayPractice {
+  /** práctica añadida a mano a este día (con minutos ya resueltos) */
+  extra?: Array<ExtraPractice & { minutes: number }>;
   kata?: { minutes: number };
   project?: { minutes: number; phases: PracticePhase[]; week: number; focus: string; theme?: string };
 }
@@ -179,6 +196,8 @@ export interface ScheduleDay {
   languageMinutes?: number;
   /** proyectos de aplicación de los temas que se completan ese día */
   topicProjects?: DayTopicProject[];
+  /** el día lleva temas del ritmo manual: su capacidad sigue a esos temas */
+  paced?: boolean;
 }
 
 /** El modo de áreas ya decidido de un plan: `together` solo si el plan es por áreas y lo declara (o lo eligió el estudiante); si no, por fases. */
@@ -226,6 +245,30 @@ function baseCapacity(plan: SchedulePlan): (date: string) => number {
 export function buildSchedule(planIn: SchedulePlan): PlanSchedule {
   // los temas «fuera de ruta» no se reparten ni cuentan (se quedan en el plan y en la vault, atenuados)
   const plan: SchedulePlan = planIn.subplans.some((s) => s.topics.some((t) => !isLive(t))) ? { ...planIn, subplans: planIn.subplans.map((s) => ({ ...s, topics: s.topics.filter(isLive) })) } : planIn;
+  // ritmo diario y extras manuales (ver planPace.ts): sin ellos, el reparto de siempre
+  const ov = planOverlay(plan);
+  if (!ov) return buildScheduleBase(plan);
+  const sch = buildScheduleBase(ov.reduced);
+  const asOf = validAsOf(plan);
+  let auto: ((subplanId: string, date: string) => number) | undefined;
+  if (ov.paced.some((p) => !p.perDay)) {
+    // «solo mínimo»: lo que daría el reparto automático (sin los temas que se añadieron como extra) con el mínimo diario como suelo
+    const autoSch = buildScheduleBase(planWithoutExtraRoute(ov));
+    const mine = new Map(ov.paced.map((p) => [p.sub.id, new Set(p.queue.map((t) => t.folder))] as const));
+    auto = (subId, date) => new Set((autoSch.byDate.get(date)?.topics ?? []).filter((t) => !t.done && t.subplanId === subId && mine.get(subId)?.has(t.folder)).map((t) => t.folder)).size;
+  }
+  const { pacedDates } = applyOverlay(ov, sch, { ...(asOf ? { asOf } : {}), ...(auto ? { auto } : {}) });
+  finishDays(plan, sch.days);
+  // el tiempo de un día con ritmo manual sigue a sus temas: la capacidad nunca queda por debajo de lo asignado
+  for (const d of sch.days) {
+    if (!pacedDates.has(d.date)) continue;
+    d.paced = true;
+    d.capacityMinutes = Math.max(d.capacityMinutes, d.topicMinutes);
+  }
+  return sch;
+}
+
+function buildScheduleBase(plan: SchedulePlan): PlanSchedule {
   const ranges = weekRangesOf(plan.start, plan.end);
   const allDays = eachDay(plan.start, plan.end);
   const base = baseCapacity(plan);
@@ -482,7 +525,8 @@ function addCompleted(plan: SchedulePlan, byDate: Map<string, ScheduleDay>, grou
 function finishDays(plan: SchedulePlan, days: ScheduleDay[]): void {
   const subOrder = new Map(plan.subplans.map((s, i) => [s.id, i] as const));
   for (const d of days) {
-    d.topics.sort((a, b) => Number(a.done) - Number(b.done) || (subOrder.get(a.subplanId) ?? 0) - (subOrder.get(b.subplanId) ?? 0) || a.position - b.position);
+    // los subplanes desconocidos (el cubo «Extra») van al final; dentro de un área, lo añadido a mano detrás de lo que le tocaba
+    d.topics.sort((a, b) => Number(a.done) - Number(b.done) || (subOrder.get(a.subplanId) ?? 1e6) - (subOrder.get(b.subplanId) ?? 1e6) || Number(!!a.extra) - Number(!!b.extra) || a.position - b.position);
     d.topicMinutes = d.topics.filter((t) => !t.done).reduce((n, t) => n + t.minutes, 0);
   }
 }

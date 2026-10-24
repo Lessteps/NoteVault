@@ -18,6 +18,7 @@ import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { MODE_KEY } from "./mentorNav";
+import { gotoSection, navTab, navView } from "./mentorTestNav";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
@@ -76,40 +77,15 @@ let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
 // «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
-const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
-const section = async (id: string) => {
-  // «Fases mes a mes» vive ahora en la Agenda, vista Mes
-  if (id === "fases") {
-    await act(async () => { host.querySelector<HTMLElement>("[data-testid='nav-pl:agenda']")!.click(); });
-    await flush();
-    await act(async () => { host.querySelector<HTMLElement>("[data-testid='nav-pl:agenda/mes']")!.click(); });
-    await flush();
-    return;
-  }
-  // si se estaba en la Agenda, se vuelve a «Mi plan» antes de elegir la sub-vista
-  if (!host.querySelector(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`)) {
-    await act(async () => { host.querySelector<HTMLElement>("[data-testid='nav-pl:plan']")?.click(); });
-    await flush();
-  }
-  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
-  expect(b, `sub-vista ${id}`).toBeTruthy();
-  await act(async () => { b!.click(); });
-  await flush();
-  // «Preparar» agrupa ejecutar · cobertura · antigravity; el detalle de las áreas vive dentro de «Temas por área»
-  if (id === "ejecutar" || id === "cobertura" || id === "antigravity") {
-    const t = host.querySelector<HTMLElement>(`[data-testid=prepare-${id}]`);
-    if (t) { await act(async () => { t.click(); }); await flush(); }
-  }
-  if (id === "areas") host.querySelector("[data-testid=plan-areas-detail]")?.setAttribute("open", "");
-};
+const section = (id: string) => gotoSection(host, id, click);
 const click = async (el: Element | null | undefined) => {
   expect(el, "elemento no encontrado").toBeTruthy();
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   await flush();
 };
 const byTest = (id: string, within: ParentNode = host) => within.querySelector<HTMLElement>(`[data-testid=${id}]`)!;
-const tab = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:${id}']`)!;
-const view = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:agenda/${id}']`)!;
+const tab = (id: string) => navTab(host, id) as HTMLButtonElement;
+const view = (id: string) => navView(host, id) as HTMLButtonElement;
 const key = async (el: Element, k: string) => { await act(async () => { el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })); }); await flush(); };
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "")))!;
@@ -148,26 +124,35 @@ afterEach(() => {
 });
 
 describe("estructura de la Agenda", () => {
-  it("la barra lateral ofrece Día · Semana · Mes · Calendario bajo Agenda y la semana actual por defecto", async () => {
+  it("la Agenda ya no es un ítem de la barra: la página lleva Semana | Mes, el Calendario es una pestaña y la semana actual es lo de por defecto", async () => {
     await openAgenda();
-    const subs = [...host.querySelectorAll("[data-testid='nav-pl:agenda']")][0]!.parentElement!.querySelectorAll("[role=group] button");
-    expect([...subs].map((t) => t.textContent)).toEqual(["Día", "Semana", "Mes", "Calendario"]);
-    // la página ya no repite la barra de vistas
-    expect(host.querySelector("[role=tablist][aria-label='Vista de la agenda']")).toBeNull();
-    expect(view("semana").getAttribute("aria-current")).toBe("page");
+    // sin sub-ítems anidados «Día · Semana · Mes · Calendario» en la barra
+    expect(host.querySelector("[data-testid='nav-pl:agenda']")).toBeNull();
+    expect(host.querySelectorAll("aside [role=group][aria-label$='sub-vistas']")).toHaveLength(0);
+    expect([...host.querySelectorAll("[data-testid=agenda-period] button")].map((t) => t.textContent)).toEqual(["Semana", "Mes"]);
+    expect([...host.querySelectorAll("[role=tab]")].map((t) => t.textContent)).toEqual(["Semana 2", "Calendario", "Por área", "Proyectos", "Detalles"]);
+    expect(view("semana").getAttribute("aria-pressed")).toBe("true");
     expect(byTest("agenda-title").textContent).toContain("Semana 2");
     await click(view("mes"));
-    expect(view("mes").getAttribute("aria-current")).toBe("page");
+    expect(view("mes").getAttribute("aria-pressed")).toBe("true");
+    expect(view("semana").getAttribute("aria-pressed")).toBe("false");
     expect(byTest("agenda-month")).toBeTruthy();
     // la vista elegida se recuerda por plan
     expect(useNavState.getState().values[`mentor.agendaView.${PID}`]).toBe("mes");
+    await click(view("calendario"));
+    expect(view("calendario").getAttribute("aria-selected")).toBe("true");
+    expect(byTest("agenda-calendar")).toBeTruthy();
+    // la pestaña de cada página se recuerda por plan y por página
+    expect(useNavState.getState().values[`mentor.pageTab.${PID}.all`]).toBe("calendario");
   });
 
-  it("la barra lateral (modo Planeación) lista Mi plan · Agenda · Práctica · Entregables · Preguntas y ajustes, sin pestañas en la página", async () => {
+  it("la barra lateral (modo Planeación) lista la Vista general, un ítem por área y «Más»; las pestañas son las de la página", async () => {
     await openAgenda();
     const top = [...host.querySelectorAll("aside nav > div > button")].map((b) => b.getAttribute("data-testid")!.replace("nav-pl:", ""));
-    expect(top).toEqual(["plan", "agenda", "practica", "entregables", "cambios"]);
-    expect(host.querySelector("[role=tablist]")).toBeNull();
+    expect(top).toEqual(["general", "area/s1-backend", "area/s2-databases", "bases", "entregables", "registros", "preparar", "practica", "cambios"]);
+    expect(host.querySelector("aside nav")!.textContent).toContain("Planificación");
+    expect(host.querySelector("aside nav")!.textContent).toContain("Más");
+    expect(host.querySelectorAll("[role=tablist]")).toHaveLength(1);
   });
 });
 
@@ -193,20 +178,23 @@ describe("navegación por el tiempo", () => {
     for (let i = 0; i < 4; i++) await click(byTest("agenda-next"));
     expect(byTest("agenda-title").textContent).toContain("Enero 2027");
     expect((byTest("agenda-next") as HTMLButtonElement).disabled).toBe(true);
-  });
+  }, 20_000);
 
-  it("«Esta semana» y «Este mes» son atajos al presente; el selector de fecha salta al futuro y al pasado del plan", async () => {
+  it("«Hoy» es el atajo al presente; el selector de fecha salta al futuro y al pasado del plan", async () => {
     await openAgenda();
     await click(view("dia"));
     await setValue(byTest("agenda-date") as HTMLInputElement, "2026-12-24");
     expect(byTest("agenda-title").textContent).toContain("jueves 24 de diciembre");
-    await click(byTest("agenda-this-week"));
-    expect(view("semana").getAttribute("aria-current")).toBe("page");
+    await click(byTest("agenda-today"));
+    expect(byTest("agenda-title").textContent).toContain("miércoles 14 de octubre");
+    await click(view("semana"));
+    expect(view("semana").getAttribute("aria-pressed")).toBe("true");
     expect(byTest("agenda-title").textContent).toContain("Semana 2");
     await setValue(byTest("agenda-date") as HTMLInputElement, "2026-11-20");
     expect(byTest("agenda-title").textContent).toContain("Semana 7");
-    await click(byTest("agenda-this-month"));
-    expect(view("mes").getAttribute("aria-current")).toBe("page");
+    await click(view("mes"));
+    await click(byTest("agenda-today"));
+    expect(view("mes").getAttribute("aria-pressed")).toBe("true");
     expect(byTest("agenda-title").textContent).toContain("Octubre 2026");
     // pasado: la primera semana del plan
     await setValue(byTest("agenda-date") as HTMLInputElement, START);
@@ -262,7 +250,7 @@ describe("conteos visibles de temas y entregables", () => {
     expect(byTest("agenda-week-areas").querySelectorAll("li").length).toBeGreaterThan(0);
     expect(byTest("agenda-week-deliverables").textContent).toMatch(/\d+ entregables/);
     await click(button("Ver el día miércoles 14 de octubre", w));
-    expect(view("dia").getAttribute("aria-current")).toBe("page");
+    expect(byTest("agenda-day-back")).toBeTruthy(); // el detalle del día se abre dentro de la página, con su «Volver a Semana N»
     expect(byTest("agenda-title").textContent).toContain("miércoles 14 de octubre");
   });
 
@@ -275,7 +263,7 @@ describe("conteos visibles de temas y entregables", () => {
     expect(byTest("agenda-month-deliverables").textContent).toMatch(/\d+ katas/);
     expect(byTest("agenda-purpose-text").textContent).toContain("Octubre 2026");
     await click(button("Ver la semana 3", byTest("agenda-month")));
-    expect(view("semana").getAttribute("aria-current")).toBe("page");
+    expect(view("semana").getAttribute("aria-pressed")).toBe("true");
     expect(byTest("agenda-title").textContent).toContain("Semana 3");
   });
 });

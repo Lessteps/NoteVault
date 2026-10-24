@@ -59,6 +59,8 @@ export function RunArea({ plan, area, card, routeRows, weekDays, upcoming, sets,
     <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]" data-testid="run-area-tab" data-area={areaKey}>
       <div className="min-w-0 space-y-4">
         <AreaWork
+          plan={plan}
+          subplanId={area.subplanId}
           planId={plan.id}
           areaName={area.area}
           areaId={area.areaId}

@@ -39,7 +39,7 @@ import {
 } from "../../core/mentor/plan.js";
 import { branchAllowed, branchOfFolder, classifyBranch, detectBranchIntent, periodLabel, sanitizeNotes, weekRangesOf } from "../../lib/planTime.js";
 import { resolveLanguages } from "../../lib/planLanguages.js";
-import { routeOf, routeOfPlan, sanitizeRouteFields, validateSkips, type RouteEntry } from "../../lib/planRoute.js";
+import { isLive, routeOf, routeOfPlan, sanitizeRouteFields, validateSkips, type RouteEntry } from "../../lib/planRoute.js";
 import type { MasteryLookup } from "../../lib/planTopicProject.js";
 import {
   BUILD_ID_RE,
@@ -77,6 +77,7 @@ import { buildSchedule, deliverablesOf, progressPlan } from "../../lib/planSched
 import { CurriculumCancel, generateCurriculum } from "../../core/mentor/planCurriculumAi.js";
 import { areaKeyOf, computeCoverage, COVERAGE_DISCLAIMER, MAX_PROFILE_CHARS, parseCoverageReply, sanitizeCriteria } from "../../lib/planCoverage.js";
 import { buildPlanTopicRows } from "../../lib/planTopicCatalog.js";
+import { EXTRA_PRACTICE_KINDS, isIsoDate, parsePace, type ExtraPractice, type ExtraPracticeKind } from "../../lib/planPace.js";
 import { coverageMessages } from "../../core/mentor/planCoverageAi.js";
 import { parseScopeReply, parseTopicsReply, scopeMessages, topicsMessages } from "../../core/mentor/planBuildAi.js";
 import {
@@ -698,6 +699,52 @@ export function mentorApi(app: AppState, send?: SendFn) {
     return b;
   };
   const buildView = (b: PlanBuild) => ({ loading: false as const, build: b, summary: summaryOf(b) });
+  /** El plan de una petición de ritmo y extras (`{ id }`) con su almacén, o error claro. */
+  const paceTarget = (o: Record<string, any>): { st: PlanStore; plan: Plan } => {
+    const id = String(o.id ?? "");
+    if (!PLAN_ID_RE.test(id)) throw new ApiError("Plan inválido.");
+    const st = new PlanStore(app.root);
+    const plan = st.load(id);
+    if (!plan) throw new ApiError("Ese plan ya no existe.");
+    return { st, plan };
+  };
+  /** La fecha de un extra (hoy por defecto) dentro del plan. */
+  const extraDate = (plan: Plan, raw: unknown): string => {
+    const date = raw === undefined || raw === null || raw === "" ? localDate() : String(raw);
+    if (!isIsoDate(date)) throw new ApiError("Fecha inválida (AAAA-MM-DD).");
+    if (date < plan.start || date > plan.end) throw new ApiError("Esa fecha no está en el plan.");
+    return date;
+  };
+  /** Los campos de una práctica extra a partir de la petición, sobre una base (alta o edición). */
+  const extraPracticeFields = (plan: Plan, o: Record<string, any>, base: Partial<ExtraPractice> & { id: string; date: string }, create: boolean): ExtraPractice => {
+    const title = create || o.title !== undefined ? String(o.title ?? "").replace(/\s+/g, " ").trim().slice(0, 160) : base.title ?? "";
+    if (!title) throw new ApiError("Escribe un título para la práctica.");
+    const kind = o.kind !== undefined ? String(o.kind) : base.kind ?? "custom";
+    if (!(EXTRA_PRACTICE_KINDS as readonly string[]).includes(kind)) throw new ApiError("Tipo de práctica inválido (kata, exercise o custom).");
+    let minutes = base.minutes;
+    if (o.minutes !== undefined) {
+      const m = o.minutes === null || o.minutes === "" ? 0 : Number(o.minutes);
+      if (!Number.isInteger(m) || m < 0 || m > 600) throw new ApiError("Los minutos deben ser un entero de 0 a 600.");
+      minutes = m > 0 ? m : undefined;
+    }
+    const area = o.area !== undefined ? String(o.area ?? "").trim() : base.area ?? "";
+    if (area && !plan.subplans.some((s) => s.id === area)) throw new ApiError("Ese área ya no existe en el plan.");
+    const note = o.note !== undefined ? String(o.note ?? "").replace(/\s+/g, " ").trim().slice(0, 400) : base.note ?? "";
+    const folder = o.folder !== undefined ? String(o.folder ?? "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").trim() : base.folder ?? "";
+    const date = o.date !== undefined && !create ? extraDate(plan, o.date) : base.date;
+    const done = o.done !== undefined ? o.done === true : base.done === true;
+    return {
+      id: base.id,
+      date,
+      ...(area ? { area } : {}),
+      title,
+      ...(minutes ? { minutes } : {}),
+      ...(note ? { note } : {}),
+      kind: kind as ExtraPracticeKind,
+      ...(done ? { done: true } : {}),
+      ...(folder ? { folder } : {}),
+    };
+  };
   /** El plan de una petición de cobertura (`{ id }`), o error claro. */
   const coveragePlan = (opts: unknown): Plan => {
     const id = String(((opts && typeof opts === "object" ? opts : {}) as Record<string, any>).id ?? "");
@@ -1622,6 +1669,139 @@ export function mentorApi(app: AppState, send?: SendFn) {
       if (!Object.keys(bag).length) delete (purposes as any)[scope];
       const { purposes: _p, ...base } = plan;
       return st.save({ ...base, ...(Object.keys(purposes).length ? { purposes } : {}), updatedAt: new Date().toISOString() });
+    },
+
+    // ── Ritmo diario y extras del día (ver lib/planPace.ts) ──
+
+    /**
+     * Fija (o quita, con `pace` vacío o nulo) el RITMO DIARIO del plan: temas por día y mínimo diario, global y por área. Enteros 0..20; el mínimo
+     * no puede superar los temas por día. Sin ritmo manda el reparto automático por minutos. Devuelve el plan; la UI sube `planVersion`.
+     */
+    mentor_plan_pace_set(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const { st, plan } = paceTarget(o);
+      let pace;
+      try {
+        pace = parsePace(o.pace, plan.subplans.map((s) => s.id));
+      } catch (e) {
+        throw new ApiError((e as Error).message);
+      }
+      const { pace: _old, ...base } = plan;
+      return st.save({ ...base, ...(pace ? { pace } : {}), updatedAt: new Date().toISOString() });
+    },
+
+    /**
+     * Añade un TEMA EXTRA a un día (por defecto hoy): uno de la ruta que está más adelante (se adelanta por decisión del estudiante) o un tema de
+     * la vault que no está en el plan. `area` (id de subplan) atribuye un tema de la vault a un área; sin él va al cubo «Extra».
+     */
+    mentor_plan_extra_topic_add(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const { st, plan } = paceTarget(o);
+      const date = extraDate(plan, o.date);
+      const folder = String(o.folder ?? "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").trim();
+      if (!folder) throw new ApiError("Falta el tema que quieres añadir.");
+      const area = String(o.area ?? "").trim();
+      if (area && !plan.subplans.some((s) => s.id === area)) throw new ApiError("Ese área ya no existe en el plan.");
+      if ((plan.extraTopics ?? []).some((e) => e.date === date && e.folder === folder)) throw new ApiError("Ese tema ya está añadido a ese día.");
+      const hit = plan.subplans.flatMap((s) => s.topics.map((t) => ({ s, t }))).find((x) => x.t.folder === folder);
+      const route = !!hit && isLive(hit.t);
+      let title: string | undefined;
+      if (route) {
+        if (hit!.t.completedAt) throw new ApiError("Ese tema ya está completo.");
+      } else {
+        if (studyIndexCold(app)) throw new ApiError("El índice de la vault aún se está preparando: inténtalo de nuevo en un momento.");
+        const snap = topicSnaps(app).find((t) => t.folder === folder);
+        if (!snap && !hit) throw new ApiError("Ese tema no existe en la vault.");
+        title = snap?.title ?? hit?.t.title;
+      }
+      const est = Math.round(Number(o.estMinutes));
+      const entry = {
+        date,
+        folder,
+        ...(!route ? { ...(area ? { area } : {}), ...(title ? { title } : {}), ...(est > 0 ? { estMinutes: Math.min(600, est) } : {}) } : {}),
+        addedAt: new Date().toISOString(),
+        source: "manual" as const,
+      };
+      return st.save({ ...plan, extraTopics: [...(plan.extraTopics ?? []), entry], updatedAt: new Date().toISOString() });
+    },
+
+    /** Quita un tema extra de un día. El tema vuelve a su sitio en la ruta (si era de la ruta) o desaparece de la agenda (si era de la vault). */
+    mentor_plan_extra_topic_remove(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const { st, plan } = paceTarget(o);
+      const date = String(o.date ?? "");
+      const folder = String(o.folder ?? "");
+      const left = (plan.extraTopics ?? []).filter((e) => !(e.date === date && e.folder === folder));
+      if (left.length === (plan.extraTopics ?? []).length) throw new ApiError("Ese tema extra ya no está en ese día.");
+      const { extraTopics: _x, ...base } = plan;
+      return st.save({ ...base, ...(left.length ? { extraTopics: left } : {}), updatedAt: new Date().toISOString() });
+    },
+
+    /** Añade un elemento de PRÁCTICA DIARIA extra a un día (por defecto hoy): kata, ejercicio de un tema o texto libre. */
+    mentor_plan_extra_practice_add(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const { st, plan } = paceTarget(o);
+      const date = extraDate(plan, o.date);
+      const item = extraPracticeFields(plan, o, { date, id: `xp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` }, true);
+      return st.save({ ...plan, extraPractice: [...(plan.extraPractice ?? []), item], updatedAt: new Date().toISOString() });
+    },
+
+    /** Edita un elemento de práctica extra (título, minutos, nota, tipo, fecha, área) o lo marca hecho (`done`). */
+    mentor_plan_extra_practice_update(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const { st, plan } = paceTarget(o);
+      const id = String(o.practiceId ?? "");
+      const cur = (plan.extraPractice ?? []).find((x) => x.id === id);
+      if (!cur) throw new ApiError("Esa práctica ya no existe.");
+      const next = extraPracticeFields(plan, o, cur, false);
+      return st.save({ ...plan, extraPractice: (plan.extraPractice ?? []).map((x) => (x.id === id ? next : x)), updatedAt: new Date().toISOString() });
+    },
+
+    mentor_plan_extra_practice_remove(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const { st, plan } = paceTarget(o);
+      const id = String(o.practiceId ?? "");
+      const left = (plan.extraPractice ?? []).filter((x) => x.id !== id);
+      if (left.length === (plan.extraPractice ?? []).length) throw new ApiError("Esa práctica ya no existe.");
+      const { extraPractice: _x, ...base } = plan;
+      return st.save({ ...base, ...(left.length ? { extraPractice: left } : {}), updatedAt: new Date().toISOString() });
+    },
+
+    /**
+     * Candidatos para añadir como tema extra: los SIGUIENTES temas de la ruta (más adelante, en orden; `area` = id de subplan para acotar) y los
+     * demás temas de la vault que no están en el plan. `query` filtra por título o carpeta (sin tildes). Solo lee.
+     */
+    mentor_plan_topic_candidates(opts: unknown) {
+      const o = (opts && typeof opts === "object" ? opts : {}) as Record<string, any>;
+      const { plan } = paceTarget(o);
+      if (studyIndexCold(app)) return { loading: true as const };
+      const q = fold(String(o.query ?? "").trim());
+      const area = String(o.area ?? "").trim();
+      const limit = Math.max(1, Math.min(100, Math.round(Number(o.limit)) || 30));
+      const match = (title: string, folder: string): boolean => !q || fold(title).includes(q) || fold(folder).includes(q);
+      const added = new Map<string, string[]>();
+      for (const e of plan.extraTopics ?? []) added.set(e.folder, [...(added.get(e.folder) ?? []), e.date]);
+      const planFolders = new Set(plan.subplans.flatMap((s) => s.topics.map((t) => t.folder)));
+      type Ahead = { folder: string; title: string; area: string; subplanId: string; inPlan: true; position: number; total: number; estMinutes: number; targetWeek: number; addedDates: string[] };
+      const bySub: Ahead[][] = [];
+      for (const s of plan.subplans) {
+        if (area && s.id !== area) continue;
+        const live = s.topics.filter((t) => isLive(t));
+        const rows: Ahead[] = [];
+        live.forEach((t, i) => {
+          if (t.completedAt || !match(t.title, t.folder)) return;
+          rows.push({ folder: t.folder, title: t.title, area: s.area, subplanId: s.id, inPlan: true, position: i + 1, total: live.length, estMinutes: t.estMinutes, targetWeek: t.targetWeek, addedDates: added.get(t.folder) ?? [] });
+        });
+        if (rows.length) bySub.push(rows);
+      }
+      // los siguientes de la ruta, intercalando las áreas para que una no tape a las demás
+      const ahead: Ahead[] = [];
+      for (let i = 0; ahead.length < limit && bySub.some((l) => l.length > i); i++) for (const l of bySub) if (l[i] && ahead.length < limit) ahead.push(l[i]!);
+      const vault = topicSnaps(app)
+        .filter((t) => !planFolders.has(t.folder) && match(t.title, t.folder))
+        .slice(0, limit)
+        .map((t) => ({ folder: t.folder, title: t.title, subject: t.subject, inPlan: false as const, addedDates: added.get(t.folder) ?? [] }));
+      return { loading: false as const, ahead, vault };
     },
 
     /**

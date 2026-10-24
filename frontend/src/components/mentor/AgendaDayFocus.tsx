@@ -24,6 +24,7 @@ import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { cn } from "../ui";
 import { AreaChip, AreaCounts, DSTATUS_LABEL, focusColour, plural, PurposeBlock, StatusChip, type AgendaModel } from "./agendaKit";
 import { AreaDot, areaColour, areaPracticeView } from "./AreaViews";
+import { ExtraTag, removeExtraTopic } from "./extraKit";
 import { openTopic } from "./openTopic";
 import { TopicNoteLinks } from "./TopicNoteLinks";
 import { hm, ProgressBar, ThinkingStatus, useAiStatus } from "./parts";
@@ -108,7 +109,7 @@ function FreeLanguage({ m, b, day }: { m: AgendaModel; b: DayBlock; day: Schedul
   );
 }
 
-function BlockTopics({ m, items }: { m: AgendaModel; items: BlockItem[] }) {
+function BlockTopics({ m, items, date, onChanged }: { m: AgendaModel; items: BlockItem[]; date: string; onChanged: (p: MentorPlan) => void }) {
   return (
     <ul className="mt-2 space-y-1.5">
       {items.map((t) => {
@@ -118,6 +119,7 @@ function BlockTopics({ m, items }: { m: AgendaModel; items: BlockItem[] }) {
           <li key={`${t.subplanId}:${t.folder}:${t.part}`} className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[14.5px]" data-testid="agenda-topic">
             <span className="min-w-0 flex-1 basis-52 font-medium" title={t.folder}>{t.title}</span>
             <AreaChip colour={colourOfArea(m, t.subplanId)}>{t.area}</AreaChip>
+            {t.extra && <ExtraTag title={t.title} onRemove={() => void removeExtraTopic(m.plan.id, date, t.folder, onChanged)} />}
             {t.applied ? <Chip large>Lógica aplicada (fundamentos)</Chip> : t.groupTitle ? <Chip large>{t.groupTitle}</Chip> : null}
             {t.parts > 1 && <span className="text-[13.5px] text-dim">parte {t.part} de {t.parts}</span>}
             <span className="text-[14px] font-medium" data-testid="agenda-topic-minutes">{hm(t.minutes)}</span>
@@ -231,7 +233,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
                             {b.status !== "topic" && <Chip large colour="var(--nv-faint)">{b.status === "review" ? "Repaso" : "Omitido"}</Chip>}
                             {b.minutes > 0 && <span className="text-[14px] text-dim">{hm(b.minutes)}</span>}
                           </div>
-                          {b.items.length > 0 ? <BlockTopics m={m} items={b.items} /> : <p className="mt-1 text-[14px] text-dim">{b.note}</p>}
+                          {b.items.length > 0 ? <BlockTopics m={m} items={b.items} date={date} onChanged={onChanged} /> : <p className="mt-1 text-[14px] text-dim">{b.note}</p>}
                         </li>
                       ))}
                     </ul>
@@ -273,7 +275,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
                               <p className="mt-1 text-[14px] text-dim">{b.note}</p>
                             ) : (
                               <>
-                                <BlockTopics m={m} items={b.items} />
+                                <BlockTopics m={m} items={b.items} date={date} onChanged={onChanged} />
                                 <ul className="mt-2.5 space-y-1.5 border-t border-line pt-2.5" aria-label={`Ejercicios de ${b.label}`}>
                                   {ex.map((x) => (
                                     <li key={x.id} className="flex flex-wrap items-start gap-x-2 gap-y-1 text-[14.5px]" data-testid="agenda-exercise">
@@ -329,7 +331,7 @@ export function DayDetailFocus({ m, date, onChanged, headingId, level = 2, areaF
               <H2 id={`${id}-bases`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[17px] font-bold">
                 Bases <span className="text-[14px] font-normal text-dim">{plural(new Set(bases.map((b) => b.folder)).size, "fundamento", "fundamentos")} intercalados en las áreas · {hm(bases.reduce((n, b) => n + b.minutes, 0))}</span>
               </H2>
-              <BlockTopics m={m} items={bases} />
+              <BlockTopics m={m} items={bases} date={date} onChanged={onChanged} />
             </section>
           )}
 
@@ -543,7 +545,7 @@ export function MonthProjects({ m, month, headingId, onChanged }: { m: AgendaMod
 const COLD_RETRY_MS = 1500;
 const COLD_RETRY_MAX = 40;
 
-export function PracticeCurriculumBar({ plan, onChanged, announce }: { plan: MentorPlan; onChanged: (p: MentorPlan) => void; announce: (msg: string) => void }) {
+export function PracticeCurriculumBar({ plan, onChanged, announce, tip }: { plan: MentorPlan; onChanged: (p: MentorPlan) => void; announce: (msg: string) => void; /** versión «nota» de las páginas del plan (tarjeta suave con 💡); `area` = el nombre del área de la página */ tip?: { area?: string } }) {
   const toast = useApp((s) => s.toast);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
@@ -585,21 +587,25 @@ export function PracticeCurriculumBar({ plan, onChanged, announce }: { plan: Men
     [plan.id, onChanged, announce, toast],
   );
   const when = cur ? new Date(cur.generatedAt).toLocaleDateString("es", { day: "numeric", month: "short" }) : "";
+  const state = cur
+    ? `${cur.source === "ai" ? "Generada con el Mentor" : cur.source === "mixed" ? "Generada con el Mentor y plantillas" : "Plantillas automáticas"} (${when}): ejercicios por tema, retos de lógica y proyectos. ${plural(cur.weeks.length, "semana", "semanas")}.`
+    : "Sin generar: la agenda usa plantillas automáticas por tipo de tema. El Mentor puede crear ejercicios concretos y proyectos enfocados en el objetivo del plan.";
+  const area = tip?.area;
   return (
-    <section aria-labelledby="pc-bar-h" className="rounded-xl border border-line bg-card px-4 py-3" data-testid="practice-curriculum-bar">
+    <section aria-labelledby="pc-bar-h" className={tip ? "rounded-2xl bg-hover px-4 py-3.5" : "rounded-xl border border-line bg-card px-4 py-3"} data-testid="practice-curriculum-bar">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {tip && <span aria-hidden className="text-[22px] leading-none">💡</span>}
         <div className="min-w-0 flex-1 basis-72">
-          <h3 id="pc-bar-h" className="text-[16px] font-semibold">Práctica del plan</h3>
+          <h3 id="pc-bar-h" className="text-[16px] font-semibold">{tip ? (area ? `Práctica de ${area} con Mentor IA` : "Práctica del plan con Mentor IA") : "Práctica del plan"}</h3>
           <p className="text-[14px] text-dim" data-testid="practice-curriculum-state">
-            {cur
-              ? `${cur.source === "ai" ? "Generada con el Mentor" : cur.source === "mixed" ? "Generada con el Mentor y plantillas" : "Plantillas automáticas"} (${when}): ejercicios por tema, retos de lógica y proyectos. ${plural(cur.weeks.length, "semana", "semanas")}.`
-              : "Sin generar: la agenda usa plantillas automáticas por tipo de tema. El Mentor puede crear ejercicios concretos y proyectos enfocados en el objetivo del plan."}
+            {state}
+            {area ? ` El Mentor la genera para todas las áreas del plan a la vez; aquí ves la de ${area}.` : ""}
           </p>
         </div>
         <PrimaryButton large disabled={busy} onClick={() => void run(false)} data-testid="practice-curriculum-generate">
-          <Sparkles size={16} aria-hidden /> {cur ? "Regenerar la práctica del plan con el Mentor" : "Generar la práctica del plan con el Mentor"}
+          <Sparkles size={16} aria-hidden /> {area ? `${cur ? "Regenerar" : "Generar"} práctica de ${area} con el Mentor` : cur ? "Regenerar la práctica del plan con el Mentor" : "Generar la práctica del plan con el Mentor"}
         </PrimaryButton>
-        {!busy && <GhostButton large onClick={() => void run(true)} data-testid="practice-curriculum-templates">Solo plantillas (sin IA)</GhostButton>}
+        {!busy && <GhostButton large onClick={() => void run(true)} data-testid="practice-curriculum-templates">{area ? `Solo plantillas de ${area}` : "Solo plantillas (sin IA)"}</GhostButton>}
       </div>
       {busy && (
         <div className="mt-2">

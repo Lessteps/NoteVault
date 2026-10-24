@@ -256,6 +256,8 @@ export interface BlockItem {
   applied?: boolean;
   /** lenguaje concreto del tema («Python», «JavaScript»), si sale de su grupo */
   language?: string;
+  /** tema añadido a mano a este día */
+  extra?: boolean;
 }
 
 export interface DayBlock {

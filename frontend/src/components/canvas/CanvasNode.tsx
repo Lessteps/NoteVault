@@ -76,7 +76,7 @@ function FileBody({ node }: { node: CNode }) {
       </div>
       {info.kind === "note" ? (
         <div
-          className="nv-prose min-h-0 flex-1 px-3 py-2 text-[12.5px]"
+          className="nv-prose nv-inline min-h-0 flex-1 px-3 py-2 text-[12.5px]"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(stripFrontmatter(info.text ?? "")) }}
         />
       ) : (
@@ -121,15 +121,20 @@ function CardEditor({ value, onDone }: { value: string; onDone: (v: string | nul
   return (
     <div
       data-card-editor
-      className="nv-card-editor h-full min-h-0 overflow-hidden px-2.5 py-1.5 [&_.cm-content]:!max-w-none [&_.cm-scroller]:!p-0 [&_.cm-scroller]:!pb-2"
-      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onDone(draft.current); }}
+      className="nv-card-editor h-full min-h-0 overflow-hidden px-2.5 py-1.5 [&_.cm-content]:!mx-0 [&_.cm-content]:!max-w-none [&_.cm-scroller]:!p-0 [&_.cm-scroller]:!pb-2"
+      onBlur={(e) => {
+        const to = e.relatedTarget as Element | null;
+        // The formatting bar floats over the canvas: using it must not end the edit.
+        if (e.currentTarget.contains(to) || to?.closest?.("[data-format-bar]")) return;
+        onDone(draft.current);
+      }}
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Escape") onDone(draft.current);
       }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <SourceEditor value={value} eol={"\n"} code={false} onChange={(raw) => { draft.current = raw; }} />
+      <SourceEditor value={value} eol={"\n"} code={false} numbered onChange={(raw) => { draft.current = raw; }} />
     </div>
   );
 }
@@ -244,7 +249,7 @@ export const CanvasNodeView = memo(function CanvasNodeView({
       {node.type === "text" && (editing
         ? <CardEditor value={node.text ?? ""} onDone={done} />
         : (
-          <div className="nv-prose h-full px-3 py-2 text-[13.5px]"
+          <div className="nv-prose nv-inline h-full px-3 py-2 text-[13.5px]"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(node.text ?? "") }} />
         ))}
       {node.type === "file" && <FileBody node={node} />}

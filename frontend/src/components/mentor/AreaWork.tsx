@@ -9,6 +9,7 @@
 import { CalendarClock, Play } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AreaPracticeView } from "../../lib/areaPracticeView";
+import type { MentorPlan } from "../../lib/types";
 import { api } from "../../lib/bridge";
 import { bucketReviews, dueText, type ReviewRow } from "../../lib/planReviews";
 import { dateLabel } from "../../lib/planSchedule";
@@ -17,7 +18,10 @@ import { useMentor } from "../../store/mentor";
 import { usePomodoro } from "../../store/pomodoro";
 import { cn } from "../ui";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
+import { AddExtraTopic } from "./AddExtraTopic";
 import { AreaPracticeBlock } from "./AreaPracticeBlock";
+import { bumpPlanVersion } from "./extraKit";
+import { ExtraPracticeSection } from "./ExtraPracticeSection";
 import { openTopic } from "./openTopic";
 import { ProgressBar } from "./parts";
 import { TopicRow, type BoardPractice, type BoardRow } from "./PlanBoard";
@@ -190,7 +194,10 @@ function WeekView({ days, today, colour, upcoming }: { days: WeekDayView[]; toda
   );
 }
 
-export function AreaWork({ planId, areaName, areaId, subtitle, loggedMinutes = 0, rows, todayRows, weekDays, upcoming, sets, today, colour, practice, reviews, plannedMinutes, onStartBlock }: {
+export function AreaWork({ plan, subplanId, planId, areaName, areaId, subtitle, loggedMinutes = 0, rows, todayRows, weekDays, upcoming, sets, today, colour, practice, reviews, plannedMinutes, onStartBlock }: {
+  /** el plan y el área (id de subplan): con ellos la Ejecución deja añadir temas y práctica extra a hoy */
+  plan?: MentorPlan;
+  subplanId?: string;
   planId: string;
   areaName: string;
   areaId?: string;
@@ -319,7 +326,23 @@ export function AreaWork({ planId, areaName, areaId, subtitle, loggedMinutes = 0
         </div>
       )}
 
-      {pa && practice && <AreaPracticeBlock planId={planId} area={pa as AreaPracticeView} mark={practice.mark} />}
+      {view === "hoy" && plan && subplanId && (
+        <div className="flex flex-wrap items-center gap-2" data-testid="work-add-topic">
+          <AddExtraTopic planId={planId} date={today} area={subplanId} minDate={plan.start} maxDate={plan.end} label="Añadir tema" onChanged={bumpPlanVersion} />
+          <span className="text-[13px] text-dim">Un tema de la ruta que está más adelante, o cualquiera de tu vault.</span>
+        </div>
+      )}
+
+      {pa && practice ? (
+        <AreaPracticeBlock
+          planId={planId}
+          area={pa as AreaPracticeView}
+          mark={practice.mark}
+          {...(plan && subplanId ? { extra: <ExtraPracticeSection plan={plan} date={today} subplanId={subplanId} topics={todayRows.map((r) => ({ folder: r.folder, title: r.title }))} /> } : {})}
+        />
+      ) : plan && subplanId ? (
+        <ExtraPracticeSection plan={plan} date={today} subplanId={subplanId} topics={todayRows.map((r) => ({ folder: r.folder, title: r.title }))} standalone />
+      ) : null}
     </section>
   );
 }

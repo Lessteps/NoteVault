@@ -23,7 +23,7 @@ export const panelId = (prefix: string, id: string): string => `${prefix}-panel-
  * Pestañas del patrón WAI-ARIA «tabs» con activación automática: ←/→ (y Inicio/Fin) mueven el foco y la selección, solo la
  * pestaña activa entra en el orden de Tab y de ahí se pasa al panel. Si no caben, se pliegan en varias líneas (nunca scroll horizontal).
  */
-export function Tabs({ tabs, active, onChange, prefix, label }: { tabs: TabDef[]; active: string; onChange: (id: string) => void; prefix: string; label: string }) {
+export function Tabs({ tabs, active, onChange, prefix, label, variant = "pill" }: { tabs: TabDef[]; active: string; onChange: (id: string) => void; prefix: string; label: string; /** `underline`: las pestañas de una página de plan (texto con subrayado, como un documento) */ variant?: "pill" | "underline" }) {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const i = tabs.findIndex((t) => t.id === active);
@@ -39,7 +39,7 @@ export function Tabs({ tabs, active, onChange, prefix, label }: { tabs: TabDef[]
     refs.current[t.id]?.focus();
   };
   return (
-    <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className="flex flex-wrap gap-0.5 py-1.5 @3xl:gap-1">
+    <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className={cn("flex flex-wrap gap-0.5 @3xl:gap-1", variant === "underline" ? "gap-x-1 border-b border-line" : "py-1.5")}>
       {tabs.map((t) => {
         const on = t.id === active;
         return (
@@ -56,8 +56,12 @@ export function Tabs({ tabs, active, onChange, prefix, label }: { tabs: TabDef[]
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(t.id)}
             className={cn(
-              "inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-2 py-2 text-[14px] font-medium @3xl:gap-2 @3xl:px-3.5",
-              on ? "border-accent bg-accent-soft text-accent-text" : "border-transparent text-dim hover:bg-hover hover:text-text",
+              variant === "underline"
+                ? "-mb-px inline-flex min-h-11 items-center gap-1.5 border-b-2 px-2.5 py-2 text-[14.5px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent @3xl:gap-2 @3xl:px-3.5"
+                : "inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-2 py-2 text-[14px] font-medium @3xl:gap-2 @3xl:px-3.5",
+              variant === "underline"
+                ? on ? "border-accent text-text" : "border-transparent text-dim hover:text-text"
+                : on ? "border-accent bg-accent-soft text-accent-text" : "border-transparent text-dim hover:bg-hover hover:text-text",
             )}
           >
             {t.short ? (

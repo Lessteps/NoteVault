@@ -3,6 +3,7 @@
 // Todo se calcula con `lib/planSchedule.ts` a partir del plan; lo único que se escribe son los propósitos editados a mano.
 
 import { CalendarDays } from "lucide-react";
+import type { ReactNode } from "react";
 import { dateLabel, dayPurpose, deliverablesText, longDateLabel, monthSummary, topicsText, weekSummary, type ScheduleDay } from "../../lib/planSchedule";
 import { PHASE_LABEL, PRACTICE_NAME, type PracticePhase } from "../../lib/practiceTrack";
 import { areaShort, dayBases, dayByArea } from "../../lib/planTopicsByArea";
@@ -15,6 +16,7 @@ import { AreaChip, AreaCounts, DeliverableLine, doneText, focusColour, plural, P
 import { DayDetailFocus, FocusStructure, MonthProjects, WeekProjects } from "./AgendaDayFocus";
 import { AreaDot, MonthAreaTotals } from "./AreaViews";
 import { MonthLegend, MonthStats, MonthWeekBlock, topicsPerDay, WeekCategories, WeekDayStrip, WeekStats } from "./AgendaBoards";
+import { ExtraTag, removeExtraTopic } from "./extraKit";
 import { openTopic } from "./openTopic";
 import { TopicNoteLinks } from "./TopicNoteLinks";
 import { hm, ProgressBar } from "./parts";
@@ -96,6 +98,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2, areaFilter
                 <li key={`${t.subplanId}:${t.folder}:${t.part}`} className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line p-3" data-testid="agenda-topic">
                   <span className="min-w-0 flex-1 basis-56 text-[15px] font-medium" title={t.folder}>{t.title}</span>
                   <AreaChip colour={colourOfArea(m, t.subplanId)}>{t.area}</AreaChip>
+                  {t.extra && <ExtraTag title={t.title} onRemove={() => void removeExtraTopic(m.plan.id, date, t.folder, onChanged)} />}
                   {t.groupTitle && <Chip large>{t.groupTitle}</Chip>}
                   {t.parts > 1 && <span className="text-[13.5px] text-dim">parte {t.part} de {t.parts}</span>}
                   {t.overflow && <Chip large colour="var(--nv-warn)">No cabe: amontonado</Chip>}
@@ -185,7 +188,7 @@ export function DayDetail({ m, date, onChanged, headingId, level = 2, areaFilter
 }
 
 /** Una semana: cuántos temas por área, horas, progreso, práctica, entregables y sus días. */
-export function WeekDetail({ m, week, onPickDay, onChanged, headingId, only = null }: { m: AgendaModel; week: number; onPickDay: (date: string) => void; onChanged: (p: MentorPlan) => void; headingId?: string; /** subplan elegido en las pestañas por área (null = todas) */ only?: string | null }) {
+export function WeekDetail({ m, week, onPickDay, onChanged, headingId, only = null, dayExtra }: { m: AgendaModel; week: number; onPickDay: (date: string) => void; onChanged: (p: MentorPlan) => void; headingId?: string; /** subplan elegido en las pestañas por área (null = todas) */ only?: string | null; /** gancho al final de cada fila de día (p. ej. «añadir tema extra») */ dayExtra?: (date: string) => ReactNode }) {
   const w = weekSummary(m.plan, m.schedule, week, m.deliverablesDefined ? m.deliverables : []);
   if (!w) return <p className="text-[14px] text-dim">Esa semana no existe en el plan.</p>;
   const days = m.schedule.days.filter((d) => d.week === week);
@@ -242,19 +245,19 @@ export function WeekDetail({ m, week, onPickDay, onChanged, headingId, only = nu
       <section aria-labelledby={`${headingId ?? "wk"}-days`} data-testid="agenda-week-days">
         <h3 id={`${headingId ?? "wk"}-days`} className={cn(SECTION, "mb-2")}>Días de la semana (plan diario)</h3>
         <ol className="space-y-1.5">
-          {days.map((d) => <WeekDayRow key={d.date} m={m} day={d} onPick={onPickDay} />)}
+          {days.map((d) => <WeekDayRow key={d.date} m={m} day={d} onPick={onPickDay} {...(dayExtra ? { extra: dayExtra(d.date) } : {})} />)}
         </ol>
       </section>
     </article>
   );
 }
 
-function WeekDayRow({ m, day, onPick }: { m: AgendaModel; day: ScheduleDay; onPick: (d: string) => void }) {
+export function WeekDayRow({ m, day, onPick, extra }: { m: AgendaModel; day: ScheduleDay; onPick: (d: string) => void; extra?: ReactNode }) {
   const due = m.dueByDate.get(day.date) ?? [];
   const areas = dayByArea(m.plan, day, due);
   const bases = new Set(dayBases(m.plan, day).map((b) => b.folder)).size;
   return (
-    <li className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border px-3.5 py-2.5 text-[14px]", day.date === m.today ? "border-accent bg-accent-soft" : "border-line bg-card")} data-testid="agenda-week-day">
+    <li className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border px-3.5 py-2.5 text-[14px]", day.date === m.today ? "border-accent bg-accent-soft" : "border-line bg-card")} data-testid="agenda-week-day" data-date={day.date}>
       <span className="w-24 flex-none font-medium capitalize">{DAY_SHORT[day.dow - 1]} {Number(day.date.slice(8))}<span className="sr-only"> {DAY_LONG[day.dow - 1]}</span></span>
       <span className="whitespace-nowrap font-medium">{topicsText(day.topics.length)}</span>
       {areas.length > 0 || bases > 0 ? (
@@ -268,9 +271,11 @@ function WeekDayRow({ m, day, onPick }: { m: AgendaModel; day: ScheduleDay; onPi
         <span className="min-w-0 flex-1 basis-48 text-dim">{day.study ? "Repaso y práctica" : day.blocked ? "Bloqueado" : "Descanso"}</span>
       )}
       {m.deliverablesDefined && <span className="whitespace-nowrap text-dim">{deliverablesText(due.length)}</span>}
+      {day.topics.some((t) => t.extra) && <Chip large colour="var(--nv-accent)">Extra {new Set(day.topics.filter((t) => t.extra).map((t) => t.folder)).size}</Chip>}
       {day.practice.kata && <Chip large colour="var(--nv-practice, #c58be0)">Kata</Chip>}
       {day.practice.project && <Chip large colour="var(--nv-practice, #c58be0)">Proyecto</Chip>}
       <GhostButton aria-label={`Ver el día ${longDateLabel(day.date)}`} onClick={() => onPick(day.date)}>Ver día</GhostButton>
+      {extra}
     </li>
   );
 }

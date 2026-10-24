@@ -1523,7 +1523,30 @@ export interface MentorPlan {
   areaModeBy?: "user" | "ai" | "rules";
   /** cuándo (ISO) quedaron definidos los entregables (los fija la ejecución del plan); ausente y sin entregables propios = «por definir» */
   deliverablesDefinedAt?: string;
+  /** ritmo diario manual (temas por día y mínimo, global y por área); ausente = reparto automático por minutos */
+  pace?: import("./planPace").DailyPace;
+  /** temas añadidos a mano a un día y práctica diaria extra (ver `lib/planPace.ts`) */
+  extraTopics?: import("./planPace").ExtraTopic[];
+  extraPractice?: import("./planPace").ExtraPractice[];
 }
+/** Candidatos para un tema extra (`mentor_plan_topic_candidates`): los siguientes de la ruta y los de la vault fuera del plan. */
+export interface MentorTopicCandidate {
+  folder: string;
+  title: string;
+  inPlan: boolean;
+  /** solo temas del plan */
+  area?: string;
+  subplanId?: string;
+  position?: number;
+  total?: number;
+  estMinutes?: number;
+  targetWeek?: number;
+  /** solo temas de la vault */
+  subject?: string;
+  /** fechas a las que ya se añadió como extra */
+  addedDates: string[];
+}
+export type MentorTopicCandidates = { loading: true } | { loading: false; ahead: MentorTopicCandidate[]; vault: MentorTopicCandidate[] };
 /** currículo de práctica del plan generado por la IA (ejercicios por semana y proyectos) */
 export type MentorPracticeCurriculum = import("./planCurriculum").PracticeCurriculum;
 export type MentorMonthlyPlan = MentorPlan;

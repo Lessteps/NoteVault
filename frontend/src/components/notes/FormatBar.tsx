@@ -21,6 +21,8 @@ function run(fn: (view: NonNullable<typeof activeEditor.view>) => boolean) {
   const view = activeEditor.view;
   if (!view) return;
   fn(view);
+  // The heading menu is a real <select> and takes the focus: hand it back to the text.
+  view.focus();
 }
 
 function Btn({ label, onClick, children, wide }: {
@@ -44,12 +46,13 @@ function Sep() {
   return <span className="mx-0.5 h-4 w-px flex-none bg-line" aria-hidden="true" />;
 }
 
-export function FormatBar() {
+export function FormatBar({ floating }: { floating?: boolean }) {
   return (
     <div
       role="toolbar"
       aria-label="Formato"
-      className="flex h-9 flex-none items-center gap-0.5 overflow-x-auto border-b border-line bg-surface px-3"
+      data-format-bar
+      className={cn("flex h-9 flex-none items-center gap-0.5 overflow-x-auto bg-surface", floating ? "px-2" : "border-b border-line px-3")}
     >
       <Btn label="Negrita (Ctrl+B)" onClick={() => run((v) => wrap(v, "**"))}><Bold size={14} /></Btn>
       <Btn label="Cursiva (Ctrl+I)" onClick={() => run((v) => wrap(v, "*"))}><Italic size={14} /></Btn>

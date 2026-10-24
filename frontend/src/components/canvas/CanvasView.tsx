@@ -19,6 +19,7 @@ import { useCanvas } from "../../store/canvas";
 import { askText, cn, openMenu } from "../ui";
 import { CanvasNodeView, forgetFileInfo } from "./CanvasNode";
 import { PathPicker } from "./PathPicker";
+import { FormatBar } from "../notes/FormatBar";
 import { DRAG_MIME } from "../notes/FileTree";
 
 type View = { x: number; y: number; zoom: number };
@@ -838,7 +839,13 @@ export function CanvasView() {
           </div>
         )}
 
-        {(sel.size > 0 || edge) && (
+        {editing && doc.nodes.find((n) => n.id === editing)?.type === "text" && (
+          <div data-canvas-ui className="absolute left-1/2 top-3 z-30 max-w-[calc(100%-24px)] -translate-x-1/2 overflow-hidden rounded-xl border border-line-strong shadow-lg">
+            <FormatBar floating />
+          </div>
+        )}
+
+        {(sel.size > 0 || edge) && !(editing && single?.type === "text") && (
           <SelectionBar
             node={single}
             edge={edge}

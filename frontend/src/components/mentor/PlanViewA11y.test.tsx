@@ -19,6 +19,7 @@ import { useNavState } from "../../store/navState";
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
 
+import { gotoSection, navTab, navView } from "./mentorTestNav";
 import { PlanWorkspace } from "./PlanWorkspace";
 
 const START = "2026-10-06";
@@ -58,19 +59,7 @@ let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
 // «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
-const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
-const section = async (id: string) => {
-  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
-  expect(b, `sub-vista ${id}`).toBeTruthy();
-  await act(async () => { b!.click(); });
-  await flush();
-  // «Preparar» agrupa ejecutar · cobertura · antigravity; el detalle de las áreas vive dentro de «Temas por área»
-  if (id === "ejecutar" || id === "cobertura" || id === "antigravity") {
-    const t = host.querySelector<HTMLElement>(`[data-testid=prepare-${id}]`);
-    if (t) { await act(async () => { t.click(); }); await flush(); }
-  }
-  if (id === "areas") host.querySelector("[data-testid=plan-areas-detail]")?.setAttribute("open", "");
-};
+const section = (id: string) => gotoSection(host, id, click);
 const click = async (el: Element | null | undefined) => {
   expect(el, "elemento no encontrado").toBeTruthy();
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
@@ -78,11 +67,11 @@ const click = async (el: Element | null | undefined) => {
 };
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "")))!;
-const tab = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:${id}']`)!;
+const tab = (id: string) => navTab(host, id) as HTMLButtonElement;
 /** ¿está la pestaña activa? (el ítem de la barra lateral o, en «Mi plan» y «Agenda», una de sus sub-vistas) */
 const tabOn = (id: string): boolean => {
   const el = tab(id);
-  return el.getAttribute("aria-current") === "page" || !!el.parentElement!.querySelector("[role=group] [aria-current=page]");
+  return el.getAttribute("aria-current") === "page";
 };
 const panelsVisible = () => [...host.querySelectorAll("[id^=plan-tabs-panel-]")].filter((p) => !(p as HTMLElement).hidden).map((p) => p.id.replace("plan-tabs-panel-", ""));
 
@@ -106,18 +95,23 @@ afterEach(() => {
 });
 
 describe("pestañas del plan (barra lateral)", () => {
-  it("la barra lista las pestañas con su estado actual (aria-current) y solo el panel activo es visible; la página no lleva pestañas", async () => {
+  it("la barra lista la Vista general, un ítem por área y «Más», con su estado actual (aria-current); solo el panel activo es visible y las pestañas son las de la página", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<PlanWorkspace planId={PID} />);
-    expect(host.querySelector("[role=tablist]")).toBeNull();
+    // las únicas pestañas (role=tab) son las de la página del plan, con su nombre
+    expect(host.querySelector("[role=tablist]")!.getAttribute("aria-label")).toContain("Secciones de");
     // sin pista Programming practice no hay «Práctica»
-    expect([...host.querySelectorAll("aside nav > div > button")].map((t) => t.getAttribute("data-testid")!.replace("nav-pl:", ""))).toEqual(["plan", "agenda", "entregables", "cambios"]);
+    expect([...host.querySelectorAll("aside nav > div > button")].map((t) => t.getAttribute("data-testid")!.replace("nav-pl:", ""))).toEqual(["general", "area/s1", "area/s2", "entregables", "registros", "preparar", "cambios"]);
     expect(tabOn("plan")).toBe(true);
-    expect(tabOn("agenda")).toBe(false);
+    expect(tabOn("entregables")).toBe(false);
     expect(panelsVisible()).toEqual(["plan"]);
     // los entregables quedan «por definir»: la decisión pendiente no se enseña como insignia hasta que haya entregables definidos
     expect(tab("entregables").textContent).toBe("Entregables");
-    await click(tab("agenda"));
+    await click(tab("entregables"));
+    expect(tabOn("entregables")).toBe(true);
+    expect(panelsVisible()).toEqual(["entregables"]);
+    await click(host.querySelector("[data-testid='nav-pl:area/s1']"));
+    expect(host.querySelector("[data-testid='nav-pl:area/s1']")!.getAttribute("aria-current")).toBe("page");
     expect(panelsVisible()).toEqual(["agenda"]);
   });
 
@@ -163,7 +157,7 @@ describe("plan propuesto", () => {
     const keep = vi.spyOn(api, "mentorPlanKeep").mockResolvedValue(plan({ proposed: false }));
     await mountEl(<PlanWorkspace planId={PID} />);
     for (const t of ["plan", "agenda", "entregables", "cambios"]) {
-      await click(tab(t));
+      await click(t === "agenda" ? host.querySelector("[data-testid='nav-pl:area/s1']") : tab(t));
       const bar = host.querySelector("[data-testid=plan-proposed-bar]")!;
       expect(bar).toBeTruthy();
       expect(bar.textContent).toContain("¿lo mantienes?");
@@ -195,7 +189,7 @@ describe("plan propuesto", () => {
     expect(week.querySelector("h2")!.textContent).toContain("Semana 1");
     expect(week.textContent).toContain("1.1 What programming is");
     expect(host.querySelector("[data-testid=plan-this-week]")).toBeNull();
-    await click(host.querySelector("[data-testid='nav-pl:agenda/dia']")!);
+    await click(navView(host, "dia"));
     expect(button("Planear mi día con esto")).toBeUndefined();
   });
 
@@ -364,7 +358,7 @@ describe("estructura accesible", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<PlanWorkspace planId={PID} />);
     for (const t of ["plan", "agenda", "entregables", "cambios"]) {
-      await click(tab(t));
+      await click(t === "agenda" ? host.querySelector("[data-testid='nav-pl:area/s1']") : tab(t));
       const hs = [...host.querySelectorAll("h1,h2,h3,h4,h5,h6")].filter((h) => !h.closest("[hidden]"));
       expect(hs.filter((h) => h.tagName === "H1")).toHaveLength(1);
       let prev = 0;
@@ -409,7 +403,7 @@ describe("estructura accesible", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<PlanWorkspace planId={PID} />);
     for (const t of ["plan", "agenda", "entregables", "cambios"]) {
-      await click(tab(t));
+      await click(t === "agenda" ? host.querySelector("[data-testid='nav-pl:area/s1']") : tab(t));
       for (const fake of ["Auditoría IA", "Mentor IA", "Latencia IA", "Sistemas operativos", "CM-8842", "sub-hitos", "Factibilidad"]) expect(host.textContent).not.toContain(fake);
     }
   });

@@ -1,14 +1,15 @@
 // Mentor — navegación: la ruta recordada (`mentor.view`), el modo global Planeación | Ejecución (`mentor.mode`) y los ítems que cada modo
 // pone en la barra lateral. Módulo PURO (sin React): la barra y los paneles solo leen y escriben las mismas claves de `navState`.
 
-import { AGENDA_VIEWS } from "../../lib/planSchedule";
+import { BASES_KEY } from "../../lib/planAreaTopics";
 import { reviewsOfTopics, type ReviewItemLike } from "../../lib/planReviews";
 import { areaRouteTopics, basesRouteTopics, orderedAreas } from "../../lib/planTopicsByArea";
 import type { MentorBuildSummary, MentorPlan, MentorPlanRow } from "../../lib/types";
 import { useEffect } from "react";
 import { useNavState, usePersistedNav } from "../../store/navState";
-import { DEFAULT_SECTION } from "./PlanSections";
-import { agendaViewKey, MODE_KEY, PLAN_TABS, planSectionKey, planTabKey, type PlanTab } from "./planShared";
+import { areaEmoji, BASES_EMOJI, GENERAL_EMOJI } from "./mentorAreas";
+import { sectionAlias } from "./PlanSections";
+import { agendaAreaKey, MODE_KEY, PLAN_TABS, planSectionKey, planTabKey, type PlanTab } from "./planShared";
 
 /** Modo GLOBAL del Mentor: cambia los ítems de la barra y lo que enseña el panel del plan elegido. */
 export type MentorMode = "planeacion" | "ejecucion";
@@ -107,6 +108,10 @@ export interface NavLink {
   /** el contador de la insignia (p. ej. entregables por decidir) */
   badge?: number;
   subs?: ReadonlyArray<NavLink>;
+  /** rótulo de sección que se pinta encima del ítem («Planificación», «Más») */
+  section?: string;
+  /** el emoji del ítem (cada área lleva el suyo) */
+  emoji?: string;
 }
 
 export const PLAN_NAV_PREFIX = "pl:";
@@ -119,15 +124,37 @@ export const PLAN_SECTION_LINKS: ReadonlyArray<{ id: string; label: string }> = 
   { id: "preparar", label: "Preparar" },
 ];
 
-/** Los ítems del modo Planeación: las pestañas del plan, con sub-vistas en «Mi plan» y la Agenda. */
-export function planeacionLinks(plan: Pick<MentorPlan, "programmingPractice">, pendingDeliverables = 0): NavLink[] {
-  return [
-    { id: `${PLAN_NAV_PREFIX}plan`, label: "Mi plan", subs: PLAN_SECTION_LINKS.map((s) => ({ id: `${PLAN_NAV_PREFIX}plan/${s.id}`, label: s.label })) },
-    { id: `${PLAN_NAV_PREFIX}agenda`, label: "Agenda", subs: AGENDA_VIEWS.map((v) => ({ id: `${PLAN_NAV_PREFIX}agenda/${v.id}`, label: v.label })) },
-    ...(plan.programmingPractice ? [{ id: `${PLAN_NAV_PREFIX}practica`, label: "Práctica" }] : []),
-    { id: `${PLAN_NAV_PREFIX}entregables`, label: "Entregables", ...(pendingDeliverables ? { badge: pendingDeliverables, hint: `${pendingDeliverables} ${pendingDeliverables === 1 ? "pendiente" : "pendientes"} de decidir` } : {}) },
-    { id: `${PLAN_NAV_PREFIX}cambios`, label: "Preguntas y ajustes" },
+export const PAGE_GENERAL = "general";
+export const PAGE_BASES = "bases";
+export const pageAreaId = (subplanId: string): string => `area/${subplanId}`;
+/** Las páginas «de Más» que siguen siendo pestañas/sub-vistas de siempre. */
+export const MORE_PAGES = ["entregables", "registros", "preparar", "cambios", "practica"] as const;
+
+/**
+ * Los ítems del modo Planeación, como un espacio de trabajo: «Vista general», UNA página por área del plan y «Bases» (si el plan las tiene); y,
+ * en un grupo secundario «Más», los paneles de apoyo (Entregables, Registros, Preparar plan, Preguntas y ajustes y, si el plan la tiene, la Práctica).
+ * La pista de cada área es su avance («3/12»), el mismo de la Ejecución.
+ */
+export function planeacionLinks(plan: Pick<MentorPlan, "programmingPractice" | "subplans">, pendingDeliverables = 0, opts: { hints?: ReadonlyMap<string, RunHint> } = {}): NavLink[] {
+  const hint = (tab: string): { hint?: string } => {
+    const h = opts.hints?.get(tab);
+    return h?.total ? { hint: `${h.done}/${h.total}` } : {};
+  };
+  const more = (id: string, label: string, extra: Partial<NavLink> = {}): NavLink => ({ id: `${PLAN_NAV_PREFIX}${id}`, label, ...extra });
+  const out: NavLink[] = [
+    { id: `${PLAN_NAV_PREFIX}${PAGE_GENERAL}`, label: "Vista general", emoji: GENERAL_EMOJI, section: "Planificación" },
+    ...orderedAreas(plan).map((a): NavLink => ({ id: `${PLAN_NAV_PREFIX}${pageAreaId(a.subplanId)}`, label: a.area, emoji: areaEmoji(a.areaId), ...hint(runAreaTab(a.subplanId)) })),
+    ...(hasBasesRoute(plan) ? [{ id: `${PLAN_NAV_PREFIX}${PAGE_BASES}`, label: "Bases", emoji: BASES_EMOJI, ...hint("bases") } as NavLink] : []),
   ];
+  const pend = pendingDeliverables ? { badge: pendingDeliverables, hint: `${pendingDeliverables} ${pendingDeliverables === 1 ? "pendiente" : "pendientes"} de decidir` } : {};
+  out.push(
+    more("entregables", "Entregables", { ...pend, section: "Más" }),
+    more("registros", "Registros"),
+    more("preparar", "Preparar plan"),
+    ...(plan.programmingPractice ? [more("practica", "Práctica")] : []),
+    more("cambios", "Preguntas y ajustes"),
+  );
+  return out;
 }
 
 /** Las vistas de la Ejecución: «Hoy», una por área, «Bases» (si el plan las tiene), «Proyectos» y «Registros». */
@@ -202,20 +229,67 @@ export function normalizeTab(stored: string, hasPractice: boolean): PlanTab {
   return (PLAN_TABS as readonly string[]).includes(t) && (t !== "practica" || hasPractice) ? (t as PlanTab) : "plan";
 }
 
-/** El id de ítem de la barra de Planeación que corresponde al estado guardado del plan (pestaña, sub-vista de «Mi plan», vista de la Agenda). */
-export function activePlaneacionId(tab: string, section: string, agendaView: string): string {
-  if (tab === "plan") return `${PLAN_NAV_PREFIX}plan/${PLAN_SECTION_LINKS.some((s) => s.id === section) ? section : DEFAULT_SECTION}`;
-  if (tab === "agenda") return `${PLAN_NAV_PREFIX}agenda/${AGENDA_VIEWS.some((v) => v.id === agendaView) ? agendaView : "semana"}`;
-  return `${PLAN_NAV_PREFIX}${tab}`;
+/** A qué página de Planeación lleva el estado guardado del plan (pestaña, sub-vista de «Mi plan» y área elegida). */
+export type PlanPage =
+  | { kind: "general" }
+  | { kind: "area"; subplanId: string }
+  | { kind: "bases" }
+  /** una sub-vista de «Mi plan» que sigue siendo página propia (Registros, Preparar plan) */
+  | { kind: "section"; id: "registros" | "preparar" }
+  | { kind: "tab"; tab: "entregables" | "cambios" | "practica" };
+
+/**
+ * Las claves antiguas (`mentor.planTab`, `mentor.planSection`, `mentor.agendaArea`) siguen mandando y se leen así: la Agenda (y cualquier
+ * enlace a una fecha) es la página del área elegida —o la Vista general si no hay—, y «Mi plan»: Resumen y Temas por área, la Vista general.
+ */
+export function resolvePlanPage(tab: string, section: string, agendaArea: string, subplanIds: ReadonlyArray<string>, hasPractice: boolean): PlanPage {
+  const t = normalizeTab(tab, hasPractice);
+  if (t === "agenda") return agendaArea === BASES_KEY ? { kind: "bases" } : subplanIds.includes(agendaArea) ? { kind: "area", subplanId: agendaArea } : { kind: "general" };
+  if (t === "plan") {
+    const sec = sectionAlias(section.replace(/^sec-/, ""));
+    return sec === "registros" || sec === "preparar" ? { kind: "section", id: sec } : { kind: "general" };
+  }
+  return { kind: "tab", tab: t };
 }
 
-/** Aplica la elección de un ítem de Planeación: escribe las mismas claves que leen `PlanView` y la Agenda (y los enlaces profundos). */
+/** El id de ítem de la barra de Planeación que corresponde a una página. */
+export function pageNavId(p: PlanPage): string {
+  switch (p.kind) {
+    case "general":
+      return `${PLAN_NAV_PREFIX}${PAGE_GENERAL}`;
+    case "area":
+      return `${PLAN_NAV_PREFIX}${pageAreaId(p.subplanId)}`;
+    case "bases":
+      return `${PLAN_NAV_PREFIX}${PAGE_BASES}`;
+    case "section":
+      return `${PLAN_NAV_PREFIX}${p.id}`;
+    default:
+      return `${PLAN_NAV_PREFIX}${p.tab}`;
+  }
+}
+/** El id de ítem activo de Planeación a partir de lo guardado. */
+export const activePlaneacionId = (tab: string, section: string, agendaArea: string, subplanIds: ReadonlyArray<string>, hasPractice: boolean): string =>
+  pageNavId(resolvePlanPage(tab, section, agendaArea, subplanIds, hasPractice));
+
+/** Aplica la elección de un ítem de Planeación: escribe las mismas claves que leen `PlanView` y la página del área (y los enlaces profundos). */
 export function selectPlaneacion(planId: string, id: string): void {
   const nav = useNavState.getState();
-  const [tab, sub] = id.slice(PLAN_NAV_PREFIX.length).split("/") as [PlanTab, string | undefined];
-  nav.set(planTabKey(planId), tab);
-  if (tab === "plan" && sub) nav.set(planSectionKey(planId), sub);
-  if (tab === "agenda" && sub) nav.set(agendaViewKey(planId), sub);
+  const rest = id.slice(PLAN_NAV_PREFIX.length);
+  const setArea = (v: string): void => nav.set(agendaAreaKey(planId), v);
+  if (rest === PAGE_GENERAL) {
+    nav.set(planTabKey(planId), "plan");
+    nav.set(planSectionKey(planId), "resumen");
+    setArea("");
+  } else if (rest === PAGE_BASES) {
+    nav.set(planTabKey(planId), "agenda");
+    setArea(BASES_KEY);
+  } else if (rest.startsWith("area/")) {
+    nav.set(planTabKey(planId), "agenda");
+    setArea(rest.slice("area/".length));
+  } else if (rest === "registros" || rest === "preparar") {
+    nav.set(planTabKey(planId), "plan");
+    nav.set(planSectionKey(planId), rest);
+  } else if ((PLAN_TABS as readonly string[]).includes(rest)) nav.set(planTabKey(planId), rest);
 }
 
 /** La vista de la Ejecución donde vive un tema: la de Bases (fundamentos) o la de su área. */

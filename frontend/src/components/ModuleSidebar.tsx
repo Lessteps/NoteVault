@@ -13,6 +13,8 @@ export interface SidebarItem {
   badgeTone?: "accent" | "danger";
   /** sub-vistas anidadas bajo este ítem (p. ej. una por plan del Mentor): crecen o decrecen con los datos */
   subItems?: SidebarItem[];
+  /** rótulo de sección que se pinta justo encima de este ítem (p. ej. «PLANIFICACIÓN», «MÁS») */
+  sectionLabel?: string;
 }
 
 export function ModuleSidebar({
@@ -57,6 +59,7 @@ export function ModuleSidebar({
       <nav aria-label={title} className="flex min-h-0 flex-col gap-0.5 overflow-y-auto p-2">
         {items.map((it) => (
           <div key={it.id} className="flex flex-col gap-0.5">
+            {!isCollapsed && it.sectionLabel && <p className="mt-2 px-2.5 pb-0.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-faint first:mt-0" data-testid={`nav-section-${it.id}`}>{it.sectionLabel}</p>}
             <SidebarButton it={it} active={active === it.id} onSelect={onSelect} collapsed={isCollapsed} />
             {!isCollapsed && it.subItems && it.subItems.length > 0 && (
               <div className="ml-4 flex flex-col gap-0.5 border-l border-line pl-1.5" role="group" aria-label={`${it.label}: sub-vistas`}>

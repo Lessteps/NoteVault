@@ -17,6 +17,7 @@ import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { MODE_KEY } from "./mentorNav";
+import { gotoSection, navTab, navView } from "./mentorTestNav";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
@@ -64,27 +65,7 @@ let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
 // «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
-const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
-const section = async (id: string) => {
-  // «Fases mes a mes» vive ahora en la Agenda, vista Mes
-  if (id === "fases") {
-    await act(async () => { host.querySelector<HTMLElement>("[data-testid='nav-pl:agenda']")!.click(); });
-    await flush();
-    await act(async () => { host.querySelector<HTMLElement>("[data-testid='nav-pl:agenda/mes']")!.click(); });
-    await flush();
-    return;
-  }
-  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
-  expect(b, `sub-vista ${id}`).toBeTruthy();
-  await act(async () => { b!.click(); });
-  await flush();
-  // «Preparar» agrupa ejecutar · cobertura · antigravity; el detalle de las áreas vive dentro de «Temas por área»
-  if (id === "ejecutar" || id === "cobertura" || id === "antigravity") {
-    const t = host.querySelector<HTMLElement>(`[data-testid=prepare-${id}]`);
-    if (t) { await act(async () => { t.click(); }); await flush(); }
-  }
-  if (id === "areas") host.querySelector("[data-testid=plan-areas-detail]")?.setAttribute("open", "");
-};
+const section = (id: string) => gotoSection(host, id, click);
 const click = async (el: Element | null | undefined) => {
   expect(el, "elemento no encontrado").toBeTruthy();
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
@@ -92,8 +73,8 @@ const click = async (el: Element | null | undefined) => {
 };
 const byTest = (id: string, within: ParentNode = host) => within.querySelector<HTMLElement>(`[data-testid=${id}]`)!;
 const all = (id: string, within: ParentNode = host) => [...within.querySelectorAll<HTMLElement>(`[data-testid=${id}]`)];
-const tab = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:${id}']`)!;
-const view = (id: string) => host.querySelector<HTMLButtonElement>(`[data-testid='nav-pl:agenda/${id}']`)!;
+const tab = (id: string) => navTab(host, id) as HTMLButtonElement;
+const view = (id: string) => navView(host, id) as HTMLButtonElement;
 const setValue = async (el: HTMLInputElement, v: string) => {
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, v);

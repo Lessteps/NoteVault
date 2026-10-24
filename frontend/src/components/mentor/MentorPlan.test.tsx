@@ -17,6 +17,7 @@ import { useAssistant } from "../../store/assistant";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { MODE_KEY } from "./mentorNav";
+import { gotoSection, navTab, navView } from "./mentorTestNav";
 
 const ui = vi.hoisted(() => ({ askText: vi.fn(), confirmAction: vi.fn() }));
 vi.mock("../ui", async (orig) => ({ ...(await orig<typeof import("../ui")>()), askText: ui.askText, confirmAction: ui.confirmAction }));
@@ -114,19 +115,7 @@ let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
 // «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
-const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
-const section = async (id: string) => {
-  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
-  expect(b, `sub-vista ${id}`).toBeTruthy();
-  await act(async () => { b!.click(); });
-  await flush();
-  // «Preparar» agrupa ejecutar · cobertura · antigravity; el detalle de las áreas vive dentro de «Temas por área»
-  if (id === "ejecutar" || id === "cobertura" || id === "antigravity") {
-    const t = host.querySelector<HTMLElement>(`[data-testid=prepare-${id}]`);
-    if (t) { await act(async () => { t.click(); }); await flush(); }
-  }
-  if (id === "areas") host.querySelector("[data-testid=plan-areas-detail]")?.setAttribute("open", "");
-};
+const section = (id: string) => gotoSection(host, id, click);
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "")))!;
 const click = async (el: Element | undefined) => {
@@ -134,7 +123,7 @@ const click = async (el: Element | undefined) => {
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   await flush();
 };
-const openTab = (id: string) => click(host.querySelector(`[data-testid='nav-pl:${id}']`)!);
+const openTab = (id: string) => click(navTab(host, id));
 
 beforeEach(() => {
   localStorage.clear();
@@ -161,7 +150,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<PlanWorkspace planId={PID} />);
     expect(host.textContent).toContain("Backend · 6 oct–5 nov");
-    const header = host.querySelector("[data-testid=plan-header]")!;
+    const header = host.querySelector("[data-testid=plan-props]")!;
     expect(header.textContent).toContain("Activo");
     await section("datos");
     const pre = host.querySelector("[data-testid=plan-preconditions]")!.textContent!;
@@ -250,7 +239,7 @@ describe("Mentor — sub-interfaz de un plan", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ today: "2026-10-13", plans: [row(PID, "A"), row("2026-10-10_2026-10-31", "B")] }));
     await mountEl(<PlanWorkspace planId={PID} />);
     await openTab("agenda");
-    await click(host.querySelector("[data-testid='nav-pl:agenda/dia']")!);
+    await click(navView(host, "dia"));
     const items = host.querySelectorAll("[data-testid=agenda-topic]");
     expect(items).toHaveLength(1);
     expect(items[0]!.textContent).toContain("2 APIs web");
@@ -535,7 +524,7 @@ describe("MentorModule: selector de plan", () => {
     await click(host.querySelector("[data-testid=plan-option-p2]")!);
     expect(useNavState.getState().values["mentor.view"]).toBe("plan:p2");
     expect(get).toHaveBeenLastCalledWith("p2");
-    expect(host.querySelector("[data-testid=plan-header]")).toBeTruthy();
+    expect(host.querySelector("[data-testid=plan-props]")).toBeTruthy();
     expect(host.querySelector("[data-testid=mentor-plan-current]")!.textContent).toBe("Plan 2");
     // el plan guardado ya no existe: el plan en curso
     act(() => root.unmount());
@@ -564,16 +553,16 @@ describe("MentorModule: modo global y «Crear plan»", () => {
     expect(navIds()).toEqual(["nav-ej:general", "nav-ej:area:s1-programacion", "nav-ej:area:s2-ingles", "nav-ej:proyectos", "nav-ej:registros"]);
     expect(byTest("plan-run")).toBeTruthy();
     await click(byTest("mentor-mode-planeacion")!);
-    expect(navIds()).toEqual(["nav-pl:plan", "nav-pl:agenda", "nav-pl:entregables", "nav-pl:cambios"]);
+    expect(navIds()).toEqual(["nav-pl:general", "nav-pl:area/s1-programacion", "nav-pl:area/s2-ingles", "nav-pl:entregables", "nav-pl:registros", "nav-pl:preparar", "nav-pl:cambios"]);
     expect(byTest("plan-run")).toBeNull();
-    expect(byTest("plan-section-resumen")).toBeTruthy();
+    expect(byTest("plan-agenda")).toBeTruthy();
     expect(useNavState.getState().values["mentor.mode"]).toBe("planeacion");
     // cambiar de plan conserva el modo
     await click(byTest("mentor-plan-selector-btn")!);
     await click(byTest("plan-option-p2")!);
     expect(useNavState.getState().values["mentor.view"]).toBe("plan:p2");
     expect(byTest("mentor-mode-planeacion")!.getAttribute("aria-checked")).toBe("true");
-    expect(navIds()[0]).toBe("nav-pl:plan");
+    expect(navIds()[0]).toBe("nav-pl:general");
   });
 
   it("«Crear plan» abre el formulario de plan nuevo; al cerrarlo se vuelve al resumen y se puede abrir otra vez", async () => {

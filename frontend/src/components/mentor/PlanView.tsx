@@ -7,7 +7,7 @@
 // SOLO LECTURA salvo propósitos y estados de entregables y las acciones del plan (renombrar, archivar, eliminar a la papelera, mantener,
 // reorganizar por áreas —deshacible desde «Preguntas y ajustes»—).
 
-import { Archive, ArchiveRestore, Check, LayoutGrid, MessageSquareText, Pencil, PlayCircle, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Check, LayoutGrid, MessageSquareText, MoreHorizontal, Pencil, PlayCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/bridge";
 import { periodLabel, weeksLabel } from "../../lib/planTime";
@@ -18,14 +18,16 @@ import { useNavState, usePersistedNav } from "../../store/navState";
 import { Chip, GhostButton, PrimaryButton } from "../common/forms";
 import { askText, cn, confirmAction } from "../ui";
 import { LoadState } from "./parts";
-import { PlanAgenda } from "./PlanAgenda";
+import { PlanScopePage } from "./PlanScopePage";
+import { PaceSlot } from "./PlanPageSlots";
+import { scopeInfo, SCOPE_ALL, SCOPE_BASES, type PageScope } from "./mentorAreas";
 import { PlanChanges } from "./PlanChanges";
 import { PlanDeliverables } from "./PlanDeliverables";
 import { BackToTop, SkipLink, TabPanel, panelId } from "./planKit";
-import { agendaDateKey, agendaViewKey, openPlanSection, planSectionKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type PlanTab } from "./planShared";
-import { modeSubject, normalizeTab, useMentorMode } from "./mentorNav";
+import { agendaAreaKey, agendaDateKey, agendaViewKey, openPlanSection, planSectionKey, planTabKey, STATUS_COLOUR, STATUS_LABEL, usePlanData, type Loaded, type PlanTab } from "./planShared";
+import { modeSubject, normalizeTab, resolvePlanPage, selectPlaneacion, useMentorMode } from "./mentorNav";
 import { ExecutionBar } from "./ExecutionBar";
-import { activeSectionOf, DEFAULT_SECTION, planSectionsOf } from "./PlanSections";
+import { activeSectionOf, DEFAULT_SECTION, planSectionsOf, sectionAlias } from "./PlanSections";
 import { PlanRun } from "./PlanRun";
 import { usePlanCoverage } from "./PlanCoverage";
 import { ExecuteDialog } from "./PlanExecution";
@@ -38,11 +40,23 @@ const CONTENT_ID = "plan-content";
 /** Lo que devuelve `usePlanData`: lo carga quien monta la vista (la barra lateral también lo necesita), no la vista. */
 export type PlanSource = ReturnType<typeof usePlanData>;
 
+/** «¿este tema ya está completo?» con el avance real: el anotado en el plan o el estado en vivo de su práctica. */
+function liveDoneFn(plan: MentorPlanData, data: Loaded): (folder: string) => boolean {
+  const done = new Set<string>();
+  for (const s of plan.subplans) for (const t of s.topics) if (t.completedAt) done.add(t.folder);
+  for (const s of data.derived?.subplans ?? []) for (const t of s.topics) if (t.state === "completo") done.add(t.folder);
+  return (f) => done.has(f);
+}
+
 export function PlanView({ planId, source }: { planId: string; source: PlanSource }) {
   const [storedTab, setStoredTab] = usePersistedNav<string>(planTabKey(planId), "plan");
   const { data, warming, error, reload, setData } = source;
   // la sub-vista elegida de «Mi plan» (por plan)
   const [storedSection] = usePersistedNav<string>(planSectionKey(planId), DEFAULT_SECTION);
+  // el área elegida en la barra (vacío = Vista general) y la fecha que se mira, compartida entre las páginas mientras el plan está abierto
+  const [storedArea] = usePersistedNav<string>(agendaAreaKey(planId), "");
+  const anchorState = useState<string | null>(null);
+  const storedView = usePersistedNav<string>(agendaViewKey(planId), "semana")[0];
   const [highlight, setHighlight] = useState<Set<string>>(new Set());
   const [autoSend, setAutoSend] = useState<{ text: string; n: number } | undefined>();
   const [focusSignal, setFocusSignal] = useState(0);
@@ -190,6 +204,13 @@ export function PlanView({ planId, source }: { planId: string; source: PlanSourc
     document.getElementById("plan-title")?.focus();
   };
 
+  const planActions = plan
+    ? ([
+        { id: "rename", label: "Renombrar", Icon: Pencil, run: () => void rename(), danger: false },
+        { id: "archive", label: plan.archived ? "Reactivar" : "Terminar / archivar", Icon: plan.archived ? ArchiveRestore : Archive, run: () => { const a = !plan.archived; void archivePlan(plan.id, a); announce(a ? "Plan archivado." : "Plan reactivado."); }, danger: false },
+        { id: "delete", label: "Eliminar", Icon: Trash2, run: () => void remove(), danger: true },
+      ] as const)
+    : [];
   const state: MentorPlanStatus | null = plan ? (plan.proposed ? "propuesto" : plan.archived ? "terminado" : (data?.status ?? "activo")) : null;
   const weeks = plan ? Math.round(((Date.parse(plan.end) - Date.parse(plan.start)) / 86400000 + 1) / 7 * 10) / 10 : 0;
   const areas = plan ? [...new Set(plan.subplans.map((s) => s.area))] : [];
@@ -222,62 +243,17 @@ export function PlanView({ planId, source }: { planId: string; source: PlanSourc
     [plan, summary, state, data, highlight, cov, openMonth, askChangesWith, announce, applied, changeTab, autoSend?.n],
   );
   const section = sections.length ? activeSectionOf(sections, storedSection) : null;
+  // La página de Planeación: Vista general, un área o Bases (páginas de plan) o una sub-vista/pestaña de apoyo (Registros, Entregables…)
+  const page = resolvePlanPage(storedTab, storedSection, storedArea, plan?.subplans.map((x) => x.id) ?? [], !!plan?.programmingPractice);
+  const scope: PageScope | null = page.kind === "general" ? SCOPE_ALL : page.kind === "bases" ? SCOPE_BASES : page.kind === "area" ? { kind: "area", subplanId: page.subplanId } : null;
+  // claves antiguas → pestaña de la página: «Datos/Alcance» = Detalles · «Temas/Catálogo/Áreas» = Por área · la vista «Calendario» de la Agenda = Calendario
+  const rawSection = storedSection.replace(/^sec-/, "");
+  const legacyTab = tab === "plan" ? (rawSection === "datos" || rawSection === "alcance" ? "detalles" : sectionAlias(rawSection) === "temas" ? "area" : undefined) : tab === "agenda" && storedView === "calendario" ? "calendario" : undefined;
+  const scopePage = mode === "planeacion" && !!scope && !!plan && !!summary;
 
-  return (
-    <div ref={scroller} className="nv-a11y relative flex min-h-0 min-w-0 flex-1 scroll-pt-40 flex-col overflow-y-auto overflow-x-hidden bg-surface text-[14px] text-text" data-testid="plan-view">
-      <SkipLink targetId={CONTENT_ID}>Saltar al contenido</SkipLink>
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only" data-testid="plan-live">{live}</div>
-      <div className="mx-auto w-full min-w-0 max-w-[1400px] px-4 pb-24 @3xl:px-6">
-        <header className="pt-5" data-testid="plan-head">
-          <p className="font-mono text-[13px] uppercase tracking-wider text-faint">
-            Plan de estudio{areas.length ? ` · ${areas.join(" · ")}` : ""}
-          </p>
-          <div className="mt-1 flex flex-wrap items-start gap-x-4 gap-y-3">
-            <div className="min-w-0 flex-1 basis-72">
-              <h1 id="plan-title" tabIndex={-1} className="text-[26px] font-bold leading-tight tracking-tight outline-none @3xl:text-[30px]">{row?.name ?? "Mentor — Plan"}</h1>
-              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 text-[15px] text-dim">
-                {plan ? (
-                  <>
-                    <span>{periodLabel(plan.start, plan.end)} · {weeksLabel(weeks)}</span>
-                    {state && <Chip large colour={STATUS_COLOUR[state]}>{plan.proposed ? "Propuesto" : plan.archived ? "Archivado" : STATUS_LABEL[state]}</Chip>}
-                    {plan.auto && <Chip large colour="var(--nv-warn)">Plan automático</Chip>}
-                  </>
-                ) : (
-                  "El plan por áreas elementales. El estado sale de tu práctica; los propósitos y los estados de los entregables se editan aquí."
-                )}
-              </p>
-            </div>
-            {plan && (
-              <div className="flex items-center gap-1 rounded-xl border border-line bg-card p-1" role="group" aria-label="Acciones del plan">
-                {([
-                  { id: "rename", label: "Renombrar", Icon: Pencil, run: () => void rename(), danger: false },
-                  { id: "archive", label: plan.archived ? "Reactivar" : "Terminar / archivar", Icon: plan.archived ? ArchiveRestore : Archive, run: () => { const a = !plan.archived; void archivePlan(plan.id, a); announce(a ? "Plan archivado." : "Plan reactivado."); }, danger: false },
-                  { id: "delete", label: "Eliminar", Icon: Trash2, run: () => void remove(), danger: true },
-                ] as const).map(({ id, label, Icon, run, danger }) => (
-                  <button key={id} type="button" aria-label={label} title={label} onClick={run} data-testid={`plan-action-${id}`} className={cn("grid h-10 w-10 place-items-center rounded-lg text-dim hover:bg-hover", danger ? "hover:text-danger" : "hover:text-text")}>
-                    <Icon size={16} aria-hidden />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </header>
-
-        <div className="mt-3 space-y-3">
-          <LoadState warming={warming} error={error} empty={!data} onRetry={() => void reload()} />
-          {data && !plan && (
-            <div className="rounded-2xl border border-dashed border-line p-6 text-center text-[14px] text-dim" data-testid="plan-missing">
-              Este plan ya no existe.{" "}
-              <button type="button" className="inline-flex min-h-8 items-center text-accent-text underline underline-offset-2" onClick={() => useNavState.getState().set("mentor.view", "plan")}>
-                Volver al resumen de planes
-              </button>
-            </div>
-          )}
-        </div>
-
-        {data && plan && summary && (
-          <>
-            {plan.proposed && (
+  const notices = plan ? (
+    <>
+      {plan.proposed && (
               <section ref={banner} aria-label="Plan propuesto" data-testid="plan-proposed-bar" className="mt-3 rounded-xl border-2 border-warn/70 bg-card px-4 py-3">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <div className="min-w-0 flex-1 basis-64">
@@ -309,6 +285,86 @@ export function PlanView({ planId, source }: { planId: string; source: PlanSourc
                 </div>
               </section>
             )}
+    </>
+  ) : null;
+  const resumen = sections.find((x) => x.id === "resumen");
+  const temas = sections.find((x) => x.id === "temas");
+  const missing = Number(resumen?.hint ?? 0);
+  const pageNode =
+    scopePage && scope && plan ? (
+      <PlanScopePage
+        key={scope.kind === "all" ? "all" : scope.kind === "bases" ? "bases" : scope.subplanId}
+        data={data!}
+        plan={plan}
+        scope={scope}
+        planName={row?.name ?? "Plan de estudio"}
+        state={state ?? "activo"}
+        onChanged={(p) => setData((d) => (d ? { ...d, plan: p } : d))}
+        announce={announce}
+        onOpenPage={(navId) => selectPlaneacion(planId, navId)}
+        anchorState={anchorState}
+        {...(resumen ? { renderDetails: () => resumen.render() } : {})}
+        {...(temas ? { renderByArea: () => temas.render() } : {})}
+        topNotice={notices}
+        {...(resumen?.notices ? { renderNotices: resumen.notices } : {})}
+        {...(legacyTab ? { defaultTab: legacyTab } : {})}
+        detailsBadge={{ n: missing, label: `${missing} sin ejercicios: falta generar` }}
+      />
+    ) : null;
+
+  return (
+    <div ref={scroller} className="nv-a11y relative flex min-h-0 min-w-0 flex-1 scroll-pt-40 flex-col overflow-y-auto overflow-x-hidden bg-surface text-[14px] text-text" data-testid="plan-view">
+      <SkipLink targetId={CONTENT_ID}>Saltar al contenido</SkipLink>
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only" data-testid="plan-live">{live}</div>
+      <div className="mx-auto w-full min-w-0 max-w-[1400px] px-4 pb-24 @3xl:px-6">
+        {!scopePage && (
+        <header className="pt-5" data-testid="plan-head">
+          <p className="font-mono text-[13px] uppercase tracking-wider text-faint">
+            Plan de estudio{areas.length ? ` · ${areas.join(" · ")}` : ""}
+          </p>
+          <div className="mt-1 flex flex-wrap items-start gap-x-4 gap-y-3">
+            <div className="min-w-0 flex-1 basis-72">
+              <h1 id="plan-title" tabIndex={-1} className="text-[26px] font-bold leading-tight tracking-tight outline-none @3xl:text-[30px]">{row?.name ?? "Mentor — Plan"}</h1>
+              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 text-[15px] text-dim">
+                {plan ? (
+                  <>
+                    <span>{periodLabel(plan.start, plan.end)} · {weeksLabel(weeks)}</span>
+                    {state && <Chip large colour={STATUS_COLOUR[state]}>{plan.proposed ? "Propuesto" : plan.archived ? "Archivado" : STATUS_LABEL[state]}</Chip>}
+                    {plan.auto && <Chip large colour="var(--nv-warn)">Plan automático</Chip>}
+                  </>
+                ) : (
+                  "El plan por áreas elementales. El estado sale de tu práctica; los propósitos y los estados de los entregables se editan aquí."
+                )}
+              </p>
+            </div>
+            {plan && (
+              <div className="flex items-center gap-1 rounded-xl border border-line bg-card p-1" role="group" aria-label="Acciones del plan">
+                {planActions.map(({ id, label, Icon, run, danger }) => (
+                  <button key={id} type="button" aria-label={label} title={label} onClick={run} data-testid={`plan-action-${id}`} className={cn("grid h-10 w-10 place-items-center rounded-lg text-dim hover:bg-hover", danger ? "hover:text-danger" : "hover:text-text")}>
+                    <Icon size={16} aria-hidden />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </header>
+        )}
+
+        <div className="mt-3 space-y-3">
+          <LoadState warming={warming} error={error} empty={!data} onRetry={() => void reload()} />
+          {data && !plan && (
+            <div className="rounded-2xl border border-dashed border-line p-6 text-center text-[14px] text-dim" data-testid="plan-missing">
+              Este plan ya no existe.{" "}
+              <button type="button" className="inline-flex min-h-8 items-center text-accent-text underline underline-offset-2" onClick={() => useNavState.getState().set("mentor.view", "plan")}>
+                Volver al resumen de planes
+              </button>
+            </div>
+          )}
+        </div>
+
+        {data && plan && summary && (
+          <>
+            {!scopePage && notices}
             {mode === "ejecucion" ? (
               <div id={CONTENT_ID} tabIndex={-1} className="mt-4 outline-none" data-testid="plan-content">
                 <PlanRun data={data} plan={plan} />
@@ -316,9 +372,37 @@ export function PlanView({ planId, source }: { planId: string; source: PlanSourc
             ) : (
             <>
             <div className="sticky top-0 z-20 -mx-4 mt-3 flex flex-wrap items-center justify-end gap-2 border-b border-line bg-surface/95 px-4 py-1 backdrop-blur @3xl:-mx-6 @3xl:px-6" data-testid="plan-sticky" role="group" aria-label="Accesos rápidos">
+              {scopePage && scope && (
+                <nav aria-label="Ruta" className="mr-auto flex min-w-0 items-center gap-1.5 truncate text-[13.5px] text-dim" data-testid="plan-crumb">
+                  <span>Mentor</span>
+                  <span aria-hidden>/</span>
+                  {scope.kind === "all" ? <span className="truncate font-medium text-text" aria-current="page">{row?.name ?? "Plan de estudio"}</span> : (
+                    <>
+                      <button type="button" onClick={() => selectPlaneacion(planId, "pl:general")} className="truncate underline-offset-2 hover:text-text hover:underline">{row?.name ?? "Plan de estudio"}</button>
+                      <span aria-hidden>/</span>
+                      <span className="truncate font-medium text-text" aria-current="page">{scopeInfo(plan, scope).title}</span>
+                    </>
+                  )}
+                </nav>
+              )}
+              {scopePage && scope && <PaceSlot plan={plan} scope={scope} today={data.today} isDone={liveDoneFn(plan, data)} onChanged={(p) => setData((d) => (d ? { ...d, plan: p } : d))} announce={announce} />}
               <GhostButton large onClick={askChanges} data-testid="plan-ask-changes" title="Pregunta algo sobre el plan, corrígelo o ajústalo con un comentario">
                 <MessageSquareText size={16} aria-hidden /> Preguntar o ajustar
               </GhostButton>
+              {scopePage && scope?.kind === "all" && (
+                <details className="relative" data-testid="plan-menu">
+                  <summary className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-lg border border-line text-dim hover:bg-hover hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" aria-label="Más acciones del plan" title="Más acciones del plan">
+                    <MoreHorizontal size={18} aria-hidden />
+                  </summary>
+                  <div className="absolute right-0 z-30 mt-1 w-56 rounded-xl border border-line bg-card p-1 shadow-lg" role="group" aria-label="Acciones del plan">
+                    {planActions.map(({ id, label, Icon, run, danger }) => (
+                      <button key={id} type="button" onClick={run} data-testid={`plan-action-${id}`} className={cn("flex min-h-10 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[14px] hover:bg-hover", danger ? "text-danger" : "text-text")}>
+                        <Icon size={16} aria-hidden /> {label}
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
               {plan.proposed && bannerGone && (
                 <span data-testid="plan-proposed-sticky" className="inline-flex flex-wrap items-center gap-2">
                   <PrimaryButton large onClick={() => void keep()}>
@@ -333,10 +417,11 @@ export function PlanView({ planId, source }: { planId: string; source: PlanSourc
 
             <div id={CONTENT_ID} tabIndex={-1} className="outline-none" data-testid="plan-content">
               <TabPanel bare prefix={PREFIX} id="plan" active={tab === "plan"}>
-                {tab === "plan" && section && <div className="mt-6" data-testid={`plan-section-${section.id}`}>{section.render()}</div>}
+                {tab === "plan" && page.kind === "section" && section && <div className="mt-6" data-testid={`plan-section-${section.id}`}>{section.render()}</div>}
+                {tab === "plan" && scopePage && scope && pageNode}
               </TabPanel>
               <TabPanel bare prefix={PREFIX} id="agenda" active={tab === "agenda"}>
-                {tab === "agenda" && <PlanAgenda data={data} plan={plan} onChanged={(p) => setData((d) => (d ? { ...d, plan: p } : d))} announce={announce} />}
+                {tab === "agenda" && scopePage && scope && pageNode}
               </TabPanel>
               {plan.programmingPractice && (
                 <TabPanel bare prefix={PREFIX} id="practica" active={tab === "practica"}>

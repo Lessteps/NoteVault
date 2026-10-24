@@ -4,7 +4,7 @@
 // Cada fila tiene su casilla (marca el día) y la flecha con el acceso directo al kata, que existe siempre: si el archivo falta, se crea al abrirlo.
 
 import { BookOpen, Check, Dumbbell, SkipForward, Undo2 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { api } from "../../lib/bridge";
 import { KATA_LEVEL_LABEL } from "../../lib/areaPracticeSystem";
 import type { AreaKataDue, AreaPracticeView } from "../../lib/areaPracticeView";
@@ -70,7 +70,7 @@ function KataRow({ planId, area, d, mark }: { planId: string; area: AreaPractice
 }
 
 /** El bloque de práctica de un área: contador, lista de katas por hacer y el siguiente si hoy no toca. */
-export function AreaPracticeBlock({ planId, area, mark }: { planId: string; area: AreaPracticeView; mark: AreaPracticeState["mark"] }) {
+export function AreaPracticeBlock({ planId, area, mark, extra }: { planId: string; area: AreaPracticeView; mark: AreaPracticeState["mark"]; /** la práctica extra del día y «Añadir práctica» */ extra?: ReactNode }) {
   const [all, setAll] = useState(false);
   const colour = focusColour(area.areaId);
   const pending = area.kata.due.filter((d) => d.state !== "done").length;
@@ -100,6 +100,7 @@ export function AreaPracticeBlock({ planId, area, mark }: { planId: string; area
         {upcoming && <KataRow planId={planId} area={area} d={upcoming} mark={mark} />}
       </ul>
       {!list.length && !upcoming && <p className="px-2.5 py-2 text-[14px] text-faint">Este plan no tiene katas en esta área.</p>}
+      {extra}
     </div>
   );
 }

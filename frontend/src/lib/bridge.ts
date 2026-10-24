@@ -373,6 +373,17 @@ export const api = {
   /** Escribe (o borra, con texto vacío) el propósito de un día, semana o mes. */
   mentorPlanPracticeGenerate: (id: string, opts: { noAi?: boolean; all?: boolean } = {}) => call<{ loading: true } | { loading: false; plan: import("./types").MentorPlan; entry: import("./types").MentorChangeEntry; history: import("./types").MentorChangeEntry[]; aiUsed: boolean; calls: number }>("mentor_plan_practice_generate", { id, ...opts }),
   mentorPlanSetPurpose: (opts: { id: string; scope: "day" | "week" | "month"; key: string; text: string }) => call<import("./types").MentorPlan>("mentor_plan_set_purpose", opts),
+  /** Ritmo diario manual (temas por día y mínimo, global y por área); `pace` vacío o nulo vuelve al reparto automático. Devuelve el plan. */
+  mentorPlanPaceSet: (opts: { id: string; pace: import("./planPace").DailyPace | null }) => call<import("./types").MentorPlan>("mentor_plan_pace_set", opts),
+  /** Añade un tema extra a un día (hoy por defecto): de la ruta (más adelante) o de la vault. Devuelve el plan. */
+  mentorPlanExtraTopicAdd: (opts: { id: string; folder: string; date?: string; area?: string; estMinutes?: number }) => call<import("./types").MentorPlan>("mentor_plan_extra_topic_add", opts),
+  mentorPlanExtraTopicRemove: (opts: { id: string; folder: string; date: string }) => call<import("./types").MentorPlan>("mentor_plan_extra_topic_remove", opts),
+  /** Práctica diaria extra de un día (kata, ejercicio o texto libre). */
+  mentorPlanExtraPracticeAdd: (opts: { id: string; title: string; kind?: import("./planPace").ExtraPracticeKind; date?: string; minutes?: number; note?: string; area?: string; folder?: string }) => call<import("./types").MentorPlan>("mentor_plan_extra_practice_add", opts),
+  mentorPlanExtraPracticeUpdate: (opts: { id: string; practiceId: string; title?: string; kind?: import("./planPace").ExtraPracticeKind; date?: string; minutes?: number | null; note?: string; area?: string; folder?: string; done?: boolean }) => call<import("./types").MentorPlan>("mentor_plan_extra_practice_update", opts),
+  mentorPlanExtraPracticeRemove: (opts: { id: string; practiceId: string }) => call<import("./types").MentorPlan>("mentor_plan_extra_practice_remove", opts),
+  /** Candidatos para añadir como tema extra: los siguientes de la ruta y los temas de la vault fuera del plan. */
+  mentorPlanTopicCandidates: (opts: { id: string; query?: string; area?: string; limit?: number }) => call<import("./types").MentorTopicCandidates>("mentor_plan_topic_candidates", opts),
   /** «Reorganizar por áreas»: convierte un plan de estructura antigua; queda en el historial y se puede deshacer. */
   mentorPlanReorganize: (id: string) => call<{ plan: import("./types").MentorPlan; entry: import("./types").MentorChangeEntry; history: import("./types").MentorChangeEntry[]; applied: true }>("mentor_plan_reorganize", { id }),
   /** Cobertura de teoría y práctica de cada área del plan contra la vault (determinista) y la última revisión guardada. */

@@ -3,9 +3,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useNavState } from "../../store/navState";
 import {
-  activePlaneacionId, asMode, defaultModeOf, ejecucionLinks, hasBasesRoute, modeSubject, normalizeTab, planeacionLinks, resolveRoute, selectEjecucion, selectPlaneacion,
+  activePlaneacionId, asMode, defaultModeOf, ejecucionLinks, hasBasesRoute, modeSubject, normalizeTab, planeacionLinks, resolvePlanPage, resolveRoute, selectEjecucion, selectPlaneacion,
 } from "./mentorNav";
-import { agendaViewKey, planSectionKey, planTabKey } from "./planShared";
+import { agendaAreaKey, planSectionKey, planTabKey } from "./planShared";
 
 const plans = [
   { id: "a", status: "futuro" as const },
@@ -71,28 +71,64 @@ describe("modo", () => {
   });
 });
 
+const group = (kind: "bases" | "none") => ({ id: "g1", title: "Bases", kind: kind === "bases" ? "bases" : "knowledge", order: 1 });
+const topic = (folder: string, g?: string) => ({ folder, title: folder, ...(g ? { group: g } : {}) });
+const sub = (id: string, area: string, areaId: string | undefined, withBases = false) =>
+  ({ id, area, ...(areaId ? { areaId } : {}), topics: [topic(`${id}/a`, withBases ? "g1" : undefined)], ...(withBases ? { groups: [group("bases")] } : {}) }) as never;
+const planWith = (subplans: unknown[], practice = false) => ({ subplans, ...(practice ? { programmingPractice: {} as never } : {}) }) as never;
+
 describe("ítems de Planeación", () => {
-  it("Mi plan (4 sub-vistas), Agenda (4 vistas), Entregables y Preguntas y ajustes; Práctica solo si el plan la tiene", () => {
-    const l = planeacionLinks({});
-    expect(l.map((x) => x.label)).toEqual(["Mi plan", "Agenda", "Entregables", "Preguntas y ajustes"]);
-    expect(l[0]!.subs!.map((x) => x.label)).toEqual(["Resumen", "Temas por área", "Registros", "Preparar"]);
-    expect(l[1]!.subs!.map((x) => x.label)).toEqual(["Día", "Semana", "Mes", "Calendario"]);
-    expect(planeacionLinks({ programmingPractice: {} as never }).map((x) => x.label)).toEqual(["Mi plan", "Agenda", "Práctica", "Entregables", "Preguntas y ajustes"]);
+  it("Vista general, una página por área (en el orden fijo) y «Más» con Entregables, Registros, Preparar plan y Preguntas y ajustes", () => {
+    const l = planeacionLinks(planWith([sub("s2", "Frontend", "frontend"), sub("s1", "Backend", "backend")]));
+    expect(l.map((x) => x.label)).toEqual(["Vista general", "Backend", "Frontend", "Entregables", "Registros", "Preparar plan", "Preguntas y ajustes"]);
+    expect(l.map((x) => x.id)).toEqual(["pl:general", "pl:area/s1", "pl:area/s2", "pl:entregables", "pl:registros", "pl:preparar", "pl:cambios"]);
+    // sin sub-ítems anidados: ya no hay «Agenda › Día · Semana · Mes · Calendario» ni «Mi plan› Resumen…»
+    expect(l.every((x) => !x.subs)).toBe(true);
+    // los rótulos de sección y los emojis de la referencia
+    expect(l.find((x) => x.id === "pl:general")).toMatchObject({ section: "Planificación", emoji: "📋" });
+    expect(l.find((x) => x.id === "pl:entregables")!.section).toBe("Más");
+    expect(l.filter((x) => x.section).length).toBe(2);
+    expect(l.find((x) => x.id === "pl:area/s1")!.emoji).toBe("⚙️");
+    expect(l.find((x) => x.id === "pl:area/s2")!.emoji).toBe("🎨");
+  });
+
+  it("«Bases» va la última de las áreas solo si el plan tiene fundamentos; «Práctica» solo si tiene la pista", () => {
+    const l = planeacionLinks(planWith([sub("s1", "Backend", "backend", true)], true));
+    expect(l.map((x) => x.label)).toEqual(["Vista general", "Backend", "Bases", "Entregables", "Registros", "Preparar plan", "Práctica", "Preguntas y ajustes"]);
+    expect(l.find((x) => x.id === "pl:bases")!.emoji).toBe("📦");
+  });
+
+  it("la pista de cada área es su avance «hechos/ruta» (el mismo de la Ejecución)", () => {
+    const hints = new Map([["area:s1", { done: 3, total: 12, due: 2 }], ["bases", { done: 0, total: 0, due: 0 }]]);
+    const l = planeacionLinks(planWith([sub("s1", "Backend", "backend")]), 0, { hints });
+    expect(l.find((x) => x.id === "pl:area/s1")!.hint).toBe("3/12");
   });
 
   it("las decisiones pendientes de entregables salen como insignia con su lectura", () => {
-    const e = planeacionLinks({}, 2).find((x) => x.id === "pl:entregables")!;
+    const e = planeacionLinks(planWith([]), 2).find((x) => x.id === "pl:entregables")!;
     expect(e.badge).toBe(2);
     expect(e.hint).toBe("2 pendientes de decidir");
-    expect(planeacionLinks({}).find((x) => x.id === "pl:entregables")!.badge).toBeUndefined();
+    expect(planeacionLinks(planWith([])).find((x) => x.id === "pl:entregables")!.badge).toBeUndefined();
   });
 
-  it("el ítem activo sale de la pestaña, la sub-vista y la vista de la Agenda guardadas", () => {
-    expect(activePlaneacionId("plan", "preparar", "mes")).toBe("pl:plan/preparar");
-    expect(activePlaneacionId("plan", "fases", "mes")).toBe("pl:plan/resumen");
-    expect(activePlaneacionId("agenda", "resumen", "mes")).toBe("pl:agenda/mes");
-    expect(activePlaneacionId("agenda", "resumen", "inventada")).toBe("pl:agenda/semana");
-    expect(activePlaneacionId("cambios", "resumen", "mes")).toBe("pl:cambios");
+  it("el ítem activo sale de la pestaña, la sub-vista y el área guardadas (claves antiguas incluidas)", () => {
+    const ids = ["s1", "s2"];
+    // Mi plan: Resumen y Temas por área ahora son la Vista general; Registros y Preparar, ítems de «Más»
+    expect(activePlaneacionId("plan", "resumen", "", ids, false)).toBe("pl:general");
+    expect(activePlaneacionId("plan", "temas", "", ids, false)).toBe("pl:general");
+    expect(activePlaneacionId("plan", "fases", "", ids, false)).toBe("pl:general");
+    expect(activePlaneacionId("plan", "preparar", "", ids, false)).toBe("pl:preparar");
+    expect(activePlaneacionId("plan", "ejecutar", "", ids, false)).toBe("pl:preparar");
+    expect(activePlaneacionId("plan", "sec-registros", "", ids, false)).toBe("pl:registros");
+    // la Agenda (y «semana», su antigua pestaña) es la página del área elegida, o la Vista general sin área
+    expect(activePlaneacionId("agenda", "resumen", "", ids, false)).toBe("pl:general");
+    expect(activePlaneacionId("semana", "resumen", "s2", ids, false)).toBe("pl:area/s2");
+    expect(activePlaneacionId("agenda", "resumen", "__bases", ids, false)).toBe("pl:bases");
+    expect(activePlaneacionId("agenda", "resumen", "ya-no-existe", ids, false)).toBe("pl:general");
+    expect(activePlaneacionId("cambios", "resumen", "", ids, false)).toBe("pl:cambios");
+    expect(activePlaneacionId("practica", "resumen", "", ids, false)).toBe("pl:general");
+    expect(activePlaneacionId("practica", "resumen", "", ids, true)).toBe("pl:practica");
+    expect(resolvePlanPage("agenda", "resumen", "s1", ids, false)).toEqual({ kind: "area", subplanId: "s1" });
   });
 
   it("la pestaña guardada se normaliza: «semana» es la Agenda y «Práctica» exige la pista", () => {
@@ -106,20 +142,25 @@ describe("ítems de Planeación", () => {
 describe("selecciones de la barra", () => {
   beforeEach(() => useNavState.setState({ values: {} }));
 
-  it("Planeación escribe las mismas claves que leen la vista del plan y la Agenda", () => {
-    selectPlaneacion("p1", "pl:plan/registros");
+  it("Planeación escribe las mismas claves que leen la vista del plan y la página del área", () => {
+    selectPlaneacion("p1", "pl:registros");
     let v = useNavState.getState().values;
     expect(v[planTabKey("p1")]).toBe("plan");
     expect(v[planSectionKey("p1")]).toBe("registros");
-    selectPlaneacion("p1", "pl:agenda/mes");
+    selectPlaneacion("p1", "pl:area/s2");
     v = useNavState.getState().values;
     expect(v[planTabKey("p1")]).toBe("agenda");
-    expect(v[agendaViewKey("p1")]).toBe("mes");
+    expect(v[agendaAreaKey("p1")]).toBe("s2");
+    selectPlaneacion("p1", "pl:bases");
+    expect(useNavState.getState().values[agendaAreaKey("p1")]).toBe("__bases");
     selectPlaneacion("p1", "pl:entregables");
     expect(useNavState.getState().values[planTabKey("p1")]).toBe("entregables");
-    // elegir el ítem padre conserva la sub-vista que ya había
-    selectPlaneacion("p1", "pl:plan");
-    expect(useNavState.getState().values[planSectionKey("p1")]).toBe("registros");
+    // la Vista general: la pestaña «Mi plan», Resumen y sin área
+    selectPlaneacion("p1", "pl:general");
+    v = useNavState.getState().values;
+    expect(v[planTabKey("p1")]).toBe("plan");
+    expect(v[planSectionKey("p1")]).toBe("resumen");
+    expect(v[agendaAreaKey("p1")]).toBe("");
   });
 
   it("Ejecución guarda la vista por plan", () => {

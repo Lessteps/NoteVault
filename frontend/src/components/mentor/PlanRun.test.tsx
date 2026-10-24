@@ -160,20 +160,20 @@ describe("vista de ejecución", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<PlanWorkspace planId={PID} />);
     await click(byTest("mentor-mode-planeacion"));
-    expect(host.querySelector("[data-testid='nav-pl:agenda']")).toBeTruthy();
+    expect(host.querySelector("[data-testid='nav-pl:general']")).toBeTruthy();
     expect(runTab("general")).toBeNull();
     expect(byTest("plan-run")).toBeNull();
     expect(useNavState.getState().values[MODE_KEY]).toBe("planeacion");
     await click(byTest("mentor-mode-ejecucion"));
     expect(byTest("plan-run")).toBeTruthy();
-    expect(host.querySelector("[data-testid='nav-pl:agenda']")).toBeNull();
+    expect(host.querySelector("[data-testid='nav-pl:general']")).toBeNull();
     expect(useNavState.getState().values[MODE_KEY]).toBe("ejecucion");
   });
 
   it("un plan propuesto abre en la vista de plan (aún hay que decidir si se mantiene)", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded(plan({ proposed: true })));
     await mountEl(<PlanWorkspace planId={PID} />);
-    expect(host.querySelector("[data-testid='nav-pl:plan']")).toBeTruthy();
+    expect(host.querySelector("[data-testid='nav-pl:general']")).toBeTruthy();
     expect(byTest("plan-run")).toBeNull();
     expect(byTest("plan-proposed-bar")).toBeTruthy();
   });
@@ -190,7 +190,7 @@ describe("vista de ejecución", () => {
     const v = useNavState.getState().values;
     expect(v[MODE_KEY]).toBe("planeacion");
     expect(v[planTabKey(PID)]).toBe("agenda");
-    expect(host.querySelector("[data-testid='nav-pl:agenda']")!.parentElement!.querySelector("[aria-current=page]")).toBeTruthy();
+    expect(host.querySelector("[data-testid='nav-pl:general']")!.getAttribute("aria-current")).toBe("page");
   });
 
   const spread = (): PlanData => {
@@ -576,10 +576,10 @@ describe("pestaña «Mi plan»: sub-barra de secciones y aviso de lo que falta g
     expect(notice.textContent).toContain("Falta generar contenido");
     expect(notice.textContent).toContain("2 de 2 temas");
     expect(notice.textContent).toContain("Ejecutar plan");
-    // vive en el Resumen (la sub-vista por defecto) y va antes que el resumen
-    const content = byTest("plan-content")!;
-    const ids = [...content.querySelectorAll("[id^=sec-]")].map((e) => e.id);
-    expect(ids).toEqual(["sec-generar", "sec-resumen", "sec-datos", "sec-alcance"]); // los datos clave y el alcance van dentro del Resumen
+    // vive arriba de la Vista general, antes que las pestañas
+    const tabs = host.querySelector("[role=tablist]")!;
+    expect(notice.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(host.querySelector("#sec-generar")).toBeTruthy();
   });
 
   it("«Ir a Ejecutar plan» cambia a esa sub-vista y la recuerda", async () => {
@@ -600,35 +600,38 @@ describe("pestaña «Mi plan»: sub-barra de secciones y aviso de lo que falta g
     expect(byTest("generate-notice")).toBeNull();
   });
 
-  it("la sub-barra lista todas las opciones, abre en Resumen y enseña solo la sección elegida", async () => {
+  it("la barra lista la Vista general, las áreas y «Más»; la Vista general abre en Semana y el resumen vive en «Detalles»", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue(coverage(0) as never);
     await openPlanTab();
-    // las sub-vistas son los sub-ítems de «Mi plan» en la barra lateral; la página ya no lleva sub-barra
+    // la página ya no lleva sub-barra ni sub-ítems anidados en «Mi plan»
     expect(byTest("plan-subnav")).toBeNull();
-    const ids = [...subItem("plan/resumen")!.parentElement!.querySelectorAll<HTMLElement>("button")].map((b) => b.dataset.testid!.replace("nav-pl:plan/", ""));
-    // cuatro sub-vistas: lo demás se fundió (datos y alcance en el Resumen, catálogo y áreas en «Temas por área», lo técnico en «Preparar», las fases en la Agenda)
-    expect(ids).toEqual(["resumen", "temas", "registros", "preparar"]);
-    expect(subItem("plan/resumen")!.getAttribute("aria-current")).toBe("page");
+    expect(subItem("plan")).toBeNull();
+    const ids = [...host.querySelectorAll("aside nav > div > button")].map((b) => (b as HTMLElement).dataset.testid!.replace("nav-pl:", ""));
+    expect(ids.slice(0, 1)).toEqual(["general"]);
+    expect(ids.slice(-3)).toEqual(["registros", "preparar", "cambios"]);
+    expect(subItem("general")!.getAttribute("aria-current")).toBe("page");
+    expect(host.querySelector("#sec-resumen")).toBeNull(); // la pestaña Semana es la de por defecto
+    await click(host.querySelector("#page-tabs-tab-detalles"));
     expect(host.querySelector("#sec-resumen")).toBeTruthy();
-    expect(host.querySelector("#sec-datos")).toBeTruthy(); // los datos clave están dentro del Resumen
+    expect(host.querySelector("#sec-datos")).toBeTruthy(); // los datos clave están dentro de Detalles
 
-    await act(async () => { subItem("plan/preparar")!.click(); });
+    await act(async () => { subItem("preparar")!.click(); });
     await flush(); await flush();
     expect(host.querySelector("#sec-preparar")).toBeTruthy();
     expect(host.querySelector("#sec-resumen")).toBeNull();
-    expect(subItem("plan/preparar")!.getAttribute("aria-current")).toBe("page");
+    expect(subItem("preparar")!.getAttribute("aria-current")).toBe("page");
     expect(useNavState.getState().values[planSectionKey(PID)]).toBe("preparar");
   });
 
-  it("una sub-vista guardada que ya no es visible vuelve al Resumen", async () => {
+  it("una sub-vista guardada que ya no es visible vuelve a la Vista general", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     vi.spyOn(api, "mentorPlanCoverage").mockResolvedValue(coverage(2) as never);
     useNavState.setState({ values: { [MODE_KEY]: "planeacion", [planSectionKey(PID)]: "fases" } });
     await mountEl(<PlanWorkspace planId={PID} />);
     expect(subItem("plan/fases")).toBeNull();
-    expect(subItem("plan/resumen")!.getAttribute("aria-current")).toBe("page");
-    expect(host.querySelector("#sec-resumen")).toBeTruthy();
+    expect(subItem("general")!.getAttribute("aria-current")).toBe("page");
+    expect(byTest("plan-agenda")).toBeTruthy();
   });
 });
 

@@ -31,6 +31,9 @@ import { useTimeLog } from "./AreaSession";
 import { useReviewItems, type UpcomingWeekView, type WeekDayView } from "./AreaWork";
 import { InterruptedRunBanner } from "./ExecutionBar";
 import { openTopic } from "./openTopic";
+import { AddExtraTopic } from "./AddExtraTopic";
+import { bumpPlanVersion, removeExtraTopic } from "./extraKit";
+import { ExtraPracticeSection } from "./ExtraPracticeSection";
 import { DeliverableLine, focusColour, plural, useAgendaModel } from "./agendaKit";
 import { hm, ProgressBar } from "./parts";
 import { ProgressOverview, type BoardRow } from "./PlanBoard";
@@ -130,12 +133,13 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
   const reviewData = useReviewItems();
   const reviewItems = useMemo(() => reviewData.data?.items ?? [], [reviewData.data]);
   const topicByFolder = m.topicByFolder;
-  const rowOf = useCallback((i: { folder: string; title: string; part: number; parts: number; minutes: number }, withBases: boolean, sub?: string): BoardRow => {
+  const rowOf = useCallback((i: { folder: string; title: string; part: number; parts: number; minutes: number; extra?: boolean }, withBases: boolean, sub?: string, rowDate: string = date): BoardRow => {
     const state = topicByFolder.get(i.folder)?.state ?? "sin_tratar";
     const time = timeTagOf(times.get(i.folder), state === "completo", date, started);
     return {
       ...(time ? { time } : {}),
       ...(sub ? { sub } : {}),
+      ...(i.extra ? { extra: { remove: () => void removeExtraTopic(plan.id, rowDate, i.folder, () => undefined) } } : {}),
       minutes: i.minutes,
       folder: i.folder,
       title: i.title,
@@ -147,7 +151,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
       pct: topicByFolder.get(i.folder)?.pct ?? 0,
       unlockOn: gate.locked.get(i.folder),
     };
-  }, [topicByFolder, times, date, started, currentWeek, gate]);
+  }, [topicByFolder, times, date, started, currentWeek, gate, plan.id]);
   const kindText = (k: Set<string>): string => (k.has("theory") && k.has("practice") ? "Teoría + Práctica" : k.has("practice") ? "Práctica" : k.has("theory") ? "Teoría" : "");
   /** Las tarjetas de área de un día (sin fundamentos); `planned` = proyección (sin bloqueo de la ruta sólida). */
   const cardsOf = useCallback((ents: DayAreaEntry[], planned = false): TodayCard[] =>
@@ -199,7 +203,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
           if (subplanId ? t.subplanId !== subplanId || isBases(t) : !isBases(t)) continue;
           if (seen.has(t.folder)) continue;
           seen.add(t.folder);
-          rows.push(rowOf(t, subplanId === null));
+          rows.push(rowOf(t, subplanId === null, undefined, d.date));
         }
         // la Semana enseña lo MISMO que la Agenda (Semana): cada día con sus temas repartidos, también los de días anteriores (lo no terminado va además a «Pendientes»)
         return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows };
@@ -219,7 +223,7 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
             if (t.done || (subplanId ? t.subplanId !== subplanId || isBases(t) : !isBases(t))) continue;
             if (seen.has(t.folder)) continue;
             seen.add(t.folder);
-            const { unlockOn: _unlock, ...row } = rowOf(t, subplanId === null);
+            const { unlockOn: _unlock, ...row } = rowOf(t, subplanId === null, undefined, d.date);
             rows.push({ ...row, week });
           }
           return { date: d.date, label: `${DAY_LONG[d.dow - 1] ?? ""} ${dateLabel(d.date)}`, rows };
@@ -386,6 +390,15 @@ export function PlanRun({ data, plan }: { data: Loaded; plan: MentorPlan }) {
                     </ul>
                   )}
                 </>
+              )}
+              {isToday && !plan.proposed && !plan.archived && (
+                <div className="space-y-2 border-t border-line pt-3" data-testid="run-extras">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AddExtraTopic planId={plan.id} date={date} minDate={plan.start} maxDate={plan.end} label="Añadir tema" onChanged={bumpPlanVersion} />
+                    <span className="text-[13px] text-dim">Los temas extra salen en «Temas de hoy» y en la Agenda de hoy.</span>
+                  </div>
+                  <ExtraPracticeSection plan={plan} date={date} all topics={topicsToday.map((t) => ({ folder: t.folder, title: t.title }))} />
+                </div>
               )}
             </section>
 

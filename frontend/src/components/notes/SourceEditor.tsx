@@ -13,6 +13,7 @@ import { tags as t } from "@lezer/highlight";
 import { useEffect, useRef } from "react";
 import { insertTable, toggleTask, wrap } from "../../lib/editorCommands";
 import { livePreview } from "../../lib/livePreview";
+import { hierarchicalNumbers } from "../../lib/listNumbering";
 import { livePreviewBlocks } from "../../lib/livePreviewBlocks";
 
 // Markdown shortcuts (the Qt editor's Ctrl+B / Ctrl+I / Ctrl+L / Ctrl+Shift+T).
@@ -82,6 +83,7 @@ const theme = EditorView.theme({
     textDecorationColor: "color-mix(in srgb, var(--nv-accent-text) 40%, transparent)",
   },
   ".cm-nv-bullet": { color: "var(--nv-accent-text)", fontWeight: "700" },
+  ".cm-nv-number": { color: "var(--nv-accent-text)", fontWeight: "600", fontVariantNumeric: "tabular-nums" },
   // Bloques dibujados (lib/livePreviewBlocks): frontmatter, tablas, fórmulas y
   // reglas se ven como en la lectura; el Markdown crudo aparece donde está el cursor.
   ".cm-nv-block": { margin: "10px 0", cursor: "default" },
@@ -138,11 +140,13 @@ export function insertAtCursor(text: string): boolean {
 }
 
 export function SourceEditor({
-  value, eol, code, onChange, onCursor, revealLine, onRevealed,
+  value, eol, code, numbered, onChange, onCursor, revealLine, onRevealed,
 }: {
   value: string;
   eol: "\n" | "\r\n";
   code: boolean;
+  /** Draw nested numbered lists as 1. / 1.1 / 1.1.1 (the canvas cards). */
+  numbered?: boolean;
   onChange: (raw: string) => void;
   onCursor?: (line: number, col: number) => void;
   revealLine?: number;
@@ -166,6 +170,7 @@ export function SourceEditor({
         // A note is read, not debugged: no gutter, and the Markdown markers are
         // hidden (see livePreview). Code files keep both.
         ...(code ? [lineNumbers(), highlightActiveLineGutter()] : [livePreview, ...livePreviewBlocks]),
+        ...(numbered && !code ? [hierarchicalNumbers] : []),
         history(),
         drawSelection(),
         highlightActiveLine(),
@@ -207,7 +212,7 @@ export function SourceEditor({
     // The editor is rebuilt only when the file identity changes; value
     // updates from outside are applied by the effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eol, code]);
+  }, [eol, code, numbered]);
 
   // Outside changes (reload from disk, a task ticked in the preview). The echo of
   // our own save is ignored: replacing the document with what it already says

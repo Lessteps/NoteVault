@@ -97,7 +97,7 @@ function Mark({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   );
 }
 
-export function PlanAreaTopics({ plan, schedule, today, started, progress }: { plan: MentorPlan; /** avance (0–100) de cada tema, de la práctica: el mismo que enseña el resumen del área */ progress?: ReadonlyMap<string, number>; /** el reparto del plan (si no se da, se calcula) */ schedule?: PlanSchedule; today?: string; /** ¿ha empezado la ruta? (si no se da, cuando hay algún tema completado) */ started?: boolean }) {
+export function PlanAreaTopics({ plan, schedule, today, started, progress, only }: { plan: MentorPlan; /** fija la página en UN área (su subplan o «__bases»): sin barra de áreas, la de la página del área */ only?: string; /** avance (0–100) de cada tema, de la práctica: el mismo que enseña el resumen del área */ progress?: ReadonlyMap<string, number>; /** el reparto del plan (si no se da, se calcula) */ schedule?: PlanSchedule; today?: string; /** ¿ha empezado la ruta? (si no se da, cuando hay algún tema completado) */ started?: boolean }) {
   const uid = useId();
   const day = today ?? todayIso();
   const begun = started ?? plan.subplans.some((s) => s.topics.some((t) => t.completedAt));
@@ -132,7 +132,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
     ? { key: BASES_KEY, area: "Bases", subplanId: BASES_KEY, total: basesRows.length, done: basesRows.filter((r) => r.completed).length, missing: basesRows.filter(pendingGenerate).length }
     : undefined;
   const tabs = useMemo(() => (basesTab ? [...baseTabs, basesTab] : baseTabs), [baseTabs, basesTab]);
-  const active = tabs.find((t) => t.key === areaKey) ?? tabs[0];
+  const active = only ? tabs.find((t) => t.key === only) : tabs.find((t) => t.key === areaKey) ?? tabs[0];
   const isBases = active?.key === BASES_KEY;
   const sub = active && !isBases ? plan.subplans.find((s) => s.id === active.subplanId) : undefined;
   const areaRows = useMemo(() => (isBases ? basesRows : sub ? areaTopicRows(sub, cat) : []), [isBases, basesRows, sub, cat]);
@@ -186,7 +186,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
   return (
     <section aria-labelledby={`${uid}-h`} data-testid="plan-areas-view" className="space-y-3">
       <SectionHeading id={`${uid}-h`} hint="Cada área del plan con todos sus temas en el orden de la ruta y lo que existe de cada uno. Elige un área arriba y, dentro de ella, un grupo.">
-        Temas por área
+        {only ? `Temas de ${tabs.find((t) => t.key === only)?.area ?? "el área"}` : "Temas por área"}
       </SectionHeading>
       <LoadState warming={warming} error={error} empty={!catalog} onRetry={reload} />
 
@@ -194,7 +194,7 @@ export function PlanAreaTopics({ plan, schedule, today, started, progress }: { p
 
       {catalog && active && group && (
         <>
-          <TabBar label="Áreas del plan" tabs={areaTabsView(tabs)} active={active.key} onSelect={pickArea} level={1} testid="area-tabs" />
+          {!only && <TabBar label="Áreas del plan" tabs={areaTabsView(tabs)} active={active.key} onSelect={pickArea} level={1} testid="area-tabs" />}
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="area-summary">
             <p className="min-w-0 flex-1 basis-72 text-[14.5px]">

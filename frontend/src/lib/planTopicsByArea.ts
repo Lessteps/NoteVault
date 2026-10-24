@@ -9,6 +9,7 @@ import { buildSchedule, type PlanSchedule, type SchedulePlan, type ScheduleDay, 
 import type { PlanDeliverable } from "./planAreas.js";
 import type { BlockItem, BlockKind } from "./planDayFocus.js";
 import { isLive } from "./planRoute.js";
+import { EXTRA_AREA_LABEL, EXTRA_SUBPLAN_ID } from "./planPace.js";
 import { weekRangesOf } from "./planTime.js";
 
 /** Orden fijo de las áreas en todas las vistas por área: Backend · Frontend · Databases · Tooling and Quality · Automation (y luego las demás). */
@@ -112,6 +113,8 @@ export interface WeekAreas {
   cells: WeekAreaCell[];
   /** los fundamentos (Bases) de la semana: cubo aparte, no cuentan en ningún área */
   bases: WeekAreaTopic[];
+  /** temas extra de la vault añadidos a mano que no son de ningún área (cubo «Extra»); solo si los hay */
+  extra?: WeekAreaTopic[];
   /** temas distintos de la semana (suma de las celdas) */
   topics: number;
   minutes: number;
@@ -163,7 +166,8 @@ export function topicsByWeekArea(plan: SchedulePlan, schedule?: PlanSchedule): T
       const review = topics.length === 0 && days.some((d) => (d.blocks ?? []).some((b) => b.subplanId === a.subplanId && b.status === "review" && b.minutes > 0));
       return { ...a, review, topics, minutes: topics.reduce((n, t) => n + t.minutes, 0), done: topics.filter((t) => t.done).length, active: !ph || (week >= ph.fromWeek && week <= ph.toWeek) };
     });
-    return { week, start: r.start, end: r.end, cells, bases: collect(days, isBases), topics: cells.reduce((n, c) => n + c.topics.length, 0), minutes: cells.reduce((n, c) => n + c.minutes, 0) };
+    const extra = collect(days, (t) => t.subplanId === EXTRA_SUBPLAN_ID);
+    return { week, start: r.start, end: r.end, cells, bases: collect(days, isBases), ...(extra.length ? { extra } : {}), topics: cells.reduce((n, c) => n + c.topics.length, 0), minutes: cells.reduce((n, c) => n + c.minutes, 0) };
   });
   const totals: TopicsByWeekArea["totals"] = {};
   for (const a of areas) {
@@ -335,6 +339,24 @@ export function dayByArea(plan: Pick<SchedulePlan, "subplans">, day: ScheduleDay
       topics: folders.size,
       project: (day.topicProjects ?? []).some((tp) => tp.subplanId === a.subplanId) || due.some((d) => d.kind === "area_project" && d.areaId === a.areaId),
       blocks,
+    });
+  }
+  // temas extra de la vault que no son de ningún área: su propio cubo «Extra», al final
+  const extraBlocks = (day.blocks ?? []).filter((b) => b.subplanId === EXTRA_SUBPLAN_ID && b.items.length > 0);
+  const extraOnly = !day.blocks?.length ? day.topics.filter((t) => t.subplanId === EXTRA_SUBPLAN_ID && !t.done) : [];
+  if (extraBlocks.length || extraOnly.length) {
+    const folders = new Set([...extraBlocks.flatMap((b) => b.items.map((i) => i.folder)), ...extraOnly.map((t) => t.folder)]);
+    out.push({
+      subplanId: EXTRA_SUBPLAN_ID,
+      areaId: EXTRA_SUBPLAN_ID,
+      area: EXTRA_AREA_LABEL,
+      theoryTopics: folders.size,
+      theoryMinutes: extraBlocks.reduce((n, b) => n + b.minutes, 0) || extraOnly.reduce((n, t) => n + t.minutes, 0),
+      practiceBlocks: 0,
+      practiceMinutes: 0,
+      topics: folders.size,
+      project: false,
+      blocks: extraBlocks,
     });
   }
   return out;

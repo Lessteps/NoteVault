@@ -7,6 +7,7 @@
 //  · `MonthStats` / `MonthLegend` / `MonthWeekBlock`: el mes por semanas, cada semana con una fila por área y los temas como chips.
 
 import { useId, useState } from "react";
+import { BASES_KEY } from "../../lib/planAreaTopics";
 import { dateLabel, type ScheduleDay, type WeekSummary } from "../../lib/planSchedule";
 import type { TopicsByWeekArea, WeekAreaCell, WeekAreaTopic, WeekAreas } from "../../lib/planTopicsByArea";
 import { Chip, GhostButton } from "../common/forms";
@@ -202,7 +203,7 @@ export function WeekCategories({ m, week, headingId, only = null }: { m: AgendaM
   const withTopics = cells.filter((c) => c.topics.length > 0);
   const empty = cells.filter((c) => c.topics.length === 0);
   const kinds = kindsOf(m, week);
-  const showBases = only === null && w.bases.length > 0;
+  const showBases = (only === null || only === BASES_KEY) && w.bases.length > 0;
   const basesDone = w.bases.filter((t) => estadoOf(m, t) === "hecho").length;
   return (
     <section aria-labelledby={headingId} data-testid="agenda-week-areas" className="space-y-3">

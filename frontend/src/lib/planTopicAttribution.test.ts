@@ -138,3 +138,44 @@ describe("Ejecución = Agenda con el plan sin empezar y temas repartidos en día
     expect(mine.some((f) => before.includes(f))).toBe(false);
   });
 });
+
+// Un tema extra añadido a HOY (de la ruta que está más adelante, de la vault dentro de un área o de la vault suelto) cae en la Agenda (Día) y en la
+// Ejecución («Temas de hoy») por la MISMA regla: el del área sale en su área, el suelto en el cubo «Extra».
+describe("temas extra de hoy: Agenda = Ejecución", () => {
+  const today = "2026-10-14";
+  const base = plan();
+  const ahead = base.subplans[0]!.topics.find((t) => t.folder === "BE/11")!; // el último tema de la ruta de Backend
+  const p: SchedulePlan = {
+    ...base,
+    extraTopics: [
+      { date: today, folder: ahead.folder, addedAt: "2026-10-14T08:00:00Z", source: "manual" },
+      { date: today, folder: "Vault/Redis", area: "s-be", title: "Redis básico", estMinutes: 30, addedAt: "2026-10-14T08:00:00Z", source: "manual" },
+      { date: today, folder: "Vault/Suelto", title: "Tema suelto", estMinutes: 30, addedAt: "2026-10-14T08:00:00Z", source: "manual" },
+    ],
+  };
+  const sch = buildSchedule(p);
+  const day = sch.days.find((d) => d.date === today)!;
+  const isBases = basesClassifier(p);
+  const week = day.week;
+
+  it("el tema de la ruta adelantado y el de la vault con área salen en «Temas de hoy» de Backend, igual que en la Agenda (Día)", () => {
+    const agenda = [...new Set((dayByArea(p, day).find((e) => e.subplanId === "s-be")?.blocks ?? []).flatMap((b) => b.items.map((i) => i.folder)))];
+    expect(agenda).toEqual(expect.arrayContaining([ahead.folder, "Vault/Redis"]));
+    const sets = areaSets(sch.days, "s-be", today, week, true, (t) => !isBases(t));
+    const lists = executionLists(areaRouteTopics(p, "s-be").map((t) => ({ folder: t.folder, done: false })), agenda.map((f) => ({ folder: f, done: false })), sets);
+    expect(lists.hoy.map((r) => r.folder)).toEqual(agenda);
+    expect(sets.today.has(ahead.folder)).toBe(true);
+    expect(sets.today.has("Vault/Redis")).toBe(true);
+    // y el tema adelantado no se repite más adelante en la ruta de Backend
+    const later = sch.days.filter((d) => d.date > today).flatMap((d) => d.topics.filter((t) => t.folder === ahead.folder && !t.extra));
+    expect(later).toEqual([]);
+  });
+
+  it("el tema de la vault sin área va al cubo «Extra», que también está en la Agenda (Día)", () => {
+    const entry = dayByArea(p, day).find((e) => e.subplanId === "extra");
+    expect(entry?.area).toBe("Extra");
+    expect([...new Set((entry?.blocks ?? []).flatMap((b) => b.items.map((i) => i.folder)))]).toEqual(["Vault/Suelto"]);
+    expect(areaSets(sch.days, "extra", today, week, true).today.has("Vault/Suelto")).toBe(true);
+    expect(orderedAreas(p).some((a) => a.subplanId === "extra")).toBe(false); // no es un área del plan
+  });
+});

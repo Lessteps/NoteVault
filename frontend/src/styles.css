@@ -689,6 +689,31 @@ body {
 .nv-canvas .nv-prose h1 {
   font-size: 1.6em;
 }
+/* Numbered lists in cards are indexed by level: 1. / 1.1 / 1.1.1 … up to five numbers (deeper ones count on their own). */
+.nv-canvas .nv-prose ol {
+  list-style: none;
+  counter-reset: nvl;
+}
+.nv-canvas .nv-prose ol > li:not(.task) {
+  counter-increment: nvl;
+  position: relative;
+}
+.nv-canvas .nv-prose ol > li:not(.task)::before {
+  position: absolute;
+  right: 100%;
+  margin-right: 0.45em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--nv-accent-text);
+  content: counter(nvl) ".";
+}
+.nv-canvas .nv-prose ol ol > li:not(.task)::before {
+  content: counters(nvl, ".");
+}
+.nv-canvas .nv-prose ol ol ol ol ol ol > li:not(.task)::before {
+  content: counter(nvl) ".";
+}
 /* Prose inside cards and lists: no centering, no reading width. */
 .nv-prose.nv-inline {
   margin: 0;

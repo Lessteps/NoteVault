@@ -17,6 +17,7 @@ import { useApp } from "../../store/app";
 import { useMentor } from "../../store/mentor";
 import { useNavState } from "../../store/navState";
 import { MODE_KEY } from "./mentorNav";
+import { gotoSection, navTab, navView } from "./mentorTestNav";
 import { usePracticeDialog } from "../practice/PracticeProjectDialog";
 import { MentorPlan } from "./MentorPlan";
 import { PlanWorkspace } from "./PlanWorkspace";
@@ -64,19 +65,7 @@ let root: Root;
 const flush = () => act(async () => { await Promise.resolve(); });
 const mountEl = async (el: React.ReactNode) => { await act(async () => { root.render(el); }); await flush(); await flush(); };
 // «Mi plan» enseña una sub-vista a la vez: elige la que la prueba necesita
-const SECTION_ALIAS: Record<string, string> = { datos: "resumen", alcance: "resumen", catalogo: "temas", areas: "temas", ejecutar: "preparar", cobertura: "preparar", antigravity: "preparar" };
-const section = async (id: string) => {
-  const b = host.querySelector<HTMLElement>(`[data-testid='nav-pl:plan/${SECTION_ALIAS[id] ?? id}']`);
-  expect(b, `sub-vista ${id}`).toBeTruthy();
-  await act(async () => { b!.click(); });
-  await flush();
-  // «Preparar» agrupa ejecutar · cobertura · antigravity; el detalle de las áreas vive dentro de «Temas por área»
-  if (id === "ejecutar" || id === "cobertura" || id === "antigravity") {
-    const t = host.querySelector<HTMLElement>(`[data-testid=prepare-${id}]`);
-    if (t) { await act(async () => { t.click(); }); await flush(); }
-  }
-  if (id === "areas") host.querySelector("[data-testid=plan-areas-detail]")?.setAttribute("open", "");
-};
+const section = (id: string) => gotoSection(host, id, click);
 const button = (label: string | RegExp, within: ParentNode = host) =>
   [...within.querySelectorAll("button")].find((b) => (typeof label === "string" ? b.textContent?.includes(label) || b.getAttribute("aria-label")?.includes(label) : label.test(b.textContent ?? "")))!;
 const click = async (el: Element | undefined) => {
@@ -84,7 +73,7 @@ const click = async (el: Element | undefined) => {
   await act(async () => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
   await flush();
 };
-const openTab = (id: string) => click(host.querySelector(`[data-testid='nav-pl:${id}']`)!);
+const openTab = (id: string) => click(navTab(host, id));
 
 beforeEach(() => {
   localStorage.clear();
@@ -225,7 +214,7 @@ describe("plan aceptado: tarjeta Programming practice", () => {
   it("un plan anterior (sin pista ni práctica en las precondiciones) se lee y se pinta igual", async () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded({ plan: plan({ programmingPractice: undefined, openQuestions: undefined, preconditions: { ...pre, practice: undefined, deliverables: "yes" } }), practice: undefined, practiceItems: undefined }));
     await mountEl(<PlanWorkspace planId={PID} />);
-    expect(host.querySelector("[data-testid=plan-header]")).toBeTruthy();
+    expect(host.querySelector("[data-testid=plan-props]")).toBeTruthy();
     expect(host.querySelector("[data-testid=practice-row]")).toBeNull();
   });
 });
@@ -235,7 +224,7 @@ describe("esta semana y hoy: la práctica del día", () => {
     vi.spyOn(api, "mentorPlanGet").mockResolvedValue(loaded());
     await mountEl(<PlanWorkspace planId={PID} />);
     await openTab("agenda");
-    await click(host.querySelector("[data-testid='nav-pl:agenda/dia']")!);
+    await click(navView(host, "dia"));
     const kata = host.querySelector("[data-testid=agenda-practice-kata]")!;
     expect(kata.textContent).toContain("Reto diario");
     expect(kata.textContent).toContain("Programming practice");

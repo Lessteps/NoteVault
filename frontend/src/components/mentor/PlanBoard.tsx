@@ -10,6 +10,7 @@ import type { TopicTimeTag } from "../../lib/planTopicTime";
 import type { MentorPlan, MentorTopicView } from "../../lib/types";
 import { cn } from "../ui";
 import { focusColour } from "./agendaKit";
+import { ExtraTag } from "./extraKit";
 import { openTopic, openTopicCanvas, openTopicNote } from "./openTopic";
 import { TopicNoteLinks } from "./TopicNoteLinks";
 import { ProgressBar } from "./parts";
@@ -40,6 +41,8 @@ export interface BoardRow {
   /** minutos de este tema en el día y su texto secundario («Teoría + Práctica»), para las tarjetas de área del resumen */
   minutes?: number;
   sub?: string;
+  /** tema añadido a mano a este día: lleva la marca «Extra» y, si hay `remove`, la × que lo quita */
+  extra?: { remove?: () => void };
 }
 
 const TIME_COLOUR: Record<TopicTimeTag["status"], string> = { done: "var(--nv-mint)", scheduled: "var(--nv-faint, #888)", current: "var(--nv-accent)", pending: "var(--nv-warn)" };
@@ -102,6 +105,7 @@ export function TopicRow({ r, colour }: { r: BoardRow; colour: string }) {
         // pulsar el tema abre sus opciones: apunte (.md), archivo de práctica, canvas y Pomodoro
         return locked ? <span className={cls}>{label}</span> : <span className={cls}><TopicMenu folder={r.folder} title={r.title} trigger={label} className="w-full rounded-md hover:text-accent-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent" /></span>;
       })()}
+      {r.extra && <ExtraTag title={r.title} {...(r.extra.remove ? { onRemove: r.extra.remove } : {})} />}
       {r.time && <TimeChip time={r.time} />}
       {!locked && <TopicNoteLinks folder={r.folder} title={r.title} />}
       {!r.done && !locked && (r.pct ?? 0) > 0 && (
